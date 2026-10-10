@@ -1,0 +1,36 @@
+---
+description: Confirmed frontend stack, theme tokens, and strict TypeScript rules
+globs: "**/*.{ts,tsx}"
+alwaysApply: false
+---
+
+# Frontend standards
+
+- Use React, TypeScript, Radix Primitives, and Tailwind.
+- Do not use Redux or Redux Toolkit.
+- Consider XState only for specific workflows where statecharts simplify
+  transitions and testing; it is optional, not a required global store.
+- Keep components small and focused. Extract repeated controls and style variants.
+- Use shared semantic color tokens such as `bg-surface`, `text-content`,
+  `border-outline`, and `text-danger`. Define theme values in one place.
+- Support light, dark, and system modes. Persist manual theme choices and follow
+  OS changes in system mode. Apply the resolved theme before the first UI paint.
+- Use complete Tailwind class names or explicit variant maps; do not construct
+  class fragments dynamically.
+
+# TypeScript standards
+
+- Apply these rules to application code, tests, and generated project contracts.
+- Enable `strict`, `noUncheckedIndexedAccess`, `exactOptionalPropertyTypes`,
+  `noImplicitOverride`, and `noFallthroughCasesInSwitch` in every TS project.
+- Do not use explicit or implicit `any`. Receive untyped external data as
+  `unknown`, validate it, then narrow it before use.
+- Do not declare `enum` or `const enum`. Use literal unions or `as const` objects.
+- Example: `type ThemeMode = "light" | "dark" | "system"`.
+- Do not use `@ts-ignore`, `@ts-nocheck`, double assertions, or lint suppressions
+  to bypass these rules. Keep legitimate negative type tests separate.
+- Configure contract generation to emit literal unions rather than enum declarations.
+- At frontend setup, add `tsc --noEmit` and type-aware ESLint to local checks and CI.
+- Enforce `@typescript-eslint/no-explicit-any` and the no-unsafe assignment,
+  argument, call, member-access, and return rules as errors.
+- Use `no-restricted-syntax` with `TSEnumDeclaration` to ban both enum forms.
