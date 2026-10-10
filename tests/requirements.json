@@ -1,0 +1,51 @@
+{
+  "version": 1,
+  "entries": [
+    {"id": "C01", "status": "implemented", "tests": ["tests/contracts/test_contracts.py::test_shared_case", "tests/contracts/test_contracts.py::test_manual_value_edit_keeps_identity", "tests/contracts/test_contracts.py::test_partial_save_preserves_source_bytes_reference"]},
+    {"id": "X01", "status": "unimplemented", "tests": []},
+    {"id": "X02", "status": "unimplemented", "tests": []},
+    {"id": "F01", "status": "unimplemented", "tests": []},
+    {"id": "P01", "status": "unimplemented", "tests": []},
+    {"id": "P02", "status": "unimplemented", "tests": []},
+    {"id": "G01", "status": "unimplemented", "tests": []},
+    {"id": "G02", "status": "unimplemented", "tests": []},
+    {"id": "G03", "status": "partial", "tests": ["tests/cli_spike/test_runner.py::RunnerTests::test_valid_result_usage_and_one_start", "tests/cli_spike/test_runner.py::RunnerTests::test_stdin_argv_environment_and_safe_logs", "tests/cli_spike/test_runner.py::RunnerTests::test_cancel_before_spawn"]},
+    {"id": "S01", "status": "unimplemented", "tests": []},
+    {"id": "U01", "status": "unimplemented", "tests": []},
+    {"id": "U02", "status": "unimplemented", "tests": []},
+    {"id": "D01", "status": "partial", "tests": ["tests/render_spike/test_renderer.py::RenderSpikeTests::test_content_structure_fonts_and_geometry", "tests/render_spike/test_renderer.py::RenderSpikeTests::test_ordinary_edit_survives_reconversion_with_later_content"]},
+    {"id": "D02", "status": "partial", "tests": ["tests/render_spike/test_renderer.py::RenderSpikeTests::test_page_images_match_reviewed_baselines", "tests/render_spike/test_renderer.py::RenderSpikeTests::test_missing_dependencies_and_oversized_block_fail_visibly"]},
+    {"id": "A01", "status": "unimplemented", "tests": []},
+    {"id": "A02", "status": "unimplemented", "tests": []},
+    {"id": "E01", "status": "unimplemented", "tests": []},
+    {"id": "E02", "status": "unimplemented", "tests": []},
+    {"id": "R01", "status": "unimplemented", "tests": []},
+    {"id": "B01", "status": "unimplemented", "tests": []},
+    {"id": "N01", "status": "unimplemented", "tests": []},
+    {"id": "L01", "status": "unimplemented", "tests": []}
+  ],
+  "foundation": {
+    "syntheticSources": "tests/foundation/test_foundation.py::test_synthetic_manifest_has_independent_source_evidence",
+    "providers": "tests/foundation/test_foundation.py::test_provider_helpers_count_and_forbid_calls",
+    "network": "tests/foundation/test_foundation.py::test_routine_python_network_is_denied",
+    "importBoundary": "tests/foundation/test_foundation.py::test_deterministic_modules_do_not_import_provider",
+    "browserShell": "apps/web/tests/shell.spec.ts",
+    "prototypeRegressions": [
+      "skills/format-resume/tests/test_policy.py::PolicyTests::test_valid_case",
+      "skills/format-resume/tests/test_policy.py::PolicyTests::test_source_and_selection_fail_closed",
+      "skills/format-resume/tests/test_policy.py::PolicyTests::test_missing_source_unit",
+      "skills/format-resume/tests/test_policy.py::PolicyTests::test_changed_source_bytes",
+      "skills/format-resume/tests/test_policy.py::PolicyTests::test_changed_extraction_in_both_copies",
+      "skills/format-resume/tests/test_policy.py::PolicyTests::test_overlapping_months_count_once",
+      "skills/format-resume/tests/test_policy.py::PolicyTests::test_global_or_undated_technology_has_no_duration",
+      "skills/format-resume/tests/test_policy.py::PolicyTests::test_invented_dates_are_rejected",
+      "skills/format-resume/tests/test_policy.py::PolicyTests::test_cutoff_and_year_precision"
+    ]
+  },
+  "manualLiveChecks": {
+    "liveCliIsolationAndRetention": "blocked_by_D004",
+    "wordPaginationAndEditing": "not_run",
+    "otherOperatingSystems": "not_run",
+    "fullBrowserWorkflow": "unimplemented"
+  }
+}

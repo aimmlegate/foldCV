@@ -1,0 +1,5 @@
+-r requirements.txt
+-r requirements-contracts.txt
+-r spikes/render/requirements.txt
+pytest-cov==7.0.0
+coverage==7.16.2

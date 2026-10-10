@@ -1,0 +1,38 @@
+{
+  "asOf": "2026-10-10",
+  "fixtures": [
+    {
+      "name": "short",
+      "file": "short.txt",
+      "sha256": "eed296ae2093b1edf9bb97c847771a1168223ff89ed91b8233e2960c4d896550",
+      "jobs": [
+        {"employer": "North Lab", "start": "2020-01", "end": "2022-12"}
+      ],
+      "metrics": [
+        {"quote": "Built a team from zero to five people", "number": 5, "meaning": "team_growth"},
+        {"quote": "up to 2000 records per day", "number": 2000, "comparator": "at_most", "period": "day"}
+      ],
+      "technologies": ["Python", "RabbitMQ"],
+      "mustNotInfer": ["managed a five-person team before the job", "processed 2000 records in total"]
+    },
+    {
+      "name": "overlap",
+      "file": "overlap.txt",
+      "sha256": "6eb8400eeba14ac0cf42409ab5aa09e93d3cd7d00d47b660a39fc4325474ef77",
+      "jobs": [
+        {"employer": "Cedar Works", "start": "2018-01", "end": "2020-12"},
+        {"employer": "North Lab", "start": "2020-07", "end": "2021-12"}
+      ],
+      "nestedProjects": [
+        {"title": "API service", "start": "2019-03", "end": "2020-06", "parentEmployer": "Cedar Works"}
+      ],
+      "metrics": [
+        {"quote": "Worked in a team of five", "number": 5, "meaning": "team_size"},
+        {"quote": "2000 records in total", "number": 2000, "period": "total"}
+      ],
+      "technologies": ["Python", "FluxWeave"],
+      "nonNumericAchievement": "Maintained a service with no numeric result",
+      "mustNotInfer": ["grew a team from zero to five", "2000 records per day"]
+    }
+  ]
+}

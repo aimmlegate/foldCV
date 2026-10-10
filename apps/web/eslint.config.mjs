@@ -2,7 +2,8 @@ import tseslint from "@typescript-eslint/eslint-plugin";
 import parser from "@typescript-eslint/parser";
 
 export default [{
-  files: ["src/**/*.ts"],
+  files: ["**/*.{ts,tsx}"],
+  ignores: ["dist/**", "node_modules/**", "test-results/**"],
   languageOptions: {
     parser,
     parserOptions: { project: "./tsconfig.json", tsconfigRootDir: import.meta.dirname }

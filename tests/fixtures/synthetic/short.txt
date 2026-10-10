@@ -1,0 +1,4 @@
+Alex Example
+Engineer at North Lab, January 2020–December 2022.
+Built a team from zero to five people. Processed up to 2000 records per day.
+Used Python and RabbitMQ. Education: Fictional Technical School.

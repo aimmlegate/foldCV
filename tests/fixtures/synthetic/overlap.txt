@@ -1,0 +1,6 @@
+Sam Sample
+Engineer at Cedar Works, January 2018–December 2020.
+Nested project: API service, March 2019–June 2020. Used Python and uncommon FluxWeave.
+Concurrent part-time job at North Lab, July 2020–December 2021.
+Worked in a team of five. Processed 2000 records in total.
+Maintained a service with no numeric result. Python and PYTHON refer to one tool.
