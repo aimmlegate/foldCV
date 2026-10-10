@@ -7,3 +7,5 @@ experiments/
 output/
 .devloop/
 .tools/
+node_modules/
+.pytest_cache/

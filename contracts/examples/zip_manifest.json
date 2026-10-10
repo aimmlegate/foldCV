@@ -1,0 +1,14 @@
+{
+  "schemaVersion": 3,
+  "appVersion": "0.1",
+  "rendererVersion": "spike-1",
+  "projectId": "project_synthetic",
+  "entries": [
+    {
+      "path": "project.json",
+      "role": "project",
+      "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "uncompressedSize": 100
+    }
+  ]
+}

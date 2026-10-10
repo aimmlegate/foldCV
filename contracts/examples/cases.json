@@ -1,0 +1,757 @@
+[
+  {
+    "name": "complete_project",
+    "contract": "project",
+    "base": "project",
+    "valid": true,
+    "edits": []
+  },
+  {
+    "name": "manual_value_edit_keeps_id",
+    "contract": "project",
+    "base": "project",
+    "valid": true,
+    "edits": [
+      {
+        "op": "set",
+        "path": [
+          "facts",
+          2,
+          "value",
+          "text"
+        ],
+        "value": "Mentored five developers"
+      },
+      {
+        "op": "set",
+        "path": [
+          "facts",
+          2,
+          "revision"
+        ],
+        "value": 2
+      }
+    ]
+  },
+  {
+    "name": "old_source_revision_retained",
+    "contract": "project",
+    "base": "project",
+    "valid": true,
+    "edits": [
+      { "op": "clone", "path": ["sources"], "from": ["sources", 0] },
+      { "op": "set", "path": ["sources", 1, "revision"], "value": 2 },
+      { "op": "set", "path": ["sources", 1, "units", 0, "revision"], "value": 2 },
+      { "op": "set", "path": ["sources", 1, "units", 0, "representedFactIds"], "value": [] },
+      { "op": "set", "path": ["sources", 1, "units", 1, "revision"], "value": 2 }
+    ]
+  },
+  {
+    "name": "missing_as_of_saved",
+    "contract": "project",
+    "base": "project",
+    "valid": true,
+    "edits": [
+      {
+        "op": "set",
+        "path": [
+          "asOf"
+        ],
+        "value": null
+      }
+    ]
+  },
+  {
+    "name": "partial_project_save",
+    "contract": "project",
+    "base": "project",
+    "valid": true,
+    "edits": [
+      {
+        "op": "set",
+        "path": [
+          "facts"
+        ],
+        "value": []
+      },
+      {
+        "op": "set",
+        "path": [
+          "employment"
+        ],
+        "value": []
+      },
+      {
+        "op": "set",
+        "path": [
+          "views"
+        ],
+        "value": []
+      },
+      {
+        "op": "set",
+        "path": [
+          "operations"
+        ],
+        "value": []
+      },
+      {
+        "op": "set",
+        "path": [
+          "proposals"
+        ],
+        "value": []
+      },
+      {
+        "op": "set",
+        "path": [
+          "renders"
+        ],
+        "value": []
+      },
+      {
+        "op": "set",
+        "path": [
+          "review"
+        ],
+        "value": {
+          "decisions": [],
+          "acknowledgments": []
+        }
+      },
+      {
+        "op": "set",
+        "path": [
+          "template"
+        ],
+        "value": null
+      },
+      {
+        "op": "set",
+        "path": [
+          "sources",
+          0,
+          "units",
+          0,
+          "representedFactIds"
+        ],
+        "value": []
+      }
+    ]
+  },
+  {
+    "name": "missing_required_field",
+    "contract": "project",
+    "base": "project",
+    "valid": false,
+    "edits": [
+      {
+        "op": "remove",
+        "path": [
+          "projectId"
+        ]
+      }
+    ]
+  },
+  {
+    "name": "extra_field",
+    "contract": "project",
+    "base": "project",
+    "valid": false,
+    "edits": [
+      {
+        "op": "set",
+        "path": [
+          "unknown"
+        ],
+        "value": 1
+      }
+    ]
+  },
+  {
+    "name": "legacy_v2_rejected",
+    "contract": "project",
+    "base": "project",
+    "valid": false,
+    "edits": [
+      {
+        "op": "set",
+        "path": [
+          "schemaVersion"
+        ],
+        "value": 2
+      }
+    ]
+  },
+  {
+    "name": "future_major_rejected",
+    "contract": "project",
+    "base": "project",
+    "valid": false,
+    "edits": [
+      {
+        "op": "set",
+        "path": [
+          "schemaVersion"
+        ],
+        "value": 4
+      }
+    ]
+  },
+  {
+    "name": "year_with_month",
+    "contract": "project",
+    "base": "project",
+    "valid": false,
+    "edits": [
+      {
+        "op": "set",
+        "path": [
+          "employment",
+          0,
+          "periods",
+          0,
+          "start",
+          "month"
+        ],
+        "value": 3
+      }
+    ]
+  },
+  {
+    "name": "missing_month_precision",
+    "contract": "project",
+    "base": "project",
+    "valid": false,
+    "edits": [
+      {
+        "op": "set",
+        "path": [
+          "employment",
+          0,
+          "subprojects",
+          0,
+          "period",
+          "start",
+          "month"
+        ],
+        "value": null
+      }
+    ]
+  },
+  {
+    "name": "invalid_leap_day",
+    "contract": "project",
+    "base": "project",
+    "valid": false,
+    "edits": [
+      {
+        "op": "set",
+        "path": [
+          "asOf"
+        ],
+        "value": {
+          "precision": "day",
+          "year": 2025,
+          "month": 2,
+          "day": 29
+        }
+      }
+    ]
+  },
+  {
+    "name": "reversed_years",
+    "contract": "project",
+    "base": "project",
+    "valid": false,
+    "edits": [
+      {
+        "op": "set",
+        "path": [
+          "employment",
+          0,
+          "periods",
+          0,
+          "end",
+          "year"
+        ],
+        "value": 2019
+      }
+    ]
+  },
+  {
+    "name": "subproject_outside_job",
+    "contract": "project",
+    "base": "project",
+    "valid": false,
+    "edits": [
+      {
+        "op": "set",
+        "path": [
+          "employment",
+          0,
+          "subprojects",
+          0,
+          "period",
+          "end",
+          "year"
+        ],
+        "value": 2025
+      }
+    ]
+  },
+  {
+    "name": "duplicate_fact_id",
+    "contract": "project",
+    "base": "project",
+    "valid": false,
+    "edits": [
+      {
+        "op": "set",
+        "path": [
+          "facts",
+          1,
+          "id"
+        ],
+        "value": "fact_metric"
+      }
+    ]
+  },
+  {
+    "name": "duplicate_unit_order",
+    "contract": "project",
+    "base": "project",
+    "valid": false,
+    "edits": [
+      {
+        "op": "set",
+        "path": [
+          "sources",
+          0,
+          "units",
+          1,
+          "order"
+        ],
+        "value": 0
+      }
+    ]
+  },
+  {
+    "name": "broken_evidence",
+    "contract": "project",
+    "base": "project",
+    "valid": false,
+    "edits": [
+      {
+        "op": "set",
+        "path": [
+          "facts",
+          0,
+          "evidence",
+          0,
+          "unitId"
+        ],
+        "value": "missing"
+      }
+    ]
+  },
+  {
+    "name": "stale_evidence",
+    "contract": "project",
+    "base": "project",
+    "valid": false,
+    "edits": [
+      {
+        "op": "set",
+        "path": [
+          "facts",
+          0,
+          "evidence",
+          0,
+          "sourceRevision"
+        ],
+        "value": 2
+      }
+    ]
+  },
+  {
+    "name": "broken_represented_fact",
+    "contract": "project",
+    "base": "project",
+    "valid": false,
+    "edits": [
+      {
+        "op": "set",
+        "path": [
+          "sources",
+          0,
+          "units",
+          0,
+          "representedFactIds",
+          0
+        ],
+        "value": "missing"
+      }
+    ]
+  },
+  {
+    "name": "global_technology_dated",
+    "contract": "project",
+    "base": "project",
+    "valid": false,
+    "edits": [
+      {
+        "op": "set",
+        "path": [
+          "facts",
+          1,
+          "jobId"
+        ],
+        "value": "job_1"
+      }
+    ]
+  },
+  {
+    "name": "user_fact_with_fake_evidence",
+    "contract": "project",
+    "base": "project",
+    "valid": false,
+    "edits": [
+      {
+        "op": "set",
+        "path": [
+          "facts",
+          2,
+          "evidence"
+        ],
+        "value": [
+          {
+            "sourceId": "source_1",
+            "sourceRevision": 1,
+            "unitId": "unit_1",
+            "unitRevision": 1
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "name": "metric_range_missing_upper",
+    "contract": "project",
+    "base": "project",
+    "valid": false,
+    "edits": [
+      {
+        "op": "set",
+        "path": [
+          "facts",
+          0,
+          "value",
+          "comparator"
+        ],
+        "value": "range"
+      }
+    ]
+  },
+  {
+    "name": "nonfinite_metric_overflow",
+    "contract": "project",
+    "base": "project",
+    "valid": false,
+    "edits": [
+      {
+        "op": "set",
+        "path": [
+          "facts",
+          0,
+          "value",
+          "number"
+        ],
+        "value": 1e999
+      }
+    ]
+  },
+  {
+    "name": "deterministic_attempts_rejected",
+    "contract": "project",
+    "base": "project",
+    "valid": false,
+    "edits": [
+      {
+        "op": "set",
+        "path": [
+          "operations",
+          0,
+          "kind"
+        ],
+        "value": "render"
+      }
+    ]
+  },
+  {
+    "name": "event_request_mismatch",
+    "contract": "project",
+    "base": "project",
+    "valid": false,
+    "edits": [
+      {
+        "op": "set",
+        "path": [
+          "operations",
+          0,
+          "events",
+          0,
+          "requestId"
+        ],
+        "value": "other"
+      }
+    ]
+  },
+  {
+    "name": "expired_acknowledgment",
+    "contract": "project",
+    "base": "project",
+    "valid": false,
+    "edits": [
+      {
+        "op": "set",
+        "path": [
+          "review",
+          "acknowledgments",
+          0,
+          "targetRevision"
+        ],
+        "value": 1
+      }
+    ]
+  },
+  {
+    "name": "proposal_future_revision",
+    "contract": "project",
+    "base": "project",
+    "valid": false,
+    "edits": [
+      {
+        "op": "set",
+        "path": [
+          "proposals",
+          0,
+          "baseBlockRevision"
+        ],
+        "value": 3
+      }
+    ]
+  },
+  {
+    "name": "proposal_nonprose_target",
+    "contract": "project",
+    "base": "project",
+    "valid": false,
+    "edits": [
+      {
+        "op": "set",
+        "path": [
+          "views",
+          0,
+          "kind"
+        ],
+        "value": "focus"
+      }
+    ]
+  },
+  {
+    "name": "proposal_kind_mismatch",
+    "contract": "project",
+    "base": "project",
+    "valid": false,
+    "edits": [
+      {
+        "op": "set",
+        "path": [
+          "proposals",
+          0,
+          "kind"
+        ],
+        "value": "draft_prose"
+      }
+    ]
+  },
+  {
+    "name": "malformed_patch_field",
+    "contract": "proposal",
+    "base": "proposal",
+    "valid": false,
+    "edits": [
+      {
+        "op": "set",
+        "path": [
+          "patch_path"
+        ],
+        "value": "/facts/0/value"
+      }
+    ]
+  },
+  {
+    "name": "missing_proposal_text",
+    "contract": "proposal",
+    "base": "proposal",
+    "valid": false,
+    "edits": [
+      {
+        "op": "remove",
+        "path": [
+          "replacementText"
+        ]
+      }
+    ]
+  },
+  {
+    "name": "source_byte_path_traversal",
+    "contract": "project",
+    "base": "project",
+    "valid": false,
+    "edits": [{ "op": "set", "path": ["sources", 0, "byteRef"], "value": "../outside.txt" }]
+  },
+  {
+    "name": "template_asset_path_traversal",
+    "contract": "template",
+    "base": "template",
+    "valid": false,
+    "edits": [{ "op": "set", "path": ["assets", 0, "path"], "value": "../base.docx" }]
+  },
+  {
+    "name": "stale_block_fact_revision_saved", "contract": "project", "base": "project", "valid": true,
+    "edits": [{ "op": "set", "path": ["views", 0, "state", "factRevisions", "fact_metric"], "value": 1 }]
+  },
+  {
+    "name": "stale_review_decision_saved", "contract": "project", "base": "project", "valid": true,
+    "edits": [{ "op": "append", "path": ["review", "decisions"], "value": { "targetKind": "fact", "targetId": "fact_metric", "disposition": "shown", "reason": null, "targetRevision": 1 } }]
+  },
+  {
+    "name": "stale_render_saved", "contract": "project", "base": "project", "valid": true,
+    "edits": [{ "op": "set", "path": ["renders", 0, "projectRevision"], "value": 2 }]
+  },
+  {
+    "name": "stale_operation_saved", "contract": "project", "base": "project", "valid": true,
+    "edits": [{ "op": "set", "path": ["operations", 0, "baseRevision"], "value": 1 }]
+  },
+  {
+    "name": "stale_proposal_saved", "contract": "project", "base": "project", "valid": true,
+    "edits": [{ "op": "set", "path": ["proposals", 0, "baseBlockRevision"], "value": 1 }]
+  },
+  {
+    "name": "represented_user_fact_rejected", "contract": "project", "base": "project", "valid": false,
+    "edits": [{ "op": "append", "path": ["sources", 0, "units", 0, "representedFactIds"], "value": "fact_user" }]
+  },
+  {
+    "name": "evidence_without_representation_rejected", "contract": "project", "base": "project", "valid": false,
+    "edits": [{ "op": "set", "path": ["sources", 0, "units", 0, "representedFactIds"], "value": [] }]
+  },
+  {
+    "name": "job_lists_foreign_fact_rejected", "contract": "project", "base": "project", "valid": false,
+    "edits": [{ "op": "append", "path": ["employment", 0, "factIds"], "value": "fact_user" }]
+  },
+  {
+    "name": "job_omits_owned_fact_rejected", "contract": "project", "base": "project", "valid": false,
+    "edits": [{ "op": "set", "path": ["employment", 0, "factIds"], "value": [] }]
+  },
+  {
+    "name": "subproject_lists_foreign_fact_rejected", "contract": "project", "base": "project", "valid": false,
+    "edits": [{ "op": "append", "path": ["employment", 0, "subprojects", 0, "factIds"], "value": "fact_user" }]
+  },
+  {
+    "name": "subproject_omits_owned_fact_rejected", "contract": "project", "base": "project", "valid": false,
+    "edits": [{ "op": "set", "path": ["employment", 0, "subprojects", 0, "factIds"], "value": [] }]
+  },
+  {
+    "name": "future_block_fact_revision_rejected", "contract": "project", "base": "project", "valid": false,
+    "edits": [{ "op": "set", "path": ["views", 0, "state", "factRevisions", "fact_metric"], "value": 999 }]
+  },
+  {
+    "name": "future_previous_fact_revision_rejected", "contract": "project", "base": "project", "valid": false,
+    "edits": [{ "op": "set", "path": ["views", 0, "previous", "factRevisions", "fact_metric"], "value": 999 }]
+  },
+  {
+    "name": "future_fact_review_rejected", "contract": "project", "base": "project", "valid": false,
+    "edits": [{ "op": "append", "path": ["review", "decisions"], "value": { "targetKind": "fact", "targetId": "fact_metric", "disposition": "shown", "reason": null, "targetRevision": 999 } }]
+  },
+  {
+    "name": "future_block_review_rejected", "contract": "project", "base": "project", "valid": false,
+    "edits": [{ "op": "append", "path": ["review", "decisions"], "value": { "targetKind": "block", "targetId": "profile", "disposition": "shown", "reason": null, "targetRevision": 999 } }]
+  },
+  {
+    "name": "future_render_project_revision_rejected", "contract": "project", "base": "project", "valid": false,
+    "edits": [{ "op": "set", "path": ["renders", 0, "projectRevision"], "value": 999 }]
+  },
+  {
+    "name": "future_operation_base_revision_rejected", "contract": "project", "base": "project", "valid": false,
+    "edits": [{ "op": "set", "path": ["operations", 0, "baseRevision"], "value": 999 }]
+  },
+  {
+    "name": "project_entry_wrong_role_rejected", "contract": "zip_manifest", "base": "zip_manifest", "valid": false,
+    "edits": [{ "op": "set", "path": ["entries", 0, "role"], "value": "render" }]
+  },
+  {
+    "name": "other_entry_claims_project_role_rejected", "contract": "zip_manifest", "base": "zip_manifest", "valid": false,
+    "edits": [{ "op": "append", "path": ["entries"], "value": { "path": "other.json", "role": "project", "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", "uncompressedSize": 10 } }]
+  },
+  {
+    "name": "valid_zip",
+    "contract": "zip_manifest",
+    "base": "zip_manifest",
+    "valid": true,
+    "edits": []
+  },
+  {
+    "name": "zip_v2_rejected",
+    "contract": "zip_manifest",
+    "base": "zip_manifest",
+    "valid": false,
+    "edits": [
+      {
+        "op": "set",
+        "path": [
+          "schemaVersion"
+        ],
+        "value": 2
+      }
+    ]
+  },
+  {
+    "name": "zip_traversal",
+    "contract": "zip_manifest",
+    "base": "zip_manifest",
+    "valid": false,
+    "edits": [
+      {
+        "op": "set",
+        "path": [
+          "entries",
+          0,
+          "path"
+        ],
+        "value": "../project.json"
+      }
+    ]
+  },
+  {
+    "name": "zip_duplicate_entry",
+    "contract": "zip_manifest",
+    "base": "zip_manifest",
+    "valid": false,
+    "edits": [
+      {
+        "op": "append",
+        "path": [
+          "entries"
+        ],
+        "value": {
+          "path": "project.json",
+          "role": "project",
+          "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "uncompressedSize": 100
+        }
+      }
+    ]
+  }
+]
