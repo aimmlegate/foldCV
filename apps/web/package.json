@@ -8,6 +8,7 @@
     "typecheck": "tsc --noEmit",
     "lint": "eslint . --max-warnings 0",
     "test:contracts": "node --import tsx src/contracts/check-fixtures.ts",
+    "test:state": "node --import tsx --test unit/state.test.ts",
     "dev": "vite --host 127.0.0.1",
     "build": "vite build",
     "test:browser": "playwright test --forbid-only"

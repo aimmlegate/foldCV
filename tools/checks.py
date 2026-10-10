@@ -107,13 +107,34 @@ def validate_map() -> None:
                                 capture_output=True, check=True).stdout
     collected = {line for line in collection.splitlines() if "::" in line}
     assert_prototype_collection(data["foundation"].get("prototypeRegressions"), collected)
+    state_result = subprocess.run(["npm", "run", "test:state"], cwd=WEB, env=safe_env(),
+                                  capture_output=True, text=True)
+    if state_result.returncode != 0:
+        raise SystemExit(state_result.stdout + state_result.stderr)
+    state_names = set(re.findall(r"^# Subtest: (.+)$", state_result.stdout, re.MULTILINE))
+    if not state_names or not re.search(r"^# fail 0$", state_result.stdout, re.MULTILINE):
+        raise SystemExit("State suite did not report passing tests")
+    browser_listing = subprocess.run(["npm", "run", "test:browser", "--", "--list"], cwd=WEB,
+                                     env=safe_env(), capture_output=True, text=True, check=True).stdout
+    browser_names = set(re.findall(r"^\s+([\w.-]+\.spec\.ts):\d+:\d+ › (.+)$",
+                                   browser_listing, re.MULTILINE))
+    if not browser_names:
+        raise SystemExit("Browser suite collected zero tests")
     for entry in entries:
         if entry["status"] not in {"implemented", "partial", "unimplemented"}:
             raise SystemExit(f"Invalid status for {entry['id']}")
         if (entry["status"] == "unimplemented") != (not entry["tests"]):
             raise SystemExit(f"Invalid test mapping for {entry['id']}")
         for node in entry["tests"]:
-            if not any(item.startswith(node) for item in collected):
+            if node.startswith("apps/web/unit/"):
+                file, _, name = node.partition("::")
+                found = (ROOT / file).is_file() and name in state_names
+            elif node.startswith("apps/web/tests/"):
+                file, _, name = node.partition("::")
+                found = (ROOT / file).is_file() and (Path(file).name, name) in browser_names
+            else:
+                found = any(item.startswith(node) for item in collected)
+            if not found:
                 raise SystemExit(f"Missing mapped test: {node}")
     for name, node in data["foundation"].items():
         if name == "prototypeRegressions":
