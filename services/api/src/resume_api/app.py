@@ -8,6 +8,7 @@ from http.cookies import SimpleCookie
 import json
 from pathlib import Path
 import secrets
+import threading
 import time
 from typing import Protocol
 import uuid
@@ -18,11 +19,12 @@ from fastapi.responses import FileResponse, JSONResponse, Response, StreamingRes
 from starlette.exceptions import HTTPException as StarletteHTTPException
 from pydantic import ValidationError
 
-from .contracts import (CompletedEvent, CompletedPayload, DraftRequest, EmptyRequest, ErrorEnvelope, ErrorPayload,
+from .contracts import (CompletedEvent, CompletedPayload, ConnectionPayload, DraftRequest, EmptyRequest, ErrorEnvelope, ErrorPayload,
                         FailedEvent, NormalizeRequest, OperationResult, RenderRequest, RewriteRequest, StartedEvent,
-                        ValidateRequest,
+                        SelectModelRequest, QuotaPayload, ValidateRequest,
                         StartedPayload, TextRequest, UsagePayload)
 from .lifecycle import OperationFiles, SpikeError, has_blocked_owned, reap_owned
+from .connection import ConnectionAdapter, ConnectionFailure, Metadata
 from .rendering import DocumentRenderer
 from .extracting import MAX_BODY as MAX_EXTRACT_BODY, UploadFailure, parse_one_part, run_extract
 from packages.resume_core.rendering.template import PACKAGE_SHA256, RenderFailure, renderer_sha256, require_template
@@ -37,7 +39,7 @@ BODY_TIMEOUT_SECONDS = 10
 CANCEL_GRACE_SECONDS = 0.5
 POST_ONLY_PATHS = frozenset({"session/exchange", "extract", "normalize", "draft", "rewrite",
                             "validate", "prepare-render", "render", "host/discover", "host/status", "host/login",
-                            "host/detach", "host/models"})
+                            "host/detach", "host/models", "host/select", "host/cancel-login"})
 JSON_POST_PATHS = frozenset("/v1/" + path for path in POST_ONLY_PATHS if path != "extract")
 
 
@@ -194,7 +196,8 @@ class LocalBoundary:
         return item is not None and secrets.compare_digest(item.value, self.session)
 
 
-def create_app(*, origin: str, secret: str, temp_root: Path, dist: Path, runner: SyntheticRunner | None = None):
+def create_app(*, origin: str, secret: str, temp_root: Path, dist: Path, runner: SyntheticRunner | None = None,
+               cli_executable: Path | None = None, connection_adapter: ConnectionAdapter | None = None):
     if not origin.startswith("http://127.0.0.1:") or not origin.rsplit(":", 1)[-1].isdigit():
         raise ValueError("A concrete IPv4 loopback origin is required")
     if len(secret) < 32:
@@ -203,12 +206,16 @@ def create_app(*, origin: str, secret: str, temp_root: Path, dist: Path, runner:
     blocked_on_start = has_blocked_owned(temp_root)
     operations: dict[asyncio.Task, OperationFiles] = {}
     cancellation_pending: set[asyncio.Task] = set()
+    connection_work: dict[asyncio.Task, tuple[OperationFiles, threading.Event]] = {}
 
     @asynccontextmanager
     async def lifespan(_app: FastAPI):
         yield
+        for task, (files, cancel) in list(connection_work.items()):
+            await stop_connection(task, files, cancel)
         for task, files in list(operations.items()):
-            await cancel_operation(task, files)
+            if task not in connection_work:
+                await cancel_operation(task, files)
 
     app = FastAPI(docs_url=None, redoc_url=None, openapi_url=None, lifespan=lifespan)
     boundary = LocalBoundary(app, origin, secret)
@@ -218,6 +225,9 @@ def create_app(*, origin: str, secret: str, temp_root: Path, dist: Path, runner:
     unsafe_cleanup = blocked_on_start
     gate = asyncio.Lock()
     document_renderer = DocumentRenderer()
+    connection = connection_adapter or ConnectionAdapter(cli_executable)
+    connection_state = ConnectionPayload(state="unchecked")
+    connection_epoch = 0
 
     def lifecycle_code(error: SpikeError) -> str:
         nonlocal unsafe_cleanup
@@ -244,13 +254,41 @@ def create_app(*, origin: str, secret: str, temp_root: Path, dist: Path, runner:
                 pass
         return cleanup_code
 
+    async def stop_connection(task: asyncio.Task, files: OperationFiles, cancel: threading.Event) -> str | None:
+        if not task.done():
+            cancellation_pending.add(task)
+        cancel.set()
+        cleanup_code = None
+        try:
+            files.stop_worker()
+        except SpikeError as error:
+            cleanup_code = lifecycle_code(error)
+        done, _ = await asyncio.wait((task,), timeout=CANCEL_GRACE_SECONDS)
+        if task not in done:
+            return lifecycle_code(SpikeError("PROCESS_CLEANUP_FAILED"))
+        if task in done:
+            try:
+                await task
+            except SpikeError as error:
+                if error.code in {"PROCESS_CLEANUP_FAILED", "CLEANUP_FAILED", "UNSAFE_TEMP_ROOT"}:
+                    cleanup_code = lifecycle_code(error)
+            except ConnectionFailure as error:
+                if error.code in {"PROCESS_CLEANUP_FAILED", "CLEANUP_FAILED"}:
+                    cleanup_code = lifecycle_code(SpikeError(error.code))
+            except Exception:
+                pass
+        return cleanup_code
+
     def operation_done(done: asyncio.Task) -> None:
         nonlocal active
         if not done.cancelled():
             error = done.exception()
             if isinstance(error, SpikeError):
                 lifecycle_code(error)
+            elif isinstance(error, ConnectionFailure) and error.code in {"PROCESS_CLEANUP_FAILED", "CLEANUP_FAILED"}:
+                lifecycle_code(SpikeError(error.code))
         operations.pop(done, None)
+        connection_work.pop(done, None)
         cancellation_pending.discard(done)
         active -= 1
 
@@ -424,15 +462,147 @@ def create_app(*, origin: str, secret: str, temp_root: Path, dist: Path, runner:
         finally:
             watcher.cancel()
 
-    async def host_unavailable(_payload: EmptyRequest):
-        return problem("FEATURE_UNAVAILABLE", 501, "host")
+    login_task: asyncio.Task | None = None
+
+    def connection_response() -> JSONResponse:
+        return JSONResponse(connection_state.model_dump(), headers={"Cache-Control": "no-store"})
+
+    async def connection_job(kind: str, work):
+        nonlocal active, connection_epoch, connection_state, login_task
+        async with gate:
+            if kind == "login" and connection_state.state != "login_required":
+                return problem("LOGIN_NOT_AVAILABLE", 409, "host")
+            if unsafe_cleanup:
+                connection_state = ConnectionPayload(state="cleanup_blocked")
+                return connection_response()
+            if cancellation_pending or active >= MAX_CONCURRENT or connection_work:
+                return problem("BUSY", 429, "host", True)
+            active += 1
+            epoch = connection_epoch
+            files = OperationFiles(temp_root)
+            cancel = threading.Event()
+
+            def execute():
+                with files.open():
+                    return work(files, cancel)
+
+            task = asyncio.create_task(asyncio.to_thread(execute))
+            operations[task] = files
+            connection_work[task] = (files, cancel)
+            task.add_done_callback(operation_done)
+            if kind == "login":
+                login_task = task
+                connection_state = ConnectionPayload(state="login_pending", version=connection_state.version)
+        try:
+            result = await asyncio.shield(task)
+            async with gate:
+                if epoch != connection_epoch:
+                    return connection_response()
+                if kind == "login":
+                    connection_state = ConnectionPayload(state="login_required", version=connection_state.version)
+                    return connection_response()
+                assert isinstance(result, Metadata)
+                selected = connection_state.selectedModel if connection_state.selectedModel in result.models else None
+                quota = QuotaPayload(state=result.quota.state, usedPercent=result.quota.used_percent,
+                                     resetsAt=result.quota.resets_at)
+                state = ("unchecked" if kind == "discover" else "quota_exhausted" if quota.state == "exhausted"
+                         else "unknown_limits" if quota.state == "unknown" else "connected")
+                connection_state = ConnectionPayload(state=state, version=result.version, plan=result.plan,
+                                                     models=list(result.models), selectedModel=selected, quota=quota,
+                                                     metadataReady=kind != "discover")
+                return connection_response()
+        except ConnectionFailure as error:
+            if error.code in {"PROCESS_CLEANUP_FAILED", "CLEANUP_FAILED"}:
+                lifecycle_code(SpikeError(error.code))
+            async with gate:
+                if unsafe_cleanup:
+                    connection_state = ConnectionPayload(state="cleanup_blocked")
+                    return connection_response()
+                if epoch != connection_epoch:
+                    return connection_response()
+                mapped = {"CLI_MISSING": "cli_missing", "CLI_LAUNCH_UNSUPPORTED": "launcher_unsupported",
+                          "UNSUPPORTED_VERSION": "unsupported_version",
+                          "LOGIN_REQUIRED": "login_required", "API_KEY_MODE": "api_key_mode",
+                          "METADATA_FAILED": "metadata_failed"}
+                state = mapped.get(error.code, "login_failed" if kind == "login" else "metadata_failed")
+                connection_state = ConnectionPayload(state=state, version=error.version)
+                return connection_response()
+        except SpikeError as error:
+            lifecycle_code(error)
+            async with gate:
+                if unsafe_cleanup:
+                    connection_state = ConnectionPayload(state="cleanup_blocked")
+                elif epoch == connection_epoch:
+                    connection_state = ConnectionPayload(state="metadata_failed")
+                return connection_response()
+        except asyncio.CancelledError:
+            await stop_connection(task, files, cancel)
+            raise
+        except Exception:
+            async with gate:
+                if unsafe_cleanup:
+                    connection_state = ConnectionPayload(state="cleanup_blocked")
+                elif epoch == connection_epoch:
+                    connection_state = ConnectionPayload(state="metadata_failed")
+                return connection_response()
+        finally:
+            if login_task is task:
+                login_task = None
+
+    async def discover(_payload: EmptyRequest):
+        return await connection_job("discover", lambda files, cancel: connection.inspect(files, cancel, full=False))
+
+    async def status(_payload: EmptyRequest):
+        return await connection_job("status", lambda files, cancel: connection.inspect(files, cancel))
+
+    async def models(_payload: EmptyRequest):
+        return await status(_payload)
+
+    async def login(_payload: EmptyRequest):
+        return await connection_job("login", connection.login)
+
+    async def select(payload: SelectModelRequest):
+        nonlocal connection_state
+        async with gate:
+            if not connection_state.metadataReady or payload.model not in connection_state.models:
+                return problem("MODEL_DENIED", 409, "host")
+            connection_state = connection_state.model_copy(update={"selectedModel": payload.model})
+            return connection_response()
+
+    async def detach(_payload: EmptyRequest):
+        nonlocal connection_epoch, connection_state
+        async with gate:
+            connection_epoch += 1
+            connection_state = ConnectionPayload(state="detached")
+            current = list(connection_work.items())
+        codes = await asyncio.gather(*(stop_connection(task, files, cancel)
+                                       for task, (files, cancel) in current))
+        if any(code is not None for code in codes) or unsafe_cleanup:
+            connection_state = ConnectionPayload(state="cleanup_blocked")
+        return connection_response()
+
+    async def cancel_login(_payload: EmptyRequest):
+        nonlocal connection_epoch, connection_state
+        async with gate:
+            current = login_task
+            if current is None or current not in connection_work:
+                return connection_response()
+            connection_epoch += 1
+            connection_state = ConnectionPayload(state="login_required", version=connection_state.version)
+            files, cancel = connection_work[current]
+        code = await stop_connection(current, files, cancel)
+        if code is not None or unsafe_cleanup:
+            connection_state = ConnectionPayload(state="cleanup_blocked")
+        return connection_response()
 
     app.add_api_route("/v1/extract", extract, methods=["POST"])
     app.add_api_route("/v1/validate", validate, methods=["POST"])
     app.add_api_route("/v1/prepare-render", prepare_render, methods=["POST"])
     app.add_api_route("/v1/render", render, methods=["POST"])
-    for path in ("discover", "status", "login", "detach", "models"):
-        app.add_api_route(f"/v1/host/{path}", host_unavailable, methods=["POST"])
+    for path, handler in (("discover", discover), ("status", status), ("models", models),
+                          ("login", login), ("select", select), ("detach", detach),
+                          ("cancel-login", cancel_login)):
+        app.add_api_route(f"/v1/host/{path}", handler, methods=["POST"])
 
     async def text_operation(kind: str, request: Request, payload: TextRequest):
         nonlocal active, count

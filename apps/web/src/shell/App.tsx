@@ -10,6 +10,7 @@ import type { PreviewState } from "../preview/workflow";
 import { ImportPanel } from "../import/ImportPanel";
 import { ImportWorkflow } from "../import/workflow";
 import type { ImportState } from "../import/workflow";
+import { ConnectionPanel } from "../connection/ConnectionPanel";
 
 type ThemeMode = "light" | "dark" | "system";
 const THEME_KEY = "foldcv-theme";
@@ -139,10 +140,11 @@ export function App() {
     <nav aria-label="Этапы работы" className="flex flex-wrap gap-2 border-b border-outline px-6 py-3">
       {(["import", "editor", "export"] as const).map((stage, index) => <button key={stage} type="button" disabled={stage !== "import" && !project} aria-current={state.stage === stage ? "step" : undefined} onClick={() => send({ type: "stage", stage })} className={state.stage === stage ? primary : control}>{index + 1}. {stage === "import" ? "Загрузка" : stage === "editor" ? "Редактор" : "Выгрузка"}</button>)}
     </nav>
+    <aside className="mx-auto max-w-5xl px-6 pt-4"><div className="ml-auto max-w-md"><ConnectionPanel /></div></aside>
     {state.stage === "import" && <main className="mx-auto max-w-5xl p-6">
       <h1 className="mb-2 text-2xl font-semibold">Из исходника — в готовое резюме</h1>
       <p className="mb-6 text-muted">Выберите исходник для локального извлечения и проверки. Вымышленный пример открывает отдельный редактор.</p>
-      <div className="grid gap-6 md:grid-cols-[minmax(0,1.2fr)_minmax(0,1fr)]">
+      <div>
         {!project ? <ImportPanel state={importState} workflow={importWorkflow} text={state.sourceText}
           onText={(text) => send({ type: "sourceText", text })} exampleDisabled={importState.entries.length > 0 || importState.pending}
           onExample={() => { importWorkflow.clear(); send({ type: "loadExample" }); }} />
@@ -153,7 +155,6 @@ export function App() {
                 <div className="flex gap-2"><button type="button" className={control} onClick={() => { importWorkflow.clear(); send({ type: "resetProject" }); setCloseProjectPrompt(false); }}>Подтвердить закрытие</button>
                   <button type="button" className={control} onClick={() => setCloseProjectPrompt(false)}>Оставить пример</button></div></div>}
           </section>}
-        <aside className="rounded border border-outline bg-panel p-5"><h2 className="mb-3 text-lg font-semibold">Подключение</h2><p role="status" className="text-sm text-danger">Генерация недоступна: профиль CLI не прошёл проверку безопасности.</p><p className="mt-4 text-sm text-muted">Шаблон: Generic · основной. Проверка подключения появится позже.</p></aside>
       </div>
     </main>}
     {state.stage === "editor" && project && block && <main className="grid min-w-0 xl:grid-cols-[200px_minmax(320px,1fr)_minmax(350px,1fr)]">

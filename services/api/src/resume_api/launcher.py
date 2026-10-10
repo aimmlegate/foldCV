@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import argparse
 import asyncio
+import os
 from pathlib import Path
 import secrets
 import socket
@@ -32,7 +33,8 @@ def trusted_temp_root() -> Path:
     return base / "foldcv-service"
 
 
-async def launch(*, port: int = 0, open_browser: bool = True) -> None:
+async def launch(*, port: int = 0, open_browser: bool = True,
+                 cli_executable: Path | None = None) -> None:
     require_supported_host()
     dist = ROOT / "apps/web/dist"
     if not (dist / "index.html").is_file():
@@ -44,7 +46,8 @@ async def launch(*, port: int = 0, open_browser: bool = True) -> None:
         actual_port = listener.getsockname()[1]
         origin = f"http://127.0.0.1:{actual_port}"
         secret = secrets.token_urlsafe(32)
-        app = create_app(origin=origin, secret=secret, temp_root=temp_root, dist=dist)
+        app = create_app(origin=origin, secret=secret, temp_root=temp_root, dist=dist,
+                         cli_executable=cli_executable)
         config = uvicorn.Config(app, host="127.0.0.1", port=actual_port, proxy_headers=False,
                                 access_log=False, server_header=False, log_level="critical",
                                 timeout_graceful_shutdown=2)
@@ -85,12 +88,15 @@ def main() -> None:
     parser = argparse.ArgumentParser(description="Run FoldCV locally")
     parser.add_argument("--no-open", action="store_true")
     parser.add_argument("--port", type=int, default=0)
+    parser.add_argument("--codex-executable", type=Path,
+                        default=Path(os.environ["FOLDCV_CODEX_EXECUTABLE"]) if os.environ.get("FOLDCV_CODEX_EXECUTABLE") else None)
     options = parser.parse_args()
     try:
         selected = HostLaunchOptions(openBrowser=not options.no_open, port=options.port)
     except ValueError:
         parser.error("port must be between 0 and 65535")
-    asyncio.run(launch(port=selected.port, open_browser=selected.openBrowser))
+    asyncio.run(launch(port=selected.port, open_browser=selected.openBrowser,
+                       cli_executable=options.codex_executable))
 
 
 if __name__ == "__main__":
