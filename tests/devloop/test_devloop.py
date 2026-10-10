@@ -34,6 +34,9 @@ class DevloopTests(unittest.TestCase):
         self.real_verify = devloop.verify_grok_version
         devloop.verify_grok_version = lambda _executable: None
         self.addCleanup(lambda: setattr(devloop, "verify_grok_version", self.real_verify))
+        self.real_isolation = devloop.verify_grok_isolation
+        devloop.verify_grok_isolation = lambda *_args: None
+        self.addCleanup(lambda: setattr(devloop, "verify_grok_isolation", self.real_isolation))
 
     def configure(self):
         config = {"version": 1, "providers": {"grok": {
@@ -243,10 +246,15 @@ class DevloopTests(unittest.TestCase):
     def test_grok_overlay_is_local_and_exact(self):
         with tempfile.TemporaryDirectory() as directory:
             target = devloop.grok_overlay({"model": "grok-4.7-build-fast"}, Path(directory))
+            devloop.grok_project_config(Path(directory))
             value = target.read_text()
             self.assertIn('allowed_models = ["grok-4.7-build-fast"]', value)
             self.assertIn("max_retries = 0", value)
             self.assertEqual(devloop.safe_environment(target)["GROK_CONFIG_PATH"], str(target))
+            environment = devloop.safe_environment(target, Path(directory))
+            self.assertEqual(environment["HOME"], os.environ["HOME"])
+            self.assertIn('disabled = ["mcpmarket-me"]',
+                          (Path(directory) / ".grok/config.toml").read_text())
             argv = devloop.grok_argv({"executable": str(self.fake),
                                      "model": "grok-4.7-build-fast", "effort": "medium",
                                      "transport": "grok_json"},
@@ -255,6 +263,59 @@ class DevloopTests(unittest.TestCase):
             self.assertEqual(argv[argv.index("--disallowed-tools") + 1],
                              "read_file,search_tool,use_tool")
             self.assertIn("--system-prompt-override", argv)
+
+    def test_grok_preflight_rejects_active_plugin_hook_or_mcp(self):
+        with tempfile.TemporaryDirectory() as directory:
+            base = Path(directory)
+            overlay = devloop.grok_overlay({"model": "grok-4.7-build-fast"}, base)
+            for key, value in (("plugins", {"name": "bad", "enabled": True}),
+                               ("hooks", {"event": "start"}),
+                               ("mcpServers", {"name": "bad"})):
+                with self.subTest(key=key):
+                    payload = {"cwd": directory, "plugins": [], "hooks": [],
+                               "mcpServers": [{"name": "compat", "disabled": True}]}
+                    payload[key].append(value)
+                    self.fake_output(payload)
+                    with self.assertRaises(devloop.DevloopError) as caught:
+                        self.real_isolation({"executable": str(self.fake)}, base, overlay)
+                    self.assertEqual(caught.exception.code, "unexpected_hooks_or_mcp")
+            payload = {"cwd": directory, "plugins": [{"name": "off", "enabled": False}],
+                       "hooks": [{"event": "off", "disabled": True}],
+                       "mcpServers": [{"name": "compat", "disabled": True}]}
+            self.fake_output(payload)
+            self.real_isolation({"executable": str(self.fake)}, base, overlay)
+
+    def test_active_hook_records_setup_debt_without_review_call(self):
+        sid = self.snap()
+        marker = self.repo / "review-invoked"
+        self.fake.write_text(
+            f"#!{sys.executable}\nimport json, pathlib, sys\n"
+            "if 'inspect' in sys.argv:\n"
+            "    print(json.dumps({'cwd': sys.argv[sys.argv.index('--cwd') + 1], "
+            "'plugins': [], 'hooks': [{'event': 'start'}], 'mcpServers': []}))\n"
+            "else:\n"
+            f"    pathlib.Path({str(marker)!r}).write_text('called')\n")
+        self.fake.chmod(0o755)
+        devloop.verify_grok_isolation = self.real_isolation
+        result = devloop.review(self.repo, sid, "grok")
+        self.assertEqual(result["status"], "pending_setup")
+        self.assertEqual(result["error"]["code"], "unexpected_hooks_or_mcp")
+        self.assertFalse(marker.exists())
+
+    def test_configured_timeout_is_bounded_and_used(self):
+        cfg_path = self.repo / "docs/gui/automation/config.json"
+        cfg = json.loads(cfg_path.read_text())
+        cfg["providers"]["grok"]["timeout_seconds"] = 600
+        cfg_path.write_text(json.dumps(cfg))
+        self.fake_output({"verdict": "pass", "summary": "Clear", "findings": []})
+        self.assertEqual(devloop.provider_config(self.repo, "grok")["timeout_seconds"], 600)
+        for invalid in (0, 601, True, 3.5):
+            with self.subTest(invalid=invalid):
+                cfg["providers"]["grok"]["timeout_seconds"] = invalid
+                cfg_path.write_text(json.dumps(cfg))
+                with self.assertRaises(devloop.DevloopError) as caught:
+                    devloop.provider_config(self.repo, "grok")
+                self.assertEqual(caught.exception.code, "invalid_timeout")
 
     def test_grok_version_drift_is_setup_failure(self):
         self.fake_output({})
@@ -292,12 +353,11 @@ class DevloopTests(unittest.TestCase):
                              "signal.signal(signal.SIGTERM, finish)\n"
                              "while True: time.sleep(0.1)\n")
         self.fake.chmod(0o755)
-        old = devloop.TIMEOUT
-        devloop.TIMEOUT = 0.8
-        try:
-            result = devloop.review(self.repo, sid, "grok")
-        finally:
-            devloop.TIMEOUT = old
+        cfg_path = self.repo / "docs/gui/automation/config.json"
+        cfg = json.loads(cfg_path.read_text())
+        cfg["providers"]["grok"]["timeout_seconds"] = 1
+        cfg_path.write_text(json.dumps(cfg))
+        result = devloop.review(self.repo, sid, "grok")
         self.assertEqual(result["status"], "failed")
         self.assertEqual(result["error"]["code"], "timeout")
         self.assertEqual(marker.read_text(), "done")
@@ -311,12 +371,11 @@ class DevloopTests(unittest.TestCase):
                              "signal.signal(signal.SIGTERM, signal.SIG_IGN)\n"
                              "while True: time.sleep(0.1)\n")
         self.fake.chmod(0o755)
-        old = devloop.TIMEOUT
-        devloop.TIMEOUT = 0.8
-        try:
-            result = devloop.review(self.repo, sid, "grok")
-        finally:
-            devloop.TIMEOUT = old
+        cfg_path = self.repo / "docs/gui/automation/config.json"
+        cfg = json.loads(cfg_path.read_text())
+        cfg["providers"]["grok"]["timeout_seconds"] = 1
+        cfg_path.write_text(json.dumps(cfg))
+        result = devloop.review(self.repo, sid, "grok")
         self.assertEqual(result["error"]["code"], "timeout")
         with self.assertRaises(ProcessLookupError):
             os.kill(int(pid_file.read_text()), 0)

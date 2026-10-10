@@ -6,3 +6,4 @@ tmp/
 experiments/
 output/
 .devloop/
+.tools/
