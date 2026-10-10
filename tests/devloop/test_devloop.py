@@ -111,6 +111,26 @@ class DevloopTests(unittest.TestCase):
         self.assertEqual(devloop.parse_response(1, json.dumps(auth).encode(), "gemini")[0],
                          "pending_setup")
 
+    def test_gemini_accepts_only_one_exact_json_fence(self):
+        report = '{"verdict":"pass","summary":"Clear","findings":[]}'
+        envelope = {"status": "completed", "model": "gemini-3.8-flash-medium",
+                    "response": f"```json\n{report}\n```", "usage": None}
+        def parsed():
+            return devloop.parse_response(0, json.dumps(envelope).encode(), "gemini",
+                                          "gemini-3.8-flash-medium")
+        self.assertEqual(parsed()[0], "reviewed")
+        for invalid in (f"Review:\n```json\n{report}\n```",
+                        f"```json\n{report}\n```\nextra",
+                        f"```json\n{report}\n```\n```json\n{report}\n```",
+                        f"```json\n{report} trailing\n```",
+                        f"```JSON\n{report}\n```"):
+            with self.subTest(response=invalid):
+                envelope["response"] = invalid
+                self.assertEqual(parsed()[0], "failed")
+        envelope["response"] = f"```json\n{report}\n```"
+        envelope["model"] = "another-model"
+        self.assertEqual(parsed()[0], "failed")
+
     def test_model_supplied_usage_is_not_recorded(self):
         report = {"verdict": "pass", "summary": "Clear", "findings": [],
                   "usage": {"input_tokens": 1}}

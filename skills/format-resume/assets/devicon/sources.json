@@ -1,0 +1,57 @@
+{
+  "python": {
+    "url": "https://raw.githubusercontent.com/devicons/devicon/master/icons/python/python-original.svg",
+    "sha256": "71493b4a732f0532b3a03a7a95da3ee11a65766367c8303b901ffbe7bf91a3a2",
+    "rasterizer": "resvg-py 0.5.0"
+  },
+  "csharp": {
+    "url": "https://raw.githubusercontent.com/devicons/devicon/master/icons/csharp/csharp-original.svg",
+    "sha256": "7093478d0888e22a224b6fa832da6c9ffd14c433de8bd14aab0c1cb50925f3ee",
+    "rasterizer": "resvg-py 0.5.0"
+  },
+  "dotnet": {
+    "url": "https://raw.githubusercontent.com/devicons/devicon/master/icons/dot-net/dot-net-original.svg",
+    "sha256": "6175b41fd7331abcd610d2c5aa2b28bc9628a6232be7628b948aa85a9216fc58",
+    "rasterizer": "resvg-py 0.5.0"
+  },
+  "docker": {
+    "url": "https://raw.githubusercontent.com/devicons/devicon/master/icons/docker/docker-original.svg",
+    "sha256": "3fd830ea69431ed7a0b8d068cd5b34ad3f00a1a78195d50f13ff56713f2462e1",
+    "rasterizer": "resvg-py 0.5.0"
+  },
+  "fastapi": {
+    "url": "https://raw.githubusercontent.com/devicons/devicon/master/icons/fastapi/fastapi-original.svg",
+    "sha256": "7ef41f6a363b00ff595e6d0b933c025c92cbfae29dc1df24b2f6eb8b476ee486",
+    "rasterizer": "resvg-py 0.5.0"
+  },
+  "djangorest": {
+    "url": "https://raw.githubusercontent.com/devicons/devicon/master/icons/djangorest/djangorest-original.svg",
+    "sha256": "0d27c70594ad23d2a6e811dba0530d8fd9cd5edac0ad3b0592cbd0c2a5f8dd2e",
+    "rasterizer": "resvg-py 0.5.0"
+  },
+  "grafana": {
+    "url": "https://raw.githubusercontent.com/devicons/devicon/master/icons/grafana/grafana-original.svg",
+    "sha256": "2dec200d4e56521bec8dd463173c623b33b8c97e6159cac9b3ed00b6bff0f6ad",
+    "rasterizer": "resvg-py 0.5.0"
+  },
+  "kibana": {
+    "url": "https://raw.githubusercontent.com/devicons/devicon/master/icons/kibana/kibana-original.svg",
+    "sha256": "836bb17d110cf81c4081f33a666f2cd035908546a4bd4eea7f627b16f2def5f9",
+    "rasterizer": "resvg-py 0.5.0"
+  },
+  "cplusplus": {
+    "url": "https://raw.githubusercontent.com/devicons/devicon/master/icons/cplusplus/cplusplus-original.svg",
+    "sha256": "7ff8253551235e3a6b002a7c2bd6e3190d85113a64fcb40f2254473caeb025d4",
+    "rasterizer": "resvg-py 0.5.0"
+  },
+  "grpc": {
+    "url": "https://raw.githubusercontent.com/devicons/devicon/master/icons/grpc/grpc-plain.svg",
+    "sha256": "a639a8c1f30d792fcd7473aba22263a14eb0783dc9527e0a2fad6f8b0a64b1d7",
+    "rasterizer": "resvg-py 0.5.0"
+  },
+  "linux": {
+    "url": "https://raw.githubusercontent.com/devicons/devicon/master/icons/linux/linux-original.svg",
+    "sha256": "cf50ae4a263c6142963fad3561f7cb0311d0d41cc6189eadfb34f81a8a36acb0",
+    "rasterizer": "resvg-py 0.5.0"
+  }
+}

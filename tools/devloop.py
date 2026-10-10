@@ -803,7 +803,13 @@ def parse_response(code: int, out: bytes, provider: str = "grok",
         if response.get("model") != "gemini-3.8-flash-medium" or not isinstance(response.get("response"), str):
             return "failed", None, {"code": "invalid_response"}
         try:
-            report = json.loads(response["response"])
+            report_text = response["response"]
+            if report_text.startswith("```"):
+                fenced = re.fullmatch(r"```json\r?\n(.*?)\r?\n```", report_text, re.S)
+                if fenced is None:
+                    return "failed", None, {"code": "invalid_response"}
+                report_text = fenced.group(1)
+            report = json.loads(report_text)
         except (ValueError, UnicodeError):
             return "failed", None, {"code": "invalid_response"}
     elif "structuredOutput" in response:
