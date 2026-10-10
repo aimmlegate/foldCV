@@ -1,10 +1,16 @@
 """Deterministic date, focus, and source coverage policies."""
 
-import calendar
 import re
+import sys
 import unicodedata
-from datetime import date
 from pathlib import Path
+
+ROOT = Path(__file__).resolve().parents[3]
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
+
+from packages.resume_core.dates import month_bounds, old_job as _old_job, union_months
+from packages.resume_core.technologies import canonical_id
 
 ASSETS = Path(__file__).resolve().parents[1] / 'assets'
 FOCUS = {
@@ -31,45 +37,11 @@ def key(text):
 
 
 def matches(focus, technology):
-    f, t = key(focus), key(technology)
-    if f == 'golang':
-        t = re.sub(r'^go(?=\s+\d)', 'golang', t)
-    if f == '.net':
-        return bool(re.match(r'^\.net(?:$|\s+(?:framework|core|standard|\d))', t))
-    return t == f or bool(re.match(re.escape(f) + r'\s+\d', t))
-
-
-def month_bounds(value):
-    if not isinstance(value, str) or not re.fullmatch(r'\d{4}(?:-\d{2})?(?:-\d{2})?', value):
-        raise ValueError(f'Invalid normalized date: {value}')
-    parts = [int(p) for p in value.split('-')]
-    year = parts[0]
-    if len(parts) == 1:
-        return year * 12, year * 12 + 11
-    month = parts[1]
-    date(year, month, parts[2] if len(parts) == 3 else 1)
-    index = year * 12 + month - 1
-    return index, index
-
-
-def union_months(intervals):
-    total, end = 0, -1
-    for start, stop in sorted(intervals):
-        if stop < start:
-            continue
-        total += max(0, stop - max(start, end + 1) + 1)
-        end = max(end, stop)
-    return total
+    return canonical_id(focus) is not None and canonical_id(focus) == canonical_id(technology)
 
 
 def old_job(job, as_of):
-    if job['end'] is None:
-        return False
-    today = date.fromisoformat(as_of)
-    cutoff = today.replace(year=today.year - 15, day=min(today.day, calendar.monthrange(today.year - 15, today.month)[1]))
-    year, month = divmod(month_bounds(job['end'])[1], 12)
-    latest_end = date(year, month + 1, calendar.monthrange(year, month + 1)[1])
-    return latest_end < cutoff
+    return _old_job(job['end'], as_of)
 
 
 def duration_label(months):
@@ -101,7 +73,7 @@ def estimate(focus, archive):
             if stop is None:
                 stop = job.get('observed_at') or archive['as_of']
                 if not job.get('observed_at'):
-                    assumptions.append(f"{job['id']}: no observation date; generation date is an explicit assumption")
+                    assumptions.append(f"{job['id']}: no observation date; archive as-of date is an explicit assumption")
             lo_start, hi_start = month_bounds(start)
             lo_stop, hi_stop = month_bounds(stop)
             if lo_start > min(hi_stop, limit):

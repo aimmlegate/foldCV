@@ -19,7 +19,7 @@ WEB = ROOT / "apps/web"
 PYTHON = ROOT / ".venv/bin/python"
 SOFFICE = ROOT / ".tools/LibreOffice.app/Contents/MacOS/soffice"
 PYTHON_SUITES = {
-    "fast": ["tests/contracts", "tests/foundation", "tests/devloop", "tests/devloop_antigravity", "skills/format-resume/tests"],
+    "fast": ["tests/contracts", "tests/core", "tests/foundation", "tests/devloop", "tests/devloop_antigravity", "skills/format-resume/tests"],
     "integration-render": ["tests/cli_spike", "tests/render_spike"],
 }
 PROTOTYPE_TESTS = (
