@@ -1,0 +1,2 @@
+"""Deterministic, bounded source extraction."""
+

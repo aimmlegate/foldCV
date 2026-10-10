@@ -24,6 +24,7 @@ from .contracts import (CompletedEvent, CompletedPayload, DraftRequest, EmptyReq
                         StartedPayload, TextRequest, UsagePayload)
 from .lifecycle import OperationFiles, SpikeError, has_blocked_owned, reap_owned
 from .rendering import DocumentRenderer
+from .extracting import MAX_BODY as MAX_EXTRACT_BODY, UploadFailure, parse_one_part, run_extract
 from packages.resume_core.rendering.template import PACKAGE_SHA256, RenderFailure, renderer_sha256, require_template
 from packages.resume_core.rendering.preparation import PrepareRequest, prepare_document
 
@@ -138,7 +139,7 @@ class LocalBoundary:
                     return
                 part = message.get("body", b"")
                 size += len(part)
-                if size > MAX_BODY:
+                if size > (MAX_EXTRACT_BODY if path == "/v1/extract" and method == "POST" else MAX_BODY):
                     await problem("INPUT_TOO_LARGE", 413)(scope, receive, send)
                     return
                 chunks.append(part)
@@ -212,6 +213,7 @@ def create_app(*, origin: str, secret: str, temp_root: Path, dist: Path, runner:
     app = FastAPI(docs_url=None, redoc_url=None, openapi_url=None, lifespan=lifespan)
     boundary = LocalBoundary(app, origin, secret)
     active = 0
+    import_active = False
     count = 0
     unsafe_cleanup = blocked_on_start
     gate = asyncio.Lock()
@@ -299,13 +301,70 @@ def create_app(*, origin: str, secret: str, temp_root: Path, dist: Path, runner:
             "rendererSha256": renderer_sha256() if ready else None,
             "providers": [{"kind": "codex_cli", "ready": False, "reason": "CLI_PROFILE_UNSAFE"}],
             "limits": {"maxBodyBytes": MAX_BODY, "maxTextOperations": MAX_OPERATIONS,
-                       "maxConcurrent": MAX_CONCURRENT, "timeoutSeconds": TIMEOUT_SECONDS},
+                       "maxConcurrent": MAX_CONCURRENT, "timeoutSeconds": TIMEOUT_SECONDS,
+                       "maxExtractBodyBytes": MAX_EXTRACT_BODY},
         }, headers={"Cache-Control": "no-store"})
 
     async def extract(request: Request):
-        if not request.headers.get("content-type", "").startswith("multipart/form-data;"):
-            return problem("INVALID_REQUEST", 415)
-        return problem("FEATURE_UNAVAILABLE", 501, "extract")
+        nonlocal active, import_active
+        if not request.headers.get("content-type", "").lower().startswith("multipart/form-data;"):
+            return problem("INVALID_REQUEST", 415, "extract")
+        try:
+            data, name, pasted = parse_one_part(await request.body(), request.headers.get("content-type", ""))
+        except (UploadFailure, UnicodeError) as error:
+            code = error.code if isinstance(error, UploadFailure) else "INVALID_REQUEST"
+            return problem(code, 413 if code == "INPUT_TOO_LARGE" else 422, "extract")
+        async with gate:
+            if unsafe_cleanup or cancellation_pending or active >= MAX_CONCURRENT or import_active:
+                return problem("BUSY", 429, "extract", True)
+            active += 1
+            import_active = True
+        files = OperationFiles(temp_root)
+
+        async def execute():
+            with files.open():
+                return await run_extract(data, name, pasted, files)
+
+        task = asyncio.create_task(execute())
+        operations[task] = files
+
+        def import_done(done: asyncio.Task) -> None:
+            nonlocal import_active
+            operation_done(done)
+            import_active = False
+
+        task.add_done_callback(import_done)
+
+        async def disconnected() -> None:
+            while not await request.is_disconnected():
+                await asyncio.sleep(0.05)
+
+        watcher = asyncio.create_task(disconnected())
+        try:
+            done, _ = await asyncio.wait((task, watcher), timeout=TIMEOUT_SECONDS,
+                                         return_when=asyncio.FIRST_COMPLETED)
+            if task in done:
+                result = await task
+                return JSONResponse(result.model_dump(mode="json", by_alias=True),
+                                    headers={"Cache-Control": "no-store"})
+            cleanup_code = await cancel_operation(task, files)
+            if cleanup_code:
+                return problem(cleanup_code, 503, "extract")
+            return problem("OPERATION_CANCELLED" if watcher in done else "OPERATION_TIMEOUT",
+                           499 if watcher in done else 504, "extract")
+        except UploadFailure as error:
+            code = error.code
+            status = 413 if code.endswith(("LIMIT", "LARGE")) else 503 if code in {"EXTRACT_FAILED", "EXTRACT_MONITOR_UNAVAILABLE"} else 422
+            return problem(code, status, "extract")
+        except SpikeError as error:
+            return problem(lifecycle_code(error), 503, "extract")
+        except asyncio.CancelledError:
+            await cancel_operation(task, files)
+            raise
+        except Exception:
+            return problem("EXTRACT_FAILED", 500, "extract")
+        finally:
+            watcher.cancel()
 
     async def validate(_payload: ValidateRequest):
         return problem("FEATURE_UNAVAILABLE", 501, "validate")

@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { dirname, resolve } from "node:path";
-import { validateContract, validateRenderRequest } from "./validate.js";
+import { validateContract, validateExtractResult, validateRenderRequest } from "./validate.js";
 
 type Edit = { op: "set" | "remove" | "append" | "clone" | "repeat_text" | "fill_sidebar"; path: (string | number)[]; value?: unknown; from?: (string | number)[]; text?: string; count?: number; repeat?: number; items?: number; sections?: number };
 type Case = { name: string; contract: string; base: string; valid: boolean; edits: Edit[] };
@@ -59,14 +59,16 @@ const project = read("project.json");
 const zip = read("zip_manifest.json");
 const render = read("render_request.json");
 const prepare = read("prepare_request.json");
-const bases: Record<string, unknown> = { project, proposal: child(child(project, "proposals"), 0), template: child(project, "template"), zip_manifest: zip, render_request: render, prepare_request: prepare };
+const extract = read("extract_result.json");
+const bases: Record<string, unknown> = { project, proposal: child(child(project, "proposals"), 0), template: child(project, "template"), zip_manifest: zip, render_request: render, prepare_request: prepare, extract_result: extract };
 const cases = array(read("cases.json")) as Case[];
 for (const test of cases) {
   const source = bases[test.base];
   if (source === undefined) throw new Error(`unknown fixture base ${test.base}`);
   const data: unknown = structuredClone(source);
   for (const change of test.edits) edit(data, change);
-  const valid = test.contract === "render_request" ? await validateRenderRequest(data) : validateContract(test.contract, data);
+  const valid = test.contract === "render_request" ? await validateRenderRequest(data)
+    : test.contract === "extract_result" ? validateExtractResult(data) : validateContract(test.contract, data);
   assert.equal(valid, test.valid, test.name);
 }
 process.stdout.write(`${cases.length} shared browser contract cases passed\n`);

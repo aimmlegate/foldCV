@@ -104,12 +104,13 @@ test("untrusted text remains inert and errors use theme color", async ({ page })
   expect(light).not.toEqual(dark);
 });
 
-test("open project cannot be replaced by loading the example again", async ({ page }) => {
+test("open project requires confirmation before returning to import", async ({ page }) => {
   await page.getByLabel("Текст блока").fill("Принятая правка");
   await page.getByRole("button", { name: "Применить правку" }).click();
   await page.getByRole("button", { name: "1. Загрузка" }).click();
-  await expect(page.getByRole("button", { name: "Загрузить вымышленный пример" })).toBeDisabled();
-  await expect(page.getByText("Повторная загрузка недоступна", { exact: false })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Открыт вымышленный пример" })).toBeVisible();
+  await page.getByRole("button", { name: "Закрыть пример и перейти к импорту" }).click();
+  await expect(page.getByText("Несохранённые правки примера будут удалены.")).toBeVisible();
   await page.getByRole("button", { name: "2. Редактор" }).click();
   await expect(page.getByLabel("Текст блока")).toHaveValue("Принятая правка");
   await expect(page.getByRole("button", { name: "Отменить правку" })).toBeEnabled();

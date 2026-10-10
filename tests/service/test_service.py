@@ -92,7 +92,7 @@ async def test_malformed_oversized_and_unavailable_routes_are_safe(tmp_path):
         assert (await client.post("/v1/host/login", headers=headers, json={})).status_code == 501
         assert (await client.post("/v1/render", headers=headers, json={})).status_code == 422
         assert (await client.post("/v1/extract", headers=headers, json={})).status_code == 415
-        assert (await client.post("/v1/extract", headers={**headers, "Content-Type": "multipart/form-data; boundary=fake"}, content=b"test")).status_code == 501
+        assert (await client.post("/v1/extract", headers={**headers, "Content-Type": "multipart/form-data; boundary=fake"}, content=b"test")).status_code == 422
         assert (await client.get("/")).text == "<html>synthetic shell</html>"
         assert (await client.get("/asset.js")).text == "safe asset"
 
@@ -181,7 +181,7 @@ async def test_startup_and_deterministic_routes_never_invoke_text_runner(tmp_pat
         assert (await client.get("/")).status_code == 200
         assert (await client.get("/asset.js")).status_code == 200
         assert (await client.post("/v1/host/status", headers={"Origin": ORIGIN}, json={})).status_code == 501
-        assert (await client.post("/v1/extract", headers={"Origin": ORIGIN, "Content-Type": "multipart/form-data; boundary=fake"}, content=b"synthetic")).status_code == 501
+        assert (await client.post("/v1/extract", headers={"Origin": ORIGIN, "Content-Type": "multipart/form-data; boundary=fake"}, content=b"synthetic")).status_code == 422
         assert (await client.post("/v1/validate", headers={"Origin": ORIGIN}, json={})).status_code == 422
         assert (await client.post("/v1/render", headers={"Origin": ORIGIN}, json={})).status_code == 422
     assert runner.calls == 0

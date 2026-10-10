@@ -6,11 +6,13 @@ import templateSchema from "../../../../contracts/json-schema/template.schema.js
 import zipSchema from "../../../../contracts/json-schema/zip_manifest.schema.json" with { type: "json" };
 import renderSchema from "../../../../contracts/json-schema/render_request.schema.json" with { type: "json" };
 import prepareSchema from "../../../../contracts/json-schema/prepare_request.schema.json" with { type: "json" };
+import extractSchema from "../../../../contracts/json-schema/extract_result.schema.json" with { type: "json" };
 import type { Project, PartialDate, Period } from "./generated/project.js";
 import type { ZipManifest } from "./generated/zip_manifest.js";
 import type { TemplateManifest } from "./generated/template.js";
 import type { RenderRequest } from "./generated/render_request.js";
 import type { PrepareRequest } from "./generated/prepare_request.js";
+import type { ExtractResult } from "./generated/extract_result.js";
 
 const ajv = new Ajv2020({ allErrors: true, strict: false });
 addFormats(ajv);
@@ -20,6 +22,24 @@ const templateShape = ajv.compile<TemplateManifest>(templateSchema);
 const zipShape = ajv.compile<ZipManifest>(zipSchema);
 const renderShape = ajv.compile<RenderRequest>(renderSchema);
 const prepareShape = ajv.compile<PrepareRequest>(prepareSchema);
+const extractShape = ajv.compile<ExtractResult>(extractSchema);
+
+export function validateExtractResult(value: unknown): value is ExtractResult {
+  if (!finiteJson(value) || !extractShape(value) || !wellFormedUnicode(value)) return false;
+  if (value.sourceId !== `source_${value.byteSha256.slice(0, 24)}` || value.byteRef !== `memory:sha256:${value.byteSha256}` ||
+      (value.sourceKind === "pdf") !== (value.pageCount !== null && value.pageCount !== undefined)) return false;
+  let bytes = 0;
+  let chars = 0;
+  for (const [index, unit] of value.units.entries()) {
+    if (unit.order !== index || unit.id !== `unit_${index + 1}`) return false;
+    bytes += new TextEncoder().encode(unit.text).length;
+    chars += [...unit.text].length;
+    if (bytes > 2 * 1024 * 1024 || chars > 750_000) return false;
+  }
+  return value.pageCount === null || value.pageCount === undefined ||
+    [...value.units.map((unit) => unit.location), ...value.gaps.map((gap) => gap.location)]
+      .every((location) => location.page === null || location.page === undefined || location.page <= value.pageCount!);
+}
 
 function ordered(value: unknown): unknown {
   if (Array.isArray(value)) return value.map(ordered);

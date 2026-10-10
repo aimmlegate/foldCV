@@ -1321,5 +1321,33 @@
       ]
     }
   ]
+},
+{
+  "name": "extract_valid_literal_source",
+  "contract": "extract_result",
+  "base": "extract_result",
+  "valid": true,
+  "edits": []
+},
+{
+  "name": "extract_duplicate_unit_id",
+  "contract": "extract_result",
+  "base": "extract_result",
+  "valid": false,
+  "edits": [{"op": "set", "path": ["units", 1, "id"], "value": "unit_1"}]
+},
+{
+  "name": "extract_wrong_order",
+  "contract": "extract_result",
+  "base": "extract_result",
+  "valid": false,
+  "edits": [{"op": "set", "path": ["units", 1, "order"], "value": 8}]
+},
+{
+  "name": "extract_missing_links",
+  "contract": "extract_result",
+  "base": "extract_result",
+  "valid": false,
+  "edits": [{"op": "remove", "path": ["links"]}]
 }
 ]

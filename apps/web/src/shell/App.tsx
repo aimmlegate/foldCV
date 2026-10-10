@@ -7,6 +7,9 @@ import type { Action, EditorState } from "../editor/state";
 import type { PrepareRequest } from "../contracts/generated/prepare_request";
 import { PreviewWorkflow } from "../preview/workflow";
 import type { PreviewState } from "../preview/workflow";
+import { ImportPanel } from "../import/ImportPanel";
+import { ImportWorkflow } from "../import/workflow";
+import type { ImportState } from "../import/workflow";
 
 type ThemeMode = "light" | "dark" | "system";
 const THEME_KEY = "foldcv-theme";
@@ -37,6 +40,11 @@ export function App() {
   const [state, dispatch] = useReducer(editorReducer, initialEditorState);
   const stateRef = useRef<EditorState>(initialEditorState);
   const [preview, setPreview] = useState<PreviewState>({ status: "empty", artifact: null, error: null });
+  const [importState, setImportState] = useState<ImportState>({ entries: [], selectedId: null, pending: false, error: null });
+  const importWorkflowRef = useRef<ImportWorkflow | null>(null);
+  if (!importWorkflowRef.current) importWorkflowRef.current = new ImportWorkflow(setImportState);
+  const importWorkflow = importWorkflowRef.current;
+  const [closeProjectPrompt, setCloseProjectPrompt] = useState(false);
   const workflowRef = useRef<PreviewWorkflow | null>(null);
   if (!workflowRef.current) workflowRef.current = new PreviewWorkflow(setPreview, (artifact, kind) => {
     const current = stateRef.current;
@@ -88,7 +96,7 @@ export function App() {
   const unapplied = hasUnappliedDraft(state);
   const canExport = preview.status === "ready" && workflow.ready !== null && !unapplied &&
     workflow.ready.request.baseRevision === project?.revision;
-  const unsaved = state.dirty || unapplied;
+  const unsaved = state.dirty || unapplied || importState.entries.length > 0;
   useEffect(() => {
     const media = window.matchMedia("(prefers-color-scheme: dark)");
     const apply = () => { document.documentElement.dataset.theme = mode === "system" ? (media.matches ? "dark" : "light") : mode; };
@@ -127,22 +135,24 @@ export function App() {
         <label className="flex items-center gap-2 text-sm">Тема <select aria-label="Тема" className={field} value={mode} onChange={(event) => { if (isThemeMode(event.target.value)) changeTheme(event.target.value); }}><option value="system">Системная</option><option value="light">Светлая</option><option value="dark">Тёмная</option></select></label>
       </div>
     </header>
-    <p className="border-b border-outline px-6 py-2 text-xs text-muted">Интерактивный редактор · вымышленные данные загружаются только по кнопке · обновление PDF по кнопке</p>
+    <p className="border-b border-outline px-6 py-2 text-xs text-muted">Локальный импорт по выбору файла · вымышленный пример отдельно · обновление PDF по кнопке</p>
     <nav aria-label="Этапы работы" className="flex flex-wrap gap-2 border-b border-outline px-6 py-3">
       {(["import", "editor", "export"] as const).map((stage, index) => <button key={stage} type="button" disabled={stage !== "import" && !project} aria-current={state.stage === stage ? "step" : undefined} onClick={() => send({ type: "stage", stage })} className={state.stage === stage ? primary : control}>{index + 1}. {stage === "import" ? "Загрузка" : stage === "editor" ? "Редактор" : "Выгрузка"}</button>)}
     </nav>
     {state.stage === "import" && <main className="mx-auto max-w-5xl p-6">
       <h1 className="mb-2 text-2xl font-semibold">Из исходника — в готовое резюме</h1>
-      <p className="mb-6 text-muted">Локальный импорт появится позже. Сейчас можно проверить редактирование на вымышленном примере.</p>
+      <p className="mb-6 text-muted">Выберите исходник для локального извлечения и проверки. Вымышленный пример открывает отдельный редактор.</p>
       <div className="grid gap-6 md:grid-cols-[minmax(0,1.2fr)_minmax(0,1fr)]">
-        <section className="rounded border border-outline bg-panel p-5"><h2 className="mb-3 text-lg font-semibold">Исходное резюме</h2>
-          <label htmlFor="source-text" className="mb-2 block">Вставьте текст резюме</label>
-          <textarea id="source-text" className={`${field} min-h-44`} value={state.sourceText} onChange={(event) => send({ type: "sourceText", text: event.target.value })} />
-          <p className="my-3 text-sm text-muted">Введённый текст пока остаётся только в этой вкладке; обработка недоступна.</p>
-          <div className="flex flex-wrap gap-2"><button type="button" disabled className={control}>Обработать текст</button><button type="button" disabled={Boolean(project)} onClick={() => send({ type: "loadExample" })} className={primary}>Загрузить вымышленный пример</button></div>
-          {project && <p className="mt-2 text-sm text-muted">Пример уже открыт. Повторная загрузка недоступна, чтобы сохранить текущие правки.</p>}
-          <p className="mt-3 text-xs text-muted">Выбор PDF, DOCX и открытие .cvproject появятся после подключения импорта и архива.</p>
-        </section>
+        {!project ? <ImportPanel state={importState} workflow={importWorkflow} text={state.sourceText}
+          onText={(text) => send({ type: "sourceText", text })} exampleDisabled={importState.entries.length > 0 || importState.pending}
+          onExample={() => { importWorkflow.clear(); send({ type: "loadExample" }); }} />
+          : <section className="rounded border border-outline bg-panel p-5"><h2 className="mb-3 text-lg font-semibold">Открыт вымышленный пример</h2>
+            <p className="text-sm text-muted">Импорт отдельного источника доступен после закрытия примера. Текущие правки не будут перенесены.</p>
+            {!closeProjectPrompt ? <button type="button" className={`${control} mt-4`} onClick={() => setCloseProjectPrompt(true)}>Закрыть пример и перейти к импорту</button>
+              : <div className="mt-4 space-y-2"><p role="alert" className="text-sm text-danger">Несохранённые правки примера будут удалены.</p>
+                <div className="flex gap-2"><button type="button" className={control} onClick={() => { importWorkflow.clear(); send({ type: "resetProject" }); setCloseProjectPrompt(false); }}>Подтвердить закрытие</button>
+                  <button type="button" className={control} onClick={() => setCloseProjectPrompt(false)}>Оставить пример</button></div></div>}
+          </section>}
         <aside className="rounded border border-outline bg-panel p-5"><h2 className="mb-3 text-lg font-semibold">Подключение</h2><p role="status" className="text-sm text-danger">Генерация недоступна: профиль CLI не прошёл проверку безопасности.</p><p className="mt-4 text-sm text-muted">Шаблон: Generic · основной. Проверка подключения появится позже.</p></aside>
       </div>
     </main>}

@@ -1,0 +1,72 @@
+{
+  "sourceId": "source_b7ceb315637633b7e7735074",
+  "sourceKind": "txt",
+  "originalName": "unicode.txt",
+  "mimeType": "text/plain",
+  "byteSha256": "b7ceb315637633b7e7735074150b94c77383403cf89547e7c33266435e420484",
+  "byteLength": 32,
+  "byteRef": "memory:sha256:b7ceb315637633b7e7735074150b94c77383403cf89547e7c33266435e420484",
+  "parser": "utf8",
+  "parserVersion": "1",
+  "pageCount": null,
+  "units": [
+    {
+      "id": "unit_1",
+      "order": 0,
+      "text": "Привет\r\n",
+      "location": {
+        "kind": "paragraph",
+        "page": null,
+        "paragraph": 0,
+        "table": null,
+        "row": null,
+        "column": null,
+        "part": null
+      }
+    },
+    {
+      "id": "unit_2",
+      "order": 1,
+      "text": "Café\n",
+      "location": {
+        "kind": "paragraph",
+        "page": null,
+        "paragraph": 1,
+        "table": null,
+        "row": null,
+        "column": null,
+        "part": null
+      }
+    },
+    {
+      "id": "unit_3",
+      "order": 2,
+      "text": "wrap-\n",
+      "location": {
+        "kind": "paragraph",
+        "page": null,
+        "paragraph": 2,
+        "table": null,
+        "row": null,
+        "column": null,
+        "part": null
+      }
+    },
+    {
+      "id": "unit_4",
+      "order": 3,
+      "text": "next\n",
+      "location": {
+        "kind": "paragraph",
+        "page": null,
+        "paragraph": 3,
+        "table": null,
+        "row": null,
+        "column": null,
+        "part": null
+      }
+    }
+  ],
+  "gaps": [],
+  "links": []
+}

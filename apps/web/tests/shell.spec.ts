@@ -15,7 +15,8 @@ test("Russian shell keeps generation closed", async ({ page }) => {
   await page.goto("/");
   await expect(page.getByRole("heading", { name: "Исходное резюме" })).toBeVisible();
   await expect(page.getByRole("status")).toContainText("Генерация недоступна");
-  await expect(page.getByRole("button", { name: "Обработать текст" })).toBeDisabled();
+  await expect(page.getByText("Обработка и генерация текста недоступны", { exact: false })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Извлечь вставленный текст" })).toBeDisabled();
   await page.getByLabel("Вставьте текст резюме").fill("Вымышленный инженер");
   await expect(page.getByLabel("Вставьте текст резюме")).toHaveValue("Вымышленный инженер");
 });

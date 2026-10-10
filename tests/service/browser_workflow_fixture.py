@@ -29,7 +29,8 @@ async def main():
         port = listener.getsockname()[1]
         origin = f"http://127.0.0.1:{port}"
         app = create_app(origin=origin, secret="synthetic-browser-secret-0123456789",
-                         temp_root=root / "operations", dist=ROOT / "apps/web/dist", runner=ForbiddenRunner())
+                         temp_root=root / "operations", dist=Path(sys.argv[2]) if len(sys.argv) > 2 else ROOT / "apps/web/dist",
+                         runner=ForbiddenRunner())
         server = uvicorn.Server(uvicorn.Config(app, host="127.0.0.1", port=port, proxy_headers=False,
                                                 access_log=False, log_level="critical",
                                                 timeout_graceful_shutdown=2))

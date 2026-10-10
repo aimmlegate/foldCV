@@ -25,6 +25,7 @@ export type EditorState = {
 };
 export type Action =
   | { type: "loadExample" }
+  | { type: "resetProject" }
   | { type: "stage"; stage: Stage }
   | { type: "panel"; panel: Panel }
   | { type: "select"; id: string }
@@ -130,6 +131,9 @@ export function editorReducer(state: EditorState, action: Action): EditorState {
           jobProseBlocks: { job_1: "job_1_prose", job_2: "job_2_prose" } },
         stage: "editor", selectedId: project.views[0]?.id ?? null, sourceText: state.sourceText, dirty: true };
     }
+    case "resetProject":
+      return { ...initialEditorState, sourceText: state.sourceText,
+        dirty: state.sourceText.length > 0 };
     case "stage":
       return action.stage !== "import" && !state.project ? state : { ...state, stage: action.stage };
     case "panel": return { ...state, panel: action.panel };
