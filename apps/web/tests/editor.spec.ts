@@ -11,7 +11,7 @@ test("draft navigation, apply, lock, undo and source text stay local", async ({ 
   const textarea = page.getByLabel("Текст блока");
   const original = await textarea.inputValue();
   await textarea.fill("Ручная правка профиля");
-  await page.getByRole("button", { name: "Последний проект" }).click();
+  await page.getByRole("button", { name: "Проект: Example One" }).click();
   await page.getByRole("button", { name: "О себе" }).click();
   await expect(textarea).toHaveValue("Ручная правка профиля");
   await expect(page.getByText("ввод не применён", { exact: false }).first()).toBeVisible();
@@ -35,11 +35,11 @@ test("empty text error, cancel and hidden block are visible", async ({ page }) =
   await page.getByRole("button", { name: "Скрыть раздел" }).click();
   await expect(page.getByRole("button", { name: "О себе" })).toContainText("Скрыт");
   await expect(page.getByRole("tab", { name: "Превью" })).toBeVisible();
-  await expect(page.getByLabel("Превью")).not.toContainText("Engineer with service experience.");
+  await expect(page.getByText("PDF ещё не собран")).toBeVisible();
 });
 
 test("fact input error and correction invalidate review and mark preview stale", async ({ page }) => {
-  await page.getByRole("button", { name: "Последний проект" }).click();
+  await page.getByRole("button", { name: "Проект: Example One" }).click();
   await page.getByRole("button", { name: "Отметить блок проверенным" }).click();
   await page.getByRole("tab", { name: "Проверки" }).click();
   await expect(page.getByText("Выбранный блок отмечен проверенным")).toBeVisible();
@@ -51,7 +51,7 @@ test("fact input error and correction invalidate review and mark preview stale",
   await expect(page.getByText("Связанный факт изменён", { exact: false })).toBeVisible();
   await expect(page.getByText("Выбранный блок ещё не отмечен проверенным")).toBeVisible();
   await page.getByRole("tab", { name: "Превью" }).click();
-  await expect(page.getByText("Рендер устарел или отсутствует")).toBeVisible();
+  await expect(page.getByText("PDF ещё не собран")).toBeVisible();
 });
 
 test("keyboard tabs, 1280 desktop and narrow layout remain usable", async ({ page }) => {
@@ -78,13 +78,13 @@ test("reload clears candidate state while manual theme persists", async ({ page 
   expect(keys).toEqual(["foldcv-theme"]);
 });
 
-test("export view states unavailable downloads without network operations", async ({ page }) => {
+test("export offers explicit PDF and DOCX while project archive stays unavailable", async ({ page }) => {
   let operations = 0;
   page.on("request", (request) => { if (request.url().includes("/v1/operations")) operations += 1; });
   await page.getByRole("button", { name: "3. Выгрузка" }).click();
-  await expect(page.getByText("Выгрузка пока недоступна", { exact: false })).toBeVisible();
-  await expect(page.getByRole("button", { name: "Скачать" })).toHaveCount(3);
-  for (const button of await page.getByRole("button", { name: "Скачать" }).all()) await expect(button).toBeDisabled();
+  await expect(page.getByRole("button", { name: "Собрать и скачать PDF" })).toBeEnabled();
+  await expect(page.getByRole("button", { name: "Собрать и скачать DOCX" })).toBeEnabled();
+  await expect(page.getByRole("button", { name: "Скачать проект" })).toBeDisabled();
   expect(operations).toBe(0);
 });
 
@@ -92,7 +92,7 @@ test("untrusted text remains inert and errors use theme color", async ({ page })
   const markup = "<img src=x onerror=alert(1)>";
   await page.getByLabel("Текст блока").fill(markup);
   await page.getByRole("button", { name: "Применить правку" }).click();
-  await expect(page.getByLabel("Превью").getByText(markup, { exact: true })).toBeVisible();
+  await expect(page.getByLabel("Текст блока")).toHaveValue(markup);
   expect(await page.locator("img").count()).toBe(0);
   await page.getByLabel("Текст блока").fill("");
   await page.getByRole("button", { name: "Применить правку" }).click();
@@ -123,14 +123,13 @@ test("undo of accepted edit leaves a later pending draft", async ({ page }) => {
   await textarea.fill("Новый неприменённый текст");
   await page.getByRole("button", { name: "Отменить правку" }).click();
   await expect(textarea).toHaveValue("Новый неприменённый текст");
-  await expect(page.getByLabel("Превью")).toContainText(original);
-  await expect(page.getByLabel("Превью")).not.toContainText("Новый неприменённый текст");
+  await expect(page.getByText("PDF ещё не собран")).toBeVisible();
   await page.getByRole("button", { name: "Отменить ввод", exact: true }).click();
   await expect(textarea).toHaveValue(original);
 });
 
 test("equivalent metric notation keeps accepted review and normalizes field", async ({ page }) => {
-  await page.getByRole("button", { name: "Последний проект" }).click();
+  await page.getByRole("button", { name: "Проект: Example One" }).click();
   await page.getByRole("button", { name: "Отметить блок проверенным" }).click();
   await page.getByLabel("Значение факта").fill("02000");
   await page.getByRole("button", { name: "Применить факт" }).click();
@@ -144,5 +143,5 @@ test("technology fact is displayed without a generic value editor", async ({ pag
   await expect(page.getByText("Python · внесено пользователем")).toBeVisible();
   await expect(page.getByText("Изменение технологии будет доступно", { exact: false })).toBeVisible();
   await expect(page.getByLabel("Значение факта")).toHaveCount(0);
-  await expect(page.getByLabel("Превью")).toContainText("Python");
+  await expect(page.getByLabel("Текст блока")).toBeDisabled();
 });

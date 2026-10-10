@@ -9,6 +9,7 @@ from pydantic import ValidationError
 
 from packages.resume_core.models import validate_contract
 from packages.resume_core.rendering.models import RenderRequest
+from packages.resume_core.rendering.preparation import PrepareRequest
 
 
 EXAMPLES = Path(__file__).resolve().parents[2] / "contracts" / "examples"
@@ -16,11 +17,12 @@ CASES = json.loads((EXAMPLES / "cases.json").read_text(encoding="utf-8"))
 PROJECT = json.loads((EXAMPLES / "project.json").read_text(encoding="utf-8"))
 ZIP = json.loads((EXAMPLES / "zip_manifest.json").read_text(encoding="utf-8"))
 RENDER = json.loads((EXAMPLES / "render_request.json").read_text(encoding="utf-8"))
+PREPARE = json.loads((EXAMPLES / "prepare_request.json").read_text(encoding="utf-8"))
 
 
 def case_data(case: dict) -> object:
     bases = {"project": PROJECT, "proposal": PROJECT["proposals"][0], "template": PROJECT["template"], "zip_manifest": ZIP,
-             "render_request": RENDER}
+             "render_request": RENDER, "prepare_request": PREPARE}
     data = copy.deepcopy(bases[case["base"]])
     for edit in case["edits"]:
         target = data
@@ -53,6 +55,8 @@ def test_shared_case(case: dict) -> None:
     try:
         if case["contract"] == "render_request":
             RenderRequest.model_validate(case_data(case))
+        elif case["contract"] == "prepare_request":
+            PrepareRequest.model_validate(case_data(case))
         else:
             validate_contract(case["contract"], case_data(case))
         accepted = True

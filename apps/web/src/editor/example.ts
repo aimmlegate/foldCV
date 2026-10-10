@@ -21,11 +21,18 @@ export function syntheticProject(): Project {
       },
     },
     {
+      id: "job_2_prose", kind: "job_prose", revision: 1, status: "ready", visible: true,
+      contentPolicyVersion: profile.contentPolicyVersion, dependencyHash: profile.dependencyHash,
+      previous: null,
+      state: { text: "Mentored developers.", origin: "source", locked: false,
+        factIds: ["fact_user"], factRevisions: { fact_user: 1 } },
+    },
+    {
       id: "focus", kind: "focus", revision: 1, status: "ready", visible: true,
       contentPolicyVersion: profile.contentPolicyVersion, dependencyHash: profile.dependencyHash,
       previous: null,
       state: {
-        text: "Python", origin: "manual", locked: false,
+        text: "", origin: "manual", locked: false,
         factIds: ["fact_tech"], factRevisions: { fact_tech: 1 },
       },
     },
@@ -37,6 +44,10 @@ export function syntheticProject(): Project {
     },
   ];
   copy.views = [...copy.views, ...extra];
+  if (copy.template === null) throw new Error("Missing synthetic template");
+  copy.template = { ...copy.template, version: "1.0.0",
+    packageSha256: "d081df948bfd55d107c38d40387a9758f563f9c14a9cffc4a847f44cb687b8b9", assets: [] };
+  copy.renders = [];
   copy.operations = [];
   copy.proposals = [];
   if (!validateContract("project", copy)) throw new Error("Invalid expanded synthetic project");

@@ -1,0 +1,380 @@
+{
+  "project": {
+    "schemaVersion": 3,
+    "projectId": "project_synthetic",
+    "revision": 3,
+    "asOf": {
+      "precision": "day",
+      "year": 2026,
+      "month": 10,
+      "day": 10
+    },
+    "createdAt": "2026-10-10T12:00:00Z",
+    "sources": [
+      {
+        "id": "source_1",
+        "revision": 1,
+        "originalName": "synthetic.txt",
+        "mimeType": "text/plain",
+        "byteSha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "byteRef": "sources/source_1/original.txt",
+        "parser": "plain",
+        "parserVersion": "1",
+        "units": [
+          {
+            "id": "unit_1",
+            "revision": 1,
+            "order": 0,
+            "text": "Built a team from zero to five and processed up to 2000 records per day.",
+            "location": {
+              "kind": "paragraph",
+              "index": 0,
+              "row": null,
+              "column": null
+            },
+            "disposition": "shown",
+            "representedFactIds": [
+              "fact_metric"
+            ]
+          },
+          {
+            "id": "unit_2",
+            "revision": 1,
+            "order": 1,
+            "text": "Earlier education detail kept in the archive.",
+            "location": {
+              "kind": "paragraph",
+              "index": 1,
+              "row": null,
+              "column": null
+            },
+            "disposition": "unresolved",
+            "representedFactIds": []
+          }
+        ],
+        "overlays": [
+          {
+            "id": "overlay_1",
+            "revision": 1,
+            "unitId": "unit_2",
+            "text": "Corrected education detail.",
+            "origin": "user"
+          }
+        ],
+        "warnings": []
+      }
+    ],
+    "facts": [
+      {
+        "id": "fact_metric",
+        "revision": 2,
+        "kind": "metric",
+        "value": {
+          "number": 2000,
+          "upperNumber": null,
+          "comparator": "at_most",
+          "unit": "records",
+          "period": "day",
+          "baseline": null,
+          "result": null,
+          "scope": "service",
+          "attribution": "team",
+          "qualifiers": [
+            "peak"
+          ]
+        },
+        "evidence": [
+          {
+            "sourceId": "source_1",
+            "sourceRevision": 1,
+            "unitId": "unit_1",
+            "unitRevision": 1
+          }
+        ],
+        "origin": "source",
+        "importance": "essential",
+        "jobId": "job_1",
+        "subprojectId": "sub_1"
+      },
+      {
+        "id": "fact_tech",
+        "revision": 1,
+        "kind": "technology",
+        "value": {
+          "canonicalId": "python",
+          "display": "Python",
+          "scope": "global"
+        },
+        "evidence": [],
+        "origin": "user",
+        "importance": "normal",
+        "jobId": null,
+        "subprojectId": null
+      },
+      {
+        "id": "fact_user",
+        "revision": 1,
+        "kind": "text",
+        "value": {
+          "text": "Mentored developers"
+        },
+        "evidence": [],
+        "origin": "user",
+        "importance": "normal",
+        "jobId": "job_2",
+        "subprojectId": null
+      },
+      {
+        "id": "fact_date",
+        "revision": 1,
+        "kind": "date",
+        "value": {
+          "precision": "year",
+          "year": 2022,
+          "month": null,
+          "day": null
+        },
+        "evidence": [],
+        "origin": "user",
+        "importance": "minor",
+        "jobId": null,
+        "subprojectId": null
+      }
+    ],
+    "employment": [
+      {
+        "id": "job_1",
+        "employer": "Example One",
+        "role": "Engineer",
+        "periods": [
+          {
+            "start": {
+              "precision": "year",
+              "year": 2020,
+              "month": null,
+              "day": null
+            },
+            "end": {
+              "precision": "year",
+              "year": 2024,
+              "month": null,
+              "day": null
+            }
+          }
+        ],
+        "subprojects": [
+          {
+            "id": "sub_1",
+            "name": "Service",
+            "period": {
+              "start": {
+                "precision": "month",
+                "year": 2021,
+                "month": 5,
+                "day": null
+              },
+              "end": {
+                "precision": "month",
+                "year": 2023,
+                "month": 8,
+                "day": null
+              }
+            },
+            "factIds": [
+              "fact_metric"
+            ]
+          }
+        ],
+        "factIds": [
+          "fact_metric"
+        ]
+      },
+      {
+        "id": "job_2",
+        "employer": "Example Two",
+        "role": "Lead",
+        "periods": [
+          {
+            "start": {
+              "precision": "year",
+              "year": 2023,
+              "month": null,
+              "day": null
+            },
+            "end": null
+          }
+        ],
+        "subprojects": [],
+        "factIds": [
+          "fact_user"
+        ]
+      }
+    ],
+    "views": [
+      {
+        "id": "profile",
+        "kind": "profile",
+        "revision": 2,
+        "state": {
+          "text": "Engineer with service experience.",
+          "origin": "manual",
+          "locked": true,
+          "factIds": [
+            "fact_metric"
+          ],
+          "factRevisions": {
+            "fact_metric": 2
+          }
+        },
+        "previous": {
+          "text": "Engineer.",
+          "origin": "generated",
+          "locked": false,
+          "factIds": [
+            "fact_metric"
+          ],
+          "factRevisions": {
+            "fact_metric": 2
+          }
+        },
+        "visible": true,
+        "status": "ready",
+        "dependencyHash": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "contentPolicyVersion": "editorial-1"
+      },
+      {
+        "id": "work-one",
+        "kind": "job_prose",
+        "revision": 1,
+        "state": {
+          "text": "Built a team from zero to five.",
+          "origin": "manual",
+          "locked": true,
+          "factIds": [
+            "fact_metric"
+          ],
+          "factRevisions": {
+            "fact_metric": 2
+          }
+        },
+        "previous": null,
+        "visible": true,
+        "status": "ready",
+        "dependencyHash": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "contentPolicyVersion": "editorial-1"
+      },
+      {
+        "id": "work-two",
+        "kind": "job_prose",
+        "revision": 1,
+        "state": {
+          "text": "Mentored developers.",
+          "origin": "manual",
+          "locked": true,
+          "factIds": [
+            "fact_user"
+          ],
+          "factRevisions": {
+            "fact_user": 1
+          }
+        },
+        "previous": null,
+        "visible": true,
+        "status": "ready",
+        "dependencyHash": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "contentPolicyVersion": "editorial-1"
+      },
+      {
+        "id": "education",
+        "kind": "education",
+        "revision": 1,
+        "state": {
+          "text": "Technical Institute, 2018",
+          "origin": "manual",
+          "locked": true,
+          "factIds": [],
+          "factRevisions": {}
+        },
+        "previous": null,
+        "visible": true,
+        "status": "ready",
+        "dependencyHash": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "contentPolicyVersion": "editorial-1"
+      }
+    ],
+    "template": {
+      "id": "generic",
+      "version": "1.0.0",
+      "packageSha256": "d081df948bfd55d107c38d40387a9758f563f9c14a9cffc4a847f44cb687b8b9",
+      "contentPolicyVersion": "editorial-1",
+      "assets": []
+    },
+    "review": {
+      "decisions": [
+        {
+          "targetKind": "source_unit",
+          "targetId": "unit_2",
+          "disposition": "unresolved",
+          "reason": "Needs review",
+          "targetRevision": 1
+        }
+      ],
+      "acknowledgments": [
+        {
+          "issueId": "issue_1",
+          "targetKind": "fact",
+          "targetId": "fact_metric",
+          "targetRevision": 2
+        }
+      ]
+    },
+    "operations": [
+      {
+        "id": "operation_1",
+        "kind": "rewrite_prose",
+        "status": "completed",
+        "baseRevision": 2,
+        "usage": {
+          "logicalAttempts": 1,
+          "internalInferenceRequests": null,
+          "reportedInputTokens": null,
+          "reportedOutputTokens": null
+        },
+        "events": [
+          {
+            "requestId": "operation_1",
+            "sequence": 0,
+            "type": "operation.started",
+            "stage": null,
+            "usage": null
+          }
+        ]
+      }
+    ],
+    "proposals": [
+      {
+        "id": "proposal_1",
+        "operationId": "operation_1",
+        "kind": "rewrite_prose",
+        "blockId": "profile",
+        "baseBlockRevision": 2,
+        "dependencyHash": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "replacementText": "Proposed profile.",
+        "evidenceFactIds": [
+          "fact_metric"
+        ],
+        "findings": []
+      }
+    ],
+    "renders": []
+  },
+  "presentation": {
+    "name": "Synthetic Person",
+    "title": "Engineer",
+    "sourceLanguage": "en",
+    "jobProseBlocks": {
+      "job_1": "work-one",
+      "job_2": "work-two"
+    }
+  }
+}

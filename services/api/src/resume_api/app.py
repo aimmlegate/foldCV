@@ -25,6 +25,7 @@ from .contracts import (CompletedEvent, CompletedPayload, DraftRequest, EmptyReq
 from .lifecycle import OperationFiles, SpikeError, has_blocked_owned, reap_owned
 from .rendering import DocumentRenderer
 from packages.resume_core.rendering.template import PACKAGE_SHA256, RenderFailure, renderer_sha256, require_template
+from packages.resume_core.rendering.preparation import PrepareRequest, prepare_document
 
 
 MAX_BODY = 1_048_576
@@ -34,7 +35,7 @@ TIMEOUT_SECONDS = 30
 BODY_TIMEOUT_SECONDS = 10
 CANCEL_GRACE_SECONDS = 0.5
 POST_ONLY_PATHS = frozenset({"session/exchange", "extract", "normalize", "draft", "rewrite",
-                            "validate", "render", "host/discover", "host/status", "host/login",
+                            "validate", "prepare-render", "render", "host/discover", "host/status", "host/login",
                             "host/detach", "host/models"})
 JSON_POST_PATHS = frozenset("/v1/" + path for path in POST_ONLY_PATHS if path != "extract")
 
@@ -309,6 +310,13 @@ def create_app(*, origin: str, secret: str, temp_root: Path, dist: Path, runner:
     async def validate(_payload: ValidateRequest):
         return problem("FEATURE_UNAVAILABLE", 501, "validate")
 
+    async def prepare_render(payload: PrepareRequest):
+        try:
+            prepared = prepare_document(payload)
+            return JSONResponse(prepared.model_dump(mode="json", by_alias=True), headers={"Cache-Control": "no-store"})
+        except (ValueError, RenderFailure):
+            return problem("PREPARATION_FAILED", 422, "prepare")
+
     async def render(request: Request, payload: RenderRequest):
         nonlocal active
         async with gate:
@@ -362,6 +370,7 @@ def create_app(*, origin: str, secret: str, temp_root: Path, dist: Path, runner:
 
     app.add_api_route("/v1/extract", extract, methods=["POST"])
     app.add_api_route("/v1/validate", validate, methods=["POST"])
+    app.add_api_route("/v1/prepare-render", prepare_render, methods=["POST"])
     app.add_api_route("/v1/render", render, methods=["POST"])
     for path in ("discover", "status", "login", "detach", "models"):
         app.add_api_route(f"/v1/host/{path}", host_unavailable, methods=["POST"])

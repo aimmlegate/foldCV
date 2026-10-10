@@ -1,5 +1,6 @@
 import type { Block, BlockState, Facts, Project, Review } from "../contracts/generated/project";
 import { syntheticProject } from "./example";
+import type { Presentation } from "../contracts/generated/prepare_request";
 
 type Fact = Facts[number];
 
@@ -9,6 +10,9 @@ type Drafts = Record<string, string>;
 type Checkpoint = { state: BlockState; visible: boolean; status: Block["status"]; review: Review };
 export type EditorState = {
   project: Project | null;
+  presentation: Presentation | null;
+  presentationDrafts: { name?: string; title?: string };
+  presentationUndo: Presentation | null;
   stage: Stage;
   panel: Panel;
   selectedId: string | null;
@@ -25,6 +29,11 @@ export type Action =
   | { type: "panel"; panel: Panel }
   | { type: "select"; id: string }
   | { type: "sourceText"; text: string }
+  | { type: "presentationDraft"; field: "name" | "title"; text: string }
+  | { type: "presentationApply"; field: "name" | "title" }
+  | { type: "presentationCancel"; field: "name" | "title" }
+  | { type: "presentationLanguage"; language: Presentation["sourceLanguage"] }
+  | { type: "presentationUndo" }
   | { type: "draft"; id: string; text: string }
   | { type: "factDraft"; id: string; text: string }
   | { type: "cancelFact"; id: string }
@@ -37,7 +46,8 @@ export type Action =
   | { type: "fact"; id: string; value: string };
 
 export const initialEditorState: EditorState = {
-  project: null, stage: "import", panel: "preview", selectedId: null,
+  project: null, presentation: null, presentationDrafts: {}, presentationUndo: null,
+  stage: "import", panel: "preview", selectedId: null,
   drafts: {}, factDrafts: {}, errors: {}, undo: {}, sourceText: "", dirty: false,
 };
 
@@ -50,7 +60,9 @@ export function draftFor(state: EditorState, block: Block): string {
 }
 
 export function hasUnappliedDraft(state: EditorState): boolean {
-  return Boolean(state.project && (state.project.views.some((block) => draftFor(state, block) !== block.state.text)
+  return Boolean(state.project && (Object.entries(state.presentationDrafts).some(([field, text]) =>
+      text !== state.presentation?.[field as "name" | "title"])
+    || state.project.views.some((block) => draftFor(state, block) !== block.state.text)
     || state.project.facts.some((fact) => state.factDrafts[fact.id] !== undefined && state.factDrafts[fact.id] !== factDisplay(fact))));
 }
 
@@ -113,7 +125,10 @@ export function editorReducer(state: EditorState, action: Action): EditorState {
     case "loadExample": {
       if (state.project) return state;
       const project = syntheticProject();
-      return { ...initialEditorState, project, stage: "editor", selectedId: project.views[0]?.id ?? null, sourceText: state.sourceText, dirty: true };
+      return { ...initialEditorState, project,
+        presentation: { name: "Мария Примерова", title: "Engineer", sourceLanguage: "en",
+          jobProseBlocks: { job_1: "job_1_prose", job_2: "job_2_prose" } },
+        stage: "editor", selectedId: project.views[0]?.id ?? null, sourceText: state.sourceText, dirty: true };
     }
     case "stage":
       return action.stage !== "import" && !state.project ? state : { ...state, stage: action.stage };
@@ -121,6 +136,35 @@ export function editorReducer(state: EditorState, action: Action): EditorState {
     case "select":
       return state.project?.views.some((block) => block.id === action.id) ? { ...state, selectedId: action.id } : state;
     case "sourceText": return { ...state, sourceText: action.text, dirty: state.dirty || action.text.length > 0 };
+    case "presentationDraft":
+      return { ...state, presentationDrafts: { ...state.presentationDrafts, [action.field]: action.text },
+        errors: { ...state.errors, [action.field]: "" } };
+    case "presentationCancel": {
+      const presentationDrafts = { ...state.presentationDrafts };
+      delete presentationDrafts[action.field];
+      return { ...state, presentationDrafts, errors: { ...state.errors, [action.field]: "" } };
+    }
+    case "presentationApply": {
+      if (!state.project || !state.presentation) return state;
+      const value = (state.presentationDrafts[action.field] ?? state.presentation[action.field]).trim();
+      if (!value || value.length > (action.field === "name" ? 160 : 240))
+        return { ...state, errors: { ...state.errors, [action.field]: "Введите корректное значение." } };
+      if (value === state.presentation[action.field]) return editorReducer(state, { type: "presentationCancel", field: action.field });
+      const presentationDrafts = { ...state.presentationDrafts };
+      delete presentationDrafts[action.field];
+      return { ...state, presentationUndo: state.presentation,
+        presentation: { ...state.presentation, [action.field]: value }, presentationDrafts,
+        project: { ...state.project, revision: state.project.revision + 1 }, dirty: true };
+    }
+    case "presentationLanguage":
+      return !state.project || !state.presentation || state.presentation.sourceLanguage === action.language ? state :
+        { ...state, presentationUndo: state.presentation,
+          presentation: { ...state.presentation, sourceLanguage: action.language },
+          project: { ...state.project, revision: state.project.revision + 1 }, dirty: true };
+    case "presentationUndo":
+      return !state.project || !state.presentationUndo ? state :
+        { ...state, presentation: state.presentationUndo, presentationUndo: null,
+          project: { ...state.project, revision: state.project.revision + 1 }, dirty: true };
     case "draft": return { ...state, drafts: { ...state.drafts, [action.id]: action.text }, errors: { ...state.errors, [action.id]: "" } };
     case "factDraft": {
       const fact = state.project?.facts.find((item) => item.id === action.id);
@@ -142,6 +186,8 @@ export function editorReducer(state: EditorState, action: Action): EditorState {
       if (!block) return state;
       const text = draftFor(state, block).trim();
       if (!text) return { ...state, errors: { ...state.errors, [action.id]: "Введите текст блока." } };
+      if (block.status === "stale" && text === block.state.text)
+        return { ...state, errors: { ...state.errors, [action.id]: "Измените текст с учётом исправленного факта." } };
       if (text === block.state.text && block.status !== "stale") return editorReducer(state, { type: "cancel", id: action.id });
       const next = replaceBlock(state, action.id, (current) => {
         const factRevisions = { ...current.state.factRevisions };

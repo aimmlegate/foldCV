@@ -5,10 +5,12 @@ import proposalSchema from "../../../../contracts/json-schema/proposal.schema.js
 import templateSchema from "../../../../contracts/json-schema/template.schema.json" with { type: "json" };
 import zipSchema from "../../../../contracts/json-schema/zip_manifest.schema.json" with { type: "json" };
 import renderSchema from "../../../../contracts/json-schema/render_request.schema.json" with { type: "json" };
+import prepareSchema from "../../../../contracts/json-schema/prepare_request.schema.json" with { type: "json" };
 import type { Project, PartialDate, Period } from "./generated/project.js";
 import type { ZipManifest } from "./generated/zip_manifest.js";
 import type { TemplateManifest } from "./generated/template.js";
 import type { RenderRequest } from "./generated/render_request.js";
+import type { PrepareRequest } from "./generated/prepare_request.js";
 
 const ajv = new Ajv2020({ allErrors: true, strict: false });
 addFormats(ajv);
@@ -17,6 +19,7 @@ const proposalShape = ajv.compile(proposalSchema);
 const templateShape = ajv.compile<TemplateManifest>(templateSchema);
 const zipShape = ajv.compile<ZipManifest>(zipSchema);
 const renderShape = ajv.compile<RenderRequest>(renderSchema);
+const prepareShape = ajv.compile<PrepareRequest>(prepareSchema);
 
 function ordered(value: unknown): unknown {
   if (Array.isArray(value)) return value.map(ordered);
@@ -237,6 +240,23 @@ function safeZip(data: unknown): boolean {
   return unique(paths) && paths.every(safePath) && projectEntries.length === 1 && projectEntries[0]?.path === "project.json";
 }
 
+function safePrepare(data: unknown): boolean {
+  if (!prepareShape(data) || !semanticProject(data.project)) return false;
+  const project = data.project;
+  const presentation = data.presentation;
+  if (project.schemaVersion !== 3 || project.template?.id !== "generic" || project.template.version !== "1.0.0" ||
+      project.template.packageSha256 !== "d081df948bfd55d107c38d40387a9758f563f9c14a9cffc4a847f44cb687b8b9") return false;
+  const jobs = project.employment.map((job) => job.id);
+  const bindings = presentation.jobProseBlocks;
+  const bound = Object.values(bindings);
+  if (!unique(bound) || !unique(jobs) || jobs.length !== Object.keys(bindings).length ||
+      !jobs.every((id) => Object.hasOwn(bindings, id))) return false;
+  const blocks = new Map(project.views.map((block) => [block.id, block]));
+  if (project.views.filter((block) => block.kind === "profile").length !== 1) return false;
+  if (bound.some((id) => blocks.get(id)?.kind !== "job_prose")) return false;
+  return !project.views.some((block) => block.kind === "job_prose" && block.visible && !bound.includes(block.id));
+}
+
 export function validateContract(kind: string, data: unknown): boolean {
   if (!finiteJson(data)) return false;
   switch (kind) {
@@ -244,6 +264,7 @@ export function validateContract(kind: string, data: unknown): boolean {
     case "proposal": return proposalShape(data);
     case "template": return templateShape(data) && data.assets.every((asset) => safePath(asset.path));
     case "zip_manifest": return safeZip(data);
+    case "prepare_request": return safePrepare(data);
     default: return false;
   }
 }

@@ -94,8 +94,11 @@ test("invalid fact input preserves revisions and a later valid edit makes render
   let state = loaded();
   const project = state.project;
   assert.ok(project);
-  const render = project.renders[0];
-  assert.ok(render);
+  const render: NonNullable<EditorState["project"]>["renders"][number] = {
+    id: "render-test", projectRevision: project.revision, snapshotSha256: "e".repeat(64),
+    templateId: "generic", templateVersion: "1.0.0", rendererVersion: "1.0.0",
+    blocks: [], docx: null, pdf: null,
+  };
   const withPdf: EditorState = { ...state, project: { ...project, renders: [{ ...render, pdf: { path: "renders/demo.pdf", sha256: "a".repeat(64), size: 10 } }] } };
   assert.equal(renderStale(withPdf.project!), false);
   state = editorReducer(withPdf, { type: "fact", id: "fact_metric", value: "bad" });
@@ -110,6 +113,7 @@ test("explicit apply after a fact change refreshes dependencies before review", 
   let state = loaded();
   state = editorReducer(state, { type: "fact", id: "fact_metric", value: "2600" });
   assert.equal(block(state, "job_1_prose").status, "stale");
+  state = editorReducer(state, { type: "draft", id: "job_1_prose", text: "Built a team from zero to five and processed up to 2600 records per day." });
   state = editorReducer(state, { type: "apply", id: "job_1_prose" });
   assert.equal(block(state, "job_1_prose").status, "ready");
   assert.equal(block(state, "job_1_prose").state.factRevisions.fact_metric, 3);
@@ -175,4 +179,14 @@ test("technology fact cannot be changed through generic text actions", () => {
     assert.equal(technology.value.display, "Python");
   }
   assert.ok(validateContract("project", state.project));
+});
+
+test("a corrected fact cannot be cleared by accepting unchanged stale prose", () => {
+  let state = loaded();
+  state = editorReducer(state, { type: "fact", id: "fact_metric", value: "2500" });
+  const revision = state.project?.revision;
+  state = editorReducer(state, { type: "apply", id: "job_1_prose" });
+  assert.equal(state.project?.revision, revision);
+  assert.equal(block(state, "job_1_prose").status, "stale");
+  assert.equal(state.errors.job_1_prose, "Измените текст с учётом исправленного факта.");
 });

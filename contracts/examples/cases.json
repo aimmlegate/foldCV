@@ -1244,5 +1244,82 @@
         "value": "d3b1c7650eef250ab2cb635d80cb3ee69e227ad12a6eb269a36bb6df1b1242c7"
       }
     ]
-  }
+  },
+{
+  "name": "prepare_valid_explicit_bindings",
+  "contract": "prepare_request",
+  "base": "prepare_request",
+  "valid": true,
+  "edits": []
+},
+{
+  "name": "prepare_missing_job_binding",
+  "contract": "prepare_request",
+  "base": "prepare_request",
+  "valid": false,
+  "edits": [
+    {
+      "op": "remove",
+      "path": [
+        "presentation",
+        "jobProseBlocks",
+        "job_2"
+      ]
+    }
+  ]
+},
+{
+  "name": "prepare_wrong_template_identity",
+  "contract": "prepare_request",
+  "base": "prepare_request",
+  "valid": false,
+  "edits": [
+    {
+      "op": "set",
+      "path": [
+        "project",
+        "template",
+        "packageSha256"
+      ],
+      "value": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+    }
+  ]
+},
+{
+  "name": "prepare_duplicate_job_binding",
+  "contract": "prepare_request",
+  "base": "prepare_request",
+  "valid": false,
+  "edits": [
+    {
+      "op": "set",
+      "path": [
+        "presentation",
+        "jobProseBlocks",
+        "job_2"
+      ],
+      "value": "work-one"
+    }
+  ]
+},
+{
+  "name": "prepare_extra_visible_prose",
+  "contract": "prepare_request",
+  "base": "prepare_request",
+  "valid": false,
+  "edits": [
+    {
+      "op": "clone",
+      "path": [
+        "project",
+        "views"
+      ],
+      "from": [
+        "project",
+        "views",
+        1
+      ]
+    }
+  ]
+}
 ]

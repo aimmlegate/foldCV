@@ -58,7 +58,8 @@ function edit(data: unknown, change: Edit): void {
 const project = read("project.json");
 const zip = read("zip_manifest.json");
 const render = read("render_request.json");
-const bases: Record<string, unknown> = { project, proposal: child(child(project, "proposals"), 0), template: child(project, "template"), zip_manifest: zip, render_request: render };
+const prepare = read("prepare_request.json");
+const bases: Record<string, unknown> = { project, proposal: child(child(project, "proposals"), 0), template: child(project, "template"), zip_manifest: zip, render_request: render, prepare_request: prepare };
 const cases = array(read("cases.json")) as Case[];
 for (const test of cases) {
   const source = bases[test.base];
