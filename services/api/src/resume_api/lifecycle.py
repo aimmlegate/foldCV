@@ -75,8 +75,9 @@ class OperationFiles:
         marker.write_text(json.dumps({"pid": process.pid}), encoding="utf-8")
         return process
 
-    def stop_worker(self) -> None:
-        self.closed = True
+    def stop_worker(self, *, final: bool = True) -> None:
+        if final:
+            self.closed = True
         if self.cleanup_failed:
             raise SpikeError("PROCESS_CLEANUP_FAILED")
         process = self.process
@@ -87,14 +88,18 @@ class OperationFiles:
                 stop_group(process)
             except SpikeError:
                 self.cleanup_failed = True
+                self.closed = True
                 raise
             except OSError:
                 self.cleanup_failed = True
+                self.closed = True
                 raise SpikeError("PROCESS_CLEANUP_FAILED") from None
             try:
                 if self.path is not None:
                     (self.path / ".worker").unlink(missing_ok=True)
             except OSError:
+                self.cleanup_failed = True
+                self.closed = True
                 raise SpikeError("CLEANUP_FAILED") from None
             self.process = None
         finally:

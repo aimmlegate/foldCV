@@ -1,0 +1,71 @@
+"""Typed boundary for code-owned, scoped text operations."""
+
+from __future__ import annotations
+
+from dataclasses import dataclass
+import math
+import threading
+from typing import Generic, Protocol, TypeVar
+
+from pydantic import BaseModel
+
+from resume_api.lifecycle import OperationFiles
+
+
+ResultT = TypeVar("ResultT", bound=BaseModel)
+
+
+@dataclass(frozen=True)
+class GenerationPolicy:
+    model: str
+    timeout_seconds: float = 30
+    max_input_bytes: int = 65_536
+    max_total_input_bytes: int = 131_072
+    max_total_output_bytes: int = 262_144
+
+    def __post_init__(self) -> None:
+        if (not math.isfinite(self.timeout_seconds) or not 0 < self.timeout_seconds <= 60
+                or not 0 < self.max_input_bytes <= 65_536
+                or not 0 < self.max_total_input_bytes <= 131_072
+                or not 0 < self.max_total_output_bytes <= 262_144):
+            raise ValueError("invalid generation limits")
+
+
+@dataclass(frozen=True)
+class ContentInput(Generic[ResultT]):
+    text: str
+    result_type: type[ResultT]
+    policy: GenerationPolicy
+
+
+@dataclass(frozen=True)
+class ReportedUsage:
+    input_tokens: int | None = None
+    cached_input_tokens: int | None = None
+    output_tokens: int | None = None
+    complete: bool = False
+
+
+@dataclass(frozen=True)
+class ContentResult(Generic[ResultT]):
+    value: ResultT
+    usage: ReportedUsage
+    cli_version: str
+    model: str
+    elapsed_seconds: float
+    logical_attempts: int
+    internal_inference_count: int | None = None
+
+
+class ContentFailure(Exception):
+    def __init__(self, code: str, *, logical_attempts: int = 0,
+                 usage: ReportedUsage = ReportedUsage()):
+        self.code = code
+        self.logical_attempts = logical_attempts
+        self.usage = usage
+        super().__init__(code)
+
+
+class ContentProvider(Protocol):
+    def generate(self, request: ContentInput[ResultT], files: OperationFiles,
+                 cancel: threading.Event) -> ContentResult[ResultT]: ...

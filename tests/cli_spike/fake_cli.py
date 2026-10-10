@@ -41,6 +41,9 @@ if args == ["login", "status"]:
     if case == "missing_login":
         print("Not logged in", file=sys.stderr)
         sys.exit(1)
+    if case == "login_failure":
+        print("synthetic-secret unknown failure", file=sys.stderr)
+        sys.exit(7)
     print("Logged in using an API key: synthetic-secret" if case == "api_key" else "Logged in using ChatGPT", file=sys.stderr)
     sys.exit(0)
 if args and args[0] == "app-server":
@@ -88,9 +91,13 @@ assert not any(key.startswith(("OPENAI_", "CODEX_", "T3CODE_", "PYTHON", "HTTP_P
 for key in ["TMPDIR", "XDG_CACHE_HOME", "XDG_DATA_HOME", "XDG_STATE_HOME"]:
     assert Path(os.environ[key]).is_relative_to(Path.cwd())
 schema = json.loads(Path(args[args.index("--output-schema") + 1]).read_text())
-assert schema["required"] == ["summary"] and schema["additionalProperties"] is False
+assert schema["required"] == config.get("schema_required", ["summary"]) and schema["additionalProperties"] is False
 prompt = sys.stdin.read()
-assert prompt == config["prompt"] and prompt not in json.dumps(args)
+attempt = sum(json.loads(line).get("generation", False) for line in (base / "audit.jsonl").read_text().splitlines())
+if prompt != config["prompt"]:
+    assert prompt.startswith(config["prompt"] + "\n\n")
+    assert "invalid JSON or did not match the schema" in prompt
+assert prompt not in json.dumps(args)
 with (base / "audit.jsonl").open("a") as audit:
     audit.write(json.dumps({"stdin_match": True, "restrictions_checked": True}) + "\n")
 # Deliberate CLI content write tests operation cleanup, not real CLI retention.
@@ -127,6 +134,9 @@ if case in ("quota", "model_denied", "expired"):
     code = {"quota": "rate_limit_exceeded", "model_denied": "model_not_supported", "expired": "authentication_error"}[case]
     emit({"type": "error", "error": {"code": code, "message": message + " " + prompt + " synthetic-secret"}})
     sys.exit(1)
+if case == "bad_error_code":
+    emit({"type": "error", "error": {"code": ["rate_limit_exceeded"], "message": prompt}})
+    sys.exit(1)
 if case == "nonzero":
     print(prompt + " synthetic-secret", file=sys.stderr)
     sys.exit(7)
@@ -135,6 +145,8 @@ if case in ("excessive", "excessive_stderr"):
     sys.exit(0)
 
 events = [json.loads(line) for line in (base / "success.jsonl").read_text().splitlines()]
+if "result_text" in config:
+    events[2]["item"]["text"] = config["result_text"]
 if case == "malformed_event":
     os.write(1, b"{bad json}\n")
     sys.exit(0)
@@ -143,6 +155,10 @@ if case == "invalid_utf8":
     sys.exit(0)
 if case == "malformed_result":
     events[2]["item"]["text"] = "{bad json}"
+if case == "repair" and attempt == 1:
+    events[2]["item"]["text"] = '{"summary":23}'
+if case == "repair_second_nonzero" and prompt == config["prompt"]:
+    events[2]["item"]["text"] = '{"summary":23}'
 if case == "schema":
     events[2]["item"]["text"] = '{"summary":23}'
 if case == "extra_field":
@@ -183,5 +199,5 @@ else:
     os.write(1, raw)
 if case == "late":
     wait_release()
-if case == "nonzero_after_complete":
+if case == "nonzero_after_complete" or (case == "repair_second_nonzero" and prompt != config["prompt"]):
     sys.exit(7)
