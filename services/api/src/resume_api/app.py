@@ -29,6 +29,7 @@ from .rendering import DocumentRenderer
 from .extracting import MAX_BODY as MAX_EXTRACT_BODY, UploadFailure, parse_one_part, run_extract
 from packages.resume_core.rendering.template import PACKAGE_SHA256, RenderFailure, renderer_sha256, require_template
 from packages.resume_core.rendering.preparation import PrepareRequest, prepare_document
+from packages.resume_core.normalization import FactRequest, FactSheet, fingerprint, literal_sheet, semantic_input
 
 
 MAX_BODY = 1_048_576
@@ -37,7 +38,7 @@ MAX_CONCURRENT = 2
 TIMEOUT_SECONDS = 30
 BODY_TIMEOUT_SECONDS = 10
 CANCEL_GRACE_SECONDS = 0.5
-POST_ONLY_PATHS = frozenset({"session/exchange", "extract", "normalize", "draft", "rewrite",
+POST_ONLY_PATHS = frozenset({"session/exchange", "extract", "facts", "facts/normalize", "normalize", "draft", "rewrite",
                             "validate", "prepare-render", "render", "host/discover", "host/status", "host/login",
                             "host/detach", "host/models", "host/select", "host/cancel-login"})
 JSON_POST_PATHS = frozenset("/v1/" + path for path in POST_ONLY_PATHS if path != "extract")
@@ -53,6 +54,11 @@ class SyntheticRunner(Protocol):
     External work must use OperationFiles.spawn so its process group can be stopped.
     """
     async def run(self, kind: str, request: TextRequest, files: OperationFiles) -> tuple[OperationResult, UsagePayload]: ...
+
+
+class SemanticRunner(Protocol):
+    def run(self, request: FactRequest, files: OperationFiles,
+            cancel: threading.Event) -> tuple[FactSheet, dict[str, int | None]]: ...
 
 
 def problem(code: str, status: int, stage: str = "request", retryable: bool = False) -> JSONResponse:
@@ -197,7 +203,8 @@ class LocalBoundary:
 
 
 def create_app(*, origin: str, secret: str, temp_root: Path, dist: Path, runner: SyntheticRunner | None = None,
-               cli_executable: Path | None = None, connection_adapter: ConnectionAdapter | None = None):
+               cli_executable: Path | None = None, connection_adapter: ConnectionAdapter | None = None,
+               semantic_runner: SemanticRunner | None = None):
     if not origin.startswith("http://127.0.0.1:") or not origin.rsplit(":", 1)[-1].isdigit():
         raise ValueError("A concrete IPv4 loopback origin is required")
     if len(secret) < 32:
@@ -207,14 +214,17 @@ def create_app(*, origin: str, secret: str, temp_root: Path, dist: Path, runner:
     operations: dict[asyncio.Task, OperationFiles] = {}
     cancellation_pending: set[asyncio.Task] = set()
     connection_work: dict[asyncio.Task, tuple[OperationFiles, threading.Event]] = {}
+    semantic_work: dict[asyncio.Task, tuple[OperationFiles, threading.Event]] = {}
 
     @asynccontextmanager
     async def lifespan(_app: FastAPI):
         yield
         for task, (files, cancel) in list(connection_work.items()):
             await stop_connection(task, files, cancel)
+        for task, (files, cancel) in list(semantic_work.items()):
+            await stop_semantic(task, files, cancel)
         for task, files in list(operations.items()):
-            if task not in connection_work:
+            if task not in connection_work and task not in semantic_work:
                 await cancel_operation(task, files)
 
     app = FastAPI(docs_url=None, redoc_url=None, openapi_url=None, lifespan=lifespan)
@@ -254,6 +264,24 @@ def create_app(*, origin: str, secret: str, temp_root: Path, dist: Path, runner:
                 pass
         return cleanup_code
 
+    async def stop_semantic(task: asyncio.Task, files: OperationFiles, cancel: threading.Event) -> str | None:
+        cancel.set()
+        try:
+            files.stop_worker()
+        except SpikeError as error:
+            return lifecycle_code(error)
+        done, _ = await asyncio.wait((task,), timeout=CANCEL_GRACE_SECONDS)
+        if task not in done:
+            return lifecycle_code(SpikeError("PROCESS_CLEANUP_FAILED"))
+        try:
+            await task
+        except SpikeError as error:
+            if error.code in {"PROCESS_CLEANUP_FAILED", "CLEANUP_FAILED", "UNSAFE_TEMP_ROOT"}:
+                return lifecycle_code(error)
+        except Exception:
+            pass
+        return None
+
     async def stop_connection(task: asyncio.Task, files: OperationFiles, cancel: threading.Event) -> str | None:
         if not task.done():
             cancellation_pending.add(task)
@@ -289,6 +317,7 @@ def create_app(*, origin: str, secret: str, temp_root: Path, dist: Path, runner:
                 lifecycle_code(SpikeError(error.code))
         operations.pop(done, None)
         connection_work.pop(done, None)
+        semantic_work.pop(done, None)
         cancellation_pending.discard(done)
         active -= 1
 
@@ -406,6 +435,94 @@ def create_app(*, origin: str, secret: str, temp_root: Path, dist: Path, runner:
 
     async def validate(_payload: ValidateRequest):
         return problem("FEATURE_UNAVAILABLE", 501, "validate")
+
+    async def facts(payload: FactRequest):
+        try:
+            sheet = literal_sheet(payload)
+            encoded = sheet.model_dump_json(by_alias=True).encode("utf-8")
+            if len(encoded) > 4 * 1024 * 1024:
+                return problem("INPUT_TOO_LARGE", 413, "facts")
+            return Response(encoded, media_type="application/json", headers={"Cache-Control": "no-store"})
+        except ValueError:
+            return problem("INVALID_REQUEST", 422, "facts")
+
+    async def normalize_facts(payload: FactRequest):
+        nonlocal active, count
+        if semantic_runner is None:
+            return problem("CLI_PROFILE_UNSAFE", 503, "normalize")
+        try:
+            semantic_input(literal_sheet(payload), payload)
+        except ValueError as error:
+            return problem("INPUT_TOO_LARGE" if str(error) == "INPUT_TOO_LARGE" else "INVALID_REQUEST",
+                           413 if str(error) == "INPUT_TOO_LARGE" else 422, "normalize")
+        request_id = "op_" + uuid.uuid4().hex
+
+        async def events():
+            nonlocal active, count
+            reject_code: str | None = None
+            async with gate:
+                if unsafe_cleanup or cancellation_pending or active >= MAX_CONCURRENT or count >= MAX_OPERATIONS:
+                    reject_code = "OPERATION_LIMIT" if count >= MAX_OPERATIONS else "BUSY"
+                else:
+                    active += 1
+                    count += 1
+            if reject_code:
+                yield (json.dumps({"transportVersion": 1, "requestId": request_id, "sequence": 1,
+                                   "baseRevision": payload.base_revision, "type": "operation.failed",
+                                   "payload": {"code": reject_code, "retryable": reject_code == "BUSY",
+                                               "stage": "normalize"}}) + "\n").encode()
+                return
+            files = OperationFiles(temp_root)
+            cancel = threading.Event()
+
+            def execute():
+                with files.open():
+                    return semantic_runner.run(payload, files, cancel)
+
+            task = asyncio.create_task(asyncio.to_thread(execute))
+            operations[task] = files
+            semantic_work[task] = (files, cancel)
+            task.add_done_callback(operation_done)
+            try:
+                yield (json.dumps({"transportVersion": 1, "requestId": request_id, "sequence": 1,
+                                   "baseRevision": payload.base_revision, "type": "operation.started",
+                                   "payload": {"stage": "normalize"}}) + "\n").encode()
+                sheet, usage = await asyncio.wait_for(asyncio.shield(task), timeout=TIMEOUT_SECONDS)
+                sheet = FactSheet.model_validate(sheet.model_dump(mode="json", by_alias=True))
+                expected_units = {(source.result.source_id, unit.id) for source in payload.sources for unit in source.result.units}
+                expected_units.update((source.result.source_id, f"gap:{index}") for source in payload.sources
+                                      for index in range(len(source.result.gaps))
+                                      if source.overlays.get(f"gap:{index}", "").strip())
+                if sheet.source_fingerprint != fingerprint(payload) or {(unit.source_id, unit.unit_id)
+                                                                         for unit in sheet.units} != expected_units:
+                    raise ValueError("semantic response has stale source references")
+                usage = UsagePayload.model_validate(usage).model_dump()
+                if len(sheet.model_dump_json(by_alias=True).encode("utf-8")) > 4 * 1024 * 1024:
+                    raise ValueError("result too large")
+                yield (json.dumps({"transportVersion": 1, "requestId": request_id, "sequence": 2,
+                                   "baseRevision": payload.base_revision, "type": "operation.completed",
+                                   "payload": {"result": sheet.model_dump(mode="json", by_alias=True), "usage": usage}},
+                                  ensure_ascii=False, separators=(",", ":")) + "\n").encode()
+            except asyncio.CancelledError:
+                await stop_semantic(task, files, cancel)
+                raise
+            except Exception as error:
+                cancel.set()
+                code = "OPERATION_TIMEOUT" if isinstance(error, asyncio.TimeoutError) else "INVALID_RESULT"
+                if isinstance(error, SpikeError):
+                    code = lifecycle_code(error)
+                if not task.done():
+                    cleanup_code = await stop_semantic(task, files, cancel)
+                    if cleanup_code:
+                        code = cleanup_code
+                yield (json.dumps({"transportVersion": 1, "requestId": request_id, "sequence": 2,
+                                   "baseRevision": payload.base_revision, "type": "operation.failed",
+                                   "payload": {"code": code, "retryable": False, "stage": "normalize"}}) + "\n").encode()
+            finally:
+                if not task.done():
+                    await stop_semantic(task, files, cancel)
+
+        return StreamingResponse(events(), media_type="application/x-ndjson", headers={"Cache-Control": "no-store"})
 
     async def prepare_render(payload: PrepareRequest):
         try:
@@ -596,6 +713,8 @@ def create_app(*, origin: str, secret: str, temp_root: Path, dist: Path, runner:
         return connection_response()
 
     app.add_api_route("/v1/extract", extract, methods=["POST"])
+    app.add_api_route("/v1/facts", facts, methods=["POST"])
+    app.add_api_route("/v1/facts/normalize", normalize_facts, methods=["POST"])
     app.add_api_route("/v1/validate", validate, methods=["POST"])
     app.add_api_route("/v1/prepare-render", prepare_render, methods=["POST"])
     app.add_api_route("/v1/render", render, methods=["POST"])

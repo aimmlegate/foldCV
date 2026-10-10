@@ -7,12 +7,18 @@ import zipSchema from "../../../../contracts/json-schema/zip_manifest.schema.jso
 import renderSchema from "../../../../contracts/json-schema/render_request.schema.json" with { type: "json" };
 import prepareSchema from "../../../../contracts/json-schema/prepare_request.schema.json" with { type: "json" };
 import extractSchema from "../../../../contracts/json-schema/extract_result.schema.json" with { type: "json" };
+import factSheetSchema from "../../../../contracts/json-schema/fact_sheet.schema.json" with { type: "json" };
+import factRequestSchema from "../../../../contracts/json-schema/fact_request.schema.json" with { type: "json" };
+import semanticProposalSchema from "../../../../contracts/json-schema/semantic_proposal.schema.json" with { type: "json" };
 import type { Project, PartialDate, Period } from "./generated/project.js";
 import type { ZipManifest } from "./generated/zip_manifest.js";
 import type { TemplateManifest } from "./generated/template.js";
 import type { RenderRequest } from "./generated/render_request.js";
 import type { PrepareRequest } from "./generated/prepare_request.js";
 import type { ExtractResult } from "./generated/extract_result.js";
+import type { FactSheet } from "./generated/fact_sheet.js";
+import type { FactRequest } from "./generated/fact_request.js";
+import type { SemanticProposal } from "./generated/semantic_proposal.js";
 
 const ajv = new Ajv2020({ allErrors: true, strict: false });
 addFormats(ajv);
@@ -23,6 +29,99 @@ const zipShape = ajv.compile<ZipManifest>(zipSchema);
 const renderShape = ajv.compile<RenderRequest>(renderSchema);
 const prepareShape = ajv.compile<PrepareRequest>(prepareSchema);
 const extractShape = ajv.compile<ExtractResult>(extractSchema);
+const factSheetShape = ajv.compile<FactSheet>(factSheetSchema);
+const factRequestShape = ajv.compile<FactRequest>(factRequestSchema);
+const semanticProposalShape = ajv.compile<SemanticProposal>(semanticProposalSchema);
+
+export function validateFactRequest(value: unknown): value is FactRequest {
+  if (!finiteJson(value) || !factRequestShape(value) || !wellFormedUnicode(value)) return false;
+  const ids = new Set(value.sources.map((source) => source.result.sourceId));
+  if (ids.size !== value.sources.length) return false;
+  let originalBytes = 0;
+  let extractedBytes = 0;
+  let overlayBytes = 0;
+  for (const source of value.sources) {
+    if (!validateExtractResult(source.result)) return false;
+    originalBytes += source.result.byteLength;
+    extractedBytes += source.result.units.reduce((count, unit) => count + new TextEncoder().encode(unit.text).length, 0);
+    const targets = new Set([...source.result.units.map((unit) => `unit:${unit.id}`),
+      ...source.result.gaps.map((_, index) => `gap:${index}`)]);
+    for (const [target, text] of Object.entries(source.overlays)) {
+      const size = new TextEncoder().encode(text).length;
+      if (!targets.has(target) || size > 65_536) return false;
+      overlayBytes += size;
+    }
+  }
+  return originalBytes <= 32 * 1024 * 1024 && extractedBytes <= 8 * 1024 * 1024 && overlayBytes <= 1024 * 1024;
+}
+
+export function validateSemanticProposal(value: unknown): value is SemanticProposal {
+  if (!finiteJson(value) || !semanticProposalShape(value) || !wellFormedUnicode(value)) return false;
+  return value.facts.every((fact) => {
+    const candidate = fact.value;
+    if (typeof candidate !== "object" || candidate === null) return false;
+    if (fact.kind === "text") return "text" in candidate;
+    if (fact.kind === "technology") return "canonicalId" in candidate;
+    if (fact.kind === "date") return "precision" in candidate;
+    if (fact.kind === "metric") return "comparator" in candidate;
+    return "action" in candidate;
+  });
+}
+
+export function validateFactSheet(value: unknown): value is FactSheet {
+  if (!finiteJson(value) || !factSheetShape(value) || !wellFormedUnicode(value)) return false;
+  const facts = new Map(value.facts.map((fact) => [fact.id, fact]));
+  if (facts.size !== value.facts.length || !unique(value.candidates.map((item) => item.id)) ||
+      !unique(value.issues.map((item) => item.id))) return false;
+  const units = new Map<string, Set<string>>();
+  for (const unit of value.units) {
+    const key = `${unit.sourceId}:${unit.unitId}`;
+    if (units.has(key) || !unique(unit.factIds) || !unit.factIds.every((id) => facts.has(id))) return false;
+    units.set(key, new Set(unit.factIds));
+  }
+  const proposed = new Set(value.proposedFactIds ?? []);
+  if (proposed.size !== (value.proposedFactIds ?? []).length || [...proposed].some((id) => !facts.has(id))) return false;
+  const overlayRefs = value.overlayFactRefs ?? {};
+  if (Object.entries(overlayRefs).some(([id]) => !proposed.has(id) || facts.get(id)?.origin !== "user")) return false;
+  if (Object.entries(value.userCorrections ?? {}).some(([sourceId, userId]) =>
+      facts.get(sourceId)?.origin !== "source" || facts.get(userId)?.origin !== "user")) return false;
+  for (const unit of value.units) {
+    if ((unit.disposition === "duplicate" && (!unit.duplicateOf || unit.factIds.length > 0)) ||
+        (unit.duplicateOf && !units.has(unit.duplicateOf))) return false;
+  }
+  for (const fact of value.facts) {
+    if (fact.origin === "source" ? fact.evidence.length === 0 : fact.evidence.length > 0) return false;
+    if (![...fact.evidence, ...(overlayRefs[fact.id] ?? [])].every((evidence) =>
+      evidence.sourceRevision === 1 && evidence.unitRevision === 1 &&
+      units.get(`${evidence.sourceId}:${evidence.unitId}`)?.has(fact.id))) return false;
+    if (fact.kind === "date" && !dateOk(fact.value)) return false;
+    if (fact.kind === "metric" && !metricOk(fact.value) ||
+        fact.kind === "leadership" && fact.value.teamSize !== null && !metricOk(fact.value.teamSize)) return false;
+  }
+  if (value.candidates.some((item) => !units.has(`${item.sourceId}:${item.unitId}`)) ||
+      value.issues.some((item) => item.unitId != null && !units.has(`${item.sourceId}:${item.unitId}`))) return false;
+  const employment = value.employment ?? [];
+  const jobs = new Map(employment.map((job) => [job.id, job]));
+  if (jobs.size !== employment.length) return false;
+  const subprojects = new Set<string>();
+  for (const job of employment) {
+    if (job.periods.some((period) => !periodOk(period)) ||
+        job.unitIds.some((id) => !units.has(`${job.sourceId}:${id}`)) ||
+        job.factIds.some((id) => !facts.has(id)) ||
+        !unique(job.factIds) ||
+        job.factIds.length !== value.facts.filter((fact) => fact.jobId === job.id).length ||
+        value.facts.some((fact) => fact.jobId === job.id && !job.factIds.includes(fact.id))) return false;
+    for (const sub of job.subprojects) {
+      if (subprojects.has(sub.id) || sub.sourceId !== job.sourceId ||
+          sub.period != null && !periodOk(sub.period) ||
+          sub.unitIds.some((id) => !units.has(`${sub.sourceId}:${id}`))) return false;
+      subprojects.add(sub.id);
+    }
+  }
+  return value.facts.every((fact) => fact.jobId === null ? fact.subprojectId === null :
+    jobs.has(fact.jobId) && (fact.subprojectId === null ||
+      jobs.get(fact.jobId)?.subprojects.some((sub) => sub.id === fact.subprojectId)));
+}
 
 export function validateExtractResult(value: unknown): value is ExtractResult {
   if (!finiteJson(value) || !extractShape(value) || !wellFormedUnicode(value)) return false;
@@ -138,6 +237,11 @@ function periodOk(value: Period): boolean {
   return dateOk(value.start) && (value.end === null || (dateOk(value.end) && dateLower(value.start) <= dateUpper(value.end)));
 }
 
+function metricOk(value: { comparator: string; number: number; upperNumber: number | null }): boolean {
+  return (value.comparator === "range") === (value.upperNumber !== null) &&
+    (value.upperNumber === null || value.upperNumber >= value.number);
+}
+
 function semanticProject(p: Project): boolean {
   if (p.asOf !== null && !dateOk(p.asOf)) return false;
   const sourceIds = p.sources.map((s) => s.id);
@@ -197,7 +301,7 @@ function semanticProject(p: Project): boolean {
     if (fact.kind === "date" && !dateOk(fact.value)) return false;
     if (fact.kind === "metric" || fact.kind === "leadership") {
       const metric = fact.kind === "metric" ? fact.value : fact.value.teamSize;
-      if (metric && ((metric.comparator === "range") !== (metric.upperNumber !== null) || (metric.upperNumber !== null && metric.upperNumber < metric.number))) return false;
+      if (metric && !metricOk(metric)) return false;
     }
     if (fact.kind === "technology" && fact.value.scope === "global" && (fact.jobId !== null || fact.subprojectId !== null)) return false;
   }

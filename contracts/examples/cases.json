@@ -1349,5 +1349,315 @@
   "base": "extract_result",
   "valid": false,
   "edits": [{"op": "remove", "path": ["links"]}]
+},
+{
+  "name": "fact_request_valid_import",
+  "contract": "fact_request",
+  "base": "fact_request",
+  "valid": true,
+  "edits": []
+},
+{
+  "name": "fact_request_bad_overlay_target",
+  "contract": "fact_request",
+  "base": "fact_request",
+  "valid": false,
+  "edits": [{"op": "set", "path": ["sources", 0, "overlays", "unit:missing"], "value": "changed"}]
+},
+{
+  "name": "fact_request_duplicate_source",
+  "contract": "fact_request",
+  "base": "fact_request",
+  "valid": false,
+  "edits": [{"op": "clone", "path": ["sources"], "from": ["sources", 0]}]
+},
+{
+  "name": "fact_sheet_valid_review",
+  "contract": "fact_sheet",
+  "base": "fact_sheet",
+  "valid": true,
+  "edits": []
+},
+{
+  "name": "fact_sheet_broken_unit_fact",
+  "contract": "fact_sheet",
+  "base": "fact_sheet",
+  "valid": false,
+  "edits": [{"op": "append", "path": ["units", 0, "factIds"], "value": "fact_missing"}]
+},
+{
+  "name": "fact_sheet_source_without_evidence",
+  "contract": "fact_sheet",
+  "base": "fact_sheet",
+  "valid": false,
+  "edits": [{"op": "set", "path": ["facts", 0, "evidence"], "value": []}]
+},
+{
+  "name": "fact_sheet_evidence_missing_from_unit_account",
+  "contract": "fact_sheet",
+  "base": "fact_sheet",
+  "valid": false,
+  "edits": [{"op": "set", "path": ["units", 0, "factIds"], "value": []}]
+},
+{
+  "name": "fact_sheet_duplicate_unit_fact_reference",
+  "contract": "fact_sheet",
+  "base": "fact_sheet",
+  "valid": false,
+  "edits": [{"op": "append", "path": ["units", 0, "factIds"], "value": "fact_a0399fb446b3ee80351cee07"}]
+},
+{
+  "name": "fact_sheet_wrong_evidence_revision",
+  "contract": "fact_sheet",
+  "base": "fact_sheet",
+  "valid": false,
+  "edits": [{"op": "set", "path": ["facts", 0, "evidence", 0, "unitRevision"], "value": 2}]
+},
+{
+  "name": "fact_sheet_missing_duplicate_target",
+  "contract": "fact_sheet",
+  "base": "fact_sheet",
+  "valid": false,
+  "edits": [{"op": "set", "path": ["units", 1, "disposition"], "value": "duplicate"}]
+},
+{
+  "name": "fact_sheet_source_overlay_proposal_rejected",
+  "contract": "fact_sheet",
+  "base": "fact_sheet",
+  "valid": false,
+  "edits": [
+    {"op": "set", "path": ["proposedFactIds"], "value": ["fact_a0399fb446b3ee80351cee07"]},
+    {"op": "set", "path": ["overlayFactRefs", "fact_a0399fb446b3ee80351cee07"], "value": []}
+  ]
+},
+{
+  "name": "fact_sheet_overlay_proposal_keeps_accounted_reference",
+  "contract": "fact_sheet",
+  "base": "fact_sheet",
+  "valid": true,
+  "edits": [
+    {"op": "set", "path": ["facts", 0, "origin"], "value": "user"},
+    {"op": "set", "path": ["facts", 0, "evidence"], "value": []},
+    {"op": "set", "path": ["proposedFactIds"], "value": ["fact_a0399fb446b3ee80351cee07"]},
+    {"op": "set", "path": ["overlayFactRefs", "fact_a0399fb446b3ee80351cee07"], "value": [{"sourceId": "source_029a1a189373c9f199247ba6", "sourceRevision": 1, "unitId": "unit_1", "unitRevision": 1}]}
+  ]
+},
+{
+  "name": "fact_sheet_overlay_reference_missing_from_unit_account",
+  "contract": "fact_sheet",
+  "base": "fact_sheet",
+  "valid": false,
+  "edits": [
+    {"op": "set", "path": ["facts", 0, "origin"], "value": "user"},
+    {"op": "set", "path": ["facts", 0, "evidence"], "value": []},
+    {"op": "set", "path": ["proposedFactIds"], "value": ["fact_a0399fb446b3ee80351cee07"]},
+    {"op": "set", "path": ["overlayFactRefs", "fact_a0399fb446b3ee80351cee07"], "value": [{"sourceId": "source_029a1a189373c9f199247ba6", "sourceRevision": 1, "unitId": "unit_1", "unitRevision": 1}]},
+    {"op": "set", "path": ["units", 0, "factIds"], "value": ["fact_6c532f064bc39c1cf8d3a03c"]}
+  ]
+},
+{
+  "name": "fact_sheet_candidate_missing_unit",
+  "contract": "fact_sheet",
+  "base": "fact_sheet",
+  "valid": false,
+  "edits": [{"op": "set", "path": ["candidates", 0, "unitId"], "value": "unit_missing"}]
+},
+{
+  "name": "fact_sheet_issue_missing_unit",
+  "contract": "fact_sheet",
+  "base": "fact_sheet",
+  "valid": false,
+  "edits": [{"op": "set", "path": ["issues", 0, "unitId"], "value": "unit_missing"}]
+},
+{
+  "name": "fact_sheet_duplicate_candidate_id",
+  "contract": "fact_sheet",
+  "base": "fact_sheet",
+  "valid": false,
+  "edits": [{"op": "set", "path": ["candidates", 1, "id"], "value": "candidate_407787469c9fc61315925d43"}]
+},
+{
+  "name": "fact_sheet_orphan_job_association",
+  "contract": "fact_sheet",
+  "base": "fact_sheet",
+  "valid": false,
+  "edits": [{"op": "set", "path": ["facts", 0, "jobId"], "value": "job_missing"}]
+},
+{
+  "name": "fact_sheet_orphan_subproject_association",
+  "contract": "fact_sheet",
+  "base": "fact_sheet",
+  "valid": false,
+  "edits": [{"op": "set", "path": ["facts", 0, "subprojectId"], "value": "subproject_missing"}]
+},
+{
+  "name": "fact_sheet_job_references_match_fact",
+  "contract": "fact_sheet",
+  "base": "fact_sheet",
+  "valid": true,
+  "edits": [
+    {"op": "set", "path": ["facts", 0, "jobId"], "value": "job_reviewed"},
+    {"op": "set", "path": ["employment"], "value": [{"id": "job_reviewed", "employer": "Acme", "role": "Engineer", "periods": [], "sourceId": "source_029a1a189373c9f199247ba6", "unitIds": ["unit_1"], "subprojects": [], "factIds": ["fact_a0399fb446b3ee80351cee07"], "reviewRequired": true}]}
+  ]
+},
+{
+  "name": "fact_sheet_job_missing_fact_reference",
+  "contract": "fact_sheet",
+  "base": "fact_sheet",
+  "valid": false,
+  "edits": [
+    {"op": "set", "path": ["facts", 0, "jobId"], "value": "job_reviewed"},
+    {"op": "set", "path": ["employment"], "value": [{"id": "job_reviewed", "employer": "Acme", "role": "Engineer", "periods": [], "sourceId": "source_029a1a189373c9f199247ba6", "unitIds": ["unit_1"], "subprojects": [], "factIds": [], "reviewRequired": true}]}
+  ]
+},
+{
+  "name": "fact_sheet_job_duplicate_fact_reference",
+  "contract": "fact_sheet",
+  "base": "fact_sheet",
+  "valid": false,
+  "edits": [
+    {"op": "set", "path": ["facts", 0, "jobId"], "value": "job_reviewed"},
+    {"op": "set", "path": ["employment"], "value": [{"id": "job_reviewed", "employer": "Acme", "role": "Engineer", "periods": [], "sourceId": "source_029a1a189373c9f199247ba6", "unitIds": ["unit_1"], "subprojects": [], "factIds": ["fact_a0399fb446b3ee80351cee07", "fact_a0399fb446b3ee80351cee07"], "reviewRequired": true}]}
+  ]
+},
+{
+  "name": "fact_sheet_duplicate_unit_with_fact_rejected",
+  "contract": "fact_sheet",
+  "base": "fact_sheet",
+  "valid": false,
+  "edits": [
+    {"op": "set", "path": ["units", 1, "disposition"], "value": "duplicate"},
+    {"op": "set", "path": ["units", 1, "duplicateOf"], "value": "source_029a1a189373c9f199247ba6:unit_1"},
+    {"op": "set", "path": ["units", 1, "factIds"], "value": ["fact_a0399fb446b3ee80351cee07"]}
+  ]
+},
+{
+  "name": "fact_sheet_duplicate_unit_without_fact_valid",
+  "contract": "fact_sheet",
+  "base": "fact_sheet",
+  "valid": true,
+  "edits": [
+    {"op": "set", "path": ["units", 1, "disposition"], "value": "duplicate"},
+    {"op": "set", "path": ["units", 1, "duplicateOf"], "value": "source_029a1a189373c9f199247ba6:unit_1"}
+  ]
+},
+{
+  "name": "fact_sheet_impossible_date_fact",
+  "contract": "fact_sheet",
+  "base": "fact_sheet",
+  "valid": false,
+  "edits": [
+    {"op": "set", "path": ["facts", 0, "kind"], "value": "date"},
+    {"op": "set", "path": ["facts", 0, "value"], "value": {"precision": "day", "year": 2020, "month": 2, "day": 30}}
+  ]
+},
+{
+  "name": "fact_sheet_date_precision_mismatch",
+  "contract": "fact_sheet",
+  "base": "fact_sheet",
+  "valid": false,
+  "edits": [
+    {"op": "set", "path": ["facts", 0, "kind"], "value": "date"},
+    {"op": "set", "path": ["facts", 0, "value"], "value": {"precision": "year", "year": 2020, "month": 2, "day": null}}
+  ]
+},
+{
+  "name": "fact_sheet_job_impossible_period_date",
+  "contract": "fact_sheet",
+  "base": "fact_sheet",
+  "valid": false,
+  "edits": [{"op": "set", "path": ["employment"], "value": [{"id": "job_reviewed", "employer": "Acme", "role": "Engineer", "periods": [{"start": {"precision": "day", "year": 2020, "month": 2, "day": 30}, "end": null}], "sourceId": "source_029a1a189373c9f199247ba6", "unitIds": ["unit_1"], "subprojects": [], "factIds": [], "reviewRequired": true}]}]
+},
+{
+  "name": "fact_sheet_job_reversed_period",
+  "contract": "fact_sheet",
+  "base": "fact_sheet",
+  "valid": false,
+  "edits": [{"op": "set", "path": ["employment"], "value": [{"id": "job_reviewed", "employer": "Acme", "role": "Engineer", "periods": [{"start": {"precision": "year", "year": 2024, "month": null, "day": null}, "end": {"precision": "year", "year": 2020, "month": null, "day": null}}], "sourceId": "source_029a1a189373c9f199247ba6", "unitIds": ["unit_1"], "subprojects": [], "factIds": [], "reviewRequired": true}]}]
+},
+{
+  "name": "fact_sheet_job_open_end_period_valid",
+  "contract": "fact_sheet",
+  "base": "fact_sheet",
+  "valid": true,
+  "edits": [{"op": "set", "path": ["employment"], "value": [{"id": "job_reviewed", "employer": "Acme", "role": "Engineer", "periods": [{"start": {"precision": "day", "year": 2020, "month": 2, "day": 29}, "end": null}], "sourceId": "source_029a1a189373c9f199247ba6", "unitIds": ["unit_1"], "subprojects": [], "factIds": [], "reviewRequired": true}]}]
+},
+{
+  "name": "fact_sheet_subproject_reversed_period",
+  "contract": "fact_sheet",
+  "base": "fact_sheet",
+  "valid": false,
+  "edits": [{"op": "set", "path": ["employment"], "value": [{"id": "job_reviewed", "employer": "Acme", "role": "Engineer", "periods": [], "sourceId": "source_029a1a189373c9f199247ba6", "unitIds": ["unit_1"], "subprojects": [{"id": "sub_reviewed", "name": "Atlas", "period": {"start": {"precision": "year", "year": 2024, "month": null, "day": null}, "end": {"precision": "year", "year": 2020, "month": null, "day": null}}, "sourceId": "source_029a1a189373c9f199247ba6", "unitIds": ["unit_1"]}], "factIds": [], "reviewRequired": true}]}]
+},
+{
+  "name": "fact_sheet_metric_range_needs_upper_number",
+  "contract": "fact_sheet",
+  "base": "fact_sheet",
+  "valid": false,
+  "edits": [
+    {"op": "set", "path": ["facts", 0, "kind"], "value": "metric"},
+    {"op": "set", "path": ["facts", 0, "value"], "value": {"number": 5, "upperNumber": null, "comparator": "range", "unit": "requests", "period": null, "baseline": null, "result": null, "scope": null, "attribution": "unknown", "qualifiers": []}}
+  ]
+},
+{
+  "name": "fact_sheet_metric_upper_below_lower",
+  "contract": "fact_sheet",
+  "base": "fact_sheet",
+  "valid": false,
+  "edits": [
+    {"op": "set", "path": ["facts", 0, "kind"], "value": "metric"},
+    {"op": "set", "path": ["facts", 0, "value"], "value": {"number": 5, "upperNumber": 4, "comparator": "range", "unit": "requests", "period": null, "baseline": null, "result": null, "scope": null, "attribution": "unknown", "qualifiers": []}}
+  ]
+},
+{
+  "name": "fact_sheet_metric_valid_range",
+  "contract": "fact_sheet",
+  "base": "fact_sheet",
+  "valid": true,
+  "edits": [
+    {"op": "set", "path": ["facts", 0, "kind"], "value": "metric"},
+    {"op": "set", "path": ["facts", 0, "value"], "value": {"number": 5, "upperNumber": 6, "comparator": "range", "unit": "requests", "period": null, "baseline": null, "result": null, "scope": null, "attribution": "unknown", "qualifiers": []}}
+  ]
+},
+{
+  "name": "fact_sheet_leadership_team_size_bad_range",
+  "contract": "fact_sheet",
+  "base": "fact_sheet",
+  "valid": false,
+  "edits": [
+    {"op": "set", "path": ["facts", 0, "kind"], "value": "leadership"},
+    {"op": "set", "path": ["facts", 0, "value"], "value": {"action": "Led", "attribution": "unknown", "teamSize": {"number": 5, "upperNumber": null, "comparator": "range", "unit": "engineers", "period": null, "baseline": null, "result": null, "scope": null, "attribution": "unknown", "qualifiers": []}}}
+  ]
+},
+{
+  "name": "fact_sheet_leadership_team_size_valid_range",
+  "contract": "fact_sheet",
+  "base": "fact_sheet",
+  "valid": true,
+  "edits": [
+    {"op": "set", "path": ["facts", 0, "kind"], "value": "leadership"},
+    {"op": "set", "path": ["facts", 0, "value"], "value": {"action": "Led", "attribution": "unknown", "teamSize": {"number": 5, "upperNumber": 6, "comparator": "range", "unit": "engineers", "period": null, "baseline": null, "result": null, "scope": null, "attribution": "unknown", "qualifiers": []}}}
+  ]
+},
+{
+  "name": "fact_sheet_issue_without_unit_is_valid",
+  "contract": "fact_sheet",
+  "base": "fact_sheet",
+  "valid": true,
+  "edits": [{"op": "remove", "path": ["issues", 0, "unitId"]}]
+},
+{
+  "name": "semantic_proposal_valid",
+  "contract": "semantic_proposal",
+  "base": "semantic_proposal",
+  "valid": true,
+  "edits": []
+},
+{
+  "name": "semantic_proposal_version_rejected",
+  "contract": "semantic_proposal",
+  "base": "semantic_proposal",
+  "valid": false,
+  "edits": [{"op": "set", "path": ["schemaVersion"], "value": 2}]
 }
 ]

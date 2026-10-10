@@ -83,6 +83,67 @@ test("real service imports PDF, DOCX and paste with visible gaps and exact origi
   expect(textCalls).toBe(0);
 });
 
+test("imported facts, unresolved dates and user assertions stay available without generation", async ({ page }) => {
+  test.setTimeout(60_000);
+  let contentCalls = 0;
+  let factCalls = 0;
+  page.on("request", (request) => { if (/\/v1\/(normalize|draft|rewrite|facts\/normalize)$/.test(request.url())) contentCalls += 1; });
+  page.on("request", (request) => { if (/\/v1\/facts$/.test(request.url())) factCalls += 1; });
+  await page.goto(`${origin}/#secret=synthetic-browser-secret-0123456789`);
+  await page.getByLabel("Или вставьте текст резюме").fill("Skills: Python, Docker\nAcme Engineer 2020-2022\nBuilt a team from zero to five");
+  await page.getByRole("button", { name: "Извлечь вставленный текст" }).click();
+  await expect(page.getByRole("heading", { name: "Лист фактов" })).toBeVisible();
+  expect(factCalls).toBe(0);
+  await page.getByRole("button", { name: "Проверить факты" }).click();
+  await expect(page.getByText("Python · общий навык")).toBeVisible();
+  await expect(page.getByText("Docker · общий навык")).toBeVisible();
+  await expect(page.getByText("Дата без связи").first()).toBeVisible();
+  await page.getByLabel("Добавить подтверждённый вами факт").fill("Led a five-person team at Acme");
+  await page.getByRole("button", { name: "Добавить факт" }).click();
+  await expect(page.getByText("Led a five-person team at Acme")).toBeVisible();
+  await expect(page.getByText("Внесено пользователем")).toBeVisible();
+  await page.getByLabel("Ваше исправление фрагмента").first().fill("Skills: Kubernetes");
+  expect(factCalls).toBe(1);
+  await page.getByRole("button", { name: "Обновить факты" }).click();
+  await expect(page.getByText("Kubernetes · проверьте контекст")).toBeVisible();
+  await expect(page.getByText("Led a five-person team at Acme")).toBeVisible();
+  expect(factCalls).toBe(2);
+  expect(contentCalls).toBe(0);
+});
+
+test("source correction rejects a late earlier fact response", async ({ page }) => {
+  test.setTimeout(60_000);
+  await page.goto(`${origin}/#secret=synthetic-browser-secret-0123456789`);
+  let held: Route | null = null;
+  let heldBody: Buffer | null = null;
+  let factCalls = 0;
+  await page.route("**/v1/facts", async (route) => {
+    factCalls += 1;
+    if (held === null) {
+      const response = await route.fetch();
+      held = route;
+      heldBody = await response.body();
+      return;
+    }
+    await route.continue();
+  });
+  await page.getByLabel("Или вставьте текст резюме").fill("Skills: Python\n");
+  await page.getByRole("button", { name: "Извлечь вставленный текст" }).click();
+  expect(factCalls).toBe(0);
+  await page.getByRole("button", { name: "Проверить факты" }).click();
+  await expect.poll(() => held !== null).toBe(true);
+  await page.getByLabel("Ваше исправление фрагмента").first().fill("Skills: Kubernetes");
+  expect(factCalls).toBe(1);
+  await page.getByRole("button", { name: "Проверить факты" }).click();
+  await expect(page.getByText("Kubernetes · проверьте контекст")).toBeVisible();
+  expect(factCalls).toBe(2);
+  const oldRoute = held as Route | null;
+  if (oldRoute && heldBody) {
+    try { await oldRoute.fulfill({ status: 200, contentType: "application/json", body: heldBody }); } catch { /* canceled request */ }
+  }
+  await expect(page.getByText("Python · общий навык")).toHaveCount(0);
+});
+
 test("real service keeps quoted and literal percent filenames distinct from transport metadata", async ({ page }) => {
   await page.goto(`${origin}/#secret=synthetic-browser-secret-0123456789`);
   const bytes = readFileSync(resolve(fixtures, "unicode.txt"));

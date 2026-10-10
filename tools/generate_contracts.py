@@ -10,6 +10,7 @@ from packages.resume_core.models.contracts import Project, Proposal, TemplateMan
 from packages.resume_core.rendering.models import RenderRequest
 from packages.resume_core.rendering.preparation import PrepareRequest
 from packages.resume_core.extraction.models import ExtractResult
+from packages.resume_core.normalization import FactRequest, FactSheet, SemanticProposal
 
 OUT = ROOT / "contracts" / "json-schema"
 
@@ -33,6 +34,9 @@ def main() -> None:
         "render_request": RenderRequest,
         "prepare_request": PrepareRequest,
         "extract_result": ExtractResult,
+        "fact_request": FactRequest,
+        "fact_sheet": FactSheet,
+        "semantic_proposal": SemanticProposal,
     }.items():
         schema = model.model_json_schema(mode="validation")
         (OUT / f"{name}.schema.json").write_text(

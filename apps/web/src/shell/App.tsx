@@ -11,6 +11,9 @@ import { ImportPanel } from "../import/ImportPanel";
 import { ImportWorkflow } from "../import/workflow";
 import type { ImportState } from "../import/workflow";
 import { ConnectionPanel } from "../connection/ConnectionPanel";
+import { FactPanel } from "../facts/FactPanel";
+import { FactWorkflow } from "../facts/workflow";
+import type { FactView } from "../facts/workflow";
 
 type ThemeMode = "light" | "dark" | "system";
 const THEME_KEY = "foldcv-theme";
@@ -45,6 +48,11 @@ export function App() {
   const importWorkflowRef = useRef<ImportWorkflow | null>(null);
   if (!importWorkflowRef.current) importWorkflowRef.current = new ImportWorkflow(setImportState);
   const importWorkflow = importWorkflowRef.current;
+  const [factView, setFactView] = useState<FactView>({ sheet: null, pending: false, stale: false, error: null });
+  const factWorkflowRef = useRef<FactWorkflow | null>(null);
+  if (!factWorkflowRef.current) factWorkflowRef.current = new FactWorkflow(setFactView);
+  const factWorkflow = factWorkflowRef.current;
+  useEffect(() => { factWorkflow.sourcesChanged(importState.entries); }, [factWorkflow, importState.entries]);
   const [closeProjectPrompt, setCloseProjectPrompt] = useState(false);
   const workflowRef = useRef<PreviewWorkflow | null>(null);
   if (!workflowRef.current) workflowRef.current = new PreviewWorkflow(setPreview, (artifact, kind) => {
@@ -147,15 +155,16 @@ export function App() {
       <div>
         {!project ? <ImportPanel state={importState} workflow={importWorkflow} text={state.sourceText}
           onText={(text) => send({ type: "sourceText", text })} exampleDisabled={importState.entries.length > 0 || importState.pending}
-          onExample={() => { importWorkflow.clear(); send({ type: "loadExample" }); }} />
+          onExample={() => { importWorkflow.clear(); factWorkflow.clear(); send({ type: "loadExample" }); }} />
           : <section className="rounded border border-outline bg-panel p-5"><h2 className="mb-3 text-lg font-semibold">Открыт вымышленный пример</h2>
             <p className="text-sm text-muted">Импорт отдельного источника доступен после закрытия примера. Текущие правки не будут перенесены.</p>
             {!closeProjectPrompt ? <button type="button" className={`${control} mt-4`} onClick={() => setCloseProjectPrompt(true)}>Закрыть пример и перейти к импорту</button>
               : <div className="mt-4 space-y-2"><p role="alert" className="text-sm text-danger">Несохранённые правки примера будут удалены.</p>
-                <div className="flex gap-2"><button type="button" className={control} onClick={() => { importWorkflow.clear(); send({ type: "resetProject" }); setCloseProjectPrompt(false); }}>Подтвердить закрытие</button>
+                <div className="flex gap-2"><button type="button" className={control} onClick={() => { importWorkflow.clear(); factWorkflow.clear(); send({ type: "resetProject" }); setCloseProjectPrompt(false); }}>Подтвердить закрытие</button>
                   <button type="button" className={control} onClick={() => setCloseProjectPrompt(false)}>Оставить пример</button></div></div>}
           </section>}
       </div>
+      {!project && importState.entries.length > 0 && <FactPanel view={factView} workflow={factWorkflow} sources={importState.entries} />}
     </main>}
     {state.stage === "editor" && project && block && <main className="grid min-w-0 xl:grid-cols-[200px_minmax(320px,1fr)_minmax(350px,1fr)]">
       <aside className="border-b border-outline p-4 xl:border-b-0 xl:border-r"><h2 className="mb-3 text-xs font-semibold uppercase tracking-wide text-muted">Разделы резюме</h2>

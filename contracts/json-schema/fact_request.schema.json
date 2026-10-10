@@ -1,0 +1,360 @@
+{
+  "$defs": {
+    "ExtractGap": {
+      "additionalProperties": false,
+      "properties": {
+        "code": {
+          "enum": [
+            "NO_TEXT",
+            "IMAGE",
+            "SHAPE",
+            "TEXT_BOX",
+            "UNSUPPORTED_CONTENT"
+          ],
+          "title": "Code",
+          "type": "string"
+        },
+        "location": {
+          "$ref": "#/$defs/ExtractLocation"
+        }
+      },
+      "required": [
+        "code",
+        "location"
+      ],
+      "title": "ExtractGap",
+      "type": "object"
+    },
+    "ExtractLink": {
+      "additionalProperties": false,
+      "properties": {
+        "part": {
+          "maxLength": 120,
+          "minLength": 1,
+          "title": "Part",
+          "type": "string"
+        },
+        "relationshipId": {
+          "maxLength": 120,
+          "minLength": 1,
+          "title": "Relationshipid",
+          "type": "string"
+        },
+        "target": {
+          "maxLength": 2048,
+          "minLength": 1,
+          "title": "Target",
+          "type": "string"
+        }
+      },
+      "required": [
+        "part",
+        "relationshipId",
+        "target"
+      ],
+      "title": "ExtractLink",
+      "type": "object"
+    },
+    "ExtractLocation": {
+      "additionalProperties": false,
+      "properties": {
+        "column": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Column"
+        },
+        "kind": {
+          "enum": [
+            "page",
+            "paragraph",
+            "table_cell",
+            "header",
+            "footer",
+            "image",
+            "pasted"
+          ],
+          "title": "Kind",
+          "type": "string"
+        },
+        "page": {
+          "anyOf": [
+            {
+              "minimum": 1,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Page"
+        },
+        "paragraph": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Paragraph"
+        },
+        "part": {
+          "anyOf": [
+            {
+              "maxLength": 120,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Part"
+        },
+        "row": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Row"
+        },
+        "table": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Table"
+        }
+      },
+      "required": [
+        "kind"
+      ],
+      "title": "ExtractLocation",
+      "type": "object"
+    },
+    "ExtractResult": {
+      "additionalProperties": false,
+      "properties": {
+        "byteLength": {
+          "maximum": 6291456,
+          "minimum": 0,
+          "title": "Bytelength",
+          "type": "integer"
+        },
+        "byteRef": {
+          "maxLength": 120,
+          "minLength": 1,
+          "title": "Byteref",
+          "type": "string"
+        },
+        "byteSha256": {
+          "pattern": "^[a-f0-9]{64}$",
+          "title": "Bytesha256",
+          "type": "string"
+        },
+        "gaps": {
+          "items": {
+            "$ref": "#/$defs/ExtractGap"
+          },
+          "maxItems": 5000,
+          "title": "Gaps",
+          "type": "array"
+        },
+        "links": {
+          "items": {
+            "$ref": "#/$defs/ExtractLink"
+          },
+          "maxItems": 100,
+          "title": "Links",
+          "type": "array"
+        },
+        "mimeType": {
+          "maxLength": 100,
+          "minLength": 1,
+          "title": "Mimetype",
+          "type": "string"
+        },
+        "originalName": {
+          "maxLength": 255,
+          "minLength": 1,
+          "title": "Originalname",
+          "type": "string"
+        },
+        "pageCount": {
+          "anyOf": [
+            {
+              "maximum": 40,
+              "minimum": 1,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Pagecount"
+        },
+        "parser": {
+          "maxLength": 60,
+          "minLength": 1,
+          "title": "Parser",
+          "type": "string"
+        },
+        "parserVersion": {
+          "maxLength": 60,
+          "minLength": 1,
+          "title": "Parserversion",
+          "type": "string"
+        },
+        "sourceId": {
+          "maxLength": 80,
+          "minLength": 1,
+          "title": "Sourceid",
+          "type": "string"
+        },
+        "sourceKind": {
+          "enum": [
+            "pdf",
+            "docx",
+            "txt",
+            "markdown",
+            "paste"
+          ],
+          "title": "Sourcekind",
+          "type": "string"
+        },
+        "units": {
+          "items": {
+            "$ref": "#/$defs/ExtractUnit"
+          },
+          "maxItems": 5000,
+          "title": "Units",
+          "type": "array"
+        }
+      },
+      "required": [
+        "sourceId",
+        "sourceKind",
+        "originalName",
+        "mimeType",
+        "byteSha256",
+        "byteLength",
+        "byteRef",
+        "parser",
+        "parserVersion",
+        "units",
+        "gaps",
+        "links"
+      ],
+      "title": "ExtractResult",
+      "type": "object"
+    },
+    "ExtractUnit": {
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "maxLength": 80,
+          "minLength": 1,
+          "title": "Id",
+          "type": "string"
+        },
+        "location": {
+          "$ref": "#/$defs/ExtractLocation"
+        },
+        "order": {
+          "minimum": 0,
+          "title": "Order",
+          "type": "integer"
+        },
+        "text": {
+          "maxLength": 750000,
+          "title": "Text",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "order",
+        "text",
+        "location"
+      ],
+      "title": "ExtractUnit",
+      "type": "object"
+    },
+    "SourceInput": {
+      "additionalProperties": false,
+      "properties": {
+        "overlays": {
+          "additionalProperties": {
+            "type": "string"
+          },
+          "maxProperties": 5000,
+          "title": "Overlays",
+          "type": "object"
+        },
+        "result": {
+          "$ref": "#/$defs/ExtractResult"
+        }
+      },
+      "required": [
+        "result",
+        "overlays"
+      ],
+      "title": "SourceInput",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "baseRevision": {
+      "default": 0,
+      "minimum": 0,
+      "title": "Baserevision",
+      "type": "integer"
+    },
+    "sources": {
+      "items": {
+        "$ref": "#/$defs/SourceInput"
+      },
+      "maxItems": 10,
+      "minItems": 1,
+      "title": "Sources",
+      "type": "array"
+    },
+    "transportVersion": {
+      "const": 1,
+      "default": 1,
+      "title": "Transportversion",
+      "type": "integer"
+    }
+  },
+  "required": [
+    "sources"
+  ],
+  "title": "FactRequest",
+  "type": "object"
+}
