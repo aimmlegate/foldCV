@@ -12,14 +12,14 @@ WEB = ROOT / "apps" / "web"
 def main() -> None:
     files = sorted((ROOT / "contracts" / "json-schema").glob("*.json"))
     files += sorted((WEB / "src" / "contracts" / "generated").glob("*.ts"))
-    if len(files) != 8:
-        raise SystemExit("expected four schemas and four generated type files")
+    if len(files) != 10:
+        raise SystemExit("expected five schemas and five generated type files")
     before = {path: path.read_bytes() for path in files}
     subprocess.run(["npm", "run", "contracts:generate"], cwd=WEB, env=os.environ.copy(), check=True)
     changed = [str(path.relative_to(ROOT)) for path in files if path.read_bytes() != before[path]]
     if changed:
         raise SystemExit("contract generation drift: " + ", ".join(changed))
-    print("8 generated contract files match Python models")
+    print("10 generated contract files match Python models")
 
 
 if __name__ == "__main__":

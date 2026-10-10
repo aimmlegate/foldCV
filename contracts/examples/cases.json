@@ -753,5 +753,496 @@
         }
       }
     ]
+  },
+  {
+    "name": "render_request_valid",
+    "contract": "render_request",
+    "base": "render_request",
+    "valid": true,
+    "edits": []
+  },
+  {
+    "name": "render_snapshot_hash_mismatch",
+    "contract": "render_request",
+    "base": "render_request",
+    "valid": false,
+    "edits": [
+      {
+        "op": "set",
+        "path": [
+          "snapshot",
+          "snapshotSha256"
+        ],
+        "value": "0000000000000000000000000000000000000000000000000000000000000000"
+      }
+    ]
+  },
+  {
+    "name": "render_revision_mismatch",
+    "contract": "render_request",
+    "base": "render_request",
+    "valid": false,
+    "edits": [
+      {
+        "op": "set",
+        "path": [
+          "baseRevision"
+        ],
+        "value": 2
+      }
+    ]
+  },
+  {
+    "name": "render_unknown_template",
+    "contract": "render_request",
+    "base": "render_request",
+    "valid": false,
+    "edits": [
+      {
+        "op": "set",
+        "path": [
+          "snapshot",
+          "templateId"
+        ],
+        "value": "external"
+      }
+    ]
+  },
+  {
+    "name": "render_icon_path_rejected",
+    "contract": "render_request",
+    "base": "render_request",
+    "valid": false,
+    "edits": [
+      {
+        "op": "set",
+        "path": [
+          "document",
+          "focus",
+          0,
+          "icon"
+        ],
+        "value": "../private"
+      }
+    ]
+  },
+  {
+    "name": "render_missing_project_role",
+    "contract": "render_request",
+    "base": "render_request",
+    "valid": false,
+    "edits": [
+      {
+        "op": "remove",
+        "path": [
+          "document",
+          "projects",
+          0,
+          "role"
+        ]
+      }
+    ]
+  },
+  {
+    "name": "render_missing_summary",
+    "contract": "render_request",
+    "base": "render_request",
+    "valid": false,
+    "edits": [
+      {
+        "op": "remove",
+        "path": [
+          "document",
+          "candidate",
+          "summary"
+        ]
+      },
+      {
+        "op": "set",
+        "path": [
+          "snapshot",
+          "snapshotSha256"
+        ],
+        "value": "43f98b20a9d2eb08f083cbae11b470797091bf291d981511eba65005988a7ba8"
+      }
+    ]
+  },
+  {
+    "name": "render_missing_footer",
+    "contract": "render_request",
+    "base": "render_request",
+    "valid": false,
+    "edits": [
+      {
+        "op": "remove",
+        "path": [
+          "document",
+          "footer"
+        ]
+      },
+      {
+        "op": "set",
+        "path": [
+          "snapshot",
+          "snapshotSha256"
+        ],
+        "value": "f610fb428d8eac27a9d1fa0f76af2d2120256886e513cbc147a89ec0f047cb51"
+      }
+    ]
+  },
+  {
+    "name": "render_missing_duration",
+    "contract": "render_request",
+    "base": "render_request",
+    "valid": false,
+    "edits": [
+      {
+        "op": "remove",
+        "path": [
+          "document",
+          "focus",
+          0,
+          "duration"
+        ]
+      },
+      {
+        "op": "set",
+        "path": [
+          "snapshot",
+          "snapshotSha256"
+        ],
+        "value": "8ba522343b339986d4ce3ccd5f5b0b64d5771da492c90bb5582097936b08c81e"
+      }
+    ]
+  },
+  {
+    "name": "render_missing_description",
+    "contract": "render_request",
+    "base": "render_request",
+    "valid": false,
+    "edits": [
+      {
+        "op": "remove",
+        "path": [
+          "document",
+          "projects",
+          0,
+          "description"
+        ]
+      },
+      {
+        "op": "set",
+        "path": [
+          "snapshot",
+          "snapshotSha256"
+        ],
+        "value": "718ef1964de9566d9d90eade54868c94b07093fb5d52878f499a33e4d4de1d4d"
+      }
+    ]
+  },
+  {
+    "name": "render_missing_stack",
+    "contract": "render_request",
+    "base": "render_request",
+    "valid": false,
+    "edits": [
+      {
+        "op": "remove",
+        "path": [
+          "document",
+          "projects",
+          0,
+          "stack"
+        ]
+      },
+      {
+        "op": "set",
+        "path": [
+          "snapshot",
+          "snapshotSha256"
+        ],
+        "value": "20ceb5e4e7d81ffc2c14e222c39f9cfac59ce951a3abe21e40fef42a8480bfd5"
+      }
+    ]
+  },
+  {
+    "name": "render_complete_empty_content",
+    "contract": "render_request",
+    "base": "render_request",
+    "valid": true,
+    "edits": [
+      {
+        "op": "set",
+        "path": [
+          "document",
+          "candidate",
+          "summary"
+        ],
+        "value": ""
+      },
+      {
+        "op": "set",
+        "path": [
+          "document",
+          "footer"
+        ],
+        "value": ""
+      },
+      {
+        "op": "set",
+        "path": [
+          "document",
+          "focus",
+          0,
+          "duration"
+        ],
+        "value": ""
+      },
+      {
+        "op": "set",
+        "path": [
+          "document",
+          "projects",
+          0,
+          "description"
+        ],
+        "value": ""
+      },
+      {
+        "op": "set",
+        "path": [
+          "document",
+          "projects",
+          0,
+          "stack"
+        ],
+        "value": ""
+      },
+      {
+        "op": "set",
+        "path": [
+          "snapshot",
+          "snapshotSha256"
+        ],
+        "value": "3502d61172113378e35a6faf0fed7e65e9c38407ff4496e2c6d179f5f1089f0c"
+      }
+    ]
+  },
+  {
+    "name": "render_astral_item_4000_valid",
+    "contract": "render_request",
+    "base": "render_request",
+    "valid": true,
+    "edits": [
+      {
+        "op": "repeat_text",
+        "path": [
+          "document",
+          "sidebar",
+          0,
+          "items",
+          0
+        ],
+        "text": "🚀",
+        "count": 4000
+      },
+      {
+        "op": "set",
+        "path": [
+          "snapshot",
+          "snapshotSha256"
+        ],
+        "value": "bf48f4fb7510f528c27f91ea2ac823b64d1dfb60d6c17833c4b4dbb1199781de"
+      }
+    ]
+  },
+  {
+    "name": "render_astral_item_4001_invalid",
+    "contract": "render_request",
+    "base": "render_request",
+    "valid": false,
+    "edits": [
+      {
+        "op": "repeat_text",
+        "path": [
+          "document",
+          "sidebar",
+          0,
+          "items",
+          0
+        ],
+        "text": "🚀",
+        "count": 4001
+      },
+      {
+        "op": "set",
+        "path": [
+          "snapshot",
+          "snapshotSha256"
+        ],
+        "value": "eea78226894fd31039dce6a4e52aacae5394837c4780ac6694016e28b6abf736"
+      }
+    ]
+  },
+  {
+    "name": "render_astral_total_97500_valid",
+    "contract": "render_request",
+    "base": "render_request",
+    "valid": true,
+    "edits": [
+      {
+        "op": "fill_sidebar",
+        "path": [
+          "document",
+          "sidebar"
+        ],
+        "text": "🚀",
+        "repeat": 25,
+        "items": 100,
+        "sections": 39
+      },
+      {
+        "op": "set",
+        "path": [
+          "snapshot",
+          "snapshotSha256"
+        ],
+        "value": "33efee886a9945047eaffda31bf8a4ca88213778a69e8f2fa2e0c11bb271106a"
+      }
+    ]
+  },
+  {
+    "name": "render_astral_total_over_100000_invalid",
+    "contract": "render_request",
+    "base": "render_request",
+    "valid": false,
+    "edits": [
+      {
+        "op": "fill_sidebar",
+        "path": [
+          "document",
+          "sidebar"
+        ],
+        "text": "🚀",
+        "repeat": 25,
+        "items": 100,
+        "sections": 40
+      },
+      {
+        "op": "set",
+        "path": [
+          "snapshot",
+          "snapshotSha256"
+        ],
+        "value": "b3a4370033ddbd3c5839466613b0c40479b4facd0223991ee51ca325b28ca11a"
+      }
+    ]
+  },
+  {
+    "name": "render_lone_surrogate_rejected",
+    "contract": "render_request",
+    "base": "render_request",
+    "valid": false,
+    "edits": [
+      {"op": "set", "path": ["document", "candidate", "summary"], "value": "\ud800"},
+      {"op": "set", "path": ["snapshot", "snapshotSha256"], "value": "67f5de8c0d16e719c494a2e00a630b490d078ce57636e5fbb1bd88a5816ac31b"}
+    ]
+  },
+  {
+    "name": "render_lone_low_surrogate_text_rejected",
+    "contract": "render_request",
+    "base": "render_request",
+    "valid": false,
+    "edits": [
+      {
+        "op": "set",
+        "path": [
+          "document",
+          "candidate",
+          "summary"
+        ],
+        "value": "\udc00"
+      },
+      {
+        "op": "set",
+        "path": [
+          "snapshot",
+          "snapshotSha256"
+        ],
+        "value": "e18ba1470369a1a42431c784b1e9e99ee7b5f9222227ed300b3fcf2f4e1e06bc"
+      }
+    ]
+  },
+  {
+    "name": "render_lone_high_surrogate_id_rejected",
+    "contract": "render_request",
+    "base": "render_request",
+    "valid": false,
+    "edits": [
+      {
+        "op": "set",
+        "path": [
+          "snapshot",
+          "id"
+        ],
+        "value": "\ud800"
+      },
+      {
+        "op": "set",
+        "path": [
+          "snapshot",
+          "snapshotSha256"
+        ],
+        "value": "346406e4d79bead3b9e386d5846600eaeac8b36c1621fac3ba4e7a4e497b8369"
+      }
+    ]
+  },
+  {
+    "name": "render_lone_low_surrogate_id_rejected",
+    "contract": "render_request",
+    "base": "render_request",
+    "valid": false,
+    "edits": [
+      {
+        "op": "set",
+        "path": [
+          "snapshot",
+          "id"
+        ],
+        "value": "\udc00"
+      },
+      {
+        "op": "set",
+        "path": [
+          "snapshot",
+          "snapshotSha256"
+        ],
+        "value": "053d010a089783e620a84f14176f62bff07c73a5fbd8c1d523eff3bd825ce619"
+      }
+    ]
+  },
+  {
+    "name": "render_valid_astral_snapshot_id",
+    "contract": "render_request",
+    "base": "render_request",
+    "valid": true,
+    "edits": [
+      {
+        "op": "set",
+        "path": [
+          "snapshot",
+          "id"
+        ],
+        "value": "synthetic-\ud83d\ude80"
+      },
+      {
+        "op": "set",
+        "path": [
+          "snapshot",
+          "snapshotSha256"
+        ],
+        "value": "d3b1c7650eef250ab2cb635d80cb3ee69e227ad12a6eb269a36bb6df1b1242c7"
+      }
+    ]
   }
 ]

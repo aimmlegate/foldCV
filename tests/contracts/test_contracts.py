@@ -8,16 +8,19 @@ import pytest
 from pydantic import ValidationError
 
 from packages.resume_core.models import validate_contract
+from packages.resume_core.rendering.models import RenderRequest
 
 
 EXAMPLES = Path(__file__).resolve().parents[2] / "contracts" / "examples"
 CASES = json.loads((EXAMPLES / "cases.json").read_text(encoding="utf-8"))
 PROJECT = json.loads((EXAMPLES / "project.json").read_text(encoding="utf-8"))
 ZIP = json.loads((EXAMPLES / "zip_manifest.json").read_text(encoding="utf-8"))
+RENDER = json.loads((EXAMPLES / "render_request.json").read_text(encoding="utf-8"))
 
 
 def case_data(case: dict) -> object:
-    bases = {"project": PROJECT, "proposal": PROJECT["proposals"][0], "template": PROJECT["template"], "zip_manifest": ZIP}
+    bases = {"project": PROJECT, "proposal": PROJECT["proposals"][0], "template": PROJECT["template"], "zip_manifest": ZIP,
+             "render_request": RENDER}
     data = copy.deepcopy(bases[case["base"]])
     for edit in case["edits"]:
         target = data
@@ -35,6 +38,11 @@ def case_data(case: dict) -> object:
             for part in edit["from"]:
                 source = source[part]
             target[key].append(copy.deepcopy(source))
+        elif edit["op"] == "repeat_text":
+            target[key] = edit["text"] * edit["count"]
+        elif edit["op"] == "fill_sidebar":
+            target[key] = [{"title": "T", "items": [edit["text"] * edit["repeat"]] * edit["items"]}
+                           for _ in range(edit["sections"])]
         else:
             raise AssertionError("unknown test edit")
     return data
@@ -43,7 +51,10 @@ def case_data(case: dict) -> object:
 @pytest.mark.parametrize("case", CASES, ids=lambda c: c["name"])
 def test_shared_case(case: dict) -> None:
     try:
-        validate_contract(case["contract"], case_data(case))
+        if case["contract"] == "render_request":
+            RenderRequest.model_validate(case_data(case))
+        else:
+            validate_contract(case["contract"], case_data(case))
         accepted = True
     except (ValueError, ValidationError):
         accepted = False

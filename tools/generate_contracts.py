@@ -7,6 +7,7 @@ import sys
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 from packages.resume_core.models.contracts import Project, Proposal, TemplateManifest, ZipManifest
+from packages.resume_core.rendering.models import RenderRequest
 
 OUT = ROOT / "contracts" / "json-schema"
 
@@ -27,6 +28,7 @@ def main() -> None:
         "proposal": Proposal,
         "template": TemplateManifest,
         "zip_manifest": ZipManifest,
+        "render_request": RenderRequest,
     }.items():
         schema = model.model_json_schema(mode="validation")
         (OUT / f"{name}.schema.json").write_text(

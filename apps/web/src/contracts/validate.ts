@@ -4,9 +4,11 @@ import projectSchema from "../../../../contracts/json-schema/project.schema.json
 import proposalSchema from "../../../../contracts/json-schema/proposal.schema.json" with { type: "json" };
 import templateSchema from "../../../../contracts/json-schema/template.schema.json" with { type: "json" };
 import zipSchema from "../../../../contracts/json-schema/zip_manifest.schema.json" with { type: "json" };
+import renderSchema from "../../../../contracts/json-schema/render_request.schema.json" with { type: "json" };
 import type { Project, PartialDate, Period } from "./generated/project.js";
 import type { ZipManifest } from "./generated/zip_manifest.js";
 import type { TemplateManifest } from "./generated/template.js";
+import type { RenderRequest } from "./generated/render_request.js";
 
 const ajv = new Ajv2020({ allErrors: true, strict: false });
 addFormats(ajv);
@@ -14,6 +16,52 @@ const projectShape = ajv.compile<Project>(projectSchema);
 const proposalShape = ajv.compile(proposalSchema);
 const templateShape = ajv.compile<TemplateManifest>(templateSchema);
 const zipShape = ajv.compile<ZipManifest>(zipSchema);
+const renderShape = ajv.compile<RenderRequest>(renderSchema);
+
+function ordered(value: unknown): unknown {
+  if (Array.isArray(value)) return value.map(ordered);
+  if (typeof value === "object" && value !== null) {
+    return Object.fromEntries(Object.entries(value).sort(([a], [b]) => a.localeCompare(b, "en")).map(([key, part]) => [key, ordered(part)]));
+  }
+  return value;
+}
+
+function safeRenderText(value: unknown): boolean {
+  let size = 0;
+  function visit(part: unknown): boolean {
+    if (typeof part === "string") {
+      size += [...part].length;
+      return size <= 100_000 && [...part].every((character) => character === "\n" || character === "\t" || character.charCodeAt(0) >= 32);
+    }
+    if (Array.isArray(part)) return part.every(visit);
+    if (typeof part === "object" && part !== null) return Object.values(part).every(visit);
+    return true;
+  }
+  return visit(value);
+}
+
+function wellFormedUnicode(value: unknown): boolean {
+  if (typeof value === "string") return [...value].every((character) =>
+    character.length !== 1 || character.charCodeAt(0) < 0xd800 || character.charCodeAt(0) > 0xdfff);
+  if (Array.isArray(value)) return value.every(wellFormedUnicode);
+  if (typeof value === "object" && value !== null) return Object.values(value).every(wellFormedUnicode);
+  return true;
+}
+
+export async function validateRenderRequest(value: unknown): Promise<boolean> {
+  if (!finiteJson(value) || !renderShape(value) || !wellFormedUnicode(value)) return false;
+  if (value.baseRevision !== value.snapshot.projectRevision) return false;
+  if (!safeRenderText(value.document)) return false;
+  const boundedItem = (item: string): boolean => [...item].length <= 4000;
+  if (value.document.sidebar.some((section) => !section.items.every(boundedItem)) ||
+      value.document.projects.some((project) => !project.tasks.every(boundedItem) || !project.results.every(boundedItem)) ||
+      !value.document.achievements.every(boundedItem)) return false;
+  const { snapshotSha256, ...snapshot } = value.snapshot;
+  const bytes = new TextEncoder().encode(JSON.stringify(ordered({ baseRevision: value.baseRevision, document: value.document, snapshot })));
+  const digest = await crypto.subtle.digest("SHA-256", bytes);
+  const hex = Array.from(new Uint8Array(digest), (part) => part.toString(16).padStart(2, "0")).join("");
+  return hex === snapshotSha256;
+}
 
 function finiteJson(value: unknown, seen = new WeakSet<object>()): boolean {
   if (typeof value === "number") return Number.isFinite(value);

@@ -64,7 +64,7 @@ async def test_exact_host_origin_one_use_secret_and_cookie_scope(tmp_path):
         cap = await client.get("/v1/capabilities")
         assert cap.status_code == 200
         assert cap.json()["generationReady"] is False
-        assert cap.json()["renderers"] == []
+        assert cap.json()["renderers"] in ([], ["docx", "pdf"])
         assert cap.headers["cache-control"] == "no-store"
         assert (await client.post("/v1/normalize", json=INPUT)).status_code == 403
         assert (await client.post("/v1/normalize", headers={"Origin": "http://evil.invalid"}, json=INPUT)).status_code == 403
@@ -488,12 +488,47 @@ def test_reaper_removes_only_owned_stale_dirs(tmp_path):
         assert reap_owned(root) == 1
         assert active.is_dir()
     assert reap_owned(root) == 0
+    assert list(root.glob(".cleanup-intent-op-*.json")) == []
     assert unrelated.joinpath("private.txt").read_text(encoding="utf-8") == "keep"
     assert target.is_dir()
     alias = tmp_path / "alias"
     alias.symlink_to(root, target_is_directory=True)
     with pytest.raises(SpikeError, match="UNSAFE_TEMP_ROOT"):
         reap_owned(alias)
+
+
+@pytest.mark.asyncio
+async def test_reaper_partial_cleanup_intent_blocks_service_restart(tmp_path, monkeypatch):
+    from spikes.cli import runner as spike_runner
+
+    root = tmp_path / "operations"
+    root.mkdir()
+    identifier = "a" * 32
+    stale = root / f"op-{identifier}"
+    stale.mkdir()
+    (stale / ".owner").write_text(json.dumps({"owner": OWNER, "id": identifier}))
+    (stale / ".lock").touch()
+    (stale / "synthetic.txt").write_text("synthetic")
+    original_remove = spike_runner.shutil.rmtree
+
+    def partial_remove(path, *args, **kwargs):
+        if Path(path) == stale:
+            (stale / ".owner").unlink()
+            (stale / ".lock").unlink()
+            raise OSError("synthetic partial reaping")
+        return original_remove(path, *args, **kwargs)
+
+    monkeypatch.setattr(spike_runner.shutil, "rmtree", partial_remove)
+    with pytest.raises(SpikeError, match="CLEANUP_FAILED"):
+        reap_owned(root)
+    monkeypatch.setattr(spike_runner.shutil, "rmtree", original_remove)
+    assert stale.is_dir() and (stale / "synthetic.txt").is_file()
+    assert len(list(root.glob(".cleanup-intent-op-*.json"))) == 1
+    app = make_app(tmp_path)
+    async with await client_for(app) as client:
+        await login(client)
+        assert (await client.get("/v1/capabilities")).json()["renderers"] == []
+    assert stale.is_dir()
 
 
 def test_worker_cleanup_on_failure(tmp_path):

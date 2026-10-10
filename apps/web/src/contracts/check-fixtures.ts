@@ -2,9 +2,9 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { dirname, resolve } from "node:path";
-import { validateContract } from "./validate.js";
+import { validateContract, validateRenderRequest } from "./validate.js";
 
-type Edit = { op: "set" | "remove" | "append" | "clone"; path: (string | number)[]; value?: unknown; from?: (string | number)[] };
+type Edit = { op: "set" | "remove" | "append" | "clone" | "repeat_text" | "fill_sidebar"; path: (string | number)[]; value?: unknown; from?: (string | number)[]; text?: string; count?: number; repeat?: number; items?: number; sections?: number };
 type Case = { name: string; contract: string; base: string; valid: boolean; edits: Edit[] };
 
 const here = dirname(fileURLToPath(import.meta.url));
@@ -33,6 +33,17 @@ function edit(data: unknown, change: Edit): void {
     array(child(parent, key)).push(structuredClone(source));
     return;
   }
+  if (change.op === "repeat_text") {
+    if (change.text === undefined || change.count === undefined) throw new Error("repeat data missing");
+    if (typeof key === "number") array(parent)[key] = change.text.repeat(change.count);
+    else record(parent)[key] = change.text.repeat(change.count);
+    return;
+  }
+  if (change.op === "fill_sidebar") {
+    if (change.text === undefined || change.repeat === undefined || change.items === undefined || change.sections === undefined) throw new Error("sidebar data missing");
+    record(parent)[String(key)] = Array.from({ length: change.sections }, () => ({ title: "T", items: Array.from({ length: change.items! }, () => change.text!.repeat(change.repeat!)) }));
+    return;
+  }
   if (change.op === "append") { array(child(parent, key)).push(change.value); return; }
   if (typeof key === "number") {
     const target = array(parent);
@@ -46,13 +57,15 @@ function edit(data: unknown, change: Edit): void {
 }
 const project = read("project.json");
 const zip = read("zip_manifest.json");
-const bases: Record<string, unknown> = { project, proposal: child(child(project, "proposals"), 0), template: child(project, "template"), zip_manifest: zip };
+const render = read("render_request.json");
+const bases: Record<string, unknown> = { project, proposal: child(child(project, "proposals"), 0), template: child(project, "template"), zip_manifest: zip, render_request: render };
 const cases = array(read("cases.json")) as Case[];
 for (const test of cases) {
   const source = bases[test.base];
   if (source === undefined) throw new Error(`unknown fixture base ${test.base}`);
   const data: unknown = structuredClone(source);
   for (const change of test.edits) edit(data, change);
-  assert.equal(validateContract(test.contract, data), test.valid, test.name);
+  const valid = test.contract === "render_request" ? await validateRenderRequest(data) : validateContract(test.contract, data);
+  assert.equal(valid, test.valid, test.name);
 }
 process.stdout.write(`${cases.length} shared browser contract cases passed\n`);

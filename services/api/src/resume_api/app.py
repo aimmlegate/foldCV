@@ -1,4 +1,4 @@
-"""Same-origin local shell. Candidate operations remain closed by policy."""
+"""Same-origin local service. Text generation remains closed by policy."""
 
 from __future__ import annotations
 
@@ -14,7 +14,7 @@ import uuid
 
 from fastapi import FastAPI, Request
 from fastapi.exceptions import RequestValidationError
-from fastapi.responses import FileResponse, JSONResponse, StreamingResponse
+from fastapi.responses import FileResponse, JSONResponse, Response, StreamingResponse
 from starlette.exceptions import HTTPException as StarletteHTTPException
 from pydantic import ValidationError
 
@@ -22,7 +22,9 @@ from .contracts import (CompletedEvent, CompletedPayload, DraftRequest, EmptyReq
                         FailedEvent, NormalizeRequest, OperationResult, RenderRequest, RewriteRequest, StartedEvent,
                         ValidateRequest,
                         StartedPayload, TextRequest, UsagePayload)
-from .lifecycle import OperationFiles, reap_owned
+from .lifecycle import OperationFiles, SpikeError, has_blocked_owned, reap_owned
+from .rendering import DocumentRenderer
+from packages.resume_core.rendering.template import PACKAGE_SHA256, RenderFailure, renderer_sha256, require_template
 
 
 MAX_BODY = 1_048_576
@@ -196,6 +198,7 @@ def create_app(*, origin: str, secret: str, temp_root: Path, dist: Path, runner:
     if len(secret) < 32:
         raise ValueError("Startup secret is too short")
     reap_owned(temp_root)
+    blocked_on_start = has_blocked_owned(temp_root)
     operations: dict[asyncio.Task, OperationFiles] = {}
     cancellation_pending: set[asyncio.Task] = set()
 
@@ -203,28 +206,50 @@ def create_app(*, origin: str, secret: str, temp_root: Path, dist: Path, runner:
     async def lifespan(_app: FastAPI):
         yield
         for task, files in list(operations.items()):
-            cancellation_pending.add(task)
-            task.cancel()
-            try:
-                files.stop_worker()
-            except Exception:
-                pass
-        if operations:
-            await asyncio.wait(tuple(operations), timeout=CANCEL_GRACE_SECONDS)
+            await cancel_operation(task, files)
 
     app = FastAPI(docs_url=None, redoc_url=None, openapi_url=None, lifespan=lifespan)
     boundary = LocalBoundary(app, origin, secret)
     active = 0
     count = 0
+    unsafe_cleanup = blocked_on_start
     gate = asyncio.Lock()
+    document_renderer = DocumentRenderer()
+
+    def lifecycle_code(error: SpikeError) -> str:
+        nonlocal unsafe_cleanup
+        if error.code in {"PROCESS_CLEANUP_FAILED", "CLEANUP_FAILED", "UNSAFE_TEMP_ROOT"}:
+            unsafe_cleanup = True
+        return error.code if error.code in {"PROCESS_CLEANUP_FAILED", "CLEANUP_FAILED", "UNSAFE_TEMP_ROOT", "TEMP_FAILED"} else "OPERATION_FAILED"
+
+    async def cancel_operation(task: asyncio.Task, files: OperationFiles) -> str | None:
+        if not task.done():
+            cancellation_pending.add(task)
+        task.cancel()
+        cleanup_code = None
+        try:
+            files.stop_worker()
+        except SpikeError as error:
+            cleanup_code = lifecycle_code(error)
+        done, _ = await asyncio.wait((task,), timeout=CANCEL_GRACE_SECONDS)
+        if task in done and not task.cancelled():
+            try:
+                await task
+            except SpikeError as error:
+                cleanup_code = lifecycle_code(error)
+            except Exception:
+                pass
+        return cleanup_code
 
     def operation_done(done: asyncio.Task) -> None:
         nonlocal active
+        if not done.cancelled():
+            error = done.exception()
+            if isinstance(error, SpikeError):
+                lifecycle_code(error)
         operations.pop(done, None)
         cancellation_pending.discard(done)
         active -= 1
-        if not done.cancelled():
-            done.exception()
 
     @app.exception_handler(RequestValidationError)
     async def invalid_request(_request: Request, _error: RequestValidationError):
@@ -260,11 +285,19 @@ def create_app(*, origin: str, secret: str, temp_root: Path, dist: Path, runner:
 
     @app.get("/v1/capabilities")
     async def capabilities():
+        try:
+            require_template()
+            ready = not unsafe_cleanup
+        except RenderFailure:
+            ready = False
         return JSONResponse({
             "appVersion": "0.1.0", "projectSchemaVersion": 3, "transportVersion": 1,
-            "generationReady": False, "renderers": [], "formats": [], "templates": [],
+            "generationReady": False, "renderers": ["docx", "pdf"] if ready else [],
+            "formats": ["docx", "pdf"] if ready else [],
+            "templates": [{"id": "generic", "version": "1.0.0", "packageSha256": PACKAGE_SHA256}] if ready else [],
+            "rendererSha256": renderer_sha256() if ready else None,
             "providers": [{"kind": "codex_cli", "ready": False, "reason": "CLI_PROFILE_UNSAFE"}],
-            "limits": {"maxBodyBytes": MAX_BODY, "maxOperations": MAX_OPERATIONS,
+            "limits": {"maxBodyBytes": MAX_BODY, "maxTextOperations": MAX_OPERATIONS,
                        "maxConcurrent": MAX_CONCURRENT, "timeoutSeconds": TIMEOUT_SECONDS},
         }, headers={"Cache-Control": "no-store"})
 
@@ -276,8 +309,53 @@ def create_app(*, origin: str, secret: str, temp_root: Path, dist: Path, runner:
     async def validate(_payload: ValidateRequest):
         return problem("FEATURE_UNAVAILABLE", 501, "validate")
 
-    async def render(_payload: RenderRequest):
-        return problem("FEATURE_UNAVAILABLE", 501, "render")
+    async def render(request: Request, payload: RenderRequest):
+        nonlocal active
+        async with gate:
+            if unsafe_cleanup or cancellation_pending or active >= MAX_CONCURRENT:
+                return problem("BUSY", 429, "render", True)
+            active += 1
+        files = OperationFiles(temp_root)
+
+        async def execute() -> bytes:
+            with files.open():
+                return await document_renderer.render(payload, files)
+
+        task = asyncio.create_task(execute())
+        operations[task] = files
+        task.add_done_callback(operation_done)
+
+        async def disconnected() -> None:
+            while not await request.is_disconnected():
+                await asyncio.sleep(0.05)
+
+        watcher = asyncio.create_task(disconnected())
+        try:
+            done, _ = await asyncio.wait((task, watcher), timeout=TIMEOUT_SECONDS,
+                                         return_when=asyncio.FIRST_COMPLETED)
+            if task in done:
+                data = await task
+                return Response(data, media_type="application/zip", headers={"Cache-Control": "no-store"})
+            if task not in done:
+                cleanup_code = await cancel_operation(task, files)
+                if cleanup_code:
+                    return problem(cleanup_code, 503, "render")
+                if watcher in done:
+                    return problem("OPERATION_CANCELLED", 499, "render")
+                return problem("OPERATION_TIMEOUT", 504, "render")
+            return problem("RENDER_FAILED", 500, "render")
+        except RenderFailure as error:
+            status = 422 if error.code in {"RENDER_UNSUPPORTED_CONTENT", "UNSUPPORTED_FOCUS_ICON"} else 503 if error.code.endswith(("UNAVAILABLE", "MISMATCH")) else 500
+            return problem(error.code, status, "render")
+        except SpikeError as error:
+            return problem(lifecycle_code(error), 503, "render")
+        except asyncio.CancelledError:
+            await cancel_operation(task, files)
+            raise
+        except Exception:
+            return problem("RENDER_FAILED", 500, "render")
+        finally:
+            watcher.cancel()
 
     async def host_unavailable(_payload: EmptyRequest):
         return problem("FEATURE_UNAVAILABLE", 501, "host")
@@ -304,7 +382,7 @@ def create_app(*, origin: str, secret: str, temp_root: Path, dist: Path, runner:
             try:
                 reject_code: str | None = None
                 async with gate:
-                    if cancellation_pending or active >= MAX_CONCURRENT:
+                    if unsafe_cleanup or cancellation_pending or active >= MAX_CONCURRENT:
                         reject_code = "BUSY"
                     elif count >= MAX_OPERATIONS:
                         reject_code = "OPERATION_LIMIT"
@@ -341,25 +419,14 @@ def create_app(*, origin: str, secret: str, temp_root: Path, dist: Path, runner:
                 yield (completed.model_dump_json() + "\n").encode()
             except asyncio.CancelledError:
                 if task is not None and files is not None:
-                    if not task.done():
-                        cancellation_pending.add(task)
-                    task.cancel()
-                    try:
-                        files.stop_worker()
-                    except Exception:
-                        pass
-                    await asyncio.wait((task,), timeout=CANCEL_GRACE_SECONDS)
+                    await cancel_operation(task, files)
                 raise
             except Exception as error:
+                code = lifecycle_code(error) if isinstance(error, SpikeError) else "OPERATION_TIMEOUT" if isinstance(error, OperationTimeout) else "OPERATION_FAILED"
                 if task is not None and files is not None and not task.done():
-                    cancellation_pending.add(task)
-                    task.cancel()
-                    try:
-                        files.stop_worker()
-                    except Exception:
-                        pass
-                    await asyncio.wait((task,), timeout=CANCEL_GRACE_SECONDS)
-                code = "OPERATION_TIMEOUT" if isinstance(error, OperationTimeout) else "OPERATION_FAILED"
+                    cleanup_code = await cancel_operation(task, files)
+                    if cleanup_code:
+                        code = cleanup_code
                 failed = FailedEvent(requestId=request_id, sequence=sequence + 1, type="operation.failed",
                                      baseRevision=payload.baseRevision,
                                      payload=ErrorPayload(code=code, retryable=False, stage=kind))

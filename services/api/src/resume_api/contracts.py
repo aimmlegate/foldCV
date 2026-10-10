@@ -6,7 +6,8 @@ from typing import Annotated, Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from packages.resume_core.models.contracts import Block, Fact, Proposal, RenderSnapshot, SourceUnit
+from packages.resume_core.models.contracts import Block, Fact, Proposal, SourceUnit
+from packages.resume_core.rendering.models import RenderRequest
 
 
 class Transport(BaseModel):
@@ -60,11 +61,6 @@ class ValidateRequest(Transport):
     baseRevision: int = Field(ge=0)
     facts: list[Fact] = Field(max_length=500)
     blocks: list[Block] = Field(max_length=100)
-
-
-class RenderRequest(Transport):
-    baseRevision: int = Field(ge=0)
-    snapshot: RenderSnapshot
 
 
 class EmptyRequest(Transport):

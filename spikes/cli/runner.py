@@ -12,6 +12,7 @@ import re
 import selectors
 import shutil
 import signal
+import stat
 import subprocess
 import threading
 import time
@@ -100,6 +101,85 @@ def _root(path: Path) -> Path:
     return path
 
 
+INTENT_NAME = re.compile(r"\.cleanup-intent-op-([0-9a-f]{32})\.json\Z")
+
+
+def _intent_path(root: Path, identifier: str) -> Path:
+    return root / f".cleanup-intent-op-{identifier}.json"
+
+
+def _write_cleanup_intent(root: Path, identifier: str, owner: str) -> Path:
+    marker = _intent_path(root, identifier)
+    raw = json.dumps({"owner": owner, "id": identifier}, separators=(",", ":")).encode("utf-8")
+    if len(raw) > 256:
+        raise OSError("cleanup identity too large")
+    with marker.open("xb") as output:
+        output.write(raw)
+        output.flush()
+        os.fsync(output.fileno())
+    directory_fd = os.open(root, os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW)
+    try:
+        os.fsync(directory_fd)
+    finally:
+        os.close(directory_fd)
+    return marker
+
+
+def cleanup_intent_ids(root: Path, *, owner: str = OWNER) -> set[str]:
+    result = set()
+    try:
+        entries = list(root.iterdir())
+    except OSError:
+        raise SpikeError("CLEANUP_FAILED") from None
+    for marker in entries:
+        match = INTENT_NAME.fullmatch(marker.name)
+        if match is None or marker.is_symlink():
+            continue
+        try:
+            descriptor = os.open(marker, os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK)
+            try:
+                info = os.fstat(descriptor)
+                if not stat.S_ISREG(info.st_mode) or info.st_size == 0 or info.st_size > 256:
+                    continue
+                chunks = []
+                remaining = info.st_size
+                while remaining:
+                    chunk = os.read(descriptor, remaining)
+                    if not chunk:
+                        raise OSError("short cleanup intent")
+                    chunks.append(chunk)
+                    remaining -= len(chunk)
+                raw = b"".join(chunks)
+                if os.fstat(descriptor).st_size != info.st_size:
+                    raise OSError("changed cleanup intent")
+            finally:
+                os.close(descriptor)
+            record = strict_json(raw)
+        except SpikeError:
+            continue
+        except OSError:
+            raise SpikeError("CLEANUP_FAILED") from None
+        if record == {"owner": owner, "id": match.group(1)}:
+            result.add(match.group(1))
+    return result
+
+
+def _remove_owned_directory(root: Path, directory: Path, identifier: str, owner: str) -> None:
+    try:
+        marker = _write_cleanup_intent(root, identifier, owner)
+    except OSError:
+        try:
+            (directory / ".cleanup-blocked").touch()
+        except OSError:
+            pass
+        raise SpikeError("CLEANUP_FAILED") from None
+    try:
+        shutil.rmtree(directory)
+        marker.unlink()
+    except OSError:
+        raise SpikeError("CLEANUP_FAILED") from None
+
+
 @contextmanager
 def operation(root: Path, *, owner: str = OWNER):
     root = _root(root)
@@ -119,18 +199,23 @@ def operation(root: Path, *, owner: str = OWNER):
             (directory / name).mkdir(mode=0o700)
         yield directory
     except SpikeError as error:
-        if error.code == "PROCESS_CLEANUP_FAILED":
+        if error.code in {"PROCESS_CLEANUP_FAILED", "CLEANUP_FAILED"}:
             preserve = True
-            (directory / ".cleanup-blocked").touch()
+            try:
+                (directory / ".cleanup-blocked").touch()
+            except OSError:
+                try:
+                    _write_cleanup_intent(root, identifier, owner)
+                except OSError:
+                    pass
+                raise SpikeError("CLEANUP_FAILED") from None
         raise
     except OSError:
         raise SpikeError("TEMP_FAILED") from None
     finally:
         try:
             if not preserve:
-                shutil.rmtree(directory)
-        except OSError:
-            raise SpikeError("CLEANUP_FAILED") from None
+                _remove_owned_directory(root, directory, identifier, owner)
         finally:
             if lock:
                 lock.close()
@@ -139,11 +224,15 @@ def operation(root: Path, *, owner: str = OWNER):
 def reap_owned(root: Path, *, owner: str = OWNER) -> int:
     count = 0
     try:
-        entries = list(_root(root).iterdir())
+        root = _root(root)
+        entries = list(root.iterdir())
+        blocked_ids = cleanup_intent_ids(root, owner=owner)
     except OSError:
         raise SpikeError("TEMP_FAILED") from None
     for path in entries:
         if path.is_symlink() or not path.is_dir() or not re.fullmatch(r"op-[0-9a-f]{32}", path.name):
+            continue
+        if path.name[3:] in blocked_ids:
             continue
         if (path / ".cleanup-blocked").exists():
             continue
@@ -183,7 +272,7 @@ def reap_owned(root: Path, *, owner: str = OWNER) -> int:
                             continue
                     except SpikeError:
                         continue
-                shutil.rmtree(path)
+                _remove_owned_directory(root, path, path.name[3:], owner)
                 count += 1
         except (OSError, SpikeError):
             raise SpikeError("CLEANUP_FAILED") from None

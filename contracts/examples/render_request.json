@@ -1,0 +1,80 @@
+{
+  "baseRevision": 1,
+  "document": {
+    "achievements": [
+      "Настроила измеримые цели надежности для четырех сервисов."
+    ],
+    "candidate": {
+      "name": "Мария Примерова",
+      "summary": "Проектирует надежные сервисы. За 6 лет построила процессы наблюдаемости и сократила время восстановления на 35%.",
+      "title": "Инженер платформы"
+    },
+    "focus": [
+      {
+        "duration": "4 года",
+        "icon": "python",
+        "label": "Python"
+      },
+      {
+        "duration": "3 года",
+        "icon": "docker",
+        "label": "Docker"
+      },
+      {
+        "duration": "5 лет",
+        "icon": "postgresql",
+        "label": "PostgreSQL"
+      }
+    ],
+    "footer": "contact@example.invalid",
+    "projects": [
+      {
+        "company": "Лаборатория Север",
+        "description": "Платформа обработки событий для тестового продукта.",
+        "period": "2022–2025",
+        "results": [
+          "Снизила p95 задержки с 1,8 до 0,9 с.",
+          "Сократила время восстановления на 35%."
+        ],
+        "role": "Ведущий инженер",
+        "stack": "Python · PostgreSQL · Docker",
+        "tasks": [
+          "Спроектировала очереди и контроль повторной обработки.",
+          "Ввела проверку схем событий и покрыла миграции тестами."
+        ]
+      }
+    ],
+    "sidebar": [
+      {
+        "items": [
+          "Условный технический институт, 2018",
+          "Прикладная информатика"
+        ],
+        "title": "ОБРАЗОВАНИЕ"
+      },
+      {
+        "items": [
+          "Русский — родной",
+          "English — B2"
+        ],
+        "title": "ЯЗЫКИ"
+      }
+    ],
+    "skillGroups": [
+      {
+        "items": "Python, SQL, Docker, Linux, CI/CD, мониторинг.",
+        "title": "НАВЫКИ"
+      }
+    ]
+  },
+  "snapshot": {
+    "id": "synthetic-short",
+    "projectRevision": 1,
+    "rendererSha256": "a200bf877115a76e8049258c3fa20b137a3ebcc0ca430eedc287bd46aa602c31",
+    "rendererVersion": "1.0.0",
+    "snapshotSha256": "da27d68dcd9a05735c1b6af126458bc2763c54ba658618fd856658ddb0e7d09f",
+    "templateId": "generic",
+    "templatePackageSha256": "d081df948bfd55d107c38d40387a9758f563f9c14a9cffc4a847f44cb687b8b9",
+    "templateVersion": "1.0.0"
+  }
+}

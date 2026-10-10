@@ -20,7 +20,7 @@ PYTHON = ROOT / ".venv/bin/python"
 SOFFICE = ROOT / ".tools/LibreOffice.app/Contents/MacOS/soffice"
 PYTHON_SUITES = {
     "fast": ["tests/contracts", "tests/core", "tests/foundation", "tests/service", "tests/devloop", "tests/devloop_antigravity", "skills/format-resume/tests"],
-    "integration-render": ["tests/cli_spike", "tests/render_spike"],
+    "integration-render": ["tests/cli_spike", "tests/render_spike", "tests/render"],
 }
 PROTOTYPE_TESTS = (
     "skills/format-resume/tests/test_policy.py::PolicyTests::test_valid_case",

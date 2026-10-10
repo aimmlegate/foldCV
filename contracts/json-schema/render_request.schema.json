@@ -1,0 +1,314 @@
+{
+  "$defs": {
+    "Candidate": {
+      "additionalProperties": false,
+      "properties": {
+        "name": {
+          "maxLength": 160,
+          "minLength": 1,
+          "title": "Name",
+          "type": "string"
+        },
+        "summary": {
+          "maxLength": 12000,
+          "title": "Summary",
+          "type": "string"
+        },
+        "title": {
+          "maxLength": 240,
+          "minLength": 1,
+          "title": "Title",
+          "type": "string"
+        }
+      },
+      "required": [
+        "name",
+        "title",
+        "summary"
+      ],
+      "title": "Candidate",
+      "type": "object"
+    },
+    "FocusItem": {
+      "additionalProperties": false,
+      "properties": {
+        "duration": {
+          "maxLength": 100,
+          "title": "Duration",
+          "type": "string"
+        },
+        "icon": {
+          "maxLength": 60,
+          "minLength": 1,
+          "pattern": "^[a-z0-9]+$",
+          "title": "Icon",
+          "type": "string"
+        },
+        "label": {
+          "maxLength": 100,
+          "minLength": 1,
+          "title": "Label",
+          "type": "string"
+        }
+      },
+      "required": [
+        "label",
+        "duration",
+        "icon"
+      ],
+      "title": "FocusItem",
+      "type": "object"
+    },
+    "Project": {
+      "additionalProperties": false,
+      "properties": {
+        "company": {
+          "maxLength": 200,
+          "minLength": 1,
+          "title": "Company",
+          "type": "string"
+        },
+        "description": {
+          "maxLength": 4000,
+          "title": "Description",
+          "type": "string"
+        },
+        "period": {
+          "maxLength": 100,
+          "minLength": 1,
+          "title": "Period",
+          "type": "string"
+        },
+        "results": {
+          "items": {
+            "type": "string"
+          },
+          "maxItems": 100,
+          "title": "Results",
+          "type": "array"
+        },
+        "role": {
+          "maxLength": 300,
+          "minLength": 1,
+          "title": "Role",
+          "type": "string"
+        },
+        "stack": {
+          "maxLength": 1000,
+          "title": "Stack",
+          "type": "string"
+        },
+        "tasks": {
+          "items": {
+            "type": "string"
+          },
+          "maxItems": 100,
+          "title": "Tasks",
+          "type": "array"
+        }
+      },
+      "required": [
+        "company",
+        "period",
+        "stack",
+        "description",
+        "role",
+        "tasks",
+        "results"
+      ],
+      "title": "Project",
+      "type": "object"
+    },
+    "RenderDocument": {
+      "additionalProperties": false,
+      "properties": {
+        "achievements": {
+          "items": {
+            "type": "string"
+          },
+          "maxItems": 100,
+          "title": "Achievements",
+          "type": "array"
+        },
+        "candidate": {
+          "$ref": "#/$defs/Candidate"
+        },
+        "focus": {
+          "items": {
+            "$ref": "#/$defs/FocusItem"
+          },
+          "maxItems": 8,
+          "title": "Focus",
+          "type": "array"
+        },
+        "footer": {
+          "maxLength": 200,
+          "title": "Footer",
+          "type": "string"
+        },
+        "projects": {
+          "items": {
+            "$ref": "#/$defs/Project"
+          },
+          "maxItems": 60,
+          "title": "Projects",
+          "type": "array"
+        },
+        "sidebar": {
+          "items": {
+            "$ref": "#/$defs/SidebarSection"
+          },
+          "maxItems": 40,
+          "title": "Sidebar",
+          "type": "array"
+        },
+        "skillGroups": {
+          "items": {
+            "$ref": "#/$defs/SkillGroup"
+          },
+          "maxItems": 40,
+          "title": "Skillgroups",
+          "type": "array"
+        }
+      },
+      "required": [
+        "candidate",
+        "focus",
+        "sidebar",
+        "projects",
+        "achievements",
+        "skillGroups",
+        "footer"
+      ],
+      "title": "RenderDocument",
+      "type": "object"
+    },
+    "RenderIdentity": {
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "maxLength": 100,
+          "minLength": 1,
+          "title": "Id",
+          "type": "string"
+        },
+        "projectRevision": {
+          "minimum": 1,
+          "title": "Projectrevision",
+          "type": "integer"
+        },
+        "rendererSha256": {
+          "pattern": "^[a-f0-9]{64}$",
+          "title": "Renderersha256",
+          "type": "string"
+        },
+        "rendererVersion": {
+          "const": "1.0.0",
+          "title": "Rendererversion",
+          "type": "string"
+        },
+        "snapshotSha256": {
+          "pattern": "^[a-f0-9]{64}$",
+          "title": "Snapshotsha256",
+          "type": "string"
+        },
+        "templateId": {
+          "const": "generic",
+          "title": "Templateid",
+          "type": "string"
+        },
+        "templatePackageSha256": {
+          "pattern": "^[a-f0-9]{64}$",
+          "title": "Templatepackagesha256",
+          "type": "string"
+        },
+        "templateVersion": {
+          "const": "1.0.0",
+          "title": "Templateversion",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "projectRevision",
+        "snapshotSha256",
+        "templateId",
+        "templateVersion",
+        "templatePackageSha256",
+        "rendererVersion",
+        "rendererSha256"
+      ],
+      "title": "RenderIdentity",
+      "type": "object"
+    },
+    "SidebarSection": {
+      "additionalProperties": false,
+      "properties": {
+        "items": {
+          "items": {
+            "type": "string"
+          },
+          "maxItems": 100,
+          "title": "Items",
+          "type": "array"
+        },
+        "title": {
+          "maxLength": 100,
+          "minLength": 1,
+          "title": "Title",
+          "type": "string"
+        }
+      },
+      "required": [
+        "title",
+        "items"
+      ],
+      "title": "SidebarSection",
+      "type": "object"
+    },
+    "SkillGroup": {
+      "additionalProperties": false,
+      "properties": {
+        "items": {
+          "maxLength": 4000,
+          "minLength": 1,
+          "title": "Items",
+          "type": "string"
+        },
+        "title": {
+          "maxLength": 100,
+          "minLength": 1,
+          "title": "Title",
+          "type": "string"
+        }
+      },
+      "required": [
+        "title",
+        "items"
+      ],
+      "title": "SkillGroup",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "baseRevision": {
+      "minimum": 1,
+      "title": "Baserevision",
+      "type": "integer"
+    },
+    "document": {
+      "$ref": "#/$defs/RenderDocument"
+    },
+    "snapshot": {
+      "$ref": "#/$defs/RenderIdentity"
+    }
+  },
+  "required": [
+    "baseRevision",
+    "snapshot",
+    "document"
+  ],
+  "title": "RenderRequest",
+  "type": "object"
+}

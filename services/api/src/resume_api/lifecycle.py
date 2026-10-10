@@ -6,10 +6,11 @@ from contextlib import contextmanager
 import json
 import platform
 from pathlib import Path
+import re
 import subprocess
 import sys
 
-from spikes.cli.runner import SpikeError, operation, reap_owned as spike_reap_owned, safe_environment, stop_group
+from spikes.cli.runner import SpikeError, cleanup_intent_ids, operation, reap_owned as spike_reap_owned, safe_environment, stop_group, strict_json
 
 
 OWNER = "foldcv-service-v1"
@@ -24,14 +25,37 @@ def reap_owned(root: Path) -> int:
     return spike_reap_owned(root, owner=OWNER)
 
 
+def has_blocked_owned(root: Path) -> bool:
+    if cleanup_intent_ids(root, owner=OWNER):
+        return True
+    try:
+        for path in root.iterdir():
+            if path.is_symlink() or not path.is_dir() or not re.fullmatch(r"op-[0-9a-f]{32}", path.name):
+                continue
+            marker, lock, blocked = path / ".owner", path / ".lock", path / ".cleanup-blocked"
+            if any(item.is_symlink() for item in (marker, lock, blocked)):
+                continue
+            try:
+                if not marker.is_file() or not lock.is_file() or not blocked.is_file() or marker.stat().st_size > 256:
+                    continue
+                if strict_json(marker.read_bytes()) == {"owner": OWNER, "id": path.name[3:]}:
+                    return True
+            except (OSError, SpikeError):
+                continue
+    except OSError:
+        raise SpikeError("TEMP_FAILED") from None
+    return False
+
+
 class OperationFiles:
     def __init__(self, root: Path):
         self.root = root
         self.path: Path | None = None
         self.process: subprocess.Popen[bytes] | None = None
         self.closed = False
+        self.cleanup_failed = False
 
-    def spawn(self, executable: Path, arguments: tuple[str, ...]) -> subprocess.Popen[bytes]:
+    def spawn(self, executable: Path, arguments: tuple[str, ...], *, capture: bool = True) -> subprocess.Popen[bytes]:
         """Start one test worker with an ambiguous crash marker before Popen."""
         if self.closed or self.path is None or self.process is not None:
             raise RuntimeError("Operation has no free worker slot")
@@ -40,8 +64,10 @@ class OperationFiles:
         try:
             process = subprocess.Popen([str(executable), *arguments], cwd=self.path,
                                        env=safe_environment(self.path),
-                                       stdin=subprocess.PIPE, stdout=subprocess.PIPE,
-                                       stderr=subprocess.PIPE, start_new_session=True, shell=False)
+                                       stdin=subprocess.PIPE if capture else subprocess.DEVNULL,
+                                       stdout=subprocess.PIPE if capture else subprocess.DEVNULL,
+                                       stderr=subprocess.PIPE if capture else subprocess.DEVNULL,
+                                       start_new_session=True, shell=False)
         except Exception:
             marker.unlink(missing_ok=True)
             raise
@@ -51,13 +77,25 @@ class OperationFiles:
 
     def stop_worker(self) -> None:
         self.closed = True
+        if self.cleanup_failed:
+            raise SpikeError("PROCESS_CLEANUP_FAILED")
         process = self.process
         if process is None:
             return
         try:
-            stop_group(process)
-            if self.path is not None:
-                (self.path / ".worker").unlink(missing_ok=True)
+            try:
+                stop_group(process)
+            except SpikeError:
+                self.cleanup_failed = True
+                raise
+            except OSError:
+                self.cleanup_failed = True
+                raise SpikeError("PROCESS_CLEANUP_FAILED") from None
+            try:
+                if self.path is not None:
+                    (self.path / ".worker").unlink(missing_ok=True)
+            except OSError:
+                raise SpikeError("CLEANUP_FAILED") from None
             self.process = None
         finally:
             for stream in (process.stdin, process.stdout, process.stderr):
