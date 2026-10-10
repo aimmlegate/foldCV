@@ -34,3 +34,17 @@ test("manual theme persists and system theme follows OS changes", async ({ page 
   await page.emulateMedia({ colorScheme: "light" });
   await expect(page.locator("html")).toHaveAttribute("data-theme", "light");
 });
+
+test("startup secret is exchanged once and removed from the address", async ({ page }) => {
+  const payloads: unknown[] = [];
+  await page.route("**/v1/session/exchange", async (route) => {
+    payloads.push(route.request().postDataJSON() as unknown);
+    await route.fulfill({ status: 200, contentType: "application/json", body: '{"sessionReady":true}' });
+  });
+  await page.goto("/#secret=synthetic-secret");
+  await expect(page.getByRole("heading", { name: "Исходное резюме" })).toBeVisible();
+  await expect(page).toHaveURL("http://127.0.0.1:4173/");
+  expect(payloads).toEqual([{ secret: "synthetic-secret" }]);
+  await page.reload();
+  expect(payloads).toHaveLength(1);
+});

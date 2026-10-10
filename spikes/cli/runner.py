@@ -101,7 +101,7 @@ def _root(path: Path) -> Path:
 
 
 @contextmanager
-def operation(root: Path):
+def operation(root: Path, *, owner: str = OWNER):
     root = _root(root)
     identifier = uuid.uuid4().hex
     directory = root / f"op-{identifier}"
@@ -114,7 +114,7 @@ def operation(root: Path):
     try:
         lock = (directory / ".lock").open("xb")
         fcntl.flock(lock, fcntl.LOCK_EX)
-        (directory / ".owner").write_text(json.dumps({"owner": OWNER, "id": identifier}))
+        (directory / ".owner").write_text(json.dumps({"owner": owner, "id": identifier}))
         for name in ("tmp", "cache", "data", "state", "logs"):
             (directory / name).mkdir(mode=0o700)
         yield directory
@@ -136,7 +136,7 @@ def operation(root: Path):
                 lock.close()
 
 
-def reap_owned(root: Path) -> int:
+def reap_owned(root: Path, *, owner: str = OWNER) -> int:
     count = 0
     try:
         entries = list(_root(root).iterdir())
@@ -154,10 +154,10 @@ def reap_owned(root: Path) -> int:
             try:
                 if marker.stat().st_size > 256:
                     continue
-                owner = strict_json(marker.read_bytes())
+                record_owner = strict_json(marker.read_bytes())
             except (OSError, SpikeError):
                 continue
-            if owner != {"owner": OWNER, "id": path.name[3:]}:
+            if record_owner != {"owner": owner, "id": path.name[3:]}:
                 continue
             with lock_path.open("rb") as lock:
                 try:

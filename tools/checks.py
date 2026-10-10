@@ -19,7 +19,7 @@ WEB = ROOT / "apps/web"
 PYTHON = ROOT / ".venv/bin/python"
 SOFFICE = ROOT / ".tools/LibreOffice.app/Contents/MacOS/soffice"
 PYTHON_SUITES = {
-    "fast": ["tests/contracts", "tests/core", "tests/foundation", "tests/devloop", "tests/devloop_antigravity", "skills/format-resume/tests"],
+    "fast": ["tests/contracts", "tests/core", "tests/foundation", "tests/service", "tests/devloop", "tests/devloop_antigravity", "skills/format-resume/tests"],
     "integration-render": ["tests/cli_spike", "tests/render_spike"],
 }
 PROTOTYPE_TESTS = (
@@ -49,7 +49,7 @@ def safe_env() -> dict[str, str]:
 def require_python() -> None:
     if not PYTHON.is_file():
         raise SystemExit("Missing .venv; install requirements-dev.txt into project .venv")
-    for module in ("pytest", "pytest_cov", "coverage", "pydantic", "pymupdf", "docx", "PIL"):
+    for module in ("pytest", "pytest_cov", "pytest_asyncio", "coverage", "pydantic", "pymupdf", "docx", "PIL", "fastapi", "uvicorn", "httpx"):
         if importlib.util.find_spec(module) is None:
             raise SystemExit(f"Missing Python dependency: {module}; install requirements-dev.txt")
 
