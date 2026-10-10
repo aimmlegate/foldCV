@@ -28,6 +28,13 @@ MAX_REVIEW_PROMPT = 200_000
 MAX_OUTPUT = 512_000
 TIMEOUT = 180
 GROK_VERSION = "grok 1.0.50 (c58f321264ba) [stable]"
+MCPMARKET_PLUGIN_FILES = {
+    ".claude-plugin/plugin.json": "94f812ff6f53539d314083bea9325a0c499f0508bd13b7a9e3a6a3305484a52a",
+    "hooks/hooks.json": "cb32ad2f3023ec90be19c270be259f6a04fd2ba965f0dc985422e584ac5c6a14",
+    "hook-shim.sh": "8a77e55a1ec4d80f753dd40b9bbdcc6aad38c0e5b2d05bab4ff5d460637c2ae5",
+    "shared/sync.sh": "8388775eb4134c696818579f7e36996d22f1d931f6e429bdfab72936e6552760",
+    "shared/skill-invocation.sh": "8543c0607651780aec348971e6466282a6d6156eff0e34ea5b5fe932377598af",
+}
 PRIVATE = {".git", ".devloop", ".venv", ".aws", ".ssh", ".claude",
            ".codex", ".agents", "node_modules", "__pycache__"}
 ID = re.compile(r"[A-Za-z0-9][A-Za-z0-9_-]{0,99}\Z")
@@ -169,6 +176,15 @@ def state_root(repo: Path, create: bool = False) -> Path:
     return root
 
 
+def state_directory(repo: Path, name: str, create: bool = False) -> Path:
+    path = state_root(repo) / name
+    if path.is_symlink():
+        raise DevloopError("unsafe_state_path")
+    if create:
+        path.mkdir(mode=0o700, exist_ok=True)
+    return path
+
+
 @contextmanager
 def locked(repo: Path):
     root = state_root(repo, create=True)
@@ -185,18 +201,40 @@ def locked(repo: Path):
 
 
 def recover_running(repo: Path) -> None:
-    directory = state_root(repo) / "reviews"
+    directory = state_directory(repo, "reviews")
     if not directory.is_dir():
         return
     for path in directory.glob("*/*.json"):
         if path.name not in ("grok.json", "gemini.json"):
             continue
+        if path.parent.is_symlink() or path.is_symlink():
+            raise DevloopError("unsafe_state_path")
+        report_path(repo, path.parent.name, path.stem)
         record = read_json(path)
+        if record.get("snapshot") != path.parent.name or record.get("provider") != path.stem:
+            raise DevloopError("invalid_report")
         if record.get("status") == "running":
             record.setdefault("attempt", 1)
             archived = attempt_path(repo, record)
+            if archived.is_symlink():
+                raise DevloopError("unsafe_state_path")
             if archived.exists():
                 final = read_json(archived)
+                status = final.get("status")
+                report = final.get("report")
+                if final.get("snapshot") != record["snapshot"] or \
+                        final.get("provider") != record["provider"] or \
+                        type(final.get("attempt")) is not int or \
+                        final.get("attempt") != record["attempt"] or \
+                        status not in ("reviewed", "failed", "pending_quota",
+                                       "pending_setup", "interrupted") or \
+                        (status == "reviewed" and
+                         (not valid_review_report(report) or
+                          not valid_review_usage(final.get("usage")) or
+                          final.get("error") is not None)) or \
+                        (status != "reviewed" and
+                         (report is not None or final.get("usage") is not None)):
+                    raise DevloopError("invalid_report")
                 atomic_json(path, final)
                 update_backlog(repo, final)
                 continue
@@ -213,7 +251,7 @@ def manifest_digest(manifest: dict) -> str:
 
 
 def snapshot(repo: Path, task: str, files_from: Path) -> dict:
-    if not ID.fullmatch(task):
+    if not ID.fullmatch(task) or len(task) > 67:
         raise DevloopError("invalid_task")
     try:
         names = [line for line in files_from.read_text(encoding="utf-8").splitlines()
@@ -232,8 +270,7 @@ def snapshot(repo: Path, task: str, files_from: Path) -> dict:
                 raise DevloopError("packet_too_large")
             pieces.append((name, data))
         sid = f"{task}-{uuid.uuid4().hex}"
-        base = state_root(repo) / "snapshots"
-        base.mkdir(exist_ok=True)
+        base = state_directory(repo, "snapshots", create=True)
         temp = base / f".{sid}.tmp"
         final = base / sid
         temp.mkdir(mode=0o700)
@@ -269,9 +306,11 @@ def snapshot(repo: Path, task: str, files_from: Path) -> dict:
 def load_snapshot(repo: Path, sid: str) -> tuple[Path, dict, str]:
     if not ID.fullmatch(sid):
         raise DevloopError("invalid_snapshot")
-    base = state_root(repo) / "snapshots" / sid
+    base = state_directory(repo, "snapshots") / sid
     if base.is_symlink() or not base.is_dir():
         raise DevloopError("missing_snapshot")
+    if (base / "manifest.json").is_symlink() or (base / "files").is_symlink():
+        raise DevloopError("unsafe_state_path")
     manifest = read_json(base / "manifest.json")
     if manifest.get("id") != sid or manifest.get("version") != 1:
         raise DevloopError("invalid_snapshot")
@@ -283,8 +322,12 @@ def load_snapshot(repo: Path, sid: str) -> tuple[Path, dict, str]:
             raise DevloopError("invalid_snapshot")
         name = item["path"]
         safe_relative(name)
-        path = base / "files" / name
-        if path.is_symlink() or not path.is_file():
+        path = base / "files"
+        for part in PurePosixPath(name).parts:
+            path = path / part
+            if path.is_symlink():
+                raise DevloopError("unsafe_state_path")
+        if not path.is_file():
             raise DevloopError("invalid_snapshot")
         data = path.read_bytes()
         if len(data) != item.get("bytes") or hashlib.sha256(data).hexdigest() != item.get("sha256"):
@@ -437,12 +480,22 @@ def doctor(repo: Path, probe: bool = False) -> dict:
 
 
 def report_path(repo: Path, sid: str, provider: str) -> Path:
-    return state_root(repo) / "reviews" / sid / f"{provider}.json"
+    if not isinstance(sid, str) or not ID.fullmatch(sid):
+        raise DevloopError("invalid_snapshot")
+    if provider not in ("grok", "gemini"):
+        raise DevloopError("invalid_provider")
+    directory = state_directory(repo, "reviews") / sid
+    if directory.is_symlink():
+        raise DevloopError("unsafe_state_path")
+    return directory / f"{provider}.json"
 
 
 def attempt_path(repo: Path, record: dict) -> Path:
-    return report_path(repo, record["snapshot"], record["provider"]).with_name(
-        f"{record['provider']}-attempt-{record['attempt']}.json")
+    attempt = record.get("attempt")
+    if type(attempt) is not int or attempt < 1:
+        raise DevloopError("invalid_attempt")
+    return report_path(repo, record.get("snapshot"), record.get("provider")).with_name(
+        f"{record['provider']}-attempt-{attempt}.json")
 
 
 def stdout_path(repo: Path, record: dict) -> Path:
@@ -450,6 +503,8 @@ def stdout_path(repo: Path, record: dict) -> Path:
 
 
 def load_report(path: Path) -> dict | None:
+    if path.is_symlink():
+        raise DevloopError("unsafe_state_path")
     return read_json(path) if path.exists() else None
 
 
@@ -486,7 +541,12 @@ def update_backlog(repo: Path, record: dict) -> None:
 
 def save_final_report(repo: Path, latest: Path, record: dict,
                       raw_stdout: bytes | None = None) -> None:
+    if latest != report_path(repo, record.get("snapshot"), record.get("provider")):
+        raise DevloopError("invalid_report")
     raw_path = stdout_path(repo, record)
+    archived = attempt_path(repo, record)
+    if any(path.is_symlink() for path in (raw_path, archived, latest)):
+        raise DevloopError("unsafe_state_path")
     if raw_stdout is None:
         raw_stdout = raw_path.read_bytes() if raw_path.exists() else b""
     if len(raw_stdout) > MAX_OUTPUT:
@@ -499,7 +559,6 @@ def save_final_report(repo: Path, latest: Path, record: dict,
     record["stdout_path"] = str(raw_path.relative_to(repo))
     record["stdout_bytes"] = len(raw_stdout)
     record["stdout_sha256"] = hashlib.sha256(raw_stdout).hexdigest()
-    archived = attempt_path(repo, record)
     if archived.exists():
         if read_json(archived) != record:
             raise DevloopError("duplicate_attempt")
@@ -520,6 +579,8 @@ def reparse(repo: Path, sid: str, provider: str, attempt: int,
         if latest is None or latest.get("attempt") != attempt:
             raise DevloopError("attempt_not_latest")
         source_path = attempt_path(repo, latest)
+        if source_path.is_symlink():
+            raise DevloopError("unsafe_state_path")
         original = read_json(source_path)
         if original.get("manifest_sha256") != digest or original.get("status") != "failed":
             raise DevloopError("invalid_reparse_source")
@@ -625,6 +686,32 @@ def grok_project_config(directory: Path) -> None:
         '[plugins]\ndisabled = ["mcpmarket-me"]\n', encoding="utf-8")
 
 
+def known_mcpmarket_plugin(plugin: dict) -> bool:
+    root = Path.home() / ".claude/plugins/marketplaces/local-desktop-app-uploads/mcpmarket-me"
+    if plugin != {"name": "mcpmarket-me", "path": str(root), "scope": "user",
+                  "enabled": True,
+                  "provides": {"agents": 0, "hooks": True, "mcpServers": 1, "skills": 1}}:
+        return False
+    # The pinned sync needs node; the review PATH must keep it unavailable.
+    if any((Path(folder) / "node").exists()
+           for folder in safe_environment()["PATH"].split(os.pathsep)):
+        return False
+    try:
+        return all(hashlib.sha256((root / name).read_bytes()).hexdigest() == digest
+                   for name, digest in MCPMARKET_PLUGIN_FILES.items())
+    except OSError:
+        return False
+
+
+def known_mcpmarket_hook(hook: dict) -> bool:
+    root = Path.home() / ".claude/plugins/marketplaces/local-desktop-app-uploads/mcpmarket-me"
+    return hook == {
+        "event": "(plugin)", "hookType": "file", "matcher": None,
+        "target": str(root / "hooks/hooks.json"),
+        "source": {"path": str(root), "plugin_name": "mcpmarket-me", "type": "plugin"},
+    }
+
+
 def verify_grok_isolation(item: dict, directory: Path, overlay: Path) -> None:
     try:
         code, raw, _ = run_bounded(
@@ -635,16 +722,19 @@ def verify_grok_isolation(item: dict, directory: Path, overlay: Path) -> None:
         found = json.loads(raw.decode("utf-8"))
         if not isinstance(found, dict) or found.get("cwd") != str(directory):
             raise DevloopError("mcp_preflight_failed")
-        for key, disabled_key in (("plugins", "enabled"),
-                                  ("hooks", "disabled"),
-                                  ("mcpServers", "disabled")):
+        for key in ("plugins", "hooks", "mcpServers"):
             entries = found.get(key)
             if not isinstance(entries, list) or not all(isinstance(x, dict) for x in entries):
                 raise DevloopError("mcp_preflight_failed")
-            if key == "plugins" and any(x.get(disabled_key) is not False for x in entries):
-                raise DevloopError("unexpected_hooks_or_mcp")
-            if key != "plugins" and any(x.get(disabled_key) is not True for x in entries):
-                raise DevloopError("unexpected_hooks_or_mcp")
+        active_plugins = [x for x in found["plugins"] if x.get("enabled") is not False]
+        if len(active_plugins) > 1 or any(not known_mcpmarket_plugin(x) for x in active_plugins):
+            raise DevloopError("unexpected_hooks_or_mcp")
+        active_hooks = [x for x in found["hooks"] if x.get("disabled") is not True]
+        if len(active_hooks) > 1 or any(not known_mcpmarket_hook(x) for x in active_hooks) or \
+                (active_hooks and not active_plugins):
+            raise DevloopError("unexpected_hooks_or_mcp")
+        if any(x.get("disabled") is not True for x in found["mcpServers"]):
+            raise DevloopError("unexpected_hooks_or_mcp")
     except (ValueError, UnicodeError) as exc:
         raise DevloopError("mcp_preflight_failed") from exc
     except DevloopError as exc:
@@ -769,6 +859,26 @@ def grok_cli_error(message: str) -> tuple[str, dict]:
     return "failed", {**detail, "code": "provider_error"}
 
 
+def valid_review_report(report: object) -> bool:
+    if not isinstance(report, dict) or report.get("verdict") not in ("pass", "findings") or \
+            not isinstance(report.get("summary"), str) or not report["summary"].strip() or \
+            not isinstance(report.get("findings"), list):
+        return False
+    if (report["verdict"] == "pass") != (not report["findings"]):
+        return False
+    return all(isinstance(finding, dict) and finding.get("severity") in
+               ("critical", "high", "medium", "low") and
+               isinstance(finding.get("file"), str) and
+               type(finding.get("line")) is int and finding["line"] >= 1 and
+               isinstance(finding.get("message"), str) and finding["message"].strip()
+               for finding in report["findings"])
+
+
+def valid_review_usage(usage: object) -> bool:
+    return usage is None or isinstance(usage, dict) and all(
+        type(value) is int and value >= 0 for value in usage.values())
+
+
 def parse_response(code: int, out: bytes, provider: str = "grok",
                    expected_model: str | None = None) -> tuple[str, dict | None, dict | None]:
     try:
@@ -824,25 +934,11 @@ def parse_response(code: int, out: bytes, provider: str = "grok",
         report = response["structuredOutput"]
     else:
         report = response.get("result", response)
-    if not isinstance(report, dict) or report.get("verdict") not in ("pass", "findings") or \
-            not isinstance(report.get("summary"), str) or not report["summary"].strip() or \
-            not isinstance(report.get("findings"), list):
+    if not valid_review_report(report):
         return "failed", None, {"code": "invalid_response"}
-    if report["verdict"] == "pass" and report["findings"]:
-        return "failed", None, {"code": "invalid_response"}
-    if report["verdict"] == "findings" and not report["findings"]:
-        return "failed", None, {"code": "invalid_response"}
-    for finding in report["findings"]:
-        if not isinstance(finding, dict) or finding.get("severity") not in \
-                ("critical", "high", "medium", "low") or \
-                not isinstance(finding.get("file"), str) or \
-                type(finding.get("line")) is not int or finding["line"] < 1 or \
-                not isinstance(finding.get("message"), str) or not finding["message"].strip():
-            return "failed", None, {"code": "invalid_response"}
     usage = response.get("usage") if provider == "gemini" or \
         "result" in response or "structuredOutput" in response else None
-    if usage is not None and (not isinstance(usage, dict) or any(
-            type(v) is not int or v < 0 for v in usage.values())):
+    if not valid_review_usage(usage):
         return "failed", None, {"code": "invalid_usage"}
     return "reviewed", {"report": report, "usage": usage}, None
 
@@ -982,7 +1078,7 @@ def review(repo: Path, sid: str, provider: str, force: bool = False) -> dict:
 
 def status(repo: Path) -> dict:
     snapshots = []
-    directory = state_root(repo) / "snapshots"
+    directory = state_directory(repo, "snapshots")
     if directory.is_dir():
         for path in sorted(directory.iterdir()):
             if not path.is_dir() or path.name.startswith("."):
@@ -994,17 +1090,20 @@ def status(repo: Path) -> dict:
                 continue
             reviews = {}
             for provider in ("grok", "gemini"):
-                entry = load_report(report_path(repo, path.name, provider))
+                latest = report_path(repo, path.name, provider)
+                entry = load_report(latest)
                 if entry:
                     state = entry.get("status")
+                    attempt = entry.get("attempt")
+                    archive = latest.with_name(f"{provider}-attempt-{attempt}.json") \
+                        if type(attempt) is int and attempt >= 0 else None
                     reviews[provider] = {
                         "status": "interrupted" if state == "running" else state,
                         "manifest_matches": entry.get("manifest_sha256") == digest,
-                        "attempt": entry.get("attempt"),
+                        "attempt": attempt,
                         "verdict": (entry.get("report") or {}).get("verdict"),
                         "findings": len((entry.get("report") or {}).get("findings", [])),
-                        "report": str(attempt_path(repo, entry).relative_to(repo))
-                        if type(entry.get("attempt")) is int else None,
+                        "report": str(archive.relative_to(repo)) if archive is not None else None,
                     }
             snapshots.append({"snapshot": path.name, "task": manifest["task"],
                               "manifest_sha256": digest,

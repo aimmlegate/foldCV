@@ -1,6 +1,7 @@
 """Offline checks for the development review ledger."""
 
 import fcntl
+import hashlib
 import importlib.util
 import json
 import os
@@ -8,6 +9,7 @@ from pathlib import Path
 import sys
 import tempfile
 import unittest
+from unittest import mock
 
 
 MODULE = Path(__file__).resolve().parents[2] / "tools/devloop.py"
@@ -63,6 +65,28 @@ class DevloopTests(unittest.TestCase):
         self.assertFalse(state["current_files_match"])
         self.assertEqual(kept.read_text(), "answer = 1\n")
 
+    def test_status_reads_historical_attempt_zero_without_new_write(self):
+        sid = self.snap()
+        latest = devloop.report_path(self.repo, sid, "grok")
+        archive = latest.with_name("grok-attempt-0.json")
+        record = {"snapshot": sid, "provider": "grok", "status": "pending_setup",
+                  "attempt": 0, "error": {"code": "unsupported_cli_version"}}
+        backlog = {"version": 1, "entries": [{"snapshot": sid, "provider": "grok",
+                                               "attempt": 0, "status": "pending_setup",
+                                               "report": str(archive.relative_to(self.repo))}]}
+        devloop.atomic_json(latest, record)
+        devloop.atomic_json(archive, record)
+        devloop.atomic_json(devloop.backlog_path(self.repo), backlog)
+        entry = devloop.status(self.repo)["snapshots"][0]["reviews"]["grok"]
+        self.assertEqual(entry["attempt"], 0)
+        self.assertEqual(entry["report"], str(archive.relative_to(self.repo)))
+        self.assertEqual(devloop.read_json(latest), record)
+        self.assertEqual(devloop.read_json(archive), record)
+        self.assertEqual(devloop.read_json(devloop.backlog_path(self.repo)), backlog)
+        with self.assertRaises(devloop.DevloopError) as caught:
+            devloop.save_final_report(self.repo, latest, record, b"new output")
+        self.assertEqual(caught.exception.code, "invalid_attempt")
+
     def test_unsafe_paths_and_symlinks_are_rejected(self):
         for name in ("../secret", "/tmp/secret", ".git/config", "src//new.py"):
             with self.subTest(name=name):
@@ -73,6 +97,26 @@ class DevloopTests(unittest.TestCase):
         self.list.write_text("src/link.py\n")
         with self.assertRaises(devloop.DevloopError):
             devloop.snapshot(self.repo, "T01", self.list)
+
+    def test_snapshot_task_limit_matches_loader(self):
+        sid = devloop.snapshot(self.repo, "T" * 67, self.list)["snapshot"]
+        self.assertEqual(len(sid), 100)
+        self.assertEqual(devloop.load_snapshot(self.repo, sid)[1]["task"], "T" * 67)
+        with self.assertRaises(devloop.DevloopError) as caught:
+            devloop.snapshot(self.repo, "T" * 68, self.list)
+        self.assertEqual(caught.exception.code, "invalid_task")
+
+    def test_snapshot_storage_symlink_is_rejected(self):
+        with tempfile.TemporaryDirectory() as external:
+            state = devloop.state_root(self.repo, create=True)
+            (state / "snapshots").symlink_to(external, target_is_directory=True)
+            for operation in (lambda: devloop.snapshot(self.repo, "T01", self.list),
+                              lambda: devloop.load_snapshot(self.repo, "T01-" + "a" * 32),
+                              lambda: devloop.status(self.repo)):
+                with self.assertRaises(devloop.DevloopError) as caught:
+                    operation()
+                self.assertEqual(caught.exception.code, "unsafe_state_path")
+            self.assertEqual(list(Path(external).iterdir()), [])
 
     def test_structured_quota_defers_and_skips_next_call(self):
         sid = self.snap()
@@ -305,6 +349,50 @@ class DevloopTests(unittest.TestCase):
             self.fake_output(payload)
             self.real_isolation({"executable": str(self.fake)}, base, overlay)
 
+    def test_known_mcpmarket_plugin_requires_exact_identity_and_files(self):
+        with tempfile.TemporaryDirectory() as directory:
+            home = Path(directory)
+            root = home / ".claude/plugins/marketplaces/local-desktop-app-uploads/mcpmarket-me"
+            sample = root / "hooks/hooks.json"
+            sample.parent.mkdir(parents=True)
+            sample.write_bytes(b"reviewed hook")
+            plugin = {"name": "mcpmarket-me", "path": str(root), "scope": "user",
+                      "enabled": True,
+                      "provides": {"agents": 0, "hooks": True, "mcpServers": 1, "skills": 1}}
+            digest = hashlib.sha256(sample.read_bytes()).hexdigest()
+            with mock.patch.object(Path, "home", return_value=home), \
+                    mock.patch.object(devloop, "safe_environment", return_value={"PATH": str(home)}), \
+                    mock.patch.object(devloop, "MCPMARKET_PLUGIN_FILES",
+                                      {"hooks/hooks.json": digest}):
+                self.assertTrue(devloop.known_mcpmarket_plugin(plugin))
+                self.assertFalse(devloop.known_mcpmarket_plugin({**plugin, "scope": "project"}))
+                node = home / "node"
+                node.touch()
+                self.assertFalse(devloop.known_mcpmarket_plugin(plugin))
+                node.unlink()
+                sample.write_bytes(b"changed hook")
+                self.assertFalse(devloop.known_mcpmarket_plugin(plugin))
+
+    def test_grok_preflight_allows_only_known_plugin_hook(self):
+        with tempfile.TemporaryDirectory() as directory:
+            base = Path(directory)
+            overlay = devloop.grok_overlay({"model": "grok-4.7-build-fast"}, base)
+            root = Path.home() / ".claude/plugins/marketplaces/local-desktop-app-uploads/mcpmarket-me"
+            hook = {"event": "(plugin)", "hookType": "file", "matcher": None,
+                    "target": str(root / "hooks/hooks.json"),
+                    "source": {"path": str(root), "plugin_name": "mcpmarket-me",
+                               "type": "plugin"}}
+            payload = {"cwd": directory, "plugins": [{"name": "mcpmarket-me", "enabled": True}],
+                       "hooks": [hook], "mcpServers": [{"name": "compat", "disabled": True}]}
+            with mock.patch.object(devloop, "known_mcpmarket_plugin", return_value=True):
+                self.fake_output(payload)
+                self.real_isolation({"executable": str(self.fake)}, base, overlay)
+                payload["hooks"].append({"event": "UserPromptSubmit"})
+                self.fake_output(payload)
+                with self.assertRaises(devloop.DevloopError) as caught:
+                    self.real_isolation({"executable": str(self.fake)}, base, overlay)
+                self.assertEqual(caught.exception.code, "unexpected_hooks_or_mcp")
+
     def test_active_hook_records_setup_debt_without_review_call(self):
         sid = self.snap()
         marker = self.repo / "review-invoked"
@@ -364,6 +452,141 @@ class DevloopTests(unittest.TestCase):
         with devloop.locked(self.repo):
             pass
         self.assertEqual(devloop.read_json(path)["status"], "interrupted")
+
+    def test_recovery_accepts_matching_archived_result(self):
+        sid = "T01-" + "a" * 32
+        for status in ("failed", "pending_quota", "pending_setup", "interrupted"):
+            with self.subTest(status=status), tempfile.TemporaryDirectory() as directory:
+                repo = Path(directory) / "repo"
+                latest = repo / ".devloop/reviews" / sid / "grok.json"
+                running = {"snapshot": sid, "provider": "grok", "status": "running",
+                           "attempt": 1}
+                final = {**running, "status": status, "error": {"code": "example"}}
+                devloop.atomic_json(latest, running)
+                devloop.atomic_json(latest.with_name("grok-attempt-1.json"), final)
+                with devloop.locked(repo):
+                    pass
+                self.assertEqual(devloop.read_json(latest), final)
+                self.assertEqual(devloop.read_json(devloop.backlog_path(repo))["entries"][0]
+                                 ["status"], status)
+
+    def test_recovery_accepts_valid_reviewed_archive(self):
+        sid = self.snap()
+        latest = devloop.report_path(self.repo, sid, "grok")
+        running = {"snapshot": sid, "provider": "grok", "status": "running", "attempt": 1}
+        final = {**running, "status": "reviewed",
+                 "report": {"verdict": "pass", "summary": "Clear", "findings": [],
+                            "usage": {"input_tokens": 1}},
+                 "usage": {"output_tokens": 5}}
+        devloop.atomic_json(latest, running)
+        devloop.atomic_json(latest.with_name("grok-attempt-1.json"), final)
+        with devloop.locked(self.repo):
+            pass
+        self.assertEqual(devloop.read_json(latest), final)
+        entry = devloop.read_json(devloop.backlog_path(self.repo))["entries"][0]
+        self.assertEqual((entry["status"], entry["verdict"]), ("reviewed", "pass"))
+
+    def test_recovery_preserves_latest_for_malformed_reviewed_archive(self):
+        sid = "T01-" + "a" * 32
+        valid = {"verdict": "pass", "summary": "Clear", "findings": []}
+        cases = (
+            ("missing_report", {}), ("null_report", {"report": None}),
+            ("empty_report", {"report": {}}),
+            ("bad_verdict", {"report": {**valid, "verdict": "unknown"}}),
+            ("blank_summary", {"report": {**valid, "summary": " "}}),
+            ("pass_with_findings", {"report": {**valid, "findings": [{
+                "severity": "high", "file": "x.py", "line": 1, "message": "Bug"}]}}),
+            ("findings_without_items", {"report": {**valid, "verdict": "findings"}}),
+            ("invalid_finding", {"report": {**valid, "verdict": "findings", "findings": [{
+                "severity": "high", "file": "x.py", "line": True, "message": "Bug"}]}}),
+            ("reviewed_with_error", {"report": valid, "error": {"code": "failure"}}),
+            ("invalid_usage", {"report": valid, "usage": {"output_tokens": -1}}),
+        )
+        for label, change in cases:
+            with self.subTest(case=label), tempfile.TemporaryDirectory() as directory:
+                repo = Path(directory) / "repo"
+                latest = repo / ".devloop/reviews" / sid / "grok.json"
+                running = {"snapshot": sid, "provider": "grok", "status": "running",
+                           "attempt": 1}
+                archived = latest.with_name("grok-attempt-1.json")
+                final = {**running, "status": "reviewed", **change}
+                devloop.atomic_json(latest, running)
+                devloop.atomic_json(archived, final)
+                with self.assertRaises(devloop.DevloopError) as caught:
+                    with devloop.locked(repo):
+                        pass
+                self.assertEqual(caught.exception.code, "invalid_report")
+                self.assertEqual(devloop.read_json(latest), running)
+                self.assertEqual(devloop.read_json(archived), final)
+                self.assertFalse(devloop.backlog_path(repo).exists())
+
+    def test_recovery_preserves_latest_for_malformed_archive(self):
+        sid = "T01-" + "a" * 32
+        changes = ({"snapshot": "../../escape"}, {"provider": "gemini"},
+                   {"attempt": 2}, {"attempt": True}, {"status": "running"},
+                   {"status": "unknown"}, {"report": []},
+                   {"report": {"verdict": "pass", "summary": "Clear", "findings": []}},
+                   {"usage": {"output_tokens": 1}})
+        for change in changes:
+            with self.subTest(change=change), tempfile.TemporaryDirectory() as directory:
+                repo = Path(directory) / "repo"
+                latest = repo / ".devloop/reviews" / sid / "grok.json"
+                running = {"snapshot": sid, "provider": "grok", "status": "running",
+                           "attempt": 1}
+                final = {**running, "status": "failed", **change}
+                devloop.atomic_json(latest, running)
+                archived = latest.with_name("grok-attempt-1.json")
+                devloop.atomic_json(archived, final)
+                with self.assertRaises(devloop.DevloopError) as caught:
+                    with devloop.locked(repo):
+                        pass
+                self.assertEqual(caught.exception.code, "invalid_report")
+                self.assertEqual(devloop.read_json(latest), running)
+                self.assertEqual(devloop.read_json(archived), final)
+                self.assertFalse(devloop.backlog_path(repo).exists())
+                self.assertFalse((repo / "escape/grok-attempt-1.json").exists())
+
+    def test_recovery_rejects_record_path_escape_before_writing(self):
+        for absolute in (False, True):
+            with self.subTest(absolute=absolute), tempfile.TemporaryDirectory() as directory:
+                repo = Path(directory) / "repo"
+                outside = Path(directory) / "outside"
+                malicious = str(outside) if absolute else "../../escape"
+                latest = repo / ".devloop/reviews/valid/grok.json"
+                latest.parent.mkdir(parents=True)
+                record = {"snapshot": malicious, "provider": "grok", "status": "running"}
+                devloop.atomic_json(latest, record)
+                with self.assertRaises(devloop.DevloopError) as caught:
+                    with devloop.locked(repo):
+                        pass
+                self.assertEqual(caught.exception.code, "invalid_report")
+                self.assertEqual(devloop.read_json(latest), record)
+                self.assertFalse((repo / "escape/grok-attempt-1.json").exists())
+                self.assertFalse((outside / "grok-attempt-1.json").exists())
+
+    def test_recovery_rejects_symlinked_attempt(self):
+        sid = self.snap()
+        latest = devloop.report_path(self.repo, sid, "grok")
+        devloop.atomic_json(latest, {"snapshot": sid, "provider": "grok",
+                                     "status": "running", "attempt": 1})
+        external = self.repo / "external.json"
+        external.write_text('{"status":"reviewed"}\n')
+        archived = latest.with_name("grok-attempt-1.json")
+        archived.symlink_to(external)
+        with self.assertRaises(devloop.DevloopError) as caught:
+            with devloop.locked(self.repo):
+                pass
+        self.assertEqual(caught.exception.code, "unsafe_state_path")
+        self.assertEqual(external.read_text(), '{"status":"reviewed"}\n')
+
+    def test_report_storage_symlink_is_rejected(self):
+        with tempfile.TemporaryDirectory() as external:
+            state = devloop.state_root(self.repo, create=True)
+            (state / "reviews").symlink_to(external, target_is_directory=True)
+            with self.assertRaises(devloop.DevloopError) as caught:
+                devloop.report_path(self.repo, "T01-" + "a" * 32, "grok")
+            self.assertEqual(caught.exception.code, "unsafe_state_path")
+            self.assertEqual(list(Path(external).iterdir()), [])
 
     def test_timeout_records_failed_and_cleans_run(self):
         sid = self.snap()
