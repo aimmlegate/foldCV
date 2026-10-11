@@ -15,9 +15,10 @@ from packages.resume_core.drafting import DraftRequest, DraftProposal, DraftResu
 from packages.resume_core.rewriting import RewritePreflightFailure, RewriteRequest, RewriteProposal, RewriteResult
 from packages.resume_core.technologies import CATALOG, CATALOG_VERSION
 from packages.resume_core.models.recovery import RECOVERY_CONTRACTS
+from packages.resume_core.gui_normalization import GUI_NORMALIZATION_CONTRACTS
 
 OUT = ROOT / "contracts" / "json-schema"
-RECOVERY_MODELS = RECOVERY_CONTRACTS
+RECOVERY_MODELS = {**RECOVERY_CONTRACTS, **GUI_NORMALIZATION_CONTRACTS}
 
 
 def main() -> None:

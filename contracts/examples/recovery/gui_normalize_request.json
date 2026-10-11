@@ -1,0 +1,193 @@
+{
+  "sources": [
+    {
+      "id": "source_dc297781ca355d302cd6f084",
+      "revision": 1,
+      "originalName": "synthetic.txt",
+      "mimeType": "text/plain",
+      "byteSha256": "dc297781ca355d302cd6f084bed031e74a1a80530ddae82a96949c5efcff4c35",
+      "byteRef": "sources/source_dc297781ca355d302cd6f084/original",
+      "parser": "utf8",
+      "parserVersion": "1",
+      "units": [
+        {
+          "id": "source_dc297781ca355d302cd6f084/unit_1",
+          "revision": 1,
+          "order": 0,
+          "text": "Ирина Примерова, backend-разработчик.\n",
+          "location": {
+            "kind": "pasted",
+            "index": 0,
+            "row": null,
+            "column": null
+          },
+          "disposition": "unresolved",
+          "representedFactIds": []
+        },
+        {
+          "id": "source_dc297781ca355d302cd6f084/unit_2",
+          "revision": 1,
+          "order": 1,
+          "text": "Север, backend-разработчик, 2021 — настоящее время.\n",
+          "location": {
+            "kind": "pasted",
+            "index": 1,
+            "row": null,
+            "column": null
+          },
+          "disposition": "unresolved",
+          "representedFactIds": []
+        },
+        {
+          "id": "source_dc297781ca355d302cd6f084/unit_3",
+          "revision": 1,
+          "order": 2,
+          "text": "Сервис обработки заказов. Python, PostgreSQL.\n",
+          "location": {
+            "kind": "pasted",
+            "index": 2,
+            "row": null,
+            "column": null
+          },
+          "disposition": "unresolved",
+          "representedFactIds": []
+        },
+        {
+          "id": "source_dc297781ca355d302cd6f084/unit_4",
+          "revision": 1,
+          "order": 3,
+          "text": "Делала REST API для заказов, писала интеграционные тесты.\n",
+          "location": {
+            "kind": "pasted",
+            "index": 3,
+            "row": null,
+            "column": null
+          },
+          "disposition": "unresolved",
+          "representedFactIds": []
+        },
+        {
+          "id": "source_dc297781ca355d302cd6f084/unit_5",
+          "revision": 1,
+          "order": 4,
+          "text": "Командой сократили время обработки со 100 до 70 мс, на 30%.\n",
+          "location": {
+            "kind": "pasted",
+            "index": 4,
+            "row": null,
+            "column": null
+          },
+          "disposition": "unresolved",
+          "representedFactIds": []
+        },
+        {
+          "id": "source_dc297781ca355d302cd6f084/unit_6",
+          "revision": 1,
+          "order": 5,
+          "text": "Обучила двух новых разработчиков.\n",
+          "location": {
+            "kind": "pasted",
+            "index": 5,
+            "row": null,
+            "column": null
+          },
+          "disposition": "unresolved",
+          "representedFactIds": []
+        },
+        {
+          "id": "source_dc297781ca355d302cd6f084/unit_7",
+          "revision": 1,
+          "order": 6,
+          "text": "Запад, разработчик, 2017–2020. Внутренняя CRM. Java, MySQL.\n",
+          "location": {
+            "kind": "pasted",
+            "index": 6,
+            "row": null,
+            "column": null
+          },
+          "disposition": "unresolved",
+          "representedFactIds": []
+        },
+        {
+          "id": "source_dc297781ca355d302cd6f084/unit_8",
+          "revision": 1,
+          "order": 7,
+          "text": "Поддерживала CRM и исправляла ошибки.\n",
+          "location": {
+            "kind": "pasted",
+            "index": 7,
+            "row": null,
+            "column": null
+          },
+          "disposition": "unresolved",
+          "representedFactIds": []
+        },
+        {
+          "id": "source_dc297781ca355d302cd6f084/unit_9",
+          "revision": 1,
+          "order": 8,
+          "text": "Восток, разработчик, 2008–2009. PHP. Разрабатывала отчёты.\n",
+          "location": {
+            "kind": "pasted",
+            "index": 8,
+            "row": null,
+            "column": null
+          },
+          "disposition": "unresolved",
+          "representedFactIds": []
+        },
+        {
+          "id": "source_dc297781ca355d302cd6f084/unit_10",
+          "revision": 1,
+          "order": 9,
+          "text": "Образование: Учебный технический университет, прикладная информатика, 2016.\n",
+          "location": {
+            "kind": "pasted",
+            "index": 9,
+            "row": null,
+            "column": null
+          },
+          "disposition": "unresolved",
+          "representedFactIds": []
+        },
+        {
+          "id": "source_dc297781ca355d302cd6f084/unit_11",
+          "revision": 1,
+          "order": 10,
+          "text": "Языки: русский — родной, английский — B2.\n",
+          "location": {
+            "kind": "pasted",
+            "index": 10,
+            "row": null,
+            "column": null
+          },
+          "disposition": "unresolved",
+          "representedFactIds": []
+        },
+        {
+          "id": "source_dc297781ca355d302cd6f084/unit_12",
+          "revision": 1,
+          "order": 11,
+          "text": "Общие навыки: Docker.\n",
+          "location": {
+            "kind": "pasted",
+            "index": 11,
+            "row": null,
+            "column": null
+          },
+          "disposition": "unresolved",
+          "representedFactIds": []
+        }
+      ],
+      "overlays": [],
+      "warnings": []
+    }
+  ],
+  "formattingAsOf": {
+    "precision": "day",
+    "year": 2026,
+    "month": 10,
+    "day": 11
+  },
+  "revision": 1
+}

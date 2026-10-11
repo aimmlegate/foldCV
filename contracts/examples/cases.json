@@ -1960,5 +1960,47 @@
   "base": "rules_settings",
   "valid": true,
   "edits": []
-}
+},
+  {
+    "name": "gui_normalize_request_valid",
+    "contract": "gui_normalize_request",
+    "base": "gui_normalize_request",
+    "valid": true,
+    "edits": []
+  },
+  {
+    "name": "gui_semantic_proposal_valid",
+    "contract": "gui_semantic_proposal",
+    "base": "gui_semantic_proposal",
+    "valid": true,
+    "edits": []
+  },
+  {
+    "name": "gui_normalized_result_valid",
+    "contract": "gui_normalized_result",
+    "base": "gui_normalized_result",
+    "valid": true,
+    "edits": []
+  },
+  {
+    "name": "gui_observation_invalid_calendar_date_rejected",
+    "contract": "gui_semantic_proposal",
+    "base": "gui_semantic_proposal",
+    "valid": false,
+    "edits": [
+      {
+        "op": "set",
+        "path": [
+          "observationAssessment",
+          "sourceObservedAt"
+        ],
+        "value": {
+          "precision": "day",
+          "year": 2026,
+          "month": 99,
+          "day": 10
+        }
+      }
+    ]
+  }
 ]

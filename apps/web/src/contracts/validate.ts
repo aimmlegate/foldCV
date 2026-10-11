@@ -276,6 +276,18 @@ function dateOk(value: PartialDate): boolean {
   return value.day >= 1 && value.day <= (monthDays[value.month - 1] ?? 0);
 }
 
+function recoveryDatesOk(value: unknown): boolean {
+  if (Array.isArray(value)) return value.every(recoveryDatesOk);
+  if (typeof value !== "object" || value === null) return true;
+  if ("precision" in value && (value.precision === "year" || value.precision === "month" || value.precision === "day")) {
+    if (!("year" in value) || typeof value.year !== "number" || !("month" in value) ||
+        !(typeof value.month === "number" || value.month === null) || !("day" in value) ||
+        !(typeof value.day === "number" || value.day === null)) return false;
+    if (!dateOk({ precision: value.precision, year: value.year, month: value.month, day: value.day })) return false;
+  }
+  return Object.values(value).every(recoveryDatesOk);
+}
+
 function dateLower(value: PartialDate): number {
   return value.year * 10000 + (value.month ?? 1) * 100 + (value.day ?? 1);
 }
@@ -461,6 +473,6 @@ export function validateContract(kind: string, data: unknown): boolean {
     case "zip_manifest": return safeZip(data);
     case "archive_manifest": return safeArchiveManifest(data);
     case "prepare_request": return safePrepare(data);
-    default: return validateRecoveryShape(kind, data);
+    default: return validateRecoveryShape(kind, data) && recoveryDatesOk(data);
   }
 }

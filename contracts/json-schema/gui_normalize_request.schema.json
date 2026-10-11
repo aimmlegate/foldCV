@@ -1,0 +1,303 @@
+{
+  "$defs": {
+    "PartialDate": {
+      "additionalProperties": false,
+      "properties": {
+        "day": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Day"
+        },
+        "month": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Month"
+        },
+        "precision": {
+          "enum": [
+            "year",
+            "month",
+            "day"
+          ],
+          "title": "Precision",
+          "type": "string"
+        },
+        "year": {
+          "maximum": 9999,
+          "minimum": 1,
+          "title": "Year",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "precision",
+        "year",
+        "month",
+        "day"
+      ],
+      "title": "PartialDate",
+      "type": "object"
+    },
+    "Source": {
+      "additionalProperties": false,
+      "properties": {
+        "byteRef": {
+          "title": "Byteref",
+          "type": "string"
+        },
+        "byteSha256": {
+          "pattern": "^[a-f0-9]{64}$",
+          "title": "Bytesha256",
+          "type": "string"
+        },
+        "id": {
+          "minLength": 1,
+          "title": "Id",
+          "type": "string"
+        },
+        "mimeType": {
+          "title": "Mimetype",
+          "type": "string"
+        },
+        "originalName": {
+          "title": "Originalname",
+          "type": "string"
+        },
+        "overlays": {
+          "items": {
+            "$ref": "#/$defs/SourceOverlay"
+          },
+          "title": "Overlays",
+          "type": "array"
+        },
+        "parser": {
+          "title": "Parser",
+          "type": "string"
+        },
+        "parserVersion": {
+          "title": "Parserversion",
+          "type": "string"
+        },
+        "revision": {
+          "minimum": 1,
+          "title": "Revision",
+          "type": "integer"
+        },
+        "units": {
+          "items": {
+            "$ref": "#/$defs/SourceUnit"
+          },
+          "title": "Units",
+          "type": "array"
+        },
+        "warnings": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Warnings",
+          "type": "array"
+        }
+      },
+      "required": [
+        "id",
+        "revision",
+        "originalName",
+        "mimeType",
+        "byteSha256",
+        "byteRef",
+        "parser",
+        "parserVersion",
+        "units",
+        "overlays",
+        "warnings"
+      ],
+      "title": "Source",
+      "type": "object"
+    },
+    "SourceLocation": {
+      "additionalProperties": false,
+      "properties": {
+        "column": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Column"
+        },
+        "index": {
+          "minimum": 0,
+          "title": "Index",
+          "type": "integer"
+        },
+        "kind": {
+          "enum": [
+            "page",
+            "paragraph",
+            "table_cell",
+            "pasted"
+          ],
+          "title": "Kind",
+          "type": "string"
+        },
+        "row": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Row"
+        }
+      },
+      "required": [
+        "kind",
+        "index",
+        "row",
+        "column"
+      ],
+      "title": "SourceLocation",
+      "type": "object"
+    },
+    "SourceOverlay": {
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "minLength": 1,
+          "title": "Id",
+          "type": "string"
+        },
+        "origin": {
+          "const": "user",
+          "title": "Origin",
+          "type": "string"
+        },
+        "revision": {
+          "minimum": 1,
+          "title": "Revision",
+          "type": "integer"
+        },
+        "text": {
+          "title": "Text",
+          "type": "string"
+        },
+        "unitId": {
+          "minLength": 1,
+          "title": "Unitid",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "revision",
+        "unitId",
+        "text",
+        "origin"
+      ],
+      "title": "SourceOverlay",
+      "type": "object"
+    },
+    "SourceUnit": {
+      "additionalProperties": false,
+      "properties": {
+        "disposition": {
+          "enum": [
+            "shown",
+            "condensed",
+            "archived",
+            "duplicate",
+            "unresolved",
+            "administrative"
+          ],
+          "title": "Disposition",
+          "type": "string"
+        },
+        "id": {
+          "minLength": 1,
+          "title": "Id",
+          "type": "string"
+        },
+        "location": {
+          "$ref": "#/$defs/SourceLocation"
+        },
+        "order": {
+          "minimum": 0,
+          "title": "Order",
+          "type": "integer"
+        },
+        "representedFactIds": {
+          "items": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "title": "Representedfactids",
+          "type": "array"
+        },
+        "revision": {
+          "minimum": 1,
+          "title": "Revision",
+          "type": "integer"
+        },
+        "text": {
+          "title": "Text",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "revision",
+        "order",
+        "text",
+        "location",
+        "disposition",
+        "representedFactIds"
+      ],
+      "title": "SourceUnit",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "formattingAsOf": {
+      "$ref": "#/$defs/PartialDate"
+    },
+    "revision": {
+      "minimum": 1,
+      "title": "Revision",
+      "type": "integer"
+    },
+    "sources": {
+      "items": {
+        "$ref": "#/$defs/Source"
+      },
+      "maxItems": 10,
+      "minItems": 1,
+      "title": "Sources",
+      "type": "array"
+    }
+  },
+  "required": [
+    "sources",
+    "formattingAsOf",
+    "revision"
+  ],
+  "title": "GuiNormalizeRequest",
+  "type": "object"
+}
