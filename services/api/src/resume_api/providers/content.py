@@ -22,12 +22,14 @@ class GenerationPolicy:
     max_input_bytes: int = 65_536
     max_total_input_bytes: int = 131_072
     max_total_output_bytes: int = 262_144
+    allow_repair: bool = True
 
     def __post_init__(self) -> None:
         if (not math.isfinite(self.timeout_seconds) or not 0 < self.timeout_seconds <= 60
                 or not 0 < self.max_input_bytes <= 65_536
                 or not 0 < self.max_total_input_bytes <= 131_072
-                or not 0 < self.max_total_output_bytes <= 262_144):
+                or not 0 < self.max_total_output_bytes <= 262_144
+                or type(self.allow_repair) is not bool):
             raise ValueError("invalid generation limits")
 
 

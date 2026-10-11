@@ -328,7 +328,8 @@ class CodexCliProvider:
             if files.path is None:
                 raise ContentFailure("TEMP_FAILED")
             (files.path / "schema.json").write_bytes(schema)
-            for index in range(2):
+            attempt_limit = 2 if policy.allow_repair else 1
+            for index in range(attempt_limit):
                 self.process._check(deadline, cancel)
                 prompt = original if index == 0 else original + b"\n\n" + REPAIR_FEEDBACK.encode()
                 consumed_input += len(prompt)
@@ -353,7 +354,7 @@ class CodexCliProvider:
                     return ContentResult(value, _combine(usages), probe.version, policy.model,
                                          self.clock() - start, attempts)
                 except InvalidFinal:
-                    if index == 1:
+                    if index == attempt_limit - 1:
                         raise
             raise ContentFailure("INVALID_RESULT")
         except SpikeError as error:
