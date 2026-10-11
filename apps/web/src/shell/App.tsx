@@ -22,12 +22,15 @@ import { DraftWorkflow } from "../facts/draftWorkflow";
 import type { DraftView } from "../facts/draftWorkflow";
 import type { FactSheet } from "../contracts/generated/fact_sheet";
 import type { DraftResult } from "../contracts/generated/draft_result";
+import { RewriteWorkflow, currentRewriteDependencyHash } from "../editor/rewriteWorkflow";
+import type { RewriteView } from "../editor/rewriteWorkflow";
+import catalog from "../../../../contracts/technology-catalog.json" with { type: "json" };
+import { control, field, primary } from "../editor/styles";
+import { StructuredFields } from "../editor/StructuredFields";
+import { RewriteControls } from "../editor/RewriteControls";
 
 type ThemeMode = "light" | "dark" | "system";
 const THEME_KEY = "foldcv-theme";
-const control = "rounded border border-outline bg-panel px-3 py-2 text-content hover:bg-soft focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent disabled:cursor-not-allowed disabled:opacity-50";
-const primary = "rounded border border-accent bg-accent px-3 py-2 text-accent-contrast focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent disabled:cursor-not-allowed disabled:opacity-50";
-const field = "w-full rounded border border-outline bg-surface p-3 text-content focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent";
 const titles: Record<Block["kind"], string> = {
   profile: "О себе", job_prose: "Последний проект", contact: "Контакты", focus: "Фокус технологий",
   education: "Образование", skills: "Навыки", early_career: "Ранний опыт",
@@ -66,13 +69,23 @@ export function App() {
   const draftWorkflowRef = useRef<DraftWorkflow | null>(null);
   if (!draftWorkflowRef.current) draftWorkflowRef.current = new DraftWorkflow(setDraftView, openGenerated);
   const draftWorkflow = draftWorkflowRef.current;
+  const [rewriteReady, setRewriteReady] = useState(false);
+  const [rewriteView, setRewriteView] = useState<RewriteView>({ pending: false, error: null, completed: 0 });
+  const [rewriteInstruction, setRewriteInstruction] = useState("");
+  const rewriteWorkflowRef = useRef<RewriteWorkflow | null>(null);
+  if (!rewriteWorkflowRef.current) rewriteWorkflowRef.current = new RewriteWorkflow(setRewriteView,
+    (result) => send({ type: "rewriteProposed", result }),
+    (result, loadId) => send({ type: "rewritePreflight", result, loadId }));
+  const rewriteWorkflow = rewriteWorkflowRef.current;
   useEffect(() => {
     const abort = new AbortController();
     void fetch("/v1/capabilities", { credentials: "same-origin", cache: "no-store", signal: abort.signal })
       .then((response) => response.ok && response.headers.get("content-type")?.startsWith("application/json") ?
         response.json() as Promise<unknown> : null)
-      .then((value) => { if (!abort.signal.aborted && typeof value === "object" && value !== null &&
-        "generationReady" in value && value.generationReady === true) setDraftReady(true); })
+      .then((value) => { if (!abort.signal.aborted && typeof value === "object" && value !== null) {
+        if ("generationReady" in value && value.generationReady === true) setDraftReady(true);
+        if ("rewriteReady" in value && value.rewriteReady === true) setRewriteReady(true);
+      } })
       .catch(() => undefined);
     return () => abort.abort();
   }, []);
@@ -104,6 +117,10 @@ export function App() {
     const previous = stateRef.current;
     const next = editorReducer(previous, action);
     stateRef.current = next;
+    if (next.project !== previous.project || next.presentation !== previous.presentation ||
+        action.type === "draft" || action.type === "factDraft" || action.type === "presentationDraft" ||
+        action.type === "structuredDraft")
+      rewriteWorkflow.cancel();
     const invalidated = next.project !== previous.project || next.presentation !== previous.presentation ||
         action.type === "draft" || action.type === "factDraft" || action.type === "presentationDraft" ||
         action.type === "cancel" || action.type === "cancelFact" || action.type === "presentationCancel";
@@ -162,7 +179,7 @@ export function App() {
           factWorkflow.view.sheet ? structuredClone(factWorkflow.view.sheet) : null,
         sourceReviewStale: factView.stale, manual: structuredClone(manual), draft: null };
       const adapted = adaptWorking(working);
-      send({ type: "loadImported", ...adapted, working });
+      send({ type: "loadImported", loadId: crypto.randomUUID(), ...adapted, working });
       setOpenError(null);
     } catch (error) { setOpenError(error instanceof Error ? error.message : "Не удалось открыть черновик."); }
   }
@@ -177,7 +194,7 @@ export function App() {
       priorSheet: factWorkflow.view.sheet ? structuredClone(factWorkflow.view.sheet) : null,
       sourceReviewStale: false, manual: structuredClone(manual), draft: structuredClone(draft) };
     const adapted = adaptDraftedWorking(working);
-    send({ type: "loadImported", ...adapted, working });
+    send({ type: "loadImported", loadId: crypto.randomUUID(), ...adapted, working });
     setOpenError(null);
   }
   function draftImported(manual: ManualInput, isManualCurrent: () => boolean) {
@@ -188,10 +205,32 @@ export function App() {
     void draftWorkflow.run(entries, accepted, manual, () => isManualCurrent() && !stateRef.current.project &&
       JSON.stringify({ entries: importWorkflow.state.entries, accepted: factWorkflow.view.sheet }) === snapshot);
   }
-  const reviewCount = (project?.review.decisions.filter((decision) => decision.disposition === "unresolved").length ?? 0) + state.workingIssues.length;
+  function rewriteBlock() {
+    const current = stateRef.current;
+    const target = selectedBlock(current);
+    if (!target || !rewriteReady) return;
+    const project = current.project;
+    void rewriteWorkflow.run(current, target, rewriteInstruction, () =>
+      stateRef.current.project === project && stateRef.current.project?.revision === project?.revision &&
+      stateRef.current.project?.views.find((item) => item.id === target.id)?.revision === target.revision &&
+      stateRef.current.drafts[target.id] === current.drafts[target.id]);
+  }
+  function reconcileBlock() {
+    const current = stateRef.current;
+    const target = selectedBlock(current);
+    if (!target || !current.project) return;
+    const baseRevision = current.project.revision;
+    void currentRewriteDependencyHash(current, target).then((dependencyHash) =>
+      send({ type: "reconcile", id: target.id, projectId: current.project!.projectId,
+        loadId: current.loadId!, baseRevision,
+        blockRevision: target.revision, dependencyHash }));
+  }
+  const reviewCount = (project?.review.decisions.filter((decision) => decision.disposition === "unresolved").length ?? 0) +
+    state.workingIssues.length + Object.values(state.rewriteIssues).reduce((total, issues) => total + issues.length, 0);
   const staleCount = project?.views.filter((view) => view.status === "stale").length ?? 0;
   const isReviewed = Boolean(block && project?.review.decisions.some((decision) => decision.targetKind === "block" && decision.targetId === block.id && decision.targetRevision === block.revision));
-  const relatedFacts = block ? project?.facts.filter((fact) => block.state.factIds.includes(fact.id)) ?? [] : [];
+  const relatedFacts = block ? project?.facts.filter((fact) => block.state.factIds.includes(fact.id) ||
+    (block.kind === "skills" || block.kind === "focus") && fact.kind === "technology" && fact.jobId === null) ?? [] : [];
   const correctedUnits = new Set(state.working && block ? Object.entries(state.working.sheet.userCorrections ?? {})
     .filter(([, userId]) => block.state.factIds.includes(userId))
     .flatMap(([sourceId]) => state.working!.sheet.facts.find((fact) => fact.id === sourceId)?.evidence.map((evidence) =>
@@ -225,7 +264,7 @@ export function App() {
       <div>
         {!project ? <ImportPanel state={importState} workflow={importWorkflow} text={state.sourceText}
           onText={(text) => send({ type: "sourceText", text })} exampleDisabled={importState.entries.length > 0 || importState.pending}
-          onExample={() => { importWorkflow.clear(); factWorkflow.clear(); send({ type: "loadExample" }); }} />
+          onExample={() => { importWorkflow.clear(); factWorkflow.clear(); send({ type: "loadExample", loadId: crypto.randomUUID() }); }} />
           : <section className="rounded border border-outline bg-panel p-5"><h2 className="mb-3 text-lg font-semibold">{state.working ? "Открыт черновик" : "Открыт вымышленный пример"}</h2>
             <p className="text-sm text-muted">Новый импорт доступен после явного закрытия текущего проекта. Текущие правки не будут перенесены.</p>
             {!closeProjectPrompt ? <button type="button" className={`${control} mt-4`} onClick={() => setCloseProjectPrompt(true)}>{state.working ? "Закрыть проект и перейти к импорту" : "Закрыть пример и перейти к импорту"}</button>
@@ -256,15 +295,30 @@ export function App() {
           <label className="text-sm">Язык исходника<select className={field} value={state.presentation.sourceLanguage} onChange={(event) => { const value = event.target.value; if (value === "ru" || value === "en" || value === "mixed") send({ type: "presentationLanguage", language: value }); }}><option value="ru">Русский</option><option value="en">Английский</option><option value="mixed">Смешанный</option></select></label>
           <button type="button" disabled={!state.presentationUndo} className={control} onClick={() => send({ type: "presentationUndo" })}>Отменить данные кандидата</button>
         </div>}
+        <StructuredFields state={state} send={send} />
         <div className="flex flex-wrap items-start justify-between gap-2"><h1 className="text-2xl font-semibold">{blockTitle(block)}</h1><span className="rounded bg-soft px-2 py-1 text-xs text-accent">{block.state.locked ? "Правка закреплена" : "Черновик"}</span></div>
-        <div className="my-5 flex flex-wrap gap-2"><button type="button" disabled title="Генерация блока появится после подключения CLI" className={primary}>Перегенерировать блок</button><button type="button" onClick={() => send({ type: "lock", id: block.id })} className={control}>{block.state.locked ? "Снять закрепление" : "Закрепить"}</button><button type="button" onClick={() => send({ type: "visible", id: block.id })} className={control}>{block.visible ? "Скрыть раздел" : "Показать раздел"}</button><button type="button" disabled={!state.undo[block.id]} onClick={() => send({ type: "undo", id: block.id })} className={control}>Отменить правку</button></div>
+        <div className="my-5 flex flex-wrap gap-2"><button type="button" onClick={() => send({ type: "lock", id: block.id })} className={control}>{block.state.locked ? "Снять закрепление" : "Закрепить"}</button><button type="button" onClick={() => send({ type: "visible", id: block.id })} className={control}>{block.visible ? "Скрыть раздел" : "Показать раздел"}</button><button type="button" disabled={!state.undo[block.id]} onClick={() => send({ type: "undo", id: block.id })} className={control}>Отменить правку</button></div>
+        <RewriteControls state={state} block={block} view={rewriteView} ready={rewriteReady}
+          instruction={rewriteInstruction} onInstruction={(value) => { setRewriteInstruction(value); rewriteWorkflow.cancel(); }}
+          onRequest={rewriteBlock} onCancel={() => rewriteWorkflow.cancel()} unapplied={unapplied} send={send} />
         <label htmlFor="block-text" className="mb-2 block font-semibold">Текст блока</label><textarea id="block-text" disabled={!["profile", "job_prose", "education"].includes(block.kind)} aria-invalid={Boolean(state.errors[block.id])} aria-describedby={state.errors[block.id] ? "block-error" : undefined} className={`${field} min-h-44`} value={draftFor(state, block)} onChange={(event) => send({ type: "draft", id: block.id, text: event.target.value })} />
         {!["profile", "job_prose", "education"].includes(block.kind) && <p className="mt-1 text-sm text-muted">Этот раздел собирается из фактов и каталога. Редактирование текста пока недоступно.</p>}
         {state.errors[block.id] && <p id="block-error" role="alert" className="mt-1 text-sm text-danger">{state.errors[block.id]}</p>}
         <div className="mt-3 flex flex-wrap items-center gap-2"><button type="button" disabled={!["profile", "job_prose", "education"].includes(block.kind)} className={primary} onClick={() => send({ type: "apply", id: block.id })}>Применить правку</button><button type="button" disabled={!["profile", "job_prose", "education"].includes(block.kind)} className={control} onClick={() => send({ type: "cancel", id: block.id })}>Отменить ввод</button><span className="text-xs text-muted">{draftFor(state, block) !== block.state.text ? "Ввод не применён" : "Текст принят"}</span></div>
-        {block.status === "stale" && <p role="alert" className="mt-4 border-l-4 border-danger bg-soft p-3 text-sm">Связанный факт изменён. Проверьте этот блок перед использованием.</p>}
+        {block.status === "stale" && <div className="mt-4 border-l-4 border-danger bg-soft p-3 text-sm"><p role="alert">Связанный факт изменён. Проверьте этот блок перед использованием.</p>
+          <button type="button" className={`${control} mt-2`} disabled={draftFor(state, block) !== block.state.text}
+            onClick={reconcileBlock}>Проверил факты, оставить текст</button></div>}
         <div className="mt-6 border-t border-outline pt-4"><h2 className="mb-2 font-semibold">На чём основан блок</h2>
-          {relatedFacts.length === 0 ? <p className="text-sm text-muted">Связанные факты пока не указаны.</p> : relatedFacts.map((fact) => { const editable = editableFactValue(fact); return <div key={fact.id} className="mb-3 rounded border border-outline p-3 text-sm"><strong className="block">{fact.id}</strong><span className="text-muted">{factText(fact)} · {fact.origin === "user" ? "внесено пользователем" : "связано с исходником"}</span>{editable !== null && <div className="mt-2"><label htmlFor={`fact-${fact.id}`} className="mb-1 block">{state.working && fact.origin === "source" ? "Ваше исправление текстом" : "Значение факта"}</label><input id={`fact-${fact.id}`} className={field} value={state.factDrafts[fact.id] ?? editable} onChange={(event) => send({ type: "factDraft", id: fact.id, text: event.target.value })} />{state.working && fact.origin === "source" && <p className="mt-1 text-xs text-muted">Исходный факт сохранится; исправление будет вашим текстовым утверждением.</p>}{state.errors[fact.id] && <p role="alert" className="mt-1 text-danger">{state.errors[fact.id]}</p>}<div className="mt-2 flex gap-2"><button type="button" className={control} onClick={() => send({ type: "fact", id: fact.id, value: state.factDrafts[fact.id] ?? editable })}>Применить факт</button><button type="button" className={control} onClick={() => send({ type: "cancelFact", id: fact.id })}>Отменить ввод факта</button></div></div>}{fact.kind === "technology" && <p className="mt-2 text-xs text-muted">Изменение технологии будет доступно после подключения выбора из каталога.</p>}</div>; })}
+          {relatedFacts.length === 0 ? <p className="text-sm text-muted">Связанные факты пока не указаны.</p> : relatedFacts.map((fact) => { const editable = editableFactValue(fact); return <div key={fact.id} className="mb-3 rounded border border-outline p-3 text-sm"><strong className="block">{fact.id}</strong><span className="text-muted">{factText(fact)} · {fact.origin === "user" ? "внесено пользователем" : "связано с исходником"}</span>{fact.kind === "technology" && <div className="mt-2"><label htmlFor={`fact-${fact.id}`} className="mb-1 block">Технология из каталога</label>
+            <select id={`fact-${fact.id}`} className={field} value={state.factDrafts[fact.id] ?? fact.value.canonicalId}
+              onChange={(event) => send({ type: "factDraft", id: fact.id, text: event.target.value })}>
+              {!catalog.entries.some((item) => item.canonicalId === fact.value.canonicalId) && <option value={fact.value.canonicalId}>{fact.value.display}</option>}
+              {catalog.entries.map((item) => <option key={item.canonicalId} value={item.canonicalId}>{item.aliases[0] ?? item.canonicalId}</option>)}
+            </select>{state.errors[fact.id] && <p role="alert" className="mt-1 text-danger">{state.errors[fact.id]}</p>}
+            <div className="mt-2 flex gap-2"><button type="button" className={control} onClick={() => send({ type: "fact", id: fact.id,
+              value: state.factDrafts[fact.id] ?? fact.value.canonicalId })}>Применить технологию</button>
+              <button type="button" className={control} onClick={() => send({ type: "cancelFact", id: fact.id })}>Отменить ввод</button></div></div>}
+            {fact.kind !== "technology" && editable !== null && <div className="mt-2"><label htmlFor={`fact-${fact.id}`} className="mb-1 block">{state.working && fact.origin === "source" ? "Ваше исправление текстом" : "Значение факта"}</label><input id={`fact-${fact.id}`} className={field} value={state.factDrafts[fact.id] ?? editable} onChange={(event) => send({ type: "factDraft", id: fact.id, text: event.target.value })} />{state.working && fact.origin === "source" && <p className="mt-1 text-xs text-muted">Исходный факт сохранится; исправление будет вашим текстовым утверждением.</p>}{state.errors[fact.id] && <p role="alert" className="mt-1 text-danger">{state.errors[fact.id]}</p>}<div className="mt-2 flex gap-2"><button type="button" className={control} onClick={() => send({ type: "fact", id: fact.id, value: state.factDrafts[fact.id] ?? editable })}>Применить факт</button><button type="button" className={control} onClick={() => send({ type: "cancelFact", id: fact.id })}>Отменить ввод факта</button></div></div>}</div>; })}
           <button type="button" className={control} onClick={() => send({ type: "panel", panel: "sources" })}>Показать источники</button>
         </div>
         <div className="mt-6 border-t border-outline pt-4"><button type="button" className={control} disabled={block.status === "stale"} onClick={() => send({ type: "review", id: block.id })}>{isReviewed ? "Снять отметку проверки" : "Отметить блок проверенным"}</button></div>
@@ -276,10 +330,10 @@ export function App() {
           {pdfUrl ? <iframe title="Превью PDF" src={pdfUrl} className="h-[65vh] min-h-96 w-full border border-outline bg-surface" /> : <p className="py-12 text-center text-muted">Нажмите «Обновить PDF», чтобы увидеть документ.</p>}
         </Tabs.Content>
         <Tabs.Content value="sources" className="rounded border border-outline bg-panel p-5"><h2 className="mb-3 font-semibold">Связанные фрагменты исходника</h2>{relatedUnits.length ? relatedUnits.map((unit) => <blockquote key={unit.id} className="mb-3 whitespace-pre-wrap break-words border-l-2 border-outline bg-surface p-3 text-sm">{unit.text}</blockquote>) : <p className="text-sm text-muted">Для этого раздела нет связанного фрагмента.</p>}{state.working && <WorkingSources working={state.working} />}<p className="mt-4 text-xs text-muted">Исходный текст неизменен; правки фактов хранятся отдельно в памяти вкладки.</p></Tabs.Content>
-        <Tabs.Content value="checks" className="rounded border border-outline bg-panel p-5"><h2 className="mb-3 font-semibold">Проверки</h2><ul className="list-disc space-y-2 pl-5 text-sm"><li>{reviewCount} пунктов проверки</li><li>{staleCount} блоков требуют повторной проверки</li><li>{isReviewed ? "Выбранный блок отмечен проверенным" : "Выбранный блок ещё не отмечен проверенным"}</li>{state.workingIssues.map((issue, index) => <li key={index}>{issue}</li>)}</ul><p className="mt-4 text-xs text-muted">Дословный черновик требует проверки смысла. Связь с источником не доказывает точность формулировки.</p></Tabs.Content>
+        <Tabs.Content value="checks" className="rounded border border-outline bg-panel p-5"><h2 className="mb-3 font-semibold">Проверки</h2><ul className="list-disc space-y-2 pl-5 text-sm"><li>{reviewCount} пунктов проверки</li><li>{staleCount} блоков требуют повторной проверки</li><li>{isReviewed ? "Выбранный блок отмечен проверенным" : "Выбранный блок ещё не отмечен проверенным"}</li>{state.workingIssues.map((issue, index) => <li key={index}>{issue}</li>)}{Object.values(state.rewriteIssues).flat().map((issue, index) => <li key={`rewrite-${index}`}>{issue}</li>)}</ul><p className="mt-4 text-xs text-muted">Дословный черновик требует проверки смысла. Связь с источником не доказывает точность формулировки.</p></Tabs.Content>
       </Tabs.Root></aside>
     </main>}
     {state.stage === "export" && <main className="mx-auto max-w-5xl p-6"><h1 className="mb-2 text-2xl font-semibold">Документы и проект для следующего раза</h1><p className="mb-5 text-muted">PDF и DOCX скачиваются из одной проверенной сборки. Если документ устарел, кнопка обновит превью перед скачиванием. Проект .cvproject появится позже.</p><div className="grid gap-4 md:grid-cols-3"><div className="rounded border border-outline bg-panel p-5"><h2 className="font-semibold">PDF</h2><button type="button" disabled={unapplied} onClick={() => refreshPreview("pdf")} className={`${control} mt-4`}>{canExport ? "Скачать PDF" : "Собрать и скачать PDF"}</button></div><div className="rounded border border-outline bg-panel p-5"><h2 className="font-semibold">DOCX</h2><button type="button" disabled={unapplied} onClick={() => refreshPreview("docx")} className={`${control} mt-4`}>{canExport ? "Скачать DOCX" : "Собрать и скачать DOCX"}</button></div><div className="rounded border border-outline bg-panel p-5"><h2 className="font-semibold">Проект .cvproject</h2><button type="button" disabled className={`${control} mt-4`}>Скачать проект</button></div></div><div aria-live="polite" aria-busy={preview.status === "rendering"} className="mt-4 text-sm">{preview.status === "rendering" && <p role="status">Сборка документов…</p>}{preview.error && <p role="alert" className="text-danger">{preview.error}</p>}</div>{project && <p className="mt-5 text-sm text-muted">Редакция {project.revision} · {canExport ? "PDF готов" : "актуального PDF нет"} · {reviewCount} пунктов проверки</p>}</main>}
-    <footer className="flex flex-wrap gap-5 border-t border-outline bg-panel px-6 py-3 text-xs text-muted"><span>Проект в памяти вкладки</span><span>Завершённых текстовых операций в этой сессии: {draftView.completed}</span><span>Ручное редактирование: 0 запросов</span></footer>
+    <footer className="flex flex-wrap gap-5 border-t border-outline bg-panel px-6 py-3 text-xs text-muted"><span>Проект в памяти вкладки</span><span>Завершённых текстовых операций в этой сессии: {draftView.completed + rewriteView.completed}</span><span>Ручное редактирование: 0 запросов</span></footer>
   </div>;
 }

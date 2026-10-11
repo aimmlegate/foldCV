@@ -12,7 +12,7 @@ function record(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
-async function completed(response: Response, signal: AbortSignal): Promise<unknown> {
+export async function completed(response: Response, signal: AbortSignal): Promise<unknown> {
   if (!response.ok || !response.headers.get("content-type")?.startsWith("application/x-ndjson") || !response.body)
     throw new Error("operation rejected");
   const reader = response.body.getReader();

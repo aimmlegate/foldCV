@@ -17,7 +17,7 @@ test("draft navigation, apply, lock, undo and source text stay local", async ({ 
   await expect(page.getByText("ввод не применён", { exact: false }).first()).toBeVisible();
   await page.getByRole("button", { name: "Применить правку" }).click();
   await expect(page.getByText("Правка закреплена")).toBeVisible();
-  await expect(page.getByRole("button", { name: "Перегенерировать блок" })).toBeDisabled();
+  await expect(page.getByRole("button", { name: "Предложить новую формулировку" })).toHaveCount(0);
   await page.getByRole("button", { name: "Отменить правку" }).click();
   await expect(textarea).toHaveValue(original);
   await page.getByRole("button", { name: "Показать источники" }).click();
@@ -139,10 +139,12 @@ test("equivalent metric notation keeps accepted review and normalizes field", as
   await expect(page.getByText("Связанный факт изменён", { exact: false })).toHaveCount(0);
 });
 
-test("technology fact is displayed without a generic value editor", async ({ page }) => {
+test("technology fact uses a catalog choice instead of a generic value editor", async ({ page }) => {
   await page.getByRole("button", { name: "Фокус технологий" }).click();
   await expect(page.getByText("Python · внесено пользователем")).toBeVisible();
-  await expect(page.getByText("Изменение технологии будет доступно", { exact: false })).toBeVisible();
+  await page.getByLabel("Технология из каталога").selectOption("docker");
+  await page.getByRole("button", { name: "Применить технологию" }).click();
+  await expect(page.getByText("docker · внесено пользователем")).toBeVisible();
   await expect(page.getByLabel("Значение факта")).toHaveCount(0);
   await expect(page.getByLabel("Текст блока")).toBeDisabled();
 });

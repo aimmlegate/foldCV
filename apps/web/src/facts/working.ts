@@ -21,7 +21,8 @@ export type ManualInput = { name: string; title: string; asOf: string; education
   leadership: ManualLeadership[] };
 export type WorkingSource = { entry: ImportedSource; originalBytes: Uint8Array };
 export type WorkingDraft = { transportVersion: 1; sources: WorkingSource[]; sheet: FactSheet;
-  priorSheet: FactSheet | null; sourceReviewStale: boolean; manual: ManualInput; draft: DraftResult | null };
+  priorSheet: FactSheet | null; sourceReviewStale: boolean; manual: ManualInput; draft: DraftResult | null;
+  structuredCorrections?: Record<string, string> };
 
 const templateHash = "d081df948bfd55d107c38d40387a9758f563f9c14a9cffc4a847f44cb687b8b9";
 const emptyHash = "0".repeat(64);
@@ -121,6 +122,16 @@ export function adaptWorking(working: WorkingDraft): { project: Project; present
   if (manualIds.size !== manual.employment.length || manual.employment.some((job) =>
     !job.employer.trim() || !job.role.trim() || !job.description.trim() || job.subprojects.some((sub) =>
       !sub.name.trim() || !sub.description.trim()))) throw new Error("Заполните каждую работу и подпроект дословным текстом.");
+  for (const job of manual.employment) {
+    const descriptions = [{ id: `fact_user_manual_job_${job.id}`, text: job.description.trim(), subprojectId: null },
+      ...job.subprojects.map((sub) => ({ id: `fact_user_manual_sub_${sub.id}`, text: sub.description.trim(), subprojectId: sub.id }))];
+    for (const item of descriptions) {
+      if (item.text.length > 4_000 || facts.some((fact) => fact.id === item.id))
+        throw new Error("Проверьте длину и уникальность ручного описания работы.");
+      facts.push({ id: item.id, revision: 1, kind: "text", value: { text: item.text },
+        evidence: [], origin: "user", importance: "normal", jobId: job.id, subprojectId: item.subprojectId });
+    }
+  }
   for (const metric of manual.metrics) {
     if (!metric.unit.trim() || !Number.isFinite(metric.number) || metric.upperNumber !== null &&
         (!Number.isFinite(metric.upperNumber) || metric.upperNumber < metric.number) ||
@@ -164,9 +175,31 @@ export function adaptWorking(working: WorkingDraft): { project: Project; present
       factIds: facts.filter((fact) => fact.jobId === job.id).map((fact) => fact.id) })),
     ...manual.employment.map((job) => ({ id: job.id, employer: job.employer, role: job.role,
       periods: period(job.start, job.end), subprojects: job.subprojects.map((sub) => ({ id: sub.id,
-        name: sub.name, period: period(sub.start, sub.end)[0] ?? null, factIds: [] })),
+        name: sub.name, period: period(sub.start, sub.end)[0] ?? null,
+        factIds: facts.filter((fact) => fact.subprojectId === sub.id).map((fact) => fact.id) })),
       factIds: facts.filter((fact) => fact.jobId === job.id).map((fact) => fact.id) })),
-  ];
+  ].map((job) => {
+    const corrections = working.structuredCorrections ?? {};
+    const employer = corrections[`job:${job.id}:employer`] ?? job.employer;
+    const role = corrections[`job:${job.id}:role`] ?? job.role;
+    const start = corrections[`job:${job.id}:start`];
+    const end = corrections[`job:${job.id}:end`];
+    const first = job.periods[0];
+    const periods = first && (start !== undefined || end !== undefined) ?
+      [{ start: start === undefined ? first.start : parseDate(start) ?? first.start,
+        end: end === undefined ? first.end : parseDate(end) }, ...job.periods.slice(1)] :
+      !first && start ? [{ start: parseDate(start)!, end: end === undefined ? null : parseDate(end) }] : job.periods;
+    const subprojects = job.subprojects.map((sub) => {
+      const subStart = corrections[`subproject:${sub.id}:start`];
+      const subEnd = corrections[`subproject:${sub.id}:end`];
+      const subPeriod = sub.period && (subStart !== undefined || subEnd !== undefined) ?
+        { start: subStart === undefined ? sub.period.start : parseDate(subStart) ?? sub.period.start,
+          end: subEnd === undefined ? sub.period.end : parseDate(subEnd) } :
+        !sub.period && subStart ? { start: parseDate(subStart)!, end: subEnd === undefined ? null : parseDate(subEnd) } : sub.period;
+      return { ...sub, name: corrections[`subproject:${sub.id}:name`] ?? sub.name, period: subPeriod };
+    });
+    return { ...job, employer, role, periods, subprojects };
+  });
   const jobProseBlocks: Record<string, string> = {};
   const views: Block[] = [];
   const profileFacts = facts.filter((fact): fact is TextFact => fact.kind === "text" && fact.jobId === null)

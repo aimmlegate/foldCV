@@ -4,7 +4,7 @@ import { validateContract } from "../src/contracts/validate";
 import { draftFor, editableFactValue, editorReducer, hasUnappliedDraft, initialEditorState, renderStale } from "../src/editor/state";
 import type { EditorState } from "../src/editor/state";
 
-function loaded(): EditorState { return editorReducer(initialEditorState, { type: "loadExample" }); }
+function loaded(): EditorState { return editorReducer(initialEditorState, { type: "loadExample", loadId: "unit-example" }); }
 function block(state: EditorState, id: string) {
   const found = state.project?.views.find((item) => item.id === id);
   assert.ok(found);
@@ -14,7 +14,7 @@ function block(state: EditorState, id: string) {
 test("explicit example starts with no operations and a valid project", () => {
   assert.equal(initialEditorState.project, null);
   const input = editorReducer(initialEditorState, { type: "sourceText", text: "Draft source" });
-  const state = editorReducer(input, { type: "loadExample" });
+  const state = editorReducer(input, { type: "loadExample", loadId: "unit-example" });
   assert.equal(state.project?.operations.length, 0);
   assert.equal(state.sourceText, "Draft source");
   assert.ok(validateContract("project", state.project));
@@ -127,7 +127,7 @@ test("example reload cannot replace an open edited project", () => {
   state = editorReducer(state, { type: "draft", id: "job_1_prose", text: "Accepted" });
   state = editorReducer(state, { type: "apply", id: "job_1_prose" });
   state = editorReducer(state, { type: "draft", id: "job_1_prose", text: "Pending" });
-  const unchanged = editorReducer(state, { type: "loadExample" });
+  const unchanged = editorReducer(state, { type: "loadExample", loadId: "unit-example" });
   assert.equal(unchanged, state);
   assert.equal(block(unchanged, "job_1_prose").state.text, "Accepted");
   assert.equal(draftFor(unchanged, block(unchanged, "job_1_prose")), "Pending");
@@ -162,17 +162,19 @@ test("equivalent metric input clears draft without revision or review changes", 
   assert.equal(state.project?.review.decisions.some((decision) => decision.targetId === "job_1_prose"), true);
 });
 
-test("technology fact cannot be changed through generic text actions", () => {
+test("technology fact accepts only a known catalog choice", () => {
   let state = loaded();
   const project = state.project;
   assert.ok(project);
   const technology = project.facts.find((fact) => fact.id === "fact_tech");
   assert.ok(technology);
-  assert.equal(editableFactValue(technology), null);
+  assert.equal(editableFactValue(technology), "Python");
   state = editorReducer(state, { type: "factDraft", id: "fact_tech", text: "Rust" });
-  assert.equal(state.factDrafts.fact_tech, undefined);
+  assert.equal(state.factDrafts.fact_tech, "Rust");
   state = editorReducer(state, { type: "fact", id: "fact_tech", value: "Rust" });
   assert.equal(state.project, project);
+  state = editorReducer(state, { type: "fact", id: "fact_tech", value: "docker" });
+  assert.equal(state.project?.facts.find((fact) => fact.id === "fact_tech")?.revision, 2);
   assert.equal(technology.kind, "technology");
   if (technology.kind === "technology") {
     assert.equal(technology.value.canonicalId, "python");

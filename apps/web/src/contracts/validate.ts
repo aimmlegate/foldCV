@@ -13,6 +13,9 @@ import semanticProposalSchema from "../../../../contracts/json-schema/semantic_p
 import draftRequestSchema from "../../../../contracts/json-schema/draft_request.schema.json" with { type: "json" };
 import draftProposalSchema from "../../../../contracts/json-schema/draft_proposal.schema.json" with { type: "json" };
 import draftResultSchema from "../../../../contracts/json-schema/draft_result.schema.json" with { type: "json" };
+import rewriteRequestSchema from "../../../../contracts/json-schema/rewrite_request.schema.json" with { type: "json" };
+import rewriteResultSchema from "../../../../contracts/json-schema/rewrite_result.schema.json" with { type: "json" };
+import rewritePreflightFailureSchema from "../../../../contracts/json-schema/rewrite_preflight_failure.schema.json" with { type: "json" };
 import type { Project, PartialDate, Period } from "./generated/project.js";
 import type { ZipManifest } from "./generated/zip_manifest.js";
 import type { TemplateManifest } from "./generated/template.js";
@@ -25,6 +28,9 @@ import type { SemanticProposal } from "./generated/semantic_proposal.js";
 import type { DraftRequest } from "./generated/draft_request.js";
 import type { DraftProposal } from "./generated/draft_proposal.js";
 import type { DraftResult } from "./generated/draft_result.js";
+import type { RewriteRequest } from "./generated/rewrite_request.js";
+import type { RewriteResult } from "./generated/rewrite_result.js";
+import type { RewritePreflightFailure } from "./generated/rewrite_preflight_failure.js";
 
 const ajv = new Ajv2020({ allErrors: true, strict: false });
 addFormats(ajv);
@@ -41,6 +47,26 @@ const semanticProposalShape = ajv.compile<SemanticProposal>(semanticProposalSche
 const draftRequestShape = ajv.compile<DraftRequest>(draftRequestSchema);
 const draftProposalShape = ajv.compile<DraftProposal>(draftProposalSchema);
 const draftResultShape = ajv.compile<DraftResult>(draftResultSchema);
+const rewriteRequestShape = ajv.compile<RewriteRequest>(rewriteRequestSchema);
+const rewriteResultShape = ajv.compile<RewriteResult>(rewriteResultSchema);
+const rewritePreflightFailureShape = ajv.compile<RewritePreflightFailure>(rewritePreflightFailureSchema);
+
+export function validateRewriteRequest(value: unknown): value is RewriteRequest {
+  if (!finiteJson(value) || !rewriteRequestShape(value) || !wellFormedUnicode(value)) return false;
+  const ids = new Set(value.facts.map((fact) => fact.id));
+  return ids.size === value.facts.length && unique(value.requiredFactIds) &&
+    value.requiredFactIds.every((id) => ids.has(id)) && value.excerpts.every((item) => ids.has(item.factId));
+}
+
+export function validateRewriteResult(value: unknown): value is RewriteResult {
+  return finiteJson(value) && rewriteResultShape(value) && wellFormedUnicode(value) && unique(value.factIds);
+}
+
+export function validateRewritePreflightFailure(value: unknown): value is RewritePreflightFailure {
+  return finiteJson(value) && rewritePreflightFailureShape(value) && wellFormedUnicode(value) &&
+    unique(value.issues.map((issue) => issue.factId)) &&
+    value.issues.every((issue) => issue.code === "SOURCE_REVIEW" && issue.blockId === value.blockId);
+}
 
 export function validateDraftRequest(value: unknown): value is DraftRequest {
   return finiteJson(value) && draftRequestShape(value) && wellFormedUnicode(value) &&

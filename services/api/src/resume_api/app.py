@@ -32,6 +32,9 @@ from packages.resume_core.rendering.preparation import PrepareRequest, prepare_d
 from packages.resume_core.rendering.privacy import guard_render_document
 from packages.resume_core.normalization import FactRequest, FactSheet, fingerprint, literal_sheet, semantic_input
 from packages.resume_core.drafting import DraftRequest as ProseDraftRequest, DraftResult as ProseDraftResult, draft_input
+from packages.resume_core.rewriting import (RewritePreflightError, RewritePreflightFailure,
+                                            RewriteRequest as ScopedRewriteRequest, RewriteResult as ScopedRewriteResult,
+                                            rewrite_input, withheld_rewrite_issues)
 
 
 MAX_BODY = 1_048_576
@@ -40,7 +43,7 @@ MAX_CONCURRENT = 2
 TIMEOUT_SECONDS = 30
 BODY_TIMEOUT_SECONDS = 10
 CANCEL_GRACE_SECONDS = 0.5
-POST_ONLY_PATHS = frozenset({"session/exchange", "extract", "facts", "facts/normalize", "facts/draft", "normalize", "draft", "rewrite",
+POST_ONLY_PATHS = frozenset({"session/exchange", "extract", "facts", "facts/normalize", "facts/draft", "facts/rewrite", "normalize", "draft", "rewrite",
                             "validate", "prepare-render", "render", "host/discover", "host/status", "host/login",
                             "host/detach", "host/models", "host/select", "host/cancel-login"})
 JSON_POST_PATHS = frozenset("/v1/" + path for path in POST_ONLY_PATHS if path != "extract")
@@ -66,6 +69,11 @@ class SemanticRunner(Protocol):
 class ProseDraftRunner(Protocol):
     def run(self, request: ProseDraftRequest, files: OperationFiles,
             cancel: threading.Event) -> tuple[ProseDraftResult, dict[str, int | None]]: ...
+
+
+class ProseRewriteRunner(Protocol):
+    def run(self, request: ScopedRewriteRequest, files: OperationFiles,
+            cancel: threading.Event) -> tuple[ScopedRewriteResult, dict[str, int | None]]: ...
 
 
 def problem(code: str, status: int, stage: str = "request", retryable: bool = False) -> JSONResponse:
@@ -212,7 +220,7 @@ class LocalBoundary:
 def create_app(*, origin: str, secret: str, temp_root: Path, dist: Path, runner: SyntheticRunner | None = None,
                cli_executable: Path | None = None, connection_adapter: ConnectionAdapter | None = None,
                semantic_runner: SemanticRunner | None = None, draft_runner: ProseDraftRunner | None = None,
-               fixture_generation_ready: bool = False):
+               rewrite_runner: ProseRewriteRunner | None = None, fixture_generation_ready: bool = False):
     if not origin.startswith("http://127.0.0.1:") or not origin.rsplit(":", 1)[-1].isdigit():
         raise ValueError("A concrete IPv4 loopback origin is required")
     if len(secret) < 32:
@@ -372,7 +380,8 @@ def create_app(*, origin: str, secret: str, temp_root: Path, dist: Path, runner:
             ready = False
         return JSONResponse({
             "appVersion": "0.1.0", "projectSchemaVersion": 3, "transportVersion": 1,
-            "generationReady": fixture_generation_ready, "renderers": ["docx", "pdf"] if ready else [],
+            "generationReady": fixture_generation_ready, "rewriteReady": rewrite_runner is not None,
+            "renderers": ["docx", "pdf"] if ready else [],
             "formats": ["docx", "pdf"] if ready else [],
             "templates": [{"id": "generic", "version": "1.0.0", "packageSha256": PACKAGE_SHA256}] if ready else [],
             "rendererSha256": renderer_sha256() if ready else None,
@@ -608,6 +617,88 @@ def create_app(*, origin: str, secret: str, temp_root: Path, dist: Path, runner:
 
         return StreamingResponse(events(), media_type="application/x-ndjson", headers={"Cache-Control": "no-store"})
 
+    async def rewrite_facts(payload: ScopedRewriteRequest):
+        nonlocal active, count
+        if rewrite_runner is None:
+            return problem("CLI_PROFILE_UNSAFE", 503, "rewrite")
+        try:
+            rewrite_input(payload)
+        except ValueError as error:
+            code = str(error) if str(error) in {"INPUT_TOO_LARGE", "NO_SAFE_CONTENT"} else "INVALID_REQUEST"
+            if code == "NO_SAFE_CONTENT":
+                failure = RewritePreflightFailure(error=RewritePreflightError(code="NO_SAFE_CONTENT", retryable=False,
+                    stage="rewrite"), baseRevision=payload.base_revision,
+                    blockId=payload.block_id, blockRevision=payload.block_revision,
+                    dependencyHash=payload.dependency_hash, issues=withheld_rewrite_issues(payload))
+                return JSONResponse(failure.model_dump(mode="json", by_alias=True), status_code=422,
+                                    headers={"Cache-Control": "no-store"})
+            return problem(code, 413 if code == "INPUT_TOO_LARGE" else 422, "rewrite")
+        request_id = "op_" + uuid.uuid4().hex
+
+        async def events():
+            nonlocal active, count
+            reject_code: str | None = None
+            async with gate:
+                if unsafe_cleanup or cancellation_pending or active >= MAX_CONCURRENT or count >= MAX_OPERATIONS:
+                    reject_code = "OPERATION_LIMIT" if count >= MAX_OPERATIONS else "BUSY"
+                else:
+                    active += 1
+                    count += 1
+            if reject_code:
+                yield (json.dumps({"transportVersion": 1, "requestId": request_id, "sequence": 1,
+                                   "baseRevision": payload.base_revision, "type": "operation.failed",
+                                   "payload": {"code": reject_code, "retryable": reject_code == "BUSY",
+                                               "stage": "rewrite"}}) + "\n").encode()
+                return
+            files = OperationFiles(temp_root)
+            cancel = threading.Event()
+
+            def execute():
+                with files.open():
+                    return rewrite_runner.run(payload, files, cancel)
+
+            task = asyncio.create_task(asyncio.to_thread(execute))
+            operations[task] = files
+            semantic_work[task] = (files, cancel)
+            task.add_done_callback(operation_done)
+            try:
+                yield (json.dumps({"transportVersion": 1, "requestId": request_id, "sequence": 1,
+                                   "baseRevision": payload.base_revision, "type": "operation.started",
+                                   "payload": {"stage": "rewrite"}}) + "\n").encode()
+                rewritten, usage = await asyncio.wait_for(asyncio.shield(task), timeout=TIMEOUT_SECONDS)
+                rewritten = ScopedRewriteResult.model_validate(rewritten.model_dump(mode="json", by_alias=True))
+                if (rewritten.block_id != payload.block_id or rewritten.block_revision != payload.block_revision or
+                        rewritten.dependency_hash != payload.dependency_hash or rewritten.base_revision != payload.base_revision):
+                    raise ValueError("stale rewrite")
+                usage = UsagePayload.model_validate(usage).model_dump()
+                encoded = rewritten.model_dump(mode="json", by_alias=True)
+                if len(json.dumps(encoded, ensure_ascii=False).encode("utf-8")) > 4 * 1024 * 1024:
+                    raise ValueError("result too large")
+                yield (json.dumps({"transportVersion": 1, "requestId": request_id, "sequence": 2,
+                                   "baseRevision": payload.base_revision, "type": "operation.completed",
+                                   "payload": {"result": encoded, "usage": usage}},
+                                  ensure_ascii=False, separators=(",", ":")) + "\n").encode()
+            except asyncio.CancelledError:
+                await stop_semantic(task, files, cancel)
+                raise
+            except Exception as error:
+                cancel.set()
+                code = "OPERATION_TIMEOUT" if isinstance(error, asyncio.TimeoutError) else "INVALID_RESULT"
+                if isinstance(error, SpikeError):
+                    code = lifecycle_code(error)
+                if not task.done():
+                    cleanup_code = await stop_semantic(task, files, cancel)
+                    if cleanup_code:
+                        code = cleanup_code
+                yield (json.dumps({"transportVersion": 1, "requestId": request_id, "sequence": 2,
+                                   "baseRevision": payload.base_revision, "type": "operation.failed",
+                                   "payload": {"code": code, "retryable": False, "stage": "rewrite"}}) + "\n").encode()
+            finally:
+                if not task.done():
+                    await stop_semantic(task, files, cancel)
+
+        return StreamingResponse(events(), media_type="application/x-ndjson", headers={"Cache-Control": "no-store"})
+
     async def prepare_render(payload: PrepareRequest):
         try:
             prepared = prepare_document(payload)
@@ -806,6 +897,7 @@ def create_app(*, origin: str, secret: str, temp_root: Path, dist: Path, runner:
     app.add_api_route("/v1/facts", facts, methods=["POST"])
     app.add_api_route("/v1/facts/normalize", normalize_facts, methods=["POST"])
     app.add_api_route("/v1/facts/draft", draft_facts, methods=["POST"])
+    app.add_api_route("/v1/facts/rewrite", rewrite_facts, methods=["POST"])
     app.add_api_route("/v1/validate", validate, methods=["POST"])
     app.add_api_route("/v1/prepare-render", prepare_render, methods=["POST"])
     app.add_api_route("/v1/render", render, methods=["POST"])

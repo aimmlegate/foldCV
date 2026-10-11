@@ -12,6 +12,7 @@ from packages.resume_core.rendering.preparation import PrepareRequest
 from packages.resume_core.extraction.models import ExtractResult
 from packages.resume_core.normalization import FactRequest, FactSheet, SemanticProposal
 from packages.resume_core.drafting import DraftRequest, DraftProposal, DraftResult
+from packages.resume_core.rewriting import RewritePreflightFailure, RewriteRequest, RewriteProposal, RewriteResult
 from packages.resume_core.technologies import CATALOG, CATALOG_VERSION
 
 OUT = ROOT / "contracts" / "json-schema"
@@ -42,6 +43,10 @@ def main() -> None:
         "draft_request": DraftRequest,
         "draft_proposal": DraftProposal,
         "draft_result": DraftResult,
+        "rewrite_request": RewriteRequest,
+        "rewrite_proposal": RewriteProposal,
+        "rewrite_result": RewriteResult,
+        "rewrite_preflight_failure": RewritePreflightFailure,
     }.items():
         schema = model.model_json_schema(mode="validation")
         (OUT / f"{name}.schema.json").write_text(

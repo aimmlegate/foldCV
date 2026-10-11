@@ -1,0 +1,38 @@
+{
+  "additionalProperties": false,
+  "properties": {
+    "blockId": {
+      "minLength": 1,
+      "title": "Blockid",
+      "type": "string"
+    },
+    "factIds": {
+      "items": {
+        "type": "string"
+      },
+      "maxItems": 200,
+      "minItems": 1,
+      "title": "Factids",
+      "type": "array"
+    },
+    "instructionVersion": {
+      "const": 1,
+      "default": 1,
+      "title": "Instructionversion",
+      "type": "integer"
+    },
+    "replacementText": {
+      "maxLength": 4000,
+      "minLength": 1,
+      "title": "Replacementtext",
+      "type": "string"
+    }
+  },
+  "required": [
+    "blockId",
+    "replacementText",
+    "factIds"
+  ],
+  "title": "RewriteProposal",
+  "type": "object"
+}
