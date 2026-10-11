@@ -104,6 +104,27 @@ async def test_real_child_low_rss_threshold_kills_and_reaps(tmp_path: Path, monk
 
 
 @pytest.mark.asyncio
+async def test_crashed_extract_worker_sanitizes_error_and_preserves_unrelated_file(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    worker = tmp_path / "synthetic-crash.py"
+    worker.write_text('import sys\nsys.stderr.write("private-crash-marker")\nsys.exit(7)\n', encoding="utf-8")
+    monkeypatch.setattr(extracting, "WORKER", worker)
+    app = make_app(tmp_path)
+    async with client_for(app) as client:
+        await client.post("/v1/session/exchange", headers={"Origin": ORIGIN}, json={"secret": SECRET})
+        failed = await client.post("/v1/extract", headers={"Origin": ORIGIN},
+                                   files={"file": ("source.txt", b"private-source-marker")})
+        assert failed.status_code == 503
+        assert failed.json()["error"]["code"] == "EXTRACT_FAILED"
+        assert "private-crash-marker" not in failed.text
+        assert "private-source-marker" not in failed.text
+    assert list((tmp_path / "operations").iterdir()) == []
+    assert worker.is_file()
+    assert "private-crash-marker" not in capsys.readouterr().err
+
+
+@pytest.mark.asyncio
 async def test_cancel_real_worker_keeps_no_process_or_source(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     original_rss = extracting._rss_kb
     entered = asyncio.Event()

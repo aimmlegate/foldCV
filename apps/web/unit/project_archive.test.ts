@@ -206,6 +206,26 @@ test("complete imported working sheet, original and manual description remain ex
   assert.equal(opened.editor.project?.facts.find((fact) => fact.id === "fact_user_manual_job_job_manual")?.kind, "text");
 });
 
+test("explicit project save keeps hidden original bytes without runtime load ID or render cache", async () => {
+  const input = base();
+  input.editor = { ...input.editor, loadId: "synthetic-startup-secret-0123456789" };
+  const source = input.editor.project?.sources[0];
+  assert.ok(source);
+  const saved = await saveProject(input);
+  const files = readZip(saved);
+  assert.deepEqual(files.get(source.byteRef), syntheticSourceBytes);
+  assert.match(new TextDecoder().decode(files.get(source.byteRef)), /Earlier education detail kept in the archive/);
+  assert.equal(files.has("renders/preview.pdf"), false);
+  assert.equal(files.has("renders/resume.docx"), false);
+  const payload = [...files.entries()].filter(([path]) => path.endsWith(".json"))
+    .map(([, bytes]) => new TextDecoder().decode(bytes)).join("\n");
+  for (const forbidden of ["synthetic-startup-secret-0123456789", "foldcv_session=", "CODEX_HOME",
+    "/private/var/folders/", "render-input.json"]) assert.equal(payload.includes(forbidden), false, forbidden);
+  const opened = await openProject(saved);
+  assert.deepEqual(opened.projectOriginals[source.id], syntheticSourceBytes);
+  assert.equal(opened.render, null);
+});
+
 test("wrong hash and nested runtime injection fail before a replacement is available", async () => {
   const bytes = await saveProject(base());
   const wrongHash = await altered(bytes, (files) => files.set("workspace.json", encoder.encode("{}")), false);

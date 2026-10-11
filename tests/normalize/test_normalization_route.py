@@ -15,6 +15,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "services/api/src")
 from packages.resume_core.extraction.parser import extract
 from packages.resume_core.normalization import FactRequest, SourceInput, literal_sheet
 from resume_api.app import create_app
+from resume_api.lifecycle import SpikeError
 
 
 ORIGIN = "http://127.0.0.1:39296"
@@ -92,3 +93,28 @@ async def test_closing_stream_after_started_releases_semantic_slot(tmp_path):
         await response.body_iterator.aclose()
         await asyncio.sleep(0)
     assert list((tmp_path / "operations").iterdir()) == []
+
+
+@pytest.mark.asyncio
+async def test_cancelled_semantic_cleanup_failure_blocks_later_operations(tmp_path):
+    class Runner:
+        calls = 0
+
+        def run(self, request, files, cancel):
+            self.calls += 1
+            assert cancel.wait(2)
+            raise SpikeError("PROCESS_CLEANUP_FAILED")
+
+    runner = Runner()
+    app = app_for(tmp_path, runner)
+    route = next(item for item in app.app.routes if getattr(item, "path", None) == "/v1/facts/normalize")
+    request = FactRequest.model_validate(payload())
+    response = await route.endpoint(request)
+    assert json.loads((await anext(response.body_iterator)).decode())["type"] == "operation.started"
+    await response.body_iterator.aclose()
+    retry = await route.endpoint(request)
+    failure = json.loads((await anext(retry.body_iterator)).decode())
+    assert failure["type"] == "operation.failed"
+    assert failure["payload"]["code"] == "BUSY"
+    await retry.body_iterator.aclose()
+    assert runner.calls == 1

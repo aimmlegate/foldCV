@@ -118,6 +118,12 @@ test("real service keeps PDF preview identical to download and DOCX editable wit
 
 test("saved project reopens with verified template and rebuilds PDF before export", async ({ page }) => {
   test.setTimeout(90_000);
+  let externalRequests = 0;
+  await page.route("**/*", (route) => {
+    if (new URL(route.request().url()).origin === origin) return route.continue();
+    externalRequests += 1;
+    return route.abort();
+  });
   let renders = 0;
   let textCalls = 0;
   page.on("request", (request) => {
@@ -200,6 +206,7 @@ test("saved project reopens with verified template and rebuilds PDF before expor
   await expect(page.getByText("PDF готов", { exact: false })).toBeVisible({ timeout: 45_000 });
   expect(renders).toBe(3);
   expect(textCalls).toBe(0);
+  expect(externalRequests).toBe(0);
   expect(existsSync(resolve(runRoot, "generation-attempt"))).toBe(false);
   await page.reload();
   await page.getByLabel("Или вставьте текст резюме").fill("Unapplied source paste");

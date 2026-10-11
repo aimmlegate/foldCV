@@ -11,6 +11,7 @@ import time
 import httpx
 import pytest
 from fastapi.routing import APIRoute
+from fastapi.responses import StreamingResponse
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "services/api/src"))
 
@@ -465,6 +466,47 @@ async def test_stalled_request_body_and_unexpected_error_are_sanitized(tmp_path,
         await app(scope, stalled, send)
         assert sent[0]["status"] == 408
         assert b"REQUEST_TIMEOUT" in sent[1]["body"]
+
+
+@pytest.mark.asyncio
+async def test_invalid_header_bytes_and_late_stream_failure_do_not_log_candidate(tmp_path, capsys):
+    app = make_app(tmp_path)
+
+    async def receive():
+        await asyncio.Event().wait()
+
+    async def invoke(path, headers):
+        sent = []
+
+        async def send(message):
+            sent.append(message)
+
+        scope = {"type": "http", "asgi": {"version": "3.0"}, "http_version": "1.1",
+                 "method": "GET", "scheme": "http", "path": path, "raw_path": path.encode(),
+                 "query_string": b"", "headers": headers,
+                 "client": ("127.0.0.1", 23456), "server": ("127.0.0.1", 39271)}
+        await asyncio.wait_for(app(scope, receive, send), 1)
+        return sent
+
+    for headers in ([(b"host", b"\xff"), (b"origin", ORIGIN.encode())],
+                    [(b"host", b"127.0.0.1:39271"), (b"origin", b"\xff")]):
+        sent = await invoke("/v1/capabilities", headers)
+        assert sent[0]["status"] == 403
+        assert b"private-marker" not in sent[1]["body"]
+
+    async def broken_stream():
+        yield b"safe chunk"
+        raise ValueError("private-marker")
+
+    app.app.router.routes.insert(0, APIRoute("/v1/stream-boom", lambda: StreamingResponse(broken_stream()), methods={"GET"}))
+    async with await client_for(app) as client:
+        exchange = await login(client)
+    cookie = exchange.headers["set-cookie"].split(";", 1)[0].encode()
+    sent = await invoke("/v1/stream-boom", [(b"host", b"127.0.0.1:39271"), (b"cookie", cookie)])
+    assert sent[0]["status"] == 200
+    assert any(message.get("body") == b"safe chunk" for message in sent)
+    assert all(b"private-marker" not in message.get("body", b"") for message in sent)
+    assert "private-marker" not in "".join(capsys.readouterr())
 
 
 def test_reaper_removes_only_owned_stale_dirs(tmp_path):

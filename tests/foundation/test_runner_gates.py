@@ -9,7 +9,8 @@ import sys
 
 import pytest
 
-from tools.checks import PROTOTYPE_TESTS, assert_prototype_collection
+from tools import checks
+from tools.checks import PROTOTYPE_TESTS, assert_mapped_python_suites, assert_partial_checks, assert_prototype_collection
 
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -33,3 +34,24 @@ def test_all_prototype_regressions_receive_network_guard() -> None:
                             capture_output=True, text=True, check=True)
     assert result.stdout.count("fixtures used by test_") == len(PROTOTYPE_TESTS)
     assert result.stdout.count("deny_network -- conftest.py") == len(PROTOTYPE_TESTS)
+
+
+def test_requirement_map_cannot_claim_collected_python_tests_outside_required_gates(monkeypatch) -> None:
+    data = json.loads((ROOT / "tests/requirements.json").read_text(encoding="utf-8"))
+    assert_mapped_python_suites(data["entries"])
+    assert (ROOT / "tests/normalize/test_normalization.py").is_file()
+    monkeypatch.setitem(checks.PYTHON_SUITES, "fast", [target for target in checks.PYTHON_SUITES["fast"]
+                                                  if target != "tests/normalize"])
+    with pytest.raises(SystemExit, match="outside required gates"):
+        assert_mapped_python_suites(data["entries"])
+
+
+def test_partial_requirement_cannot_lose_its_remaining_check() -> None:
+    data = json.loads((ROOT / "tests/requirements.json").read_text(encoding="utf-8"))
+    assert_partial_checks(data["entries"], data["partialChecks"])
+    missing = {key: value for key, value in data["partialChecks"].items() if key != "F01"}
+    with pytest.raises(SystemExit, match="exactly one remaining check"):
+        assert_partial_checks(data["entries"], missing)
+    incomplete = {**data["partialChecks"], "F01": {**data["partialChecks"]["F01"], "check": ""}}
+    with pytest.raises(SystemExit, match="Incomplete remaining check: F01"):
+        assert_partial_checks(data["entries"], incomplete)

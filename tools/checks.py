@@ -19,7 +19,7 @@ WEB = ROOT / "apps/web"
 PYTHON = ROOT / ".venv/bin/python"
 SOFFICE = ROOT / ".tools/LibreOffice.app/Contents/MacOS/soffice"
 PYTHON_SUITES = {
-    "fast": ["tests/contracts", "tests/core", "tests/draft", "tests/extract", "tests/foundation", "tests/service", "tests/devloop", "tests/devloop_antigravity", "skills/format-resume/tests"],
+    "fast": ["tests/contracts", "tests/core", "tests/draft", "tests/extract", "tests/foundation", "tests/normalize", "tests/service", "tests/devloop", "tests/devloop_antigravity", "skills/format-resume/tests"],
     "integration-render": ["tests/cli_spike", "tests/render_spike", "tests/render"],
 }
 PROTOTYPE_TESTS = (
@@ -82,7 +82,8 @@ def pytest_group(name: str) -> None:
         env = safe_env()
         env["COVERAGE_FILE"] = str(Path(temp) / ".coverage")
         run([str(PYTHON), "-m", "pytest", "-q", *targets, "--cov=packages", "--cov=spikes",
-             "--cov=tools", "--cov-branch", "--cov-report=term-missing:skip-covered"], env=env)
+             "--cov=tools", "--cov=services/api/src/resume_api", "--cov-branch",
+             "--cov-report=term-missing:skip-covered"], env=env)
 
 
 def assert_prototype_collection(mapped: object, collected: set[str]) -> None:
@@ -91,6 +92,27 @@ def assert_prototype_collection(mapped: object, collected: set[str]) -> None:
     missing = set(PROTOTYPE_TESTS) - collected
     if missing:
         raise SystemExit("Missing required prototype regression: " + ", ".join(sorted(missing)))
+
+
+def assert_mapped_python_suites(entries: list[dict[str, object]]) -> None:
+    targets = {target for group in PYTHON_SUITES.values() for target in group}
+    for entry in entries:
+        for node in entry["tests"]:
+            file = node.split("::", 1)[0]
+            if file.startswith(("apps/web/unit/", "apps/web/tests/")):
+                continue
+            if not any(file == target or file.startswith(target + "/") for target in targets):
+                raise SystemExit(f"Mapped Python test is outside required gates: {node}")
+
+
+def assert_partial_checks(entries: list[dict[str, object]], checks: object) -> None:
+    partial = {entry["id"] for entry in entries if entry["status"] == "partial"}
+    if not isinstance(checks, dict) or set(checks) != partial:
+        raise SystemExit("Each partial requirement needs exactly one remaining check")
+    for requirement, detail in checks.items():
+        if not isinstance(detail, dict) or any(not isinstance(detail.get(key), str) or not detail[key].strip()
+                                               for key in ("unproved", "owner", "check")):
+            raise SystemExit(f"Incomplete remaining check: {requirement}")
 
 
 def validate_map() -> None:
@@ -102,6 +124,8 @@ def validate_map() -> None:
                 "U01", "U02", "D01", "D02", "A01", "A02", "E01", "E02", "R01", "B01", "N01", "L01"}
     if ids != expected or len(entries) != len(expected):
         raise SystemExit("Requirement map IDs do not match docs/gui/testing.md")
+    assert_partial_checks(entries, data.get("partialChecks"))
+    assert_mapped_python_suites(entries)
     collection = subprocess.run([str(PYTHON), "-m", "pytest", "--collect-only", "-q", "tests",
                                  "skills/format-resume/tests"], cwd=ROOT, env=safe_env(), text=True,
                                 capture_output=True, check=True).stdout

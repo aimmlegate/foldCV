@@ -62,7 +62,9 @@ def test_routine_python_network_is_denied() -> None:
 def test_deterministic_modules_do_not_import_provider() -> None:
     paths = [*sorted((ROOT / "packages/resume_core").rglob("*.py")),
              *sorted((ROOT / "spikes/render").glob("*.py")),
-             *sorted((ROOT / "skills/format-resume/scripts").glob("*.py"))]
+             *sorted((ROOT / "skills/format-resume/scripts").glob("*.py")),
+             *(ROOT / "services/api/src/resume_api" / name for name in
+               ("extracting.py", "rendering.py", "lifecycle.py", "cli/process_runner.py"))]
     assert paths
     for path in paths:
         tree = ast.parse(path.read_text(encoding="utf-8"), filename=str(path))

@@ -71,12 +71,20 @@ test("keyboard tabs, 1280 desktop and narrow layout remain usable", async ({ pag
 test("reload clears candidate state while manual theme persists", async ({ page }) => {
   await page.getByLabel("Текст блока").fill("Несохранённый текст");
   await page.getByLabel("Тема").selectOption("dark");
+  const beforeReload = await page.evaluate(async () => ({
+    local: Object.keys(localStorage), session: Object.keys(sessionStorage),
+    databases: (await indexedDB.databases()).map((entry) => entry.name), cache: await caches.keys(),
+  }));
+  expect(beforeReload).toEqual({ local: ["foldcv-theme"], session: [], databases: [], cache: [] });
   await page.reload();
   await expect(page.getByRole("heading", { name: "Исходное резюме" })).toBeVisible();
   await expect(page.getByRole("button", { name: "2. Редактор" })).toBeDisabled();
   await expect(page.getByLabel("Тема")).toHaveValue("dark");
-  const keys = await page.evaluate(() => Object.keys(localStorage));
-  expect(keys).toEqual(["foldcv-theme"]);
+  const afterReload = await page.evaluate(async () => ({
+    local: Object.keys(localStorage), session: Object.keys(sessionStorage),
+    databases: (await indexedDB.databases()).map((entry) => entry.name), cache: await caches.keys(),
+  }));
+  expect(afterReload).toEqual(beforeReload);
 });
 
 test("export offers explicit PDF, DOCX and project archive", async ({ page }) => {
