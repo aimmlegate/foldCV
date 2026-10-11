@@ -1,0 +1,114 @@
+{
+  "$defs": {
+    "ArchiveEntry": {
+      "additionalProperties": false,
+      "properties": {
+        "path": {
+          "title": "Path",
+          "type": "string"
+        },
+        "role": {
+          "enum": [
+            "project",
+            "workspace",
+            "source_original",
+            "template_asset",
+            "render"
+          ],
+          "title": "Role",
+          "type": "string"
+        },
+        "sha256": {
+          "pattern": "^[a-f0-9]{64}$",
+          "title": "Sha256",
+          "type": "string"
+        },
+        "uncompressedSize": {
+          "maximum": 33554432,
+          "minimum": 0,
+          "title": "Uncompressedsize",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "path",
+        "role",
+        "sha256",
+        "uncompressedSize"
+      ],
+      "title": "ArchiveEntry",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "appVersion": {
+      "title": "Appversion",
+      "type": "string"
+    },
+    "entries": {
+      "items": {
+        "$ref": "#/$defs/ArchiveEntry"
+      },
+      "maxItems": 47,
+      "minItems": 1,
+      "title": "Entries",
+      "type": "array"
+    },
+    "projectId": {
+      "anyOf": [
+        {
+          "minLength": 1,
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "title": "Projectid"
+    },
+    "rendererVersion": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "title": "Rendererversion"
+    },
+    "schemaVersion": {
+      "const": 4,
+      "title": "Schemaversion",
+      "type": "integer"
+    },
+    "templateAssetsIncluded": {
+      "title": "Templateassetsincluded",
+      "type": "boolean"
+    },
+    "templatePackageSha256": {
+      "anyOf": [
+        {
+          "pattern": "^[a-f0-9]{64}$",
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "title": "Templatepackagesha256"
+    }
+  },
+  "required": [
+    "schemaVersion",
+    "appVersion",
+    "rendererVersion",
+    "templatePackageSha256",
+    "templateAssetsIncluded",
+    "projectId",
+    "entries"
+  ],
+  "title": "ArchiveManifest",
+  "type": "object"
+}

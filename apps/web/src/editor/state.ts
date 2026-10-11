@@ -45,6 +45,7 @@ export type EditorState = {
   dirty: boolean;
 };
 export type Action =
+  | { type: "restoreArchive"; state: EditorState }
   | { type: "loadExample"; loadId: string }
   | { type: "loadImported"; loadId: string; project: Project; presentation: Presentation; working: WorkingDraft; issues: string[] }
   | { type: "sourceIntegrity"; loadId: string; sources: WorkingSource[]; proof: SourceIntegrity }
@@ -57,6 +58,7 @@ export type Action =
   | { type: "presentationApply"; field: "name" | "title" }
   | { type: "presentationCancel"; field: "name" | "title" }
   | { type: "presentationLanguage"; language: Presentation["sourceLanguage"] }
+  | { type: "presentationMigrate"; language: Presentation["sourceLanguage"] }
   | { type: "presentationUndo" }
   | { type: "draft"; id: string; text: string }
   | { type: "factDraft"; id: string; text: string }
@@ -268,6 +270,7 @@ export function subprojectFieldValue(state: EditorState, jobId: string, id: stri
 
 function reduceEditorState(state: EditorState, action: Action): EditorState {
   switch (action.type) {
+    case "restoreArchive": return action.state;
     case "coverageDecision": {
       if (!state.project || !state.working) return state;
       const input = { project: state.project, working: state.working, presentation: state.presentation,
@@ -494,6 +497,24 @@ function reduceEditorState(state: EditorState, action: Action): EditorState {
         presentation: { name: "Мария Примерова", title: "Engineer", sourceLanguage: "en",
           jobProseBlocks: { job_1: "job_1_prose", job_2: "job_2_prose" } },
         stage: "editor", selectedId: project.views[0]?.id ?? null, sourceText: state.sourceText, dirty: true };
+    }
+    case "presentationMigrate": {
+      if (!state.project || state.presentation) return state;
+      const name = state.presentationDrafts.name?.trim() ?? "";
+      const title = state.presentationDrafts.title?.trim() ?? "";
+      const bindings = Object.fromEntries(state.project.employment.map((job) =>
+        [job.id, state.structuredDrafts[`migration:job:${job.id}`] ?? ""]));
+      const targets = Object.values(bindings);
+      if (!name || !title || targets.some((id) => !state.project?.views.some((block) =>
+          block.id === id && block.kind === "job_prose")) || new Set(targets).size !== targets.length)
+        return { ...state, errors: { ...state.errors, migration: "Укажите имя, должность и раздел для каждой работы." } };
+      const next = { ...state.project, revision: state.project.revision + 1 };
+      if (!validateContract("project", next)) return state;
+      return { ...state, project: next, presentation: { name, title, sourceLanguage: action.language,
+        jobProseBlocks: bindings }, presentationDrafts: {}, structuredDrafts: Object.fromEntries(
+        Object.entries(state.structuredDrafts).filter(([key]) => !key.startsWith("migration:"))),
+        errors: { ...state.errors, migration: "" }, workingIssues: state.workingIssues.filter((item) =>
+          !item.startsWith("Архив v3")), dirty: true };
     }
     case "resetProject":
       return { ...initialEditorState, sourceText: state.sourceText,
@@ -788,6 +809,7 @@ function reduceEditorState(state: EditorState, action: Action): EditorState {
 }
 
 export function editorReducer(state: EditorState, action: Action): EditorState {
+  if (action.type === "restoreArchive") return action.state;
   const next = reduceEditorState(state, action);
   if (!next.project || !next.working?.coverage) return next;
   const input = { project: next.project, working: next.working,

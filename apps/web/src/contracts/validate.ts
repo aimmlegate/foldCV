@@ -4,6 +4,7 @@ import projectSchema from "../../../../contracts/json-schema/project.schema.json
 import proposalSchema from "../../../../contracts/json-schema/proposal.schema.json" with { type: "json" };
 import templateSchema from "../../../../contracts/json-schema/template.schema.json" with { type: "json" };
 import zipSchema from "../../../../contracts/json-schema/zip_manifest.schema.json" with { type: "json" };
+import archiveSchema from "../../../../contracts/json-schema/archive_manifest.schema.json" with { type: "json" };
 import renderSchema from "../../../../contracts/json-schema/render_request.schema.json" with { type: "json" };
 import prepareSchema from "../../../../contracts/json-schema/prepare_request.schema.json" with { type: "json" };
 import extractSchema from "../../../../contracts/json-schema/extract_result.schema.json" with { type: "json" };
@@ -18,6 +19,7 @@ import rewriteResultSchema from "../../../../contracts/json-schema/rewrite_resul
 import rewritePreflightFailureSchema from "../../../../contracts/json-schema/rewrite_preflight_failure.schema.json" with { type: "json" };
 import type { Project, PartialDate, Period } from "./generated/project.js";
 import type { ZipManifest } from "./generated/zip_manifest.js";
+import type { ArchiveManifest } from "./generated/archive_manifest.js";
 import type { TemplateManifest } from "./generated/template.js";
 import type { RenderRequest } from "./generated/render_request.js";
 import type { PrepareRequest } from "./generated/prepare_request.js";
@@ -38,6 +40,7 @@ const projectShape = ajv.compile<Project>(projectSchema);
 const proposalShape = ajv.compile(proposalSchema);
 const templateShape = ajv.compile<TemplateManifest>(templateSchema);
 const zipShape = ajv.compile<ZipManifest>(zipSchema);
+const archiveShape = ajv.compile<ArchiveManifest>(archiveSchema);
 const renderShape = ajv.compile<RenderRequest>(renderSchema);
 const prepareShape = ajv.compile<PrepareRequest>(prepareSchema);
 const extractShape = ajv.compile<ExtractResult>(extractSchema);
@@ -415,6 +418,21 @@ function safeZip(data: unknown): boolean {
   return unique(paths) && paths.every(safePath) && projectEntries.length === 1 && projectEntries[0]?.path === "project.json";
 }
 
+function safeArchiveManifest(data: unknown): boolean {
+  if (!archiveShape(data)) return false;
+  const paths = data.entries.map((entry) => entry.path);
+  if (new Set(paths.map((path) => path.toLocaleLowerCase("en-US"))).size !== paths.length ||
+      !paths.every(safePath)) return false;
+  if (data.entries.filter((entry) => entry.role === "workspace").map((entry) => entry.path).join() !== "workspace.json") return false;
+  const projectPaths = data.entries.filter((entry) => entry.role === "project").map((entry) => entry.path);
+  if (projectPaths.join() !== (data.projectId === null ? "" : "project.json")) return false;
+  if (data.projectId === null && (data.rendererVersion !== null || data.templatePackageSha256 !== null)) return false;
+  if ((data.rendererVersion === null) !== (data.templatePackageSha256 === null)) return false;
+  if (data.templateAssetsIncluded !== data.entries.some((entry) => entry.role === "template_asset")) return false;
+  return data.entries.every((entry) => entry.role !== "render" || entry.path.startsWith("renders/")) &&
+    data.entries.every((entry) => entry.role !== "template_asset" || entry.path.startsWith("template/"));
+}
+
 function safePrepare(data: unknown): boolean {
   if (!prepareShape(data) || !semanticProject(data.project)) return false;
   const project = data.project;
@@ -439,6 +457,7 @@ export function validateContract(kind: string, data: unknown): boolean {
     case "proposal": return proposalShape(data);
     case "template": return templateShape(data) && data.assets.every((asset) => safePath(asset.path));
     case "zip_manifest": return safeZip(data);
+    case "archive_manifest": return safeArchiveManifest(data);
     case "prepare_request": return safePrepare(data);
     default: return false;
   }

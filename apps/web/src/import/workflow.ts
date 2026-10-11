@@ -101,6 +101,19 @@ export class ImportWorkflow {
     return bytes ? Uint8Array.from(bytes) : null;
   }
 
+  snapshot(): { state: ImportState; originals: Record<string, Uint8Array> } {
+    return { state: { ...structuredClone(this.state), pending: false },
+      originals: Object.fromEntries([...this.originals].map(([id, bytes]) => [id, Uint8Array.from(bytes)])) };
+  }
+
+  restore(state: ImportState, originals: Record<string, Uint8Array>): void {
+    this.epoch += 1;
+    this.abort?.abort();
+    this.abort = null;
+    this.originals = new Map(Object.entries(originals).map(([id, bytes]) => [id, Uint8Array.from(bytes)]));
+    this.publish({ ...structuredClone(state), pending: false, error: null });
+  }
+
   select(id: string): void {
     if (!this.state.entries.some((entry) => entry.result.sourceId === id)) return;
     this.publish({ ...this.state, selectedId: id });

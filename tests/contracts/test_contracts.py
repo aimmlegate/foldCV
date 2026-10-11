@@ -19,6 +19,7 @@ EXAMPLES = Path(__file__).resolve().parents[2] / "contracts" / "examples"
 CASES = json.loads((EXAMPLES / "cases.json").read_text(encoding="utf-8"))
 PROJECT = json.loads((EXAMPLES / "project.json").read_text(encoding="utf-8"))
 ZIP = json.loads((EXAMPLES / "zip_manifest.json").read_text(encoding="utf-8"))
+ARCHIVE = json.loads((EXAMPLES / "archive_manifest.json").read_text(encoding="utf-8"))
 RENDER = json.loads((EXAMPLES / "render_request.json").read_text(encoding="utf-8"))
 PREPARE = json.loads((EXAMPLES / "prepare_request.json").read_text(encoding="utf-8"))
 EXTRACT = json.loads((EXAMPLES / "extract_result.json").read_text(encoding="utf-8"))
@@ -31,7 +32,7 @@ DRAFT_RESULT = json.loads((EXAMPLES / "draft_result.json").read_text(encoding="u
 
 
 def case_data(case: dict) -> object:
-    bases = {"project": PROJECT, "proposal": PROJECT["proposals"][0], "template": PROJECT["template"], "zip_manifest": ZIP,
+    bases = {"project": PROJECT, "proposal": PROJECT["proposals"][0], "template": PROJECT["template"], "zip_manifest": ZIP, "archive_manifest": ARCHIVE,
              "render_request": RENDER, "prepare_request": PREPARE, "extract_result": EXTRACT,
              "fact_request": FACT_REQUEST, "fact_sheet": FACT_SHEET, "semantic_proposal": SEMANTIC,
              "draft_request": DRAFT_REQUEST, "draft_proposal": DRAFT_PROPOSAL, "draft_result": DRAFT_RESULT}

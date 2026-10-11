@@ -1,6 +1,6 @@
 import { expect, test, type Page } from "@playwright/test";
 import { spawn, execFileSync } from "node:child_process";
-import { existsSync, mkdtempSync, mkdirSync, readFileSync, readdirSync, realpathSync, rmSync } from "node:fs";
+import { existsSync, mkdtempSync, readFileSync, readdirSync, realpathSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { resolve } from "node:path";
 import type { ChildProcessWithoutNullStreams } from "node:child_process";
@@ -19,8 +19,7 @@ test.beforeAll(() => {
 });
 
 test.beforeEach(async () => {
-  runRoot = resolve(temp, "run");
-  mkdirSync(runRoot);
+  runRoot = mkdtempSync(resolve(temp, "run-"));
   server = spawn(resolve(root, ".venv/bin/python"), ["tests/service/browser_rewrite_fixture.py", runRoot, resolve(temp, "dist")],
     { cwd: root, stdio: "pipe" });
   origin = await new Promise<string>((resolveOrigin, reject) => {
@@ -38,7 +37,7 @@ test.beforeEach(async () => {
 });
 
 test.afterEach(async () => {
-  if (server && server.exitCode === null) {
+  if (server && server.exitCode === null && server.signalCode === null) {
     const stopped = new Promise<void>((resolveStopped) => server.once("exit", () => resolveStopped()));
     server.kill("SIGTERM");
     await stopped;

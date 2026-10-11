@@ -18,14 +18,20 @@ function label(fact: Facts[number]): string {
   return `${fact.value.action} · ${fact.value.attribution}`;
 }
 
-export function FactPanel({ view, workflow, sources, onOpen, onDraft, draftView, onCancelDraft, onManualChange }: {
+export function FactPanel({ view, workflow, sources, onOpen, onDraft, draftView, onCancelDraft, onManualChange,
+  initialManual, onManualInput, initialAssertion, initialEdits, onLocalDraft }: {
   view: FactView; workflow: FactWorkflow; sources: ImportedSource[]; onOpen: (manual: ManualInput) => void;
   onDraft?: ((manual: ManualInput, isCurrent: () => boolean) => void) | undefined;
   draftView?: DraftView | undefined; onCancelDraft?: (() => void) | undefined;
   onManualChange?: (() => void) | undefined;
+  initialManual: ManualInput; onManualInput: (input: ManualInput) => void;
+  initialAssertion: string; initialEdits: Record<string, string>;
+  onLocalDraft: (assertion: string, edits: Record<string, string>) => void;
 }) {
-  const [assertion, setAssertion] = useState("");
-  const [edits, setEdits] = useState<Record<string, string>>({});
+  const [assertion, setAssertion] = useState(initialAssertion);
+  const [edits, setEdits] = useState<Record<string, string>>(initialEdits);
+  const changeAssertion = (text: string) => { setAssertion(text); onLocalDraft(text, edits); };
+  const changeEdits = (next: Record<string, string>) => { setEdits(next); onLocalDraft(assertion, next); };
   const [page, setPage] = useState(0);
   const sheet = view.sheet;
   const sourceUnit = (sourceId: string, unitId: string) => {
@@ -46,12 +52,12 @@ export function FactPanel({ view, workflow, sources, onOpen, onDraft, draftView,
     <div className="mt-4 rounded border border-outline p-3">
       <label htmlFor="user-assertion" className="mb-1 block font-semibold">Добавить подтверждённый вами факт</label>
       <textarea id="user-assertion" className={`${field} min-h-20`} maxLength={4096} value={assertion}
-        onChange={(event) => setAssertion(event.target.value)} />
-      <button type="button" className={`${primary} mt-2`} onClick={() => { workflow.addAssertion(assertion); if (assertion.trim()) setAssertion(""); }}>Добавить факт</button>
+        onChange={(event) => changeAssertion(event.target.value)} />
+      <button type="button" className={`${primary} mt-2`} onClick={() => { workflow.addAssertion(assertion); if (assertion.trim()) changeAssertion(""); }}>Добавить факт</button>
       <p className="mt-1 text-xs text-muted">Ваш факт отмечается как внесённый пользователем; исходный текст не меняется.</p>
     </div>
     <ManualPanel onOpen={onOpen} onDraft={onDraft} draftView={draftView} onCancelDraft={onCancelDraft}
-      onManualChange={onManualChange} />
+      onManualChange={onManualChange} initialInput={initialManual} onInput={onManualInput} />
     {sheet && <>
       <div className="mt-5 grid gap-4 md:grid-cols-2">
         <div><h3 className="font-semibold">Факты · {sheet.facts.length}</h3>
@@ -60,8 +66,8 @@ export function FactPanel({ view, workflow, sources, onOpen, onDraft, draftView,
             <strong className="block break-words">{label(fact)}</strong>
             <span className="text-xs text-muted">{sheet.proposedFactIds?.includes(fact.id) ? "Предложено · проверьте по исходнику или исправлению" : fact.origin === "user" ? "Внесено пользователем" : "Из исходника"}</span>
             {[...fact.evidence, ...(sheet.overlayFactRefs?.[fact.id] ?? [])].map((evidence) => { const source = sourceUnit(evidence.sourceId, evidence.unitId); return <p key={`${evidence.sourceId}:${evidence.unitId}`} className="mt-2 break-words text-xs text-muted">{source.name} · {evidence.unitId}: {source.original}{source.overlay !== undefined && source.overlay !== source.original ? ` · исправление: ${source.overlay}` : ""}</p>; })}
-            {fact.origin === "source" && <div className="mt-2"><label htmlFor={`correct-${fact.id}`} className="block">Исправить факт, сохранив исходник</label><input id={`correct-${fact.id}`} className={field} value={edits[fact.id] ?? ""} onChange={(event) => setEdits({ ...edits, [fact.id]: event.target.value })} /><button type="button" className={`${control} mt-1`} onClick={() => workflow.correctFact(fact.id, edits[fact.id] ?? "")}>Применить исправление</button>{sheet.userCorrections?.[fact.id] && <p className="mt-1 text-xs text-muted">Исправление связано с вашим фактом {sheet.userCorrections[fact.id]}</p>}</div>}
-            {fact.origin === "user" && fact.kind === "text" && !sheet.proposedFactIds?.includes(fact.id) && <div className="mt-2"><label htmlFor={`edit-${fact.id}`} className="block">Изменить свой факт</label><input id={`edit-${fact.id}`} className={field} value={edits[fact.id] ?? fact.value.text} onChange={(event) => setEdits({ ...edits, [fact.id]: event.target.value })} /><button type="button" className={`${control} mt-1`} onClick={() => workflow.editAssertion(fact.id, edits[fact.id] ?? fact.value.text)}>Применить</button></div>}
+            {fact.origin === "source" && <div className="mt-2"><label htmlFor={`correct-${fact.id}`} className="block">Исправить факт, сохранив исходник</label><input id={`correct-${fact.id}`} className={field} value={edits[fact.id] ?? ""} onChange={(event) => changeEdits({ ...edits, [fact.id]: event.target.value })} /><button type="button" className={`${control} mt-1`} onClick={() => workflow.correctFact(fact.id, edits[fact.id] ?? "")}>Применить исправление</button>{sheet.userCorrections?.[fact.id] && <p className="mt-1 text-xs text-muted">Исправление связано с вашим фактом {sheet.userCorrections[fact.id]}</p>}</div>}
+            {fact.origin === "user" && fact.kind === "text" && !sheet.proposedFactIds?.includes(fact.id) && <div className="mt-2"><label htmlFor={`edit-${fact.id}`} className="block">Изменить свой факт</label><input id={`edit-${fact.id}`} className={field} value={edits[fact.id] ?? fact.value.text} onChange={(event) => changeEdits({ ...edits, [fact.id]: event.target.value })} /><button type="button" className={`${control} mt-1`} onClick={() => workflow.editAssertion(fact.id, edits[fact.id] ?? fact.value.text)}>Применить</button></div>}
           </article>)}</div>
         </div>
         <div><h3 className="font-semibold">Вопросы · {sheet.issues.length}</h3>

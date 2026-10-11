@@ -78,13 +78,13 @@ test("reload clears candidate state while manual theme persists", async ({ page 
   expect(keys).toEqual(["foldcv-theme"]);
 });
 
-test("export offers explicit PDF and DOCX while project archive stays unavailable", async ({ page }) => {
+test("export offers explicit PDF, DOCX and project archive", async ({ page }) => {
   let operations = 0;
   page.on("request", (request) => { if (request.url().includes("/v1/operations")) operations += 1; });
   await page.getByRole("button", { name: "3. Выгрузка" }).click();
   await expect(page.getByRole("button", { name: "Собрать и скачать PDF" })).toBeEnabled();
   await expect(page.getByRole("button", { name: "Собрать и скачать DOCX" })).toBeEnabled();
-  await expect(page.getByRole("button", { name: "Скачать проект" })).toBeDisabled();
+  await expect(page.getByRole("button", { name: "Скачать проект" })).toBeEnabled();
   expect(operations).toBe(0);
 });
 

@@ -1667,5 +1667,12 @@
 {"name": "draft_proposal_valid", "contract": "draft_proposal", "base": "draft_proposal", "valid": true, "edits": []},
 {"name": "draft_proposal_duplicate_block", "contract": "draft_proposal", "base": "draft_proposal", "valid": false, "edits": [{"op": "clone", "path": ["blocks"], "from": ["blocks", 0]}]},
 {"name": "draft_result_valid", "contract": "draft_result", "base": "draft_result", "valid": true, "edits": []},
-{"name": "draft_result_wrong_version", "contract": "draft_result", "base": "draft_result", "valid": false, "edits": [{"op": "set", "path": ["transportVersion"], "value": 2}]}
+{"name": "draft_result_wrong_version", "contract": "draft_result", "base": "draft_result", "valid": false, "edits": [{"op": "set", "path": ["transportVersion"], "value": 2}]},
+{"name": "archive_v4_valid", "contract": "archive_manifest", "base": "archive_manifest", "valid": true, "edits": []},
+{"name": "archive_v4_unknown_version", "contract": "archive_manifest", "base": "archive_manifest", "valid": false, "edits": [{"op": "set", "path": ["schemaVersion"], "value": 5}]},
+{"name": "archive_v4_missing_workspace", "contract": "archive_manifest", "base": "archive_manifest", "valid": false, "edits": [{"op": "remove", "path": ["entries", 0]}]},
+{"name": "archive_v4_case_alias", "contract": "archive_manifest", "base": "archive_manifest", "valid": false, "edits": [{"op": "set", "path": ["entries", 1, "path"], "value": "WORKSPACE.JSON"}]},
+{"name": "archive_v4_wrong_project_role", "contract": "archive_manifest", "base": "archive_manifest", "valid": false, "edits": [{"op": "set", "path": ["entries", 1, "role"], "value": "render"}]},
+{"name": "archive_v4_partial_identity", "contract": "archive_manifest", "base": "archive_manifest", "valid": false, "edits": [{"op": "set", "path": ["projectId"], "value": null}]},
+{"name": "archive_v4_asset_marker_mismatch", "contract": "archive_manifest", "base": "archive_manifest", "valid": false, "edits": [{"op": "set", "path": ["templateAssetsIncluded"], "value": true}]}
 ]

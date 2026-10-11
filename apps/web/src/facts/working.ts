@@ -19,6 +19,8 @@ export type ManualLeadership = { id: string; jobId: string; action: string;
 export type ManualInput = { name: string; title: string; asOf: string; education: string; language: Presentation["sourceLanguage"];
   languages: string[]; skills: string[]; employment: ManualEmployment[]; metrics: ManualMetric[];
   leadership: ManualLeadership[] };
+export const emptyManualInput: ManualInput = { name: "", title: "", asOf: "", education: "", language: "ru",
+  languages: [], skills: [], employment: [], metrics: [], leadership: [] };
 export type WorkingSource = { entry: ImportedSource; originalBytes: Uint8Array };
 export type WorkingDraft = { transportVersion: 1; sources: WorkingSource[]; sheet: FactSheet;
   priorSheet: FactSheet | null; sourceReviewStale: boolean; manual: ManualInput; draft: DraftResult | null;

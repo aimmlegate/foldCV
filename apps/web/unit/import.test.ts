@@ -11,6 +11,7 @@ import { ImportWorkflow } from "../src/import/workflow";
 const root = resolve(import.meta.dirname, "../../..");
 const firstBytes = Uint8Array.from(readFileSync(resolve(root, "tests/fixtures/synthetic/import/unicode.txt")));
 const secondBytes = Uint8Array.from(readFileSync(resolve(root, "tests/fixtures/synthetic/import/notes.md")));
+if (!validateExtractResult(secondFixture)) throw new Error("broken second fixture");
 
 function deferred<T>() {
   let resolve!: (value: T) => void;
@@ -75,6 +76,22 @@ test("new selection, cancellation and project replacement discard late imports",
   workflow.clear();
   assert.equal(workflow.state.entries.length, 0);
   assert.equal(workflow.original(secondFixture.sourceId), null);
+});
+
+test("archive restore takes a fresh epoch while an import is in flight", async () => {
+  const late = deferred<Response>();
+  const workflow = new ImportWorkflow(() => {}, () => late.promise);
+  const pending = workflow.file(file(firstBytes, "unicode.txt"));
+  await tick();
+  const restoredResult: unknown = secondFixture;
+  if (!validateExtractResult(restoredResult)) throw new Error("broken restored result");
+  workflow.restore({ entries: [{ result: restoredResult, overlays: {} }],
+    selectedId: secondFixture.sourceId, pending: false, error: null }, { [secondFixture.sourceId]: secondBytes });
+  late.resolve(response(firstFixture));
+  await pending;
+  assert.equal(workflow.state.entries[0]?.result.sourceId, secondFixture.sourceId);
+  assert.deepEqual(workflow.original(secondFixture.sourceId), secondBytes);
+  assert.equal(workflow.original(firstFixture.sourceId), null);
 });
 
 test("original bytes and user overlays survive a failed replacement independently", async () => {

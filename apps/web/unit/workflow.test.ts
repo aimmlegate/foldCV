@@ -126,3 +126,83 @@ test("matching revision in a different project cannot reuse cached bytes", async
   await tick();
   assert.equal(calls, 2);
 });
+
+test("archive replacement clears matching cached bytes and late render results", async () => {
+  const pending = deferred<Rendered>();
+  let calls = 0;
+  const states: string[] = [];
+  const workflow = new PreviewWorkflow((state) => states.push(state.status), () => {}, prepareMock,
+    async (request) => { calls += 1; return calls === 2 ? pending.promise : artifact(request); });
+  workflow.request(input);
+  await tick();
+  assert.ok(workflow.ready);
+  workflow.resetArchive();
+  workflow.restore(input);
+  assert.equal(workflow.ready, null);
+  assert.equal(states.at(-1), "empty");
+  workflow.request(input);
+  await tick();
+  workflow.resetArchive();
+  pending.resolve(artifact(prepared));
+  await tick();
+  workflow.restore(input);
+  assert.equal(workflow.ready, null);
+  workflow.request(input);
+  await tick();
+  assert.equal(calls, 3);
+  assert.ok(workflow.ready);
+});
+
+test("archive replacement aborts an unresolved prepare and starts the new project immediately", async () => {
+  const oldPrepare = deferred<RenderRequest>();
+  const states: string[] = [];
+  const exports: string[] = [];
+  const signals: AbortSignal[] = [];
+  let preparations = 0;
+  const workflow = new PreviewWorkflow((state) => states.push(state.status), (_result, kind) => exports.push(kind),
+    (value, signal) => { preparations += 1; signals.push(signal!);
+      return preparations === 1 ? oldPrepare.promise : prepareMock(value); },
+    async (request) => artifact(request));
+  workflow.request(input, "pdf");
+  await tick();
+  const next = structuredClone(input);
+  next.project.projectId = "new-project";
+  workflow.resetArchive();
+  assert.equal(signals[0]?.aborted, true);
+  workflow.request(next, "docx");
+  await tick();
+  assert.equal(preparations, 2);
+  assert.equal(workflow.ready?.request.baseRevision, next.project.revision);
+  assert.deepEqual(exports, ["docx"]);
+  oldPrepare.resolve(await prepareMock(input));
+  await tick();
+  assert.equal(states.at(-1), "ready");
+  assert.deepEqual(exports, ["docx"]);
+});
+
+test("archive replacement aborts an unresolved render and late failure cannot clear new output", async () => {
+  const oldRender = deferred<Rendered>();
+  const states: string[] = [];
+  const exports: string[] = [];
+  const signals: AbortSignal[] = [];
+  let renders = 0;
+  const workflow = new PreviewWorkflow((state) => states.push(state.status), (_result, kind) => exports.push(kind),
+    prepareMock, (request, signal) => { renders += 1; signals.push(signal!);
+      return renders === 1 ? oldRender.promise : Promise.resolve(artifact(request)); });
+  workflow.request(input, "pdf");
+  await tick();
+  const next = structuredClone(input);
+  next.project.projectId = "new-project";
+  workflow.resetArchive();
+  assert.equal(signals[0]?.aborted, true);
+  workflow.request(next, "docx");
+  await tick();
+  assert.equal(renders, 2);
+  assert.ok(workflow.ready);
+  assert.deepEqual(exports, ["docx"]);
+  oldRender.reject(new Error("late old render failure"));
+  await tick();
+  assert.equal(states.at(-1), "ready");
+  assert.ok(workflow.ready);
+  assert.deepEqual(exports, ["docx"]);
+});

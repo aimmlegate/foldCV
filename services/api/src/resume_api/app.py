@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+from io import BytesIO
 from contextlib import asynccontextmanager
 from http.cookies import SimpleCookie
 import json
@@ -12,6 +13,7 @@ import threading
 import time
 from typing import Protocol
 import uuid
+from zipfile import ZipFile, ZIP_STORED
 
 from fastapi import FastAPI, Request
 from fastapi.exceptions import RequestValidationError
@@ -27,7 +29,7 @@ from .lifecycle import OperationFiles, SpikeError, has_blocked_owned, reap_owned
 from .connection import ConnectionAdapter, ConnectionFailure, Metadata
 from .rendering import DocumentRenderer
 from .extracting import MAX_BODY as MAX_EXTRACT_BODY, UploadFailure, parse_one_part, run_extract
-from packages.resume_core.rendering.template import PACKAGE_SHA256, RenderFailure, renderer_sha256, require_template
+from packages.resume_core.rendering.template import PACKAGE_SHA256, ROOT as TEMPLATE_ROOT, MANIFEST as TEMPLATE_MANIFEST, RenderFailure, renderer_sha256, require_template
 from packages.resume_core.rendering.preparation import PrepareRequest, prepare_document
 from packages.resume_core.rendering.privacy import guard_render_document
 from packages.resume_core.normalization import FactRequest, FactSheet, fingerprint, literal_sheet, semantic_input
@@ -390,6 +392,21 @@ def create_app(*, origin: str, secret: str, temp_root: Path, dist: Path, runner:
                        "maxConcurrent": MAX_CONCURRENT, "timeoutSeconds": TIMEOUT_SECONDS,
                        "maxExtractBodyBytes": MAX_EXTRACT_BODY},
         }, headers={"Cache-Control": "no-store"})
+
+    @app.get("/v1/template-package")
+    async def template_package():
+        try:
+            manifest = require_template()
+            output = BytesIO()
+            with ZipFile(output, "w", compression=ZIP_STORED) as archive:
+                archive.write(TEMPLATE_MANIFEST, "template/manifest.json")
+                for relative in sorted(manifest["assets"]):
+                    archive.write(TEMPLATE_ROOT / relative, f"template/{relative}")
+            if output.tell() > 2 * 1024 * 1024:
+                return problem("TEMPLATE_UNAVAILABLE", 503)
+            return Response(output.getvalue(), media_type="application/zip", headers={"Cache-Control": "no-store"})
+        except (RenderFailure, OSError):
+            return problem("TEMPLATE_UNAVAILABLE", 503)
 
     async def extract(request: Request):
         nonlocal active, import_active

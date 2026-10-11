@@ -4,7 +4,17 @@ import type { Rendered } from "./render";
 
 export type PreviewState = { status: "empty" | "rendering" | "ready" | "stale" | "error"; artifact: Rendered | null; error: string | null };
 type ExportKind = "pdf" | "docx";
-type Job = { epoch: number; key: string; input: PrepareRequest; exports: Set<ExportKind> };
+type Job = { epoch: number; key: string; input: PrepareRequest; exports: Set<ExportKind>; controller: AbortController };
+
+function cancellable<T>(promise: Promise<T>, signal: AbortSignal): Promise<T> {
+  if (signal.aborted) return Promise.reject(new Error("cancelled"));
+  return new Promise((resolve, reject) => {
+    const abort = () => { signal.removeEventListener("abort", abort); reject(new Error("cancelled")); };
+    signal.addEventListener("abort", abort, { once: true });
+    void promise.then((value) => { signal.removeEventListener("abort", abort); resolve(value); },
+      (error: unknown) => { signal.removeEventListener("abort", abort); reject(error); });
+  });
+}
 
 export class PreviewWorkflow {
   private epoch = 0;
@@ -31,6 +41,13 @@ export class PreviewWorkflow {
 
   get ready(): Rendered | null { return this.current; }
 
+  install(input: PrepareRequest, artifact: Rendered): void {
+    this.invalidate();
+    const key = JSON.stringify(input);
+    this.cached = { key, artifact };
+    this.restore(input);
+  }
+
   invalidate(): void {
     if (this.closed) return;
     this.epoch += 1;
@@ -38,6 +55,20 @@ export class PreviewWorkflow {
     this.current = null;
     this.currentKey = null;
     this.onChange({ status: this.displayed ? "stale" : "empty", artifact: this.displayed, error: null });
+  }
+
+  resetArchive(): void {
+    if (this.closed) return;
+    this.epoch += 1;
+    this.activeJob?.controller.abort();
+    this.active = false;
+    this.activeJob = null;
+    this.queued = null;
+    this.current = null;
+    this.currentKey = null;
+    this.cached = null;
+    this.displayed = null;
+    this.onChange({ status: "empty", artifact: null, error: null });
   }
 
   restore(input: PrepareRequest): void {
@@ -67,7 +98,8 @@ export class PreviewWorkflow {
       if (exportKind) this.activeJob.exports.add(exportKind);
       return;
     }
-    const job: Job = { epoch: this.epoch, key, input: structuredClone(input), exports: new Set(exportKind ? [exportKind] : []) };
+    const job: Job = { epoch: this.epoch, key, input: structuredClone(input),
+      exports: new Set(exportKind ? [exportKind] : []), controller: new AbortController() };
     if (this.active) {
       this.queued = job;
       this.onChange({ status: "rendering", artifact: this.displayed, error: null });
@@ -79,6 +111,7 @@ export class PreviewWorkflow {
   close(): void {
     this.closed = true;
     this.epoch += 1;
+    this.activeJob?.controller.abort();
     this.queued = null;
     this.current = null;
     this.currentKey = null;
@@ -91,13 +124,13 @@ export class PreviewWorkflow {
     this.activeJob = job;
     this.onChange({ status: "rendering", artifact: this.displayed, error: null });
     try {
-      const request = await this.prepareRequest(job.input);
+      const request = await cancellable(this.prepareRequest(job.input, job.controller.signal), job.controller.signal);
       if (request.baseRevision !== job.input.project.revision ||
           request.document.candidate.name !== job.input.presentation.name ||
           request.document.candidate.title !== job.input.presentation.title) throw new Error("preparation mismatch");
-      if (this.closed || job.epoch !== this.epoch || this.queued) return;
-      const artifact = await this.renderRequest(request);
-      if (this.closed || job.epoch !== this.epoch || this.queued) return;
+      if (this.closed || job.epoch !== this.epoch || this.activeJob !== job || this.queued) return;
+      const artifact = await cancellable(this.renderRequest(request, job.controller.signal), job.controller.signal);
+      if (this.closed || job.epoch !== this.epoch || this.activeJob !== job || this.queued) return;
       this.current = artifact;
       this.currentKey = job.key;
       this.cached = { key: job.key, artifact };
@@ -105,15 +138,17 @@ export class PreviewWorkflow {
       this.onChange({ status: "ready", artifact, error: null });
       for (const kind of job.exports) this.onExport(artifact, kind);
     } catch (error) {
-      if (!this.closed && job.epoch === this.epoch && !this.queued)
+      if (!this.closed && job.epoch === this.epoch && this.activeJob === job && !this.queued)
         this.onChange({ status: "error", artifact: this.displayed, error: error instanceof PrivateOutputError ? error.message :
           "Не удалось подготовить или проверить документы. Повторите по кнопке." });
     } finally {
-      this.active = false;
-      this.activeJob = null;
-      const next = this.queued;
-      this.queued = null;
-      if (next && !this.closed && next.epoch === this.epoch) void this.run(next);
+      if (this.activeJob === job) {
+        this.active = false;
+        this.activeJob = null;
+        const next = this.queued;
+        this.queued = null;
+        if (next && !this.closed && next.epoch === this.epoch) void this.run(next);
+      }
     }
   }
 }

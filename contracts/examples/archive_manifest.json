@@ -1,0 +1,12 @@
+{
+  "schemaVersion": 4,
+  "appVersion": "0.1.0",
+  "rendererVersion": "1.0.0",
+  "templatePackageSha256": "d081df948bfd55d107c38d40387a9758f563f9c14a9cffc4a847f44cb687b8b9",
+  "templateAssetsIncluded": false,
+  "projectId": "project_synthetic",
+  "entries": [
+    {"path": "workspace.json", "role": "workspace", "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", "uncompressedSize": 100},
+    {"path": "project.json", "role": "project", "sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb", "uncompressedSize": 100}
+  ]
+}

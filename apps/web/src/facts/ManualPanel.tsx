@@ -12,27 +12,28 @@ const freshMetric = (): ManualMetric => ({ id: `fact_user_${crypto.randomUUID()}
 const freshLeadership = (): ManualLeadership => ({ id: `fact_user_${crypto.randomUUID()}`, jobId: "", action: "",
   attribution: "unknown", teamSize: null, teamUnit: "", teamBaseline: null });
 
-export function ManualPanel({ onOpen, onDraft, draftView, onCancelDraft, onManualChange }: {
+export function ManualPanel({ onOpen, onDraft, draftView, onCancelDraft, onManualChange, initialInput, onInput }: {
   onOpen: (input: ManualInput) => void;
   onDraft?: ((input: ManualInput, isCurrent: () => boolean) => void) | undefined;
   draftView?: DraftView | undefined;
   onCancelDraft?: (() => void) | undefined;
   onManualChange?: (() => void) | undefined;
+  initialInput: ManualInput; onInput: (input: ManualInput) => void;
 }) {
-  const [input, setInput] = useState<ManualInput>({ name: "", title: "", asOf: "", education: "", language: "ru",
-    languages: [], skills: [], employment: [], metrics: [], leadership: [] });
+  const [input, setInput] = useState<ManualInput>(initialInput);
   const manualRevision = useRef(0);
   const changed = () => { manualRevision.current += 1; onManualChange?.(); };
-  const setField = <K extends keyof ManualInput>(key: K, value: ManualInput[K]) => { changed(); setInput((current) => ({ ...current, [key]: value })); };
-  const setJob = (id: string, change: Partial<ManualEmployment>) => { changed(); setInput((current) => ({ ...current,
+  const changeInput = (update: (current: ManualInput) => ManualInput) => { changed(); setInput((current) => {
+    const next = update(current); onInput(next); return next;
+  }); };
+  const setField = <K extends keyof ManualInput>(key: K, value: ManualInput[K]) =>
+    changeInput((current) => ({ ...current, [key]: value }));
+  const setJob = (id: string, change: Partial<ManualEmployment>) => changeInput((current) => ({ ...current,
     employment: current.employment.map((job) => job.id === id ? { ...job, ...change } : job) }));
-  };
-  const setMetric = (id: string, change: Partial<ManualMetric>) => { changed(); setInput((current) => ({ ...current,
+  const setMetric = (id: string, change: Partial<ManualMetric>) => changeInput((current) => ({ ...current,
     metrics: current.metrics.map((metric) => metric.id === id ? { ...metric, ...change } : metric) }));
-  };
-  const setLeadership = (id: string, change: Partial<ManualLeadership>) => { changed(); setInput((current) => ({ ...current,
+  const setLeadership = (id: string, change: Partial<ManualLeadership>) => changeInput((current) => ({ ...current,
     leadership: current.leadership.map((item) => item.id === id ? { ...item, ...change } : item) }));
-  };
   return <section aria-label="Ручные данные" className="mt-5 rounded border border-outline p-4">
     <h3 className="font-semibold">Ручной путь к редактору</h3>
     <p className="mt-1 text-sm text-muted">Укажите данные, которых нет в проверенных фактах. Исходник и лист фактов останутся в памяти отдельно. Текст работы сохраняется дословно.</p>

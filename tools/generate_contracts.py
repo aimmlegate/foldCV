@@ -6,7 +6,7 @@ import sys
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
-from packages.resume_core.models.contracts import Project, Proposal, TemplateManifest, ZipManifest
+from packages.resume_core.models.contracts import ArchiveManifest, Project, Proposal, TemplateManifest, ZipManifest
 from packages.resume_core.rendering.models import RenderRequest
 from packages.resume_core.rendering.preparation import PrepareRequest
 from packages.resume_core.extraction.models import ExtractResult
@@ -34,6 +34,7 @@ def main() -> None:
         "proposal": Proposal,
         "template": TemplateManifest,
         "zip_manifest": ZipManifest,
+        "archive_manifest": ArchiveManifest,
         "render_request": RenderRequest,
         "prepare_request": PrepareRequest,
         "extract_result": ExtractResult,

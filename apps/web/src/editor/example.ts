@@ -3,6 +3,8 @@ import type { Block, Project } from "../contracts/generated/project";
 import { validateContract } from "../contracts/validate";
 
 const sample: unknown = fixture;
+export const syntheticSourceBytes = new TextEncoder().encode(
+  "Built a team from zero to five and processed up to 2000 records per day.\nEarlier education detail kept in the archive.\n");
 
 export function syntheticProject(): Project {
   const input: unknown = structuredClone(sample);
@@ -48,6 +50,9 @@ export function syntheticProject(): Project {
   copy.template = { ...copy.template, version: "1.0.0",
     packageSha256: "d081df948bfd55d107c38d40387a9758f563f9c14a9cffc4a847f44cb687b8b9", assets: [] };
   copy.renders = [];
+  const source = copy.sources[0];
+  if (!source) throw new Error("Missing synthetic source");
+  source.byteSha256 = "c590f21591b00b55a3d42e16e36464c87f85f0d6b5156b9037e45afb1d1e7f29";
   copy.operations = [];
   copy.proposals = [];
   if (!validateContract("project", copy)) throw new Error("Invalid expanded synthetic project");

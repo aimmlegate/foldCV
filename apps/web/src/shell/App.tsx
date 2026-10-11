@@ -16,6 +16,7 @@ import { FactWorkflow } from "../facts/workflow";
 import type { FactView } from "../facts/workflow";
 import { adaptWorking } from "../facts/working";
 import { adaptDraftedWorking } from "../facts/working";
+import { emptyManualInput } from "../facts/working";
 import type { ManualInput, WorkingDraft } from "../facts/working";
 import { WorkingSources } from "../facts/WorkingSources";
 import { DraftWorkflow } from "../facts/draftWorkflow";
@@ -30,6 +31,9 @@ import { StructuredFields } from "../editor/StructuredFields";
 import { RewriteControls } from "../editor/RewriteControls";
 import { CoveragePanel } from "../editor/CoveragePanel";
 import { coverageReview, verifyWorkingSources } from "../editor/coverage";
+import { fetchTrustedTemplateAssets, openProject, saveProject } from "../project/archive";
+import type { OpenedArchive } from "../project/archive";
+import type { LegacyV2 } from "../project/archive";
 
 type ThemeMode = "light" | "dark" | "system";
 const THEME_KEY = "foldcv-theme";
@@ -95,6 +99,17 @@ export function App() {
   useEffect(() => { draftWorkflow.cancel(); }, [draftWorkflow, importState.entries, factView.sheet]);
   const [closeProjectPrompt, setCloseProjectPrompt] = useState(false);
   const [openError, setOpenError] = useState<string | null>(null);
+  const [saveMessage, setSaveMessage] = useState<string | null>(null);
+  const [manualForm, setManualForm] = useState<ManualInput>(emptyManualInput);
+  const manualRef = useRef<ManualInput>(emptyManualInput);
+  const [assertionDraft, setAssertionDraft] = useState("");
+  const [factEdits, setFactEdits] = useState<Record<string, string>>({});
+  const [archiveEpoch, setArchiveEpoch] = useState(0);
+  const projectOriginals = useRef<Record<string, Uint8Array>>({});
+  const archivedTemplateAssets = useRef<Map<string, Uint8Array> | null>(null);
+  const [legacy, setLegacy] = useState<LegacyV2 | null>(null);
+  const openingEpoch = useRef(0);
+  const [replacement, setReplacement] = useState<OpenedArchive | null>(null);
   const workflowRef = useRef<PreviewWorkflow | null>(null);
   if (!workflowRef.current) workflowRef.current = new PreviewWorkflow(setPreview, (artifact, kind) => {
     const current = stateRef.current;
@@ -158,12 +173,85 @@ export function App() {
     const input: PrepareRequest = { project: current.project, presentation: current.presentation };
     workflow.request(input, exportKind);
   }
+  async function saveArchive(): Promise<void> {
+    try {
+      const captured = { editor: stateRef.current, imports: importWorkflow.snapshot(),
+        projectOriginals: projectOriginals.current, legacy,
+        facts: factWorkflow.snapshot(), manualForm: manualRef.current, assertionDraft, factEdits,
+        rewriteInstruction, render: workflow.ready };
+      const fetched = captured.editor.project?.template ? await fetchTrustedTemplateAssets() : null;
+      const trustedAssets = fetched ?? archivedTemplateAssets.current;
+      const bytes = await saveProject({ ...captured, trustedAssets });
+      const url = URL.createObjectURL(new Blob([Uint8Array.from(bytes)], { type: "application/zip" }));
+      const anchor = document.createElement("a");
+      anchor.href = url;
+      anchor.download = "resume.cvproject";
+      anchor.click();
+      window.setTimeout(() => URL.revokeObjectURL(url), 10_000);
+      setSaveMessage(!captured.editor.project?.template || trustedAssets ?
+        "Проект подготовлен к скачиванию. Проверьте файл в загрузках браузера." :
+        "Проект подготовлен к скачиванию без файлов шаблона. Проверьте файл в загрузках браузера.");
+    } catch { setSaveMessage("Не удалось подготовить архив. Проверьте исходные файлы и повторите сохранение."); }
+  }
+  function installArchive(opened: OpenedArchive): void {
+    openingEpoch.current += 1;
+    draftWorkflow.cancel(); rewriteWorkflow.cancel(); workflow.resetArchive();
+    importWorkflow.restore(opened.imports.state, opened.imports.originals);
+    factWorkflow.restore(opened.facts, importWorkflow.state.entries);
+    projectOriginals.current = opened.projectOriginals;
+    archivedTemplateAssets.current = opened.trustedAssets;
+    setLegacy(opened.legacy);
+    manualRef.current = opened.manualForm;
+    setManualForm(opened.manualForm);
+    setAssertionDraft(opened.assertionDraft);
+    setFactEdits(opened.factEdits);
+    setRewriteInstruction(opened.rewriteInstruction);
+    setArchiveEpoch((epoch) => epoch + 1);
+    send({ type: "restoreArchive", state: opened.editor });
+    setReplacement(null);
+    setOpenError(opened.migration);
+    setSaveMessage(null);
+  }
+  function clearArchiveOwners(): void {
+    projectOriginals.current = {};
+    archivedTemplateAssets.current = null;
+    setLegacy(null);
+    manualRef.current = emptyManualInput;
+    setManualForm(emptyManualInput);
+    setAssertionDraft("");
+    setFactEdits({});
+    setRewriteInstruction("");
+    setArchiveEpoch((epoch) => epoch + 1);
+  }
+  async function chooseArchive(file: File | undefined): Promise<void> {
+    if (!file) return;
+    const epoch = ++openingEpoch.current;
+    setOpenError(null);
+    try {
+      if (file.size > 64 * 1024 * 1024) throw new Error("ARCHIVE_TOO_LARGE");
+      const opened = await openProject(new Uint8Array(await file.arrayBuffer()));
+      if (epoch !== openingEpoch.current) return;
+      if (stateRef.current.project || legacy || importWorkflow.state.entries.length || stateRef.current.sourceText.trim() ||
+          JSON.stringify(manualRef.current) !== JSON.stringify(emptyManualInput) || factWorkflow.view.sheet ||
+          assertionDraft.trim() || Object.keys(factEdits).length ||
+          Object.keys(stateRef.current.presentationDrafts).length || Object.keys(stateRef.current.structuredDrafts).length ||
+          Object.keys(stateRef.current.drafts).length || Object.keys(stateRef.current.factDrafts).length ||
+          rewriteInstruction.trim()) setReplacement(opened);
+      else installArchive(opened);
+    } catch (error) {
+      if (epoch === openingEpoch.current) setOpenError(error instanceof Error && error.message === "ARCHIVE_TOO_LARGE" ?
+        "Архив больше 64 МБ. Выберите меньший .cvproject; текущий проект сохранён." :
+        "Архив не открыт: он повреждён, неполон или имеет неподдерживаемую версию. Выберите другой .cvproject; текущий проект сохранён.");
+    }
+  }
   const project = state.project;
   const block = selectedBlock(state);
   const unapplied = hasUnappliedDraft(state);
   const canExport = preview.status === "ready" && workflow.ready !== null && !unapplied &&
     workflow.ready.request.baseRevision === project?.revision;
-  const unsaved = state.dirty || unapplied || importState.entries.length > 0;
+  const unsaved = state.dirty || unapplied || importState.entries.length > 0 || legacy !== null ||
+    JSON.stringify(manualForm) !== JSON.stringify(emptyManualInput) || assertionDraft.trim().length > 0 ||
+    Object.keys(factEdits).length > 0 || rewriteInstruction.trim().length > 0;
   useEffect(() => {
     const media = window.matchMedia("(prefers-color-scheme: dark)");
     const apply = () => { document.documentElement.dataset.theme = mode === "system" ? (media.matches ? "dark" : "light") : mode; };
@@ -274,10 +362,19 @@ export function App() {
       <span className="rounded bg-soft px-2 py-1 text-xs text-accent">На вашем компьютере</span>
       <div className="ml-auto flex flex-wrap items-center gap-3">
         <span aria-live="polite" className="text-sm text-muted">{unsaved ? `Есть несохранённые изменения${unapplied ? " · ввод не применён" : ""}` : "Новый проект"}</span>
-        <button type="button" disabled title="Сохранение проекта появится позже" className={control}>Сохранить проект</button>
+        <button type="button" onClick={() => void saveArchive()} className={control}>Сохранить проект</button>
+        <label className={control}>Открыть .cvproject<input aria-label="Открыть .cvproject" className="sr-only" type="file" accept=".cvproject,application/zip" onChange={(event) => {
+          void chooseArchive(event.target.files?.[0]); event.target.value = "";
+        }} /></label>
         <label className="flex items-center gap-2 text-sm">Тема <select aria-label="Тема" className={field} value={mode} onChange={(event) => { if (isThemeMode(event.target.value)) changeTheme(event.target.value); }}><option value="system">Системная</option><option value="light">Светлая</option><option value="dark">Тёмная</option></select></label>
       </div>
     </header>
+    {saveMessage && <p role="status" className="border-b border-outline px-6 py-2 text-sm">{saveMessage}</p>}
+    {openError && <p role="alert" className="border-b border-outline px-6 py-2 text-sm text-danger">{openError}</p>}
+    {replacement && <div role="dialog" aria-label="Заменить текущий проект" className="border-b border-outline bg-panel px-6 py-3 text-sm">
+      <p>Открыть выбранный проект и заменить текущие данные в памяти?</p>
+      <div className="mt-2 flex gap-2"><button type="button" className={primary} onClick={() => installArchive(replacement)}>Заменить проект</button>
+        <button type="button" className={control} onClick={() => setReplacement(null)}>Оставить текущий</button></div></div>}
     <p className="border-b border-outline px-6 py-2 text-xs text-muted">Локальный импорт по выбору файла · вымышленный пример отдельно · обновление PDF по кнопке</p>
     <nav aria-label="Этапы работы" className="flex flex-wrap gap-2 border-b border-outline px-6 py-3">
       {(["import", "editor", "export"] as const).map((stage, index) => <button key={stage} type="button" disabled={stage !== "import" && !project} aria-current={state.stage === stage ? "step" : undefined} onClick={() => send({ type: "stage", stage })} className={state.stage === stage ? primary : control}>{index + 1}. {stage === "import" ? "Загрузка" : stage === "editor" ? "Редактор" : "Выгрузка"}</button>)}
@@ -286,24 +383,61 @@ export function App() {
     {state.stage === "import" && <main className="mx-auto max-w-5xl p-6">
       <h1 className="mb-2 text-2xl font-semibold">Из исходника — в готовое резюме</h1>
       <p className="mb-6 text-muted">Выберите исходник для локального извлечения и проверки. Вымышленный пример открывает отдельный редактор.</p>
+      {legacy && <section className="mb-5 rounded border border-outline bg-panel p-4">
+        <h2 className="font-semibold">Экспериментальный архив v2</h2>
+        <p className="mt-1 text-sm">Старый исходник, фрагменты и решения сохранены. Извлечение по кнопке выполняется локально без генерации текста.</p>
+        <button type="button" className={`${control} mt-3`} onClick={() => void importWorkflow.file(
+          new File([Uint8Array.from(legacy.originalBytes)], legacy.originalName))}>Проверить исходный файл локально</button>
+        <details className="mt-3"><summary>Показать старые фрагменты и решения</summary>
+          <pre className="mt-2 max-h-72 overflow-auto whitespace-pre-wrap break-words text-xs">{JSON.stringify({
+            units: legacy.archive.units, classifications: legacy.archive.classifications,
+            jobs: legacy.archive.jobs, global_technologies: legacy.archive.global_technologies }, null, 2)}</pre></details>
+      </section>}
       <div>
         {!project ? <ImportPanel state={importState} workflow={importWorkflow} text={state.sourceText}
           onText={(text) => send({ type: "sourceText", text })} exampleDisabled={importState.entries.length > 0 || importState.pending}
-          onExample={() => { importWorkflow.clear(); factWorkflow.clear(); send({ type: "loadExample", loadId: crypto.randomUUID() }); }} />
+          onExample={() => { importWorkflow.clear(); factWorkflow.clear(); clearArchiveOwners();
+            send({ type: "loadExample", loadId: crypto.randomUUID() }); }} />
           : <section className="rounded border border-outline bg-panel p-5"><h2 className="mb-3 text-lg font-semibold">{state.working ? "Открыт черновик" : "Открыт вымышленный пример"}</h2>
             <p className="text-sm text-muted">Новый импорт доступен после явного закрытия текущего проекта. Текущие правки не будут перенесены.</p>
             {!closeProjectPrompt ? <button type="button" className={`${control} mt-4`} onClick={() => setCloseProjectPrompt(true)}>{state.working ? "Закрыть проект и перейти к импорту" : "Закрыть пример и перейти к импорту"}</button>
               : <div className="mt-4 space-y-2"><p role="alert" className="text-sm text-danger">Несохранённые правки {state.working ? "проекта" : "примера"} будут удалены.</p>
-                <div className="flex gap-2"><button type="button" className={control} onClick={() => { importWorkflow.clear(); factWorkflow.clear(); send({ type: "resetProject" }); setCloseProjectPrompt(false); }}>Подтвердить закрытие</button>
+                <div className="flex gap-2"><button type="button" className={control} onClick={() => { importWorkflow.clear(); factWorkflow.clear(); clearArchiveOwners();
+                  send({ type: "resetProject" }); setCloseProjectPrompt(false); }}>Подтвердить закрытие</button>
                   <button type="button" className={control} onClick={() => setCloseProjectPrompt(false)}>{state.working ? "Оставить проект" : "Оставить пример"}</button></div></div>}
           </section>}
       </div>
-      {!project && importState.entries.length > 0 && <><FactPanel view={factView} workflow={factWorkflow} sources={importState.entries}
+      {!project && importState.entries.length > 0 && <><FactPanel key={archiveEpoch} view={factView} workflow={factWorkflow} sources={importState.entries}
         onOpen={(manual) => { draftWorkflow.cancel(); openImported(manual); }}
         onDraft={draftReady ? draftImported : undefined} draftView={draftView}
-        onCancelDraft={() => draftWorkflow.cancel()} onManualChange={() => draftWorkflow.cancel()} />
+        onCancelDraft={() => draftWorkflow.cancel()} onManualChange={() => draftWorkflow.cancel()}
+        initialManual={manualForm} onManualInput={(value) => { manualRef.current = value; setManualForm(value); }}
+        initialAssertion={assertionDraft} initialEdits={factEdits}
+        onLocalDraft={(assertion, edits) => { setAssertionDraft(assertion); setFactEdits(edits); }} />
         {openError && <p role="alert" className="mt-3 text-danger">{openError}</p>}</>}
     </main>}
+    {state.stage === "editor" && project && !state.presentation && <section className="mx-auto max-w-5xl p-6">
+      <h2 className="text-lg font-semibold">Данные для архива v3</h2>
+      <p className="mt-2 text-sm text-muted">В старом архиве нет имени, должности и привязки разделов к работам. Укажите их для локальной сборки PDF и DOCX.</p>
+      <div className="mt-3 grid gap-3 sm:grid-cols-2"><label>Имя кандидата<input className={field} value={state.presentationDrafts.name ?? ""}
+        onChange={(event) => send({ type: "presentationDraft", field: "name", text: event.target.value })} /></label>
+        <label>Должность<input className={field} value={state.presentationDrafts.title ?? ""}
+          onChange={(event) => send({ type: "presentationDraft", field: "title", text: event.target.value })} /></label>
+        <label>Язык<select className={field} value={state.structuredDrafts["migration:language"] ?? ""}
+          onChange={(event) => send({ type: "structuredDraft", key: "migration:language", text: event.target.value })}>
+          <option value="">Выберите язык</option><option value="ru">Русский</option><option value="en">English</option>
+          <option value="mixed">Смешанный</option></select></label></div>
+      {project.employment.map((job) => <label key={job.id} className="mt-3 block">{job.employer} · {job.role}
+        <select className={field} value={state.structuredDrafts[`migration:job:${job.id}`] ?? ""}
+          onChange={(event) => send({ type: "structuredDraft", key: `migration:job:${job.id}`, text: event.target.value })}>
+          <option value="">Выберите раздел работы</option>{project.views.filter((item) => item.kind === "job_prose").map((item) =>
+            <option key={item.id} value={item.id}>{item.state.text.slice(0, 100) || item.id}</option>)}</select></label>)}
+      {state.errors.migration && <p role="alert" className="mt-2 text-danger">{state.errors.migration}</p>}
+      <button type="button" className={`${primary} mt-4`} onClick={() => {
+        const value = state.structuredDrafts["migration:language"];
+        if (value === "ru" || value === "en" || value === "mixed") send({ type: "presentationMigrate", language: value });
+      }}>Применить данные</button>
+    </section>}
     {state.stage === "editor" && project && block && <main className="grid min-w-0 xl:grid-cols-[200px_minmax(320px,1fr)_minmax(350px,1fr)]">
       <aside className="border-b border-outline p-4 xl:border-b-0 xl:border-r"><h2 className="mb-3 text-xs font-semibold uppercase tracking-wide text-muted">Разделы резюме</h2>
         <div className="flex flex-wrap gap-1 xl:block">{project.views.map((item) => <button type="button" key={item.id} onClick={() => send({ type: "select", id: item.id })} aria-current={item.id === block.id ? "true" : undefined} className={`w-full rounded px-3 py-2 text-left focus-visible:outline-2 focus-visible:outline-accent ${item.id === block.id ? "bg-soft text-accent" : "hover:bg-soft"}`}>{blockTitle(item)}<small className="block text-xs text-muted">{!item.visible ? "Скрыт" : item.status === "stale" ? "Нужно проверить" : item.status === "proposed" ? "Предложено · требует проверки" : "Готово к проверке"}</small></button>)}</div>
@@ -358,7 +492,7 @@ export function App() {
         <Tabs.Content value="checks" className="rounded border border-outline bg-panel p-5"><h2 className="mb-3 font-semibold">Проверки</h2><ul className="list-disc space-y-2 pl-5 text-sm"><li>{reviewCount} пунктов проверки</li><li>{staleCount} блоков требуют повторной проверки</li><li>{isReviewed ? "Выбранный блок отмечен проверенным" : "Выбранный блок ещё не отмечен проверенным"}</li>{state.workingIssues.map((issue, index) => <li key={index}>{issue}</li>)}</ul><CoveragePanel state={state} send={send} openSource={openSource} /><p className="mt-4 text-xs text-muted">Дословный черновик требует проверки смысла. Связь с источником не доказывает точность формулировки.</p></Tabs.Content>
       </Tabs.Root></aside>
     </main>}
-    {state.stage === "export" && <main className="mx-auto max-w-5xl p-6"><h1 className="mb-2 text-2xl font-semibold">Документы и проект для следующего раза</h1><p className="mb-5 text-muted">PDF и DOCX скачиваются из одной проверенной сборки. Если документ устарел, кнопка обновит превью перед скачиванием. Проект .cvproject появится позже.</p><div className="grid gap-4 md:grid-cols-3"><div className="rounded border border-outline bg-panel p-5"><h2 className="font-semibold">PDF</h2><button type="button" disabled={unapplied} onClick={() => refreshPreview("pdf")} className={`${control} mt-4`}>{canExport ? "Скачать PDF" : "Собрать и скачать PDF"}</button></div><div className="rounded border border-outline bg-panel p-5"><h2 className="font-semibold">DOCX</h2><button type="button" disabled={unapplied} onClick={() => refreshPreview("docx")} className={`${control} mt-4`}>{canExport ? "Скачать DOCX" : "Собрать и скачать DOCX"}</button></div><div className="rounded border border-outline bg-panel p-5"><h2 className="font-semibold">Проект .cvproject</h2><button type="button" disabled className={`${control} mt-4`}>Скачать проект</button></div></div><div aria-live="polite" aria-busy={preview.status === "rendering"} className="mt-4 text-sm">{preview.status === "rendering" && <p role="status">Сборка документов…</p>}{preview.error && <p role="alert" className="text-danger">{preview.error}</p>}</div>{project && <p className="mt-5 text-sm text-muted">Редакция {project.revision} · {canExport ? "PDF готов" : "актуального PDF нет"} · {reviewCount} пунктов проверки</p>}</main>}
+    {state.stage === "export" && <main className="mx-auto max-w-5xl p-6"><h1 className="mb-2 text-2xl font-semibold">Документы и проект для следующего раза</h1><p className="mb-5 text-muted">PDF и DOCX скачиваются из одной проверенной сборки. Проект сохраняется отдельно по кнопке.</p><div className="grid gap-4 md:grid-cols-3"><div className="rounded border border-outline bg-panel p-5"><h2 className="font-semibold">PDF</h2><button type="button" disabled={unapplied} onClick={() => refreshPreview("pdf")} className={`${control} mt-4`}>{canExport ? "Скачать PDF" : "Собрать и скачать PDF"}</button></div><div className="rounded border border-outline bg-panel p-5"><h2 className="font-semibold">DOCX</h2><button type="button" disabled={unapplied} onClick={() => refreshPreview("docx")} className={`${control} mt-4`}>{canExport ? "Скачать DOCX" : "Собрать и скачать DOCX"}</button></div><div className="rounded border border-outline bg-panel p-5"><h2 className="font-semibold">Проект .cvproject</h2><button type="button" onClick={() => void saveArchive()} className={`${control} mt-4`}>Скачать проект</button></div></div><div aria-live="polite" aria-busy={preview.status === "rendering"} className="mt-4 text-sm">{preview.status === "rendering" && <p role="status">Сборка документов…</p>}{preview.error && <p role="alert" className="text-danger">{preview.error}</p>}</div>{project && <p className="mt-5 text-sm text-muted">Редакция {project.revision} · {canExport ? "PDF готов" : "актуального PDF нет"} · {reviewCount} пунктов проверки</p>}</main>}
     <footer className="flex flex-wrap gap-5 border-t border-outline bg-panel px-6 py-3 text-xs text-muted"><span>Проект в памяти вкладки</span><span>Завершённых текстовых операций в этой сессии: {draftView.completed + rewriteView.completed}</span><span>Ручное редактирование: 0 запросов</span></footer>
   </div>;
 }

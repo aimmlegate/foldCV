@@ -256,6 +256,37 @@ test("imported facts, unresolved dates and user assertions stay available withou
   expect(contentCalls).toBe(0);
 });
 
+test("title-only and education-only form drafts keep the replacement boundary", async ({ page }) => {
+  test.setTimeout(60_000);
+  await page.goto(`${origin}/#secret=synthetic-browser-secret-0123456789`);
+  await page.getByLabel("Или вставьте текст резюме").fill("Synthetic text for a partial form.");
+  await page.getByRole("button", { name: "Извлечь вставленный текст" }).click();
+  await expect(page.getByRole("heading", { name: "Лист фактов" })).toBeVisible();
+  await page.getByLabel("Должность").fill("Pending title only");
+  await page.getByLabel("Образование").fill("Pending school only");
+  await page.getByLabel("Добавить подтверждённый вами факт").fill("Pending assertion text");
+  await page.getByRole("button", { name: "Очистить импорт" }).click();
+  await page.getByRole("button", { name: "Подтвердить очистку" }).click();
+  await page.getByLabel("Или вставьте текст резюме").fill("");
+  const download = page.waitForEvent("download");
+  await page.getByRole("button", { name: "Сохранить проект" }).click();
+  const path = await (await download).path();
+  expect(path).not.toBeNull();
+  const bytes = readFileSync(path!);
+  const entries = unzipSync(new Uint8Array(bytes));
+  expect(JSON.parse(new TextDecoder().decode(entries["manifest.json"]))).toMatchObject({ projectId: null });
+  expect(JSON.parse(new TextDecoder().decode(entries["workspace.json"]))).toMatchObject({
+    manualForm: { title: "Pending title only", education: "Pending school only" },
+    assertionDraft: "Pending assertion text",
+  });
+  await page.getByLabel("Открыть .cvproject").setInputFiles({ name: "partial.cvproject",
+    mimeType: "application/zip", buffer: bytes });
+  await expect(page.getByRole("dialog", { name: "Заменить текущий проект" })).toBeVisible();
+  await page.getByRole("button", { name: "Оставить текущий" }).click();
+  await page.getByLabel("Или вставьте текст резюме").fill("New local text");
+  await expect(page.getByLabel("Или вставьте текст резюме")).toHaveValue("New local text");
+});
+
 test("source correction rejects a late earlier fact response", async ({ page }) => {
   test.setTimeout(60_000);
   await page.goto(`${origin}/#secret=synthetic-browser-secret-0123456789`);

@@ -92,6 +92,22 @@ test("cancelled fact refresh keeps accepted assertions and ignores its response"
   assert.equal(workflow.view.sheet?.facts.length, 1);
 });
 
+test("archive restore ignores a late fact response from the prior epoch", async () => {
+  let release: ((value: Response) => void) | undefined;
+  const workflow = new FactWorkflow(() => {}, () => new Promise<Response>((resolve) => { release = resolve; }));
+  const selected = [entry];
+  const pending = workflow.update(selected);
+  const archived = sheet(selected);
+  assert.equal(validateFactSheet(archived), true);
+  if (!validateFactSheet(archived)) throw new Error("broken archived sheet");
+  workflow.restore({ view: { sheet: archived, pending: false, stale: false, error: null },
+    assertions: [], corrections: {} }, selected);
+  release?.(response({ ...archived, sourceFingerprint: "late" }));
+  await pending;
+  assert.equal(workflow.view.sheet?.sourceFingerprint, "synthetic");
+  assert.equal(workflow.view.pending, false);
+});
+
 test("correcting a source fact keeps its literal and links a user assertion", async () => {
   const sourceFact = { id: "fact_source", revision: 1, kind: "technology", value: { canonicalId: "python", display: "Python", scope: "global" },
     evidence: [{ sourceId: entry.result.sourceId, sourceRevision: 1, unitId: "unit_1", unitRevision: 1 }],

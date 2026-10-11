@@ -27,6 +27,22 @@ export class FactWorkflow {
   constructor(private readonly onChange: (view: FactView) => void,
               private readonly request: typeof fetch = (input, init) => fetch(input, init)) {}
 
+  snapshot(): { view: FactView; assertions: TextFact[]; corrections: Record<string, string> } {
+    return { view: { ...structuredClone(this.view), pending: false },
+      assertions: structuredClone(this.assertions), corrections: { ...this.corrections } };
+  }
+
+  restore(snapshot: { view: FactView; assertions: TextFact[]; corrections: Record<string, string> },
+          entries: ImportedSource[]): void {
+    this.epoch += 1;
+    this.abort?.abort();
+    this.abort = null;
+    this.entries = entries;
+    this.assertions = structuredClone(snapshot.assertions);
+    this.corrections = { ...snapshot.corrections };
+    this.publish({ ...structuredClone(snapshot.view), pending: false, error: null });
+  }
+
   sheetForManual(entries: ImportedSource[]): FactSheet {
     const current = this.view.sheet;
     if (current && current.units.every((unit) => entries.some((entry) => entry.result.sourceId === unit.sourceId &&

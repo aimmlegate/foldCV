@@ -84,9 +84,9 @@ async function sha256(bytes: Uint8Array): Promise<string> {
   return Array.from(new Uint8Array(digest), (part) => part.toString(16).padStart(2, "0")).join("");
 }
 
-async function requestJson(path: string, body: unknown): Promise<unknown> {
+async function requestJson(path: string, body: unknown, signal?: AbortSignal): Promise<unknown> {
   const response = await fetch(path, { method: "POST", credentials: "same-origin", cache: "no-store",
-    headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+    headers: { "Content-Type": "application/json" }, body: JSON.stringify(body), ...(signal ? { signal } : {}) });
   if (!response.ok) {
     if (response.headers.get("content-type")?.startsWith("application/json")) {
       const payload: unknown = await response.json();
@@ -100,13 +100,13 @@ async function requestJson(path: string, body: unknown): Promise<unknown> {
   return await response.json() as unknown;
 }
 
-export async function prepare(input: PrepareRequest): Promise<RenderRequest> {
-  const result = await requestJson("/v1/prepare-render", input);
+export async function prepare(input: PrepareRequest, signal?: AbortSignal): Promise<RenderRequest> {
+  const result = await requestJson("/v1/prepare-render", input, signal);
   if (!await validateRenderRequest(result)) throw new Error("invalid preparation");
   return result as RenderRequest;
 }
 
-async function unzipResponse(response: Response): Promise<Record<string, Uint8Array>> {
+async function unzipResponse(response: Response, signal?: AbortSignal): Promise<Record<string, Uint8Array>> {
   if (!response.ok || response.headers.get("content-type")?.split(";")[0] !== "application/zip" || !response.body)
     throw new Error("invalid render response");
   const declared = Number(response.headers.get("content-length"));
@@ -139,12 +139,14 @@ async function unzipResponse(response: Response): Promise<Record<string, Uint8Ar
   const archiveChunks: Uint8Array[] = [];
   try {
     while (true) {
+      if (signal?.aborted) throw new Error("render cancelled");
       const { done, value } = await reader.read();
       if (done) break;
       total += value.length;
       if (total > maxArchive) throw new Error("archive too large");
       archiveChunks.push(value);
       for (let offset = 0; offset < value.length; offset += 4096) {
+        if (signal?.aborted) throw new Error("render cancelled");
         unzip.push(value.subarray(offset, offset + 4096));
         if (failure) throw failure;
       }
@@ -173,10 +175,10 @@ async function unzipResponse(response: Response): Promise<Record<string, Uint8Ar
   return result;
 }
 
-export async function render(request: RenderRequest): Promise<Rendered> {
+export async function render(request: RenderRequest, signal?: AbortSignal): Promise<Rendered> {
   const response = await fetch("/v1/render", { method: "POST", credentials: "same-origin", cache: "no-store",
-    headers: { "Content-Type": "application/json" }, body: JSON.stringify(request) });
-  const entries = await unzipResponse(response);
+    headers: { "Content-Type": "application/json" }, body: JSON.stringify(request), ...(signal ? { signal } : {}) });
+  const entries = await unzipResponse(response, signal);
   const docx = entries["resume.docx"];
   const pdf = entries["resume.pdf"];
   const metadataBytes = entries["render.json"];

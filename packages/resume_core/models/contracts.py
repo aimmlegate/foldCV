@@ -344,6 +344,53 @@ class ZipManifest(Wire):
         return validate_manifest(self)
 
 
+class ArchiveEntry(Wire):
+    path: str
+    role: Literal["project", "workspace", "source_original", "template_asset", "render"]
+    sha256: Sha256
+    uncompressed_size: int = Field(ge=0, le=32 * 1024 * 1024)
+
+    @model_validator(mode="after")
+    def valid_path(self) -> ArchiveEntry:
+        if not _safe_path(self.path):
+            raise ValueError("unsafe archive path")
+        return self
+
+
+class ArchiveManifest(Wire):
+    schema_version: Literal[4]
+    app_version: str
+    renderer_version: str | None
+    template_package_sha256: Sha256 | None
+    template_assets_included: bool
+    project_id: Id | None
+    entries: list[ArchiveEntry] = Field(min_length=1, max_length=47)
+
+    @model_validator(mode="after")
+    def valid_entries(self) -> ArchiveManifest:
+        paths = [entry.path for entry in self.entries]
+        _unique(paths, "archive entry")
+        if len({path.casefold() for path in paths}) != len(paths):
+            raise ValueError("case alias archive entry")
+        if [entry.path for entry in self.entries if entry.role == "workspace"] != ["workspace.json"]:
+            raise ValueError("workspace entry is required")
+        project_paths = [entry.path for entry in self.entries if entry.role == "project"]
+        if project_paths != (["project.json"] if self.project_id is not None else []):
+            raise ValueError("project entry mismatch")
+        if self.project_id is None and (self.renderer_version is not None or self.template_package_sha256 is not None):
+            raise ValueError("partial project cannot claim renderer identity")
+        if (self.renderer_version is None) != (self.template_package_sha256 is None):
+            raise ValueError("renderer and template identity must be paired")
+        if self.template_assets_included != any(entry.role == "template_asset" for entry in self.entries):
+            raise ValueError("template asset status mismatch")
+        for entry in self.entries:
+            if entry.role == "render" and not entry.path.startswith("renders/"):
+                raise ValueError("render entry path mismatch")
+            if entry.role == "template_asset" and not entry.path.startswith("template/"):
+                raise ValueError("template entry path mismatch")
+        return self
+
+
 class Project(Wire):
     schema_version: Literal[3]
     project_id: Id
@@ -530,7 +577,8 @@ def validate_manifest(manifest: ZipManifest) -> ZipManifest:
 
 
 def validate_contract(kind: str, data: object) -> Wire:
-    models = {"project": Project, "proposal": Proposal, "template": TemplateManifest, "zip_manifest": ZipManifest}
+    models = {"project": Project, "proposal": Proposal, "template": TemplateManifest,
+              "zip_manifest": ZipManifest, "archive_manifest": ArchiveManifest}
     if kind not in models:
         raise ValueError("unknown contract")
     result = models[kind].model_validate(data)

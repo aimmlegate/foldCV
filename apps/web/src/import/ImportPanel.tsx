@@ -77,7 +77,7 @@ export function ImportPanel({ state, workflow, text, onText, onExample, exampleD
       {state.pending && <button type="button" className={control} onClick={() => workflow.cancel()}>Отменить импорт</button>}
       <button type="button" disabled={exampleDisabled} onClick={onExample} className={control}>Загрузить вымышленный пример</button>
     </div>
-    <p className="text-sm text-muted">Извлечение выполняется локально. Обработка и генерация текста недоступны. Оригиналы и исправления остаются в памяти вкладки до сохранения проекта в будущей версии.</p>
+    <p className="text-sm text-muted">Извлечение выполняется локально. Обработка и генерация текста недоступны. Оригиналы и исправления остаются в памяти вкладки до явного сохранения проекта.</p>
     {state.pending && <p role="status" className="mt-3 text-sm">Читаем источник…</p>}
     {state.error && <p role="alert" className="mt-3 text-sm text-danger">{state.error}</p>}
     {draftError && <p role="alert" className="mt-3 text-sm text-danger">{draftError}</p>}
