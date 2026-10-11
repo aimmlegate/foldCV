@@ -76,6 +76,20 @@ def test_selection_bounds_prompt_and_keeps_older_and_contacts_out():
         draft_input(huge)
 
 
+@pytest.mark.parametrize("origin", ["source", "user"])
+def test_cited_text_fact_with_unverified_wording_needs_source_review(origin):
+    request = request_with_jobs()
+    fact = next(fact for fact in request.sheet.facts if fact.id == "recent_text")
+    fact.origin = origin
+    draft = proposal()
+    draft.blocks[1].text = "Worked on a team. team peak at most 20 requests per day in the service."
+    result = validate_draft(request, draft)
+    assert any(issue.code == "SOURCE_REVIEW" and issue.block_id == "prose_recent" and
+               issue.fact_id == "recent_text" for issue in result.issues)
+    assert not any(issue.code == "SOURCE_REVIEW" and issue.block_id == "profile" and
+                   issue.fact_id == "recent_text" for issue in result.issues)
+
+
 def test_all_recent_jobs_and_facts_are_selected_without_silent_truncation():
     request = request_with_jobs()
     sheet = request.sheet.model_dump(mode="json", by_alias=True)

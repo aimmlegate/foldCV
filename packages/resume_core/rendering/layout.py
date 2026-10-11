@@ -26,6 +26,16 @@ FONT_FAMILY = {
 }
 
 
+def _labels(language: str) -> dict[str, str]:
+    if language == "ru":
+        return {"focus": "ФОКУС", "summary": "О СЕБЕ", "projects": "ПРОЕКТЫ",
+                "role": "Роль: ", "tasks": "Задачи:", "results": "Личные результаты:",
+                "achievements": "Ключевые достижения:"}
+    return {"focus": "FOCUS", "summary": "ABOUT ME", "projects": "PROJECTS",
+            "role": "Role: ", "tasks": "Tasks:", "results": "Personal results:",
+            "achievements": "Key achievements:"}
+
+
 def _font(run, weight: str = "light", size: float = 10, color: str = "171717") -> None:
     run.font.name = FONT_FAMILY[weight]
     run.font.size = Pt(size)
@@ -129,10 +139,10 @@ def _header(doc, candidate: dict) -> None:
     p_pr.append(borders)
 
 
-def _sidebar(cell, data: dict) -> None:
+def _sidebar(cell, data: dict, language: str = "ru") -> None:
     _remove_empty_first(cell)
     if data.get("focus"):
-        _section(cell, "ФОКУС")
+        _section(cell, _labels(language)["focus"])
         for item in data["focus"]:
             p = cell.add_paragraph()
             p.paragraph_format.space_after = Pt(0)
@@ -158,13 +168,14 @@ def _sidebar(cell, data: dict) -> None:
                 _para(cell, item, after=7)
 
 
-def _main(cell, data: dict) -> None:
+def _main(cell, data: dict, language: str = "ru") -> None:
+    labels = _labels(language)
     _remove_empty_first(cell)
     if data.get("summary"):
-        _section(cell, "О СЕБЕ")
+        _section(cell, labels["summary"])
         _para(cell, data["summary"], after=11)
     if data.get("projects_title"):
-        _section(cell, "ПРОЕКТЫ", bar=True)
+        _section(cell, labels["projects"], bar=True)
     for project in data.get("projects", []):
         _para(cell, project["company"], weight="semibold", size=12, before=9, after=1, keep_next=True)
         if project.get("period"):
@@ -174,16 +185,16 @@ def _main(cell, data: dict) -> None:
         if project.get("description"):
             _para(cell, project["description"], after=4, keep_next=True)
         if project.get("role"):
-            _para(cell, "Роль: " + project["role"], after=4, keep_next=bool(project.get("tasks") or project.get("results")))
-        for title, key in (("Задачи:", "tasks"), ("Личные результаты:", "results")):
+            _para(cell, labels["role"] + project["role"], after=4, keep_next=bool(project.get("tasks") or project.get("results")))
+        for key in ("tasks", "results"):
             if project.get(key):
-                _para(cell, title, after=1, keep_next=True)
+                _para(cell, labels[key], after=1, keep_next=True)
                 continued = set(project.get("_continued_" + key, []))
                 for number, item in enumerate(project[key]):
                     _para(cell, item, bullet=number not in continued,
                           continuation=number in continued, after=2)
     if data.get("achievements"):
-        _para(cell, "Ключевые достижения:", weight="semibold", before=9, keep_next=True)
+        _para(cell, labels["achievements"], weight="semibold", before=9, keep_next=True)
         for item in data["achievements"]:
             _para(cell, item, bullet=True)
     for section in data.get("skill_groups", []):
@@ -260,22 +271,24 @@ def _take_prefix(text: str, width: float, available: float, *, after: float,
     return "".join(tokens[:best]).rstrip(), "".join(tokens[best:])
 
 
-def _project_height(project: dict, *, first: bool) -> float:
+def _project_height(project: dict, *, first: bool, language: str = "ru") -> float:
+    labels = _labels(language)
     height = 17 if first else 0
     height += _measure(project["company"], 410, font="bold", size=12, before=9, after=1)
     height += _measure(project["period"], 410, after=1)
     for field in ("stack", "description"):
         if project.get(field):
             height += _measure(project[field], 410, after=4)
-    height += _measure("Роль: " + project["role"], 410, after=4)
-    for title, key in (("Задачи:", "tasks"), ("Личные результаты:", "results")):
+    height += _measure(labels["role"] + project["role"], 410, after=4)
+    for key in ("tasks", "results"):
         if project.get(key):
-            height += _measure(title, 410, after=1)
+            height += _measure(labels[key], 410, after=1)
             height += sum(_measure("•  " + line, 385, after=2) for line in project[key])
     return height
 
 
-def _paginate_large_project(pages: list[list], index: int, project: dict) -> None:
+def _paginate_large_project(pages: list[list], index: int, project: dict, language: str = "ru") -> None:
+    labels = _labels(language)
     def fresh(continued: bool) -> tuple[dict, float]:
         part = {"company": project["company"],
                 "period": "" if continued else project["period"],
@@ -308,7 +321,7 @@ def _paginate_large_project(pages: list[list], index: int, project: dict) -> Non
         remaining_text = value
         continuation = False
         while remaining_text:
-            title = ("Задачи:" if key == "tasks" else "Личные результаты:") if bullet else ""
+            title = labels[key] if bullet else ""
             title_cost = _measure(title, 410, after=1) if title and not part[key] else 0
             width, after, prefix = (385, 2, "•  ") if bullet else (410, 4, "")
             piece, rest = _take_prefix(remaining_text, width, _flow_remaining(pages) - height - title_cost,
@@ -332,7 +345,7 @@ def _paginate_large_project(pages: list[list], index: int, project: dict) -> Non
 
     if project.get("description"):
         add_paragraph("description", project["description"])
-    role_cost = _measure("Роль: " + project["role"], 410, after=4)
+    role_cost = _measure(labels["role"] + project["role"], 410, after=4)
     if height + role_cost > _flow_remaining(pages):
         flush()
     if height + role_cost > _flow_remaining(pages):
@@ -346,16 +359,17 @@ def _paginate_large_project(pages: list[list], index: int, project: dict) -> Non
 
 
 def _paginate_main(data: dict) -> list[dict]:
+    language = data.get("source_language", "ru")
     pages: list[list] = [[]]
     summary = data["candidate"].get("summary", "")
     if summary.strip():
         _append_with_budget(pages, ("summary", summary), 35 + _measure(summary, 410, after=11))
     for index, project in enumerate(data.get("projects", [])):
-        height = _project_height(project, first=index == 0)
+        height = _project_height(project, first=index == 0, language=language)
         if height <= _page_budget(1):
             _append_with_budget(pages, ("project", (index, project)), height)
         else:
-            _paginate_large_project(pages, index, project)
+            _paginate_large_project(pages, index, project, language)
     if data.get("achievements"):
         height = 20 + sum(_measure("•  " + line, 385) for line in data["achievements"])
         _append_with_budget(pages, ("achievements", data["achievements"]), height)
@@ -471,9 +485,9 @@ def render_docx(data: dict, target: Path) -> None:
         side.vertical_alignment = WD_CELL_VERTICAL_ALIGNMENT.TOP
         main.vertical_alignment = WD_CELL_VERTICAL_ALIGNMENT.TOP
         if index < len(side_pages):
-            _sidebar(side, side_pages[index])
+            _sidebar(side, side_pages[index], data.get("source_language", "ru"))
         if index < len(main_pages):
-            _main(main, main_pages[index])
+            _main(main, main_pages[index], data.get("source_language", "ru"))
     footer = sec.footer.paragraphs[0]
     footer.alignment = WD_ALIGN_PARAGRAPH.CENTER
     _font(footer.add_run(data.get("footer", "mail@example.com")), "light", 12)

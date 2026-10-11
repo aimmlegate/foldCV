@@ -25,6 +25,7 @@ MAX_ZIP_ENTRY = 8 * 1024 * 1024
 MAX_ZIP_EXPANDED = 32 * 1024 * 1024
 W = "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}"
 R = "{http://schemas.openxmlformats.org/package/2006/relationships}"
+MC = "{http://schemas.openxmlformats.org/markup-compatibility/2006}"
 
 
 class ExtractFailure(Exception):
@@ -215,6 +216,13 @@ def _paragraph_text(paragraph: ET.Element) -> str:
     def visit(node: ET.Element) -> None:
         if node.tag.endswith("}txbxContent"):
             return
+        if node.tag == MC + "AlternateContent":
+            selected = node.find(MC + "Fallback")
+            if selected is None:
+                selected = node.find(MC + "Choice")
+            if selected is not None:
+                visit(selected)
+            return
         if node.tag == W + "t":
             parts.append(node.text or "")
         elif node.tag == W + "tab":
@@ -292,6 +300,10 @@ def _docx(data: bytes, out: Collected) -> None:
         elif child.tag != W + "sectPr":
             out.gap("UNSUPPORTED_CONTENT", ExtractLocation(kind="paragraph", paragraph=paragraph_index, part="word/document.xml"))
     for name in sorted(contents):
+        if name in {"word/footnotes.xml", "word/endnotes.xml", "word/comments.xml"}:
+            root = _check_xml(contents[name])
+            if any(node.tag == W + "t" and (node.text or "").strip() for node in root.iter()):
+                out.gap("UNSUPPORTED_CONTENT", ExtractLocation(kind="paragraph", part=name))
         if re.fullmatch(r"word/(?:header|footer)\d*\.xml", name):
             root = _check_xml(contents[name])
             kind = "header" if "header" in name else "footer"

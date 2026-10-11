@@ -169,6 +169,16 @@
           "maxItems": 40,
           "title": "Skillgroups",
           "type": "array"
+        },
+        "sourceLanguage": {
+          "default": "ru",
+          "enum": [
+            "ru",
+            "en",
+            "mixed"
+          ],
+          "title": "Sourcelanguage",
+          "type": "string"
         }
       },
       "required": [

@@ -227,13 +227,14 @@ function wellFormedUnicode(value: unknown): boolean {
 export async function validateRenderRequest(value: unknown): Promise<boolean> {
   if (!finiteJson(value) || !renderShape(value) || !wellFormedUnicode(value)) return false;
   if (value.baseRevision !== value.snapshot.projectRevision) return false;
-  if (!safeRenderText(value.document)) return false;
+  const document = { ...value.document, sourceLanguage: value.document.sourceLanguage ?? "ru" };
+  if (!safeRenderText(document)) return false;
   const boundedItem = (item: string): boolean => [...item].length <= 4000;
   if (value.document.sidebar.some((section) => !section.items.every(boundedItem)) ||
       value.document.projects.some((project) => !project.tasks.every(boundedItem) || !project.results.every(boundedItem)) ||
       !value.document.achievements.every(boundedItem)) return false;
   const { snapshotSha256, ...snapshot } = value.snapshot;
-  const bytes = new TextEncoder().encode(JSON.stringify(ordered({ baseRevision: value.baseRevision, document: value.document, snapshot })));
+  const bytes = new TextEncoder().encode(JSON.stringify(ordered({ baseRevision: value.baseRevision, document, snapshot })));
   const digest = await crypto.subtle.digest("SHA-256", bytes);
   const hex = Array.from(new Uint8Array(digest), (part) => part.toString(16).padStart(2, "0")).join("");
   return hex === snapshotSha256;

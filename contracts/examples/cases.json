@@ -1024,7 +1024,7 @@
           "snapshot",
           "snapshotSha256"
         ],
-        "value": "3502d61172113378e35a6faf0fed7e65e9c38407ff4496e2c6d179f5f1089f0c"
+        "value": "756e91d0ce8f27090d77039dc7a64cb4635750e79e44a5f6d8fa09104690729a"
       }
     ]
   },
@@ -1052,7 +1052,7 @@
           "snapshot",
           "snapshotSha256"
         ],
-      "value": "e0daf367355881d2d2f25b055b9b08e443c78b4961bc0c328aa19c1cd648f97f"
+      "value": "53a62b75b936ca4a196ccb72d64e5166a302a14b22266449332533e4a7f14578"
       }
     ]
   },
@@ -1107,7 +1107,7 @@
           "snapshot",
           "snapshotSha256"
         ],
-      "value": "2c5a1676860ef4334bff5c560e15a2e4f1ea765882c01a1e90220a2bc3b6d51c"
+      "value": "958ff3e0248137dd9cd6c8ebd27eb25321abfa8338996bb5cc8063f3c6a99a4f"
       }
     ]
   },
@@ -1241,7 +1241,7 @@
           "snapshot",
           "snapshotSha256"
         ],
-      "value": "0f502481bd95a2dedd4775839074d79369b242343e8b5ce0c05b16d9478d8743"
+      "value": "29508d09e35f06361fa1127e7c9f87647031223a25a29d43c97ae657c4e25557"
       }
     ]
   },
@@ -1674,5 +1674,8 @@
 {"name": "archive_v4_case_alias", "contract": "archive_manifest", "base": "archive_manifest", "valid": false, "edits": [{"op": "set", "path": ["entries", 1, "path"], "value": "WORKSPACE.JSON"}]},
 {"name": "archive_v4_wrong_project_role", "contract": "archive_manifest", "base": "archive_manifest", "valid": false, "edits": [{"op": "set", "path": ["entries", 1, "role"], "value": "render"}]},
 {"name": "archive_v4_partial_identity", "contract": "archive_manifest", "base": "archive_manifest", "valid": false, "edits": [{"op": "set", "path": ["projectId"], "value": null}]},
-{"name": "archive_v4_asset_marker_mismatch", "contract": "archive_manifest", "base": "archive_manifest", "valid": false, "edits": [{"op": "set", "path": ["templateAssetsIncluded"], "value": true}]}
+{"name": "archive_v4_asset_marker_mismatch", "contract": "archive_manifest", "base": "archive_manifest", "valid": false, "edits": [{"op": "set", "path": ["templateAssetsIncluded"], "value": true}]},
+  {"name": "render_unknown_language", "contract": "render_request", "base": "render_request", "valid": false, "edits": [{"op": "set", "path": ["document", "sourceLanguage"], "value": "fr"}]},
+  {"name": "render_default_language_uses_canonical_hash", "contract": "render_request", "base": "render_request", "valid": true, "edits": [{"op": "remove", "path": ["document", "sourceLanguage"]}]},
+  {"name": "render_omitted_language_raw_hash_is_invalid", "contract": "render_request", "base": "render_request", "valid": false, "edits": [{"op": "remove", "path": ["document", "sourceLanguage"]}, {"op": "set", "path": ["snapshot", "snapshotSha256"], "value": "dac7a557f3d1eb7ceae55a2ad3ea7e5f202889d5371401448dcc55e001accc45"}]}
 ]

@@ -21,6 +21,8 @@ import tempfile
 import time
 import uuid
 
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+from tools.process_groups import signal_group
 
 MAX_FILE = 512_000
 MAX_PACKET = 2_000_000
@@ -757,29 +759,29 @@ def gemini_argv(repo: Path, item: dict, prompt: Path) -> list[str]:
 
 
 def stop_group(proc: subprocess.Popen) -> None:
+    if proc.returncode is not None:
+        raise DevloopError("cleanup_failed")
+
     def group_exists() -> bool:
-        proc.poll()
+        # Keep the leader unreaped until the final signal so its group ID cannot be reused.
         try:
-            os.killpg(proc.pid, 0)
-            return True
-        except ProcessLookupError:
-            return False
-        except PermissionError as exc:
+            return signal_group(proc.pid, 0)
+        except OSError as exc:
             raise DevloopError("cleanup_failed") from exc
 
     if group_exists():
         try:
-            os.killpg(proc.pid, signal.SIGTERM)
-        except ProcessLookupError:
-            pass
+            signal_group(proc.pid, signal.SIGTERM)
+        except OSError as exc:
+            raise DevloopError("cleanup_failed") from exc
     deadline = time.monotonic() + 1.0
     while group_exists() and time.monotonic() < deadline:
         time.sleep(0.05)
     if group_exists():
         try:
-            os.killpg(proc.pid, signal.SIGKILL)
-        except ProcessLookupError:
-            pass
+            signal_group(proc.pid, signal.SIGKILL)
+        except OSError as exc:
+            raise DevloopError("cleanup_failed") from exc
     try:
         proc.wait(timeout=2)
     except subprocess.TimeoutExpired as exc:
@@ -814,8 +816,6 @@ def run_bounded(argv: list[str], cwd: Path, timeout: int | float | None = None,
                 data[key.data].extend(chunk)
                 if len(data["out"]) + len(data["err"]) > MAX_OUTPUT:
                     raise DevloopError("output_limit")
-            if proc.poll() is not None and not selector.get_map():
-                break
         remaining = deadline - time.monotonic()
         if remaining <= 0:
             raise DevloopError("timeout")

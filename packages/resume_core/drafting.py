@@ -215,8 +215,9 @@ def validate_draft(request: DraftRequest, proposal: DraftProposal) -> DraftResul
                 if fact.value.attribution != "unknown" and fact.value.attribution not in block.text.casefold():
                     issues.append(DraftIssue(code="ATTRIBUTION_LOSS", blockId=block_id, factId=fact.id,
                                              message="Leadership attribution needs review."))
-            if fact.id in request.sheet.proposed_fact_ids:
+            if (fact.id in request.sheet.proposed_fact_ids or fact.kind == "text" and
+                    not _term_present(block.text, fact.value.text)):
                 issues.append(DraftIssue(code="SOURCE_REVIEW", blockId=block_id, factId=fact.id,
-                                         message="Proposed source meaning still needs human review."))
+                                         message="Compare proposed wording with the fact; references do not prove meaning."))
     return DraftResult(sourceFingerprint=request.source_fingerprint, baseRevision=request.base_revision,
                        blocks=proposal.blocks, issues=issues)

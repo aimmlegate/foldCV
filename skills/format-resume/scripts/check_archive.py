@@ -15,20 +15,38 @@ from validate import validate
 CATEGORIES = {'identity', 'profile', 'job_header', 'period', 'role', 'task', 'result',
               'stack', 'education', 'course', 'language', 'location', 'preferences',
               'contacts', 'personal', 'meta'}
-MONTHS = ['январ', 'феврал', 'март', 'апрел', 'ма[йя]', 'июн', 'июл', 'август',
-          'сентябр', 'октябр', 'ноябр', 'декабр']
-EN_MONTHS = ['jan', 'feb', 'mar', 'apr', 'may', 'jun', 'jul', 'aug', 'sep', 'oct', 'nov', 'dec']
+MONTHS = ['янв(?:арь|аря)?', 'фев(?:раль|раля)?', 'мар(?:т|та)?', 'апр(?:ель|еля)?',
+          'ма[йя]', 'июн[ья]?', 'июл[ья]?', 'авг(?:уст|уста)?', 'сен(?:т|тябрь|тября)?',
+          'окт(?:ябрь|ября)?', 'ноя(?:брь|бря)?', 'дек(?:абрь|абря)?']
+EN_MONTHS = ['jan(?:uary)?', 'feb(?:ruary)?', 'mar(?:ch)?', 'apr(?:il)?', 'may',
+             'jun(?:e)?', 'jul(?:y)?', 'aug(?:ust)?', 'sep(?:t|tember)?',
+             'oct(?:ober)?', 'nov(?:ember)?', 'dec(?:ember)?']
 
 
 def dates_in(text):
     result = set()
     for month, (ru, en) in enumerate(zip(MONTHS, EN_MONTHS), 1):
-        for match in re.finditer(r'\b(?:' + ru + '|' + en + r')\w*\.?\s+(\d{4})\b', text, re.I):
+        for match in re.finditer(r'\b(?:' + ru + '|' + en + r')\b\.?\s+(\d{4})\b', text, re.I):
             result.add(f'{match[1]}-{month:02d}')
     for match in re.finditer(r'\b(0?[1-9]|1[0-2])[./](\d{4})\b', text):
         result.add(f'{match[2]}-{int(match[1]):02d}')
     result.update(re.findall(r'\b\d{4}-\d{2}\b', text))
     return result
+
+
+def token_present(text, value):
+    return bool(re.search(r'(?<!\w)' + re.escape(value) + r'(?!\w)', text))
+
+
+def observation_supported(text, observed):
+    day = r'0?' + str(observed.day)
+    month = r'0?' + str(observed.month)
+    year = str(observed.year)
+    names = '(?:' + MONTHS[observed.month - 1] + '|' + EN_MONTHS[observed.month - 1] + r')\b\.?'
+    patterns = [re.escape(observed.isoformat()), day + r'[./]' + month + r'[./]' + year,
+                day + r'\s+' + names + r'\s+' + year,
+                names + r'\s+' + day + r',?\s+' + year]
+    return any(re.search(r'(?<!\w)(?:' + pattern + r')(?!\w)', text, re.I) for pattern in patterns)
 
 
 def check(view, archive, archive_path, source=None):
@@ -37,7 +55,7 @@ def check(view, archive, archive_path, source=None):
             raise ValueError(message)
 
     archive_path = Path(archive_path)
-    require(view.get('schema_version') == archive.get('schema_version') == 2, 'Version 2 required')
+    require(view.get('schema_version') in (2, '2') and archive.get('schema_version') in (2, '2'), 'Version 2 required')
     require(view.get('archive_sha256') == digest(archive_path), 'Archive changed; finalize the view again')
     frozen_source = json.loads((archive_path.parent / 'source.json').read_text())
     require(archive['source'] == frozen_source, 'Archive source text was changed')
@@ -45,7 +63,8 @@ def check(view, archive, archive_path, source=None):
         require(source == frozen_source, 'Render source differs from archived source')
     require(archive['units'] == source_units(frozen_source), 'Source units were changed or lost')
     snapshot = archive_path.parent / archive['source_snapshot']
-    require(snapshot.parent.resolve() == archive_path.parent.resolve(), 'Snapshot must be inside the case folder')
+    require(not snapshot.is_symlink() and snapshot.resolve().is_relative_to(archive_path.parent.resolve()),
+            'Snapshot must be a regular file inside the case folder')
     require(snapshot.is_file() and digest(snapshot) == frozen_source['sha256'], 'Original bytes differ or are missing')
     extracted = extract(snapshot)
     require(extracted['pages'] == frozen_source['pages'], 'Archived text differs from fresh source extraction')
@@ -80,13 +99,13 @@ def check(view, archive, archive_path, source=None):
                 require(field == 'end' and re.search(r'настоящее|present|current', source_period, re.I), f"{job['id']}: unsupported open date")
                 continue
             month_bounds(value)
-            supported = value in dates_in(source_period) if len(value) > 4 else value in source_period
+            supported = value in dates_in(source_period) if len(value) > 4 else token_present(source_period, value)
             require(supported, f"{job['id']}: normalized {field} {value} absent from cited dates")
         require(job['end'] is None or month_bounds(job['start'])[0] <= month_bounds(job['end'])[1], 'Reversed job dates')
         if job.get('observed_at'):
             observed = date.fromisoformat(job['observed_at'])
             text = refs({'sources': job['observed_sources']}, job['id'] + '.observed_at')
-            require(job['observed_at'][:7] in dates_in(text) and re.search(r'\b0?' + str(observed.day) + r'\b', text),
+            require(observation_supported(text, observed),
                     f"{job['id']}: observation date not supported")
         for tech in job['technologies']:
             tech_source = refs(tech, f"{job['id']}.{tech['name']}")
@@ -94,7 +113,7 @@ def check(view, archive, archive_path, source=None):
                 if tech.get(bound):
                     value = tech[bound]
                     month_bounds(value)
-                    require(value in dates_in(tech_source) if len(value) > 4 else value in tech_source,
+                    require(value in dates_in(tech_source) if len(value) > 4 else token_present(tech_source, value),
                             f"{job['id']}.{tech['name']}: unsupported subproject date")
                     require(month_bounds(value)[0] >= month_bounds(job['start'])[0] and
                             month_bounds(value)[1] <= month_bounds(job['end'] or job.get('observed_at') or archive['as_of'])[1],
@@ -152,7 +171,7 @@ def check(view, archive, archive_path, source=None):
     unaccounted = []
     for tech in archive['global_technologies'] + [t for j in jobs.values() for t in j['technologies']]:
         name = key(tech['name'])
-        if name not in text and name not in hidden:
+        if not token_present(text, name) and name not in hidden:
             unaccounted.append(tech['name'])
     require(not unaccounted, f'Technologies not displayed or explicitly archived: {sorted(set(unaccounted))}')
     return {**base, 'source_bytes_verified': True, 'source_text_verified': True,

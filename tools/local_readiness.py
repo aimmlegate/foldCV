@@ -15,6 +15,7 @@ import sys
 import threading
 import time
 
+from tools.process_groups import signal_group
 
 ROOT = Path(__file__).resolve().parents[1]
 MANIFEST = ROOT / "docs/gui/local-version-manifest.json"
@@ -85,11 +86,10 @@ def bounded_version(executable: Path) -> str | None:
                     break
                 output.extend(chunk)
     finally:
-        process.poll()
+        # Keep the leader unreaped until its process group has been stopped.
         try:
-            os.killpg(process.pid, signal.SIGKILL)
-        except ProcessLookupError:
-            pass
+            if signal_group(process.pid, 0):
+                signal_group(process.pid, signal.SIGKILL)
         except OSError:
             cleanup_failed = True
         try:

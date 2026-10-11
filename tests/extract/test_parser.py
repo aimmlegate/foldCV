@@ -82,6 +82,31 @@ def test_docx_printer_settings_remain_inert_and_unknown_binary_is_rejected() -> 
     failure(rebuild(extra=("word/unknown.bin", b"never run")), "unknown.docx", "EXTRACT_UNSUPPORTED")
 
 
+@pytest.mark.parametrize("part", ["footnotes", "endnotes", "comments"])
+@pytest.mark.parametrize("text", ["Source detail", ""])
+def test_docx_notes_and_comments_with_text_report_visible_part_gap(part, text) -> None:
+    name = f"word/{part}.xml"
+    xml = (f'<w:{part} xmlns:w="{parser.W[1:-1]}"><w:p><w:r><w:t>{text}</w:t>'
+           f'</w:r></w:p></w:{part}>').encode()
+    result = extract(rebuild(extra=(name, xml)), "notes.docx")
+    assert [(gap.code, gap.location.part) for gap in result.gaps if gap.location.part == name] == (
+        [("UNSUPPORTED_CONTENT", name)] if text else [])
+
+
+@pytest.mark.parametrize("fallback", [True, False])
+def test_docx_alternate_content_selects_one_variant_and_keeps_surrounding_text(fallback) -> None:
+    fallback_xml = '<mc:Fallback><w:r><w:t>Fallback text</w:t></w:r></mc:Fallback>' if fallback else ''
+    xml = (f'<w:document xmlns:w="{parser.W[1:-1]}" xmlns:mc="{parser.MC[1:-1]}"><w:body><w:p>'
+           '<w:r><w:t>Before </w:t></w:r><mc:AlternateContent>'
+           '<mc:Choice Requires="w"><w:r><w:t>Choice text</w:t></w:r></mc:Choice>'
+           '<mc:Choice Requires="w"><w:r><w:t>Other choice</w:t></w:r></mc:Choice>'
+           f'{fallback_xml}</mc:AlternateContent><w:r><w:t> After</w:t></w:r>'
+           '</w:p></w:body></w:document>').encode()
+    result = extract(rebuild({"word/document.xml": xml}), "alternate.docx")
+    assert result.units[0].text == f"Before {'Fallback text' if fallback else 'Choice text'} After"
+    assert any(gap.code == "SHAPE" and gap.location.part == "word/document.xml" for gap in result.gaps)
+
+
 def test_docx_table_wrappers_report_located_gaps_without_losing_other_units() -> None:
     namespace = "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}"
 

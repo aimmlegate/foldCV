@@ -29,13 +29,14 @@ from .lifecycle import OperationFiles, SpikeError, has_blocked_owned, reap_owned
 from .connection import ConnectionAdapter, ConnectionFailure, Metadata
 from .cli.experimental_profile import BINARY, ExperimentalCliProfile
 from .providers.codex_cli import CodexCliProvider
+from .providers.content import ContentFailure
 from .normalization_content import NormalizationContentService
 from .drafting_content import DraftingContentService
 from .rewriting_content import RewritingContentService
 from .rendering import DocumentRenderer
 from .extracting import MAX_BODY as MAX_EXTRACT_BODY, UploadFailure, parse_one_part, run_extract
 from packages.resume_core.rendering.template import PACKAGE_SHA256, ROOT as TEMPLATE_ROOT, MANIFEST as TEMPLATE_MANIFEST, RenderFailure, renderer_sha256, require_template
-from packages.resume_core.rendering.preparation import PrepareRequest, prepare_document
+from packages.resume_core.rendering.preparation import PreparationFailure, PrepareRequest, prepare_document
 from packages.resume_core.rendering.privacy import guard_render_document
 from packages.resume_core.normalization import FactRequest, FactSheet, fingerprint, literal_sheet, semantic_input
 from packages.resume_core.drafting import DraftRequest as ProseDraftRequest, DraftResult as ProseDraftResult, draft_input
@@ -297,6 +298,31 @@ def create_app(*, origin: str, secret: str, temp_root: Path, dist: Path, runner:
             unsafe_cleanup = True
         return error.code if error.code in {"PROCESS_CLEANUP_FAILED", "CLEANUP_FAILED", "UNSAFE_TEMP_ROOT", "TEMP_FAILED"} else "OPERATION_FAILED"
 
+    def content_error_code(error: Exception) -> str:
+        if isinstance(error, asyncio.TimeoutError):
+            return "OPERATION_TIMEOUT"
+        if isinstance(error, ContentFailure):
+            return error.code
+        if isinstance(error, InterruptedError) and str(error) == "cancelled":
+            return "CANCELLED"
+        if isinstance(error, SpikeError):
+            return "CANCELLED" if error.code == "CANCELLED" else lifecycle_code(error)
+        return "INVALID_RESULT"
+
+    def execute_content(files, runner, payload, cancel, runner_epoch):
+        worker_error = None
+        with files.open():
+            if experimental_profile and not accepted_operation_valid(runner_epoch):
+                raise SpikeError("CLI_PROFILE_UNSAFE")
+            try:
+                result = runner.run(payload, files, cancel)
+            except OSError as error:
+                # Re-raise worker cancellation/timeout after the filesystem scope cleans up.
+                worker_error = error
+        if worker_error is not None:
+            raise worker_error
+        return result
+
     async def cancel_operation(task: asyncio.Task, files: OperationFiles) -> str | None:
         if not task.done():
             cancellation_pending.add(task)
@@ -548,10 +574,7 @@ def create_app(*, origin: str, secret: str, temp_root: Path, dist: Path, runner:
             cancel = threading.Event()
 
             def execute():
-                with files.open():
-                    if experimental_profile and not accepted_operation_valid(runner_epoch):
-                        raise SpikeError("CLI_PROFILE_UNSAFE")
-                    return active_runner.run(payload, files, cancel)
+                return execute_content(files, active_runner, payload, cancel, runner_epoch)
 
             task = asyncio.create_task(asyncio.to_thread(execute))
             operations[task] = files
@@ -584,16 +607,15 @@ def create_app(*, origin: str, secret: str, temp_root: Path, dist: Path, runner:
                 raise
             except Exception as error:
                 cancel.set()
-                code = "OPERATION_TIMEOUT" if isinstance(error, asyncio.TimeoutError) else "INVALID_RESULT"
-                if isinstance(error, SpikeError):
-                    code = lifecycle_code(error)
+                code = content_error_code(error)
                 if not task.done():
                     cleanup_code = await stop_semantic(task, files, cancel)
                     if cleanup_code:
                         code = cleanup_code
                 yield (json.dumps({"transportVersion": 1, "requestId": request_id, "sequence": 2,
                                    "baseRevision": payload.base_revision, "type": "operation.failed",
-                                   "payload": {"code": code, "retryable": False, "stage": "normalize"}}) + "\n").encode()
+                                   "payload": {"code": code, "retryable": code in {"RATE_LIMITED", "BUSY", "OPERATION_TIMEOUT"},
+                                               "stage": "normalize"}}) + "\n").encode()
             finally:
                 if not task.done():
                     await stop_semantic(task, files, cancel)
@@ -632,10 +654,7 @@ def create_app(*, origin: str, secret: str, temp_root: Path, dist: Path, runner:
             cancel = threading.Event()
 
             def execute():
-                with files.open():
-                    if experimental_profile and not accepted_operation_valid(runner_epoch):
-                        raise SpikeError("CLI_PROFILE_UNSAFE")
-                    return active_runner.run(payload, files, cancel)
+                return execute_content(files, active_runner, payload, cancel, runner_epoch)
 
             task = asyncio.create_task(asyncio.to_thread(execute))
             operations[task] = files
@@ -664,16 +683,15 @@ def create_app(*, origin: str, secret: str, temp_root: Path, dist: Path, runner:
                 raise
             except Exception as error:
                 cancel.set()
-                code = "OPERATION_TIMEOUT" if isinstance(error, asyncio.TimeoutError) else "INVALID_RESULT"
-                if isinstance(error, SpikeError):
-                    code = lifecycle_code(error)
+                code = content_error_code(error)
                 if not task.done():
                     cleanup_code = await stop_semantic(task, files, cancel)
                     if cleanup_code:
                         code = cleanup_code
                 yield (json.dumps({"transportVersion": 1, "requestId": request_id, "sequence": 2,
                                    "baseRevision": payload.base_revision, "type": "operation.failed",
-                                   "payload": {"code": code, "retryable": False, "stage": "draft"}}) + "\n").encode()
+                                   "payload": {"code": code, "retryable": code in {"RATE_LIMITED", "BUSY", "OPERATION_TIMEOUT"},
+                                               "stage": "draft"}}) + "\n").encode()
             finally:
                 if not task.done():
                     await stop_semantic(task, files, cancel)
@@ -719,10 +737,7 @@ def create_app(*, origin: str, secret: str, temp_root: Path, dist: Path, runner:
             cancel = threading.Event()
 
             def execute():
-                with files.open():
-                    if experimental_profile and not accepted_operation_valid(runner_epoch):
-                        raise SpikeError("CLI_PROFILE_UNSAFE")
-                    return active_runner.run(payload, files, cancel)
+                return execute_content(files, active_runner, payload, cancel, runner_epoch)
 
             task = asyncio.create_task(asyncio.to_thread(execute))
             operations[task] = files
@@ -752,16 +767,15 @@ def create_app(*, origin: str, secret: str, temp_root: Path, dist: Path, runner:
                 raise
             except Exception as error:
                 cancel.set()
-                code = "OPERATION_TIMEOUT" if isinstance(error, asyncio.TimeoutError) else "INVALID_RESULT"
-                if isinstance(error, SpikeError):
-                    code = lifecycle_code(error)
+                code = content_error_code(error)
                 if not task.done():
                     cleanup_code = await stop_semantic(task, files, cancel)
                     if cleanup_code:
                         code = cleanup_code
                 yield (json.dumps({"transportVersion": 1, "requestId": request_id, "sequence": 2,
                                    "baseRevision": payload.base_revision, "type": "operation.failed",
-                                   "payload": {"code": code, "retryable": False, "stage": "rewrite"}}) + "\n").encode()
+                                   "payload": {"code": code, "retryable": code in {"RATE_LIMITED", "BUSY", "OPERATION_TIMEOUT"},
+                                               "stage": "rewrite"}}) + "\n").encode()
             finally:
                 if not task.done():
                     await stop_semantic(task, files, cancel)
@@ -772,6 +786,8 @@ def create_app(*, origin: str, secret: str, temp_root: Path, dist: Path, runner:
         try:
             prepared = prepare_document(payload)
             return JSONResponse(prepared.model_dump(mode="json", by_alias=True), headers={"Cache-Control": "no-store"})
+        except PreparationFailure as error:
+            return problem(error.code, 422, "prepare")
         except RenderFailure as error:
             return problem(error.code if error.code.startswith("PRIVATE_OUTPUT_") else "PREPARATION_FAILED", 422, "prepare")
         except ValueError:

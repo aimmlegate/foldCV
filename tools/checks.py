@@ -131,6 +131,8 @@ def validate_map() -> None:
                                 capture_output=True, check=True).stdout
     collected = {line for line in collection.splitlines() if "::" in line}
     assert_prototype_collection(data["foundation"].get("prototypeRegressions"), collected)
+    # A function ID maps its parametrized cases without matching longer function names.
+    mapped_ids = collected | {node.partition("[")[0] for node in collected}
     state_result = subprocess.run(["npm", "run", "test:state"], cwd=WEB, env=safe_env(),
                                   capture_output=True, text=True)
     if state_result.returncode != 0:
@@ -157,7 +159,7 @@ def validate_map() -> None:
                 file, _, name = node.partition("::")
                 found = (ROOT / file).is_file() and (Path(file).name, name) in browser_names
             else:
-                found = any(item.startswith(node) for item in collected)
+                found = node in mapped_ids
             if not found:
                 raise SystemExit(f"Missing mapped test: {node}")
     for name, node in data["foundation"].items():
@@ -166,7 +168,7 @@ def validate_map() -> None:
         if name == "browserShell":
             if not (ROOT / node).is_file():
                 raise SystemExit(f"Missing browser shell test: {node}")
-        elif not any(item.startswith(node) for item in collected):
+        elif node not in mapped_ids:
             raise SystemExit(f"Missing foundation test: {node}")
     gaps = [entry["id"] for entry in entries if entry["status"] != "implemented"]
     print("Unimplemented or partial requirements: " + ", ".join(gaps), flush=True)

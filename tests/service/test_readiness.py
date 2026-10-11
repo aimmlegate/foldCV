@@ -4,6 +4,7 @@ from pathlib import Path
 import platform
 import subprocess
 import sys
+from unittest.mock import Mock
 
 import pytest
 
@@ -13,6 +14,36 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "services/api/src")
 from tools import local_readiness as readiness
 from packages.resume_core.rendering import template
 from resume_api.connection import ConnectionAdapter, ConnectionFailure
+
+
+def test_version_probe_signals_owned_group_before_reaping(monkeypatch):
+    process = Mock(pid=98765, returncode=None)
+    process.poll.side_effect = lambda: setattr(process, "returncode", 0)
+    process.wait.side_effect = lambda **kwargs: setattr(process, "returncode", 0)
+    process.stdout.fileno.return_value = 9
+
+    class Selector:
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *args):
+            pass
+
+        def register(self, *args):
+            pass
+
+        def select(self, timeout):
+            return [True]
+
+    def killpg(pid, sig):
+        assert process.returncode is None, "Version probe signaled a group after losing its PID ownership"
+
+    chunks = iter([b"codex-cli fixture\n", b""])
+    monkeypatch.setattr(readiness.subprocess, "Popen", lambda *args, **kwargs: process)
+    monkeypatch.setattr(readiness.selectors, "DefaultSelector", Selector)
+    monkeypatch.setattr(readiness.os, "read", lambda *args: next(chunks))
+    monkeypatch.setattr(readiness.os, "killpg", killpg)
+    assert readiness.bounded_version(Path("/synthetic/codex")) == "codex-cli fixture"
 
 
 def test_local_readiness_checks_current_pinned_runtime():

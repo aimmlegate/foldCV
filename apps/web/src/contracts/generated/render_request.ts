@@ -55,6 +55,7 @@ export type Title2 = string;
  * @maxItems 40
  */
 export type Skillgroups = SkillGroup[];
+export type Sourcelanguage = "ru" | "en" | "mixed";
 export type Id = string;
 export type Projectrevision = number;
 export type Renderersha256 = string;
@@ -77,6 +78,7 @@ export interface RenderDocument {
   projects: Projects;
   sidebar: Sidebar;
   skillGroups: Skillgroups;
+  sourceLanguage?: Sourcelanguage;
 }
 export interface Candidate {
   name: Name;

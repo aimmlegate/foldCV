@@ -37,6 +37,24 @@ def make_app(tmp_path, runner=None):
     return create_app(origin=ORIGIN, secret=SECRET, temp_root=tmp_path / "operations", dist=dist, runner=runner)
 
 
+@pytest.mark.asyncio
+async def test_prepare_reports_description_limit_and_allows_missing_job_dates(tmp_path):
+    app = make_app(tmp_path)
+    async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url=ORIGIN) as client:
+        await client.post("/v1/session/exchange", headers={"Origin": ORIGIN}, json={"secret": SECRET})
+        data = deepcopy(PREPARE)
+        data["project"]["employment"][0]["periods"] = []
+        response = await client.post("/v1/prepare-render", headers={"Origin": ORIGIN}, json=data)
+        assert response.status_code == 200
+        assert response.json()["document"]["projects"][0]["period"] == "Dates not specified"
+        data["project"]["views"][1]["state"]["text"] = "private long draft " * 300
+        response = await client.post("/v1/prepare-render", headers={"Origin": ORIGIN}, json=data)
+        assert response.status_code == 422
+        assert response.json()["error"]["code"] == "JOB_DESCRIPTION_TOO_LONG"
+        assert "private long draft" not in response.text
+        assert data["project"]["views"][1]["state"]["text"] == "private long draft " * 300
+
+
 @pytest.mark.parametrize(("private", "section"), [
     ("Built a tool. Call 555-123-4567.", "JOB"),
     ("Portfolio: alice.dev", "PROFILE"),

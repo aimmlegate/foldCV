@@ -17,6 +17,12 @@ from packages.resume_core.rendering.template import PACKAGE_SHA256, renderer_sha
 from packages.resume_core.rendering.privacy import guard_render_document
 
 
+class PreparationFailure(ValueError):
+    def __init__(self, code: str):
+        self.code = code
+        super().__init__(code)
+
+
 class Presentation(RenderWire):
     name: str = Field(min_length=1, max_length=160)
     title: str = Field(min_length=1, max_length=240)
@@ -57,6 +63,8 @@ class PrepareRequest(RenderWire):
 
 
 def _period(job, language: str) -> str:
+    if not job.periods:
+        return "Даты не указаны" if language == "ru" else "Dates not specified"
     def label(point):
         if point is None:
             return "н. в." if language == "ru" else "present"
@@ -66,6 +74,17 @@ def _period(job, language: str) -> str:
             return f"{point.year}-{point.month:02d}"
         return f"{point.year}-{point.month:02d}-{point.day:02d}"
     return ", ".join(f"{label(period.start)}–{label(period.end)}" for period in job.periods)
+
+
+def _duration(months: int, language: str) -> str:
+    years = months // 12
+    if not years:
+        return "< 1 года" if language == "ru" else "< 1 year"
+    if language == "ru":
+        unit = "лет" if 11 <= years % 100 <= 14 else "год" if years % 10 == 1 else "года" if years % 10 in {2, 3, 4} else "лет"
+    else:
+        unit = "year" if years == 1 else "years"
+    return f"≈ {years} {unit}"
 
 
 def prepare_document(payload: PrepareRequest) -> RenderRequest:
@@ -87,8 +106,7 @@ def prepare_document(payload: PrepareRequest) -> RenderRequest:
         for item in select_focus(project, available):
             duration = ""
             if item.experience is not None:
-                years = item.experience.months_max // 12
-                duration = f"≈ {years} {'лет' if presentation.source_language == 'ru' else 'years'}" if years else "< 1 года" if presentation.source_language == "ru" else "< 1 year"
+                duration = _duration(item.experience.months_min, presentation.source_language)
             focus.append(FocusItem(label=item.display, duration=duration, icon=item.canonical_id))
     detailed = []
     for job in project.employment:
@@ -103,6 +121,10 @@ def prepare_document(payload: PrepareRequest) -> RenderRequest:
             continue
         if not block.state.text.strip():
             raise ValueError("visible job prose is empty")
+        if len(block.state.text) > 4000:
+            raise PreparationFailure("JOB_DESCRIPTION_TOO_LONG")
+        if len(_period(job, presentation.source_language)) > 100:
+            raise PreparationFailure("JOB_PERIOD_TOO_LONG")
         detailed.append(RenderProject(company=job.employer, period=_period(job, presentation.source_language),
                                       stack="", description=block.state.text, role=job.role,
                                       tasks=[], results=[]))
@@ -115,14 +137,19 @@ def prepare_document(payload: PrepareRequest) -> RenderRequest:
                                           items=[", ".join(format_early_career(row) for row in old_rows)]))
     for block in project.views:
         if block.kind == "education" and block.visible and block.state.text.strip():
-            sidebar.append(SidebarSection(title="ОБРАЗОВАНИЕ", items=[block.state.text]))
+            if len(block.state.text) > 4000:
+                raise PreparationFailure("EDUCATION_TOO_LONG")
+            sidebar.append(SidebarSection(title="ОБРАЗОВАНИЕ" if presentation.source_language == "ru" else "EDUCATION", items=[block.state.text]))
     if presentation.languages:
         sidebar.append(SidebarSection(title="ЯЗЫКИ" if presentation.source_language == "ru" else "LANGUAGES",
                                       items=presentation.languages))
     skills_block = next((block for block in project.views if block.kind == "skills"), None)
     groups = [SkillGroup(title=category.upper(), items=", ".join(items))
               for category, items in group_technologies(project).items()] if skills_block is None or skills_block.visible else []
-    document = RenderDocument(candidate=Candidate(name=presentation.name, title=presentation.title,
+    if profile.visible and len(profile.state.text) > 12000:
+        raise PreparationFailure("PROFILE_TOO_LONG")
+    document = RenderDocument(sourceLanguage=presentation.source_language,
+                              candidate=Candidate(name=presentation.name, title=presentation.title,
                                                    summary=profile.state.text if profile.visible else ""),
                               focus=focus, sidebar=sidebar, projects=detailed, achievements=[],
                               skillGroups=groups, footer="")

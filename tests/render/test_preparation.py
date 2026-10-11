@@ -14,7 +14,7 @@ import pytest
 from pydantic import ValidationError
 import pymupdf
 
-from packages.resume_core.rendering.preparation import PrepareRequest, prepare_document
+from packages.resume_core.rendering.preparation import PreparationFailure, PrepareRequest, prepare_document
 from packages.resume_core.rendering.template import PACKAGE_SHA256, RenderFailure
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -66,6 +66,59 @@ def test_dated_technology_selects_available_icon_and_duration():
     prepared = prepare_document(PrepareRequest.model_validate(data))
     assert [(item.label, item.icon) for item in prepared.document.focus] == [("Python", "python")]
     assert prepared.document.focus[0].duration
+
+
+@pytest.mark.parametrize(("language", "label"), [("en", "Dates not specified"), ("ru", "Даты не указаны")])
+def test_job_without_dates_still_prepares_for_export(language, label):
+    data = example()
+    data["presentation"]["sourceLanguage"] = language
+    data["project"]["employment"][0]["periods"] = []
+    prepared = prepare_document(PrepareRequest.model_validate(data))
+    assert prepared.document.projects[0].period == label
+    assert prepared.document.source_language == language
+
+
+@pytest.mark.parametrize(("index", "length", "code"), [
+    (1, 4001, "JOB_DESCRIPTION_TOO_LONG"), (0, 12001, "PROFILE_TOO_LONG"),
+    (-1, 4001, "EDUCATION_TOO_LONG"),
+])
+def test_visible_text_limit_reports_field_before_document_validation(index, length, code):
+    data = example()
+    data["project"]["views"][index]["state"]["text"] = "x" * length
+    original = deepcopy(data)
+    with pytest.raises(PreparationFailure, match=code):
+        prepare_document(PrepareRequest.model_validate(data))
+    assert data == original
+    data["project"]["views"][index]["state"]["text"] = "x" * (length - 1)
+    prepare_document(PrepareRequest.model_validate(data))
+    data["project"]["views"][index]["visible"] = False
+    data["project"]["views"][index]["state"]["text"] = "x" * length
+    prepare_document(PrepareRequest.model_validate(data))
+
+
+@pytest.mark.parametrize(("language", "start", "end", "precision", "duration"), [
+    ("en", 2020, 2024, "year", "≈ 3 years"),
+    ("ru", 2020, 2020, "month", "≈ 1 год"),
+    ("ru", 2020, 2021, "month", "≈ 2 года"),
+    ("ru", 2020, 2024, "month", "≈ 5 лет"),
+    ("en", 2020, 2020, "month", "≈ 1 year"),
+])
+def test_focus_uses_conservative_duration_and_language_grammar(language, start, end, precision, duration):
+    data = example()
+    data["presentation"]["sourceLanguage"] = language
+    data["project"]["employment"][0]["periods"] = [{
+        "start": {"precision": precision, "year": start, "month": 1 if precision == "month" else None, "day": None},
+        "end": {"precision": precision, "year": end, "month": 12 if precision == "month" else None, "day": None}}]
+    for subproject in data["project"]["employment"][0]["subprojects"]:
+        subproject["period"] = deepcopy(data["project"]["employment"][0]["periods"][0])
+    technology = deepcopy(data["project"]["facts"][1])
+    technology.update(id="job-tech", jobId="job_1")
+    technology["value"]["scope"] = "job"
+    data["project"]["facts"].append(technology)
+    data["project"]["employment"][0]["factIds"].append("job-tech")
+    prepared = prepare_document(PrepareRequest.model_validate(data))
+    assert prepared.document.focus[0].duration == duration
+    assert prepared.document.sidebar[-1].title == ("ОБРАЗОВАНИЕ" if language == "ru" else "EDUCATION")
 
 
 def test_hidden_profile_and_job_are_omitted_but_skills_and_education_remain():
@@ -203,6 +256,7 @@ async def test_prepared_snapshot_converts_to_matching_pdf_and_editable_docx(tmp_
     assert "Synthetic edited summary." in text
     assert "Built a team from zero to five." in text
     assert "Technical Institute, 2018" in text
+    assert all(label in text for label in ("ABOUT ME", "PROJECTS", "Role:", "EDUCATION"))
     with zipfile.ZipFile(io.BytesIO(docx)) as editable:
         assert b"Synthetic edited summary." in editable.read("word/document.xml")
     assert list((tmp_path / "operations").iterdir()) == []

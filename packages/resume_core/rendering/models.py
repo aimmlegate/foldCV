@@ -47,6 +47,7 @@ class SkillGroup(RenderWire):
 
 
 class RenderDocument(RenderWire):
+    source_language: Literal["ru", "en", "mixed"] = "ru"
     candidate: Candidate
     focus: list[FocusItem] = Field(max_length=8)
     sidebar: list[SidebarSection] = Field(max_length=40)

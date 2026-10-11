@@ -55,3 +55,34 @@ def test_partial_requirement_cannot_lose_its_remaining_check() -> None:
     incomplete = {**data["partialChecks"], "F01": {**data["partialChecks"]["F01"], "check": ""}}
     with pytest.raises(SystemExit, match="Incomplete remaining check: F01"):
         assert_partial_checks(data["entries"], incomplete)
+
+
+@pytest.mark.parametrize("scope", ["entry", "foundation"])
+def test_requirement_map_does_not_accept_a_test_name_prefix(monkeypatch, scope) -> None:
+    data = json.loads((ROOT / "tests/requirements.json").read_text())
+    python_nodes = {node for entry in data["entries"] for node in entry["tests"]
+                    if not node.startswith("apps/web/")}
+    python_nodes.update(node for name, node in data["foundation"].items()
+                        if name not in {"browserShell", "prototypeRegressions"})
+    python_nodes.update(PROTOTYPE_TESTS)
+    node = (next(node for node in data["entries"][0]["tests"] if node.startswith("tests/"))
+            if scope == "entry" else data["foundation"]["syntheticSources"])
+    collected = (python_nodes - {node}) | {node + "_extra"}
+    state_names = {node.split("::", 1)[1] for entry in data["entries"] for node in entry["tests"]
+                   if node.startswith("apps/web/unit/")}
+    browser_names = {node.split("::", 1)[0].rsplit("/", 1)[1] + ":1:1 › " + node.split("::", 1)[1]
+                     for entry in data["entries"] for node in entry["tests"] if node.startswith("apps/web/tests/")}
+
+    def run(argv, **kwargs):
+        if "--collect-only" in argv:
+            output = "\n".join(sorted(collected))
+        elif "test:state" in argv:
+            output = "\n".join("# Subtest: " + name for name in state_names) + "\n# fail 0\n"
+        else:
+            output = "\n".join("  " + name for name in browser_names)
+        return subprocess.CompletedProcess(argv, 0, stdout=output)
+
+    monkeypatch.setattr(checks, "require_python", lambda: None)
+    monkeypatch.setattr(checks.subprocess, "run", run)
+    with pytest.raises(SystemExit, match="Missing mapped test|Missing foundation test"):
+        checks.validate_map()
