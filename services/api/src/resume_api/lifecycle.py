@@ -55,7 +55,8 @@ class OperationFiles:
         self.closed = False
         self.cleanup_failed = False
 
-    def spawn(self, executable: Path, arguments: tuple[str, ...], *, capture: bool = True) -> subprocess.Popen[bytes]:
+    def spawn(self, executable: Path, arguments: tuple[str, ...], *, capture: bool = True,
+              environment: dict[str, str] | None = None) -> subprocess.Popen[bytes]:
         """Start one test worker with an ambiguous crash marker before Popen."""
         if self.closed or self.path is None or self.process is not None:
             raise RuntimeError("Operation has no free worker slot")
@@ -63,7 +64,7 @@ class OperationFiles:
         marker.write_text('{"state":"spawning"}', encoding="utf-8")
         try:
             process = subprocess.Popen([str(executable), *arguments], cwd=self.path,
-                                       env=safe_environment(self.path),
+                                       env=environment if environment is not None else safe_environment(self.path),
                                        stdin=subprocess.PIPE if capture else subprocess.DEVNULL,
                                        stdout=subprocess.PIPE if capture else subprocess.DEVNULL,
                                        stderr=subprocess.PIPE if capture else subprocess.DEVNULL,

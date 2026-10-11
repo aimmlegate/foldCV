@@ -87,7 +87,8 @@ class ConnectionPayload(Transport):
     selectedModel: str | None = None
     quota: QuotaPayload = Field(default_factory=lambda: QuotaPayload(state="unknown"))
     metadataReady: bool = False
-    generationReady: Literal[False] = False
+    generationReady: bool = False
+    experimentalMode: bool = False
 
 
 TextRequest = NormalizeRequest | DraftRequest | RewriteRequest

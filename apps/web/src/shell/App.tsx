@@ -410,7 +410,10 @@ export function App() {
     <nav aria-label="Этапы работы" className="flex flex-wrap gap-2 border-b border-outline px-6 py-3">
       {(["import", "editor", "export"] as const).map((stage, index) => <button key={stage} type="button" disabled={stage !== "import" && !project} aria-current={state.stage === stage ? "step" : undefined} onClick={() => send({ type: "stage", stage })} className={state.stage === stage ? primary : control}>{index + 1}. {stage === "import" ? "Загрузка" : stage === "editor" ? "Редактор" : "Выгрузка"}</button>)}
     </nav>
-    <aside className="mx-auto max-w-5xl px-6 pt-4"><div className="ml-auto max-w-md"><ConnectionPanel /></div></aside>
+    <aside className="mx-auto max-w-5xl px-6 pt-4"><div className="ml-auto max-w-md"><ConnectionPanel onReadyChange={(ready) => {
+      setDraftReady(ready);
+      setRewriteReady(ready);
+    }} /></div></aside>
     {state.stage === "import" && <main className="mx-auto max-w-5xl p-6">
       <h1 className="mb-2 text-2xl font-semibold">Из исходника — в готовое резюме</h1>
       <p className="mb-6 text-muted">Выберите исходник для локального извлечения и проверки. Вымышленный пример открывает отдельный редактор.</p>

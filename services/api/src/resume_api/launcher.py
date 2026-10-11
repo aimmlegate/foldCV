@@ -17,6 +17,7 @@ import uvicorn
 from .app import create_app
 from .contracts import HostLaunchOptions
 from .lifecycle import require_supported_host
+from .cli.experimental_profile import BINARY, ExperimentalCliProfile
 
 
 ROOT = Path(__file__).resolve().parents[4]
@@ -34,7 +35,8 @@ def trusted_temp_root() -> Path:
 
 
 async def launch(*, port: int = 0, open_browser: bool = True,
-                 cli_executable: Path | None = None) -> None:
+                 cli_executable: Path | None = None,
+                 experimental_cli: bool = False) -> None:
     require_supported_host()
     dist = ROOT / "apps/web/dist"
     if not (dist / "index.html").is_file():
@@ -46,8 +48,11 @@ async def launch(*, port: int = 0, open_browser: bool = True,
         actual_port = listener.getsockname()[1]
         origin = f"http://127.0.0.1:{actual_port}"
         secret = secrets.token_urlsafe(32)
+        profile = (ExperimentalCliProfile(Path.home() / "Library/Application Support/FoldCV/cli-experiment")
+                   if experimental_cli else None)
         app = create_app(origin=origin, secret=secret, temp_root=temp_root, dist=dist,
-                         cli_executable=cli_executable)
+                         cli_executable=BINARY if profile else cli_executable,
+                         experimental_profile=profile)
         config = uvicorn.Config(app, host="127.0.0.1", port=actual_port, proxy_headers=False,
                                 access_log=False, server_header=False, log_level="critical",
                                 timeout_graceful_shutdown=2)
@@ -88,15 +93,19 @@ def main() -> None:
     parser = argparse.ArgumentParser(description="Run FoldCV locally")
     parser.add_argument("--no-open", action="store_true")
     parser.add_argument("--port", type=int, default=0)
+    parser.add_argument("--experimental-cli", action="store_true")
     parser.add_argument("--codex-executable", type=Path,
                         default=Path(os.environ["FOLDCV_CODEX_EXECUTABLE"]) if os.environ.get("FOLDCV_CODEX_EXECUTABLE") else None)
     options = parser.parse_args()
+    if options.experimental_cli and options.codex_executable is not None:
+        parser.error("--experimental-cli uses the pinned native CLI; omit --codex-executable")
     try:
         selected = HostLaunchOptions(openBrowser=not options.no_open, port=options.port)
     except ValueError:
         parser.error("port must be between 0 and 65535")
     asyncio.run(launch(port=selected.port, open_browser=selected.openBrowser,
-                       cli_executable=options.codex_executable))
+                       cli_executable=options.codex_executable,
+                       experimental_cli=options.experimental_cli))
 
 
 if __name__ == "__main__":

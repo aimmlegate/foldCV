@@ -3,9 +3,10 @@
 This source checkout is verified on **macOS 26.6.2 arm64** (Apple M1 Pro,
 32 GiB RAM). Other macOS versions, Windows, Linux, other chips, and packaged
 installers have not been tested. The local app can import, edit, review, render,
-export and reopen projects without a Codex CLI. Real normalization, drafting and
-rewriting remain closed by [D004](automation/decisions.md); test fixtures are not
-a release model.
+export and reopen projects without a Codex CLI. The default launch keeps real
+normalization, drafting and rewriting closed by [D004](automation/decisions.md).
+The separate personal experiment below is an explicit opt-in under
+[D034](automation/decisions.md).
 
 ## Setup
 
@@ -55,6 +56,34 @@ reviewed profile pins `0.162.0-alpha.2`, so this host remains manual-ready.
 An explicit executable may be passed with `--codex-executable` or the
 `FOLDCV_CODEX_EXECUTABLE` environment variable. Neither changes global CLI
 configuration. CLI login availability would not open D004 by itself.
+
+## Personal CLI experiment
+
+After reviewing the experiment's limits, start the separate mode from this
+checkout:
+
+```sh
+.venv/bin/python tools/run-local.py --experimental-cli
+```
+
+In the opened app, choose **Refresh connection**, then **Sign in with Codex CLI**
+and complete the official ChatGPT browser flow. Refresh again and choose a
+reported model. The default launcher command above remains manual-only. The
+experiment pins the installed native `0.162.0-alpha.17.2` binary by SHA-256;
+`--codex-executable` and `FOLDCV_CODEX_EXECUTABLE` cannot override it. A changed
+binary or missing sandbox stops the mode. `--check --experimental-cli` checks
+the separate profile without generating text.
+
+The experiment uses private `HOME` and `CODEX_HOME` directories under
+`~/Library/Application Support/FoldCV/cli-experiment`. The CLI owns its sign-in
+there; the app never reads or copies the auth file. Detach stops this app's
+active CLI work but keeps that sign-in for the next launch. The macOS sandbox
+denies reads of other user homes, volumes and temporary data, and denies child
+process execution except the pinned CLI (plus the browser opener during sign-in).
+It permits provider networking and required system reads. Built-in CLI tools
+may still be visible to the model, and the CLI may retain prompt or response
+traces in the dedicated profile. Subscription limits and provider retention
+still apply. This mode does not use API keys, Anthropic or a paid API fallback.
 
 ## Data and outputs
 

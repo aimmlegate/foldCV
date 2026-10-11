@@ -13,6 +13,7 @@ import threading
 import time
 
 from resume_api.cli.process_runner import ProcessExit, ProcessRunner
+from resume_api.cli.experimental_profile import ExperimentalCliProfile, ExperimentalProfileError, VERSION as EXPERIMENTAL_VERSION
 from resume_api.lifecycle import OperationFiles, SpikeError
 from resume_api.providers.codex_cli import MODEL, strict_json
 from spikes.cli.profile import VERSION, overrides
@@ -83,11 +84,13 @@ def quota_from_result(raw: object) -> Quota:
 
 class ConnectionAdapter:
     def __init__(self, executable: Path | None = None, *, allow_fixture: bool = False,
-                 node_executable: Path | None = None):
+                 node_executable: Path | None = None,
+                 experimental_profile: ExperimentalCliProfile | None = None):
         selected = executable if executable is not None else shutil.which("codex")
         self.executable = Path(selected).absolute() if selected is not None else None
         self.allow_fixture = allow_fixture
         self.node_executable = node_executable
+        self.experimental_profile = experimental_profile
 
     def _launcher(self) -> tuple[Path, tuple[str, ...]]:
         if self.executable is None or not self.executable.is_file():
@@ -116,8 +119,11 @@ class ConnectionAdapter:
              deadline: float, **kwargs: object) -> tuple[bytes, bytes]:
         launcher, prefix = self._launcher()
         try:
-            return ProcessRunner(launcher).run(files, (*prefix, *args), cancel=cancel,
+            return ProcessRunner(launcher, launch=self.experimental_profile.launch
+                                 if self.experimental_profile is not None else None).run(files, (*prefix, *args), cancel=cancel,
                                                       deadline=deadline, **kwargs)
+        except ExperimentalProfileError as error:
+            raise ConnectionFailure(str(error)) from None
         except ProcessExit as error:
             if args == ("login", "status") and (error.stdout + error.stderr).strip().lower() == b"not logged in":
                 raise ConnectionFailure("LOGIN_REQUIRED") from None
@@ -133,7 +139,8 @@ class ConnectionAdapter:
             version = raw.decode("utf-8", "strict").strip()
         except UnicodeError:
             raise ConnectionFailure("UNSUPPORTED_VERSION") from None
-        if len(version) > 80 or version != VERSION and not (self.allow_fixture and version == VERSION + "-fixture"):
+        expected = EXPERIMENTAL_VERSION if self.experimental_profile is not None else VERSION
+        if len(version) > 80 or version != expected and not (self.allow_fixture and version == VERSION + "-fixture"):
             raise ConnectionFailure("UNSUPPORTED_VERSION", version if len(version) <= 80 else None)
         return version
 
@@ -223,7 +230,9 @@ class ConnectionAdapter:
                 return b""
             raise ConnectionFailure("METADATA_FAILED")
 
-        self._run(files, ("app-server", "--strict-config", *overrides(files.path)), cancel, deadline,
+        config = (self.experimental_profile.config(files.path) if self.experimental_profile is not None
+                  else overrides(files.path))
+        self._run(files, ("app-server", "--strict-config", *config), cancel, deadline,
                   data=request(0, "initialize", {"clientInfo": {"name": "foldcv", "version": "0.1.0"}}),
                   on_line=accept, interactive=True)
         if stage != 4:

@@ -10,7 +10,7 @@ const messages: Record<ConnectionView["snapshot"]["state"], string> = {
   detached: "Disconnected from this app. Your CLI sign-in stays in place.",
   cli_missing: "Codex CLI was not found. Install it, or start the local service with FOLDCV_CODEX_EXECUTABLE set to its path.",
   launcher_unsupported: "This CLI needs Node to start. Install Node, then restart the local service so it can find Node, and refresh.",
-  unsupported_version: "This CLI version is not supported. Configure the tested 0.162.0-alpha.2 version and refresh.",
+  unsupported_version: "This CLI version is not supported by this service mode.",
   login_required: "Sign in with ChatGPT through the Codex CLI to check your plan and models.",
   api_key_mode: "The CLI is using an API key. This app requires a ChatGPT subscription login.",
   metadata_failed: "The CLI could not report account or model details. Check the CLI and try again.",
@@ -22,12 +22,15 @@ const messages: Record<ConnectionView["snapshot"]["state"], string> = {
   cleanup_blocked: "Could not confirm that the CLI operation stopped safely. Restart the local service after checking it.",
 };
 
-export function ConnectionPanel() {
+export function ConnectionPanel({ onReadyChange }: { onReadyChange?: (ready: boolean) => void }) {
   const [view, setView] = useState<ConnectionView>({ snapshot: { state: "unchecked", version: null,
     plan: null, models: [], selectedModel: null, quota: { state: "unknown", usedPercent: null, resetsAt: null },
-    metadataReady: false, generationReady: false }, pending: false, detaching: false, error: null });
+    metadataReady: false, generationReady: false, experimentalMode: false }, pending: false, detaching: false, error: null });
   const workflowRef = useRef<ConnectionWorkflow | null>(null);
-  if (!workflowRef.current) workflowRef.current = new ConnectionWorkflow(setView);
+  if (!workflowRef.current) workflowRef.current = new ConnectionWorkflow((next) => {
+    setView(next);
+    onReadyChange?.(next.snapshot.generationReady);
+  });
   const workflow = workflowRef.current;
   useEffect(() => () => workflow.close(), [workflow]);
   const { snapshot } = view;
@@ -57,7 +60,10 @@ export function ConnectionPanel() {
         {snapshot.quota.usedPercent !== null ? ` · ${snapshot.quota.usedPercent}% used` : ""}
         {snapshot.quota.resetsAt !== null ? ` · resets ${new Date(snapshot.quota.resetsAt * 1000).toLocaleString()}` : ""}</p>
     </div>}
-    <p className="mt-4 border-l-4 border-danger pl-3 text-sm text-danger">Generation is unavailable: this CLI profile has not passed the safety check.</p>
+    {snapshot.experimentalMode ? <p className="mt-4 border-l-4 border-accent pl-3 text-sm">
+      {snapshot.generationReady ? "Personal CLI experiment is ready." : "Personal CLI experiment: sign in, refresh, and choose a model to enable generation."}
+      {" "}Uses your ChatGPT subscription; provider retention applies. The native CLI may expose built-in tools to the model and retain prompt or response traces. Dedicated sign-in and state persist after Detach.
+    </p> : <p className="mt-4 border-l-4 border-danger pl-3 text-sm text-danger">Generation is unavailable: this CLI profile has not passed the safety check.</p>}
     <p className="mt-3 text-xs text-muted">Need setup? <a className="underline" href="https://developers.openai.com/codex/cli" target="_blank" rel="noreferrer">Install Codex CLI</a> · <a className="underline" href="https://learn.chatgpt.com/docs/auth" target="_blank" rel="noreferrer">Sign-in guide</a></p>
   </section>;
 }

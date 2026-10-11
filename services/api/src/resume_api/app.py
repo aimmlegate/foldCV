@@ -27,6 +27,11 @@ from .contracts import (CompletedEvent, CompletedPayload, ConnectionPayload, Dra
                         StartedPayload, TextRequest, UsagePayload)
 from .lifecycle import OperationFiles, SpikeError, has_blocked_owned, reap_owned
 from .connection import ConnectionAdapter, ConnectionFailure, Metadata
+from .cli.experimental_profile import BINARY, ExperimentalCliProfile
+from .providers.codex_cli import CodexCliProvider
+from .normalization_content import NormalizationContentService
+from .drafting_content import DraftingContentService
+from .rewriting_content import RewritingContentService
 from .rendering import DocumentRenderer
 from .extracting import MAX_BODY as MAX_EXTRACT_BODY, UploadFailure, parse_one_part, run_extract
 from packages.resume_core.rendering.template import PACKAGE_SHA256, ROOT as TEMPLATE_ROOT, MANIFEST as TEMPLATE_MANIFEST, RenderFailure, renderer_sha256, require_template
@@ -222,13 +227,17 @@ class LocalBoundary:
 def create_app(*, origin: str, secret: str, temp_root: Path, dist: Path, runner: SyntheticRunner | None = None,
                cli_executable: Path | None = None, connection_adapter: ConnectionAdapter | None = None,
                semantic_runner: SemanticRunner | None = None, draft_runner: ProseDraftRunner | None = None,
-               rewrite_runner: ProseRewriteRunner | None = None, fixture_generation_ready: bool = False):
+               rewrite_runner: ProseRewriteRunner | None = None, fixture_generation_ready: bool = False,
+               experimental_profile: ExperimentalCliProfile | None = None):
     if not origin.startswith("http://127.0.0.1:") or not origin.rsplit(":", 1)[-1].isdigit():
         raise ValueError("A concrete IPv4 loopback origin is required")
     if len(secret) < 32:
         raise ValueError("Startup secret is too short")
     if fixture_generation_ready and (semantic_runner is None or draft_runner is None):
         raise ValueError("Fixture generation requires both injected runners")
+    if experimental_profile is not None and (fixture_generation_ready or any(
+            runner is not None for runner in (semantic_runner, draft_runner, rewrite_runner))):
+        raise ValueError("Experimental CLI cannot use injected generation runners")
     reap_owned(temp_root)
     blocked_on_start = has_blocked_owned(temp_root)
     operations: dict[asyncio.Task, OperationFiles] = {}
@@ -255,9 +264,32 @@ def create_app(*, origin: str, secret: str, temp_root: Path, dist: Path, runner:
     unsafe_cleanup = blocked_on_start
     gate = asyncio.Lock()
     document_renderer = DocumentRenderer()
-    connection = connection_adapter or ConnectionAdapter(cli_executable)
+    connection = connection_adapter or ConnectionAdapter(BINARY if experimental_profile else cli_executable,
+                                                          experimental_profile=experimental_profile)
+    provider = (CodexCliProvider(BINARY, experimental_profile=experimental_profile)
+                if experimental_profile else None)
     connection_state = ConnectionPayload(state="unchecked")
     connection_epoch = 0
+
+    def experimental_authorized() -> bool:
+        return (experimental_profile is not None and not unsafe_cleanup
+                and connection_state.state == "connected" and connection_state.metadataReady
+                and connection_state.quota.state == "available"
+                and connection_state.selectedModel in connection_state.models)
+
+    def experimental_ready() -> bool:
+        return (experimental_authorized()
+                and not any(not task.done() for task in connection_work))
+
+    def accepted_operation_valid(epoch: int) -> bool:
+        return experimental_profile is not None and epoch == connection_epoch and not unsafe_cleanup
+
+    def selected_runner(kind: str):
+        if not experimental_ready() or provider is None or connection_state.selectedModel is None:
+            return None
+        service = {"normalize": NormalizationContentService, "draft": DraftingContentService,
+                   "rewrite": RewritingContentService}[kind]
+        return service(provider, connection_state.selectedModel)
 
     def lifecycle_code(error: SpikeError) -> str:
         nonlocal unsafe_cleanup
@@ -382,12 +414,14 @@ def create_app(*, origin: str, secret: str, temp_root: Path, dist: Path, runner:
             ready = False
         return JSONResponse({
             "appVersion": "0.1.0", "projectSchemaVersion": 3, "transportVersion": 1,
-            "generationReady": fixture_generation_ready, "rewriteReady": rewrite_runner is not None,
+            "generationReady": fixture_generation_ready or experimental_ready(),
+            "rewriteReady": rewrite_runner is not None or experimental_ready(),
             "renderers": ["docx", "pdf"] if ready else [],
             "formats": ["docx", "pdf"] if ready else [],
             "templates": [{"id": "generic", "version": "1.0.0", "packageSha256": PACKAGE_SHA256}] if ready else [],
             "rendererSha256": renderer_sha256() if ready else None,
-            "providers": [{"kind": "codex_cli", "ready": False, "reason": "CLI_PROFILE_UNSAFE"}],
+            "providers": [{"kind": "codex_cli", "ready": bool(experimental_ready()),
+                           "reason": None if experimental_ready() else "CLI_PROFILE_UNSAFE"}],
             "limits": {"maxBodyBytes": MAX_BODY, "maxTextOperations": MAX_OPERATIONS,
                        "maxConcurrent": MAX_CONCURRENT, "timeoutSeconds": TIMEOUT_SECONDS,
                        "maxExtractBodyBytes": MAX_EXTRACT_BODY},
@@ -484,7 +518,9 @@ def create_app(*, origin: str, secret: str, temp_root: Path, dist: Path, runner:
 
     async def normalize_facts(payload: FactRequest):
         nonlocal active, count
-        if semantic_runner is None:
+        active_runner = semantic_runner or selected_runner("normalize")
+        runner_epoch = connection_epoch
+        if active_runner is None:
             return problem("CLI_PROFILE_UNSAFE", 503, "normalize")
         try:
             semantic_input(literal_sheet(payload), payload)
@@ -513,7 +549,9 @@ def create_app(*, origin: str, secret: str, temp_root: Path, dist: Path, runner:
 
             def execute():
                 with files.open():
-                    return semantic_runner.run(payload, files, cancel)
+                    if experimental_profile and not accepted_operation_valid(runner_epoch):
+                        raise SpikeError("CLI_PROFILE_UNSAFE")
+                    return active_runner.run(payload, files, cancel)
 
             task = asyncio.create_task(asyncio.to_thread(execute))
             operations[task] = files
@@ -524,6 +562,8 @@ def create_app(*, origin: str, secret: str, temp_root: Path, dist: Path, runner:
                                    "baseRevision": payload.base_revision, "type": "operation.started",
                                    "payload": {"stage": "normalize"}}) + "\n").encode()
                 sheet, usage = await asyncio.wait_for(asyncio.shield(task), timeout=TIMEOUT_SECONDS)
+                if experimental_profile and not accepted_operation_valid(runner_epoch):
+                    raise SpikeError("CANCELLED")
                 sheet = FactSheet.model_validate(sheet.model_dump(mode="json", by_alias=True))
                 expected_units = {(source.result.source_id, unit.id) for source in payload.sources for unit in source.result.units}
                 expected_units.update((source.result.source_id, f"gap:{index}") for source in payload.sources
@@ -562,7 +602,9 @@ def create_app(*, origin: str, secret: str, temp_root: Path, dist: Path, runner:
 
     async def draft_facts(payload: ProseDraftRequest):
         nonlocal active, count
-        if draft_runner is None:
+        active_runner = draft_runner or selected_runner("draft")
+        runner_epoch = connection_epoch
+        if active_runner is None:
             return problem("CLI_PROFILE_UNSAFE", 503, "draft")
         try:
             draft_input(payload)
@@ -591,7 +633,9 @@ def create_app(*, origin: str, secret: str, temp_root: Path, dist: Path, runner:
 
             def execute():
                 with files.open():
-                    return draft_runner.run(payload, files, cancel)
+                    if experimental_profile and not accepted_operation_valid(runner_epoch):
+                        raise SpikeError("CLI_PROFILE_UNSAFE")
+                    return active_runner.run(payload, files, cancel)
 
             task = asyncio.create_task(asyncio.to_thread(execute))
             operations[task] = files
@@ -602,6 +646,8 @@ def create_app(*, origin: str, secret: str, temp_root: Path, dist: Path, runner:
                                    "baseRevision": payload.base_revision, "type": "operation.started",
                                    "payload": {"stage": "draft"}}) + "\n").encode()
                 draft, usage = await asyncio.wait_for(asyncio.shield(task), timeout=TIMEOUT_SECONDS)
+                if experimental_profile and not accepted_operation_valid(runner_epoch):
+                    raise SpikeError("CANCELLED")
                 draft = ProseDraftResult.model_validate(draft.model_dump(mode="json", by_alias=True))
                 if draft.source_fingerprint != payload.source_fingerprint or draft.base_revision != payload.base_revision:
                     raise ValueError("stale draft")
@@ -636,7 +682,9 @@ def create_app(*, origin: str, secret: str, temp_root: Path, dist: Path, runner:
 
     async def rewrite_facts(payload: ScopedRewriteRequest):
         nonlocal active, count
-        if rewrite_runner is None:
+        active_runner = rewrite_runner or selected_runner("rewrite")
+        runner_epoch = connection_epoch
+        if active_runner is None:
             return problem("CLI_PROFILE_UNSAFE", 503, "rewrite")
         try:
             rewrite_input(payload)
@@ -672,7 +720,9 @@ def create_app(*, origin: str, secret: str, temp_root: Path, dist: Path, runner:
 
             def execute():
                 with files.open():
-                    return rewrite_runner.run(payload, files, cancel)
+                    if experimental_profile and not accepted_operation_valid(runner_epoch):
+                        raise SpikeError("CLI_PROFILE_UNSAFE")
+                    return active_runner.run(payload, files, cancel)
 
             task = asyncio.create_task(asyncio.to_thread(execute))
             operations[task] = files
@@ -683,6 +733,8 @@ def create_app(*, origin: str, secret: str, temp_root: Path, dist: Path, runner:
                                    "baseRevision": payload.base_revision, "type": "operation.started",
                                    "payload": {"stage": "rewrite"}}) + "\n").encode()
                 rewritten, usage = await asyncio.wait_for(asyncio.shield(task), timeout=TIMEOUT_SECONDS)
+                if experimental_profile and not accepted_operation_valid(runner_epoch):
+                    raise SpikeError("CANCELLED")
                 rewritten = ScopedRewriteResult.model_validate(rewritten.model_dump(mode="json", by_alias=True))
                 if (rewritten.block_id != payload.block_id or rewritten.block_revision != payload.block_revision or
                         rewritten.dependency_hash != payload.dependency_hash or rewritten.base_revision != payload.base_revision):
@@ -780,7 +832,9 @@ def create_app(*, origin: str, secret: str, temp_root: Path, dist: Path, runner:
     login_task: asyncio.Task | None = None
 
     def connection_response() -> JSONResponse:
-        return JSONResponse(connection_state.model_dump(), headers={"Cache-Control": "no-store"})
+        state = connection_state.model_copy(update={"experimentalMode": experimental_profile is not None,
+                                                    "generationReady": experimental_ready()})
+        return JSONResponse(state.model_dump(), headers={"Cache-Control": "no-store"})
 
     async def connection_job(kind: str, work):
         nonlocal active, connection_epoch, connection_state, login_task
@@ -890,8 +944,11 @@ def create_app(*, origin: str, secret: str, temp_root: Path, dist: Path, runner:
             connection_epoch += 1
             connection_state = ConnectionPayload(state="detached")
             current = list(connection_work.items())
+            generating = list(semantic_work.items())
         codes = await asyncio.gather(*(stop_connection(task, files, cancel)
-                                       for task, (files, cancel) in current))
+                                       for task, (files, cancel) in current),
+                                     *(stop_semantic(task, files, cancel)
+                                       for task, (files, cancel) in generating))
         if any(code is not None for code in codes) or unsafe_cleanup:
             connection_state = ConnectionPayload(state="cleanup_blocked")
         return connection_response()

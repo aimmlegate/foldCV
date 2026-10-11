@@ -26,9 +26,12 @@ class ProcessExit(SpikeError):
 
 
 class ProcessRunner:
-    def __init__(self, executable: Path, *, clock: Callable[[], float] = time.monotonic):
+    def __init__(self, executable: Path, *, clock: Callable[[], float] = time.monotonic,
+                 launch: Callable[[Path, tuple[str, ...], Path],
+                                  tuple[Path, tuple[str, ...], dict[str, str]]] | None = None):
         self.executable = executable
         self.clock = clock
+        self.launch = launch
 
     def run(self, files: OperationFiles, arguments: tuple[str, ...], *, data: bytes = b"",
             deadline: float, cancel: threading.Event,
@@ -44,7 +47,10 @@ class ProcessRunner:
         line = bytearray()
         close_input = not interactive
         try:
-            process = files.spawn(self.executable, arguments)
+            executable, args, environment = (self.launch(self.executable, arguments, files.path)
+                                             if self.launch is not None and files.path is not None
+                                             else (self.executable, arguments, None))
+            process = files.spawn(executable, args, environment=environment)
             assert process.stdin is not None and process.stdout is not None and process.stderr is not None
             with selectors.DefaultSelector() as selector:
                 for stream, kind in ((process.stdin, "stdin"), (process.stdout, "stdout"), (process.stderr, "stderr")):

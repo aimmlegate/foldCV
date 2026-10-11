@@ -146,9 +146,32 @@ def check_cli(executable: Path | None = None) -> str:
         return "CLI metadata unavailable; manual editing and rendering are ready."
 
 
-def preflight(executable: Path | None = None) -> str:
+def check_experimental_cli() -> str:
+    from resume_api.cli.experimental_profile import BINARY, ExperimentalCliProfile
+    from resume_api.connection import ConnectionAdapter, ConnectionFailure
+    from resume_api.launcher import trusted_temp_root
+    from resume_api.lifecycle import OperationFiles, SpikeError
+
+    profile = ExperimentalCliProfile(Path.home() / "Library/Application Support/FoldCV/cli-experiment")
+    try:
+        with OperationFiles(trusted_temp_root()).open() as files:
+            metadata = ConnectionAdapter(BINARY, experimental_profile=profile).inspect(files, threading.Event())
+        return f"Personal CLI profile ready ({metadata.version}); choose a model in the app."
+    except ConnectionFailure as error:
+        if error.code in {"PROCESS_CLEANUP_FAILED", "CLEANUP_FAILED"}:
+            raise ReadinessError("CLI process cleanup failed; inspect owned operations before launching.") from None
+        if error.code == "LOGIN_REQUIRED":
+            return "Personal CLI profile ready; separate ChatGPT sign-in is required in the app."
+        raise ReadinessError(f"Personal CLI profile unavailable ({error.code}); use the default manual mode.") from None
+    except SpikeError as error:
+        if error.code in {"PROCESS_CLEANUP_FAILED", "CLEANUP_FAILED"}:
+            raise ReadinessError("CLI process cleanup failed; inspect owned operations before launching.") from None
+        raise ReadinessError(f"Personal CLI profile unavailable ({error.code}); use the default manual mode.") from None
+
+
+def preflight(executable: Path | None = None, *, experimental_cli: bool = False) -> str:
     check_local()
-    return check_cli(executable)
+    return check_experimental_cli() if experimental_cli else check_cli(executable)
 
 
 def main() -> None:

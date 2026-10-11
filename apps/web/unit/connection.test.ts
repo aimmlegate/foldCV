@@ -4,7 +4,8 @@ import { ConnectionWorkflow, validConnection } from "../src/connection/workflow"
 
 const ready = { state: "connected", version: "codex-cli 0.162.0-alpha.2", plan: "plus",
   models: ["gpt-6-luna"], selectedModel: null,
-  quota: { state: "available", usedPercent: 25, resetsAt: 1800000000 }, metadataReady: true, generationReady: false };
+  quota: { state: "available", usedPercent: 25, resetsAt: 1800000000 }, metadataReady: true,
+  generationReady: false, experimentalMode: false };
 
 function response(body: object): Response {
   return new Response(JSON.stringify(body), { status: 200, headers: { "Content-Type": "application/json" } });
@@ -13,6 +14,8 @@ function response(body: object): Response {
 test("connection response rejects arbitrary models, quotas and production readiness", () => {
   assert.equal(validConnection(ready), true);
   assert.equal(validConnection({ ...ready, generationReady: true }), false);
+  assert.equal(validConnection({ ...ready, experimentalMode: true, selectedModel: "gpt-6-luna",
+    generationReady: true }), true);
   assert.equal(validConnection({ ...ready, models: ["evil command --flag"] }), false);
   assert.equal(validConnection({ ...ready, selectedModel: "other" }), false);
   assert.equal(validConnection({ ...ready, quota: { ...ready.quota, usedPercent: Infinity } }), false);

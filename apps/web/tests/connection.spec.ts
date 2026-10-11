@@ -3,7 +3,25 @@ import { expect, test } from "@playwright/test";
 const ready = { state: "connected", version: "codex-cli 0.162.0-alpha.2", plan: "plus",
   models: ["gpt-6-luna", "gpt-6-sol"], selectedModel: null,
   quota: { state: "available", usedPercent: 25, resetsAt: 1800000000 },
-  metadataReady: true, generationReady: false };
+  metadataReady: true, generationReady: false, experimentalMode: false };
+
+test("experimental readiness follows selection and detach", async ({ page }) => {
+  const experimental = { ...ready, version: "codex-cli 0.162.0-alpha.17.2", experimentalMode: true };
+  await page.route("**/v1/host/**", async (route) => {
+    const path = new URL(route.request().url()).pathname;
+    const body = path.endsWith("/detach") ? { ...experimental, state: "detached", models: [],
+      selectedModel: null, metadataReady: false, generationReady: false } : path.endsWith("/select") ?
+      { ...experimental, selectedModel: "gpt-6-luna", generationReady: true } : experimental;
+    await route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(body) });
+  });
+  await page.goto("/");
+  await page.getByRole("button", { name: "Refresh connection" }).click();
+  await expect(page.getByText("Personal CLI experiment: sign in, refresh, and choose a model to enable generation.", { exact: false })).toBeVisible();
+  await page.getByLabel("Reported model").selectOption("gpt-6-luna");
+  await expect(page.getByText("Personal CLI experiment is ready.", { exact: false })).toBeVisible();
+  await page.getByRole("button", { name: "Detach" }).click();
+  await expect(page.getByText("Personal CLI experiment: sign in, refresh, and choose a model to enable generation.", { exact: false })).toBeVisible();
+});
 
 test("connection checks and selection require clicks; detach keeps editor work", async ({ page }) => {
   let hostCalls = 0;

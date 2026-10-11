@@ -10,7 +10,8 @@ export type ConnectionSnapshot = {
   selectedModel: string | null;
   quota: { state: "unknown" | "available" | "exhausted"; usedPercent: number | null; resetsAt: number | null };
   metadataReady: boolean;
-  generationReady: false;
+  generationReady: boolean;
+  experimentalMode: boolean;
 };
 
 export type ConnectionView = { snapshot: ConnectionSnapshot; pending: boolean; detaching: boolean; error: string | null };
@@ -20,7 +21,8 @@ const states = new Set<ConnectionState>(["unchecked", "detached", "cli_missing",
   "login_failed", "cleanup_blocked"]);
 const model = /^[a-zA-Z0-9][a-zA-Z0-9._-]{0,79}$/;
 const initial: ConnectionSnapshot = { state: "unchecked", version: null, plan: null, models: [], selectedModel: null,
-  quota: { state: "unknown", usedPercent: null, resetsAt: null }, metadataReady: false, generationReady: false };
+  quota: { state: "unknown", usedPercent: null, resetsAt: null }, metadataReady: false,
+  generationReady: false, experimentalMode: false };
 
 function record(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
@@ -34,7 +36,10 @@ export function validConnection(value: unknown): value is ConnectionSnapshot {
       !value.models.every((entry: unknown) => typeof entry === "string" && model.test(entry)) ||
       new Set(value.models).size !== value.models.length ||
       !(value.selectedModel === null || (typeof value.selectedModel === "string" && value.models.includes(value.selectedModel))) ||
-      typeof value.metadataReady !== "boolean" || value.generationReady !== false || !record(value.quota)) return false;
+      typeof value.metadataReady !== "boolean" || typeof value.generationReady !== "boolean" ||
+      typeof value.experimentalMode !== "boolean" || !record(value.quota)) return false;
+  if (value.generationReady && (!value.experimentalMode || value.state !== "connected" || !value.metadataReady ||
+      value.selectedModel === null || value.quota.state !== "available")) return false;
   const quota = value.quota;
   return ["unknown", "available", "exhausted"].includes(String(quota.state)) &&
     (quota.usedPercent === null || (typeof quota.usedPercent === "number" && Number.isFinite(quota.usedPercent) && quota.usedPercent >= 0 && quota.usedPercent <= 100)) &&
@@ -86,7 +91,8 @@ export class ConnectionWorkflow {
     const epoch = this.epoch;
     const abort = new AbortController();
     this.abort = abort;
-    this.publish({ ...this.view, pending: true, error: null });
+    this.publish({ ...this.view, snapshot: { ...this.view.snapshot, generationReady: false },
+      pending: true, error: null });
     try {
       const snapshot = await this.post(path, body, abort.signal);
       if (epoch !== this.epoch) return;

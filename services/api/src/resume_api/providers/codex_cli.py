@@ -15,6 +15,7 @@ from typing import Callable
 from pydantic import BaseModel, ValidationError
 
 from resume_api.cli.process_runner import ProcessExit, ProcessRunner
+from resume_api.cli.experimental_profile import ExperimentalCliProfile, ExperimentalProfileError, VERSION as EXPERIMENTAL_VERSION
 from resume_api.lifecycle import OperationFiles, SpikeError
 from resume_api.providers.content import (ContentFailure, ContentInput, ContentResult,
                                           ReportedUsage, ResultT)
@@ -170,14 +171,17 @@ class FixtureTransport:
 class CodexCliProvider:
     def __init__(self, executable: Path | None = None, *,
                  fixture_transport: FixtureTransport | None = None,
+                 experimental_profile: ExperimentalCliProfile | None = None,
                  clock: Callable[[], float] = time.monotonic):
         resolved = executable or shutil.which("codex")
         if resolved is None:
             raise ContentFailure("CLI_MISSING")
         self.executable = Path(resolved).absolute()
         self.fixture_transport = fixture_transport
+        self.experimental_profile = experimental_profile
         self.clock = clock
-        self.process = ProcessRunner(self.executable, clock=clock)
+        self.process = ProcessRunner(self.executable, clock=clock,
+                                     launch=experimental_profile.launch if experimental_profile else None)
 
     def _run(self, files: OperationFiles, args: tuple[str, ...], deadline: float,
              cancel: threading.Event, *, login_status: bool = False,
@@ -190,6 +194,8 @@ class CodexCliProvider:
             raise ContentFailure("CLI_FAILED") from None
         except SpikeError as error:
             raise ContentFailure(error.code) from None
+        except ExperimentalProfileError as error:
+            raise ContentFailure(str(error)) from None
 
     def probe(self, files: OperationFiles, cancel: threading.Event, *, deadline: float | None = None) -> Probe:
         end = deadline if deadline is not None else self.clock() + 15
@@ -198,7 +204,8 @@ class CodexCliProvider:
             version = version_raw.decode("utf-8", "strict").strip()
         except UnicodeError:
             raise ContentFailure("CLI_UNSUPPORTED") from None
-        if version not in {VERSION, FIXTURE_VERSION}:
+        expected = {EXPERIMENTAL_VERSION} if self.experimental_profile else {VERSION, FIXTURE_VERSION}
+        if version not in expected:
             raise ContentFailure("CLI_UNSUPPORTED")
         help_raw, _ = self._run(files, ("exec", "--help"), end, cancel)
         if any(flag.encode() not in help_raw for flag in REQUIRED_FLAGS):
@@ -212,7 +219,9 @@ class CodexCliProvider:
         fixture_ready = (self.fixture_transport is not None
                          and self.fixture_transport.executable.absolute() == self.executable
                          and version == FIXTURE_VERSION)
-        return Probe(version, "chatgpt", fixture_ready, () if fixture_ready else GAPS)
+        experimental_ready = self.experimental_profile is not None and version == EXPERIMENTAL_VERSION
+        return Probe(version, "chatgpt", fixture_ready or experimental_ready,
+                     () if fixture_ready or experimental_ready else GAPS)
 
     def list_models(self, files: OperationFiles, cancel: threading.Event, *, deadline: float | None = None) -> tuple[str, ...]:
         end = deadline if deadline is not None else self.clock() + 15
@@ -263,7 +272,9 @@ class CodexCliProvider:
 
         if files.path is None:
             raise ContentFailure("TEMP_FAILED")
-        self._run(files, ("app-server", "--strict-config", *overrides(files.path)), end, cancel,
+        config = (self.experimental_profile.config(files.path) if self.experimental_profile
+                  else overrides(files.path))
+        self._run(files, ("app-server", "--strict-config", *config), end, cancel,
                   data=request(0, "initialize", {"clientInfo": {"name": "foldcv", "version": "0.1.0"}}),
                   on_line=accept, interactive=True)
         if state["id"] != 3:
@@ -329,7 +340,9 @@ class CodexCliProvider:
                 attempts += 1
                 try:
                     try:
-                        output, errors = self._run(files, tuple(exec_arguments(files.path, policy.model)), deadline, cancel,
+                        args = (self.experimental_profile.exec_arguments(files.path, policy.model)
+                                if self.experimental_profile else tuple(exec_arguments(files.path, policy.model)))
+                        output, errors = self._run(files, args, deadline, cancel,
                                                    data=prompt, on_line=events.accept,
                                                    max_output=policy.max_total_output_bytes - consumed_output)
                     finally:
