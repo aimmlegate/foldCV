@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+from copy import deepcopy
 import json
 import os
 from pathlib import Path
@@ -19,9 +20,12 @@ from resume_api.rendering import DocumentRenderer
 from resume_api.lifecycle import SpikeError
 from resume_api import lifecycle
 from resume_api.contracts import NormalizeResult, UsagePayload
+from packages.resume_core.rendering.models import snapshot_digest
+from packages.resume_core.rendering.preparation import PrepareRequest, prepare_document
 
 ROOT = Path(__file__).resolve().parents[2]
 REQUEST = json.loads((ROOT / "contracts/examples/render_request.json").read_text(encoding="utf-8"))
+PREPARE = json.loads((ROOT / "contracts/examples/prepare_request.json").read_text(encoding="utf-8"))
 ORIGIN = "http://127.0.0.1:39279"
 SECRET = "synthetic-render-secret-01234567890123"
 
@@ -31,6 +35,47 @@ def make_app(tmp_path, runner=None):
     dist.mkdir(exist_ok=True)
     (dist / "index.html").write_text("synthetic shell")
     return create_app(origin=ORIGIN, secret=SECRET, temp_root=tmp_path / "operations", dist=dist, runner=runner)
+
+
+@pytest.mark.parametrize(("private", "section"), [
+    ("Built a tool. Call 555-123-4567.", "JOB"),
+    ("Portfolio: alice.dev", "PROFILE"),
+    ("Website: alice.com", "PROFILE"),
+    ("LinkedIn: linkedin.com", "PROFILE"),
+])
+@pytest.mark.asyncio
+async def test_private_visible_output_stops_prepare_and_direct_render_before_worker(tmp_path, monkeypatch, private, section):
+    calls = []
+
+    async def forbidden_render(self, request, files):
+        calls.append(request)
+        raise AssertionError("renderer must not start")
+
+    monkeypatch.setattr(DocumentRenderer, "render", forbidden_render)
+    app = make_app(tmp_path)
+    async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url=ORIGIN) as client:
+        await client.post("/v1/session/exchange", headers={"Origin": ORIGIN}, json={"secret": SECRET})
+        unsafe = deepcopy(PREPARE)
+        unsafe["project"]["views"][1 if section == "JOB" else 0]["state"]["text"] = private
+        rejected = await client.post("/v1/prepare-render", headers={"Origin": ORIGIN}, json=unsafe)
+        assert rejected.status_code == 422
+        assert rejected.json()["error"]["code"] == f"PRIVATE_OUTPUT_{section}"
+        assert private not in rejected.text
+        assert unsafe["project"]["views"][1 if section == "JOB" else 0]["state"]["text"] == private
+
+        direct = prepare_document(PrepareRequest.model_validate(PREPARE))
+        if section == "JOB":
+            direct.document.projects[0].description = private
+        else:
+            direct.document.candidate.summary = private
+        direct.snapshot.snapshot_sha256 = snapshot_digest(direct)
+        blocked = await client.post("/v1/render", headers={"Origin": ORIGIN},
+                                    json=direct.model_dump(mode="json", by_alias=True))
+        assert blocked.status_code == 422
+        assert blocked.json()["error"]["code"] == f"PRIVATE_OUTPUT_{section}"
+        assert private not in blocked.text
+    assert calls == []
+    assert list((tmp_path / "operations").iterdir()) == []
 
 
 @pytest.mark.asyncio

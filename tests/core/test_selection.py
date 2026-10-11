@@ -155,6 +155,17 @@ def test_unknown_and_versioned_skills_are_grouped_without_changing_facts() -> No
     assert project.model_dump() == before
 
 
+def test_manual_global_skill_uses_catalog_group_without_dated_focus() -> None:
+    data = copy.deepcopy(EXAMPLE)
+    skill = copy.deepcopy(data["facts"][1])
+    skill.update(id="manual-python", origin="user", evidence=[], jobId=None, subprojectId=None)
+    skill["value"].update(canonicalId="unknown_user_0", display="Python 3.11", scope="global")
+    data["facts"].append(skill)
+    project = Project.model_validate(data)
+    assert "Python 3.11" in group_technologies(project)["language"]
+    assert all(item.canonical_id != "unknown_user_0" for item in select_focus(project, {"devicon/python.png"}))
+
+
 def test_early_career_uses_exact_cutoff_and_approved_labels() -> None:
     data = copy.deepcopy(EXAMPLE)
     data["employment"][0]["periods"][0]["end"] = {"precision": "day", "year": 2011, "month": 10, "day": 9}

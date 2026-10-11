@@ -87,7 +87,7 @@ class RenderSpikeTests(unittest.TestCase):
                                 self.assertGreaterEqual(box.y0, 0)
                                 self.assertLessEqual(box.x1, page.rect.width)
                                 self.assertLessEqual(box.y1, page.rect.height)
-                    self.assertIn("contact@example.invalid", page.get_text())
+                    self.assertIn("Synthetic local document", page.get_text())
                     self.assertTrue((BASELINES / f"{stem}-{number:02d}.png").is_file())
 
     def test_page_images_match_reviewed_baselines(self) -> None:

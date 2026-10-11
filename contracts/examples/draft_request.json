@@ -1,0 +1,159 @@
+{
+  "asOf": {
+    "day": 11,
+    "month": 10,
+    "precision": "day",
+    "year": 2026
+  },
+  "baseRevision": 1,
+  "sheet": {
+    "candidates": [
+      {
+        "canonicalId": "python",
+        "confident": true,
+        "id": "candidate_407787469c9fc61315925d43",
+        "kind": "technology",
+        "sourceId": "source_029a1a189373c9f199247ba6",
+        "text": "Python",
+        "unitId": "unit_1"
+      },
+      {
+        "canonicalId": "docker",
+        "confident": true,
+        "id": "candidate_b6790c2d93dd16414bf8b8fb",
+        "kind": "technology",
+        "sourceId": "source_029a1a189373c9f199247ba6",
+        "text": "Docker",
+        "unitId": "unit_1"
+      },
+      {
+        "canonicalId": null,
+        "confident": false,
+        "id": "candidate_9b8c14a1a40af849127562f6",
+        "kind": "date",
+        "sourceId": "source_029a1a189373c9f199247ba6",
+        "text": "2020",
+        "unitId": "unit_2"
+      },
+      {
+        "canonicalId": null,
+        "confident": false,
+        "id": "candidate_affa4cc23db7c62e44a01c21",
+        "kind": "date",
+        "sourceId": "source_029a1a189373c9f199247ba6",
+        "text": "2022",
+        "unitId": "unit_2"
+      }
+    ],
+    "employment": [],
+    "facts": [
+      {
+        "evidence": [
+          {
+            "sourceId": "source_029a1a189373c9f199247ba6",
+            "sourceRevision": 1,
+            "unitId": "unit_1",
+            "unitRevision": 1
+          }
+        ],
+        "id": "fact_a0399fb446b3ee80351cee07",
+        "importance": "normal",
+        "jobId": null,
+        "kind": "technology",
+        "origin": "source",
+        "revision": 1,
+        "subprojectId": null,
+        "value": {
+          "canonicalId": "python",
+          "display": "Python",
+          "scope": "global"
+        }
+      },
+      {
+        "evidence": [
+          {
+            "sourceId": "source_029a1a189373c9f199247ba6",
+            "sourceRevision": 1,
+            "unitId": "unit_1",
+            "unitRevision": 1
+          }
+        ],
+        "id": "fact_6c532f064bc39c1cf8d3a03c",
+        "importance": "normal",
+        "jobId": null,
+        "kind": "technology",
+        "origin": "source",
+        "revision": 1,
+        "subprojectId": null,
+        "value": {
+          "canonicalId": "docker",
+          "display": "Docker",
+          "scope": "global"
+        }
+      },
+      {
+        "evidence": [],
+        "id": "fact_user_profile",
+        "importance": "essential",
+        "jobId": null,
+        "kind": "text",
+        "origin": "user",
+        "revision": 1,
+        "subprojectId": null,
+        "value": {
+          "text": "Built reliable services."
+        }
+      }
+    ],
+    "issues": [
+      {
+        "code": "AMBIGUOUS_DATE",
+        "id": "issue_4075b30566f427294d1dd80e",
+        "message": "Confirm what this date describes.",
+        "sourceId": "source_029a1a189373c9f199247ba6",
+        "unitId": "unit_2"
+      },
+      {
+        "code": "AMBIGUOUS_DATE",
+        "id": "issue_71f24e272155ee86780966b2",
+        "message": "Confirm what this date describes.",
+        "sourceId": "source_029a1a189373c9f199247ba6",
+        "unitId": "unit_2"
+      },
+      {
+        "code": "NARRATIVE_REVIEW",
+        "id": "issue_32a1c84c53839c51247fd80b",
+        "message": "Review source wording and add or confirm facts.",
+        "sourceId": "source_029a1a189373c9f199247ba6",
+        "unitId": "unit_2"
+      }
+    ],
+    "overlayFactRefs": {},
+    "proposedFactIds": [],
+    "revision": 1,
+    "sourceFingerprint": "b8b244bfd33fa80593450a1caf9fddfb942637241662297a1450c436ecb224bd",
+    "transportVersion": 1,
+    "units": [
+      {
+        "disposition": "facts",
+        "duplicateOf": null,
+        "factIds": [
+          "fact_a0399fb446b3ee80351cee07",
+          "fact_6c532f064bc39c1cf8d3a03c"
+        ],
+        "sourceId": "source_029a1a189373c9f199247ba6",
+        "unitId": "unit_1"
+      },
+      {
+        "disposition": "unresolved",
+        "duplicateOf": null,
+        "factIds": [],
+        "sourceId": "source_029a1a189373c9f199247ba6",
+        "unitId": "unit_2"
+      }
+    ]
+  },
+  "sourceFingerprint": "b8b244bfd33fa80593450a1caf9fddfb942637241662297a1450c436ecb224bd",
+  "sourceLanguage": "mixed",
+  "transportVersion": 1
+}

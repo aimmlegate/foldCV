@@ -27,6 +27,14 @@ export class FactWorkflow {
   constructor(private readonly onChange: (view: FactView) => void,
               private readonly request: typeof fetch = (input, init) => fetch(input, init)) {}
 
+  sheetForManual(entries: ImportedSource[]): FactSheet {
+    const current = this.view.sheet;
+    if (current && current.units.every((unit) => entries.some((entry) => entry.result.sourceId === unit.sourceId &&
+      (entry.result.units.some((sourceUnit) => sourceUnit.id === unit.unitId) ||
+       /^gap:(0|[1-9]\d*)$/.test(unit.unitId) && Boolean(entry.overlays[unit.unitId]?.trim()))))) return current;
+    return manualSheet(entries, this.assertions);
+  }
+
   private publish(view: FactView): void { this.view = view; this.onChange(view); }
 
   clear(): void {

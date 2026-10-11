@@ -1,5 +1,5 @@
 import type { PrepareRequest } from "../contracts/generated/prepare_request";
-import { prepare, render } from "./render";
+import { prepare, PrivateOutputError, render } from "./render";
 import type { Rendered } from "./render";
 
 export type PreviewState = { status: "empty" | "rendering" | "ready" | "stale" | "error"; artifact: Rendered | null; error: string | null };
@@ -104,9 +104,10 @@ export class PreviewWorkflow {
       this.displayed = artifact;
       this.onChange({ status: "ready", artifact, error: null });
       for (const kind of job.exports) this.onExport(artifact, kind);
-    } catch {
+    } catch (error) {
       if (!this.closed && job.epoch === this.epoch && !this.queued)
-        this.onChange({ status: "error", artifact: this.displayed, error: "Не удалось подготовить или проверить документы. Повторите по кнопке." });
+        this.onChange({ status: "error", artifact: this.displayed, error: error instanceof PrivateOutputError ? error.message :
+          "Не удалось подготовить или проверить документы. Повторите по кнопке." });
     } finally {
       this.active = false;
       this.activeJob = null;

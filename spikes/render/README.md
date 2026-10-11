@@ -28,7 +28,7 @@ done
 The committed page images under `tests/render_spike/baselines/` are the reviewed
 synthetic reference for the pinned converter and fonts. Rendered DOCX/PDF and
 review images in `experiments/gui-render-spike/` are ignored. The output fixture
-footer is `contact@example.invalid`; production defaults to `mail@example.com`.
+footer is `Synthetic local document`; production defaults to `mail@example.com`.
 
 The macOS shell sandbox used during development aborts headless LibreOffice with
 exit 134. The real conversion and test commands were run outside that sandbox.

@@ -1052,7 +1052,7 @@
           "snapshot",
           "snapshotSha256"
         ],
-        "value": "bf48f4fb7510f528c27f91ea2ac823b64d1dfb60d6c17833c4b4dbb1199781de"
+      "value": "e0daf367355881d2d2f25b055b9b08e443c78b4961bc0c328aa19c1cd648f97f"
       }
     ]
   },
@@ -1107,7 +1107,7 @@
           "snapshot",
           "snapshotSha256"
         ],
-        "value": "33efee886a9945047eaffda31bf8a4ca88213778a69e8f2fa2e0c11bb271106a"
+      "value": "2c5a1676860ef4334bff5c560e15a2e4f1ea765882c01a1e90220a2bc3b6d51c"
       }
     ]
   },
@@ -1241,7 +1241,7 @@
           "snapshot",
           "snapshotSha256"
         ],
-        "value": "d3b1c7650eef250ab2cb635d80cb3ee69e227ad12a6eb269a36bb6df1b1242c7"
+      "value": "0f502481bd95a2dedd4775839074d79369b242343e8b5ce0c05b16d9478d8743"
       }
     ]
   },
@@ -1659,5 +1659,13 @@
   "base": "semantic_proposal",
   "valid": false,
   "edits": [{"op": "set", "path": ["schemaVersion"], "value": 2}]
-}
+},
+{"name": "draft_request_valid", "contract": "draft_request", "base": "draft_request", "valid": true, "edits": []},
+{"name": "draft_request_stale_fingerprint", "contract": "draft_request", "base": "draft_request", "valid": false, "edits": [{"op": "set", "path": ["sourceFingerprint"], "value": "stale"}]},
+{"name": "draft_request_missing_as_of", "contract": "draft_request", "base": "draft_request", "valid": false, "edits": [{"op": "remove", "path": ["asOf"]}]},
+{"name": "draft_request_unknown_language", "contract": "draft_request", "base": "draft_request", "valid": false, "edits": [{"op": "set", "path": ["sourceLanguage"], "value": "auto"}]},
+{"name": "draft_proposal_valid", "contract": "draft_proposal", "base": "draft_proposal", "valid": true, "edits": []},
+{"name": "draft_proposal_duplicate_block", "contract": "draft_proposal", "base": "draft_proposal", "valid": false, "edits": [{"op": "clone", "path": ["blocks"], "from": ["blocks", 0]}]},
+{"name": "draft_result_valid", "contract": "draft_result", "base": "draft_result", "valid": true, "edits": []},
+{"name": "draft_result_wrong_version", "contract": "draft_result", "base": "draft_result", "valid": false, "edits": [{"op": "set", "path": ["transportVersion"], "value": 2}]}
 ]

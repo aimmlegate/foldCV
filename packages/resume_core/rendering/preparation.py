@@ -14,6 +14,7 @@ from packages.resume_core.rendering.models import (Candidate, FocusItem, Project
                                                   RenderDocument, RenderIdentity, RenderRequest, RenderWire, SidebarSection,
                                                   SkillGroup, snapshot_digest)
 from packages.resume_core.rendering.template import PACKAGE_SHA256, renderer_sha256, require_template
+from packages.resume_core.rendering.privacy import guard_render_document
 
 
 class Presentation(RenderWire):
@@ -21,6 +22,13 @@ class Presentation(RenderWire):
     title: str = Field(min_length=1, max_length=240)
     source_language: Literal["ru", "en", "mixed"]
     job_prose_blocks: dict[str, str] = Field(max_length=60)
+    languages: list[str] = Field(default_factory=list)
+
+    @model_validator(mode="after")
+    def valid_languages(self) -> Presentation:
+        if len(self.languages) > 20 or any(not item.strip() or len(item) > 80 for item in self.languages):
+            raise ValueError("invalid language")
+        return self
 
 
 class PrepareRequest(RenderWire):
@@ -101,17 +109,17 @@ def prepare_document(payload: PrepareRequest) -> RenderRequest:
     sidebar = []
     early_block = next((block for block in project.views if block.kind == "early_career"), None)
     if project.as_of is not None and (early_block is None or early_block.visible):
-        old_labels = {job.id: [blocks[presentation.job_prose_blocks[job.id]].state.text]
-                      for job in project.employment if blocks[presentation.job_prose_blocks[job.id]].visible
-                      and blocks[presentation.job_prose_blocks[job.id]].state.text.strip()}
         old_rows = early_career_rows((job for job in project.employment
-                                      if blocks[presentation.job_prose_blocks[job.id]].visible), project.as_of,
-                                     approved_labels=old_labels)
+                                      if blocks[presentation.job_prose_blocks[job.id]].visible), project.as_of)
         if old_rows:
-            sidebar.append(SidebarSection(title="РАННИЙ ОПЫТ", items=[format_early_career(row) for row in old_rows]))
+            sidebar.append(SidebarSection(title="РАННИЙ ОПЫТ" if presentation.source_language == "ru" else "EARLY CAREER",
+                                          items=[", ".join(format_early_career(row) for row in old_rows)]))
     for block in project.views:
         if block.kind == "education" and block.visible and block.state.text.strip():
             sidebar.append(SidebarSection(title="ОБРАЗОВАНИЕ", items=[block.state.text]))
+    if presentation.languages:
+        sidebar.append(SidebarSection(title="ЯЗЫКИ" if presentation.source_language == "ru" else "LANGUAGES",
+                                      items=presentation.languages))
     skills_block = next((block for block in project.views if block.kind == "skills"), None)
     groups = [SkillGroup(title=category.upper(), items=", ".join(items))
               for category, items in group_technologies(project).items()] if skills_block is None or skills_block.visible else []
@@ -119,6 +127,7 @@ def prepare_document(payload: PrepareRequest) -> RenderRequest:
                                                    summary=profile.state.text if profile.visible else ""),
                               focus=focus, sidebar=sidebar, projects=detailed, achievements=[],
                               skillGroups=groups, footer="")
+    guard_render_document(document)
     identity = RenderIdentity(id="render-" + hashlib.sha256((project.project_id + ":" + str(project.revision)).encode()).hexdigest()[:16],
                               projectRevision=project.revision, snapshotSha256="0" * 64,
                               templateId="generic", templateVersion="1.0.0",

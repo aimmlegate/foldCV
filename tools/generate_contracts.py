@@ -11,6 +11,8 @@ from packages.resume_core.rendering.models import RenderRequest
 from packages.resume_core.rendering.preparation import PrepareRequest
 from packages.resume_core.extraction.models import ExtractResult
 from packages.resume_core.normalization import FactRequest, FactSheet, SemanticProposal
+from packages.resume_core.drafting import DraftRequest, DraftProposal, DraftResult
+from packages.resume_core.technologies import CATALOG, CATALOG_VERSION
 
 OUT = ROOT / "contracts" / "json-schema"
 
@@ -37,12 +39,19 @@ def main() -> None:
         "fact_request": FactRequest,
         "fact_sheet": FactSheet,
         "semantic_proposal": SemanticProposal,
+        "draft_request": DraftRequest,
+        "draft_proposal": DraftProposal,
+        "draft_result": DraftResult,
     }.items():
         schema = model.model_json_schema(mode="validation")
         (OUT / f"{name}.schema.json").write_text(
             json.dumps(schema, ensure_ascii=False, sort_keys=True, indent=2) + "\n",
             encoding="utf-8",
         )
+    (ROOT / "contracts" / "technology-catalog.json").write_text(
+        json.dumps({"version": CATALOG_VERSION, "entries": [
+            {"canonicalId": item.canonical_id, "aliases": list(item.aliases)} for item in CATALOG
+        ]}, ensure_ascii=False, sort_keys=True, indent=2) + "\n", encoding="utf-8")
 
 
 if __name__ == "__main__":

@@ -1,3 +1,4 @@
+export type Languages = string[];
 export type Name = string;
 export type Sourcelanguage = "ru" | "en" | "mixed";
 export type Title = string;
@@ -182,6 +183,7 @@ export interface PrepareRequest {
 }
 export interface Presentation {
   jobProseBlocks: Jobproseblocks;
+  languages?: Languages;
   name: Name;
   sourceLanguage: Sourcelanguage;
   title: Title;

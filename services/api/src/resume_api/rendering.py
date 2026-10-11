@@ -9,6 +9,7 @@ import sys
 import zipfile
 
 from packages.resume_core.rendering.models import RenderRequest
+from packages.resume_core.rendering.privacy import guard_render_document
 from packages.resume_core.rendering.template import RenderFailure
 
 from .lifecycle import OperationFiles
@@ -26,6 +27,7 @@ ALLOWED_ERRORS = frozenset({
 
 class DocumentRenderer:
     async def render(self, request: RenderRequest, files: OperationFiles) -> bytes:
+        guard_render_document(request.document)
         if files.path is None:
             raise RenderFailure("RENDER_FAILED")
         workspace = files.path

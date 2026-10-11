@@ -29,7 +29,9 @@ from .rendering import DocumentRenderer
 from .extracting import MAX_BODY as MAX_EXTRACT_BODY, UploadFailure, parse_one_part, run_extract
 from packages.resume_core.rendering.template import PACKAGE_SHA256, RenderFailure, renderer_sha256, require_template
 from packages.resume_core.rendering.preparation import PrepareRequest, prepare_document
+from packages.resume_core.rendering.privacy import guard_render_document
 from packages.resume_core.normalization import FactRequest, FactSheet, fingerprint, literal_sheet, semantic_input
+from packages.resume_core.drafting import DraftRequest as ProseDraftRequest, DraftResult as ProseDraftResult, draft_input
 
 
 MAX_BODY = 1_048_576
@@ -38,7 +40,7 @@ MAX_CONCURRENT = 2
 TIMEOUT_SECONDS = 30
 BODY_TIMEOUT_SECONDS = 10
 CANCEL_GRACE_SECONDS = 0.5
-POST_ONLY_PATHS = frozenset({"session/exchange", "extract", "facts", "facts/normalize", "normalize", "draft", "rewrite",
+POST_ONLY_PATHS = frozenset({"session/exchange", "extract", "facts", "facts/normalize", "facts/draft", "normalize", "draft", "rewrite",
                             "validate", "prepare-render", "render", "host/discover", "host/status", "host/login",
                             "host/detach", "host/models", "host/select", "host/cancel-login"})
 JSON_POST_PATHS = frozenset("/v1/" + path for path in POST_ONLY_PATHS if path != "extract")
@@ -59,6 +61,11 @@ class SyntheticRunner(Protocol):
 class SemanticRunner(Protocol):
     def run(self, request: FactRequest, files: OperationFiles,
             cancel: threading.Event) -> tuple[FactSheet, dict[str, int | None]]: ...
+
+
+class ProseDraftRunner(Protocol):
+    def run(self, request: ProseDraftRequest, files: OperationFiles,
+            cancel: threading.Event) -> tuple[ProseDraftResult, dict[str, int | None]]: ...
 
 
 def problem(code: str, status: int, stage: str = "request", retryable: bool = False) -> JSONResponse:
@@ -204,11 +211,14 @@ class LocalBoundary:
 
 def create_app(*, origin: str, secret: str, temp_root: Path, dist: Path, runner: SyntheticRunner | None = None,
                cli_executable: Path | None = None, connection_adapter: ConnectionAdapter | None = None,
-               semantic_runner: SemanticRunner | None = None):
+               semantic_runner: SemanticRunner | None = None, draft_runner: ProseDraftRunner | None = None,
+               fixture_generation_ready: bool = False):
     if not origin.startswith("http://127.0.0.1:") or not origin.rsplit(":", 1)[-1].isdigit():
         raise ValueError("A concrete IPv4 loopback origin is required")
     if len(secret) < 32:
         raise ValueError("Startup secret is too short")
+    if fixture_generation_ready and (semantic_runner is None or draft_runner is None):
+        raise ValueError("Fixture generation requires both injected runners")
     reap_owned(temp_root)
     blocked_on_start = has_blocked_owned(temp_root)
     operations: dict[asyncio.Task, OperationFiles] = {}
@@ -362,7 +372,7 @@ def create_app(*, origin: str, secret: str, temp_root: Path, dist: Path, runner:
             ready = False
         return JSONResponse({
             "appVersion": "0.1.0", "projectSchemaVersion": 3, "transportVersion": 1,
-            "generationReady": False, "renderers": ["docx", "pdf"] if ready else [],
+            "generationReady": fixture_generation_ready, "renderers": ["docx", "pdf"] if ready else [],
             "formats": ["docx", "pdf"] if ready else [],
             "templates": [{"id": "generic", "version": "1.0.0", "packageSha256": PACKAGE_SHA256}] if ready else [],
             "rendererSha256": renderer_sha256() if ready else None,
@@ -524,15 +534,95 @@ def create_app(*, origin: str, secret: str, temp_root: Path, dist: Path, runner:
 
         return StreamingResponse(events(), media_type="application/x-ndjson", headers={"Cache-Control": "no-store"})
 
+    async def draft_facts(payload: ProseDraftRequest):
+        nonlocal active, count
+        if draft_runner is None:
+            return problem("CLI_PROFILE_UNSAFE", 503, "draft")
+        try:
+            draft_input(payload)
+        except ValueError as error:
+            return problem("INPUT_TOO_LARGE" if str(error) == "INPUT_TOO_LARGE" else "INVALID_REQUEST",
+                           413 if str(error) == "INPUT_TOO_LARGE" else 422, "draft")
+        request_id = "op_" + uuid.uuid4().hex
+
+        async def events():
+            nonlocal active, count
+            reject_code: str | None = None
+            async with gate:
+                if unsafe_cleanup or cancellation_pending or active >= MAX_CONCURRENT or count >= MAX_OPERATIONS:
+                    reject_code = "OPERATION_LIMIT" if count >= MAX_OPERATIONS else "BUSY"
+                else:
+                    active += 1
+                    count += 1
+            if reject_code:
+                yield (json.dumps({"transportVersion": 1, "requestId": request_id, "sequence": 1,
+                                   "baseRevision": payload.base_revision, "type": "operation.failed",
+                                   "payload": {"code": reject_code, "retryable": reject_code == "BUSY",
+                                               "stage": "draft"}}) + "\n").encode()
+                return
+            files = OperationFiles(temp_root)
+            cancel = threading.Event()
+
+            def execute():
+                with files.open():
+                    return draft_runner.run(payload, files, cancel)
+
+            task = asyncio.create_task(asyncio.to_thread(execute))
+            operations[task] = files
+            semantic_work[task] = (files, cancel)
+            task.add_done_callback(operation_done)
+            try:
+                yield (json.dumps({"transportVersion": 1, "requestId": request_id, "sequence": 1,
+                                   "baseRevision": payload.base_revision, "type": "operation.started",
+                                   "payload": {"stage": "draft"}}) + "\n").encode()
+                draft, usage = await asyncio.wait_for(asyncio.shield(task), timeout=TIMEOUT_SECONDS)
+                draft = ProseDraftResult.model_validate(draft.model_dump(mode="json", by_alias=True))
+                if draft.source_fingerprint != payload.source_fingerprint or draft.base_revision != payload.base_revision:
+                    raise ValueError("stale draft")
+                usage = UsagePayload.model_validate(usage).model_dump()
+                encoded = draft.model_dump(mode="json", by_alias=True)
+                if len(json.dumps(encoded, ensure_ascii=False).encode("utf-8")) > 4 * 1024 * 1024:
+                    raise ValueError("result too large")
+                yield (json.dumps({"transportVersion": 1, "requestId": request_id, "sequence": 2,
+                                   "baseRevision": payload.base_revision, "type": "operation.completed",
+                                   "payload": {"result": encoded, "usage": usage}},
+                                  ensure_ascii=False, separators=(",", ":")) + "\n").encode()
+            except asyncio.CancelledError:
+                await stop_semantic(task, files, cancel)
+                raise
+            except Exception as error:
+                cancel.set()
+                code = "OPERATION_TIMEOUT" if isinstance(error, asyncio.TimeoutError) else "INVALID_RESULT"
+                if isinstance(error, SpikeError):
+                    code = lifecycle_code(error)
+                if not task.done():
+                    cleanup_code = await stop_semantic(task, files, cancel)
+                    if cleanup_code:
+                        code = cleanup_code
+                yield (json.dumps({"transportVersion": 1, "requestId": request_id, "sequence": 2,
+                                   "baseRevision": payload.base_revision, "type": "operation.failed",
+                                   "payload": {"code": code, "retryable": False, "stage": "draft"}}) + "\n").encode()
+            finally:
+                if not task.done():
+                    await stop_semantic(task, files, cancel)
+
+        return StreamingResponse(events(), media_type="application/x-ndjson", headers={"Cache-Control": "no-store"})
+
     async def prepare_render(payload: PrepareRequest):
         try:
             prepared = prepare_document(payload)
             return JSONResponse(prepared.model_dump(mode="json", by_alias=True), headers={"Cache-Control": "no-store"})
-        except (ValueError, RenderFailure):
+        except RenderFailure as error:
+            return problem(error.code if error.code.startswith("PRIVATE_OUTPUT_") else "PREPARATION_FAILED", 422, "prepare")
+        except ValueError:
             return problem("PREPARATION_FAILED", 422, "prepare")
 
     async def render(request: Request, payload: RenderRequest):
         nonlocal active
+        try:
+            guard_render_document(payload.document)
+        except RenderFailure as error:
+            return problem(error.code, 422, "render")
         async with gate:
             if unsafe_cleanup or cancellation_pending or active >= MAX_CONCURRENT:
                 return problem("BUSY", 429, "render", True)
@@ -567,7 +657,7 @@ def create_app(*, origin: str, secret: str, temp_root: Path, dist: Path, runner:
                 return problem("OPERATION_TIMEOUT", 504, "render")
             return problem("RENDER_FAILED", 500, "render")
         except RenderFailure as error:
-            status = 422 if error.code in {"RENDER_UNSUPPORTED_CONTENT", "UNSUPPORTED_FOCUS_ICON"} else 503 if error.code.endswith(("UNAVAILABLE", "MISMATCH")) else 500
+            status = 422 if error.code in {"RENDER_UNSUPPORTED_CONTENT", "UNSUPPORTED_FOCUS_ICON"} or error.code.startswith("PRIVATE_OUTPUT_") else 503 if error.code.endswith(("UNAVAILABLE", "MISMATCH")) else 500
             return problem(error.code, status, "render")
         except SpikeError as error:
             return problem(lifecycle_code(error), 503, "render")
@@ -715,6 +805,7 @@ def create_app(*, origin: str, secret: str, temp_root: Path, dist: Path, runner:
     app.add_api_route("/v1/extract", extract, methods=["POST"])
     app.add_api_route("/v1/facts", facts, methods=["POST"])
     app.add_api_route("/v1/facts/normalize", normalize_facts, methods=["POST"])
+    app.add_api_route("/v1/facts/draft", draft_facts, methods=["POST"])
     app.add_api_route("/v1/validate", validate, methods=["POST"])
     app.add_api_route("/v1/prepare-render", prepare_render, methods=["POST"])
     app.add_api_route("/v1/render", render, methods=["POST"])

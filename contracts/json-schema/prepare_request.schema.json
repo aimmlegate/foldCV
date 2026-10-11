@@ -878,6 +878,13 @@
           "title": "Jobproseblocks",
           "type": "object"
         },
+        "languages": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Languages",
+          "type": "array"
+        },
         "name": {
           "maxLength": 160,
           "minLength": 1,

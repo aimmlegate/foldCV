@@ -12,6 +12,7 @@ from packages.resume_core.rendering.models import RenderRequest
 from packages.resume_core.rendering.preparation import PrepareRequest
 from packages.resume_core.extraction.models import ExtractResult
 from packages.resume_core.normalization import FactRequest, FactSheet, SemanticProposal
+from packages.resume_core.drafting import DraftRequest, DraftProposal, DraftResult
 
 
 EXAMPLES = Path(__file__).resolve().parents[2] / "contracts" / "examples"
@@ -24,12 +25,16 @@ EXTRACT = json.loads((EXAMPLES / "extract_result.json").read_text(encoding="utf-
 FACT_REQUEST = json.loads((EXAMPLES / "fact_request.json").read_text(encoding="utf-8"))
 FACT_SHEET = json.loads((EXAMPLES / "fact_sheet.json").read_text(encoding="utf-8"))
 SEMANTIC = json.loads((EXAMPLES / "semantic_proposal.json").read_text(encoding="utf-8"))
+DRAFT_REQUEST = json.loads((EXAMPLES / "draft_request.json").read_text(encoding="utf-8"))
+DRAFT_PROPOSAL = json.loads((EXAMPLES / "draft_proposal.json").read_text(encoding="utf-8"))
+DRAFT_RESULT = json.loads((EXAMPLES / "draft_result.json").read_text(encoding="utf-8"))
 
 
 def case_data(case: dict) -> object:
     bases = {"project": PROJECT, "proposal": PROJECT["proposals"][0], "template": PROJECT["template"], "zip_manifest": ZIP,
              "render_request": RENDER, "prepare_request": PREPARE, "extract_result": EXTRACT,
-             "fact_request": FACT_REQUEST, "fact_sheet": FACT_SHEET, "semantic_proposal": SEMANTIC}
+             "fact_request": FACT_REQUEST, "fact_sheet": FACT_SHEET, "semantic_proposal": SEMANTIC,
+             "draft_request": DRAFT_REQUEST, "draft_proposal": DRAFT_PROPOSAL, "draft_result": DRAFT_RESULT}
     data = copy.deepcopy(bases[case["base"]])
     for edit in case["edits"]:
         target = data
@@ -72,6 +77,12 @@ def test_shared_case(case: dict) -> None:
             FactSheet.model_validate(case_data(case))
         elif case["contract"] == "semantic_proposal":
             SemanticProposal.model_validate(case_data(case))
+        elif case["contract"] == "draft_request":
+            DraftRequest.model_validate(case_data(case))
+        elif case["contract"] == "draft_proposal":
+            DraftProposal.model_validate(case_data(case))
+        elif case["contract"] == "draft_result":
+            DraftResult.model_validate(case_data(case))
         else:
             validate_contract(case["contract"], case_data(case))
         accepted = True

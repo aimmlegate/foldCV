@@ -1,0 +1,131 @@
+{
+  "entries": [
+    {
+      "aliases": [
+        "golang",
+        "go (golang)"
+      ],
+      "canonicalId": "golang"
+    },
+    {
+      "aliases": [
+        "python"
+      ],
+      "canonicalId": "python"
+    },
+    {
+      "aliases": [
+        "c#",
+        "csharp",
+        "c sharp"
+      ],
+      "canonicalId": "csharp"
+    },
+    {
+      "aliases": [
+        "c++"
+      ],
+      "canonicalId": "cplusplus"
+    },
+    {
+      "aliases": [
+        ".net",
+        ".net core",
+        ".net framework",
+        ".net standard"
+      ],
+      "canonicalId": "dotnet"
+    },
+    {
+      "aliases": [
+        "postgresql",
+        "postgres",
+        "postges",
+        "postrgesql"
+      ],
+      "canonicalId": "postgresql"
+    },
+    {
+      "aliases": [
+        "redis"
+      ],
+      "canonicalId": "redis"
+    },
+    {
+      "aliases": [
+        "kafka",
+        "apache kafka"
+      ],
+      "canonicalId": "kafka"
+    },
+    {
+      "aliases": [
+        "rabbitmq"
+      ],
+      "canonicalId": "rabbitmq"
+    },
+    {
+      "aliases": [
+        "kubernetes"
+      ],
+      "canonicalId": "kubernetes"
+    },
+    {
+      "aliases": [
+        "docker"
+      ],
+      "canonicalId": "docker"
+    },
+    {
+      "aliases": [
+        "php"
+      ],
+      "canonicalId": "php"
+    },
+    {
+      "aliases": [
+        "node.js",
+        "nodejs"
+      ],
+      "canonicalId": "nodejs"
+    },
+    {
+      "aliases": [
+        "grpc"
+      ],
+      "canonicalId": "grpc"
+    },
+    {
+      "aliases": [
+        "linux"
+      ],
+      "canonicalId": "linux"
+    },
+    {
+      "aliases": [
+        "fastapi"
+      ],
+      "canonicalId": "fastapi"
+    },
+    {
+      "aliases": [
+        "django rest framework",
+        "django rest framework (drf)"
+      ],
+      "canonicalId": "djangorest"
+    },
+    {
+      "aliases": [
+        "grafana"
+      ],
+      "canonicalId": "grafana"
+    },
+    {
+      "aliases": [
+        "kibana"
+      ],
+      "canonicalId": "kibana"
+    }
+  ],
+  "version": "generic-1"
+}

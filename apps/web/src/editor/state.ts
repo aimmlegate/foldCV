@@ -1,6 +1,8 @@
 import type { Block, BlockState, Facts, Project, Review } from "../contracts/generated/project";
 import { syntheticProject } from "./example";
 import type { Presentation } from "../contracts/generated/prepare_request";
+import type { WorkingDraft } from "../facts/working";
+import { validateFactSheet } from "../contracts/validate";
 
 type Fact = Facts[number];
 
@@ -10,6 +12,8 @@ type Drafts = Record<string, string>;
 type Checkpoint = { state: BlockState; visible: boolean; status: Block["status"]; review: Review };
 export type EditorState = {
   project: Project | null;
+  working: WorkingDraft | null;
+  workingIssues: string[];
   presentation: Presentation | null;
   presentationDrafts: { name?: string; title?: string };
   presentationUndo: Presentation | null;
@@ -25,6 +29,7 @@ export type EditorState = {
 };
 export type Action =
   | { type: "loadExample" }
+  | { type: "loadImported"; project: Project; presentation: Presentation; working: WorkingDraft; issues: string[] }
   | { type: "resetProject" }
   | { type: "stage"; stage: Stage }
   | { type: "panel"; panel: Panel }
@@ -47,7 +52,7 @@ export type Action =
   | { type: "fact"; id: string; value: string };
 
 export const initialEditorState: EditorState = {
-  project: null, presentation: null, presentationDrafts: {}, presentationUndo: null,
+  project: null, working: null, workingIssues: [], presentation: null, presentationDrafts: {}, presentationUndo: null,
   stage: "import", panel: "preview", selectedId: null,
   drafts: {}, factDrafts: {}, errors: {}, undo: {}, sourceText: "", dirty: false,
 };
@@ -123,6 +128,11 @@ export function editableFactValue(fact: Fact): string | null { return factDispla
 
 export function editorReducer(state: EditorState, action: Action): EditorState {
   switch (action.type) {
+    case "loadImported":
+      if (state.project) return state;
+      return { ...initialEditorState, project: action.project, presentation: action.presentation,
+        working: action.working, workingIssues: action.issues, stage: "editor",
+        selectedId: action.project.views[0]?.id ?? null, sourceText: state.sourceText, dirty: true };
     case "loadExample": {
       if (state.project) return state;
       const project = syntheticProject();
@@ -258,7 +268,8 @@ export function editorReducer(state: EditorState, action: Action): EditorState {
       const fact = project?.facts.find((item) => item.id === action.id);
       if (!project || !fact || factDisplay(fact) === null) return state;
       const value = action.value.trim();
-      if (!value || (fact.kind === "metric" && (!/^\d+$/.test(value) || Number(value) > 1000000000
+      const sourceCorrection = Boolean(state.working && fact.origin === "source");
+      if (!value || new TextEncoder().encode(value).length > 4096 || (!sourceCorrection && fact.kind === "metric" && (!/^\d+$/.test(value) || Number(value) > 1000000000
         || (fact.value.upperNumber !== null && Number(value) > fact.value.upperNumber)))) {
         return { ...state, errors: { ...state.errors, [action.id]: "Введите корректное значение факта." } };
       }
@@ -266,14 +277,55 @@ export function editorReducer(state: EditorState, action: Action): EditorState {
         return editorReducer(state, { type: "cancelFact", id: action.id });
       }
       let updated: Fact;
-      if (fact.kind === "text") updated = { ...fact, revision: fact.revision + 1, value: { text: value } };
-      else if (fact.kind === "metric") updated = { ...fact, revision: fact.revision + 1, value: { ...fact.value, number: Number(value) } };
-      else return state;
+      let working = state.working;
+      const oldId = action.id;
+      if (working && sourceCorrection) {
+        const source = working.sheet.facts.find((item) => item.id === action.id && item.origin === "source");
+        if (!source) return state;
+        const id = `fact_user_${crypto.randomUUID()}`;
+        updated = { id, revision: 1, kind: "text", value: { text: value }, evidence: [], origin: "user",
+          importance: source.importance, jobId: source.jobId, subprojectId: source.subprojectId };
+        working = { ...working, sheet: { ...working.sheet, revision: (working.sheet.revision ?? 1) + 1,
+          facts: [...working.sheet.facts, updated],
+          userCorrections: { ...working.sheet.userCorrections, [source.id]: id },
+          ...(working.sheet.employment ? { employment: working.sheet.employment.map((job) => job.id === source.jobId ?
+            { ...job, factIds: [...job.factIds, id] } : job) } : {}) } };
+      } else {
+        if (fact.kind === "text") updated = { ...fact, revision: fact.revision + 1, value: { text: value } };
+        else if (fact.kind === "metric") updated = { ...fact, revision: fact.revision + 1, value: { ...fact.value, number: Number(value) } };
+        else return state;
+        if (working) {
+          const sheetFact = working.sheet.facts.find((item) => item.id === action.id);
+          const manualMetric = working.manual.metrics.find((item) => item.id === action.id);
+          if (sheetFact && sheetFact.origin === "user") {
+            working = { ...working, sheet: { ...working.sheet, revision: (working.sheet.revision ?? 1) + 1,
+              facts: working.sheet.facts.map((item) => item.id === action.id ? updated : item) } };
+          } else if (manualMetric && updated.kind === "metric") {
+            const number = updated.value.number;
+            working = { ...working, manual: { ...working.manual, metrics: working.manual.metrics.map((item) =>
+              item.id === action.id ? { ...item, number } : item) } };
+          } else return state;
+        }
+      }
+      if (working && !validateFactSheet(working.sheet)) return { ...state,
+        errors: { ...state.errors, [action.id]: "Не удалось сохранить исправление в листе фактов." } };
       const affected = project.views.filter((block) => block.state.factIds.includes(action.id)).map((block) => block.id);
       const next: Project = {
         ...project, revision: project.revision + 1,
-        facts: project.facts.map((item) => item.id === action.id ? updated : item),
-        views: project.views.map((block) => affected.includes(block.id) ? { ...block, status: "stale" } : block),
+        facts: sourceCorrection ? [...project.facts.filter((item) => item.id !== action.id), updated] :
+          project.facts.map((item) => item.id === action.id ? updated : item),
+        sources: sourceCorrection ? project.sources.map((source) => ({ ...source, units: source.units.map((unit) =>
+          ({ ...unit, representedFactIds: unit.representedFactIds.filter((id) => id !== oldId) })) })) : project.sources,
+        employment: sourceCorrection ? project.employment.map((job) => ({ ...job,
+          factIds: job.factIds.map((id) => id === oldId ? updated.id : id),
+          subprojects: job.subprojects.map((sub) => ({ ...sub,
+            factIds: sub.factIds.map((id) => id === oldId ? updated.id : id) })) })) : project.employment,
+        views: project.views.map((block) => affected.includes(block.id) ? { ...block, status: "stale",
+          previous: sourceCorrection ? null : block.previous,
+          state: sourceCorrection ? { ...block.state,
+            factIds: block.state.factIds.map((id) => id === oldId ? updated.id : id),
+            factRevisions: { ...Object.fromEntries(Object.entries(block.state.factRevisions).filter(([id]) => id !== oldId)),
+              [updated.id]: updated.revision } } : block.state } : block),
         review: {
           decisions: project.review.decisions.filter((decision) => !(decision.targetKind === "fact" && decision.targetId === action.id) && !(decision.targetKind === "block" && affected.includes(decision.targetId))),
           acknowledgments: project.review.acknowledgments.filter((ack) => !(ack.targetKind === "fact" && ack.targetId === action.id) && !(ack.targetKind === "block" && affected.includes(ack.targetId))),
@@ -281,7 +333,10 @@ export function editorReducer(state: EditorState, action: Action): EditorState {
       };
       const factDrafts = { ...state.factDrafts };
       delete factDrafts[action.id];
-      return { ...state, project: next, factDrafts, dirty: true, errors: { ...state.errors, [action.id]: "" } };
+      const undo = { ...state.undo };
+      for (const id of affected) delete undo[id];
+      return { ...state, project: next, working, factDrafts, undo, dirty: true,
+        errors: { ...state.errors, [action.id]: "" } };
     }
   }
 }

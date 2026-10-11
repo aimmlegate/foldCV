@@ -1,0 +1,58 @@
+{
+  "$defs": {
+    "DraftBlock": {
+      "additionalProperties": false,
+      "properties": {
+        "blockId": {
+          "title": "Blockid",
+          "type": "string"
+        },
+        "factIds": {
+          "items": {
+            "type": "string"
+          },
+          "maxItems": 200,
+          "minItems": 1,
+          "title": "Factids",
+          "type": "array"
+        },
+        "text": {
+          "maxLength": 4000,
+          "minLength": 1,
+          "title": "Text",
+          "type": "string"
+        }
+      },
+      "required": [
+        "blockId",
+        "text",
+        "factIds"
+      ],
+      "title": "DraftBlock",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "blocks": {
+      "items": {
+        "$ref": "#/$defs/DraftBlock"
+      },
+      "maxItems": 201,
+      "minItems": 1,
+      "title": "Blocks",
+      "type": "array"
+    },
+    "instructionVersion": {
+      "const": 1,
+      "default": 1,
+      "title": "Instructionversion",
+      "type": "integer"
+    }
+  },
+  "required": [
+    "blocks"
+  ],
+  "title": "DraftProposal",
+  "type": "object"
+}

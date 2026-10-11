@@ -26,7 +26,7 @@
         "label": "PostgreSQL"
       }
     ],
-    "footer": "contact@example.invalid",
+    "footer": "",
     "projects": [
       {
         "company": "Лаборатория Север",
@@ -72,7 +72,7 @@
     "projectRevision": 1,
     "rendererSha256": "a200bf877115a76e8049258c3fa20b137a3ebcc0ca430eedc287bd46aa602c31",
     "rendererVersion": "1.0.0",
-    "snapshotSha256": "da27d68dcd9a05735c1b6af126458bc2763c54ba658618fd856658ddb0e7d09f",
+    "snapshotSha256": "dac7a557f3d1eb7ceae55a2ad3ea7e5f202889d5371401448dcc55e001accc45",
     "templateId": "generic",
     "templatePackageSha256": "d081df948bfd55d107c38d40387a9758f563f9c14a9cffc4a847f44cb687b8b9",
     "templateVersion": "1.0.0"

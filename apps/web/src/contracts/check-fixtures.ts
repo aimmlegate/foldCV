@@ -3,7 +3,7 @@ import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { dirname, resolve } from "node:path";
 import { validateContract, validateExtractResult, validateFactRequest, validateFactSheet,
-  validateRenderRequest, validateSemanticProposal } from "./validate.js";
+  validateRenderRequest, validateSemanticProposal, validateDraftRequest, validateDraftProposal, validateDraftResult } from "./validate.js";
 
 type Edit = { op: "set" | "remove" | "append" | "clone" | "repeat_text" | "fill_sidebar"; path: (string | number)[]; value?: unknown; from?: (string | number)[]; text?: string; count?: number; repeat?: number; items?: number; sections?: number };
 type Case = { name: string; contract: string; base: string; valid: boolean; edits: Edit[] };
@@ -62,7 +62,8 @@ const render = read("render_request.json");
 const prepare = read("prepare_request.json");
 const extract = read("extract_result.json");
 const bases: Record<string, unknown> = { project, proposal: child(child(project, "proposals"), 0), template: child(project, "template"), zip_manifest: zip, render_request: render, prepare_request: prepare, extract_result: extract,
-  fact_request: read("fact_request.json"), fact_sheet: read("fact_sheet.json"), semantic_proposal: read("semantic_proposal.json") };
+  fact_request: read("fact_request.json"), fact_sheet: read("fact_sheet.json"), semantic_proposal: read("semantic_proposal.json"),
+  draft_request: read("draft_request.json"), draft_proposal: read("draft_proposal.json"), draft_result: read("draft_result.json") };
 const cases = array(read("cases.json")) as Case[];
 for (const test of cases) {
   const source = bases[test.base];
@@ -74,6 +75,9 @@ for (const test of cases) {
       : test.contract === "fact_request" ? validateFactRequest(data)
         : test.contract === "fact_sheet" ? validateFactSheet(data)
           : test.contract === "semantic_proposal" ? validateSemanticProposal(data)
+            : test.contract === "draft_request" ? validateDraftRequest(data)
+              : test.contract === "draft_proposal" ? validateDraftProposal(data)
+                : test.contract === "draft_result" ? validateDraftResult(data)
             : validateContract(test.contract, data);
   assert.equal(valid, test.valid, test.name);
 }

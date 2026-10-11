@@ -1,0 +1,15 @@
+{
+  "baseRevision": 1,
+  "blocks": [
+    {
+      "blockId": "profile",
+      "factIds": [
+        "fact_user_profile"
+      ],
+      "text": "Built reliable services."
+    }
+  ],
+  "issues": [],
+  "sourceFingerprint": "b8b244bfd33fa80593450a1caf9fddfb942637241662297a1450c436ecb224bd",
+  "transportVersion": 1
+}

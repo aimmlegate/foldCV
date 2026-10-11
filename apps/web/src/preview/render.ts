@@ -6,6 +6,18 @@ import { validateRenderRequest } from "../contracts/validate";
 const maxArchive = 16 * 1024 * 1024;
 const limits: Record<string, number> = { "resume.docx": 8 * 1024 * 1024, "resume.pdf": 12 * 1024 * 1024, "render.json": 8192 };
 const names = Object.keys(limits);
+const privateOutputMessages: Record<string, string> = {
+  PRIVATE_OUTPUT_IDENTITY: "В данных кандидата есть контакт, возраст или данные сайта вакансий. Исправьте имя или должность и повторите сборку.",
+  PRIVATE_OUTPUT_PROFILE: "В видимом разделе «О себе» есть контакт, возраст или данные сайта вакансий. Исправьте текст и повторите сборку.",
+  PRIVATE_OUTPUT_JOB: "В видимом разделе работы есть контакт, возраст или данные сайта вакансий. Исправьте текст или поля работы и повторите сборку.",
+  PRIVATE_OUTPUT_FOCUS: "В видимом разделе специализации есть контакт, возраст или данные сайта вакансий. Исправьте поле и повторите сборку.",
+  PRIVATE_OUTPUT_SIDEBAR: "В видимом боковом разделе есть контакт, возраст или данные сайта вакансий. Исправьте поле и повторите сборку.",
+  PRIVATE_OUTPUT_SKILLS: "В видимом разделе навыков есть контакт, возраст или данные сайта вакансий. Исправьте поле и повторите сборку.",
+  PRIVATE_OUTPUT_ACHIEVEMENTS: "В видимом разделе достижений есть контакт, возраст или данные сайта вакансий. Исправьте текст и повторите сборку.",
+  PRIVATE_OUTPUT_FOOTER: "В видимом нижнем поле есть контакт, возраст или данные сайта вакансий. Исправьте текст и повторите сборку.",
+};
+
+export class PrivateOutputError extends Error {}
 
 function crc32(bytes: Uint8Array): number {
   let crc = 0xffffffff;
@@ -75,7 +87,16 @@ async function sha256(bytes: Uint8Array): Promise<string> {
 async function requestJson(path: string, body: unknown): Promise<unknown> {
   const response = await fetch(path, { method: "POST", credentials: "same-origin", cache: "no-store",
     headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
-  if (!response.ok || !response.headers.get("content-type")?.startsWith("application/json")) throw new Error("request failed");
+  if (!response.ok) {
+    if (response.headers.get("content-type")?.startsWith("application/json")) {
+      const payload: unknown = await response.json();
+      const error = record(payload) ? payload.error : null;
+      const code = record(error) && typeof error.code === "string" ? error.code : "";
+      if (Object.hasOwn(privateOutputMessages, code)) throw new PrivateOutputError(privateOutputMessages[code]);
+    }
+    throw new Error("request failed");
+  }
+  if (!response.headers.get("content-type")?.startsWith("application/json")) throw new Error("request failed");
   return await response.json() as unknown;
 }
 

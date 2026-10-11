@@ -1,0 +1,12 @@
+{
+  "blocks": [
+    {
+      "blockId": "profile",
+      "factIds": [
+        "fact_user_profile"
+      ],
+      "text": "Built reliable services."
+    }
+  ],
+  "instructionVersion": 1
+}

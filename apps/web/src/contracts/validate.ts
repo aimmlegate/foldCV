@@ -10,6 +10,9 @@ import extractSchema from "../../../../contracts/json-schema/extract_result.sche
 import factSheetSchema from "../../../../contracts/json-schema/fact_sheet.schema.json" with { type: "json" };
 import factRequestSchema from "../../../../contracts/json-schema/fact_request.schema.json" with { type: "json" };
 import semanticProposalSchema from "../../../../contracts/json-schema/semantic_proposal.schema.json" with { type: "json" };
+import draftRequestSchema from "../../../../contracts/json-schema/draft_request.schema.json" with { type: "json" };
+import draftProposalSchema from "../../../../contracts/json-schema/draft_proposal.schema.json" with { type: "json" };
+import draftResultSchema from "../../../../contracts/json-schema/draft_result.schema.json" with { type: "json" };
 import type { Project, PartialDate, Period } from "./generated/project.js";
 import type { ZipManifest } from "./generated/zip_manifest.js";
 import type { TemplateManifest } from "./generated/template.js";
@@ -19,6 +22,9 @@ import type { ExtractResult } from "./generated/extract_result.js";
 import type { FactSheet } from "./generated/fact_sheet.js";
 import type { FactRequest } from "./generated/fact_request.js";
 import type { SemanticProposal } from "./generated/semantic_proposal.js";
+import type { DraftRequest } from "./generated/draft_request.js";
+import type { DraftProposal } from "./generated/draft_proposal.js";
+import type { DraftResult } from "./generated/draft_result.js";
 
 const ajv = new Ajv2020({ allErrors: true, strict: false });
 addFormats(ajv);
@@ -32,6 +38,25 @@ const extractShape = ajv.compile<ExtractResult>(extractSchema);
 const factSheetShape = ajv.compile<FactSheet>(factSheetSchema);
 const factRequestShape = ajv.compile<FactRequest>(factRequestSchema);
 const semanticProposalShape = ajv.compile<SemanticProposal>(semanticProposalSchema);
+const draftRequestShape = ajv.compile<DraftRequest>(draftRequestSchema);
+const draftProposalShape = ajv.compile<DraftProposal>(draftProposalSchema);
+const draftResultShape = ajv.compile<DraftResult>(draftResultSchema);
+
+export function validateDraftRequest(value: unknown): value is DraftRequest {
+  return finiteJson(value) && draftRequestShape(value) && wellFormedUnicode(value) &&
+    value.sourceFingerprint === value.sheet.sourceFingerprint && value.baseRevision === value.sheet.revision &&
+    validateFactSheet(value.sheet);
+}
+
+export function validateDraftProposal(value: unknown): value is DraftProposal {
+  return finiteJson(value) && draftProposalShape(value) && wellFormedUnicode(value) &&
+    unique(value.blocks.map((block) => block.blockId)) && value.blocks.every((block) => unique(block.factIds));
+}
+
+export function validateDraftResult(value: unknown): value is DraftResult {
+  return finiteJson(value) && draftResultShape(value) && wellFormedUnicode(value) &&
+    unique(value.blocks.map((block) => block.blockId));
+}
 
 export function validateFactRequest(value: unknown): value is FactRequest {
   if (!finiteJson(value) || !factRequestShape(value) || !wellFormedUnicode(value)) return false;

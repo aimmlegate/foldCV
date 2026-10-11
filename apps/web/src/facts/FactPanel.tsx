@@ -2,6 +2,9 @@ import { useState } from "react";
 import type { Facts } from "../contracts/generated/fact_sheet";
 import type { ImportedSource } from "../import/workflow";
 import type { FactView, FactWorkflow } from "./workflow";
+import type { ManualInput } from "./working";
+import { ManualPanel } from "./ManualPanel";
+import type { DraftView } from "./draftWorkflow";
 
 const control = "rounded border border-outline bg-panel px-3 py-2 text-content hover:bg-soft focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent disabled:opacity-50";
 const primary = "rounded border border-accent bg-accent px-3 py-2 text-accent-contrast focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent disabled:opacity-50";
@@ -15,7 +18,12 @@ function label(fact: Facts[number]): string {
   return `${fact.value.action} · ${fact.value.attribution}`;
 }
 
-export function FactPanel({ view, workflow, sources }: { view: FactView; workflow: FactWorkflow; sources: ImportedSource[] }) {
+export function FactPanel({ view, workflow, sources, onOpen, onDraft, draftView, onCancelDraft, onManualChange }: {
+  view: FactView; workflow: FactWorkflow; sources: ImportedSource[]; onOpen: (manual: ManualInput) => void;
+  onDraft?: ((manual: ManualInput, isCurrent: () => boolean) => void) | undefined;
+  draftView?: DraftView | undefined; onCancelDraft?: (() => void) | undefined;
+  onManualChange?: (() => void) | undefined;
+}) {
   const [assertion, setAssertion] = useState("");
   const [edits, setEdits] = useState<Record<string, string>>({});
   const [page, setPage] = useState(0);
@@ -42,6 +50,8 @@ export function FactPanel({ view, workflow, sources }: { view: FactView; workflo
       <button type="button" className={`${primary} mt-2`} onClick={() => { workflow.addAssertion(assertion); if (assertion.trim()) setAssertion(""); }}>Добавить факт</button>
       <p className="mt-1 text-xs text-muted">Ваш факт отмечается как внесённый пользователем; исходный текст не меняется.</p>
     </div>
+    <ManualPanel onOpen={onOpen} onDraft={onDraft} draftView={draftView} onCancelDraft={onCancelDraft}
+      onManualChange={onManualChange} />
     {sheet && <>
       <div className="mt-5 grid gap-4 md:grid-cols-2">
         <div><h3 className="font-semibold">Факты · {sheet.facts.length}</h3>

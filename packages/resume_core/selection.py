@@ -7,7 +7,7 @@ from typing import Iterable, Mapping
 
 from .dates import ExperienceEstimate, month_bounds, old_job, project_experience
 from .models.contracts import Job, PartialDate, Project, TechnologyFact
-from .technologies import BY_ID, CATALOG, CatalogEntry
+from .technologies import BY_ID, CATALOG, CatalogEntry, resolve_technology
 
 
 @dataclass(frozen=True)
@@ -75,6 +75,8 @@ def group_technologies(project: Project) -> dict[str, tuple[str, ...]]:
     for fact in project.facts:
         if isinstance(fact, TechnologyFact):
             entry = BY_ID.get(fact.value.canonical_id)
+            if entry is None:
+                entry = BY_ID.get(resolve_technology(fact.value.display).canonical_id)
             category = entry.category if entry else "other"
             groups.setdefault(category, [])
             if fact.value.display not in groups[category]:

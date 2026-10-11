@@ -15,7 +15,7 @@ from pydantic import ValidationError
 import pymupdf
 
 from packages.resume_core.rendering.preparation import PrepareRequest, prepare_document
-from packages.resume_core.rendering.template import PACKAGE_SHA256
+from packages.resume_core.rendering.template import PACKAGE_SHA256, RenderFailure
 
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / "services/api/src"))
@@ -79,7 +79,7 @@ def test_hidden_profile_and_job_are_omitted_but_skills_and_education_remain():
     assert prepared.document.sidebar[-1].items == ["Technical Institute, 2018"]
 
 
-def test_old_job_uses_policy_row_and_preserves_accepted_prose():
+def test_old_job_uses_compact_policy_row_and_keeps_detail_only_in_project():
     data = example()
     data["project"]["employment"].append({"id": "old-job", "employer": "Earlier Company", "role": "Developer",
         "periods": [{"start": {"precision": "year", "year": 2001, "month": None, "day": None},
@@ -92,7 +92,66 @@ def test_old_job_uses_policy_row_and_preserves_accepted_prose():
     data["presentation"]["jobProseBlocks"]["old-job"] = "old-prose"
     prepared = prepare_document(PrepareRequest.model_validate(data))
     assert "Earlier Company" not in [item.company for item in prepared.document.projects]
-    assert any("Maintained service integrations." in item for section in prepared.document.sidebar for item in section.items)
+    row = next(section for section in prepared.document.sidebar if section.title == "EARLY CAREER")
+    assert row.items == ["Earlier Company — Developer (2001–2005)"]
+    assert "Maintained service integrations." not in row.items[0]
+    assert data["project"]["views"][-1]["state"]["text"] == "Maintained service integrations."
+
+
+@pytest.mark.parametrize(("field", "value", "section"), [
+    ("job_prose", "Built a tool. Call 555-123-4567.", "JOB"),
+    ("profile", "Reach me at example@example.com", "PROFILE"),
+    ("profile", "Portfolio: alice.dev", "PROFILE"),
+    ("profile", "Website: alice.com", "PROFILE"),
+    ("profile", "LinkedIn: linkedin.com", "PROFILE"),
+    ("identity", "https://example.com/profile", "IDENTITY"),
+    ("employer", "Example Works. Phone: (555) 123-4567", "JOB"),
+    ("role", "Engineer. Age: 29", "JOB"),
+    ("education", "Technical Institute. Resume ID: 12345", "SIDEBAR"),
+    ("language", "Job board: hh.ru", "SIDEBAR"),
+    ("skill", "Python, contact@example.com", "SKILLS"),
+])
+def test_preparation_rejects_visible_private_output_without_changing_input(field, value, section):
+    data = example()
+    if field == "job_prose":
+        data["project"]["views"][1]["state"]["text"] = value
+    elif field == "profile":
+        data["project"]["views"][0]["state"]["text"] = value
+    elif field == "identity":
+        data["presentation"]["name"] = value
+    elif field == "employer":
+        data["project"]["employment"][0]["employer"] = value
+    elif field == "role":
+        data["project"]["employment"][0]["role"] = value
+    elif field == "education":
+        data["project"]["views"][-1]["state"]["text"] = value
+    elif field == "language":
+        data["presentation"]["languages"] = [value]
+    else:
+        data["project"]["facts"][1]["value"]["display"] = value
+    original = deepcopy(data)
+    with pytest.raises(RenderFailure, match=f"PRIVATE_OUTPUT_{section}"):
+        prepare_document(PrepareRequest.model_validate(data))
+    assert data == original
+
+
+def test_hidden_source_private_values_do_not_block_safe_visible_document():
+    data = example()
+    data["project"]["sources"][0]["units"][0]["text"] = "Call 555-123-4567 for references."
+    data["project"]["views"][1]["visible"] = False
+    data["project"]["views"][1]["state"]["text"] = "Call 555-123-4567 for references."
+    prepared = prepare_document(PrepareRequest.model_validate(data))
+    assert all("555" not in item.description for item in prepared.document.projects)
+
+
+def test_safe_metrics_and_dates_remain_renderable():
+    data = example()
+    data["project"]["views"][0]["state"]["text"] = "Engineer with 12 years of experience."
+    data["project"]["employment"][0]["employer"] = "HeadHunter"
+    data["project"]["views"][1]["state"]["text"] = "Built hh.ru integrations for 5000 jobs in 2022-2025; grew by +20 000 users."
+    prepared = prepare_document(PrepareRequest.model_validate(data))
+    assert "5000 jobs" in prepared.document.projects[0].description
+    assert prepared.document.projects[0].company == "HeadHunter"
 
 
 @pytest.mark.parametrize("change", ["missing_binding", "extra_prose", "second_profile", "wrong_template", "stale_prose"])
