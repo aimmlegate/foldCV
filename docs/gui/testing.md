@@ -1,5 +1,110 @@
 # Test strategy
 
+## Recovery iteration migration
+
+The [recovery plan](flow-recovery-plan.md) defines the next iteration. The table
+below overrides conflicting assertions in the legacy T00–T17 strategy that follows.
+It is a migration contract, not a claim that replacement tests already exist.
+
+`tests/requirements.json` currently accounts for 22 requirement IDs, including
+links to 10 browser spec files. `tools/checks.py` checks that mapped tests actually
+exist. A00 inventories those mappings; each implementation task adds its tests
+and updates affected mappings together. Leave the map unchanged during planning.
+Do not remove a test to evade a requirement or mark an unrun replacement passed.
+At A21, switch the default entry and remove replaced legacy UI/specs only with
+their replacement mappings. Keep applicable Python, CLI and skill regressions.
+Use the existing web test directory/tooling for new-entry browser tests.
+Task A06B also checks the built next.html served by the API; a Vite dev-server
+pass alone cannot catch fallback to the old index.html. The Playwright config
+starts only the Vite dev server on port 4173, so that check needs its own
+API-served harness. Add new Python test directories to PYTHON_SUITES in
+tools/checks.py and new schemas to the contracts:generate list, or validate_map
+and contract generation reject them. New DOCX tests live in a converter-free
+fast-group directory named by task A00; integration-render keeps the converter
+for legacy PDF only. Under D040 Sol runs these gates and records acceptance per
+task; skipped reviews are recorded as debt, never as passed reviews.
+
+| Requirement IDs | Recovery assertions / replacement owners |
+| --- | --- |
+| C01 | Add Rules, EditorialPlan, Mutation/Result, SourceContext, Generation/Operation and versioned snapshots; freeze Workspace v5/Project v4 document fields, legacyText rows, LegacyData, DocxError and slot IDs before consumers; generated Python/TS contracts agree. Preserve Operation legacy kinds/statuses and v3 decoding. RenderSnapshotV4 is separate from the existing v3 RenderSnapshot. A00/A02–A08B, A12/A14. |
+| X01 | Keep parser/format coverage and exact originals. Task A06 tests the input state machine and preDraft promotion in memory with stable IDs; task A12 alone owns durable originals, registry, private permissions and pre-creation warning recovery. Replacement file/paste keeps projectId. Paste then file selects only the file; failed extraction cannot silently reuse or send the inactive paste. Sample is E1 raw text and stays volatile until creation. A06/A12, E6. |
+| X02 | Empty, scan-only or failed extraction shows warnings and paste/replacement input. Creation still makes zero inference calls until usable text exists; partial text/warnings are inspectable before creation. Test both UI and API guards. A06/A15, E6. |
+| F01 | Keep immutable evidence and provenance; authoritative user edits update effective facts while source history stays intact. E2's controlled evidence oracle pairs exact “пять”/“шесть” spans with five/six. Wrong values fail that oracle; wrong spans fail evidence validation. Keep _observed_number unchanged; no general numeral parser or production fixture-text map. A03/A04/A07B/A10. |
+| P01 | Keep exact interval/precision/overlap tests. Keep legacy old_job/skill cutoff tests unchanged. In the GUI, fifteen years is the seeded Markdown default; EditorialPlan alone controls disposition through rendering/coverage. Test formattingAsOf separately from sourceObservedAt; sourceObservedAt comes only from the controlled normalization observation assessment with a validated span, and E1/E2 stay null; migrate legacy as_of only to formattingAsOf. Preserve PartialDate precision on import. Fixed Draft/EditorialPlan fixtures test all-job prompt input and GUI builder application without old_job or Markdown parsing; actual example E4 model adherence stays a manual post-MVP check. A05/A08B. |
+| P02 | Keep alias/logo/capacity and user-override checks. Replace fixed semantic ranking/group policy with Rules-based EditorialPlan validation; retain unknown/global-only tools in facts/text. Initial focus keeps the first eight distinct eligible catalog entries with logos in model order; later explicit user order wins. Removed entries produce warning annotations with code focus_entry_removed at skills-focus, with reasons; persist and replace/clear them on validation, never duplicate them on export. Verify zero extra calls, lower-bound duration labels using sourceLanguage (ru Russian, en/mixed English) and blank badges for incomplete exposure. A04/A05/A07/A08B. |
+| G01 | Four explicit operations: normalization, drafting, scoped rewrite, edit reconciliation. Test completion-event triggers/coalescing/counts and pure zero-call paths separately. Rewrite cancels the same project's running reconciliation, waits for cleanup/lock release, rejects its old result and allows one new batch after success; paused mode retains it. A02/A05/A06/A09/A10/A11. |
+| G02, G03 | Keep CLI protocol/lifecycle and metadata-only probes. Parent Generation, linked one-kind Operations, zero-call extract/assemble/render and guarded retries. GUI sets GenerationPolicy.allow_repair=false; legacy default stays true. GUI operations queue for the provider's non-blocking lock; BUSY never surfaces or counts. Count admitted GUI content attempts including early probe/model denial once, separately from actual inference and unknown usage. Preserve timeout_seconds <= 60 under D038. D034 personal mode does not pass the strict production gate. A01/A06/A19. |
+| S01 | Keep loopback/Host/Origin/session/input checks on both route families. Legacy HTTP shapes and the legacy 20-operation cap survive through cutover and MVP, with removal as post-MVP cleanup; project routes support more than 20 sequential batches with shared concurrency/process guards. Replace no-project-retention with authorized private Python local storage and APIs. A12/A13, D035. |
+| U01 | Direct editing, structural rows, visibility, arbitrary contiguous selection and one previous version per block. Test application-owned cross-field Selection separately from widget text selection. Use completion events and 500 ms event debounce, never typing-idle inference; distinguish undo-session departure. Verify 1000 ms buffer/session saves during continuous typing without pointer movement or inference. Cmd/Ctrl+Z only restores the active block, in two steps (changed buffer to session baseline, then stored version), and cannot undo row deletion. Period rows change through edit-field on the job and revert with the job restore. Remove lock/proposal/global-history assumptions. A08/A09/A12/A16. |
+| U02 | Test counters from a preDraft at (1, 1) and generation at (2, 2): document change increments both once; facts/annotations/derivatives/rename alone increment only projectRevision; status/usage/disk ack/replay/no-op increment neither. Public Mutation.baseRevision is documentRevision; Operation.baseRevision remains projectRevision with separate capturedDocumentRevision. Background results compare both counters/dependencies. Persist slim mutation replay records (ID, payload hash, status, both revisions) and reject deleted-project writes. Test E3b's shared-fact restore and UTF-16/captured-text guards. A08–A13/A19/A20. |
+| D01 | Reuse real Generic DOCX writer; verify OOXML, styles, structure, metadata and exclusions. Test the full adapter mapping: required-field labels, location/certification/education/language/early-career sidebars including legacyText rows, authored skillsText, validated focus, separate context/tasks/results and ru versus en/mixed headings. Assert the final visible role is “Роль: не указана” / “Role: not specified”; cover year/month/day, multiple and present period strings. Inspect actual w:br nodes for short multiline education/certification, skills and early-career text, including consecutive breaks; do not change layout.py. Keep achievements empty and footer explicitly "", omit empty/hidden optional sections, and never reconstruct them through legacy preparation/grouping. Use the plan's DocxError codes/paths for writer reasons and all schema-limit families, with safe field/section identity and no candidate text or truncation. New flow succeeds without LibreOffice or its bundled fonts; legacy PDF preflight stays intact. DOCX tests run in the converter-free fast group; python-docx==1.2.0 is pinned in requirements.txt. Tasks A06/A08/A20. |
+| D02 | PDF output/layout deferred under D039. Preserve legacy converter tests as optional compatibility coverage; mark PDF assertions deferred, not passed, in the task A21 requirement-map migration. PDF source extraction remains required. |
+| A01 | Independently bump manifest/workspace 4 → 5 and canonical project 3 → 4; read existing v2/v3/v4 shapes using the plan's current-content mapping. Preserve unsplit job prose as context, education/languages as legacyText, typed employment, private contacts and readable unmapped history without inference. Migrate profile.previous.text from BlockState; retain job_prose.previous as history, never whole-job undo. Old RenderSnapshots cannot masquerade as current RenderSnapshotV4. Imported locks are ignored with notice; local and portable saves share Workspace v5; historical Rules never replace global Rules; subsequent operations use global Rules and stored formattingAsOf. A14. |
+| A02 | Keep the 47-entry limit; package workspace, sources and at most current DOCX, without template assets/history binaries. Keep all archive rejection/security cases without losing current work. Preserve old decoder version rejections in contracts/examples/cases.json; add valid Project v4/archive v5 and unknown-next-version cases for new dispatch. Do not delete the former future-version cases to make tests pass. A00/A03/A14. |
+| E01 | Missing/uncertain facts create nonblocking annotations. Test section anchors with no education/language rows, Facts-owned missingSurname true/false/null, and E2's two leadership facts plus one conflict mark with neither claim exported. Keep one job-date gap until every period is complete/valid; start-only with present=false stays marked, while valid year/month precision and valid present periods clear it. Missing sourceObservedAt alone leaves the duration blank, not a date gap. Cover multiple periods and restore. Adapter display labels do not become facts or authored text. Keep corrupt-reference/structure failures; user additions/removals remain authoritative. A03/A04/A07/A08B/A11/A20. |
+| E02 | D039: downloaded DOCX captures both revisions and render inputs; reuse requires current document/input/template identity. Test buffered edits, changed render dependencies, render failure/retry and no per-key rendering. PDF preview-byte equality is deferred. Tasks A06/A20. |
+| R01 | Task A12 owns durable local originals/edits/previous versions and registry; A06 checkpoints are in-memory. Paste/sample is volatile until submission. Saved means a disk acknowledgment; refresh recovers that state and may lose only newer unacknowledged characters. No content in logs/errors/diagnostics/browser persistence. Test private permissions, tombstone-before-delete and project-local file-removal failure without the process cleanup_blocked latch. Do not promise no CLI-owned retention under D034. A12/A13/A14/A19. |
+| B01 | New raw input → complete draft → final editor → export flow; no fact wizard/tabs. Settings separate, accessible focus/keyboard and all four design states. A06B discloses creation/model transfer without promising disk saving; A15 owns the final local-save disclosure after A12. Test the selected file/text indicator and migration notice's read-only source text. A06B/A14–A18/A20/A21. |
+| N01 | Keep automated responsiveness/size/resource and coalescing checks. Actual CLI latency/usage is measured manually after MVP under D038; it does not block A21. A06/A10/A19/A21. |
+| L01 | Keep packaging/start/stop/assets/paths/process cleanup on the existing target platform; prove new-app startup and DOCX export with LibreOffice absent; no platform expansion. A21. |
+
+For recovery property tests, replace “changing prose does not alter facts” with
+“original evidence is immutable; effective facts follow authoritative edits”.
+Replace lock/proposal properties with per-block previous-version restore and
+captured-selection guards. Unknown typed values remain visible/unresolved with
+no stale numeric derivative; they are not silent edits to the source evidence.
+
+Handoffs must prefix task IDs with `task`, requirement IDs with `requirement`,
+and examples with `example`. In this table the first column is requirements;
+all A-number references in the owner column are tasks. Follow the recovery plan
+source order; every handoff repeats that D038 supersedes D037's pilot schedule,
+D039 removes the PDF gate, D040 defers reviews as debt and D041 sets two-step
+restore and the evidence-only observation date. Legacy bodies do not restore superseded behavior.
+Copy the recovery plan's applicable mandatory handoff notes verbatim, including
+legacy cutoff/duration bypasses, GUI versus legacy attempt counts, explicit empty
+footer, version-dispatch fixtures, DOCX errors/preflight/newlines, the E2 evidence
+oracle and the next.html marker. Accept task A00's concrete schemas before any
+consumer starts, including task A03. Accept task A02's two preset texts before
+task A09; a started dependency is not an accepted output.
+
+Use E1–E8 and E3a–E3e phases as defined in the plan. D038 defers the CLI pilot and
+live quality/usage evaluation to manual use after MVP. Automated integration uses
+controlled provider responses and real parsing/rendering/persistence; the delivered
+application still uses the real CLI adapter. Record live assertions as pending
+manual evaluation rather than passed or blocking MVP delivery. Do not remove or
+weaken automated checks to implement this scheduling decision. Operators later
+use the same examples and existing safe duration/usage output; no benchmark system
+or mandatory three-launch/60-second test series is required. The existing
+GenerationPolicy.timeout_seconds <= 60 runtime bound remains required.
+Inject a clock frozen at local date 2026-10-11 for formattingAsOf examples;
+their results must not depend on date.today(). Explicit import-precision cases
+retain their fixture's partial date.
+Capture and inspect 1280×900 synthetic screenshots at product checkpoints; A16/A20
+own final reference comparisons and theme/narrow-window/keyboard checks. Record
+inspection, not assumed user approval. No real candidate data in test traces/artifacts.
+
+BlockNote adapter acceptance belongs to task A06B before full editor work: one
+instance, two-job field/date selection mapped to exact UTF-16 spans, IME/newlines,
+disabled native history with `disableExtensions: ["history"]`, slot-aware popover
+focus and echo-free backend patches. The built API-served next.html smoke test
+asserts `[data-app="foldcv-next"]`; HTTP 200 alone cannot detect the legacy fallback.
+Use controlled callbacks before task A08's backend exists. Tasks A08/A09 add real
+mutation/restore/rewrite, structural guards and paste/stale-response cases.
+Transient BlockNote state is allowed; a second canonical/persisted document is not.
+See the recovery plan's BlockNote adapter boundary and linked integration report.
+
+D039 limits MVP resume output to DOCX using the existing Python writer. Task A00
+inventories PDF-only checks; tasks A06/A20 separate DOCX preflight/worker output
+from conversion. Task A21 updates requirement mappings with explicit deferral
+rather than deleting requirements or claiming PDF success. Keep DOCX and PDF-input
+checks required; optional legacy PDF tests do not require a converter on an MVP
+installation. The legacy mandatory-conversion paragraphs below are superseded.
+The existing python-docx add_run already emits w:br for normalized LF. Preserve
+that behavior and test OOXML breaks explicitly; paragraph text equality alone
+is insufficient. Keep Word visual inspection separate from the automated result.
+
+## Legacy T00–T17 strategy
+
 Test every automatable behavior, data invariant and error path in the first
 release. Tests ship with each implementation task. T16 audits the complete system;
 it is not a deferred testing phase. The current wireframe is the interface base,

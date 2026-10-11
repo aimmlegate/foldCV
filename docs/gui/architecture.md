@@ -1,5 +1,16 @@
 # Resume editor architecture
 
+> D039: MVP exports DOCX only through the existing Python writer. PDF export and
+> paginated preview are deferred; the new flow must work without LibreOffice.
+> Portable project save/open and PDF source import remain supported.
+
+> Next iteration: [backend reuse and frontend ownership](flow-recovery-plan.md#backend-reuse-and-frontend-ownership).
+> Build the frontend from scratch and reuse/extend Python for canonical project
+> state, domain operations, local storage, and export. This supersedes the
+> browser-owned state, stateless-project service, and memory-only restrictions
+> below. The new plan also overrides conflicting fixed editorial rules and UI
+> assumptions. This document retains the previous implementation's architecture.
+
 ## Runtime boundaries
 
 Use React and TypeScript for the browser interface, a Python FastAPI service for
