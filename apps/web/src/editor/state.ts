@@ -8,7 +8,7 @@ import type { RewritePreflightFailure } from "../contracts/generated/rewrite_pre
 import type { RewriteIssue } from "../contracts/generated/rewrite_result";
 import { parseDate } from "../facts/working";
 import { coverageDependency, coverageReview } from "./coverage";
-import type { CoverageDecision, SourceIntegrity } from "./coverage";
+import type { CoverageAcknowledgment, CoverageDecision, SourceIntegrity } from "./coverage";
 import type { WorkingSource } from "../facts/working";
 import catalog from "../../../../contracts/technology-catalog.json" with { type: "json" };
 
@@ -19,12 +19,15 @@ export type Panel = "preview" | "sources" | "checks";
 type Drafts = Record<string, string>;
 type Checkpoint = { state: BlockState; revision: number; visible: boolean; status: Block["status"]; dependencyHash: string;
   review: Review; issues: string[]; issueDetails: RewriteIssue[];
-  coverage: NonNullable<WorkingDraft["coverage"]> | null; manualEducation: string | null };
+  coverage: NonNullable<WorkingDraft["coverage"]> | null; manualEducation: string | null;
+  standaloneAcknowledgments: CoverageAcknowledgment[]; standaloneDecisions: CoverageDecision[] };
 export type PendingRewrite = { result: RewriteResult; before: string };
 export type EditorState = {
   project: Project | null;
   loadId: string | null;
   working: WorkingDraft | null;
+  standaloneAcknowledgments: CoverageAcknowledgment[];
+  standaloneDecisions: CoverageDecision[];
   sourceIntegrity: SourceIntegrity | null;
   workingIssues: string[];
   presentation: Presentation | null;
@@ -87,7 +90,7 @@ export type Action =
   | { type: "coverageAcknowledge"; issueId: string; dependency: string };
 
 export const initialEditorState: EditorState = {
-  project: null, loadId: null, working: null, sourceIntegrity: null, workingIssues: [], presentation: null, presentationDrafts: {}, presentationUndo: null,
+  project: null, loadId: null, working: null, standaloneAcknowledgments: [], standaloneDecisions: [], sourceIntegrity: null, workingIssues: [], presentation: null, presentationDrafts: {}, presentationUndo: null,
   stage: "import", panel: "preview", selectedId: null,
   drafts: {}, factDrafts: {}, structuredDrafts: {}, errors: {}, undo: {}, rewriteProposal: null,
   rewriteIssues: {}, rewriteIssueDetails: {}, sourceText: "", dirty: false,
@@ -176,6 +179,8 @@ function replaceBlock(state: EditorState, id: string, update: (block: Block) => 
     issues: state.rewriteIssues[id] ?? [],
     issueDetails: state.rewriteIssueDetails[id] ?? [],
     coverage: state.working?.coverage ? structuredClone(state.working.coverage) : null,
+    standaloneAcknowledgments: state.working ? [] : structuredClone(state.standaloneAcknowledgments),
+    standaloneDecisions: state.working ? [] : structuredClone(state.standaloneDecisions),
     manualEducation: block.kind === "education" ? state.working?.manual.education ?? null : null,
     review: {
       decisions: project.review.decisions.filter((decision) => decision.targetKind === "block" && decision.targetId === id),
@@ -272,9 +277,10 @@ function reduceEditorState(state: EditorState, action: Action): EditorState {
   switch (action.type) {
     case "restoreArchive": return action.state;
     case "coverageDecision": {
-      if (!state.project || !state.working) return state;
+      if (!state.project) return state;
       const input = { project: state.project, working: state.working, presentation: state.presentation,
-        rewriteIssues: state.rewriteIssueDetails, sourceIntegrity: state.sourceIntegrity };
+        rewriteIssues: state.rewriteIssueDetails, sourceIntegrity: state.sourceIntegrity,
+        standaloneDecisions: state.standaloneDecisions };
       if (coverageDependency(input, action.targetKind, action.targetId) !== action.dependency) return state;
       const review = coverageReview(input);
       const target = [...review.units, ...review.facts].find((item) =>
@@ -288,27 +294,38 @@ function reduceEditorState(state: EditorState, action: Action): EditorState {
       if (action.targetKind === "job" && action.disposition !== "excluded") return state;
       if (target && ["shown", "condensed", "duplicate"].includes(action.disposition) &&
         target.disposition !== action.disposition && !(action.disposition === "shown" && target.confirmable)) return state;
-      const decisions = state.working.coverage?.decisions.filter((item) =>
+      const decisions = (state.working?.coverage?.decisions ?? state.standaloneDecisions).filter((item) =>
         item.targetKind !== action.targetKind || item.targetId !== action.targetId) ?? [];
+      const saved = { targetKind: action.targetKind, targetId: action.targetId,
+        disposition: action.disposition, reason: reason || null, dependency: action.dependency };
+      if (!state.working) return { ...state, dirty: true, standaloneDecisions: [...decisions, saved] };
       return { ...state, dirty: true, working: { ...state.working, coverage: {
-        decisions: [...decisions, { targetKind: action.targetKind, targetId: action.targetId,
-          disposition: action.disposition, reason: reason || null, dependency: action.dependency }],
+        decisions: [...decisions, saved],
         acknowledgments: state.working.coverage?.acknowledgments ?? [] } } };
     }
     case "coverageClear": {
+      if (!state.working) return { ...state, dirty: true, standaloneDecisions: state.standaloneDecisions.filter((item) =>
+        item.targetKind !== action.targetKind || item.targetId !== action.targetId) };
       if (!state.working?.coverage) return state;
       return { ...state, dirty: true, working: { ...state.working, coverage: {
         ...state.working.coverage, decisions: state.working.coverage.decisions.filter((item) =>
           item.targetKind !== action.targetKind || item.targetId !== action.targetId) } } };
     }
     case "coverageAcknowledge": {
-      if (!state.project || !state.working) return state;
+      if (!state.project) return state;
       const review = coverageReview({ project: state.project, working: state.working,
         presentation: state.presentation, rewriteIssues: state.rewriteIssueDetails,
-        sourceIntegrity: state.sourceIntegrity });
+        sourceIntegrity: state.sourceIntegrity,
+        standaloneAcknowledgments: state.standaloneAcknowledgments,
+        standaloneDecisions: state.standaloneDecisions });
       const warning = review.warnings.find((item) => item.id === action.issueId &&
         item.dependency === action.dependency);
       if (!warning) return state;
+      if (!state.working) {
+        const retained = state.standaloneAcknowledgments.filter((item) => item.issueId !== action.issueId);
+        return { ...state, dirty: true, standaloneAcknowledgments: warning.acknowledged ? retained :
+          [...retained, { issueId: action.issueId, dependency: action.dependency }] };
+      }
       const acknowledgments = state.working.coverage?.acknowledgments.filter((item) =>
         item.issueId !== action.issueId) ?? [];
       return { ...state, dirty: true, working: { ...state.working, coverage: {
@@ -677,10 +694,45 @@ function reduceEditorState(state: EditorState, action: Action): EditorState {
         }
         working = { ...candidate, coverage: { decisions: candidate.coverage.decisions, acknowledgments } };
       }
+      let standaloneAcknowledgments = state.standaloneAcknowledgments;
+      let standaloneDecisions = state.standaloneDecisions;
+      if (!working && dependenciesCurrent) {
+        const restoredProject = { ...project, views, review };
+        const restoredInput = { project: restoredProject, working: null, presentation: state.presentation,
+          rewriteIssues: { ...state.rewriteIssueDetails, [action.id]: checkpoint.issueDetails } };
+        const expectedViews = views.map((item) => item.id === action.id ?
+          { ...item, revision: checkpoint.revision } : item);
+        const expectedInput = { ...restoredInput,
+          project: { ...restoredProject, views: expectedViews },
+          standaloneDecisions: checkpoint.standaloneDecisions };
+        const related = relatedCoverageTargets(state, action.id, checkpoint.state.factIds);
+        const retainedDecisions = state.standaloneDecisions.filter((item) =>
+          !related.has(`${item.targetKind}:${item.targetId}`));
+        const restoredDecisions = checkpoint.standaloneDecisions.filter((item) =>
+          related.has(`${item.targetKind}:${item.targetId}`)).flatMap((item) => {
+            if (coverageDependency(expectedInput, item.targetKind, item.targetId) !== item.dependency) return [];
+            const dependency = coverageDependency(restoredInput, item.targetKind, item.targetId);
+            return dependency ? [{ ...item, dependency }] : [];
+          });
+        standaloneDecisions = [...retainedDecisions, ...restoredDecisions];
+        const active = coverageReview({ ...restoredInput, standaloneDecisions }).warnings.filter((item) => item.blockId === action.id ||
+          item.factId && related.has(`fact:${item.factId}`));
+        const relatedIds = new Set(active.map((item) => item.id));
+        const expected = new Map(coverageReview(expectedInput).warnings.map((item) =>
+          [item.id, item.dependency]));
+        standaloneAcknowledgments = state.standaloneAcknowledgments.filter((item) => !relatedIds.has(item.issueId));
+        for (const item of active) {
+          if (checkpoint.standaloneAcknowledgments.some((ack) => ack.issueId === item.id &&
+              expected.get(ack.issueId) === ack.dependency))
+            standaloneAcknowledgments.push({ issueId: item.id, dependency: item.dependency });
+        }
+      }
       return { ...state, dirty: true, undo, rewriteProposal: state.rewriteProposal?.result.blockId === action.id ? null : state.rewriteProposal,
         rewriteIssues: { ...state.rewriteIssues, [action.id]: checkpoint.issues },
         rewriteIssueDetails: { ...state.rewriteIssueDetails, [action.id]: checkpoint.issueDetails },
         working,
+        standaloneAcknowledgments,
+        standaloneDecisions,
         project: { ...project, revision: project.revision + 1, views, review } };
     }
     case "review": {
@@ -811,6 +863,22 @@ function reduceEditorState(state: EditorState, action: Action): EditorState {
 export function editorReducer(state: EditorState, action: Action): EditorState {
   if (action.type === "restoreArchive") return action.state;
   const next = reduceEditorState(state, action);
+  if (next.project && !next.working &&
+      (next.standaloneAcknowledgments.length || next.standaloneDecisions.length)) {
+    const input = { project: next.project, working: null, presentation: next.presentation,
+      rewriteIssues: next.rewriteIssueDetails,
+      standaloneAcknowledgments: next.standaloneAcknowledgments,
+      standaloneDecisions: next.standaloneDecisions };
+    const decisions = next.standaloneDecisions.filter((item) =>
+      coverageDependency(input, item.targetKind, item.targetId) === item.dependency);
+    const review = coverageReview({ ...input, standaloneDecisions: decisions });
+    const warnings = new Map(review.warnings.map((item) => [item.id, item.dependency]));
+    const acknowledgments = next.standaloneAcknowledgments.filter((item) =>
+      warnings.get(item.issueId) === item.dependency);
+    if (decisions.length !== next.standaloneDecisions.length ||
+        acknowledgments.length !== next.standaloneAcknowledgments.length)
+      return { ...next, standaloneDecisions: decisions, standaloneAcknowledgments: acknowledgments };
+  }
   if (!next.project || !next.working?.coverage) return next;
   const input = { project: next.project, working: next.working,
     presentation: next.presentation, rewriteIssues: next.rewriteIssueDetails,

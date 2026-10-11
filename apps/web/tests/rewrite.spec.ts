@@ -5,6 +5,7 @@ import { tmpdir } from "node:os";
 import { resolve } from "node:path";
 import type { ChildProcessWithoutNullStreams } from "node:child_process";
 import { unzipSync } from "fflate";
+import { acknowledgeVisibleWarnings } from "./export-review";
 
 const root = resolve(import.meta.dirname, "../../../");
 const web = resolve(root, "apps/web");
@@ -69,7 +70,9 @@ async function openManualProject(page: Page, jobDescription = "Built a local ser
 
 test("imported project shows before/after, applies one rewrite, undoes, and renders without another call", async ({ page }) => {
   let rewrites = 0;
+  let previewCalls = 0;
   page.on("request", (request) => { if (request.url().endsWith("/v1/facts/rewrite")) rewrites += 1; });
+  page.on("request", (request) => { if (/\/v1\/(prepare-render|render)$/.test(request.url())) previewCalls += 1; });
   await openManualProject(page);
   await expect(page.getByLabel("Текст блока")).toContainText("Built reliable systems.");
   await page.getByLabel("Уточнение для предложения").fill("Make it concise.");
@@ -82,12 +85,18 @@ test("imported project shows before/after, applies one rewrite, undoes, and rend
   expect(prompt.task).toBe("rewrite_prose");
   expect(prompt.blockId).toBe("profile");
   expect(JSON.stringify(prompt)).not.toContain("originalBytes");
+  await page.getByRole("tab", { name: "Превью" }).click();
+  await expect(page.getByRole("status").getByText("Есть неприменённый ввод", { exact: false })).toBeVisible();
+  await page.getByRole("button", { name: "Обновить PDF" }).click();
+  await expect(page.getByRole("alert").getByText("Сначала примените или отмените введённые правки.")).toBeVisible();
+  expect(previewCalls).toBe(0);
   await page.getByRole("button", { name: "Применить предложение" }).click();
   await expect(page.getByLabel("Текст блока")).toContainText("Rewritten: Built reliable systems.");
   await page.getByRole("button", { name: "Отменить правку" }).click();
   await expect(page.getByLabel("Текст блока")).toContainText("Built reliable systems.");
   await page.getByRole("button", { name: "Обновить PDF" }).click();
   await expect(page.getByText("PDF готов", { exact: false })).toBeVisible({ timeout: 45_000 });
+  await acknowledgeVisibleWarnings(page);
   await page.getByRole("button", { name: "3. Выгрузка" }).click();
   const pdfDownload = page.waitForEvent("download");
   await page.getByRole("button", { name: "Скачать PDF" }).click();

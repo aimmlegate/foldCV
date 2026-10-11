@@ -1,4 +1,5 @@
 import { expect, test } from "@playwright/test";
+import { acknowledgeVisibleWarnings } from "./export-review";
 
 test.beforeEach(async ({ page }) => {
   await page.goto("/");
@@ -81,11 +82,22 @@ test("reload clears candidate state while manual theme persists", async ({ page 
 test("export offers explicit PDF, DOCX and project archive", async ({ page }) => {
   let operations = 0;
   page.on("request", (request) => { if (request.url().includes("/v1/operations")) operations += 1; });
+  await acknowledgeVisibleWarnings(page);
   await page.getByRole("button", { name: "3. Выгрузка" }).click();
   await expect(page.getByRole("button", { name: "Собрать и скачать PDF" })).toBeEnabled();
   await expect(page.getByRole("button", { name: "Собрать и скачать DOCX" })).toBeEnabled();
   await expect(page.getByRole("button", { name: "Скачать проект" })).toBeEnabled();
   expect(operations).toBe(0);
+});
+
+test("synthetic review links the stored source fragment without a working draft", async ({ page }) => {
+  await page.getByRole("tab", { name: "Проверки" }).click();
+  const metric = page.getByRole("tabpanel", { name: "Проверки" }).getByText(
+    "Проверьте число, диапазон, предел, единицу и контекст метрики.").locator("..");
+  await expect(metric).toContainText("Built a team from zero to five");
+  await metric.getByRole("button", { name: "Исходник" }).click();
+  await expect(page.getByRole("tabpanel", { name: "Источники" })).toContainText(
+    "Built a team from zero to five and processed up to 2000 records per day.");
 });
 
 test("untrusted text remains inert and errors use theme color", async ({ page }) => {

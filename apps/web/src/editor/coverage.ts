@@ -20,7 +20,8 @@ export type CoverageReadiness = { kind: "document_readiness"; status: "ready" | 
   blockers: CoverageIssue[]; warnings: CoverageIssue[]; units: CoverageTarget[]; facts: CoverageTarget[];
   projectSaveAllowed: true };
 export type CoverageInput = { project: Project; working: WorkingDraft | null; presentation: Presentation | null;
-  rewriteIssues?: Record<string, RewriteIssue[]>; sourceIntegrity?: SourceIntegrity | null };
+  rewriteIssues?: Record<string, RewriteIssue[]>; sourceIntegrity?: SourceIntegrity | null;
+  standaloneAcknowledgments?: CoverageAcknowledgment[]; standaloneDecisions?: CoverageDecision[] };
 
 export type SourceIntegrity = { valid: boolean; matches: (sources: WorkingSource[]) => boolean };
 
@@ -87,6 +88,19 @@ function confirmableText(input: CoverageInput, fact: Fact): boolean {
   return eligibleTextBlocks(input, fact).some((block) => block.status === "ready");
 }
 
+function identityField(input: CoverageInput, fact: Fact): "name" | "title" | null {
+  if (fact.kind !== "text" || fact.jobId !== null || !input.presentation) return null;
+  const value = fact.value.text.trim();
+  if (!value) return null;
+  if (value === input.presentation.name.trim()) return "name";
+  if (value === input.presentation.title.trim()) return "title";
+  return null;
+}
+
+function identityRepresented(input: CoverageInput, fact: Fact): boolean {
+  return identityField(input, fact) !== null;
+}
+
 function factDisposition(input: CoverageInput, fact: Fact): CoverageTarget["disposition"] {
   if (fact.kind === "technology") {
     const skills = input.project.views.find((block) => block.kind === "skills");
@@ -95,7 +109,7 @@ function factDisposition(input: CoverageInput, fact: Fact): CoverageTarget["disp
         item.value.display === fact.value.display);
     return rendered ? "shown" : "unresolved";
   }
-  if (fact.kind === "text") return eligibleTextBlocks(input, fact).some((block) =>
+  if (fact.kind === "text") return identityRepresented(input, fact) || eligibleTextBlocks(input, fact).some((block) =>
     textContains(block.state.text, fact.value.text)) ? "shown" : "unresolved";
   if (fact.jobId && oldJob(input.project, fact.jobId)) return "unresolved";
   const block = linkedBlock(input, fact);
@@ -113,13 +127,18 @@ function factDependency(input: CoverageInput, fact: Fact): string {
   const job = input.project.employment.find((item) => item.id === fact.jobId);
   const early = fact.jobId && oldJob(input.project, fact.jobId) ?
     input.project.views.find((item) => item.kind === "early_career") : undefined;
+  const identity = identityField(input, fact);
   return JSON.stringify([policy, fact, input.project.facts.some((item) => item.id === fact.id),
     skills && [skills.id, skills.revision, skills.visible],
     block && [block.id, block.revision, block.visible, block.status,
     block.state.text, block.state.factIds, block.contentPolicyVersion], job,
   profile && profile.id !== block?.id && [profile.id, profile.revision, profile.visible,
     profile.status, profile.state.text, profile.state.factIds, profile.contentPolicyVersion],
-  early && [early.id, early.revision, early.visible], fact.jobId ? input.project.asOf : null]);
+  early && [early.id, early.revision, early.visible], fact.jobId ? input.project.asOf : null,
+  fact.kind === "text" && fact.jobId === null ?
+    identity === "name" ? ["name", input.presentation?.name] :
+    identity === "title" ? ["title", input.presentation?.title] :
+    [input.presentation?.name, input.presentation?.title] : null]);
 }
 
 function reviewableFacts(input: CoverageInput): Fact[] {
@@ -181,7 +200,7 @@ function jobDependency(input: CoverageInput, jobId: string): string | null {
 
 function activeDecision(input: CoverageInput, kind: CoverageDecision["targetKind"], id: string,
                         dependency: string): CoverageDecision | undefined {
-  return input.working?.coverage?.decisions.find((item) => item.targetKind === kind &&
+  return (input.working?.coverage?.decisions ?? input.standaloneDecisions)?.find((item) => item.targetKind === kind &&
     item.targetId === id && item.dependency === dependency);
 }
 
@@ -191,7 +210,7 @@ function issue(input: CoverageInput, code: string, group: CoverageIssue["group"]
                "sourceId" | "unitId" | "factId" | "blockId" | "jobId"> = {}): CoverageIssue {
   const id = `${code}:${target}`;
   return { id, code, group, severity, message, action, dependency, ...links,
-    acknowledged: Boolean(input.working?.coverage?.acknowledgments.some((item) =>
+    acknowledged: Boolean((input.working?.coverage?.acknowledgments ?? input.standaloneAcknowledgments)?.some((item) =>
       item.issueId === id && item.dependency === dependency)) };
 }
 
@@ -311,6 +330,11 @@ export function coverageReview(input: CoverageInput): CoverageReadiness {
       issues.push(issue(input, "OMITTED_FACT", "decide", "warning", fact.id, dependency,
         "Факт остался только в данных проекта.", "Покажите факт, сократите или объясните исключение.",
         { factId: fact.id, ...(block ? { blockId: block.id } : {}), ...(sourceLink ?? {}) }));
+    }
+    if (disposition === "shown" && identityRepresented(input, fact) && !block) {
+      issues.push(visibleFactIssue(input, fact, undefined, "TEXT_MEANING",
+        "Проверьте, что имя или должность сохраняет смысл факта из исходника."));
+      continue;
     }
     if (disposition !== "shown" || !block?.visible || block.status === "stale") continue;
     const text = block.state.text;

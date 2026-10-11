@@ -3,7 +3,7 @@ import type { Presentation } from "../contracts/generated/prepare_request";
 import type { ExtractResult } from "../contracts/generated/extract_result";
 import type { FactSheet, TextFact } from "../contracts/generated/fact_sheet";
 import type { EditorState } from "../editor/state";
-import { initialEditorState } from "../editor/state";
+import { editorReducer, initialEditorState } from "../editor/state";
 import type { ImportedSource, ImportState } from "../import/workflow";
 import type { FactView } from "../facts/workflow";
 import type { ManualInput, WorkingDraft } from "../facts/working";
@@ -176,25 +176,33 @@ function review(value: unknown): boolean {
       ["fact", "block"].includes(String(item.targetKind)) && typeof item.targetId === "string" &&
       Number.isInteger(item.targetRevision));
 }
-function coverage(value: unknown): boolean {
-  return object(value) && exact(value, ["decisions", "acknowledgments"]) &&
-    Array.isArray(value.decisions) && Array.isArray(value.acknowledgments) &&
-    value.decisions.every((item: unknown) => object(item) &&
+function coverageDecisions(value: unknown): boolean {
+  return Array.isArray(value) && value.every((item: unknown) => object(item) &&
       exact(item, ["targetKind", "targetId", "disposition", "reason", "dependency"]) &&
       ["unit", "fact", "job"].includes(String(item.targetKind)) && typeof item.targetId === "string" &&
       ["shown", "condensed", "archived", "duplicate", "unresolved", "excluded"].includes(String(item.disposition)) &&
-      (item.reason === null || typeof item.reason === "string") && typeof item.dependency === "string") &&
-    value.acknowledgments.every((item: unknown) => object(item) && exact(item, ["issueId", "dependency"]) &&
+      (item.reason === null || typeof item.reason === "string") && typeof item.dependency === "string");
+}
+function coverageAcknowledgments(value: unknown): boolean {
+  return Array.isArray(value) && value.every((item: unknown) => object(item) && exact(item, ["issueId", "dependency"]) &&
       typeof item.issueId === "string" && typeof item.dependency === "string");
+}
+function coverage(value: unknown): boolean {
+  return object(value) && exact(value, ["decisions", "acknowledgments"]) &&
+    coverageDecisions(value.decisions) && coverageAcknowledgments(value.acknowledgments);
 }
 function checkpoints(value: unknown): boolean {
   return object(value) && Object.values(value).every((item) => object(item) &&
-    exact(item, ["state", "revision", "visible", "status", "dependencyHash", "review", "issues",
-      "issueDetails", "coverage", "manualEducation"]) && blockState(item.state) &&
+    optional(item, ["state", "revision", "visible", "status", "dependencyHash", "review", "issues",
+      "issueDetails", "coverage", "manualEducation"],
+      ["state", "revision", "visible", "status", "dependencyHash", "review", "issues",
+      "issueDetails", "coverage", "manualEducation", "standaloneAcknowledgments", "standaloneDecisions"]) && blockState(item.state) &&
     Number.isInteger(item.revision) && Number(item.revision) >= 1 && typeof item.visible === "boolean" &&
     ["empty", "running", "proposed", "ready", "stale", "error"].includes(String(item.status)) &&
     typeof item.dependencyHash === "string" && hashPattern.test(item.dependencyHash) && review(item.review) &&
     stringArray(item.issues) && issues(item.issueDetails) && (item.coverage === null || coverage(item.coverage)) &&
+    (item.standaloneAcknowledgments === undefined || coverageAcknowledgments(item.standaloneAcknowledgments)) &&
+    (item.standaloneDecisions === undefined || coverageDecisions(item.standaloneDecisions)) &&
     (item.manualEducation === null || typeof item.manualEducation === "string"));
 }
 function json(value: unknown): Uint8Array {
@@ -266,6 +274,8 @@ function recordEditor(state: EditorState, project: Project): EditorRecord {
   structuredDrafts: { ...state.structuredDrafts }, errors: { ...state.errors }, undo: structuredClone(state.undo),
   rewriteProposal: structuredClone(state.rewriteProposal), rewriteIssues: structuredClone(state.rewriteIssues),
   rewriteIssueDetails: structuredClone(state.rewriteIssueDetails), workingIssues: [...state.workingIssues],
+  standaloneAcknowledgments: state.working ? [] : structuredClone(state.standaloneAcknowledgments),
+  standaloneDecisions: state.working ? [] : structuredClone(state.standaloneDecisions),
   sourceText: state.sourceText, dirty: state.dirty };
 }
 function originalMap(input: ArchiveInput): Map<string, Uint8Array> {
@@ -360,9 +370,19 @@ function validWorking(value: unknown): value is WorkingRecord {
     (value.coverage === undefined || coverage(value.coverage));
 }
 function validEditor(value: unknown, project: Project | null): value is EditorRecord {
-  if (!object(value) || !exact(value, ["working", "presentation", "presentationDrafts", "presentationUndo", "stage",
+  if (!object(value) || !optional(value, ["working", "presentation", "presentationDrafts", "presentationUndo", "stage",
       "panel", "selectedId", "drafts", "factDrafts", "structuredDrafts", "errors", "undo", "rewriteProposal",
-      "rewriteIssues", "rewriteIssueDetails", "workingIssues", "sourceText", "dirty"]) ||
+      "rewriteIssues", "rewriteIssueDetails", "workingIssues", "sourceText", "dirty"],
+      ["working", "presentation", "presentationDrafts", "presentationUndo", "stage",
+      "panel", "selectedId", "drafts", "factDrafts", "structuredDrafts", "errors", "undo", "rewriteProposal",
+      "rewriteIssues", "rewriteIssueDetails", "workingIssues", "sourceText", "dirty", "standaloneAcknowledgments",
+      "standaloneDecisions"]) ||
+      (value.standaloneAcknowledgments !== undefined && !coverageAcknowledgments(value.standaloneAcknowledgments)) ||
+      (value.standaloneDecisions !== undefined && !coverageDecisions(value.standaloneDecisions)) ||
+      (value.working !== null && Array.isArray(value.standaloneAcknowledgments) &&
+        value.standaloneAcknowledgments.length > 0) ||
+      (value.working !== null && Array.isArray(value.standaloneDecisions) &&
+        value.standaloneDecisions.length > 0) ||
       !["import", "editor", "export"].includes(String(value.stage)) ||
       !["preview", "sources", "checks"].includes(String(value.panel)) ||
       !(value.selectedId === null || typeof value.selectedId === "string") ||
@@ -381,6 +401,10 @@ function validEditor(value: unknown, project: Project | null): value is EditorRe
       !object(value.presentationDrafts) || !optional(value.presentationDrafts, [], ["name", "title"]) ||
       !Object.values(value.presentationDrafts).every((item) => typeof item === "string")) return false;
   if (project === null && (value.working !== null || value.presentation !== null)) return false;
+  if (value.working !== null && object(value.undo) && Object.values(value.undo).some((item) =>
+    object(item) && (Array.isArray(item.standaloneAcknowledgments) && item.standaloneAcknowledgments.length > 0 ||
+      Array.isArray(item.standaloneDecisions) && item.standaloneDecisions.length > 0)))
+    return false;
   if (project && (!object(value.undo) || !object(value.drafts) || !object(value.factDrafts) ||
       !object(value.rewriteIssues) || !object(value.rewriteIssueDetails) ||
       !Object.keys(value.undo).every((id) => project.views.some((block) => block.id === id)) ||
@@ -696,12 +720,18 @@ export async function openProject(bytes: Uint8Array): Promise<OpenedArchive> {
     if (!original || await sha256(original) !== source.byteSha256) throw new Error("Project original is missing or changed.");
     projectOriginals[source.id] = Uint8Array.from(original);
   }
-  const editor: EditorState = workspace.editor ? { ...workspace.editor, project, working: restoredWorking,
+  const restoredEditor: EditorState = workspace.editor ? { ...workspace.editor,
+    standaloneAcknowledgments: workspace.editor.standaloneAcknowledgments ?? [], project, working: restoredWorking,
+    standaloneDecisions: workspace.editor.standaloneDecisions ?? [],
+    undo: Object.fromEntries(Object.entries(workspace.editor.undo).map(([id, checkpoint]) =>
+      [id, { ...checkpoint, standaloneAcknowledgments: checkpoint.standaloneAcknowledgments ?? [],
+        standaloneDecisions: checkpoint.standaloneDecisions ?? [] }])),
     loadId: crypto.randomUUID(), sourceIntegrity: null, dirty: true } :
-    { project: null, loadId: null, working: null, sourceIntegrity: null, workingIssues: [],
+    { project: null, loadId: null, working: null, standaloneAcknowledgments: [], standaloneDecisions: [], sourceIntegrity: null, workingIssues: [],
       presentation: null, presentationDrafts: {}, presentationUndo: null, stage: "import", panel: "preview",
       selectedId: null, drafts: {}, factDrafts: {}, structuredDrafts: {}, errors: {}, undo: {}, rewriteProposal: null,
       rewriteIssues: {}, rewriteIssueDetails: {}, sourceText: workspace.preEditorSourceText, dirty: true };
+  const editor = editorReducer(restoredEditor, { type: "panel", panel: restoredEditor.panel });
   const pdf = files.get("renders/preview.pdf");
   const docx = files.get("renders/resume.docx");
   const request = files.get("renders/request.json");

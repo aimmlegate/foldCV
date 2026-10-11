@@ -7,6 +7,7 @@ import type { Action, EditorState } from "../editor/state";
 import type { PrepareRequest } from "../contracts/generated/prepare_request";
 import { PreviewWorkflow } from "../preview/workflow";
 import type { PreviewState } from "../preview/workflow";
+import { exportReadiness } from "../preview/readiness";
 import { ImportPanel } from "../import/ImportPanel";
 import { ImportWorkflow } from "../import/workflow";
 import type { ImportState } from "../import/workflow";
@@ -113,7 +114,8 @@ export function App() {
   const workflowRef = useRef<PreviewWorkflow | null>(null);
   if (!workflowRef.current) workflowRef.current = new PreviewWorkflow(setPreview, (artifact, kind) => {
     const current = stateRef.current;
-    if (!current.project || hasUnappliedDraft(current) || artifact.request.baseRevision !== current.project.revision) return;
+    if (!current.project || !current.presentation || !exportReadiness(current).allowed ||
+        !workflow.matches({ project: current.project, presentation: current.presentation }, artifact)) return;
     const bytes = kind === "pdf" ? artifact.pdf : artifact.docx;
     const url = URL.createObjectURL(new Blob([Uint8Array.from(bytes)],
       { type: kind === "pdf" ? "application/pdf" : "application/vnd.openxmlformats-officedocument.wordprocessingml.document" }));
@@ -141,6 +143,7 @@ export function App() {
       rewriteWorkflow.cancel();
     const invalidated = next.project !== previous.project || next.presentation !== previous.presentation ||
         action.type === "draft" || action.type === "factDraft" || action.type === "presentationDraft" ||
+        action.type === "structuredDraft" || action.type === "structuredCancel" ||
         action.type === "cancel" || action.type === "cancelFact" || action.type === "presentationCancel";
     if (invalidated) {
       workflow.invalidate();
@@ -165,7 +168,8 @@ export function App() {
   function refreshPreview(exportKind?: "pdf" | "docx") {
     const current = stateRef.current;
     if (!current.project || !current.presentation) return;
-    if (hasUnappliedDraft(current)) {
+    if (exportKind && !exportReadiness(current).allowed) return;
+    if (exportReadiness(current).pendingInput) {
       setPreview({ status: "error", artifact: preview.artifact,
         error: "Сначала примените или отмените введённые правки." });
       return;
@@ -245,10 +249,12 @@ export function App() {
     }
   }
   const project = state.project;
+  const isExample = project?.projectId === "project_synthetic";
   const block = selectedBlock(state);
-  const unapplied = hasUnappliedDraft(state);
-  const canExport = preview.status === "ready" && workflow.ready !== null && !unapplied &&
-    workflow.ready.request.baseRevision === project?.revision;
+  const readiness = exportReadiness(state);
+  const unapplied = readiness.pendingInput;
+  const canExport = preview.status === "ready" && workflow.ready !== null && Boolean(project && state.presentation) &&
+    readiness.allowed && workflow.matches({ project: project!, presentation: state.presentation! }, workflow.ready);
   const unsaved = state.dirty || unapplied || importState.entries.length > 0 || legacy !== null ||
     JSON.stringify(manualForm) !== JSON.stringify(emptyManualInput) || assertionDraft.trim().length > 0 ||
     Object.keys(factEdits).length > 0 || rewriteInstruction.trim().length > 0;
@@ -330,13 +336,11 @@ export function App() {
         blockRevision: target.revision, dependencyHash }));
   }
   function openSource(sourceId: string, unitId: string) {
-    setFocusedUnit(`view_${sourceId}_${unitId}`);
+    setFocusedUnit(unitId.startsWith(`view_${sourceId}_`) ? unitId : `view_${sourceId}_${unitId}`);
     send({ type: "panel", panel: "sources" });
     window.requestAnimationFrame(() => document.getElementById(`source-${sourceId}-${unitId}`)?.scrollIntoView({ block: "nearest" }));
   }
-  const coverage = project && state.working ? coverageReview({ project, working: state.working,
-    presentation: state.presentation, rewriteIssues: state.rewriteIssueDetails,
-    sourceIntegrity: state.sourceIntegrity }) : null;
+  const coverage = readiness.review;
   const reviewCount = (project?.review.decisions.filter((decision) => decision.disposition === "unresolved").length ?? 0) +
     state.workingIssues.length + (coverage?.blockers.length ?? 0) +
     (coverage?.warnings.filter((issue) => !issue.acknowledged).length ?? 0);
@@ -350,11 +354,38 @@ export function App() {
       `view_${evidence.sourceId}_${evidence.unitId}`) ?? []) : []);
   const relatedUnits = block ? project?.sources.flatMap((source) => source.units.filter((unit) =>
     correctedUnits.has(unit.id) || unit.representedFactIds.some((id) => block.state.factIds.includes(id)))) ?? [] : [];
+  const focusedSource = !state.working && focusedUnit ? project?.sources.flatMap((source) =>
+    source.units.filter((unit) => unit.id === focusedUnit ||
+      `view_${source.id}_${unit.id}` === focusedUnit).map((unit) => ({ source, unit })))[0] : undefined;
   function blockTitle(item: Block): string {
     if (item.kind !== "job_prose") return titles[item.kind];
     const jobId = Object.entries(state.presentation?.jobProseBlocks ?? {}).find(([, blockId]) => blockId === item.id)?.[0];
     const employer = project?.employment.find((job) => job.id === jobId)?.employer;
     return employer ? `Проект: ${employer}` : "Проект без привязки";
+  }
+  function issueLabel(issue: NonNullable<typeof coverage>["warnings"][number]): string {
+    const target = project?.views.find((item) => item.id === issue.blockId);
+    const indexForJob = (id: string): string => {
+      const index = project?.employment.findIndex((item) => item.id === id) ?? -1;
+      return index < 0 ? "Раздел работы" : `Работа ${index + 1}`;
+    };
+    if (target) {
+      if (target.kind !== "job_prose") return titles[target.kind];
+      const jobId = Object.entries(state.presentation?.jobProseBlocks ?? {})
+        .find(([, blockId]) => blockId === target.id)?.[0];
+      return jobId ? indexForJob(jobId) : "Раздел работы";
+    }
+    const job = project?.employment.find((item) => item.id === issue.jobId ||
+      item.id === project.facts.find((fact) => fact.id === issue.factId)?.jobId);
+    if (job) return indexForJob(job.id);
+    const fact = project?.facts.find((item) => item.id === issue.factId);
+    if (issue.code === "TEXT_MEANING" && fact?.kind === "text" && fact.jobId === null) {
+      if (fact.value.text.trim() === state.presentation?.name.trim()) return "Имя кандидата";
+      if (fact.value.text.trim() === state.presentation?.title.trim()) return "Должность";
+    }
+    if (fact) return fact.kind === "metric" ? "Метрика" : fact.kind === "leadership" ? "Руководство" :
+      fact.kind === "technology" ? "Навык" : "Факт";
+    return issue.sourceId ? "Исходный фрагмент" : "Документ";
   }
   return <div className="min-h-screen bg-surface text-content">
     <header className="flex flex-wrap items-center gap-4 border-b border-outline bg-panel px-6 py-4">
@@ -398,13 +429,13 @@ export function App() {
           onText={(text) => send({ type: "sourceText", text })} exampleDisabled={importState.entries.length > 0 || importState.pending}
           onExample={() => { importWorkflow.clear(); factWorkflow.clear(); clearArchiveOwners();
             send({ type: "loadExample", loadId: crypto.randomUUID() }); }} />
-          : <section className="rounded border border-outline bg-panel p-5"><h2 className="mb-3 text-lg font-semibold">{state.working ? "Открыт черновик" : "Открыт вымышленный пример"}</h2>
+          : <section className="rounded border border-outline bg-panel p-5"><h2 className="mb-3 text-lg font-semibold">{state.working ? "Открыт черновик" : isExample ? "Открыт вымышленный пример" : "Открыт проект из архива"}</h2>
             <p className="text-sm text-muted">Новый импорт доступен после явного закрытия текущего проекта. Текущие правки не будут перенесены.</p>
-            {!closeProjectPrompt ? <button type="button" className={`${control} mt-4`} onClick={() => setCloseProjectPrompt(true)}>{state.working ? "Закрыть проект и перейти к импорту" : "Закрыть пример и перейти к импорту"}</button>
-              : <div className="mt-4 space-y-2"><p role="alert" className="text-sm text-danger">Несохранённые правки {state.working ? "проекта" : "примера"} будут удалены.</p>
+            {!closeProjectPrompt ? <button type="button" className={`${control} mt-4`} onClick={() => setCloseProjectPrompt(true)}>{isExample ? "Закрыть пример и перейти к импорту" : "Закрыть проект и перейти к импорту"}</button>
+              : <div className="mt-4 space-y-2"><p role="alert" className="text-sm text-danger">Несохранённые правки {isExample ? "примера" : "проекта"} будут удалены.</p>
                 <div className="flex gap-2"><button type="button" className={control} onClick={() => { importWorkflow.clear(); factWorkflow.clear(); clearArchiveOwners();
                   send({ type: "resetProject" }); setCloseProjectPrompt(false); }}>Подтвердить закрытие</button>
-                  <button type="button" className={control} onClick={() => setCloseProjectPrompt(false)}>{state.working ? "Оставить проект" : "Оставить пример"}</button></div></div>}
+                  <button type="button" className={control} onClick={() => setCloseProjectPrompt(false)}>{isExample ? "Оставить пример" : "Оставить проект"}</button></div></div>}
           </section>}
       </div>
       {!project && importState.entries.length > 0 && <><FactPanel key={archiveEpoch} view={factView} workflow={factWorkflow} sources={importState.entries}
@@ -444,7 +475,7 @@ export function App() {
         <div className="mt-5 border-t border-outline pt-4 text-sm"><strong>Проверка</strong><p className="mt-1 text-muted">{reviewCount} пунктов проверки · {staleCount} устаревших блоков</p></div>
       </aside>
       <section aria-label="Редактор блока" className="min-w-0 border-b border-outline bg-panel p-5 xl:border-b-0 xl:border-r xl:p-7">
-        <p className="mb-1 text-xs uppercase tracking-wide text-muted">{state.working?.draft ? "Черновик из импорта · предложение требует проверки" : state.working ? "Дословный черновик из импорта" : "Вымышленный пример"} · редакция {project.revision}</p>
+        <p className="mb-1 text-xs uppercase tracking-wide text-muted">{state.working?.draft ? "Черновик из импорта · предложение требует проверки" : state.working ? "Дословный черновик из импорта" : isExample ? "Вымышленный пример" : "Проект из архива"} · редакция {project.revision}</p>
         {state.presentation && <div className="mb-5 grid gap-3 rounded border border-outline p-3 sm:grid-cols-2">
           {(["name", "title"] as const).map((key) => <div key={key}><label htmlFor={`candidate-${key}`} className="mb-1 block text-sm font-semibold">{key === "name" ? "Имя кандидата" : "Должность"}</label>
             <input id={`candidate-${key}`} className={field} aria-invalid={Boolean(state.errors[key])} value={state.presentationDrafts[key] ?? state.presentation?.[key] ?? ""} onChange={(event) => send({ type: "presentationDraft", field: key, text: event.target.value })} />
@@ -488,11 +519,59 @@ export function App() {
           {preview.error && <p role="alert" className="mb-2 text-sm text-danger">{preview.error}</p>}
           {pdfUrl ? <iframe title="Превью PDF" src={pdfUrl} className="h-[65vh] min-h-96 w-full border border-outline bg-surface" /> : <p className="py-12 text-center text-muted">Нажмите «Обновить PDF», чтобы увидеть документ.</p>}
         </Tabs.Content>
-        <Tabs.Content value="sources" className="rounded border border-outline bg-panel p-5"><h2 className="mb-3 font-semibold">Связанные фрагменты исходника</h2>{relatedUnits.length ? relatedUnits.map((unit) => <blockquote key={unit.id} className="mb-3 whitespace-pre-wrap break-words border-l-2 border-outline bg-surface p-3 text-sm">{unit.text}</blockquote>) : <p className="text-sm text-muted">Для этого раздела нет связанного фрагмента.</p>}{state.working && <WorkingSources working={state.working} focusedUnit={focusedUnit} />}<p className="mt-4 text-xs text-muted">Исходный текст неизменен; правки фактов хранятся отдельно в памяти вкладки.</p></Tabs.Content>
+        <Tabs.Content value="sources" className="rounded border border-outline bg-panel p-5"><h2 className="mb-3 font-semibold">Связанные фрагменты исходника</h2>
+          {focusedSource && <blockquote id={`source-${focusedSource.source.id}-${focusedSource.unit.id}`}
+            className="mb-3 whitespace-pre-wrap break-words border-l-2 border-accent bg-surface p-3 text-sm">
+            {focusedSource.source.overlays.find((item) => item.unitId === focusedSource.unit.id)?.text ?? focusedSource.unit.text}
+          </blockquote>}
+          {relatedUnits.length ? relatedUnits.filter((unit) => unit !== focusedSource?.unit).map((unit) =>
+            <blockquote key={unit.id} className="mb-3 whitespace-pre-wrap break-words border-l-2 border-outline bg-surface p-3 text-sm">{unit.text}</blockquote>) :
+            !focusedSource && <p className="text-sm text-muted">Для этого раздела нет связанного фрагмента.</p>}
+          {state.working && <WorkingSources working={state.working} focusedUnit={focusedUnit} />}
+          <p className="mt-4 text-xs text-muted">Исходный текст неизменен; правки фактов хранятся отдельно в памяти вкладки.</p></Tabs.Content>
         <Tabs.Content value="checks" className="rounded border border-outline bg-panel p-5"><h2 className="mb-3 font-semibold">Проверки</h2><ul className="list-disc space-y-2 pl-5 text-sm"><li>{reviewCount} пунктов проверки</li><li>{staleCount} блоков требуют повторной проверки</li><li>{isReviewed ? "Выбранный блок отмечен проверенным" : "Выбранный блок ещё не отмечен проверенным"}</li>{state.workingIssues.map((issue, index) => <li key={index}>{issue}</li>)}</ul><CoveragePanel state={state} send={send} openSource={openSource} /><p className="mt-4 text-xs text-muted">Дословный черновик требует проверки смысла. Связь с источником не доказывает точность формулировки.</p></Tabs.Content>
       </Tabs.Root></aside>
     </main>}
-    {state.stage === "export" && <main className="mx-auto max-w-5xl p-6"><h1 className="mb-2 text-2xl font-semibold">Документы и проект для следующего раза</h1><p className="mb-5 text-muted">PDF и DOCX скачиваются из одной проверенной сборки. Проект сохраняется отдельно по кнопке.</p><div className="grid gap-4 md:grid-cols-3"><div className="rounded border border-outline bg-panel p-5"><h2 className="font-semibold">PDF</h2><button type="button" disabled={unapplied} onClick={() => refreshPreview("pdf")} className={`${control} mt-4`}>{canExport ? "Скачать PDF" : "Собрать и скачать PDF"}</button></div><div className="rounded border border-outline bg-panel p-5"><h2 className="font-semibold">DOCX</h2><button type="button" disabled={unapplied} onClick={() => refreshPreview("docx")} className={`${control} mt-4`}>{canExport ? "Скачать DOCX" : "Собрать и скачать DOCX"}</button></div><div className="rounded border border-outline bg-panel p-5"><h2 className="font-semibold">Проект .cvproject</h2><button type="button" onClick={() => void saveArchive()} className={`${control} mt-4`}>Скачать проект</button></div></div><div aria-live="polite" aria-busy={preview.status === "rendering"} className="mt-4 text-sm">{preview.status === "rendering" && <p role="status">Сборка документов…</p>}{preview.error && <p role="alert" className="text-danger">{preview.error}</p>}</div>{project && <p className="mt-5 text-sm text-muted">Редакция {project.revision} · {canExport ? "PDF готов" : "актуального PDF нет"} · {reviewCount} пунктов проверки</p>}</main>}
+    {state.stage === "export" && <main className="mx-auto max-w-5xl p-6">
+      <h1 className="mb-2 text-2xl font-semibold">Документы и проект для следующего раза</h1>
+      <p className="mb-5 text-muted">PDF и DOCX скачиваются из одной проверенной сборки. Проект сохраняется отдельно по кнопке.</p>
+      <div className="grid gap-4 md:grid-cols-3">
+        <div className="rounded border border-outline bg-panel p-5"><h2 className="font-semibold">PDF</h2>
+          <button type="button" disabled={!readiness.allowed} onClick={() => refreshPreview("pdf")}
+            className={`${control} mt-4`}>{canExport ? "Скачать PDF" : "Собрать и скачать PDF"}</button></div>
+        <div className="rounded border border-outline bg-panel p-5"><h2 className="font-semibold">DOCX</h2>
+          <button type="button" disabled={!readiness.allowed} onClick={() => refreshPreview("docx")}
+            className={`${control} mt-4`}>{canExport ? "Скачать DOCX" : "Собрать и скачать DOCX"}</button></div>
+        <div className="rounded border border-outline bg-panel p-5"><h2 className="font-semibold">Проект .cvproject</h2>
+          <button type="button" onClick={() => void saveArchive()} className={`${control} mt-4`}>Скачать проект</button></div>
+      </div>
+      <div aria-live="polite" aria-busy={preview.status === "rendering"} className="mt-4 text-sm">
+        {preview.status === "rendering" && <p role="status">Сборка документов…</p>}
+        {preview.error && <p role="alert" className="text-danger">{preview.error}</p>}
+      </div>
+      {readiness.pendingInput && <p role="alert" className="mt-4 text-sm text-danger">Есть неприменённый ввод. Примените или отмените его перед выгрузкой документов.</p>}
+      {(readiness.blockers.length > 0 || readiness.unacknowledged.length > 0) &&
+        <section className="mt-5 rounded border border-outline bg-panel p-4 text-sm">
+          <h2 className="font-semibold">Перед выгрузкой документов</h2>
+          <p className="mt-1">{readiness.blockers.length} препятствий · {readiness.unacknowledged.length} предупреждений ждут проверки.</p>
+          <ul className="mt-2 list-disc space-y-1 pl-5">
+            {[...readiness.blockers, ...readiness.unacknowledged].slice(0, 6).map((issue) =>
+              <li key={issue.id}>{issueLabel(issue)}: {issue.message}</li>)}
+          </ul>
+          {readiness.blockers.length + readiness.unacknowledged.length > 6 &&
+            <p className="mt-2 text-muted">Ещё {readiness.blockers.length + readiness.unacknowledged.length - 6} пунктов в проверках.</p>}
+          <button type="button" className={`${control} mt-3`} onClick={() => {
+            send({ type: "stage", stage: "editor" }); send({ type: "panel", panel: "checks" });
+          }}>Открыть проверки</button>
+        </section>}
+      {coverage?.warnings.some((issue) => issue.acknowledged) &&
+        <details className="mt-5 rounded border border-outline bg-panel p-4 text-sm">
+          <summary className="cursor-pointer font-semibold">Оставшиеся признанные неоднозначности · {coverage.warnings.filter((issue) => issue.acknowledged).length}</summary>
+          <ul className="mt-2 list-disc space-y-1 pl-5">{coverage.warnings.filter((issue) => issue.acknowledged).map((issue) =>
+            <li key={issue.id}>{issueLabel(issue)}: {issue.message}</li>)}</ul>
+        </details>}
+      {project && <p className="mt-5 text-sm text-muted">Редакция {project.revision} · {canExport ? "PDF готов" : "актуального PDF нет"} · {reviewCount} пунктов проверки</p>}
+    </main>}
     <footer className="flex flex-wrap gap-5 border-t border-outline bg-panel px-6 py-3 text-xs text-muted"><span>Проект в памяти вкладки</span><span>Завершённых текстовых операций в этой сессии: {draftView.completed + rewriteView.completed}</span><span>Ручное редактирование: 0 запросов</span></footer>
   </div>;
 }

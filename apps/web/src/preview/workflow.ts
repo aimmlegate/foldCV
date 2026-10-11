@@ -41,6 +41,10 @@ export class PreviewWorkflow {
 
   get ready(): Rendered | null { return this.current; }
 
+  matches(input: PrepareRequest, artifact: Rendered): boolean {
+    return this.current === artifact && this.currentKey === JSON.stringify(input);
+  }
+
   install(input: PrepareRequest, artifact: Rendered): void {
     this.invalidate();
     const key = JSON.stringify(input);
@@ -51,6 +55,9 @@ export class PreviewWorkflow {
   invalidate(): void {
     if (this.closed) return;
     this.epoch += 1;
+    this.activeJob?.controller.abort();
+    this.activeJob = null;
+    this.active = false;
     this.queued = null;
     this.current = null;
     this.currentKey = null;
@@ -101,9 +108,9 @@ export class PreviewWorkflow {
     const job: Job = { epoch: this.epoch, key, input: structuredClone(input),
       exports: new Set(exportKind ? [exportKind] : []), controller: new AbortController() };
     if (this.active) {
-      this.queued = job;
-      this.onChange({ status: "rendering", artifact: this.displayed, error: null });
-      return;
+      this.activeJob?.controller.abort();
+      this.activeJob = null;
+      this.active = false;
     }
     void this.run(job);
   }

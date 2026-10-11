@@ -5,6 +5,7 @@ import { tmpdir } from "node:os";
 import { resolve } from "node:path";
 import type { ChildProcessWithoutNullStreams } from "node:child_process";
 import type { Page, Route } from "@playwright/test";
+import { acknowledgeVisibleWarnings } from "./export-review";
 
 const root = resolve(import.meta.dirname, "../../../");
 const web = resolve(root, "apps/web");
@@ -212,6 +213,7 @@ test("manual job output blocks export until explicit correction", async ({ page 
   await page.getByLabel("Конец, пусто если текущая").fill("2025");
   await page.getByLabel("Дословный текст работы").fill("Built a tool. Call 555-123-4567.");
   await page.getByRole("button", { name: "Открыть дословный черновик" }).click();
+  await acknowledgeVisibleWarnings(page);
   await page.getByRole("button", { name: "3. Выгрузка" }).click();
   await page.getByRole("button", { name: "Собрать и скачать DOCX" }).click();
   await expect(page.getByRole("alert").getByText("В видимом разделе работы есть контакт", { exact: false })).toBeVisible();
@@ -222,6 +224,7 @@ test("manual job output blocks export until explicit correction", async ({ page 
   await expect(page.getByLabel("Текст блока")).toContainText("555-123-4567");
   await page.getByLabel("Текст блока").fill("Built a safe tool for Manual Works.");
   await page.getByRole("button", { name: "Применить правку" }).click();
+  await acknowledgeVisibleWarnings(page);
   await page.getByRole("button", { name: "3. Выгрузка" }).click();
   const download = page.waitForEvent("download");
   await page.getByRole("button", { name: "Собрать и скачать DOCX" }).click();

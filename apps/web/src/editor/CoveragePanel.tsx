@@ -79,7 +79,11 @@ function unitSummary(state: EditorState, target: CoverageTarget): string {
     ?.entry.result.units.find((item) => item.id === target.unitId);
   const overlay = state.working?.sources.find((item) => item.entry.result.sourceId === target.sourceId)
     ?.entry.overlays[`unit:${target.unitId}`];
-  return safeSummary(overlay || unit?.text || "Фрагмент исходника недоступен");
+  const saved = state.project?.sources.find((item) => item.id === target.sourceId);
+  const savedUnit = saved?.units.find((item) => item.id === target.unitId ||
+    item.id === `view_${target.sourceId}_${target.unitId}`);
+  const savedOverlay = saved?.overlays.find((item) => item.unitId === savedUnit?.id);
+  return safeSummary(overlay || savedOverlay?.text || unit?.text || savedUnit?.text || "Фрагмент исходника недоступен");
 }
 
 function IssueList({ title, issues, facts, state, send, openSource, openFact }: {
@@ -115,7 +119,7 @@ function IssueList({ title, issues, facts, state, send, openSource, openFact }: 
 function DecisionRow({ target, state, send, openSource }: {
   target: CoverageTarget; state: EditorState; send: Props["send"]; openSource: Props["openSource"] }) {
   const [reason, setReason] = useState("");
-  const saved = state.working?.coverage?.decisions.find((item) => item.targetKind === target.kind &&
+  const saved = (state.working?.coverage?.decisions ?? state.standaloneDecisions).find((item) => item.targetKind === target.kind &&
     item.targetId === target.id && item.dependency === target.dependency);
   const canDecide = target.disposition === "unresolved" || target.disposition === "archived" ||
     target.disposition === "excluded" || Boolean(saved);
@@ -145,9 +149,11 @@ function DecisionRow({ target, state, send, openSource }: {
 
 export function CoveragePanel({ state, send, openSource }: Props) {
   const [jobReasons, setJobReasons] = useState<Record<string, string>>({});
-  if (!state.project || !state.working) return null;
+  if (!state.project) return null;
   const input = { project: state.project, working: state.working, presentation: state.presentation,
-    rewriteIssues: state.rewriteIssueDetails, sourceIntegrity: state.sourceIntegrity };
+    rewriteIssues: state.rewriteIssueDetails, sourceIntegrity: state.sourceIntegrity,
+    standaloneAcknowledgments: state.standaloneAcknowledgments,
+    standaloneDecisions: state.standaloneDecisions };
   const review = coverageReview(input);
   function openFact(id: string) {
     const details = document.getElementById("coverage-facts");
@@ -169,7 +175,7 @@ export function CoveragePanel({ state, send, openSource }: Props) {
         onClick={() => send({ type: "coverageDecision", targetKind: "job", targetId: item.jobId!,
           disposition: "excluded", reason: jobReasons[item.jobId!] ?? "", dependency: item.dependency })}>Исключить работу</button>
     </div>)}
-    {state.working.coverage?.decisions.filter((item) => item.targetKind === "job" &&
+    {(state.working?.coverage?.decisions ?? state.standaloneDecisions).filter((item) => item.targetKind === "job" &&
       item.disposition === "excluded").map((item) => <div key={`saved-${item.targetId}`}
         className="mt-2 rounded border border-outline p-2" title={item.targetId}>Работа {jobLabel(state, item.targetId)} исключена: {item.reason}
         <button type="button" className={`${control} ml-2`} onClick={() => send({ type: "coverageClear",

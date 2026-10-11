@@ -7,6 +7,7 @@ import { resolve } from "node:path";
 import type { ChildProcessWithoutNullStreams } from "node:child_process";
 import { unzipSync, zipSync } from "fflate";
 import { syntheticProject, syntheticSourceBytes } from "../src/editor/example";
+import { acknowledgeVisibleWarnings, excludeUnrepresentedFacts } from "./export-review";
 
 const root = resolve(import.meta.dirname, "../../../");
 const web = resolve(root, "apps/web");
@@ -68,6 +69,7 @@ test("real service keeps PDF preview identical to download and DOCX editable wit
     if (!(iframe instanceof HTMLIFrameElement) || !iframe.src) throw new Error("missing PDF viewer");
     return Array.from(new Uint8Array(await (await fetch(iframe.src)).arrayBuffer()));
   });
+  await acknowledgeVisibleWarnings(page);
   await page.getByRole("button", { name: "3. Выгрузка" }).click();
   const pdfPromise = page.waitForEvent("download");
   await page.getByRole("button", { name: "Скачать PDF" }).click();
@@ -87,6 +89,7 @@ test("real service keeps PDF preview identical to download and DOCX editable wit
   await page.getByRole("button", { name: "2. Редактор" }).click();
   await page.getByLabel("Текст блока").fill("A second explicit synthetic revision.");
   await page.getByRole("button", { name: "Применить правку" }).click();
+  await acknowledgeVisibleWarnings(page);
   await page.getByRole("button", { name: "3. Выгрузка" }).click();
   const newerDocxPromise = page.waitForEvent("download");
   await page.getByRole("button", { name: "Собрать и скачать DOCX" }).click();
@@ -96,6 +99,7 @@ test("real service keeps PDF preview identical to download and DOCX editable wit
   const newerDocument = unzipSync(new Uint8Array(readFileSync(newerPath!)));
   expect(new TextDecoder().decode(newerDocument["word/document.xml"])).toContain("A second explicit synthetic revision.");
   await page.getByRole("button", { name: "2. Редактор" }).click();
+  await page.getByRole("tab", { name: "Превью" }).click();
   await expect(page.getByText("PDF готов", { exact: false })).toBeVisible();
   const newerShown = await page.getByTitle("Превью PDF").evaluate(async (iframe) => {
     if (!(iframe instanceof HTMLIFrameElement) || !iframe.src) throw new Error("missing PDF viewer");
@@ -160,6 +164,7 @@ test("saved project reopens with verified template and rebuilds PDF before expor
     if (!(iframe instanceof HTMLIFrameElement) || !iframe.src) throw new Error("missing PDF viewer");
     return Array.from(new Uint8Array(await (await fetch(iframe.src)).arrayBuffer()));
   });
+  await acknowledgeVisibleWarnings(page);
   await page.getByRole("button", { name: "3. Выгрузка" }).click();
   const rebuiltDownload = page.waitForEvent("download");
   await page.getByRole("button", { name: "Скачать PDF" }).click();
@@ -176,6 +181,7 @@ test("saved project reopens with verified template and rebuilds PDF before expor
     if (path.startsWith("template/")) expect(secondEntries[path]).toEqual(data);
   }
   await page.getByRole("button", { name: "2. Редактор" }).click();
+  await page.getByRole("tab", { name: "Превью" }).click();
   const edited = "Current unsaved project must survive cancel and corruption.";
   await page.getByLabel("Текст блока").fill(edited);
   await page.getByLabel("Открыть .cvproject").setInputFiles({ name: "saved.cvproject",
@@ -284,7 +290,12 @@ test("version 2 selected view renders locally after migration and reopen", async
   await expect(page.getByLabel("Текст блока")).toHaveValue(/Built a service at Example Works in 2021/);
   await page.getByRole("button", { name: "Обновить PDF" }).click();
   await expect(page.getByText("PDF готов", { exact: false })).toBeVisible({ timeout: 45_000 });
+  await excludeUnrepresentedFacts(page);
+  await acknowledgeVisibleWarnings(page);
   await page.getByRole("button", { name: "3. Выгрузка" }).click();
+  await page.getByText("Оставшиеся признанные неоднозначности", { exact: false }).click();
+  await expect(page.getByText(/^Имя кандидата: Проверьте, что имя или должность/)).toBeVisible();
+  await expect(page.getByText(/^Должность: Проверьте, что имя или должность/)).toBeVisible();
   const docxDownload = page.waitForEvent("download");
   await page.getByRole("button", { name: "Скачать DOCX" }).click();
   const docxPath = await (await docxDownload).path();
@@ -303,6 +314,7 @@ test("version 2 selected view renders locally after migration and reopen", async
   await page.getByRole("button", { name: "2. Редактор" }).click();
   await expect(page.getByLabel("Текст блока")).toHaveValue(/Built a service at Example Works in 2021/);
   await expect(page.getByText("PDF готов", { exact: false })).toHaveCount(0);
+  await page.getByRole("tab", { name: "Превью" }).click();
   await page.getByRole("button", { name: "Обновить PDF" }).click();
   await expect(page.getByText("PDF готов", { exact: false })).toBeVisible({ timeout: 45_000 });
   expect(textCalls).toBe(0);

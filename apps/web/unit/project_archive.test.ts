@@ -11,6 +11,8 @@ import { validateExtractResult, validateFactSheet } from "../src/contracts/valid
 import { adaptWorking, emptyManualInput } from "../src/facts/working";
 import type { ManualInput, WorkingDraft } from "../src/facts/working";
 import { editorReducer, initialEditorState } from "../src/editor/state";
+import type { EditorState } from "../src/editor/state";
+import { exportReadiness } from "../src/preview/readiness";
 import { syntheticProject, syntheticSourceBytes } from "../src/editor/example";
 import { openProject, saveProject } from "../src/project/archive";
 import type { ArchiveInput } from "../src/project/archive";
@@ -100,6 +102,83 @@ test("partial failed import and unapplied manual forms save without an editor", 
   assert.deepEqual(opened.manualForm, input.manualForm);
   assert.equal(opened.assertionDraft, input.assertionDraft);
   assert.deepEqual(opened.factEdits, input.factEdits);
+});
+
+test("standalone warning review survives v4 reopen; older v4 defaults and malformed entries fail", async () => {
+  const input = base();
+  const warning = exportReadiness(input.editor).unacknowledged[0];
+  assert.ok(warning);
+  input.editor = editorReducer(input.editor, { type: "coverageAcknowledge",
+    issueId: warning.id, dependency: warning.dependency });
+  const bytes = await saveProject(input);
+  const opened = await openProject(bytes);
+  assert.deepEqual(opened.editor.standaloneAcknowledgments, input.editor.standaloneAcknowledgments);
+  assert.equal(exportReadiness(opened.editor).review?.warnings.find((item) => item.id === warning.id)?.acknowledged, true);
+  const priorV4 = await altered(bytes, (files) => {
+    const workspace = parsed(files.get("workspace.json"));
+    assert.ok(record(workspace.editor));
+    delete workspace.editor.standaloneAcknowledgments;
+    delete workspace.editor.standaloneDecisions;
+    files.set("workspace.json", encoder.encode(JSON.stringify(workspace)));
+  });
+  assert.deepEqual((await openProject(priorV4)).editor.standaloneAcknowledgments, []);
+  assert.deepEqual((await openProject(priorV4)).editor.standaloneDecisions, []);
+  const malformed = await altered(bytes, (files) => {
+    const workspace = parsed(files.get("workspace.json"));
+    assert.ok(record(workspace.editor));
+    workspace.editor.standaloneAcknowledgments = [{ issueId: warning.id, dependency: warning.dependency,
+      bypass: true }];
+    files.set("workspace.json", encoder.encode(JSON.stringify(workspace)));
+  });
+  await assert.rejects(openProject(malformed), /workspace/);
+  const malformedDecision = await altered(bytes, (files) => {
+    const workspace = parsed(files.get("workspace.json"));
+    assert.ok(record(workspace.editor));
+    workspace.editor.standaloneDecisions = [{ targetKind: "fact", targetId: "fact_metric",
+      disposition: "excluded", reason: "", dependency: "old", bypass: true }];
+    files.set("workspace.json", encoder.encode(JSON.stringify(workspace)));
+  });
+  await assert.rejects(openProject(malformedDecision), /workspace/);
+});
+
+test("reasoned standalone fact exclusion survives archive reopen", async () => {
+  const input = base();
+  const project = input.editor.project!;
+  const changed = { ...project, views: project.views.map((block) => block.id === "job_1_prose" ?
+    { ...block, state: { ...block.state, factIds: [], factRevisions: {} } } : block) };
+  let state: EditorState = { ...input.editor, project: changed };
+  const missing = exportReadiness(state).blockers.find((item) => item.code === "MISSING_ESSENTIAL");
+  assert.ok(missing?.factId);
+  state = editorReducer(state, { type: "coverageDecision", targetKind: "fact", targetId: missing.factId,
+    disposition: "excluded", reason: "Selected resume omits this fact", dependency: missing.dependency });
+  input.editor = state;
+  const opened = await openProject(await saveProject(input));
+  assert.deepEqual(opened.editor.standaloneDecisions, state.standaloneDecisions);
+  assert.equal(exportReadiness(opened.editor).blockers.some((item) => item.code === "MISSING_ESSENTIAL"), false);
+  state = editorReducer(state, { type: "draft", id: "job_1_prose", text: "Changed selected prose." });
+  state = editorReducer(state, { type: "apply", id: "job_1_prose" });
+  input.editor = state;
+  const edited = await openProject(await saveProject(input));
+  assert.equal(edited.editor.standaloneDecisions.length, 0);
+  assert.equal(edited.editor.undo.job_1_prose?.standaloneDecisions.length, 1);
+  const undone = editorReducer(edited.editor, { type: "undo", id: "job_1_prose" });
+  assert.equal(undone.standaloneDecisions[0]?.reason, "Selected resume omits this fact");
+});
+
+test("standalone review checkpoint restores only matching warnings after reopen and undo", async () => {
+  const input = base();
+  const warning = exportReadiness(input.editor).unacknowledged.find((item) => item.blockId === "job_1_prose");
+  assert.ok(warning);
+  let state = editorReducer(input.editor, { type: "coverageAcknowledge",
+    issueId: warning.id, dependency: warning.dependency });
+  state = editorReducer(state, { type: "draft", id: "job_1_prose", text: "Changed job prose." });
+  state = editorReducer(state, { type: "apply", id: "job_1_prose" });
+  assert.equal(exportReadiness(state).review?.warnings.find((item) => item.id === warning.id)?.acknowledged, false);
+  input.editor = state;
+  const reopened = await openProject(await saveProject(input));
+  assert.equal(reopened.editor.undo.job_1_prose?.standaloneAcknowledgments.length, 1);
+  const restored = editorReducer(reopened.editor, { type: "undo", id: "job_1_prose" });
+  assert.equal(exportReadiness(restored).review?.warnings.find((item) => item.id === warning.id)?.acknowledged, true);
 });
 
 test("complete imported working sheet, original and manual description remain exact", async () => {

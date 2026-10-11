@@ -5,6 +5,7 @@ import { zipSync } from "fflate";
 import fixture from "../../../contracts/examples/render_request.json" with { type: "json" };
 import type { PrepareRequest } from "../src/contracts/generated/prepare_request";
 import type { RenderRequest } from "../src/contracts/generated/render_request";
+import { acknowledgeVisibleWarnings } from "./export-review";
 
 const prepared: RenderRequest = fixture as RenderRequest;
 const docx = Uint8Array.from([0x50, 0x4b, 0x03, 0x04, 1]);
@@ -58,12 +59,14 @@ test("old PDF remains visibly stale during a controlled replacement render", asy
   await page.getByLabel("Текст блока").fill("A cancelled draft.");
   await page.getByRole("button", { name: "Отменить ввод", exact: true }).click();
   await expect(page.getByText("PDF готов", { exact: false })).toBeVisible();
+  await acknowledgeVisibleWarnings(page);
   await page.getByRole("button", { name: "3. Выгрузка" }).click();
   const download = page.waitForEvent("download");
   await page.getByRole("button", { name: "Скачать PDF" }).click();
   await download;
   expect(calls).toBe(1);
   await page.getByRole("button", { name: "2. Редактор" }).click();
+  await page.getByRole("tab", { name: "Превью" }).click();
   await page.getByLabel("Текст блока").fill("A newer accepted profile.");
   await page.getByRole("button", { name: "Применить правку" }).click();
   await page.getByRole("button", { name: "Обновить PDF" }).click();
@@ -83,6 +86,7 @@ test("export shows progress and a render failure on its own screen", async ({ pa
   await page.route("**/v1/render", (route) => { pending = route; });
   await page.goto("/");
   await page.getByRole("button", { name: "Загрузить вымышленный пример" }).click();
+  await acknowledgeVisibleWarnings(page);
   await page.getByRole("button", { name: "3. Выгрузка" }).click();
   await page.getByRole("button", { name: "Собрать и скачать PDF" }).click();
   await expect.poll(() => pending !== null).toBe(true);

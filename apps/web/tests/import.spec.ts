@@ -6,6 +6,7 @@ import { resolve } from "node:path";
 import type { ChildProcessWithoutNullStreams } from "node:child_process";
 import type { Route } from "@playwright/test";
 import { unzipSync } from "fflate";
+import { acknowledgeVisibleWarnings } from "./export-review";
 
 const root = resolve(import.meta.dirname, "../../../");
 const web = resolve(root, "apps/web");
@@ -131,6 +132,7 @@ test("imported source opens a verbatim editor and real PDF and DOCX without gene
   await expect(page.getByLabel("Текст блока")).toHaveValue("Built reliable systems.");
   await page.getByRole("button", { name: "Обновить PDF" }).click();
   await expect(page.getByText("PDF готов", { exact: false })).toBeVisible({ timeout: 45_000 });
+  await acknowledgeVisibleWarnings(page);
   await page.getByRole("button", { name: "3. Выгрузка" }).click();
   const download = page.waitForEvent("download");
   await page.getByRole("button", { name: "Скачать DOCX" }).click();
