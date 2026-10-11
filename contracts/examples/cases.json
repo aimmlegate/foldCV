@@ -1677,5 +1677,251 @@
 {"name": "archive_v4_asset_marker_mismatch", "contract": "archive_manifest", "base": "archive_manifest", "valid": false, "edits": [{"op": "set", "path": ["templateAssetsIncluded"], "value": true}]},
   {"name": "render_unknown_language", "contract": "render_request", "base": "render_request", "valid": false, "edits": [{"op": "set", "path": ["document", "sourceLanguage"], "value": "fr"}]},
   {"name": "render_default_language_uses_canonical_hash", "contract": "render_request", "base": "render_request", "valid": true, "edits": [{"op": "remove", "path": ["document", "sourceLanguage"]}]},
-  {"name": "render_omitted_language_raw_hash_is_invalid", "contract": "render_request", "base": "render_request", "valid": false, "edits": [{"op": "remove", "path": ["document", "sourceLanguage"]}, {"op": "set", "path": ["snapshot", "snapshotSha256"], "value": "dac7a557f3d1eb7ceae55a2ad3ea7e5f202889d5371401448dcc55e001accc45"}]}
+  {"name": "render_omitted_language_raw_hash_is_invalid", "contract": "render_request", "base": "render_request", "valid": false, "edits": [{"op": "remove", "path": ["document", "sourceLanguage"]}, {"op": "set", "path": ["snapshot", "snapshotSha256"], "value": "dac7a557f3d1eb7ceae55a2ad3ea7e5f202889d5371401448dcc55e001accc45"}]},
+  {
+    "name": "recovery_project_v4_valid",
+    "contract": "project_v4",
+    "base": "project_v4",
+    "valid": true,
+    "edits": []
+  },
+  {
+    "name": "recovery_workspace_v5_valid",
+    "contract": "workspace_v5",
+    "base": "workspace_v5",
+    "valid": true,
+    "edits": []
+  },
+  {
+    "name": "recovery_archive_manifest_v5_valid",
+    "contract": "archive_manifest_v5",
+    "base": "archive_manifest_v5",
+    "valid": true,
+    "edits": []
+  },
+  {
+    "name": "recovery_render_snapshot_v4_valid",
+    "contract": "render_snapshot_v4",
+    "base": "render_snapshot_v4",
+    "valid": true,
+    "edits": []
+  },
+  {
+    "name": "recovery_mutation_valid",
+    "contract": "mutation",
+    "base": "mutation",
+    "valid": true,
+    "edits": []
+  },
+  {
+    "name": "recovery_mutation_result_valid",
+    "contract": "mutation_result",
+    "base": "mutation_result",
+    "valid": true,
+    "edits": []
+  },
+  {
+    "name": "recovery_document_valid",
+    "contract": "document",
+    "base": "document",
+    "valid": true,
+    "edits": []
+  },
+  {
+    "name": "recovery_preferences_valid",
+    "contract": "preferences",
+    "base": "preferences",
+    "valid": true,
+    "edits": []
+  },
+  {
+    "name": "recovery_registry_valid",
+    "contract": "registry",
+    "base": "registry",
+    "valid": true,
+    "edits": []
+  },
+  {
+    "name": "recovery_rules_valid",
+    "contract": "rules",
+    "base": "rules",
+    "valid": true,
+    "edits": []
+  },
+  {
+    "name": "recovery_selection_valid",
+    "contract": "selection",
+    "base": "selection",
+    "valid": true,
+    "edits": []
+  },
+  {
+    "name": "recovery_source_context_valid",
+    "contract": "source_context",
+    "base": "source_context",
+    "valid": true,
+    "edits": []
+  },
+  {
+    "name": "recovery_editorial_plan_valid",
+    "contract": "editorial_plan",
+    "base": "editorial_plan",
+    "valid": true,
+    "edits": []
+  },
+  {
+    "name": "recovery_project_v4_next_version_rejected",
+    "contract": "project_v4",
+    "base": "project_v4",
+    "valid": false,
+    "edits": [
+      {
+        "op": "set",
+        "path": [
+          "schemaVersion"
+        ],
+        "value": 5
+      }
+    ]
+  },
+  {
+    "name": "recovery_workspace_v5_next_version_rejected",
+    "contract": "workspace_v5",
+    "base": "workspace_v5",
+    "valid": false,
+    "edits": [
+      {
+        "op": "set",
+        "path": [
+          "schemaVersion"
+        ],
+        "value": 6
+      }
+    ]
+  },
+  {
+    "name": "recovery_archive_manifest_v5_next_version_rejected",
+    "contract": "archive_manifest_v5",
+    "base": "archive_manifest_v5",
+    "valid": false,
+    "edits": [
+      {
+        "op": "set",
+        "path": [
+          "schemaVersion"
+        ],
+        "value": 6
+      }
+    ]
+  },
+  {
+    "name": "recovery_project_v4_zero_revision_rejected",
+    "contract": "project_v4",
+    "base": "project_v4",
+    "valid": false,
+    "edits": [
+      {
+        "op": "set",
+        "path": [
+          "revision"
+        ],
+        "value": 0
+      }
+    ]
+  },
+  {
+    "name": "recovery_workspace_v5_zero_revision_rejected",
+    "contract": "workspace_v5",
+    "base": "workspace_v5",
+    "valid": false,
+    "edits": [
+      {
+        "op": "set",
+        "path": [
+          "documentRevision"
+        ],
+        "value": 0
+      }
+    ]
+  },
+  {
+    "name": "recovery_render_snapshot_v4_zero_revision_rejected",
+    "contract": "render_snapshot_v4",
+    "base": "render_snapshot_v4",
+    "valid": false,
+    "edits": [
+      {
+        "op": "set",
+        "path": [
+          "documentRevision"
+        ],
+        "value": 0
+      }
+    ]
+  },
+  {
+    "name": "recovery_mutation_zero_revision_rejected",
+    "contract": "mutation",
+    "base": "mutation",
+    "valid": false,
+    "edits": [
+      {
+        "op": "set",
+        "path": [
+          "baseRevision"
+        ],
+        "value": 0
+      }
+    ]
+  },
+  {
+    "name": "recovery_pdf_cannot_be_current_render",
+    "contract": "render_snapshot_v4",
+    "base": "render_snapshot_v4",
+    "valid": false,
+    "edits": [
+      {
+        "op": "set",
+        "path": [
+          "pdf"
+        ],
+        "value": {
+          "path": "renders/old.pdf",
+          "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "size": 1
+        }
+      }
+    ]
+  },
+  {
+    "name": "recovery_document_candidate_cannot_hide",
+    "contract": "document",
+    "base": "document",
+    "valid": false,
+    "edits": [
+      {
+        "op": "set",
+        "path": [
+          "candidate",
+          "visible"
+        ],
+        "value": false
+      }
+    ]
+  },
+  {
+    "name": "recovery_replay_result_has_no_content",
+    "contract": "mutation_result",
+    "base": "mutation_result",
+    "valid": false,
+    "edits": [
+      {
+        "op": "set",
+        "path": [
+          "text"
+        ],
+        "value": "unexpected"
+      }
+    ]
+  }
 ]

@@ -1,0 +1,18 @@
+{
+  "id": "render-v4",
+  "projectRevision": 2,
+  "documentRevision": 2,
+  "renderInputFingerprint": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "templateId": "generic",
+  "templateVersion": "fixture",
+  "templateSha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+  "rendererVersion": "fixture",
+  "rendererSha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+  "docx": {
+    "path": "renders/current.docx",
+    "sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+    "size": 100
+  },
+  "pdf": null,
+  "artifactAvailable": true
+}

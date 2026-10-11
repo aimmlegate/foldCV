@@ -1,0 +1,104 @@
+{
+  "$defs": {
+    "AssetRef": {
+      "additionalProperties": false,
+      "properties": {
+        "path": {
+          "title": "Path",
+          "type": "string"
+        },
+        "sha256": {
+          "pattern": "^[a-f0-9]{64}$",
+          "title": "Sha256",
+          "type": "string"
+        },
+        "size": {
+          "minimum": 0,
+          "title": "Size",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "path",
+        "sha256",
+        "size"
+      ],
+      "title": "AssetRef",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "artifactAvailable": {
+      "title": "Artifactavailable",
+      "type": "boolean"
+    },
+    "documentRevision": {
+      "minimum": 1,
+      "title": "Documentrevision",
+      "type": "integer"
+    },
+    "docx": {
+      "$ref": "#/$defs/AssetRef"
+    },
+    "id": {
+      "minLength": 1,
+      "title": "Id",
+      "type": "string"
+    },
+    "pdf": {
+      "const": null,
+      "title": "Pdf",
+      "type": "null"
+    },
+    "projectRevision": {
+      "minimum": 1,
+      "title": "Projectrevision",
+      "type": "integer"
+    },
+    "renderInputFingerprint": {
+      "pattern": "^[a-f0-9]{64}$",
+      "title": "Renderinputfingerprint",
+      "type": "string"
+    },
+    "rendererSha256": {
+      "pattern": "^[a-f0-9]{64}$",
+      "title": "Renderersha256",
+      "type": "string"
+    },
+    "rendererVersion": {
+      "title": "Rendererversion",
+      "type": "string"
+    },
+    "templateId": {
+      "minLength": 1,
+      "title": "Templateid",
+      "type": "string"
+    },
+    "templateSha256": {
+      "pattern": "^[a-f0-9]{64}$",
+      "title": "Templatesha256",
+      "type": "string"
+    },
+    "templateVersion": {
+      "title": "Templateversion",
+      "type": "string"
+    }
+  },
+  "required": [
+    "id",
+    "projectRevision",
+    "documentRevision",
+    "renderInputFingerprint",
+    "templateId",
+    "templateVersion",
+    "templateSha256",
+    "rendererVersion",
+    "rendererSha256",
+    "docx",
+    "pdf",
+    "artifactAvailable"
+  ],
+  "title": "RenderSnapshotV4",
+  "type": "object"
+}

@@ -1,0 +1,623 @@
+{
+  "$defs": {
+    "AuthoredField": {
+      "additionalProperties": false,
+      "properties": {
+        "evidence": {
+          "items": {
+            "$ref": "#/$defs/Evidence"
+          },
+          "title": "Evidence",
+          "type": "array"
+        },
+        "factIds": {
+          "items": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "title": "Factids",
+          "type": "array"
+        },
+        "fieldId": {
+          "minLength": 1,
+          "title": "Fieldid",
+          "type": "string"
+        },
+        "origin": {
+          "enum": [
+            "source",
+            "generated",
+            "user",
+            "migration"
+          ],
+          "title": "Origin",
+          "type": "string"
+        },
+        "text": {
+          "title": "Text",
+          "type": "string"
+        }
+      },
+      "required": [
+        "fieldId",
+        "text",
+        "factIds",
+        "evidence",
+        "origin"
+      ],
+      "title": "AuthoredField",
+      "type": "object"
+    },
+    "CandidateRecord": {
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "const": "candidate",
+          "title": "Id",
+          "type": "string"
+        },
+        "kind": {
+          "const": "candidate",
+          "title": "Kind",
+          "type": "string"
+        },
+        "location": {
+          "$ref": "#/$defs/AuthoredField"
+        },
+        "name": {
+          "$ref": "#/$defs/AuthoredField"
+        },
+        "revision": {
+          "minimum": 1,
+          "title": "Revision",
+          "type": "integer"
+        },
+        "title": {
+          "$ref": "#/$defs/AuthoredField"
+        },
+        "visible": {
+          "const": true,
+          "title": "Visible",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "id",
+        "revision",
+        "visible",
+        "kind",
+        "name",
+        "title",
+        "location"
+      ],
+      "title": "CandidateRecord",
+      "type": "object"
+    },
+    "CertificationRecord": {
+      "additionalProperties": false,
+      "properties": {
+        "dateText": {
+          "$ref": "#/$defs/AuthoredField"
+        },
+        "id": {
+          "minLength": 1,
+          "title": "Id",
+          "type": "string"
+        },
+        "issuer": {
+          "$ref": "#/$defs/AuthoredField"
+        },
+        "kind": {
+          "const": "certification",
+          "title": "Kind",
+          "type": "string"
+        },
+        "legacyText": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/AuthoredField"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "name": {
+          "$ref": "#/$defs/AuthoredField"
+        },
+        "revision": {
+          "minimum": 1,
+          "title": "Revision",
+          "type": "integer"
+        },
+        "visible": {
+          "title": "Visible",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "id",
+        "revision",
+        "visible",
+        "kind",
+        "name",
+        "issuer",
+        "dateText",
+        "legacyText"
+      ],
+      "title": "CertificationRecord",
+      "type": "object"
+    },
+    "DocumentPeriod": {
+      "additionalProperties": false,
+      "properties": {
+        "endText": {
+          "$ref": "#/$defs/AuthoredField"
+        },
+        "id": {
+          "minLength": 1,
+          "title": "Id",
+          "type": "string"
+        },
+        "present": {
+          "title": "Present",
+          "type": "boolean"
+        },
+        "startText": {
+          "$ref": "#/$defs/AuthoredField"
+        }
+      },
+      "required": [
+        "id",
+        "startText",
+        "endText",
+        "present"
+      ],
+      "title": "DocumentPeriod",
+      "type": "object"
+    },
+    "EarlyCareerRecord": {
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "const": "early-career",
+          "title": "Id",
+          "type": "string"
+        },
+        "kind": {
+          "const": "early-career",
+          "title": "Kind",
+          "type": "string"
+        },
+        "representedJobIds": {
+          "items": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "title": "Representedjobids",
+          "type": "array"
+        },
+        "revision": {
+          "minimum": 1,
+          "title": "Revision",
+          "type": "integer"
+        },
+        "text": {
+          "$ref": "#/$defs/AuthoredField"
+        },
+        "visible": {
+          "title": "Visible",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "id",
+        "revision",
+        "visible",
+        "kind",
+        "text",
+        "representedJobIds"
+      ],
+      "title": "EarlyCareerRecord",
+      "type": "object"
+    },
+    "EducationRecord": {
+      "additionalProperties": false,
+      "properties": {
+        "dateText": {
+          "$ref": "#/$defs/AuthoredField"
+        },
+        "id": {
+          "minLength": 1,
+          "title": "Id",
+          "type": "string"
+        },
+        "institution": {
+          "$ref": "#/$defs/AuthoredField"
+        },
+        "kind": {
+          "const": "education",
+          "title": "Kind",
+          "type": "string"
+        },
+        "legacyText": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/AuthoredField"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "qualification": {
+          "$ref": "#/$defs/AuthoredField"
+        },
+        "revision": {
+          "minimum": 1,
+          "title": "Revision",
+          "type": "integer"
+        },
+        "specialty": {
+          "$ref": "#/$defs/AuthoredField"
+        },
+        "visible": {
+          "title": "Visible",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "id",
+        "revision",
+        "visible",
+        "kind",
+        "institution",
+        "qualification",
+        "specialty",
+        "dateText",
+        "legacyText"
+      ],
+      "title": "EducationRecord",
+      "type": "object"
+    },
+    "Evidence": {
+      "additionalProperties": false,
+      "properties": {
+        "sourceId": {
+          "minLength": 1,
+          "title": "Sourceid",
+          "type": "string"
+        },
+        "sourceRevision": {
+          "minimum": 1,
+          "title": "Sourcerevision",
+          "type": "integer"
+        },
+        "unitId": {
+          "minLength": 1,
+          "title": "Unitid",
+          "type": "string"
+        },
+        "unitRevision": {
+          "minimum": 1,
+          "title": "Unitrevision",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "sourceId",
+        "sourceRevision",
+        "unitId",
+        "unitRevision"
+      ],
+      "title": "Evidence",
+      "type": "object"
+    },
+    "FocusEntry": {
+      "additionalProperties": false,
+      "properties": {
+        "catalogId": {
+          "minLength": 1,
+          "title": "Catalogid",
+          "type": "string"
+        },
+        "display": {
+          "$ref": "#/$defs/AuthoredField"
+        },
+        "factIds": {
+          "items": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "title": "Factids",
+          "type": "array"
+        },
+        "id": {
+          "minLength": 1,
+          "title": "Id",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "catalogId",
+        "display",
+        "factIds"
+      ],
+      "title": "FocusEntry",
+      "type": "object"
+    },
+    "JobRecord": {
+      "additionalProperties": false,
+      "properties": {
+        "context": {
+          "$ref": "#/$defs/AuthoredField"
+        },
+        "employer": {
+          "$ref": "#/$defs/AuthoredField"
+        },
+        "id": {
+          "minLength": 1,
+          "title": "Id",
+          "type": "string"
+        },
+        "kind": {
+          "const": "job",
+          "title": "Kind",
+          "type": "string"
+        },
+        "periods": {
+          "items": {
+            "$ref": "#/$defs/DocumentPeriod"
+          },
+          "title": "Periods",
+          "type": "array"
+        },
+        "periodsFieldId": {
+          "minLength": 1,
+          "title": "Periodsfieldid",
+          "type": "string"
+        },
+        "results": {
+          "$ref": "#/$defs/AuthoredField"
+        },
+        "revision": {
+          "minimum": 1,
+          "title": "Revision",
+          "type": "integer"
+        },
+        "role": {
+          "$ref": "#/$defs/AuthoredField"
+        },
+        "stack": {
+          "$ref": "#/$defs/AuthoredField"
+        },
+        "subprojectIds": {
+          "items": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "title": "Subprojectids",
+          "type": "array"
+        },
+        "tasks": {
+          "$ref": "#/$defs/AuthoredField"
+        },
+        "visible": {
+          "title": "Visible",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "id",
+        "revision",
+        "visible",
+        "kind",
+        "employer",
+        "role",
+        "periodsFieldId",
+        "periods",
+        "context",
+        "tasks",
+        "results",
+        "stack",
+        "subprojectIds"
+      ],
+      "title": "JobRecord",
+      "type": "object"
+    },
+    "LanguageRecord": {
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "minLength": 1,
+          "title": "Id",
+          "type": "string"
+        },
+        "kind": {
+          "const": "language",
+          "title": "Kind",
+          "type": "string"
+        },
+        "legacyText": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/AuthoredField"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "name": {
+          "$ref": "#/$defs/AuthoredField"
+        },
+        "proficiency": {
+          "$ref": "#/$defs/AuthoredField"
+        },
+        "revision": {
+          "minimum": 1,
+          "title": "Revision",
+          "type": "integer"
+        },
+        "visible": {
+          "title": "Visible",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "id",
+        "revision",
+        "visible",
+        "kind",
+        "name",
+        "proficiency",
+        "legacyText"
+      ],
+      "title": "LanguageRecord",
+      "type": "object"
+    },
+    "ProfileRecord": {
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "const": "profile",
+          "title": "Id",
+          "type": "string"
+        },
+        "kind": {
+          "const": "profile",
+          "title": "Kind",
+          "type": "string"
+        },
+        "revision": {
+          "minimum": 1,
+          "title": "Revision",
+          "type": "integer"
+        },
+        "text": {
+          "$ref": "#/$defs/AuthoredField"
+        },
+        "visible": {
+          "title": "Visible",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "id",
+        "revision",
+        "visible",
+        "kind",
+        "text"
+      ],
+      "title": "ProfileRecord",
+      "type": "object"
+    },
+    "SkillsFocusRecord": {
+      "additionalProperties": false,
+      "properties": {
+        "focus": {
+          "items": {
+            "$ref": "#/$defs/FocusEntry"
+          },
+          "maxItems": 8,
+          "title": "Focus",
+          "type": "array"
+        },
+        "focusFieldId": {
+          "minLength": 1,
+          "title": "Focusfieldid",
+          "type": "string"
+        },
+        "id": {
+          "const": "skills-focus",
+          "title": "Id",
+          "type": "string"
+        },
+        "kind": {
+          "const": "skills-focus",
+          "title": "Kind",
+          "type": "string"
+        },
+        "revision": {
+          "minimum": 1,
+          "title": "Revision",
+          "type": "integer"
+        },
+        "skillsText": {
+          "$ref": "#/$defs/AuthoredField"
+        },
+        "visible": {
+          "title": "Visible",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "id",
+        "revision",
+        "visible",
+        "kind",
+        "skillsText",
+        "focusFieldId",
+        "focus"
+      ],
+      "title": "SkillsFocusRecord",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "candidate": {
+      "$ref": "#/$defs/CandidateRecord"
+    },
+    "certifications": {
+      "items": {
+        "$ref": "#/$defs/CertificationRecord"
+      },
+      "title": "Certifications",
+      "type": "array"
+    },
+    "earlyCareer": {
+      "$ref": "#/$defs/EarlyCareerRecord"
+    },
+    "education": {
+      "items": {
+        "$ref": "#/$defs/EducationRecord"
+      },
+      "title": "Education",
+      "type": "array"
+    },
+    "jobs": {
+      "items": {
+        "$ref": "#/$defs/JobRecord"
+      },
+      "title": "Jobs",
+      "type": "array"
+    },
+    "languages": {
+      "items": {
+        "$ref": "#/$defs/LanguageRecord"
+      },
+      "title": "Languages",
+      "type": "array"
+    },
+    "profile": {
+      "$ref": "#/$defs/ProfileRecord"
+    },
+    "skillsFocus": {
+      "$ref": "#/$defs/SkillsFocusRecord"
+    }
+  },
+  "required": [
+    "candidate",
+    "profile",
+    "jobs",
+    "education",
+    "certifications",
+    "languages",
+    "skillsFocus",
+    "earlyCareer"
+  ],
+  "title": "Document",
+  "type": "object"
+}

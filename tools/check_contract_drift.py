@@ -3,10 +3,15 @@
 import os
 from pathlib import Path
 import subprocess
+import sys
 
 
 ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(ROOT))
+from tools.generate_contracts import RECOVERY_MODELS
+
 WEB = ROOT / "apps" / "web"
+PAIR_COUNT = 18 + len(RECOVERY_MODELS)
 
 
 def generated_files() -> set[Path]:
@@ -26,8 +31,8 @@ def generated_directories() -> set[Path]:
 def main() -> None:
     before = {path: path.read_bytes() for path in generated_files()}
     directories = generated_directories()
-    if len(before) != 37:
-        raise SystemExit("expected eighteen schema/type pairs and one catalog")
+    if len(before) != PAIR_COUNT * 2 + 1:
+        raise SystemExit(f"expected {PAIR_COUNT} schema/type pairs and one catalog")
     try:
         subprocess.run(["npm", "run", "contracts:generate"], cwd=WEB, env=os.environ.copy(), check=True)
         after = {path: path.read_bytes() for path in generated_files()}
@@ -44,7 +49,7 @@ def main() -> None:
         for directory in sorted(generated_directories() - directories, key=lambda path: len(path.parts), reverse=True):
             directory.rmdir()
         raise
-    print("37 generated contract and catalog files match Python models")
+    print(f"{PAIR_COUNT * 2 + 1} generated contract and catalog files match Python models")
 
 
 if __name__ == "__main__":

@@ -1,0 +1,66 @@
+{
+  "$defs": {
+    "RegistryEntry": {
+      "additionalProperties": false,
+      "properties": {
+        "cleanupStatus": {
+          "enum": [
+            "none",
+            "pending",
+            "complete",
+            "failed"
+          ],
+          "title": "Cleanupstatus",
+          "type": "string"
+        },
+        "projectId": {
+          "minLength": 1,
+          "title": "Projectid",
+          "type": "string"
+        },
+        "title": {
+          "title": "Title",
+          "type": "string"
+        },
+        "tombstoned": {
+          "title": "Tombstoned",
+          "type": "boolean"
+        },
+        "updatedAt": {
+          "title": "Updatedat",
+          "type": "string"
+        }
+      },
+      "required": [
+        "projectId",
+        "title",
+        "updatedAt",
+        "tombstoned",
+        "cleanupStatus"
+      ],
+      "title": "RegistryEntry",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "entries": {
+      "items": {
+        "$ref": "#/$defs/RegistryEntry"
+      },
+      "title": "Entries",
+      "type": "array"
+    },
+    "schemaVersion": {
+      "const": 1,
+      "title": "Schemaversion",
+      "type": "integer"
+    }
+  },
+  "required": [
+    "schemaVersion",
+    "entries"
+  ],
+  "title": "Registry",
+  "type": "object"
+}

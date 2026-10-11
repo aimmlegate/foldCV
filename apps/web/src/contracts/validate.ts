@@ -1,3 +1,4 @@
+import { validateRecoveryShape } from "./recovery-validate.js";
 import Ajv2020 from "ajv/dist/2020.js";
 import addFormats from "ajv-formats";
 import projectSchema from "../../../../contracts/json-schema/project.schema.json" with { type: "json" };
@@ -460,6 +461,6 @@ export function validateContract(kind: string, data: unknown): boolean {
     case "zip_manifest": return safeZip(data);
     case "archive_manifest": return safeArchiveManifest(data);
     case "prepare_request": return safePrepare(data);
-    default: return false;
+    default: return validateRecoveryShape(kind, data);
   }
 }

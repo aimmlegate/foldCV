@@ -1,0 +1,14 @@
+{
+  "projectId": "recovery-E1",
+  "baseRevision": 2,
+  "clientMutationId": "edit-1",
+  "kind": "edit-field",
+  "payload": {
+    "fieldId": "profile/text",
+    "text": "New text",
+    "periods": null,
+    "focus": null,
+    "sessionId": "session-1",
+    "completion": "none"
+  }
+}

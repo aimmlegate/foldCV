@@ -1,0 +1,17 @@
+{
+  "id": "render_1",
+  "projectRevision": 3,
+  "snapshotSha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+  "templateId": "generic",
+  "templateVersion": "1",
+  "rendererVersion": "spike-1",
+  "blocks": [
+    {
+      "blockId": "profile",
+      "blockRevision": 2,
+      "text": "Engineer with service experience."
+    }
+  ],
+  "docx": null,
+  "pdf": null
+}

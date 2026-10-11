@@ -1,0 +1,42 @@
+{
+  "additionalProperties": false,
+  "properties": {
+    "automaticAnalysis": {
+      "title": "Automaticanalysis",
+      "type": "boolean"
+    },
+    "schemaVersion": {
+      "const": 1,
+      "title": "Schemaversion",
+      "type": "integer"
+    },
+    "selectedModel": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "title": "Selectedmodel"
+    },
+    "theme": {
+      "enum": [
+        "light",
+        "dark",
+        "system"
+      ],
+      "title": "Theme",
+      "type": "string"
+    }
+  },
+  "required": [
+    "schemaVersion",
+    "automaticAnalysis",
+    "theme",
+    "selectedModel"
+  ],
+  "title": "Preferences",
+  "type": "object"
+}

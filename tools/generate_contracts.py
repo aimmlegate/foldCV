@@ -14,8 +14,10 @@ from packages.resume_core.normalization import FactRequest, FactSheet, SemanticP
 from packages.resume_core.drafting import DraftRequest, DraftProposal, DraftResult
 from packages.resume_core.rewriting import RewritePreflightFailure, RewriteRequest, RewriteProposal, RewriteResult
 from packages.resume_core.technologies import CATALOG, CATALOG_VERSION
+from packages.resume_core.models.recovery import RECOVERY_CONTRACTS
 
 OUT = ROOT / "contracts" / "json-schema"
+RECOVERY_MODELS = RECOVERY_CONTRACTS
 
 
 def main() -> None:
@@ -48,6 +50,7 @@ def main() -> None:
         "rewrite_proposal": RewriteProposal,
         "rewrite_result": RewriteResult,
         "rewrite_preflight_failure": RewritePreflightFailure,
+        **RECOVERY_MODELS,
     }.items():
         schema = model.model_json_schema(mode="validation")
         (OUT / f"{name}.schema.json").write_text(

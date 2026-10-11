@@ -1,0 +1,33 @@
+{
+  "origin": "model",
+  "revision": 1,
+  "rulesRevision": 1,
+  "formattingAsOf": {
+    "precision": "day",
+    "year": 2026,
+    "month": 10,
+    "day": 11
+  },
+  "sourceLanguage": "ru",
+  "profileLanguage": "ru",
+  "jobs": [
+    {
+      "jobId": "north",
+      "disposition": "detailed",
+      "factIds": []
+    },
+    {
+      "jobId": "west",
+      "disposition": "detailed",
+      "factIds": []
+    },
+    {
+      "jobId": "east",
+      "disposition": "early-career",
+      "factIds": []
+    }
+  ],
+  "focus": [],
+  "technologyGroups": [],
+  "factIds": []
+}

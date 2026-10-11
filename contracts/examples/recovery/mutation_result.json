@@ -1,0 +1,10 @@
+{
+  "status": "applied",
+  "projectRevision": 3,
+  "documentRevision": 3,
+  "changedSlotIds": [
+    "profile"
+  ],
+  "rejectionReason": null,
+  "persistence": "memory"
+}

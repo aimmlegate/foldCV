@@ -1,0 +1,44 @@
+{
+  "formattingAsOf": "2026-10-11",
+  "sourceObservedAt": null,
+  "examples": {
+    "E1": {
+      "candidate": {"name": "Ирина Примерова", "title": "backend-разработчик"},
+      "education": [{"institution": "Учебный технический университет", "specialty": "прикладная информатика", "year": 2016}],
+      "languages": [{"name": "русский", "proficiency": "родной"}, {"name": "английский", "proficiency": "B2"}],
+      "jobs": [
+        {"employer": "Север", "start": 2021, "end": null, "present": true, "stack": ["Python", "PostgreSQL"], "disposition": "detailed"},
+        {"employer": "Запад", "start": 2017, "end": 2020, "present": false, "stack": ["Java", "MySQL"], "disposition": "detailed"},
+        {"employer": "Восток", "start": 2008, "end": 2009, "present": false, "stack": ["PHP"], "disposition": "early-career"}
+      ],
+      "globalTechnologies": ["Docker"],
+      "metrics": [{"quote": "со 100 до 70 мс, на 30%", "baseline": 100, "result": 70, "unit": "ms", "percent": 30, "attribution": "team"}],
+      "trainees": {"quote": "Обучила двух новых разработчиков", "count": 2, "attribution": "personal"},
+      "sourceLanguage": "ru", "profileLanguage": "ru"
+    },
+    "E2": {
+      "candidate": {"name": "Алексей", "title": "Data engineer", "missingSurname": null},
+      "jobs": [{"employer": "Гамма", "periods": [], "stack": ["Python", "ExampleDB-X"]}, {"employer": "Дельта", "start": 2020, "end": 2022, "stack": ["SQL"]}],
+      "globalTechnologies": ["Rust"],
+      "claims": [
+        {"factId": "gamma-team-five", "jobId": "gamma", "unitId": "E2-unit", "span": "пять", "teamSize": 5, "candidateLedTeam": false},
+        {"factId": "gamma-team-six", "jobId": "gamma", "unitId": "E2-unit", "span": "шесть", "teamSize": 6, "candidateLedTeam": false}
+      ],
+      "conflict": {"factIds": ["gamma-team-five", "gamma-team-six"], "fieldId": "job:gamma/context", "exportClaims": false},
+      "missingSections": ["education", "languages"],
+      "sourceLanguage": "mixed", "profileLanguage": "ru",
+      "mustNotInvent": ["surname", "education", "language proficiency", "gamma dates", "gamma duration"]
+    },
+    "E3": {"phases": ["E3a", "E3b", "E3c", "E3d", "E3e"], "undoDepth": 2, "storedVersions": 1, "saveIntervalMs": 1000},
+    "E4": {"rulesYears": [15, 20], "changedDisposition": {"job": "Восток", "disposition": "detailed"}, "rulesSaveCalls": 0, "liveAdherence": "pending manual evaluation"},
+    "E5": {"lateResultApplies": false, "reopenCalls": 0, "retryRequiresMatchingDependencies": true},
+    "E6": {"emptyCreationCalls": 0, "fileReplacesPaste": true, "observationQuote": "Резюме обновлено 10.10.2026", "observationDate": "2026-10-10", "privateFields": ["phone", "email", "age", "job-board metadata"]},
+    "E7": {"startOnlyMark": true, "presentCompleteMark": false, "presentWithoutObservationDuration": null, "selectionOffsets": "UTF-16", "thirdRestore": "no-op"},
+    "E8": {"projectIsolation": true, "tombstoneBeforeDelete": true, "lateWritesRejected": true}
+  },
+  "nameAssessments": [
+    {"input": "Имя: Алексей. Фамилия: не указана.", "missingSurname": true},
+    {"input": "Имя: Алексей.", "missingSurname": null},
+    {"input": "Имя: Мадонна. Единственное имя, фамилии нет.", "missingSurname": false}
+  ]
+}
