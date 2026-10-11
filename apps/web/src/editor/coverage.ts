@@ -246,8 +246,22 @@ export async function verifyWorkingSources(sources: WorkingSource[]): Promise<So
     return snapshot?.sourceId === source.entry.result.sourceId &&
       snapshot.expected === source.entry.result.byteSha256 &&
       snapshot.bytes.length === source.originalBytes.length &&
-      snapshot.bytes.every((part, offset) => part === source.originalBytes[offset]);
+      sameBytes(snapshot.bytes, source.originalBytes);
   }) };
+}
+
+function sameBytes(expected: Uint8Array, current: Uint8Array): boolean {
+  if (expected.length !== current.length) return false;
+  const left = new DataView(expected.buffer, expected.byteOffset, expected.byteLength);
+  const right = new DataView(current.buffer, current.byteOffset, current.byteLength);
+  const whole = expected.length - expected.length % 8;
+  for (let offset = 0; offset < whole; offset += 8) {
+    if (left.getBigUint64(offset) !== right.getBigUint64(offset)) return false;
+  }
+  for (let offset = whole; offset < expected.length; offset += 1) {
+    if (expected[offset] !== current[offset]) return false;
+  }
+  return true;
 }
 
 export function coverageReview(input: CoverageInput): CoverageReadiness {

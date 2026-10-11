@@ -1,0 +1,24 @@
+{
+  "scope": "personal local developer run",
+  "macos": "26.6.2",
+  "architecture": "arm64",
+  "python": "3.13.1",
+  "nodeBuild": "22.14.0",
+  "libreOffice": "26.2.6.3",
+  "libreOfficeExecutableSha256": "c772a72b6f07e953a34956cebedf5d037b1ea841fad29014b1ee6355775c1d1e",
+  "codexCliPinned": "0.162.0-alpha.2",
+  "template": "generic 1.0.0",
+  "templatePackageSha256": "d081df948bfd55d107c38d40387a9758f563f9c14a9cffc4a847f44cb687b8b9",
+  "pythonPackages": {
+    "PyMuPDF": "1.28.2",
+    "reportlab": "5.0.1",
+    "Pillow": "12.3.0",
+    "PyYAML": "6.0.3",
+    "pydantic": "2.12.5",
+    "fastapi": "0.143.0",
+    "starlette": "1.7.0",
+    "uvicorn": "0.54.0",
+    "httpx": "0.28.1",
+    "python-docx": "1.2.0"
+  }
+}
