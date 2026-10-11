@@ -109,8 +109,7 @@ def prepare_document(payload: PrepareRequest) -> RenderRequest:
     sidebar = []
     early_block = next((block for block in project.views if block.kind == "early_career"), None)
     if project.as_of is not None and (early_block is None or early_block.visible):
-        old_rows = early_career_rows((job for job in project.employment
-                                      if blocks[presentation.job_prose_blocks[job.id]].visible), project.as_of)
+        old_rows = early_career_rows(project.employment, project.as_of)
         if old_rows:
             sidebar.append(SidebarSection(title="РАННИЙ ОПЫТ" if presentation.source_language == "ru" else "EARLY CAREER",
                                           items=[", ".join(format_early_career(row) for row in old_rows)]))

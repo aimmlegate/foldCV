@@ -28,6 +28,8 @@ import catalog from "../../../../contracts/technology-catalog.json" with { type:
 import { control, field, primary } from "../editor/styles";
 import { StructuredFields } from "../editor/StructuredFields";
 import { RewriteControls } from "../editor/RewriteControls";
+import { CoveragePanel } from "../editor/CoveragePanel";
+import { coverageReview, verifyWorkingSources } from "../editor/coverage";
 
 type ThemeMode = "light" | "dark" | "system";
 const THEME_KEY = "foldcv-theme";
@@ -72,6 +74,7 @@ export function App() {
   const [rewriteReady, setRewriteReady] = useState(false);
   const [rewriteView, setRewriteView] = useState<RewriteView>({ pending: false, error: null, completed: 0 });
   const [rewriteInstruction, setRewriteInstruction] = useState("");
+  const [focusedUnit, setFocusedUnit] = useState<string | null>(null);
   const rewriteWorkflowRef = useRef<RewriteWorkflow | null>(null);
   if (!rewriteWorkflowRef.current) rewriteWorkflowRef.current = new RewriteWorkflow(setRewriteView,
     (result) => send({ type: "rewriteProposed", result }),
@@ -131,6 +134,19 @@ export function App() {
     }
     dispatch(action);
   }
+  const currentSources = state.working?.sources;
+  useEffect(() => {
+    if (!currentSources || !state.loadId) return;
+    const loadId = state.loadId;
+    let current = true;
+    void verifyWorkingSources(currentSources).then((proof) => {
+      if (current) send({ type: "sourceIntegrity", loadId, sources: currentSources, proof });
+    }).catch(() => {
+      if (current) send({ type: "sourceIntegrity", loadId, sources: currentSources,
+        proof: { valid: false, matches: () => false } });
+    });
+    return () => { current = false; };
+  }, [currentSources, state.loadId]);
   function refreshPreview(exportKind?: "pdf" | "docx") {
     const current = stateRef.current;
     if (!current.project || !current.presentation) return;
@@ -225,8 +241,17 @@ export function App() {
         loadId: current.loadId!, baseRevision,
         blockRevision: target.revision, dependencyHash }));
   }
+  function openSource(sourceId: string, unitId: string) {
+    setFocusedUnit(`view_${sourceId}_${unitId}`);
+    send({ type: "panel", panel: "sources" });
+    window.requestAnimationFrame(() => document.getElementById(`source-${sourceId}-${unitId}`)?.scrollIntoView({ block: "nearest" }));
+  }
+  const coverage = project && state.working ? coverageReview({ project, working: state.working,
+    presentation: state.presentation, rewriteIssues: state.rewriteIssueDetails,
+    sourceIntegrity: state.sourceIntegrity }) : null;
   const reviewCount = (project?.review.decisions.filter((decision) => decision.disposition === "unresolved").length ?? 0) +
-    state.workingIssues.length + Object.values(state.rewriteIssues).reduce((total, issues) => total + issues.length, 0);
+    state.workingIssues.length + (coverage?.blockers.length ?? 0) +
+    (coverage?.warnings.filter((issue) => !issue.acknowledged).length ?? 0);
   const staleCount = project?.views.filter((view) => view.status === "stale").length ?? 0;
   const isReviewed = Boolean(block && project?.review.decisions.some((decision) => decision.targetKind === "block" && decision.targetId === block.id && decision.targetRevision === block.revision));
   const relatedFacts = block ? project?.facts.filter((fact) => block.state.factIds.includes(fact.id) ||
@@ -329,8 +354,8 @@ export function App() {
           {preview.error && <p role="alert" className="mb-2 text-sm text-danger">{preview.error}</p>}
           {pdfUrl ? <iframe title="Превью PDF" src={pdfUrl} className="h-[65vh] min-h-96 w-full border border-outline bg-surface" /> : <p className="py-12 text-center text-muted">Нажмите «Обновить PDF», чтобы увидеть документ.</p>}
         </Tabs.Content>
-        <Tabs.Content value="sources" className="rounded border border-outline bg-panel p-5"><h2 className="mb-3 font-semibold">Связанные фрагменты исходника</h2>{relatedUnits.length ? relatedUnits.map((unit) => <blockquote key={unit.id} className="mb-3 whitespace-pre-wrap break-words border-l-2 border-outline bg-surface p-3 text-sm">{unit.text}</blockquote>) : <p className="text-sm text-muted">Для этого раздела нет связанного фрагмента.</p>}{state.working && <WorkingSources working={state.working} />}<p className="mt-4 text-xs text-muted">Исходный текст неизменен; правки фактов хранятся отдельно в памяти вкладки.</p></Tabs.Content>
-        <Tabs.Content value="checks" className="rounded border border-outline bg-panel p-5"><h2 className="mb-3 font-semibold">Проверки</h2><ul className="list-disc space-y-2 pl-5 text-sm"><li>{reviewCount} пунктов проверки</li><li>{staleCount} блоков требуют повторной проверки</li><li>{isReviewed ? "Выбранный блок отмечен проверенным" : "Выбранный блок ещё не отмечен проверенным"}</li>{state.workingIssues.map((issue, index) => <li key={index}>{issue}</li>)}{Object.values(state.rewriteIssues).flat().map((issue, index) => <li key={`rewrite-${index}`}>{issue}</li>)}</ul><p className="mt-4 text-xs text-muted">Дословный черновик требует проверки смысла. Связь с источником не доказывает точность формулировки.</p></Tabs.Content>
+        <Tabs.Content value="sources" className="rounded border border-outline bg-panel p-5"><h2 className="mb-3 font-semibold">Связанные фрагменты исходника</h2>{relatedUnits.length ? relatedUnits.map((unit) => <blockquote key={unit.id} className="mb-3 whitespace-pre-wrap break-words border-l-2 border-outline bg-surface p-3 text-sm">{unit.text}</blockquote>) : <p className="text-sm text-muted">Для этого раздела нет связанного фрагмента.</p>}{state.working && <WorkingSources working={state.working} focusedUnit={focusedUnit} />}<p className="mt-4 text-xs text-muted">Исходный текст неизменен; правки фактов хранятся отдельно в памяти вкладки.</p></Tabs.Content>
+        <Tabs.Content value="checks" className="rounded border border-outline bg-panel p-5"><h2 className="mb-3 font-semibold">Проверки</h2><ul className="list-disc space-y-2 pl-5 text-sm"><li>{reviewCount} пунктов проверки</li><li>{staleCount} блоков требуют повторной проверки</li><li>{isReviewed ? "Выбранный блок отмечен проверенным" : "Выбранный блок ещё не отмечен проверенным"}</li>{state.workingIssues.map((issue, index) => <li key={index}>{issue}</li>)}</ul><CoveragePanel state={state} send={send} openSource={openSource} /><p className="mt-4 text-xs text-muted">Дословный черновик требует проверки смысла. Связь с источником не доказывает точность формулировки.</p></Tabs.Content>
       </Tabs.Root></aside>
     </main>}
     {state.stage === "export" && <main className="mx-auto max-w-5xl p-6"><h1 className="mb-2 text-2xl font-semibold">Документы и проект для следующего раза</h1><p className="mb-5 text-muted">PDF и DOCX скачиваются из одной проверенной сборки. Если документ устарел, кнопка обновит превью перед скачиванием. Проект .cvproject появится позже.</p><div className="grid gap-4 md:grid-cols-3"><div className="rounded border border-outline bg-panel p-5"><h2 className="font-semibold">PDF</h2><button type="button" disabled={unapplied} onClick={() => refreshPreview("pdf")} className={`${control} mt-4`}>{canExport ? "Скачать PDF" : "Собрать и скачать PDF"}</button></div><div className="rounded border border-outline bg-panel p-5"><h2 className="font-semibold">DOCX</h2><button type="button" disabled={unapplied} onClick={() => refreshPreview("docx")} className={`${control} mt-4`}>{canExport ? "Скачать DOCX" : "Собрать и скачать DOCX"}</button></div><div className="rounded border border-outline bg-panel p-5"><h2 className="font-semibold">Проект .cvproject</h2><button type="button" disabled className={`${control} mt-4`}>Скачать проект</button></div></div><div aria-live="polite" aria-busy={preview.status === "rendering"} className="mt-4 text-sm">{preview.status === "rendering" && <p role="status">Сборка документов…</p>}{preview.error && <p role="alert" className="text-danger">{preview.error}</p>}</div>{project && <p className="mt-5 text-sm text-muted">Редакция {project.revision} · {canExport ? "PDF готов" : "актуального PDF нет"} · {reviewCount} пунктов проверки</p>}</main>}

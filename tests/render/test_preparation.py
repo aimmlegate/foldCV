@@ -87,6 +87,7 @@ def test_old_job_uses_compact_policy_row_and_keeps_detail_only_in_project():
         "subprojects": [], "factIds": []})
     block = deepcopy(data["project"]["views"][1])
     block["id"] = "old-prose"
+    block["visible"] = False
     block["state"].update(text="Maintained service integrations.", factIds=[], factRevisions={})
     data["project"]["views"].append(block)
     data["presentation"]["jobProseBlocks"]["old-job"] = "old-prose"
@@ -96,6 +97,12 @@ def test_old_job_uses_compact_policy_row_and_keeps_detail_only_in_project():
     assert row.items == ["Earlier Company — Developer (2001–2005)"]
     assert "Maintained service integrations." not in row.items[0]
     assert data["project"]["views"][-1]["state"]["text"] == "Maintained service integrations."
+    early = deepcopy(block)
+    early.update(id="early-career", kind="early_career", visible=False)
+    early["state"].update(text="", factIds=[], factRevisions={})
+    data["project"]["views"].append(early)
+    hidden = prepare_document(PrepareRequest.model_validate(data))
+    assert all(section.title != "EARLY CAREER" for section in hidden.document.sidebar)
 
 
 @pytest.mark.parametrize(("field", "value", "section"), [

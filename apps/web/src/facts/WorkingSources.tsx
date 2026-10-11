@@ -2,7 +2,7 @@ import type { WorkingDraft } from "./working";
 
 const control = "rounded border border-outline bg-panel px-3 py-2 text-content hover:bg-soft focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent";
 
-export function WorkingSources({ working }: { working: WorkingDraft }) {
+export function WorkingSources({ working, focusedUnit }: { working: WorkingDraft; focusedUnit?: string | null }) {
   function download(index: number) {
     const source = working.sources[index];
     if (!source) return;
@@ -14,10 +14,15 @@ export function WorkingSources({ working }: { working: WorkingDraft }) {
     window.setTimeout(() => URL.revokeObjectURL(url), 10_000);
   }
   return <div className="mt-4 space-y-3">
-    {working.sources.map(({ entry }, index) => <details key={entry.result.sourceId} className="rounded border border-outline p-3">
+    {working.sources.map(({ entry }, index) => <details key={entry.result.sourceId}
+      open={Boolean(focusedUnit?.startsWith(`view_${entry.result.sourceId}_`)) || undefined}
+      className="rounded border border-outline p-3">
       <summary className="cursor-pointer font-semibold">{entry.result.originalName} · {entry.result.units.length} фрагментов · {entry.result.gaps.length} пробелов</summary>
       <button type="button" className={`${control} mt-2`} onClick={() => download(index)}>Скачать неизменённый оригинал</button>
-      <div className="mt-2 max-h-72 space-y-2 overflow-auto text-sm">{entry.result.units.map((unit) => <p key={unit.id} className="whitespace-pre-wrap break-words border-l-2 border-outline pl-2">
+      <div className="mt-2 max-h-72 space-y-2 overflow-auto text-sm">{entry.result.units.map((unit) => <p key={unit.id}
+        id={`source-${entry.result.sourceId}-${unit.id}`}
+        className={`whitespace-pre-wrap break-words border-l-2 pl-2 ${focusedUnit === `view_${entry.result.sourceId}_${unit.id}` ?
+          "border-accent bg-soft" : "border-outline"}`}>
         <span className="text-xs text-muted">{unit.id} · {unit.location.kind}</span><br />{unit.text}
         {entry.overlays[`unit:${unit.id}`] && <span className="block text-accent">Исправление: {entry.overlays[`unit:${unit.id}`]}</span>}
       </p>)}{entry.result.gaps.map((gap, gapIndex) => <p key={`gap:${gapIndex}`} className="border-l-2 border-danger pl-2">

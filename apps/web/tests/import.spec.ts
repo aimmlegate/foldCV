@@ -175,6 +175,59 @@ test("manual work and subproject without dates stay editable with visible checks
   await expect(page.getByLabel("Текст блока")).toContainText("Built local tools.");
 });
 
+test("coverage links source, records an exclusion reason and expires an affected warning", async ({ page }) => {
+  let contentCalls = 0;
+  page.on("request", (request) => { if (/\/v1\/(normalize|draft|rewrite|facts\/normalize|facts\/draft)$/.test(request.url()))
+    contentCalls += 1; });
+  await page.goto(`${origin}/#secret=synthetic-browser-secret-0123456789`);
+  await page.getByLabel("Или вставьте текст резюме").fill("Unusual detail from the original source.");
+  await page.getByRole("button", { name: "Извлечь вставленный текст" }).click();
+  await page.getByLabel("Имя кандидата").fill("Alex Example");
+  await page.getByLabel("Должность").fill("Engineer");
+  await page.getByLabel("Дата наблюдения, YYYY-MM-DD").fill("2026-10-11");
+  await page.getByRole("button", { name: "Добавить работу" }).click();
+  await page.getByLabel("Организация").fill("Example Works");
+  await page.getByLabel("Роль").fill("Developer");
+  await page.getByLabel("Начало, YYYY или YYYY-MM").fill("2022");
+  await page.getByLabel("Конец, пусто если текущая").fill("2025");
+  await page.getByLabel("Дословный текст работы").fill("Built a local service.");
+  await page.getByRole("button", { name: "Добавить число" }).click();
+  await page.getByRole("combobox", { name: "Работа", exact: true }).selectOption({ label: "Example Works" });
+  await page.getByLabel("Число").fill("20");
+  await page.getByLabel("Сравнение").selectOption("at_most");
+  await page.getByLabel("Единица").fill("records");
+  await page.getByLabel("Чей результат").selectOption("team");
+  await page.getByRole("button", { name: "Открыть дословный черновик" }).click();
+  await page.getByRole("tab", { name: "Проверки" }).click();
+  const metric = page.locator("li").filter({ hasText: "Проверьте число, диапазон" }).first();
+  await expect(metric).toBeVisible();
+  await page.getByText("Факты ·", { exact: false }).click();
+  await expect(page.getByText("Факт: не более 20 records · вклад: командный", { exact: false }).last()).toBeVisible();
+  await metric.getByRole("button", { name: "Подтвердить проверку" }).click();
+  await expect(metric.getByRole("button", { name: "Снять подтверждение" })).toBeVisible();
+  await page.getByText("Фрагменты исходника ·", { exact: false }).click();
+  const unit = page.locator("li").filter({ hasText: "Фрагмент" }).filter({ hasText: "Не решён" }).first();
+  await unit.getByLabel("Причина исключения").fill("Out of scope for this client");
+  await unit.getByRole("button", { name: "Исключить" }).click();
+  const excluded = page.locator("li").filter({ hasText: "Причина: Out of scope for this client" });
+  await expect(excluded).toBeVisible();
+  await excluded.getByRole("button", { name: "Исходник" }).click();
+  await expect(page.locator("[id^=source-]").filter({ hasText: "Unusual detail from the original source." })).toBeVisible();
+  await page.getByRole("button", { name: "Проект: Example Works", exact: false }).click();
+  await page.getByLabel("Текст блока").fill("Built a changed local service.");
+  await page.getByRole("button", { name: "Применить правку" }).click();
+  await page.getByRole("tab", { name: "Проверки" }).click();
+  await expect(page.locator("li").filter({ hasText: "Проверьте число, диапазон" }).first()
+    .getByRole("button", { name: "Подтвердить проверку" })).toBeVisible();
+  await page.getByText("Факты ·", { exact: false }).click();
+  const proseFact = page.locator("#coverage-facts li").filter({ hasText: "Факт: Built a local service." });
+  await expect(proseFact.getByText("Не решён")).toBeVisible();
+  await proseFact.getByLabel("Причина исключения или проверки").fill("Reviewed equivalent wording");
+  await proseFact.getByRole("button", { name: "Подтвердить изложение" }).click();
+  await expect(proseFact.getByText("Показан")).toBeVisible();
+  expect(contentCalls).toBe(0);
+});
+
 test("imported facts, unresolved dates and user assertions stay available without generation", async ({ page }) => {
   test.setTimeout(60_000);
   let contentCalls = 0;

@@ -151,7 +151,8 @@ test("all-private rewrite links a safe fact issue, then correction allows retry"
   await expect(issue).not.toContainText("555-123-4567");
   expect(existsSync(resolve(runRoot, "rewrite-calls"))).toBe(false);
   await page.getByRole("tab", { name: "Проверки" }).click();
-  await expect(page.getByRole("listitem").filter({ hasText: "fact_user_manual_job_job_user_" })).toBeVisible();
+  await expect(page.getByRole("tabpanel", { name: "Проверки" })
+    .locator('section ul li button[title^="fact_user_manual_job_job_user_"]').first()).toBeVisible();
   await page.getByRole("tab", { name: "Превью" }).click();
   await page.getByLabel("Значение факта").fill("Built a local service.");
   await page.getByRole("button", { name: "Применить факт" }).click();

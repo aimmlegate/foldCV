@@ -5,7 +5,11 @@ import type { WorkingDraft } from "../facts/working";
 import { validateContract, validateFactSheet } from "../contracts/validate";
 import type { RewriteResult } from "../contracts/generated/rewrite_result";
 import type { RewritePreflightFailure } from "../contracts/generated/rewrite_preflight_failure";
+import type { RewriteIssue } from "../contracts/generated/rewrite_result";
 import { parseDate } from "../facts/working";
+import { coverageDependency, coverageReview } from "./coverage";
+import type { CoverageDecision, SourceIntegrity } from "./coverage";
+import type { WorkingSource } from "../facts/working";
 import catalog from "../../../../contracts/technology-catalog.json" with { type: "json" };
 
 type Fact = Facts[number];
@@ -13,13 +17,15 @@ type Fact = Facts[number];
 export type Stage = "import" | "editor" | "export";
 export type Panel = "preview" | "sources" | "checks";
 type Drafts = Record<string, string>;
-type Checkpoint = { state: BlockState; visible: boolean; status: Block["status"]; dependencyHash: string;
-  review: Review; issues: string[]; manualEducation: string | null };
+type Checkpoint = { state: BlockState; revision: number; visible: boolean; status: Block["status"]; dependencyHash: string;
+  review: Review; issues: string[]; issueDetails: RewriteIssue[];
+  coverage: NonNullable<WorkingDraft["coverage"]> | null; manualEducation: string | null };
 export type PendingRewrite = { result: RewriteResult; before: string };
 export type EditorState = {
   project: Project | null;
   loadId: string | null;
   working: WorkingDraft | null;
+  sourceIntegrity: SourceIntegrity | null;
   workingIssues: string[];
   presentation: Presentation | null;
   presentationDrafts: { name?: string; title?: string };
@@ -34,12 +40,14 @@ export type EditorState = {
   undo: Record<string, Checkpoint>;
   rewriteProposal: PendingRewrite | null;
   rewriteIssues: Record<string, string[]>;
+  rewriteIssueDetails: Record<string, RewriteIssue[]>;
   sourceText: string;
   dirty: boolean;
 };
 export type Action =
   | { type: "loadExample"; loadId: string }
   | { type: "loadImported"; loadId: string; project: Project; presentation: Presentation; working: WorkingDraft; issues: string[] }
+  | { type: "sourceIntegrity"; loadId: string; sources: WorkingSource[]; proof: SourceIntegrity }
   | { type: "resetProject" }
   | { type: "stage"; stage: Stage }
   | { type: "panel"; panel: Panel }
@@ -70,13 +78,17 @@ export type Action =
   | { type: "rewritePreflight"; result: RewritePreflightFailure; loadId: string }
   | { type: "rewriteApply"; id: string }
   | { type: "rewriteDiscard" }
-  | { type: "reconcile"; id: string; projectId: string; loadId: string; baseRevision: number; blockRevision: number; dependencyHash: string };
+  | { type: "reconcile"; id: string; projectId: string; loadId: string; baseRevision: number; blockRevision: number; dependencyHash: string }
+  | { type: "coverageDecision"; targetKind: CoverageDecision["targetKind"]; targetId: string;
+      disposition: CoverageDecision["disposition"]; reason: string; dependency: string }
+  | { type: "coverageClear"; targetKind: CoverageDecision["targetKind"]; targetId: string }
+  | { type: "coverageAcknowledge"; issueId: string; dependency: string };
 
 export const initialEditorState: EditorState = {
-  project: null, loadId: null, working: null, workingIssues: [], presentation: null, presentationDrafts: {}, presentationUndo: null,
+  project: null, loadId: null, working: null, sourceIntegrity: null, workingIssues: [], presentation: null, presentationDrafts: {}, presentationUndo: null,
   stage: "import", panel: "preview", selectedId: null,
   drafts: {}, factDrafts: {}, structuredDrafts: {}, errors: {}, undo: {}, rewriteProposal: null,
-  rewriteIssues: {}, sourceText: "", dirty: false,
+  rewriteIssues: {}, rewriteIssueDetails: {}, sourceText: "", dirty: false,
 };
 
 export function selectedBlock(state: EditorState): Block | undefined {
@@ -157,8 +169,11 @@ function replaceBlock(state: EditorState, id: string, update: (block: Block) => 
   const block = project?.views.find((item) => item.id === id);
   if (!project || !block) return state;
   const checkpoint: Checkpoint = {
-    state: block.state, visible: block.visible, status: block.status, dependencyHash: block.dependencyHash,
+    state: block.state, revision: block.revision, visible: block.visible, status: block.status,
+    dependencyHash: block.dependencyHash,
     issues: state.rewriteIssues[id] ?? [],
+    issueDetails: state.rewriteIssueDetails[id] ?? [],
+    coverage: state.working?.coverage ? structuredClone(state.working.coverage) : null,
     manualEducation: block.kind === "education" ? state.working?.manual.education ?? null : null,
     review: {
       decisions: project.review.decisions.filter((decision) => decision.targetKind === "block" && decision.targetId === id),
@@ -180,6 +195,33 @@ function replaceBlock(state: EditorState, id: string, update: (block: Block) => 
       },
     },
   };
+}
+
+function relatedCoverageTargets(state: EditorState, blockId: string, priorFactIds: string[] = []): Set<string> {
+  const project = state.project;
+  const block = project?.views.find((item) => item.id === blockId);
+  const ids = new Set<string>();
+  if (!project || !block) return ids;
+  const jobIds = block.kind === "job_prose" ? Object.entries(state.presentation?.jobProseBlocks ?? {})
+    .filter(([, id]) => id === blockId).map(([jobId]) => jobId) : [];
+  for (const jobId of jobIds) ids.add(`job:${jobId}`);
+  const addProjectUnit = (unitId: string): void => { ids.add(`unit:${unitId}`); };
+  const addSheetUnit = (sourceId: string, unitId: string): void => {
+    ids.add(`unit:view_${sourceId}_${unitId}`);
+  };
+  const facts = project.facts.filter((fact) => block.state.factIds.includes(fact.id) ||
+    priorFactIds.includes(fact.id) ||
+    jobIds.includes(fact.jobId ?? ""));
+  for (const fact of facts) {
+    ids.add(`fact:${fact.id}`);
+    for (const evidence of fact.evidence) addProjectUnit(evidence.unitId);
+    for (const [sourceId, correctedId] of Object.entries(state.working?.sheet.userCorrections ?? {})) {
+      if (correctedId !== fact.id) continue;
+      for (const evidence of state.working?.sheet.facts.find((item) => item.id === sourceId)?.evidence ?? [])
+        addSheetUnit(evidence.sourceId, evidence.unitId);
+    }
+  }
+  return ids;
 }
 
 function factDisplay(fact: Fact): string | null {
@@ -224,15 +266,61 @@ export function subprojectFieldValue(state: EditorState, jobId: string, id: stri
   return field === "name" ? sub.name : dateText(field === "start" ? sub.period?.start ?? null : sub.period?.end ?? null);
 }
 
-export function editorReducer(state: EditorState, action: Action): EditorState {
+function reduceEditorState(state: EditorState, action: Action): EditorState {
   switch (action.type) {
+    case "coverageDecision": {
+      if (!state.project || !state.working) return state;
+      const input = { project: state.project, working: state.working, presentation: state.presentation,
+        rewriteIssues: state.rewriteIssueDetails, sourceIntegrity: state.sourceIntegrity };
+      if (coverageDependency(input, action.targetKind, action.targetId) !== action.dependency) return state;
+      const review = coverageReview(input);
+      const target = [...review.units, ...review.facts].find((item) =>
+        item.kind === action.targetKind && item.id === action.targetId);
+      const missingJob = action.targetKind === "job" && review.blockers.some((item) =>
+        item.code === "MISSING_JOB" && item.jobId === action.targetId);
+      if (!target && !missingJob) return state;
+      const reason = action.reason.trim();
+      if ((action.disposition === "excluded" || action.disposition === "archived" ||
+          action.disposition === "shown" && target?.confirmable) && !reason) return state;
+      if (action.targetKind === "job" && action.disposition !== "excluded") return state;
+      if (target && ["shown", "condensed", "duplicate"].includes(action.disposition) &&
+        target.disposition !== action.disposition && !(action.disposition === "shown" && target.confirmable)) return state;
+      const decisions = state.working.coverage?.decisions.filter((item) =>
+        item.targetKind !== action.targetKind || item.targetId !== action.targetId) ?? [];
+      return { ...state, dirty: true, working: { ...state.working, coverage: {
+        decisions: [...decisions, { targetKind: action.targetKind, targetId: action.targetId,
+          disposition: action.disposition, reason: reason || null, dependency: action.dependency }],
+        acknowledgments: state.working.coverage?.acknowledgments ?? [] } } };
+    }
+    case "coverageClear": {
+      if (!state.working?.coverage) return state;
+      return { ...state, dirty: true, working: { ...state.working, coverage: {
+        ...state.working.coverage, decisions: state.working.coverage.decisions.filter((item) =>
+          item.targetKind !== action.targetKind || item.targetId !== action.targetId) } } };
+    }
+    case "coverageAcknowledge": {
+      if (!state.project || !state.working) return state;
+      const review = coverageReview({ project: state.project, working: state.working,
+        presentation: state.presentation, rewriteIssues: state.rewriteIssueDetails,
+        sourceIntegrity: state.sourceIntegrity });
+      const warning = review.warnings.find((item) => item.id === action.issueId &&
+        item.dependency === action.dependency);
+      if (!warning) return state;
+      const acknowledgments = state.working.coverage?.acknowledgments.filter((item) =>
+        item.issueId !== action.issueId) ?? [];
+      return { ...state, dirty: true, working: { ...state.working, coverage: {
+        decisions: state.working.coverage?.decisions ?? [],
+        acknowledgments: warning.acknowledged ? acknowledgments :
+          [...acknowledgments, { issueId: action.issueId, dependency: action.dependency }] } } };
+    }
     case "rewritePreflight": {
       const block = state.project?.views.find((item) => item.id === action.result.blockId);
       if (!block || state.loadId !== action.loadId || state.project?.revision !== action.result.baseRevision ||
           block.revision !== action.result.blockRevision) return state;
       const issues = action.result.issues.map((issue) =>
         `${issue.blockId} · ${issue.factId}: Требуемый факт или фрагмент скрыт из-за возможных контактных данных. Проверьте вручную.`);
-      return { ...state, rewriteIssues: { ...state.rewriteIssues, [block.id]: issues } };
+      return { ...state, rewriteIssues: { ...state.rewriteIssues, [block.id]: issues },
+        rewriteIssueDetails: { ...state.rewriteIssueDetails, [block.id]: action.result.issues } };
     }
     case "rewriteProposed": {
       const block = state.project?.views.find((item) => item.id === action.result.blockId);
@@ -374,7 +462,8 @@ export function editorReducer(state: EditorState, action: Action): EditorState {
             state.project?.facts.find((fact) => fact.id === id)?.revision ?? 1])) } }));
       const issues = proposal.result.issues.map((issue) => `${issue.blockId} · ${issue.factId}: ${issue.message}`);
       return { ...next, rewriteProposal: null, errors: { ...next.errors, [action.id]: "" },
-        rewriteIssues: { ...next.rewriteIssues, [action.id]: issues } };
+        rewriteIssues: { ...next.rewriteIssues, [action.id]: issues },
+        rewriteIssueDetails: { ...next.rewriteIssueDetails, [action.id]: proposal.result.issues } };
     }
     case "reconcile": {
       const block = state.project?.views.find((item) => item.id === action.id);
@@ -395,6 +484,9 @@ export function editorReducer(state: EditorState, action: Action): EditorState {
       return { ...initialEditorState, project: action.project, loadId: action.loadId, presentation: action.presentation,
         working: action.working, workingIssues: action.issues, stage: "editor",
         selectedId: action.project.views[0]?.id ?? null, sourceText: state.sourceText, dirty: true };
+    case "sourceIntegrity":
+      return state.loadId === action.loadId && state.working?.sources === action.sources ?
+        { ...state, sourceIntegrity: action.proof } : state;
     case "loadExample": {
       if (state.project) return state;
       const project = syntheticProject();
@@ -485,6 +577,7 @@ export function editorReducer(state: EditorState, action: Action): EditorState {
       const drafts = { ...next.drafts };
       delete drafts[action.id];
       return { ...next, drafts, rewriteIssues: { ...next.rewriteIssues, [action.id]: [] },
+        rewriteIssueDetails: { ...next.rewriteIssueDetails, [action.id]: [] },
         working: block.kind === "education" && next.working ?
         { ...next.working, manual: { ...next.working.manual, education: text } } : next.working,
         errors: { ...next.errors, [action.id]: "" } };
@@ -521,10 +614,52 @@ export function editorReducer(state: EditorState, action: Action): EditorState {
       });
       const undo = { ...state.undo };
       delete undo[action.id];
+      let working = checkpoint.manualEducation !== null && state.working ? { ...state.working,
+        manual: { ...state.working.manual, education: checkpoint.manualEducation } } : state.working;
+      const related = relatedCoverageTargets(state, action.id, checkpoint.state.factIds);
+      if (working && checkpoint.coverage && dependenciesCurrent) {
+        const restoredProject = { ...project, views, review };
+        const input = { project: restoredProject, working, presentation: state.presentation,
+          rewriteIssues: { ...state.rewriteIssueDetails, [action.id]: checkpoint.issueDetails },
+          sourceIntegrity: state.sourceIntegrity };
+        const expectedViews = views.map((item) => item.id === action.id ?
+          { ...item, revision: checkpoint.revision } : item);
+        const expectedReview = reviewForCurrent({ ...project, views: expectedViews }, {
+          decisions: [...otherReview.decisions, ...checkpoint.review.decisions],
+          acknowledgments: [...otherReview.acknowledgments, ...checkpoint.review.acknowledgments],
+        });
+        const expectedInput = { ...input, project: { ...project, views: expectedViews,
+          review: expectedReview }, working: { ...working, coverage: checkpoint.coverage } };
+        const retained = working.coverage?.decisions.filter((item) =>
+          !related.has(`${item.targetKind}:${item.targetId}`)) ?? [];
+        const restored = checkpoint.coverage.decisions.filter((item) =>
+          related.has(`${item.targetKind}:${item.targetId}`)).flatMap((item) => {
+            if (coverageDependency(expectedInput, item.targetKind, item.targetId) !== item.dependency) return [];
+            const dependency = coverageDependency(input, item.targetKind, item.targetId);
+            return dependency ? [{ ...item, dependency }] : [];
+          });
+        const candidate = { ...working, coverage: { decisions: [...retained, ...restored],
+          acknowledgments: working.coverage?.acknowledgments ?? [] } };
+        const active = coverageReview({ ...input, working: candidate });
+        const relatedIssues = active.warnings.filter((item) => item.blockId === action.id ||
+          item.factId && related.has(`fact:${item.factId}`) ||
+          item.sourceId && item.unitId && related.has(`unit:view_${item.sourceId}_${item.unitId}`));
+        const relatedIssueIds = new Set(relatedIssues.map((item) => item.id));
+        const expectedWarnings = new Map(coverageReview(expectedInput).warnings.map((item) =>
+          [item.id, item.dependency]));
+        const acknowledgments = candidate.coverage.acknowledgments.filter((item) =>
+          !relatedIssueIds.has(item.issueId));
+        for (const item of relatedIssues) {
+          if (checkpoint.coverage.acknowledgments.some((ack) => ack.issueId === item.id &&
+              expectedWarnings.get(ack.issueId) === ack.dependency))
+            acknowledgments.push({ issueId: item.id, dependency: item.dependency });
+        }
+        working = { ...candidate, coverage: { decisions: candidate.coverage.decisions, acknowledgments } };
+      }
       return { ...state, dirty: true, undo, rewriteProposal: state.rewriteProposal?.result.blockId === action.id ? null : state.rewriteProposal,
         rewriteIssues: { ...state.rewriteIssues, [action.id]: checkpoint.issues },
-        working: checkpoint.manualEducation !== null && state.working ? { ...state.working,
-          manual: { ...state.working.manual, education: checkpoint.manualEducation } } : state.working,
+        rewriteIssueDetails: { ...state.rewriteIssueDetails, [action.id]: checkpoint.issueDetails },
+        working,
         project: { ...project, revision: project.revision + 1, views, review } };
     }
     case "review": {
@@ -642,10 +777,29 @@ export function editorReducer(state: EditorState, action: Action): EditorState {
       for (const id of affected) delete undo[id];
       const rewriteIssues = { ...state.rewriteIssues };
       for (const id of affected) delete rewriteIssues[id];
+      const rewriteIssueDetails = { ...state.rewriteIssueDetails };
+      for (const id of affected) delete rewriteIssueDetails[id];
       return { ...state, project: next, working, factDrafts, undo, dirty: true,
-        rewriteIssues,
+        rewriteIssues, rewriteIssueDetails,
         rewriteProposal: affected.includes(state.rewriteProposal?.result.blockId ?? "") ? null : state.rewriteProposal,
         errors: { ...state.errors, [action.id]: "" } };
     }
   }
+}
+
+export function editorReducer(state: EditorState, action: Action): EditorState {
+  const next = reduceEditorState(state, action);
+  if (!next.project || !next.working?.coverage) return next;
+  const input = { project: next.project, working: next.working,
+    presentation: next.presentation, rewriteIssues: next.rewriteIssueDetails,
+    sourceIntegrity: next.sourceIntegrity };
+  const decisions = next.working.coverage.decisions.filter((item) =>
+    coverageDependency(input, item.targetKind, item.targetId) === item.dependency);
+  const review = coverageReview(input);
+  const warnings = new Map(review.warnings.map((item) => [item.id, item.dependency]));
+  const acknowledgments = next.working.coverage.acknowledgments.filter((item) =>
+    warnings.get(item.issueId) === item.dependency);
+  if (decisions.length === next.working.coverage.decisions.length &&
+      acknowledgments.length === next.working.coverage.acknowledgments.length) return next;
+  return { ...next, working: { ...next.working, coverage: { decisions, acknowledgments } } };
 }

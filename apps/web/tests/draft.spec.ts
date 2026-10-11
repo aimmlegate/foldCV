@@ -154,11 +154,11 @@ test("private metric and mixed fact stay out of draft input and remain visible a
     containsPrivateText: boolean; containsPrivateIds: boolean };
   expect(guard).toEqual({ containsPrivateText: false, containsPrivateIds: false });
   await page.getByRole("tab", { name: "Проверки" }).click();
-  await expect(page.getByText("fact_fixture_private_metric: Fact withheld from drafting", { exact: false }).first()).toBeVisible();
-  await expect(page.getByText("fact_fixture_private_mixed: Fact withheld from drafting", { exact: false }).first()).toBeVisible();
+  await expect(page.locator('button[title="fact_fixture_private_metric"]').first()).toBeVisible();
+  await expect(page.locator('button[title="fact_fixture_private_mixed"]').first()).toBeVisible();
   await expect(page.getByText("555-123-4567", { exact: false })).toHaveCount(0);
   const checks = page.getByRole("tabpanel", { name: "Проверки" });
-  const issueRows = await checks.locator("li").count() - 3;
+  const issueRows = await checks.locator("section ul li").count();
   const countText = await checks.locator("li").first().innerText();
   const reviewCount = Number(countText.match(/^(\d+) пунктов проверки$/)?.[1]);
   expect(reviewCount).toBeGreaterThanOrEqual(issueRows);

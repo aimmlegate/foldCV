@@ -10,6 +10,7 @@ import { editorReducer, initialEditorState, scopedFactsForBlock } from "../src/e
 import { buildRewriteRequest, currentRewriteDependencyHash, RewriteWorkflow } from "../src/editor/rewriteWorkflow";
 import type { RewriteResult } from "../src/contracts/generated/rewrite_result";
 import type { RewritePreflightFailure } from "../src/contracts/generated/rewrite_preflight_failure";
+import { coverageReview } from "../src/editor/coverage";
 
 function working(): WorkingDraft {
   const result: unknown = structuredClone(sourceRequest.sources[0]?.result);
@@ -530,8 +531,9 @@ test("withheld fact issue identifies its block and stays complete in working dra
   const adapted = adaptDraftedWorking(input);
   assert.deepEqual(input, complete);
   assert.deepEqual(input.draft?.issues, complete.draft?.issues);
-  assert.ok(adapted.issues.some((issue) => issue.includes("profile · fact_user_private:") &&
-    issue.includes("Fact withheld from drafting")));
+  const review = coverageReview({ project: adapted.project, working: input, presentation: adapted.presentation });
+  assert.ok(review.warnings.some((issue) => issue.code === "DRAFT_SOURCE_REVIEW" &&
+    issue.blockId === "profile" && issue.factId === "fact_user_private"));
   assert.equal(adapted.issues.some((issue) => issue.includes("555-123-4567")), false);
   assert.equal(adapted.project.facts.find((fact) => fact.id === "fact_user_private")?.origin, "user");
   assert.ok(validateFactSheet(input.sheet));

@@ -22,7 +22,12 @@ export type ManualInput = { name: string; title: string; asOf: string; education
 export type WorkingSource = { entry: ImportedSource; originalBytes: Uint8Array };
 export type WorkingDraft = { transportVersion: 1; sources: WorkingSource[]; sheet: FactSheet;
   priorSheet: FactSheet | null; sourceReviewStale: boolean; manual: ManualInput; draft: DraftResult | null;
-  structuredCorrections?: Record<string, string> };
+  structuredCorrections?: Record<string, string>; coverage?: {
+    decisions: { targetKind: "unit" | "fact" | "job"; targetId: string;
+      disposition: "shown" | "condensed" | "archived" | "duplicate" | "unresolved" | "excluded";
+      reason: string | null; dependency: string }[];
+    acknowledgments: { issueId: string; dependency: string }[];
+  } };
 
 const templateHash = "d081df948bfd55d107c38d40387a9758f563f9c14a9cffc4a847f44cb687b8b9";
 const emptyHash = "0".repeat(64);
@@ -208,7 +213,7 @@ export function adaptWorking(working: WorkingDraft): { project: Project; present
   const globalMetrics = manual.metrics.filter((metric) => metric.jobId === null);
   views.push(block("profile", "profile", [...profileText, ...globalMetrics.map((metric) => metricLine(metric, manual.language))].join("\n"),
     [...profileFacts.map((fact) => fact.id), ...globalMetrics.map((metric) => metric.id)], facts));
-  const issues: string[] = sheet.issues.map((issue) => issue.message);
+  const issues: string[] = [];
   if (!employment.length) issues.push("Нет записей о работе. Добавьте работу вручную или проверьте лист фактов.");
   for (const job of manual.employment) {
     const spans = period(job.start, job.end);
@@ -290,8 +295,7 @@ export function adaptDraftedWorking(working: WorkingDraft): { project: Project; 
             [id, adapted.project.facts.find((fact) => fact.id === id)?.revision ?? 1])) } };
     }) };
   if (!validateContract("project", project)) throw new Error("Проверьте связи черновика перед открытием редактора.");
-  return { ...adapted, project, issues: [...adapted.issues, ...draft.issues.map((issue) =>
-    `${issue.blockId} · ${issue.factId}: ${issue.message}`),
+  return { ...adapted, project, issues: [...adapted.issues,
     ...(preserveProfile ? ["Модельный текст профиля не запрашивался: сохранены ручные числа и вклад."] : []),
     "Текст предложен моделью. Проверьте смысл по исходнику перед подтверждением."] };
 }
