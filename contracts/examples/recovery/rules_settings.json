@@ -1,0 +1,9 @@
+{
+  "markdown": "## Preset: shorten\nСократи.\n## Preset: clarify\nНапиши яснее.\n",
+  "revision": 1,
+  "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "presets": {
+    "shorten": "Сократи.",
+    "clarify": "Напиши яснее."
+  }
+}

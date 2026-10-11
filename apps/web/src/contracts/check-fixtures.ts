@@ -65,7 +65,7 @@ const extract = read("extract_result.json");
 const bases: Record<string, unknown> = { project, proposal: child(child(project, "proposals"), 0), template: child(project, "template"), zip_manifest: zip, archive_manifest: archive, render_request: render, prepare_request: prepare, extract_result: extract,
   fact_request: read("fact_request.json"), fact_sheet: read("fact_sheet.json"), semantic_proposal: read("semantic_proposal.json"),
   draft_request: read("draft_request.json"), draft_proposal: read("draft_proposal.json"), draft_result: read("draft_result.json") };
-for (const name of ["project_v4", "workspace_v5", "archive_manifest_v5", "render_snapshot_v4", "mutation", "mutation_result", "document", "preferences", "registry", "rules", "selection", "source_context", "editorial_plan"]) {
+for (const name of ["project_v4", "workspace_v5", "archive_manifest_v5", "render_snapshot_v4", "mutation", "mutation_result", "document", "preferences", "registry", "rules", "selection", "source_context", "editorial_plan", "save_rules_request", "rules_settings_error", "rules_settings"]) {
   bases[name] = read(`recovery/${name}.json`);
 }
 const cases = array(read("cases.json")) as Case[];

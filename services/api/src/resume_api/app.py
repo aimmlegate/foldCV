@@ -43,6 +43,8 @@ from packages.resume_core.drafting import DraftRequest as ProseDraftRequest, Dra
 from packages.resume_core.rewriting import (RewritePreflightError, RewritePreflightFailure,
                                             RewriteRequest as ScopedRewriteRequest, RewriteResult as ScopedRewriteResult,
                                             rewrite_input, withheld_rewrite_issues)
+from packages.resume_core.rules import PRESET_HEADINGS, RulesFailure, RulesStore, presets
+from packages.resume_core.models.recovery import SaveRulesRequest, RulesSettingsError, RulesSettings
 
 
 MAX_BODY = 1_048_576
@@ -55,6 +57,7 @@ POST_ONLY_PATHS = frozenset({"session/exchange", "extract", "facts", "facts/norm
                             "validate", "prepare-render", "render", "host/discover", "host/status", "host/login",
                             "host/detach", "host/models", "host/select", "host/cancel-login"})
 JSON_POST_PATHS = frozenset("/v1/" + path for path in POST_ONLY_PATHS if path != "extract")
+JSON_PUT_PATHS = frozenset({"/v1/settings/rules"})
 
 
 class OperationTimeout(Exception):
@@ -177,7 +180,7 @@ class LocalBoundary:
                 if not message.get("more_body", False):
                     break
             body = b"".join(chunks)
-            if method == "POST" and path in JSON_POST_PATHS:
+            if (method == "POST" and path in JSON_POST_PATHS) or (method == "PUT" and path in JSON_PUT_PATHS):
                 if not is_json_media_type(headers.get(b"content-type", b"")):
                     await problem("INVALID_REQUEST", 415)(scope, receive, send)
                     return
@@ -229,7 +232,7 @@ def create_app(*, origin: str, secret: str, temp_root: Path, dist: Path, runner:
                cli_executable: Path | None = None, connection_adapter: ConnectionAdapter | None = None,
                semantic_runner: SemanticRunner | None = None, draft_runner: ProseDraftRunner | None = None,
                rewrite_runner: ProseRewriteRunner | None = None, fixture_generation_ready: bool = False,
-               experimental_profile: ExperimentalCliProfile | None = None):
+               experimental_profile: ExperimentalCliProfile | None = None, data_root: Path | None = None):
     if not origin.startswith("http://127.0.0.1:") or not origin.rsplit(":", 1)[-1].isdigit():
         raise ValueError("A concrete IPv4 loopback origin is required")
     if len(secret) < 32:
@@ -259,6 +262,7 @@ def create_app(*, origin: str, secret: str, temp_root: Path, dist: Path, runner:
 
     app = FastAPI(docs_url=None, redoc_url=None, openapi_url=None, lifespan=lifespan)
     boundary = LocalBoundary(app, origin, secret)
+    rules_store = RulesStore(data_root)
     active = 0
     import_active = False
     count = 0
@@ -430,6 +434,37 @@ def create_app(*, origin: str, secret: str, temp_root: Path, dist: Path, runner:
         response.set_cookie(boundary.cookie_name, boundary.session, httponly=True, secure=False,
                             samesite="strict", path="/v1/")
         return response
+
+    def rules_failure(error: RulesFailure):
+        status = 409 if error.code == "RULES_STALE" else 422 if error.code in {
+            "RULES_PRESETS_REQUIRED", "RULES_TOO_LARGE", "RULES_INVALID_TEXT"} else 500
+        payload = RulesSettingsError.model_validate({
+            "error": {"code": error.code, "retryable": False, "stage": "rules"},
+            "requiredHeadings": list(PRESET_HEADINGS.values()) if error.code == "RULES_PRESETS_REQUIRED" else [],
+        })
+        return JSONResponse(payload.model_dump(mode="json", by_alias=True), status_code=status,
+                            headers={"Cache-Control": "no-store"})
+
+    def rules_response(captured):
+        value = {**captured.model_dump(mode="json", by_alias=True), "presets": presets(captured.markdown)}
+        payload = RulesSettings.model_validate(value)
+        return JSONResponse(payload.model_dump(mode="json", by_alias=True), headers={"Cache-Control": "no-store"})
+
+    @app.get("/v1/settings/rules")
+    async def read_rules():
+        try:
+            captured = rules_store.load()
+            return rules_response(captured)
+        except RulesFailure as error:
+            return rules_failure(error)
+
+    @app.put("/v1/settings/rules")
+    async def save_rules(request: SaveRulesRequest):
+        try:
+            captured = rules_store.save(request.markdown, request.base_revision)
+            return rules_response(captured)
+        except RulesFailure as error:
+            return rules_failure(error)
 
     @app.get("/v1/capabilities")
     async def capabilities():

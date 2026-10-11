@@ -1,0 +1,62 @@
+{
+  "$defs": {
+    "RulesErrorPayload": {
+      "additionalProperties": false,
+      "properties": {
+        "code": {
+          "enum": [
+            "RULES_PRESETS_REQUIRED",
+            "RULES_STALE",
+            "RULES_TOO_LARGE",
+            "RULES_INVALID_TEXT",
+            "RULES_LOAD_FAILED",
+            "RULES_SAVE_FAILED",
+            "RULES_UNSAFE_STORAGE"
+          ],
+          "title": "Code",
+          "type": "string"
+        },
+        "retryable": {
+          "const": false,
+          "title": "Retryable",
+          "type": "boolean"
+        },
+        "stage": {
+          "const": "rules",
+          "title": "Stage",
+          "type": "string"
+        }
+      },
+      "required": [
+        "code",
+        "retryable",
+        "stage"
+      ],
+      "title": "RulesErrorPayload",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "error": {
+      "$ref": "#/$defs/RulesErrorPayload"
+    },
+    "requiredHeadings": {
+      "items": {
+        "enum": [
+          "## Preset: shorten",
+          "## Preset: clarify"
+        ],
+        "type": "string"
+      },
+      "title": "Requiredheadings",
+      "type": "array"
+    }
+  },
+  "required": [
+    "error",
+    "requiredHeadings"
+  ],
+  "title": "RulesSettingsError",
+  "type": "object"
+}

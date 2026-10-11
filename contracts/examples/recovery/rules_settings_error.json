@@ -1,0 +1,11 @@
+{
+  "error": {
+    "code": "RULES_PRESETS_REQUIRED",
+    "retryable": false,
+    "stage": "rules"
+  },
+  "requiredHeadings": [
+    "## Preset: shorten",
+    "## Preset: clarify"
+  ]
+}

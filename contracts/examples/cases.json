@@ -1923,5 +1923,42 @@
         "value": "unexpected"
       }
     ]
-  }
+  },
+  {
+    "name": "rules_save_rules_request_valid",
+    "contract": "save_rules_request",
+    "base": "save_rules_request",
+    "valid": true,
+    "edits": []
+  },
+  {
+    "name": "rules_rules_settings_error_valid",
+    "contract": "rules_settings_error",
+    "base": "rules_settings_error",
+    "valid": true,
+    "edits": []
+  },
+  {
+    "name": "rules_settings_unknown_error_rejected",
+    "contract": "rules_settings_error",
+    "base": "rules_settings_error",
+    "valid": false,
+    "edits": [
+      {
+        "op": "set",
+        "path": [
+          "error",
+          "code"
+        ],
+        "value": "private exception"
+      }
+    ]
+  },
+  {
+  "name": "rules_settings_parsed_presets_valid",
+  "contract": "rules_settings",
+  "base": "rules_settings",
+  "valid": true,
+  "edits": []
+}
 ]

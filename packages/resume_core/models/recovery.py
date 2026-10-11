@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import Annotated, Literal, Union
 
-from pydantic import Field, RootModel, model_validator
+from pydantic import ConfigDict, Field, RootModel, model_validator
 
 from .contracts import (
     ArchiveEntry, AssetRef, Block, Evidence, Fact, Id, Job, Operation, PartialDate,
@@ -63,6 +63,7 @@ RecoveryFact = Union[Fact, CandidateFact, NameAssessmentFact, ObservationFact]
 
 
 class Rules(Wire):
+    model_config = ConfigDict(frozen=True)
     markdown: str
     revision: Revision
     sha256: Sha256
@@ -746,10 +747,38 @@ class ArchiveManifestV5(Wire):
         return self
 
 
+class SaveRulesRequest(Wire):
+    markdown: str = Field(min_length=1, max_length=32_768)
+    base_revision: Revision
+
+
+class RulePresets(Wire):
+    shorten: str = Field(min_length=1)
+    clarify: str = Field(min_length=1)
+
+
+class RulesSettings(Rules):
+    presets: RulePresets
+
+
+class RulesErrorPayload(Wire):
+    code: Literal["RULES_PRESETS_REQUIRED", "RULES_STALE", "RULES_TOO_LARGE",
+                  "RULES_INVALID_TEXT", "RULES_LOAD_FAILED", "RULES_SAVE_FAILED", "RULES_UNSAFE_STORAGE"]
+    retryable: Literal[False]
+    stage: Literal["rules"]
+
+
+class RulesSettingsError(Wire):
+    error: RulesErrorPayload
+    required_headings: list[Literal["## Preset: shorten", "## Preset: clarify"]]
+
+
 RECOVERY_CONTRACTS = {
     "project_v4": ProjectV4, "workspace_v5": WorkspaceV5, "archive_manifest_v5": ArchiveManifestV5,
     "document": Document, "docx_error": DocxError, "editorial_plan": EditorialPlan,
     "mutation": Mutation, "mutation_result": MutationResult, "preferences": Preferences,
     "registry": Registry, "render_snapshot_v4": RenderSnapshotV4, "rules": Rules,
     "selection": Selection, "source_context": SourceContext,
+    "save_rules_request": SaveRulesRequest, "rules_settings_error": RulesSettingsError,
+    "rules_settings": RulesSettings,
 }

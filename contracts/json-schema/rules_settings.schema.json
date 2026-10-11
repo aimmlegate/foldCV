@@ -1,0 +1,53 @@
+{
+  "$defs": {
+    "RulePresets": {
+      "additionalProperties": false,
+      "properties": {
+        "clarify": {
+          "minLength": 1,
+          "title": "Clarify",
+          "type": "string"
+        },
+        "shorten": {
+          "minLength": 1,
+          "title": "Shorten",
+          "type": "string"
+        }
+      },
+      "required": [
+        "shorten",
+        "clarify"
+      ],
+      "title": "RulePresets",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "markdown": {
+      "title": "Markdown",
+      "type": "string"
+    },
+    "presets": {
+      "$ref": "#/$defs/RulePresets"
+    },
+    "revision": {
+      "minimum": 1,
+      "title": "Revision",
+      "type": "integer"
+    },
+    "sha256": {
+      "pattern": "^[a-f0-9]{64}$",
+      "title": "Sha256",
+      "type": "string"
+    }
+  },
+  "required": [
+    "markdown",
+    "revision",
+    "sha256",
+    "presets"
+  ],
+  "title": "RulesSettings",
+  "type": "object"
+}

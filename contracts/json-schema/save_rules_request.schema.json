@@ -1,0 +1,22 @@
+{
+  "additionalProperties": false,
+  "properties": {
+    "baseRevision": {
+      "minimum": 1,
+      "title": "Baserevision",
+      "type": "integer"
+    },
+    "markdown": {
+      "maxLength": 32768,
+      "minLength": 1,
+      "title": "Markdown",
+      "type": "string"
+    }
+  },
+  "required": [
+    "markdown",
+    "baseRevision"
+  ],
+  "title": "SaveRulesRequest",
+  "type": "object"
+}

@@ -1,3 +1,6 @@
+import rulesSettings from "../../../../contracts/json-schema/rules_settings.schema.json" with { type: "json" };
+import saveRules from "../../../../contracts/json-schema/save_rules_request.schema.json" with { type: "json" };
+import rulesError from "../../../../contracts/json-schema/rules_settings_error.schema.json" with { type: "json" };
 import { Ajv2020 } from "ajv/dist/2020.js";
 import project from "../../../../contracts/json-schema/project_v4.schema.json" with { type: "json" };
 import workspace from "../../../../contracts/json-schema/workspace_v5.schema.json" with { type: "json" };
@@ -17,7 +20,7 @@ import context from "../../../../contracts/json-schema/source_context.schema.jso
 const ajv = new Ajv2020({ allErrors: true, strict: false });
 const schemas = { project_v4: project, workspace_v5: workspace, archive_manifest_v5: archive,
   document, docx_error: error, editorial_plan: plan, mutation, mutation_result: result,
-  preferences, registry, render_snapshot_v4: render, rules, selection, source_context: context };
+  preferences, registry, render_snapshot_v4: render, rules, selection, source_context: context, save_rules_request: saveRules, rules_settings_error: rulesError, rules_settings: rulesSettings };
 const validators = new Map(Object.entries(schemas).map(([name, schema]) => [name, ajv.compile(schema)]));
 
 export function validateRecoveryShape(kind: string, value: unknown): boolean {
