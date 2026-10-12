@@ -1,4 +1,4 @@
-import type { Workspace } from "./api";
+import { ApiFailure, errorLabel, type Workspace } from "./api";
 
 const labels = { extract: "Читаем исходник", normalize_semantics: "Разбираем факты", draft_prose: "Готовим резюме", assemble: "Проверяем документ", render: "Оформляем DOCX" };
 const statuses = { queued: "Ожидает", running: "Выполняется", completed: "Готово", failed: "Ошибка", cancelled: "Отменено", interrupted: "Прервано" };
@@ -6,6 +6,7 @@ const statuses = { queued: "Ожидает", running: "Выполняется", 
 export function GenerationProgress({ generation, busy, control }: { generation: Workspace["generations"][number]; busy: boolean; control: (action: "cancel" | "retry") => void }) {
   const running = generation.status === "queued" || generation.status === "running";
   const failed = generation.status === "failed" || generation.status === "cancelled" || generation.status === "interrupted";
+  const error = generation.stages.find(stage => stage.errorCode !== null && stage.docxError === null)?.errorCode;
   return <section className="next-progress" aria-label="Создание резюме">
     <p role="status">{running ? labels[generation.stages.find(stage => stage.status === "queued" || stage.status === "running")?.kind ?? "render"]
       : generation.status === "completed" ? "Резюме готово" : generation.status === "cancelled" ? "Создание отменено" : "Создание не завершено"}</p>
@@ -14,6 +15,7 @@ export function GenerationProgress({ generation, busy, control }: { generation: 
     </li>)}</ol></details>
     {running && <button disabled={busy} onClick={() => control("cancel")}>Отменить создание</button>}
     {failed && <button disabled={busy} onClick={() => control("retry")}>Повторить создание</button>}
+    {error && generation.status !== "cancelled" && <p role="alert">{errorLabel(new ApiFailure(error))}</p>}
     {generation.stages.some(stage => stage.docxError) && <p role="alert">Документ готов. DOCX пока не удалось оформить; текст доступен для правок.</p>}
   </section>;
 }

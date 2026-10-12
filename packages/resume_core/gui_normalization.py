@@ -193,6 +193,8 @@ def validate_span(span: EvidenceSpan, sources: list[Source]) -> Evidence:
 
 def normalize_candidate(request: GuiNormalizeRequest, proposal: GuiSemanticProposal, rules: Rules) -> GuiNormalizedResult:
     sources = [source.model_copy(deep=True) for source in request.sources]
+    for source in sources:
+        for unit in source.units:unit.represented_fact_ids = []
     facts: list[RecoveryFact] = []
     field_refs: dict[str, list[str]] = {}
     all_refs = [Evidence.model_validate({"sourceId": source.id, "sourceRevision": source.revision,

@@ -44,6 +44,7 @@ class ControlledProvider(CreationProvider):
         if request.result_type is GuiSemanticProposal:
             while (self.root/'hold-normalization').exists():
                 if cancel.wait(.01):raise ContentFailure('CANCELLED')
+        if request.result_type is GuiDraftProposal and (self.root/'deny-draft').exists():raise ContentFailure('MODEL_DENIED')
         if request.result_type is GuiRewriteProposal:
             (self.root / "rewrite-started").touch()
             while (self.root / "hold-rewrite").exists():
@@ -153,6 +154,8 @@ async def main():
             gui_provider=ControlledProvider(root, example.split("-")[0], remove_focus=example.endswith("-focus")),
             gui_renderer=ControlledRenderer(root), gui_clock=frozen_now, connection_adapter=ControlledConnection(root))
         store = app.app.state.gui_projects
+        selected_provider=store.provider_factory
+        store.provider_factory=lambda:None if (root/'deny-creation').exists() else selected_provider()
         if (root / 'pause-analysis').exists():
             store.rules.load()
             store.preferences.save_analysis(False)

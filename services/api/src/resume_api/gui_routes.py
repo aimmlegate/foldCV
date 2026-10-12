@@ -37,7 +37,12 @@ def mount_projects(app, service, problem):
         workspace = await service.select(payload.text.encode("utf-8"), "pasted.txt", True)
         if service.durability(workspace.project_id) == "failed":
             return response(workspace.project_id, status=201)
-        return response(workspace.project_id, service.start(workspace.project_id), 202)
+        try:return response(workspace.project_id, service.start(workspace.project_id), 202)
+        except ProjectFailure as error:
+            service.persist(workspace.project_id)
+            result=problem(error.code,error.status,"project")
+            result.headers['X-FoldCV-Project-Id']=workspace.project_id
+            return result
 
     @app.get("/v1/projects")
     async def projects():
@@ -135,10 +140,18 @@ def mount_projects(app, service, problem):
 
     @app.post("/v1/projects/{id}/generations")
     async def start(id: str, payload: GuiStartGenerationRequest):
-        service.read(id)
+        workspace=service.read(id)
         if payload.text is not None:
-            await service.select(payload.text.encode("utf-8"), "pasted.txt", True, id)
-        return response(id, service.start(id), 202)
+            pre=workspace.pre_draft;content=payload.text.encode('utf-8')
+            if not (pre and pre.selected_input=='text' and pre.extraction_fingerprint is not None
+                and service.originals.get((id,pre.selected_source_id))==content):
+                await service.select(content, "pasted.txt", True, id)
+        try:return response(id, service.start(id), 202)
+        except ProjectFailure as error:
+            service.persist(id)
+            result=problem(error.code,error.status,"project")
+            result.headers['X-FoldCV-Project-Id']=id
+            return result
 
     @app.get("/v1/projects/{id}/generations/{gid}")
     async def generation(id: str, gid: str):

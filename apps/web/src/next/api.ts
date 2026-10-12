@@ -21,7 +21,7 @@ import { validateContract } from "../contracts/validate";
 
 export type Workspace = GuiProjectResponse["workspace"];
 export class ApiFailure extends Error {
-  constructor(readonly code: string) { super(code); }
+  constructor(readonly code: string, readonly recoveryProjectId: string | null = null) { super(code); }
 }
 function isResponse(value: unknown): value is GuiProjectResponse {
   return validateContract("gui_project_response", value);
@@ -38,7 +38,10 @@ async function request(path: string, method = "GET", body?: GuiCreateProjectRequ
   else if (body !== undefined) { init.body = JSON.stringify(body); init.headers = { "Content-Type": "application/json" }; }
   const response = await fetch(path, init);
   const value: unknown = await response.json();
-  if (!response.ok) throw new ApiFailure(errorCode(value));
+  if (!response.ok) {
+    const id = response.headers.get("X-FoldCV-Project-Id");
+    throw new ApiFailure(errorCode(value), id !== null && /^[A-Za-z0-9][A-Za-z0-9_-]{0,127}$/.test(id) ? id : null);
+  }
   return value;
 }
 export async function projectRequest(path: string, method = "GET", body?: GuiCreateProjectRequest | GuiStartGenerationRequest | GuiExportRequest | GuiAnalysisRequest | Record<string, never> | FormData): Promise<GuiProjectResponse> {
@@ -141,6 +144,12 @@ export async function exchangeSession(): Promise<void> {
 export function errorLabel(error: unknown): string {
   const code = error instanceof ApiFailure ? error.code : "REQUEST_FAILED";
   const labels: Record<string, string> = { CONNECTION_REQUIRED: "Подключите модель перед созданием резюме.",
+    STALE_GENERATION: "Документ изменён после создания. Используйте «Экспорт DOCX» для текущего текста.",
+    INTERRUPTED: "Создание прервано. Исходник и сохранённый текст доступны для явного повтора.",
+    OPERATION_TIMEOUT: "Операция превысила время ожидания. Сохранённая работа доступна для повтора.",
+    PROCESS_CLEANUP_FAILED: "Не удалось подтвердить остановку процесса. Перезапустите приложение перед новой операцией.",
+    RULES_LOAD_FAILED: "Общие правила недоступны. Откройте Настройки и проверьте их перед новой операцией.",
+    RULES_UNSAFE_STORAGE: "Не удалось безопасно прочитать общие правила. Проверьте их в Настройках.",
     AUTH_REQUIRED: "Откройте приложение по ссылке из запуска.", NO_USABLE_TEXT: "Доступного текста нет. Выберите другой файл или вставьте текст.",
     INPUT_TOO_LARGE: "Текст слишком большой для одного запроса.", CANCELLED: "Создание отменено. Исходник сохранён в памяти.",
     MODEL_DENIED: "Выбранная модель недоступна.", QUOTA_EXHAUSTED: "Лимит модели исчерпан. Повторите позже." };

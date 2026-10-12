@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { FieldEditor, type FieldEditorHandle } from "./FieldEditor";
-import { projectRequest, sourceRequest, migrationRequest, errorLabel, type Workspace } from "./api";
+import { ApiFailure, projectRequest, sourceRequest, migrationRequest, errorLabel, type Workspace } from "./api";
 import { SourcePanel } from "./SourcePanel";
 import { StructureControls } from "./StructureControls";
 import { useEdits } from "./useEdits";
@@ -124,13 +124,23 @@ export function App() {
       const result = await projectRequest(workspace ? `/v1/projects/${workspace.projectId}/generations` : "/v1/projects", "POST",
         input === "text" ? { text } : {});
       if (epoch === requestEpoch.current) { accept(result); setGenerationId(result.generationId); }
-    } catch (error) { setError(errorLabel(error)); }
-    finally { setBusy(false);setActivity(null); }
+    } catch (error) {
+      if (epoch !== requestEpoch.current) return;
+      if (error instanceof ApiFailure && error.recoveryProjectId) {
+        try {
+          const recovered = await projectRequest(`/v1/projects/${encodeURIComponent(error.recoveryProjectId)}`);
+          if (epoch === requestEpoch.current) accept(recovered);
+        } catch { /* Keep the input buffer when snapshot recovery is unavailable. */ }
+      }
+      if (epoch === requestEpoch.current) setError(errorLabel(error));
+    }
+    finally { if (epoch === requestEpoch.current) { setBusy(false);setActivity(null); } }
   }
   async function control(action: "cancel" | "retry") {
     if (!workspace || !generationId) return;
     setBusy(true);setActivity("control");setError("");
     try {
+      if (action === "retry" && !await edits.flushBeforeAction()) { setError("Сначала завершите ввод и сохраните текущие правки.");return; }
       const result = await projectRequest(`/v1/projects/${workspace.projectId}/generations/${generationId}/${action}`, "POST", {});
       accept(result); setGenerationId(result.generationId);
     } catch (error) { setError(errorLabel(error)); }
@@ -239,7 +249,7 @@ export function App() {
         </div>
         <button className="next-sample" disabled={busy || !!running} onClick={() => { setText(sample);setInput("text");setGenerationId(null);setError(""); }}>Открыть пример</button>
         <label className="next-paste-label" htmlFor="resume-input">Или вставьте текст</label>
-        <textarea id="resume-input" rows={8} maxLength={60000} disabled={busy || !!running}
+        <textarea id="resume-input" rows={6} maxLength={60000} disabled={busy || !!running}
           value={input === "file" ? fileAvailable ? workspace?.preDraft?.extractedText ?? "" : "" : text}
           onChange={event => { setText(event.target.value);setInput("text");setGenerationId(null);setError(""); }} />
         <p className="next-selected">Выбрано: {input === "file" ? fileName : "вставленный текст"}</p>
@@ -247,8 +257,8 @@ export function App() {
           ? durability === "durable" ? "Часть содержимого не удалось прочитать. Исходник и доступный текст сохранены локально." : "Часть содержимого не удалось прочитать. Текст доступен в окне; запись на диск не подтверждена."
           : "Доступного текста нет. Выберите другой файл или вставьте текст."}</p> : null}
         {activity && <p role="status">{activity === "input" ? "Читаем и сохраняем исходник…" : activity === "create" ? "Начинаем создание резюме…" : "Завершаем действие…"}</p>}
-        <button className="next-create" disabled={!usable || busy || !!running || workspace !== null && durability !== "durable"} onClick={() => { void create(); }}>Создать резюме</button>
         <StartDisclosure settings={() => { void showSettings(); }} />
+        <button className="next-create" disabled={!usable || busy || !!running || workspace !== null && durability !== "durable"} onClick={() => { void create(); }}>Создать резюме</button>
       </div>
     </section>}
     {sourceOpen && workspace && <SourcePanel context={source} workspace={workspace} loading={sourceBusy}

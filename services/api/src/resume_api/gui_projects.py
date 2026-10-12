@@ -308,6 +308,8 @@ class GuiProjectService(GuiExportMixin, GuiAnalysisMixin, GuiManagementMixin, Gu
             raise ProjectFailure("PROJECT_NOT_FOUND", 404)
         if any(not task.done() for (pid, _), task in self.tasks.items() if pid == id):
             raise ProjectFailure("PROJECT_GENERATION_ACTIVE")
+        old = self.generation(id, previous) if previous else None
+        render_only = False
         if previous is None:
             if workspace.pre_draft is None:
                 raise ProjectFailure("DOCUMENT_ALREADY_CREATED")
@@ -318,16 +320,26 @@ class GuiProjectService(GuiExportMixin, GuiAnalysisMixin, GuiManagementMixin, Gu
             if "portable_project_imported" not in workspace.migration_notices:
                 workspace.formatting_as_of = partial_date(self.clock().date().isoformat())
         else:
-            old = self.generation(id, previous)
             if old.status not in {"failed", "cancelled", "interrupted"}:
                 raise ProjectFailure("GENERATION_NOT_RETRYABLE")
             if old.stages[3].status == "completed" and old.dependencies.document_revision != workspace.document_revision:
                 raise ProjectFailure("STALE_GENERATION")
-            source_ids = old.source_ids[:]
-        selected = self.provider_factory()
-        if selected is None:
+            if workspace.pre_draft:
+                pre = workspace.pre_draft
+                if not pre.extracted_text.strip() or pre.extraction_fingerprint is None:
+                    raise ProjectFailure("NO_USABLE_TEXT", 422)
+                source_ids = [pre.selected_source_id]
+            else:
+                source_ids = old.source_ids[:]
+                render_only = (old.stages[3].status == "completed" and workspace.rules_used == old.rules_used
+                    and workspace.formatting_as_of == old.formatting_as_of
+                    and source_fingerprint([source for source in workspace.project.sources if source.id in source_ids]) == old.dependencies.source_fingerprint)
+                if not render_only:raise ProjectFailure("STALE_GENERATION")
+        selected = None if render_only else self.provider_factory()
+        if not render_only and selected is None:
             raise ProjectFailure("CONNECTION_REQUIRED", 409)
-        rules = self.rules.load()
+        try:rules = old.rules_used if render_only else self.rules.load()
+        except RulesFailure as error:raise ProjectFailure(error.code,503) from None
         deps = self.dependencies(workspace, source_ids, rules)
         generation = Generation(id=identity("generation"), projectId=id, status="queued", dependencies=deps,
             rulesUsed=rules, sourceIds=source_ids, formattingAsOf=workspace.formatting_as_of,
@@ -335,13 +347,21 @@ class GuiProjectService(GuiExportMixin, GuiAnalysisMixin, GuiManagementMixin, Gu
                 resultFingerprint=None, operationId=None, errorCode=None, docxError=None)
                 for kind in ("extract", "normalize_semantics", "draft_prose", "assemble", "render")])
         cached = {}
-        if previous:
-            old = self.generation(id, previous)
-            if old.dependencies == deps:
-                cached = self.cache.get((id, previous), {}).copy()
-                for index, stage in enumerate(old.stages):
-                    if stage.status == "completed" and stage.dependency_fingerprint == deps.dependency_fingerprint:
-                        generation.stages[index] = stage.model_copy(deep=True)
+        if old:
+            if render_only:
+                for index, stage in enumerate(old.stages[:4]):
+                    if stage.status != "completed" or stage.dependency_fingerprint != old.dependencies.dependency_fingerprint:
+                        raise ProjectFailure("STALE_GENERATION")
+                    generation.stages[index] = stage.model_copy(deep=True)
+                    generation.stages[index].dependency_fingerprint = deps.dependency_fingerprint
+            elif old.dependencies == deps and old.rules_used == rules:
+                available = self.cache.get((id, previous), {})
+                for index, name in [(1, "normalized"), (2, "draft")]:
+                    stage, result = old.stages[index], available.get(name)
+                    if (stage.status != "completed" or stage.dependency_fingerprint != deps.dependency_fingerprint
+                        or result is None or digest(result.model_dump(mode="json", by_alias=True)) != stage.result_fingerprint):break
+                    cached[name] = result.model_copy(deep=True)
+                    generation.stages[index] = stage.model_copy(deep=True)
         generation.stages[0].status = "completed"
         generation.stages[0].result_fingerprint = deps.source_fingerprint
         workspace.generations.append(generation)
@@ -456,6 +476,9 @@ class GuiProjectService(GuiExportMixin, GuiAnalysisMixin, GuiManagementMixin, Gu
                     normalized_sources = {source.id: source for source in normalized.sources}
                     owner.sources = [normalized_sources.get(source.id, source) for source in owner.sources]
                     owner.facts = normalized.facts[:]
+                    valid_facts = {fact.id for fact in owner.facts}
+                    for source in owner.sources:
+                        for unit in source.units:unit.represented_fact_ids = [ref for ref in unit.represented_fact_ids if ref in valid_facts]
                     workspace.source_observed_at = normalized.source_observed_at
                     result = normalized
                 elif stage.kind == "draft_prose":
