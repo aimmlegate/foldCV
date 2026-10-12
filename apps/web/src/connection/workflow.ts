@@ -57,8 +57,9 @@ export class ConnectionWorkflow {
   private publish(view: ConnectionView): void { this.view = view; this.onChange(view); }
 
   private async post(path: string, body: object, signal?: AbortSignal): Promise<ConnectionSnapshot> {
-    const response = await this.request(`/v1/host/${path}`, { method: "POST", credentials: "same-origin",
-      headers: { "Content-Type": "application/json" }, body: JSON.stringify(body), ...(signal ? { signal } : {}) });
+    const peek = path === "peek";
+    const response = await this.request(peek ? "/v1/settings/connection" : `/v1/host/${path}`, { method: peek ? "GET" : "POST", credentials: "same-origin",
+      ...(peek ? {} : { headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) }), ...(signal ? { signal } : {}) });
     if (!response.ok || !response.headers.get("content-type")?.startsWith("application/json")) throw new Error("request failed");
     const length = Number(response.headers.get("content-length") ?? "0");
     if (!Number.isFinite(length) || length > 32_768) throw new Error("response too large");
@@ -104,6 +105,7 @@ export class ConnectionWorkflow {
   }
 
   refresh(): Promise<void> { return this.run("status"); }
+  peek(): Promise<void> { return this.run("peek"); }
   discover(): Promise<void> { return this.run("discover"); }
   select(modelName: string): Promise<void> {
     if (!this.view.snapshot.models.includes(modelName)) return Promise.resolve();

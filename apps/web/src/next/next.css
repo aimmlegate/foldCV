@@ -70,3 +70,10 @@ button:disabled { cursor: default; opacity: .6; }
 .next-export-file{display:grid;gap:1rem;padding:1.5rem;border:1px solid var(--outline);border-radius:8px}
 .next-export-file span{color:var(--muted);font-size:.85rem}
 @media(max-width:760px){.next-export{margin:1rem;padding:1rem}}
+.next-settings{max-width:720px;margin:2rem auto;padding:2rem;background:var(--panel);border:1px solid var(--outline)}
+.next-settings section{padding:1rem 0;border-bottom:1px solid var(--outline)}
+.next-settings-controls{display:flex;flex-wrap:wrap;gap:.5rem;margin:1rem 0}
+.next-settings-model{display:grid;gap:.5rem;max-width:420px}
+.next-settings-model select{padding:.6rem;border:1px solid var(--outline);background:var(--surface);color:var(--content)}
+.next-settings-disclosure{padding:1rem;background:var(--soft);border-left:3px solid var(--accent)}
+@media(max-width:760px){.next-settings{margin:1rem;padding:1rem}}

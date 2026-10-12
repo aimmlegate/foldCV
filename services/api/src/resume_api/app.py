@@ -46,6 +46,7 @@ from packages.resume_core.rewriting import (RewritePreflightError, RewritePrefli
 from packages.resume_core.rules import PRESET_HEADINGS, RulesFailure, RulesStore, presets
 from packages.resume_core.models.recovery import SaveRulesRequest, RulesSettingsError, RulesSettings
 from .gui_projects import GuiProjectService, ProjectFailure
+from packages.resume_core.preferences import PreferencesStore, PreferencesFailure
 from packages.resume_core.project_store import ProjectStore
 from .gui_routes import mount_projects
 
@@ -269,6 +270,8 @@ def create_app(*, origin: str, secret: str, temp_root: Path, dist: Path, runner:
 
     app = FastAPI(docs_url=None, redoc_url=None, openapi_url=None, lifespan=lifespan)
     boundary = LocalBoundary(app, origin, secret)
+    if data_root is None and any(value is not None for value in (runner, connection_adapter, semantic_runner, draft_runner, rewrite_runner, gui_provider)):
+        data_root = temp_root.parent / "FoldCV"
     rules_store = RulesStore(data_root)
     active = 0
     import_active = False
@@ -341,7 +344,7 @@ def create_app(*, origin: str, secret: str, temp_root: Path, dist: Path, runner:
 
     def gui_selected_provider():
         if gui_provider is not None and not unsafe_cleanup:
-            return gui_provider, "fixture"
+            return gui_provider, connection_state.selectedModel or "fixture"
         if experimental_ready() and provider is not None:
             return provider, connection_state.selectedModel
         return None
@@ -351,6 +354,7 @@ def create_app(*, origin: str, secret: str, temp_root: Path, dist: Path, runner:
         worker_slot=gui_worker_slot, cleanup_error=lifecycle_code, renderer=gui_renderer,
         storage=ProjectStore(rules_store.root), **gui_options)
     app.state.gui_projects = gui_projects
+    preferences_store = PreferencesStore(rules_store.root)
     mount_projects(app, gui_projects, problem)
 
     def execute_content(files, runner, payload, cancel, runner_epoch):
@@ -927,6 +931,19 @@ def create_app(*, origin: str, secret: str, temp_root: Path, dist: Path, runner:
                                                     "generationReady": experimental_ready()})
         return JSONResponse(state.model_dump(), headers={"Cache-Control": "no-store"})
 
+    @app.get("/v1/settings/connection")
+    async def current_connection():
+        return connection_response()
+
+    @app.get("/v1/settings/preferences")
+    async def preferences():
+        try:
+            rules_store.load()
+            value = preferences_store.load()
+            return JSONResponse(value.model_dump(mode="json", by_alias=True), headers={"Cache-Control": "no-store"})
+        except (PreferencesFailure, RulesFailure) as error:
+            return problem(error.code, 409, "settings")
+
     async def connection_job(kind: str, work):
         nonlocal active, connection_epoch, connection_state, login_task
         async with gate:
@@ -963,6 +980,13 @@ def create_app(*, origin: str, secret: str, temp_root: Path, dist: Path, runner:
                     return connection_response()
                 assert isinstance(result, Metadata)
                 selected = connection_state.selectedModel if connection_state.selectedModel in result.models else None
+                if selected is None:
+                    try:
+                        if not rules_store.path.exists():rules_store.load()
+                        preferred = preferences_store.load().selected_model
+                        if preferred in result.models:selected = preferred
+                    except (PreferencesFailure, RulesFailure):
+                        pass
                 quota = QuotaPayload(state=result.quota.state, usedPercent=result.quota.used_percent,
                                      resetsAt=result.quota.resets_at)
                 state = ("unchecked" if kind == "discover" else "quota_exhausted" if quota.state == "exhausted"
@@ -1026,6 +1050,11 @@ def create_app(*, origin: str, secret: str, temp_root: Path, dist: Path, runner:
         async with gate:
             if not connection_state.metadataReady or payload.model not in connection_state.models:
                 return problem("MODEL_DENIED", 409, "host")
+            try:
+                rules_store.load()
+                preferences_store.select_model(payload.model)
+            except (PreferencesFailure, RulesFailure) as error:
+                return problem(error.code, 409, "settings")
             connection_state = connection_state.model_copy(update={"selectedModel": payload.model})
             return connection_response()
 

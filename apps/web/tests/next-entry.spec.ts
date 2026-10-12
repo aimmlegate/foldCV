@@ -786,3 +786,54 @@ test("built E1 corrupt transport bytes cannot download and retry uses the same v
   expect(renderCount()).toBe(1);await page.unroute("**/exports/*/docx");
   const file = await downloadDocx(page, "verified-retry.docx");expect(file.xml).toContain("Ирина Примерова");expect(renderCount()).toBe(1);
 });
+
+test("built E1 Settings opens with no probe and keeps one disabled analysis control outside the editor", async ({ page }) => {
+  await createRewriteExample(page);const before = await currentWorkspace(page);
+  await page.getByRole("button", { name: "Настройки", exact: true }).click();
+  await expect(page.getByRole("region", { name: "Настройки", exact: true })).toBeVisible();
+  await expect(page.getByText("Подключение ещё не проверено.", { exact: true })).toBeVisible();
+  await expect(page.getByRole("checkbox", { name: "Автоматически проверять изменения", exact: true })).toHaveCount(1);
+  await expect(page.getByRole("checkbox", { name: "Автоматически проверять изменения", exact: true })).toBeDisabled();
+  expect(existsSync(resolve(runRoot, "connection-actions.json"))).toBe(false);expect(existsSync(resolve(runRoot, "native-login-called"))).toBe(false);
+  const after = await currentWorkspace(page);expect(after.projectRevision).toBe(before.projectRevision);expect(after.documentRevision).toBe(before.documentRevision);
+  expect(after.project?.document).toEqual(before.project?.document);
+  await page.getByRole("button", { name: "Вернуться", exact: true }).click();await expect(page.locator('[data-field-content="profile/text"]')).toHaveText(before.project?.document.profile.text.text ?? "");
+});
+
+test("built E1 Settings reported model is saved and reaches normalization and drafting", async ({ page }) => {
+  await page.goto(`${origin}/next.html#secret=synthetic-next-secret-0123456789`);
+  await page.getByRole("button", { name: "Настройки", exact: true }).click();await page.getByRole("button", { name: "Проверить подключение", exact: true }).click();
+  await expect(page.getByRole("combobox", { name: "Модель", exact: true })).toBeVisible();
+  await page.getByRole("combobox", { name: "Модель", exact: true }).selectOption("fixture-model-b");
+  await expect(page.getByText("Сохранённый выбор: fixture-model-b.", { exact: false })).toBeVisible();
+  await page.getByRole("button", { name: "Вернуться", exact: true }).click();await page.getByRole("button", { name: "Открыть пример", exact: true }).click();
+  await page.getByRole("button", { name: "Создать резюме", exact: true }).click();await expect(page.getByText("Резюме готово", { exact: true })).toBeVisible({ timeout: 30000 });
+  const raw: unknown = JSON.parse(readFileSync(resolve(runRoot, "model-requests.json"), "utf8"));
+  expect(raw).toEqual([{ model: "fixture-model-b", kind: "normalize_semantics" }, { model: "fixture-model-b", kind: "draft_prose" }]);
+  await page.getByRole("button", { name: "Настройки", exact: true }).click();await expect(page.getByRole("combobox", { name: "Модель", exact: true })).toHaveValue("fixture-model-b");
+  await page.getByRole("button", { name: "Отключить модель", exact: true }).click();await expect(page.getByText("Модель отключена от FoldCV.", { exact: false })).toBeVisible();
+  expect(existsSync(resolve(runRoot, "native-login-called"))).toBe(false);
+});
+
+test("built E1 Settings distinguishes quota and login without native global sign in", async ({ page }) => {
+  await page.goto(`${origin}/next.html#secret=synthetic-next-secret-0123456789`);await page.getByRole("button", { name: "Настройки", exact: true }).click();
+  writeFileSync(resolve(runRoot, "connection-case"), "quota_exhausted");await page.getByRole("button", { name: "Проверить подключение", exact: true }).click();
+  await expect(page.getByText("Лимит подписки исчерпан.", { exact: false })).toBeVisible();
+  writeFileSync(resolve(runRoot, "connection-case"), "login_required");await page.getByRole("button", { name: "Проверить подключение", exact: true }).click();
+  await expect(page.getByText("Нужен вход с подпиской ChatGPT", { exact: false })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Войти в выделенный CLI", exact: true })).toHaveCount(0);
+  expect(existsSync(resolve(runRoot, "native-login-called"))).toBe(false);
+  writeFileSync(resolve(runRoot, "connection-case"), "unknown_limits");await page.getByRole("button", { name: "Проверить подключение", exact: true }).click();
+  await expect(page.getByText("сведения о лимите не получены", { exact: false })).toBeVisible();
+});
+
+test("built E1 Settings detach cancels a controlled pending check and retains current text", async ({ page }) => {
+  await createRewriteExample(page);await replaceFieldText(page, "profile/text", "Current retained text.");
+  await page.getByRole("button", { name: "Настройки", exact: true }).click();writeFileSync(resolve(runRoot, "hold-connection"), "controlled wait");
+  await page.getByRole("button", { name: "Проверить подключение", exact: true }).click();
+  await expect.poll(() => existsSync(resolve(runRoot, "connection-actions.json"))).toBe(true);
+  await page.getByRole("button", { name: "Отключить модель", exact: true }).click();
+  await expect(page.getByText("Модель отключена от FoldCV.", { exact: false })).toBeVisible();rmSync(resolve(runRoot, "hold-connection"));
+  await page.getByRole("button", { name: "Вернуться", exact: true }).click();await expect(page.locator('[data-field-content="profile/text"]')).toHaveText("Current retained text.");
+  expect((await currentWorkspace(page)).project?.operations.filter(item => item.kind !== "render")).toHaveLength(2);
+});

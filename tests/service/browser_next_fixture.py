@@ -19,6 +19,7 @@ from packages.resume_core.gui_rewriting import GuiRewriteProposal
 from resume_api.providers.content import ContentFailure
 from resume_api.gui_rendering import GuiDocxRenderer
 from packages.resume_core.rendering.docx_errors import failure
+from resume_api.connection import Metadata, Quota, ConnectionFailure
 
 
 class ControlledProvider(CreationProvider):
@@ -27,6 +28,9 @@ class ControlledProvider(CreationProvider):
         self.root = root
 
     def generate(self, request, files, cancel):
+        path = self.root/'model-requests.json'
+        records = json.loads(path.read_text()) if path.exists() else []
+        records.append({'model':request.policy.model,'kind':json.loads(request.text)['task']});path.write_text(json.dumps(records))
         if request.result_type is GuiRewriteProposal:
             (self.root / "rewrite-started").touch()
             while (self.root / "hold-rewrite").exists():
@@ -49,6 +53,25 @@ class ControlledRenderer(GuiDocxRenderer):
         if (self.root / "fail-export").exists():
             raise failure("DOCX_BLOCK_PAGE_BUDGET", "candidate.summary", anchors)
         return await super().render(document, anchors, files)
+
+
+class ControlledConnection:
+    def __init__(self, root):
+        self.root = root
+    def inspect(self, _files, cancel, *, full=True):
+        path = self.root/'connection-actions.json'
+        actions = json.loads(path.read_text()) if path.exists() else []
+        actions.append('status' if full else 'discover');path.write_text(json.dumps(actions))
+        while (self.root/'hold-connection').exists():
+            if cancel.wait(.01):raise ConnectionFailure('METADATA_FAILED')
+        case = (self.root/'connection-case').read_text() if (self.root/'connection-case').exists() else 'connected'
+        if case == 'login_required':raise ConnectionFailure('LOGIN_REQUIRED')
+        if case == 'cli_missing':raise ConnectionFailure('CLI_MISSING')
+        quota = Quota('exhausted',100) if case == 'quota_exhausted' else Quota() if case == 'unknown_limits' else Quota('available',25)
+        return Metadata('synthetic-cli',('fixture-model-a','fixture-model-b'),'plus',quota)
+    def login(self, _files, _cancel):
+        (self.root/'native-login-called').touch()
+        raise ConnectionFailure('LOGIN_REQUIRED')
 
 
 def retain_evidence(root, store, example):
@@ -82,7 +105,7 @@ async def main():
         app = create_app(origin=origin, secret="synthetic-next-secret-0123456789",
             temp_root=root / "operations", data_root=root / "FoldCV", dist=dist,
             gui_provider=ControlledProvider(root, example.split("-")[0], remove_focus=example.endswith("-focus")),
-            gui_renderer=ControlledRenderer(root), gui_clock=frozen_now)
+            gui_renderer=ControlledRenderer(root), gui_clock=frozen_now, connection_adapter=ControlledConnection(root))
         store = app.app.state.gui_projects
         save = store.storage.save
         def controlled_save(workspace, originals, artifacts):

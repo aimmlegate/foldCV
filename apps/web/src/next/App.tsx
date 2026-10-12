@@ -8,6 +8,7 @@ import { useRewrite } from "./useRewrite";
 import { RewritePanel } from "./RewritePanel";
 import { useExport } from "./useExport";
 import { ExportPanel } from "./ExportPanel";
+import { SettingsPanel } from "./SettingsPanel";
 import type { SourceContext } from "../contracts/generated/source_context";
 import type { GuiProjectResponse } from "../contracts/generated/gui_project_response";
 import { documentFields } from "./fields";
@@ -28,6 +29,7 @@ export function App() {
   const [error, setError] = useState("");
   const [slot, setSlot] = useState<string | null>(null);
   const [hasSelection, setHasSelection] = useState(false);
+  const [settingsOpen, setSettingsOpen] = useState(false);
   const [selectionFingerprint, setSelectionFingerprint] = useState<string | null>(null);
   const [sourceOpen, setSourceOpen] = useState(false);
   const [sourceBusy, setSourceBusy] = useState(false);
@@ -140,7 +142,9 @@ export function App() {
       <span className="next-save" role="status">{edits.saving ? "Сохраняем…" : edits.pending ? "Есть несохранённые правки" : workspace
         ? durability === "durable" ? "Сохранено" : durability === "failed" ? "Сохранение не удалось" : durability === "in_memory" ? "В памяти приложения" : "Сохраняем…" : ""}</span>
       <div className="next-actions">
-        <button disabled>Сохранить проект</button><button disabled={!document || edits.locked} onClick={() => { setSourceOpen(false);rewrite.close();void exporter.start(); }}>Экспорт DOCX</button><button disabled>Настройки</button>
+        <button disabled>Сохранить проект</button><button disabled={!document || edits.locked} onClick={() => { setSettingsOpen(false);setSourceOpen(false);rewrite.close();void exporter.start(); }}>Экспорт DOCX</button>
+        <button onClick={() => { void edits.flushBeforeAction().then(saved => { if (saved) { setSourceOpen(false);rewrite.close();setSettingsOpen(true); }
+          else setError("Завершите ввод и сохраните правки перед открытием настроек."); }); }}>Настройки</button>
         <label className="next-theme">Тема <select aria-label="Тема" value={theme.mode} onChange={event => theme.select(event.target.value)}>
           <option value="system">Системная</option><option value="light">Светлая</option><option value="dark">Тёмная</option>
         </select></label>
@@ -161,7 +165,7 @@ export function App() {
       {initialArtifact && workspace && <a className="next-download" download="resume.docx"
         href={`/v1/projects/${workspace.projectId}/renders/${initialArtifact.id}/docx`}>Скачать исходный DOCX</a>}
     </section>}
-    {exporter.open ? <ExportPanel exporter={exporter} workspace={workspace} /> : document ? <section className="next-editor-surface" aria-label="Документ">
+    {settingsOpen ? <SettingsPanel close={() => setSettingsOpen(false)} /> : exporter.open ? <ExportPanel exporter={exporter} workspace={workspace} /> : document ? <section className="next-editor-surface" aria-label="Документ">
       <p className="next-editor-note">Правки сохраняются локально. Отметка «Сохранено» появляется после записи на диск.</p>
       <div className="next-editor-tools"><button disabled={sourceBusy} onPointerDown={event => event.preventDefault()}
         onClick={() => { void showSource(); }}>Показать исходник</button>

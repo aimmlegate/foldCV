@@ -8,6 +8,7 @@ import type { MutationResult } from "../contracts/generated/mutation_result";
 import type { GuiRewriteRequest } from "../contracts/generated/gui_rewrite_request";
 import type { RulesSettings } from "../contracts/generated/rules_settings";
 import type { GuiExportRequest } from "../contracts/generated/gui_export_request";
+import type { Preferences } from "../contracts/generated/preferences";
 import { validateContract } from "../contracts/validate";
 
 export type Workspace = GuiProjectResponse["workspace"];
@@ -58,6 +59,12 @@ function isRules(value: unknown): value is RulesSettings { return validateContra
 export async function rulesRequest(): Promise<RulesSettings> {
   const value = await request("/v1/settings/rules");
   if (!isRules(value)) throw new ApiFailure("INVALID_RESULT");
+  return value;
+}
+function isPreferences(value: unknown): value is Preferences { return validateContract("preferences", value); }
+export async function preferencesRequest(): Promise<Preferences> {
+  const value = await request("/v1/settings/preferences");
+  if (!isPreferences(value)) throw new ApiFailure("INVALID_RESULT");
   return value;
 }
 export async function docxDownload(path: string, expected: { sha256: string; size: number }): Promise<Blob> {
