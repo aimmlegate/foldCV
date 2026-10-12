@@ -1,0 +1,15 @@
+{
+  "additionalProperties": false,
+  "properties": {
+    "text": {
+      "maxLength": 60000,
+      "title": "Text",
+      "type": "string"
+    }
+  },
+  "required": [
+    "text"
+  ],
+  "title": "GuiCreateProjectRequest",
+  "type": "object"
+}

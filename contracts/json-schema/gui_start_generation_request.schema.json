@@ -1,0 +1,20 @@
+{
+  "additionalProperties": false,
+  "properties": {
+    "text": {
+      "anyOf": [
+        {
+          "maxLength": 60000,
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Text"
+    }
+  },
+  "title": "GuiStartGenerationRequest",
+  "type": "object"
+}

@@ -36,30 +36,39 @@ def renderer_sha256() -> str:
     return digest.hexdigest()
 
 
-def require_template() -> dict:
+def require_docx_template() -> dict:
     try:
         if sha256_file(MANIFEST) != PACKAGE_SHA256:
             raise RenderFailure("TEMPLATE_MISMATCH")
         manifest = json.loads(MANIFEST.read_text(encoding="utf-8"))
         if manifest["id"] != "generic" or manifest["version"] != "1.0.0" or manifest["rendererVersion"] != "1.0.0":
             raise RenderFailure("TEMPLATE_MISMATCH")
-        if not SOFFICE.is_file():
-            raise RenderFailure("CONVERTER_UNAVAILABLE")
-        if sha256_file(SOFFICE) != manifest["converter"]["sha256"]:
-            raise RenderFailure("CONVERTER_MISMATCH")
         for relative, expected in manifest["assets"].items():
             path = ROOT / relative
             if not path.is_file():
                 raise RenderFailure("ASSET_UNAVAILABLE")
             if sha256_file(path) != expected:
                 raise RenderFailure("ASSET_MISMATCH")
+    except (OSError, KeyError, ValueError, json.JSONDecodeError) as error:
+        raise RenderFailure("TEMPLATE_UNAVAILABLE") from error
+    return manifest
+
+
+def require_template() -> dict:
+    manifest = require_docx_template()
+    try:
+        if not SOFFICE.is_file():
+            raise RenderFailure("CONVERTER_UNAVAILABLE")
+        if sha256_file(SOFFICE) != manifest["converter"]["sha256"]:
+            raise RenderFailure("CONVERTER_MISMATCH")
+        for relative, expected in manifest["assets"].items():
             if relative.endswith(".ttf"):
-                installed = APP_FONTS / path.name
+                installed = APP_FONTS / Path(relative).name
                 if not installed.is_file():
                     raise RenderFailure("FONT_UNAVAILABLE")
                 if sha256_file(installed) != expected:
                     raise RenderFailure("FONT_MISMATCH")
-    except (OSError, KeyError, ValueError, json.JSONDecodeError) as error:
+    except (OSError, KeyError, ValueError) as error:
         raise RenderFailure("TEMPLATE_UNAVAILABLE") from error
     return manifest
 

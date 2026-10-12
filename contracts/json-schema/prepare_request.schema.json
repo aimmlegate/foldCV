@@ -677,6 +677,43 @@
           "title": "Baserevision",
           "type": "integer"
         },
+        "capturedDocumentRevision": {
+          "anyOf": [
+            {
+              "minimum": 1,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Captureddocumentrevision"
+        },
+        "dependencies": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/OperationDependencies"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "errorCode": {
+          "anyOf": [
+            {
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Errorcode"
+        },
         "events": {
           "items": {
             "$ref": "#/$defs/OperationEvent"
@@ -697,10 +734,48 @@
             "project_save",
             "normalize_semantics",
             "draft_prose",
-            "rewrite_prose"
+            "rewrite_prose",
+            "reconcile_edits"
           ],
           "title": "Kind",
           "type": "string"
+        },
+        "projectId": {
+          "anyOf": [
+            {
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Projectid"
+        },
+        "resultFingerprint": {
+          "anyOf": [
+            {
+              "pattern": "^[a-f0-9]{64}$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Resultfingerprint"
+        },
+        "rulesUsed": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/OperationRules"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
         },
         "status": {
           "enum": [
@@ -713,6 +788,14 @@
           ],
           "title": "Status",
           "type": "string"
+        },
+        "targetFieldIds": {
+          "items": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "title": "Targetfieldids",
+          "type": "array"
         },
         "usage": {
           "anyOf": [
@@ -734,6 +817,52 @@
         "events"
       ],
       "title": "Operation",
+      "type": "object"
+    },
+    "OperationDependencies": {
+      "additionalProperties": false,
+      "properties": {
+        "dependencyFingerprint": {
+          "pattern": "^[a-f0-9]{64}$",
+          "title": "Dependencyfingerprint",
+          "type": "string"
+        },
+        "documentRevision": {
+          "minimum": 1,
+          "title": "Documentrevision",
+          "type": "integer"
+        },
+        "projectRevision": {
+          "minimum": 1,
+          "title": "Projectrevision",
+          "type": "integer"
+        },
+        "rulesSha256": {
+          "anyOf": [
+            {
+              "pattern": "^[a-f0-9]{64}$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Rulessha256"
+        },
+        "sourceFingerprint": {
+          "pattern": "^[a-f0-9]{64}$",
+          "title": "Sourcefingerprint",
+          "type": "string"
+        }
+      },
+      "required": [
+        "projectRevision",
+        "documentRevision",
+        "rulesSha256",
+        "sourceFingerprint",
+        "dependencyFingerprint"
+      ],
+      "title": "OperationDependencies",
       "type": "object"
     },
     "OperationEvent": {
@@ -767,7 +896,8 @@
             "result.ready",
             "usage.updated",
             "operation.completed",
-            "operation.failed"
+            "operation.failed",
+            "cancelled"
           ],
           "title": "Type",
           "type": "string"
@@ -791,6 +921,32 @@
         "usage"
       ],
       "title": "OperationEvent",
+      "type": "object"
+    },
+    "OperationRules": {
+      "additionalProperties": false,
+      "properties": {
+        "markdown": {
+          "title": "Markdown",
+          "type": "string"
+        },
+        "revision": {
+          "minimum": 1,
+          "title": "Revision",
+          "type": "integer"
+        },
+        "sha256": {
+          "pattern": "^[a-f0-9]{64}$",
+          "title": "Sha256",
+          "type": "string"
+        }
+      },
+      "required": [
+        "markdown",
+        "revision",
+        "sha256"
+      ],
+      "title": "OperationRules",
       "type": "object"
     },
     "PartialDate": {

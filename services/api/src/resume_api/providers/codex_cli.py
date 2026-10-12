@@ -290,6 +290,21 @@ class CodexCliProvider:
         finally:
             _GENERATION_LOCK.release()
 
+    def generate_queued(self, request: ContentInput[ResultT], files: OperationFiles,
+                        cancel: threading.Event, admitted) -> ContentResult[ResultT]:
+        while not _GENERATION_LOCK.acquire(timeout=0.025):
+            if cancel.is_set():
+                from ..gui_admission import AdmissionCancelled
+                raise AdmissionCancelled()
+        try:
+            if cancel.is_set():
+                from ..gui_admission import AdmissionCancelled
+                raise AdmissionCancelled()
+            admitted()
+            return self._generate(request, files, cancel)
+        finally:
+            _GENERATION_LOCK.release()
+
     def _generate(self, request: ContentInput[ResultT], files: OperationFiles,
                   cancel: threading.Event) -> ContentResult[ResultT]:
         start = self.clock()

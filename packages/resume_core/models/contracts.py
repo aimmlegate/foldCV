@@ -273,18 +273,39 @@ class Usage(Wire):
 class OperationEvent(Wire):
     request_id: Id
     sequence: int = Field(ge=0)
-    type: Literal["operation.started", "stage.changed", "result.ready", "usage.updated", "operation.completed", "operation.failed"]
+    type: Literal["operation.started", "stage.changed", "result.ready", "usage.updated", "operation.completed", "operation.failed", "cancelled"]
     stage: str | None
     usage: Usage | None
 
 
+class OperationDependencies(Wire):
+    project_revision: Revision
+    document_revision: Revision
+    rules_sha256: Sha256 | None
+    source_fingerprint: Sha256
+    dependency_fingerprint: Sha256
+
+
+class OperationRules(Wire):
+    markdown: str
+    revision: Revision
+    sha256: Sha256
+
+
 class Operation(Wire):
     id: Id
-    kind: Literal["extract", "validate", "render", "project_save", "normalize_semantics", "draft_prose", "rewrite_prose"]
+    kind: Literal["extract", "validate", "render", "project_save", "normalize_semantics", "draft_prose", "rewrite_prose", "reconcile_edits"]
     status: Literal["queued", "running", "completed", "failed", "cancelled", "interrupted"]
     base_revision: Revision
     usage: Usage | None
     events: list[OperationEvent]
+    project_id: Id | None = None
+    captured_document_revision: Revision | None = None
+    dependencies: OperationDependencies | None = None
+    rules_used: OperationRules | None = None
+    target_field_ids: list[Id] = Field(default_factory=list)
+    result_fingerprint: Sha256 | None = None
+    error_code: Id | None = None
 
 
 class AssetRef(Wire):
@@ -551,7 +572,7 @@ def validate_project(project: Project) -> Project:
             raise ValueError("render block revision is in the future")
         if any(asset is not None and not _safe_path(asset.path) for asset in (render.docx, render.pdf)):
             raise ValueError("unsafe render asset reference")
-    model_kinds = {"normalize_semantics", "draft_prose", "rewrite_prose"}
+    model_kinds = {"normalize_semantics", "draft_prose", "rewrite_prose", "reconcile_edits"}
     for operation in project.operations:
         if operation.base_revision > project.revision:
             raise ValueError("operation refers to future project revision")
@@ -582,9 +603,11 @@ def validate_contract(kind: str, data: object) -> Wire:
     from .recovery import RECOVERY_CONTRACTS
     from ..gui_normalization import GUI_NORMALIZATION_CONTRACTS
     from ..gui_drafting import GUI_DRAFT_CONTRACTS
+    from ..gui_projects import GUI_PROJECT_CONTRACTS
     models.update(RECOVERY_CONTRACTS)
     models.update(GUI_NORMALIZATION_CONTRACTS)
     models.update(GUI_DRAFT_CONTRACTS)
+    models.update(GUI_PROJECT_CONTRACTS)
     if kind not in models:
         raise ValueError("unknown contract")
     result = models[kind].model_validate(data)

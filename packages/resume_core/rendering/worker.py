@@ -18,9 +18,12 @@ import pymupdf
 
 from packages.resume_core.rendering import layout
 from packages.resume_core.rendering.models import RenderRequest
+from packages.resume_core.rendering.docx_errors import DocxFailure, failure, validate_document, writer_failure
+from packages.resume_core.models.recovery import Anchor
+from pydantic import TypeAdapter
 from packages.resume_core.rendering.template import (APP_FONTS, PACKAGE_SHA256, SOFFICE,
                                                      RenderFailure, icon_path, require_template,
-                                                     renderer_sha256, sha256_file)
+                                                     renderer_sha256, sha256_file, require_docx_template)
 
 MAX_DOCX = 8 * 1024 * 1024
 MAX_PDF = 12 * 1024 * 1024
@@ -215,14 +218,47 @@ def render(workspace: Path) -> None:
     _write_zip(workspace / "render-output.zip", docx, pdf, metadata)
 
 
+def render_docx_only(workspace: Path) -> None:
+    payload = json.loads((workspace / "docx-input.json").read_bytes())
+    anchors = {path: TypeAdapter(Anchor).validate_python(anchor) for path, anchor in payload["anchors"].items()}
+    document = validate_document(payload["document"], anchors)
+    manifest = require_docx_template()
+    if payload["rendererSha256"] != renderer_sha256():
+        raise RenderFailure("RENDERER_MISMATCH")
+    for index, item in enumerate(document.focus):
+        try:
+            icon_path(item.icon, manifest)
+        except RenderFailure as error:
+            if error.code == "UNSUPPORTED_FOCUS_ICON":
+                raise failure("DOCX_UNKNOWN_FOCUS_ICON", f"focus[{index}].icon", anchors) from None
+            raise
+    docx = workspace / "resume.docx"
+    try:
+        layout.render_docx(document.model_dump(mode="json"), docx)
+    except Exception as error:
+        raise writer_failure(error, anchors) from None
+    _strip_docx_metadata(docx)
+    if docx.stat().st_size > MAX_DOCX:
+        raise RenderFailure("RENDER_OUTPUT_LIMIT")
+
+
 def main() -> int:
     workspace = Path.cwd()
     try:
-        render(workspace)
+        if (workspace / "docx-input.json").is_file():
+            render_docx_only(workspace)
+        else:
+            render(workspace)
         return 0
+    except DocxFailure as error:
+        (workspace / "render-status.json").write_text(error.error.model_dump_json(by_alias=True), encoding="utf-8")
+        return 1
     except RenderFailure as error:
         code = error.code
     except Exception:
+        if (workspace / "docx-input.json").is_file():
+            (workspace / "render-status.json").write_text(failure("DOCX_RENDER_FAILED").error.model_dump_json(by_alias=True), encoding="utf-8")
+            return 1
         code = "RENDER_FAILED"
     (workspace / "render-status.json").write_text(json.dumps({"code": code}), encoding="utf-8")
     return 1

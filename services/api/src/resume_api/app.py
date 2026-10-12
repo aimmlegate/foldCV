@@ -45,6 +45,8 @@ from packages.resume_core.rewriting import (RewritePreflightError, RewritePrefli
                                             rewrite_input, withheld_rewrite_issues)
 from packages.resume_core.rules import PRESET_HEADINGS, RulesFailure, RulesStore, presets
 from packages.resume_core.models.recovery import SaveRulesRequest, RulesSettingsError, RulesSettings
+from .gui_projects import GuiProjectService, ProjectFailure
+from .gui_routes import mount_projects
 
 
 MAX_BODY = 1_048_576
@@ -173,14 +175,16 @@ class LocalBoundary:
                     return
                 part = message.get("body", b"")
                 size += len(part)
-                if size > (MAX_EXTRACT_BODY if path == "/v1/extract" and method == "POST" else MAX_BODY):
+                project_upload = path == "/v1/projects/input" or (path.startswith("/v1/projects/") and path.endswith("/input"))
+                if size > (MAX_EXTRACT_BODY if (path == "/v1/extract" or project_upload) else MAX_BODY):
                     await problem("INPUT_TOO_LARGE", 413)(scope, receive, send)
                     return
                 chunks.append(part)
                 if not message.get("more_body", False):
                     break
             body = b"".join(chunks)
-            if (method == "POST" and path in JSON_POST_PATHS) or (method == "PUT" and path in JSON_PUT_PATHS):
+            project_json = (path == "/v1/projects" or path.startswith("/v1/projects/")) and not project_upload
+            if (method == "POST" and path in JSON_POST_PATHS) or (method == "PUT" and path in JSON_PUT_PATHS) or project_json:
                 if not is_json_media_type(headers.get(b"content-type", b"")):
                     await problem("INVALID_REQUEST", 415)(scope, receive, send)
                     return
@@ -232,7 +236,8 @@ def create_app(*, origin: str, secret: str, temp_root: Path, dist: Path, runner:
                cli_executable: Path | None = None, connection_adapter: ConnectionAdapter | None = None,
                semantic_runner: SemanticRunner | None = None, draft_runner: ProseDraftRunner | None = None,
                rewrite_runner: ProseRewriteRunner | None = None, fixture_generation_ready: bool = False,
-               experimental_profile: ExperimentalCliProfile | None = None, data_root: Path | None = None):
+               experimental_profile: ExperimentalCliProfile | None = None, data_root: Path | None = None,
+               gui_provider=None, gui_clock=None, gui_renderer=None):
     if not origin.startswith("http://127.0.0.1:") or not origin.rsplit(":", 1)[-1].isdigit():
         raise ValueError("A concrete IPv4 loopback origin is required")
     if len(secret) < 32:
@@ -240,7 +245,7 @@ def create_app(*, origin: str, secret: str, temp_root: Path, dist: Path, runner:
     if fixture_generation_ready and (semantic_runner is None or draft_runner is None):
         raise ValueError("Fixture generation requires both injected runners")
     if experimental_profile is not None and (fixture_generation_ready or any(
-            runner is not None for runner in (semantic_runner, draft_runner, rewrite_runner))):
+            runner is not None for runner in (semantic_runner, draft_runner, rewrite_runner, gui_provider))):
         raise ValueError("Experimental CLI cannot use injected generation runners")
     reap_owned(temp_root)
     blocked_on_start = has_blocked_owned(temp_root)
@@ -252,6 +257,7 @@ def create_app(*, origin: str, secret: str, temp_root: Path, dist: Path, runner:
     @asynccontextmanager
     async def lifespan(_app: FastAPI):
         yield
+        await gui_projects.shutdown()
         for task, (files, cancel) in list(connection_work.items()):
             await stop_connection(task, files, cancel)
         for task, (files, cancel) in list(semantic_work.items()):
@@ -312,6 +318,38 @@ def create_app(*, origin: str, secret: str, temp_root: Path, dist: Path, runner:
         if isinstance(error, SpikeError):
             return "CANCELLED" if error.code == "CANCELLED" else lifecycle_code(error)
         return "INVALID_RESULT"
+
+    @asynccontextmanager
+    async def gui_worker_slot(cancel):
+        nonlocal active
+        while True:
+            async with gate:
+                if unsafe_cleanup:
+                    raise SpikeError("PROCESS_CLEANUP_FAILED")
+                if cancel.is_set():
+                    from .gui_admission import AdmissionCancelled
+                    raise AdmissionCancelled()
+                if active < MAX_CONCURRENT and not cancellation_pending:
+                    active += 1
+                    break
+            await asyncio.sleep(0.025)
+        try:
+            yield
+        finally:
+            active -= 1
+
+    def gui_selected_provider():
+        if gui_provider is not None and not unsafe_cleanup:
+            return gui_provider, "fixture"
+        if experimental_ready() and provider is not None:
+            return provider, connection_state.selectedModel
+        return None
+
+    gui_options = {"clock": gui_clock} if gui_clock is not None else {}
+    gui_projects = GuiProjectService(temp_root, rules_store, gui_selected_provider,
+        worker_slot=gui_worker_slot, cleanup_error=lifecycle_code, renderer=gui_renderer, **gui_options)
+    app.state.gui_projects = gui_projects
+    mount_projects(app, gui_projects, problem)
 
     def execute_content(files, runner, payload, cancel, runner_epoch):
         worker_error = None
@@ -996,10 +1034,16 @@ def create_app(*, origin: str, secret: str, temp_root: Path, dist: Path, runner:
             connection_state = ConnectionPayload(state="detached")
             current = list(connection_work.items())
             generating = list(semantic_work.items())
+            gui_projects.request_shutdown()
         codes = await asyncio.gather(*(stop_connection(task, files, cancel)
                                        for task, (files, cancel) in current),
                                      *(stop_semantic(task, files, cancel)
                                        for task, (files, cancel) in generating))
+        try:
+            await gui_projects.shutdown()
+        except ProjectFailure:
+            unsafe_code = SpikeError("PROCESS_CLEANUP_FAILED")
+            lifecycle_code(unsafe_code)
         if any(code is not None for code in codes) or unsafe_cleanup:
             connection_state = ConnectionPayload(state="cleanup_blocked")
         return connection_response()

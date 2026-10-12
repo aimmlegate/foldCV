@@ -1,0 +1,74 @@
+{
+  "workspace": {
+    "schemaVersion": 5,
+    "projectId": "recovery-E1",
+    "projectRevision": 1,
+    "documentRevision": 1,
+    "title": "Новое резюме",
+    "titleManuallySet": false,
+    "createdAt": "2026-10-11T12:00:00+00:00",
+    "updatedAt": "2026-10-11T12:00:00+00:00",
+    "project": null,
+    "preDraft": {
+      "sources": [
+        {
+          "id": "E1-source",
+          "revision": 1,
+          "originalName": "E1.txt",
+          "mimeType": "text/plain",
+          "byteSha256": "dc297781ca355d302cd6f084bed031e74a1a80530ddae82a96949c5efcff4c35",
+          "byteRef": "sources/E1-source/original.txt",
+          "parser": "plain_text",
+          "parserVersion": "fixture-1",
+          "units": [
+            {
+              "id": "E1-unit",
+              "revision": 1,
+              "order": 0,
+              "text": "Ирина Примерова, backend-разработчик.\nСевер, backend-разработчик, 2021 — настоящее время.\nСервис обработки заказов. Python, PostgreSQL.\nДелала REST API для заказов, писала интеграционные тесты.\nКомандой сократили время обработки со 100 до 70 мс, на 30%.\nОбучила двух новых разработчиков.\nЗапад, разработчик, 2017–2020. Внутренняя CRM. Java, MySQL.\nПоддерживала CRM и исправляла ошибки.\nВосток, разработчик, 2008–2009. PHP. Разрабатывала отчёты.\nОбразование: Учебный технический университет, прикладная информатика, 2016.\nЯзыки: русский — родной, английский — B2.\nОбщие навыки: Docker.\n",
+              "location": {
+                "kind": "pasted",
+                "index": 0,
+                "row": null,
+                "column": null
+              },
+              "disposition": "shown",
+              "representedFactIds": []
+            }
+          ],
+          "overlays": [],
+          "warnings": []
+        }
+      ],
+      "facts": [],
+      "operations": [],
+      "renders": [],
+      "selectedInput": "text",
+      "selectedSourceId": "E1-source",
+      "extractedText": "Ирина Примерова, backend-разработчик.\nСевер, backend-разработчик, 2021 — настоящее время.\nСервис обработки заказов. Python, PostgreSQL.\nДелала REST API для заказов, писала интеграционные тесты.\nКомандой сократили время обработки со 100 до 70 мс, на 30%.\nОбучила двух новых разработчиков.\nЗапад, разработчик, 2017–2020. Внутренняя CRM. Java, MySQL.\nПоддерживала CRM и исправляла ошибки.\nВосток, разработчик, 2008–2009. PHP. Разрабатывала отчёты.\nОбразование: Учебный технический университет, прикладная информатика, 2016.\nЯзыки: русский — родной, английский — B2.\nОбщие навыки: Docker.\n",
+      "warnings": [],
+      "extractionFingerprint": "dc297781ca355d302cd6f084bed031e74a1a80530ddae82a96949c5efcff4c35"
+    },
+    "formattingAsOf": {
+      "precision": "day",
+      "year": 2026,
+      "month": 10,
+      "day": 11
+    },
+    "sourceObservedAt": null,
+    "rulesUsed": null,
+    "editorialPlan": null,
+    "annotations": [],
+    "relatedUpdateSuggestions": [],
+    "derivedState": null,
+    "undoSlots": {},
+    "editSessions": {},
+    "mutationReplay": [],
+    "generations": [],
+    "sourceExclusions": [],
+    "migrationNotices": [],
+    "legacyData": null
+  },
+  "durability": "in_memory",
+  "generationId": null
+}

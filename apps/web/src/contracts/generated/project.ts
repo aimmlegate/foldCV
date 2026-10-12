@@ -75,11 +75,24 @@ export type Revision4 = number;
 export type Subprojectid4 = string | null;
 export type Facts = (TextFact | TechnologyFact | MetricFact | LeadershipFact | DateFact)[];
 export type Baserevision = number;
+export type Captureddocumentrevision = number | null;
+export type Dependencyfingerprint = string;
+export type Documentrevision = number;
+export type Projectrevision = number;
+export type Rulessha256 = string | null;
+export type Sourcefingerprint = string;
+export type Errorcode = string | null;
 export type Requestid = string;
 export type Sequence = number;
 export type Stage = string | null;
 export type Type =
-  "operation.started" | "stage.changed" | "result.ready" | "usage.updated" | "operation.completed" | "operation.failed";
+  | "operation.started"
+  | "stage.changed"
+  | "result.ready"
+  | "usage.updated"
+  | "operation.completed"
+  | "operation.failed"
+  | "cancelled";
 export type Internalinferencerequests = number | null;
 export type Logicalattempts = number;
 export type Reportedinputtokens = number | null;
@@ -87,10 +100,23 @@ export type Reportedoutputtokens = number | null;
 export type Events = OperationEvent[];
 export type Id7 = string;
 export type Kind5 =
-  "extract" | "validate" | "render" | "project_save" | "normalize_semantics" | "draft_prose" | "rewrite_prose";
+  | "extract"
+  | "validate"
+  | "render"
+  | "project_save"
+  | "normalize_semantics"
+  | "draft_prose"
+  | "rewrite_prose"
+  | "reconcile_edits";
+export type Projectid = string | null;
+export type Resultfingerprint = string | null;
+export type Markdown = string;
+export type Revision5 = number;
+export type Sha256 = string;
 export type Status = "queued" | "running" | "completed" | "failed" | "cancelled" | "interrupted";
+export type Targetfieldids = string[];
 export type Operations = Operation[];
-export type Projectid = string;
+export type Projectid1 = string;
 export type Baseblockrevision = number;
 export type Blockid = string;
 export type Dependencyhash = string;
@@ -106,10 +132,10 @@ export type Blockrevision = number;
 export type Text1 = string;
 export type Blocks = RenderBlock[];
 export type Path = string;
-export type Sha256 = string;
+export type Sha2561 = string;
 export type Size = number;
 export type Id9 = string;
-export type Projectrevision = number;
+export type Projectrevision1 = number;
 export type Rendererversion = string;
 export type Snapshotsha256 = string;
 export type Templateid = string;
@@ -126,7 +152,7 @@ export type Targetid1 = string;
 export type Targetkind1 = "source_unit" | "fact" | "block";
 export type Targetrevision1 = number;
 export type Decisions = ReviewDecision[];
-export type Revision5 = number;
+export type Revision6 = number;
 export type Schemaversion = 3;
 export type Byteref = string;
 export type Bytesha256 = string;
@@ -135,13 +161,13 @@ export type Mimetype = string;
 export type Originalname = string;
 export type Id11 = string;
 export type Origin5 = "user";
-export type Revision6 = number;
+export type Revision7 = number;
 export type Text2 = string;
 export type Unitid1 = string;
 export type Overlays = SourceOverlay[];
 export type Parser = string;
 export type Parserversion = string;
-export type Revision7 = number;
+export type Revision8 = number;
 export type Disposition1 = "shown" | "condensed" | "archived" | "duplicate" | "unresolved" | "administrative";
 export type Id12 = string;
 export type Column = number | null;
@@ -150,7 +176,7 @@ export type Kind7 = "page" | "paragraph" | "table_cell" | "pasted";
 export type Row = number | null;
 export type Order = number;
 export type Representedfactids = string[];
-export type Revision8 = number;
+export type Revision9 = number;
 export type Text3 = string;
 export type Units = SourceUnit[];
 export type Warnings = string[];
@@ -168,7 +194,7 @@ export type Factids2 = string[];
 export type Locked = boolean;
 export type Origin6 = "source" | "generated" | "manual";
 export type Text4 = string;
-export type Revision9 = number;
+export type Revision10 = number;
 export type Status1 = "empty" | "running" | "proposed" | "ready" | "stale" | "error";
 export type Visible = boolean;
 export type Views = Block[];
@@ -179,11 +205,11 @@ export interface Project {
   employment: Employment;
   facts: Facts;
   operations: Operations;
-  projectId: Projectid;
+  projectId: Projectid1;
   proposals: Proposals;
   renders: Renders;
   review: Review;
-  revision: Revision5;
+  revision: Revision6;
   schemaVersion: Schemaversion;
   sources: Sources;
   template: TemplateManifest | null;
@@ -301,11 +327,25 @@ export interface DateFact {
 }
 export interface Operation {
   baseRevision: Baserevision;
+  capturedDocumentRevision?: Captureddocumentrevision;
+  dependencies?: OperationDependencies | null;
+  errorCode?: Errorcode;
   events: Events;
   id: Id7;
   kind: Kind5;
+  projectId?: Projectid;
+  resultFingerprint?: Resultfingerprint;
+  rulesUsed?: OperationRules | null;
   status: Status;
+  targetFieldIds?: Targetfieldids;
   usage: Usage | null;
+}
+export interface OperationDependencies {
+  dependencyFingerprint: Dependencyfingerprint;
+  documentRevision: Documentrevision;
+  projectRevision: Projectrevision;
+  rulesSha256: Rulessha256;
+  sourceFingerprint: Sourcefingerprint;
 }
 export interface OperationEvent {
   requestId: Requestid;
@@ -319,6 +359,11 @@ export interface Usage {
   logicalAttempts: Logicalattempts;
   reportedInputTokens: Reportedinputtokens;
   reportedOutputTokens: Reportedoutputtokens;
+}
+export interface OperationRules {
+  markdown: Markdown;
+  revision: Revision5;
+  sha256: Sha256;
 }
 export interface Proposal {
   baseBlockRevision: Baseblockrevision;
@@ -336,7 +381,7 @@ export interface RenderSnapshot {
   docx: AssetRef | null;
   id: Id9;
   pdf: AssetRef | null;
-  projectRevision: Projectrevision;
+  projectRevision: Projectrevision1;
   rendererVersion: Rendererversion;
   snapshotSha256: Snapshotsha256;
   templateId: Templateid;
@@ -349,7 +394,7 @@ export interface RenderBlock {
 }
 export interface AssetRef {
   path: Path;
-  sha256: Sha256;
+  sha256: Sha2561;
   size: Size;
 }
 export interface Review {
@@ -378,14 +423,14 @@ export interface Source {
   overlays: Overlays;
   parser: Parser;
   parserVersion: Parserversion;
-  revision: Revision7;
+  revision: Revision8;
   units: Units;
   warnings: Warnings;
 }
 export interface SourceOverlay {
   id: Id11;
   origin: Origin5;
-  revision: Revision6;
+  revision: Revision7;
   text: Text2;
   unitId: Unitid1;
 }
@@ -395,7 +440,7 @@ export interface SourceUnit {
   location: SourceLocation;
   order: Order;
   representedFactIds: Representedfactids;
-  revision: Revision8;
+  revision: Revision9;
   text: Text3;
 }
 export interface SourceLocation {
@@ -417,7 +462,7 @@ export interface Block {
   id: Id14;
   kind: Kind8;
   previous: BlockState | null;
-  revision: Revision9;
+  revision: Revision10;
   state: BlockState;
   status: Status1;
   visible: Visible;

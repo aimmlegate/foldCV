@@ -2023,5 +2023,107 @@
     "base": "gui_draft_result",
     "valid": true,
     "edits": []
-  }
+  },
+{
+  "name": "gui_create_project_request_valid",
+  "contract": "gui_create_project_request",
+  "base": "gui_create_project_request",
+  "valid": true,
+  "edits": []
+},
+{
+  "name": "gui_start_generation_request_valid",
+  "contract": "gui_start_generation_request",
+  "base": "gui_start_generation_request",
+  "valid": true,
+  "edits": []
+},
+{
+  "name": "gui_project_response_valid",
+  "contract": "gui_project_response",
+  "base": "gui_project_response",
+  "valid": true,
+  "edits": []
+},
+{
+  "name": "gui_create_text_limit",
+  "contract": "gui_create_project_request",
+  "base": "gui_create_project_request",
+  "valid": false,
+  "edits": [
+    {
+      "op": "repeat_text",
+      "path": [
+        "text"
+      ],
+      "text": "x",
+      "count": 60001
+    }
+  ]
+},
+{
+  "name": "gui_create_unknown_key",
+  "contract": "gui_create_project_request",
+  "base": "gui_create_project_request",
+  "valid": false,
+  "edits": [
+    {
+      "op": "set",
+      "path": [
+        "sourceObservedAt"
+      ],
+      "value": "2026-10-11"
+    }
+  ]
+},
+{
+  "name": "gui_response_cannot_claim_disk_save",
+  "contract": "gui_project_response",
+  "base": "gui_project_response",
+  "valid": false,
+  "edits": [
+    {
+      "op": "set",
+      "path": [
+        "durability"
+      ],
+      "value": "saved"
+    }
+  ]
+},
+{
+  "name": "legacy_reconcile_edits_accepts_one_attempt",
+  "contract": "project",
+  "base": "project",
+  "valid": true,
+  "edits": [
+    {
+      "op": "append",
+      "path": [
+        "operations"
+      ],
+      "value": {
+        "id": "operation_reconcile",
+        "kind": "reconcile_edits",
+        "status": "cancelled",
+        "baseRevision": 2,
+        "usage": {
+          "logicalAttempts": 1,
+          "internalInferenceRequests": null,
+          "reportedInputTokens": null,
+          "reportedOutputTokens": null
+        },
+        "events": [
+          {
+            "requestId": "operation_reconcile",
+            "sequence": 0,
+            "type": "cancelled",
+            "stage": null,
+            "usage": null
+          }
+        ]
+      }
+    }
+  ]
+}
 ]

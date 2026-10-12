@@ -416,7 +416,7 @@ function semanticProject(p: Project): boolean {
     if (render.blocks.some((b) => b.blockRevision > (p.views.find((view) => view.id === b.blockId)?.revision ?? 0))) return false;
     if ([render.docx, render.pdf].some((asset) => asset !== null && !safePath(asset.path))) return false;
   }
-  const modelKinds = new Set(["normalize_semantics", "draft_prose", "rewrite_prose"]);
+  const modelKinds = new Set(["normalize_semantics", "draft_prose", "rewrite_prose", "reconcile_edits"]);
   for (const operation of p.operations) {
     if (operation.baseRevision > p.revision) return false;
     if (!modelKinds.has(operation.kind) && operation.usage !== null && operation.usage.logicalAttempts !== 0) return false;
