@@ -3,6 +3,7 @@ import { execFileSync, spawn, type ChildProcessWithoutNullStreams } from "node:c
 import { mkdtempSync, readFileSync, realpathSync, rmSync, cpSync, existsSync, readdirSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { resolve } from "node:path";
+import { createHash } from "node:crypto";
 import type { GuiProjectResponse } from "../src/contracts/generated/gui_project_response";
 import { validateContract } from "../src/contracts/validate";
 
@@ -13,10 +14,11 @@ test.beforeAll(() => {
   temp = mkdtempSync(resolve(realpathSync(tmpdir()), "foldcv-next-entry-"));
   execFileSync("npm", ["run", "build", "--", "--outDir", resolve(temp, "dist")], { cwd: resolve(root, "apps/web"), stdio: "pipe" });
 });
-test.beforeEach(async () => {
+test.beforeEach(async ({}, info) => {
   runRoot = mkdtempSync(resolve(temp, "run-"));
   cpSync(resolve(temp, "dist"), resolve(runRoot, "dist"), { recursive: true });
-  const child = spawn(resolve(root, ".venv/bin/python"), ["tests/service/browser_next_fixture.py", runRoot, resolve(runRoot, "dist")], { cwd: root, stdio: "pipe" });
+  const example = info.title.includes("focus warning") ? "E2-focus" : info.title.includes("E2") ? "E2" : "E1";
+  const child = spawn(resolve(root, ".venv/bin/python"), ["tests/service/browser_next_fixture.py", runRoot, resolve(runRoot, "dist"), example], { cwd: root, stdio: "pipe" });
   server = child;
   origin = await new Promise<string>((ready, reject) => {
     let text = "";
@@ -64,9 +66,54 @@ test("built API entry creates E1 with two operations and no browser assembly or 
   expect(workspace.project?.renders).toHaveLength(1);
   expect([workspace.projectRevision, workspace.documentRevision]).toEqual([2, 2]);
   expect(response(value).durability).toBe("in_memory");
+  const artifact = workspace.project?.renders[0];
+  const link = page.getByRole("link", { name: "Скачать исходный DOCX" });
+  await expect(link).toHaveAttribute("href", `/v1/projects/${id}/renders/${artifact?.id}/docx`);
+  const downloaded = page.waitForEvent("download");
+  await link.click();
+  const file = await downloaded;
+  const path = await file.path();
+  expect(path).not.toBeNull();
+  const bytes = readFileSync(path ?? "");
+  expect(createHash("sha256").update(bytes).digest("hex")).toBe(artifact?.docx?.sha256);
+  expect(bytes.subarray(0, 2).toString()).toBe("PK");
   await expect(page.getByRole("button", { name: "Сохранить проект", exact: true })).toBeVisible();
   await expect(page.getByRole("button", { name: "Экспорт DOCX", exact: true })).toBeVisible();
   await expect(page.getByRole("button", { name: "Настройки", exact: true })).toBeVisible();
+});
+
+test("built E2 entry locates empty sections and one shared conflict outside editable text", async ({ page }) => {
+  await page.goto(`${origin}/next.html#secret=synthetic-next-secret-0123456789`);
+  await page.getByLabel("Или вставьте текст").fill(readFileSync(resolve(root, "tests/fixtures/recovery/E2.txt"), "utf8"));
+  await page.getByRole("button", { name: "Создать резюме" }).click();
+  await expect(page.getByText("Резюме готово", { exact: true })).toBeVisible({ timeout: 30000 });
+  await expect(page.locator('[data-annotation-type="missing"]')).toHaveCount(3);
+  await expect(page.locator('[data-section-id="education"]')).toHaveText("Образование не указано");
+  await expect(page.locator('[data-section-id="languages"]')).toHaveText("Языки не указаны");
+  const conflict = page.locator('[data-annotation-code="team_size_conflict"]');
+  await expect(conflict).toHaveCount(1);
+  await expect(conflict).toHaveAttribute("contenteditable", "false");
+  const anchor = await conflict.getAttribute("data-anchor-field");
+  expect(anchor).toMatch(/^job:.+\/context$/);
+  await expect(page.locator(`[data-field-content="${anchor}"]`)).toHaveText("");
+  await expect(page.locator('[data-annotation-code="missing_surname"]')).toHaveCount(0);
+  await expect(page.locator('[data-field-content^="education:"]')).toHaveCount(0);
+  await expect(page.locator('[data-field-content^="language:"]')).toHaveCount(0);
+  expect(await page.locator('[data-field-content]').allTextContents()).not.toContain("Образование не указано");
+  await expect(page.getByRole("link", { name: "Скачать исходный DOCX" })).toBeVisible();
+});
+
+test("built E2 focus warning stays at skills and outside authored text", async ({ page }) => {
+  await page.goto(`${origin}/next.html#secret=synthetic-next-secret-0123456789`);
+  await page.getByLabel("Или вставьте текст").fill(readFileSync(resolve(root, "tests/fixtures/recovery/E2.txt"), "utf8"));
+  await page.getByRole("button", { name: "Создать резюме" }).click();
+  await expect(page.getByText("Резюме готово", { exact: true })).toBeVisible({ timeout: 30000 });
+  const warning = page.locator('[data-annotation-code="focus_entry_removed"]');
+  await expect(warning).toHaveAttribute("data-annotation-type", "warning");
+  await expect(warning).toHaveAttribute("data-section-id", "skills-focus");
+  await expect(warning).toHaveAttribute("contenteditable", "false");
+  await expect(page.locator('[data-annotation-type="missing"]')).toHaveCount(3);
+  expect((await page.locator('[data-field-content]').allTextContents()).join(" ")).not.toContain("исключена из фокуса");
 });
 
 test("built entry persists manual theme, follows system and fits a narrow keyboard layout", async ({ page }) => {

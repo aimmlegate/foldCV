@@ -22,6 +22,7 @@ export function App() {
   const generation = workspace?.generations.find(item => item.id === generationId);
   const document = workspace?.project?.document;
   const fields = useMemo(() => document ? documentFields(document) : [], [document]);
+  const initialArtifact = workspace?.project?.renders.find(render => render.artifactAvailable && render.docx);
 
   useEffect(() => {
     if (!workspace || !generationId || !generation || !["queued", "running"].includes(generation.status)) return;
@@ -86,10 +87,12 @@ export function App() {
       {running && <button disabled={busy} onClick={() => { void control("cancel"); }}>Отменить создание</button>}
       {failed && <button disabled={busy} onClick={() => { void control("retry"); }}>Повторить создание</button>}
       {generation.stages.some(stage => stage.docxError) && <p role="alert">Документ готов. DOCX пока не удалось оформить; текст доступен для правок.</p>}
+      {initialArtifact && workspace && <a className="next-download" download="resume.docx"
+        href={`/v1/projects/${workspace.projectId}/renders/${initialArtifact.id}/docx`}>Скачать исходный DOCX</a>}
     </section>}
     {document ? <section className="next-editor-surface" aria-label="Документ">
       <p className="next-editor-note">Текст можно редактировать. Пока правки остаются в текущем окне.</p>
-      <div className="next-document"><FieldEditor key={workspace?.projectId} fields={fields} theme={theme.resolved} callbacks={{
+      <div className="next-document"><FieldEditor key={workspace?.projectId} fields={fields} theme={theme.resolved} annotations={workspace?.annotations ?? []} callbacks={{
         buffer: () => setBuffered(true), selection: () => {}, slot: setSlot, departure: () => {},
         restore: () => setError("Восстановление правок пока недоступно."),
       }} /></div>

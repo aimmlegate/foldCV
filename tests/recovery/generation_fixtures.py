@@ -20,8 +20,9 @@ def frozen_now():
 
 
 class CreationProvider:
-    def __init__(self, example="E1", fail_kind=None):
+    def __init__(self, example="E1", fail_kind=None, remove_focus=False):
         self.example, self.fail_kind = example, fail_kind
+        self.remove_focus = remove_focus
         self.calls = []
         self.normalized = None
 
@@ -46,6 +47,8 @@ class CreationProvider:
             captured = GuiDraftRequest(projectId=payload["input"]["projectId"], projectRevision=1, documentRevision=1,
                 normalized=self.normalized, formattingAsOf=self.formatting_as_of)
             reply = draft_reply(captured, rules_revision=rules.revision, example=self.example)
+            if self.remove_focus:
+                reply.editorial_plan.focus.append(reply.editorial_plan.focus[0].model_copy(update={"catalog_id": "unknown"}))
         return ContentResult(reply, ReportedUsage(input_tokens=11, output_tokens=7), "fixture", request.policy.model, 0.01, 1)
 
 

@@ -11,6 +11,7 @@ import threading
 import uuid
 
 from packages.resume_core.dates import partial_date
+from packages.resume_core.gui_annotations import initial_annotations
 from packages.resume_core.gui_derived import digest, initial_derived
 from packages.resume_core.gui_drafting import GuiDraftRequest
 from packages.resume_core.gui_normalization import GuiNormalizeRequest, canonical_source, source_fingerprint
@@ -307,12 +308,13 @@ class GuiProjectService:
                     workspace.project = project
                     workspace.pre_draft = None
                     workspace.rules_used, workspace.editorial_plan = generation.rules_used, result.editorial_plan.model_copy(deep=True)
-                    workspace.annotations = result.annotations
                     workspace.undo_slots = {record_slot(record): None for record in result.document.records()}
                     workspace.derived_state = derived
                     if not workspace.title_manually_set and result.document.candidate.name.text.strip():
                         workspace.title = result.document.candidate.name.text
                     generation.dependencies = self.dependencies(workspace, generation.source_ids, generation.rules_used)
+                    workspace.annotations = initial_annotations(workspace.project_id, document, cached["normalized"],
+                        result.annotations, generation.dependencies)
                     for captured_stage in generation.stages:
                         captured_stage.dependency_fingerprint = generation.dependencies.dependency_fingerprint
                     workspace.updated_at = self.clock().isoformat()

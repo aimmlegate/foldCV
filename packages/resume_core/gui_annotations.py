@@ -1,0 +1,59 @@
+"""Located initial uncertainty, separate from authored text and render input."""
+
+from __future__ import annotations
+
+from .gui_derived import endpoint
+from .gui_normalization import GuiNormalizedResult
+from .models.recovery import Annotation, Dependencies, Document, JobRecord, NameAssessmentFact, authored_fields
+from .normalization import _id
+
+
+def complete_job_dates(job: JobRecord, facts) -> bool:
+    if not job.periods:
+        return False
+    for period in job.periods:
+        start, end = endpoint(period.start_text, facts), endpoint(period.end_text, facts)
+        if start is None:
+            return False
+        if period.present:
+            if period.end_text.text.strip():
+                return False
+        elif end is None or start.lower() > end.upper():
+            return False
+    return True
+
+
+def filled_section(rows) -> bool:
+    return any(row.visible and any(field.text.strip() for field in authored_fields(row)) for row in rows)
+
+
+def initial_annotations(project_id: str, document: Document, normalized: GuiNormalizedResult,
+                        warnings: list[Annotation], dependencies: Dependencies) -> list[Annotation]:
+    marks = [mark.model_copy(update={"dependencies": dependencies.model_copy(deep=True)}, deep=True)
+             for mark in warnings]
+
+    def add(code, type, anchor, reason, fact_ids=None, evidence=None):
+        marks.append(Annotation(id=_id("annotation", project_id, code, str(anchor)), type=type,
+            code=code, anchor=anchor, dependencies=dependencies.model_copy(deep=True),
+            factIds=fact_ids or [], reason=reason, evidence=evidence or [], resolved=False,
+            updateSuggestionId=None, removedFocus=[]))
+
+    assessment = next(fact for fact in normalized.facts if isinstance(fact, NameAssessmentFact))
+    if document.candidate.visible and document.candidate.name.text.strip() and assessment.value.missing_surname is True:
+        add("missing_surname", "missing", {"kind": "field", "fieldId": document.candidate.name.field_id, "range": None},
+            "The source explicitly says the surname is missing.", [assessment.id], assessment.value.evidence)
+    for section, rows in (("education", document.education), ("languages", document.languages)):
+        if not filled_section(rows):
+            add("missing_" + section, "missing", {"kind": "section", "sectionId": section},
+                "No supplied content in this section.")
+    jobs = {job.id: job for job in document.jobs}
+    for job in document.jobs:
+        if job.visible and not complete_job_dates(job, normalized.facts):
+            add("missing_job_dates", "missing", {"kind": "field", "fieldId": job.periods_field_id, "range": None},
+                "Every declared period needs a valid start and an ordered end or an explicit present flag.")
+    for conflict in normalized.conflicts:
+        job = jobs.get(conflict.job_id)
+        if job and job.visible:
+            add(conflict.code, "conflicting", {"kind": "field", "fieldId": job.context.field_id, "range": None},
+                "The source gives conflicting team sizes.", conflict.fact_ids, conflict.evidence)
+    return marks
