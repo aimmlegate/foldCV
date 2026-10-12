@@ -74,17 +74,20 @@ class GuiAnalysisMixin:
         if result.status != 'applied': return
         workspace = self.workspaces[id]
         indexed = analysis_index(workspace)
-        if request.kind == 'restore-previous-block':
-            # Restore's facts/checkpoints are already authoritative and never invoke the model.
+        if request.kind in {'restore-previous-block', 'apply-related-update'}:
+            # Both actions already carry assessed facts and never require a second call.
             if before.document_revision != workspace.document_revision:
                 pending = self.accumulate_analysis(id)
-                fields = {key for key, (_field, slot) in indexed.items() if slot == request.payload.slot_id}
+                if request.kind == 'restore-previous-block':
+                    fields = {key for key, (_field, slot) in indexed.items() if slot == request.payload.slot_id}
+                else:
+                    suggestion = next(item for item in before.related_update_suggestions if item.id == request.payload.suggestion_id)
+                    fields = {item.field_id for item in suggestion.replacements}
                 for op in workspace.project.operations:
                     if op.kind == 'reconcile_edits' and op.analysis_batch and op.analysis_batch.phase == 'dispatched' and op.status in {'queued','running'}:
                         op.analysis_batch.completed_field_ids = [key for key in op.analysis_batch.completed_field_ids if key not in fields]
                 if pending:
                     pending.analysis_batch.enabled = False
-                    fields = {key for key, (_field, slot) in indexed.items() if slot == request.payload.slot_id}
                     pending.target_field_ids = [key for key in pending.target_field_ids if key not in fields]
                     pending.analysis_batch.completed_field_ids = [key for key in pending.analysis_batch.completed_field_ids if key not in fields]
                     if not pending.target_field_ids: pending.status, pending.error_code = 'cancelled', 'RESTORED'

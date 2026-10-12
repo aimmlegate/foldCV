@@ -10,6 +10,8 @@ import { useExport } from "./useExport";
 import { ExportPanel } from "./ExportPanel";
 import { SettingsPanel } from "./SettingsPanel";
 import { useAnalysis } from "./useAnalysis";
+import { useRelated } from "./useRelated";
+import { AnnotationActions } from "./Annotations";
 import type { SourceContext } from "../contracts/generated/source_context";
 import type { GuiProjectResponse } from "../contracts/generated/gui_project_response";
 import { documentFields } from "./fields";
@@ -51,6 +53,7 @@ export function App() {
   }
   const edits = useEdits(workspace, editor, accept);
   const analysis = useAnalysis(workspace, edits);
+  const related = useRelated(editor, edits);
   const rewrite = useRewrite(editor, edits);
   const exporter = useExport(workspace, editor, edits);
   const editorKey = `${workspace?.projectId}:${fields.map(field => field.fieldId).join("|")}`;
@@ -158,6 +161,8 @@ export function App() {
     {analysis.message && <p className="next-message" role="status">{analysis.message}
       {analysis.retryable && <button onClick={() => { void analysis.retry(); }}>Повторить проверку</button>}</p>}
     {analysis.error && <p role="alert">{analysis.error}</p>}
+    {related.message && <p className="next-message" role="status">{related.message}
+      {related.retryable && <button onClick={() => { void related.retry(); }}>Повторить обновление</button>}</p>}
     {!exporter.open && exporter.message && <p className="next-message text-danger" role="alert">{exporter.message}</p>}
     {saveError && !edits.error && workspace && <p className="next-message text-danger" role="alert">Не удалось сохранить проект. Данные остаются в окне.
       <button onClick={() => { void projectRequest(`/v1/projects/${workspace.projectId}/save`, "POST", {}).then(accept).catch(error => setError(errorLabel(error))); }}>Повторить сохранение</button></p>}
@@ -181,11 +186,14 @@ export function App() {
         <button disabled={edits.locked} onPointerDown={event => event.preventDefault()} onClick={() => { rewrite.invalidate(); edits.restore(slot ?? lastSlot.current); }}>Отменить правку блока</button>
         <StructureControls document={document} send={edits.structural} periods={edits.periods} disabled={edits.locked} />
       </div>
+      <AnnotationActions.Provider value={{ suggestions: workspace?.relatedUpdateSuggestions ?? [], fields,
+        projectRevision: workspace?.projectRevision ?? 1, documentRevision: workspace?.documentRevision ?? 1,
+        disabled: related.busy || edits.pending || edits.locked, apply: suggestion => { void related.apply(suggestion); } }}>
       <div className="next-document"><FieldEditor ref={editor} key={editorKey} fields={edits.overlay(fields)} editable={!edits.locked} theme={theme.resolved} annotations={workspace?.annotations ?? []}
         derived={edits.pending ? null : workspace?.derivedState} callbacks={{
         buffer: values => { rewrite.invalidate(); edits.buffer(values); }, selection: value => setHasSelection(value !== null), slot: value => { setSlot(value); if (value) lastSlot.current = value; }, departure: edits.departure,
         restore: value => { rewrite.invalidate(); edits.restore(value); }, completion: edits.completion, compositionEnd: edits.compositionEnd,
-      }} /></div>
+      }} /></div></AnnotationActions.Provider>
       <p className="next-editor-status" aria-live="polite">{slot ? "Редактирование текста" : ""}</p>
     </section> : <section className="next-start">
       <div className="next-intro"><p className="next-eyebrow">ХОРОШИЙ ТЕКСТ НАЧИНАЕТСЯ С ФАКТОВ</p>

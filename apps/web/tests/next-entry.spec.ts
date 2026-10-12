@@ -21,7 +21,8 @@ test.beforeEach(async ({}, info) => {
   runRoot = mkdtempSync(resolve(temp, "run-"));
   cpSync(resolve(temp, "dist"), resolve(runRoot, "dist"), { recursive: true });
   const example = info.title.includes("focus warning") ? "E2-focus" : info.title.includes("E2") ? "E2" : "E1";
-  if (!info.title.includes("A10")) writeFileSync(resolve(runRoot, "pause-analysis"), "Isolate the accepted foreground feature from background analysis.");
+  if (info.title.includes("task A11")) writeFileSync(resolve(runRoot, "related-example"), "Controlled shared-claim fixture.");
+  if (!info.title.includes("A10") && !info.title.includes("task A11")) writeFileSync(resolve(runRoot, "pause-analysis"), "Isolate the accepted foreground feature from background analysis.");
   origin = await launch(example);
 });
 async function launch(example: string): Promise<string> {
@@ -910,4 +911,62 @@ test("built E1 A10 rewrite stops its running reconciliation and sends one curren
   await expect.poll(async () => (await currentWorkspace(page)).project?.operations.filter(item => item.kind === "reconcile_edits" && item.status === "completed").length).toBe(1);
   const metadata: unknown = JSON.parse(readFileSync(resolve(runRoot, "model-requests.json"), "utf8"));
   expect(metadata).toEqual(["normalize_semantics", "draft_prose", "reconcile_edits", "rewrite_prose", "reconcile_edits"].map(kind => ({ model: "fixture", kind })));
+});
+
+async function relatedExample(page: Page) {
+  await createRewriteExample(page);
+  const workspace = await currentWorkspace(page), job = workspace.project?.document.jobs[0];
+  if (!job) throw new Error("Missing controlled job");
+  await expect(page.locator('[data-field-content="profile/text"]')).toHaveText("Обучила двух новых разработчиков.");
+  await replaceFieldText(page, job.tasks.fieldId, "Обучила трёх новых разработчиков.");
+  await page.locator('[data-field-content="profile/text"]').click();
+  await expect.poll(analysisCalls).toBe(1);
+  const mark = page.locator('[data-annotation-id="related-profile-conflict"]');await expect(mark).toBeVisible();
+  return { job, mark: page.locator('[data-annotation-id="related-profile-conflict"]') };
+}
+
+test("built example E1 task A11 keeps the older profile until an explicit related update and preserves the newer shared fact on restore", async ({ page }) => {
+  const { job, mark } = await relatedExample(page);
+  await expect(page.locator('[data-field-content="profile/text"]')).toHaveText("Обучила двух новых разработчиков.");
+  await mark.getByText("Связанные изменения", { exact: true }).click();
+  await expect(mark.getByText("Обучила трёх новых разработчиков.", { exact: true })).toBeVisible();
+  const before = await currentWorkspace(page);
+  await mark.getByRole("button", { name: "Обновить связанный текст", exact: true }).click();
+  await expect(page.locator('[data-field-content="profile/text"]')).toHaveText("Обучила трёх новых разработчиков.");
+  await expect(mark).toHaveCount(0);const current = await currentWorkspace(page);
+  expect([current.projectRevision, current.documentRevision]).toEqual([before.projectRevision + 1, before.documentRevision + 1]);
+  expect(current.undoSlots.profile?.record.kind).toBe("profile");expect(analysisCalls()).toBe(1);
+  await page.locator(`[data-field-content="${job.tasks.fieldId}"]`).click();await page.getByRole("button", { name: "Отменить правку блока", exact: true }).click();
+  await expect(page.locator(`[data-field-content="${job.tasks.fieldId}"]`)).toHaveText("Обучила двух новых разработчиков.");
+  await expect(page.locator('[data-field-content="profile/text"]')).toHaveText("Обучила трёх новых разработчиков.");
+  await expect(page.locator('[data-annotation-code="restore_shared_fact_conflict"]')).toHaveCount(1);expect(analysisCalls()).toBe(1);
+});
+
+test("built example E1 task A11 restores the job first and clears its profile conflict with no extra assessment", async ({ page }) => {
+  const { job, mark } = await relatedExample(page);
+  await page.locator(`[data-field-content="${job.tasks.fieldId}"]`).click();await page.getByRole("button", { name: "Отменить правку блока", exact: true }).click();
+  await expect(page.locator(`[data-field-content="${job.tasks.fieldId}"]`)).toHaveText("Обучила двух новых разработчиков.");
+  await expect(mark).toHaveCount(0);await expect(page.locator('[data-field-content="profile/text"]')).toHaveText("Обучила двух новых разработчиков.");
+  expect((await currentWorkspace(page)).relatedUpdateSuggestions).toEqual([]);expect(analysisCalls()).toBe(1);
+});
+
+test("built example E1 task A11 rejects a delayed related action after a newer saved edit", async ({ page }) => {
+  const { mark } = await relatedExample(page);
+  let release: (() => void) | undefined, intercepted = false;
+  const wait = new Promise<void>(resolve => { release = resolve; });
+  await page.route("**/mutations", async route => {
+    const body: unknown = route.request().postDataJSON();
+    if (typeof body === "object" && body !== null && "kind" in body && body.kind === "apply-related-update") {
+      intercepted = true;await wait;
+    }
+    await route.continue();
+  });
+  await mark.getByText("Связанные изменения", { exact: true }).click();
+  await mark.getByRole("button", { name: "Обновить связанный текст", exact: true }).click();await expect.poll(() => intercepted).toBe(true);
+  await replaceFieldText(page, "profile/text", "Новая правка профиля.");await expect(page.locator(".next-save")).toHaveText("Сохранено");
+  const saved = await currentWorkspace(page);release?.();
+  await expect(page.getByText("Предложение устарело.", { exact: false })).toBeVisible();
+  await expect(page.locator('[data-field-content="profile/text"]')).toHaveText("Новая правка профиля.");
+  const after = await currentWorkspace(page);expect([after.projectRevision, after.documentRevision]).toEqual([saved.projectRevision, saved.documentRevision]);
+  expect(analysisCalls()).toBe(1);
 });

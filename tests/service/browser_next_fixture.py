@@ -5,6 +5,7 @@ from pathlib import Path
 import socket
 import sys
 import json
+from dataclasses import replace
 
 import uvicorn
 
@@ -17,6 +18,8 @@ from tests.recovery.generation_fixtures import CreationProvider, frozen_now
 from packages.resume_core.project_store import ProjectStoreFailure
 from packages.resume_core.gui_rewriting import GuiRewriteProposal
 from packages.resume_core.gui_reconciliation import GuiReconcileProposal
+from packages.resume_core.gui_drafting import GuiDraftProposal
+from packages.resume_core.models.recovery import GuiLeadershipFact
 from resume_api.providers.content import ContentFailure
 from resume_api.gui_rendering import GuiDocxRenderer
 from packages.resume_core.rendering.docx_errors import failure
@@ -45,7 +48,32 @@ class ControlledProvider(CreationProvider):
                     raise ContentFailure('CANCELLED', logical_attempts=1)
             if (self.root / 'fail-analysis').exists(): raise ContentFailure('QUOTA_EXHAUSTED', logical_attempts=1)
             (self.root / 'analysis-released').touch()
-        return super().generate(request, files, cancel)
+        response = super().generate(request, files, cancel)
+        if (self.root / 'related-example').exists() and request.result_type is GuiDraftProposal:
+            reply = response.value.model_copy(deep=True)
+            fact = next(fact for fact in self.normalized.facts if isinstance(fact, GuiLeadershipFact))
+            for field in reply.fields:
+                if field.field_id == 'profile/text' or field.field_id.endswith('/tasks') and field.field_id.startswith('job:'+fact.job_id+'/'):
+                    field.text, field.fact_ids = 'Обучила двух новых разработчиков.', [fact.id]
+            return replace(response, value=reply)
+        if (self.root / 'related-example').exists() and request.result_type is GuiReconcileProposal:
+            payload = json.loads(request.text)['input']
+            fact = next((item for item in payload['facts'] if item['kind']=='leadership'), None)
+            if fact and any('трёх' in field.get('text','') for field in payload['changedFields']):
+                fact = GuiLeadershipFact.model_validate(fact);fact.value.action = 'Обучила трёх новых разработчиков'
+                fact.value.team_size.number = 3
+                reply = response.value.model_copy(deep=True);reply.facts = [fact]
+                for field in reply.field_facts:
+                    if field.field_id.endswith('/tasks'): field.fact_ids = [fact.id]
+                raw = reply.model_dump(mode='json',by_alias=True)
+                raw['annotations'] = [{'id':'related-profile-conflict','type':'conflicting','code':'trainee_conflict',
+                    'anchor':{'kind':'field','fieldId':'profile/text','range':None},'factIds':[fact.id],
+                    'reason':'В опыте изменилось число обученных разработчиков.','updateSuggestionId':'related-profile-update'}]
+                raw['suggestions'] = [{'id':'related-profile-update','factIds':[fact.id],
+                    'replacements':[{'fieldId':'profile/text','range':None,'text':'Обучила трёх новых разработчиков.'}],
+                    'reason':'Обновить прежнее упоминание в профиле.'}]
+                return replace(response, value=GuiReconcileProposal.model_validate(raw))
+        return response
 
 
 class ControlledRenderer(GuiDocxRenderer):

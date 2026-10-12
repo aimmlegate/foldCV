@@ -234,7 +234,7 @@ def test_scoped_input_immutable_sources_observation_and_foreign_result_rejection
     originals=[source.model_dump() for source in w.project.sources];observed=w.source_observed_at
     edit(w,job.tasks.field_id,'Mentored three trainees',completion='field')
     payload=json.loads(reconciliation_input(w,[job.tasks.field_id],rules))
-    assert set(payload['input'])=={'projectId','projectRevision','documentRevision','changedFields','facts','otherMentions','nameAssessmentFactId','editorialPlan'}
+    assert set(payload['input'])=={'projectId','projectRevision','documentRevision','changedFields','facts','otherMentions','nameAssessmentFactId','annotations','editorialPlan'}
     assert 'sources' not in payload['input'] and any(mention['fieldId']=='profile/text' for mention in payload['input']['otherMentions'])
     reply=claim_reply(w,job.tasks.field_id,fact);reply.field_facts[0].field_id='candidate/name'
     with pytest.raises(ValueError,match='ANALYSIS_SCOPE_INVALID'):validate_proposal(w,[job.tasks.field_id],reply)

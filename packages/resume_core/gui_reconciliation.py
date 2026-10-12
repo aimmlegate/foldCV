@@ -76,7 +76,18 @@ def relevant_ids(workspace, field_ids):
         session = workspace.edit_sessions.get(slot)
         baseline = session.baseline if session else workspace.undo_slots.get(slot)
         if baseline: ids.update(fact.id for fact in baseline.facts)
+        ids.update(ref for mark in workspace.annotations if mark.anchor.kind == 'field'
+            and mark.anchor.field_id in indexed and indexed[mark.anchor.field_id][1] == slot for ref in mark.fact_ids)
     return ids
+
+
+def assessed_fields(workspace, field_ids):
+    indexed = analysis_index(workspace)
+    ids = relevant_ids(workspace, field_ids)
+    slots = {indexed[id][1] for id in field_ids}
+    return set(field_ids) | {id for id, (field, _slot) in indexed.items() if field and set(field.fact_ids) & ids} | {
+        mark.anchor.field_id for mark in workspace.annotations if mark.anchor.kind == 'field'
+        and mark.anchor.field_id in indexed and indexed[mark.anchor.field_id][1] in slots}
 
 
 def reconciliation_input(workspace, field_ids, rules):
@@ -98,10 +109,15 @@ def reconciliation_input(workspace, field_ids, rules):
         elif field and set(field.fact_ids) & public:
             mentions.append({'fieldId': id, 'text': field.text, 'factIds': [ref for ref in field.fact_ids if ref in public]})
     assessment = next((fact for fact in workspace.project.facts if isinstance(fact, NameAssessmentFact)), None)
+    anchors = assessed_fields(workspace, field_ids)
+    marks = [{'id': mark.id, 'type': mark.type, 'code': mark.code, 'anchor': mark.anchor.model_dump(by_alias=True),
+        'factIds': [id for id in mark.fact_ids if id in public], 'reason': mark.reason}
+        for mark in workspace.annotations if mark.anchor.kind == 'field' and mark.anchor.field_id in anchors]
     return content_input('reconcile_edits', {'projectId': workspace.project_id,
         'projectRevision': workspace.project_revision, 'documentRevision': workspace.document_revision,
         'changedFields': fields, 'facts': [fact.model_dump(mode='json', by_alias=True) for fact in facts],
         'otherMentions': mentions, 'nameAssessmentFactId': assessment.id if assessment and workspace.project.document.candidate.name.field_id in field_ids else None,
+        'annotations': marks,
         'editorialPlan': workspace.editorial_plan.model_dump(mode='json', by_alias=True) if workspace.editorial_plan else None}, rules)
 
 
@@ -149,7 +165,7 @@ def validate_proposal(workspace, field_ids, proposal):
         if fact.job_id is not None and fact.job_id not in ({job.id for job in workspace.project.document.jobs} | set(workspace.project.document.early_career.represented_job_ids)):
             raise ValueError('ANALYSIS_SCOPE_INVALID')
     mention_ids = {id for id, (field, _slot) in indexed.items() if field and set(field.fact_ids) & allowed}
-    anchors = expanded | mention_ids
+    anchors = expanded | mention_ids | assessed_fields(workspace, field_ids)
     sections = {'education', 'languages', 'candidate', 'profile', 'employment', 'jobs', 'skills-focus', 'early-career', 'certifications'}
     suggestions = {item.id for item in proposal.suggestions}
     if len(suggestions) != len(proposal.suggestions): raise ValueError('ANALYSIS_SCOPE_INVALID')
@@ -213,9 +229,12 @@ def apply_reconciliation(workspace, field_ids, proposal, dependencies, rules, up
         candidate.editorial_plan = proposal.editorial_plan.model_copy(deep=True)
         candidate.annotations = [mark for mark in candidate.annotations if mark.code != 'editorial_plan_stale']
     # Replace only semantic assessments in the supplied context; pure gaps refresh below.
-    relevant = set(field_ids) | {id for id, (field, _slot) in indexed.items() if field and set(field.fact_ids) & relevant_ids(workspace, field_ids)}
-    candidate.annotations = [mark for mark in candidate.annotations if not
-        (mark.code.startswith('reconcile_') and (mark.anchor.kind != 'field' or mark.anchor.field_id in relevant))]
+    relevant = assessed_fields(workspace, field_ids)
+    assessed_fact_ids = relevant_ids(workspace, field_ids)
+    pure = {'missing_surname', 'missing_education', 'missing_languages', 'missing_job_dates',
+        'name_assessment_stale', 'focus_entry_removed', 'editorial_plan_stale'}
+    candidate.annotations = [mark for mark in candidate.annotations if mark.code in pure or not
+        (mark.anchor.kind == 'field' and mark.anchor.field_id in relevant or set(mark.fact_ids) & assessed_fact_ids)]
     candidate.related_update_suggestions = []
     provisional = result_dependencies(candidate, rules)
     candidate.annotations += [Annotation(id=mark.id, type=mark.type, code='reconcile_' + mark.code,

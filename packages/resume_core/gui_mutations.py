@@ -292,7 +292,7 @@ def structural(workspace, mutation):
     raise MutationFailure("FEATURE_NOT_READY")
 
 
-def apply_mutation(workspace, mutation, updated_at):
+def apply_mutation(workspace, mutation, updated_at, *, rules_sha256=None):
     request = mutation.root
     payload = request.model_dump(mode="json", by_alias=True)
     fingerprint = hashlib.sha256(json.dumps(payload, ensure_ascii=True, sort_keys=True, separators=(",", ":")).encode()).hexdigest()
@@ -328,7 +328,9 @@ def apply_mutation(workspace, mutation, updated_at):
         try:
             if request.kind == "edit-field": changed = edit(candidate, request.payload)
             elif request.kind == "restore-previous-block": changed = restore(candidate, request.payload)
-            elif request.kind == "apply-related-update": raise MutationFailure("FEATURE_NOT_READY")
+            elif request.kind == "apply-related-update":
+                from .gui_related import apply_related
+                changed = apply_related(candidate, request.payload, rules_sha256)
             else: changed = structural(candidate, request)
             removed_focus = validate_focus(candidate, explicit=request.kind == "edit-field" and request.payload.focus is not None)
             Document.model_validate(candidate.project.document.model_dump(by_alias=True))

@@ -21,6 +21,7 @@ from packages.resume_core.gui_mutations import apply_mutation
 from packages.resume_core.gui_selection import normalized_text
 from packages.resume_core.gui_rewriting import apply_rewrite, rewriting_input, rewrite_fingerprint
 from packages.resume_core.project_store import ProjectStoreFailure
+from packages.resume_core.rules import RulesFailure
 from packages.resume_core.models.contracts import Source, Usage
 from packages.resume_core.models.recovery import (WorkspaceV5, ProjectV4, Generation, GenerationStage,
     GuiOperation, GuiOperationEvent, Dependencies, RenderSnapshotV4, record_slot, MutationResult, MutationReplay)
@@ -171,7 +172,12 @@ class GuiProjectService(GuiExportMixin, GuiAnalysisMixin):
             if any(operation.id == mutation.root.client_mutation_id for operation in self.owner(self.workspaces[id]).operations):
                 raise ProjectFailure("MUTATION_ID_RESERVED", 422)
             before = self.read_memory(id)
-            result = apply_mutation(self.workspaces[id], mutation, self.clock().isoformat())
+            known = any(item.client_mutation_id == mutation.root.client_mutation_id for item in self.workspaces[id].mutation_replay)
+            try:
+                rules_sha = self.rules.load().sha256 if mutation.root.kind == "apply-related-update" and not known else None
+            except RulesFailure as error:
+                raise ProjectFailure(error.code, 409) from None
+            result = apply_mutation(self.workspaces[id], mutation, self.clock().isoformat(), rules_sha256=rules_sha)
             self.analysis_mutation(id, mutation.root, result, before)
             result.persistence = "durable" if self.persist(id) == "durable" else "memory" if self.storage is None else "failed"
             return result
