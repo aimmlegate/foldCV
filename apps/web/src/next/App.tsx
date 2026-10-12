@@ -18,6 +18,7 @@ import { MigrationNotice } from "./MigrationNotice";
 import { StartProjects } from "./StartProjects";
 import { StartDisclosure } from "./StartDisclosure";
 import { GenerationProgress } from "./GenerationProgress";
+import { DocumentLayout } from "./DocumentLayout";
 import type { SourceContext } from "../contracts/generated/source_context";
 import type { GuiProjectResponse } from "../contracts/generated/gui_project_response";
 import { documentFields } from "./fields";
@@ -213,9 +214,12 @@ export function App() {
     {generation && <GenerationProgress generation={generation} busy={busy} control={action => { void control(action); }} />}
     {generation && initialArtifact && workspace && <a className="next-download" download="resume.docx"
       href={`/v1/projects/${workspace.projectId}/renders/${initialArtifact.id}/docx`}>Скачать исходный DOCX</a>}
-    {settingsOpen ? <SettingsPanel close={() => setSettingsOpen(false)} analysisChanged={analysis.preferenceChanged} /> : exporter.open ? <ExportPanel exporter={exporter} workspace={workspace} /> : document ? <section className="next-editor-surface" aria-label="Документ">
-      <p className="next-editor-note">Правки сохраняются локально. Отметка «Сохранено» появляется после записи на диск.</p>
-      <div className="next-editor-tools"><button disabled={sourceBusy} onPointerDown={event => event.preventDefault()}
+    {settingsOpen ? <SettingsPanel close={() => setSettingsOpen(false)} analysisChanged={analysis.preferenceChanged} /> : exporter.open ? <ExportPanel exporter={exporter} workspace={workspace} /> : document ? <AnnotationActions.Provider value={{ suggestions: workspace?.relatedUpdateSuggestions ?? [], fields,
+        projectRevision: workspace?.projectRevision ?? 1, documentRevision: workspace?.documentRevision ?? 1,
+        disabled: related.busy || edits.pending || edits.locked, apply: suggestion => { void related.apply(suggestion); } }}>
+      <DocumentLayout document={document} fields={fields} activeSlot={slot} focus={id => { editor.current?.focus(id); }} structure={() => {
+        const control = window.document.querySelector(".next-structure");if (control instanceof HTMLDetailsElement) { control.open = true;control.querySelector("summary")?.focus();control.scrollIntoView({ block: "nearest" }); }
+      }} tools={<div className="next-editor-tools"><button disabled={sourceBusy} onPointerDown={event => event.preventDefault()}
         onClick={() => { void showSource(); }}>Показать исходник</button>
         <button disabled={!hasSelection || rewrite.busy || edits.locked} onPointerDown={event => event.preventDefault()}
           onClick={() => { setSourceOpen(false); void rewrite.open(); }}>Улучшить выделение</button>
@@ -223,17 +227,15 @@ export function App() {
           onClick={() => { setSourceOpen(false); void rewrite.open(slot ?? lastSlot.current); }}>Улучшить текст блока</button>
         <button disabled={edits.locked} onPointerDown={event => event.preventDefault()} onClick={() => { rewrite.invalidate(); edits.restore(slot ?? lastSlot.current); }}>Отменить правку блока</button>
         <StructureControls document={document} send={edits.structural} periods={edits.periods} disabled={edits.locked} />
-      </div>
-      <AnnotationActions.Provider value={{ suggestions: workspace?.relatedUpdateSuggestions ?? [], fields,
-        projectRevision: workspace?.projectRevision ?? 1, documentRevision: workspace?.documentRevision ?? 1,
-        disabled: related.busy || edits.pending || edits.locked, apply: suggestion => { void related.apply(suggestion); } }}>
-      <div className="next-document"><FieldEditor ref={editor} key={editorKey} fields={edits.overlay(fields)} editable={!edits.locked} theme={theme.resolved} annotations={workspace?.annotations ?? []}
+      </div>}>
+      <FieldEditor ref={editor} key={editorKey} fields={edits.overlay(fields)} editable={!edits.locked} theme={theme.resolved} annotations={workspace?.annotations ?? []}
         derived={edits.pending ? null : workspace?.derivedState} callbacks={{
         buffer: values => { rewrite.invalidate(); edits.buffer(values); }, selection: value => setHasSelection(value !== null), slot: value => { setSlot(value); if (value) lastSlot.current = value; }, departure: edits.departure,
         restore: value => { rewrite.invalidate(); edits.restore(value); }, completion: edits.completion, compositionEnd: edits.compositionEnd,
-      }} /></div></AnnotationActions.Provider>
+      }} />
+      </DocumentLayout>
       <p className="next-editor-status" aria-live="polite">{slot ? "Редактирование текста" : ""}</p>
-    </section> : opening ? <section className="next-start" role="status">Открываем сохранённый проект…</section> : <section className="next-start">
+    </AnnotationActions.Provider> : opening ? <section className="next-start" role="status">Открываем сохранённый проект…</section> : <section className="next-start">
       <div className="next-intro"><p className="next-eyebrow">ХОРОШИЙ ТЕКСТ НАЧИНАЕТСЯ С ФАКТОВ</p>
         <h1>Дайте резюме<br />чистый лист.</h1><p>Добавьте исходник. Получите полный документ<br />для окончательных правок.</p>
         <StartProjects refreshKey={`${workspace?.projectId ?? ""}:${durability}`} disabled={busy || !!running} open={id => { void openProject(id); }} manage={() => setProjectsOpen(true)} /></div>

@@ -1,6 +1,6 @@
 import { createExtension } from "@blocknote/core";
 import type { Node as ProseNode } from "@tiptap/pm/model";
-import { Plugin, PluginKey } from "@tiptap/pm/state";
+import { Plugin, PluginKey, TextSelection } from "@tiptap/pm/state";
 import type { EditorView } from "@tiptap/pm/view";
 
 export type FieldProjection = { fieldId: string; slotId: string; label: string; text: string };
@@ -186,6 +186,21 @@ export function createAdapter(fields: readonly FieldProjection[], callbacks: () 
     extension,
     capture: () => currentView && !composing ? capture(currentView.state.doc, currentView.state.selection.anchor, currentView.state.selection.head) : null,
     isComposing: () => composing,
+    focus: (fieldId?: string) => {
+      if (!currentView || composing) return false;
+      const view = currentView;
+      if (fieldId !== undefined) {
+        const field = positionedFields(view.state.doc).find(field => field.fieldId === fieldId);
+        if (!field) return false;
+        view.dispatch(view.state.tr.setSelection(TextSelection.create(view.state.doc, field.from)).scrollIntoView());
+        view.focus();
+        const node = view.domAtPos(field.from).node;
+        const element = node instanceof Element ? node : node.parentElement;
+        element?.closest(".next-field")?.scrollIntoView({ block: "center" });
+        return true;
+      }
+      view.focus();return true;
+    },
     read: () => currentView ? positionedFields(currentView.state.doc) : [],
     patch: (patches: readonly FieldPatch[]) => {
       if (!currentView || composing) return false;

@@ -1268,3 +1268,37 @@ test("built example E5 task A19 backend restart repeats only DOCX with provider 
   const stale = await page.request.post(`${origin}/v1/projects/${before.projectId}/generations/${before.generations.at(-1)?.id}/retry`, { headers: { Origin: origin }, data: {} });expect(stale.status()).toBe(409);
   await expect(page.locator('[data-field-content="profile/text"]')).toHaveText("Current edit after recovered export.");expect(readFileSync(resolve(runRoot, "model-requests.json"), "utf8")).toBe(calls);
 });
+
+test("built example E7 task A16 document outline collapse and focus mode preserve editor buffers and shell actions", async ({ page }) => {
+  await page.setViewportSize({ width: 1280, height: 900 });await createRewriteExample(page);const before = await currentWorkspace(page);
+  await page.locator('[contenteditable="true"]').evaluate(root => root.setAttribute("data-instance", "stable-document"));
+  await page.locator('[data-outline-section="profile"]').click();await expect(page.locator('[data-field-content="profile/text"]')).toBeInViewport();
+  await page.keyboard.insertText("Layout addition. ");await expect(page.locator('[data-field-content="profile/text"]')).toContainText("Layout addition.");
+  await page.getByRole("button", { name: "Режим фокуса", exact: true }).click();await expect(page.getByRole("navigation", { name: "Разделы документа", exact: true })).toBeHidden();
+  await expect(page.locator('[contenteditable="true"]')).toHaveAttribute("data-instance", "stable-document");await page.keyboard.insertText("Focused addition. ");
+  await page.getByRole("button", { name: "Выйти из режима фокуса", exact: true }).click();await expect(page.getByRole("navigation", { name: "Разделы документа", exact: true })).toBeVisible();
+  await page.getByRole("button", { name: "Свернуть оглавление", exact: true }).click();await expect(page.locator('[data-outline-section="profile"]')).toBeHidden();
+  await page.getByRole("button", { name: "Развернуть оглавление", exact: true }).click();await expect(page.locator('[data-field-content="profile/text"]')).toContainText("Focused addition.");
+  await expect(page.locator('[contenteditable="true"]')).toHaveCount(1);await expect(page.locator('[contenteditable="true"]')).toHaveAttribute("data-instance", "stable-document");
+  await page.locator('[data-outline-section="candidate"]').click();await expect(page.locator(".next-save")).toHaveText("Сохранено");const after = await currentWorkspace(page);
+  expect(after.documentRevision).toBeGreaterThan(before.documentRevision);expect(after.project?.operations.filter(operation => operation.kind !== "reconcile_edits")).toHaveLength(2);
+  for (const name of ["Сохранить проект", "Экспорт DOCX", "Настройки"]) await expect(page.getByRole("button", { name, exact: true })).toBeVisible();
+  if (process.env.FOLDCV_EVIDENCE_ROOT) await page.screenshot({ path: resolve(process.env.FOLDCV_EVIDENCE_ROOT, "A16-document-light.png") });
+  await page.getByLabel("Тема", { exact: true }).selectOption("dark");if (process.env.FOLDCV_EVIDENCE_ROOT) await page.screenshot({ path: resolve(process.env.FOLDCV_EVIDENCE_ROOT, "A16-document-dark.png") });
+  await page.setViewportSize({ width: 390, height: 844 });expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+  await page.locator('[data-outline-section="profile"]').click();await expect(page.locator('[data-field-content="profile/text"]')).toBeInViewport();
+  if (process.env.FOLDCV_EVIDENCE_ROOT) await page.screenshot({ path: resolve(process.env.FOLDCV_EVIDENCE_ROOT, "A16-document-narrow.png") });
+});
+
+test("built example E7 task A16 document date structure and hidden controls stay connected to canonical fields", async ({ page }) => {
+  await createRewriteExample(page);const before = await currentWorkspace(page), job = before.project?.document.jobs[0], period = job?.periods[0];if (!job || !period) throw new Error("Missing fixture job period");
+  await page.locator('[data-outline-section="jobs"]').click();await page.getByRole("button", { name: "Дата: Начало работы", exact: true }).first().click();
+  await expect(page.getByText("Год, месяц или день. Текст даты остаётся в документе.", { exact: true })).toBeVisible();await page.getByRole("button", { name: "Вернуться к тексту", exact: true }).click();
+  await replaceFieldText(page, period.startText.fieldId, "2015-07");await page.locator('[data-outline-section="profile"]').click();await expect(page.locator(".next-save")).toHaveText("Сохранено");
+  expect((await currentWorkspace(page)).project?.document.jobs[0]?.periods[0]?.startText.text).toBe("2015-07");
+  await page.getByText("Разделы и строки", { exact: true }).click();await page.getByRole("button", { name: "Скрыть О специалисте", exact: true }).click();
+  await expect(page.locator('.next-field[data-field-id="profile/text"]')).toHaveAttribute("data-hidden-record", "true");await expect(page.locator('.next-field[data-field-id="profile/text"]').getByText("Скрыто из DOCX", { exact: true })).toBeVisible();
+  await page.getByRole("button", { name: "Показать О специалисте", exact: true }).click();await expect(page.locator('.next-field[data-field-id="profile/text"]')).toHaveAttribute("data-hidden-record", "false");
+  await page.getByRole("button", { name: "Добавить образование", exact: true }).click();await expect(page.locator('[data-field-content^="education:"]')).toHaveCount(8);
+  expect((await currentWorkspace(page)).project?.document.education).toHaveLength(2);await expect(page.locator('[contenteditable="true"]')).toHaveCount(1);
+});

@@ -3,7 +3,8 @@ import { ru } from "@blocknote/core/locales";
 import { createReactBlockSpec, useCreateBlockNote } from "@blocknote/react";
 import { BlockNoteView } from "@blocknote/shadcn";
 import * as Popover from "@radix-ui/react-popover";
-import { forwardRef, useImperativeHandle, useMemo, useRef } from "react";
+import { forwardRef, useContext, useImperativeHandle, useMemo, useRef } from "react";
+import { FieldLayout } from "./DocumentLayout";
 import { createAdapter, type AdapterCallbacks, type FieldProjection } from "./adapter";
 import { AnnotationContext, FieldAnnotations, locateAnnotations } from "./Annotations";
 import type { Annotation, DerivedState } from "../contracts/generated/workspace_v5";
@@ -13,8 +14,11 @@ const createField = createReactBlockSpec({ type: "resumeField", content: "plain"
   propSchema: { fieldId: { default: "" }, slotId: { default: "" }, label: { default: "" } },
 }, { meta: { hardBreakShortcut: "enter", code: true }, render: function Field({ block, contentRef, editor }) {
   const returnToEditor = useRef(false);
+  const layout = useContext(FieldLayout).get(block.props.fieldId);
   return (
-  <section className="next-field" data-field-id={block.props.fieldId} data-slot-id={block.props.slotId}>
+  <section className="next-field" data-field-id={block.props.fieldId} data-slot-id={block.props.slotId} data-hidden-record={layout?.hidden ?? false}>
+    {layout?.heading && <h2 className="next-section-heading" contentEditable={false} data-slot-owner={block.props.slotId}>{layout.heading}
+      {layout.hidden && <small>Скрыто из DOCX</small>}</h2>}
     <FieldAnnotations fieldId={block.props.fieldId} />
     <div className="next-field-heading" contentEditable={false}>
       <span>{block.props.label}</span>
