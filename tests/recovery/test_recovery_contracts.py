@@ -153,7 +153,7 @@ def test_migration_inventory_accounts_for_all_requirements_and_browser_specs():
     current = json.loads((ROOT / "tests/requirements.json").read_text())
     assert {entry["requirement"] for entry in inventory["requirements"]} == {entry["id"] for entry in current["entries"]}
     assert len(inventory["requirements"]) == 22
-    assert {entry["path"] for entry in inventory["browserSpecs"]} == {
+    assert {entry["path"] for entry in inventory["browserSpecs"] + inventory.get("recoveryBrowserSpecs", [])} == {
         str(path.relative_to(ROOT)) for path in (ROOT / "apps/web/tests").glob("*.spec.ts")}
     assert len(inventory["browserSpecs"]) == 10
     assert inventory["apiEntryHarness"]["assert"] == '[data-app="foldcv-next"]'

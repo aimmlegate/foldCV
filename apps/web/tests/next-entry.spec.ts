@@ -1,0 +1,118 @@
+import { expect, test } from "@playwright/test";
+import { execFileSync, spawn, type ChildProcessWithoutNullStreams } from "node:child_process";
+import { mkdtempSync, readFileSync, realpathSync, rmSync, cpSync, existsSync, readdirSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { resolve } from "node:path";
+import type { GuiProjectResponse } from "../src/contracts/generated/gui_project_response";
+import { validateContract } from "../src/contracts/validate";
+
+const root = resolve(import.meta.dirname, "../../..");
+let temp: string, runRoot: string, origin: string;
+let server: ChildProcessWithoutNullStreams | undefined;
+test.beforeAll(() => {
+  temp = mkdtempSync(resolve(realpathSync(tmpdir()), "foldcv-next-entry-"));
+  execFileSync("npm", ["run", "build", "--", "--outDir", resolve(temp, "dist")], { cwd: resolve(root, "apps/web"), stdio: "pipe" });
+});
+test.beforeEach(async () => {
+  runRoot = mkdtempSync(resolve(temp, "run-"));
+  cpSync(resolve(temp, "dist"), resolve(runRoot, "dist"), { recursive: true });
+  const child = spawn(resolve(root, ".venv/bin/python"), ["tests/service/browser_next_fixture.py", runRoot, resolve(runRoot, "dist")], { cwd: root, stdio: "pipe" });
+  server = child;
+  origin = await new Promise<string>((ready, reject) => {
+    let text = "";
+    const timer = setTimeout(() => reject(new Error("Controlled entry server timed out")), 15000);
+    child.stdout.on("data", (chunk: Buffer) => {
+      text += chunk.toString("utf8"); const line = text.split("\n")[0];
+      if (line?.startsWith("http://127.0.0.1:")) { clearTimeout(timer); ready(line); }
+    });
+    child.once("exit", () => { clearTimeout(timer); reject(new Error("Controlled entry server stopped")); });
+  });
+});
+test.afterEach(async () => {
+  if (server && server.exitCode === null && server.signalCode === null) {
+    const exit = new Promise<void>(ready => server?.once("exit", () => ready()));
+    server.kill("SIGTERM"); await exit;
+  }
+  if (existsSync(resolve(runRoot, "operations"))) expect(readdirSync(resolve(runRoot, "operations"))).toEqual([]);
+});
+test.afterAll(() => { if (temp) rmSync(temp, { recursive: true, force: true }); });
+function response(value: unknown): GuiProjectResponse {
+  if (!isResponse(value)) throw new Error("Invalid project response");
+  return value;
+}
+function isResponse(value: unknown): value is GuiProjectResponse { return validateContract("gui_project_response", value); }
+
+test("built API entry creates E1 with two operations and no browser assembly or fact forms", async ({ page }) => {
+  await page.goto(`${origin}/next.html#secret=synthetic-next-secret-0123456789`);
+  await expect(page.locator('[data-app="foldcv-next"]')).toHaveCount(1);
+  expect(new URL(page.url()).hash).toBe("");
+  await expect(page.getByRole("button", { name: "Создать резюме" })).toBeDisabled();
+  await page.getByRole("button", { name: "Открыть пример" }).click();
+  const raw = readFileSync(resolve(root, "tests/fixtures/recovery/E1.txt"), "utf8");
+  await expect(page.getByLabel("Или вставьте текст")).toHaveValue(raw);
+  const created = page.waitForResponse(result => new URL(result.url()).pathname === "/v1/projects" && result.request().method() === "POST");
+  await page.getByRole("button", { name: "Создать резюме" }).click();
+  const initial: unknown = await (await created).json();
+  const id = response(initial).workspace.projectId;
+  await expect(page.getByText("Резюме готово", { exact: true })).toBeVisible({ timeout: 30000 });
+  await expect(page.locator('[data-field-content="candidate/name"]')).toHaveText("Ирина Примерова");
+  await expect(page.locator('[data-field-content="profile/text"]')).toHaveText("Разрабатываю backend-сервисы на Python.");
+  await expect(page.locator('[contenteditable="true"]')).toHaveCount(1);
+  const value: unknown = await (await page.request.get(`${origin}/v1/projects/${id}`)).json();
+  const workspace = response(value).workspace;
+  expect(workspace.project?.operations.map(operation => operation.usage?.logicalAttempts)).toEqual([1, 1]);
+  expect(workspace.project?.renders).toHaveLength(1);
+  expect([workspace.projectRevision, workspace.documentRevision]).toEqual([2, 2]);
+  expect(response(value).durability).toBe("in_memory");
+  await expect(page.getByRole("button", { name: "Сохранить проект", exact: true })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Экспорт DOCX", exact: true })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Настройки", exact: true })).toBeVisible();
+});
+
+test("built entry persists manual theme, follows system and fits a narrow keyboard layout", async ({ page }) => {
+  await page.emulateMedia({ colorScheme: "dark" });
+  await page.goto(`${origin}/next.html#secret=synthetic-next-secret-0123456789`);
+  await expect(page.locator("html")).toHaveAttribute("data-theme", "dark");
+  await page.getByLabel("Тема", { exact: true }).selectOption("light");
+  await page.reload();
+  await expect(page.locator("html")).toHaveAttribute("data-theme", "light");
+  await page.getByLabel("Тема", { exact: true }).selectOption("system");
+  await expect(page.locator("html")).toHaveAttribute("data-theme", "dark");
+  await page.emulateMedia({ colorScheme: "light" });
+  await expect(page.locator("html")).toHaveAttribute("data-theme", "light");
+  await page.setViewportSize({ width: 390, height: 844 });
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+  await page.getByRole("button", { name: "Открыть пример" }).focus();
+  await page.keyboard.press("Enter");
+  await expect(page.getByLabel("Или вставьте текст")).not.toHaveValue("");
+  await expect(page.getByRole("tab")).toHaveCount(0);
+  expect(await page.evaluate(() => Object.keys(localStorage).filter(key => key !== "foldcv-theme"))).toEqual([]);
+});
+
+test("missing built next entry returns legacy HTTP 200 but fails the unique root smoke", async ({ page }) => {
+  rmSync(resolve(runRoot, "dist/next.html"));
+  const result = await page.goto(`${origin}/next.html#secret=synthetic-next-secret-0123456789`);
+  expect(result?.status()).toBe(200);
+  await expect(page.locator('[data-app="foldcv-next"]')).toHaveCount(0);
+  await expect(page.getByRole("heading", { name: "Из исходника — в готовое резюме" })).toBeVisible();
+});
+
+test("chosen failed file disables inactive paste and explicit text recovery keeps project ID", async ({ page }) => {
+  await page.goto(`${origin}/next.html#secret=synthetic-next-secret-0123456789`);
+  await page.getByRole("button", { name: "Открыть пример" }).click();
+  const selected = page.waitForResponse(result => new URL(result.url()).pathname === "/v1/projects/input");
+  await page.getByLabel("Файл резюме").setInputFiles({ name: "failed.pdf", mimeType: "application/pdf", buffer: Buffer.from("broken") });
+  const selectedValue: unknown = await (await selected).json();
+  const selectedWorkspace = response(selectedValue).workspace;
+  await expect(page.getByText("Выбрано: failed.pdf", { exact: true })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Создать резюме" })).toBeDisabled();
+  await expect(page.getByLabel("Или вставьте текст")).toHaveValue("");
+  expect(selectedWorkspace.preDraft?.operations).toEqual([]);
+  const raw = readFileSync(resolve(root, "tests/fixtures/recovery/E1.txt"), "utf8");
+  await page.getByLabel("Или вставьте текст").fill(raw);
+  const created = page.waitForResponse(result => new URL(result.url()).pathname === `/v1/projects/${selectedWorkspace.projectId}/generations`);
+  await page.getByRole("button", { name: "Создать резюме" }).click();
+  const createdValue: unknown = await (await created).json();
+  expect(response(createdValue).workspace.projectId).toBe(selectedWorkspace.projectId);
+  await expect(page.getByText("Резюме готово", { exact: true })).toBeVisible({ timeout: 30000 });
+});
