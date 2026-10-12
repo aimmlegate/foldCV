@@ -425,6 +425,58 @@ test("built E1 first unsent edit starts the save deadline and canceled compositi
   await expect(page.locator(".next-save")).toHaveText("Сохранено");expect(writes.length).toBeGreaterThan(count);
 });
 
+test("built E2 filled sections and complete dates clear gaps without calls or fabricated values", async ({ page }) => {
+  await page.goto(`${origin}/next.html#secret=synthetic-next-secret-0123456789`);
+  await page.getByLabel("Или вставьте текст").fill(readFileSync(resolve(root, "tests/fixtures/recovery/E2.txt"), "utf8"));
+  await page.getByRole("button", { name: "Создать резюме" }).click();
+  await expect(page.getByText("Резюме готово", { exact: true })).toBeVisible({ timeout: 30000 });
+  await page.getByText("Разделы и строки", { exact: true }).click();
+  await page.getByRole("button", { name: "Добавить образование", exact: true }).click();
+  const institution = page.locator('[data-field-content$="/institution"]');await expect.poll(() => institution.evaluate(node => node.closest("[contenteditable]")?.getAttribute("contenteditable"))).toBe("true");await institution.click();await page.keyboard.type("User university");
+  await expect(page.locator('[data-annotation-code="missing_education"]')).toHaveCount(0);
+  await page.getByRole("button", { name: "Добавить язык", exact: true }).click();
+  const language = page.locator('[data-field-content^="language:"][data-field-content$="/name"]');await expect.poll(() => language.evaluate(node => node.closest("[contenteditable]")?.getAttribute("contenteditable"))).toBe("true");await language.click();await page.keyboard.type("User language");
+  await expect(page.locator('[data-annotation-code="missing_languages"]')).toHaveCount(0);
+  await page.getByText("Периоды: Гамма", { exact: true }).click();
+  const group = page.locator('[data-period-job]').filter({ hasText: "Периоды: Гамма" });
+  await group.getByRole("button", { name: "Добавить период", exact: true }).click();
+  const start = page.locator('[data-field-content$="/startText"]').first();await expect.poll(() => start.evaluate(node => node.closest("[contenteditable]")?.getAttribute("contenteditable"))).toBe("true");await start.click();await page.keyboard.type("2020");
+  const end = page.locator('[data-field-content$="/endText"]').first();await end.click();await page.keyboard.type("2022");
+  await expect(page.locator('[data-annotation-code="missing_job_dates"]')).toHaveCount(0);
+  await expect(page.locator('[data-duration]')).toHaveCount(1);
+  await expect(page.locator('[data-annotation-code="team_size_conflict"]')).toHaveCount(1);
+  await expect(page.locator('[data-annotation-code="missing_surname"]')).toHaveCount(0);
+  const id = new URL(page.url()).searchParams.get("project");
+  const raw: unknown = await (await page.request.get(`${origin}/v1/projects/${id}`)).json();const workspace = response(raw).workspace;
+  expect(workspace.project?.operations).toHaveLength(2);expect(workspace.sourceObservedAt).toBeNull();
+  expect(workspace.project?.document.languages[0]?.proficiency.text).toBe("");
+  await page.getByRole("button", { name: "Удалить User university", exact: true }).click();
+  await expect(page.locator('[data-annotation-code="missing_education"]')).toHaveCount(1);
+  await expect(page.locator('[data-annotation-code="missing_education"]')).toHaveAttribute("data-section-id", "education");
+});
+
+test("built E1 invalid typed dates remove duration and restore refreshes its marks", async ({ page }) => {
+  await page.goto(`${origin}/next.html#secret=synthetic-next-secret-0123456789`);
+  await page.getByRole("button", { name: "Открыть пример" }).click();await page.getByRole("button", { name: "Создать резюме" }).click();
+  await expect(page.getByText("Резюме готово", { exact: true })).toBeVisible({ timeout: 30000 });
+  await page.getByText("Разделы и строки", { exact: true }).click();await page.getByText("Периоды: Север", { exact: true }).click();
+  const group = page.locator('[data-period-job]').filter({ hasText: "Периоды: Север" });await group.getByRole("checkbox").click();
+  await expect(group.getByRole("checkbox")).not.toBeChecked();
+  const end = page.locator('[data-field-content$="/endText"]').first();await end.click();await page.keyboard.type("2024");
+  await expect(page.locator('[data-duration]')).toHaveCount(1);
+  await end.click();await page.keyboard.press("End");await page.keyboard.type("invalid");
+  await expect(page.locator('[data-duration]')).toHaveCount(0);
+  await expect(page.locator('[data-annotation-code="missing_job_dates"]')).toHaveCount(1);
+  await expect(end).toContainText("invalid");
+  await page.keyboard.press("Control+z");
+  await expect(page.locator('[data-annotation-code="missing_job_dates"]')).toHaveCount(0);
+  await expect(page.locator('[data-duration]')).toHaveCount(0);
+  await expect(end).toHaveText("");
+  const id = new URL(page.url()).searchParams.get("project");
+  const raw: unknown = await (await page.request.get(`${origin}/v1/projects/${id}`)).json();
+  expect(response(raw).workspace.project?.operations).toHaveLength(2);
+});
+
 test("built entry persists manual theme, follows system and fits a narrow keyboard layout", async ({ page }) => {
   await page.emulateMedia({ colorScheme: "dark" });
   await page.goto(`${origin}/next.html#secret=synthetic-next-secret-0123456789`);

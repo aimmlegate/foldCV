@@ -61,6 +61,7 @@ export function createAdapter(fields: readonly FieldProjection[], callbacks: () 
   let activeField: string | null = null;
   let composing = false;
   let ownedIntent: string | null = null;
+  let pendingEditorSlot: string | null = null;
   let lastSent = 0;
   let currentView: EditorView | null = null;
 
@@ -141,10 +142,17 @@ export function createAdapter(fields: readonly FieldProjection[], callbacks: () 
       const focus = (event: FocusEvent) => {
         const slot = owner(event.target);
         if (slot) move(slot);
+        else if (ownedIntent && (event.target === view.dom.ownerDocument.body || event.target === view.dom.ownerDocument.documentElement)) return;
         else if (event.target instanceof Node && !view.dom.contains(event.target)) move(null);
       };
-      const pointer = (event: PointerEvent) => { ownedIntent = owner(event.target); if (ownedIntent) move(ownedIntent); };
+      const pointer = (event: PointerEvent) => {
+        pendingEditorSlot = event.target instanceof Element && view.dom.contains(event.target)
+          ? event.target.closest("[data-slot-id]")?.getAttribute("data-slot-id") ?? null : null;
+        ownedIntent = owner(event.target) ?? pendingEditorSlot;
+        if (ownedIntent) move(ownedIntent);
+      };
       const history = (event: KeyboardEvent) => {
+        if (event.key === "Tab") { ownedIntent = null; pendingEditorSlot = null; }
         if (!owner(event.target) || (event.target instanceof Node && view.dom.contains(event.target))) return;
         if ((event.ctrlKey || event.metaKey) && ["z", "y"].includes(event.key.toLowerCase())) {
           event.preventDefault(); if (event.key.toLowerCase() === "z" && !event.shiftKey) restore();
@@ -156,10 +164,11 @@ export function createAdapter(fields: readonly FieldProjection[], callbacks: () 
       return { update: next => {
         const selected = next.state.selection;
         const field = positionedFields(next.state.doc).find(field => selected.head >= field.from && selected.head <= field.to);
-        if (next.hasFocus()) {
+        if (next.hasFocus() && (!pendingEditorSlot || pendingEditorSlot === field?.slotId)) {
           if (activeField && activeField !== field?.fieldId) callbacks().completion?.(activeField, "field");
           activeField = field?.fieldId ?? null;
           move(field?.slotId ?? null);
+          if (pendingEditorSlot) { pendingEditorSlot = null; ownedIntent = null; }
         }
         callbacks().selection(composing ? null : capture(next.state.doc, selected.anchor, selected.head));
         emit(next);

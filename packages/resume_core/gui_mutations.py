@@ -9,6 +9,7 @@ from pydantic import ValidationError
 from .gui_derived import digest
 from .gui_projection import compatibility_views
 from .gui_selection import field_index, normalized_text
+from .gui_refresh import refresh, validate_focus
 from .models.recovery import (Annotation, BlockCheckpoint, BufferedField, Dependencies, Document,
     EditSession, FactStamp, MutationReplay, MutationResult, SourceExclusion, authored_fields, record_slot)
 from .normalization import _id
@@ -318,6 +319,7 @@ def apply_mutation(workspace, mutation, updated_at):
             elif request.kind == "restore-previous-block": changed = restore(candidate, request.payload)
             elif request.kind == "apply-related-update": raise MutationFailure("FEATURE_NOT_READY")
             else: changed = structural(candidate, request)
+            removed_focus = validate_focus(candidate, explicit=request.kind == "edit-field" and request.payload.focus is not None)
             Document.model_validate(candidate.project.document.model_dump(by_alias=True))
             document_changed = document_content(candidate.project.document) != document_content(workspace.project.document)
             facts_changed = candidate.project.facts != workspace.project.facts
@@ -330,6 +332,7 @@ def apply_mutation(workspace, mutation, updated_at):
                 candidate.derived_state = None
                 candidate.updated_at = updated_at
                 candidate.project.views = compatibility_views(candidate.project.document, candidate.project.facts)
+                refresh(candidate, changed, removed_focus)
             if request.kind == "restore-previous-block" and request.payload.slot_id in candidate.edit_sessions:
                 session = candidate.edit_sessions[request.payload.slot_id]
                 session.baseline = checkpoint(candidate, request.payload.slot_id)

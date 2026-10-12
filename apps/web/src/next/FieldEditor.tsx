@@ -6,7 +6,8 @@ import * as Popover from "@radix-ui/react-popover";
 import { forwardRef, useImperativeHandle, useMemo, useRef } from "react";
 import { createAdapter, type AdapterCallbacks, type FieldProjection } from "./adapter";
 import { AnnotationContext, FieldAnnotations, locateAnnotations } from "./Annotations";
-import type { Annotation } from "../contracts/generated/workspace_v5";
+import type { Annotation, DerivedState } from "../contracts/generated/workspace_v5";
+import { DerivedContext, FieldDerived, derivedValues } from "./Derived";
 
 const createField = createReactBlockSpec({ type: "resumeField", content: "plain",
   propSchema: { fieldId: { default: "" }, slotId: { default: "" }, label: { default: "" } },
@@ -28,13 +29,14 @@ const createField = createReactBlockSpec({ type: "resumeField", content: "plain"
       </Popover.Root>}
     </div>
     <div className="next-field-content" data-field-content={block.props.fieldId} ref={contentRef} />
+    <FieldDerived fieldId={block.props.fieldId} />
   </section>
 ); } });
 const schema = BlockNoteSchema.create({ blockSpecs: { resumeField: createField() }, styleSpecs: {} });
 export type FieldEditorHandle = ReturnType<typeof createAdapter> & { historyEnabled: () => boolean };
-type Props = { fields: readonly FieldProjection[]; callbacks: AdapterCallbacks; theme: "light" | "dark"; annotations?: readonly Annotation[]; editable?: boolean };
+type Props = { fields: readonly FieldProjection[]; callbacks: AdapterCallbacks; theme: "light" | "dark"; annotations?: readonly Annotation[]; editable?: boolean; derived?: DerivedState | null };
 
-export const FieldEditor = forwardRef<FieldEditorHandle, Props>(function FieldEditor({ fields, callbacks, theme, annotations = [], editable = true }, ref) {
+export const FieldEditor = forwardRef<FieldEditorHandle, Props>(function FieldEditor({ fields, callbacks, theme, annotations = [], editable = true, derived }, ref) {
   const latest = useRef(callbacks);
   latest.current = callbacks;
   const adapter = useMemo(() => createAdapter(fields, () => latest.current), []);
@@ -45,7 +47,9 @@ export const FieldEditor = forwardRef<FieldEditorHandle, Props>(function FieldEd
   }, []);
   useImperativeHandle(ref, () => ({ ...adapter, historyEnabled: () => Object.hasOwn(editor.extensions, "history") }), [adapter, editor]);
   return <AnnotationContext.Provider value={locateAnnotations(fields, annotations)}>
+    <DerivedContext.Provider value={derivedValues(derived)}>
     <BlockNoteView editor={editor} theme={theme} editable={editable} formattingToolbar={false} sideMenu={false}
       slashMenu={false} linkToolbar={false} filePanel={false} tableHandles={false} />
+    </DerivedContext.Provider>
   </AnnotationContext.Provider>;
 });

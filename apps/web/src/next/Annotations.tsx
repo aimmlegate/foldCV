@@ -11,6 +11,8 @@ const labels: Readonly<Record<string, string>> = {
   missing_job_dates: "Уточните даты работы",
   team_size_conflict: "В исходнике указаны разные размеры команды",
   focus_entry_removed: "Часть технологий исключена из фокуса",
+  editorial_plan_stale: "Редакторские рекомендации требуют обновления",
+  name_assessment_stale: "Имя изменено. Оценку фамилии нужно обновить",
 };
 const sectionSlots: Readonly<Record<string, readonly string[]>> = {
   education: ["education:", "certification:", "language:", "skills-focus"],

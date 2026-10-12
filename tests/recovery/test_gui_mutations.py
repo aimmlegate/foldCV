@@ -66,7 +66,7 @@ def test_incremental_edits_keep_baseline_and_pointer_until_slot_departure():
     assert edit(workspace, 'profile/text', baseline + '\r\nAdded 😀').status == 'applied'
     assert workspace.project.document.profile.text.text == baseline + '\nAdded 😀'
     assert workspace.undo_slots['profile'] is None and workspace.edit_sessions['profile'].baseline.record.text.text == baseline
-    assert workspace.derived_state is None
+    assert workspace.derived_state.document_revision == workspace.document_revision
     assert edit(workspace, 'profile/text', baseline + '\nAdded 😀 more', completion='paragraph').status == 'applied'
     assert workspace.undo_slots['profile'] is None
     counters = (workspace.project_revision, workspace.document_revision)

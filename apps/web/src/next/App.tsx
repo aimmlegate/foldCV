@@ -157,9 +157,10 @@ export function App() {
       <div className="next-editor-tools"><button disabled={sourceBusy} onPointerDown={event => event.preventDefault()}
         onClick={() => { void showSource(); }}>Показать исходник</button>
         <button disabled={edits.locked} onPointerDown={event => event.preventDefault()} onClick={() => edits.restore(slot ?? lastSlot.current)}>Отменить правку блока</button>
-        <StructureControls document={document} send={edits.structural} periods={edits.periods} disabled={edits.locked || edits.saving} />
+        <StructureControls document={document} send={edits.structural} periods={edits.periods} disabled={edits.locked} />
       </div>
-      <div className="next-document"><FieldEditor ref={editor} key={editorKey} fields={edits.overlay(fields)} editable={!edits.locked} theme={theme.resolved} annotations={workspace?.annotations ?? []} callbacks={{
+      <div className="next-document"><FieldEditor ref={editor} key={editorKey} fields={edits.overlay(fields)} editable={!edits.locked} theme={theme.resolved} annotations={workspace?.annotations ?? []}
+        derived={edits.pending ? null : workspace?.derivedState} callbacks={{
         buffer: edits.buffer, selection: () => {}, slot: value => { setSlot(value); if (value) lastSlot.current = value; }, departure: edits.departure,
         restore: edits.restore, completion: edits.completion, compositionEnd: edits.compositionEnd,
       }} /></div>

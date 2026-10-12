@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from .gui_derived import endpoint
+from .gui_derived import complete_period
 from .gui_normalization import GuiNormalizedResult
 from .models.recovery import Annotation, Dependencies, Document, JobRecord, NameAssessmentFact, authored_fields
 from .normalization import _id
@@ -11,16 +11,7 @@ from .normalization import _id
 def complete_job_dates(job: JobRecord, facts) -> bool:
     if not job.periods:
         return False
-    for period in job.periods:
-        start, end = endpoint(period.start_text, facts), endpoint(period.end_text, facts)
-        if start is None:
-            return False
-        if period.present:
-            if period.end_text.text.strip():
-                return False
-        elif end is None or start.lower() > end.upper():
-            return False
-    return True
+    return all(complete_period(period, facts) for period in job.periods)
 
 
 def filled_section(rows) -> bool:

@@ -62,3 +62,4 @@ button:disabled { cursor: default; opacity: .6; }
 .next-structure ul { padding: 0; }
 .next-structure button { padding: 4px 8px; font-size: 12px; }
 .next-structure h3 { font-size: 14px; }
+.next-derived { color: var(--muted); font-size: 12px; margin-top: 4px; }
