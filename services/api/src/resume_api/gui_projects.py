@@ -19,10 +19,11 @@ from packages.resume_core.gui_rendering import render_input
 from packages.resume_core.gui_projection import compatibility_views
 from packages.resume_core.gui_mutations import apply_mutation
 from packages.resume_core.gui_selection import normalized_text
+from packages.resume_core.gui_rewriting import apply_rewrite, rewriting_input, rewrite_fingerprint
 from packages.resume_core.project_store import ProjectStoreFailure
 from packages.resume_core.models.contracts import Source, Usage
 from packages.resume_core.models.recovery import (WorkspaceV5, ProjectV4, Generation, GenerationStage,
-    GuiOperation, GuiOperationEvent, Dependencies, RenderSnapshotV4, record_slot)
+    GuiOperation, GuiOperationEvent, Dependencies, RenderSnapshotV4, record_slot, MutationResult, MutationReplay)
 from packages.resume_core.rendering.docx_errors import DocxFailure
 from packages.resume_core.rendering.template import PACKAGE_SHA256, renderer_sha256, RenderFailure
 from .extracting import run_extract, UploadFailure
@@ -30,6 +31,7 @@ from .gui_admission import AdmissionCancelled, QueuedProvider
 from .gui_normalization_content import GuiNormalizationContentService
 from .gui_drafting_content import GuiDraftingContentService
 from .gui_rendering import GuiDocxRenderer
+from .gui_rewriting_content import GuiRewritingContentService
 from .lifecycle import OperationFiles, SpikeError
 from .providers.content import ContentFailure
 
@@ -163,29 +165,32 @@ class GuiProjectService:
     def mutate(self, id, mutation):
         self.read(id)
         with self.state_lock:
+            if any(operation.id == mutation.root.client_mutation_id for operation in self.owner(self.workspaces[id]).operations):
+                raise ProjectFailure("MUTATION_ID_RESERVED", 422)
             result = apply_mutation(self.workspaces[id], mutation, self.clock().isoformat())
             result.persistence = "durable" if self.persist(id) == "durable" else "memory" if self.storage is None else "failed"
             return result
 
     def rename(self, id, request):
         self.read(id)
-        workspace = self.workspaces[id]
-        if workspace.project_revision != request.base_revision:
-            raise ProjectFailure("PROJECT_REVISION_CHANGED")
-        title = request.title.strip()
-        try:
-            title.encode("utf-8")
-        except UnicodeError:
-            raise ProjectFailure("TITLE_INVALID", 422) from None
-        if not title:
-            raise ProjectFailure("TITLE_REQUIRED", 422)
-        if title != workspace.title or not workspace.title_manually_set:
-            workspace.title, workspace.title_manually_set = title, True
-            workspace.project_revision += 1
-            if workspace.project:
-                workspace.project.revision = workspace.project_revision
-            workspace.updated_at = self.clock().isoformat()
-        self.persist(id)
+        with self.state_lock:
+            workspace = self.workspaces[id]
+            if workspace.project_revision != request.base_revision:
+                raise ProjectFailure("PROJECT_REVISION_CHANGED")
+            title = request.title.strip()
+            try:
+                title.encode("utf-8")
+            except UnicodeError:
+                raise ProjectFailure("TITLE_INVALID", 422) from None
+            if not title:
+                raise ProjectFailure("TITLE_REQUIRED", 422)
+            if title != workspace.title or not workspace.title_manually_set:
+                workspace.title, workspace.title_manually_set = title, True
+                workspace.project_revision += 1
+                if workspace.project:
+                    workspace.project.revision = workspace.project_revision
+                workspace.updated_at = self.clock().isoformat()
+            self.persist(id)
 
     def allocate(self, title):
         self.ensure_loaded()
@@ -497,8 +502,121 @@ class GuiProjectService:
             self.files.pop(key, None)
             self.persist(workspace.project_id)
 
+    async def rewrite(self, id, request):
+        self.read(id)
+        key = (id, request.client_request_id)
+        try:
+            fingerprint = rewrite_fingerprint(request)
+        except UnicodeError:
+            raise ProjectFailure("INVALID_CONTENT_INPUT", 422) from None
+        with self.state_lock:
+            workspace = self.workspaces[id]
+            if workspace.project is None or request.selection.project_id != id:
+                raise ProjectFailure("SELECTION_STALE")
+            previous = next((item for item in workspace.project.operations if item.id == request.client_request_id), None)
+            if previous:
+                if previous.kind != "rewrite_prose" or not previous.dependencies or previous.dependencies.dependency_fingerprint != fingerprint:
+                    raise ProjectFailure("REQUEST_ID_REUSED")
+                saved = next((item for item in workspace.mutation_replay if item.client_mutation_id == previous.id), None)
+                if saved:
+                    return MutationResult(status="replayed", projectRevision=saved.project_revision,
+                        documentRevision=saved.document_revision, changedSlotIds=[], rejectionReason=saved.rejection_reason,
+                        persistence="durable" if self.persist(id) == "durable" else "memory" if self.storage is None else "failed")
+                if key not in self.tasks:
+                    raise ProjectFailure("OPERATION_INTERRUPTED")
+            else:
+                if any(not task.done() for (pid, _), task in self.tasks.items() if pid == id):
+                    raise ProjectFailure("PROJECT_OPERATION_ACTIVE")
+                if self.persist(id) == "failed":
+                    raise ProjectFailure("PROJECT_SAVE_FAILED", 503)
+                selected = self.provider_factory()
+                if selected is None:
+                    raise ProjectFailure("CONNECTION_REQUIRED")
+                rules = self.rules.load()
+                operation = GuiOperation(id=request.client_request_id, kind="rewrite_prose", status="queued",
+                    baseRevision=workspace.project_revision, usage=None, events=[], projectId=id,
+                    capturedDocumentRevision=None, dependencies=None, rulesUsed=rules,
+                    targetFieldIds=[span.field_id for span in request.selection.spans], resultFingerprint=None, errorCode=None)
+                workspace.project.operations.append(operation)
+                operation.captured_document_revision = workspace.document_revision
+                operation.dependencies = Dependencies(projectRevision=workspace.project_revision, documentRevision=workspace.document_revision,
+                    rulesSha256=rules.sha256, sourceFingerprint=source_fingerprint(workspace.project.sources), dependencyFingerprint=fingerprint)
+                captured = self.read_memory(id)
+                self.cancels[key] = threading.Event()
+                self.tasks[key] = asyncio.create_task(self._run_rewrite(captured, request.model_copy(deep=True), operation, selected))
+        return await asyncio.shield(self.tasks[key])
+
+    async def _run_rewrite(self, captured, request, operation, selected):
+        id, oid = captured.project_id, operation.id
+        key, cancel = (id, oid), self.cancels[(id, oid)]
+        result = None
+        files = OperationFiles(self.temp_root)
+        self.files[key] = files
+
+        def admitted():
+            with self.state_lock:
+                operation.status = "running"
+                operation.usage = Usage(logicalAttempts=1, internalInferenceRequests=None, reportedInputTokens=None, reportedOutputTokens=None)
+                self._event(operation, "operation.started")
+                if id in self.save_errors:
+                    raise ProjectFailure("PROJECT_SAVE_FAILED", 503)
+
+        try:
+            prompt = rewriting_input(captured, request, operation.rules_used)
+            if self.persist(id) == "failed":
+                raise ProjectFailure("PROJECT_SAVE_FAILED", 503)
+            provider, model = selected
+            service = GuiRewritingContentService(QueuedProvider(provider, admitted), model)
+            def run():
+                with files.open():
+                    return service.run(prompt, request.selection, files, cancel)
+            async with self.worker_slot(cancel):
+                proposal, response = await asyncio.to_thread(run)
+            operation.usage = Usage(logicalAttempts=response.logical_attempts, internalInferenceRequests=response.internal_inference_count,
+                reportedInputTokens=response.usage.input_tokens, reportedOutputTokens=response.usage.output_tokens)
+            with self.state_lock:
+                if cancel.is_set():
+                    raise AdmissionCancelled()
+                if self.rules.load().sha256 != operation.rules_used.sha256:
+                    raise ProjectFailure("RULES_CHANGED")
+                result = apply_rewrite(self.workspaces[id], request, proposal, operation.base_revision, self.clock().isoformat())
+                operation.result_fingerprint = digest(proposal.model_dump(mode="json", by_alias=True))
+                operation.status = "completed" if result.status == "applied" else "failed"
+                operation.error_code = result.rejection_reason
+                self._event(operation, "usage.updated", save=False)
+                self._event(operation, "operation.completed" if result.status == "applied" else "operation.failed", save=False)
+        except (ContentFailure, AdmissionCancelled, ProjectFailure, ValueError, SpikeError) as error:
+            if isinstance(error, SpikeError):
+                self.cleanup_error(error)
+            operation.status = "cancelled" if cancel.is_set() or isinstance(error, AdmissionCancelled) else "failed"
+            safe_code = str(error) if isinstance(error, ValueError) and str(error) in {
+                "SELECTION_STALE", "RULES_CHANGED", "NO_SAFE_CONTENT", "INPUT_TOO_LARGE", "INVALID_CONTENT_INPUT"} else "INVALID_RESULT"
+            operation.error_code = "CANCELLED" if operation.status == "cancelled" else getattr(error, "code", safe_code)
+            attempts = max(operation.usage.logical_attempts if operation.usage else 0, error.logical_attempts if isinstance(error, ContentFailure) else 0)
+            usage = error.usage if isinstance(error, ContentFailure) else None
+            if operation.usage is None or usage:
+                operation.usage = Usage(logicalAttempts=attempts, internalInferenceRequests=None,
+                    reportedInputTokens=usage.input_tokens if usage else None, reportedOutputTokens=usage.output_tokens if usage else None)
+            self._event(operation, "cancelled" if operation.status == "cancelled" else "operation.failed", save=False)
+        except Exception:
+            operation.status, operation.error_code = "failed", "INVALID_RESULT"
+            self._event(operation, "operation.failed", save=False)
+        finally:
+            self.files.pop(key, None)
+        with self.state_lock:
+            workspace = self.workspaces[id]
+            result = result or MutationResult(status="rejected", projectRevision=workspace.project_revision,
+                documentRevision=workspace.document_revision, changedSlotIds=[], rejectionReason=operation.error_code, persistence="memory")
+            workspace.mutation_replay.append(MutationReplay(clientMutationId=oid, payloadSha256=rewrite_fingerprint(request),
+                status=result.status, projectRevision=result.project_revision, documentRevision=result.document_revision,
+                rejectionReason=result.rejection_reason))
+            result.persistence = "durable" if self.persist(id) == "durable" else "memory" if self.storage is None else "failed"
+        return result
+
     async def cancel(self, id, gid):
-        generation = self.generation(id, gid)
+        workspace = self.read(id)
+        if not any(item.id == gid for item in workspace.generations) and not any(item.id == gid for item in self.owner(workspace).operations):
+            raise ProjectFailure("OPERATION_NOT_FOUND", 404)
         key = (id, gid)
         task = self.tasks.get(key)
         if task is None or task.done():

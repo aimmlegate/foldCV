@@ -1,4 +1,6 @@
 import draftRequest from "../../../../contracts/json-schema/gui_draft_request.schema.json" with { type: "json" };
+import rewriteRequest from "../../../../contracts/json-schema/gui_rewrite_request.schema.json" with { type: "json" };
+import rewriteProposal from "../../../../contracts/json-schema/gui_rewrite_proposal.schema.json" with { type: "json" };
 import createProject from "../../../../contracts/json-schema/gui_create_project_request.schema.json" with { type: "json" };
 import startGeneration from "../../../../contracts/json-schema/gui_start_generation_request.schema.json" with { type: "json" };
 import renameProject from "../../../../contracts/json-schema/gui_rename_project_request.schema.json" with { type: "json" };
@@ -29,7 +31,7 @@ import context from "../../../../contracts/json-schema/source_context.schema.jso
 import contextRequest from "../../../../contracts/json-schema/source_context_request.schema.json" with { type: "json" };
 
 const ajv = new Ajv2020({ allErrors: true, strict: false });
-const schemas = { gui_rename_project_request: renameProject, gui_create_project_request: createProject, gui_start_generation_request: startGeneration,
+const schemas = { gui_rewrite_request: rewriteRequest, gui_rewrite_proposal: rewriteProposal, gui_rename_project_request: renameProject, gui_create_project_request: createProject, gui_start_generation_request: startGeneration,
   gui_project_response: projectResponse, project_v4: project, workspace_v5: workspace, archive_manifest_v5: archive,
   document, docx_error: error, editorial_plan: plan, mutation, mutation_result: result,
   preferences, registry, render_snapshot_v4: render, rules, selection, source_context: context, source_context_request: contextRequest, save_rules_request: saveRules, rules_settings_error: rulesError, rules_settings: rulesSettings, gui_normalize_request: guiRequest, gui_semantic_proposal: guiProposal, gui_normalized_result: guiResult, gui_draft_request: draftRequest, gui_draft_proposal: draftProposal, gui_draft_result: draftResult };

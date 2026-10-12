@@ -5,6 +5,8 @@ import type { SourceContextRequest } from "../contracts/generated/source_context
 import type { SourceContext } from "../contracts/generated/source_context";
 import type { Mutation } from "../contracts/generated/mutation";
 import type { MutationResult } from "../contracts/generated/mutation_result";
+import type { GuiRewriteRequest } from "../contracts/generated/gui_rewrite_request";
+import type { RulesSettings } from "../contracts/generated/rules_settings";
 import { validateContract } from "../contracts/validate";
 
 export type Workspace = GuiProjectResponse["workspace"];
@@ -20,7 +22,7 @@ function errorCode(value: unknown): string {
   return typeof error === "object" && error !== null && "code" in error && typeof error.code === "string"
     ? error.code : "REQUEST_FAILED";
 }
-async function request(path: string, method = "GET", body?: GuiCreateProjectRequest | GuiStartGenerationRequest | SourceContextRequest | Mutation | Record<string, never> | FormData): Promise<unknown> {
+async function request(path: string, method = "GET", body?: GuiCreateProjectRequest | GuiStartGenerationRequest | SourceContextRequest | GuiRewriteRequest | Mutation | Record<string, never> | FormData): Promise<unknown> {
   const init: RequestInit = { method, credentials: "same-origin", cache: "no-store" };
   if (body instanceof FormData) init.body = body;
   else if (body !== undefined) { init.body = JSON.stringify(body); init.headers = { "Content-Type": "application/json" }; }
@@ -44,6 +46,17 @@ function isMutationResult(value: unknown): value is MutationResult { return vali
 export async function mutationRequest(body: Mutation): Promise<MutationResult> {
   const value = await request(`/v1/projects/${body.projectId}/mutations`, "POST", body);
   if (!isMutationResult(value)) throw new ApiFailure("INVALID_RESULT");
+  return value;
+}
+export async function rewriteRequest(body: GuiRewriteRequest): Promise<MutationResult> {
+  const value = await request(`/v1/projects/${body.selection.projectId}/rewrite`, "POST", body);
+  if (!isMutationResult(value)) throw new ApiFailure("INVALID_RESULT");
+  return value;
+}
+function isRules(value: unknown): value is RulesSettings { return validateContract("rules_settings", value); }
+export async function rulesRequest(): Promise<RulesSettings> {
+  const value = await request("/v1/settings/rules");
+  if (!isRules(value)) throw new ApiFailure("INVALID_RESULT");
   return value;
 }
 export async function exchangeSession(): Promise<void> {

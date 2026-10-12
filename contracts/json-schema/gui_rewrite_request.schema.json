@@ -1,0 +1,121 @@
+{
+  "$defs": {
+    "Range": {
+      "additionalProperties": false,
+      "properties": {
+        "end": {
+          "minimum": 0,
+          "title": "End",
+          "type": "integer"
+        },
+        "start": {
+          "minimum": 0,
+          "title": "Start",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "start",
+        "end"
+      ],
+      "title": "Range",
+      "type": "object"
+    },
+    "Selection": {
+      "additionalProperties": false,
+      "properties": {
+        "dependencyFingerprint": {
+          "pattern": "^[a-f0-9]{64}$",
+          "title": "Dependencyfingerprint",
+          "type": "string"
+        },
+        "documentRevision": {
+          "minimum": 1,
+          "title": "Documentrevision",
+          "type": "integer"
+        },
+        "projectId": {
+          "minLength": 1,
+          "title": "Projectid",
+          "type": "string"
+        },
+        "spans": {
+          "items": {
+            "$ref": "#/$defs/SelectionSpan"
+          },
+          "minItems": 1,
+          "title": "Spans",
+          "type": "array"
+        }
+      },
+      "required": [
+        "projectId",
+        "documentRevision",
+        "dependencyFingerprint",
+        "spans"
+      ],
+      "title": "Selection",
+      "type": "object"
+    },
+    "SelectionSpan": {
+      "additionalProperties": false,
+      "properties": {
+        "capturedText": {
+          "title": "Capturedtext",
+          "type": "string"
+        },
+        "fieldId": {
+          "minLength": 1,
+          "title": "Fieldid",
+          "type": "string"
+        },
+        "range": {
+          "$ref": "#/$defs/Range"
+        }
+      },
+      "required": [
+        "fieldId",
+        "range",
+        "capturedText"
+      ],
+      "title": "SelectionSpan",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "clientRequestId": {
+      "minLength": 1,
+      "title": "Clientrequestid",
+      "type": "string"
+    },
+    "instruction": {
+      "maxLength": 2000,
+      "minLength": 1,
+      "title": "Instruction",
+      "type": "string"
+    },
+    "rulesRevision": {
+      "minimum": 1,
+      "title": "Rulesrevision",
+      "type": "integer"
+    },
+    "rulesSha256": {
+      "pattern": "^[a-f0-9]{64}$",
+      "title": "Rulessha256",
+      "type": "string"
+    },
+    "selection": {
+      "$ref": "#/$defs/Selection"
+    }
+  },
+  "required": [
+    "clientRequestId",
+    "selection",
+    "instruction",
+    "rulesRevision",
+    "rulesSha256"
+  ],
+  "title": "GuiRewriteRequest",
+  "type": "object"
+}

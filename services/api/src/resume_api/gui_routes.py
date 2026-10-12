@@ -7,6 +7,7 @@ from packages.resume_core.gui_projects import GuiCreateProjectRequest, GuiStartG
 from packages.resume_core.gui_selection import selection_fingerprint
 from packages.resume_core.gui_source_context import source_context
 from packages.resume_core.models.recovery import SourceContextRequest, Mutation
+from packages.resume_core.gui_rewriting import GuiRewriteRequest
 from .contracts import EmptyRequest
 from .extracting import parse_one_part, UploadFailure
 from .gui_projects import ProjectFailure
@@ -62,6 +63,16 @@ def mount_projects(app, service, problem):
     async def mutate(id: str, payload: Mutation):
         result = service.mutate(id, payload)
         return JSONResponse(result.model_dump(mode="json", by_alias=True), headers={"Cache-Control": "no-store"})
+
+    @app.post("/v1/projects/{id}/rewrite")
+    async def rewrite(id: str, payload: GuiRewriteRequest):
+        result = await service.rewrite(id, payload)
+        return JSONResponse(result.model_dump(mode="json", by_alias=True), headers={"Cache-Control": "no-store"})
+
+    @app.post("/v1/projects/{id}/operations/{oid}/cancel")
+    async def cancel_operation(id: str, oid: str, _payload: EmptyRequest):
+        await service.cancel(id, oid)
+        return response(id)
 
     @app.patch("/v1/projects/{id}/metadata")
     async def metadata(id: str, payload: GuiRenameProjectRequest):

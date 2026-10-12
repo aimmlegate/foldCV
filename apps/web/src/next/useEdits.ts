@@ -203,5 +203,19 @@ export function useEdits(workspace: Workspace | null, editor: RefObject<FieldEdi
     await enqueue(() => flush(undefined, complete ? "slot" : "none"));
     return !blocked.current && dirty.current.size === 0;
   }
-  return { buffer, departure, restore, structural, periods, retry, completion, compositionEnd: schedule, overlay, flushBeforeAction, pending, saving, locked, error };
+  async function acceptExternal(captured: ReadonlyMap<string, string>) {
+    await enqueue(async () => {
+      const id = latest.current?.projectId;
+      if (!id) return;
+      const response = await projectRequest(`/v1/projects/${id}`);
+      const live = new Map(editor.current?.read().map(field => [field.fieldId, field.text]) ?? []);
+      latest.current = response.workspace;
+      acceptLatest.current(response);
+      if (response.workspace.project) editor.current?.patch(documentFields(response.workspace.project.document)
+        .filter(field => live.get(field.fieldId) === captured.get(field.fieldId) && live.get(field.fieldId) !== field.text)
+        .map(field => ({ fieldId: field.fieldId, text: field.text, capturedText: live.get(field.fieldId) ?? "" })));
+    });
+  }
+  return { buffer, departure, restore, structural, periods, retry, completion, compositionEnd: schedule, overlay,
+    flushBeforeAction, acknowledged: () => latest.current, acceptExternal, pending, saving, locked, error };
 }

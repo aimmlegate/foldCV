@@ -6,6 +6,8 @@ import { resolve } from "node:path";
 import { createHash } from "node:crypto";
 import type { GuiProjectResponse } from "../src/contracts/generated/gui_project_response";
 import { validateContract } from "../src/contracts/validate";
+import type { Page } from "@playwright/test";
+import type { GuiRewriteRequest } from "../src/contracts/generated/gui_rewrite_request";
 
 const root = resolve(import.meta.dirname, "../../..");
 let temp: string, runRoot: string, origin: string;
@@ -523,4 +525,151 @@ test("chosen failed file disables inactive paste and explicit text recovery keep
   const createdValue: unknown = await (await created).json();
   expect(response(createdValue).workspace.projectId).toBe(selectedWorkspace.projectId);
   await expect(page.getByText("Резюме готово", { exact: true })).toBeVisible({ timeout: 30000 });
+});
+
+async function createRewriteExample(page: Page) {
+  await page.goto(`${origin}/next.html#secret=synthetic-next-secret-0123456789`);
+  await page.getByRole("button", { name: "Открыть пример", exact: true }).click();
+  await page.getByRole("button", { name: "Создать резюме", exact: true }).click();
+  await expect(page.getByText("Резюме готово", { exact: true })).toBeVisible({ timeout: 30000 });
+}
+async function currentWorkspace(page: Page) {
+  const id = new URL(page.url()).searchParams.get("project");
+  const raw: unknown = await (await page.request.get(`${origin}/v1/projects/${id}`)).json();
+  return response(raw).workspace;
+}
+async function selectFields(page: Page, first: string, start: number, last: string, end: number) {
+  await page.locator(`[data-field-content="${first}"]`).click();
+  await page.evaluate(({ first, start, last, end }) => {
+    function point(id: string, offset: number) {
+      const element = document.querySelector(`[data-field-content="${id}"]`);
+      if (!element) throw new Error("Missing field");
+      const walker = document.createTreeWalker(element, NodeFilter.SHOW_TEXT);
+      let node = walker.nextNode();
+      while (node) {
+        const size = node.textContent?.length ?? 0;
+        if (offset <= size) return { node, offset };
+        offset -= size;node = walker.nextNode();
+      }
+      throw new Error("Missing text endpoint");
+    }
+    const a = point(first, start), b = point(last, end);
+    window.getSelection()?.setBaseAndExtent(a.node, a.offset, b.node, b.offset);
+    document.dispatchEvent(new Event("selectionchange"));
+  }, { first, start, last, end });
+  await expect.poll(() => page.evaluate(() => window.getSelection()?.toString() ?? "")).not.toBe("");
+}
+async function replaceFieldText(page: Page, id: string, text: string) {
+  const field = page.locator(`[data-field-content="${id}"]`);
+  const before = await field.textContent() ?? "";
+  await selectFields(page, id, 0, id, before.length);
+  const lines = text.split("\n");
+  for (const [index, line] of lines.entries()) { if (index > 0) await page.keyboard.press("Enter");await page.keyboard.insertText(line); }
+  await expect(field).toHaveText(text);
+}
+async function openSelectionAssistant(page: Page) {
+  await expect(page.getByRole("button", { name: "Улучшить выделение", exact: true })).toBeEnabled();
+  await page.getByRole("button", { name: "Улучшить выделение", exact: true }).click();
+  await expect(page.getByRole("complementary", { name: "Помощник текста" })).toBeVisible();
+}
+async function submitRewrite(page: Page, instruction = "Make clearer") {
+  await page.getByLabel("Что изменить", { exact: true }).fill(instruction);
+  await page.getByRole("button", { name: "Обновить выделение", exact: true }).click();
+}
+function isRewrite(value: unknown): value is GuiRewriteRequest { return validateContract("gui_rewrite_request", value); }
+
+test("built E1 partial Unicode rewrite captures after durable flush and presets only fill the instruction", async ({ page }) => {
+  await createRewriteExample(page);
+  const posted: GuiRewriteRequest[] = [];
+  let acknowledged = 2;
+  page.on("response", result => {
+    if (result.url().endsWith("/mutations")) void result.json().then((raw: unknown) => {
+      if (typeof raw === "object" && raw !== null && "documentRevision" in raw && typeof raw.documentRevision === "number") acknowledged = raw.documentRevision;
+    });
+  });
+  page.on("request", event => {
+    if (event.url().endsWith("/rewrite")) { const raw: unknown = event.postDataJSON();if (!isRewrite(raw)) throw new Error("Invalid rewrite request");posted.push(raw);expect(raw.selection.documentRevision).toBe(acknowledged); }
+  });
+  await replaceFieldText(page, "profile/text", "Alpha 😀é\nBeta");
+  await selectFields(page, "profile/text", 6, "profile/text", 11);
+  await openSelectionAssistant(page);
+  await page.getByRole("button", { name: "Яснее", exact: true }).click();
+  await expect(page.getByLabel("Что изменить")).not.toHaveValue("");expect(posted).toHaveLength(0);
+  await page.getByRole("button", { name: "Обновить выделение", exact: true }).click();
+  await expect(page.locator('[data-field-content="profile/text"]')).toHaveText("Alpha Яснее: 😀é\nBeta");
+  expect(posted).toHaveLength(1);expect(posted[0]?.selection.spans).toEqual([{ fieldId: "profile/text", range: { start: 6, end: 11 }, capturedText: "😀é\n" }]);
+  const workspace = await currentWorkspace(page);expect(workspace.project?.operations).toHaveLength(3);
+  await page.getByRole("button", { name: "Отменить правку блока", exact: true }).click();
+  await expect(page.locator('[data-field-content="profile/text"]')).toHaveText("Alpha 😀é\nBeta");
+  await page.getByRole("button", { name: "Отменить правку блока", exact: true }).click();
+  await expect(page.locator('[data-field-content="profile/text"]')).toHaveText("Alpha 😀é\nBeta");
+});
+
+test("built E1 heading structured and whole job rewrites keep field and record boundaries", async ({ page }) => {
+  await createRewriteExample(page);
+  const before = await currentWorkspace(page), job = before.project?.document.jobs[0];if (!job) throw new Error("Missing job");
+  for (const id of ["candidate/title", job.role.fieldId]) {
+    const original = await page.locator(`[data-field-content="${id}"]`).textContent() ?? "";
+    await selectFields(page, id, 0, id, original.length);await openSelectionAssistant(page);await submitRewrite(page);
+    await expect(page.locator(`[data-field-content="${id}"]`)).toHaveText("Яснее: " + original);
+  }
+  await page.locator(`[data-field-content="${job.role.fieldId}"]`).click();
+  await page.getByRole("button", { name: "Улучшить текст блока", exact: true }).click();
+  await expect(page.getByRole("complementary", { name: "Помощник текста" })).toBeVisible();
+  await submitRewrite(page);
+  await expect(page.locator(`[data-field-content="${job.role.fieldId}"]`)).toHaveText("Яснее: Яснее: " + job.role.text);
+  const after = await currentWorkspace(page);expect(after.project?.document.jobs.map(row => row.id)).toEqual(before.project?.document.jobs.map(row => row.id));
+  expect(after.project?.document.education).toEqual(before.project?.document.education);
+  expect(after.project?.document.jobs[0]?.periods.map(period => period.id)).toEqual(job.periods.map(period => period.id));
+  await page.getByRole("button", { name: "Отменить правку блока", exact: true }).click();
+  await expect(page.locator(`[data-field-content="${job.role.fieldId}"]`)).toHaveText("Яснее: " + job.role.text);
+});
+
+test("built E1 cross section rewrite preserves an added sentence and removed detail with per block restore", async ({ page }) => {
+  await createRewriteExample(page);
+  const before = await currentWorkspace(page), job = before.project?.document.jobs[0];if (!job) throw new Error("Missing job");
+  const addition = "Подготовила инструкцию для дежурной смены.";
+  await replaceFieldText(page, job.tasks.fieldId, addition);
+  await selectFields(page, "profile/text", 0, job.tasks.fieldId, addition.length);
+  await openSelectionAssistant(page);await submitRewrite(page);
+  await expect(page.locator(`[data-field-content="${job.tasks.fieldId}"]`)).toHaveText("Яснее: " + addition);
+  await expect(page.locator('[data-field-content="profile/text"]')).toHaveText("Яснее: " + before.project?.document.profile.text.text);
+  const after = await currentWorkspace(page);expect(after.undoSlots["profile"]).not.toBeNull();expect(after.undoSlots[`job:${job.id}`]).not.toBeNull();
+  expect(after.project?.sources).toEqual(before.project?.sources);
+  await page.locator('[data-field-content="profile/text"]').click();await page.getByRole("button", { name: "Отменить правку блока", exact: true }).click();
+  await expect(page.locator('[data-field-content="profile/text"]')).toHaveText(before.project?.document.profile.text.text ?? "");
+  await page.locator(`[data-field-content="${job.tasks.fieldId}"]`).click();await page.getByRole("button", { name: "Отменить правку блока", exact: true }).click();
+  await expect(page.locator(`[data-field-content="${job.tasks.fieldId}"]`)).toHaveText(addition);
+});
+
+test("built E1 typing cancels a delayed rewrite and an error keeps authored text without retry", async ({ page }) => {
+  await createRewriteExample(page);
+  const before = await page.locator('[data-field-content="profile/text"]').textContent() ?? "";
+  await selectFields(page, "profile/text", 0, "profile/text", before.length);await openSelectionAssistant(page);
+  writeFileSync(resolve(runRoot, "hold-rewrite"), "controlled wait");await submitRewrite(page);
+  await expect.poll(() => existsSync(resolve(runRoot, "rewrite-started"))).toBe(true);
+  await replaceFieldText(page, "profile/text", "Newer typed text");
+  rmSync(resolve(runRoot, "hold-rewrite"));
+  await expect(page.getByText("Улучшение отменено. Ваши правки сохранены.", { exact: true })).toBeVisible();
+  await expect(page.locator('[data-field-content="profile/text"]')).toHaveText("Newer typed text");
+  await expect(page.locator(".next-save")).toHaveText("Сохранено");
+  const current = await currentWorkspace(page);expect(current.project?.operations.at(-1)?.status).toBe("cancelled");
+  await selectFields(page, "profile/text", 0, "profile/text", 16);await openSelectionAssistant(page);await submitRewrite(page, "TEST_ERROR");
+  await expect(page.getByText("Не удалось обновить выделение.", { exact: false })).toBeVisible();
+  await expect(page.locator('[data-field-content="profile/text"]')).toHaveText("Newer typed text");
+  expect((await currentWorkspace(page)).project?.operations).toHaveLength(4);
+});
+
+test("built E1 a metadata change during rewrite rejects its late reply and preserves current text", async ({ page }) => {
+  await createRewriteExample(page);
+  const before = await currentWorkspace(page), text = before.project?.document.profile.text.text ?? "";
+  await selectFields(page, "profile/text", 0, "profile/text", text.length);await openSelectionAssistant(page);
+  writeFileSync(resolve(runRoot, "hold-rewrite"), "controlled wait");await submitRewrite(page);
+  await expect.poll(() => existsSync(resolve(runRoot, "rewrite-started"))).toBe(true);
+  const result = await page.request.patch(`${origin}/v1/projects/${before.projectId}/metadata`, { headers: { Origin: origin }, data: { title: "Renamed during rewrite", baseRevision: before.projectRevision } });
+  expect(result.ok()).toBe(true);rmSync(resolve(runRoot, "hold-rewrite"));
+  await expect(page.getByText("Не удалось обновить выделение.", { exact: false })).toBeVisible();
+  await expect(page.locator('[data-field-content="profile/text"]')).toHaveText(text);
+  const after = await currentWorkspace(page);expect(after.title).toBe("Renamed during rewrite");expect(after.documentRevision).toBe(before.documentRevision);
+  expect(after.project?.operations.at(-1)?.errorCode).toBe("SELECTION_STALE");
 });

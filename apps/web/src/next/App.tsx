@@ -4,6 +4,8 @@ import { projectRequest, sourceRequest, errorLabel, type Workspace } from "./api
 import { SourcePanel } from "./SourcePanel";
 import { StructureControls } from "./StructureControls";
 import { useEdits } from "./useEdits";
+import { useRewrite } from "./useRewrite";
+import { RewritePanel } from "./RewritePanel";
 import type { SourceContext } from "../contracts/generated/source_context";
 import type { GuiProjectResponse } from "../contracts/generated/gui_project_response";
 import { documentFields } from "./fields";
@@ -23,6 +25,7 @@ export function App() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [slot, setSlot] = useState<string | null>(null);
+  const [hasSelection, setHasSelection] = useState(false);
   const [selectionFingerprint, setSelectionFingerprint] = useState<string | null>(null);
   const [sourceOpen, setSourceOpen] = useState(false);
   const [sourceBusy, setSourceBusy] = useState(false);
@@ -42,6 +45,7 @@ export function App() {
     history.replaceState(null, "", url.pathname + url.search);
   }
   const edits = useEdits(workspace, editor, accept);
+  const rewrite = useRewrite(editor, edits);
   const editorKey = `${workspace?.projectId}:${fields.map(field => field.fieldId).join("|")}`;
   const initialArtifact = workspace?.project?.renders.find(render => render.artifactAvailable && render.docx);
 
@@ -141,6 +145,7 @@ export function App() {
     </header>
     {error && <p className="next-message text-danger" role="alert">{error}</p>}
     {edits.error && <p className="next-message text-danger" role="alert">{edits.error} <button onClick={edits.retry}>Повторить сохранение</button></p>}
+    {rewrite.message && <p className="next-message" role="status">{rewrite.message}</p>}
     {saveError && !edits.error && workspace && <p className="next-message text-danger" role="alert">Не удалось сохранить проект. Данные остаются в окне.
       <button onClick={() => { void projectRequest(`/v1/projects/${workspace.projectId}/save`, "POST", {}).then(accept).catch(error => setError(errorLabel(error))); }}>Повторить сохранение</button></p>}
     {generation && <section className="next-progress" aria-label="Создание резюме">
@@ -156,13 +161,17 @@ export function App() {
       <p className="next-editor-note">Правки сохраняются локально. Отметка «Сохранено» появляется после записи на диск.</p>
       <div className="next-editor-tools"><button disabled={sourceBusy} onPointerDown={event => event.preventDefault()}
         onClick={() => { void showSource(); }}>Показать исходник</button>
-        <button disabled={edits.locked} onPointerDown={event => event.preventDefault()} onClick={() => edits.restore(slot ?? lastSlot.current)}>Отменить правку блока</button>
+        <button disabled={!hasSelection || rewrite.busy || edits.locked} onPointerDown={event => event.preventDefault()}
+          onClick={() => { setSourceOpen(false); void rewrite.open(); }}>Улучшить выделение</button>
+        <button disabled={rewrite.busy || edits.locked} data-slot-owner={slot ?? lastSlot.current} onPointerDown={event => event.preventDefault()}
+          onClick={() => { setSourceOpen(false); void rewrite.open(slot ?? lastSlot.current); }}>Улучшить текст блока</button>
+        <button disabled={edits.locked} onPointerDown={event => event.preventDefault()} onClick={() => { rewrite.invalidate(); edits.restore(slot ?? lastSlot.current); }}>Отменить правку блока</button>
         <StructureControls document={document} send={edits.structural} periods={edits.periods} disabled={edits.locked} />
       </div>
       <div className="next-document"><FieldEditor ref={editor} key={editorKey} fields={edits.overlay(fields)} editable={!edits.locked} theme={theme.resolved} annotations={workspace?.annotations ?? []}
         derived={edits.pending ? null : workspace?.derivedState} callbacks={{
-        buffer: edits.buffer, selection: () => {}, slot: value => { setSlot(value); if (value) lastSlot.current = value; }, departure: edits.departure,
-        restore: edits.restore, completion: edits.completion, compositionEnd: edits.compositionEnd,
+        buffer: values => { rewrite.invalidate(); edits.buffer(values); }, selection: value => setHasSelection(value !== null), slot: value => { setSlot(value); if (value) lastSlot.current = value; }, departure: edits.departure,
+        restore: value => { rewrite.invalidate(); edits.restore(value); }, completion: edits.completion, compositionEnd: edits.compositionEnd,
       }} /></div>
       <p className="next-editor-status" aria-live="polite">{slot ? "Редактирование текста" : ""}</p>
     </section> : <section className="next-start">
@@ -193,5 +202,6 @@ export function App() {
     </section>}
     {sourceOpen && workspace && <SourcePanel context={source} workspace={workspace} loading={sourceBusy}
       close={() => { ++sourceEpoch.current; setSourceOpen(false); setSourceBusy(false); }} />}
+    <RewritePanel rewrite={rewrite} />
   </main>;
 }

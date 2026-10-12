@@ -5,6 +5,7 @@ import json
 
 from packages.resume_core.gui_drafting import GuiDraftProposal, GuiDraftRequest, validate_draft
 from packages.resume_core.gui_normalization import GuiNormalizeRequest, GuiSemanticProposal, normalize_candidate
+from packages.resume_core.gui_rewriting import GuiRewriteProposal
 from packages.resume_core.gui_employment import normalize_employment
 from packages.resume_core.gui_derived import initial_derived
 from packages.resume_core.models.recovery import WorkspaceV5, record_slot
@@ -42,6 +43,11 @@ class CreationProvider:
             self.formatting_as_of = captured.formatting_as_of
             reply = employment_proposal(captured, self.example)
             self.normalized = normalize_employment(captured, reply, normalize_candidate(captured, reply, rules))
+        elif request.result_type is GuiRewriteProposal:
+            if payload["input"]["instruction"] == "TEST_ERROR":
+                raise ContentFailure("MODEL_DENIED")
+            reply = GuiRewriteProposal(replacements=[{"fieldId": span["fieldId"],
+                "text": "Яснее: " + span["capturedText"]} for span in payload["input"]["selection"]])
         else:
             assert request.result_type is GuiDraftProposal
             captured = GuiDraftRequest(projectId=payload["input"]["projectId"], projectRevision=1, documentRevision=1,

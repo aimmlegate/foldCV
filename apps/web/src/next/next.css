@@ -63,3 +63,5 @@ button:disabled { cursor: default; opacity: .6; }
 .next-structure button { padding: 4px 8px; font-size: 12px; }
 .next-structure h3 { font-size: 14px; }
 .next-derived { color: var(--muted); font-size: 12px; margin-top: 4px; }
+.next-rewrite-panel textarea{width:100%;margin:.6rem 0;padding:.6rem;border:1px solid var(--outline);background:var(--panel);color:var(--content)}
+.next-rewrite-presets{display:flex;gap:.5rem;margin-bottom:1rem}

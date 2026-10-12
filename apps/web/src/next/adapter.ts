@@ -49,6 +49,7 @@ export function capture(document: ProseNode, anchor: number, head: number): Capt
     if (to <= field.from || from >= field.to) continue;
     const start = snap(field.text, Math.max(0, from - field.from), false);
     const end = snap(field.text, Math.min(field.text.length, to - field.from), true);
+    if (start === end) continue;
     spans.push({ fieldId: field.fieldId, range: { start, end }, capturedText: field.text.slice(start, end) });
   }
   return spans.length ? { direction: anchor <= head ? "forward" : "backward", spans } : null;

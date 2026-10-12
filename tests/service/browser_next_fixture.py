@@ -15,6 +15,22 @@ sys.path.insert(0, str(ROOT / "services/api/src"))
 from resume_api.app import create_app
 from tests.recovery.generation_fixtures import CreationProvider, frozen_now
 from packages.resume_core.project_store import ProjectStoreFailure
+from packages.resume_core.gui_rewriting import GuiRewriteProposal
+from resume_api.providers.content import ContentFailure
+
+
+class ControlledProvider(CreationProvider):
+    def __init__(self, root, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.root = root
+
+    def generate(self, request, files, cancel):
+        if request.result_type is GuiRewriteProposal:
+            (self.root / "rewrite-started").touch()
+            while (self.root / "hold-rewrite").exists():
+                if cancel.wait(.01):
+                    raise ContentFailure("CANCELLED", logical_attempts=1)
+        return super().generate(request, files, cancel)
 
 
 def retain_evidence(root, store, example):
@@ -47,7 +63,7 @@ async def main():
         origin = f"http://127.0.0.1:{port}"
         app = create_app(origin=origin, secret="synthetic-next-secret-0123456789",
             temp_root=root / "operations", data_root=root / "FoldCV", dist=dist,
-            gui_provider=CreationProvider(example.split("-")[0], remove_focus=example.endswith("-focus")), gui_clock=frozen_now)
+            gui_provider=ControlledProvider(root, example.split("-")[0], remove_focus=example.endswith("-focus")), gui_clock=frozen_now)
         store = app.app.state.gui_projects
         save = store.storage.save
         def controlled_save(workspace, originals, artifacts):

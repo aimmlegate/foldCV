@@ -19,6 +19,15 @@ class MutationFailure(Exception):
     pass
 
 
+def unicode_valid(value):
+    if isinstance(value, str):
+        value.encode("utf-8")
+    elif isinstance(value, list):
+        for item in value: unicode_valid(item)
+    elif isinstance(value, dict):
+        for item in value.values(): unicode_valid(item)
+
+
 def content(record):
     def authored(value):
         if isinstance(value, list):
@@ -278,13 +287,6 @@ def apply_mutation(workspace, mutation, updated_at):
     request = mutation.root
     payload = request.model_dump(mode="json", by_alias=True)
     fingerprint = hashlib.sha256(json.dumps(payload, ensure_ascii=True, sort_keys=True, separators=(",", ":")).encode()).hexdigest()
-    def unicode_valid(value):
-        if isinstance(value, str):
-            value.encode("utf-8")
-        elif isinstance(value, list):
-            for item in value: unicode_valid(item)
-        elif isinstance(value, dict):
-            for item in value.values(): unicode_valid(item)
     previous = next((item for item in workspace.mutation_replay if item.client_mutation_id == request.client_mutation_id), None)
     if previous:
         if previous.payload_sha256 != fingerprint:
