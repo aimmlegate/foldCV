@@ -7,9 +7,9 @@ from typing import Annotated, Literal, Union
 from pydantic import ConfigDict, Field, RootModel, model_validator
 
 from .contracts import (
-    ArchiveEntry, AssetRef, Block, Evidence, Fact, Id, Job, Operation, PartialDate,
+    ArchiveEntry, AssetRef, Block, Evidence, Fact, Id, Job, Subproject, Operation, PartialDate,
     OperationEvent, Proposal, RenderSnapshot, Review, Revision, Sha256, Source, TemplateManifest,
-    TextFact, Wire, _unique,
+    TextFact, TechnologyFact, MetricFact, LeadershipFact, DateFact, Wire, _unique,
 )
 
 
@@ -42,6 +42,7 @@ class ObservationAssessment(Wire):
 class CandidateDetail(Wire):
     field: Literal["name", "title", "location", "education", "certification", "language", "private_metadata"]
     text: str
+    field_id: Id | None = None
 
 
 class CandidateFact(TextFact):
@@ -59,7 +60,52 @@ class ObservationFact(TextFact):
     value: ObservationAssessment
 
 
-RecoveryFact = Union[Fact, CandidateFact, NameAssessmentFact, ObservationFact]
+class GuiTextFact(TextFact):
+    literal_evidence: list[EvidenceSpan]
+
+
+class GuiTechnologyFact(TechnologyFact):
+    literal_evidence: list[EvidenceSpan]
+
+
+class GuiMetricFact(MetricFact):
+    literal_evidence: list[EvidenceSpan]
+
+
+class GuiLeadershipFact(LeadershipFact):
+    literal_evidence: list[EvidenceSpan]
+
+
+class GuiDateFact(DateFact):
+    literal_evidence: list[EvidenceSpan]
+
+
+class EmploymentPeriodValue(Wire):
+    id: Id
+    start: PartialDate | None
+    end: PartialDate | None
+    start_text: str
+    end_text: str
+    present: bool
+    evidence: list[EvidenceSpan]
+
+
+class EmploymentValue(Wire):
+    job_id: Id
+    employer: str
+    role: str
+    periods: list[EmploymentPeriodValue]
+    subprojects: list[Subproject]
+
+
+class EmploymentFact(TextFact):
+    kind: Literal["employment"]
+    value: EmploymentValue
+    literal_evidence: list[EvidenceSpan]
+
+
+GuiFact = Annotated[Union[GuiTextFact, GuiTechnologyFact, GuiMetricFact, GuiLeadershipFact, GuiDateFact], Field(discriminator="kind")]
+RecoveryFact = Union[GuiFact, Fact, CandidateFact, NameAssessmentFact, ObservationFact, EmploymentFact]
 
 
 class Rules(Wire):

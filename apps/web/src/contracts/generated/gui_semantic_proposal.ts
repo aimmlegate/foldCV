@@ -18,6 +18,7 @@ export type Education = EducationDetails[];
 export type Importance = "essential" | "normal" | "minor";
 export type Jobtempid = string | null;
 export type Kind = "text" | "technology" | "date" | "metric" | "leadership";
+export type Literalevidence = EvidenceSpan[];
 export type Sourceid1 = string;
 export type Subprojecttempid = string | null;
 export type Tempid = string;
@@ -50,173 +51,240 @@ export type Attribution1 = "personal" | "team" | "organization" | "unknown";
 /**
  * @maxItems 500
  */
-export type Facts = ProposedFact[];
+export type Facts = GuiFactProposal[];
 export type Employer = string;
 /**
  * @maxItems 20
  */
 export type Periods =
   | []
-  | [Period1]
-  | [Period1, Period1]
-  | [Period1, Period1, Period1]
-  | [Period1, Period1, Period1, Period1]
-  | [Period1, Period1, Period1, Period1, Period1]
-  | [Period1, Period1, Period1, Period1, Period1, Period1]
-  | [Period1, Period1, Period1, Period1, Period1, Period1, Period1]
-  | [Period1, Period1, Period1, Period1, Period1, Period1, Period1, Period1]
-  | [Period1, Period1, Period1, Period1, Period1, Period1, Period1, Period1, Period1]
-  | [Period1, Period1, Period1, Period1, Period1, Period1, Period1, Period1, Period1, Period1]
-  | [Period1, Period1, Period1, Period1, Period1, Period1, Period1, Period1, Period1, Period1, Period1]
-  | [Period1, Period1, Period1, Period1, Period1, Period1, Period1, Period1, Period1, Period1, Period1, Period1]
+  | [GuiPeriodProposal]
+  | [GuiPeriodProposal, GuiPeriodProposal]
+  | [GuiPeriodProposal, GuiPeriodProposal, GuiPeriodProposal]
+  | [GuiPeriodProposal, GuiPeriodProposal, GuiPeriodProposal, GuiPeriodProposal]
+  | [GuiPeriodProposal, GuiPeriodProposal, GuiPeriodProposal, GuiPeriodProposal, GuiPeriodProposal]
+  | [GuiPeriodProposal, GuiPeriodProposal, GuiPeriodProposal, GuiPeriodProposal, GuiPeriodProposal, GuiPeriodProposal]
   | [
-      Period1,
-      Period1,
-      Period1,
-      Period1,
-      Period1,
-      Period1,
-      Period1,
-      Period1,
-      Period1,
-      Period1,
-      Period1,
-      Period1,
-      Period1
+      GuiPeriodProposal,
+      GuiPeriodProposal,
+      GuiPeriodProposal,
+      GuiPeriodProposal,
+      GuiPeriodProposal,
+      GuiPeriodProposal,
+      GuiPeriodProposal
     ]
   | [
-      Period1,
-      Period1,
-      Period1,
-      Period1,
-      Period1,
-      Period1,
-      Period1,
-      Period1,
-      Period1,
-      Period1,
-      Period1,
-      Period1,
-      Period1,
-      Period1
+      GuiPeriodProposal,
+      GuiPeriodProposal,
+      GuiPeriodProposal,
+      GuiPeriodProposal,
+      GuiPeriodProposal,
+      GuiPeriodProposal,
+      GuiPeriodProposal,
+      GuiPeriodProposal
     ]
   | [
-      Period1,
-      Period1,
-      Period1,
-      Period1,
-      Period1,
-      Period1,
-      Period1,
-      Period1,
-      Period1,
-      Period1,
-      Period1,
-      Period1,
-      Period1,
-      Period1,
-      Period1
+      GuiPeriodProposal,
+      GuiPeriodProposal,
+      GuiPeriodProposal,
+      GuiPeriodProposal,
+      GuiPeriodProposal,
+      GuiPeriodProposal,
+      GuiPeriodProposal,
+      GuiPeriodProposal,
+      GuiPeriodProposal
     ]
   | [
-      Period1,
-      Period1,
-      Period1,
-      Period1,
-      Period1,
-      Period1,
-      Period1,
-      Period1,
-      Period1,
-      Period1,
-      Period1,
-      Period1,
-      Period1,
-      Period1,
-      Period1,
-      Period1
+      GuiPeriodProposal,
+      GuiPeriodProposal,
+      GuiPeriodProposal,
+      GuiPeriodProposal,
+      GuiPeriodProposal,
+      GuiPeriodProposal,
+      GuiPeriodProposal,
+      GuiPeriodProposal,
+      GuiPeriodProposal,
+      GuiPeriodProposal
     ]
   | [
-      Period1,
-      Period1,
-      Period1,
-      Period1,
-      Period1,
-      Period1,
-      Period1,
-      Period1,
-      Period1,
-      Period1,
-      Period1,
-      Period1,
-      Period1,
-      Period1,
-      Period1,
-      Period1,
-      Period1
+      GuiPeriodProposal,
+      GuiPeriodProposal,
+      GuiPeriodProposal,
+      GuiPeriodProposal,
+      GuiPeriodProposal,
+      GuiPeriodProposal,
+      GuiPeriodProposal,
+      GuiPeriodProposal,
+      GuiPeriodProposal,
+      GuiPeriodProposal,
+      GuiPeriodProposal
     ]
   | [
-      Period1,
-      Period1,
-      Period1,
-      Period1,
-      Period1,
-      Period1,
-      Period1,
-      Period1,
-      Period1,
-      Period1,
-      Period1,
-      Period1,
-      Period1,
-      Period1,
-      Period1,
-      Period1,
-      Period1,
-      Period1
+      GuiPeriodProposal,
+      GuiPeriodProposal,
+      GuiPeriodProposal,
+      GuiPeriodProposal,
+      GuiPeriodProposal,
+      GuiPeriodProposal,
+      GuiPeriodProposal,
+      GuiPeriodProposal,
+      GuiPeriodProposal,
+      GuiPeriodProposal,
+      GuiPeriodProposal,
+      GuiPeriodProposal
     ]
   | [
-      Period1,
-      Period1,
-      Period1,
-      Period1,
-      Period1,
-      Period1,
-      Period1,
-      Period1,
-      Period1,
-      Period1,
-      Period1,
-      Period1,
-      Period1,
-      Period1,
-      Period1,
-      Period1,
-      Period1,
-      Period1,
-      Period1
+      GuiPeriodProposal,
+      GuiPeriodProposal,
+      GuiPeriodProposal,
+      GuiPeriodProposal,
+      GuiPeriodProposal,
+      GuiPeriodProposal,
+      GuiPeriodProposal,
+      GuiPeriodProposal,
+      GuiPeriodProposal,
+      GuiPeriodProposal,
+      GuiPeriodProposal,
+      GuiPeriodProposal,
+      GuiPeriodProposal
     ]
   | [
-      Period1,
-      Period1,
-      Period1,
-      Period1,
-      Period1,
-      Period1,
-      Period1,
-      Period1,
-      Period1,
-      Period1,
-      Period1,
-      Period1,
-      Period1,
-      Period1,
-      Period1,
-      Period1,
-      Period1,
-      Period1,
-      Period1,
-      Period1
+      GuiPeriodProposal,
+      GuiPeriodProposal,
+      GuiPeriodProposal,
+      GuiPeriodProposal,
+      GuiPeriodProposal,
+      GuiPeriodProposal,
+      GuiPeriodProposal,
+      GuiPeriodProposal,
+      GuiPeriodProposal,
+      GuiPeriodProposal,
+      GuiPeriodProposal,
+      GuiPeriodProposal,
+      GuiPeriodProposal,
+      GuiPeriodProposal
+    ]
+  | [
+      GuiPeriodProposal,
+      GuiPeriodProposal,
+      GuiPeriodProposal,
+      GuiPeriodProposal,
+      GuiPeriodProposal,
+      GuiPeriodProposal,
+      GuiPeriodProposal,
+      GuiPeriodProposal,
+      GuiPeriodProposal,
+      GuiPeriodProposal,
+      GuiPeriodProposal,
+      GuiPeriodProposal,
+      GuiPeriodProposal,
+      GuiPeriodProposal,
+      GuiPeriodProposal
+    ]
+  | [
+      GuiPeriodProposal,
+      GuiPeriodProposal,
+      GuiPeriodProposal,
+      GuiPeriodProposal,
+      GuiPeriodProposal,
+      GuiPeriodProposal,
+      GuiPeriodProposal,
+      GuiPeriodProposal,
+      GuiPeriodProposal,
+      GuiPeriodProposal,
+      GuiPeriodProposal,
+      GuiPeriodProposal,
+      GuiPeriodProposal,
+      GuiPeriodProposal,
+      GuiPeriodProposal,
+      GuiPeriodProposal
+    ]
+  | [
+      GuiPeriodProposal,
+      GuiPeriodProposal,
+      GuiPeriodProposal,
+      GuiPeriodProposal,
+      GuiPeriodProposal,
+      GuiPeriodProposal,
+      GuiPeriodProposal,
+      GuiPeriodProposal,
+      GuiPeriodProposal,
+      GuiPeriodProposal,
+      GuiPeriodProposal,
+      GuiPeriodProposal,
+      GuiPeriodProposal,
+      GuiPeriodProposal,
+      GuiPeriodProposal,
+      GuiPeriodProposal,
+      GuiPeriodProposal
+    ]
+  | [
+      GuiPeriodProposal,
+      GuiPeriodProposal,
+      GuiPeriodProposal,
+      GuiPeriodProposal,
+      GuiPeriodProposal,
+      GuiPeriodProposal,
+      GuiPeriodProposal,
+      GuiPeriodProposal,
+      GuiPeriodProposal,
+      GuiPeriodProposal,
+      GuiPeriodProposal,
+      GuiPeriodProposal,
+      GuiPeriodProposal,
+      GuiPeriodProposal,
+      GuiPeriodProposal,
+      GuiPeriodProposal,
+      GuiPeriodProposal,
+      GuiPeriodProposal
+    ]
+  | [
+      GuiPeriodProposal,
+      GuiPeriodProposal,
+      GuiPeriodProposal,
+      GuiPeriodProposal,
+      GuiPeriodProposal,
+      GuiPeriodProposal,
+      GuiPeriodProposal,
+      GuiPeriodProposal,
+      GuiPeriodProposal,
+      GuiPeriodProposal,
+      GuiPeriodProposal,
+      GuiPeriodProposal,
+      GuiPeriodProposal,
+      GuiPeriodProposal,
+      GuiPeriodProposal,
+      GuiPeriodProposal,
+      GuiPeriodProposal,
+      GuiPeriodProposal,
+      GuiPeriodProposal
+    ]
+  | [
+      GuiPeriodProposal,
+      GuiPeriodProposal,
+      GuiPeriodProposal,
+      GuiPeriodProposal,
+      GuiPeriodProposal,
+      GuiPeriodProposal,
+      GuiPeriodProposal,
+      GuiPeriodProposal,
+      GuiPeriodProposal,
+      GuiPeriodProposal,
+      GuiPeriodProposal,
+      GuiPeriodProposal,
+      GuiPeriodProposal,
+      GuiPeriodProposal,
+      GuiPeriodProposal,
+      GuiPeriodProposal,
+      GuiPeriodProposal,
+      GuiPeriodProposal,
+      GuiPeriodProposal,
+      GuiPeriodProposal
     ];
+export type Endtext = string | null;
+export type Evidence1 = EvidenceSpan[];
+export type Present = boolean;
+export type Starttext = string | null;
 export type Role = string;
 export type Sourceid2 = string;
 export type Name = string;
@@ -239,13 +307,13 @@ export type Unitids2 = [string, ...string[]];
 /**
  * @maxItems 100
  */
-export type Jobs = ProposedJob[];
+export type Jobs = GuiJobProposal[];
 export type Id2 = string;
 /**
  * @maxItems 40
  */
 export type Languages = LanguageDetails[];
-export type Evidence1 = EvidenceSpan[];
+export type Evidence2 = EvidenceSpan[];
 export type Missingsurname = boolean | null;
 export type Revision = number;
 export type Revision1 = number;
@@ -307,10 +375,11 @@ export interface EducationDetails {
   qualification: SupportedText;
   specialty: SupportedText;
 }
-export interface ProposedFact {
+export interface GuiFactProposal {
   importance?: Importance;
   jobTempId?: Jobtempid;
   kind: Kind;
+  literalEvidence?: Literalevidence;
   sourceId: Sourceid1;
   subprojectTempId?: Subprojecttempid;
   tempId: Tempid;
@@ -348,7 +417,7 @@ export interface LeadershipValue {
   attribution: Attribution1;
   teamSize: MetricValue | null;
 }
-export interface ProposedJob {
+export interface GuiJobProposal {
   employer: Employer;
   periods: Periods;
   role: Role;
@@ -357,9 +426,13 @@ export interface ProposedJob {
   tempId: Tempid2;
   unitIds: Unitids2;
 }
-export interface Period1 {
+export interface GuiPeriodProposal {
   end: PartialDate | null;
-  start: PartialDate;
+  endText?: Endtext;
+  evidence?: Evidence1;
+  present?: Present;
+  start: PartialDate | null;
+  startText?: Starttext;
 }
 export interface ProposedSubproject {
   name: Name;
@@ -367,13 +440,17 @@ export interface ProposedSubproject {
   tempId: Tempid1;
   unitIds: Unitids1;
 }
+export interface Period1 {
+  end: PartialDate | null;
+  start: PartialDate;
+}
 export interface LanguageDetails {
   id: Id2;
   name: SupportedText;
   proficiency: SupportedText;
 }
 export interface NameAssessment {
-  evidence: Evidence1;
+  evidence: Evidence2;
   missingSurname: Missingsurname;
   revision: Revision;
 }

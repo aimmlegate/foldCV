@@ -5,6 +5,7 @@ from pydantic import ValidationError
 
 from packages.resume_core.gui_normalization import GuiNormalizeRequest, GuiSemanticProposal, NormalizationFailure, normalization_input, normalize_candidate
 from packages.resume_core.models.recovery import Rules
+from packages.resume_core.gui_employment import normalize_employment
 
 from .gui_content import generate_admitted
 from .lifecycle import OperationFiles
@@ -25,6 +26,7 @@ class GuiNormalizationContentService:
         try:
             proposal = GuiSemanticProposal.model_validate(response.value)
             result = normalize_candidate(captured, proposal, rules)
+            result = normalize_employment(captured, proposal, result)
         except NormalizationFailure as error:
             raise ContentFailure(error.code, logical_attempts=response.logical_attempts, usage=response.usage) from None
         except (ValidationError, ValueError):

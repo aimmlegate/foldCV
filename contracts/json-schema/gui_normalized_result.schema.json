@@ -16,6 +16,19 @@
           "title": "Field",
           "type": "string"
         },
+        "fieldId": {
+          "anyOf": [
+            {
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Fieldid"
+        },
         "text": {
           "title": "Text",
           "type": "string"
@@ -275,6 +288,199 @@
       "title": "EducationDetails",
       "type": "object"
     },
+    "EmploymentFact": {
+      "additionalProperties": false,
+      "properties": {
+        "evidence": {
+          "items": {
+            "$ref": "#/$defs/Evidence"
+          },
+          "title": "Evidence",
+          "type": "array"
+        },
+        "id": {
+          "minLength": 1,
+          "title": "Id",
+          "type": "string"
+        },
+        "importance": {
+          "enum": [
+            "essential",
+            "normal",
+            "minor"
+          ],
+          "title": "Importance",
+          "type": "string"
+        },
+        "jobId": {
+          "anyOf": [
+            {
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Jobid"
+        },
+        "kind": {
+          "const": "employment",
+          "title": "Kind",
+          "type": "string"
+        },
+        "literalEvidence": {
+          "items": {
+            "$ref": "#/$defs/EvidenceSpan"
+          },
+          "title": "Literalevidence",
+          "type": "array"
+        },
+        "origin": {
+          "enum": [
+            "source",
+            "user"
+          ],
+          "title": "Origin",
+          "type": "string"
+        },
+        "revision": {
+          "minimum": 1,
+          "title": "Revision",
+          "type": "integer"
+        },
+        "subprojectId": {
+          "anyOf": [
+            {
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Subprojectid"
+        },
+        "value": {
+          "$ref": "#/$defs/EmploymentValue"
+        }
+      },
+      "required": [
+        "id",
+        "revision",
+        "kind",
+        "value",
+        "evidence",
+        "origin",
+        "importance",
+        "jobId",
+        "subprojectId",
+        "literalEvidence"
+      ],
+      "title": "EmploymentFact",
+      "type": "object"
+    },
+    "EmploymentPeriodValue": {
+      "additionalProperties": false,
+      "properties": {
+        "end": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/PartialDate"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "endText": {
+          "title": "Endtext",
+          "type": "string"
+        },
+        "evidence": {
+          "items": {
+            "$ref": "#/$defs/EvidenceSpan"
+          },
+          "title": "Evidence",
+          "type": "array"
+        },
+        "id": {
+          "minLength": 1,
+          "title": "Id",
+          "type": "string"
+        },
+        "present": {
+          "title": "Present",
+          "type": "boolean"
+        },
+        "start": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/PartialDate"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "startText": {
+          "title": "Starttext",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "start",
+        "end",
+        "startText",
+        "endText",
+        "present",
+        "evidence"
+      ],
+      "title": "EmploymentPeriodValue",
+      "type": "object"
+    },
+    "EmploymentValue": {
+      "additionalProperties": false,
+      "properties": {
+        "employer": {
+          "title": "Employer",
+          "type": "string"
+        },
+        "jobId": {
+          "minLength": 1,
+          "title": "Jobid",
+          "type": "string"
+        },
+        "periods": {
+          "items": {
+            "$ref": "#/$defs/EmploymentPeriodValue"
+          },
+          "title": "Periods",
+          "type": "array"
+        },
+        "role": {
+          "title": "Role",
+          "type": "string"
+        },
+        "subprojects": {
+          "items": {
+            "$ref": "#/$defs/Subproject"
+          },
+          "title": "Subprojects",
+          "type": "array"
+        }
+      },
+      "required": [
+        "jobId",
+        "employer",
+        "role",
+        "periods",
+        "subprojects"
+      ],
+      "title": "EmploymentValue",
+      "type": "object"
+    },
     "Evidence": {
       "additionalProperties": false,
       "properties": {
@@ -347,6 +553,560 @@
       "title": "EvidenceSpan",
       "type": "object"
     },
+    "FactConflict": {
+      "additionalProperties": false,
+      "properties": {
+        "code": {
+          "const": "team_size_conflict",
+          "title": "Code",
+          "type": "string"
+        },
+        "evidence": {
+          "items": {
+            "$ref": "#/$defs/EvidenceSpan"
+          },
+          "title": "Evidence",
+          "type": "array"
+        },
+        "factIds": {
+          "items": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "title": "Factids",
+          "type": "array"
+        },
+        "id": {
+          "minLength": 1,
+          "title": "Id",
+          "type": "string"
+        },
+        "jobId": {
+          "minLength": 1,
+          "title": "Jobid",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "jobId",
+        "code",
+        "factIds",
+        "evidence"
+      ],
+      "title": "FactConflict",
+      "type": "object"
+    },
+    "GuiDateFact": {
+      "additionalProperties": false,
+      "properties": {
+        "evidence": {
+          "items": {
+            "$ref": "#/$defs/Evidence"
+          },
+          "title": "Evidence",
+          "type": "array"
+        },
+        "id": {
+          "minLength": 1,
+          "title": "Id",
+          "type": "string"
+        },
+        "importance": {
+          "enum": [
+            "essential",
+            "normal",
+            "minor"
+          ],
+          "title": "Importance",
+          "type": "string"
+        },
+        "jobId": {
+          "anyOf": [
+            {
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Jobid"
+        },
+        "kind": {
+          "const": "date",
+          "title": "Kind",
+          "type": "string"
+        },
+        "literalEvidence": {
+          "items": {
+            "$ref": "#/$defs/EvidenceSpan"
+          },
+          "title": "Literalevidence",
+          "type": "array"
+        },
+        "origin": {
+          "enum": [
+            "source",
+            "user"
+          ],
+          "title": "Origin",
+          "type": "string"
+        },
+        "revision": {
+          "minimum": 1,
+          "title": "Revision",
+          "type": "integer"
+        },
+        "subprojectId": {
+          "anyOf": [
+            {
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Subprojectid"
+        },
+        "value": {
+          "$ref": "#/$defs/PartialDate"
+        }
+      },
+      "required": [
+        "id",
+        "revision",
+        "kind",
+        "value",
+        "evidence",
+        "origin",
+        "importance",
+        "jobId",
+        "subprojectId",
+        "literalEvidence"
+      ],
+      "title": "GuiDateFact",
+      "type": "object"
+    },
+    "GuiFactProposal": {
+      "additionalProperties": false,
+      "properties": {
+        "importance": {
+          "default": "normal",
+          "enum": [
+            "essential",
+            "normal",
+            "minor"
+          ],
+          "title": "Importance",
+          "type": "string"
+        },
+        "jobTempId": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Jobtempid"
+        },
+        "kind": {
+          "enum": [
+            "text",
+            "technology",
+            "date",
+            "metric",
+            "leadership"
+          ],
+          "title": "Kind",
+          "type": "string"
+        },
+        "literalEvidence": {
+          "items": {
+            "$ref": "#/$defs/EvidenceSpan"
+          },
+          "title": "Literalevidence",
+          "type": "array"
+        },
+        "sourceId": {
+          "title": "Sourceid",
+          "type": "string"
+        },
+        "subprojectTempId": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Subprojecttempid"
+        },
+        "tempId": {
+          "maxLength": 80,
+          "minLength": 1,
+          "title": "Tempid",
+          "type": "string"
+        },
+        "unitIds": {
+          "items": {
+            "type": "string"
+          },
+          "maxItems": 100,
+          "minItems": 1,
+          "title": "Unitids",
+          "type": "array"
+        },
+        "value": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/TextValue"
+            },
+            {
+              "$ref": "#/$defs/TechnologyValue"
+            },
+            {
+              "$ref": "#/$defs/PartialDate"
+            },
+            {
+              "$ref": "#/$defs/MetricValue"
+            },
+            {
+              "$ref": "#/$defs/LeadershipValue"
+            }
+          ],
+          "title": "Value"
+        }
+      },
+      "required": [
+        "tempId",
+        "kind",
+        "value",
+        "sourceId",
+        "unitIds"
+      ],
+      "title": "GuiFactProposal",
+      "type": "object"
+    },
+    "GuiJobProposal": {
+      "additionalProperties": false,
+      "properties": {
+        "employer": {
+          "maxLength": 200,
+          "minLength": 1,
+          "title": "Employer",
+          "type": "string"
+        },
+        "periods": {
+          "items": {
+            "$ref": "#/$defs/GuiPeriodProposal"
+          },
+          "maxItems": 20,
+          "title": "Periods",
+          "type": "array"
+        },
+        "role": {
+          "maxLength": 200,
+          "minLength": 1,
+          "title": "Role",
+          "type": "string"
+        },
+        "sourceId": {
+          "title": "Sourceid",
+          "type": "string"
+        },
+        "subprojects": {
+          "items": {
+            "$ref": "#/$defs/ProposedSubproject"
+          },
+          "maxItems": 100,
+          "title": "Subprojects",
+          "type": "array"
+        },
+        "tempId": {
+          "maxLength": 80,
+          "minLength": 1,
+          "title": "Tempid",
+          "type": "string"
+        },
+        "unitIds": {
+          "items": {
+            "type": "string"
+          },
+          "maxItems": 100,
+          "minItems": 1,
+          "title": "Unitids",
+          "type": "array"
+        }
+      },
+      "required": [
+        "tempId",
+        "employer",
+        "role",
+        "periods",
+        "sourceId",
+        "unitIds"
+      ],
+      "title": "GuiJobProposal",
+      "type": "object"
+    },
+    "GuiLeadershipFact": {
+      "additionalProperties": false,
+      "properties": {
+        "evidence": {
+          "items": {
+            "$ref": "#/$defs/Evidence"
+          },
+          "title": "Evidence",
+          "type": "array"
+        },
+        "id": {
+          "minLength": 1,
+          "title": "Id",
+          "type": "string"
+        },
+        "importance": {
+          "enum": [
+            "essential",
+            "normal",
+            "minor"
+          ],
+          "title": "Importance",
+          "type": "string"
+        },
+        "jobId": {
+          "anyOf": [
+            {
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Jobid"
+        },
+        "kind": {
+          "const": "leadership",
+          "title": "Kind",
+          "type": "string"
+        },
+        "literalEvidence": {
+          "items": {
+            "$ref": "#/$defs/EvidenceSpan"
+          },
+          "title": "Literalevidence",
+          "type": "array"
+        },
+        "origin": {
+          "enum": [
+            "source",
+            "user"
+          ],
+          "title": "Origin",
+          "type": "string"
+        },
+        "revision": {
+          "minimum": 1,
+          "title": "Revision",
+          "type": "integer"
+        },
+        "subprojectId": {
+          "anyOf": [
+            {
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Subprojectid"
+        },
+        "value": {
+          "$ref": "#/$defs/LeadershipValue"
+        }
+      },
+      "required": [
+        "id",
+        "revision",
+        "kind",
+        "value",
+        "evidence",
+        "origin",
+        "importance",
+        "jobId",
+        "subprojectId",
+        "literalEvidence"
+      ],
+      "title": "GuiLeadershipFact",
+      "type": "object"
+    },
+    "GuiMetricFact": {
+      "additionalProperties": false,
+      "properties": {
+        "evidence": {
+          "items": {
+            "$ref": "#/$defs/Evidence"
+          },
+          "title": "Evidence",
+          "type": "array"
+        },
+        "id": {
+          "minLength": 1,
+          "title": "Id",
+          "type": "string"
+        },
+        "importance": {
+          "enum": [
+            "essential",
+            "normal",
+            "minor"
+          ],
+          "title": "Importance",
+          "type": "string"
+        },
+        "jobId": {
+          "anyOf": [
+            {
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Jobid"
+        },
+        "kind": {
+          "const": "metric",
+          "title": "Kind",
+          "type": "string"
+        },
+        "literalEvidence": {
+          "items": {
+            "$ref": "#/$defs/EvidenceSpan"
+          },
+          "title": "Literalevidence",
+          "type": "array"
+        },
+        "origin": {
+          "enum": [
+            "source",
+            "user"
+          ],
+          "title": "Origin",
+          "type": "string"
+        },
+        "revision": {
+          "minimum": 1,
+          "title": "Revision",
+          "type": "integer"
+        },
+        "subprojectId": {
+          "anyOf": [
+            {
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Subprojectid"
+        },
+        "value": {
+          "$ref": "#/$defs/MetricValue"
+        }
+      },
+      "required": [
+        "id",
+        "revision",
+        "kind",
+        "value",
+        "evidence",
+        "origin",
+        "importance",
+        "jobId",
+        "subprojectId",
+        "literalEvidence"
+      ],
+      "title": "GuiMetricFact",
+      "type": "object"
+    },
+    "GuiPeriodProposal": {
+      "additionalProperties": false,
+      "properties": {
+        "end": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/PartialDate"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "endText": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Endtext"
+        },
+        "evidence": {
+          "items": {
+            "$ref": "#/$defs/EvidenceSpan"
+          },
+          "title": "Evidence",
+          "type": "array"
+        },
+        "present": {
+          "default": false,
+          "title": "Present",
+          "type": "boolean"
+        },
+        "start": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/PartialDate"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "startText": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Starttext"
+        }
+      },
+      "required": [
+        "start",
+        "end"
+      ],
+      "title": "GuiPeriodProposal",
+      "type": "object"
+    },
     "GuiSemanticProposal": {
       "additionalProperties": false,
       "properties": {
@@ -371,7 +1131,7 @@
         },
         "facts": {
           "items": {
-            "$ref": "#/$defs/ProposedFact"
+            "$ref": "#/$defs/GuiFactProposal"
           },
           "maxItems": 500,
           "title": "Facts",
@@ -379,7 +1139,7 @@
         },
         "jobs": {
           "items": {
-            "$ref": "#/$defs/ProposedJob"
+            "$ref": "#/$defs/GuiJobProposal"
           },
           "maxItems": 100,
           "title": "Jobs",
@@ -435,6 +1195,240 @@
         "observationAssessment"
       ],
       "title": "GuiSemanticProposal",
+      "type": "object"
+    },
+    "GuiTechnologyFact": {
+      "additionalProperties": false,
+      "properties": {
+        "evidence": {
+          "items": {
+            "$ref": "#/$defs/Evidence"
+          },
+          "title": "Evidence",
+          "type": "array"
+        },
+        "id": {
+          "minLength": 1,
+          "title": "Id",
+          "type": "string"
+        },
+        "importance": {
+          "enum": [
+            "essential",
+            "normal",
+            "minor"
+          ],
+          "title": "Importance",
+          "type": "string"
+        },
+        "jobId": {
+          "anyOf": [
+            {
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Jobid"
+        },
+        "kind": {
+          "const": "technology",
+          "title": "Kind",
+          "type": "string"
+        },
+        "literalEvidence": {
+          "items": {
+            "$ref": "#/$defs/EvidenceSpan"
+          },
+          "title": "Literalevidence",
+          "type": "array"
+        },
+        "origin": {
+          "enum": [
+            "source",
+            "user"
+          ],
+          "title": "Origin",
+          "type": "string"
+        },
+        "revision": {
+          "minimum": 1,
+          "title": "Revision",
+          "type": "integer"
+        },
+        "subprojectId": {
+          "anyOf": [
+            {
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Subprojectid"
+        },
+        "value": {
+          "$ref": "#/$defs/TechnologyValue"
+        }
+      },
+      "required": [
+        "id",
+        "revision",
+        "kind",
+        "value",
+        "evidence",
+        "origin",
+        "importance",
+        "jobId",
+        "subprojectId",
+        "literalEvidence"
+      ],
+      "title": "GuiTechnologyFact",
+      "type": "object"
+    },
+    "GuiTextFact": {
+      "additionalProperties": false,
+      "properties": {
+        "evidence": {
+          "items": {
+            "$ref": "#/$defs/Evidence"
+          },
+          "title": "Evidence",
+          "type": "array"
+        },
+        "id": {
+          "minLength": 1,
+          "title": "Id",
+          "type": "string"
+        },
+        "importance": {
+          "enum": [
+            "essential",
+            "normal",
+            "minor"
+          ],
+          "title": "Importance",
+          "type": "string"
+        },
+        "jobId": {
+          "anyOf": [
+            {
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Jobid"
+        },
+        "kind": {
+          "const": "text",
+          "title": "Kind",
+          "type": "string"
+        },
+        "literalEvidence": {
+          "items": {
+            "$ref": "#/$defs/EvidenceSpan"
+          },
+          "title": "Literalevidence",
+          "type": "array"
+        },
+        "origin": {
+          "enum": [
+            "source",
+            "user"
+          ],
+          "title": "Origin",
+          "type": "string"
+        },
+        "revision": {
+          "minimum": 1,
+          "title": "Revision",
+          "type": "integer"
+        },
+        "subprojectId": {
+          "anyOf": [
+            {
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Subprojectid"
+        },
+        "value": {
+          "$ref": "#/$defs/TextValue"
+        }
+      },
+      "required": [
+        "id",
+        "revision",
+        "kind",
+        "value",
+        "evidence",
+        "origin",
+        "importance",
+        "jobId",
+        "subprojectId",
+        "literalEvidence"
+      ],
+      "title": "GuiTextFact",
+      "type": "object"
+    },
+    "Job": {
+      "additionalProperties": false,
+      "properties": {
+        "employer": {
+          "title": "Employer",
+          "type": "string"
+        },
+        "factIds": {
+          "items": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "title": "Factids",
+          "type": "array"
+        },
+        "id": {
+          "minLength": 1,
+          "title": "Id",
+          "type": "string"
+        },
+        "periods": {
+          "items": {
+            "$ref": "#/$defs/Period"
+          },
+          "title": "Periods",
+          "type": "array"
+        },
+        "role": {
+          "title": "Role",
+          "type": "string"
+        },
+        "subprojects": {
+          "items": {
+            "$ref": "#/$defs/Subproject"
+          },
+          "title": "Subprojects",
+          "type": "array"
+        }
+      },
+      "required": [
+        "id",
+        "employer",
+        "role",
+        "periods",
+        "subprojects",
+        "factIds"
+      ],
+      "title": "Job",
       "type": "object"
     },
     "LanguageDetails": {
@@ -893,6 +1887,66 @@
       "title": "NameAssessmentFact",
       "type": "object"
     },
+    "NormalizedPeriod": {
+      "additionalProperties": false,
+      "properties": {
+        "end": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/PartialDate"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "endText": {
+          "title": "Endtext",
+          "type": "string"
+        },
+        "evidence": {
+          "items": {
+            "$ref": "#/$defs/EvidenceSpan"
+          },
+          "title": "Evidence",
+          "type": "array"
+        },
+        "id": {
+          "minLength": 1,
+          "title": "Id",
+          "type": "string"
+        },
+        "present": {
+          "title": "Present",
+          "type": "boolean"
+        },
+        "start": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/PartialDate"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "startText": {
+          "title": "Starttext",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "start",
+        "end",
+        "startText",
+        "endText",
+        "present",
+        "evidence"
+      ],
+      "title": "NormalizedPeriod",
+      "type": "object"
+    },
     "ObservationAssessment": {
       "additionalProperties": false,
       "properties": {
@@ -1112,166 +2166,6 @@
         "value"
       ],
       "title": "PrivateDetails",
-      "type": "object"
-    },
-    "ProposedFact": {
-      "additionalProperties": false,
-      "properties": {
-        "importance": {
-          "default": "normal",
-          "enum": [
-            "essential",
-            "normal",
-            "minor"
-          ],
-          "title": "Importance",
-          "type": "string"
-        },
-        "jobTempId": {
-          "anyOf": [
-            {
-              "type": "string"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "title": "Jobtempid"
-        },
-        "kind": {
-          "enum": [
-            "text",
-            "technology",
-            "date",
-            "metric",
-            "leadership"
-          ],
-          "title": "Kind",
-          "type": "string"
-        },
-        "sourceId": {
-          "title": "Sourceid",
-          "type": "string"
-        },
-        "subprojectTempId": {
-          "anyOf": [
-            {
-              "type": "string"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "title": "Subprojecttempid"
-        },
-        "tempId": {
-          "maxLength": 80,
-          "minLength": 1,
-          "title": "Tempid",
-          "type": "string"
-        },
-        "unitIds": {
-          "items": {
-            "type": "string"
-          },
-          "maxItems": 100,
-          "minItems": 1,
-          "title": "Unitids",
-          "type": "array"
-        },
-        "value": {
-          "anyOf": [
-            {
-              "$ref": "#/$defs/TextValue"
-            },
-            {
-              "$ref": "#/$defs/TechnologyValue"
-            },
-            {
-              "$ref": "#/$defs/PartialDate"
-            },
-            {
-              "$ref": "#/$defs/MetricValue"
-            },
-            {
-              "$ref": "#/$defs/LeadershipValue"
-            }
-          ],
-          "title": "Value"
-        }
-      },
-      "required": [
-        "tempId",
-        "kind",
-        "value",
-        "sourceId",
-        "unitIds"
-      ],
-      "title": "ProposedFact",
-      "type": "object"
-    },
-    "ProposedJob": {
-      "additionalProperties": false,
-      "properties": {
-        "employer": {
-          "maxLength": 200,
-          "minLength": 1,
-          "title": "Employer",
-          "type": "string"
-        },
-        "periods": {
-          "items": {
-            "$ref": "#/$defs/Period"
-          },
-          "maxItems": 20,
-          "title": "Periods",
-          "type": "array"
-        },
-        "role": {
-          "maxLength": 200,
-          "minLength": 1,
-          "title": "Role",
-          "type": "string"
-        },
-        "sourceId": {
-          "title": "Sourceid",
-          "type": "string"
-        },
-        "subprojects": {
-          "items": {
-            "$ref": "#/$defs/ProposedSubproject"
-          },
-          "maxItems": 100,
-          "title": "Subprojects",
-          "type": "array"
-        },
-        "tempId": {
-          "maxLength": 80,
-          "minLength": 1,
-          "title": "Tempid",
-          "type": "string"
-        },
-        "unitIds": {
-          "items": {
-            "type": "string"
-          },
-          "maxItems": 100,
-          "minItems": 1,
-          "title": "Unitids",
-          "type": "array"
-        }
-      },
-      "required": [
-        "tempId",
-        "employer",
-        "role",
-        "periods",
-        "sourceId",
-        "unitIds"
-      ],
-      "title": "ProposedJob",
       "type": "object"
     },
     "ProposedSubproject": {
@@ -1538,6 +2432,46 @@
         "representedFactIds"
       ],
       "title": "SourceUnit",
+      "type": "object"
+    },
+    "Subproject": {
+      "additionalProperties": false,
+      "properties": {
+        "factIds": {
+          "items": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "title": "Factids",
+          "type": "array"
+        },
+        "id": {
+          "minLength": 1,
+          "title": "Id",
+          "type": "string"
+        },
+        "name": {
+          "title": "Name",
+          "type": "string"
+        },
+        "period": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Period"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "id",
+        "name",
+        "period",
+        "factIds"
+      ],
+      "title": "Subproject",
       "type": "object"
     },
     "SupportedText": {
@@ -1838,6 +2772,13 @@
       "title": "Certifications",
       "type": "array"
     },
+    "conflicts": {
+      "items": {
+        "$ref": "#/$defs/FactConflict"
+      },
+      "title": "Conflicts",
+      "type": "array"
+    },
     "education": {
       "items": {
         "$ref": "#/$defs/EducationDetails"
@@ -1845,9 +2786,45 @@
       "title": "Education",
       "type": "array"
     },
+    "employment": {
+      "items": {
+        "$ref": "#/$defs/Job"
+      },
+      "title": "Employment",
+      "type": "array"
+    },
     "facts": {
       "items": {
         "anyOf": [
+          {
+            "discriminator": {
+              "mapping": {
+                "date": "#/$defs/GuiDateFact",
+                "leadership": "#/$defs/GuiLeadershipFact",
+                "metric": "#/$defs/GuiMetricFact",
+                "technology": "#/$defs/GuiTechnologyFact",
+                "text": "#/$defs/GuiTextFact"
+              },
+              "propertyName": "kind"
+            },
+            "oneOf": [
+              {
+                "$ref": "#/$defs/GuiTextFact"
+              },
+              {
+                "$ref": "#/$defs/GuiTechnologyFact"
+              },
+              {
+                "$ref": "#/$defs/GuiMetricFact"
+              },
+              {
+                "$ref": "#/$defs/GuiLeadershipFact"
+              },
+              {
+                "$ref": "#/$defs/GuiDateFact"
+              }
+            ]
+          },
           {
             "discriminator": {
               "mapping": {
@@ -1885,6 +2862,9 @@
           },
           {
             "$ref": "#/$defs/ObservationFact"
+          },
+          {
+            "$ref": "#/$defs/EmploymentFact"
           }
         ]
       },
@@ -1900,6 +2880,16 @@
         "type": "array"
       },
       "title": "Fieldfactids",
+      "type": "object"
+    },
+    "jobPeriods": {
+      "additionalProperties": {
+        "items": {
+          "$ref": "#/$defs/NormalizedPeriod"
+        },
+        "type": "array"
+      },
+      "title": "Jobperiods",
       "type": "object"
     },
     "languages": {

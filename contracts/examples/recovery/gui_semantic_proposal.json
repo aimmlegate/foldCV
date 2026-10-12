@@ -13,12 +13,28 @@
             "month": null,
             "day": null
           },
-          "end": null
+          "end": null,
+          "present": true,
+          "startText": null,
+          "endText": null,
+          "evidence": [
+            {
+              "sourceId": "source_dc297781ca355d302cd6f084",
+              "sourceRevision": 1,
+              "unitId": "source_dc297781ca355d302cd6f084/unit_2",
+              "unitRevision": 1,
+              "text": "Север, backend-разработчик, 2021 — настоящее время."
+            }
+          ]
         }
       ],
       "sourceId": "source_dc297781ca355d302cd6f084",
       "unitIds": [
-        "source_dc297781ca355d302cd6f084/unit_2"
+        "source_dc297781ca355d302cd6f084/unit_2",
+        "source_dc297781ca355d302cd6f084/unit_3",
+        "source_dc297781ca355d302cd6f084/unit_4",
+        "source_dc297781ca355d302cd6f084/unit_5",
+        "source_dc297781ca355d302cd6f084/unit_6"
       ],
       "subprojects": []
     },
@@ -39,12 +55,25 @@
             "year": 2020,
             "month": null,
             "day": null
-          }
+          },
+          "present": false,
+          "startText": null,
+          "endText": null,
+          "evidence": [
+            {
+              "sourceId": "source_dc297781ca355d302cd6f084",
+              "sourceRevision": 1,
+              "unitId": "source_dc297781ca355d302cd6f084/unit_7",
+              "unitRevision": 1,
+              "text": "Запад, разработчик, 2017–2020. Внутренняя CRM. Java, MySQL."
+            }
+          ]
         }
       ],
       "sourceId": "source_dc297781ca355d302cd6f084",
       "unitIds": [
-        "source_dc297781ca355d302cd6f084/unit_7"
+        "source_dc297781ca355d302cd6f084/unit_7",
+        "source_dc297781ca355d302cd6f084/unit_8"
       ],
       "subprojects": []
     },
@@ -65,7 +94,19 @@
             "year": 2009,
             "month": null,
             "day": null
-          }
+          },
+          "present": false,
+          "startText": null,
+          "endText": null,
+          "evidence": [
+            {
+              "sourceId": "source_dc297781ca355d302cd6f084",
+              "sourceRevision": 1,
+              "unitId": "source_dc297781ca355d302cd6f084/unit_9",
+              "unitRevision": 1,
+              "text": "Восток, разработчик, 2008–2009. PHP. Разрабатывала отчёты."
+            }
+          ]
         }
       ],
       "sourceId": "source_dc297781ca355d302cd6f084",
@@ -75,7 +116,320 @@
       "subprojects": []
     }
   ],
-  "facts": [],
+  "facts": [
+    {
+      "tempId": "python",
+      "kind": "technology",
+      "value": {
+        "canonicalId": "python",
+        "display": "Python",
+        "scope": "job"
+      },
+      "sourceId": "source_dc297781ca355d302cd6f084",
+      "unitIds": [
+        "source_dc297781ca355d302cd6f084/unit_3"
+      ],
+      "jobTempId": "north",
+      "subprojectTempId": null,
+      "importance": "normal",
+      "literalEvidence": [
+        {
+          "sourceId": "source_dc297781ca355d302cd6f084",
+          "sourceRevision": 1,
+          "unitId": "source_dc297781ca355d302cd6f084/unit_3",
+          "unitRevision": 1,
+          "text": "Python"
+        }
+      ]
+    },
+    {
+      "tempId": "postgres",
+      "kind": "technology",
+      "value": {
+        "canonicalId": "postgres",
+        "display": "PostgreSQL",
+        "scope": "job"
+      },
+      "sourceId": "source_dc297781ca355d302cd6f084",
+      "unitIds": [
+        "source_dc297781ca355d302cd6f084/unit_3"
+      ],
+      "jobTempId": "north",
+      "subprojectTempId": null,
+      "importance": "normal",
+      "literalEvidence": [
+        {
+          "sourceId": "source_dc297781ca355d302cd6f084",
+          "sourceRevision": 1,
+          "unitId": "source_dc297781ca355d302cd6f084/unit_3",
+          "unitRevision": 1,
+          "text": "PostgreSQL"
+        }
+      ]
+    },
+    {
+      "tempId": "java",
+      "kind": "technology",
+      "value": {
+        "canonicalId": "java",
+        "display": "Java",
+        "scope": "job"
+      },
+      "sourceId": "source_dc297781ca355d302cd6f084",
+      "unitIds": [
+        "source_dc297781ca355d302cd6f084/unit_7"
+      ],
+      "jobTempId": "west",
+      "subprojectTempId": null,
+      "importance": "normal",
+      "literalEvidence": [
+        {
+          "sourceId": "source_dc297781ca355d302cd6f084",
+          "sourceRevision": 1,
+          "unitId": "source_dc297781ca355d302cd6f084/unit_7",
+          "unitRevision": 1,
+          "text": "Java"
+        }
+      ]
+    },
+    {
+      "tempId": "mysql",
+      "kind": "technology",
+      "value": {
+        "canonicalId": "mysql",
+        "display": "MySQL",
+        "scope": "job"
+      },
+      "sourceId": "source_dc297781ca355d302cd6f084",
+      "unitIds": [
+        "source_dc297781ca355d302cd6f084/unit_7"
+      ],
+      "jobTempId": "west",
+      "subprojectTempId": null,
+      "importance": "normal",
+      "literalEvidence": [
+        {
+          "sourceId": "source_dc297781ca355d302cd6f084",
+          "sourceRevision": 1,
+          "unitId": "source_dc297781ca355d302cd6f084/unit_7",
+          "unitRevision": 1,
+          "text": "MySQL"
+        }
+      ]
+    },
+    {
+      "tempId": "php",
+      "kind": "technology",
+      "value": {
+        "canonicalId": "php",
+        "display": "PHP",
+        "scope": "job"
+      },
+      "sourceId": "source_dc297781ca355d302cd6f084",
+      "unitIds": [
+        "source_dc297781ca355d302cd6f084/unit_9"
+      ],
+      "jobTempId": "east",
+      "subprojectTempId": null,
+      "importance": "normal",
+      "literalEvidence": [
+        {
+          "sourceId": "source_dc297781ca355d302cd6f084",
+          "sourceRevision": 1,
+          "unitId": "source_dc297781ca355d302cd6f084/unit_9",
+          "unitRevision": 1,
+          "text": "PHP"
+        }
+      ]
+    },
+    {
+      "tempId": "docker",
+      "kind": "technology",
+      "value": {
+        "canonicalId": "docker",
+        "display": "Docker",
+        "scope": "global"
+      },
+      "sourceId": "source_dc297781ca355d302cd6f084",
+      "unitIds": [
+        "source_dc297781ca355d302cd6f084/unit_12"
+      ],
+      "jobTempId": null,
+      "subprojectTempId": null,
+      "importance": "normal",
+      "literalEvidence": [
+        {
+          "sourceId": "source_dc297781ca355d302cd6f084",
+          "sourceRevision": 1,
+          "unitId": "source_dc297781ca355d302cd6f084/unit_12",
+          "unitRevision": 1,
+          "text": "Docker"
+        }
+      ]
+    },
+    {
+      "tempId": "north-context",
+      "kind": "text",
+      "value": {
+        "text": "Сервис обработки заказов."
+      },
+      "sourceId": "source_dc297781ca355d302cd6f084",
+      "unitIds": [
+        "source_dc297781ca355d302cd6f084/unit_3"
+      ],
+      "jobTempId": "north",
+      "subprojectTempId": null,
+      "importance": "normal",
+      "literalEvidence": [
+        {
+          "sourceId": "source_dc297781ca355d302cd6f084",
+          "sourceRevision": 1,
+          "unitId": "source_dc297781ca355d302cd6f084/unit_3",
+          "unitRevision": 1,
+          "text": "Сервис обработки заказов."
+        }
+      ]
+    },
+    {
+      "tempId": "north-task",
+      "kind": "text",
+      "value": {
+        "text": "Делала REST API для заказов, писала интеграционные тесты."
+      },
+      "sourceId": "source_dc297781ca355d302cd6f084",
+      "unitIds": [
+        "source_dc297781ca355d302cd6f084/unit_4"
+      ],
+      "jobTempId": "north",
+      "subprojectTempId": null,
+      "importance": "normal",
+      "literalEvidence": [
+        {
+          "sourceId": "source_dc297781ca355d302cd6f084",
+          "sourceRevision": 1,
+          "unitId": "source_dc297781ca355d302cd6f084/unit_4",
+          "unitRevision": 1,
+          "text": "Делала REST API для заказов, писала интеграционные тесты."
+        }
+      ]
+    },
+    {
+      "tempId": "north-result",
+      "kind": "metric",
+      "value": {
+        "number": 70.0,
+        "upperNumber": null,
+        "comparator": "exact",
+        "unit": "мс",
+        "period": null,
+        "baseline": "100",
+        "result": "70",
+        "scope": null,
+        "attribution": "team",
+        "qualifiers": [
+          "на 30%"
+        ]
+      },
+      "sourceId": "source_dc297781ca355d302cd6f084",
+      "unitIds": [
+        "source_dc297781ca355d302cd6f084/unit_5"
+      ],
+      "jobTempId": "north",
+      "subprojectTempId": null,
+      "importance": "normal",
+      "literalEvidence": [
+        {
+          "sourceId": "source_dc297781ca355d302cd6f084",
+          "sourceRevision": 1,
+          "unitId": "source_dc297781ca355d302cd6f084/unit_5",
+          "unitRevision": 1,
+          "text": "Командой сократили время обработки со 100 до 70 мс, на 30%."
+        }
+      ]
+    },
+    {
+      "tempId": "trainees",
+      "kind": "leadership",
+      "value": {
+        "action": "Обучила двух новых разработчиков",
+        "teamSize": {
+          "number": 2.0,
+          "upperNumber": null,
+          "comparator": "exact",
+          "unit": "разработчиков",
+          "period": null,
+          "baseline": null,
+          "result": null,
+          "scope": null,
+          "attribution": "personal",
+          "qualifiers": []
+        },
+        "attribution": "personal"
+      },
+      "sourceId": "source_dc297781ca355d302cd6f084",
+      "unitIds": [
+        "source_dc297781ca355d302cd6f084/unit_6"
+      ],
+      "jobTempId": "north",
+      "subprojectTempId": null,
+      "importance": "normal",
+      "literalEvidence": [
+        {
+          "sourceId": "source_dc297781ca355d302cd6f084",
+          "sourceRevision": 1,
+          "unitId": "source_dc297781ca355d302cd6f084/unit_6",
+          "unitRevision": 1,
+          "text": "Обучила двух новых разработчиков."
+        }
+      ]
+    },
+    {
+      "tempId": "west-task",
+      "kind": "text",
+      "value": {
+        "text": "Поддерживала CRM и исправляла ошибки."
+      },
+      "sourceId": "source_dc297781ca355d302cd6f084",
+      "unitIds": [
+        "source_dc297781ca355d302cd6f084/unit_8"
+      ],
+      "jobTempId": "west",
+      "subprojectTempId": null,
+      "importance": "normal",
+      "literalEvidence": [
+        {
+          "sourceId": "source_dc297781ca355d302cd6f084",
+          "sourceRevision": 1,
+          "unitId": "source_dc297781ca355d302cd6f084/unit_8",
+          "unitRevision": 1,
+          "text": "Поддерживала CRM и исправляла ошибки."
+        }
+      ]
+    },
+    {
+      "tempId": "east-task",
+      "kind": "text",
+      "value": {
+        "text": "Разрабатывала отчёты."
+      },
+      "sourceId": "source_dc297781ca355d302cd6f084",
+      "unitIds": [
+        "source_dc297781ca355d302cd6f084/unit_9"
+      ],
+      "jobTempId": "east",
+      "subprojectTempId": null,
+      "importance": "normal",
+      "literalEvidence": [
+        {
+          "sourceId": "source_dc297781ca355d302cd6f084",
+          "sourceRevision": 1,
+          "unitId": "source_dc297781ca355d302cd6f084/unit_9",
+          "unitRevision": 1,
+          "text": "Разрабатывала отчёты."
+        }
+      ]
+    }
+  ],
   "units": [
     {
       "sourceId": "source_dc297781ca355d302cd6f084",
@@ -94,50 +448,68 @@
     {
       "sourceId": "source_dc297781ca355d302cd6f084",
       "unitId": "source_dc297781ca355d302cd6f084/unit_3",
-      "disposition": "unresolved",
-      "factTempIds": [],
+      "disposition": "facts",
+      "factTempIds": [
+        "python",
+        "postgres",
+        "north-context"
+      ],
       "duplicateOf": null
     },
     {
       "sourceId": "source_dc297781ca355d302cd6f084",
       "unitId": "source_dc297781ca355d302cd6f084/unit_4",
-      "disposition": "unresolved",
-      "factTempIds": [],
+      "disposition": "facts",
+      "factTempIds": [
+        "north-task"
+      ],
       "duplicateOf": null
     },
     {
       "sourceId": "source_dc297781ca355d302cd6f084",
       "unitId": "source_dc297781ca355d302cd6f084/unit_5",
-      "disposition": "unresolved",
-      "factTempIds": [],
+      "disposition": "facts",
+      "factTempIds": [
+        "north-result"
+      ],
       "duplicateOf": null
     },
     {
       "sourceId": "source_dc297781ca355d302cd6f084",
       "unitId": "source_dc297781ca355d302cd6f084/unit_6",
-      "disposition": "unresolved",
-      "factTempIds": [],
+      "disposition": "facts",
+      "factTempIds": [
+        "trainees"
+      ],
       "duplicateOf": null
     },
     {
       "sourceId": "source_dc297781ca355d302cd6f084",
       "unitId": "source_dc297781ca355d302cd6f084/unit_7",
-      "disposition": "unresolved",
-      "factTempIds": [],
+      "disposition": "facts",
+      "factTempIds": [
+        "java",
+        "mysql"
+      ],
       "duplicateOf": null
     },
     {
       "sourceId": "source_dc297781ca355d302cd6f084",
       "unitId": "source_dc297781ca355d302cd6f084/unit_8",
-      "disposition": "unresolved",
-      "factTempIds": [],
+      "disposition": "facts",
+      "factTempIds": [
+        "west-task"
+      ],
       "duplicateOf": null
     },
     {
       "sourceId": "source_dc297781ca355d302cd6f084",
       "unitId": "source_dc297781ca355d302cd6f084/unit_9",
-      "disposition": "unresolved",
-      "factTempIds": [],
+      "disposition": "facts",
+      "factTempIds": [
+        "php",
+        "east-task"
+      ],
       "duplicateOf": null
     },
     {
@@ -157,8 +529,10 @@
     {
       "sourceId": "source_dc297781ca355d302cd6f084",
       "unitId": "source_dc297781ca355d302cd6f084/unit_12",
-      "disposition": "unresolved",
-      "factTempIds": [],
+      "disposition": "facts",
+      "factTempIds": [
+        "docker"
+      ],
       "duplicateOf": null
     }
   ],

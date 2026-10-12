@@ -10,12 +10,12 @@ from pydantic import Field, model_validator
 
 from .extraction.models import ExtractResult
 from .gui_prompts import content_input
-from .models.contracts import Evidence, Id, PartialDate, Revision, Source, Wire
+from .models.contracts import Evidence, Id, Job, PartialDate, Revision, Source, Wire
 from .models.recovery import (
     CandidateFact, EvidenceSpan, NameAssessment, NameAssessmentFact, ObservationAssessment,
     ObservationFact, RecoveryFact, Rules,
 )
-from .normalization import SemanticProposal, _id
+from .normalization import ProposedFact, ProposedJob, SemanticProposal, _id
 
 
 class SupportedText(Wire):
@@ -69,7 +69,44 @@ class GuiNormalizeRequest(Wire):
         return self
 
 
+class GuiPeriodProposal(Wire):
+    start: PartialDate | None
+    end: PartialDate | None
+    present: bool = False
+    start_text: str | None = None
+    end_text: str | None = None
+    evidence: list[EvidenceSpan] = Field(default_factory=list)
+
+
+class GuiJobProposal(ProposedJob):
+    periods: list[GuiPeriodProposal] = Field(max_length=20)
+
+
+class GuiFactProposal(ProposedFact):
+    literal_evidence: list[EvidenceSpan] = Field(default_factory=list)
+
+
+class FactConflict(Wire):
+    id: Id
+    job_id: Id
+    code: Literal["team_size_conflict"]
+    fact_ids: list[Id]
+    evidence: list[EvidenceSpan]
+
+
+class NormalizedPeriod(Wire):
+    id: Id
+    start: PartialDate | None
+    end: PartialDate | None
+    start_text: str
+    end_text: str
+    present: bool
+    evidence: list[EvidenceSpan]
+
+
 class GuiSemanticProposal(SemanticProposal):
+    jobs: list[GuiJobProposal] = Field(max_length=100)
+    facts: list[GuiFactProposal] = Field(max_length=500)
     candidate: CandidateDetails
     education: list[EducationDetails] = Field(max_length=40)
     certifications: list[CertificationDetails] = Field(max_length=40)
@@ -94,6 +131,9 @@ class GuiNormalizedResult(Wire):
     source_fingerprint: str
     rules_revision: Revision
     semantic_proposal: GuiSemanticProposal
+    employment: list[Job] = Field(default_factory=list)
+    job_periods: dict[str, list[NormalizedPeriod]] = Field(default_factory=dict)
+    conflicts: list[FactConflict] = Field(default_factory=list)
 
 
 class NormalizationFailure(Exception):
@@ -136,6 +176,9 @@ def normalization_input(request: GuiNormalizeRequest, rules: Rules) -> str:
         "sourceObservedAt may come only from an explicit dated statement in the source, at its original precision, with its literal evidence span. "
         "No source observation means null; file metadata and formattingAsOf do not supply it. "
         "Retain omitted private details as evidence, separate from public fields. All employment shares this result."
+        " Supply literalEvidence for every employment fact and exact source/unit references. "
+        "Keep global skills separate from job/subproject skills. Keep conflicting claims separate, without asserting personal leadership. "
+        "Set present=true only for explicit ongoing work; a missing end date alone is not present. Preserve incomplete/unknown period text."
     )
     return content_input("normalize_semantics", payload, rules)
 
@@ -175,7 +218,7 @@ def normalize_candidate(request: GuiNormalizeRequest, proposal: GuiSemanticPropo
             return
         fact_id = _id("fact", field_id, value.text, *[f"{ref.source_id}:{ref.unit_id}" for ref in refs])
         fact = CandidateFact.model_validate({"id": fact_id, "revision": request.revision, "kind": "candidate_detail",
-                                            "value": {"field": category, "text": value.text},
+                                            "value": {"field": category, "text": value.text, "fieldId": field_id},
                                             "evidence": [ref.model_dump(by_alias=True) for ref in refs],
                                             "origin": "source", "importance": "normal", "jobId": None, "subprojectId": None})
         add_fact(fact)

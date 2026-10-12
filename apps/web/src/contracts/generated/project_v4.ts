@@ -86,15 +86,22 @@ export type Id12 = string;
 export type Importance = "essential" | "normal" | "minor";
 export type Jobid = string | null;
 export type Kind8 = "text";
+export type Sourceid1 = string;
+export type Sourcerevision1 = number;
+export type Text1 = string;
+export type Unitid1 = string;
+export type Unitrevision1 = number;
+export type Literalevidence = EvidenceSpan[];
 export type Origin1 = "source" | "user";
 export type Revision8 = number;
 export type Subprojectid = string | null;
-export type Text1 = string;
+export type Text2 = string;
 export type Evidence3 = Evidence1[];
 export type Id13 = string;
 export type Importance1 = "essential" | "normal" | "minor";
 export type Jobid1 = string | null;
 export type Kind9 = "technology";
+export type Literalevidence1 = EvidenceSpan[];
 export type Origin2 = "source" | "user";
 export type Revision9 = number;
 export type Subprojectid1 = string | null;
@@ -106,6 +113,7 @@ export type Id14 = string;
 export type Importance2 = "essential" | "normal" | "minor";
 export type Jobid2 = string | null;
 export type Kind10 = "metric";
+export type Literalevidence2 = EvidenceSpan[];
 export type Origin3 = "source" | "user";
 export type Revision10 = number;
 export type Subprojectid2 = string | null;
@@ -124,6 +132,7 @@ export type Id15 = string;
 export type Importance3 = "essential" | "normal" | "minor";
 export type Jobid3 = string | null;
 export type Kind11 = "leadership";
+export type Literalevidence3 = EvidenceSpan[];
 export type Origin4 = "source" | "user";
 export type Revision11 = number;
 export type Subprojectid3 = string | null;
@@ -134,6 +143,7 @@ export type Id16 = string;
 export type Importance4 = "essential" | "normal" | "minor";
 export type Jobid4 = string | null;
 export type Kind12 = "date";
+export type Literalevidence4 = EvidenceSpan[];
 export type Origin5 = "source" | "user";
 export type Revision12 = number;
 export type Subprojectid4 = string | null;
@@ -141,42 +151,99 @@ export type Evidence7 = Evidence1[];
 export type Id17 = string;
 export type Importance5 = "essential" | "normal" | "minor";
 export type Jobid5 = string | null;
-export type Kind13 = "candidate_detail";
+export type Kind13 = "text";
 export type Origin6 = "source" | "user";
 export type Revision13 = number;
 export type Subprojectid5 = string | null;
-export type Field = "name" | "title" | "location" | "education" | "certification" | "language" | "private_metadata";
-export type Text2 = string;
 export type Evidence8 = Evidence1[];
 export type Id18 = string;
 export type Importance6 = "essential" | "normal" | "minor";
 export type Jobid6 = string | null;
-export type Kind14 = "name_assessment";
+export type Kind14 = "technology";
 export type Origin7 = "source" | "user";
 export type Revision14 = number;
 export type Subprojectid6 = string | null;
-export type Sourceid1 = string;
-export type Sourcerevision1 = number;
-export type Text3 = string;
-export type Unitid1 = string;
-export type Unitrevision1 = number;
-export type Evidence9 = EvidenceSpan[];
-export type Missingsurname = boolean | null;
-export type Revision15 = number;
-export type Evidence10 = Evidence1[];
+export type Evidence9 = Evidence1[];
 export type Id19 = string;
 export type Importance7 = "essential" | "normal" | "minor";
 export type Jobid7 = string | null;
-export type Kind15 = "source_observation";
+export type Kind15 = "metric";
 export type Origin8 = "source" | "user";
-export type Revision16 = number;
+export type Revision15 = number;
 export type Subprojectid7 = string | null;
+export type Evidence10 = Evidence1[];
+export type Id20 = string;
+export type Importance8 = "essential" | "normal" | "minor";
+export type Jobid8 = string | null;
+export type Kind16 = "leadership";
+export type Origin9 = "source" | "user";
+export type Revision16 = number;
+export type Subprojectid8 = string | null;
+export type Evidence11 = Evidence1[];
+export type Id21 = string;
+export type Importance9 = "essential" | "normal" | "minor";
+export type Jobid9 = string | null;
+export type Kind17 = "date";
+export type Origin10 = "source" | "user";
 export type Revision17 = number;
+export type Subprojectid9 = string | null;
+export type Evidence12 = Evidence1[];
+export type Id22 = string;
+export type Importance10 = "essential" | "normal" | "minor";
+export type Jobid10 = string | null;
+export type Kind18 = "candidate_detail";
+export type Origin11 = "source" | "user";
+export type Revision18 = number;
+export type Subprojectid10 = string | null;
+export type Field = "name" | "title" | "location" | "education" | "certification" | "language" | "private_metadata";
+export type Fieldid1 = string | null;
+export type Text3 = string;
+export type Evidence13 = Evidence1[];
+export type Id23 = string;
+export type Importance11 = "essential" | "normal" | "minor";
+export type Jobid11 = string | null;
+export type Kind19 = "name_assessment";
+export type Origin12 = "source" | "user";
+export type Revision19 = number;
+export type Subprojectid11 = string | null;
+export type Evidence14 = EvidenceSpan[];
+export type Missingsurname = boolean | null;
+export type Revision20 = number;
+export type Evidence15 = Evidence1[];
+export type Id24 = string;
+export type Importance12 = "essential" | "normal" | "minor";
+export type Jobid12 = string | null;
+export type Kind20 = "source_observation";
+export type Origin13 = "source" | "user";
+export type Revision21 = number;
+export type Subprojectid12 = string | null;
+export type Revision22 = number;
+export type Evidence16 = Evidence1[];
+export type Id25 = string;
+export type Importance13 = "essential" | "normal" | "minor";
+export type Jobid13 = string | null;
+export type Kind21 = "employment";
+export type Literalevidence5 = EvidenceSpan[];
+export type Origin14 = "source" | "user";
+export type Revision23 = number;
+export type Subprojectid13 = string | null;
+export type Employer1 = string;
+export type Jobid14 = string;
+export type Endtext = string;
+export type Evidence17 = EvidenceSpan[];
+export type Id26 = string;
+export type Present1 = boolean;
+export type Starttext = string;
+export type Periods2 = EmploymentPeriodValue[];
+export type Role1 = string;
+export type Subprojects1 = Subproject[];
 export type Facts = (
+  | (GuiTextFact | GuiTechnologyFact | GuiMetricFact | GuiLeadershipFact | GuiDateFact)
   | (TextFact | TechnologyFact | MetricFact | LeadershipFact | DateFact)
   | CandidateFact
   | NameAssessmentFact
   | ObservationFact
+  | EmploymentFact
 )[];
 export type Baserevision = number;
 export type Captureddocumentrevision = number | null;
@@ -202,8 +269,8 @@ export type Logicalattempts = number;
 export type Reportedinputtokens = number | null;
 export type Reportedoutputtokens = number | null;
 export type Events = GuiOperationEvent[];
-export type Id20 = string;
-export type Kind16 =
+export type Id27 = string;
+export type Kind22 =
   | "extract"
   | "validate"
   | "render"
@@ -215,7 +282,7 @@ export type Kind16 =
 export type Projectid = string;
 export type Resultfingerprint = string | null;
 export type Markdown = string;
-export type Revision18 = number;
+export type Revision24 = number;
 export type Sha256 = string;
 export type Status = "queued" | "running" | "completed" | "failed" | "cancelled" | "interrupted";
 export type Targetfieldids = string[];
@@ -226,8 +293,8 @@ export type Blockid = string;
 export type Dependencyhash = string;
 export type Evidencefactids = string[];
 export type Findings = string[];
-export type Id21 = string;
-export type Kind17 = "draft_prose" | "rewrite_prose";
+export type Id28 = string;
+export type Kind23 = "draft_prose" | "rewrite_prose";
 export type Operationid = string;
 export type Replacementtext = string;
 export type Proposals = Proposal[];
@@ -236,7 +303,7 @@ export type Documentrevision1 = number;
 export type Path = string;
 export type Sha2561 = string;
 export type Size = number;
-export type Id22 = string;
+export type Id29 = string;
 export type Pdf = null;
 export type Projectrevision1 = number;
 export type Renderinputfingerprint = string;
@@ -257,49 +324,49 @@ export type Targetid1 = string;
 export type Targetkind1 = "source_unit" | "fact" | "block";
 export type Targetrevision1 = number;
 export type Decisions = ReviewDecision[];
-export type Revision19 = number;
+export type Revision25 = number;
 export type Schemaversion = 4;
 export type Byteref = string;
 export type Bytesha256 = string;
-export type Id23 = string;
+export type Id30 = string;
 export type Mimetype = string;
 export type Originalname = string;
-export type Id24 = string;
-export type Origin9 = "user";
-export type Revision20 = number;
+export type Id31 = string;
+export type Origin15 = "user";
+export type Revision26 = number;
 export type Text4 = string;
 export type Unitid2 = string;
 export type Overlays = SourceOverlay[];
 export type Parser = string;
 export type Parserversion = string;
-export type Revision21 = number;
+export type Revision27 = number;
 export type Disposition1 = "shown" | "condensed" | "archived" | "duplicate" | "unresolved" | "administrative";
-export type Id25 = string;
+export type Id32 = string;
 export type Column = number | null;
 export type Index = number;
-export type Kind18 = "page" | "paragraph" | "table_cell" | "pasted";
+export type Kind24 = "page" | "paragraph" | "table_cell" | "pasted";
 export type Row = number | null;
 export type Order = number;
 export type Representedfactids = string[];
-export type Revision22 = number;
+export type Revision28 = number;
 export type Text5 = string;
 export type Units = SourceUnit[];
 export type Warnings = string[];
 export type Sources = Source[];
 export type Assets = AssetRef[];
 export type Contentpolicyversion = string;
-export type Id26 = string;
+export type Id33 = string;
 export type Packagesha256 = string;
 export type Version = string;
 export type Contentpolicyversion1 = string;
 export type Dependencyhash1 = string;
-export type Id27 = string;
-export type Kind19 = "profile" | "job_prose" | "contact" | "focus" | "education" | "skills" | "early_career";
+export type Id34 = string;
+export type Kind25 = "profile" | "job_prose" | "contact" | "focus" | "education" | "skills" | "early_career";
 export type Factids4 = string[];
 export type Locked = boolean;
-export type Origin10 = "source" | "generated" | "manual";
+export type Origin16 = "source" | "generated" | "manual";
 export type Text6 = string;
-export type Revision23 = number;
+export type Revision29 = number;
 export type Status1 = "empty" | "running" | "proposed" | "ready" | "stale" | "error";
 export type Visible8 = boolean;
 export type Views = Block[];
@@ -315,7 +382,7 @@ export interface ProjectV4 {
   proposals: Proposals;
   renders: Renders;
   review: Review;
-  revision: Revision19;
+  revision: Revision25;
   schemaVersion: Schemaversion;
   sources: Sources;
   template: TemplateManifest | null;
@@ -458,26 +525,35 @@ export interface Subproject {
   name: Name;
   period: Period | null;
 }
-export interface TextFact {
+export interface GuiTextFact {
   evidence: Evidence2;
   id: Id12;
   importance: Importance;
   jobId: Jobid;
   kind: Kind8;
+  literalEvidence: Literalevidence;
   origin: Origin1;
   revision: Revision8;
   subprojectId: Subprojectid;
   value: TextValue;
 }
-export interface TextValue {
+export interface EvidenceSpan {
+  sourceId: Sourceid1;
+  sourceRevision: Sourcerevision1;
   text: Text1;
+  unitId: Unitid1;
+  unitRevision: Unitrevision1;
 }
-export interface TechnologyFact {
+export interface TextValue {
+  text: Text2;
+}
+export interface GuiTechnologyFact {
   evidence: Evidence3;
   id: Id13;
   importance: Importance1;
   jobId: Jobid1;
   kind: Kind9;
+  literalEvidence: Literalevidence1;
   origin: Origin2;
   revision: Revision9;
   subprojectId: Subprojectid1;
@@ -488,12 +564,13 @@ export interface TechnologyValue {
   display: Display;
   scope: Scope;
 }
-export interface MetricFact {
+export interface GuiMetricFact {
   evidence: Evidence4;
   id: Id14;
   importance: Importance2;
   jobId: Jobid2;
   kind: Kind10;
+  literalEvidence: Literalevidence2;
   origin: Origin3;
   revision: Revision10;
   subprojectId: Subprojectid2;
@@ -511,12 +588,13 @@ export interface MetricValue {
   unit: Unit;
   upperNumber: Uppernumber;
 }
-export interface LeadershipFact {
+export interface GuiLeadershipFact {
   evidence: Evidence5;
   id: Id15;
   importance: Importance3;
   jobId: Jobid3;
   kind: Kind11;
+  literalEvidence: Literalevidence3;
   origin: Origin4;
   revision: Revision11;
   subprojectId: Subprojectid3;
@@ -527,18 +605,19 @@ export interface LeadershipValue {
   attribution: Attribution1;
   teamSize: MetricValue | null;
 }
-export interface DateFact {
+export interface GuiDateFact {
   evidence: Evidence6;
   id: Id16;
   importance: Importance4;
   jobId: Jobid4;
   kind: Kind12;
+  literalEvidence: Literalevidence4;
   origin: Origin5;
   revision: Revision12;
   subprojectId: Subprojectid4;
   value: PartialDate;
 }
-export interface CandidateFact {
+export interface TextFact {
   evidence: Evidence7;
   id: Id17;
   importance: Importance5;
@@ -547,13 +626,9 @@ export interface CandidateFact {
   origin: Origin6;
   revision: Revision13;
   subprojectId: Subprojectid5;
-  value: CandidateDetail;
+  value: TextValue;
 }
-export interface CandidateDetail {
-  field: Field;
-  text: Text2;
-}
-export interface NameAssessmentFact {
+export interface TechnologyFact {
   evidence: Evidence8;
   id: Id18;
   importance: Importance6;
@@ -562,35 +637,116 @@ export interface NameAssessmentFact {
   origin: Origin7;
   revision: Revision14;
   subprojectId: Subprojectid6;
-  value: NameAssessment;
+  value: TechnologyValue;
 }
-export interface NameAssessment {
+export interface MetricFact {
   evidence: Evidence9;
-  missingSurname: Missingsurname;
-  revision: Revision15;
-}
-export interface EvidenceSpan {
-  sourceId: Sourceid1;
-  sourceRevision: Sourcerevision1;
-  text: Text3;
-  unitId: Unitid1;
-  unitRevision: Unitrevision1;
-}
-export interface ObservationFact {
-  evidence: Evidence10;
   id: Id19;
   importance: Importance7;
   jobId: Jobid7;
   kind: Kind15;
   origin: Origin8;
-  revision: Revision16;
+  revision: Revision15;
   subprojectId: Subprojectid7;
+  value: MetricValue;
+}
+export interface LeadershipFact {
+  evidence: Evidence10;
+  id: Id20;
+  importance: Importance8;
+  jobId: Jobid8;
+  kind: Kind16;
+  origin: Origin9;
+  revision: Revision16;
+  subprojectId: Subprojectid8;
+  value: LeadershipValue;
+}
+export interface DateFact {
+  evidence: Evidence11;
+  id: Id21;
+  importance: Importance9;
+  jobId: Jobid9;
+  kind: Kind17;
+  origin: Origin10;
+  revision: Revision17;
+  subprojectId: Subprojectid9;
+  value: PartialDate;
+}
+export interface CandidateFact {
+  evidence: Evidence12;
+  id: Id22;
+  importance: Importance10;
+  jobId: Jobid10;
+  kind: Kind18;
+  origin: Origin11;
+  revision: Revision18;
+  subprojectId: Subprojectid10;
+  value: CandidateDetail;
+}
+export interface CandidateDetail {
+  field: Field;
+  fieldId?: Fieldid1;
+  text: Text3;
+}
+export interface NameAssessmentFact {
+  evidence: Evidence13;
+  id: Id23;
+  importance: Importance11;
+  jobId: Jobid11;
+  kind: Kind19;
+  origin: Origin12;
+  revision: Revision19;
+  subprojectId: Subprojectid11;
+  value: NameAssessment;
+}
+export interface NameAssessment {
+  evidence: Evidence14;
+  missingSurname: Missingsurname;
+  revision: Revision20;
+}
+export interface ObservationFact {
+  evidence: Evidence15;
+  id: Id24;
+  importance: Importance12;
+  jobId: Jobid12;
+  kind: Kind20;
+  origin: Origin13;
+  revision: Revision21;
+  subprojectId: Subprojectid12;
   value: ObservationAssessment;
 }
 export interface ObservationAssessment {
   evidence: EvidenceSpan | null;
-  revision: Revision17;
+  revision: Revision22;
   sourceObservedAt: PartialDate | null;
+}
+export interface EmploymentFact {
+  evidence: Evidence16;
+  id: Id25;
+  importance: Importance13;
+  jobId: Jobid13;
+  kind: Kind21;
+  literalEvidence: Literalevidence5;
+  origin: Origin14;
+  revision: Revision23;
+  subprojectId: Subprojectid13;
+  value: EmploymentValue;
+}
+export interface EmploymentValue {
+  employer: Employer1;
+  jobId: Jobid14;
+  periods: Periods2;
+  role: Role1;
+  subprojects: Subprojects1;
+}
+export interface EmploymentPeriodValue {
+  end: PartialDate | null;
+  endText: Endtext;
+  evidence: Evidence17;
+  id: Id26;
+  present: Present1;
+  start: PartialDate | null;
+  startText: Starttext;
 }
 export interface GuiOperation {
   baseRevision: Baserevision;
@@ -598,8 +754,8 @@ export interface GuiOperation {
   dependencies: Dependencies | null;
   errorCode: Errorcode;
   events: Events;
-  id: Id20;
-  kind: Kind16;
+  id: Id27;
+  kind: Kind22;
   projectId: Projectid;
   resultFingerprint: Resultfingerprint;
   rulesUsed: Rules | null;
@@ -629,7 +785,7 @@ export interface Usage {
 }
 export interface Rules {
   markdown: Markdown;
-  revision: Revision18;
+  revision: Revision24;
   sha256: Sha256;
 }
 export interface Proposal {
@@ -638,8 +794,8 @@ export interface Proposal {
   dependencyHash: Dependencyhash;
   evidenceFactIds: Evidencefactids;
   findings: Findings;
-  id: Id21;
-  kind: Kind17;
+  id: Id28;
+  kind: Kind23;
   operationId: Operationid;
   replacementText: Replacementtext;
 }
@@ -647,7 +803,7 @@ export interface RenderSnapshotV4 {
   artifactAvailable: Artifactavailable;
   documentRevision: Documentrevision1;
   docx: AssetRef;
-  id: Id22;
+  id: Id29;
   pdf: Pdf;
   projectRevision: Projectrevision1;
   renderInputFingerprint: Renderinputfingerprint;
@@ -682,52 +838,52 @@ export interface ReviewDecision {
 export interface Source {
   byteRef: Byteref;
   byteSha256: Bytesha256;
-  id: Id23;
+  id: Id30;
   mimeType: Mimetype;
   originalName: Originalname;
   overlays: Overlays;
   parser: Parser;
   parserVersion: Parserversion;
-  revision: Revision21;
+  revision: Revision27;
   units: Units;
   warnings: Warnings;
 }
 export interface SourceOverlay {
-  id: Id24;
-  origin: Origin9;
-  revision: Revision20;
+  id: Id31;
+  origin: Origin15;
+  revision: Revision26;
   text: Text4;
   unitId: Unitid2;
 }
 export interface SourceUnit {
   disposition: Disposition1;
-  id: Id25;
+  id: Id32;
   location: SourceLocation;
   order: Order;
   representedFactIds: Representedfactids;
-  revision: Revision22;
+  revision: Revision28;
   text: Text5;
 }
 export interface SourceLocation {
   column: Column;
   index: Index;
-  kind: Kind18;
+  kind: Kind24;
   row: Row;
 }
 export interface TemplateManifest {
   assets: Assets;
   contentPolicyVersion: Contentpolicyversion;
-  id: Id26;
+  id: Id33;
   packageSha256: Packagesha256;
   version: Version;
 }
 export interface Block {
   contentPolicyVersion: Contentpolicyversion1;
   dependencyHash: Dependencyhash1;
-  id: Id27;
-  kind: Kind19;
+  id: Id34;
+  kind: Kind25;
   previous: BlockState | null;
-  revision: Revision23;
+  revision: Revision29;
   state: BlockState;
   status: Status1;
   visible: Visible8;
@@ -736,7 +892,7 @@ export interface BlockState {
   factIds: Factids4;
   factRevisions: Factrevisions;
   locked: Locked;
-  origin: Origin10;
+  origin: Origin16;
   text: Text6;
 }
 export interface Factrevisions {
