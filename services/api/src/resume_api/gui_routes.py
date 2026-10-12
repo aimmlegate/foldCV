@@ -5,6 +5,9 @@ from fastapi.responses import JSONResponse, Response
 
 from packages.resume_core.gui_projects import GuiCreateProjectRequest, GuiStartGenerationRequest, GuiProjectResponse, GuiRenameProjectRequest
 from packages.resume_core.gui_projects import GuiDeleteProjectRequest
+from packages.resume_core.gui_projects import GuiArchiveRequest
+from packages.resume_core.gui_archive_zip import MAX_ARCHIVE
+from packages.resume_core.gui_legacy_context import migration_context
 from packages.resume_core.gui_selection import selection_fingerprint
 from packages.resume_core.gui_source_context import source_context
 from packages.resume_core.models.recovery import SourceContextRequest, Mutation
@@ -40,6 +43,19 @@ def mount_projects(app, service, problem):
     async def projects():
         return JSONResponse(service.list_projects().model_dump(mode="json",by_alias=True),headers={"Cache-Control":"no-store"})
 
+    @app.post("/v1/projects/archive")
+    async def open_portable(request: Request):
+        try:
+            data,name,pasted=parse_one_part(await request.body(),request.headers.get("content-type",""),maximum=MAX_ARCHIVE)
+            if pasted or not name.lower().endswith((".foldcv",".recv",".zip")):return problem("ARCHIVE_FILE_UNSUPPORTED",422,"archive")
+        except UploadFailure as error:return problem(error.code,422,"archive")
+        return response(await service.import_archive(data),status=201)
+
+    @app.post("/v1/projects/{id}/archive")
+    async def save_portable(id: str,payload: GuiArchiveRequest):
+        data=await service.portable_archive(id,payload)
+        return Response(data,media_type="application/vnd.foldcv.project+zip",headers={"Cache-Control":"no-store","Content-Disposition":'attachment; filename="project.foldcv"'})
+
     @app.delete("/v1/projects/{id}")
     async def delete(id: str, _payload: GuiDeleteProjectRequest):
         result = await service.delete_project(id)
@@ -70,6 +86,10 @@ def mount_projects(app, service, problem):
     async def context(id: str, payload: SourceContextRequest):
         result = source_context(service.read(id), payload)
         return JSONResponse(result.model_dump(mode="json", by_alias=True), headers={"Cache-Control": "no-store"})
+
+    @app.get("/v1/projects/{id}/migration-context")
+    async def migration_history(id: str):
+        return JSONResponse(migration_context(service.read(id)).model_dump(mode="json",by_alias=True),headers={"Cache-Control":"no-store"})
 
     @app.post("/v1/projects/{id}/mutations")
     async def mutate(id: str, payload: Mutation):

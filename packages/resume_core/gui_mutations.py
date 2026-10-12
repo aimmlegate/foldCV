@@ -54,8 +54,11 @@ def checkpoint(workspace, slot):
     if record.kind == "candidate":
         ids.update(fact.id for fact in workspace.project.facts if isinstance(fact, NameAssessmentFact))
     facts = [fact.model_copy(deep=True) for fact in workspace.project.facts if fact.id in ids]
+    owned = {field.field_id for field in authored_fields(record)}
+    if record.kind == "job": owned.add(record.periods_field_id)
+    if record.kind == "skills-focus": owned.add(record.focus_field_id)
     marks = [mark.model_copy(deep=True) for mark in workspace.annotations
-             if mark.anchor.kind == "field" and mark.anchor.field_id.split("/", 1)[0] == slot]
+             if mark.anchor.kind == "field" and mark.anchor.field_id in owned]
     return BlockCheckpoint(record=record.model_copy(deep=True), facts=facts, annotations=marks,
         factStamps=[FactStamp(factId=fact.id, revision=fact.revision, ownerSlotId=slot, origin=fact.origin,
             authoritativeRevision=workspace.document_revision) for fact in facts],
@@ -100,7 +103,7 @@ def restore_facts(workspace, slot, target, previous_record):
     other_refs = {id for other_slot, record in records(workspace).items() if other_slot != slot
                   for field in authored_fields(record) for id in field.fact_ids}
     previous_ids = {id for field in authored_fields(previous_record) for id in field.fact_ids}
-    baseline_ids = {fact.id for fact in target.facts}
+    baseline_ids = {fact.id for fact in target.facts} | {stamp.fact_id for stamp in target.fact_stamps}
     removed = previous_ids - baseline_ids - other_refs
     workspace.project.facts = [fact for fact in workspace.project.facts if fact.id not in removed or fact.origin != "user"]
     conflicts = []
@@ -141,8 +144,11 @@ def restore(workspace, payload):
         workspace.annotations = [mark for mark in workspace.annotations if not
             (mark.code.startswith("reconcile_") and mark.type == "conflicting" and mark.fact_ids and set(mark.fact_ids) <= reverted)]
         workspace.related_update_suggestions = [item for item in workspace.related_update_suggestions if not set(item.fact_ids) & reverted]
+    owned = {field.field_id for field in authored_fields(record)} | {field.field_id for field in authored_fields(restored)}
+    if record.kind == "job": owned.add(record.periods_field_id)
+    if record.kind == "skills-focus": owned.add(record.focus_field_id)
     workspace.annotations = [mark for mark in workspace.annotations
-        if not (mark.anchor.kind == "field" and mark.anchor.field_id.split("/", 1)[0] == slot)] + [mark.model_copy(deep=True) for mark in target.annotations]
+        if not (mark.anchor.kind == "field" and mark.anchor.field_id in owned)] + [mark.model_copy(deep=True) for mark in target.annotations]
     if not changed_buffer:
         workspace.undo_slots[slot] = None
     if session:
@@ -278,7 +284,7 @@ def structural(workspace, mutation):
         workspace.undo_slots.pop(slot, None)
         workspace.edit_sessions.pop(slot, None)
         workspace.annotations = [mark for mark in workspace.annotations
-            if not (mark.anchor.kind == "field" and mark.anchor.field_id.split("/", 1)[0] == slot)]
+            if not (mark.anchor.kind == "field" and mark.anchor.field_id in {field.field_id for field in authored_fields(record)} | {getattr(record, "periods_field_id", "")} )]
         return [slot]
     if mutation.kind == "reorder":
         ids = [item.id for item in collection]

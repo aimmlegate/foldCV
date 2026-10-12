@@ -1050,3 +1050,80 @@ test("built example E8 task A13 cleanup failure stays visible and retries withou
   await expect(row).toHaveCount(0);await page.getByRole("dialog", { name: "Локальные проекты" }).getByRole("button", { name: "Закрыть", exact: true }).click();
   expect((await currentWorkspace(page)).projectId).toBe(second.projectId);expect(analysisCalls()).toBe(0);
 });
+
+test("built example E3d task A14 portable reopen preserves edits prior version and sources with zero calls", async ({ page }) => {
+  await page.setViewportSize({ width: 1280, height: 900 });await createRewriteExample(page);
+  await replaceFieldText(page, "profile/text", "Portable prior.");await page.locator('[data-field-content="candidate/name"]').click();
+  await expect.poll(async () => (await currentWorkspace(page)).undoSlots["profile"]?.record.kind).toBe("profile");
+  await replaceFieldText(page, "profile/text", "Portable current.");
+  const downloaded = page.waitForEvent("download");await page.getByRole("button", { name: "Сохранить проект", exact: true }).click();
+  const file = await downloaded, path = await file.path();expect(path).not.toBeNull();
+  const before = await currentWorkspace(page), calls = readFileSync(resolve(runRoot, "model-requests.json"), "utf8");
+  const archive = unzipSync(readFileSync(path ?? ""));expect(Object.keys(archive)).toContain("workspace.json");
+  expect(Object.keys(archive).some(name => name.startsWith("template/"))).toBe(false);
+  await projectMenu(page);await page.getByLabel("Файл проекта", { exact: true }).setInputFiles({ name: "synthetic.foldcv", mimeType: "application/zip", buffer: readFileSync(path ?? "") });
+  await expect.poll(() => new URL(page.url()).searchParams.get("project")).not.toBe(before.projectId);
+  await expect(page.locator('[data-field-content="profile/text"]')).toHaveText("Portable current.");
+  const after = await currentWorkspace(page);expect(after.project?.document).toEqual(before.project?.document);expect(after.undoSlots).toEqual(before.undoSlots);
+  expect(after.project?.sources).toEqual(before.project?.sources);expect(after.formattingAsOf).toEqual(before.formattingAsOf);expect(after.mutationReplay).toEqual([]);
+  expect(readFileSync(resolve(runRoot, "model-requests.json"), "utf8")).toBe(calls);
+  if (process.env.FOLDCV_EVIDENCE_ROOT) {
+    writeFileSync(resolve(process.env.FOLDCV_EVIDENCE_ROOT, "E3d-portable-project.foldcv"), readFileSync(path ?? ""));
+    await page.screenshot({ path: resolve(process.env.FOLDCV_EVIDENCE_ROOT, "E3d-portable-reopen.png") });
+  }
+  await page.locator('[data-field-content="profile/text"]').click();await page.keyboard.press("Control+z");await expect(page.locator('[data-field-content="profile/text"]')).toHaveText("Portable prior.");
+  await page.reload();await expect(page.locator('[data-field-content="profile/text"]')).toHaveText("Portable prior.");
+  const old: unknown = await (await page.request.get(`${origin}/v1/projects/${before.projectId}`)).json();expect(response(old).workspace.project?.document.profile.text.text).toBe("Portable current.");
+  expect(readFileSync(resolve(runRoot, "model-requests.json"), "utf8")).toBe(calls);
+});
+
+test("built example E8 task A14 corrupt portable file keeps current text project and settings", async ({ page }) => {
+  await createRewriteExample(page);await replaceFieldText(page, "profile/text", "Retained while opening corrupt file.");
+  await projectMenu(page);await expect.poll(async () => (await currentWorkspace(page)).project?.document.profile.text.text).toBe("Retained while opening corrupt file.");
+  const before = await currentWorkspace(page), url = page.url(), calls = readFileSync(resolve(runRoot, "model-requests.json"), "utf8");
+  await page.getByLabel("Файл проекта", { exact: true }).setInputFiles({ name: "broken.foldcv", mimeType: "application/zip", buffer: Buffer.from("corrupt bytes") });
+  await expect(page.getByRole("dialog", { name: "Локальные проекты" }).getByRole("alert")).toContainText("Не удалось открыть файл проекта");
+  expect(page.url()).toBe(url);expect((await currentWorkspace(page)).project?.document).toEqual(before.project?.document);
+  await page.getByRole("dialog", { name: "Локальные проекты" }).getByRole("button", { name: "Закрыть", exact: true }).click();
+  await expect(page.locator('[data-field-content="profile/text"]')).toHaveText("Retained while opening corrupt file.");
+  expect(readFileSync(resolve(runRoot, "model-requests.json"), "utf8")).toBe(calls);
+});
+
+test("built task A14 legacy v4 migration notice opens read only history and imported text remains editable", async ({ page }) => {
+  await page.setViewportSize({ width: 1280, height: 900 });await page.goto(`${origin}/next.html#secret=synthetic-next-secret-0123456789`);await projectMenu(page);
+  await page.getByLabel("Файл проекта", { exact: true }).setInputFiles(resolve(root, "contracts/examples/recovery/legacy_workspace_v4.foldcv"));
+  await expect(page.locator('[data-field-content="candidate/name"]')).toHaveText("Мария Примерова");
+  await page.getByText("Особенности переноса", { exact: true }).click();await expect(page.getByText("Свободный текст старого фокуса перенесён в навыки без подбора логотипов.", { exact: true })).toBeVisible();
+  await page.getByText("Особенности переноса", { exact: true }).click();
+  await page.getByRole("button", { name: "Показать текст переноса", exact: true }).click();const panel = page.getByRole("complementary", { name: "Исходный контекст" });
+  await expect(panel.locator('[data-legacy-kind="unapplied_draft"]').first()).toBeVisible();expect(await panel.locator('[contenteditable="true"]').count()).toBe(0);
+  if (process.env.FOLDCV_EVIDENCE_ROOT) await page.screenshot({ path: resolve(process.env.FOLDCV_EVIDENCE_ROOT, "legacy-migration-history.png") });
+  await page.getByRole("button", { name: "Закрыть исходный контекст", exact: true }).click();await replaceFieldText(page, "profile/text", "Editable imported profile.");
+  await page.locator('[data-field-content="candidate/name"]').click();await expect(page.locator(".next-save")).toHaveText("Сохранено");
+  await page.reload();await expect(page.locator('[data-field-content="profile/text"]')).toHaveText("Editable imported profile.");
+  expect(existsSync(resolve(runRoot, "model-requests.json"))).toBe(false);
+});
+
+test("built task A14 portable save error keeps current text and offers a fresh download", async ({ page }) => {
+  await createRewriteExample(page);await replaceFieldText(page, "profile/text", "Retained after save error.");
+  await page.route("**/archive", route => route.fulfill({ status: 503, contentType: "application/json", body: JSON.stringify({ error: { code: "PROJECT_SAVE_FAILED" } }) }));
+  await page.getByRole("button", { name: "Сохранить проект", exact: true }).click();await expect(page.getByText("Не удалось сохранить файл проекта.", { exact: false })).toBeVisible();
+  await expect(page.locator('[data-field-content="profile/text"]')).toHaveText("Retained after save error.");await page.unroute("**/archive");
+  const downloaded = page.waitForEvent("download");await page.getByRole("button", { name: "Сохранить проект", exact: true }).click();expect((await downloaded).suggestedFilename()).toBe("project.foldcv");
+});
+
+test("built task A14 failed imported project save retries same identity and preserves current project", async ({ page }) => {
+  await createRewriteExample(page);const before = await currentWorkspace(page);
+  const downloaded = page.waitForEvent("download");await page.getByRole("button", { name: "Сохранить проект", exact: true }).click();
+  const path = await (await downloaded).path();expect(path).not.toBeNull();let importedId: string | null = null;
+  await page.route("**/v1/projects/archive", async route => {
+    const result = await route.fetch(), body: unknown = await result.json();const value = response(body);importedId = value.workspace.projectId;
+    await route.fulfill({ response: result, json: { ...value, durability: "failed", savedProjectRevision: null, savedDocumentRevision: null } });
+  });
+  await projectMenu(page);await page.getByLabel("Файл проекта", { exact: true }).setInputFiles({ name: "synthetic.foldcv", mimeType: "application/zip", buffer: readFileSync(path ?? "") });
+  const retry = page.getByRole("button", { name: "Повторить сохранение открытого проекта", exact: true });await expect(retry).toBeVisible();
+  expect(new URL(page.url()).searchParams.get("project")).toBe(before.projectId);expect((await currentWorkspace(page)).project?.document).toEqual(before.project?.document);
+  await retry.click();await expect.poll(() => new URL(page.url()).searchParams.get("project")).toBe(importedId);
+  await expect(page.locator('[data-field-content="profile/text"]')).toHaveText(before.project?.document.profile.text.text ?? "");
+  expect((await currentWorkspace(page)).projectId).not.toBe(before.projectId);
+});

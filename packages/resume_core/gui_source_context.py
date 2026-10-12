@@ -25,6 +25,9 @@ def source_context(workspace, request) -> SourceContext:
     sources = {source.id: source for source in project.sources}
     facts = {fact.id: fact for fact in project.facts}
     records = {record_slot(record): record for record in project.document.records()}
+    anchor_owners = {id: slot for id, (_field, slot) in indexed.items()}
+    anchor_owners.update({job.periods_field_id: record_slot(job) for job in project.document.jobs})
+    anchor_owners[project.document.skills_focus.focus_field_id] = 'skills-focus'
     sections = {"education": "education", "language": "languages", "skills-focus": "skills-focus",
                 "certification": "certifications", "early-career": "early-career"}
     seen = {}
@@ -82,7 +85,7 @@ def source_context(workspace, request) -> SourceContext:
         anchor = mark.anchor
         relevant = anchor.kind == "document" or bool(set(mark.fact_ids) & linked_facts)
         if anchor.kind == "field":
-            relevant = relevant or anchor.field_id in ids or anchor.field_id.split("/", 1)[0] in slots
+            relevant = relevant or anchor.field_id in ids or anchor_owners.get(anchor.field_id) in slots
         if anchor.kind == "section":
             relevant = relevant or any(sections.get(records[slot].kind) == anchor.section_id for slot in slots)
         if relevant and not mark.resolved:

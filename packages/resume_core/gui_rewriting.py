@@ -5,6 +5,7 @@ from pydantic import Field
 from .gui_derived import digest
 from .gui_mutations import checkpoint, complete_session, document_content, records, unicode_valid
 from .gui_normalization import public_context_facts
+from .gui_legacy_context import public_workspace_facts
 from .gui_projection import compatibility_views
 from .gui_prompts import content_input
 from .gui_refresh import refresh
@@ -45,7 +46,7 @@ def rewriting_input(workspace, request, rules):
     indexed = field_index(workspace.project.document)
     selected = [indexed[span.field_id][0] for span in request.selection.spans]
     ids = {id for field in selected for id in field.fact_ids}
-    facts = [fact for fact in public_context_facts(workspace.project.facts) if fact.id in ids
+    facts = [fact for fact in public_workspace_facts(workspace) if fact.id in ids
              and not private_output_text(fact.model_dump_json(by_alias=True))]
     context = source_context(workspace, SourceContextRequest(projectId=workspace.project_id,
         documentRevision=workspace.document_revision, selection=request.selection, fieldIds=[]))

@@ -36,6 +36,7 @@ from .gui_rewriting_content import GuiRewritingContentService
 from .gui_exports import GuiExportMixin
 from .gui_analysis import GuiAnalysisMixin
 from .gui_management import GuiManagementMixin
+from .gui_archives import GuiArchiveMixin
 from .gui_errors import ProjectFailure
 from .lifecycle import OperationFiles, SpikeError
 from .providers.content import ContentFailure
@@ -49,7 +50,7 @@ def identity(prefix):
     return prefix + "-" + uuid.uuid4().hex
 
 
-class GuiProjectService(GuiExportMixin, GuiAnalysisMixin, GuiManagementMixin):
+class GuiProjectService(GuiExportMixin, GuiAnalysisMixin, GuiManagementMixin, GuiArchiveMixin):
     def __init__(self, temp_root: Path, rules, provider_factory, *, clock=now,
                  worker_slot=None, cleanup_error=None, renderer=None, storage=None, preferences=None,
                  analysis_delay=0.5):
@@ -314,7 +315,8 @@ class GuiProjectService(GuiExportMixin, GuiAnalysisMixin, GuiManagementMixin):
             if not pre.extracted_text.strip() or pre.extraction_fingerprint is None:
                 raise ProjectFailure("NO_USABLE_TEXT", 422)
             source_ids = [pre.selected_source_id]
-            workspace.formatting_as_of = partial_date(self.clock().date().isoformat())
+            if "portable_project_imported" not in workspace.migration_notices:
+                workspace.formatting_as_of = partial_date(self.clock().date().isoformat())
         else:
             old = self.generation(id, previous)
             if old.status not in {"failed", "cancelled", "interrupted"}:

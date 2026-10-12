@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { FieldEditor, type FieldEditorHandle } from "./FieldEditor";
-import { projectRequest, sourceRequest, errorLabel, type Workspace } from "./api";
+import { projectRequest, sourceRequest, migrationRequest, errorLabel, type Workspace } from "./api";
 import { SourcePanel } from "./SourcePanel";
 import { StructureControls } from "./StructureControls";
 import { useEdits } from "./useEdits";
@@ -13,6 +13,8 @@ import { useAnalysis } from "./useAnalysis";
 import { useRelated } from "./useRelated";
 import { AnnotationActions } from "./Annotations";
 import { ProjectsDialog } from "./ProjectsDialog";
+import { usePortable } from "./usePortable";
+import { MigrationNotice } from "./MigrationNotice";
 import type { SourceContext } from "../contracts/generated/source_context";
 import type { GuiProjectResponse } from "../contracts/generated/gui_project_response";
 import { documentFields } from "./fields";
@@ -58,8 +60,16 @@ export function App() {
   const related = useRelated(editor, edits);
   const rewrite = useRewrite(editor, edits);
   const exporter = useExport(workspace, editor, edits);
+  const portable = usePortable(edits);
   const editorKey = `${workspace?.projectId}:${fields.map(field => field.fieldId).join("|")}`;
   const initialArtifact = workspace?.project?.renders.find(render => render.artifactAvailable && render.docx);
+  async function showMigration() {
+    if (!workspace) return;
+    const epoch = ++sourceEpoch.current;setSourceOpen(true);setSourceBusy(true);setSource(null);
+    try { const result = await migrationRequest(workspace.projectId);if (epoch === sourceEpoch.current) setSource(result); }
+    catch { setError("Не удалось прочитать историю переноса. Текущий текст остаётся в редакторе."); }
+    finally { if (epoch === sourceEpoch.current) setSourceBusy(false); }
+  }
 
   useEffect(() => {
     if (!workspace || !generationId || !generation || !["queued", "running"].includes(generation.status)) return;
@@ -149,7 +159,7 @@ export function App() {
       <span className="next-save" role="status">{edits.saving ? "Сохраняем…" : edits.pending ? "Есть несохранённые правки" : workspace
         ? durability === "durable" ? "Сохранено" : durability === "failed" ? "Сохранение не удалось" : durability === "in_memory" ? "В памяти приложения" : "Сохраняем…" : ""}</span>
       <div className="next-actions">
-        <button disabled>Сохранить проект</button><button disabled={!document || edits.locked} onClick={() => { setSettingsOpen(false);setSourceOpen(false);rewrite.close();void exporter.start(); }}>Экспорт DOCX</button>
+        <button disabled={!workspace || portable.busy || busy} onClick={() => { void portable.save(); }}>Сохранить проект</button><button disabled={!document || edits.locked} onClick={() => { setSettingsOpen(false);setSourceOpen(false);rewrite.close();void exporter.start(); }}>Экспорт DOCX</button>
         <button onClick={() => { void edits.flushBeforeAction().then(saved => { if (saved) { setSourceOpen(false);rewrite.close();setSettingsOpen(true); }
           else setError("Завершите ввод и сохраните правки перед открытием настроек."); }); }}>Настройки</button>
         <label className="next-theme">Тема <select aria-label="Тема" value={theme.mode} onChange={event => theme.select(event.target.value)}>
@@ -165,6 +175,8 @@ export function App() {
     {analysis.error && <p role="alert">{analysis.error}</p>}
     {related.message && <p className="next-message" role="status">{related.message}
       {related.retryable && <button onClick={() => { void related.retry(); }}>Повторить обновление</button>}</p>}
+    {portable.message && <p className="next-message" role="status">{portable.message}</p>}
+    {workspace && <MigrationNotice notices={workspace.migrationNotices} showText={() => { void showMigration(); }} />}
     {!exporter.open && exporter.message && <p className="next-message text-danger" role="alert">{exporter.message}</p>}
     {saveError && !edits.error && workspace && <p className="next-message text-danger" role="alert">Не удалось сохранить проект. Данные остаются в окне.
       <button onClick={() => { void projectRequest(`/v1/projects/${workspace.projectId}/save`, "POST", {}).then(accept).catch(error => setError(errorLabel(error))); }}>Повторить сохранение</button></p>}

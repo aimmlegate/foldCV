@@ -1,0 +1,21 @@
+{
+  "additionalProperties": false,
+  "properties": {
+    "documentRevision": {
+      "minimum": 1,
+      "title": "Documentrevision",
+      "type": "integer"
+    },
+    "projectRevision": {
+      "minimum": 1,
+      "title": "Projectrevision",
+      "type": "integer"
+    }
+  },
+  "required": [
+    "projectRevision",
+    "documentRevision"
+  ],
+  "title": "GuiArchiveRequest",
+  "type": "object"
+}

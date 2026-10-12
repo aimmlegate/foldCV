@@ -12,6 +12,7 @@ import type { GuiProjectListResponse } from "../contracts/generated/gui_project_
 import type { GuiDeleteProjectRequest } from "../contracts/generated/gui_delete_project_request";
 import type { GuiDeleteProjectResult } from "../contracts/generated/gui_delete_project_result";
 import type { GuiRenameProjectRequest } from "../contracts/generated/gui_rename_project_request";
+import type { GuiArchiveRequest } from "../contracts/generated/gui_archive_request";
 import type { RulesSettings } from "../contracts/generated/rules_settings";
 import type { GuiExportRequest } from "../contracts/generated/gui_export_request";
 import type { Preferences } from "../contracts/generated/preferences";
@@ -47,6 +48,11 @@ export async function projectRequest(path: string, method = "GET", body?: GuiCre
 function isContext(value: unknown): value is SourceContext { return validateContract("source_context", value); }
 export async function sourceRequest(body: SourceContextRequest): Promise<SourceContext> {
   const value = await request(`/v1/projects/${body.projectId}/source-context`, "POST", body);
+  if (!isContext(value)) throw new ApiFailure("INVALID_RESULT");
+  return value;
+}
+export async function migrationRequest(id: string): Promise<SourceContext> {
+  const value = await request(`/v1/projects/${id}/migration-context`);
   if (!isContext(value)) throw new ApiFailure("INVALID_RESULT");
   return value;
 }
@@ -93,6 +99,19 @@ export async function deleteProjectRequest(id: string): Promise<GuiDeleteProject
   const value = await request(`/v1/projects/${id}`, "DELETE", { confirmed: true });
   if (!isDeleteResult(value)) throw new ApiFailure("INVALID_RESULT");
   return value;
+}
+export async function openArchiveRequest(file: File): Promise<GuiProjectResponse> {
+  if (file.size > 64 * 1024 * 1024) throw new ApiFailure("ARCHIVE_SIZE_LIMIT");
+  const body = new FormData();body.append("file", file);
+  return projectRequest("/v1/projects/archive", "POST", body);
+}
+export async function archiveDownload(id: string, body: GuiArchiveRequest): Promise<Blob> {
+  const response = await fetch(`/v1/projects/${id}/archive`, { method: "POST", credentials: "same-origin", cache: "no-store",
+    headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+  if (!response.ok) { const value: unknown = await response.json();throw new ApiFailure(errorCode(value)); }
+  const blob = await response.blob();
+  if (blob.type !== "application/vnd.foldcv.project+zip" || blob.size > 64 * 1024 * 1024 || blob.size < 22) throw new ApiFailure("INVALID_RESULT");
+  return blob;
 }
 export async function docxDownload(path: string, expected: { sha256: string; size: number }): Promise<Blob> {
   const response = await fetch(path, { credentials: "same-origin", cache: "no-store" });

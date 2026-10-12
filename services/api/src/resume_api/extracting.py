@@ -32,7 +32,7 @@ class UploadFailure(Exception):
         super().__init__(code)
 
 
-def parse_one_part(body: bytes, content_type: str) -> tuple[bytes, str, bool]:
+def parse_one_part(body: bytes, content_type: str, *, maximum=MAX_SOURCE) -> tuple[bytes, str, bool]:
     match = re.fullmatch(r"multipart/form-data;\s*boundary=(?:\"([^\"]+)\"|([^;\s]+))", content_type, re.I)
     if not match:
         raise UploadFailure("INVALID_REQUEST")
@@ -64,8 +64,8 @@ def parse_one_part(body: bytes, content_type: str) -> tuple[bytes, str, bool]:
     else:
         raise UploadFailure("INVALID_REQUEST")
     if (not name or len(name) > 255 or any(ord(char) < 32 for char in name) or
-            "/" in name or "\\" in name or not data or len(data) > MAX_SOURCE):
-        raise UploadFailure("INPUT_TOO_LARGE" if len(data) > MAX_SOURCE else "INVALID_REQUEST")
+            "/" in name or "\\" in name or not data or len(data) > maximum):
+        raise UploadFailure("INPUT_TOO_LARGE" if len(data) > maximum else "INVALID_REQUEST")
     return data, name, pasted
 
 

@@ -56,8 +56,13 @@ class GuiDeleteProjectResult(Wire):
     error_code: Id | None
 
 
+class GuiArchiveRequest(Wire):
+    project_revision: Revision
+    document_revision: Revision
+
+
 GUI_PROJECT_CONTRACTS = {"gui_create_project_request": GuiCreateProjectRequest,
     "gui_start_generation_request": GuiStartGenerationRequest, "gui_project_response": GuiProjectResponse,
     "gui_rename_project_request": GuiRenameProjectRequest,
     "gui_project_list_response": GuiProjectListResponse, "gui_delete_project_request": GuiDeleteProjectRequest,
-    "gui_delete_project_result": GuiDeleteProjectResult}
+    "gui_delete_project_result": GuiDeleteProjectResult, "gui_archive_request": GuiArchiveRequest}

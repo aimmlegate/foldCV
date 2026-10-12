@@ -5,6 +5,7 @@ from .gui_normalization import public_context_facts, source_fingerprint
 from .gui_selection import field_index, normalized_text, selection_fingerprint, utf16_slice
 from .privacy import private_output_text
 from .models.recovery import NameAssessmentFact
+from .gui_legacy_context import public_workspace_facts
 
 
 def apply_related(workspace, payload, rules_sha256=None):
@@ -19,7 +20,7 @@ def apply_related(workspace, payload, rules_sha256=None):
         raise MutationFailure('RELATED_UPDATE_STALE')
     unicode_valid(suggestion.model_dump())
     indexed = field_index(workspace.project.document)
-    public = {fact.id for fact in public_context_facts(workspace.project.facts)}
+    public = {fact.id for fact in public_workspace_facts(workspace)}
     public.update(fact.id for fact in workspace.project.facts if isinstance(fact, NameAssessmentFact))
     if not set(suggestion.fact_ids) <= public or not suggestion.replacements or len(suggestion.replacements) > 100:
         raise MutationFailure('RELATED_UPDATE_INVALID')

@@ -5,6 +5,11 @@ const relations = { exact: "Совпадает с выделением", field: 
 const statuses = { "user-origin": "Этот текст добавлен пользователем. Источника для него нет.",
   "no-evidence": "Для этого фрагмента нет сохранённого источника.",
   stale: "Выделение устарело или текст изменён. Выделите фрагмент снова после сохранения." };
+const legacyLabels: Record<string, string> = { unapplied_draft: "Неприменённая правка", unapplied_form: "Неприменённый текст",
+  unapplied_presentation: "Неприменённые данные кандидата", unapplied_input: "Сохранённый ввод", unapplied_education: "Неприменённое образование",
+  legacy_profile: "Старый профиль", legacy_previous_profile: "Предыдущий профиль", legacy_job_prose: "Старое описание работы",
+  legacy_previous_job_prose: "Предыдущее описание работы", legacy_education: "Старое образование", legacy_focus: "Старый фокус",
+  legacy_skills: "Старые навыки", contact: "Контактные данные из старого файла", unapplied_proposal: "Неприменённое предложение" };
 export function SourcePanel({ context, workspace, loading, close }: {
   context: SourceContext | null; workspace: Workspace; loading: boolean; close: () => void;
 }) {
@@ -19,6 +24,6 @@ export function SourcePanel({ context, workspace, loading, close }: {
     </section>)}
     {context?.annotations.length ? <section><h3>Связанные отметки</h3>{context.annotations.map(mark => <p key={mark.id}
       data-source-annotation={mark.code}>{mark.type === "conflicting" ? "В исходнике есть противоречие. Обе версии сохранены." : "В этом блоке есть сведения для уточнения."}</p>)}</section> : null}
-    {context?.legacyText.map(item => <section key={item.id}><h3>{item.label}</h3><p>{item.text}</p></section>)}
+    {context?.legacyText.map(item => <section key={item.id} data-legacy-kind={item.originalKind}><h3>{legacyLabels[item.originalKind] ?? item.label}</h3><p className="next-related-text">{item.text}</p></section>)}
   </aside>;
 }

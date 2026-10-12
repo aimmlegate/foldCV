@@ -6,6 +6,7 @@ from pydantic import Field
 from .gui_derived import digest
 from .gui_mutations import document_content, records, unicode_valid
 from .gui_normalization import public_context_facts, source_fingerprint
+from .gui_legacy_context import public_workspace_facts
 from .gui_projection import compatibility_views
 from .gui_prompts import content_input
 from .gui_refresh import refresh
@@ -94,7 +95,7 @@ def reconciliation_input(workspace, field_ids, rules):
     indexed = analysis_index(workspace)
     if not field_ids or not set(field_ids) <= indexed.keys(): raise ValueError('ANALYSIS_SCOPE_INVALID')
     ids = relevant_ids(workspace, field_ids)
-    facts = public_context_facts([fact for fact in workspace.project.facts if fact.id in ids])
+    facts = [fact for fact in public_workspace_facts(workspace) if fact.id in ids]
     public = {fact.id for fact in facts}
     fields = []
     mentions = []
@@ -132,7 +133,7 @@ def validate_proposal(workspace, field_ids, proposal):
     unicode_valid(raw)
     indexed = analysis_index(workspace)
     allowed = relevant_ids(workspace, field_ids)
-    public = {fact.id for fact in public_context_facts(workspace.project.facts)}
+    public = {fact.id for fact in public_workspace_facts(workspace)}
     if workspace.project.document.candidate.name.field_id in field_ids:
         public.update(fact.id for fact in workspace.project.facts if isinstance(fact, NameAssessmentFact))
     fields = [entry.field_id for entry in proposal.field_facts]
@@ -153,7 +154,7 @@ def validate_proposal(workspace, field_ids, proposal):
     references = {id for entry in proposal.field_facts for id in entry.fact_ids}
     existing = {fact.id for fact in workspace.project.facts}
     if not references <= public | facts.keys(): raise ValueError('ANALYSIS_SCOPE_INVALID')
-    if not facts.keys() <= references or not (facts.keys() & existing) <= allowed: raise ValueError('ANALYSIS_SCOPE_INVALID')
+    if not facts.keys() <= references or not (facts.keys() & existing) <= allowed & public: raise ValueError('ANALYSIS_SCOPE_INVALID')
     for fact in proposal.facts:
         if isinstance(fact, NameAssessmentFact):
             if workspace.project.document.candidate.name.field_id not in field_ids or fact.value.evidence:

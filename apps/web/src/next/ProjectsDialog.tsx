@@ -3,14 +3,16 @@ import type { RegistryEntry } from "../contracts/generated/registry";
 import type { GuiProjectListResponse } from "../contracts/generated/gui_project_list_response";
 import type { GuiProjectResponse } from "../contracts/generated/gui_project_response";
 import type { useEdits } from "./useEdits";
-import { deleteProjectRequest, projectListRequest, projectRequest, renameProjectRequest, type Workspace } from "./api";
+import { deleteProjectRequest, openArchiveRequest, projectListRequest, projectRequest, renameProjectRequest, type Workspace } from "./api";
 
 type Props = { workspace: Workspace | null; edits: ReturnType<typeof useEdits>; accept: (response: GuiProjectResponse) => void; close: () => void };
 export function ProjectsDialog({ workspace, edits, accept, close }: Props) {
   const dialog = useRef<HTMLDialogElement>(null);
+  const chooser = useRef<HTMLInputElement>(null);
   const [list, setList] = useState<GuiProjectListResponse | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
+  const [unsavedImport, setUnsavedImport] = useState<string | null>(null);
   const [renaming, setRenaming] = useState<RegistryEntry | null>(null);
   const [title, setTitle] = useState("");
   const [deleting, setDeleting] = useState<RegistryEntry | null>(null);
@@ -65,10 +67,40 @@ export function ProjectsDialog({ workspace, edits, accept, close }: Props) {
     } catch { setError("Не удалось подтвердить удаление. Обновите список и повторите действие.");await refresh(); }
     finally { setBusy(false); }
   }
+  async function openFile(file: File) {
+    setBusy(true);setError("");
+    try {
+      if (!await edits.flushBeforeAction(true)) { setError("Сначала завершите ввод и сохраните правки.");return; }
+      const imported = await openArchiveRequest(file);
+      if (imported.durability !== "durable") { setUnsavedImport(imported.workspace.projectId);setError("Файл прочитан, но запись нового проекта на диск не подтверждена. Повторите сохранение; текущий проект открыт.");await refresh();return; }
+      setUnsavedImport(null);
+      if (!await edits.flushBeforeAction(true)) { setError("Новый проект сохранён в списке. Сначала сохраните текущие правки.");await refresh();return; }
+      location.assign(`/next.html?project=${encodeURIComponent(imported.workspace.projectId)}`);
+    } catch { setError("Не удалось открыть файл проекта. Текущие правки остаются в редакторе; проверьте формат и целостность файла."); }
+    finally { setBusy(false); }
+  }
+  async function retryImport() {
+    if (!unsavedImport) return;
+    setBusy(true);setError("");
+    try {
+      if (!await edits.flushBeforeAction(true)) { setError("Сначала сохраните текущие правки.");return; }
+      const result = await projectRequest(`/v1/projects/${unsavedImport}/save`, "POST", {});
+      if (result.durability !== "durable") { setError("Запись открытого проекта на диск не подтверждена. Повторите сохранение.");return; }
+      setUnsavedImport(null);
+      if (!await edits.flushBeforeAction(true)) { setError("Новый проект сохранён в списке. Сначала сохраните текущие правки.");await refresh();return; }
+      location.assign(`/next.html?project=${encodeURIComponent(result.workspace.projectId)}`);
+    } catch { setError("Не удалось сохранить открытый проект. Текущие правки остаются в редакторе."); }
+    finally { setBusy(false); }
+  }
   return <dialog ref={dialog} className="next-projects" aria-label="Локальные проекты" onCancel={event => { event.preventDefault();if (!busy) dismiss(); }}>
     <header><h2>Локальные проекты</h2><button disabled={busy} onClick={dismiss}>Закрыть</button></header>
     <button disabled={busy} onClick={() => { void navigate(); }}>Новое резюме</button>
+    <button disabled={busy} onClick={() => chooser.current?.click()}>Открыть файл проекта</button>
+    <input ref={chooser} type="file" accept=".foldcv,.recv,.zip" aria-label="Файл проекта" hidden onChange={event => {
+      const file = event.target.files?.[0];if (file) void openFile(file);event.target.value = "";
+    }} />
     {busy && <p role="status">Выполняем действие…</p>}{error && <p role="alert" className="text-danger">{error}</p>}
+    {unsavedImport && <button disabled={busy} onClick={() => { void retryImport(); }}>Повторить сохранение открытого проекта</button>}
     {renaming ? <form onSubmit={event => { event.preventDefault();void rename(); }}>
       <label>Имя проекта<input autoFocus value={title} maxLength={200} onChange={event => setTitle(event.target.value)} /></label>
       <button disabled={busy || !title.trim()} type="submit">Сохранить имя</button>
