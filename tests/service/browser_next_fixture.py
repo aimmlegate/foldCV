@@ -89,6 +89,23 @@ class ControlledProvider(CreationProvider):
 class ControlledRenderer(GuiDocxRenderer):
     def __init__(self, root):
         self.root, self.calls = root, 0
+        if (root / "no-converter").exists():
+            import resume_api.gui_rendering as rendering
+            wrapper = root / "docx-without-converter.py"
+            wrapper.write_text(f'''import sys
+from pathlib import Path
+sys.path.insert(0, {str(ROOT)!r})
+from packages.resume_core.rendering import template, worker
+template.SOFFICE = Path({str(root / "missing-converter")!r})
+template.APP_FONTS = Path({str(root / "missing-font-copies")!r})
+assert not template.SOFFICE.exists() and not template.APP_FONTS.exists()
+def forbidden(*args):
+    raise RuntimeError("Legacy converter invoked")
+worker._convert = forbidden
+Path({str(root / "converter-disabled")!r}).touch()
+raise SystemExit(worker.main())
+''')
+            rendering.WORKER = wrapper
 
     async def render(self, document, anchors, files):
         self.calls += 1

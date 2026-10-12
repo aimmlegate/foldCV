@@ -24,6 +24,7 @@ test.beforeEach(async ({}, info) => {
   const example = info.title.includes("focus warning") ? "E2-focus" : info.title.includes("E2") ? "E2" : "E1";
   if (info.title.includes("task A13")) writeFileSync(resolve(runRoot, "multiple-examples"), "Controlled E1/E2 projects.");
   if (info.title.includes("task A11")) writeFileSync(resolve(runRoot, "related-example"), "Controlled shared-claim fixture.");
+  if (info.title.includes("without LibreOffice")) writeFileSync(resolve(runRoot, "no-converter"), "The owned worker must render with unavailable legacy dependencies.");
   if (!info.title.includes("A10") && !info.title.includes("task A11")) writeFileSync(resolve(runRoot, "pause-analysis"), "Isolate the accepted foreground feature from background analysis.");
   origin = await launch(example);
 });
@@ -1345,4 +1346,42 @@ test("built task A16 assistant source evidence stays beside the editor and close
   if (process.env.FOLDCV_EVIDENCE_ROOT) await page.screenshot({ path: resolve(process.env.FOLDCV_EVIDENCE_ROOT, "A16-source-light.png") });
   await page.getByRole("button", { name: "Закрыть исходный контекст", exact: true }).focus();await page.keyboard.press("Escape");await expect(panel).toHaveCount(0);
   expect(await page.evaluate(() => window.getSelection()?.toString())).toBe(field.text);await expect(page.locator('[contenteditable="true"]')).toHaveCount(1);
+});
+
+test("built examples E1 E3 task A21 flow connects edit restore local portable reopen and DOCX without LibreOffice", async ({ page }) => {
+  await page.setViewportSize({ width: 1280, height: 900 });await createRewriteExample(page);const initial = await currentWorkspace(page), job = initial.project?.document.jobs[0];if (!job) throw new Error("Missing job");
+  expect(initial.project?.operations).toHaveLength(2);expect(initial.project?.document.earlyCareer.text.text).toContain("2008–2009");
+  const addition = "Подготовила инструкцию для дежурной смены.";await replaceFieldText(page, job.tasks.fieldId, addition);
+  await selectFields(page, job.tasks.fieldId, 0, job.tasks.fieldId, 11);await openSelectionAssistant(page);await submitRewrite(page);
+  await expect(page.locator(`[data-field-content="${job.tasks.fieldId}"]`)).toHaveText("Яснее: " + addition);
+  await page.locator(`[data-field-content="${job.tasks.fieldId}"]`).click();await page.getByRole("button", { name: "Отменить правку блока", exact: true }).click();
+  await expect(page.locator(`[data-field-content="${job.tasks.fieldId}"]`)).toHaveText(addition);
+  await page.getByRole("button", { name: "Отменить правку блока", exact: true }).click();await expect(page.locator(`[data-field-content="${job.tasks.fieldId}"]`)).toHaveText(addition);
+  await replaceFieldText(page, "profile/text", "Connected prior.");await page.locator('[data-outline-section="candidate"]').click();await expect(page.locator(".next-save")).toHaveText("Сохранено");
+  await replaceFieldText(page, "profile/text", "Connected current.");await page.locator('[data-outline-section="jobs"]').click();await expect(page.locator(".next-save")).toHaveText("Сохранено");
+  const saved = await currentWorkspace(page), calls = readFileSync(resolve(runRoot, "model-requests.json"), "utf8");await page.reload();
+  await expect(page.locator('[data-field-content="profile/text"]')).toHaveText("Connected current.");const local = await currentWorkspace(page);
+  expect(local.project?.document).toEqual(saved.project?.document);expect(local.undoSlots).toEqual(saved.undoSlots);expect(local.project?.sources).toEqual(initial.project?.sources);
+  expect(readFileSync(resolve(runRoot, "model-requests.json"), "utf8")).toBe(calls);
+  const portable = page.waitForEvent("download");await page.getByRole("button", { name: "Сохранить проект", exact: true }).click();const archiveFile = await portable, archivePath = await archiveFile.path();if (!archivePath) throw new Error("Missing archive download");
+  const bytes = readFileSync(archivePath), entries = unzipSync(bytes), workspaceBytes = entries["workspace.json"];if (!workspaceBytes) throw new Error("Missing archived workspace");
+  const raw: unknown = JSON.parse(new TextDecoder().decode(workspaceBytes));expect(validateContract("workspace_v5", raw)).toBe(true);
+  const original = readFileSync(resolve(root, "tests/fixtures/recovery/E1.txt"));expect(Object.entries(entries).some(([path, bytes]) => path.startsWith("sources/") && Buffer.from(bytes).equals(original))).toBe(true);
+  await projectMenu(page);await page.getByLabel("Файл проекта", { exact: true }).setInputFiles({ name: "connected.foldcv", mimeType: "application/zip", buffer: bytes });
+  await expect.poll(() => new URL(page.url()).searchParams.get("project")).not.toBe(saved.projectId);await expect(page.locator('[data-field-content="profile/text"]')).toHaveText("Connected current.");
+  const imported = await currentWorkspace(page);expect(imported.project?.document).toEqual(saved.project?.document);expect(imported.project?.facts).toEqual(saved.project?.facts);
+  expect(imported.undoSlots).toEqual(saved.undoSlots);expect(imported.formattingAsOf).toEqual(saved.formattingAsOf);expect(imported.mutationReplay).toEqual([]);
+  expect(readFileSync(resolve(runRoot, "model-requests.json"), "utf8")).toBe(calls);
+  await exportCurrent(page);await expect(page.getByRole("button", { name: "Скачать DOCX", exact: true })).toBeEnabled();const docx = await downloadDocx(page, "connected.docx");
+  expect(docx.xml).toContain(addition);expect(docx.xml).toContain("Connected current.");expect(docx.xml).not.toContain("Интеграционные тесты.");expect(docx.xml).not.toContain("mail@example.com");expect(Object.keys(docx.entries).some(path => path.endsWith(".pdf"))).toBe(false);
+  expect(existsSync(resolve(runRoot, "converter-disabled"))).toBe(true);expect(readFileSync(resolve(runRoot, "model-requests.json"), "utf8")).toBe(calls);
+  if (process.env.FOLDCV_EVIDENCE_ROOT) {
+    writeFileSync(resolve(process.env.FOLDCV_EVIDENCE_ROOT, "A21-connected.foldcv"), bytes);writeFileSync(resolve(process.env.FOLDCV_EVIDENCE_ROOT, "A21-connected.docx"), docx.bytes);
+    await page.screenshot({ path: resolve(process.env.FOLDCV_EVIDENCE_ROOT, "A21-export.png") });
+  }
+  await page.getByRole("button", { name: "К тексту", exact: true }).click();await page.locator('[data-outline-section="profile"]').click();
+  await page.getByRole("button", { name: "Отменить правку блока", exact: true }).click();await expect(page.locator('[data-field-content="profile/text"]')).toHaveText("Connected prior.");
+  await page.locator('[data-outline-section="jobs"]').click();await expect(page.locator(".next-save")).toHaveText("Сохранено");await page.reload();await expect(page.locator('[data-field-content="profile/text"]')).toHaveText("Connected prior.");
+  if (process.env.FOLDCV_EVIDENCE_ROOT) await page.screenshot({ path: resolve(process.env.FOLDCV_EVIDENCE_ROOT, "A21-editor-reopen.png") });
+  expect(readFileSync(resolve(runRoot, "model-requests.json"), "utf8")).toBe(calls);
 });
