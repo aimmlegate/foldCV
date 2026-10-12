@@ -581,8 +581,10 @@ def validate_contract(kind: str, data: object) -> Wire:
               "zip_manifest": ZipManifest, "archive_manifest": ArchiveManifest}
     from .recovery import RECOVERY_CONTRACTS
     from ..gui_normalization import GUI_NORMALIZATION_CONTRACTS
+    from ..gui_drafting import GUI_DRAFT_CONTRACTS
     models.update(RECOVERY_CONTRACTS)
     models.update(GUI_NORMALIZATION_CONTRACTS)
+    models.update(GUI_DRAFT_CONTRACTS)
     if kind not in models:
         raise ValueError("unknown contract")
     result = models[kind].model_validate(data)

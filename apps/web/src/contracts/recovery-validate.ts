@@ -1,3 +1,6 @@
+import draftRequest from "../../../../contracts/json-schema/gui_draft_request.schema.json" with { type: "json" };
+import draftProposal from "../../../../contracts/json-schema/gui_draft_proposal.schema.json" with { type: "json" };
+import draftResult from "../../../../contracts/json-schema/gui_draft_result.schema.json" with { type: "json" };
 import guiRequest from "../../../../contracts/json-schema/gui_normalize_request.schema.json" with { type: "json" };
 import guiProposal from "../../../../contracts/json-schema/gui_semantic_proposal.schema.json" with { type: "json" };
 import guiResult from "../../../../contracts/json-schema/gui_normalized_result.schema.json" with { type: "json" };
@@ -23,7 +26,7 @@ import context from "../../../../contracts/json-schema/source_context.schema.jso
 const ajv = new Ajv2020({ allErrors: true, strict: false });
 const schemas = { project_v4: project, workspace_v5: workspace, archive_manifest_v5: archive,
   document, docx_error: error, editorial_plan: plan, mutation, mutation_result: result,
-  preferences, registry, render_snapshot_v4: render, rules, selection, source_context: context, save_rules_request: saveRules, rules_settings_error: rulesError, rules_settings: rulesSettings, gui_normalize_request: guiRequest, gui_semantic_proposal: guiProposal, gui_normalized_result: guiResult };
+  preferences, registry, render_snapshot_v4: render, rules, selection, source_context: context, save_rules_request: saveRules, rules_settings_error: rulesError, rules_settings: rulesSettings, gui_normalize_request: guiRequest, gui_semantic_proposal: guiProposal, gui_normalized_result: guiResult, gui_draft_request: draftRequest, gui_draft_proposal: draftProposal, gui_draft_result: draftResult };
 const validators = new Map(Object.entries(schemas).map(([name, schema]) => [name, ajv.compile(schema)]));
 
 export function validateRecoveryShape(kind: string, value: unknown): boolean {

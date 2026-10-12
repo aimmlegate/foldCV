@@ -2002,5 +2002,26 @@
         }
       }
     ]
+  },
+  {
+    "name": "gui_draft_request_valid",
+    "contract": "gui_draft_request",
+    "base": "gui_draft_request",
+    "valid": true,
+    "edits": []
+  },
+  {
+    "name": "gui_draft_proposal_valid",
+    "contract": "gui_draft_proposal",
+    "base": "gui_draft_proposal",
+    "valid": true,
+    "edits": []
+  },
+  {
+    "name": "gui_draft_result_valid",
+    "contract": "gui_draft_result",
+    "base": "gui_draft_result",
+    "valid": true,
+    "edits": []
   }
 ]

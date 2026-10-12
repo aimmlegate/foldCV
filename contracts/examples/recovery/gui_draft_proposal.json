@@ -1,0 +1,204 @@
+{
+  "fields": [
+    {
+      "fieldId": "profile/text",
+      "text": "Разрабатываю backend-сервисы на Python.",
+      "factIds": [
+        "fact_0bda1e73fd9798fd63392055"
+      ]
+    },
+    {
+      "fieldId": "job:job_31c7e5bb4cb2b8146b6567ac/context",
+      "text": "Сервис обработки заказов.",
+      "factIds": [
+        "fact_0bda1e73fd9798fd63392055",
+        "fact_f932146f9e46bc87751c454b",
+        "fact_a23f31c3d0398cabe2515641",
+        "fact_0517ea130ed13166460bdb23",
+        "fact_2db90a5d319549fa695f3ac0",
+        "fact_5f3a5861d1ef06c45bc116d9",
+        "fact_6715ef57edf82fa0397da1f4"
+      ]
+    },
+    {
+      "fieldId": "job:job_31c7e5bb4cb2b8146b6567ac/tasks",
+      "text": "Разработка REST API для заказов.\nИнтеграционные тесты.",
+      "factIds": [
+        "fact_0bda1e73fd9798fd63392055",
+        "fact_f932146f9e46bc87751c454b",
+        "fact_a23f31c3d0398cabe2515641",
+        "fact_0517ea130ed13166460bdb23",
+        "fact_2db90a5d319549fa695f3ac0",
+        "fact_5f3a5861d1ef06c45bc116d9",
+        "fact_6715ef57edf82fa0397da1f4"
+      ]
+    },
+    {
+      "fieldId": "job:job_31c7e5bb4cb2b8146b6567ac/results",
+      "text": "В составе команды сократила время обработки со 100 до 70 мс — на 30%.\nОбучила двух новых разработчиков.",
+      "factIds": [
+        "fact_0bda1e73fd9798fd63392055",
+        "fact_f932146f9e46bc87751c454b",
+        "fact_a23f31c3d0398cabe2515641",
+        "fact_0517ea130ed13166460bdb23",
+        "fact_2db90a5d319549fa695f3ac0",
+        "fact_5f3a5861d1ef06c45bc116d9",
+        "fact_6715ef57edf82fa0397da1f4"
+      ]
+    },
+    {
+      "fieldId": "job:job_31c7e5bb4cb2b8146b6567ac/stack",
+      "text": "Python, PostgreSQL",
+      "factIds": [
+        "fact_0bda1e73fd9798fd63392055",
+        "fact_f932146f9e46bc87751c454b",
+        "fact_a23f31c3d0398cabe2515641",
+        "fact_0517ea130ed13166460bdb23",
+        "fact_2db90a5d319549fa695f3ac0",
+        "fact_5f3a5861d1ef06c45bc116d9",
+        "fact_6715ef57edf82fa0397da1f4"
+      ]
+    },
+    {
+      "fieldId": "job:job_a56d79b59870559b42129439/context",
+      "text": "Внутренняя CRM.",
+      "factIds": [
+        "fact_ffaa9156d01558b64914aef2",
+        "fact_0272dbf1eeab6d79a45950b3",
+        "fact_a2802f33daaf38b6c56d56a2",
+        "fact_9206e9edf15097fad175ddb9"
+      ]
+    },
+    {
+      "fieldId": "job:job_a56d79b59870559b42129439/tasks",
+      "text": "Поддержка CRM и исправление ошибок.",
+      "factIds": [
+        "fact_ffaa9156d01558b64914aef2",
+        "fact_0272dbf1eeab6d79a45950b3",
+        "fact_a2802f33daaf38b6c56d56a2",
+        "fact_9206e9edf15097fad175ddb9"
+      ]
+    },
+    {
+      "fieldId": "job:job_a56d79b59870559b42129439/results",
+      "text": "",
+      "factIds": []
+    },
+    {
+      "fieldId": "job:job_a56d79b59870559b42129439/stack",
+      "text": "Java, MySQL",
+      "factIds": [
+        "fact_ffaa9156d01558b64914aef2",
+        "fact_0272dbf1eeab6d79a45950b3",
+        "fact_a2802f33daaf38b6c56d56a2",
+        "fact_9206e9edf15097fad175ddb9"
+      ]
+    },
+    {
+      "fieldId": "skills-focus/skillsText",
+      "text": "Docker",
+      "factIds": [
+        "fact_261d2d985fd15f2b2ce49a0a"
+      ]
+    },
+    {
+      "fieldId": "early-career/text",
+      "text": "Восток, 2008–2009. PHP. Разрабатывала отчёты.",
+      "factIds": [
+        "fact_715c487f0c990e074f3e5912",
+        "fact_b6a28535f4a1fdb0e05040a3",
+        "fact_3ec12b2ca1763cbd546e55a0"
+      ]
+    }
+  ],
+  "editorialPlan": {
+    "origin": "model",
+    "revision": 1,
+    "rulesRevision": 1,
+    "formattingAsOf": {
+      "precision": "day",
+      "year": 2026,
+      "month": 10,
+      "day": 11
+    },
+    "sourceLanguage": "ru",
+    "profileLanguage": "ru",
+    "jobs": [
+      {
+        "jobId": "job_31c7e5bb4cb2b8146b6567ac",
+        "disposition": "detailed",
+        "factIds": [
+          "fact_0bda1e73fd9798fd63392055",
+          "fact_f932146f9e46bc87751c454b",
+          "fact_a23f31c3d0398cabe2515641",
+          "fact_0517ea130ed13166460bdb23",
+          "fact_2db90a5d319549fa695f3ac0",
+          "fact_5f3a5861d1ef06c45bc116d9",
+          "fact_6715ef57edf82fa0397da1f4"
+        ]
+      },
+      {
+        "jobId": "job_a56d79b59870559b42129439",
+        "disposition": "detailed",
+        "factIds": [
+          "fact_ffaa9156d01558b64914aef2",
+          "fact_0272dbf1eeab6d79a45950b3",
+          "fact_a2802f33daaf38b6c56d56a2",
+          "fact_9206e9edf15097fad175ddb9"
+        ]
+      },
+      {
+        "jobId": "job_0cf80c036772a5d0434213a5",
+        "disposition": "early-career",
+        "factIds": [
+          "fact_715c487f0c990e074f3e5912",
+          "fact_b6a28535f4a1fdb0e05040a3",
+          "fact_3ec12b2ca1763cbd546e55a0"
+        ]
+      }
+    ],
+    "focus": [
+      {
+        "catalogId": "python",
+        "display": "Python",
+        "factIds": [
+          "fact_0bda1e73fd9798fd63392055"
+        ]
+      }
+    ],
+    "technologyGroups": [
+      {
+        "title": "Backend",
+        "factIds": [
+          "fact_0bda1e73fd9798fd63392055"
+        ]
+      }
+    ],
+    "factIds": [
+      "fact_4175dac4d44d14e7d016fa88",
+      "fact_94d6008bb15aa6acfc6a0b29",
+      "fact_12517227d18df32befaacd49",
+      "fact_f05ee804cecbe1c57fef43be",
+      "fact_90914182617afab012eecd32",
+      "fact_671be645cf934533a38dfe46",
+      "fact_7a27a7b6c84ec125f93bebe5",
+      "fact_1170c9039e92756d17ba4780",
+      "fact_32d9e14a7e5e49cbf06068a8",
+      "fact_0bda1e73fd9798fd63392055",
+      "fact_f932146f9e46bc87751c454b",
+      "fact_ffaa9156d01558b64914aef2",
+      "fact_0272dbf1eeab6d79a45950b3",
+      "fact_715c487f0c990e074f3e5912",
+      "fact_261d2d985fd15f2b2ce49a0a",
+      "fact_a23f31c3d0398cabe2515641",
+      "fact_0517ea130ed13166460bdb23",
+      "fact_2db90a5d319549fa695f3ac0",
+      "fact_5f3a5861d1ef06c45bc116d9",
+      "fact_a2802f33daaf38b6c56d56a2",
+      "fact_b6a28535f4a1fdb0e05040a3",
+      "fact_6715ef57edf82fa0397da1f4",
+      "fact_9206e9edf15097fad175ddb9",
+      "fact_3ec12b2ca1763cbd546e55a0"
+    ]
+  }
+}
