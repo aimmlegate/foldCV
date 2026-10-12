@@ -1,6 +1,8 @@
 import type { GuiProjectResponse } from "../contracts/generated/gui_project_response";
 import type { GuiCreateProjectRequest } from "../contracts/generated/gui_create_project_request";
 import type { GuiStartGenerationRequest } from "../contracts/generated/gui_start_generation_request";
+import type { SourceContextRequest } from "../contracts/generated/source_context_request";
+import type { SourceContext } from "../contracts/generated/source_context";
 import { validateContract } from "../contracts/validate";
 
 export type Workspace = GuiProjectResponse["workspace"];
@@ -16,14 +18,24 @@ function errorCode(value: unknown): string {
   return typeof error === "object" && error !== null && "code" in error && typeof error.code === "string"
     ? error.code : "REQUEST_FAILED";
 }
-export async function projectRequest(path: string, method = "GET", body?: GuiCreateProjectRequest | GuiStartGenerationRequest | Record<string, never> | FormData): Promise<GuiProjectResponse> {
+async function request(path: string, method = "GET", body?: GuiCreateProjectRequest | GuiStartGenerationRequest | SourceContextRequest | Record<string, never> | FormData): Promise<unknown> {
   const init: RequestInit = { method, credentials: "same-origin", cache: "no-store" };
   if (body instanceof FormData) init.body = body;
   else if (body !== undefined) { init.body = JSON.stringify(body); init.headers = { "Content-Type": "application/json" }; }
   const response = await fetch(path, init);
   const value: unknown = await response.json();
   if (!response.ok) throw new ApiFailure(errorCode(value));
+  return value;
+}
+export async function projectRequest(path: string, method = "GET", body?: GuiCreateProjectRequest | GuiStartGenerationRequest | Record<string, never> | FormData): Promise<GuiProjectResponse> {
+  const value = await request(path, method, body);
   if (!isResponse(value)) throw new ApiFailure("INVALID_RESULT");
+  return value;
+}
+function isContext(value: unknown): value is SourceContext { return validateContract("source_context", value); }
+export async function sourceRequest(body: SourceContextRequest): Promise<SourceContext> {
+  const value = await request(`/v1/projects/${body.projectId}/source-context`, "POST", body);
+  if (!isContext(value)) throw new ApiFailure("INVALID_RESULT");
   return value;
 }
 export async function exchangeSession(): Promise<void> {

@@ -1,5 +1,6 @@
 export type Durability = "in_memory";
 export type Generationid = string | null;
+export type Selectionfingerprint = string | null;
 export type Anchor = FieldAnchor | SectionAnchor | DocumentAnchor;
 export type Fieldid = string;
 export type Kind = "field";
@@ -549,6 +550,7 @@ export type Updatedat = string;
 export interface GuiProjectResponse {
   durability: Durability;
   generationId: Generationid;
+  selectionFingerprint?: Selectionfingerprint;
   workspace: WorkspaceV5;
 }
 export interface WorkspaceV5 {

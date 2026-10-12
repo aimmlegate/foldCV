@@ -116,6 +116,56 @@ test("built E2 focus warning stays at skills and outside authored text", async (
   expect((await page.locator('[data-field-content]').allTextContents()).join(" ")).not.toContain("исключена из фокуса");
 });
 
+test("built E1 source panel reads captured job evidence with zero extra content operations", async ({ page }) => {
+  await page.goto(`${origin}/next.html#secret=synthetic-next-secret-0123456789`);
+  await page.getByRole("button", { name: "Открыть пример" }).click();
+  await page.getByRole("button", { name: "Создать резюме" }).click();
+  await expect(page.getByText("Резюме готово", { exact: true })).toBeVisible({ timeout: 30000 });
+  const context = page.locator('[data-field-content$="/context"]').first();
+  await context.evaluate(field => {
+    const text = document.createTreeWalker(field, NodeFilter.SHOW_TEXT).nextNode();
+    const root = document.querySelector<HTMLElement>('[contenteditable="true"]');
+    if (!text || !root) throw new Error("Context field is missing");
+    root.focus(); window.getSelection()?.setBaseAndExtent(text, 0, text, text.textContent?.length ?? 0);
+    document.dispatchEvent(new Event("selectionchange"));
+  });
+  const read = page.waitForResponse(result => new URL(result.url()).pathname.endsWith("/source-context"));
+  await page.getByRole("button", { name: "Показать исходник" }).click();
+  const result: unknown = await (await read).json();
+  expect(validateContract("source_context", result)).toBe(true);
+  const panel = page.getByRole("complementary", { name: "Исходный контекст" });
+  await expect(panel.locator("blockquote", { hasText: "Сервис обработки заказов." }).first()).toBeVisible();
+  await expect(panel.locator('[data-source-relation="exact"]').first()).toBeVisible();
+  await page.getByRole("button", { name: "Закрыть исходный контекст" }).click();
+  await expect(panel).toHaveCount(0);
+  const link = await page.getByRole("link", { name: "Скачать исходный DOCX" }).getAttribute("href");
+  const id = link?.split("/")[3];
+  const raw: unknown = await (await page.request.get(`${origin}/v1/projects/${id}`)).json();
+  expect(response(raw).workspace.project?.operations).toHaveLength(2);
+});
+
+test("built E1 changed capture is rejected and source refresh preserves the typing buffer", async ({ page }) => {
+  await page.goto(`${origin}/next.html#secret=synthetic-next-secret-0123456789`);
+  await page.getByRole("button", { name: "Открыть пример" }).click();
+  await page.getByRole("button", { name: "Создать резюме" }).click();
+  await expect(page.getByText("Резюме готово", { exact: true })).toBeVisible({ timeout: 30000 });
+  const profile = page.locator('[data-field-content="profile/text"]');
+  await profile.click();
+  await page.keyboard.press("End");
+  await page.keyboard.type(" Added 😀");
+  await profile.evaluate(field => {
+    const text = document.createTreeWalker(field, NodeFilter.SHOW_TEXT).nextNode();
+    if (!text) throw new Error("Profile text is missing");
+    window.getSelection()?.setBaseAndExtent(text, 0, text, text.textContent?.length ?? 0);
+    document.dispatchEvent(new Event("selectionchange"));
+  });
+  await page.getByRole("button", { name: "Показать исходник" }).click();
+  const panel = page.getByRole("complementary", { name: "Исходный контекст" });
+  await expect(panel.getByRole("status")).toContainText("Выделение устарело");
+  await expect(panel.locator("blockquote")).toHaveCount(0);
+  await expect(profile).toContainText("Added 😀");
+});
+
 test("built entry persists manual theme, follows system and fits a narrow keyboard layout", async ({ page }) => {
   await page.emulateMedia({ colorScheme: "dark" });
   await page.goto(`${origin}/next.html#secret=synthetic-next-secret-0123456789`);

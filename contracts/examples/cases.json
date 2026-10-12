@@ -2125,5 +2125,27 @@
       }
     }
   ]
+},
+{
+  "name": "recovery_source_context_request_valid",
+  "contract": "source_context_request",
+  "base": "source_context_request",
+  "valid": true,
+  "edits": []
+},
+{
+  "name": "recovery_source_context_request_zero_revision_rejected",
+  "contract": "source_context_request",
+  "base": "source_context_request",
+  "valid": false,
+  "edits": [
+    {
+      "op": "set",
+      "path": [
+        "documentRevision"
+      ],
+      "value": 0
+    }
+  ]
 }
 ]

@@ -1,6 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { FieldEditor } from "./FieldEditor";
-import { projectRequest, errorLabel, type Workspace } from "./api";
+import { FieldEditor, type FieldEditorHandle } from "./FieldEditor";
+import { projectRequest, sourceRequest, errorLabel, type Workspace } from "./api";
+import { SourcePanel } from "./SourcePanel";
+import type { SourceContext } from "../contracts/generated/source_context";
 import { documentFields } from "./fields";
 import { useTheme } from "./theme";
 import sample from "../../../../tests/fixtures/recovery/E1.txt?raw";
@@ -17,6 +19,13 @@ export function App() {
   const [error, setError] = useState("");
   const [buffered, setBuffered] = useState(false);
   const [slot, setSlot] = useState<string | null>(null);
+  const [selectionFingerprint, setSelectionFingerprint] = useState<string | null>(null);
+  const [sourceOpen, setSourceOpen] = useState(false);
+  const [sourceBusy, setSourceBusy] = useState(false);
+  const [source, setSource] = useState<SourceContext | null>(null);
+  const sourceEpoch = useRef(0);
+  const editor = useRef<FieldEditorHandle>(null);
+  const lastSlot = useRef("profile");
   const requestEpoch = useRef(0);
   const chooser = useRef<HTMLInputElement>(null);
   const generation = workspace?.generations.find(item => item.id === generationId);
@@ -30,7 +39,7 @@ export function App() {
     const id = workspace.projectId, epoch = requestEpoch.current;
     const timer = window.setTimeout(() => {
       void projectRequest(`/v1/projects/${id}`).then(result => {
-        if (alive && epoch === requestEpoch.current) setWorkspace(result.workspace);
+        if (alive && epoch === requestEpoch.current) { setWorkspace(result.workspace); setSelectionFingerprint(result.selectionFingerprint ?? null); }
       }).catch(error => { if (alive) setError(errorLabel(error)); });
     }, 250);
     return () => { alive = false; clearTimeout(timer); };
@@ -42,7 +51,7 @@ export function App() {
     const body = new FormData(); body.append("file", file);
     try {
       const result = await projectRequest(workspace ? `/v1/projects/${workspace.projectId}/input` : "/v1/projects/input", workspace ? "PUT" : "POST", body);
-      if (epoch === requestEpoch.current) { setWorkspace(result.workspace); setGenerationId(null); }
+      if (epoch === requestEpoch.current) { setWorkspace(result.workspace); setSelectionFingerprint(result.selectionFingerprint ?? null); setGenerationId(null); }
     } catch (error) { if (epoch === requestEpoch.current) setError(errorLabel(error)); }
     finally { if (epoch === requestEpoch.current) setBusy(false); }
   }
@@ -52,7 +61,7 @@ export function App() {
     try {
       const result = await projectRequest(workspace ? `/v1/projects/${workspace.projectId}/generations` : "/v1/projects", "POST",
         input === "text" ? { text } : {});
-      if (epoch === requestEpoch.current) { setWorkspace(result.workspace); setGenerationId(result.generationId); }
+      if (epoch === requestEpoch.current) { setWorkspace(result.workspace); setSelectionFingerprint(result.selectionFingerprint ?? null); setGenerationId(result.generationId); }
     } catch (error) { setError(errorLabel(error)); }
     finally { setBusy(false); }
   }
@@ -62,12 +71,33 @@ export function App() {
     try {
       const result = await projectRequest(`/v1/projects/${workspace.projectId}/generations/${generationId}/${action}`, "POST", {});
       setWorkspace(result.workspace); setGenerationId(result.generationId);
+      setSelectionFingerprint(result.selectionFingerprint ?? null);
     } catch (error) { setError(errorLabel(error)); }
     finally { setBusy(false); }
   }
   const running = generation && ["queued", "running"].includes(generation.status);
   const failed = generation && ["failed", "cancelled", "interrupted"].includes(generation.status);
   const usable = input === "text" ? !!text.trim() : !!workspace?.preDraft?.extractedText.trim();
+  async function showSource() {
+    if (!workspace || !selectionFingerprint) return;
+    const captured = editor.current?.capture();
+    const first = captured?.spans[0];
+    const epoch = ++sourceEpoch.current;
+    setSourceOpen(true); setSourceBusy(true); setSource(null);
+    try {
+      const context = await sourceRequest({ projectId: workspace.projectId, documentRevision: workspace.documentRevision,
+        selection: captured && first ? { projectId: workspace.projectId, documentRevision: workspace.documentRevision,
+          dependencyFingerprint: selectionFingerprint, spans: [first, ...captured.spans.slice(1)] } : null,
+        fieldIds: captured && first ? [] : fields.filter(field => field.slotId === (slot ?? lastSlot.current)).map(field => field.fieldId) });
+      if (epoch !== sourceEpoch.current) return;
+      setSource(context);
+      if (context.status === "stale") {
+        const refreshed = await projectRequest(`/v1/projects/${workspace.projectId}`);
+        if (epoch === sourceEpoch.current) { setWorkspace(refreshed.workspace); setSelectionFingerprint(refreshed.selectionFingerprint ?? null); }
+      }
+    } catch (error) { if (epoch === sourceEpoch.current) setError(errorLabel(error)); }
+    finally { if (epoch === sourceEpoch.current) setSourceBusy(false); }
+  }
   return <main data-app="foldcv-next" className="next-shell">
     <header className="next-header">
       <strong className="next-brand">FoldCV.</strong>
@@ -92,8 +122,10 @@ export function App() {
     </section>}
     {document ? <section className="next-editor-surface" aria-label="Документ">
       <p className="next-editor-note">Текст можно редактировать. Пока правки остаются в текущем окне.</p>
-      <div className="next-document"><FieldEditor key={workspace?.projectId} fields={fields} theme={theme.resolved} annotations={workspace?.annotations ?? []} callbacks={{
-        buffer: () => setBuffered(true), selection: () => {}, slot: setSlot, departure: () => {},
+      <div className="next-editor-tools"><button disabled={sourceBusy} onPointerDown={event => event.preventDefault()}
+        onClick={() => { void showSource(); }}>Показать исходник</button></div>
+      <div className="next-document"><FieldEditor ref={editor} key={workspace?.projectId} fields={fields} theme={theme.resolved} annotations={workspace?.annotations ?? []} callbacks={{
+        buffer: () => setBuffered(true), selection: () => {}, slot: value => { setSlot(value); if (value) lastSlot.current = value; }, departure: () => {},
         restore: () => setError("Восстановление правок пока недоступно."),
       }} /></div>
       <p className="next-editor-status" aria-live="polite">{slot ? "Редактирование текста" : ""}</p>
@@ -123,5 +155,7 @@ export function App() {
         <button className="next-create" disabled={!usable || busy || !!running} onClick={() => { void create(); }}>{busy ? "Читаем исходник…" : "Создать резюме"}</button>
       </div>
     </section>}
+    {sourceOpen && workspace && <SourcePanel context={source} workspace={workspace} loading={sourceBusy}
+      close={() => { ++sourceEpoch.current; setSourceOpen(false); setSourceBusy(false); }} />}
   </main>;
 }

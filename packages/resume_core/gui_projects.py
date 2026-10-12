@@ -3,7 +3,7 @@
 from typing import Literal
 from pydantic import Field
 
-from .models.contracts import Id, Wire
+from .models.contracts import Id, Wire, Sha256
 from .models.recovery import WorkspaceV5
 
 
@@ -19,6 +19,7 @@ class GuiProjectResponse(Wire):
     workspace: WorkspaceV5
     durability: Literal["in_memory"]
     generation_id: Id | None
+    selection_fingerprint: Sha256 | None = None
 
 
 GUI_PROJECT_CONTRACTS = {"gui_create_project_request": GuiCreateProjectRequest,

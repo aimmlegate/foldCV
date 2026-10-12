@@ -5425,6 +5425,19 @@
       ],
       "title": "Generationid"
     },
+    "selectionFingerprint": {
+      "anyOf": [
+        {
+          "pattern": "^[a-f0-9]{64}$",
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Selectionfingerprint"
+    },
     "workspace": {
       "$ref": "#/$defs/WorkspaceV5"
     }

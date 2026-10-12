@@ -4,6 +4,9 @@ from fastapi import Request
 from fastapi.responses import JSONResponse, Response
 
 from packages.resume_core.gui_projects import GuiCreateProjectRequest, GuiStartGenerationRequest, GuiProjectResponse
+from packages.resume_core.gui_selection import selection_fingerprint
+from packages.resume_core.gui_source_context import source_context
+from packages.resume_core.models.recovery import SourceContextRequest
 from .contracts import EmptyRequest
 from .extracting import parse_one_part, UploadFailure
 from .gui_projects import ProjectFailure
@@ -11,7 +14,9 @@ from .gui_projects import ProjectFailure
 
 def mount_projects(app, service, problem):
     def response(id, generation_id=None, status=200):
-        payload = GuiProjectResponse(workspace=service.read(id), durability="in_memory", generationId=generation_id)
+        workspace = service.read(id)
+        payload = GuiProjectResponse(workspace=workspace, durability="in_memory", generationId=generation_id,
+            selectionFingerprint=selection_fingerprint(workspace))
         return JSONResponse(payload.model_dump(mode="json", by_alias=True), status_code=status, headers={"Cache-Control": "no-store"})
 
     @app.exception_handler(ProjectFailure)
@@ -43,6 +48,11 @@ def mount_projects(app, service, problem):
     @app.get("/v1/projects/{id}")
     async def read(id: str):
         return response(id)
+
+    @app.post("/v1/projects/{id}/source-context")
+    async def context(id: str, payload: SourceContextRequest):
+        result = source_context(service.read(id), payload)
+        return JSONResponse(result.model_dump(mode="json", by_alias=True), headers={"Cache-Control": "no-store"})
 
     @app.post("/v1/projects/{id}/generations")
     async def start(id: str, payload: GuiStartGenerationRequest):

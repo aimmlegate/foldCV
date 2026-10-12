@@ -824,7 +824,7 @@ RECOVERY_CONTRACTS = {
     "document": Document, "docx_error": DocxError, "editorial_plan": EditorialPlan,
     "mutation": Mutation, "mutation_result": MutationResult, "preferences": Preferences,
     "registry": Registry, "render_snapshot_v4": RenderSnapshotV4, "rules": Rules,
-    "selection": Selection, "source_context": SourceContext,
+    "selection": Selection, "source_context": SourceContext, "source_context_request": SourceContextRequest,
     "save_rules_request": SaveRulesRequest, "rules_settings_error": RulesSettingsError,
     "rules_settings": RulesSettings,
 }
