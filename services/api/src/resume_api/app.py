@@ -160,7 +160,7 @@ class LocalBoundary:
             await problem("INVALID_REQUEST", 422)(scope, receive, send)
             return
 
-        if method in {"POST", "PUT", "PATCH"}:
+        if method in {"POST", "PUT", "PATCH", "DELETE"}:
             deadline = time.monotonic() + BODY_TIMEOUT_SECONDS
             size = 0
             chunks: list[bytes] = []

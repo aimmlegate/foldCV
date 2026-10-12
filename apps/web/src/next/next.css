@@ -80,3 +80,15 @@ button:disabled { cursor: default; opacity: .6; }
 .next-annotation-update summary { cursor: pointer; text-decoration: underline; text-underline-offset: 3px; }
 .next-annotation-update button { margin-top: 8px; }
 .next-related-text { white-space: pre-wrap; overflow-wrap: anywhere; padding: 8px; background: var(--panel); }
+.next-projects { width: min(720px, calc(100vw - 32px)); max-height: calc(100vh - 32px); overflow-y: auto; box-sizing: border-box; padding: 24px; color: var(--content); background: var(--panel); border: 1px solid var(--outline); border-radius: 12px; }
+.next-projects::backdrop { background: #0006; }
+.next-projects header, .next-projects li { display: flex; justify-content: space-between; align-items: start; gap: 16px; }
+.next-projects ul { list-style: none; padding: 0; }
+.next-projects li { margin: 16px 0; padding: 12px 0; border-top: 1px solid var(--outline); }
+.next-projects li p { font-size: 12px; color: var(--muted); }
+.next-projects button { margin: 4px; }
+.next-projects input { display: block; margin: 12px 0; width: 100%; padding: 8px; background: var(--surface); border: 1px solid var(--outline); }
+.next-projects input { box-sizing: border-box; color: var(--content); }
+.next-projects li > div:first-child { min-width: 0; overflow-wrap: anywhere; }
+.next-projects li > div:last-child { display: flex; flex-wrap: wrap; justify-content: flex-end; }
+@media (max-width: 600px) { .next-projects li { display: block; } .next-projects li > div:last-child { justify-content: flex-start; } }

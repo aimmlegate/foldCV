@@ -21,6 +21,7 @@ test.beforeEach(async ({}, info) => {
   runRoot = mkdtempSync(resolve(temp, "run-"));
   cpSync(resolve(temp, "dist"), resolve(runRoot, "dist"), { recursive: true });
   const example = info.title.includes("focus warning") ? "E2-focus" : info.title.includes("E2") ? "E2" : "E1";
+  if (info.title.includes("task A13")) writeFileSync(resolve(runRoot, "multiple-examples"), "Controlled E1/E2 projects.");
   if (info.title.includes("task A11")) writeFileSync(resolve(runRoot, "related-example"), "Controlled shared-claim fixture.");
   if (!info.title.includes("A10") && !info.title.includes("task A11")) writeFileSync(resolve(runRoot, "pause-analysis"), "Isolate the accepted foreground feature from background analysis.");
   origin = await launch(example);
@@ -693,7 +694,7 @@ async function downloadDocx(page: Page, name: string) {
   const path = resolve(runRoot, name);await download.saveAs(path);
   const bytes = readFileSync(path), entries = unzipSync(bytes);
   const xml = entries["word/document.xml"];if (!xml) throw new Error("Missing DOCX document");
-  return { bytes, xml: new TextDecoder().decode(xml), entries };
+  return { bytes, xml: new TextDecoder().decode(xml), entries, path };
 }
 function renderCount() {
   const raw: unknown = JSON.parse(readFileSync(resolve(runRoot, "render-count.json"), "utf8"));
@@ -969,4 +970,83 @@ test("built example E1 task A11 rejects a delayed related action after a newer s
   await expect(page.locator('[data-field-content="profile/text"]')).toHaveText("Новая правка профиля.");
   const after = await currentWorkspace(page);expect([after.projectRevision, after.documentRevision]).toEqual([saved.projectRevision, saved.documentRevision]);
   expect(analysisCalls()).toBe(1);
+});
+
+async function projectMenu(page: Page) {
+  await page.getByRole("button", { name: "Меню проекта", exact: true }).click();
+  await expect(page.getByRole("dialog", { name: "Локальные проекты", exact: true })).toBeVisible();
+}
+async function newProject(page: Page) {
+  await projectMenu(page);await page.getByRole("button", { name: "Новое резюме", exact: true }).click();
+  await expect(page.getByLabel("Или вставьте текст")).toBeVisible();
+}
+async function openProject(page: Page, id: string) {
+  await projectMenu(page);await page.locator(`[data-project-id="${id}"]`).getByRole("button", { name: "Открыть", exact: true }).click();
+  await expect.poll(() => new URL(page.url()).searchParams.get("project")).toBe(id);
+  await expect(page.locator('[contenteditable="true"]')).toHaveCount(1);
+}
+
+test("built example E8 task A13 persists manual names and switches isolated E1 E2 projects without content calls", async ({ page }) => {
+  await createRewriteExample(page);const first = await currentWorkspace(page);
+  await replaceFieldText(page, "profile/text", "Saved first project addition.");
+  await projectMenu(page);const row = page.locator(`[data-project-id="${first.projectId}"]`);
+  await row.getByRole("button", { name: "Переименовать", exact: true }).click();
+  await page.getByLabel("Имя проекта", { exact: true }).fill("Manual first project");await page.getByRole("button", { name: "Сохранить имя", exact: true }).click();
+  await expect(row.getByText("Manual first project", { exact: true })).toBeVisible();
+  await page.getByRole("dialog", { name: "Локальные проекты" }).getByRole("button", { name: "Закрыть", exact: true }).click();
+  await newProject(page);await page.getByLabel("Или вставьте текст").fill(readFileSync(resolve(root, "tests/fixtures/recovery/E2.txt"), "utf8"));
+  await page.getByRole("button", { name: "Создать резюме", exact: true }).click();await expect(page.getByText("Резюме готово", { exact: true })).toBeVisible({ timeout: 30000 });
+  const second = await currentWorkspace(page);expect(second.projectId).not.toBe(first.projectId);
+  await expect(page.locator('[data-field-content="profile/text"]')).toHaveText("Разрабатываю пайплайны данных.");
+  await openProject(page, first.projectId);await expect(page.getByRole("button", { name: "Меню проекта", exact: true })).toHaveText("Manual first project");
+  await expect(page.locator('[data-field-content="profile/text"]')).toHaveText("Saved first project addition.");
+  await page.reload();await expect(page.locator('[data-field-content="profile/text"]')).toHaveText("Saved first project addition.");
+  await openProject(page, second.projectId);expect(analysisCalls()).toBe(0);
+  const metadata: unknown = JSON.parse(readFileSync(resolve(runRoot, "model-requests.json"), "utf8"));
+  expect(metadata).toEqual(["normalize_semantics", "draft_prose", "normalize_semantics", "draft_prose"].map(kind => ({ model: "fixture", kind })));
+});
+
+test("built example E8 task A13 failed save blocks switching and keeps the current typing buffer", async ({ page }) => {
+  await createRewriteExample(page);const first = await currentWorkspace(page);
+  writeFileSync(resolve(runRoot, "fail-user-saves"), "controlled failure");await replaceFieldText(page, "profile/text", "Unacknowledged project edit.");
+  await projectMenu(page);await page.getByRole("button", { name: "Новое резюме", exact: true }).click();
+  await expect(page.getByRole("dialog", { name: "Локальные проекты" }).getByRole("alert")).toBeVisible();
+  expect(new URL(page.url()).searchParams.get("project")).toBe(first.projectId);
+  await page.getByRole("dialog", { name: "Локальные проекты" }).getByRole("button", { name: "Закрыть", exact: true }).click();
+  await expect(page.locator('[data-field-content="profile/text"]')).toHaveText("Unacknowledged project edit.");rmSync(resolve(runRoot, "fail-user-saves"));
+  await page.getByRole("button", { name: "Повторить сохранение", exact: true }).click();await expect(page.locator(".next-save")).toHaveText("Сохранено");
+  await newProject(page);await expect(page.getByLabel("Или вставьте текст")).toHaveValue("");expect(analysisCalls()).toBe(0);
+});
+
+test("built example E8 task A13 confirms deletion during pending rewrite and preserves the other project and exported file", async ({ page }) => {
+  await createRewriteExample(page);const first = await currentWorkspace(page);await exportCurrent(page);
+  const exported = await downloadDocx(page, "retained-user-export.docx"), expected = readFileSync(exported.path);
+  await page.getByRole("button", { name: "К тексту", exact: true }).click();await newProject(page);
+  await page.getByLabel("Или вставьте текст").fill(readFileSync(resolve(root, "tests/fixtures/recovery/E2.txt"), "utf8"));
+  await page.getByRole("button", { name: "Создать резюме", exact: true }).click();await expect(page.getByText("Резюме готово", { exact: true })).toBeVisible({ timeout: 30000 });
+  const second = await currentWorkspace(page);await openProject(page, first.projectId);
+  writeFileSync(resolve(runRoot, "hold-rewrite"), "controlled wait");const profile = (await currentWorkspace(page)).project?.document.profile.text.text ?? "";
+  await selectFields(page, "profile/text", 0, "profile/text", profile.length);await openSelectionAssistant(page);await submitRewrite(page);
+  await expect.poll(() => existsSync(resolve(runRoot, "rewrite-started"))).toBe(true);await openProject(page, second.projectId);
+  await projectMenu(page);const row = page.locator(`[data-project-id="${first.projectId}"]`);await row.getByRole("button", { name: "Удалить", exact: true }).click();
+  expect(existsSync(resolve(runRoot, "FoldCV/projects", first.projectId))).toBe(true);
+  const deleted = page.waitForResponse(result => result.request().method() === "DELETE" && new URL(result.url()).pathname.endsWith(first.projectId));
+  await page.getByRole("button", { name: "Удалить проект", exact: true }).click();
+  expect((await deleted).status()).toBe(200);await expect.poll(() => existsSync(resolve(runRoot, "FoldCV/projects", first.projectId))).toBe(false);await expect(row).toHaveCount(0);
+  expect(existsSync(resolve(runRoot, "FoldCV/projects", first.projectId))).toBe(false);expect(readFileSync(exported.path)).toEqual(expected);
+  await page.getByRole("dialog", { name: "Локальные проекты" }).getByRole("button", { name: "Закрыть", exact: true }).click();
+  expect((await currentWorkspace(page)).projectId).toBe(second.projectId);await expect(page.locator('[data-field-content="profile/text"]')).toHaveText("Разрабатываю пайплайны данных.");
+  expect((await page.request.get(`${origin}/v1/projects/${first.projectId}`)).status()).toBe(410);expect(analysisCalls()).toBe(0);
+});
+
+test("built example E8 task A13 cleanup failure stays visible and retries without losing another project", async ({ page }) => {
+  await createRewriteExample(page);const first = await currentWorkspace(page);await newProject(page);await createRewriteExample(page);const second = await currentWorkspace(page);
+  writeFileSync(resolve(runRoot, "fail-project-cleanup"), "controlled failure");await projectMenu(page);
+  await page.locator(`[data-project-id="${first.projectId}"]`).getByRole("button", { name: "Удалить", exact: true }).click();
+  await page.getByRole("button", { name: "Удалить проект", exact: true }).click();await expect(page.getByText("Не удалось подтвердить удаление всех файлов.", { exact: false })).toBeVisible();
+  expect(existsSync(resolve(runRoot, "FoldCV/projects", first.projectId))).toBe(true);rmSync(resolve(runRoot, "fail-project-cleanup"));
+  await page.getByRole("button", { name: "Вернуться к списку", exact: true }).click();const row = page.locator(`[data-project-id="${first.projectId}"]`);
+  await row.getByRole("button", { name: "Повторить очистку", exact: true }).click();await page.getByRole("region", { name: "Подтверждение удаления", exact: true }).getByRole("button", { name: "Повторить очистку", exact: true }).click();
+  await expect(row).toHaveCount(0);await page.getByRole("dialog", { name: "Локальные проекты" }).getByRole("button", { name: "Закрыть", exact: true }).click();
+  expect((await currentWorkspace(page)).projectId).toBe(second.projectId);expect(analysisCalls()).toBe(0);
 });

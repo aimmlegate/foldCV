@@ -1,10 +1,10 @@
 """Python-owned creation API contracts for the recovery document flow."""
 
 from typing import Literal
-from pydantic import Field
+from pydantic import Field, field_validator
 
 from .models.contracts import Id, Revision, Wire, Sha256
-from .models.recovery import WorkspaceV5
+from .models.recovery import WorkspaceV5, RegistryEntry
 
 
 class GuiCreateProjectRequest(Wire):
@@ -30,6 +30,34 @@ class GuiRenameProjectRequest(Wire):
     base_revision: Revision
 
 
+class ProjectReadError(Wire):
+    project_id: Id
+    error_code: Id
+
+
+class GuiProjectListResponse(Wire):
+    entries: list[RegistryEntry]
+    errors: list[ProjectReadError]
+
+
+class GuiDeleteProjectRequest(Wire):
+    confirmed: Literal[True]
+
+    @field_validator("confirmed", mode="before")
+    @classmethod
+    def explicit_confirmation(cls, value):
+        if value is not True: raise ValueError("confirmation_required")
+        return value
+
+
+class GuiDeleteProjectResult(Wire):
+    project_id: Id
+    status: Literal["deleted", "cleanup_incomplete"]
+    error_code: Id | None
+
+
 GUI_PROJECT_CONTRACTS = {"gui_create_project_request": GuiCreateProjectRequest,
     "gui_start_generation_request": GuiStartGenerationRequest, "gui_project_response": GuiProjectResponse,
-    "gui_rename_project_request": GuiRenameProjectRequest}
+    "gui_rename_project_request": GuiRenameProjectRequest,
+    "gui_project_list_response": GuiProjectListResponse, "gui_delete_project_request": GuiDeleteProjectRequest,
+    "gui_delete_project_result": GuiDeleteProjectResult}

@@ -1,0 +1,89 @@
+{
+  "$defs": {
+    "ProjectReadError": {
+      "additionalProperties": false,
+      "properties": {
+        "errorCode": {
+          "minLength": 1,
+          "title": "Errorcode",
+          "type": "string"
+        },
+        "projectId": {
+          "minLength": 1,
+          "title": "Projectid",
+          "type": "string"
+        }
+      },
+      "required": [
+        "projectId",
+        "errorCode"
+      ],
+      "title": "ProjectReadError",
+      "type": "object"
+    },
+    "RegistryEntry": {
+      "additionalProperties": false,
+      "properties": {
+        "cleanupStatus": {
+          "enum": [
+            "none",
+            "pending",
+            "complete",
+            "failed"
+          ],
+          "title": "Cleanupstatus",
+          "type": "string"
+        },
+        "projectId": {
+          "minLength": 1,
+          "title": "Projectid",
+          "type": "string"
+        },
+        "title": {
+          "title": "Title",
+          "type": "string"
+        },
+        "tombstoned": {
+          "title": "Tombstoned",
+          "type": "boolean"
+        },
+        "updatedAt": {
+          "title": "Updatedat",
+          "type": "string"
+        }
+      },
+      "required": [
+        "projectId",
+        "title",
+        "updatedAt",
+        "tombstoned",
+        "cleanupStatus"
+      ],
+      "title": "RegistryEntry",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "entries": {
+      "items": {
+        "$ref": "#/$defs/RegistryEntry"
+      },
+      "title": "Entries",
+      "type": "array"
+    },
+    "errors": {
+      "items": {
+        "$ref": "#/$defs/ProjectReadError"
+      },
+      "title": "Errors",
+      "type": "array"
+    }
+  },
+  "required": [
+    "entries",
+    "errors"
+  ],
+  "title": "GuiProjectListResponse",
+  "type": "object"
+}

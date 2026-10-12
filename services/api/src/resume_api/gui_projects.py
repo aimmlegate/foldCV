@@ -35,6 +35,7 @@ from .gui_rendering import GuiDocxRenderer
 from .gui_rewriting_content import GuiRewritingContentService
 from .gui_exports import GuiExportMixin
 from .gui_analysis import GuiAnalysisMixin
+from .gui_management import GuiManagementMixin
 from .gui_errors import ProjectFailure
 from .lifecycle import OperationFiles, SpikeError
 from .providers.content import ContentFailure
@@ -48,7 +49,7 @@ def identity(prefix):
     return prefix + "-" + uuid.uuid4().hex
 
 
-class GuiProjectService(GuiExportMixin, GuiAnalysisMixin):
+class GuiProjectService(GuiExportMixin, GuiAnalysisMixin, GuiManagementMixin):
     def __init__(self, temp_root: Path, rules, provider_factory, *, clock=now,
                  worker_slot=None, cleanup_error=None, renderer=None, storage=None, preferences=None,
                  analysis_delay=0.5):
@@ -73,6 +74,8 @@ class GuiProjectService(GuiExportMixin, GuiAnalysisMixin):
         self.analysis_delay = analysis_delay
         self.analysis_timers = {}
         self.analysis_cleanup_failed = False
+        self.deleted_ids = set()
+        self.input_tasks, self.input_cancels, self.input_files = {}, {}, {}
 
     def ensure_loaded(self):
         if self.loaded:
@@ -84,6 +87,7 @@ class GuiProjectService(GuiExportMixin, GuiAnalysisMixin):
                 loaded, self.load_errors, _registry = self.storage.load_all()
             except ProjectStoreFailure as error:
                 raise ProjectFailure(error.code, 503) from None
+            self.deleted_ids.update(entry.project_id for entry in _registry.entries if entry.tombstoned)
             for id, (workspace, originals, artifacts) in loaded.items():
                 self.workspaces[id] = workspace
                 self.originals.update(originals)
@@ -117,6 +121,9 @@ class GuiProjectService(GuiExportMixin, GuiAnalysisMixin):
             self.loaded = True
 
     def persist(self, id):
+        if id in self.deleted_ids:
+            self.save_errors[id] = "PROJECT_DELETED"
+            return "failed"
         if self.storage is None:
             return "in_memory"
         with self.state_lock:
@@ -155,6 +162,13 @@ class GuiProjectService(GuiExportMixin, GuiAnalysisMixin):
 
     def read(self, id):
         self.ensure_loaded()
+        if self.storage is not None:
+            try:
+                if any(entry.project_id == id and entry.tombstoned for entry in self.storage.registry().entries):
+                    self.deleted_ids.add(id)
+            except ProjectStoreFailure as error:
+                raise ProjectFailure(error.code, 503) from None
+        if id in self.deleted_ids: raise ProjectFailure("PROJECT_DELETED", 410)
         workspace = self.workspaces.get(id)
         if workspace is None:
             if id in self.load_errors:
@@ -221,6 +235,7 @@ class GuiProjectService(GuiExportMixin, GuiAnalysisMixin):
         return id
 
     async def select(self, data, name, pasted, id=None):
+        if id is not None: self.read(id)
         id = id or self.allocate("Новое резюме" if pasted else name)
         workspace = self.workspaces[id]
         if workspace.project is not None or any(not task.done() for (pid, _), task in self.tasks.items() if pid == id):
@@ -239,6 +254,9 @@ class GuiProjectService(GuiExportMixin, GuiAnalysisMixin):
         pre.extraction_fingerprint, pre.warnings = None, ["EXTRACT_PENDING"]
         self.persist(id)
         files, cancel = OperationFiles(self.temp_root), threading.Event()
+        input_key = (id, source_id)
+        self.input_files[input_key], self.input_cancels[input_key] = files, cancel
+        self.input_tasks[input_key] = asyncio.current_task()
         try:
             async with self.worker_slot(cancel):
                 with files.open():
@@ -251,6 +269,10 @@ class GuiProjectService(GuiExportMixin, GuiAnalysisMixin):
                 if not pre.extracted_text.strip():
                     pre.warnings = list(dict.fromkeys([*pre.warnings, "NO_USABLE_TEXT"]))
                 pre.extraction_fingerprint = source_fingerprint([source])
+        except AdmissionCancelled:
+            source.parser, source.warnings = "interrupted", ["EXTRACT_INTERRUPTED"]
+            if self.selection_epochs[id] == source_id:
+                pre.warnings = ["EXTRACT_INTERRUPTED", "NO_USABLE_TEXT"]
         except UploadFailure as error:
             source.parser, source.warnings = "failed", [error.code]
             if self.selection_epochs[id] == source_id:
@@ -259,6 +281,10 @@ class GuiProjectService(GuiExportMixin, GuiAnalysisMixin):
             self.cleanup_error(error)
             if self.selection_epochs[id] == source_id:
                 pre.warnings = [error.code, "NO_USABLE_TEXT"]
+        finally:
+            self.input_tasks.pop(input_key, None)
+            self.input_files.pop(input_key, None)
+            self.input_cancels.pop(input_key, None)
         workspace.updated_at = self.clock().isoformat()
         self.persist(id)
         return self.read(id)
@@ -636,8 +662,8 @@ class GuiProjectService(GuiExportMixin, GuiAnalysisMixin):
             result.persistence = "durable" if self.persist(id) == "durable" else "memory" if self.storage is None else "failed"
         return result
 
-    async def cancel(self, id, gid):
-        workspace = self.read(id)
+    async def cancel(self, id, gid, *, allow_deleted=False):
+        workspace = self.read_memory(id) if allow_deleted and id in self.workspaces else self.read(id)
         if not any(item.id == gid for item in workspace.generations) and not any(item.id == gid for item in self.owner(workspace).operations):
             raise ProjectFailure("OPERATION_NOT_FOUND", 404)
         key = (id, gid)
@@ -665,8 +691,26 @@ class GuiProjectService(GuiExportMixin, GuiAnalysisMixin):
             self.stop_analysis_timer(id)
         for cancel in self.cancels.values():
             cancel.set()
+        for cancel in self.input_cancels.values(): cancel.set()
 
     async def shutdown(self):
         self.request_shutdown()
         for id, gid in list(self.tasks):
-            await self.cancel(id, gid)
+            await self.cancel(id, gid, allow_deleted=id in self.deleted_ids)
+        for id, sid in list(self.input_tasks): await self.cancel_input(id, sid)
+
+    async def cancel_input(self, id, sid):
+        key = (id, sid)
+        task = self.input_tasks.get(key)
+        if task is None or task.done(): return
+        self.input_cancels[key].set()
+        files = self.input_files.get(key)
+        try:
+            if files: files.stop_worker()
+            await asyncio.wait_for(asyncio.shield(task), timeout=65)
+        except ProjectFailure as error:
+            if error.code != "PROJECT_DELETED": raise
+        except (SpikeError, asyncio.TimeoutError):
+            self.analysis_cleanup_failed = True
+            self.cleanup_error(SpikeError("PROCESS_CLEANUP_FAILED"))
+            raise ProjectFailure("PROCESS_CLEANUP_FAILED", 503) from None

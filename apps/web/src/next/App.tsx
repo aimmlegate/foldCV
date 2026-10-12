@@ -12,6 +12,7 @@ import { SettingsPanel } from "./SettingsPanel";
 import { useAnalysis } from "./useAnalysis";
 import { useRelated } from "./useRelated";
 import { AnnotationActions } from "./Annotations";
+import { ProjectsDialog } from "./ProjectsDialog";
 import type { SourceContext } from "../contracts/generated/source_context";
 import type { GuiProjectResponse } from "../contracts/generated/gui_project_response";
 import { documentFields } from "./fields";
@@ -33,6 +34,7 @@ export function App() {
   const [slot, setSlot] = useState<string | null>(null);
   const [hasSelection, setHasSelection] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [projectsOpen, setProjectsOpen] = useState(false);
   const [selectionFingerprint, setSelectionFingerprint] = useState<string | null>(null);
   const [sourceOpen, setSourceOpen] = useState(false);
   const [sourceBusy, setSourceBusy] = useState(false);
@@ -143,7 +145,7 @@ export function App() {
   return <main data-app="foldcv-next" className="next-shell">
     <header className="next-header">
       <strong className="next-brand">FoldCV.</strong>
-      <button className="next-title" disabled aria-label="Меню проекта">{workspace?.title ?? "Новое резюме"}</button>
+      <button className="next-title" disabled={busy || edits.locked} aria-label="Меню проекта" onClick={() => setProjectsOpen(true)}>{workspace?.title ?? "Новое резюме"}</button>
       <span className="next-save" role="status">{edits.saving ? "Сохраняем…" : edits.pending ? "Есть несохранённые правки" : workspace
         ? durability === "durable" ? "Сохранено" : durability === "failed" ? "Сохранение не удалось" : durability === "in_memory" ? "В памяти приложения" : "Сохраняем…" : ""}</span>
       <div className="next-actions">
@@ -224,5 +226,6 @@ export function App() {
     {sourceOpen && workspace && <SourcePanel context={source} workspace={workspace} loading={sourceBusy}
       close={() => { ++sourceEpoch.current; setSourceOpen(false); setSourceBusy(false); }} />}
     <RewritePanel rewrite={rewrite} />
+    {projectsOpen && <ProjectsDialog workspace={workspace} edits={edits} accept={accept} close={() => setProjectsOpen(false)} />}
   </main>;
 }

@@ -225,3 +225,64 @@ class ProjectStore:
                 return self._registry()
         except (StorageFailure, OSError, ValueError, ValidationError):
             raise ProjectStoreFailure("PROJECT_LOAD_FAILED") from None
+
+    def tombstone(self, id):
+        try:
+            with locked_root(self.root, ".projects.lock"):
+                registry = self._registry()
+                entry = next((item for item in registry.entries if item.project_id == id), None)
+                if entry is None: raise ProjectStoreFailure("PROJECT_NOT_FOUND")
+                if not entry.tombstoned:
+                    self._directory(id)
+                    entry.tombstoned, entry.cleanup_status = True, "pending"
+                    self._write_registry(registry)
+                self.expected.pop(id, None)
+                return entry.model_copy(deep=True)
+        except ProjectStoreFailure:
+            raise
+        except (StorageFailure, OSError, ValueError, ValidationError):
+            raise ProjectStoreFailure("PROJECT_DELETE_FAILED") from None
+
+    def cleanup_deleted(self, id):
+        try:
+            with locked_root(self.root, ".projects.lock"):
+                registry = self._registry()
+                entry = next((item for item in registry.entries if item.project_id == id), None)
+                if entry is None or not entry.tombstoned: raise ProjectStoreFailure("PROJECT_NOT_DELETED")
+                directory = self.projects / id
+                try:
+                    if directory.exists() or directory.is_symlink():
+                        marker = directory / ".project-identity.json"
+                        if not marker.exists() and not directory.is_symlink() and directory.is_dir() and not any(directory.iterdir()):
+                            # A prior cleanup can remove the identity before an empty-directory removal fails.
+                            private_directory(directory)
+                            directory.rmdir()
+                        else:
+                            directory = self._directory(id)
+                            files, folders = [], []
+                            for path in directory.iterdir():
+                                if path.name in {"workspace.json", ".project-identity.json"}:
+                                    owned_file(path);files.append(path)
+                                elif path.name in {"sources", "renders"}:
+                                    private_directory(path)
+                                    suffix = "bin" if path.name == "sources" else "docx"
+                                    for blob in path.iterdir():
+                                        if re.fullmatch(r"[0-9a-f]{64}\." + suffix, blob.name) is None:
+                                            raise StorageFailure("UNSAFE_STORAGE")
+                                        owned_file(blob, 32 * 1024 * 1024);files.append(blob)
+                                    folders.append(path)
+                                else: raise StorageFailure("UNSAFE_STORAGE")
+                            for path in files:
+                                if path != marker: path.unlink()
+                            for path in folders: path.rmdir()
+                            marker.unlink()
+                            directory.rmdir()
+                    entry.cleanup_status = "complete"
+                except (StorageFailure, OSError, ValueError):
+                    entry.cleanup_status = "failed"
+                self._write_registry(registry)
+                return entry.model_copy(deep=True)
+        except ProjectStoreFailure:
+            raise
+        except (StorageFailure, OSError, ValueError, ValidationError):
+            raise ProjectStoreFailure("PROJECT_DELETE_FAILED") from None

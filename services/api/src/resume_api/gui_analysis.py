@@ -212,7 +212,7 @@ class GuiAnalysisMixin:
         finally:
             self.files.pop(key, None)
             with self.state_lock:
-                if id in self.workspaces:
+                if id in self.workspaces and id not in self.deleted_ids:
                     if operation.status != 'completed':
                         pending = self.pending_analysis(id)
                         enabled = pending.analysis_batch.enabled if pending else False

@@ -217,11 +217,13 @@ async def test_corrupt_project_is_isolated_and_tombstones_never_resurrect_or_all
     reopened = service(tmp_path)
     assert reopened.read(other).project.document.candidate.name.text == 'Ирина Примерова'
     with pytest.raises(ProjectFailure, match='PROJECT_LOAD_FAILED'):reopened.read(id)
+    retained = reopened.read(other)
     registry = reopened.storage.registry()
     next(entry for entry in registry.entries if entry.project_id == other).tombstoned = True
     atomic_write(tmp_path / 'FoldCV/registry.json', storage_module.encoded(registry.model_dump(mode='json', by_alias=True)))
-    with pytest.raises(ProjectStoreFailure, match='PROJECT_DELETED'):reopened.storage.save(reopened.read(other), reopened.originals, reopened.artifacts)
-    with pytest.raises(ProjectFailure, match='PROJECT_NOT_FOUND'):service(tmp_path).read(other)
+    with pytest.raises(ProjectStoreFailure, match='PROJECT_DELETED'):reopened.storage.save(retained, reopened.originals, reopened.artifacts)
+    with pytest.raises(ProjectFailure, match='PROJECT_DELETED'):reopened.read(other)
+    with pytest.raises(ProjectFailure, match='PROJECT_DELETED'):service(tmp_path).read(other)
 
 
 @pytest.mark.asyncio

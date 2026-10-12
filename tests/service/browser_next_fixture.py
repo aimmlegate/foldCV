@@ -5,6 +5,7 @@ from pathlib import Path
 import socket
 import sys
 import json
+import hashlib
 from dataclasses import replace
 
 import uvicorn
@@ -19,6 +20,7 @@ from packages.resume_core.project_store import ProjectStoreFailure
 from packages.resume_core.gui_rewriting import GuiRewriteProposal
 from packages.resume_core.gui_reconciliation import GuiReconcileProposal
 from packages.resume_core.gui_drafting import GuiDraftProposal
+from packages.resume_core.gui_normalization import GuiSemanticProposal
 from packages.resume_core.models.recovery import GuiLeadershipFact
 from resume_api.providers.content import ContentFailure
 from resume_api.gui_rendering import GuiDocxRenderer
@@ -32,6 +34,10 @@ class ControlledProvider(CreationProvider):
         self.root = root
 
     def generate(self, request, files, cancel):
+        if (self.root / 'multiple-examples').exists() and request.result_type is GuiSemanticProposal:
+            payload = json.loads(request.text)
+            expected = hashlib.sha256((ROOT/'tests/fixtures/recovery/E2.txt').read_bytes()).hexdigest()
+            self.example = 'E2' if payload['input']['sources'][0]['byteSha256'] == expected else 'E1'
         path = self.root/'model-requests.json'
         records = json.loads(path.read_text()) if path.exists() else []
         records.append({'model':request.policy.model,'kind':json.loads(request.text)['task']});path.write_text(json.dumps(records))
@@ -153,6 +159,15 @@ async def main():
                 raise ProjectStoreFailure("PROJECT_SAVE_FAILED")
             save(workspace, originals, artifacts)
         store.storage.save = controlled_save
+        cleanup = store.storage.cleanup_deleted
+        def controlled_cleanup(id):
+            if (root/'fail-project-cleanup').exists():
+                from packages.resume_core.storage import locked_root
+                with locked_root(store.storage.root,'.projects.lock'):
+                    registry=store.storage._registry();entry=next(item for item in registry.entries if item.project_id==id)
+                    entry.cleanup_status='failed';store.storage._write_registry(registry);return entry
+            return cleanup(id)
+        store.storage.cleanup_deleted=controlled_cleanup
         run = store._run
         async def run_retained(*args):
             await run(*args)

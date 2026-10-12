@@ -4,6 +4,7 @@ from fastapi import Request
 from fastapi.responses import JSONResponse, Response
 
 from packages.resume_core.gui_projects import GuiCreateProjectRequest, GuiStartGenerationRequest, GuiProjectResponse, GuiRenameProjectRequest
+from packages.resume_core.gui_projects import GuiDeleteProjectRequest
 from packages.resume_core.gui_selection import selection_fingerprint
 from packages.resume_core.gui_source_context import source_context
 from packages.resume_core.models.recovery import SourceContextRequest, Mutation
@@ -34,6 +35,15 @@ def mount_projects(app, service, problem):
         if service.durability(workspace.project_id) == "failed":
             return response(workspace.project_id, status=201)
         return response(workspace.project_id, service.start(workspace.project_id), 202)
+
+    @app.get("/v1/projects")
+    async def projects():
+        return JSONResponse(service.list_projects().model_dump(mode="json",by_alias=True),headers={"Cache-Control":"no-store"})
+
+    @app.delete("/v1/projects/{id}")
+    async def delete(id: str, _payload: GuiDeleteProjectRequest):
+        result = await service.delete_project(id)
+        return JSONResponse(result.model_dump(mode="json",by_alias=True),headers={"Cache-Control":"no-store"})
 
     async def upload(request, id=None):
         try:

@@ -8,6 +8,10 @@ import type { MutationResult } from "../contracts/generated/mutation_result";
 import type { GuiRewriteRequest } from "../contracts/generated/gui_rewrite_request";
 import type { GuiAnalysisRequest } from "../contracts/generated/gui_analysis_request";
 import type { SaveAnalysisPreference } from "../contracts/generated/save_analysis_preference";
+import type { GuiProjectListResponse } from "../contracts/generated/gui_project_list_response";
+import type { GuiDeleteProjectRequest } from "../contracts/generated/gui_delete_project_request";
+import type { GuiDeleteProjectResult } from "../contracts/generated/gui_delete_project_result";
+import type { GuiRenameProjectRequest } from "../contracts/generated/gui_rename_project_request";
 import type { RulesSettings } from "../contracts/generated/rules_settings";
 import type { GuiExportRequest } from "../contracts/generated/gui_export_request";
 import type { Preferences } from "../contracts/generated/preferences";
@@ -26,7 +30,7 @@ function errorCode(value: unknown): string {
   return typeof error === "object" && error !== null && "code" in error && typeof error.code === "string"
     ? error.code : "REQUEST_FAILED";
 }
-async function request(path: string, method = "GET", body?: GuiCreateProjectRequest | GuiStartGenerationRequest | SourceContextRequest | GuiRewriteRequest | GuiExportRequest | GuiAnalysisRequest | SaveAnalysisPreference | Mutation | Record<string, never> | FormData): Promise<unknown> {
+async function request(path: string, method = "GET", body?: GuiCreateProjectRequest | GuiStartGenerationRequest | SourceContextRequest | GuiRewriteRequest | GuiExportRequest | GuiAnalysisRequest | SaveAnalysisPreference | GuiDeleteProjectRequest | GuiRenameProjectRequest | Mutation | Record<string, never> | FormData): Promise<unknown> {
   const init: RequestInit = { method, credentials: "same-origin", cache: "no-store" };
   if (body instanceof FormData) init.body = body;
   else if (body !== undefined) { init.body = JSON.stringify(body); init.headers = { "Content-Type": "application/json" }; }
@@ -72,6 +76,23 @@ export async function preferencesRequest(automaticAnalysis?: boolean): Promise<P
 }
 export async function analysisRequest(projectId: string, action: "invalidate" | "retry", fieldIds: string[] = []): Promise<GuiProjectResponse> {
   return projectRequest(`/v1/projects/${projectId}/analysis`, "POST", { action, fieldIds });
+}
+function isProjectList(value: unknown): value is GuiProjectListResponse { return validateContract("gui_project_list_response", value); }
+function isDeleteResult(value: unknown): value is GuiDeleteProjectResult { return validateContract("gui_delete_project_result", value); }
+export async function projectListRequest(): Promise<GuiProjectListResponse> {
+  const value = await request("/v1/projects");
+  if (!isProjectList(value)) throw new ApiFailure("INVALID_RESULT");
+  return value;
+}
+export async function renameProjectRequest(id: string, body: GuiRenameProjectRequest): Promise<GuiProjectResponse> {
+  const value = await request(`/v1/projects/${id}/metadata`, "PATCH", body);
+  if (!isResponse(value)) throw new ApiFailure("INVALID_RESULT");
+  return value;
+}
+export async function deleteProjectRequest(id: string): Promise<GuiDeleteProjectResult> {
+  const value = await request(`/v1/projects/${id}`, "DELETE", { confirmed: true });
+  if (!isDeleteResult(value)) throw new ApiFailure("INVALID_RESULT");
+  return value;
 }
 export async function docxDownload(path: string, expected: { sha256: string; size: number }): Promise<Blob> {
   const response = await fetch(path, { credentials: "same-origin", cache: "no-store" });
