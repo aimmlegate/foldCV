@@ -2,6 +2,8 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { FieldEditor, type FieldEditorHandle } from "./FieldEditor";
 import { projectRequest, sourceRequest, errorLabel, type Workspace } from "./api";
 import { SourcePanel } from "./SourcePanel";
+import { StructureControls } from "./StructureControls";
+import { useEdits } from "./useEdits";
 import type { SourceContext } from "../contracts/generated/source_context";
 import { documentFields } from "./fields";
 import { useTheme } from "./theme";
@@ -17,7 +19,6 @@ export function App() {
   const [generationId, setGenerationId] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
-  const [buffered, setBuffered] = useState(false);
   const [slot, setSlot] = useState<string | null>(null);
   const [selectionFingerprint, setSelectionFingerprint] = useState<string | null>(null);
   const [sourceOpen, setSourceOpen] = useState(false);
@@ -31,6 +32,8 @@ export function App() {
   const generation = workspace?.generations.find(item => item.id === generationId);
   const document = workspace?.project?.document;
   const fields = useMemo(() => document ? documentFields(document) : [], [document]);
+  const edits = useEdits(workspace, editor, response => { setWorkspace(response.workspace); setSelectionFingerprint(response.selectionFingerprint ?? null); });
+  const editorKey = `${workspace?.projectId}:${fields.map(field => field.fieldId).join("|")}`;
   const initialArtifact = workspace?.project?.renders.find(render => render.artifactAvailable && render.docx);
 
   useEffect(() => {
@@ -102,7 +105,7 @@ export function App() {
     <header className="next-header">
       <strong className="next-brand">FoldCV.</strong>
       <button className="next-title" disabled aria-label="Меню проекта">{workspace?.title ?? "Новое резюме"}</button>
-      <span className="next-save" role="status">{buffered ? "Правки в текущем окне" : workspace ? "В памяти приложения" : ""}</span>
+      <span className="next-save" role="status">{edits.saving ? "Сохраняем в памяти…" : edits.pending ? "Правки в текущем окне" : workspace ? "В памяти приложения" : ""}</span>
       <div className="next-actions">
         <button disabled>Сохранить проект</button><button disabled>Экспорт DOCX</button><button disabled>Настройки</button>
         <label className="next-theme">Тема <select aria-label="Тема" value={theme.mode} onChange={event => theme.select(event.target.value)}>
@@ -111,6 +114,7 @@ export function App() {
       </div>
     </header>
     {error && <p className="next-message text-danger" role="alert">{error}</p>}
+    {edits.error && <p className="next-message text-danger" role="alert">{edits.error} <button onClick={edits.retry}>Повторить сохранение</button></p>}
     {generation && <section className="next-progress" aria-label="Создание резюме">
       <p role="status">{running ? stageLabels[generation.stages.find(stage => ["queued", "running"].includes(stage.status))?.kind ?? "render"]
         : generation.status === "completed" ? "Резюме готово" : generation.status === "cancelled" ? "Создание отменено" : "Создание не завершено"}</p>
@@ -121,12 +125,15 @@ export function App() {
         href={`/v1/projects/${workspace.projectId}/renders/${initialArtifact.id}/docx`}>Скачать исходный DOCX</a>}
     </section>}
     {document ? <section className="next-editor-surface" aria-label="Документ">
-      <p className="next-editor-note">Текст можно редактировать. Пока правки остаются в текущем окне.</p>
+      <p className="next-editor-note">Правки сохраняются в памяти приложения. Дисковое сохранение ещё не подключено.</p>
       <div className="next-editor-tools"><button disabled={sourceBusy} onPointerDown={event => event.preventDefault()}
-        onClick={() => { void showSource(); }}>Показать исходник</button></div>
-      <div className="next-document"><FieldEditor ref={editor} key={workspace?.projectId} fields={fields} theme={theme.resolved} annotations={workspace?.annotations ?? []} callbacks={{
-        buffer: () => setBuffered(true), selection: () => {}, slot: value => { setSlot(value); if (value) lastSlot.current = value; }, departure: () => {},
-        restore: () => setError("Восстановление правок пока недоступно."),
+        onClick={() => { void showSource(); }}>Показать исходник</button>
+        <button disabled={edits.locked} onPointerDown={event => event.preventDefault()} onClick={() => edits.restore(slot ?? lastSlot.current)}>Отменить правку блока</button>
+        <StructureControls document={document} send={edits.structural} periods={edits.periods} disabled={edits.locked || edits.saving} />
+      </div>
+      <div className="next-document"><FieldEditor ref={editor} key={editorKey} fields={edits.overlay(fields)} editable={!edits.locked} theme={theme.resolved} annotations={workspace?.annotations ?? []} callbacks={{
+        buffer: edits.buffer, selection: () => {}, slot: value => { setSlot(value); if (value) lastSlot.current = value; }, departure: edits.departure,
+        restore: edits.restore, completion: edits.completion,
       }} /></div>
       <p className="next-editor-status" aria-live="polite">{slot ? "Редактирование текста" : ""}</p>
     </section> : <section className="next-start">

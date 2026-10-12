@@ -32,9 +32,9 @@ const createField = createReactBlockSpec({ type: "resumeField", content: "plain"
 ); } });
 const schema = BlockNoteSchema.create({ blockSpecs: { resumeField: createField() }, styleSpecs: {} });
 export type FieldEditorHandle = ReturnType<typeof createAdapter> & { historyEnabled: () => boolean };
-type Props = { fields: readonly FieldProjection[]; callbacks: AdapterCallbacks; theme: "light" | "dark"; annotations?: readonly Annotation[] };
+type Props = { fields: readonly FieldProjection[]; callbacks: AdapterCallbacks; theme: "light" | "dark"; annotations?: readonly Annotation[]; editable?: boolean };
 
-export const FieldEditor = forwardRef<FieldEditorHandle, Props>(function FieldEditor({ fields, callbacks, theme, annotations = [] }, ref) {
+export const FieldEditor = forwardRef<FieldEditorHandle, Props>(function FieldEditor({ fields, callbacks, theme, annotations = [], editable = true }, ref) {
   const latest = useRef(callbacks);
   latest.current = callbacks;
   const adapter = useMemo(() => createAdapter(fields, () => latest.current), []);
@@ -45,7 +45,7 @@ export const FieldEditor = forwardRef<FieldEditorHandle, Props>(function FieldEd
   }, []);
   useImperativeHandle(ref, () => ({ ...adapter, historyEnabled: () => Object.hasOwn(editor.extensions, "history") }), [adapter, editor]);
   return <AnnotationContext.Provider value={locateAnnotations(fields, annotations)}>
-    <BlockNoteView editor={editor} theme={theme} formattingToolbar={false} sideMenu={false}
+    <BlockNoteView editor={editor} theme={theme} editable={editable} formattingToolbar={false} sideMenu={false}
       slashMenu={false} linkToolbar={false} filePanel={false} tableHandles={false} />
   </AnnotationContext.Provider>;
 });

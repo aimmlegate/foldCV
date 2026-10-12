@@ -117,3 +117,23 @@ test("stale backend text cannot replace a newer local buffer", async ({ page }) 
   expect(await page.locator('[data-field-content="job:a/context"]').textContent()).toBe("Alpha 😀\n\nContextx");
   await expect(page.locator('[data-proof="buffer"]')).toHaveText("1");
 });
+
+test("field boundary Backspace Delete Enter and plain paste preserve field membership", async ({ page }) => {
+  await select(page, "job:b/context", 0);
+  await page.keyboard.press("Backspace");
+  await expect(page.locator('[data-field-content="job:a/tasks"]')).toHaveText("Task A");
+  await expect(page.locator('[data-field-content="job:b/context"]')).toHaveText("Beta text");
+  await select(page, "job:a/tasks", 6);
+  await page.keyboard.press("Delete");
+  await expect(page.locator('[data-field-content]')).toHaveCount(5);
+  await select(page, "job:b/context", 4);
+  await page.keyboard.press("Enter");
+  await expect(page.locator('[data-field-content="job:b/context"]')).toHaveText("Beta\n text");
+  await page.locator('[contenteditable="true"]').evaluate(root => {
+    const data = new DataTransfer();data.setData("text/plain", "Plain\r\n\r\n😀");data.setData("text/html", "<b>Rich</b>");
+    root.dispatchEvent(new ClipboardEvent("paste", { bubbles: true, cancelable: true, clipboardData: data }));
+  });
+  await expect(page.locator('[data-field-content="job:b/context"]')).toHaveText("Beta\nPlain\n\n😀 text");
+  await expect(page.locator('[data-field-content]')).toHaveCount(5);
+  await expect(page.locator('[contenteditable="true"]')).toHaveCount(1);
+});

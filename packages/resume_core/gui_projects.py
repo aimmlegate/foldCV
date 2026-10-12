@@ -3,7 +3,7 @@
 from typing import Literal
 from pydantic import Field
 
-from .models.contracts import Id, Wire, Sha256
+from .models.contracts import Id, Revision, Wire, Sha256
 from .models.recovery import WorkspaceV5
 
 
@@ -22,5 +22,11 @@ class GuiProjectResponse(Wire):
     selection_fingerprint: Sha256 | None = None
 
 
+class GuiRenameProjectRequest(Wire):
+    title: str = Field(min_length=1, max_length=200)
+    base_revision: Revision
+
+
 GUI_PROJECT_CONTRACTS = {"gui_create_project_request": GuiCreateProjectRequest,
-    "gui_start_generation_request": GuiStartGenerationRequest, "gui_project_response": GuiProjectResponse}
+    "gui_start_generation_request": GuiStartGenerationRequest, "gui_project_response": GuiProjectResponse,
+    "gui_rename_project_request": GuiRenameProjectRequest}

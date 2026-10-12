@@ -17,6 +17,7 @@ from packages.resume_core.gui_drafting import GuiDraftRequest
 from packages.resume_core.gui_normalization import GuiNormalizeRequest, canonical_source, source_fingerprint
 from packages.resume_core.gui_rendering import render_input
 from packages.resume_core.gui_projection import compatibility_views
+from packages.resume_core.gui_mutations import apply_mutation
 from packages.resume_core.models.contracts import Source, Usage
 from packages.resume_core.models.recovery import (WorkspaceV5, ProjectV4, Generation, GenerationStage,
     GuiOperation, GuiOperationEvent, Dependencies, RenderSnapshotV4, record_slot)
@@ -76,6 +77,25 @@ class GuiProjectService:
 
     def owner(self, workspace):
         return workspace.project or workspace.pre_draft
+
+    def mutate(self, id, mutation):
+        self.read(id)
+        return apply_mutation(self.workspaces[id], mutation, self.clock().isoformat())
+
+    def rename(self, id, request):
+        self.read(id)
+        workspace = self.workspaces[id]
+        if workspace.project_revision != request.base_revision:
+            raise ProjectFailure("PROJECT_REVISION_CHANGED")
+        title = request.title.strip()
+        if not title:
+            raise ProjectFailure("TITLE_REQUIRED", 422)
+        if title != workspace.title or not workspace.title_manually_set:
+            workspace.title, workspace.title_manually_set = title, True
+            workspace.project_revision += 1
+            if workspace.project:
+                workspace.project.revision = workspace.project_revision
+            workspace.updated_at = self.clock().isoformat()
 
     def allocate(self, title):
         stamp = self.clock()
@@ -160,6 +180,8 @@ class GuiProjectService:
             old = self.generation(id, previous)
             if old.status not in {"failed", "cancelled", "interrupted"}:
                 raise ProjectFailure("GENERATION_NOT_RETRYABLE")
+            if old.stages[3].status == "completed" and old.dependencies.document_revision != workspace.document_revision:
+                raise ProjectFailure("STALE_GENERATION")
             source_ids = old.source_ids[:]
         selected = self.provider_factory()
         if selected is None:
@@ -202,7 +224,7 @@ class GuiProjectService:
     async def _content(self, workspace, generation, stage, request, selected):
         cancel = self.cancels[(workspace.project_id, generation.id)]
         operation = GuiOperation(id=identity("operation"), kind=stage.kind, status="queued",
-            baseRevision=workspace.document_revision, usage=None, events=[], projectId=workspace.project_id,
+            baseRevision=workspace.project_revision, usage=None, events=[], projectId=workspace.project_id,
             capturedDocumentRevision=workspace.document_revision, dependencies=generation.dependencies,
             rulesUsed=generation.rules_used, targetFieldIds=[], resultFingerprint=None, errorCode=None)
         self.owner(workspace).operations.append(operation)
@@ -321,6 +343,7 @@ class GuiProjectService:
                 else:
                     stage.status = "running"
                     document, anchors, fingerprint = render_input(workspace)
+                    captured_revisions = (workspace.project_revision, workspace.document_revision)
                     files = OperationFiles(self.temp_root)
                     self.files[key] = files
                     async with self.worker_slot(cancel):
@@ -328,6 +351,8 @@ class GuiProjectService:
                             content = await self.renderer.render(document, anchors, files)
                     if cancel.is_set():
                         raise AdmissionCancelled()
+                    if captured_revisions != (workspace.project_revision, workspace.document_revision) or render_input(workspace)[2] != fingerprint:
+                        raise ProjectFailure("STALE_GENERATION")
                     snapshot = RenderSnapshotV4(id=identity("render"), projectRevision=workspace.project_revision,
                         documentRevision=workspace.document_revision, renderInputFingerprint=fingerprint,
                         templateId="generic", templateVersion="1.0.0", templateSha256=PACKAGE_SHA256,

@@ -3,10 +3,10 @@
 from fastapi import Request
 from fastapi.responses import JSONResponse, Response
 
-from packages.resume_core.gui_projects import GuiCreateProjectRequest, GuiStartGenerationRequest, GuiProjectResponse
+from packages.resume_core.gui_projects import GuiCreateProjectRequest, GuiStartGenerationRequest, GuiProjectResponse, GuiRenameProjectRequest
 from packages.resume_core.gui_selection import selection_fingerprint
 from packages.resume_core.gui_source_context import source_context
-from packages.resume_core.models.recovery import SourceContextRequest
+from packages.resume_core.models.recovery import SourceContextRequest, Mutation
 from .contracts import EmptyRequest
 from .extracting import parse_one_part, UploadFailure
 from .gui_projects import ProjectFailure
@@ -53,6 +53,16 @@ def mount_projects(app, service, problem):
     async def context(id: str, payload: SourceContextRequest):
         result = source_context(service.read(id), payload)
         return JSONResponse(result.model_dump(mode="json", by_alias=True), headers={"Cache-Control": "no-store"})
+
+    @app.post("/v1/projects/{id}/mutations")
+    async def mutate(id: str, payload: Mutation):
+        result = service.mutate(id, payload)
+        return JSONResponse(result.model_dump(mode="json", by_alias=True), headers={"Cache-Control": "no-store"})
+
+    @app.patch("/v1/projects/{id}/metadata")
+    async def metadata(id: str, payload: GuiRenameProjectRequest):
+        service.rename(id, payload)
+        return response(id)
 
     @app.post("/v1/projects/{id}/generations")
     async def start(id: str, payload: GuiStartGenerationRequest):

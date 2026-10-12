@@ -15,6 +15,7 @@ export type AdapterCallbacks = {
   slot: (slotId: string | null) => void;
   departure: (slotId: string) => void;
   restore: (slotId: string) => void;
+  completion?: (fieldId: string, reason: "field" | "paragraph") => void;
 };
 
 function identity(value: unknown): Pick<FieldProjection, "fieldId" | "slotId" | "label"> | null {
@@ -56,6 +57,7 @@ export function createAdapter(fields: readonly FieldProjection[], callbacks: () 
   const key = new PluginKey<AdapterState>("foldcv-fields");
   const order = fields.map(field => field.fieldId);
   let activeSlot: string | null = null;
+  let activeField: string | null = null;
   let composing = false;
   let ownedIntent: string | null = null;
   let lastSent = 0;
@@ -97,7 +99,9 @@ export function createAdapter(fields: readonly FieldProjection[], callbacks: () 
           return true;
         }
         if (event.key === "Enter" && !event.isComposing && !composing) {
-          event.preventDefault(); view.dispatch(view.state.tr.insertText("\n")); return true;
+          event.preventDefault(); view.dispatch(view.state.tr.insertText("\n"));
+          if (activeField) callbacks().completion?.(activeField, "paragraph");
+          return true;
         }
         return false;
       },
@@ -151,7 +155,11 @@ export function createAdapter(fields: readonly FieldProjection[], callbacks: () 
       return { update: next => {
         const selected = next.state.selection;
         const field = positionedFields(next.state.doc).find(field => selected.head >= field.from && selected.head <= field.to);
-        if (next.hasFocus()) move(field?.slotId ?? null);
+        if (next.hasFocus()) {
+          if (activeField && activeField !== field?.fieldId) callbacks().completion?.(activeField, "field");
+          activeField = field?.fieldId ?? null;
+          move(field?.slotId ?? null);
+        }
         callbacks().selection(composing ? null : capture(next.state.doc, selected.anchor, selected.head));
         emit(next);
       }, destroy: () => {
@@ -166,6 +174,7 @@ export function createAdapter(fields: readonly FieldProjection[], callbacks: () 
   return {
     extension,
     capture: () => currentView && !composing ? capture(currentView.state.doc, currentView.state.selection.anchor, currentView.state.selection.head) : null,
+    isComposing: () => composing,
     read: () => currentView ? positionedFields(currentView.state.doc) : [],
     patch: (patches: readonly FieldPatch[]) => {
       if (!currentView || composing) return false;

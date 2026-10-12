@@ -55,3 +55,10 @@ button:disabled { cursor: default; opacity: .6; }
 .next-source-panel blockquote { margin: 8px 0 24px; padding: 12px; white-space: pre-wrap; background: var(--soft); border-left: 2px solid var(--outline); font-size: 14px; }
 .next-source-reference { color: var(--muted); font-size: 12px; }
 @media (max-width: 900px) { .next-editor-tools { margin-inline: 1rem; } }
+.next-editor-tools > button { margin-right: 8px; }
+.next-structure { margin: 16px 0; padding: 12px; border: 1px solid var(--outline); background: var(--panel); }
+.next-structure summary { cursor: pointer; }
+.next-structure li { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin: 8px 0; }
+.next-structure ul { padding: 0; }
+.next-structure button { padding: 4px 8px; font-size: 12px; }
+.next-structure h3 { font-size: 14px; }

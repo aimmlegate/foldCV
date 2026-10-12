@@ -262,7 +262,9 @@ def record_slot(record: DocumentRecord) -> str:
 def authored_fields(record: DocumentRecord) -> list[AuthoredField]:
     fields = [value for value in record.__dict__.values() if isinstance(value, AuthoredField)]
     if isinstance(record, JobRecord):
-        fields.extend(field for period in record.periods for field in (period.start_text, period.end_text))
+        fields = [record.employer, record.role,
+                  *(field for period in record.periods for field in (period.start_text, period.end_text)),
+                  record.context, record.tasks, record.results, record.stack]
     if isinstance(record, SkillsFocusRecord):
         fields.extend(entry.display for entry in record.focus)
     return fields

@@ -145,6 +145,11 @@ test("built E1 source panel reads captured job evidence with zero extra content 
 });
 
 test("built E1 changed capture is rejected and source refresh preserves the typing buffer", async ({ page }) => {
+  await page.route("**/source-context", async route => {
+    const value: unknown = route.request().postDataJSON();
+    if (typeof value !== "object" || value === null || !("documentRevision" in value) || typeof value.documentRevision !== "number") throw new Error("Invalid context request");
+    await route.continue({ postData: JSON.stringify({ ...value, documentRevision: value.documentRevision - 1 }) });
+  });
   await page.goto(`${origin}/next.html#secret=synthetic-next-secret-0123456789`);
   await page.getByRole("button", { name: "Открыть пример" }).click();
   await page.getByRole("button", { name: "Создать резюме" }).click();
@@ -164,6 +169,146 @@ test("built E1 changed capture is rejected and source refresh preserves the typi
   await expect(panel.getByRole("status")).toContainText("Выделение устарело");
   await expect(panel.locator("blockquote")).toHaveCount(0);
   await expect(profile).toContainText("Added 😀");
+});
+
+test("built E1 continuous typing retains a session and real two-step block restore", async ({ page }) => {
+  await page.goto(`${origin}/next.html#secret=synthetic-next-secret-0123456789`);
+  await page.getByRole("button", { name: "Открыть пример" }).click();
+  await page.getByRole("button", { name: "Создать резюме" }).click();
+  await expect(page.getByText("Резюме готово", { exact: true })).toBeVisible({ timeout: 30000 });
+  const link = await page.getByRole("link", { name: "Скачать исходный DOCX" }).getAttribute("href"), id = link?.split("/")[3];
+  const read = async () => { const value: unknown = await (await page.request.get(`${origin}/v1/projects/${id}`)).json(); return response(value).workspace; };
+  const profile = page.locator('[data-field-content="profile/text"]'), original = await profile.innerText();
+  await page.locator('[contenteditable="true"]').evaluate(root => root.setAttribute("data-instance", "original"));
+  await profile.click();await page.keyboard.press("End");
+  await page.keyboard.type(" Long continuous user addition", { delay: 80 });
+  await expect.poll(async () => (await read()).project?.document.profile.text.text).toContain("Long continuous user addition");
+  expect((await read()).undoSlots["profile"]).toBeNull();
+  expect((await read()).editSessions["profile"]?.baseline.record.kind).toBe("profile");
+  expect((await read()).project?.operations).toHaveLength(2);
+  await page.getByRole("button", { name: "Показать исходник" }).click();
+  await expect(page.getByRole("complementary", { name: "Исходный контекст" }).getByRole("status")).toContainText("добавлен пользователем");
+  await page.getByRole("button", { name: "Закрыть исходный контекст" }).click();
+  await expect.poll(async () => (await read()).undoSlots["profile"]?.record.kind).toBe("profile");
+  const first = await profile.innerText();
+  await profile.click();await page.keyboard.press("End");await page.keyboard.type(" unfinished");
+  await page.keyboard.press("Control+z");
+  await expect(profile).toHaveText(first);
+  expect((await read()).undoSlots["profile"]).not.toBeNull();
+  await page.keyboard.press("Meta+z");
+  await expect(profile).toHaveText(original);
+  await expect.poll(async () => (await read()).undoSlots["profile"]).toBeNull();
+  const revision = (await read()).documentRevision;
+  await page.keyboard.press("Control+z");
+  await expect(profile).toHaveText(original);
+  await expect.poll(async () => (await read()).documentRevision).toBe(revision);
+  await expect(page.locator('[contenteditable="true"]')).toHaveAttribute("data-instance", "original");
+});
+
+test("built E1 lost acknowledgment retry applies once and keeps newer buffered text", async ({ page }) => {
+  let interrupted = false;
+  await page.route("**/mutations", async route => {
+    if (!interrupted) { interrupted = true;await route.fetch();await route.abort("failed"); }
+    else await route.continue();
+  });
+  await page.goto(`${origin}/next.html#secret=synthetic-next-secret-0123456789`);
+  await page.getByRole("button", { name: "Открыть пример" }).click();await page.getByRole("button", { name: "Создать резюме" }).click();
+  await expect(page.getByText("Резюме готово", { exact: true })).toBeVisible({ timeout: 30000 });
+  const profile = page.locator('[data-field-content="profile/text"]');await profile.click();await page.keyboard.press("End");await page.keyboard.type(" First");
+  await expect(page.getByRole("alert")).toContainText("Не удалось сохранить правки");
+  await expect(profile).toContainText("First");
+  await page.keyboard.type(" newer");
+  await page.getByRole("button", { name: "Повторить сохранение" }).click();
+  await expect(page.getByRole("alert")).toHaveCount(0);
+  const link = await page.getByRole("link", { name: "Скачать исходный DOCX" }).getAttribute("href"), id = link?.split("/")[3];
+  await expect.poll(async () => { const raw: unknown = await (await page.request.get(`${origin}/v1/projects/${id}`)).json();return response(raw).workspace.project?.document.profile.text.text; }).toContain("First newer");
+  await expect(profile).toContainText("First newer");
+  const raw: unknown = await (await page.request.get(`${origin}/v1/projects/${id}`)).json();const workspace = response(raw).workspace;
+  expect(workspace.project?.operations).toHaveLength(2);expect(workspace.documentRevision).toBe(4);
+  expect(workspace.editSessions["profile"]).toBeUndefined();
+});
+
+test("built E1 explicit rows periods and visibility survive editor projection changes", async ({ page }) => {
+  await page.goto(`${origin}/next.html#secret=synthetic-next-secret-0123456789`);
+  await page.getByRole("button", { name: "Открыть пример" }).click();await page.getByRole("button", { name: "Создать резюме" }).click();
+  await expect(page.getByText("Резюме готово", { exact: true })).toBeVisible({ timeout: 30000 });
+  await page.getByText("Разделы и строки", { exact: true }).click();
+  await page.getByRole("button", { name: "Добавить работу", exact: true }).click();
+  await expect(page.locator('[data-field-content$="/employer"]')).toHaveCount(3);
+  await page.getByRole("button", { name: "Скрыть Работа 3", exact: true }).click();
+  await expect(page.getByText("Работа 3 · скрыт из DOCX", { exact: true })).toBeVisible();
+  await page.getByRole("button", { name: "Показать Работа 3", exact: true }).click();
+  await page.getByRole("button", { name: "Выше Работа 3", exact: true }).click();
+  await expect(page.getByRole("button", { name: "Удалить Работа 2", exact: true })).toBeVisible();
+  await page.getByRole("button", { name: "Удалить Работа 2", exact: true }).click();
+  await expect(page.locator('[data-field-content$="/employer"]')).toHaveCount(2);
+  await page.getByRole("button", { name: "Добавить образование", exact: true }).click();
+  await expect(page.locator('[data-field-content$="/institution"]')).toHaveCount(2);
+  await page.getByRole("button", { name: "Добавить язык", exact: true }).click();
+  await expect(page.locator('[data-field-content^="language:"][data-field-content$="/name"]')).toHaveCount(3);
+  await page.getByText("Периоды: Север", { exact: true }).click();
+  const periods = page.locator('[data-period-job]').filter({ hasText: "Периоды: Север" });
+  await periods.getByRole("button", { name: "Добавить период", exact: true }).click();
+  await expect(periods.getByRole("checkbox")).toHaveCount(2);
+  await periods.getByRole("button", { name: "Период выше" }).last().click();
+  await periods.getByRole("button", { name: "Удалить период" }).first().click();
+  await expect(periods.getByRole("checkbox")).toHaveCount(1);
+  await page.getByRole("button", { name: "Отменить правку блока", exact: true }).click();
+  await expect(periods.getByRole("checkbox")).toHaveCount(1);
+  await expect(periods.getByRole("checkbox")).toBeChecked();
+  await expect(page.getByRole("alert")).toHaveCount(0);
+  await expect(page.locator('[contenteditable="true"]')).toHaveCount(1);
+});
+
+test("built E1 delayed edit acknowledgment preserves newer typing and editor identity", async ({ page }) => {
+  let release = () => {};const held = new Promise<void>(ready => { release = ready; });
+  let admitted = () => {};const written = new Promise<void>(ready => { admitted = ready; });
+  let first = true;
+  await page.route("**/mutations", async route => {
+    if (first) { first = false;const result = await route.fetch();admitted();await held;await route.fulfill({ response: result }); }
+    else await route.continue();
+  });
+  try {
+    await page.goto(`${origin}/next.html#secret=synthetic-next-secret-0123456789`);
+    await page.getByRole("button", { name: "Открыть пример" }).click();await page.getByRole("button", { name: "Создать резюме" }).click();
+    await expect(page.getByText("Резюме готово", { exact: true })).toBeVisible({ timeout: 30000 });
+    const profile = page.locator('[data-field-content="profile/text"]');
+    await page.locator('[contenteditable="true"]').evaluate(root => root.setAttribute("data-instance", "original"));
+    await profile.click();await page.keyboard.press("End");await page.keyboard.type(" First");
+    await written;
+    await page.keyboard.type(" newer");release();
+    const link = await page.getByRole("link", { name: "Скачать исходный DOCX" }).getAttribute("href"), id = link?.split("/")[3];
+    await expect.poll(async () => { const raw: unknown = await (await page.request.get(`${origin}/v1/projects/${id}`)).json();return response(raw).workspace.project?.document.profile.text.text; }).toContain("First newer");
+    await expect(profile).toContainText("First newer");
+    await expect(page.locator('[contenteditable="true"]')).toHaveAttribute("data-instance", "original");
+    await expect(page.getByRole("alert")).toHaveCount(0);
+  } finally { release(); }
+});
+
+test("built E1 active composition sends no partial mutation and retains completed IME text", async ({ page }) => {
+  await page.goto(`${origin}/next.html#secret=synthetic-next-secret-0123456789`);
+  await page.getByRole("button", { name: "Открыть пример" }).click();await page.getByRole("button", { name: "Создать резюме" }).click();
+  await expect(page.getByText("Резюме готово", { exact: true })).toBeVisible({ timeout: 30000 });
+  const link = await page.getByRole("link", { name: "Скачать исходный DOCX" }).getAttribute("href"), id = link?.split("/")[3];
+  const profile = page.locator('[data-field-content="profile/text"]');await profile.click();
+  await profile.evaluate(field => {
+    const root = document.querySelector('[contenteditable="true"]');const text = document.createTreeWalker(field, NodeFilter.SHOW_TEXT).nextNode();
+    if (!root || !text) throw new Error("Profile text is missing");
+    root.dispatchEvent(new CompositionEvent("compositionstart", { bubbles: true, data: "" }));
+    text.textContent = `${text.textContent ?? ""}入力`;
+    root.dispatchEvent(new InputEvent("input", { bubbles: true, inputType: "insertCompositionText", data: "入力", isComposing: true }));
+  });
+  await page.keyboard.press("Control+z");
+  await page.waitForTimeout(1200);
+  const before: unknown = await (await page.request.get(`${origin}/v1/projects/${id}`)).json();
+  expect(response(before).workspace.documentRevision).toBe(2);
+  await profile.evaluate(field => {
+    const root = field.closest('[contenteditable="true"]');
+    root?.dispatchEvent(new CompositionEvent("compositionend", { bubbles: true, data: "入力" }));
+    root?.dispatchEvent(new InputEvent("input", { bubbles: true, inputType: "insertText", data: "入力" }));
+  });
+  await expect.poll(async () => { const raw: unknown = await (await page.request.get(`${origin}/v1/projects/${id}`)).json();return response(raw).workspace.project?.document.profile.text.text; }).toContain("入力");
+  await expect(profile).toContainText("入力");
 });
 
 test("built entry persists manual theme, follows system and fits a narrow keyboard layout", async ({ page }) => {

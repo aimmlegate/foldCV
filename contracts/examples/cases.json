@@ -2147,5 +2147,12 @@
       "value": 0
     }
   ]
+},
+{
+  "name": "gui_rename_project_request_valid",
+  "contract": "gui_rename_project_request",
+  "base": "gui_rename_project_request",
+  "valid": true,
+  "edits": []
 }
 ]
