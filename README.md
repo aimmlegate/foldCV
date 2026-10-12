@@ -1,15 +1,16 @@
 # FoldCV
 
-Original file → complete archive → selected resume JSON → fixed Generic PDF.
+Command-line skill: original file → complete archive → selected resume JSON → fixed Generic PDF.
 
 The supplied outputs define the layout, not the candidate's facts. The skill
 handles extraction and rewriting; Python checks preservation and renders the
 layout. No provider API or model benchmark is implemented yet.
 
-The planned local browser application is described in
-[the GUI implementation handoff](docs/gui/README.md), with an interactive
-wireframe, CLI subscription integration, and explicit code/model boundaries.
-These files are a design, not an implemented application.
+The local browser MVP is implemented and opens the recovery editor by default.
+It supports direct editing, selection rewrites, local/portable projects and DOCX.
+Read [the manual-use guide](docs/gui/mvp-manual.md) for launch and connection steps.
+The recovery run is accepted with review debt; native CLI quality/usage/retention,
+Word and clean-host checks remain pending.
 
 ## Setup
 
@@ -66,7 +67,7 @@ Experience estimates describe project exposure, not continuous full-time use.
 .venv/bin/python -m unittest discover -s skills/format-resume/tests -v
 ```
 
-## Current scope
+## Current command-line skill scope
 
 - PDF with extractable text, TXT, and Markdown inputs. Other formats and scans
   need a separate extraction or OCR step.
