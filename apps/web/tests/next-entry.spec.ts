@@ -1,6 +1,6 @@
 import { expect, test } from "@playwright/test";
 import { execFileSync, spawn, type ChildProcessWithoutNullStreams } from "node:child_process";
-import { mkdtempSync, readFileSync, realpathSync, rmSync, cpSync, existsSync, readdirSync } from "node:fs";
+import { mkdtempSync, readFileSync, realpathSync, rmSync, cpSync, existsSync, readdirSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { resolve } from "node:path";
 import { createHash } from "node:crypto";
@@ -18,9 +18,12 @@ test.beforeEach(async ({}, info) => {
   runRoot = mkdtempSync(resolve(temp, "run-"));
   cpSync(resolve(temp, "dist"), resolve(runRoot, "dist"), { recursive: true });
   const example = info.title.includes("focus warning") ? "E2-focus" : info.title.includes("E2") ? "E2" : "E1";
+  origin = await launch(example);
+});
+async function launch(example: string): Promise<string> {
   const child = spawn(resolve(root, ".venv/bin/python"), ["tests/service/browser_next_fixture.py", runRoot, resolve(runRoot, "dist"), example], { cwd: root, stdio: "pipe" });
   server = child;
-  origin = await new Promise<string>((ready, reject) => {
+  return new Promise<string>((ready, reject) => {
     let text = "";
     const timer = setTimeout(() => reject(new Error("Controlled entry server timed out")), 15000);
     child.stdout.on("data", (chunk: Buffer) => {
@@ -29,12 +32,15 @@ test.beforeEach(async ({}, info) => {
     });
     child.once("exit", () => { clearTimeout(timer); reject(new Error("Controlled entry server stopped")); });
   });
-});
-test.afterEach(async () => {
+}
+async function stopServer() {
   if (server && server.exitCode === null && server.signalCode === null) {
     const exit = new Promise<void>(ready => server?.once("exit", () => ready()));
     server.kill("SIGTERM"); await exit;
   }
+}
+test.afterEach(async () => {
+  await stopServer();
   if (existsSync(resolve(runRoot, "operations"))) expect(readdirSync(resolve(runRoot, "operations"))).toEqual([]);
 });
 test.afterAll(() => { if (temp) rmSync(temp, { recursive: true, force: true }); });
@@ -65,7 +71,9 @@ test("built API entry creates E1 with two operations and no browser assembly or 
   expect(workspace.project?.operations.map(operation => operation.usage?.logicalAttempts)).toEqual([1, 1]);
   expect(workspace.project?.renders).toHaveLength(1);
   expect([workspace.projectRevision, workspace.documentRevision]).toEqual([2, 2]);
-  expect(response(value).durability).toBe("in_memory");
+  expect(response(value).durability).toBe("durable");
+  expect(response(value).savedDocumentRevision).toBe(workspace.documentRevision);
+  expect(existsSync(resolve(runRoot, "FoldCV/projects", id, "workspace.json"))).toBe(true);
   const artifact = workspace.project?.renders[0];
   const link = page.getByRole("link", { name: "Скачать исходный DOCX" });
   await expect(link).toHaveAttribute("href", `/v1/projects/${id}/renders/${artifact?.id}/docx`);
@@ -309,6 +317,112 @@ test("built E1 active composition sends no partial mutation and retains complete
   });
   await expect.poll(async () => { const raw: unknown = await (await page.request.get(`${origin}/v1/projects/${id}`)).json();return response(raw).workspace.project?.document.profile.text.text; }).toContain("入力");
   await expect(profile).toContainText("入力");
+});
+
+test("built E1 disk acknowledgment refresh retains open session and resumes its baseline", async ({ page }) => {
+  await page.goto(`${origin}/next.html#secret=synthetic-next-secret-0123456789`);
+  await page.getByRole("button", { name: "Открыть пример" }).click();await page.getByRole("button", { name: "Создать резюме" }).click();
+  await expect(page.getByText("Резюме готово", { exact: true })).toBeVisible({ timeout: 30000 });
+  const profile = page.locator('[data-field-content="profile/text"]'), original = await profile.innerText();
+  await profile.click();await page.keyboard.press("End");await page.keyboard.type(" Durable addition");
+  await expect(page.locator(".next-save")).toHaveText("Сохранено");
+  const id = new URL(page.url()).searchParams.get("project");expect(id).not.toBeNull();
+  const disk: unknown = JSON.parse(readFileSync(resolve(runRoot, "FoldCV/projects", id ?? "", "workspace.json"), "utf8"));
+  expect(validateContract("workspace_v5", disk)).toBe(true);
+  const before: unknown = await (await page.request.get(`${origin}/v1/projects/${id}`)).json();
+  const sessionId = response(before).workspace.editSessions["profile"]?.sessionId;
+  expect(sessionId).toBeDefined();expect(response(before).workspace.undoSlots["profile"]).toBeNull();
+  await page.reload();
+  await expect(profile).toContainText("Durable addition");
+  await profile.click();await page.keyboard.press("End");await page.keyboard.type(" continued");
+  await expect(page.locator(".next-save")).toHaveText("Сохранено");
+  const after: unknown = await (await page.request.get(`${origin}/v1/projects/${id}`)).json();
+  expect(response(after).workspace.editSessions["profile"]?.sessionId).toBe(sessionId);
+  expect(response(after).workspace.project?.operations).toHaveLength(2);
+  await page.keyboard.press("Control+z");
+  await expect(profile).toHaveText(original);
+  await expect(page.getByRole("alert")).toHaveCount(0);
+  const persisted: unknown = JSON.parse(readFileSync(resolve(runRoot, "FoldCV/projects", id ?? "", "workspace.json"), "utf8"));
+  expect(validateContract("workspace_v5", persisted)).toBe(true);
+  const stored = response(after).workspace;
+  expect(response(after).savedDocumentRevision).toBe(stored.documentRevision);
+});
+
+test("built E1 save failure shows unsaved text and explicit retry obtains a disk acknowledgment", async ({ page }) => {
+  await page.goto(`${origin}/next.html#secret=synthetic-next-secret-0123456789`);
+  await page.getByRole("button", { name: "Открыть пример" }).click();await page.getByRole("button", { name: "Создать резюме" }).click();
+  await expect(page.getByText("Резюме готово", { exact: true })).toBeVisible({ timeout: 30000 });
+  const flag = resolve(runRoot, "fail-user-saves");writeFileSync(flag, "1");
+  const profile = page.locator('[data-field-content="profile/text"]');await profile.click();await page.keyboard.press("End");await page.keyboard.type(" Pending disk");
+  await expect(page.getByRole("alert")).toContainText("Не удалось сохранить правки");
+  await expect(page.locator(".next-save")).not.toHaveText("Сохранено");
+  const id = new URL(page.url()).searchParams.get("project");
+  expect(readFileSync(resolve(runRoot, "FoldCV/projects", id ?? "", "workspace.json"), "utf8")).not.toContain("Pending disk");
+  const failed: unknown = await (await page.request.get(`${origin}/v1/projects/${id}`)).json();
+  expect(response(failed).durability).toBe("failed");expect(response(failed).savedDocumentRevision).toBe(2);
+  await expect(profile).toContainText("Pending disk");rmSync(flag);
+  await page.getByRole("button", { name: "Повторить сохранение" }).click();
+  await expect(page.getByRole("alert")).toHaveCount(0);await expect(page.locator(".next-save")).toHaveText("Сохранено");
+  expect(readFileSync(resolve(runRoot, "FoldCV/projects", id ?? "", "workspace.json"), "utf8")).toContain("Pending disk");
+  await page.reload();await expect(profile).toContainText("Pending disk");
+  const saved: unknown = await (await page.request.get(`${origin}/v1/projects/${id}`)).json();
+  expect(response(saved).workspace.project?.operations).toHaveLength(2);
+});
+
+test("built failed-file preDraft refresh retains warnings original bytes and the same project", async ({ page }) => {
+  await page.goto(`${origin}/next.html#secret=synthetic-next-secret-0123456789`);
+  await page.getByLabel("Файл резюме").setInputFiles({ name: "broken.pdf", mimeType: "application/pdf", buffer: Buffer.from("broken PDF bytes") });
+  await expect(page.getByText("Доступного текста нет. Выберите другой файл или вставьте текст.", { exact: true })).toBeVisible();
+  await expect(page.locator(".next-save")).toHaveText("Сохранено");
+  const id = new URL(page.url()).searchParams.get("project");
+  const before: unknown = await (await page.request.get(`${origin}/v1/projects/${id}`)).json();
+  const sourceId = response(before).workspace.preDraft?.selectedSourceId;
+  const blobs = readdirSync(resolve(runRoot, "FoldCV/projects", id ?? "", "sources"));
+  expect(blobs).toHaveLength(1);expect(readFileSync(resolve(runRoot, "FoldCV/projects", id ?? "", "sources", blobs[0] ?? ""), "utf8")).toBe("broken PDF bytes");
+  await page.reload();await expect(page.getByText("Выбрано: broken.pdf", { exact: true })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Создать резюме" })).toBeDisabled();
+  const after: unknown = await (await page.request.get(`${origin}/v1/projects/${id}`)).json();
+  expect(response(after).workspace.preDraft?.selectedSourceId).toBe(sourceId);
+  expect(response(after).workspace.preDraft?.operations).toHaveLength(0);
+  expect(new URL(page.url()).searchParams.get("project")).toBe(id);
+});
+
+test("built E1 backend restart opens its disk snapshot without generation or pointer movement", async ({ page }) => {
+  await page.goto(`${origin}/next.html#secret=synthetic-next-secret-0123456789`);
+  await page.getByRole("button", { name: "Открыть пример" }).click();await page.getByRole("button", { name: "Создать резюме" }).click();
+  await expect(page.getByText("Резюме готово", { exact: true })).toBeVisible({ timeout: 30000 });
+  const profile = page.locator('[data-field-content="profile/text"]');await profile.click();await page.keyboard.press("End");await page.keyboard.type(" Survives restart");
+  await expect(page.locator(".next-save")).toHaveText("Сохранено");
+  const id = new URL(page.url()).searchParams.get("project");
+  const before: unknown = await (await page.request.get(`${origin}/v1/projects/${id}`)).json();
+  const saved = response(before).workspace;
+  await stopServer();origin = await launch("E1");
+  await page.goto(`${origin}/next.html?project=${id}#secret=synthetic-next-secret-0123456789`);
+  await expect(profile).toContainText("Survives restart");await expect(page.locator(".next-save")).toHaveText("Сохранено");
+  expect(new URL(page.url()).hash).toBe("");expect(new URL(page.url()).searchParams.get("project")).toBe(id);
+  const raw: unknown = await (await page.request.get(`${origin}/v1/projects/${id}`)).json();const workspace = response(raw).workspace;
+  expect([workspace.projectRevision, workspace.documentRevision]).toEqual([saved.projectRevision, saved.documentRevision]);
+  expect(workspace.editSessions).toEqual(saved.editSessions);expect(workspace.undoSlots).toEqual(saved.undoSlots);
+  expect(workspace.project?.operations).toHaveLength(2);
+  await expect(page.getByRole("link", { name: "Скачать исходный DOCX" })).toBeVisible();
+});
+
+test("built E1 first unsent edit starts the save deadline and canceled composition resumes it", async ({ page }) => {
+  await page.goto(`${origin}/next.html#secret=synthetic-next-secret-0123456789`);
+  await page.getByRole("button", { name: "Открыть пример" }).click();await page.getByRole("button", { name: "Создать резюме" }).click();
+  await expect(page.getByText("Резюме готово", { exact: true })).toBeVisible({ timeout: 30000 });
+  const profile = page.locator('[data-field-content="profile/text"]');await profile.click();await page.keyboard.press("End");
+  const writes: number[] = [];
+  page.on("request", request => { if (new URL(request.url()).pathname.endsWith("/mutations")) writes.push(performance.now()); });
+  const started = performance.now();await page.keyboard.type(" Timer");
+  await page.waitForTimeout(350);expect(writes).toHaveLength(0);
+  await expect.poll(() => writes.length).toBeGreaterThan(0);expect((writes[0] ?? 0) - started).toBeGreaterThan(850);
+  await expect(page.locator(".next-save")).toHaveText("Сохранено");
+  await page.keyboard.type(" Before canceled IME");
+  await profile.evaluate(field => field.closest('[contenteditable="true"]')?.dispatchEvent(new CompositionEvent("compositionstart", { bubbles: true })));
+  const count = writes.length;await page.waitForTimeout(1200);expect(writes).toHaveLength(count);
+  await profile.evaluate(field => field.closest('[contenteditable="true"]')?.dispatchEvent(new CompositionEvent("compositionend", { bubbles: true })));
+  await expect(page.locator(".next-save")).toHaveText("Сохранено");expect(writes.length).toBeGreaterThan(count);
 });
 
 test("built entry persists manual theme, follows system and fits a narrow keyboard layout", async ({ page }) => {

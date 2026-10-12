@@ -15,8 +15,10 @@ from .gui_projects import ProjectFailure
 def mount_projects(app, service, problem):
     def response(id, generation_id=None, status=200):
         workspace = service.read(id)
-        payload = GuiProjectResponse(workspace=workspace, durability="in_memory", generationId=generation_id,
-            selectionFingerprint=selection_fingerprint(workspace))
+        saved = service.saved_revisions.get(id)
+        payload = GuiProjectResponse(workspace=workspace, durability=service.durability(id), generationId=generation_id,
+            selectionFingerprint=selection_fingerprint(workspace), savedProjectRevision=saved[0] if saved else None,
+            savedDocumentRevision=saved[1] if saved else None, saveError=service.save_errors.get(id))
         return JSONResponse(payload.model_dump(mode="json", by_alias=True), status_code=status, headers={"Cache-Control": "no-store"})
 
     @app.exception_handler(ProjectFailure)
@@ -26,6 +28,8 @@ def mount_projects(app, service, problem):
     @app.post("/v1/projects")
     async def create(payload: GuiCreateProjectRequest):
         workspace = await service.select(payload.text.encode("utf-8"), "pasted.txt", True)
+        if service.durability(workspace.project_id) == "failed":
+            return response(workspace.project_id, status=201)
         return response(workspace.project_id, service.start(workspace.project_id), 202)
 
     async def upload(request, id=None):
@@ -62,6 +66,12 @@ def mount_projects(app, service, problem):
     @app.patch("/v1/projects/{id}/metadata")
     async def metadata(id: str, payload: GuiRenameProjectRequest):
         service.rename(id, payload)
+        return response(id)
+
+    @app.post("/v1/projects/{id}/save")
+    async def save(id: str, _payload: EmptyRequest):
+        service.read(id)
+        service.persist(id)
         return response(id)
 
     @app.post("/v1/projects/{id}/generations")

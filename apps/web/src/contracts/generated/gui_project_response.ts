@@ -1,5 +1,8 @@
-export type Durability = "in_memory";
+export type Durability = "in_memory" | "durable" | "pending" | "failed";
 export type Generationid = string | null;
+export type Saveerror = string | null;
+export type Saveddocumentrevision = number | null;
+export type Savedprojectrevision = number | null;
 export type Selectionfingerprint = string | null;
 export type Anchor = FieldAnchor | SectionAnchor | DocumentAnchor;
 export type Fieldid = string;
@@ -550,6 +553,9 @@ export type Updatedat = string;
 export interface GuiProjectResponse {
   durability: Durability;
   generationId: Generationid;
+  saveError?: Saveerror;
+  savedDocumentRevision?: Saveddocumentrevision;
+  savedProjectRevision?: Savedprojectrevision;
   selectionFingerprint?: Selectionfingerprint;
   workspace: WorkspaceV5;
 }

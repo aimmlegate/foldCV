@@ -49,7 +49,7 @@ export async function mutationRequest(body: Mutation): Promise<MutationResult> {
 export async function exchangeSession(): Promise<void> {
   const secret = new URLSearchParams(location.hash.slice(1)).get("secret");
   if (secret === null) return;
-  history.replaceState(null, "", location.pathname);
+  history.replaceState(null, "", location.pathname + location.search);
   const response = await fetch("/v1/session/exchange", { method: "POST", credentials: "same-origin",
     headers: { "Content-Type": "application/json" }, body: JSON.stringify({ secret }) });
   if (!response.ok) throw new ApiFailure("AUTH_REQUIRED");

@@ -46,6 +46,7 @@ from packages.resume_core.rewriting import (RewritePreflightError, RewritePrefli
 from packages.resume_core.rules import PRESET_HEADINGS, RulesFailure, RulesStore, presets
 from packages.resume_core.models.recovery import SaveRulesRequest, RulesSettingsError, RulesSettings
 from .gui_projects import GuiProjectService, ProjectFailure
+from packages.resume_core.project_store import ProjectStore
 from .gui_routes import mount_projects
 
 
@@ -347,7 +348,8 @@ def create_app(*, origin: str, secret: str, temp_root: Path, dist: Path, runner:
 
     gui_options = {"clock": gui_clock} if gui_clock is not None else {}
     gui_projects = GuiProjectService(temp_root, rules_store, gui_selected_provider,
-        worker_slot=gui_worker_slot, cleanup_error=lifecycle_code, renderer=gui_renderer, **gui_options)
+        worker_slot=gui_worker_slot, cleanup_error=lifecycle_code, renderer=gui_renderer,
+        storage=ProjectStore(rules_store.root), **gui_options)
     app.state.gui_projects = gui_projects
     mount_projects(app, gui_projects, problem)
 

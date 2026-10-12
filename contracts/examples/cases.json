@@ -2154,5 +2154,71 @@
   "base": "gui_rename_project_request",
   "valid": true,
   "edits": []
+},
+{
+  "name": "gui_project_response_durable_ack_valid",
+  "contract": "gui_project_response",
+  "base": "gui_project_response",
+  "valid": true,
+  "edits": [
+    {
+      "op": "set",
+      "path": [
+        "durability"
+      ],
+      "value": "durable"
+    },
+    {
+      "op": "set",
+      "path": [
+        "savedProjectRevision"
+      ],
+      "value": 2
+    },
+    {
+      "op": "set",
+      "path": [
+        "savedDocumentRevision"
+      ],
+      "value": 2
+    }
+  ]
+},
+{
+  "name": "gui_project_response_failed_ack_valid",
+  "contract": "gui_project_response",
+  "base": "gui_project_response",
+  "valid": true,
+  "edits": [
+    {
+      "op": "set",
+      "path": [
+        "durability"
+      ],
+      "value": "failed"
+    },
+    {
+      "op": "set",
+      "path": [
+        "saveError"
+      ],
+      "value": "PROJECT_SAVE_FAILED"
+    }
+  ]
+},
+{
+  "name": "gui_project_response_zero_saved_revision_rejected",
+  "contract": "gui_project_response",
+  "base": "gui_project_response",
+  "valid": false,
+  "edits": [
+    {
+      "op": "set",
+      "path": [
+        "savedDocumentRevision"
+      ],
+      "value": 0
+    }
+  ]
 }
 ]

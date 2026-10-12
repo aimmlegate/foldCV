@@ -14,6 +14,7 @@ sys.path.insert(0, str(ROOT / "services/api/src"))
 
 from resume_api.app import create_app
 from tests.recovery.generation_fixtures import CreationProvider, frozen_now
+from packages.resume_core.project_store import ProjectStoreFailure
 
 
 def retain_evidence(root, store, example):
@@ -48,6 +49,12 @@ async def main():
             temp_root=root / "operations", data_root=root / "FoldCV", dist=dist,
             gui_provider=CreationProvider(example.split("-")[0], remove_focus=example.endswith("-focus")), gui_clock=frozen_now)
         store = app.app.state.gui_projects
+        save = store.storage.save
+        def controlled_save(workspace, originals, artifacts):
+            if (root / "fail-user-saves").exists() and workspace.project and workspace.project.document.profile.text.origin == "user":
+                raise ProjectStoreFailure("PROJECT_SAVE_FAILED")
+            save(workspace, originals, artifacts)
+        store.storage.save = controlled_save
         run = store._run
         async def run_retained(*args):
             await run(*args)

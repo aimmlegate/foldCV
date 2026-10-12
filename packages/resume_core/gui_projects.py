@@ -17,9 +17,12 @@ class GuiStartGenerationRequest(Wire):
 
 class GuiProjectResponse(Wire):
     workspace: WorkspaceV5
-    durability: Literal["in_memory"]
+    durability: Literal["in_memory", "durable", "pending", "failed"]
     generation_id: Id | None
     selection_fingerprint: Sha256 | None = None
+    saved_project_revision: Revision | None = None
+    saved_document_revision: Revision | None = None
+    save_error: Id | None = None
 
 
 class GuiRenameProjectRequest(Wire):

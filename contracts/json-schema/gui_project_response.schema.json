@@ -5409,7 +5409,12 @@
   "additionalProperties": false,
   "properties": {
     "durability": {
-      "const": "in_memory",
+      "enum": [
+        "in_memory",
+        "durable",
+        "pending",
+        "failed"
+      ],
       "title": "Durability",
       "type": "string"
     },
@@ -5424,6 +5429,45 @@
         }
       ],
       "title": "Generationid"
+    },
+    "saveError": {
+      "anyOf": [
+        {
+          "minLength": 1,
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Saveerror"
+    },
+    "savedDocumentRevision": {
+      "anyOf": [
+        {
+          "minimum": 1,
+          "type": "integer"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Saveddocumentrevision"
+    },
+    "savedProjectRevision": {
+      "anyOf": [
+        {
+          "minimum": 1,
+          "type": "integer"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Savedprojectrevision"
     },
     "selectionFingerprint": {
       "anyOf": [

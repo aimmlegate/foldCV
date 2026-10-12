@@ -1,4 +1,4 @@
-"""In-memory creation state; durable project storage belongs to task A12."""
+"""Canonical project state with guarded creation, edits and durable checkpoints."""
 
 from __future__ import annotations
 
@@ -18,6 +18,8 @@ from packages.resume_core.gui_normalization import GuiNormalizeRequest, canonica
 from packages.resume_core.gui_rendering import render_input
 from packages.resume_core.gui_projection import compatibility_views
 from packages.resume_core.gui_mutations import apply_mutation
+from packages.resume_core.gui_selection import normalized_text
+from packages.resume_core.project_store import ProjectStoreFailure
 from packages.resume_core.models.contracts import Source, Usage
 from packages.resume_core.models.recovery import (WorkspaceV5, ProjectV4, Generation, GenerationStage,
     GuiOperation, GuiOperationEvent, Dependencies, RenderSnapshotV4, record_slot)
@@ -48,12 +50,16 @@ def identity(prefix):
 
 class GuiProjectService:
     def __init__(self, temp_root: Path, rules, provider_factory, *, clock=now,
-                 worker_slot=None, cleanup_error=None, renderer=None):
+                 worker_slot=None, cleanup_error=None, renderer=None, storage=None):
         self.temp_root, self.rules, self.provider_factory = temp_root, rules, provider_factory
         self.clock = clock
         self.worker_slot = worker_slot or self._local_slot
         self.cleanup_error = cleanup_error or (lambda _error: None)
         self.renderer = renderer or GuiDocxRenderer()
+        self.storage = storage
+        self.loaded = storage is None
+        self.state_lock = threading.RLock()
+        self.save_errors, self.saved_hashes, self.saved_revisions, self.load_errors = {}, {}, {}, {}
         self.workspaces = {}
         self.originals = {}
         self.artifacts = {}
@@ -63,6 +69,78 @@ class GuiProjectService:
         self.cache = {}
         self.selection_epochs = {}
 
+    def ensure_loaded(self):
+        if self.loaded:
+            return
+        with self.state_lock:
+            if self.loaded:
+                return
+            try:
+                loaded, self.load_errors, _registry = self.storage.load_all()
+            except ProjectStoreFailure as error:
+                raise ProjectFailure(error.code, 503) from None
+            for id, (workspace, originals, artifacts) in loaded.items():
+                self.workspaces[id] = workspace
+                self.originals.update(originals)
+                self.artifacts.update(artifacts)
+                owner = self.owner(workspace)
+                changed = False
+                for generation in workspace.generations:
+                    if generation.status in {"queued", "running"}:
+                        generation.status = "interrupted"
+                        changed = True
+                        for stage in generation.stages:
+                            if stage.status in {"queued", "running"}:
+                                stage.status, stage.error_code = "interrupted", "INTERRUPTED"
+                for operation in owner.operations:
+                    if operation.status in {"queued", "running"}:
+                        operation.status, operation.error_code = "interrupted", "INTERRUPTED"
+                        self._event(operation, "operation.failed", save=False)
+                        changed = True
+                if workspace.pre_draft:
+                    active = next((source for source in owner.sources if source.id == workspace.pre_draft.selected_source_id), None)
+                    if active and active.parser == "pending":
+                        active.parser = "interrupted"
+                        active.warnings = ["EXTRACT_INTERRUPTED"]
+                        workspace.pre_draft.warnings = ["EXTRACT_INTERRUPTED", "NO_USABLE_TEXT"]
+                        changed = True
+                self.saved_hashes[id] = digest(workspace.model_dump(mode="json", by_alias=True))
+                self.saved_revisions[id] = (workspace.project_revision, workspace.document_revision)
+                if changed:
+                    self.persist(id)
+            self.loaded = True
+
+    def persist(self, id):
+        if self.storage is None:
+            return "in_memory"
+        with self.state_lock:
+            if id not in self.workspaces:
+                self.save_errors[id] = "PROJECT_DELETED"
+                return "failed"
+            workspace = self.workspaces[id]
+            try:
+                snapshot = self.read_memory(id)
+                self.storage.save(snapshot, self.originals, self.artifacts)
+                self.saved_hashes[id] = digest(snapshot.model_dump(mode="json", by_alias=True))
+                self.saved_revisions[id] = (snapshot.project_revision, snapshot.document_revision)
+                self.save_errors.pop(id, None)
+                return "durable"
+            except ProjectStoreFailure as error:
+                self.save_errors[id] = error.code
+                return "failed"
+
+    def durability(self, id):
+        if self.storage is None:
+            return "in_memory"
+        if id in self.save_errors:
+            return "failed"
+        if self.saved_hashes.get(id) == digest(self.workspaces[id].model_dump(mode="json", by_alias=True)):
+            return "durable"
+        return "pending"
+
+    def read_memory(self, id):
+        return WorkspaceV5.model_validate(self.workspaces[id].model_dump(by_alias=True))
+
     @asynccontextmanager
     async def _local_slot(self, cancel):
         if cancel.is_set():
@@ -70,17 +148,24 @@ class GuiProjectService:
         yield
 
     def read(self, id):
+        self.ensure_loaded()
         workspace = self.workspaces.get(id)
         if workspace is None:
+            if id in self.load_errors:
+                raise ProjectFailure(self.load_errors[id], 409)
             raise ProjectFailure("PROJECT_NOT_FOUND", 404)
-        return WorkspaceV5.model_validate(workspace.model_dump(by_alias=True))
+        with self.state_lock:
+            return self.read_memory(id)
 
     def owner(self, workspace):
         return workspace.project or workspace.pre_draft
 
     def mutate(self, id, mutation):
         self.read(id)
-        return apply_mutation(self.workspaces[id], mutation, self.clock().isoformat())
+        with self.state_lock:
+            result = apply_mutation(self.workspaces[id], mutation, self.clock().isoformat())
+            result.persistence = "durable" if self.persist(id) == "durable" else "memory" if self.storage is None else "failed"
+            return result
 
     def rename(self, id, request):
         self.read(id)
@@ -88,6 +173,10 @@ class GuiProjectService:
         if workspace.project_revision != request.base_revision:
             raise ProjectFailure("PROJECT_REVISION_CHANGED")
         title = request.title.strip()
+        try:
+            title.encode("utf-8")
+        except UnicodeError:
+            raise ProjectFailure("TITLE_INVALID", 422) from None
         if not title:
             raise ProjectFailure("TITLE_REQUIRED", 422)
         if title != workspace.title or not workspace.title_manually_set:
@@ -96,8 +185,10 @@ class GuiProjectService:
             if workspace.project:
                 workspace.project.revision = workspace.project_revision
             workspace.updated_at = self.clock().isoformat()
+        self.persist(id)
 
     def allocate(self, title):
+        self.ensure_loaded()
         stamp = self.clock()
         id = identity("project")
         workspace = WorkspaceV5.model_validate({"schemaVersion": 5, "projectId": id,
@@ -110,6 +201,7 @@ class GuiProjectService:
             "relatedUpdateSuggestions": [], "derivedState": None, "undoSlots": {}, "editSessions": {},
             "mutationReplay": [], "generations": [], "sourceExclusions": [], "migrationNotices": [], "legacyData": None})
         self.workspaces[id] = workspace
+        self.persist(id)
         return id
 
     async def select(self, data, name, pasted, id=None):
@@ -129,6 +221,7 @@ class GuiProjectService:
         pre.selected_input = "text" if pasted else "file"
         pre.selected_source_id, pre.extracted_text = source_id, ""
         pre.extraction_fingerprint, pre.warnings = None, ["EXTRACT_PENDING"]
+        self.persist(id)
         files, cancel = OperationFiles(self.temp_root), threading.Event()
         try:
             async with self.worker_slot(cancel):
@@ -151,6 +244,7 @@ class GuiProjectService:
             if self.selection_epochs[id] == source_id:
                 pre.warnings = [error.code, "NO_USABLE_TEXT"]
         workspace.updated_at = self.clock().isoformat()
+        self.persist(id)
         return self.read(id)
 
     def dependencies(self, workspace, source_ids, rules):
@@ -163,6 +257,9 @@ class GuiProjectService:
                 "documentRevision": workspace.document_revision}))
 
     def start(self, id, previous=None):
+        self.read(id)
+        if self.persist(id) == "failed":
+            raise ProjectFailure("PROJECT_SAVE_FAILED", 503)
         workspace = self.workspaces.get(id)
         if workspace is None:
             raise ProjectFailure("PROJECT_NOT_FOUND", 404)
@@ -204,6 +301,9 @@ class GuiProjectService:
         generation.stages[0].status = "completed"
         generation.stages[0].result_fingerprint = deps.source_fingerprint
         workspace.generations.append(generation)
+        if self.persist(id) == "failed":
+            workspace.generations.remove(generation)
+            raise ProjectFailure("PROJECT_SAVE_FAILED", 503)
         key = (id, generation.id)
         self.cache[key] = cached
         self.cancels[key] = threading.Event()
@@ -217,9 +317,11 @@ class GuiProjectService:
             raise ProjectFailure("GENERATION_NOT_FOUND", 404)
         return generation
 
-    def _event(self, operation, type):
+    def _event(self, operation, type, save=True):
         operation.events.append(GuiOperationEvent(requestId=operation.id, sequence=len(operation.events),
             type=type, stage=operation.kind, usage=operation.usage))
+        if save:
+            self.persist(operation.project_id)
 
     async def _content(self, workspace, generation, stage, request, selected):
         cancel = self.cancels[(workspace.project_id, generation.id)]
@@ -229,10 +331,17 @@ class GuiProjectService:
             rulesUsed=generation.rules_used, targetFieldIds=[], resultFingerprint=None, errorCode=None)
         self.owner(workspace).operations.append(operation)
         stage.operation_id = operation.id
+        if self.persist(workspace.project_id) == "failed":
+            raise ProjectFailure("PROJECT_SAVE_FAILED", 503)
 
         def admitted():
-            operation.status, stage.status = "running", "running"
-            self._event(operation, "operation.started")
+            with self.state_lock:
+                operation.status, stage.status = "running", "running"
+                operation.usage = Usage(logicalAttempts=1, internalInferenceRequests=None,
+                    reportedInputTokens=None, reportedOutputTokens=None)
+                self._event(operation, "operation.started")
+                if workspace.project_id in self.save_errors:
+                    raise ProjectFailure("PROJECT_SAVE_FAILED", 503)
 
         provider, model = selected
         queued = QueuedProvider(provider, admitted)
@@ -319,6 +428,10 @@ class GuiProjectService:
                     revision = workspace.project_revision + 1
                     document_revision = workspace.document_revision + 1
                     document = result.document.model_copy(deep=True)
+                    from packages.resume_core.models.recovery import authored_fields
+                    for record in document.records():
+                        for field in authored_fields(record):
+                            field.text = normalized_text(field.text)
                     project = ProjectV4(schemaVersion=4, projectId=workspace.project_id, revision=revision,
                         asOf=workspace.source_observed_at, createdAt=workspace.created_at, document=document,
                         employment=cached["normalized"].employment, views=compatibility_views(result.document, pre.facts), template=None,
@@ -364,10 +477,14 @@ class GuiProjectService:
                     result = snapshot
                 stage.status = "completed"
                 stage.result_fingerprint = digest(result.model_dump(mode="json", by_alias=True))
+                if self.persist(workspace.project_id) == "failed":
+                    raise ProjectFailure("PROJECT_SAVE_FAILED", 503)
             generation.status = "completed"
         except (ContentFailure, AdmissionCancelled, ProjectFailure, UploadFailure, RenderFailure, DocxFailure, SpikeError, asyncio.TimeoutError) as error:
             cancelled = cancel.is_set() or isinstance(error, AdmissionCancelled)
-            generation.status = stage.status = "cancelled" if cancelled else "failed"
+            generation.status = "cancelled" if cancelled else "failed"
+            if not (isinstance(error, ProjectFailure) and error.code == "PROJECT_SAVE_FAILED" and stage.status == "completed"):
+                stage.status = generation.status
             stage.error_code = "CANCELLED" if cancelled else getattr(error, "code", "OPERATION_TIMEOUT")
             if isinstance(error, DocxFailure):
                 stage.docx_error = error.error
@@ -378,6 +495,7 @@ class GuiProjectService:
             stage.error_code = "INVALID_RESULT"
         finally:
             self.files.pop(key, None)
+            self.persist(workspace.project_id)
 
     async def cancel(self, id, gid):
         generation = self.generation(id, gid)

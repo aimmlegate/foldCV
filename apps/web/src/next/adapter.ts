@@ -16,6 +16,7 @@ export type AdapterCallbacks = {
   departure: (slotId: string) => void;
   restore: (slotId: string) => void;
   completion?: (fieldId: string, reason: "field" | "paragraph") => void;
+  compositionEnd?: () => void;
 };
 
 function identity(value: unknown): Pick<FieldProjection, "fieldId" | "slotId" | "label"> | null {
@@ -107,7 +108,7 @@ export function createAdapter(fields: readonly FieldProjection[], callbacks: () 
       },
       handleDOMEvents: {
         compositionstart: () => { composing = true; callbacks().selection(null); return false; },
-        compositionend: view => { composing = false; queueMicrotask(() => emit(view)); return false; },
+        compositionend: view => { composing = false; queueMicrotask(() => { emit(view); callbacks().compositionEnd?.(); }); return false; },
         beforeinput: (_view, event) => {
           if (event instanceof InputEvent && ["historyUndo", "historyRedo"].includes(event.inputType)) {
             event.preventDefault(); if (event.inputType === "historyUndo") restore(); return true;

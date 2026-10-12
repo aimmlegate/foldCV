@@ -5,6 +5,7 @@ import { SourcePanel } from "./SourcePanel";
 import { StructureControls } from "./StructureControls";
 import { useEdits } from "./useEdits";
 import type { SourceContext } from "../contracts/generated/source_context";
+import type { GuiProjectResponse } from "../contracts/generated/gui_project_response";
 import { documentFields } from "./fields";
 import { useTheme } from "./theme";
 import sample from "../../../../tests/fixtures/recovery/E1.txt?raw";
@@ -16,6 +17,8 @@ export function App() {
   const [input, setInput] = useState<"text" | "file">("text");
   const [fileName, setFileName] = useState("");
   const [workspace, setWorkspace] = useState<Workspace | null>(null);
+  const [durability, setDurability] = useState<GuiProjectResponse["durability"]>("pending");
+  const [saveError, setSaveError] = useState<string | null>(null);
   const [generationId, setGenerationId] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
@@ -32,7 +35,13 @@ export function App() {
   const generation = workspace?.generations.find(item => item.id === generationId);
   const document = workspace?.project?.document;
   const fields = useMemo(() => document ? documentFields(document) : [], [document]);
-  const edits = useEdits(workspace, editor, response => { setWorkspace(response.workspace); setSelectionFingerprint(response.selectionFingerprint ?? null); });
+  function accept(response: GuiProjectResponse) {
+    setWorkspace(response.workspace); setSelectionFingerprint(response.selectionFingerprint ?? null);
+    setDurability(response.durability); setSaveError(response.saveError ?? null);
+    const url = new URL(location.href); url.searchParams.set("project", response.workspace.projectId);
+    history.replaceState(null, "", url.pathname + url.search);
+  }
+  const edits = useEdits(workspace, editor, accept);
   const editorKey = `${workspace?.projectId}:${fields.map(field => field.fieldId).join("|")}`;
   const initialArtifact = workspace?.project?.renders.find(render => render.artifactAvailable && render.docx);
 
@@ -42,11 +51,28 @@ export function App() {
     const id = workspace.projectId, epoch = requestEpoch.current;
     const timer = window.setTimeout(() => {
       void projectRequest(`/v1/projects/${id}`).then(result => {
-        if (alive && epoch === requestEpoch.current) { setWorkspace(result.workspace); setSelectionFingerprint(result.selectionFingerprint ?? null); }
+        if (alive && epoch === requestEpoch.current) accept(result);
       }).catch(error => { if (alive) setError(errorLabel(error)); });
     }, 250);
     return () => { alive = false; clearTimeout(timer); };
   }, [workspace, generationId, generation]);
+
+  useEffect(() => {
+    const id = new URLSearchParams(location.search).get("project");
+    if (!id) return;
+    let alive = true;
+    void projectRequest(`/v1/projects/${encodeURIComponent(id)}`).then(response => {
+      if (!alive) return;
+      accept(response);
+      const active = response.workspace.project ?? response.workspace.preDraft;
+      const sourceId = response.workspace.preDraft?.selectedSourceId;
+      setInput(response.workspace.preDraft?.selectedInput ?? "text");
+      setFileName(active?.sources.find(source => source.id === sourceId)?.originalName ?? "");
+      setText(response.workspace.preDraft?.extractedText ?? "");
+      setGenerationId(response.workspace.generations.at(-1)?.id ?? null);
+    }).catch(error => { if (alive) setError(errorLabel(error)); });
+    return () => { alive = false; };
+  }, []);
 
   async function choose(file: File) {
     const epoch = ++requestEpoch.current;
@@ -54,7 +80,7 @@ export function App() {
     const body = new FormData(); body.append("file", file);
     try {
       const result = await projectRequest(workspace ? `/v1/projects/${workspace.projectId}/input` : "/v1/projects/input", workspace ? "PUT" : "POST", body);
-      if (epoch === requestEpoch.current) { setWorkspace(result.workspace); setSelectionFingerprint(result.selectionFingerprint ?? null); setGenerationId(null); }
+      if (epoch === requestEpoch.current) { accept(result); setGenerationId(null); }
     } catch (error) { if (epoch === requestEpoch.current) setError(errorLabel(error)); }
     finally { if (epoch === requestEpoch.current) setBusy(false); }
   }
@@ -64,7 +90,7 @@ export function App() {
     try {
       const result = await projectRequest(workspace ? `/v1/projects/${workspace.projectId}/generations` : "/v1/projects", "POST",
         input === "text" ? { text } : {});
-      if (epoch === requestEpoch.current) { setWorkspace(result.workspace); setSelectionFingerprint(result.selectionFingerprint ?? null); setGenerationId(result.generationId); }
+      if (epoch === requestEpoch.current) { accept(result); setGenerationId(result.generationId); }
     } catch (error) { setError(errorLabel(error)); }
     finally { setBusy(false); }
   }
@@ -73,8 +99,7 @@ export function App() {
     setBusy(true); setError("");
     try {
       const result = await projectRequest(`/v1/projects/${workspace.projectId}/generations/${generationId}/${action}`, "POST", {});
-      setWorkspace(result.workspace); setGenerationId(result.generationId);
-      setSelectionFingerprint(result.selectionFingerprint ?? null);
+      accept(result); setGenerationId(result.generationId);
     } catch (error) { setError(errorLabel(error)); }
     finally { setBusy(false); }
   }
@@ -96,7 +121,7 @@ export function App() {
       setSource(context);
       if (context.status === "stale") {
         const refreshed = await projectRequest(`/v1/projects/${workspace.projectId}`);
-        if (epoch === sourceEpoch.current) { setWorkspace(refreshed.workspace); setSelectionFingerprint(refreshed.selectionFingerprint ?? null); }
+        if (epoch === sourceEpoch.current) accept(refreshed);
       }
     } catch (error) { if (epoch === sourceEpoch.current) setError(errorLabel(error)); }
     finally { if (epoch === sourceEpoch.current) setSourceBusy(false); }
@@ -105,7 +130,8 @@ export function App() {
     <header className="next-header">
       <strong className="next-brand">FoldCV.</strong>
       <button className="next-title" disabled aria-label="Меню проекта">{workspace?.title ?? "Новое резюме"}</button>
-      <span className="next-save" role="status">{edits.saving ? "Сохраняем в памяти…" : edits.pending ? "Правки в текущем окне" : workspace ? "В памяти приложения" : ""}</span>
+      <span className="next-save" role="status">{edits.saving ? "Сохраняем…" : edits.pending ? "Есть несохранённые правки" : workspace
+        ? durability === "durable" ? "Сохранено" : durability === "failed" ? "Сохранение не удалось" : durability === "in_memory" ? "В памяти приложения" : "Сохраняем…" : ""}</span>
       <div className="next-actions">
         <button disabled>Сохранить проект</button><button disabled>Экспорт DOCX</button><button disabled>Настройки</button>
         <label className="next-theme">Тема <select aria-label="Тема" value={theme.mode} onChange={event => theme.select(event.target.value)}>
@@ -115,6 +141,8 @@ export function App() {
     </header>
     {error && <p className="next-message text-danger" role="alert">{error}</p>}
     {edits.error && <p className="next-message text-danger" role="alert">{edits.error} <button onClick={edits.retry}>Повторить сохранение</button></p>}
+    {saveError && !edits.error && workspace && <p className="next-message text-danger" role="alert">Не удалось сохранить проект. Данные остаются в окне.
+      <button onClick={() => { void projectRequest(`/v1/projects/${workspace.projectId}/save`, "POST", {}).then(accept).catch(error => setError(errorLabel(error))); }}>Повторить сохранение</button></p>}
     {generation && <section className="next-progress" aria-label="Создание резюме">
       <p role="status">{running ? stageLabels[generation.stages.find(stage => ["queued", "running"].includes(stage.status))?.kind ?? "render"]
         : generation.status === "completed" ? "Резюме готово" : generation.status === "cancelled" ? "Создание отменено" : "Создание не завершено"}</p>
@@ -125,7 +153,7 @@ export function App() {
         href={`/v1/projects/${workspace.projectId}/renders/${initialArtifact.id}/docx`}>Скачать исходный DOCX</a>}
     </section>}
     {document ? <section className="next-editor-surface" aria-label="Документ">
-      <p className="next-editor-note">Правки сохраняются в памяти приложения. Дисковое сохранение ещё не подключено.</p>
+      <p className="next-editor-note">Правки сохраняются локально. Отметка «Сохранено» появляется после записи на диск.</p>
       <div className="next-editor-tools"><button disabled={sourceBusy} onPointerDown={event => event.preventDefault()}
         onClick={() => { void showSource(); }}>Показать исходник</button>
         <button disabled={edits.locked} onPointerDown={event => event.preventDefault()} onClick={() => edits.restore(slot ?? lastSlot.current)}>Отменить правку блока</button>
@@ -133,7 +161,7 @@ export function App() {
       </div>
       <div className="next-document"><FieldEditor ref={editor} key={editorKey} fields={edits.overlay(fields)} editable={!edits.locked} theme={theme.resolved} annotations={workspace?.annotations ?? []} callbacks={{
         buffer: edits.buffer, selection: () => {}, slot: value => { setSlot(value); if (value) lastSlot.current = value; }, departure: edits.departure,
-        restore: edits.restore, completion: edits.completion,
+        restore: edits.restore, completion: edits.completion, compositionEnd: edits.compositionEnd,
       }} /></div>
       <p className="next-editor-status" aria-live="polite">{slot ? "Редактирование текста" : ""}</p>
     </section> : <section className="next-start">
@@ -159,7 +187,7 @@ export function App() {
           ? "Часть содержимого не удалось прочитать. Доступный текст сохранён в памяти."
           : "Доступного текста нет. Выберите другой файл или вставьте текст."}</p> : null}
         <p className="next-disclosure">При создании выбранный текст передаётся настроенной модели через CLI.</p>
-        <button className="next-create" disabled={!usable || busy || !!running} onClick={() => { void create(); }}>{busy ? "Читаем исходник…" : "Создать резюме"}</button>
+        <button className="next-create" disabled={!usable || busy || !!running || workspace !== null && durability !== "durable"} onClick={() => { void create(); }}>{busy ? "Читаем исходник…" : "Создать резюме"}</button>
       </div>
     </section>}
     {sourceOpen && workspace && <SourcePanel context={source} workspace={workspace} loading={sourceBusy}

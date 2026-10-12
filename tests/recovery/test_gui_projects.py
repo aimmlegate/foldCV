@@ -212,7 +212,8 @@ async def test_project_routes_retain_security_typed_errors_and_no_legacy_cap(tmp
         response = await client.post("/v1/projects", headers={"Origin": origin}, json={"text": (ROOT / "E1.txt").read_text()})
         assert response.status_code == 202, response.text
         raw = response.json()
-        assert raw["durability"] == "in_memory"
+        assert raw["durability"] == "durable"
+        assert (tmp_path / "FoldCV/projects" / raw["workspace"]["projectId"] / "workspace.json").is_file()
         id, gid = raw["workspace"]["projectId"], raw["generationId"]
         store = app.app.state.gui_projects
         workspace = await finish(store, id, gid)
