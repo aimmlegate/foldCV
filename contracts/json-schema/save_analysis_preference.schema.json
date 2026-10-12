@@ -1,0 +1,14 @@
+{
+  "additionalProperties": false,
+  "properties": {
+    "automaticAnalysis": {
+      "title": "Automaticanalysis",
+      "type": "boolean"
+    }
+  },
+  "required": [
+    "automaticAnalysis"
+  ],
+  "title": "SaveAnalysisPreference",
+  "type": "object"
+}

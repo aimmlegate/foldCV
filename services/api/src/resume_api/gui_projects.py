@@ -33,6 +33,7 @@ from .gui_drafting_content import GuiDraftingContentService
 from .gui_rendering import GuiDocxRenderer
 from .gui_rewriting_content import GuiRewritingContentService
 from .gui_exports import GuiExportMixin
+from .gui_analysis import GuiAnalysisMixin
 from .gui_errors import ProjectFailure
 from .lifecycle import OperationFiles, SpikeError
 from .providers.content import ContentFailure
@@ -46,9 +47,10 @@ def identity(prefix):
     return prefix + "-" + uuid.uuid4().hex
 
 
-class GuiProjectService(GuiExportMixin):
+class GuiProjectService(GuiExportMixin, GuiAnalysisMixin):
     def __init__(self, temp_root: Path, rules, provider_factory, *, clock=now,
-                 worker_slot=None, cleanup_error=None, renderer=None, storage=None):
+                 worker_slot=None, cleanup_error=None, renderer=None, storage=None, preferences=None,
+                 analysis_delay=0.5):
         self.temp_root, self.rules, self.provider_factory = temp_root, rules, provider_factory
         self.clock = clock
         self.worker_slot = worker_slot or self._local_slot
@@ -66,6 +68,10 @@ class GuiProjectService(GuiExportMixin):
         self.files = {}
         self.cache = {}
         self.selection_epochs = {}
+        self.preferences = preferences
+        self.analysis_delay = analysis_delay
+        self.analysis_timers = {}
+        self.analysis_cleanup_failed = False
 
     def ensure_loaded(self):
         if self.loaded:
@@ -105,6 +111,7 @@ class GuiProjectService(GuiExportMixin):
                 self.saved_hashes[id] = digest(workspace.model_dump(mode="json", by_alias=True))
                 self.saved_revisions[id] = (workspace.project_revision, workspace.document_revision)
                 if changed:
+                    self.restore_analysis_pending(id)
                     self.persist(id)
             self.loaded = True
 
@@ -163,7 +170,9 @@ class GuiProjectService(GuiExportMixin):
         with self.state_lock:
             if any(operation.id == mutation.root.client_mutation_id for operation in self.owner(self.workspaces[id]).operations):
                 raise ProjectFailure("MUTATION_ID_RESERVED", 422)
+            before = self.read_memory(id)
             result = apply_mutation(self.workspaces[id], mutation, self.clock().isoformat())
+            self.analysis_mutation(id, mutation.root, result, before)
             result.persistence = "durable" if self.persist(id) == "durable" else "memory" if self.storage is None else "failed"
             return result
 
@@ -505,6 +514,8 @@ class GuiProjectService(GuiExportMixin):
             fingerprint = rewrite_fingerprint(request)
         except UnicodeError:
             raise ProjectFailure("INVALID_CONTENT_INPUT", 422) from None
+        if not any(item.id == request.client_request_id for item in self.owner(self.workspaces[id]).operations):
+            await self.prepare_analysis_rewrite(id)
         with self.state_lock:
             workspace = self.workspaces[id]
             if workspace.project is None or request.selection.project_id != id:
@@ -521,7 +532,7 @@ class GuiProjectService(GuiExportMixin):
                 if key not in self.tasks:
                     raise ProjectFailure("OPERATION_INTERRUPTED")
             else:
-                renders = {item.id for item in workspace.project.operations if item.kind == "render"}
+                renders = {item.id for item in workspace.project.operations if item.kind in {"render", "reconcile_edits"}}
                 if any(not task.done() for (pid, oid), task in self.tasks.items() if pid == id and oid not in renders):
                     raise ProjectFailure("PROJECT_OPERATION_ACTIVE")
                 if self.persist(id) == "failed":
@@ -582,6 +593,10 @@ class GuiProjectService(GuiExportMixin):
                 operation.error_code = result.rejection_reason
                 self._event(operation, "usage.updated", save=False)
                 self._event(operation, "operation.completed" if result.status == "applied" else "operation.failed", save=False)
+                if result.status == "applied":
+                    fields = [span.field_id for span in request.selection.spans]
+                    self.accumulate_analysis(id, fields, fields, enable=True)
+                    self.schedule_analysis(id)
         except (ContentFailure, AdmissionCancelled, ProjectFailure, ValueError, SpikeError) as error:
             if isinstance(error, SpikeError):
                 self.cleanup_error(error)
@@ -604,6 +619,11 @@ class GuiProjectService(GuiExportMixin):
             workspace = self.workspaces[id]
             result = result or MutationResult(status="rejected", projectRevision=workspace.project_revision,
                 documentRevision=workspace.document_revision, changedSlotIds=[], rejectionReason=operation.error_code, persistence="memory")
+            if result.status != "applied":
+                pending = self.pending_analysis(id)
+                if pending:
+                    pending.analysis_batch.enabled = False
+                    pending.error_code = operation.error_code or "REWRITE_FAILED"
             workspace.mutation_replay.append(MutationReplay(clientMutationId=oid, payloadSha256=rewrite_fingerprint(request),
                 status=result.status, projectRevision=result.project_revision, documentRevision=result.document_revision,
                 rejectionReason=result.rejection_reason))
@@ -625,14 +645,18 @@ class GuiProjectService(GuiExportMixin):
                 files.stop_worker()
             except SpikeError as error:
                 self.cleanup_error(error)
+                self.analysis_cleanup_failed = True
                 raise ProjectFailure(error.code, 503) from None
         try:
             await asyncio.wait_for(asyncio.shield(task), timeout=65)
         except asyncio.TimeoutError:
             self.cleanup_error(SpikeError("PROCESS_CLEANUP_FAILED"))
+            self.analysis_cleanup_failed = True
             raise ProjectFailure("PROCESS_CLEANUP_FAILED", 503) from None
 
     def request_shutdown(self):
+        for id in list(self.analysis_timers):
+            self.stop_analysis_timer(id)
         for cancel in self.cancels.values():
             cancel.set()
 

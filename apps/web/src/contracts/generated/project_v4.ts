@@ -245,6 +245,9 @@ export type Facts = (
   | ObservationFact
   | EmploymentFact
 )[];
+export type Completedfieldids = string[];
+export type Enabled = boolean;
+export type Phase = "pending" | "dispatched";
 export type Baserevision = number;
 export type Captureddocumentrevision = number | null;
 export type Dependencyfingerprint = string;
@@ -274,6 +277,7 @@ export type Code =
   | "DOCX_INVALID_RENDER_INPUT"
   | "DOCX_RENDER_FAILED";
 export type Path = string | null;
+export type Editorialrecommendations = string[];
 export type Errorcode = string | null;
 export type Requestid = string;
 export type Sequence = number;
@@ -772,10 +776,12 @@ export interface EmploymentPeriodValue {
   startText: Starttext;
 }
 export interface GuiOperation {
+  analysisBatch?: AnalysisBatch | null;
   baseRevision: Baserevision;
   capturedDocumentRevision: Captureddocumentrevision;
   dependencies: Dependencies | null;
   docxError?: DocxError | null;
+  editorialRecommendations?: Editorialrecommendations;
   errorCode: Errorcode;
   events: Events;
   id: Id27;
@@ -787,6 +793,11 @@ export interface GuiOperation {
   status: Status;
   targetFieldIds: Targetfieldids;
   usage: Usage | null;
+}
+export interface AnalysisBatch {
+  completedFieldIds: Completedfieldids;
+  enabled: Enabled;
+  phase: Phase;
 }
 export interface Dependencies {
   dependencyFingerprint: Dependencyfingerprint;

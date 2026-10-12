@@ -9,6 +9,7 @@ import { RewritePanel } from "./RewritePanel";
 import { useExport } from "./useExport";
 import { ExportPanel } from "./ExportPanel";
 import { SettingsPanel } from "./SettingsPanel";
+import { useAnalysis } from "./useAnalysis";
 import type { SourceContext } from "../contracts/generated/source_context";
 import type { GuiProjectResponse } from "../contracts/generated/gui_project_response";
 import { documentFields } from "./fields";
@@ -49,6 +50,7 @@ export function App() {
     history.replaceState(null, "", url.pathname + url.search);
   }
   const edits = useEdits(workspace, editor, accept);
+  const analysis = useAnalysis(workspace, edits);
   const rewrite = useRewrite(editor, edits);
   const exporter = useExport(workspace, editor, edits);
   const editorKey = `${workspace?.projectId}:${fields.map(field => field.fieldId).join("|")}`;
@@ -153,6 +155,9 @@ export function App() {
     {error && <p className="next-message text-danger" role="alert">{error}</p>}
     {edits.error && <p className="next-message text-danger" role="alert">{edits.error} <button onClick={edits.retry}>Повторить сохранение</button></p>}
     {rewrite.message && <p className="next-message" role="status">{rewrite.message}</p>}
+    {analysis.message && <p className="next-message" role="status">{analysis.message}
+      {analysis.retryable && <button onClick={() => { void analysis.retry(); }}>Повторить проверку</button>}</p>}
+    {analysis.error && <p role="alert">{analysis.error}</p>}
     {!exporter.open && exporter.message && <p className="next-message text-danger" role="alert">{exporter.message}</p>}
     {saveError && !edits.error && workspace && <p className="next-message text-danger" role="alert">Не удалось сохранить проект. Данные остаются в окне.
       <button onClick={() => { void projectRequest(`/v1/projects/${workspace.projectId}/save`, "POST", {}).then(accept).catch(error => setError(errorLabel(error))); }}>Повторить сохранение</button></p>}
@@ -165,7 +170,7 @@ export function App() {
       {initialArtifact && workspace && <a className="next-download" download="resume.docx"
         href={`/v1/projects/${workspace.projectId}/renders/${initialArtifact.id}/docx`}>Скачать исходный DOCX</a>}
     </section>}
-    {settingsOpen ? <SettingsPanel close={() => setSettingsOpen(false)} /> : exporter.open ? <ExportPanel exporter={exporter} workspace={workspace} /> : document ? <section className="next-editor-surface" aria-label="Документ">
+    {settingsOpen ? <SettingsPanel close={() => setSettingsOpen(false)} analysisChanged={analysis.preferenceChanged} /> : exporter.open ? <ExportPanel exporter={exporter} workspace={workspace} /> : document ? <section className="next-editor-surface" aria-label="Документ">
       <p className="next-editor-note">Правки сохраняются локально. Отметка «Сохранено» появляется после записи на диск.</p>
       <div className="next-editor-tools"><button disabled={sourceBusy} onPointerDown={event => event.preventDefault()}
         onClick={() => { void showSource(); }}>Показать исходник</button>

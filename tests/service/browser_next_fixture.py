@@ -16,6 +16,7 @@ from resume_api.app import create_app
 from tests.recovery.generation_fixtures import CreationProvider, frozen_now
 from packages.resume_core.project_store import ProjectStoreFailure
 from packages.resume_core.gui_rewriting import GuiRewriteProposal
+from packages.resume_core.gui_reconciliation import GuiReconcileProposal
 from resume_api.providers.content import ContentFailure
 from resume_api.gui_rendering import GuiDocxRenderer
 from packages.resume_core.rendering.docx_errors import failure
@@ -36,6 +37,14 @@ class ControlledProvider(CreationProvider):
             while (self.root / "hold-rewrite").exists():
                 if cancel.wait(.01):
                     raise ContentFailure("CANCELLED", logical_attempts=1)
+        if request.result_type is GuiReconcileProposal:
+            (self.root / 'analysis-started').touch()
+            while (self.root / 'hold-analysis').exists():
+                if cancel.wait(.01):
+                    (self.root / 'analysis-released').touch()
+                    raise ContentFailure('CANCELLED', logical_attempts=1)
+            if (self.root / 'fail-analysis').exists(): raise ContentFailure('QUOTA_EXHAUSTED', logical_attempts=1)
+            (self.root / 'analysis-released').touch()
         return super().generate(request, files, cancel)
 
 
@@ -107,6 +116,9 @@ async def main():
             gui_provider=ControlledProvider(root, example.split("-")[0], remove_focus=example.endswith("-focus")),
             gui_renderer=ControlledRenderer(root), gui_clock=frozen_now, connection_adapter=ControlledConnection(root))
         store = app.app.state.gui_projects
+        if (root / 'pause-analysis').exists():
+            store.rules.load()
+            store.preferences.save_analysis(False)
         save = store.storage.save
         def controlled_save(workspace, originals, artifacts):
             if (root / "fail-user-saves").exists() and workspace.project and workspace.project.document.profile.text.origin == "user":

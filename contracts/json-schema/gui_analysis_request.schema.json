@@ -1,0 +1,27 @@
+{
+  "additionalProperties": false,
+  "properties": {
+    "action": {
+      "enum": [
+        "invalidate",
+        "retry"
+      ],
+      "title": "Action",
+      "type": "string"
+    },
+    "fieldIds": {
+      "items": {
+        "minLength": 1,
+        "type": "string"
+      },
+      "maxItems": 500,
+      "title": "Fieldids",
+      "type": "array"
+    }
+  },
+  "required": [
+    "action"
+  ],
+  "title": "GuiAnalysisRequest",
+  "type": "object"
+}

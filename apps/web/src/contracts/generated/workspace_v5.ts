@@ -414,8 +414,12 @@ export type Facts1 = (
   | ObservationFact
   | EmploymentFact
 )[];
+export type Completedfieldids = string[];
+export type Enabled = boolean;
+export type Phase = "pending" | "dispatched";
 export type Baserevision = number;
 export type Captureddocumentrevision = number | null;
+export type Editorialrecommendations = string[];
 export type Errorcode1 = string | null;
 export type Requestid = string;
 export type Sequence = number;
@@ -1161,10 +1165,12 @@ export interface PreDraft {
   warnings: Warnings1;
 }
 export interface GuiOperation {
+  analysisBatch?: AnalysisBatch | null;
   baseRevision: Baserevision;
   capturedDocumentRevision: Captureddocumentrevision;
   dependencies: Dependencies | null;
   docxError?: DocxError | null;
+  editorialRecommendations?: Editorialrecommendations;
   errorCode: Errorcode1;
   events: Events;
   id: Id32;
@@ -1176,6 +1182,11 @@ export interface GuiOperation {
   status: Status4;
   targetFieldIds: Targetfieldids;
   usage: Usage | null;
+}
+export interface AnalysisBatch {
+  completedFieldIds: Completedfieldids;
+  enabled: Enabled;
+  phase: Phase;
 }
 export interface GuiOperationEvent {
   requestId: Requestid;

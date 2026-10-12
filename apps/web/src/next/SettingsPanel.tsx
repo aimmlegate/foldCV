@@ -18,16 +18,25 @@ const messages: Record<ConnectionState, string> = {
   cleanup_blocked: "Не удалось подтвердить остановку процесса. Проверьте CLI и перезапустите приложение.",
 };
 
-export function SettingsPanel({ close }: { close: () => void }) {
+export function SettingsPanel({ close, analysisChanged }: { close: () => void; analysisChanged: (enabled: boolean) => void }) {
   const [view, setView] = useState<ConnectionView>(() => new ConnectionWorkflow(() => {}).view);
   const [preferences, setPreferences] = useState<Preferences | null>(null);
   const [preferenceError, setPreferenceError] = useState(false);
+  const [savingAnalysis, setSavingAnalysis] = useState(false);
   const workflowRef = useRef<ConnectionWorkflow | null>(null);
   if (!workflowRef.current) workflowRef.current = new ConnectionWorkflow(setView);
   const workflow = workflowRef.current, snapshot = view.snapshot;
   async function readPreferences() {
     try { setPreferences(await preferencesRequest());setPreferenceError(false); }
     catch { setPreferenceError(true); }
+  }
+  async function changeAnalysis(enabled: boolean) {
+    setSavingAnalysis(true);
+    try {
+      const saved = await preferencesRequest(enabled);
+      setPreferences(saved);setPreferenceError(false);analysisChanged(saved.automaticAnalysis);
+    } catch { setPreferenceError(true); }
+    finally { setSavingAnalysis(false); }
   }
   useEffect(() => {
     void workflow.peek();void readPreferences();
@@ -66,11 +75,12 @@ export function SettingsPanel({ close }: { close: () => void }) {
           Для персонального режима запустите приложение с выделенным профилем CLI.</p>}
       {!snapshot.generationReady && snapshot.experimentalMode && <p>Генерация пока недоступна. Проверьте вход, модель и лимит.</p>}
       {preferences?.selectedModel && <p>Сохранённый выбор: {preferences.selectedModel}. Доступ подтверждается проверкой подключения.</p>}
-      {preferenceError && <p role="alert" className="text-danger">Не удалось прочитать сохранённые настройки. Ваш текст не изменён.</p>}
+      {preferenceError && <p role="alert" className="text-danger">Не удалось прочитать или сохранить настройки. Повторите действие.</p>}
     </section>
     <section aria-label="Проверка изменений"><h2>Проверка изменений</h2>
-      <label><input type="checkbox" checked={preferences?.automaticAnalysis ?? true} disabled readOnly /> Автоматически проверять изменения</label>
-      <p>Проверка изменений пока недоступна.</p>
+      <label><input type="checkbox" checked={preferences?.automaticAnalysis ?? true} disabled={!preferences || savingAnalysis}
+        onChange={event => { void changeAnalysis(event.target.checked); }} /> Автоматически проверять изменения</label>
+      <p>Проверяем завершённые правки. Остальные упоминания меняются только по вашему действию.</p>
     </section>
   </section>;
 }

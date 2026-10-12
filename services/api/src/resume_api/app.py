@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+from packages.resume_core.gui_reconciliation import SaveAnalysisPreference
 from io import BytesIO
 from contextlib import asynccontextmanager
 from http.cookies import SimpleCookie
@@ -350,11 +351,11 @@ def create_app(*, origin: str, secret: str, temp_root: Path, dist: Path, runner:
         return None
 
     gui_options = {"clock": gui_clock} if gui_clock is not None else {}
+    preferences_store = PreferencesStore(rules_store.root)
     gui_projects = GuiProjectService(temp_root, rules_store, gui_selected_provider,
         worker_slot=gui_worker_slot, cleanup_error=lifecycle_code, renderer=gui_renderer,
-        storage=ProjectStore(rules_store.root), **gui_options)
+        storage=ProjectStore(rules_store.root), preferences=preferences_store, **gui_options)
     app.state.gui_projects = gui_projects
-    preferences_store = PreferencesStore(rules_store.root)
     mount_projects(app, gui_projects, problem)
 
     def execute_content(files, runner, payload, cancel, runner_epoch):
@@ -942,6 +943,16 @@ def create_app(*, origin: str, secret: str, temp_root: Path, dist: Path, runner:
             value = preferences_store.load()
             return JSONResponse(value.model_dump(mode="json", by_alias=True), headers={"Cache-Control": "no-store"})
         except (PreferencesFailure, RulesFailure) as error:
+            return problem(error.code, 409, "settings")
+
+    @app.put("/v1/settings/preferences")
+    async def save_analysis_preferences(payload: SaveAnalysisPreference):
+        try:
+            rules_store.load()
+            value = preferences_store.save_analysis(payload.automatic_analysis)
+            await gui_projects.set_analysis_preference(value.automatic_analysis)
+            return JSONResponse(value.model_dump(mode="json", by_alias=True), headers={"Cache-Control": "no-store"})
+        except (PreferencesFailure, RulesFailure, ProjectFailure) as error:
             return problem(error.code, 409, "settings")
 
     async def connection_job(kind: str, work):

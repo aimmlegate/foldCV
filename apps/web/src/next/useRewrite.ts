@@ -60,10 +60,15 @@ export function useRewrite(editor: RefObject<FieldEditorHandle | null>, edits: R
     if (current?.projectId !== target.selection.projectId || current.documentRevision !== target.selection.documentRevision) {
       setMessage("Текст изменился. Выделите фрагмент снова."); return;
     }
+    const response = await projectRequest(`/v1/projects/${current.projectId}`);
+    if (response.workspace.documentRevision !== target.selection.documentRevision || !response.selectionFingerprint) {
+      setMessage("Текст изменился. Выделите фрагмент снова."); return;
+    }
+    const selection = { ...target.selection, dependencyFingerprint: response.selectionFingerprint };
     const operation = { projectId: current.projectId, operationId: `rewrite-${crypto.randomUUID()}`, cancelled: false };
     active.current = operation; setBusy(true); setMessage("");
     try {
-      const result = await rewriteRequest({ clientRequestId: operation.operationId, selection: target.selection,
+      const result = await rewriteRequest({ clientRequestId: operation.operationId, selection,
         instruction: instruction.trim(), rulesRevision: target.rules.revision, rulesSha256: target.rules.sha256 });
       await edits.acceptExternal(target.fields);
       if (result.status !== "applied" || result.rejectionReason !== null) throw new ApiFailure(result.rejectionReason ?? "REWRITE_FAILED");

@@ -399,6 +399,12 @@ class GuiOperationEvent(OperationEvent):
                   "operation.completed", "operation.failed", "cancelled"]
 
 
+class AnalysisBatch(Wire):
+    phase: Literal["pending", "dispatched"]
+    completed_field_ids: list[Id]
+    enabled: bool
+
+
 class GuiOperation(Operation):
     kind: Literal["extract", "validate", "render", "project_save", "normalize_semantics",
                   "draft_prose", "rewrite_prose", "reconcile_edits"]
@@ -412,6 +418,8 @@ class GuiOperation(Operation):
     events: list[GuiOperationEvent]
     docx_error: DocxError | None = None
     render_snapshot_id: Id | None = None
+    analysis_batch: AnalysisBatch | None = None
+    editorial_recommendations: list[str] = Field(default_factory=list)
 
 
 class GenerationStage(Wire):

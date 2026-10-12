@@ -9,6 +9,7 @@ from packages.resume_core.gui_source_context import source_context
 from packages.resume_core.models.recovery import SourceContextRequest, Mutation
 from packages.resume_core.gui_rewriting import GuiRewriteRequest
 from packages.resume_core.gui_exports import GuiExportRequest
+from packages.resume_core.gui_reconciliation import GuiAnalysisRequest
 from .contracts import EmptyRequest
 from .extracting import parse_one_part, UploadFailure
 from .gui_projects import ProjectFailure
@@ -69,6 +70,11 @@ def mount_projects(app, service, problem):
     async def rewrite(id: str, payload: GuiRewriteRequest):
         result = await service.rewrite(id, payload)
         return JSONResponse(result.model_dump(mode="json", by_alias=True), headers={"Cache-Control": "no-store"})
+
+    @app.post("/v1/projects/{id}/analysis")
+    async def analysis(id: str, payload: GuiAnalysisRequest):
+        await service.analysis_action(id, payload)
+        return response(id)
 
     @app.post("/v1/projects/{id}/exports")
     async def export(id: str, payload: GuiExportRequest):

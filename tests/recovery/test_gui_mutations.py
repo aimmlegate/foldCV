@@ -375,4 +375,4 @@ async def test_protected_mutation_api_preserves_stale_replay_and_facts_only_base
         assert (await client.post(f'/v1/projects/{id}/mutations', headers=headers, json=body)).json()['status'] == 'replayed'
         renamed = await client.patch(f'/v1/projects/{id}/metadata', headers=headers, json={'title': 'Named', 'baseRevision': 4})
         assert renamed.json()['workspace']['projectRevision'] == 5 and renamed.json()['workspace']['documentRevision'] == 3
-        assert len(provider.calls) == 2 and len(stored.project.operations) == 2
+        assert len(provider.calls) == 2 and len([op for op in stored.project.operations if op.kind != "reconcile_edits"]) == 2 and store.pending_analysis(id).usage is None

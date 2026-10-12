@@ -63,6 +63,8 @@ async def test_current_cached_export_and_download_are_zero_call_and_make_no_rend
 async def test_edited_rewritten_and_excluded_content_reaches_real_docx_without_source_refill(tmp_path):
     store, id = await created(tmp_path);workspace = store.read(id);job = workspace.project.document.jobs[0]
     from tests.recovery.test_gui_rewriting import request as rewrite_request
+    from packages.resume_core.preferences import PreferencesStore
+    store.preferences = PreferencesStore(store.rules.root);store.preferences.save_analysis(False)
     store.mutate(id, mutation(workspace, 'edit-field', {'fieldId':job.tasks.field_id,'text':'Подготовила инструкцию для дежурной смены.',
         'periods':None,'focus':None,'sessionId':'tasks','completion':'slot'}))
     workspace = store.read(id)
@@ -81,7 +83,7 @@ async def test_edited_rewritten_and_excluded_content_reaches_real_docx_without_s
         assert 'Разрабатываю backend-сервисы на Python.' not in xml and 'mail@example.com' not in xml
         assert 'Уточните' not in xml and 'editorial_plan_stale' not in xml
         assert 'word/styles.xml' in archive.namelist()
-    assert len([item for item in after.project.operations if item.kind in {'normalize_semantics','draft_prose','rewrite_prose','reconcile_edits'}]) == 3
+    assert len([item for item in after.project.operations if item.kind in {'normalize_semantics','draft_prose','rewrite_prose','reconcile_edits'} and (item.kind != 'reconcile_edits' or item.analysis_batch.phase == 'dispatched')]) == 3
     assert after.undo_slots[record_slot(job)] is not None
 
 

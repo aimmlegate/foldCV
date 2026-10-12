@@ -36,6 +36,38 @@
       "title": "Acknowledgment",
       "type": "object"
     },
+    "AnalysisBatch": {
+      "additionalProperties": false,
+      "properties": {
+        "completedFieldIds": {
+          "items": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "title": "Completedfieldids",
+          "type": "array"
+        },
+        "enabled": {
+          "title": "Enabled",
+          "type": "boolean"
+        },
+        "phase": {
+          "enum": [
+            "pending",
+            "dispatched"
+          ],
+          "title": "Phase",
+          "type": "string"
+        }
+      },
+      "required": [
+        "phase",
+        "completedFieldIds",
+        "enabled"
+      ],
+      "title": "AnalysisBatch",
+      "type": "object"
+    },
     "AssetRef": {
       "additionalProperties": false,
       "properties": {
@@ -1469,6 +1501,17 @@
     "GuiOperation": {
       "additionalProperties": false,
       "properties": {
+        "analysisBatch": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/AnalysisBatch"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
         "baseRevision": {
           "minimum": 1,
           "title": "Baserevision",
@@ -1506,6 +1549,13 @@
             }
           ],
           "default": null
+        },
+        "editorialRecommendations": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Editorialrecommendations",
+          "type": "array"
         },
         "errorCode": {
           "anyOf": [

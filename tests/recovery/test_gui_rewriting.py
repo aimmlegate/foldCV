@@ -170,7 +170,7 @@ async def test_late_rewrite_rejects_new_text_metadata_or_cancellation_and_cleans
     before = workspace.project.document.model_dump()
     provider.release.set();result = await task
     assert result.status in {'stale', 'rejected'} and workspace.project.document.model_dump() == before
-    assert len(provider.calls) == 1 and workspace.project.operations[-1].usage.logical_attempts == 1
+    assert len(provider.calls) == 1 and [op for op in workspace.project.operations if op.kind == "rewrite_prose"][-1].usage.logical_attempts == 1
     assert list((tmp_path / 'operations').iterdir()) == []
 
 
@@ -181,9 +181,9 @@ async def test_durable_rewrite_is_one_operation_replays_after_restart_and_preser
     result = await store.rewrite(id, captured)
     assert result.status == 'applied' and result.persistence == 'durable'
     assert store.read(id).undo_slots['profile'].record.text.text == workspace.project.document.profile.text.text
-    assert len(store.read(id).project.operations) == 3
+    assert len([op for op in store.read(id).project.operations if op.kind != "reconcile_edits"]) == 3
     replay = await store.rewrite(id, captured)
-    assert replay.status == 'replayed' and len(store.read(id).project.operations) == 3
+    assert replay.status == 'replayed' and len([op for op in store.read(id).project.operations if op.kind != "reconcile_edits"]) == 3
     provider = CreationProvider();reopened = durable_service(tmp_path, provider)
     assert (await reopened.rewrite(id, captured)).status == 'replayed' and provider.calls == []
     changed = captured.model_copy(update={'instruction':'Different payload'})
@@ -198,7 +198,7 @@ async def test_rewrite_failure_preserves_document_counts_once_and_has_no_automat
     captured = request(workspace, rules=store.rules.load(), instruction='TEST_ERROR');before = workspace.project.document.model_dump()
     result = await store.rewrite(workspace.project_id, captured)
     assert result.rejection_reason == 'MODEL_DENIED' and workspace.project.document.model_dump() == before
-    assert len(provider.calls) == 1 and workspace.project.operations[-1].usage.logical_attempts == 1
+    assert len(provider.calls) == 1 and [op for op in workspace.project.operations if op.kind == "rewrite_prose"][-1].usage.logical_attempts == 1
     await asyncio.sleep(.02)
     assert len(provider.calls) == 1
 
@@ -209,8 +209,8 @@ async def test_more_than_twenty_explicit_rewrites_do_not_use_the_legacy_lifetime
     for _ in range(21):
         result = await store.rewrite(workspace.project_id, request(workspace, rules=store.rules.load()))
         assert result.status == 'applied'
-    assert len(provider.calls) == len(workspace.project.operations) == 21
-    assert all(operation.usage.logical_attempts == 1 for operation in workspace.project.operations)
+    assert len(provider.calls) == len([op for op in workspace.project.operations if op.kind == "rewrite_prose"]) == 21
+    assert all(operation.usage.logical_attempts == 1 for operation in workspace.project.operations if operation.kind == "rewrite_prose")
     assert workspace.generations == [] and (workspace.project_revision, workspace.document_revision) == (23, 23)
 
 
@@ -228,7 +228,7 @@ async def test_foreign_model_span_fails_once_without_replacement_or_unsafe_error
     result = await store.rewrite(workspace.project_id, request(workspace, rules=store.rules.load()))
     assert result.status == 'rejected' and result.rejection_reason == 'INVALID_RESULT'
     assert workspace.project.document.model_dump() == original and len(provider.calls) == 1
-    assert workspace.project.operations[-1].usage.logical_attempts == 1
+    assert [op for op in workspace.project.operations if op.kind == "rewrite_prose"][-1].usage.logical_attempts == 1
     assert capsys.readouterr() == ('', '')
 
 
@@ -237,7 +237,7 @@ async def test_invalid_capture_and_instruction_are_zero_call_preflight_failures(
     provider = CreationProvider();store = service(tmp_path, provider);workspace = render_workspace();store.workspaces[workspace.project_id] = workspace
     captured = request(workspace, rules=store.rules.load());captured.selection.spans[0].captured_text = 'mismatched'
     result = await store.rewrite(workspace.project_id, captured)
-    assert result.rejection_reason == 'SELECTION_STALE' and workspace.project.operations[-1].usage.logical_attempts == 0
+    assert result.rejection_reason == 'SELECTION_STALE' and [op for op in workspace.project.operations if op.kind == "rewrite_prose"][-1].usage.logical_attempts == 0
     private = request(workspace, rules=store.rules.load(), instruction='Call 555-123-4567')
     assert (await store.rewrite(workspace.project_id, private)).rejection_reason == 'NO_SAFE_CONTENT'
     assert provider.calls == []

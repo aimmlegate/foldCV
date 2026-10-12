@@ -11,7 +11,7 @@ from .gui_projection import compatibility_views
 from .gui_selection import field_index, normalized_text
 from .gui_refresh import refresh, validate_focus
 from .models.recovery import (Annotation, BlockCheckpoint, BufferedField, Dependencies, Document,
-    EditSession, FactStamp, MutationReplay, MutationResult, SourceExclusion, authored_fields, record_slot)
+    EditSession, FactStamp, MutationReplay, MutationResult, SourceExclusion, NameAssessmentFact, authored_fields, record_slot)
 from .normalization import _id
 
 
@@ -51,6 +51,8 @@ def records(workspace):
 def checkpoint(workspace, slot):
     record = records(workspace)[slot]
     ids = {id for field in authored_fields(record) for id in field.fact_ids}
+    if record.kind == "candidate":
+        ids.update(fact.id for fact in workspace.project.facts if isinstance(fact, NameAssessmentFact))
     facts = [fact.model_copy(deep=True) for fact in workspace.project.facts if fact.id in ids]
     marks = [mark.model_copy(deep=True) for mark in workspace.annotations
              if mark.anchor.kind == "field" and mark.anchor.field_id.split("/", 1)[0] == slot]
@@ -131,7 +133,14 @@ def restore(workspace, payload):
     restored = target.record.model_copy(update={"visible": record.visible,
         "revision": record.revision + int(previous_content != content(target.record))}, deep=True)
     replace_record(workspace.project.document, slot, restored)
+    previous_facts = {fact.id: fact.model_dump(exclude={"revision"}) for fact in workspace.project.facts}
     conflicts = restore_facts(workspace, slot, target, record)
+    reverted = {fact.id for fact in workspace.project.facts
+        if fact.id in previous_facts and fact.model_dump(exclude={"revision"}) != previous_facts[fact.id]} - set(conflicts)
+    if reverted:
+        workspace.annotations = [mark for mark in workspace.annotations if not
+            (mark.code.startswith("reconcile_") and mark.type == "conflicting" and mark.fact_ids and set(mark.fact_ids) <= reverted)]
+        workspace.related_update_suggestions = [item for item in workspace.related_update_suggestions if not set(item.fact_ids) & reverted]
     workspace.annotations = [mark for mark in workspace.annotations
         if not (mark.anchor.kind == "field" and mark.anchor.field_id.split("/", 1)[0] == slot)] + [mark.model_copy(deep=True) for mark in target.annotations]
     if not changed_buffer:
@@ -343,7 +352,7 @@ def apply_mutation(workspace, mutation, updated_at):
             result.project_revision, result.document_revision = candidate.project_revision, candidate.document_revision
             # Keep live Generation/Operation objects; their status changes do not replace authored state.
             for field in ("project_revision", "document_revision", "updated_at", "undo_slots", "edit_sessions",
-                          "annotations", "derived_state", "source_exclusions"):
+                          "annotations", "derived_state", "source_exclusions", "related_update_suggestions"):
                 setattr(workspace, field, getattr(candidate, field))
             for field in ("document", "revision", "views", "facts"):
                 setattr(workspace.project, field, getattr(candidate.project, field))

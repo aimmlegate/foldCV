@@ -21,6 +21,7 @@ test.beforeEach(async ({}, info) => {
   runRoot = mkdtempSync(resolve(temp, "run-"));
   cpSync(resolve(temp, "dist"), resolve(runRoot, "dist"), { recursive: true });
   const example = info.title.includes("focus warning") ? "E2-focus" : info.title.includes("E2") ? "E2" : "E1";
+  if (!info.title.includes("A10")) writeFileSync(resolve(runRoot, "pause-analysis"), "Isolate the accepted foreground feature from background analysis.");
   origin = await launch(example);
 });
 async function launch(example: string): Promise<string> {
@@ -44,6 +45,10 @@ async function stopServer() {
 }
 test.afterEach(async () => {
   await stopServer();
+  if (existsSync(resolve(runRoot, "pause-analysis")) && existsSync(resolve(runRoot, "model-requests.json"))) {
+    const modelRequests: unknown = JSON.parse(readFileSync(resolve(runRoot, "model-requests.json"), "utf8"));
+    expect(JSON.stringify(modelRequests)).not.toContain('reconcile_edits');
+  }
   if (existsSync(resolve(runRoot, "operations"))) expect(readdirSync(resolve(runRoot, "operations"))).toEqual([]);
 });
 test.afterAll(() => { if (temp) rmSync(temp, { recursive: true, force: true }); });
@@ -152,7 +157,7 @@ test("built E1 source panel reads captured job evidence with zero extra content 
   const link = await page.getByRole("link", { name: "Скачать исходный DOCX" }).getAttribute("href");
   const id = link?.split("/")[3];
   const raw: unknown = await (await page.request.get(`${origin}/v1/projects/${id}`)).json();
-  expect(response(raw).workspace.project?.operations).toHaveLength(2);
+  expect(response(raw).workspace.project?.operations.filter(item => item.kind !== "reconcile_edits")).toHaveLength(2);
 });
 
 test("built E1 changed capture is rejected and source refresh preserves the typing buffer", async ({ page }) => {
@@ -196,7 +201,7 @@ test("built E1 continuous typing retains a session and real two-step block resto
   await expect.poll(async () => (await read()).project?.document.profile.text.text).toContain("Long continuous user addition");
   expect((await read()).undoSlots["profile"]).toBeNull();
   expect((await read()).editSessions["profile"]?.baseline.record.kind).toBe("profile");
-  expect((await read()).project?.operations).toHaveLength(2);
+  expect((await read()).project?.operations.filter(item => item.kind !== "reconcile_edits")).toHaveLength(2);
   await page.getByRole("button", { name: "Показать исходник" }).click();
   await expect(page.getByRole("complementary", { name: "Исходный контекст" }).getByRole("status")).toContainText("добавлен пользователем");
   await page.getByRole("button", { name: "Закрыть исходный контекст" }).click();
@@ -235,7 +240,7 @@ test("built E1 lost acknowledgment retry applies once and keeps newer buffered t
   await expect.poll(async () => { const raw: unknown = await (await page.request.get(`${origin}/v1/projects/${id}`)).json();return response(raw).workspace.project?.document.profile.text.text; }).toContain("First newer");
   await expect(profile).toContainText("First newer");
   const raw: unknown = await (await page.request.get(`${origin}/v1/projects/${id}`)).json();const workspace = response(raw).workspace;
-  expect(workspace.project?.operations).toHaveLength(2);expect(workspace.documentRevision).toBe(4);
+  expect(workspace.project?.operations.filter(item => item.kind !== "reconcile_edits")).toHaveLength(2);expect(workspace.documentRevision).toBe(4);
   expect(workspace.editSessions["profile"]).toBeUndefined();
 });
 
@@ -341,7 +346,7 @@ test("built E1 disk acknowledgment refresh retains open session and resumes its 
   await expect(page.locator(".next-save")).toHaveText("Сохранено");
   const after: unknown = await (await page.request.get(`${origin}/v1/projects/${id}`)).json();
   expect(response(after).workspace.editSessions["profile"]?.sessionId).toBe(sessionId);
-  expect(response(after).workspace.project?.operations).toHaveLength(2);
+  expect(response(after).workspace.project?.operations.filter(item => item.kind !== "reconcile_edits")).toHaveLength(2);
   await page.keyboard.press("Control+z");
   await expect(profile).toHaveText(original);
   await expect(page.getByRole("alert")).toHaveCount(0);
@@ -369,7 +374,7 @@ test("built E1 save failure shows unsaved text and explicit retry obtains a disk
   expect(readFileSync(resolve(runRoot, "FoldCV/projects", id ?? "", "workspace.json"), "utf8")).toContain("Pending disk");
   await page.reload();await expect(profile).toContainText("Pending disk");
   const saved: unknown = await (await page.request.get(`${origin}/v1/projects/${id}`)).json();
-  expect(response(saved).workspace.project?.operations).toHaveLength(2);
+  expect(response(saved).workspace.project?.operations.filter(item => item.kind !== "reconcile_edits")).toHaveLength(2);
 });
 
 test("built failed-file preDraft refresh retains warnings original bytes and the same project", async ({ page }) => {
@@ -406,7 +411,7 @@ test("built E1 backend restart opens its disk snapshot without generation or poi
   const raw: unknown = await (await page.request.get(`${origin}/v1/projects/${id}`)).json();const workspace = response(raw).workspace;
   expect([workspace.projectRevision, workspace.documentRevision]).toEqual([saved.projectRevision, saved.documentRevision]);
   expect(workspace.editSessions).toEqual(saved.editSessions);expect(workspace.undoSlots).toEqual(saved.undoSlots);
-  expect(workspace.project?.operations).toHaveLength(2);
+  expect(workspace.project?.operations.filter(item => item.kind !== "reconcile_edits")).toHaveLength(2);
   await expect(page.getByRole("link", { name: "Скачать исходный DOCX" })).toBeVisible();
 });
 
@@ -451,7 +456,7 @@ test("built E2 filled sections and complete dates clear gaps without calls or fa
   await expect(page.locator('[data-annotation-code="missing_surname"]')).toHaveCount(0);
   const id = new URL(page.url()).searchParams.get("project");
   const raw: unknown = await (await page.request.get(`${origin}/v1/projects/${id}`)).json();const workspace = response(raw).workspace;
-  expect(workspace.project?.operations).toHaveLength(2);expect(workspace.sourceObservedAt).toBeNull();
+  expect(workspace.project?.operations.filter(item => item.kind !== "reconcile_edits")).toHaveLength(2);expect(workspace.sourceObservedAt).toBeNull();
   expect(workspace.project?.document.languages[0]?.proficiency.text).toBe("");
   await page.getByRole("button", { name: "Удалить User university", exact: true }).click();
   await expect(page.locator('[data-annotation-code="missing_education"]')).toHaveCount(1);
@@ -477,7 +482,7 @@ test("built E1 invalid typed dates remove duration and restore refreshes its mar
   await expect(end).toHaveText("");
   const id = new URL(page.url()).searchParams.get("project");
   const raw: unknown = await (await page.request.get(`${origin}/v1/projects/${id}`)).json();
-  expect(response(raw).workspace.project?.operations).toHaveLength(2);
+  expect(response(raw).workspace.project?.operations.filter(item => item.kind !== "reconcile_edits")).toHaveLength(2);
 });
 
 test("built entry persists manual theme, follows system and fits a narrow keyboard layout", async ({ page }) => {
@@ -599,7 +604,7 @@ test("built E1 partial Unicode rewrite captures after durable flush and presets 
   await page.getByRole("button", { name: "Обновить выделение", exact: true }).click();
   await expect(page.locator('[data-field-content="profile/text"]')).toHaveText("Alpha Яснее: 😀é\nBeta");
   expect(posted).toHaveLength(1);expect(posted[0]?.selection.spans).toEqual([{ fieldId: "profile/text", range: { start: 6, end: 11 }, capturedText: "😀é\n" }]);
-  const workspace = await currentWorkspace(page);expect(workspace.project?.operations).toHaveLength(3);
+  const workspace = await currentWorkspace(page);expect(workspace.project?.operations.filter(item => item.kind !== "reconcile_edits")).toHaveLength(3);
   await page.getByRole("button", { name: "Отменить правку блока", exact: true }).click();
   await expect(page.locator('[data-field-content="profile/text"]')).toHaveText("Alpha 😀é\nBeta");
   await page.getByRole("button", { name: "Отменить правку блока", exact: true }).click();
@@ -654,11 +659,11 @@ test("built E1 typing cancels a delayed rewrite and an error keeps authored text
   await expect(page.getByText("Улучшение отменено. Ваши правки остаются в редакторе.", { exact: true })).toBeVisible();
   await expect(page.locator('[data-field-content="profile/text"]')).toHaveText("Newer typed text");
   await expect(page.locator(".next-save")).toHaveText("Сохранено");
-  const current = await currentWorkspace(page);expect(current.project?.operations.at(-1)?.status).toBe("cancelled");
+  const current = await currentWorkspace(page);expect(current.project?.operations.filter(item => item.kind !== "reconcile_edits").at(-1)?.status).toBe("cancelled");
   await selectFields(page, "profile/text", 0, "profile/text", 16);await openSelectionAssistant(page);await submitRewrite(page, "TEST_ERROR");
   await expect(page.getByText("Не удалось обновить выделение.", { exact: false })).toBeVisible();
   await expect(page.locator('[data-field-content="profile/text"]')).toHaveText("Newer typed text");
-  expect((await currentWorkspace(page)).project?.operations).toHaveLength(4);
+  expect((await currentWorkspace(page)).project?.operations.filter(item => item.kind !== "reconcile_edits")).toHaveLength(4);
 });
 
 test("built E1 a metadata change during rewrite rejects its late reply and preserves current text", async ({ page }) => {
@@ -672,7 +677,7 @@ test("built E1 a metadata change during rewrite rejects its late reply and prese
   await expect(page.getByText("Не удалось обновить выделение.", { exact: false })).toBeVisible();
   await expect(page.locator('[data-field-content="profile/text"]')).toHaveText(text);
   const after = await currentWorkspace(page);expect(after.title).toBe("Renamed during rewrite");expect(after.documentRevision).toBe(before.documentRevision);
-  expect(after.project?.operations.at(-1)?.errorCode).toBe("SELECTION_STALE");
+  expect(after.project?.operations.filter(item => item.kind !== "reconcile_edits").at(-1)?.errorCode).toBe("SELECTION_STALE");
 });
 
 async function exportCurrent(page: Page) {
@@ -706,8 +711,8 @@ test("built E1 minimum slice exports current additions and a partial rewrite wit
   const file = await downloadDocx(page, "current-resume.docx");
   expect(file.xml).toContain("Яснее: " + addition);expect(file.xml).not.toContain("Интеграционные тесты.");
   expect(file.xml).not.toContain("editorial_plan_stale");expect(file.xml).not.toContain("mail@example.com");expect(file.entries["word/styles.xml"]).toBeDefined();
-  const exported = await currentWorkspace(page), operation = exported.project?.operations.at(-1);
-  expect(exported.project?.operations.filter(item => ["normalize_semantics", "draft_prose", "rewrite_prose", "reconcile_edits"].includes(item.kind))).toHaveLength(3);
+  const exported = await currentWorkspace(page), operation = exported.project?.operations.filter(item => item.kind !== "reconcile_edits").at(-1);
+  expect(exported.project?.operations.filter(item => ["normalize_semantics", "draft_prose", "rewrite_prose"].includes(item.kind))).toHaveLength(3);
   expect(operation?.kind).toBe("render");expect(operation?.usage).toBeNull();
   const snapshot = exported.project?.renders.find(item => item.id === operation?.renderSnapshotId);if (!snapshot) throw new Error("Missing snapshot");
   expect(snapshot.projectRevision).toBe(exported.projectRevision);expect(snapshot.documentRevision).toBe(exported.documentRevision);
@@ -729,7 +734,7 @@ test("built E2 current export reuses verified cache and keeps semantic gaps outs
   expect(file.xml).not.toContain("team_size_conflict");expect(renderCount()).toBe(1);
   await page.getByRole("button", { name: "К тексту", exact: true }).click();await exportCurrent(page);
   await expect(page.getByRole("button", { name: "Скачать DOCX", exact: true })).toBeEnabled();expect(renderCount()).toBe(1);
-  expect((await currentWorkspace(page)).project?.operations.filter(item => item.kind !== "render")).toHaveLength(2);
+  expect((await currentWorkspace(page)).project?.operations.filter(item => item.kind !== "render" && item.kind !== "reconcile_edits")).toHaveLength(2);
 });
 
 test("built E1 oversized field stays intact with a located DOCX error and current retry", async ({ page }) => {
@@ -751,8 +756,8 @@ test("built E1 editing during DOCX formation rejects late output and retry captu
   await expect.poll(() => existsSync(resolve(runRoot, "export-started"))).toBe(true);
   await page.getByRole("button", { name: "К тексту", exact: true }).click();await replaceFieldText(page, "profile/text", "Newer current profile.");
   await expect(page.locator(".next-save")).toHaveText("Сохранено");rmSync(resolve(runRoot, "hold-export"));
-  await expect.poll(async () => (await currentWorkspace(page)).project?.operations.at(-1)?.status).toBe("failed");
-  const old = (await currentWorkspace(page)).project?.operations.at(-1);expect(old?.errorCode).toBe("EXPORT_STALE");
+  await expect.poll(async () => (await currentWorkspace(page)).project?.operations.filter(item => item.kind !== "reconcile_edits").at(-1)?.status).toBe("failed");
+  const old = (await currentWorkspace(page)).project?.operations.filter(item => item.kind !== "reconcile_edits").at(-1);expect(old?.errorCode).toBe("EXPORT_STALE");
   const stale = await page.request.get(`${origin}/v1/projects/${new URL(page.url()).searchParams.get("project")}/exports/${old?.id}/docx`);expect(stale.status()).toBe(409);
   await exportCurrent(page);await expect(page.getByRole("button", { name: "Скачать DOCX", exact: true })).toBeEnabled();
   const file = await downloadDocx(page, "newer-profile.docx");expect(file.xml).toContain("Newer current profile.");expect(file.xml).not.toContain("First current profile.");
@@ -787,13 +792,13 @@ test("built E1 corrupt transport bytes cannot download and retry uses the same v
   const file = await downloadDocx(page, "verified-retry.docx");expect(file.xml).toContain("Ирина Примерова");expect(renderCount()).toBe(1);
 });
 
-test("built E1 Settings opens with no probe and keeps one disabled analysis control outside the editor", async ({ page }) => {
+test("built E1 Settings opens with no probe and keeps one persistent analysis control outside the editor", async ({ page }) => {
   await createRewriteExample(page);const before = await currentWorkspace(page);
   await page.getByRole("button", { name: "Настройки", exact: true }).click();
   await expect(page.getByRole("region", { name: "Настройки", exact: true })).toBeVisible();
   await expect(page.getByText("Подключение ещё не проверено.", { exact: true })).toBeVisible();
   await expect(page.getByRole("checkbox", { name: "Автоматически проверять изменения", exact: true })).toHaveCount(1);
-  await expect(page.getByRole("checkbox", { name: "Автоматически проверять изменения", exact: true })).toBeDisabled();
+  await expect(page.getByRole("checkbox", { name: "Автоматически проверять изменения", exact: true })).toBeEnabled();
   expect(existsSync(resolve(runRoot, "connection-actions.json"))).toBe(false);expect(existsSync(resolve(runRoot, "native-login-called"))).toBe(false);
   const after = await currentWorkspace(page);expect(after.projectRevision).toBe(before.projectRevision);expect(after.documentRevision).toBe(before.documentRevision);
   expect(after.project?.document).toEqual(before.project?.document);
@@ -835,5 +840,74 @@ test("built E1 Settings detach cancels a controlled pending check and retains cu
   await page.getByRole("button", { name: "Отключить модель", exact: true }).click();
   await expect(page.getByText("Модель отключена от FoldCV.", { exact: false })).toBeVisible();rmSync(resolve(runRoot, "hold-connection"));
   await page.getByRole("button", { name: "Вернуться", exact: true }).click();await expect(page.locator('[data-field-content="profile/text"]')).toHaveText("Current retained text.");
-  expect((await currentWorkspace(page)).project?.operations.filter(item => item.kind !== "render")).toHaveLength(2);
+  expect((await currentWorkspace(page)).project?.operations.filter(item => item.kind !== "render" && item.kind !== "reconcile_edits")).toHaveLength(2);
+});
+
+function analysisCalls() {
+  if (!existsSync(resolve(runRoot, "model-requests.json"))) return 0;
+  const metadata: unknown = JSON.parse(readFileSync(resolve(runRoot, "model-requests.json"), "utf8"));
+  return JSON.stringify(metadata).match(/reconcile_edits/g)?.length ?? 0;
+}
+
+async function analysisSetting(page: Page, enabled: boolean) {
+  await page.getByRole("button", { name: "Настройки", exact: true }).click();
+  const checkbox = page.getByRole("checkbox", { name: "Автоматически проверять изменения", exact: true });
+  await expect(checkbox).toBeEnabled();if (await checkbox.isChecked() !== enabled) await checkbox.click();
+  if (enabled) await expect(checkbox).toBeChecked();else await expect(checkbox).not.toBeChecked();
+  await expect(checkbox).toBeEnabled();
+  await page.getByRole("button", { name: "Вернуться", exact: true }).click();
+}
+
+test("built E1 A10 typing and save ticks wait for completion while stale analysis never consumes undo", async ({ page }) => {
+  await createRewriteExample(page);writeFileSync(resolve(runRoot, "hold-analysis"), "controlled wait");
+  await replaceFieldText(page, "profile/text", "Completed claim");await expect(page.locator(".next-save")).toHaveText("Сохранено");
+  expect(analysisCalls()).toBe(0);
+  await page.keyboard.press("End");await page.keyboard.press("Enter");
+  await expect.poll(analysisCalls).toBe(1);await expect(page.getByText("Проверяем изменения", { exact: true })).toBeVisible();
+  const before = await currentWorkspace(page);expect(before.editSessions.profile).toBeDefined();expect(before.undoSlots.profile).toBeNull();
+  await page.keyboard.insertText("New incomplete text");await expect(page.locator(".next-save")).toHaveText("Сохранено");
+  const current = await currentWorkspace(page);expect(current.documentRevision).toBeGreaterThan(before.documentRevision);
+  await expect.poll(() => existsSync(resolve(runRoot, "analysis-released"))).toBe(true);expect(analysisCalls()).toBe(1);
+  rmSync(resolve(runRoot, "hold-analysis"));await page.locator('[data-field-content="candidate/title"]').click();
+  await expect.poll(analysisCalls).toBe(2);
+  await expect.poll(async () => (await currentWorkspace(page)).project?.operations.filter(item => item.kind === "reconcile_edits" && item.status === "completed").length).toBe(1);
+  const settled = await currentWorkspace(page);expect(settled.project?.document.profile.text.text).toBe("Completed claim\nNew incomplete text");
+  expect(settled.undoSlots.profile?.record).toEqual(before.editSessions.profile?.baseline.record);
+});
+
+test("built E1 A10 the single Settings switch persists pause and resumes one accumulated batch", async ({ page }) => {
+  await createRewriteExample(page);await analysisSetting(page, false);
+  await replaceFieldText(page, "profile/text", "Paused correction");await page.locator('[data-field-content="candidate/title"]').click();
+  await expect(page.getByText("Проверка изменений приостановлена", { exact: true })).toBeVisible();expect(analysisCalls()).toBe(0);
+  await page.reload();await expect(page.locator('[data-field-content="profile/text"]')).toHaveText("Paused correction");expect(analysisCalls()).toBe(0);
+  await analysisSetting(page, true);await expect.poll(analysisCalls).toBe(1);
+  await expect.poll(async () => (await currentWorkspace(page)).project?.operations.filter(item => item.kind === "reconcile_edits" && item.status === "completed").length).toBe(1);
+  await page.getByRole("button", { name: "Настройки", exact: true }).click();
+  await expect(page.getByRole("checkbox", { name: "Автоматически проверять изменения", exact: true })).toHaveCount(1);
+  await expect(page.getByRole("checkbox", { name: "Автоматически проверять изменения", exact: true })).toBeChecked();expect(analysisCalls()).toBe(1);
+});
+
+test("built E1 A10 quota failure preserves typing and retry runs only on an explicit action", async ({ page }) => {
+  await createRewriteExample(page);writeFileSync(resolve(runRoot, "fail-analysis"), "controlled quota");
+  await replaceFieldText(page, "profile/text", "User correction");await page.locator('[data-field-content="candidate/title"]').click();
+  await expect(page.getByRole("button", { name: "Повторить проверку", exact: true })).toBeVisible();expect(analysisCalls()).toBe(1);
+  rmSync(resolve(runRoot, "fail-analysis"));await page.reload();await expect(page.getByRole("button", { name: "Повторить проверку", exact: true })).toBeVisible();
+  expect(analysisCalls()).toBe(1);await page.getByRole("button", { name: "Повторить проверку", exact: true }).click();
+  await expect.poll(analysisCalls).toBe(2);await expect(page.getByRole("button", { name: "Повторить проверку", exact: true })).toHaveCount(0);
+  await expect(page.locator('[data-field-content="profile/text"]')).toHaveText("User correction");
+});
+
+test("built E1 A10 rewrite stops its running reconciliation and sends one current batch after replacement", async ({ page }) => {
+  await createRewriteExample(page);writeFileSync(resolve(runRoot, "hold-analysis"), "controlled wait");
+  await replaceFieldText(page, "profile/text", "Completed rewrite target");await page.keyboard.press("End");await page.keyboard.press("Enter");
+  await expect.poll(analysisCalls).toBe(1);
+  await selectFields(page, "profile/text", 0, "profile/text", "Completed rewrite target".length);
+  await openSelectionAssistant(page);await submitRewrite(page);
+  await expect.poll(() => existsSync(resolve(runRoot, "analysis-released"))).toBe(true);
+  await expect.poll(() => existsSync(resolve(runRoot, "rewrite-started"))).toBe(true);rmSync(resolve(runRoot, "hold-analysis"));
+  await expect(page.locator('[data-field-content="profile/text"]')).toHaveText("Яснее: Completed rewrite target\n");
+  await expect.poll(analysisCalls).toBe(2);
+  await expect.poll(async () => (await currentWorkspace(page)).project?.operations.filter(item => item.kind === "reconcile_edits" && item.status === "completed").length).toBe(1);
+  const metadata: unknown = JSON.parse(readFileSync(resolve(runRoot, "model-requests.json"), "utf8"));
+  expect(metadata).toEqual(["normalize_semantics", "draft_prose", "reconcile_edits", "rewrite_prose", "reconcile_edits"].map(kind => ({ model: "fixture", kind })));
 });

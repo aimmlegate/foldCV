@@ -6,6 +6,8 @@ import type { SourceContext } from "../contracts/generated/source_context";
 import type { Mutation } from "../contracts/generated/mutation";
 import type { MutationResult } from "../contracts/generated/mutation_result";
 import type { GuiRewriteRequest } from "../contracts/generated/gui_rewrite_request";
+import type { GuiAnalysisRequest } from "../contracts/generated/gui_analysis_request";
+import type { SaveAnalysisPreference } from "../contracts/generated/save_analysis_preference";
 import type { RulesSettings } from "../contracts/generated/rules_settings";
 import type { GuiExportRequest } from "../contracts/generated/gui_export_request";
 import type { Preferences } from "../contracts/generated/preferences";
@@ -24,7 +26,7 @@ function errorCode(value: unknown): string {
   return typeof error === "object" && error !== null && "code" in error && typeof error.code === "string"
     ? error.code : "REQUEST_FAILED";
 }
-async function request(path: string, method = "GET", body?: GuiCreateProjectRequest | GuiStartGenerationRequest | SourceContextRequest | GuiRewriteRequest | GuiExportRequest | Mutation | Record<string, never> | FormData): Promise<unknown> {
+async function request(path: string, method = "GET", body?: GuiCreateProjectRequest | GuiStartGenerationRequest | SourceContextRequest | GuiRewriteRequest | GuiExportRequest | GuiAnalysisRequest | SaveAnalysisPreference | Mutation | Record<string, never> | FormData): Promise<unknown> {
   const init: RequestInit = { method, credentials: "same-origin", cache: "no-store" };
   if (body instanceof FormData) init.body = body;
   else if (body !== undefined) { init.body = JSON.stringify(body); init.headers = { "Content-Type": "application/json" }; }
@@ -33,7 +35,7 @@ async function request(path: string, method = "GET", body?: GuiCreateProjectRequ
   if (!response.ok) throw new ApiFailure(errorCode(value));
   return value;
 }
-export async function projectRequest(path: string, method = "GET", body?: GuiCreateProjectRequest | GuiStartGenerationRequest | GuiExportRequest | Record<string, never> | FormData): Promise<GuiProjectResponse> {
+export async function projectRequest(path: string, method = "GET", body?: GuiCreateProjectRequest | GuiStartGenerationRequest | GuiExportRequest | GuiAnalysisRequest | Record<string, never> | FormData): Promise<GuiProjectResponse> {
   const value = await request(path, method, body);
   if (!isResponse(value)) throw new ApiFailure("INVALID_RESULT");
   return value;
@@ -62,10 +64,14 @@ export async function rulesRequest(): Promise<RulesSettings> {
   return value;
 }
 function isPreferences(value: unknown): value is Preferences { return validateContract("preferences", value); }
-export async function preferencesRequest(): Promise<Preferences> {
-  const value = await request("/v1/settings/preferences");
+export async function preferencesRequest(automaticAnalysis?: boolean): Promise<Preferences> {
+  const value = automaticAnalysis === undefined ? await request("/v1/settings/preferences")
+    : await request("/v1/settings/preferences", "PUT", { automaticAnalysis });
   if (!isPreferences(value)) throw new ApiFailure("INVALID_RESULT");
   return value;
+}
+export async function analysisRequest(projectId: string, action: "invalidate" | "retry", fieldIds: string[] = []): Promise<GuiProjectResponse> {
+  return projectRequest(`/v1/projects/${projectId}/analysis`, "POST", { action, fieldIds });
 }
 export async function docxDownload(path: string, expected: { sha256: string; size: number }): Promise<Blob> {
   const response = await fetch(path, { credentials: "same-origin", cache: "no-store" });

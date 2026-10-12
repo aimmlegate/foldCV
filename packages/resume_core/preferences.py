@@ -59,3 +59,13 @@ class PreferencesStore:
                 value = self._read();value.selected_model = model;self._write(value);return value
         except StorageFailure:
             raise PreferencesFailure('PREFERENCES_SAVE_FAILED') from None
+
+    def save_analysis(self, enabled):
+        try:
+            with locked_root(self.root, '.preferences.lock'):
+                value = self._read()
+                value.automatic_analysis = enabled
+                self._write(value)
+                return value
+        except StorageFailure:
+            raise PreferencesFailure('PREFERENCES_SAVE_FAILED') from None

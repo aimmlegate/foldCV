@@ -4,7 +4,7 @@ import type { Mutation } from "../contracts/generated/mutation";
 import type { DocumentPeriod } from "../contracts/generated/document";
 import type { FieldEditorHandle } from "./FieldEditor";
 import type { FieldProjection } from "./adapter";
-import { ApiFailure, mutationRequest, projectRequest, type Workspace } from "./api";
+import { ApiFailure, analysisRequest, mutationRequest, projectRequest, type Workspace } from "./api";
 import { documentFields } from "./fields";
 
 type Pending = { field: FieldProjection; sessionId: string; since: number };
@@ -14,6 +14,7 @@ export function useEdits(workspace: Workspace | null, editor: RefObject<FieldEdi
   const latest = useRef(workspace); latest.current = workspace;
   const acceptLatest = useRef(accept); acceptLatest.current = accept;
   const dirty = useRef(new Map<string, Pending>());
+  const invalidated = useRef(new Set<string>());
   const sessions = useRef(new Map<string, string>());
   const departed = useRef(new Set<string>());
   const queue = useRef(Promise.resolve());
@@ -47,6 +48,13 @@ export function useEdits(workspace: Workspace | null, editor: RefObject<FieldEdi
     const saved = new Map(documentFields(canonical).map(field => [field.fieldId, field.text]));
     for (const field of fields) {
       if (saved.get(field.fieldId) === field.text) { dirty.current.delete(field.fieldId); continue; }
+      if (!invalidated.current.has(field.fieldId)) {
+        invalidated.current.add(field.fieldId);
+        void enqueue(async () => {
+          const id = latest.current?.projectId;
+          if (id) await analysisRequest(id, "invalidate", [field.fieldId]);
+        });
+      }
       let sessionId = sessions.current.get(field.slotId) ?? latest.current?.editSessions[field.slotId]?.sessionId;
       if (!sessionId) sessionId = crypto.randomUUID();
       sessions.current.set(field.slotId, sessionId);
@@ -56,16 +64,17 @@ export function useEdits(workspace: Workspace | null, editor: RefObject<FieldEdi
     }
     updatePending(); schedule();
   }
-  function enqueue(work: () => Promise<void>) {
-    queue.current = queue.current.then(async () => {
+  function enqueue(work: () => Promise<void>, kind: "write" | "read" = "write") {
+    queue.current = queue.current.catch(() => {}).then(async () => {
       if (blocked.current) { setLocked(false); return; }
       inFlight.current = true;
-      setSaving(true);
+      if (kind === "write") setSaving(true);
       try { await work(); }
-      catch (error) { blocked.current = true; setError(error instanceof ApiFailure && error.code === "MUTATION_STALE"
+      catch (error) { if (kind === "read") throw error;
+        blocked.current = true; setError(error instanceof ApiFailure && error.code === "MUTATION_STALE"
         ? "Текст на сервере изменился. Ваш ввод сохранён в окне; повторите сохранение после проверки."
         : "Не удалось сохранить правки. Ввод остаётся в окне; повторите сохранение."); }
-      finally { inFlight.current = false; setSaving(false); updatePending(); schedule(); }
+      finally { inFlight.current = false; if (kind === "write") setSaving(false); updatePending(); schedule(); }
     });
     return queue.current;
   }
@@ -116,6 +125,7 @@ export function useEdits(workspace: Workspace | null, editor: RefObject<FieldEdi
         if (field) await send({ ...base(), kind: "edit-field", payload: { fieldId: field.fieldId, text: field.text,
           periods: null, focus: null, sessionId, completion: "slot" } }, new Map([[field.fieldId, field.text]]));
         sessions.current.delete(id);
+        for (const value of editor.current?.read().filter(value => value.slotId === id) ?? []) invalidated.current.delete(value.fieldId);
       }
     }
   }
@@ -131,6 +141,7 @@ export function useEdits(workspace: Workspace | null, editor: RefObject<FieldEdi
   function restore(slot: string) {
     if (editor.current?.isComposing()) return;
     const captured = editor.current?.read().filter(field => field.slotId === slot) ?? [];
+    for (const field of captured) invalidated.current.delete(field.fieldId);
     const capturedSession = sessions.current.get(slot) ?? latest.current?.editSessions[slot]?.sessionId ?? null;
     const wasDirty = captured.some(field => dirty.current.has(field.fieldId));
     void enqueue(async () => {
@@ -189,12 +200,11 @@ export function useEdits(workspace: Workspace | null, editor: RefObject<FieldEdi
   function completion(fieldId: string, reason: "field" | "paragraph") {
     const field = editor.current?.read().find(field => field.fieldId === fieldId);
     if (!field || !sessions.current.has(field.slotId)) return;
+    const sessionId = sessions.current.get(field.slotId);
+    invalidated.current.delete(fieldId);
     void enqueue(async () => {
-      await flush(field.slotId);
-      const sessionId = sessions.current.get(field.slotId);
-      const current = editor.current?.read().find(field => field.fieldId === fieldId);
-      if (sessionId && current) await send({ ...base(), kind: "edit-field", payload: { fieldId, text: current.text,
-        periods: null, focus: null, sessionId, completion: reason } }, new Map([[fieldId, current.text]]));
+      if (sessionId) await send({ ...base(), kind: "edit-field", payload: { fieldId, text: field.text,
+        periods: null, focus: null, sessionId, completion: reason } }, new Map([[fieldId, field.text]]));
     });
   }
   function overlay(fields: FieldProjection[]) { return fields.map(field => ({ ...field, text: dirty.current.get(field.fieldId)?.field.text ?? field.text })); }
@@ -214,7 +224,7 @@ export function useEdits(workspace: Workspace | null, editor: RefObject<FieldEdi
       if (response.workspace.project) editor.current?.patch(documentFields(response.workspace.project.document)
         .filter(field => live.get(field.fieldId) === captured.get(field.fieldId) && live.get(field.fieldId) !== field.text)
         .map(field => ({ fieldId: field.fieldId, text: field.text, capturedText: live.get(field.fieldId) ?? "" })));
-    });
+    }, "read");
   }
   return { buffer, departure, restore, structural, periods, retry, completion, compositionEnd: schedule, overlay,
     flushBeforeAction, acknowledged: () => latest.current, acceptExternal, pending, saving, locked, error };
