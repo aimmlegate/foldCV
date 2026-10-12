@@ -59,7 +59,7 @@ test("real service imports PDF, DOCX and paste with visible gaps and exact origi
   test.setTimeout(60_000);
   let textCalls = 0;
   page.on("request", (request) => { if (/\/v1\/(normalize|draft|rewrite)$/.test(request.url())) textCalls += 1; });
-  await page.goto(`${origin}/#secret=synthetic-browser-secret-0123456789`);
+  await page.goto(`${origin}/legacy.html#secret=synthetic-browser-secret-0123456789`);
   await page.getByLabel("Выберите PDF, DOCX, TXT или Markdown").setInputFiles(resolve(fixtures, "mixed-columns.pdf"));
   await expect(page.getByText("4 стр. · 6 фрагментов · 4 пробелов", { exact: false })).toBeVisible();
   await expect(page.getByText("Текст на этой странице не найден").first()).toBeVisible();
@@ -89,7 +89,7 @@ test("imported source opens a verbatim editor and real PDF and DOCX without gene
   test.setTimeout(90_000);
   let contentCalls = 0;
   page.on("request", (request) => { if (/\/v1\/(normalize|draft|rewrite|facts\/normalize|facts\/draft)$/.test(request.url())) contentCalls += 1; });
-  await page.goto(`${origin}/#secret=synthetic-browser-secret-0123456789`);
+  await page.goto(`${origin}/legacy.html#secret=synthetic-browser-secret-0123456789`);
   await page.getByLabel("Или вставьте текст резюме").fill("Synthetic engineer. Skills: Python. Built a local service.");
   await page.getByRole("button", { name: "Извлечь вставленный текст" }).click();
   await expect(page.getByRole("heading", { name: "Лист фактов" })).toBeVisible();
@@ -157,7 +157,7 @@ test("imported source opens a verbatim editor and real PDF and DOCX without gene
 });
 
 test("manual work and subproject without dates stay editable with visible checks", async ({ page }) => {
-  await page.goto(`${origin}/#secret=synthetic-browser-secret-0123456789`);
+  await page.goto(`${origin}/legacy.html#secret=synthetic-browser-secret-0123456789`);
   await page.getByLabel("Или вставьте текст резюме").fill("Local profile text.");
   await page.getByRole("button", { name: "Извлечь вставленный текст" }).click();
   await page.getByLabel("Имя кандидата").fill("Alex Example");
@@ -181,7 +181,7 @@ test("coverage links source, records an exclusion reason and expires an affected
   let contentCalls = 0;
   page.on("request", (request) => { if (/\/v1\/(normalize|draft|rewrite|facts\/normalize|facts\/draft)$/.test(request.url()))
     contentCalls += 1; });
-  await page.goto(`${origin}/#secret=synthetic-browser-secret-0123456789`);
+  await page.goto(`${origin}/legacy.html#secret=synthetic-browser-secret-0123456789`);
   await page.getByLabel("Или вставьте текст резюме").fill("Unusual detail from the original source.");
   await page.getByRole("button", { name: "Извлечь вставленный текст" }).click();
   await page.getByLabel("Имя кандидата").fill("Alex Example");
@@ -236,7 +236,7 @@ test("imported facts, unresolved dates and user assertions stay available withou
   let factCalls = 0;
   page.on("request", (request) => { if (/\/v1\/(normalize|draft|rewrite|facts\/normalize)$/.test(request.url())) contentCalls += 1; });
   page.on("request", (request) => { if (/\/v1\/facts$/.test(request.url())) factCalls += 1; });
-  await page.goto(`${origin}/#secret=synthetic-browser-secret-0123456789`);
+  await page.goto(`${origin}/legacy.html#secret=synthetic-browser-secret-0123456789`);
   await page.getByLabel("Или вставьте текст резюме").fill("Skills: Python, Docker\nAcme Engineer 2020-2022\nBuilt a team from zero to five");
   await page.getByRole("button", { name: "Извлечь вставленный текст" }).click();
   await expect(page.getByRole("heading", { name: "Лист фактов" })).toBeVisible();
@@ -260,7 +260,7 @@ test("imported facts, unresolved dates and user assertions stay available withou
 
 test("title-only and education-only form drafts keep the replacement boundary", async ({ page }) => {
   test.setTimeout(60_000);
-  await page.goto(`${origin}/#secret=synthetic-browser-secret-0123456789`);
+  await page.goto(`${origin}/legacy.html#secret=synthetic-browser-secret-0123456789`);
   await page.getByLabel("Или вставьте текст резюме").fill("Synthetic text for a partial form.");
   await page.getByRole("button", { name: "Извлечь вставленный текст" }).click();
   await expect(page.getByRole("heading", { name: "Лист фактов" })).toBeVisible();
@@ -291,7 +291,7 @@ test("title-only and education-only form drafts keep the replacement boundary", 
 
 test("source correction rejects a late earlier fact response", async ({ page }) => {
   test.setTimeout(60_000);
-  await page.goto(`${origin}/#secret=synthetic-browser-secret-0123456789`);
+  await page.goto(`${origin}/legacy.html#secret=synthetic-browser-secret-0123456789`);
   let held: Route | null = null;
   let heldBody: Buffer | null = null;
   let factCalls = 0;
@@ -323,7 +323,7 @@ test("source correction rejects a late earlier fact response", async ({ page }) 
 });
 
 test("real service keeps quoted and literal percent filenames distinct from transport metadata", async ({ page }) => {
-  await page.goto(`${origin}/#secret=synthetic-browser-secret-0123456789`);
+  await page.goto(`${origin}/legacy.html#secret=synthetic-browser-secret-0123456789`);
   const bytes = readFileSync(resolve(fixtures, "unicode.txt"));
   const input = page.getByLabel("Выберите PDF, DOCX, TXT или Markdown");
   await input.setInputFiles({ name: 'resume "draft".txt', mimeType: "text/plain", buffer: bytes });
@@ -342,7 +342,7 @@ test("real service keeps quoted and literal percent filenames distinct from tran
 
 test("newer file selection ignores a late earlier response and keeps accepted source", async ({ page }) => {
   test.setTimeout(60_000);
-  await page.goto(`${origin}/#secret=synthetic-browser-secret-0123456789`);
+  await page.goto(`${origin}/legacy.html#secret=synthetic-browser-secret-0123456789`);
   await page.getByLabel("Выберите PDF, DOCX, TXT или Markdown").setInputFiles(resolve(fixtures, "unicode.txt"));
   await expect(page.getByRole("heading", { name: "unicode.txt" })).toBeVisible();
   let held: Route | null = null;

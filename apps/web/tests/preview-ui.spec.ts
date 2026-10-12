@@ -52,7 +52,7 @@ test("old PDF remains visibly stale during a controlled replacement render", asy
     const request = route.request().postDataJSON() as RenderRequest;
     await route.fulfill({ status: 200, contentType: "application/zip", body: archive(request) });
   });
-  await page.goto("/");
+  await page.goto("/legacy.html");
   await page.getByRole("button", { name: "Загрузить вымышленный пример" }).click();
   await page.getByRole("button", { name: "Обновить PDF" }).click();
   await expect(page.getByText("PDF готов", { exact: false })).toBeVisible();
@@ -84,7 +84,7 @@ test("export shows progress and a render failure on its own screen", async ({ pa
   await page.route("**/v1/prepare-render", prepareRoute);
   let pending: Route | null = null;
   await page.route("**/v1/render", (route) => { pending = route; });
-  await page.goto("/");
+  await page.goto("/legacy.html");
   await page.getByRole("button", { name: "Загрузить вымышленный пример" }).click();
   await acknowledgeVisibleWarnings(page);
   await page.getByRole("button", { name: "3. Выгрузка" }).click();

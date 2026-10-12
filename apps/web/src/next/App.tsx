@@ -161,7 +161,7 @@ export function App() {
       if (!await edits.flushBeforeAction(true)) { setError("Сначала сохраните текущие правки.");return; }
       await projectRequest(`/v1/projects/${encodeURIComponent(id)}`);
       if (!await edits.flushBeforeAction(true)) { setError("Сначала сохраните новые правки.");return; }
-      location.assign(`/next.html?project=${encodeURIComponent(id)}`);
+      location.assign(`/?project=${encodeURIComponent(id)}`);
     } catch { setError("Не удалось открыть проект. Текущий ввод остаётся в окне."); }
     finally { setBusy(false); }
   }

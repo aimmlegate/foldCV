@@ -50,7 +50,7 @@ test.afterEach(async () => {
 test.afterAll(() => { if (temp) rmSync(temp, { recursive: true, force: true }); });
 
 async function openManualProject(page: Page, jobDescription = "Built a local service."): Promise<void> {
-  await page.goto(`${origin}/#secret=synthetic-browser-secret-0123456789`);
+  await page.goto(`${origin}/legacy.html#secret=synthetic-browser-secret-0123456789`);
   await page.getByLabel("Или вставьте текст резюме").fill("Built a local service.");
   await page.getByRole("button", { name: "Извлечь вставленный текст" }).click();
   await page.getByLabel("Добавить подтверждённый вами факт").fill("Built reliable systems.");

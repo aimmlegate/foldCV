@@ -59,7 +59,7 @@ test("real service keeps PDF preview identical to download and DOCX editable wit
     if (request.url().endsWith("/v1/render")) renders += 1;
     if (/\/v1\/(normalize|draft|rewrite)$/.test(request.url())) textCalls += 1;
   });
-  await page.goto(`${origin}/#secret=synthetic-browser-secret-0123456789`);
+  await page.goto(`${origin}/legacy.html#secret=synthetic-browser-secret-0123456789`);
   await page.getByRole("button", { name: "Загрузить вымышленный пример" }).click();
   await page.getByLabel("Текст блока").fill("Synthetic edited profile for exact export.");
   await page.getByRole("button", { name: "Применить правку" }).click();
@@ -130,7 +130,7 @@ test("saved project reopens with verified template and rebuilds PDF before expor
     if (request.url().endsWith("/v1/render")) renders += 1;
     if (/\/v1\/(normalize|draft|rewrite)$/.test(request.url())) textCalls += 1;
   });
-  await page.goto(`${origin}/#secret=synthetic-browser-secret-0123456789`);
+  await page.goto(`${origin}/legacy.html#secret=synthetic-browser-secret-0123456789`);
   await page.getByRole("button", { name: "Загрузить вымышленный пример" }).click();
   await page.getByLabel("Текст блока").fill("Saved synthetic profile for reopen.");
   await page.getByRole("button", { name: "Применить правку" }).click();
@@ -219,7 +219,7 @@ test("saved project reopens with verified template and rebuilds PDF before expor
 
 test("archive replacement aborts a delayed prepare before the new local render", async ({ page }) => {
   test.setTimeout(90_000);
-  await page.goto(`${origin}/#secret=synthetic-browser-secret-0123456789`);
+  await page.goto(`${origin}/legacy.html#secret=synthetic-browser-secret-0123456789`);
   await page.getByRole("button", { name: "Загрузить вымышленный пример" }).click();
   const download = page.waitForEvent("download");
   await page.getByRole("button", { name: "Сохранить проект" }).click();
@@ -291,7 +291,7 @@ test("version 2 selected view renders locally after migration and reopen", async
     "view.json": new TextEncoder().encode(JSON.stringify(view)) }, { level: 0 }));
   let textCalls = 0;
   page.on("request", (request) => { if (/\/v1\/(normalize|draft|rewrite)$/.test(request.url())) textCalls += 1; });
-  await page.goto(`${origin}/#secret=synthetic-browser-secret-0123456789`);
+  await page.goto(`${origin}/legacy.html#secret=synthetic-browser-secret-0123456789`);
   await page.getByLabel("Открыть .cvproject").setInputFiles({ name: "legacy.cvproject",
     mimeType: "application/zip", buffer: bytes });
   await expect(page.getByLabel("Текст блока")).toHaveValue(/Built a service at Example Works in 2021/);
@@ -343,7 +343,7 @@ test("version 3 requires explicit presentation fields before local render", asyn
     "project.json": projectBytes, [source.byteRef]: syntheticSourceBytes }, { level: 0 }));
   let textCalls = 0;
   page.on("request", (request) => { if (/\/v1\/(normalize|draft|rewrite)$/.test(request.url())) textCalls += 1; });
-  await page.goto(`${origin}/#secret=synthetic-browser-secret-0123456789`);
+  await page.goto(`${origin}/legacy.html#secret=synthetic-browser-secret-0123456789`);
   await page.getByLabel("Открыть .cvproject").setInputFiles({ name: "old-v3.cvproject",
     mimeType: "application/zip", buffer: bytes });
   await expect(page.getByRole("heading", { name: "Данные для архива v3" })).toBeVisible();

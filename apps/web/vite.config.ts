@@ -7,7 +7,8 @@ export default defineConfig({
   plugins: [react(), tailwindcss()],
   server: { host: "127.0.0.1" },
   build: { target: "es2022", rollupOptions: { input: {
-    legacy: fileURLToPath(new URL("./index.html", import.meta.url)),
+    main: fileURLToPath(new URL("./index.html", import.meta.url)),
+    legacy: fileURLToPath(new URL("./legacy.html", import.meta.url)),
     next: fileURLToPath(new URL("./next.html", import.meta.url)),
   } } },
 });

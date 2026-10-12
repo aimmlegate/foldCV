@@ -1,19 +1,7 @@
 <!doctype html>
-<html lang="ru">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>FoldCV</title>
-    <script>
-      const saved = localStorage.getItem("foldcv-theme");
-      const mode = saved === "light" || saved === "dark" ? saved : "system";
-      document.documentElement.dataset.theme = mode === "system"
-        ? (matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light")
-        : mode;
-    </script>
-  </head>
-  <body>
-    <div id="root"></div>
-    <script type="module" src="/src/main.tsx"></script>
-  </body>
-</html>
+<html lang="ru"><head><meta charset="UTF-8"/><meta name="viewport" content="width=device-width,initial-scale=1,interactive-widget=resizes-content"/><title>FoldCV</title>
+<script>
+  const saved = localStorage.getItem("foldcv-theme");
+  const mode = saved === "light" || saved === "dark" ? saved : "system";
+  document.documentElement.dataset.theme = mode === "system" ? (matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light") : mode;
+</script></head><body><div id="root"></div><script type="module" src="/src/next/main.tsx"></script></body></html>

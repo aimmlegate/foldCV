@@ -60,7 +60,7 @@ test("continuous synthetic import through rewrite, both exports and reopen", asy
     if (path === "/v1/facts/rewrite") calls.rewrite += 1;
     if (path === "/v1/render") calls.render += 1;
   });
-  await page.goto(`${origin}/#secret=synthetic-browser-secret-0123456789`);
+  await page.goto(`${origin}/legacy.html#secret=synthetic-browser-secret-0123456789`);
   await page.getByLabel("Или вставьте текст резюме").fill("Built a local service.\nExample Works Developer 2022-2025");
   await page.getByRole("button", { name: "Извлечь вставленный текст" }).click();
   await expect(page.getByRole("button", { name: "Составить черновик" })).toBeVisible();

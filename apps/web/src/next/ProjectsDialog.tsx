@@ -22,7 +22,7 @@ export function ProjectsDialog({ workspace, edits, accept, close }: Props) {
     catch { setError("Не удалось прочитать список проектов. Повторите открытие."); }
   }
   function dismiss() {
-    if (deletedCurrent.current || list?.entries.some(entry => entry.projectId === workspace?.projectId && entry.tombstoned)) location.assign("/next.html");
+    if (deletedCurrent.current || list?.entries.some(entry => entry.projectId === workspace?.projectId && entry.tombstoned)) location.assign("/");
     else close();
   }
   useEffect(() => {
@@ -35,7 +35,7 @@ export function ProjectsDialog({ workspace, edits, accept, close }: Props) {
       if (!await edits.flushBeforeAction(true)) { setError("Завершите ввод и сохраните правки перед переключением проекта.");return; }
       if (id) await projectRequest(`/v1/projects/${id}`);
       if (!await edits.flushBeforeAction(true)) { setError("Сначала сохраните новые правки.");return; }
-      location.assign(id ? `/next.html?project=${encodeURIComponent(id)}` : "/next.html");
+      location.assign(id ? `/?project=${encodeURIComponent(id)}` : "/");
     } catch { setError("Не удалось открыть проект. Текущие правки остаются в редакторе."); }
     finally { setBusy(false); }
   }
@@ -63,7 +63,7 @@ export function ProjectsDialog({ workspace, edits, accept, close }: Props) {
         setError("Не удалось подтвердить удаление всех файлов. Повторите очистку; остальные проекты доступны.");return;
       }
       setDeleting(null);
-      if (deletedCurrent.current) location.assign("/next.html");
+      if (deletedCurrent.current) location.assign("/");
     } catch { setError("Не удалось подтвердить удаление. Обновите список и повторите действие.");await refresh(); }
     finally { setBusy(false); }
   }
@@ -75,7 +75,7 @@ export function ProjectsDialog({ workspace, edits, accept, close }: Props) {
       if (imported.durability !== "durable") { setUnsavedImport(imported.workspace.projectId);setError("Файл прочитан, но запись нового проекта на диск не подтверждена. Повторите сохранение; текущий проект открыт.");await refresh();return; }
       setUnsavedImport(null);
       if (!await edits.flushBeforeAction(true)) { setError("Новый проект сохранён в списке. Сначала сохраните текущие правки.");await refresh();return; }
-      location.assign(`/next.html?project=${encodeURIComponent(imported.workspace.projectId)}`);
+      location.assign(`/?project=${encodeURIComponent(imported.workspace.projectId)}`);
     } catch { setError("Не удалось открыть файл проекта. Текущие правки остаются в редакторе; проверьте формат и целостность файла."); }
     finally { setBusy(false); }
   }
@@ -88,7 +88,7 @@ export function ProjectsDialog({ workspace, edits, accept, close }: Props) {
       if (result.durability !== "durable") { setError("Запись открытого проекта на диск не подтверждена. Повторите сохранение.");return; }
       setUnsavedImport(null);
       if (!await edits.flushBeforeAction(true)) { setError("Новый проект сохранён в списке. Сначала сохраните текущие правки.");await refresh();return; }
-      location.assign(`/next.html?project=${encodeURIComponent(result.workspace.projectId)}`);
+      location.assign(`/?project=${encodeURIComponent(result.workspace.projectId)}`);
     } catch { setError("Не удалось сохранить открытый проект. Текущие правки остаются в редакторе."); }
     finally { setBusy(false); }
   }

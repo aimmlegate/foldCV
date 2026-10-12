@@ -630,3 +630,26 @@ async def test_launcher_bounds_startup_and_shutdown(tmp_path, monkeypatch, phase
     with pytest.raises(RuntimeError, match=f"Service {phase} timed out"):
         await launcher.launch(open_browser=False)
     assert time.monotonic() - start < 0.5
+
+
+@pytest.mark.asyncio
+async def test_html_entries_are_fresh_and_static_assets_keep_the_existing_cache_policy(tmp_path):
+    def forbidden(*_args):
+        pytest.fail("Static entry started content work")
+    app = make_app(tmp_path, forbidden)
+    dist = tmp_path / "dist"
+    for name in ("next.html", "legacy.html"):
+        (dist / name).write_text(f"<html>{name}</html>", encoding="utf-8")
+    async with await client_for(app) as client:
+        for path in ("/", "/index.html", "/next.html", "/legacy.html", "/saved/project"):
+            result = await client.get(path)
+            assert result.status_code == 200
+            assert result.headers["cache-control"] == "no-store"
+        asset = await client.get("/asset.js")
+        assert asset.status_code == 200
+        assert asset.headers["cache-control"] == "public, max-age=31536000, immutable"
+        (dist / "index.html").unlink()
+        unavailable = await client.get("/")
+        assert unavailable.status_code == 503
+        assert unavailable.json()["error"]["code"] == "FRONTEND_UNAVAILABLE"
+        assert (await client.get("/legacy.html")).status_code == 200

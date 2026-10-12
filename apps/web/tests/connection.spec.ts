@@ -14,7 +14,7 @@ test("experimental readiness follows selection and detach", async ({ page }) => 
       { ...experimental, selectedModel: "gpt-6-luna", generationReady: true } : experimental;
     await route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(body) });
   });
-  await page.goto("/");
+  await page.goto("/legacy.html");
   await page.getByRole("button", { name: "Refresh connection" }).click();
   await expect(page.getByText("Personal CLI experiment: sign in, refresh, and choose a model to enable generation.", { exact: false })).toBeVisible();
   await page.getByLabel("Reported model").selectOption("gpt-6-luna");
@@ -35,7 +35,7 @@ test("connection checks and selection require clicks; detach keeps editor work",
     await route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(body) });
   });
   page.on("request", (request) => { if (/\/v1\/(normalize|draft|rewrite)$/.test(request.url())) generationCalls += 1; });
-  await page.goto("/");
+  await page.goto("/legacy.html");
   await expect(page.getByRole("heading", { name: "Codex connection" })).toBeVisible();
   expect(hostCalls).toBe(0);
   await page.getByRole("button", { name: "Загрузить вымышленный пример" }).click();
@@ -68,7 +68,7 @@ test("distinct setup and quota states remain actionable", async ({ page }) => {
   await page.route("**/v1/host/status", async (route) => {
     await route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(responses[index++]) });
   });
-  await page.goto("/");
+  await page.goto("/legacy.html");
   for (const expected of ["not found", "needs Node", "not supported", "Sign in with ChatGPT", "using an API key",
     "could not report", "reached plan limit", "plan limits are unavailable"]) {
     await page.getByRole("button", { name: "Refresh connection" }).click();
@@ -104,7 +104,7 @@ test("detach during a pending refresh shows cleanup uncertainty and ignores its 
       metadataReady: false,
     }) });
   });
-  await page.goto("/");
+  await page.goto("/legacy.html");
   await page.getByRole("button", { name: "Refresh connection" }).click();
   await started.waiting;
   await expect(page.getByRole("button", { name: "Refresh connection" })).toBeDisabled();

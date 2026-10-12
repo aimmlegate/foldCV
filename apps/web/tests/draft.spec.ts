@@ -53,7 +53,7 @@ test.afterAll(() => { if (temp) rmSync(temp, { recursive: true, force: true }); 
 
 async function source(page: Page, text =
   "Built a local service.\nExample Works Developer 2022-2025") {
-  await page.goto(`${origin}/#secret=synthetic-browser-secret-0123456789`);
+  await page.goto(`${origin}/legacy.html#secret=synthetic-browser-secret-0123456789`);
   await page.getByLabel("Или вставьте текст резюме").fill(text);
   await page.getByRole("button", { name: "Извлечь вставленный текст" }).click();
   await expect(page.getByRole("button", { name: "Составить черновик" })).toBeVisible();

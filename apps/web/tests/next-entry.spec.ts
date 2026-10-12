@@ -510,6 +510,7 @@ test("built entry persists manual theme, follows system and fits a narrow keyboa
 });
 
 test("missing built next entry returns legacy HTTP 200 but fails the unique root smoke", async ({ page }) => {
+  cpSync(resolve(runRoot, "dist/legacy.html"), resolve(runRoot, "dist/index.html"));
   rmSync(resolve(runRoot, "dist/next.html"));
   const result = await page.goto(`${origin}/next.html#secret=synthetic-next-secret-0123456789`);
   expect(result?.status()).toBe(200);
@@ -537,8 +538,9 @@ test("chosen failed file disables inactive paste and explicit text recovery keep
   await expect(page.getByText("Резюме готово", { exact: true })).toBeVisible({ timeout: 30000 });
 });
 
-async function createRewriteExample(page: Page) {
-  await page.goto(`${origin}/next.html#secret=synthetic-next-secret-0123456789`);
+async function createRewriteExample(page: Page, entry = "/") {
+  const secret = new URL(page.url()).origin === origin ? "" : "#secret=synthetic-next-secret-0123456789";
+  await page.goto(`${origin}${entry}${secret}`);
   await page.getByRole("button", { name: "Открыть пример", exact: true }).click();
   await page.getByRole("button", { name: "Создать резюме", exact: true }).click();
   await expect(page.getByText("Резюме готово", { exact: true })).toBeVisible({ timeout: 30000 });
@@ -1349,7 +1351,7 @@ test("built task A16 assistant source evidence stays beside the editor and close
 });
 
 test("built examples E1 E3 task A21 flow connects edit restore local portable reopen and DOCX without LibreOffice", async ({ page }) => {
-  await page.setViewportSize({ width: 1280, height: 900 });await createRewriteExample(page);const initial = await currentWorkspace(page), job = initial.project?.document.jobs[0];if (!job) throw new Error("Missing job");
+  await page.setViewportSize({ width: 1280, height: 900 });await createRewriteExample(page, "/");const initial = await currentWorkspace(page), job = initial.project?.document.jobs[0];if (!job) throw new Error("Missing job");
   expect(initial.project?.operations).toHaveLength(2);expect(initial.project?.document.earlyCareer.text.text).toContain("2008–2009");
   const addition = "Подготовила инструкцию для дежурной смены.";await replaceFieldText(page, job.tasks.fieldId, addition);
   await selectFields(page, job.tasks.fieldId, 0, job.tasks.fieldId, 11);await openSelectionAssistant(page);await submitRewrite(page);
@@ -1384,4 +1386,27 @@ test("built examples E1 E3 task A21 flow connects edit restore local portable re
   await page.locator('[data-outline-section="jobs"]').click();await expect(page.locator(".next-save")).toHaveText("Сохранено");await page.reload();await expect(page.locator('[data-field-content="profile/text"]')).toHaveText("Connected prior.");
   if (process.env.FOLDCV_EVIDENCE_ROOT) await page.screenshot({ path: resolve(process.env.FOLDCV_EVIDENCE_ROOT, "A21-editor-reopen.png") });
   expect(readFileSync(resolve(runRoot, "model-requests.json"), "utf8")).toBe(calls);
+});
+
+test("built task A21 cutover default entry creates and reopens the same project while next and legacy stay explicit", async ({ page }) => {
+  await page.setViewportSize({ width: 1280, height: 900 });await page.goto(`${origin}/#secret=synthetic-next-secret-0123456789`);
+  await expect(page.locator('[data-app="foldcv-next"]')).toHaveCount(1);await expect(page.getByRole("heading", { name: "Из исходника — в готовое резюме", exact: true })).toHaveCount(0);
+  await expect(page.getByText("Автопроверку можно приостановить в настройках.", { exact: false })).toBeVisible();
+  if (process.env.FOLDCV_EVIDENCE_ROOT) await page.screenshot({ path: resolve(process.env.FOLDCV_EVIDENCE_ROOT, "A21-default-start.png") });
+  await page.getByRole("button", { name: "Открыть пример", exact: true }).click();await page.getByRole("button", { name: "Создать резюме", exact: true }).click();await expect(page.getByText("Резюме готово", { exact: true })).toBeVisible({ timeout: 30000 });
+  expect(new URL(page.url()).pathname).toBe("/");const initial = await currentWorkspace(page), calls = readFileSync(resolve(runRoot, "model-requests.json"), "utf8");
+  await page.getByRole("button", { name: "Настройки", exact: true }).click();await expect(page.getByRole("heading", { name: "Настройки", exact: true })).toBeVisible();await page.getByRole("button", { name: "Вернуться", exact: true }).click();
+  await projectMenu(page);await page.getByRole("button", { name: "Новое резюме", exact: true }).click();await expect(page.getByLabel("Или вставьте текст", { exact: true })).toHaveValue("");
+  expect(new URL(page.url()).pathname).toBe("/");await page.locator(`[data-start-project="${initial.projectId}"]`).getByRole("button").click();await expect(page.locator('[data-field-content="candidate/name"]')).toHaveText("Ирина Примерова");
+  expect(new URL(page.url()).pathname).toBe("/");expect((await currentWorkspace(page)).projectId).toBe(initial.projectId);expect(readFileSync(resolve(runRoot, "model-requests.json"), "utf8")).toBe(calls);
+  for (const path of ["/", "/index.html", "/next.html", "/legacy.html"]) { const result = await page.request.get(`${origin}${path}`);expect(result.status()).toBe(200);expect(result.headers()["cache-control"]).toBe("no-store"); }
+  await page.goto(`${origin}/next.html?project=${initial.projectId}`);await expect(page.locator('[data-app="foldcv-next"]')).toHaveCount(1);await expect(page.locator('[data-field-content="candidate/name"]')).toHaveText("Ирина Примерова");
+  expect(readFileSync(resolve(runRoot, "model-requests.json"), "utf8")).toBe(calls);await page.goto(`${origin}/legacy.html`);await expect(page.getByRole("heading", { name: "Из исходника — в готовое резюме", exact: true })).toBeVisible();await expect(page.locator('[data-app="foldcv-next"]')).toHaveCount(0);
+});
+
+test("built task A21 cutover missing default bundle fails visibly while the explicit legacy entry remains usable", async ({ page }) => {
+  rmSync(resolve(runRoot, "dist/index.html"));const result = await page.goto(`${origin}/`);expect(result?.status()).toBe(503);
+  await expect(page.locator('[data-app="foldcv-next"]')).toHaveCount(0);const raw: unknown = await (await page.request.get(`${origin}/`)).json();
+  expect(raw).toEqual({ error: { code: "FRONTEND_UNAVAILABLE", retryable: false, stage: "request" } });
+  await page.goto(`${origin}/legacy.html`);await expect(page.getByRole("heading", { name: "Из исходника — в готовое резюме", exact: true })).toBeVisible();expect(existsSync(resolve(runRoot, "model-requests.json"))).toBe(false);
 });

@@ -1218,6 +1218,6 @@ def create_app(*, origin: str, secret: str, temp_root: Path, dist: Path, runner:
             return problem("NOT_FOUND", 404)
         if not target.is_file():
             return problem("FRONTEND_UNAVAILABLE", 503)
-        return FileResponse(target, headers={"Cache-Control": "no-store" if target.name == "index.html" else "public, max-age=31536000, immutable"})
+        return FileResponse(target, headers={"Cache-Control": "no-store" if target.suffix.lower() == ".html" else "public, max-age=31536000, immutable"})
 
     return boundary

@@ -12,7 +12,7 @@ test.beforeEach(async ({ page }) => {
 });
 
 test("Russian shell keeps generation closed", async ({ page }) => {
-  await page.goto("/");
+  await page.goto("/legacy.html");
   await expect(page.getByRole("heading", { name: "Исходное резюме" })).toBeVisible();
   await expect(page.getByText("Generation is unavailable: this CLI profile has not passed the safety check.")).toBeVisible();
   await expect(page.getByText("Обработка и генерация текста недоступны", { exact: false })).toBeVisible();
@@ -23,7 +23,7 @@ test("Russian shell keeps generation closed", async ({ page }) => {
 
 test("manual theme persists and system theme follows OS changes", async ({ page }) => {
   await page.emulateMedia({ colorScheme: "light" });
-  await page.goto("/");
+  await page.goto("/legacy.html");
   await expect(page.locator("html")).toHaveAttribute("data-theme", "light");
   await page.getByLabel("Тема").selectOption("dark");
   await expect(page.locator("html")).toHaveAttribute("data-theme", "dark");
@@ -42,9 +42,9 @@ test("startup secret is exchanged once and removed from the address", async ({ p
     payloads.push(route.request().postDataJSON() as unknown);
     await route.fulfill({ status: 200, contentType: "application/json", body: '{"sessionReady":true}' });
   });
-  await page.goto("/#secret=synthetic-secret");
+  await page.goto("/legacy.html#secret=synthetic-secret");
   await expect(page.getByRole("heading", { name: "Исходное резюме" })).toBeVisible();
-  await expect(page).toHaveURL("http://127.0.0.1:4173/");
+  await expect(page).toHaveURL("http://127.0.0.1:4173/legacy.html");
   expect(payloads).toEqual([{ secret: "synthetic-secret" }]);
   await page.reload();
   expect(payloads).toHaveLength(1);

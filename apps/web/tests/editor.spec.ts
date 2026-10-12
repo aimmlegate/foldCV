@@ -2,7 +2,7 @@ import { expect, test } from "@playwright/test";
 import { acknowledgeVisibleWarnings } from "./export-review";
 
 test.beforeEach(async ({ page }) => {
-  await page.goto("/");
+  await page.goto("/legacy.html");
   await page.getByRole("button", { name: "Загрузить вымышленный пример" }).click();
 });
 
