@@ -151,3 +151,31 @@ button:disabled { cursor: default; opacity: .6; }
   .next-document-area { padding: 1rem; }
   .next-workspace .next-document { padding: 1.25rem; }
 }
+.next-header { position: sticky; top: 0; z-index: 25; }
+.next-outline { top: 82px; }
+.next-workspace[data-panel-open="true"] { grid-template-columns: 190px minmax(0, 1fr) 320px; }
+.next-workspace[data-panel-open="true"][data-outline-collapsed="true"] { grid-template-columns: 62px minmax(0, 1fr) 320px; }
+.next-workspace[data-panel-open="true"][data-focus-mode="true"] { grid-template-columns: minmax(0, 1fr) 320px; }
+.next-panel-dock { position: sticky; top: 100px; align-self: start; max-height: calc(100vh - 110px); overflow-y: auto; min-width: 0; border-left: 1px solid var(--outline); background: var(--panel); }
+.next-workspace[data-panel-open="false"] .next-panel-dock { display: none; }
+.next-panel-dock .next-source-panel { position: static; width: 100%; border: 0; box-shadow: none; padding: 1.25rem; }
+.next-panel-eyebrow { font-size: .65rem; letter-spacing: .14em; color: var(--muted); }
+.next-panel-dock h2 { font-family: Georgia, serif; font-weight: 400; font-size: 1.5rem; }
+.next-panel-hint { font-size: .75rem; line-height: 1.6; color: var(--muted); }
+.next-captured-selection { margin: 1rem 0; font-size: .8rem; }
+.next-captured-selection summary { color: var(--muted); cursor: pointer; }
+.next-source-panel blockquote, .next-source-panel p { overflow-wrap: anywhere; }
+.next-rewrite-panel textarea { box-sizing: border-box; font: inherit; resize: vertical; }
+.next-workspace .bn-editor { background: var(--panel); }
+@media (max-width: 1100px) {
+  .next-header { position: static; flex-wrap: wrap; }
+  .next-actions { flex-wrap: wrap; }
+  .next-outline { top: 0; }
+  .next-workspace[data-panel-open="true"] { grid-template-columns: 190px minmax(0, 1fr); }
+  .next-workspace[data-panel-open="true"][data-outline-collapsed="true"] { grid-template-columns: 62px minmax(0, 1fr); }
+  .next-workspace[data-panel-open="true"][data-focus-mode="true"] { grid-template-columns: minmax(0, 1fr); }
+  .next-panel-dock { position: fixed; inset: 0 0 0 auto; z-index: 30; width: min(380px, 100vw); max-height: 100vh; height: 100dvh; box-shadow: -8px 0 24px #0002; }
+}
+@media (max-width: 900px) {
+  .next-workspace[data-panel-open="true"], .next-workspace[data-panel-open="true"][data-outline-collapsed="true"] { grid-template-columns: minmax(0, 1fr); }
+}

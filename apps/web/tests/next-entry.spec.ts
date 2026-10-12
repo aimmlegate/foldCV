@@ -8,6 +8,7 @@ import type { GuiProjectResponse } from "../src/contracts/generated/gui_project_
 import { validateContract } from "../src/contracts/validate";
 import type { Page } from "@playwright/test";
 import type { GuiRewriteRequest } from "../src/contracts/generated/gui_rewrite_request";
+import type { RulesSettings } from "../src/contracts/generated/rules_settings";
 import { unzipSync } from "fflate";
 
 const root = resolve(import.meta.dirname, "../../..");
@@ -585,6 +586,7 @@ async function submitRewrite(page: Page, instruction = "Make clearer") {
   await page.getByRole("button", { name: "Обновить выделение", exact: true }).click();
 }
 function isRewrite(value: unknown): value is GuiRewriteRequest { return validateContract("gui_rewrite_request", value); }
+function isRules(value: unknown): value is RulesSettings { return validateContract("rules_settings", value); }
 
 test("built E1 partial Unicode rewrite captures after durable flush and presets only fill the instruction", async ({ page }) => {
   await createRewriteExample(page);
@@ -1301,4 +1303,46 @@ test("built example E7 task A16 document date structure and hidden controls stay
   await page.getByRole("button", { name: "Показать О специалисте", exact: true }).click();await expect(page.locator('.next-field[data-field-id="profile/text"]')).toHaveAttribute("data-hidden-record", "false");
   await page.getByRole("button", { name: "Добавить образование", exact: true }).click();await expect(page.locator('[data-field-content^="education:"]')).toHaveCount(8);
   expect((await currentWorkspace(page)).project?.document.education).toHaveLength(2);await expect(page.locator('[contenteditable="true"]')).toHaveCount(1);
+});
+
+test("built example E3a task A16 assistant captures selection beside the same document and presets only fill saved instructions", async ({ page }) => {
+  await page.setViewportSize({ width: 1280, height: 900 });await createRewriteExample(page);const before = await currentWorkspace(page);
+  await page.locator('[contenteditable="true"]').evaluate(root => root.setAttribute("data-instance", "stable-assistant"));
+  const text = before.project?.document.profile.text.text ?? "";await selectFields(page, "profile/text", 0, "profile/text", text.length);await openSelectionAssistant(page);
+  const panel = page.getByRole("complementary", { name: "Помощник текста" });await expect(panel.locator('[data-captured-field="profile/text"]')).toHaveText(text);
+  const paper = await page.locator(".next-document").boundingBox(), bounds = await panel.boundingBox();if (!paper || !bounds) throw new Error("Missing document or assistant bounds");
+  expect(paper.x + paper.width).toBeLessThanOrEqual(bounds.x);expect(bounds.x + bounds.width).toBeLessThanOrEqual(1280);
+  const rules: unknown = await (await page.request.get(`${origin}/v1/settings/rules`)).json();if (!isRules(rules)) throw new Error("Invalid saved Rules");
+  for (const [name, instruction] of [["Сократить", rules.presets.shorten], ["Яснее", rules.presets.clarify]] as const) {
+    await page.getByRole("button", { name, exact: true }).click();await expect(page.getByLabel("Что изменить", { exact: true })).toHaveValue(instruction ?? "");
+  }
+  expect((await currentWorkspace(page)).project?.operations).toEqual(before.project?.operations);
+  await expect(page.locator('[contenteditable="true"]')).toHaveCount(1);await expect(page.locator('[contenteditable="true"]')).toHaveAttribute("data-instance", "stable-assistant");
+  if (process.env.FOLDCV_EVIDENCE_ROOT) await page.screenshot({ path: resolve(process.env.FOLDCV_EVIDENCE_ROOT, "A16-assistant-light.png") });
+  await page.getByLabel("Тема", { exact: true }).selectOption("dark");if (process.env.FOLDCV_EVIDENCE_ROOT) await page.screenshot({ path: resolve(process.env.FOLDCV_EVIDENCE_ROOT, "A16-assistant-dark.png") });
+  await page.setViewportSize({ width: 390, height: 844 });await expect(panel).toBeVisible();expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+  if (process.env.FOLDCV_EVIDENCE_ROOT) await page.screenshot({ path: resolve(process.env.FOLDCV_EVIDENCE_ROOT, "A16-assistant-narrow.png") });
+  await page.getByLabel("Что изменить", { exact: true }).focus();await page.keyboard.press("Escape");await expect(panel).toHaveCount(0);
+  await expect(page.locator('[contenteditable="true"]')).toHaveAttribute("data-instance", "stable-assistant");expect(await page.evaluate(() => window.getSelection()?.toString())).toBe(text);
+});
+
+test("built task A16 assistant pending open cannot reappear after Settings closes its capture", async ({ page }) => {
+  await createRewriteExample(page);let release: (() => void) | undefined;const held = new Promise<void>(ready => { release = ready; });let entered = false;
+  await page.route("**/v1/settings/rules", async route => { if (!entered) { entered = true;await held; }await route.continue(); });
+  const text = await page.locator('[data-field-content="profile/text"]').textContent() ?? "";await selectFields(page, "profile/text", 0, "profile/text", text.length);
+  await page.getByRole("button", { name: "Улучшить выделение", exact: true }).click();await expect.poll(() => entered).toBe(true);
+  await page.getByRole("button", { name: "Настройки", exact: true }).click();await expect(page.getByRole("heading", { name: "Настройки", exact: true })).toBeVisible();
+  const delivered = page.waitForResponse(result => result.url().endsWith("/v1/settings/rules"));release?.();await delivered;
+  await page.getByRole("button", { name: "Вернуться", exact: true }).click();await expect(page.getByRole("complementary", { name: "Помощник текста" })).toHaveCount(0);
+  await expect(page.locator('[data-field-content="profile/text"]')).toHaveText(text);expect((await currentWorkspace(page)).project?.operations).toHaveLength(2);
+});
+
+test("built task A16 assistant source evidence stays beside the editor and closes by keyboard without content calls", async ({ page }) => {
+  await page.setViewportSize({ width: 1280, height: 900 });await createRewriteExample(page);const before = await currentWorkspace(page), field = before.project?.document.jobs[0]?.context;if (!field) throw new Error("Missing context field");
+  await selectFields(page, field.fieldId, 0, field.fieldId, field.text.length);await page.getByRole("button", { name: "Показать исходник", exact: true }).click();
+  const panel = page.getByRole("complementary", { name: "Исходный контекст" });await expect(panel.locator("blockquote").first()).toBeVisible();
+  await expect(page.getByRole("complementary", { name: "Помощник текста" })).toHaveCount(0);expect((await currentWorkspace(page)).project?.operations).toEqual(before.project?.operations);
+  if (process.env.FOLDCV_EVIDENCE_ROOT) await page.screenshot({ path: resolve(process.env.FOLDCV_EVIDENCE_ROOT, "A16-source-light.png") });
+  await page.getByRole("button", { name: "Закрыть исходный контекст", exact: true }).focus();await page.keyboard.press("Escape");await expect(panel).toHaveCount(0);
+  expect(await page.evaluate(() => window.getSelection()?.toString())).toBe(field.text);await expect(page.locator('[contenteditable="true"]')).toHaveCount(1);
 });

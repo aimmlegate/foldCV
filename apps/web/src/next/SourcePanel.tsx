@@ -13,7 +13,8 @@ const legacyLabels: Record<string, string> = { unapplied_draft: "Неприме�
 export function SourcePanel({ context, workspace, loading, close }: {
   context: SourceContext | null; workspace: Workspace; loading: boolean; close: () => void;
 }) {
-  return <aside className="next-source-panel" aria-label="Исходный контекст">
+  return <aside className="next-source-panel" aria-label="Исходный контекст" onKeyDown={event => { if (event.key === "Escape") { event.preventDefault();close(); } }}>
+    <p className="next-panel-eyebrow">СОХРАНЁННЫЙ ИСХОДНИК</p>
     <header><h2>Исходный контекст</h2><button onClick={close} aria-label="Закрыть исходный контекст">Закрыть</button></header>
     {loading && <p role="status">Читаем сохранённые источники…</p>}
     {context && context.status !== "evidence" && <p role="status">{statuses[context.status]}</p>}

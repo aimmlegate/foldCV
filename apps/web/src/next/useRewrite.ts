@@ -13,8 +13,9 @@ export function useRewrite(editor: RefObject<FieldEditorHandle | null>, edits: R
   const [message, setMessage] = useState("");
   const active = useRef<{ projectId: string; operationId: string; cancelled: boolean } | null>(null);
   const opening = useRef(false);
+  const openingEpoch = useRef(0);
 
-  async function captureTarget(slot?: string) {
+  async function captureTarget(epoch: number, slot?: string) {
     setTarget(null);
     setMessage("");
     if (!await edits.flushBeforeAction()) { setMessage("Сначала завершите ввод и сохраните правки."); return; }
@@ -27,6 +28,7 @@ export function useRewrite(editor: RefObject<FieldEditorHandle | null>, edits: R
     const first = spans[0];
     if (!first) { setMessage("Выделите текст для улучшения."); return; }
     const response = await projectRequest(`/v1/projects/${workspace.projectId}`);
+    if (epoch !== openingEpoch.current) return;
     if (response.workspace.documentRevision !== workspace.documentRevision || !response.selectionFingerprint) {
       setMessage("Текст изменился. Выделите фрагмент снова."); return;
     }
@@ -34,16 +36,18 @@ export function useRewrite(editor: RefObject<FieldEditorHandle | null>, edits: R
       dependencyFingerprint: response.selectionFingerprint, spans: [first, ...spans.slice(1)] };
     try {
       const rules = await rulesRequest();
+      if (epoch !== openingEpoch.current) return;
       setTarget({ selection, fields: new Map(fields.map(field => [field.fieldId, field.text])),
         owner: fields.find(field => field.fieldId === spans.at(-1)?.fieldId)?.slotId ?? "profile", rules });
       setInstruction("");
-    } catch { setMessage("Не удалось прочитать настройки текста. Повторите открытие помощника."); }
+    } catch { if (epoch === openingEpoch.current) setMessage("Не удалось прочитать настройки текста. Повторите открытие помощника."); }
   }
   async function open(slot?: string) {
     if (opening.current || active.current) return;
     opening.current = true;
-    try { await captureTarget(slot); }
-    catch { setMessage("Не удалось открыть помощник. Текст остаётся в документе."); }
+    const epoch = ++openingEpoch.current;
+    try { await captureTarget(epoch, slot); }
+    catch { if (epoch === openingEpoch.current) setMessage("Не удалось открыть помощник. Текст остаётся в документе."); }
     finally { opening.current = false; }
   }
   function invalidate() {
@@ -81,5 +85,5 @@ export function useRewrite(editor: RefObject<FieldEditorHandle | null>, edits: R
     } finally { if (active.current === operation) active.current = null; setBusy(false); }
   }
   return { target, instruction, setInstruction, busy, message, invalidate,
-    open, submit, close: () => setTarget(null) };
+    open, submit, close: () => { ++openingEpoch.current;setTarget(null); } };
 }

@@ -5,9 +5,9 @@ import type { FieldProjection } from "./adapter";
 type FieldStyle = { heading: string | null; hidden: boolean };
 export const FieldLayout = createContext<ReadonlyMap<string, FieldStyle>>(new Map());
 type Props = { document: Document; fields: readonly FieldProjection[]; activeSlot: string | null; tools: ReactNode;
-  children: ReactNode; focus: (fieldId?: string) => void; structure: () => void };
+  children: ReactNode; panels: ReactNode; panelOpen: boolean; focus: (fieldId?: string) => void; structure: () => void };
 
-export function DocumentLayout({ document, fields, activeSlot, tools, children, focus, structure }: Props) {
+export function DocumentLayout({ document, fields, activeSlot, tools, children, panels, panelOpen, focus, structure }: Props) {
   const [collapsed, setCollapsed] = useState(false), [focused, setFocused] = useState(false);
   const navigation = [
     { section: "candidate", label: "Данные кандидата", slots: ["candidate"] },
@@ -38,7 +38,7 @@ export function DocumentLayout({ document, fields, activeSlot, tools, children, 
     }
     return values;
   }, [document, fields]);
-  return <section className="next-workspace" aria-label="Документ" data-focus-mode={focused} data-outline-collapsed={collapsed}>
+  return <section className="next-workspace" aria-label="Документ" data-focus-mode={focused} data-outline-collapsed={collapsed} data-panel-open={panelOpen}>
     <nav className="next-outline" aria-label="Разделы документа">
       <button aria-label={collapsed ? "Развернуть оглавление" : "Свернуть оглавление"} aria-expanded={!collapsed} onClick={() => setCollapsed(value => !value)}>{collapsed ? "→" : "В документе ←"}</button>
       <ol>{navigation.map(item => {
@@ -56,5 +56,6 @@ export function DocumentLayout({ document, fields, activeSlot, tools, children, 
       {tools}
       <FieldLayout.Provider value={styles}><div className="next-document"><p className="next-paper-label">РЕЗЮМЕ СПЕЦИАЛИСТА</p>{children}</div></FieldLayout.Provider>
     </div>
+    <div className="next-panel-dock">{panels}</div>
   </section>;
 }

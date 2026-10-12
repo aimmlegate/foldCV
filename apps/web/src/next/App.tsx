@@ -71,6 +71,7 @@ export function App() {
   const initialArtifact = workspace?.project?.renders.find(render => render.artifactAvailable && render.docx);
   async function showMigration() {
     if (!workspace) return;
+    rewrite.close();
     const epoch = ++sourceEpoch.current;setSourceOpen(true);setSourceBusy(true);setSource(null);
     try { const result = await migrationRequest(workspace.projectId);if (epoch === sourceEpoch.current) setSource(result); }
     catch { setError("Не удалось прочитать историю переноса. Текущий текст остаётся в редакторе."); }
@@ -166,6 +167,7 @@ export function App() {
   }
   async function showSource() {
     if (!workspace || !selectionFingerprint) return;
+    rewrite.close();
     const captured = editor.current?.capture();
     const first = captured?.spans[0];
     const epoch = ++sourceEpoch.current;
@@ -217,9 +219,13 @@ export function App() {
     {settingsOpen ? <SettingsPanel close={() => setSettingsOpen(false)} analysisChanged={analysis.preferenceChanged} /> : exporter.open ? <ExportPanel exporter={exporter} workspace={workspace} /> : document ? <AnnotationActions.Provider value={{ suggestions: workspace?.relatedUpdateSuggestions ?? [], fields,
         projectRevision: workspace?.projectRevision ?? 1, documentRevision: workspace?.documentRevision ?? 1,
         disabled: related.busy || edits.pending || edits.locked, apply: suggestion => { void related.apply(suggestion); } }}>
-      <DocumentLayout document={document} fields={fields} activeSlot={slot} focus={id => { editor.current?.focus(id); }} structure={() => {
+      <DocumentLayout document={document} fields={fields} activeSlot={slot} panelOpen={sourceOpen || rewrite.target !== null}
+      panels={<>{sourceOpen && workspace && <SourcePanel context={source} workspace={workspace} loading={sourceBusy}
+        close={() => { ++sourceEpoch.current;setSourceOpen(false);setSourceBusy(false);editor.current?.focus(); }} />}
+        <RewritePanel rewrite={rewrite} fields={fields} close={() => { rewrite.close();editor.current?.focus(); }} /></>}
+      focus={id => { editor.current?.focus(id); }} structure={() => {
         const control = window.document.querySelector(".next-structure");if (control instanceof HTMLDetailsElement) { control.open = true;control.querySelector("summary")?.focus();control.scrollIntoView({ block: "nearest" }); }
-      }} tools={<div className="next-editor-tools"><button disabled={sourceBusy} onPointerDown={event => event.preventDefault()}
+      }} tools={<div className="next-editor-tools"><button disabled={sourceBusy || rewrite.busy} onPointerDown={event => event.preventDefault()}
         onClick={() => { void showSource(); }}>Показать исходник</button>
         <button disabled={!hasSelection || rewrite.busy || edits.locked} onPointerDown={event => event.preventDefault()}
           onClick={() => { setSourceOpen(false); void rewrite.open(); }}>Улучшить выделение</button>
@@ -263,9 +269,8 @@ export function App() {
         <button className="next-create" disabled={!usable || busy || !!running || workspace !== null && durability !== "durable"} onClick={() => { void create(); }}>Создать резюме</button>
       </div>
     </section>}
-    {sourceOpen && workspace && <SourcePanel context={source} workspace={workspace} loading={sourceBusy}
+    {!document && sourceOpen && workspace && <SourcePanel context={source} workspace={workspace} loading={sourceBusy}
       close={() => { ++sourceEpoch.current; setSourceOpen(false); setSourceBusy(false); }} />}
-    <RewritePanel rewrite={rewrite} />
     {projectsOpen && <ProjectsDialog workspace={workspace} edits={edits} accept={accept} close={() => setProjectsOpen(false)} />}
   </main>;
 }
