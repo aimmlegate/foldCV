@@ -1127,3 +1127,51 @@ test("built task A14 failed imported project save retries same identity and pres
   await expect(page.locator('[data-field-content="profile/text"]')).toHaveText(before.project?.document.profile.text.text ?? "");
   expect((await currentWorkspace(page)).projectId).not.toBe(before.projectId);
 });
+
+test("built example E4 task A18 saves Rules preserves document and reloads its revision and rewrite presets", async ({ page }) => {
+  await createRewriteExample(page);const before = await currentWorkspace(page), calls = readFileSync(resolve(runRoot, "model-requests.json"), "utf8");
+  await page.getByRole("button", { name: "Настройки", exact: true }).click();const text = page.getByLabel("Markdown правил", { exact: true });await expect(text).toBeEnabled();
+  const original = await text.inputValue();const updated = original.replace("15 years", "20 years").replace("Сократи", "CUSTOM SHORTEN Сократи");expect(updated).not.toBe(original);
+  await text.fill(updated);await page.getByRole("button", { name: "Сохранить правила", exact: true }).click();await expect(page.getByText("Правила сохранены.", { exact: false })).toBeVisible();
+  await expect(page.getByText("Версия правил: 2", { exact: true })).toBeVisible();expect((await currentWorkspace(page)).project?.document).toEqual(before.project?.document);
+  expect((await currentWorkspace(page)).undoSlots).toEqual(before.undoSlots);expect(readFileSync(resolve(runRoot, "model-requests.json"), "utf8")).toBe(calls);
+  await page.reload();await page.getByRole("button", { name: "Настройки", exact: true }).click();await expect(page.getByLabel("Markdown правил", { exact: true })).toHaveValue(updated);
+  await page.getByRole("button", { name: "Вернуться", exact: true }).click();const profile = before.project?.document.profile.text.text ?? "";
+  await selectFields(page, "profile/text", 0, "profile/text", profile.length);await openSelectionAssistant(page);
+  await page.getByRole("button", { name: "Сократить", exact: true }).click();await expect(page.getByLabel("Что изменить", { exact: true })).toHaveValue(/CUSTOM SHORTEN/);
+  const sent = page.waitForRequest(request => new URL(request.url()).pathname.endsWith("/rewrite"));await page.getByRole("button", { name: "Обновить выделение", exact: true }).click();
+  const raw: unknown = (await sent).postDataJSON();if (!isRewrite(raw)) throw new Error("Invalid rewrite capture");expect(raw.rulesSha256).not.toBe(before.rulesUsed?.sha256);
+  await expect(page.locator('[data-field-content="profile/text"]')).toContainText("Яснее:");const after = await currentWorkspace(page);
+  const rewritten = after.project?.operations.filter(operation => operation.kind === "rewrite_prose").at(-1);
+  expect(rewritten?.rulesUsed?.revision).toBe(2);expect(rewritten?.rulesUsed?.markdown).toBe(updated);
+});
+
+test("built task A18 rejects missing preset headings without revision and preserves rule draft on storage error", async ({ page }) => {
+  await page.goto(`${origin}/next.html#secret=synthetic-next-secret-0123456789`);await page.getByRole("button", { name: "Настройки", exact: true }).click();
+  const text = page.getByLabel("Markdown правил", { exact: true });await expect(text).toBeEnabled();const original = await text.inputValue();
+  await text.fill("Editorial text without presets");await page.getByRole("button", { name: "Сохранить правила", exact: true }).click();
+  await expect(page.getByRole("alert")).toContainText("## Preset: shorten");await expect(page.getByRole("alert")).toContainText("## Preset: clarify");await expect(page.getByText("Версия правил: 1", { exact: true })).toBeVisible();
+  await expect(text).toHaveValue("Editorial text without presets");const saved: unknown = await (await page.request.get(`${origin}/v1/settings/rules`)).json();expect(validateContract("rules_settings", saved)).toBe(true);
+  expect(typeof saved === "object" && saved !== null && "markdown" in saved && saved.markdown).toBe(original);
+  await text.fill(`${original}\nNew policy`);await page.route("**/settings/rules", route => route.request().method() === "PUT"
+    ? route.fulfill({ status: 500, contentType: "application/json", body: JSON.stringify({ error: { code: "RULES_SAVE_FAILED" } }) }) : route.continue());
+  await page.getByRole("button", { name: "Сохранить правила", exact: true }).click();await expect(page.getByRole("alert")).toContainText("Не удалось сохранить правила");await expect(text).toHaveValue(`${original}\nNew policy`);
+  await page.unroute("**/settings/rules");await page.getByRole("button", { name: "Сохранить правила", exact: true }).click();await expect(page.getByText("Версия правил: 2", { exact: true })).toBeVisible();
+  expect(existsSync(resolve(runRoot, "model-requests.json"))).toBe(false);
+});
+
+test("built task A18 delayed Rules acknowledgment keeps newer typing and stale comparison keeps the draft", async ({ page }) => {
+  await page.goto(`${origin}/next.html#secret=synthetic-next-secret-0123456789`);await page.getByRole("button", { name: "Настройки", exact: true }).click();
+  const text = page.getByLabel("Markdown правил", { exact: true });await expect(text).toBeEnabled();const original = await text.inputValue();let release: (() => void) | undefined, reached = false;
+  const held = new Promise<void>(ready => { release = ready; });await page.route("**/settings/rules", async route => {
+    if (route.request().method() !== "PUT") { await route.continue();return; }
+    const response = await route.fetch();reached = true;await held;await route.fulfill({ response });
+  });
+  await text.fill(`${original}\nSubmitted policy`);await page.getByRole("button", { name: "Сохранить правила", exact: true }).click();await expect.poll(() => reached).toBe(true);
+  await text.fill(`${original}\nNewer unsent policy`);release?.();await expect(page.getByText("Предыдущий текст правил сохранён.", { exact: false })).toBeVisible();await expect(text).toHaveValue(`${original}\nNewer unsent policy`);
+  await page.unroute("**/settings/rules");const concurrent = await page.request.put(`${origin}/v1/settings/rules`, { headers: { Origin: origin }, data: { markdown: `${original}\nOther window policy`, baseRevision: 2 } });expect(concurrent.status()).toBe(200);
+  await page.getByRole("button", { name: "Сохранить правила", exact: true }).click();await expect(page.getByRole("alert")).toContainText("изменены в другом окне");await expect(text).toHaveValue(`${original}\nNewer unsent policy`);
+  await page.getByRole("button", { name: "Загрузить актуальную версию правил", exact: true }).click();await expect(page.getByLabel("Сохранённая версия правил", { exact: true })).toHaveValue(`${original}\nOther window policy`);
+  await expect(text).toHaveValue(`${original}\nNewer unsent policy`);await expect(page.getByText("Версия правил: 3", { exact: true })).toBeVisible();
+  await page.getByRole("button", { name: "Сохранить правила", exact: true }).click();await expect(page.getByText("Версия правил: 4", { exact: true })).toBeVisible();expect(existsSync(resolve(runRoot, "model-requests.json"))).toBe(false);
+});

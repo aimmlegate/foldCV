@@ -14,6 +14,7 @@ import type { GuiDeleteProjectResult } from "../contracts/generated/gui_delete_p
 import type { GuiRenameProjectRequest } from "../contracts/generated/gui_rename_project_request";
 import type { GuiArchiveRequest } from "../contracts/generated/gui_archive_request";
 import type { RulesSettings } from "../contracts/generated/rules_settings";
+import type { SaveRulesRequest } from "../contracts/generated/save_rules_request";
 import type { GuiExportRequest } from "../contracts/generated/gui_export_request";
 import type { Preferences } from "../contracts/generated/preferences";
 import { validateContract } from "../contracts/validate";
@@ -31,7 +32,7 @@ function errorCode(value: unknown): string {
   return typeof error === "object" && error !== null && "code" in error && typeof error.code === "string"
     ? error.code : "REQUEST_FAILED";
 }
-async function request(path: string, method = "GET", body?: GuiCreateProjectRequest | GuiStartGenerationRequest | SourceContextRequest | GuiRewriteRequest | GuiExportRequest | GuiAnalysisRequest | SaveAnalysisPreference | GuiDeleteProjectRequest | GuiRenameProjectRequest | Mutation | Record<string, never> | FormData): Promise<unknown> {
+async function request(path: string, method = "GET", body?: GuiCreateProjectRequest | GuiStartGenerationRequest | SourceContextRequest | GuiRewriteRequest | GuiExportRequest | GuiAnalysisRequest | SaveAnalysisPreference | GuiDeleteProjectRequest | GuiRenameProjectRequest | SaveRulesRequest | Mutation | Record<string, never> | FormData): Promise<unknown> {
   const init: RequestInit = { method, credentials: "same-origin", cache: "no-store" };
   if (body instanceof FormData) init.body = body;
   else if (body !== undefined) { init.body = JSON.stringify(body); init.headers = { "Content-Type": "application/json" }; }
@@ -70,6 +71,11 @@ export async function rewriteRequest(body: GuiRewriteRequest): Promise<MutationR
 function isRules(value: unknown): value is RulesSettings { return validateContract("rules_settings", value); }
 export async function rulesRequest(): Promise<RulesSettings> {
   const value = await request("/v1/settings/rules");
+  if (!isRules(value)) throw new ApiFailure("INVALID_RESULT");
+  return value;
+}
+export async function saveRulesRequest(body: SaveRulesRequest): Promise<RulesSettings> {
+  const value = await request("/v1/settings/rules", "PUT", body);
   if (!isRules(value)) throw new ApiFailure("INVALID_RESULT");
   return value;
 }

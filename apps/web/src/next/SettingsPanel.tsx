@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { ConnectionWorkflow, type ConnectionState, type ConnectionView } from "../connection/workflow";
 import type { Preferences } from "../contracts/generated/preferences";
 import { preferencesRequest } from "./api";
+import { RulesPanel } from "./RulesPanel";
 
 const messages: Record<ConnectionState, string> = {
   unchecked: "Подключение ещё не проверено.", detached: "Модель отключена от FoldCV. Вход в CLI остаётся в силе.",
@@ -82,5 +83,6 @@ export function SettingsPanel({ close, analysisChanged }: { close: () => void; a
         onChange={event => { void changeAnalysis(event.target.checked); }} /> Автоматически проверять изменения</label>
       <p>Проверяем завершённые правки. Остальные упоминания меняются только по вашему действию.</p>
     </section>
+    <RulesPanel />
   </section>;
 }
