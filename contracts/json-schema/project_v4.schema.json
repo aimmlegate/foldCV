@@ -648,6 +648,21 @@
       "title": "Document",
       "type": "object"
     },
+    "DocumentAnchor": {
+      "additionalProperties": false,
+      "properties": {
+        "kind": {
+          "const": "document",
+          "title": "Kind",
+          "type": "string"
+        }
+      },
+      "required": [
+        "kind"
+      ],
+      "title": "DocumentAnchor",
+      "type": "object"
+    },
     "DocumentPeriod": {
       "additionalProperties": false,
       "properties": {
@@ -674,6 +689,70 @@
         "present"
       ],
       "title": "DocumentPeriod",
+      "type": "object"
+    },
+    "DocxError": {
+      "additionalProperties": false,
+      "properties": {
+        "anchor": {
+          "discriminator": {
+            "mapping": {
+              "document": "#/$defs/DocumentAnchor",
+              "field": "#/$defs/FieldAnchor",
+              "section": "#/$defs/SectionAnchor"
+            },
+            "propertyName": "kind"
+          },
+          "oneOf": [
+            {
+              "$ref": "#/$defs/FieldAnchor"
+            },
+            {
+              "$ref": "#/$defs/SectionAnchor"
+            },
+            {
+              "$ref": "#/$defs/DocumentAnchor"
+            }
+          ],
+          "title": "Anchor"
+        },
+        "code": {
+          "enum": [
+            "DOCX_NAME_LINE_LIMIT",
+            "DOCX_TITLE_LINE_LIMIT",
+            "DOCX_UNBREAKABLE_TEXT",
+            "DOCX_BLOCK_PAGE_BUDGET",
+            "DOCX_BLOCK_PLANNED_PAGE",
+            "DOCX_UNKNOWN_FOCUS_ICON",
+            "DOCX_TEXT_LIMIT",
+            "DOCX_LIST_LIMIT",
+            "DOCX_TOTAL_TEXT_LIMIT",
+            "DOCX_INVALID_CHARACTER",
+            "DOCX_INVALID_RENDER_INPUT",
+            "DOCX_RENDER_FAILED"
+          ],
+          "title": "Code",
+          "type": "string"
+        },
+        "path": {
+          "anyOf": [
+            {
+              "pattern": "^(candidate\\.(name|title|summary)|footer|focus(\\[[0-9]+\\]\\.(label|duration|icon))?|sidebar(\\[[0-9]+\\]\\.(title|items(\\[[0-9]+\\])?))?|projects(\\[[0-9]+\\]\\.(company|role|period|stack|description|tasks(\\[[0-9]+\\])?|results(\\[[0-9]+\\])?))?|achievements(\\[[0-9]+\\])?|skillGroups(\\[[0-9]+\\]\\.(title|items))?)$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Path"
+        }
+      },
+      "required": [
+        "code",
+        "path",
+        "anchor"
+      ],
+      "title": "DocxError",
       "type": "object"
     },
     "EarlyCareerRecord": {
@@ -1045,6 +1124,38 @@
       "title": "EvidenceSpan",
       "type": "object"
     },
+    "FieldAnchor": {
+      "additionalProperties": false,
+      "properties": {
+        "fieldId": {
+          "minLength": 1,
+          "title": "Fieldid",
+          "type": "string"
+        },
+        "kind": {
+          "const": "field",
+          "title": "Kind",
+          "type": "string"
+        },
+        "range": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Range"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "kind",
+        "fieldId",
+        "range"
+      ],
+      "title": "FieldAnchor",
+      "type": "object"
+    },
     "FocusEntry": {
       "additionalProperties": false,
       "properties": {
@@ -1385,6 +1496,17 @@
             }
           ]
         },
+        "docxError": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/DocxError"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
         "errorCode": {
           "anyOf": [
             {
@@ -1427,6 +1549,19 @@
           "minLength": 1,
           "title": "Projectid",
           "type": "string"
+        },
+        "renderSnapshotId": {
+          "anyOf": [
+            {
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Rendersnapshotid"
         },
         "resultFingerprint": {
           "anyOf": [
@@ -2655,6 +2790,27 @@
       "title": "Proposal",
       "type": "object"
     },
+    "Range": {
+      "additionalProperties": false,
+      "properties": {
+        "end": {
+          "minimum": 0,
+          "title": "End",
+          "type": "integer"
+        },
+        "start": {
+          "minimum": 0,
+          "title": "Start",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "start",
+        "end"
+      ],
+      "title": "Range",
+      "type": "object"
+    },
     "RenderSnapshotV4": {
       "additionalProperties": false,
       "properties": {
@@ -2836,6 +2992,27 @@
         "sha256"
       ],
       "title": "Rules",
+      "type": "object"
+    },
+    "SectionAnchor": {
+      "additionalProperties": false,
+      "properties": {
+        "kind": {
+          "const": "section",
+          "title": "Kind",
+          "type": "string"
+        },
+        "sectionId": {
+          "minLength": 1,
+          "title": "Sectionid",
+          "type": "string"
+        }
+      },
+      "required": [
+        "kind",
+        "sectionId"
+      ],
+      "title": "SectionAnchor",
       "type": "object"
     },
     "SkillsFocusRecord": {

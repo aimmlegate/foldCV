@@ -410,6 +410,8 @@ class GuiOperation(Operation):
     result_fingerprint: Sha256 | None
     error_code: Id | None
     events: list[GuiOperationEvent]
+    docx_error: DocxError | None = None
+    render_snapshot_id: Id | None = None
 
 
 class GenerationStage(Wire):

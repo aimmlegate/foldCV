@@ -8,6 +8,7 @@ from packages.resume_core.gui_selection import selection_fingerprint
 from packages.resume_core.gui_source_context import source_context
 from packages.resume_core.models.recovery import SourceContextRequest, Mutation
 from packages.resume_core.gui_rewriting import GuiRewriteRequest
+from packages.resume_core.gui_exports import GuiExportRequest
 from .contracts import EmptyRequest
 from .extracting import parse_one_part, UploadFailure
 from .gui_projects import ProjectFailure
@@ -68,6 +69,17 @@ def mount_projects(app, service, problem):
     async def rewrite(id: str, payload: GuiRewriteRequest):
         result = await service.rewrite(id, payload)
         return JSONResponse(result.model_dump(mode="json", by_alias=True), headers={"Cache-Control": "no-store"})
+
+    @app.post("/v1/projects/{id}/exports")
+    async def export(id: str, payload: GuiExportRequest):
+        service.start_export(id, payload)
+        return response(id, status=202)
+
+    @app.get("/v1/projects/{id}/exports/{oid}/docx")
+    async def export_artifact(id: str, oid: str):
+        content = service.export_artifact(id, oid)
+        return Response(content, media_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+            headers={"Cache-Control": "no-store", "Content-Disposition": 'attachment; filename="resume.docx"'})
 
     @app.post("/v1/projects/{id}/operations/{oid}/cancel")
     async def cancel_operation(id: str, oid: str, _payload: EmptyRequest):

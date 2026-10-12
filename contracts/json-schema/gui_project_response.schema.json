@@ -2281,6 +2281,17 @@
             }
           ]
         },
+        "docxError": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/DocxError"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
         "errorCode": {
           "anyOf": [
             {
@@ -2323,6 +2334,19 @@
           "minLength": 1,
           "title": "Projectid",
           "type": "string"
+        },
+        "renderSnapshotId": {
+          "anyOf": [
+            {
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Rendersnapshotid"
         },
         "resultFingerprint": {
           "anyOf": [

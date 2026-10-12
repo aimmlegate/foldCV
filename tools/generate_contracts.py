@@ -19,9 +19,10 @@ from packages.resume_core.gui_normalization import GUI_NORMALIZATION_CONTRACTS
 from packages.resume_core.gui_drafting import GUI_DRAFT_CONTRACTS
 from packages.resume_core.gui_projects import GUI_PROJECT_CONTRACTS
 from packages.resume_core.gui_rewriting import GUI_REWRITE_CONTRACTS
+from packages.resume_core.gui_exports import GUI_EXPORT_CONTRACTS
 
 OUT = ROOT / "contracts" / "json-schema"
-RECOVERY_MODELS = {**RECOVERY_CONTRACTS, **GUI_NORMALIZATION_CONTRACTS, **GUI_DRAFT_CONTRACTS, **GUI_PROJECT_CONTRACTS, **GUI_REWRITE_CONTRACTS}
+RECOVERY_MODELS = {**RECOVERY_CONTRACTS, **GUI_NORMALIZATION_CONTRACTS, **GUI_DRAFT_CONTRACTS, **GUI_PROJECT_CONTRACTS, **GUI_REWRITE_CONTRACTS, **GUI_EXPORT_CONTRACTS}
 
 
 def main() -> None:

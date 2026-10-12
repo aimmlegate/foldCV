@@ -32,14 +32,10 @@ from .gui_normalization_content import GuiNormalizationContentService
 from .gui_drafting_content import GuiDraftingContentService
 from .gui_rendering import GuiDocxRenderer
 from .gui_rewriting_content import GuiRewritingContentService
+from .gui_exports import GuiExportMixin
+from .gui_errors import ProjectFailure
 from .lifecycle import OperationFiles, SpikeError
 from .providers.content import ContentFailure
-
-
-class ProjectFailure(Exception):
-    def __init__(self, code, status=409):
-        self.code, self.status = code, status
-        super().__init__(code)
 
 
 def now():
@@ -50,7 +46,7 @@ def identity(prefix):
     return prefix + "-" + uuid.uuid4().hex
 
 
-class GuiProjectService:
+class GuiProjectService(GuiExportMixin):
     def __init__(self, temp_root: Path, rules, provider_factory, *, clock=now,
                  worker_slot=None, cleanup_error=None, renderer=None, storage=None):
         self.temp_root, self.rules, self.provider_factory = temp_root, rules, provider_factory
@@ -525,7 +521,8 @@ class GuiProjectService:
                 if key not in self.tasks:
                     raise ProjectFailure("OPERATION_INTERRUPTED")
             else:
-                if any(not task.done() for (pid, _), task in self.tasks.items() if pid == id):
+                renders = {item.id for item in workspace.project.operations if item.kind == "render"}
+                if any(not task.done() for (pid, oid), task in self.tasks.items() if pid == id and oid not in renders):
                     raise ProjectFailure("PROJECT_OPERATION_ACTIVE")
                 if self.persist(id) == "failed":
                     raise ProjectFailure("PROJECT_SAVE_FAILED", 503)

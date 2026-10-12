@@ -65,3 +65,8 @@ button:disabled { cursor: default; opacity: .6; }
 .next-derived { color: var(--muted); font-size: 12px; margin-top: 4px; }
 .next-rewrite-panel textarea{width:100%;margin:.6rem 0;padding:.6rem;border:1px solid var(--outline);background:var(--panel);color:var(--content)}
 .next-rewrite-presets{display:flex;gap:.5rem;margin-bottom:1rem}
+.next-export{max-width:620px;margin:4rem auto;padding:2rem;background:var(--panel);border:1px solid var(--outline)}
+.next-export h1{font-size:2rem;letter-spacing:-.04em}
+.next-export-file{display:grid;gap:1rem;padding:1.5rem;border:1px solid var(--outline);border-radius:8px}
+.next-export-file span{color:var(--muted);font-size:.85rem}
+@media(max-width:760px){.next-export{margin:1rem;padding:1rem}}

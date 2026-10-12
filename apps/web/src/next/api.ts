@@ -7,6 +7,7 @@ import type { Mutation } from "../contracts/generated/mutation";
 import type { MutationResult } from "../contracts/generated/mutation_result";
 import type { GuiRewriteRequest } from "../contracts/generated/gui_rewrite_request";
 import type { RulesSettings } from "../contracts/generated/rules_settings";
+import type { GuiExportRequest } from "../contracts/generated/gui_export_request";
 import { validateContract } from "../contracts/validate";
 
 export type Workspace = GuiProjectResponse["workspace"];
@@ -22,7 +23,7 @@ function errorCode(value: unknown): string {
   return typeof error === "object" && error !== null && "code" in error && typeof error.code === "string"
     ? error.code : "REQUEST_FAILED";
 }
-async function request(path: string, method = "GET", body?: GuiCreateProjectRequest | GuiStartGenerationRequest | SourceContextRequest | GuiRewriteRequest | Mutation | Record<string, never> | FormData): Promise<unknown> {
+async function request(path: string, method = "GET", body?: GuiCreateProjectRequest | GuiStartGenerationRequest | SourceContextRequest | GuiRewriteRequest | GuiExportRequest | Mutation | Record<string, never> | FormData): Promise<unknown> {
   const init: RequestInit = { method, credentials: "same-origin", cache: "no-store" };
   if (body instanceof FormData) init.body = body;
   else if (body !== undefined) { init.body = JSON.stringify(body); init.headers = { "Content-Type": "application/json" }; }
@@ -31,7 +32,7 @@ async function request(path: string, method = "GET", body?: GuiCreateProjectRequ
   if (!response.ok) throw new ApiFailure(errorCode(value));
   return value;
 }
-export async function projectRequest(path: string, method = "GET", body?: GuiCreateProjectRequest | GuiStartGenerationRequest | Record<string, never> | FormData): Promise<GuiProjectResponse> {
+export async function projectRequest(path: string, method = "GET", body?: GuiCreateProjectRequest | GuiStartGenerationRequest | GuiExportRequest | Record<string, never> | FormData): Promise<GuiProjectResponse> {
   const value = await request(path, method, body);
   if (!isResponse(value)) throw new ApiFailure("INVALID_RESULT");
   return value;
@@ -58,6 +59,17 @@ export async function rulesRequest(): Promise<RulesSettings> {
   const value = await request("/v1/settings/rules");
   if (!isRules(value)) throw new ApiFailure("INVALID_RESULT");
   return value;
+}
+export async function docxDownload(path: string, expected: { sha256: string; size: number }): Promise<Blob> {
+  const response = await fetch(path, { credentials: "same-origin", cache: "no-store" });
+  if (!response.ok) { const raw: unknown = await response.json();throw new ApiFailure(errorCode(raw)); }
+  if (!response.headers.get("Content-Type")?.startsWith("application/vnd.openxmlformats-officedocument.wordprocessingml.document")) throw new ApiFailure("INVALID_RESULT");
+  const blob = await response.blob();
+  if (blob.size !== expected.size || blob.size > 8 * 1024 * 1024) throw new ApiFailure("INVALID_RESULT");
+  const bytes = await crypto.subtle.digest("SHA-256", await blob.arrayBuffer());
+  const sha256 = [...new Uint8Array(bytes)].map(byte => byte.toString(16).padStart(2, "0")).join("");
+  if (sha256 !== expected.sha256) throw new ApiFailure("INVALID_RESULT");
+  return blob;
 }
 export async function exchangeSession(): Promise<void> {
   const secret = new URLSearchParams(location.hash.slice(1)).get("secret");

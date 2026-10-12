@@ -252,6 +252,28 @@ export type Documentrevision = number;
 export type Projectrevision = number;
 export type Rulessha256 = string | null;
 export type Sourcefingerprint = string;
+export type Anchor = FieldAnchor | SectionAnchor | DocumentAnchor;
+export type Fieldid2 = string;
+export type Kind22 = "field";
+export type End = number;
+export type Start = number;
+export type Kind23 = "section";
+export type Sectionid = string;
+export type Kind24 = "document";
+export type Code =
+  | "DOCX_NAME_LINE_LIMIT"
+  | "DOCX_TITLE_LINE_LIMIT"
+  | "DOCX_UNBREAKABLE_TEXT"
+  | "DOCX_BLOCK_PAGE_BUDGET"
+  | "DOCX_BLOCK_PLANNED_PAGE"
+  | "DOCX_UNKNOWN_FOCUS_ICON"
+  | "DOCX_TEXT_LIMIT"
+  | "DOCX_LIST_LIMIT"
+  | "DOCX_TOTAL_TEXT_LIMIT"
+  | "DOCX_INVALID_CHARACTER"
+  | "DOCX_INVALID_RENDER_INPUT"
+  | "DOCX_RENDER_FAILED";
+export type Path = string | null;
 export type Errorcode = string | null;
 export type Requestid = string;
 export type Sequence = number;
@@ -270,7 +292,7 @@ export type Reportedinputtokens = number | null;
 export type Reportedoutputtokens = number | null;
 export type Events = GuiOperationEvent[];
 export type Id27 = string;
-export type Kind22 =
+export type Kind25 =
   | "extract"
   | "validate"
   | "render"
@@ -280,6 +302,7 @@ export type Kind22 =
   | "rewrite_prose"
   | "reconcile_edits";
 export type Projectid = string;
+export type Rendersnapshotid = string | null;
 export type Resultfingerprint = string | null;
 export type Markdown = string;
 export type Revision24 = number;
@@ -294,13 +317,13 @@ export type Dependencyhash = string;
 export type Evidencefactids = string[];
 export type Findings = string[];
 export type Id28 = string;
-export type Kind23 = "draft_prose" | "rewrite_prose";
+export type Kind26 = "draft_prose" | "rewrite_prose";
 export type Operationid = string;
 export type Replacementtext = string;
 export type Proposals = Proposal[];
 export type Artifactavailable = boolean;
 export type Documentrevision1 = number;
-export type Path = string;
+export type Path1 = string;
 export type Sha2561 = string;
 export type Size = number;
 export type Id29 = string;
@@ -344,7 +367,7 @@ export type Disposition1 = "shown" | "condensed" | "archived" | "duplicate" | "u
 export type Id32 = string;
 export type Column = number | null;
 export type Index = number;
-export type Kind24 = "page" | "paragraph" | "table_cell" | "pasted";
+export type Kind27 = "page" | "paragraph" | "table_cell" | "pasted";
 export type Row = number | null;
 export type Order = number;
 export type Representedfactids = string[];
@@ -361,7 +384,7 @@ export type Version = string;
 export type Contentpolicyversion1 = string;
 export type Dependencyhash1 = string;
 export type Id34 = string;
-export type Kind25 = "profile" | "job_prose" | "contact" | "focus" | "education" | "skills" | "early_career";
+export type Kind28 = "profile" | "job_prose" | "contact" | "focus" | "education" | "skills" | "early_career";
 export type Factids4 = string[];
 export type Locked = boolean;
 export type Origin16 = "source" | "generated" | "manual";
@@ -752,11 +775,13 @@ export interface GuiOperation {
   baseRevision: Baserevision;
   capturedDocumentRevision: Captureddocumentrevision;
   dependencies: Dependencies | null;
+  docxError?: DocxError | null;
   errorCode: Errorcode;
   events: Events;
   id: Id27;
-  kind: Kind22;
+  kind: Kind25;
   projectId: Projectid;
+  renderSnapshotId?: Rendersnapshotid;
   resultFingerprint: Resultfingerprint;
   rulesUsed: Rules | null;
   status: Status;
@@ -769,6 +794,27 @@ export interface Dependencies {
   projectRevision: Projectrevision;
   rulesSha256: Rulessha256;
   sourceFingerprint: Sourcefingerprint;
+}
+export interface DocxError {
+  anchor: Anchor;
+  code: Code;
+  path: Path;
+}
+export interface FieldAnchor {
+  fieldId: Fieldid2;
+  kind: Kind22;
+  range: Range | null;
+}
+export interface Range {
+  end: End;
+  start: Start;
+}
+export interface SectionAnchor {
+  kind: Kind23;
+  sectionId: Sectionid;
+}
+export interface DocumentAnchor {
+  kind: Kind24;
 }
 export interface GuiOperationEvent {
   requestId: Requestid;
@@ -795,7 +841,7 @@ export interface Proposal {
   evidenceFactIds: Evidencefactids;
   findings: Findings;
   id: Id28;
-  kind: Kind23;
+  kind: Kind26;
   operationId: Operationid;
   replacementText: Replacementtext;
 }
@@ -814,7 +860,7 @@ export interface RenderSnapshotV4 {
   templateVersion: Templateversion;
 }
 export interface AssetRef {
-  path: Path;
+  path: Path1;
   sha256: Sha2561;
   size: Size;
 }
@@ -867,7 +913,7 @@ export interface SourceUnit {
 export interface SourceLocation {
   column: Column;
   index: Index;
-  kind: Kind24;
+  kind: Kind27;
   row: Row;
 }
 export interface TemplateManifest {
@@ -881,7 +927,7 @@ export interface Block {
   contentPolicyVersion: Contentpolicyversion1;
   dependencyHash: Dependencyhash1;
   id: Id34;
-  kind: Kind25;
+  kind: Kind28;
   previous: BlockState | null;
   revision: Revision29;
   state: BlockState;

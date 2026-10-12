@@ -17,6 +17,8 @@ from tests.recovery.generation_fixtures import CreationProvider, frozen_now
 from packages.resume_core.project_store import ProjectStoreFailure
 from packages.resume_core.gui_rewriting import GuiRewriteProposal
 from resume_api.providers.content import ContentFailure
+from resume_api.gui_rendering import GuiDocxRenderer
+from packages.resume_core.rendering.docx_errors import failure
 
 
 class ControlledProvider(CreationProvider):
@@ -31,6 +33,22 @@ class ControlledProvider(CreationProvider):
                 if cancel.wait(.01):
                     raise ContentFailure("CANCELLED", logical_attempts=1)
         return super().generate(request, files, cancel)
+
+
+class ControlledRenderer(GuiDocxRenderer):
+    def __init__(self, root):
+        self.root, self.calls = root, 0
+
+    async def render(self, document, anchors, files):
+        self.calls += 1
+        (self.root / "render-count.json").write_text(json.dumps({"count": self.calls}))
+        if (self.root / "hold-export").exists():
+            (self.root / "export-started").touch()
+            while (self.root / "hold-export").exists():
+                await asyncio.sleep(.01)
+        if (self.root / "fail-export").exists():
+            raise failure("DOCX_BLOCK_PAGE_BUDGET", "candidate.summary", anchors)
+        return await super().render(document, anchors, files)
 
 
 def retain_evidence(root, store, example):
@@ -63,7 +81,8 @@ async def main():
         origin = f"http://127.0.0.1:{port}"
         app = create_app(origin=origin, secret="synthetic-next-secret-0123456789",
             temp_root=root / "operations", data_root=root / "FoldCV", dist=dist,
-            gui_provider=ControlledProvider(root, example.split("-")[0], remove_focus=example.endswith("-focus")), gui_clock=frozen_now)
+            gui_provider=ControlledProvider(root, example.split("-")[0], remove_focus=example.endswith("-focus")),
+            gui_renderer=ControlledRenderer(root), gui_clock=frozen_now)
         store = app.app.state.gui_projects
         save = store.storage.save
         def controlled_save(workspace, originals, artifacts):

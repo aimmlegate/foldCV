@@ -6,6 +6,8 @@ import { StructureControls } from "./StructureControls";
 import { useEdits } from "./useEdits";
 import { useRewrite } from "./useRewrite";
 import { RewritePanel } from "./RewritePanel";
+import { useExport } from "./useExport";
+import { ExportPanel } from "./ExportPanel";
 import type { SourceContext } from "../contracts/generated/source_context";
 import type { GuiProjectResponse } from "../contracts/generated/gui_project_response";
 import { documentFields } from "./fields";
@@ -46,6 +48,7 @@ export function App() {
   }
   const edits = useEdits(workspace, editor, accept);
   const rewrite = useRewrite(editor, edits);
+  const exporter = useExport(workspace, editor, edits);
   const editorKey = `${workspace?.projectId}:${fields.map(field => field.fieldId).join("|")}`;
   const initialArtifact = workspace?.project?.renders.find(render => render.artifactAvailable && render.docx);
 
@@ -137,7 +140,7 @@ export function App() {
       <span className="next-save" role="status">{edits.saving ? "Сохраняем…" : edits.pending ? "Есть несохранённые правки" : workspace
         ? durability === "durable" ? "Сохранено" : durability === "failed" ? "Сохранение не удалось" : durability === "in_memory" ? "В памяти приложения" : "Сохраняем…" : ""}</span>
       <div className="next-actions">
-        <button disabled>Сохранить проект</button><button disabled>Экспорт DOCX</button><button disabled>Настройки</button>
+        <button disabled>Сохранить проект</button><button disabled={!document || edits.locked} onClick={() => { setSourceOpen(false);rewrite.close();void exporter.start(); }}>Экспорт DOCX</button><button disabled>Настройки</button>
         <label className="next-theme">Тема <select aria-label="Тема" value={theme.mode} onChange={event => theme.select(event.target.value)}>
           <option value="system">Системная</option><option value="light">Светлая</option><option value="dark">Тёмная</option>
         </select></label>
@@ -146,6 +149,7 @@ export function App() {
     {error && <p className="next-message text-danger" role="alert">{error}</p>}
     {edits.error && <p className="next-message text-danger" role="alert">{edits.error} <button onClick={edits.retry}>Повторить сохранение</button></p>}
     {rewrite.message && <p className="next-message" role="status">{rewrite.message}</p>}
+    {!exporter.open && exporter.message && <p className="next-message text-danger" role="alert">{exporter.message}</p>}
     {saveError && !edits.error && workspace && <p className="next-message text-danger" role="alert">Не удалось сохранить проект. Данные остаются в окне.
       <button onClick={() => { void projectRequest(`/v1/projects/${workspace.projectId}/save`, "POST", {}).then(accept).catch(error => setError(errorLabel(error))); }}>Повторить сохранение</button></p>}
     {generation && <section className="next-progress" aria-label="Создание резюме">
@@ -157,7 +161,7 @@ export function App() {
       {initialArtifact && workspace && <a className="next-download" download="resume.docx"
         href={`/v1/projects/${workspace.projectId}/renders/${initialArtifact.id}/docx`}>Скачать исходный DOCX</a>}
     </section>}
-    {document ? <section className="next-editor-surface" aria-label="Документ">
+    {exporter.open ? <ExportPanel exporter={exporter} workspace={workspace} /> : document ? <section className="next-editor-surface" aria-label="Документ">
       <p className="next-editor-note">Правки сохраняются локально. Отметка «Сохранено» появляется после записи на диск.</p>
       <div className="next-editor-tools"><button disabled={sourceBusy} onPointerDown={event => event.preventDefault()}
         onClick={() => { void showSource(); }}>Показать исходник</button>

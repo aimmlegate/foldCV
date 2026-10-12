@@ -450,6 +450,7 @@ export type Kind28 =
   | "rewrite_prose"
   | "reconcile_edits";
 export type Projectid1 = string;
+export type Rendersnapshotid = string | null;
 export type Resultfingerprint1 = string | null;
 export type Status4 = "queued" | "running" | "completed" | "failed" | "cancelled" | "interrupted";
 export type Targetfieldids = string[];
@@ -1178,11 +1179,13 @@ export interface GuiOperation {
   baseRevision: Baserevision;
   capturedDocumentRevision: Captureddocumentrevision;
   dependencies: Dependencies | null;
+  docxError?: DocxError | null;
   errorCode: Errorcode1;
   events: Events;
   id: Id32;
   kind: Kind28;
   projectId: Projectid1;
+  renderSnapshotId?: Rendersnapshotid;
   resultFingerprint: Resultfingerprint1;
   rulesUsed: Rules | null;
   status: Status4;

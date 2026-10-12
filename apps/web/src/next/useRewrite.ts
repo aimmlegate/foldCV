@@ -71,8 +71,8 @@ export function useRewrite(editor: RefObject<FieldEditorHandle | null>, edits: R
         : "Текст обновлён, но запись на диск не подтверждена. Повторите сохранение.");
       setTarget(null);
     } catch (error) {
-      setMessage(error instanceof ApiFailure && error.code === "CANCELLED" ? "Улучшение отменено. Ваши правки сохранены."
-        : "Не удалось обновить выделение. Текст и ваши правки сохранены; выделите фрагмент для повтора.");
+      setMessage(error instanceof ApiFailure && error.code === "CANCELLED" ? "Улучшение отменено. Ваши правки остаются в редакторе."
+        : "Не удалось обновить выделение. Текст и ваши правки остаются в редакторе; выделите фрагмент для повтора.");
     } finally { if (active.current === operation) active.current = null; setBusy(false); }
   }
   return { target, instruction, setInstruction, busy, message, invalidate,

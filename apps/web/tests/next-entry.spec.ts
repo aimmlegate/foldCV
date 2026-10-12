@@ -8,6 +8,7 @@ import type { GuiProjectResponse } from "../src/contracts/generated/gui_project_
 import { validateContract } from "../src/contracts/validate";
 import type { Page } from "@playwright/test";
 import type { GuiRewriteRequest } from "../src/contracts/generated/gui_rewrite_request";
+import { unzipSync } from "fflate";
 
 const root = resolve(import.meta.dirname, "../../..");
 let temp: string, runRoot: string, origin: string;
@@ -650,7 +651,7 @@ test("built E1 typing cancels a delayed rewrite and an error keeps authored text
   await expect.poll(() => existsSync(resolve(runRoot, "rewrite-started"))).toBe(true);
   await replaceFieldText(page, "profile/text", "Newer typed text");
   rmSync(resolve(runRoot, "hold-rewrite"));
-  await expect(page.getByText("Улучшение отменено. Ваши правки сохранены.", { exact: true })).toBeVisible();
+  await expect(page.getByText("Улучшение отменено. Ваши правки остаются в редакторе.", { exact: true })).toBeVisible();
   await expect(page.locator('[data-field-content="profile/text"]')).toHaveText("Newer typed text");
   await expect(page.locator(".next-save")).toHaveText("Сохранено");
   const current = await currentWorkspace(page);expect(current.project?.operations.at(-1)?.status).toBe("cancelled");
@@ -672,4 +673,116 @@ test("built E1 a metadata change during rewrite rejects its late reply and prese
   await expect(page.locator('[data-field-content="profile/text"]')).toHaveText(text);
   const after = await currentWorkspace(page);expect(after.title).toBe("Renamed during rewrite");expect(after.documentRevision).toBe(before.documentRevision);
   expect(after.project?.operations.at(-1)?.errorCode).toBe("SELECTION_STALE");
+});
+
+async function exportCurrent(page: Page) {
+  await page.getByRole("button", { name: "Экспорт DOCX", exact: true }).click();
+  await expect(page.getByRole("region", { name: "Экспорт DOCX", exact: true })).toBeVisible();
+}
+async function downloadDocx(page: Page, name: string) {
+  const receipt = page.waitForEvent("download");
+  await page.getByRole("button", { name: "Скачать DOCX", exact: true }).click();
+  const download = await receipt;
+  expect(download.suggestedFilename()).toBe("resume.docx");
+  const path = resolve(runRoot, name);await download.saveAs(path);
+  const bytes = readFileSync(path), entries = unzipSync(bytes);
+  const xml = entries["word/document.xml"];if (!xml) throw new Error("Missing DOCX document");
+  return { bytes, xml: new TextDecoder().decode(xml), entries };
+}
+function renderCount() {
+  const raw: unknown = JSON.parse(readFileSync(resolve(runRoot, "render-count.json"), "utf8"));
+  if (typeof raw !== "object" || raw === null || !("count" in raw) || typeof raw.count !== "number") throw new Error("Invalid render count");
+  return raw.count;
+}
+
+test("built E1 minimum slice exports current additions and a partial rewrite with no extra model call", async ({ page }) => {
+  await createRewriteExample(page);
+  const before = await currentWorkspace(page), job = before.project?.document.jobs[0];if (!job) throw new Error("Missing job");
+  const addition = "Подготовила инструкцию для дежурной смены.";
+  await replaceFieldText(page, job.tasks.fieldId, addition);
+  await selectFields(page, job.tasks.fieldId, 0, job.tasks.fieldId, 11);await openSelectionAssistant(page);await submitRewrite(page);
+  await expect(page.locator(`[data-field-content="${job.tasks.fieldId}"]`)).toHaveText("Яснее: " + addition);
+  await exportCurrent(page);await expect(page.getByRole("button", { name: "Скачать DOCX", exact: true })).toBeEnabled();
+  const file = await downloadDocx(page, "current-resume.docx");
+  expect(file.xml).toContain("Яснее: " + addition);expect(file.xml).not.toContain("Интеграционные тесты.");
+  expect(file.xml).not.toContain("editorial_plan_stale");expect(file.xml).not.toContain("mail@example.com");expect(file.entries["word/styles.xml"]).toBeDefined();
+  const exported = await currentWorkspace(page), operation = exported.project?.operations.at(-1);
+  expect(exported.project?.operations.filter(item => ["normalize_semantics", "draft_prose", "rewrite_prose", "reconcile_edits"].includes(item.kind))).toHaveLength(3);
+  expect(operation?.kind).toBe("render");expect(operation?.usage).toBeNull();
+  const snapshot = exported.project?.renders.find(item => item.id === operation?.renderSnapshotId);if (!snapshot) throw new Error("Missing snapshot");
+  expect(snapshot.projectRevision).toBe(exported.projectRevision);expect(snapshot.documentRevision).toBe(exported.documentRevision);
+  expect(snapshot.docx?.sha256).toBe(createHash("sha256").update(file.bytes).digest("hex"));expect(snapshot.pdf).toBeNull();
+  expect(renderCount()).toBe(2);
+  await page.getByRole("button", { name: "К тексту", exact: true }).click();
+  await page.locator(`[data-field-content="${job.tasks.fieldId}"]`).click();await page.getByRole("button", { name: "Отменить правку блока", exact: true }).click();
+  await expect(page.locator(`[data-field-content="${job.tasks.fieldId}"]`)).toHaveText(addition);
+  expect(renderCount()).toBe(2);
+});
+
+test("built E2 current export reuses verified cache and keeps semantic gaps outside DOCX", async ({ page }) => {
+  await page.goto(`${origin}/next.html#secret=synthetic-next-secret-0123456789`);
+  await page.getByLabel("Или вставьте текст").fill(readFileSync(resolve(root, "tests/fixtures/recovery/E2.txt"), "utf8"));
+  await page.getByRole("button", { name: "Создать резюме" }).click();await expect(page.getByText("Резюме готово", { exact: true })).toBeVisible({ timeout: 30000 });
+  await exportCurrent(page);await expect(page.getByRole("button", { name: "Скачать DOCX", exact: true })).toBeEnabled();
+  const file = await downloadDocx(page, "e2-current.docx");
+  expect(file.xml).toContain("Dates not specified");expect(file.xml).not.toContain("Уточните даты");expect(file.xml).not.toContain("Образование не указано");
+  expect(file.xml).not.toContain("team_size_conflict");expect(renderCount()).toBe(1);
+  await page.getByRole("button", { name: "К тексту", exact: true }).click();await exportCurrent(page);
+  await expect(page.getByRole("button", { name: "Скачать DOCX", exact: true })).toBeEnabled();expect(renderCount()).toBe(1);
+  expect((await currentWorkspace(page)).project?.operations.filter(item => item.kind !== "render")).toHaveLength(2);
+});
+
+test("built E1 oversized field stays intact with a located DOCX error and current retry", async ({ page }) => {
+  await createRewriteExample(page);
+  const job = (await currentWorkspace(page)).project?.document.jobs[0];if (!job) throw new Error("Missing job");
+  const long = "x".repeat(4001);await replaceFieldText(page, job.context.fieldId, long);
+  await exportCurrent(page);await expect(page.getByText("Текст поля слишком длинный", { exact: false })).toBeVisible();
+  await expect(page.getByText("Поле: Контекст.", { exact: false })).toBeVisible();await expect(page.getByRole("button", { name: "Скачать DOCX", exact: true })).toHaveCount(0);
+  expect(renderCount()).toBe(1);
+  await page.getByRole("button", { name: "К тексту", exact: true }).click();await expect(page.locator(`[data-field-content="${job.context.fieldId}"]`)).toHaveText(long);
+  await replaceFieldText(page, job.context.fieldId, "Short current context.");await exportCurrent(page);
+  await expect(page.getByRole("button", { name: "Скачать DOCX", exact: true })).toBeEnabled();
+  expect((await downloadDocx(page, "retry-current.docx")).xml).toContain("Short current context.");expect(renderCount()).toBe(2);
+});
+
+test("built E1 editing during DOCX formation rejects late output and retry captures the new text", async ({ page }) => {
+  await createRewriteExample(page);await replaceFieldText(page, "profile/text", "First current profile.");
+  writeFileSync(resolve(runRoot, "hold-export"), "controlled wait");await exportCurrent(page);
+  await expect.poll(() => existsSync(resolve(runRoot, "export-started"))).toBe(true);
+  await page.getByRole("button", { name: "К тексту", exact: true }).click();await replaceFieldText(page, "profile/text", "Newer current profile.");
+  await expect(page.locator(".next-save")).toHaveText("Сохранено");rmSync(resolve(runRoot, "hold-export"));
+  await expect.poll(async () => (await currentWorkspace(page)).project?.operations.at(-1)?.status).toBe("failed");
+  const old = (await currentWorkspace(page)).project?.operations.at(-1);expect(old?.errorCode).toBe("EXPORT_STALE");
+  const stale = await page.request.get(`${origin}/v1/projects/${new URL(page.url()).searchParams.get("project")}/exports/${old?.id}/docx`);expect(stale.status()).toBe(409);
+  await exportCurrent(page);await expect(page.getByRole("button", { name: "Скачать DOCX", exact: true })).toBeEnabled();
+  const file = await downloadDocx(page, "newer-profile.docx");expect(file.xml).toContain("Newer current profile.");expect(file.xml).not.toContain("First current profile.");
+});
+
+test("built E1 active composition and failed save keep the editor mounted and start no export", async ({ page }) => {
+  await createRewriteExample(page);
+  await replaceFieldText(page, "profile/text", "Saved input");await expect(page.locator(".next-save")).toHaveText("Сохранено");
+  await page.evaluate(() => {
+    const editor = document.querySelector('[contenteditable="true"]'), field = document.querySelector('[data-field-content="profile/text"]');
+    if (!editor || !field) throw new Error("Missing editor");const text = document.createTreeWalker(field, NodeFilter.SHOW_TEXT).nextNode();if (!text) throw new Error("Missing text");
+    editor.dispatchEvent(new CompositionEvent("compositionstart", { bubbles: true }));text.textContent = "Saved input入力";
+    editor.dispatchEvent(new InputEvent("input", { bubbles: true, inputType: "insertCompositionText", data: "入力", isComposing: true }));
+    const button = Array.from(document.querySelectorAll('button')).find(button => button.textContent === "Экспорт DOCX");button?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+  });
+  await expect(page.getByText("Завершите ввод и сохраните правки.", { exact: false })).toBeVisible();await expect(page.locator('[contenteditable="true"]')).toHaveCount(1);
+  await expect(page.locator('[data-field-content="profile/text"]')).toHaveText("Saved input入力");expect(renderCount()).toBe(1);
+  await page.evaluate(() => { const editor = document.querySelector('[contenteditable="true"]');editor?.dispatchEvent(new CompositionEvent("compositionend", { bubbles: true, data: "入力" })); });
+  await expect(page.locator(".next-save")).toHaveText("Сохранено");
+  writeFileSync(resolve(runRoot, "fail-user-saves"), "controlled failure");await replaceFieldText(page, "profile/text", "Unsaved kept input.");
+  await page.getByRole("button", { name: "Экспорт DOCX", exact: true }).click();
+  await expect(page.getByText("Завершите ввод и сохраните правки.", { exact: false })).toBeVisible();await expect(page.locator('[contenteditable="true"]')).toHaveCount(1);
+  await expect(page.locator('[data-field-content="profile/text"]')).toHaveText("Unsaved kept input.");expect(renderCount()).toBe(1);
+  rmSync(resolve(runRoot, "fail-user-saves"));
+});
+
+test("built E1 corrupt transport bytes cannot download and retry uses the same verified artifact", async ({ page }) => {
+  await createRewriteExample(page);await exportCurrent(page);await expect(page.getByRole("button", { name: "Скачать DOCX", exact: true })).toBeEnabled();
+  await page.route("**/exports/*/docx", async route => { const result = await route.fetch();const bytes = await result.body();bytes[0] = 0;await route.fulfill({ response: result, body: bytes }); });
+  await page.getByRole("button", { name: "Скачать DOCX", exact: true }).click();await expect(page.getByText("Не удалось скачать DOCX.", { exact: false })).toBeVisible();
+  expect(renderCount()).toBe(1);await page.unroute("**/exports/*/docx");
+  const file = await downloadDocx(page, "verified-retry.docx");expect(file.xml).toContain("Ирина Примерова");expect(renderCount()).toBe(1);
 });
