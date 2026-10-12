@@ -41,6 +41,9 @@ class ControlledProvider(CreationProvider):
         path = self.root/'model-requests.json'
         records = json.loads(path.read_text()) if path.exists() else []
         records.append({'model':request.policy.model,'kind':json.loads(request.text)['task']});path.write_text(json.dumps(records))
+        if request.result_type is GuiSemanticProposal:
+            while (self.root/'hold-normalization').exists():
+                if cancel.wait(.01):raise ContentFailure('CANCELLED')
         if request.result_type is GuiRewriteProposal:
             (self.root / "rewrite-started").touch()
             while (self.root / "hold-rewrite").exists():

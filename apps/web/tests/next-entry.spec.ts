@@ -1175,3 +1175,57 @@ test("built task A18 delayed Rules acknowledgment keeps newer typing and stale c
   await expect(text).toHaveValue(`${original}\nNewer unsent policy`);await expect(page.getByText("Версия правил: 3", { exact: true })).toBeVisible();
   await page.getByRole("button", { name: "Сохранить правила", exact: true }).click();await expect(page.getByText("Версия правил: 4", { exact: true })).toBeVisible();expect(existsSync(resolve(runRoot, "model-requests.json"))).toBe(false);
 });
+
+test("built task A15 start shows local model disclosure and saved projects reopen without calls", async ({ page }) => {
+  await page.setViewportSize({ width: 1280, height: 900 });await page.goto(`${origin}/next.html#secret=synthetic-next-secret-0123456789`);
+  const disclosure = page.getByRole("region", { name: "Хранение и модель", exact: true });await expect(disclosure).toContainText("запись на диск");await expect(disclosure).toContainText("до нажатия");await expect(disclosure).toContainText("модели через CLI");
+  await expect(page.getByRole("region", { name: "Сохранённые проекты", exact: true })).toContainText("Пока нет сохранённых проектов");
+  expect(existsSync(resolve(runRoot, "connection-actions.json"))).toBe(false);expect(existsSync(resolve(runRoot, "model-requests.json"))).toBe(false);
+  if (process.env.FOLDCV_EVIDENCE_ROOT) await page.screenshot({ path: resolve(process.env.FOLDCV_EVIDENCE_ROOT, "A15-start.png") });
+  await createRewriteExample(page);const saved = await currentWorkspace(page), calls = readFileSync(resolve(runRoot, "model-requests.json"), "utf8");
+  await newProject(page);const row = page.locator(`[data-start-project="${saved.projectId}"]`);await expect(row).toBeVisible();await row.getByRole("button").click();
+  await expect(page.locator('[data-field-content="candidate/name"]')).toHaveText("Ирина Примерова");expect((await currentWorkspace(page)).projectId).toBe(saved.projectId);
+  expect(readFileSync(resolve(runRoot, "model-requests.json"), "utf8")).toBe(calls);
+});
+
+test("built example E6 task A15 rejected file replacement cannot reactivate inactive paste or previous source", async ({ page }) => {
+  await page.goto(`${origin}/next.html#secret=synthetic-next-secret-0123456789`);const raw = readFileSync(resolve(root, "tests/fixtures/recovery/E1.txt"));
+  await page.getByLabel("Файл резюме", { exact: true }).setInputFiles({ name: "first.txt", mimeType: "text/plain", buffer: raw });
+  await expect(page.getByRole("button", { name: "Создать резюме", exact: true })).toBeEnabled();const before = await currentWorkspace(page);
+  await page.getByLabel("Или вставьте текст", { exact: true }).fill("Inactive paste must not be sent.");
+  await page.getByLabel("Файл резюме", { exact: true }).setInputFiles({ name: "oversized.txt", mimeType: "text/plain", buffer: Buffer.alloc(6 * 1024 * 1024 + 1, 65) });
+  await expect(page.getByRole("alert").first()).toBeVisible();await expect(page.getByText("Выбрано: oversized.txt", { exact: true })).toBeVisible();
+  await expect(page.getByLabel("Или вставьте текст", { exact: true })).toHaveValue("");await expect(page.getByRole("button", { name: "Создать резюме", exact: true })).toBeDisabled();
+  expect((await currentWorkspace(page)).preDraft).toEqual(before.preDraft);expect(existsSync(resolve(runRoot, "model-requests.json"))).toBe(false);
+  await page.getByLabel("Файл резюме", { exact: true }).setInputFiles({ name: "replacement.txt", mimeType: "text/plain", buffer: raw });await expect(page.getByRole("button", { name: "Создать резюме", exact: true })).toBeEnabled();
+  expect((await currentWorkspace(page)).projectId).toBe(before.projectId);await page.getByRole("button", { name: "Создать резюме", exact: true }).click();
+  await expect(page.getByText("Резюме готово", { exact: true })).toBeVisible({ timeout: 30000 });expect((await currentWorkspace(page)).projectId).toBe(before.projectId);
+  await expect(page.locator('[data-field-content="candidate/name"]')).toHaveText("Ирина Примерова");
+});
+
+test("built task A15 real Generation stages support cancel and explicit retry while keeping input", async ({ page }) => {
+  await page.setViewportSize({ width: 1280, height: 900 });writeFileSync(resolve(runRoot, "hold-normalization"), "Controlled pending normalization.");
+  await page.goto(`${origin}/next.html#secret=synthetic-next-secret-0123456789`);await page.getByRole("button", { name: "Открыть пример", exact: true }).click();
+  await page.getByRole("button", { name: "Создать резюме", exact: true }).click();const progress = page.getByRole("region", { name: "Создание резюме", exact: true });
+  await expect(progress.locator('[data-stage="normalize_semantics"]')).toHaveAttribute("data-status", "running");await expect(progress.locator('[data-stage="draft_prose"]')).toHaveAttribute("data-status", "queued");
+  const before = await currentWorkspace(page);if (process.env.FOLDCV_EVIDENCE_ROOT) await page.screenshot({ path: resolve(process.env.FOLDCV_EVIDENCE_ROOT, "A15-progress.png") });
+  await page.getByRole("button", { name: "Отменить создание", exact: true }).click();await expect(page.getByText("Создание отменено", { exact: true })).toBeVisible();
+  await expect(page.getByLabel("Или вставьте текст", { exact: true })).toHaveValue(readFileSync(resolve(root, "tests/fixtures/recovery/E1.txt"), "utf8"));
+  expect((await currentWorkspace(page)).projectId).toBe(before.projectId);rmSync(resolve(runRoot, "hold-normalization"));
+  await page.getByRole("button", { name: "Повторить создание", exact: true }).click();await expect(page.getByText("Резюме готово", { exact: true })).toBeVisible({ timeout: 30000 });
+  const after = await currentWorkspace(page);expect(after.projectId).toBe(before.projectId);expect(after.generations.at(-1)?.stages.every(stage => stage.status === "completed")).toBe(true);
+  expect(after.project?.operations.filter(operation => operation.kind === "normalize_semantics" || operation.kind === "draft_prose").map(operation => operation.usage?.logicalAttempts)).toEqual([1, 1, 1]);
+});
+
+test("built example E6 task A15 drop and failed file recovery retain project identity before explicit creation", async ({ page }) => {
+  await page.goto(`${origin}/next.html#secret=synthetic-next-secret-0123456789`);const raw = readFileSync(resolve(root, "tests/fixtures/recovery/E1.txt"), "utf8");
+  const transfer = await page.evaluateHandle(text => { const value = new DataTransfer();value.items.add(new File([text], "dropped.txt", { type: "text/plain" }));return value; }, raw);
+  await page.locator(".next-upload").dispatchEvent("drop", { dataTransfer: transfer });await expect(page.getByRole("button", { name: "Создать резюме", exact: true })).toBeEnabled();
+  const before = await currentWorkspace(page);expect(existsSync(resolve(runRoot, "model-requests.json"))).toBe(false);
+  await page.getByLabel("Файл резюме", { exact: true }).setInputFiles({ name: "broken.pdf", mimeType: "application/pdf", buffer: Buffer.from("Synthetic invalid PDF") });
+  await expect(page.getByText("Доступного текста нет. Выберите другой файл или вставьте текст.", { exact: true })).toBeVisible();await expect(page.getByRole("button", { name: "Создать резюме", exact: true })).toBeDisabled();
+  expect((await currentWorkspace(page)).projectId).toBe(before.projectId);expect(existsSync(resolve(runRoot, "model-requests.json"))).toBe(false);
+  await page.getByLabel("Или вставьте текст", { exact: true }).fill(raw);await page.getByRole("button", { name: "Создать резюме", exact: true }).click();
+  await expect(page.getByText("Резюме готово", { exact: true })).toBeVisible({ timeout: 30000 });const after = await currentWorkspace(page);
+  expect(after.projectId).toBe(before.projectId);expect(after.project?.sources).toHaveLength(3);expect(after.project?.operations.filter(operation => operation.kind === "normalize_semantics" || operation.kind === "draft_prose")).toHaveLength(2);
+});
