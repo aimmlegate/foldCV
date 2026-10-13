@@ -191,6 +191,30 @@ def validate_span(span: EvidenceSpan, sources: list[Source]) -> Evidence:
     return Evidence.model_validate(span.model_dump(by_alias=True, exclude={"text"}))
 
 
+def literal_contains(value: str, source: str) -> bool:
+    return " ".join(value.split()) in " ".join(source.split())
+
+
+def supported_text(value: str, spans: list[EvidenceSpan], sources: list[Source]) -> bool:
+    if any(literal_contains(value.casefold(), span.text.casefold()) for span in spans):
+        return True
+    if len(spans) < 2:
+        return False
+    located = []
+    for span in spans:
+        source = next((source for source in sources if source.id == span.source_id and source.revision == span.source_revision), None)
+        unit = next((unit for unit in source.units if unit.id == span.unit_id and unit.revision == span.unit_revision), None) if source else None
+        if unit is None or span.text.strip() != unit.text.strip() or unit.location.kind != "page":
+            return False
+        located.append(unit)
+    # Consecutive complete PDF units on the same page prove a wrapped source continuation.
+    if any(a.source_id != b.source_id or a.source_revision != b.source_revision
+           or first.order + 1 != second.order or first.location != second.location
+           for a, b, first, second in zip(spans, spans[1:], located, located[1:])):
+        return False
+    return literal_contains(value.casefold(), "\n".join(unit.text for unit in located).casefold())
+
+
 def normalize_candidate(request: GuiNormalizeRequest, proposal: GuiSemanticProposal, rules: Rules) -> GuiNormalizedResult:
     sources = [source.model_copy(deep=True) for source in request.sources]
     for source in sources:
@@ -211,7 +235,8 @@ def normalize_candidate(request: GuiNormalizeRequest, proposal: GuiSemanticPropo
 
     def add_text(field_id: str, value: SupportedText, category: str):
         refs = [validate_span(span, sources) for span in value.evidence]
-        if value.text and (not refs or value.text.casefold() not in "\n".join(span.text for span in value.evidence).casefold()):
+        # PDF line wraps may differ from the supported field's display spacing.
+        if value.text and (not refs or not supported_text(value.text, value.evidence, sources)):
             raise NormalizationFailure("UNSUPPORTED_CANDIDATE_VALUE")
         if not value.text:
             if value.evidence:

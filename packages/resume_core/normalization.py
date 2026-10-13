@@ -16,6 +16,7 @@ from .models.contracts import (DateFact, Evidence, Fact, LeadershipFact, Leaders
                                TextFact, TextValue, Wire)
 from .technologies import CATALOG, resolve_technology
 from .dates import partial_date
+from .source_dates import NAMED_DATE, observed_named_date
 
 
 class SourceInput(Wire):
@@ -243,7 +244,9 @@ def _observed_date(date: PartialDate, text: str) -> bool:
         literal += f"-{date.month:02d}"
     if date.day is not None:
         literal += f"-{date.day:02d}"
-    return any(match.group(1) == literal for match in DATE.finditer(text))
+    named_spans = [match.span() for match in NAMED_DATE.finditer(text)]
+    return any(match.group(1) == literal and not any(start <= match.start() < end for start, end in named_spans)
+               for match in DATE.finditer(text)) or observed_named_date(date, text)
 
 
 def _observed_number(number: float, text: str) -> bool:

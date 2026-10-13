@@ -7,16 +7,30 @@ import re
 
 from .gui_normalization import (
     FactConflict, GuiNormalizeRequest, GuiNormalizedResult, GuiSemanticProposal,
-    NormalizationFailure, NormalizedPeriod, validate_span,
+    NormalizationFailure, NormalizedPeriod, validate_span, literal_contains, supported_text,
 )
 from .models.contracts import Job, PartialDate, Period, Subproject, TechnologyValue
-from .models.recovery import EmploymentFact, GuiTextFact, GuiTechnologyFact, GuiMetricFact, GuiLeadershipFact, GuiDateFact
+from .models.recovery import EvidenceSpan, EmploymentFact, GuiTextFact, GuiTechnologyFact, GuiMetricFact, GuiLeadershipFact, GuiDateFact
 from .normalization import _id, _observed_date, _observed_number
 from .technologies import resolve_technology
 
 
 FACT_TYPES = {"text": GuiTextFact, "technology": GuiTechnologyFact, "metric": GuiMetricFact,
               "leadership": GuiLeadershipFact, "date": GuiDateFact}
+PRESENT = re.compile(r"(?<!\w)(?:по\s+)?(?:настоящее\s+время|н\.?\s*в\.?|present|current|ongoing|to\s+date)(?!\w)", re.I)
+
+
+def _supported_header(value, source_id, unit_ids, sources):
+    source = next(source for source in sources if source.id == source_id)
+    groups = []
+    previous = None
+    for unit in sorted((unit for unit in source.units if unit.id in unit_ids), key=lambda unit: unit.order):
+        if previous is None or previous.order + 1 != unit.order or previous.location != unit.location:
+            groups.append([])
+        groups[-1].append(EvidenceSpan(sourceId=source.id, sourceRevision=source.revision,
+            unitId=unit.id, unitRevision=unit.revision, text=unit.text))
+        previous = unit
+    return any(supported_text(value, group, sources) for group in groups)
 
 
 def _date_text(date: PartialDate | None) -> str:
@@ -48,7 +62,7 @@ def normalize_employment(request: GuiNormalizeRequest, proposal: GuiSemanticProp
         if not job.unit_ids or len(set(job.unit_ids)) != len(job.unit_ids) or any((job.source_id, uid) not in units for uid in job.unit_ids):
             raise NormalizationFailure("INVALID_JOB_EVIDENCE")
         text = "\n".join(units[(job.source_id, uid)].text for uid in job.unit_ids)
-        if job.employer not in text or job.role not in text:
+        if any(not _supported_header(value, job.source_id, job.unit_ids, result.sources) for value in (job.employer, job.role)):
             raise NormalizationFailure("UNSUPPORTED_EMPLOYMENT_LITERAL")
         periods = []
         projection = []
@@ -60,13 +74,16 @@ def normalize_employment(request: GuiNormalizeRequest, proposal: GuiSemanticProp
             for date in (period.start, period.end):
                 if date is not None and not _observed_date(date, evidence_text):
                     raise NormalizationFailure("UNSUPPORTED_EMPLOYMENT_DATE")
-            if period.present and (period.start is None or period.end is not None or period.end_text):
+            if period.present and (period.start is None or period.end is not None):
+                raise NormalizationFailure("INVALID_PRESENT_PERIOD")
+            if period.present and (not PRESENT.search(evidence_text) or
+                    period.end_text and not PRESENT.fullmatch(period.end_text.strip())):
                 raise NormalizationFailure("INVALID_PRESENT_PERIOD")
             if period.start and period.end and period.start.lower() > period.end.upper():
                 raise NormalizationFailure("INVALID_EMPLOYMENT_PERIOD")
             start_text = period.start_text if period.start_text is not None else _date_text(period.start)
-            end_text = period.end_text if period.end_text is not None else _date_text(period.end)
-            if period.start_text and period.start_text not in evidence_text or period.end_text and period.end_text not in evidence_text:
+            end_text = "" if period.present else period.end_text if period.end_text is not None else _date_text(period.end)
+            if period.start_text and not literal_contains(period.start_text, evidence_text) or period.end_text and not literal_contains(period.end_text, evidence_text):
                 raise NormalizationFailure("UNSUPPORTED_PERIOD_TEXT")
             periods.append(NormalizedPeriod.model_validate({"id": _id("period", job_ids[temp], str(index), start_text, end_text),
                 "start": period.start.model_dump(by_alias=True) if period.start else None,
@@ -80,7 +97,7 @@ def normalize_employment(request: GuiNormalizeRequest, proposal: GuiSemanticProp
             if (temp, sub.temp_id) in sub_ids or not sub.unit_ids or not set(sub.unit_ids) <= set(job.unit_ids):
                 raise NormalizationFailure("INVALID_SUBPROJECT_EVIDENCE")
             subtext = "\n".join(units[(job.source_id, uid)].text for uid in sub.unit_ids)
-            if sub.name not in subtext:
+            if not _supported_header(sub.name, job.source_id, sub.unit_ids, result.sources):
                 raise NormalizationFailure("UNSUPPORTED_SUBPROJECT_LITERAL")
             if sub.period:
                 for date in (sub.period.start, sub.period.end):
@@ -115,7 +132,8 @@ def normalize_employment(request: GuiNormalizeRequest, proposal: GuiSemanticProp
             raise NormalizationFailure("FACT_OUTSIDE_SUBPROJECT")
         literal = "\n".join(span.text for span in item.literal_evidence)
         value = item.value.model_dump(mode="json", by_alias=True)
-        if item.kind == "text" and item.value.text not in literal:
+        if item.kind == "text" and item.value.text not in literal and not any(
+                literal_contains(item.value.text, span.text) for span in item.literal_evidence):
             raise NormalizationFailure("UNSUPPORTED_FACT_TEXT")
         if item.kind == "date" and not _observed_date(item.value, literal):
             raise NormalizationFailure("UNSUPPORTED_FACT_DATE")
@@ -130,7 +148,8 @@ def normalize_employment(request: GuiNormalizeRequest, proposal: GuiSemanticProp
                 raise NormalizationFailure("UNSUPPORTED_METRIC_BOUNDS")
         if item.kind == "technology":
             technology = item.value
-            if not isinstance(technology, TechnologyValue) or technology.display not in literal:
+            if not isinstance(technology, TechnologyValue) or not any(
+                    literal_contains(technology.display.casefold(), span.text.casefold()) for span in item.literal_evidence):
                 raise NormalizationFailure("UNSUPPORTED_TECHNOLOGY_LITERAL")
             if (technology.scope == "global" and job is not None or
                 technology.scope == "job" and (job is None or sub_id is not None) or

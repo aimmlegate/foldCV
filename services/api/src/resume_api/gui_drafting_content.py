@@ -7,18 +7,20 @@ from packages.resume_core.gui_drafting import GuiDraftRequest, GuiDraftProposal,
 from packages.resume_core.models.recovery import Rules
 
 from .gui_content import generate_admitted
+from .gui_drafting_transport import DraftingTransport
 from .lifecycle import OperationFiles
-from .providers.content import ContentFailure, ContentInput, ContentProvider, GenerationPolicy
+from .providers.content import ContentFailure, ContentInput, ContentProvider, GenerationPolicy, MAX_GENERATION_SECONDS
 
 
 class GuiDraftingContentService:
     def __init__(self, provider: ContentProvider, model: str):
         self.provider = provider
-        self.policy = GenerationPolicy(model=model, timeout_seconds=60, allow_repair=False)
+        self.policy = GenerationPolicy(model=model, timeout_seconds=MAX_GENERATION_SECONDS, allow_repair=False)
 
     def run(self, request: GuiDraftRequest, rules: Rules, files: OperationFiles, cancel: threading.Event):
         captured = request.model_copy(deep=True)
-        response = generate_admitted(self.provider, ContentInput(drafting_input(captured, rules), GuiDraftProposal, self.policy), files, cancel)
+        response = generate_admitted(self.provider, ContentInput(drafting_input(captured, rules), GuiDraftProposal,
+            self.policy, DraftingTransport(captured)), files, cancel)
         if cancel.is_set():
             raise ContentFailure("CANCELLED", logical_attempts=response.logical_attempts, usage=response.usage)
         try:

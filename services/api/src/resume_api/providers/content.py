@@ -13,6 +13,12 @@ from resume_api.lifecycle import OperationFiles
 
 
 ResultT = TypeVar("ResultT", bound=BaseModel)
+MAX_GENERATION_SECONDS = 180
+
+
+class ContentTransport(Protocol[ResultT]):
+    def encode(self, text: str) -> str: ...
+    def restore(self, value: ResultT) -> ResultT: ...
 
 
 @dataclass(frozen=True)
@@ -25,7 +31,7 @@ class GenerationPolicy:
     allow_repair: bool = True
 
     def __post_init__(self) -> None:
-        if (not math.isfinite(self.timeout_seconds) or not 0 < self.timeout_seconds <= 60
+        if (not math.isfinite(self.timeout_seconds) or not 0 < self.timeout_seconds <= MAX_GENERATION_SECONDS
                 or not 0 < self.max_input_bytes <= 65_536
                 or not 0 < self.max_total_input_bytes <= 131_072
                 or not 0 < self.max_total_output_bytes <= 262_144
@@ -38,6 +44,7 @@ class ContentInput(Generic[ResultT]):
     text: str
     result_type: type[ResultT]
     policy: GenerationPolicy
+    transport: ContentTransport[ResultT] | None = None
 
 
 @dataclass(frozen=True)

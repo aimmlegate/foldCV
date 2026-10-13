@@ -64,6 +64,24 @@ def request(*, timeout: float = 3, max_total_input_bytes: int = 16_384) -> Conte
                                                         max_total_input_bytes=max_total_input_bytes))
 
 
+def test_encoded_transport_size_is_bounded_before_cli_dispatch(fake):
+    from dataclasses import replace
+
+    class Oversized:
+        def encode(self, _text):
+            return "x" * 65_537
+
+        def restore(self, value):
+            return value
+
+    cli, root, keep, _configure, starts = fake
+    provider = CodexCliProvider(cli, fixture_transport=FixtureTransport(cli))
+    with OperationFiles(root).open() as files, pytest.raises(ContentFailure) as error:
+        provider.generate(replace(request(), transport=Oversized()), files, threading.Event())
+    assert error.value.code == "INPUT_TOO_LARGE" and starts() == 0
+    assert list(root.iterdir()) == [keep]
+
+
 def generate(fake, *, case: str = "valid", fixture: bool = True, **config: object):
     cli, root, keep, configure, starts = fake
     configure(case, **config)
@@ -151,24 +169,25 @@ def test_valid_intermediate_message_cannot_hide_invalid_final_response(fake) -> 
 
 
 @pytest.mark.parametrize("operation", ["normalize", "draft"])
-@pytest.mark.parametrize("elapsed", [31, 61])
-def test_gui_creation_waits_past_thirty_seconds_but_keeps_sixty_second_deadline(fake, monkeypatch, operation, elapsed) -> None:
+@pytest.mark.parametrize("elapsed", [31, 61, 179, 181])
+def test_gui_creation_waits_past_thirty_seconds_but_keeps_bounded_deadline(fake, monkeypatch, operation, elapsed) -> None:
     from packages.resume_core.gui_drafting import drafting_input
-    from packages.resume_core.gui_normalization import normalization_input
     from resume_api.gui_drafting_content import GuiDraftingContentService
     from resume_api.gui_normalization_content import GuiNormalizationContentService
     from tests.recovery.candidate_fixtures import ROOT, request as normalize_request, proposal
     from tests.recovery.draft_fixtures import RULES, draft_request, draft_reply
 
     if operation == "normalize":
+        from resume_api.gui_normalization_transport import NormalizationTransport
         content_request = normalize_request((ROOT / "E1.txt").read_text())
         reply = proposal(content_request)
-        prompt = normalization_input(content_request, RULES)
+        prompt = NormalizationTransport(content_request).prompt(RULES)
         service_type = GuiNormalizationContentService
     else:
+        from resume_api.gui_drafting_transport import DraftingTransport
         content_request = draft_request()
         reply = draft_reply(content_request)
-        prompt = drafting_input(content_request, RULES)
+        prompt = DraftingTransport(content_request).encode(drafting_input(content_request, RULES))
         service_type = GuiDraftingContentService
     cli, root, keep, configure, starts = fake
     configure("valid", prompt=prompt, result_text=reply.model_dump_json(by_alias=True),
@@ -190,7 +209,7 @@ def test_gui_creation_waits_past_thirty_seconds_but_keeps_sixty_second_deadline(
     monkeypatch.setattr(provider.process, "run", delayed_run)
     with OperationFiles(root).open() as files:
         service = service_type(provider, "gpt-6-luna")
-        if elapsed < 60:
+        if elapsed < 180:
             result, usage = service.run(content_request, RULES, files, threading.Event())
             candidate = result.candidate if operation == "normalize" else result.document.candidate
             assert candidate.name.text == "Ирина Примерова"

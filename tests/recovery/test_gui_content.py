@@ -105,8 +105,8 @@ def test_gui_success_preserves_usage_and_does_not_double_count(tmp_path, reporte
 
 @pytest.mark.parametrize("repair", [True, False])
 def test_gui_repair_setting_does_not_remove_runtime_timeout_ceiling(repair):
-    assert GenerationPolicy("fixture", timeout_seconds=60, allow_repair=repair).timeout_seconds == 60
-    for seconds in [60.01, 0, float("inf"), float("nan")]:
+    assert GenerationPolicy("fixture", timeout_seconds=180, allow_repair=repair).timeout_seconds == 180
+    for seconds in [180.01, 0, float("inf"), float("nan")]:
         with pytest.raises(ValueError, match="generation limits"):
             GenerationPolicy("fixture", timeout_seconds=seconds, allow_repair=repair)
 

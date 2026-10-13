@@ -329,8 +329,9 @@ class CodexCliProvider:
         if not isinstance(request.text, str) or not request.text:
             raise ContentFailure("INVALID_INPUT")
         try:
-            original = request.text.encode("utf-8", "strict")
-        except UnicodeError:
+            text = request.transport.encode(request.text) if request.transport else request.text
+            original = text.encode("utf-8", "strict")
+        except (UnicodeError, ValueError, TypeError):
             raise ContentFailure("INVALID_INPUT") from None
         if len(original) > policy.max_input_bytes:
             raise ContentFailure("INPUT_TOO_LARGE")
@@ -381,6 +382,11 @@ class CodexCliProvider:
                         usages.append(events.usage)
                     consumed_output += len(output) + len(errors)
                     value = events.result(request.result_type, output_schema)
+                    if request.transport:
+                        try:
+                            value = request.result_type.model_validate(request.transport.restore(value), strict=True)
+                        except (ValidationError, ValueError):
+                            raise InvalidFinal() from None
                     self.process._check(deadline, cancel)
                     return ContentResult(value, _combine(usages), probe.version, policy.model,
                                          self.clock() - start, attempts)
