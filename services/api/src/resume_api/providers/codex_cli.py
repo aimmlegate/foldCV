@@ -109,6 +109,7 @@ class Events:
         self.turn = False
         self.complete = False
         self.text: str | None = None
+        self.message_ids: set[str] = set()
         self.usage = ReportedUsage()
 
     def accept(self, raw: bytes) -> None:
@@ -120,6 +121,10 @@ class Events:
             self.thread = True
         elif kind == "turn.started" and self.thread and not self.turn:
             self.turn = True
+        elif kind == "item.completed" and self.thread and isinstance(event.get("item"), dict) and event["item"].get("type") == "error":
+            # Exec emits nonfatal warnings as error items, including before the turn.
+            if not isinstance(event["item"].get("message"), str):
+                raise ContentFailure("INVALID_RESULT")
         elif kind in {"item.started", "item.updated", "item.completed"} and self.turn:
             item = event.get("item")
             if not isinstance(item, dict):
@@ -127,8 +132,11 @@ class Events:
             if item.get("type") not in {"reasoning", "agent_message"}:
                 raise ContentFailure("UNEXPECTED_TOOL_ACTIVITY")
             if kind == "item.completed" and item["type"] == "agent_message":
-                if self.text is not None or not isinstance(item.get("text"), str):
+                message_id = item.get("id")
+                if not isinstance(message_id, str) or not message_id or message_id in self.message_ids or not isinstance(item.get("text"), str):
                     raise ContentFailure("INVALID_RESULT")
+                self.message_ids.add(message_id)
+                # The last completed assistant message is the structured final response.
                 self.text = item["text"]
         elif kind == "turn.completed" and self.turn and self.text is not None:
             self.usage = _usage(event.get("usage"))

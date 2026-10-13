@@ -182,6 +182,17 @@ if case == "duplicate_completion":
     events.append(events[-1])
 if case == "duplicate_message":
     events.insert(3, events[2])
+if case == "intermediate_message":
+    events.insert(2, {"type": "item.completed", "item": {
+        "id": "synthetic-progress", "type": "agent_message", "text": "Checking synthetic facts."}})
+if case in ("startup_warning", "invalid_startup_warning"):
+    events.insert(1, {"type": "item.completed", "item": {
+        "id": "synthetic-warning", "type": "error", "message":
+        "An optional synthetic feature is unavailable." if case == "startup_warning" else 42}})
+if case == "intermediate_invalid_final":
+    events.insert(2, {"type": "item.completed", "item": {
+        "id": "synthetic-progress", "type": "agent_message", "text": '{"summary":"Earlier synthetic response"}'}})
+    events[3]["item"]["text"] = '{"summary":42}'
 if case == "out_of_order":
     events.reverse()
 if case == "unknown_event":

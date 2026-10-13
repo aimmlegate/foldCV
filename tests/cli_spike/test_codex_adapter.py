@@ -113,6 +113,7 @@ def test_success_reports_usage_and_native_metadata_without_idle_generation(fake)
     ("nonzero_after_complete", "CLI_FAILED"), ("nonzero", "CLI_FAILED"),
     ("quota", "RATE_LIMITED"), ("expired", "AUTH_REQUIRED"),
     ("bad_error_code", "CLI_FAILED"),
+    ("invalid_startup_warning", "INVALID_RESULT"),
     ("model_denied", "MODEL_DENIED"), ("excessive", "OUTPUT_TOO_LARGE"),
     ("excessive_stderr", "OUTPUT_TOO_LARGE"),
 ])
@@ -128,6 +129,25 @@ def test_fragmented_utf8_unknown_optional_and_unknown_usage(fake) -> None:
     assert result.usage.input_tokens is None and result.usage.output_tokens is None
     assert not result.usage.complete and result.internal_inference_count is None
     assert count == 2
+
+
+def test_intermediate_agent_message_does_not_replace_structured_final_or_start_repair(fake) -> None:
+    result, count = generate(fake, case="intermediate_message")
+    assert result.value.summary == "Fictional engineer builds small services."
+    assert result.usage.input_tokens == 100 and result.usage.output_tokens == 12
+    assert result.logical_attempts == count == 1
+
+
+def test_nonfatal_startup_error_item_preserves_final_result_and_usage(fake) -> None:
+    result, count = generate(fake, case="startup_warning")
+    assert result.value.summary == "Fictional engineer builds small services."
+    assert result.usage.input_tokens == 100 and result.usage.complete
+    assert result.logical_attempts == count == 1
+
+
+def test_valid_intermediate_message_cannot_hide_invalid_final_response(fake) -> None:
+    error = failure(fake, "intermediate_invalid_final", "INVALID_RESULT", 2)
+    assert error.logical_attempts == 2 and error.usage.input_tokens == 200
 
 
 def test_output_contract_is_code_owned_and_generic(fake) -> None:
