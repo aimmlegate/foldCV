@@ -15,7 +15,7 @@ from .providers.content import ContentFailure, ContentInput, ContentProvider, Ge
 class GuiNormalizationContentService:
     def __init__(self, provider: ContentProvider, model: str):
         self.provider = provider
-        self.policy = GenerationPolicy(model=model, allow_repair=False)
+        self.policy = GenerationPolicy(model=model, timeout_seconds=60, allow_repair=False)
 
     def run(self, request: GuiNormalizeRequest, rules: Rules, files: OperationFiles, cancel: threading.Event):
         captured = request.model_copy(deep=True)

@@ -150,6 +150,59 @@ def test_valid_intermediate_message_cannot_hide_invalid_final_response(fake) -> 
     assert error.logical_attempts == 2 and error.usage.input_tokens == 200
 
 
+@pytest.mark.parametrize("operation", ["normalize", "draft"])
+@pytest.mark.parametrize("elapsed", [31, 61])
+def test_gui_creation_waits_past_thirty_seconds_but_keeps_sixty_second_deadline(fake, monkeypatch, operation, elapsed) -> None:
+    from packages.resume_core.gui_drafting import drafting_input
+    from packages.resume_core.gui_normalization import normalization_input
+    from resume_api.gui_drafting_content import GuiDraftingContentService
+    from resume_api.gui_normalization_content import GuiNormalizationContentService
+    from tests.recovery.candidate_fixtures import ROOT, request as normalize_request, proposal
+    from tests.recovery.draft_fixtures import RULES, draft_request, draft_reply
+
+    if operation == "normalize":
+        content_request = normalize_request((ROOT / "E1.txt").read_text())
+        reply = proposal(content_request)
+        prompt = normalization_input(content_request, RULES)
+        service_type = GuiNormalizationContentService
+    else:
+        content_request = draft_request()
+        reply = draft_reply(content_request)
+        prompt = drafting_input(content_request, RULES)
+        service_type = GuiDraftingContentService
+    cli, root, keep, configure, starts = fake
+    configure("valid", prompt=prompt, result_text=reply.model_dump_json(by_alias=True),
+              schema_required=type(reply).model_json_schema()["required"])
+    now = [0.0]
+    provider = CodexCliProvider(cli, fixture_transport=FixtureTransport(cli), clock=lambda: now[0])
+    run_process = provider.process.run
+
+    def delayed_run(files, args, **kwargs):
+        accept = kwargs.get("on_line")
+        if args[0] == "exec" and accept is not None:
+            def delayed_line(raw):
+                if json.loads(raw)["type"] == "turn.completed":
+                    now[0] = elapsed
+                return accept(raw)
+            kwargs["on_line"] = delayed_line
+        return run_process(files, args, **kwargs)
+
+    monkeypatch.setattr(provider.process, "run", delayed_run)
+    with OperationFiles(root).open() as files:
+        service = service_type(provider, "gpt-6-luna")
+        if elapsed < 60:
+            result, usage = service.run(content_request, RULES, files, threading.Event())
+            candidate = result.candidate if operation == "normalize" else result.document.candidate
+            assert candidate.name.text == "Ирина Примерова"
+            assert usage["logicalAttempts"] == 1 and usage["inputTokens"] == 100
+        else:
+            with pytest.raises(ContentFailure) as raised:
+                service.run(content_request, RULES, files, threading.Event())
+            assert raised.value.code == "DEADLINE_EXCEEDED"
+            assert raised.value.logical_attempts == 1
+    assert starts() == 1 and list(root.iterdir()) == [keep]
+
+
 def test_output_contract_is_code_owned_and_generic(fake) -> None:
     cli, root, keep, configure, starts = fake
     configure("valid", schema_required=["heading"], result_text='{"heading":"Synthetic heading"}')
