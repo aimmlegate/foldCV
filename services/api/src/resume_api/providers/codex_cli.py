@@ -19,6 +19,7 @@ from resume_api.cli.experimental_profile import ExperimentalCliProfile, Experime
 from resume_api.lifecycle import OperationFiles, SpikeError
 from resume_api.providers.content import (ContentFailure, ContentInput, ContentResult,
                                           ReportedUsage, ResultT)
+from resume_api.providers.structured_schema import StructuredSchema
 from spikes.cli.profile import FIXTURE_VERSION, GAPS, REQUIRED_FLAGS, VERSION, exec_arguments, overrides
 
 
@@ -143,21 +144,27 @@ class Events:
             self.complete = True
         elif kind in {"error", "turn.failed"}:
             detail = event.get("error")
+            if not isinstance(detail, dict) and isinstance(event.get("message"), str):
+                try:
+                    envelope = strict_json(event["message"])
+                    detail = envelope.get("error") if isinstance(envelope, dict) else None
+                except ContentFailure:
+                    detail = None
             code = detail.get("code") if isinstance(detail, dict) else None
             mapped = {"rate_limit_exceeded": "RATE_LIMITED", "authentication_error": "AUTH_REQUIRED",
-                      "model_not_supported": "MODEL_DENIED"}
+                      "model_not_supported": "MODEL_DENIED", "invalid_json_schema": "INVALID_SCHEMA"}
             raise ContentFailure(mapped.get(code, "CLI_FAILED") if isinstance(code, str) else "CLI_FAILED")
         else:
             raise ContentFailure("INVALID_RESULT")
 
-    def result(self, model: type[ResultT]) -> ResultT:
+    def result(self, model: type[ResultT], schema: StructuredSchema) -> ResultT:
         if not self.complete or self.text is None:
             raise ContentFailure("INCOMPLETE_STREAM")
         try:
             value = strict_json(self.text)
             if not isinstance(value, dict):
                 raise InvalidFinal()
-            return model.model_validate(value, strict=True)
+            return model.model_validate(schema.restore(value, model), strict=True)
         except (ContentFailure, ValidationError, ValueError):
             raise InvalidFinal() from None
 
@@ -331,9 +338,10 @@ class CodexCliProvider:
                 or request.result_type.model_config.get("extra") != "forbid"):
             raise ContentFailure("INVALID_SCHEMA")
         try:
-            schema = json.dumps(request.result_type.model_json_schema(), ensure_ascii=False,
+            output_schema = StructuredSchema(request.result_type.model_json_schema())
+            schema = json.dumps(output_schema.wire, ensure_ascii=False,
                                 allow_nan=False, separators=(",", ":")).encode("utf-8")
-        except (ValueError, TypeError, UnicodeError):
+        except (ValueError, TypeError, UnicodeError, KeyError, RecursionError):
             raise ContentFailure("INVALID_SCHEMA") from None
         if len(schema) > MAX_SCHEMA:
             raise ContentFailure("INVALID_SCHEMA")
@@ -372,7 +380,7 @@ class CodexCliProvider:
                     finally:
                         usages.append(events.usage)
                     consumed_output += len(output) + len(errors)
-                    value = events.result(request.result_type)
+                    value = events.result(request.result_type, output_schema)
                     self.process._check(deadline, cancel)
                     return ContentResult(value, _combine(usages), probe.version, policy.model,
                                          self.clock() - start, attempts)

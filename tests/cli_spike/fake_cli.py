@@ -92,6 +92,30 @@ for key in ["TMPDIR", "XDG_CACHE_HOME", "XDG_DATA_HOME", "XDG_STATE_HOME"]:
     assert Path(os.environ[key]).is_relative_to(Path.cwd())
 schema = json.loads(Path(args[args.index("--output-schema") + 1]).read_text())
 assert schema["required"] == config.get("schema_required", ["summary"]) and schema["additionalProperties"] is False
+
+
+def schema_error(node):
+    if "oneOf" in node or "discriminator" in node:
+        return "Unsupported exclusive union"
+    if node.get("type") == "object":
+        if node.get("additionalProperties") is not False:
+            return "Object must be closed"
+        missing = set(node.get("properties", {})) - set(node.get("required", []))
+        if missing:
+            return "Missing required property: " + sorted(missing)[0]
+    children = list(node.get("properties", {}).values()) + list(node.get("$defs", {}).values())
+    children += node.get("anyOf", [])
+    if isinstance(node.get("items"), dict):
+        children.append(node["items"])
+    return next((error for child in children if (error := schema_error(child))), None)
+
+
+problem = schema_error(schema)
+if problem or case == "schema_rejected":
+    emit({"type": "error", "message": json.dumps({"type": "error", "status": 400,
+          "error": {"type": "invalid_request_error", "code": "invalid_json_schema",
+                    "message": problem or "synthetic-secret schema rejected", "param": "text.format.schema"}})})
+    sys.exit(1)
 prompt = sys.stdin.read()
 attempt = sum(json.loads(line).get("generation", False) for line in (base / "audit.jsonl").read_text().splitlines())
 if prompt != config["prompt"]:
