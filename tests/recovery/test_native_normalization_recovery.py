@@ -45,6 +45,19 @@ def test_supported_native_rows_keep_canonical_facts_without_partial_warning():
     assert result.candidate == expected.candidate and unresolved == 0
 
 
+def test_native_cli_task_precedes_json_without_changing_source_or_rules():
+    from packages.resume_core.gui_normalization import normalization_input
+    captured = source()
+    transport = NativeNormalizationTransport(captured, RULES)
+    encoded = transport.encode(normalization_input(captured, RULES))
+    task, payload = encoded.split("\n\nRequest payload:\n", 1)
+    assert task.startswith("Extract the actual resume")
+    request = json.loads(payload)
+    assert request["rulesUsed"] == RULES.model_dump(mode="json", by_alias=True)
+    assert [row["text"] for row in request["input"]["sources"][0]["units"]] == [unit.text for unit in captured.sources[0].units]
+    assert len(encoded.encode()) < 65_536
+
+
 @pytest.mark.parametrize("change", ["citation", "ownership", "malformed", "unknown_kind"])
 def test_one_bad_native_fact_does_not_block_other_jobs_or_verified_facts(change):
     captured = source()
