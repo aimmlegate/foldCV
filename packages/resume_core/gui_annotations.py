@@ -18,6 +18,13 @@ def filled_section(rows) -> bool:
     return any(row.visible and any(field.text.strip() for field in authored_fields(row)) for row in rows)
 
 
+def unresolved_source_units(normalized):
+    assessments = {fact.id for fact in normalized.facts if fact.kind == "name_assessment"
+        or fact.kind == "source_observation" and fact.value.source_observed_at is None}
+    return [(source, unit) for source in normalized.sources for unit in source.units
+        if unit.text.strip() and unit.disposition == "unresolved" and not set(unit.represented_fact_ids) - assessments]
+
+
 def initial_annotations(project_id: str, document: Document, normalized: GuiNormalizedResult,
                         warnings: list[Annotation], dependencies: Dependencies) -> list[Annotation]:
     marks = [mark.model_copy(update={"dependencies": dependencies.model_copy(deep=True)}, deep=True)
@@ -29,11 +36,7 @@ def initial_annotations(project_id: str, document: Document, normalized: GuiNorm
             factIds=fact_ids or [], reason=reason, evidence=evidence or [], resolved=False,
             updateSuggestionId=None, removedFocus=[]))
 
-    assessments = {fact.id for fact in normalized.facts if fact.kind == "name_assessment"
-        or fact.kind == "source_observation" and fact.value.source_observed_at is None}
-    unresolved_source = any(unit.text.strip() and unit.disposition == "unresolved"
-        and not set(unit.represented_fact_ids) - assessments for source in normalized.sources for unit in source.units)
-    if normalized._native_recovery_count or unresolved_source:
+    if normalized._native_recovery_count or unresolved_source_units(normalized):
         add("source_details_unresolved", "warning", {"kind": "document"},
             "Some source details could not be structured. Review the saved source.")
 

@@ -15,6 +15,7 @@ from packages.resume_core.project_store import ProjectStoreFailure
 from packages.resume_core.rich_api import RichGenerationState, RichProjectResponse
 from packages.resume_core.rich_archive import archive_payload, export_rich_archive, open_rich_archive
 from packages.resume_core.rich_assembly import assemble_rich, identity
+from packages.resume_core.gui_annotations import unresolved_source_units
 from packages.resume_core.rich_mutations import RichMutationFailure, apply_rich_mutation
 from packages.resume_core.rich_project_store import RichProjectStore
 from packages.resume_core.rendering.rich_docx import RENDERER_VERSION, current_snapshot, renderer_sha256, validate_export
@@ -243,7 +244,8 @@ class RichProjectService(RichSynchronization, RichAssets, GuiProjectService):
             workspace.rules_used, workspace.source_observed_at = rules, normalized.source_observed_at
             if not workspace.title_manually_set:
                 workspace.title = draft.document.candidate.name.text or workspace.title
-            for code in dict.fromkeys([*[code for source in normalized.sources for code in source.warnings], *[a.code for a in draft.annotations]]):
+            unresolved = ["source_details_unresolved"] if normalized._native_recovery_count or unresolved_source_units(normalized) else []
+            for code in dict.fromkeys([*[code for source in normalized.sources for code in source.warnings], *[a.code for a in draft.annotations], *unresolved]):
                 workspace.warnings.append(RichWarning(id=identity("warning"), code=code, blockIds=[], recordIds=[], evidence=[]))
             if self.persist(identifier) == "failed":
                 raise ProjectFailure("PROJECT_SAVE_FAILED", 503)

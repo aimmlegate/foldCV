@@ -10,6 +10,7 @@ import { validateRichWorkspaceShape } from "../src/rich/validate";
 import { validateRichDocumentShape } from "../src/rich/validate";
 import { copyBlock, mergeBlocks } from "../src/rich/structure";
 import { documentSteps, RichSaveQueue } from "../src/rich/save-queue";
+import { normalizeInline } from "../src/rich/normalize";
 
 function response(): RichProjectResponse {
   const workspace: unknown = structuredClone(fixture);
@@ -17,6 +18,18 @@ function response(): RichProjectResponse {
   return { workspace, durability: "durable", savedProjectRevision: workspace.projectRevision,
     savedDocumentRevision: workspace.documentRevision, saveError: null, generation: null };
 }
+
+test("empty unbound runs do not create an initial save while empty fact bindings retain identity", () => {
+  const before = response().workspace.project?.document; assert.ok(before);
+  const first = before.regions[0].blocks[0]; assert.ok(first && Array.isArray(first.content));
+  first.content.push({ type: "text", text: "", styles: {} });
+  const after = structuredClone(before), projected = after.regions[0].blocks[0]; assert.ok(projected && Array.isArray(projected.content));
+  projected.content = projected.content.filter(span => span.type !== "text" || !!span.text);
+  assert.deepEqual(documentSteps(before, after), []);
+  const emptyField = { type: "fact_field" as const, bindingId: "empty-binding", recordId: "candidate",
+    fieldKey: "name", syncedFactRevision: 1, text: "", styles: {} };
+  assert.deepEqual(normalizeInline([emptyField]), [emptyField]);
+});
 
 test("table save acknowledgments advance cell revisions without queuing the same content again", async () => {
   const baseline = response(), target = structuredClone(baseline.workspace.project?.document);

@@ -5,6 +5,7 @@ import { stableJson } from "./json";
 function textRuns(content: StyledText[]): StyledText[] {
   const result: StyledText[] = [];
   for (const span of content) {
+    if (span.type === "text" && !span.text) continue;
     const last = result.at(-1);
     if (last && stableJson(last.styles) === stableJson(span.styles)) last.text += span.text;
     else result.push(structuredClone(span));
@@ -14,6 +15,7 @@ function textRuns(content: StyledText[]): StyledText[] {
 export function normalizeInline(content: Content): Content {
   const result: Content = [];
   for (const span of content) {
+    if (span.type === "text" && !span.text) continue;
     const last = result.at(-1);
     if (span.type === "text" && last?.type === "text" && stableJson(last.styles) === stableJson(span.styles)) last.text += span.text;
     else if (span.type === "link" && last?.type === "link" && span.href === last.href) last.content = textRuns([...last.content, ...span.content]);

@@ -3,6 +3,7 @@
 import uuid
 
 from .dates import partial_date
+from .gui_annotations import unresolved_source_units
 from .models.rich_workspace import ProjectV5
 from .rendering.rich_template import require_rich_template
 
@@ -230,6 +231,17 @@ def assemble_rich(workspace, normalized, draft, rules):
         main.append(section("experience", "EXPERIENCE" if english else "ОПЫТ", employment_blocks))
     main.append(section("early-career", "EARLY CAREER" if english else "РАННИЙ ОПЫТ", [block(draft.document.early_career.text)]))
     main.append(section("skills", "SKILLS" if english else "НАВЫКИ", [block(draft.document.skills_focus.skills_text)]))
+    unresolved = unresolved_source_units(normalized)
+    literal_source = "\n".join(unit.text for source in normalized.sources for unit in source.units if unit.text.strip())
+    if unresolved and draft.document.profile.text.text != literal_source:
+        recovered = []
+        for source, unit in unresolved:
+            recovered.append({"id": identity("source-literal"), "revision": 1, "type": "paragraph", "props": {},
+                "content": [{"type": "text", "text": unit.text, "styles": {}}], "children": [],
+                "provenance": [{"kind": "source", "id": identity("source-link"), "evidence": [{
+                    "sourceId": source.id, "sourceRevision": source.revision, "unitId": unit.id,
+                    "unitRevision": unit.revision, "text": unit.text}]}]})
+        main.append(section("unresolved-source", "UNRESOLVED SOURCE" if english else "НЕРАЗОБРАННЫЙ ИСХОДНИК", recovered))
     return ProjectV5.model_validate({"schemaVersion": 5, "projectId": workspace.project_id,
         "revision": workspace.project_revision + 1, "createdAt": workspace.created_at,
         "sources": [source.model_dump(by_alias=True) for source in normalized.sources], "evidenceRecords": evidence_records,

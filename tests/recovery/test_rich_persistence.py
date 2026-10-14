@@ -240,3 +240,46 @@ async def test_technical_render_failure_keeps_imported_rich_content_but_cannot_c
     assert workspace.project is not None and workspace.project.renders == []
     assert workspace.project.document.regions[0].blocks and service.durability(identifier) == "durable"
     assert len(provider.calls) == 2
+
+
+@pytest.mark.asyncio
+async def test_valid_empty_native_result_keeps_unresolved_source_editable_warned_and_portable(tmp_path):
+    from packages.resume_core.gui_normalization import GuiSemanticProposal
+    from packages.resume_core.gui_drafting import GuiDraftProposal
+    from resume_api.providers.content import ContentResult, ReportedUsage
+    from tests.recovery.draft_fixtures import draft_reply, draft_request
+    from tests.recovery.employment_fixtures import employment_proposal
+    from tests.recovery.candidate_fixtures import request as captured_source
+
+    class EmptyProvider:
+        def generate(self, request, _files, _cancel):
+            if request.result_type is GuiSemanticProposal:
+                raw = employment_proposal(captured_source(data.decode())).model_dump(by_alias=True)
+                for key in ("jobs", "facts", "units", "education", "certifications", "languages", "privateDetails"):
+                    raw[key] = []
+                raw["candidate"] = {key: {"text": "", "evidence": []} for key in ("name", "title", "location")}
+                raw["nameAssessment"] = {"revision": 1, "missingSurname": None, "evidence": []}
+                raw["observationAssessment"] = {"revision": 1, "sourceObservedAt": None, "evidence": None}
+                result = GuiSemanticProposal.model_validate(raw)
+            else:
+                result = draft_reply(draft_request())
+                result.fields = [result.fields[0].model_copy(update={"text": "Generic profile", "fact_ids": []})]
+                result.editorial_plan.jobs = []; result.editorial_plan.focus = []
+            return ContentResult(result, ReportedUsage(), "fixture", request.policy.model, .01, 1)
+
+    data = Path("tests/fixtures/recovery/E1.txt").read_bytes()
+    service = RichProjectService(tmp_path / "operations", RulesStore(tmp_path / "store"), lambda: (EmptyProvider(), "fixture"), clock=frozen_now)
+    selected = await service.select(data, "pasted.txt", True)
+    generation = service.start(selected.project_id); await service.tasks[(selected.project_id, generation)]
+    assert service.generations[selected.project_id].status == "completed"
+    workspace = service.read(selected.project_id)
+    assert "source_details_unresolved" in {warning.code for warning in workspace.warnings}
+    assert not any(record.kind == "employment" for record in workspace.project.facts.records)
+    unresolved = next(block for block in workspace.project.document.regions[2].blocks if block.id == "unresolved-source")
+    units = workspace.project.sources[0].units
+    assert [block.content[0].text for block in unresolved.children] == [unit.text for unit in units if unit.text.strip()]
+    assert all(block.provenance[0].evidence[0].text == block.content[0].text for block in unresolved.children)
+    reopened = RichProjectService(tmp_path / "operations-2", RulesStore(tmp_path / "store"), lambda: None, clock=frozen_now)
+    assert reopened.read(selected.project_id) == workspace
+    imported, *_ = open_rich_archive(reopened.portable(selected.project_id), "empty-import")
+    assert imported.project.document == workspace.project.document and imported.warnings == workspace.warnings
