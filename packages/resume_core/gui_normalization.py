@@ -6,7 +6,7 @@ import hashlib
 import json
 from typing import Literal
 
-from pydantic import Field, model_validator
+from pydantic import Field, PrivateAttr, model_validator
 
 from .extraction.models import ExtractResult
 from .gui_prompts import content_input
@@ -117,6 +117,7 @@ class GuiSemanticProposal(SemanticProposal):
 
 
 class GuiNormalizedResult(Wire):
+    _native_recovery_count: int = PrivateAttr(default=0)
     sources: list[Source]
     facts: list[RecoveryFact]
     candidate: CandidateDetails
@@ -175,7 +176,7 @@ def normalization_input(request: GuiNormalizeRequest, rules: Rules) -> str:
         "missingSurname is true only with explicit source evidence of absence, false for a supported surname or explicit mononym, null otherwise. "
         "sourceObservedAt may come only from an explicit dated statement in the source, at its original precision, with its literal evidence span. "
         "No source observation means null; file metadata and formattingAsOf do not supply it. "
-        "Retain omitted private details as evidence, separate from public fields. All employment shares this result."
+        "Retain candidate contacts and other details with exact evidence in privateDetails (a legacy descriptive field). All employment shares this result."
         " Supply literalEvidence for every employment fact and exact source/unit references. "
         "Keep global skills separate from job/subproject skills. Keep conflicting claims separate, without asserting personal leadership. "
         "Set present=true only for explicit ongoing work; a missing end date alone is not present. Preserve incomplete/unknown period text."
@@ -312,5 +313,4 @@ GUI_NORMALIZATION_CONTRACTS = {
 
 
 def public_context_facts(facts: list[RecoveryFact]) -> list[RecoveryFact]:
-    return [fact for fact in facts if not isinstance(fact, (NameAssessmentFact, ObservationFact))
-            and not (isinstance(fact, CandidateFact) and fact.value.field == "private_metadata")]
+    return [fact for fact in facts if not isinstance(fact, (NameAssessmentFact, ObservationFact))]

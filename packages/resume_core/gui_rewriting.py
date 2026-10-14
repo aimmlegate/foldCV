@@ -13,7 +13,6 @@ from .gui_selection import field_index, normalized_text, utf16_slice, valid_sele
 from .gui_source_context import source_context
 from .models.contracts import Id, Revision, Sha256, Wire
 from .models.recovery import Document, MutationResult, Selection, SourceContextRequest
-from .privacy import private_output_text
 
 
 class GuiRewriteRequest(Wire):
@@ -46,19 +45,15 @@ def rewriting_input(workspace, request, rules):
     indexed = field_index(workspace.project.document)
     selected = [indexed[span.field_id][0] for span in request.selection.spans]
     ids = {id for field in selected for id in field.fact_ids}
-    facts = [fact for fact in public_workspace_facts(workspace) if fact.id in ids
-             and not private_output_text(fact.model_dump_json(by_alias=True))]
+    facts = [fact for fact in public_workspace_facts(workspace) if fact.id in ids]
     context = source_context(workspace, SourceContextRequest(projectId=workspace.project_id,
         documentRevision=workspace.document_revision, selection=request.selection, fieldIds=[]))
     fields = [{"fieldId": span.field_id, "range": span.range.model_dump(),
                "capturedText": span.captured_text, "currentFieldText": indexed[span.field_id][0].text}
               for span in request.selection.spans]
-    if any(private_output_text(field["currentFieldText"]) for field in fields) or private_output_text(request.instruction):
-        raise ValueError("NO_SAFE_CONTENT")
     return content_input("rewrite_prose", {"selection": fields, "instruction": request.instruction,
         "facts": [fact.model_dump(mode="json", by_alias=True, exclude={"evidence"}) for fact in facts],
-        "excerpts": [item.model_dump(mode="json", by_alias=True) for item in context.excerpts
-                     if not private_output_text(item.evidence.text)],
+        "excerpts": [item.model_dump(mode="json", by_alias=True) for item in context.excerpts],
         "authoredTextPolicy": "Current authored text is authoritative. Preserve additions and omissions. Replace only each captured span; never restore removed material from evidence."}, rules)
 
 
@@ -68,8 +63,6 @@ def validate_replacements(selection, proposal):
     for item in proposal.replacements:
         item.text = normalized_text(item.text)
         item.text.encode("utf-8", "strict")
-        if private_output_text(item.text):
-            raise ValueError("NO_SAFE_CONTENT")
     return proposal
 
 

@@ -32,7 +32,8 @@ Complete these fields in `archive.json` without deleting any source data:
 A statement is `{text: string, sources: [unit IDs]}`. Keep original dates and
 grouped employment. Full duties, results, education, certificates, interests,
 contacts, and preferences remain in the immutable source units with categories
-and job links. This archive is the regeneration input; the PDF is only one view.
+and job links. These categories are descriptive, not automatic exclusion rules. This archive
+is the regeneration input; the PDF is only one view.
 
 ## Selected view
 

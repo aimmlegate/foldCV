@@ -1,5 +1,3 @@
-export type Id = "candidate";
-export type Kind = "candidate";
 export type Sourceid = string;
 export type Sourcerevision = number;
 export type Unitid = string;
@@ -9,6 +7,12 @@ export type Factids = string[];
 export type Fieldid = string;
 export type Origin = "source" | "generated" | "user" | "migration";
 export type Text = string;
+/**
+ * @maxItems 100
+ */
+export type Details = AuthoredField[];
+export type Id = "candidate";
+export type Kind = "candidate";
 export type Revision = number;
 export type Visible = true;
 export type Id1 = string;
@@ -78,6 +82,7 @@ export interface Document {
   skillsFocus: SkillsFocusRecord;
 }
 export interface CandidateRecord {
+  details?: Details;
   id: Id;
   kind: Kind;
   location: AuthoredField;

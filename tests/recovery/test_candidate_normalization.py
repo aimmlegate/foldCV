@@ -113,7 +113,7 @@ def test_invalid_observation_fails_one_attempt_without_repair_or_source_mutation
     assert all(not unit.represented_fact_ids for unit in source_request.sources[0].units)
 
 
-def test_private_details_stay_in_facts_and_out_of_public_context():
+def test_candidate_details_keep_evidence_and_remain_in_content_context():
     text = (ROOT / "E1.txt").read_text() + "Email: fictional@example.invalid\nPhone: +12345678901\nAge: 42\nJob board: synthetic\n"
     source_request = request(text)
     raw = proposal(source_request).model_dump(by_alias=True)
@@ -122,8 +122,8 @@ def test_private_details_stay_in_facts_and_out_of_public_context():
     result = normalize_candidate(source_request, GuiSemanticProposal.model_validate(raw), RULES)
     assert [(item.kind, item.value.text) for item in result.private_details] == private
     public = public_context_facts(result.facts)
-    assert not any(fact.value.text == literal for fact in public for _, literal in private)
-    assert all(fact.value.field != "private_metadata" for fact in public)
+    assert all(any(fact.value.text == literal for fact in public) for _, literal in private)
+    assert any(fact.value.field == "private_metadata" for fact in public)
     authored = json.dumps(result.candidate.model_dump(by_alias=True))
     assert "fictional@example.invalid" not in authored
     assert any(fact.kind == "candidate_detail" and fact.value.field == "private_metadata" for fact in result.facts)

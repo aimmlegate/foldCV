@@ -12,6 +12,10 @@ from .storage import StorageFailure, atomic_write, data_root, locked_root, priva
 
 PRESET_HEADINGS = {"shorten": "## Preset: shorten", "clarify": "## Preset: clarify"}
 MAX_RULE_BYTES = 32_768
+EXCLUSION_SENTENCE = (
+    "Omit personal phone, email, messengers, birth date, age and job-board metadata "
+    "from the public resume while retaining their private source evidence."
+)
 HEADER = re.compile(r"<!-- foldcv-rules:v1 revision=([1-9][0-9]*) sha256=([a-f0-9]{64}) -->\n")
 DEFAULT_RULES = Path(__file__).with_name("default_rules.md").read_text(encoding="utf-8")
 
@@ -20,6 +24,15 @@ class RulesFailure(Exception):
     def __init__(self, code: str):
         self.code = code
         super().__init__(code)
+
+
+def remove_candidate_exclusion(markdown: str) -> str:
+    pattern = r"\s+".join(re.escape(word) for word in EXCLUSION_SENTENCE.split())
+    matches = list(re.finditer(pattern, markdown))
+    if len(matches) != 1:
+        raise RulesFailure("RULES_EXCLUSION_MISMATCH")
+    span = matches[0]
+    return markdown[:span.start()] + markdown[span.end():]
 
 
 def normalize_markdown(markdown: str) -> str:

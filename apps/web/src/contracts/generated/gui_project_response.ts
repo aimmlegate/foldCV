@@ -234,13 +234,17 @@ export type Record =
   | LanguageRecord
   | SkillsFocusRecord
   | EarlyCareerRecord;
-export type Id17 = "candidate";
-export type Kind17 = "candidate";
 export type Evidence18 = Evidence2[];
 export type Factids2 = string[];
 export type Fieldid3 = string;
 export type Origin15 = "source" | "generated" | "user" | "migration";
 export type Text3 = string;
+/**
+ * @maxItems 100
+ */
+export type Details = AuthoredField[];
+export type Id17 = "candidate";
+export type Kind17 = "candidate";
 export type Revision17 = number;
 export type Visible = true;
 export type Id18 = "profile";
@@ -915,6 +919,7 @@ export interface Period1 {
   start: PartialDate;
 }
 export interface CandidateRecord {
+  details?: Details;
   id: Id17;
   kind: Kind17;
   location: AuthoredField;

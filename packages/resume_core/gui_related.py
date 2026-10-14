@@ -3,7 +3,6 @@
 from .gui_mutations import MutationFailure, checkpoint, complete_session, records, unicode_valid
 from .gui_normalization import public_context_facts, source_fingerprint
 from .gui_selection import field_index, normalized_text, selection_fingerprint, utf16_slice
-from .privacy import private_output_text
 from .models.recovery import NameAssessmentFact
 from .gui_legacy_context import public_workspace_facts
 
@@ -31,7 +30,7 @@ def apply_related(workspace, payload, rules_sha256=None):
         for replacement in suggestion.replacements:
             field, slot = indexed[replacement.field_id]
             text = normalized_text(replacement.text)
-            if len(text) > 12000 or private_output_text(text): raise MutationFailure('RELATED_UPDATE_INVALID')
+            if len(text) > 12000: raise MutationFailure('RELATED_UPDATE_INVALID')
             if replacement.range:
                 size = len(field.text.encode('utf-16-le')) // 2
                 text = utf16_slice(field.text, 0, replacement.range.start) + text + utf16_slice(field.text, replacement.range.end, size)

@@ -12,7 +12,7 @@ import httpx
 import pytest
 
 from packages.resume_core.rewriting import (RewriteProposal, RewriteRequest, rewrite_input,
-                                            validate_rewrite, withheld_rewrite_issues)
+                                            validate_rewrite)
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "services/api/src"))
 from resume_api.app import create_app
@@ -43,33 +43,33 @@ def request() -> RewriteRequest:
             {"factId": "private", "text": "Call 555-123-4567."}]})
 
 
-def test_prompt_scope_privacy_bounds_and_factual_issue():
+def test_prompt_scope_contacts_bounds_and_factual_issue():
     chosen = request()
     prompt = json.loads(rewrite_input(chosen))
     assert prompt["task"] == "rewrite_prose" and prompt["blockId"] == "prose_recent"
     assert prompt["baseRevision"] == 7 and prompt["dependencyHash"] == "a" * 64
-    assert prompt["requiredFactIds"] == ["safe"]
+    assert prompt["requiredFactIds"] == ["safe", "private"]
     assert json.loads(rewrite_input(chosen.model_copy(update={"instruction": ""})))["instruction"] == ""
-    assert [fact["id"] for fact in prompt["facts"]] == ["safe"]
-    assert "555-123-4567" not in json.dumps(prompt) and "private" not in json.dumps(prompt)
+    assert [fact["id"] for fact in prompt["facts"]] == ["safe", "private"]
+    assert "555-123-4567" in json.dumps(prompt) and "private" in json.dumps(prompt)
     assert all("evidence" not in fact for fact in prompt["facts"])
     result = validate_rewrite(chosen, RewriteProposal(blockId="prose_recent",
         replacementText="Built a clearer service.", factIds=["safe"]))
     assert result.replacement_text == "Built a clearer service."
-    assert [(issue.code, issue.fact_id) for issue in result.issues] == [("SOURCE_REVIEW", "private")]
+    assert [(issue.code, issue.fact_id) for issue in result.issues] == [("MISSING_REQUIRED", "private")]
     with pytest.raises(ValueError, match="reference mismatch"):
         validate_rewrite(chosen, RewriteProposal(blockId="other", replacementText="Other.", factIds=["safe"]))
     with pytest.raises(ValueError, match="reference mismatch"):
-        validate_rewrite(chosen, RewriteProposal(blockId="prose_recent", replacementText="Other.", factIds=["private"]))
+        validate_rewrite(chosen, RewriteProposal(blockId="prose_recent", replacementText="Other.", factIds=["foreign"]))
     huge = chosen.model_copy(update={"instruction": "x" * 2000, "current_text": "y" * 4000,
                               "excerpts": [chosen.excerpts[0].model_copy(update={"text": "z" * 4000})] * 20})
     with pytest.raises(ValueError, match="INPUT_TOO_LARGE"):
         rewrite_input(huge)
     all_private = chosen.model_copy(update={"facts": [chosen.facts[1]], "required_fact_ids": ["private"]})
-    assert [(issue.block_id, issue.fact_id, issue.code) for issue in withheld_rewrite_issues(all_private)] == [
-        ("prose_recent", "private", "SOURCE_REVIEW")]
-    with pytest.raises(ValueError, match="NO_SAFE_CONTENT"):
-        rewrite_input(all_private)
+    assert json.loads(rewrite_input(all_private))["requiredFactIds"] == ["private"]
+    accepted = validate_rewrite(all_private, RewriteProposal(blockId="prose_recent",
+        replacementText="team 20 teams; call 555-123-4567", factIds=["private"]))
+    assert accepted.issues == []
 
 
 def test_single_content_call_uses_provider_repair_authority(tmp_path):
@@ -134,15 +134,10 @@ async def test_route_is_closed_without_runner_and_rejects_malformed_result(tmp_p
                                                "excerpts": [request().excerpts[1]]})
         withheld = await client.post("/v1/facts/rewrite", headers={"Origin": ORIGIN},
                                      json=private.model_dump(mode="json", by_alias=True))
-        body = withheld.json()
-        assert withheld.status_code == 422 and body["error"] == {
-            "code": "NO_SAFE_CONTENT", "retryable": False, "stage": "rewrite"}
-        assert body["baseRevision"] == 7 and body["blockRevision"] == 2
-        assert body["dependencyHash"] == "a" * 64
-        assert body["issues"] == [{"code": "SOURCE_REVIEW", "blockId": "prose_recent",
-                                   "factId": "private", "message": "Required fact or evidence withheld because it may contain contact information. Review manually."}]
-        assert "555-123-4567" not in withheld.text
-        assert bad.calls == 1
+        assert [json.loads(line)["type"] for line in withheld.text.splitlines()] == [
+            "operation.started", "operation.failed"]
+        assert bad.calls == 2
+
 
 
 def test_cancelled_request_does_not_start_provider(tmp_path):

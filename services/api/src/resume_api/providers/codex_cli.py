@@ -157,14 +157,16 @@ class Events:
         else:
             raise ContentFailure("INVALID_RESULT")
 
-    def result(self, model: type[ResultT], schema: StructuredSchema) -> ResultT:
+    def result(self, model: type[ResultT], schema: StructuredSchema,
+               decoder: Callable[[object], ResultT] | None = None) -> ResultT:
         if not self.complete or self.text is None:
             raise ContentFailure("INCOMPLETE_STREAM")
         try:
             value = strict_json(self.text)
             if not isinstance(value, dict):
                 raise InvalidFinal()
-            return model.model_validate(schema.restore(value, model), strict=True)
+            restored = schema.restore(value, model)
+            return model.model_validate(decoder(restored) if decoder else restored, strict=True)
         except (ContentFailure, ValidationError, ValueError):
             raise InvalidFinal() from None
 
@@ -347,6 +349,8 @@ class CodexCliProvider:
         if len(schema) > MAX_SCHEMA:
             raise ContentFailure("INVALID_SCHEMA")
         deadline = start + policy.timeout_seconds
+        if request.transport and hasattr(request.transport, "bind_guard"):
+            request.transport.bind_guard(lambda: self.process._check(deadline, cancel))
         attempts = 0
         usages: list[ReportedUsage] = []
         consumed_input = 0
@@ -381,7 +385,7 @@ class CodexCliProvider:
                     finally:
                         usages.append(events.usage)
                     consumed_output += len(output) + len(errors)
-                    value = events.result(request.result_type, output_schema)
+                    value = events.result(request.result_type, output_schema, getattr(request.transport, "decode", None))
                     if request.transport:
                         try:
                             value = request.result_type.model_validate(request.transport.restore(value), strict=True)

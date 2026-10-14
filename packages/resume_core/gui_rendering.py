@@ -72,6 +72,8 @@ def render_input(workspace: WorkspaceV5):
 
     add("МЕСТОПОЛОЖЕНИЕ" if russian else "LOCATION", [(document.candidate.location.text,
         FieldAnchor(kind="field", fieldId=document.candidate.location.field_id, range=None))], "candidate")
+    add("КОНТАКТЫ И ДАННЫЕ" if russian else "CONTACTS AND DETAILS", [(value.text,
+        FieldAnchor(kind="field", fieldId=value.field_id, range=None)) for value in document.candidate.details], "candidate")
     for collection, ru, en, keys in [("education", "ОБРАЗОВАНИЕ", "EDUCATION", ("institution", "qualification", "specialty", "date_text")),
             ("certifications", "СЕРТИФИКАТЫ", "CERTIFICATIONS", ("name", "issuer", "date_text")),
             ("languages", "ЯЗЫКИ", "LANGUAGES", ("name", "proficiency"))]:

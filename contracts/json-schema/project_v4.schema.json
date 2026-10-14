@@ -396,6 +396,14 @@
     "CandidateRecord": {
       "additionalProperties": false,
       "properties": {
+        "details": {
+          "items": {
+            "$ref": "#/$defs/AuthoredField"
+          },
+          "maxItems": 100,
+          "title": "Details",
+          "type": "array"
+        },
         "id": {
           "const": "candidate",
           "title": "Id",

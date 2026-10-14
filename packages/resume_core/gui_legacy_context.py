@@ -1,18 +1,13 @@
-"""Explicit read-only migration history and private-fact scope filtering."""
+"""Explicit read-only legacy history and content context."""
 
 from .gui_normalization import public_context_facts
 from .gui_migration import history
 from .models.recovery import SourceContext
-from .privacy import private_output_text
 
 
 def public_workspace_facts(workspace):
     owner=workspace.project or workspace.pre_draft
-    private=set()
-    if workspace.legacy_data:
-        private.update(ref for block in workspace.legacy_data.blocks if block.kind=='contact' for ref in block.state.fact_ids)
-        private.update(ref for item in workspace.legacy_data.unmapped_text if item.original_kind in {'contact','personal','meta'} for ref in item.fact_ids)
-    return [fact for fact in public_context_facts(owner.facts) if fact.id not in private and not private_output_text(fact.model_dump_json(by_alias=True))]
+    return public_context_facts(owner.facts)
 
 
 def migration_context(workspace):

@@ -98,7 +98,7 @@ def test_multi_slot_partial_utf16_related_update_is_atomic_and_preserves_boundar
     restore(w,'job:'+job.id);assert w.project.document.jobs[0].tasks.text=='Prefix OLD suffix'
 
 
-@pytest.mark.parametrize('invalid',['foreign','surrogate','private','duplicate','missing_fact'])
+@pytest.mark.parametrize('invalid',['foreign','surrogate','duplicate','missing_fact'])
 def test_invalid_stored_replacement_rejects_whole_atomic_update_without_pointer_changes(invalid):
     w,job,fact=corrected();suggestion=w.related_update_suggestions[0]
     if invalid=='foreign':suggestion.replacements.append(suggestion.replacements[0].model_copy(update={'field_id':'unknown'}))
@@ -106,7 +106,6 @@ def test_invalid_stored_replacement_rejects_whole_atomic_update_without_pointer_
         edit(w,'profile/text','😀 older',completion='slot');suggestion=w.related_update_suggestions[0];suggestion.dependencies=result_dependencies(w,RULES)
         from packages.resume_core.models.recovery import Range
         suggestion.replacements[0].range=Range(start=1,end=2)
-    elif invalid=='private':suggestion.replacements[0].text='Call 555-123-4567'
     elif invalid=='duplicate':suggestion.replacements.append(suggestion.replacements[0].model_copy(deep=True))
     else:suggestion.fact_ids=['unknown']
     before=document_content(w.project.document);pointers=w.undo_slots.copy();counters=w.project_revision,w.document_revision
@@ -218,3 +217,13 @@ def test_related_name_recipe_accepts_assessment_reference_without_changing_sourc
     suggestion.fact_ids=[assessment.id];observed=w.source_observed_at
     assert invoke(w,related(w)).status=='applied'
     assert w.project.document.candidate.name.fact_ids==[assessment.id] and w.source_observed_at==observed
+
+
+def test_related_contact_replacement_keeps_other_text_and_normal_scope_guards():
+    w,job,fact=corrected();suggestion=w.related_update_suggestions[0]
+    before=w.project.document.jobs[0].tasks.text
+    suggestion.replacements[0].text='Call 555-123-4567'
+    result=invoke(w,related(w))
+    assert result.status=='applied'
+    assert w.project.document.profile.text.text=='Call 555-123-4567'
+    assert w.project.document.jobs[0].tasks.text==before

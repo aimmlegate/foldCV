@@ -41,9 +41,7 @@ intervals merged. Never invent duration for global skills, undated work or ongoi
 periods without an explicit source observation date.
 
 Include education, certifications, location and languages only when supported.
-Do not expand an institution or degree from a layout reference. Omit personal
-phone, email, messengers, birth date, age and job-board metadata from the public
-resume while retaining their private source evidence. Leave unknown fields empty;
+Do not expand an institution or degree from a layout reference. Leave unknown fields empty;
 internal gaps, conflicts and warnings stay outside public resume text.
 
 ## Preset: shorten

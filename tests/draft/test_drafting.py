@@ -60,13 +60,13 @@ def proposal() -> DraftProposal:
     ])
 
 
-def test_selection_bounds_prompt_and_keeps_older_and_contacts_out():
+def test_selection_bounds_prompt_and_keeps_contacts_without_old_work():
     request = request_with_jobs()
     selection = draft_selection(request)
     assert set(selection) == {"profile", "prose_recent"}
     prompt = draft_input(request)
     assert "global_strength" in prompt and "recent_metric" in prompt
-    assert "private@example.test" not in prompt
+    assert "private@example.test" in prompt
     assert "evidence" not in prompt and "sourceFingerprint" not in prompt
     assert "Maintained a system" not in prompt
     assert '"sourceLanguage":"mixed"' in prompt
@@ -113,7 +113,7 @@ def test_all_recent_jobs_and_facts_are_selected_without_silent_truncation():
         draft_input(oversized)
 
 
-def test_job_attached_contacts_do_not_reach_provider_payload():
+def test_job_attached_contacts_reach_scoped_provider_payload():
     request = request_with_jobs()
     sheet = request.sheet.model_dump(mode="json", by_alias=True)
     sheet["facts"].append({"id": "job_contact", "revision": 1, "kind": "text",
@@ -121,7 +121,7 @@ def test_job_attached_contacts_do_not_reach_provider_payload():
                            "importance": "essential", "jobId": "recent", "subprojectId": None})
     sheet["employment"][0]["factIds"].append("job_contact")
     scoped = request.model_copy(update={"sheet": FactSheet.model_validate(sheet)})
-    assert "job_contact" not in draft_input(scoped)
+    assert "job_contact" in draft_input(scoped)
 
 
 @pytest.mark.parametrize("contact", [
@@ -135,7 +135,7 @@ def test_job_attached_contacts_do_not_reach_provider_payload():
     "Profile at linkedin.com/in/example",
     "phone: 5551234567",
 ])
-def test_unlabeled_and_marked_contacts_stay_out_of_every_draft_block(contact):
+def test_unlabeled_and_marked_contacts_remain_in_selected_draft_blocks(contact):
     request = request_with_jobs()
     sheet = request.sheet.model_dump(mode="json", by_alias=True)
     sheet["facts"].append({"id": "job_contact", "revision": 1, "kind": "text",
@@ -144,11 +144,11 @@ def test_unlabeled_and_marked_contacts_stay_out_of_every_draft_block(contact):
     sheet["employment"][0]["factIds"].append("job_contact")
     scoped = request.model_copy(update={"sheet": FactSheet.model_validate(sheet)})
     payload = draft_input(scoped)
-    assert "job_contact" not in payload
-    assert contact not in payload
+    assert "job_contact" in payload
+    assert contact in payload
 
 
-def test_numeric_work_and_date_context_remain_selectable_after_contact_filter():
+def test_numeric_work_and_date_context_remain_selectable():
     request = request_with_jobs()
     sheet = request.sheet.model_dump(mode="json", by_alias=True)
     next(fact for fact in sheet["facts"] if fact["id"] == "recent_metric")["value"]["number"] = 5551234567
@@ -164,7 +164,7 @@ def test_numeric_work_and_date_context_remain_selectable_after_contact_filter():
 
 
 @pytest.mark.parametrize("private", ["Age: 29", "Дата рождения: 1997", "Resume ID: 12345", "Job board: hh.ru"])
-def test_labeled_age_and_job_board_metadata_are_withheld(private):
+def test_labeled_age_and_job_board_metadata_remain_selected(private):
     request = request_with_jobs()
     sheet = request.sheet.model_dump(mode="json", by_alias=True)
     sheet["facts"].append({"id": "private_metadata", "revision": 1, "kind": "text",
@@ -172,12 +172,12 @@ def test_labeled_age_and_job_board_metadata_are_withheld(private):
                            "importance": "essential", "jobId": "recent", "subprojectId": None})
     sheet["employment"][0]["factIds"].append("private_metadata")
     payload = draft_input(request.model_copy(update={"sheet": FactSheet.model_validate(sheet)}))
-    assert "private_metadata" not in payload
-    assert private not in payload
+    assert "private_metadata" in payload
+    assert private in payload
 
 
 @pytest.mark.parametrize("site", ["Portfolio: alice.dev", "Website: alice.com", "LinkedIn: linkedin.com"])
-def test_labeled_personal_site_is_withheld_while_safe_facts_remain(site):
+def test_labeled_personal_site_and_other_facts_remain_selected(site):
     request = request_with_jobs()
     sheet = request.sheet.model_dump(mode="json", by_alias=True)
     sheet["facts"].append({"id": "personal_site", "revision": 1, "kind": "text",
@@ -186,7 +186,7 @@ def test_labeled_personal_site_is_withheld_while_safe_facts_remain(site):
     sheet["employment"][0]["factIds"].append("personal_site")
     original = json.loads(json.dumps(sheet))
     payload = draft_input(request.model_copy(update={"sheet": FactSheet.model_validate(sheet)}))
-    assert "personal_site" not in payload and site not in payload
+    assert "personal_site" in payload and site in payload
     assert "recent_text" in payload and "recent_metric" in payload
     assert sheet == original
 
@@ -203,7 +203,7 @@ def test_experience_and_technical_job_board_mentions_remain_selectable():
 
 
 @pytest.mark.parametrize("contact", ["Call 5551234567 for references.", "5551234567"])
-def test_bare_domestic_phone_forms_are_withheld(contact):
+def test_bare_domestic_phone_forms_remain_selected(contact):
     request = request_with_jobs()
     sheet = request.sheet.model_dump(mode="json", by_alias=True)
     sheet["facts"].append({"id": "bare_contact", "revision": 1, "kind": "text",
@@ -211,8 +211,8 @@ def test_bare_domestic_phone_forms_are_withheld(contact):
                            "importance": "essential", "jobId": "recent", "subprojectId": None})
     sheet["employment"][0]["factIds"].append("bare_contact")
     scoped = request.model_copy(update={"sheet": FactSheet.model_validate(sheet)})
-    assert "bare_contact" not in draft_input(scoped)
-    assert contact not in draft_input(scoped)
+    assert "bare_contact" in draft_input(scoped)
+    assert contact in draft_input(scoped)
 
 
 @pytest.mark.parametrize("kind,path", [
@@ -224,7 +224,7 @@ def test_bare_domestic_phone_forms_are_withheld(contact):
     ("leadership", "teamSize.result"), ("leadership", "teamSize.scope"),
     ("leadership", "teamSize.qualifiers"),
 ])
-def test_contact_in_any_selected_free_text_value_withholds_whole_fact_and_reports_it(kind, path):
+def test_contact_in_any_selected_free_text_value_preserves_fact_and_normal_checks(kind, path):
     request = request_with_jobs()
     sheet = request.sheet.model_dump(mode="json", by_alias=True)
     if kind == "metric":
@@ -252,18 +252,19 @@ def test_contact_in_any_selected_free_text_value_withholds_whole_fact_and_report
     target[field] = [private] if field == "qualifiers" else private
     scoped = request.model_copy(update={"sheet": FactSheet.model_validate(sheet)})
     payload = draft_input(scoped)
-    assert private not in payload and fact["id"] not in payload
+    assert private in payload and fact["id"] in payload
     selection = draft_selection(scoped)
     candidate = DraftProposal(blocks=[{"blockId": block_id, "text": "Safe draft text.",
                                       "factIds": [item.id for item in facts]}
                                      for block_id, facts in selection.items()])
     issues = validate_draft(scoped, candidate).issues
-    withheld = [issue for issue in issues if issue.fact_id == fact["id"]]
-    assert {issue.block_id for issue in withheld} == {"profile", "prose_recent"}
-    assert all(issue.code == "SOURCE_REVIEW" and private not in issue.message for issue in withheld)
+    assert all(fact["id"] in [item.id for item in facts] for facts in selection.values())
+    assert not any("withheld" in issue.message for issue in issues)
+    if kind in {"metric", "leadership"}:
+        assert any(issue.code == "QUALIFIER_LOSS" and issue.fact_id == fact["id"] for issue in issues)
 
 
-def test_mixed_achievement_contact_fact_warns_even_when_its_job_block_disappears():
+def test_mixed_achievement_contact_fact_keeps_job_and_required_coverage():
     request = request_with_jobs()
     sheet = request.sheet.model_dump(mode="json", by_alias=True)
     sheet["facts"] = [fact for fact in sheet["facts"] if fact["id"] not in {"recent_text", "recent_metric"}]
@@ -275,26 +276,31 @@ def test_mixed_achievement_contact_fact_warns_even_when_its_job_block_disappears
     sheet["employment"][0]["factIds"] = [mixed["id"]]
     scoped = request.model_copy(update={"sheet": FactSheet.model_validate(sheet)})
     payload = draft_input(scoped)
-    assert "mixed_private" not in payload and "555-123-4567" not in payload
-    assert [block["blockId"] for block in json.loads(payload)["blocks"]] == ["profile"]
+    assert "mixed_private" in payload and "555-123-4567" in payload
+    assert [block["blockId"] for block in json.loads(payload)["blocks"]] == ["profile", "prose_recent"]
     candidate = DraftProposal(blocks=[{"blockId": "profile", "text": "Designed reliable systems.",
-                                       "factIds": ["global_strength"]}])
+                                       "factIds": ["global_strength"]},
+                                      {"blockId": "prose_recent", "text": mixed["value"]["text"], "factIds": ["mixed_private"]}])
     issues = validate_draft(scoped, candidate).issues
     assert {(issue.code, issue.block_id, issue.fact_id) for issue in issues if issue.fact_id == "mixed_private"} == {
-        ("SOURCE_REVIEW", "profile", "mixed_private"),
-        ("SOURCE_REVIEW", "prose_recent", "mixed_private")}
+        ("MISSING_REQUIRED", "profile", "mixed_private")}
     assert all("555-123-4567" not in issue.message for issue in issues)
 
 
 @pytest.mark.parametrize("private", ["Call 5551234567", "Portfolio: alice.dev",
                                       "Website: alice.com", "LinkedIn: linkedin.com"])
-def test_all_candidate_contacts_fail_before_provider_launch(tmp_path, private):
+def test_all_candidate_contacts_reach_provider_without_content_rejection(tmp_path, private):
     class Provider:
         calls = 0
 
         def generate(self, call, files, cancel):
             self.calls += 1
-            raise AssertionError("provider should not start")
+            payload = json.loads(call.text)
+            return ContentResult(value=DraftProposal(blocks=[{
+                "blockId": block["blockId"], "text": "Contact details retained.",
+                "factIds": [fact["id"] for fact in block["facts"]]} for block in payload["blocks"]]),
+                usage=ReportedUsage(), cli_version="fixture", model="fixture",
+                elapsed_seconds=0.01, logical_attempts=1)
 
     request = request_with_jobs()
     sheet = request.sheet.model_dump(mode="json", by_alias=True)
@@ -303,13 +309,13 @@ def test_all_candidate_contacts_fail_before_provider_launch(tmp_path, private):
     next(fact for fact in sheet["facts"] if fact["id"] == "recent_metric")["value"]["scope"] = private
     scoped = request.model_copy(update={"sheet": FactSheet.model_validate(sheet)})
     provider = Provider()
-    with OperationFiles(tmp_path).open() as files, pytest.raises(ValueError, match="NO_SAFE_FACTS"):
-        DraftingContentService(provider, "fixture").run(scoped, files, threading.Event())
-    assert provider.calls == 0
+    with OperationFiles(tmp_path).open() as files:
+        result, _ = DraftingContentService(provider, "fixture").run(scoped, files, threading.Event())
+    assert provider.calls == 1 and len(result.blocks) == 2
     assert next(fact for fact in scoped.sheet.facts if fact.id == "recent_text").value.text == private
 
 
-def test_injected_provider_receives_only_safe_fact_values_and_result_keeps_omission(tmp_path):
+def test_injected_provider_receives_contacts_and_result_keeps_normal_review(tmp_path):
     class Provider:
         calls = 0
         text = ""
@@ -338,10 +344,10 @@ def test_injected_provider_receives_only_safe_fact_values_and_result_keeps_omiss
     with OperationFiles(tmp_path).open() as files:
         result, _ = DraftingContentService(provider, "fixture").run(scoped, files, threading.Event())
     assert provider.calls == 1
-    assert "555-123-4567" not in provider.text
-    assert "recent_metric" not in provider.text and "mixed_private" not in provider.text
-    assert {issue.fact_id for issue in result.issues if issue.code == "SOURCE_REVIEW"} >= {
-        "recent_metric", "mixed_private"}
+    assert "555-123-4567" in provider.text
+    assert "recent_metric" in provider.text and "mixed_private" in provider.text
+    assert any(issue.fact_id == "recent_metric" and issue.code == "QUALIFIER_LOSS" for issue in result.issues)
+    assert any(issue.fact_id == "mixed_private" and issue.code == "SOURCE_REVIEW" for issue in result.issues)
     assert all("555-123-4567" not in issue.message for issue in result.issues)
     assert next(fact for fact in scoped.sheet.facts if fact.id == "recent_metric").value.scope == "contact me at 555-123-4567"
 
@@ -397,7 +403,7 @@ def test_number_preservation_uses_complete_numeric_tokens():
 def test_required_qualifiers_credit_and_references_are_reviewed():
     request = request_with_jobs()
     accepted = validate_draft(request, proposal())
-    assert {(issue.code, issue.fact_id) for issue in accepted.issues} == {("SOURCE_REVIEW", "contact")}
+    assert {(issue.code, issue.fact_id) for issue in accepted.issues} == {("MISSING_REQUIRED", "contact")}
     missing = proposal()
     missing.blocks[1].fact_ids.remove("recent_metric")
     assert any(issue.code == "MISSING_REQUIRED" for issue in validate_draft(request, missing).issues)
@@ -428,7 +434,7 @@ def test_leadership_team_size_and_credit_loss_stay_visible():
         block.fact_ids.append("leadership")
         block.text += " Built the team with 5 engineers from zero, personal credit."
     assert {(issue.code, issue.fact_id) for issue in validate_draft(request, candidate).issues} == {
-        ("SOURCE_REVIEW", "contact")}
+        ("MISSING_REQUIRED", "contact")}
     candidate.blocks[1].text = "Built the team with 5 engineers."
     issues = validate_draft(request, candidate).issues
     assert {issue.code for issue in issues if issue.fact_id == "leadership"} == {"QUALIFIER_LOSS", "ATTRIBUTION_LOSS"}
@@ -452,7 +458,7 @@ def test_one_scoped_provider_call_and_cancel_before_launch(tmp_path):
         result, usage = service.run(request_with_jobs(), files, threading.Event())
     assert len(result.blocks) == 2 and usage == {"logicalAttempts": 1, "inputTokens": 10,
                                                  "outputTokens": 20, "inferenceCount": None}
-    assert provider.calls == 1 and "private@example.test" not in provider.text
+    assert provider.calls == 1 and "private@example.test" in provider.text
     cancel = threading.Event()
     cancel.set()
     with OperationFiles(tmp_path).open() as files, pytest.raises(InterruptedError):

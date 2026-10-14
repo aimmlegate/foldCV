@@ -143,6 +143,28 @@ def test_missing_end_date_does_not_support_a_present_assertion():
     assert error.value.code == "INVALID_PRESENT_PERIOD"
 
 
+@pytest.mark.parametrize("endpoint", ["not current", "no longer ongoing", "не настоящее время", "не по настоящее время"])
+def test_negated_source_endpoint_cannot_assert_a_present_period(endpoint):
+    text = (ROOT / "E1.txt").read_text().replace("настоящее время", endpoint)
+    captured = request(text)
+    raw = employment_proposal(captured).model_dump(by_alias=True)
+    raw["jobs"][0]["periods"][0]["endText"] = endpoint
+    reply = GuiSemanticProposal.model_validate(raw)
+    with pytest.raises(NormalizationFailure) as error:
+        normalize_employment(captured, reply, normalize_candidate(captured, reply, RULES))
+    assert error.value.code == "INVALID_PRESENT_PERIOD"
+
+
+def test_present_endpoint_keeps_unrelated_negated_claim_in_same_evidence():
+    text = (ROOT / "E1.txt").read_text().replace("настоящее время.", "настоящее время. No current production incidents.")
+    captured = request(text)
+    raw = employment_proposal(captured).model_dump(by_alias=True)
+    raw["jobs"][0]["periods"][0]["endText"] = "настоящее время"
+    reply = GuiSemanticProposal.model_validate(raw)
+    result = normalize_employment(captured, reply, normalize_candidate(captured, reply, RULES))
+    assert result.job_periods[result.employment[0].id][0].present
+
+
 def test_wrapped_subproject_and_text_claim_preserve_words_and_exact_evidence():
     captured = source()
     raw = employment_proposal(captured).model_dump(by_alias=True)
@@ -462,3 +484,164 @@ def test_empty_native_detail_placeholder_is_an_empty_list_without_losing_evidenc
     with pytest.raises(NormalizationFailure) as error:
         normalize_candidate(captured, reply, RULES)
     assert error.value.code == "EMPTY_DETAIL_ROW"
+
+
+@pytest.mark.parametrize("endpoint", ["по настоящее время (5 лет)", "настоящее время — 5 лет"])
+def test_present_endpoint_can_keep_literal_source_duration_text(endpoint):
+    text = (ROOT / "E1.txt").read_text().replace("настоящее время", endpoint)
+    captured = request(text)
+    raw = employment_proposal(captured).model_dump(by_alias=True)
+    period = raw["jobs"][0]["periods"][0]
+    period["endText"] = endpoint
+    reply = GuiSemanticProposal.model_validate(raw)
+    result = normalize_employment(captured, reply, normalize_candidate(captured, reply, RULES))
+    normalized = result.job_periods[result.employment[0].id][0]
+    assert normalized.present and normalized.end is None and normalized.end_text == ""
+    assert any(endpoint in span.text for span in normalized.evidence)
+
+
+def test_present_endpoint_duration_does_not_allow_unsupported_text_or_a_past_endpoint():
+    captured = source()
+    raw = employment_proposal(captured).model_dump(by_alias=True)
+    period = raw["jobs"][0]["periods"][0]
+    period["endText"] = "по настоящее время (invented duration)"
+    reply = GuiSemanticProposal.model_validate(raw)
+    with pytest.raises(NormalizationFailure) as error:
+        normalize_employment(captured, reply, normalize_candidate(captured, reply, RULES))
+    assert error.value.code == "UNSUPPORTED_PERIOD_TEXT"
+    period["endText"] = "2020"
+    reply = GuiSemanticProposal.model_validate(raw)
+    with pytest.raises(NormalizationFailure) as error:
+        normalize_employment(captured, reply, normalize_candidate(captured, reply, RULES))
+    assert error.value.code == "INVALID_PRESENT_PERIOD"
+
+
+@pytest.mark.parametrize("change", [None, "gap", "page", "outside", "partial", "revision", "source_revision", "ambiguous", "invented", "unowned"])
+def test_joined_fact_quote_splits_only_at_verified_owned_pdf_continuation(change):
+    captured = source()
+    raw = employment_proposal(captured).model_dump(by_alias=True)
+    document = captured.sources[0]
+    fact = next(row for row in raw["facts"] if row["tempId"] == "north-task")
+    span = fact["literalEvidence"][0]
+    first = next(unit for unit in document.units if unit.id == span["unitId"])
+    second = first.model_copy(deep=True)
+    second.id += "-continuation"
+    second.order += 1
+    for unit in document.units:
+        if unit.order >= second.order:
+            unit.order += 1
+    first.text, second.text = "Built event pipeline", "with exact source words. Extra context."
+    for unit in (first, second):
+        unit.location.kind, unit.location.index = "page", 0
+    document.units.append(second)
+    claim = "Built event pipeline with exact source words."
+    fact["value"]["text"], span["text"] = claim, claim
+    job = next(row for row in raw["jobs"] if row["tempId"] == fact["jobTempId"])
+    job["unitIds"].append(second.id)
+    if change == "gap": second.order += 1
+    if change == "page": second.location.index += 1
+    if change == "outside": job["unitIds"].remove(second.id)
+    if change == "partial": first.text = "Other heading. " + first.text
+    if change == "revision": span["unitRevision"] += 1
+    if change == "source_revision": span["sourceRevision"] += 1
+    if change == "ambiguous": second.text += " " + claim
+    if change == "invented": span["text"] = claim.replace("exact", "invented")
+    if change == "unowned": fact["jobTempId"] = None
+    before = captured.model_dump(mode="json", by_alias=True)
+    reply = NormalizationTransport(captured).restore(GuiSemanticProposal.model_validate(raw))
+    kept = next(row for row in reply.facts if row.temp_id == fact["tempId"])
+    assert captured.model_dump(mode="json", by_alias=True) == before
+    assert len(kept.literal_evidence) == (2 if change is None else 1)
+    if change is None:
+        assert [span.text for span in kept.literal_evidence] == [first.text, "with exact source words."]
+        assert kept.unit_ids == [first.id, second.id]
+        assert kept.value.text == first.text + "\nwith exact source words."
+        assert " ".join(kept.value.text.split()) == claim
+        normalize_employment(captured, reply, normalize_candidate(captured, reply, RULES))
+    else:
+        with pytest.raises(NormalizationFailure) as error:
+            normalize_employment(captured, reply, normalize_candidate(captured, reply, RULES))
+        assert error.value.code == "INVALID_SOURCE_EVIDENCE"
+
+
+@pytest.mark.parametrize("change", [None, "no_copy", "different_claim", "importance", "invalid_copy", "invalid_owner", "duplicate_id"])
+def test_misowned_duplicate_is_removed_only_when_its_exact_owned_claim_survives(change):
+    captured = source()
+    raw = employment_proposal(captured).model_dump(by_alias=True)
+    original = next(row for row in raw["facts"] if row["tempId"] == "north-task")
+    wrong = deepcopy(original)
+    wrong.update(tempId="wrong-copy", jobTempId="west")
+    wrong["value"]["text"] = "Unsupported native paraphrase"
+    raw["facts"].append(wrong)
+    for unit in raw["units"]:
+        if original["tempId"] in unit["factTempIds"]:
+            unit["factTempIds"].append(wrong["tempId"])
+    if change == "no_copy":
+        raw["facts"].remove(original)
+        for unit in raw["units"]:
+            unit["factTempIds"] = [id for id in unit["factTempIds"] if id != original["tempId"]]
+    if change == "different_claim": wrong["literalEvidence"][0]["text"] = "Делала REST API"
+    if change == "importance": wrong["importance"] = "essential"
+    if change == "invalid_copy": original["literalEvidence"][0]["unitRevision"] += 1
+    if change == "invalid_owner": original["jobTempId"] = "west"
+    if change == "duplicate_id": wrong["tempId"] = original["tempId"]
+    reply = NormalizationTransport(captured).restore(GuiSemanticProposal.model_validate(raw))
+    if change is None:
+        assert len(reply.facts) == len(raw["facts"]) - 1
+        assert not any(fact.temp_id == wrong["tempId"] for fact in reply.facts)
+        assert not any(wrong["tempId"] in unit.fact_temp_ids for unit in reply.units)
+        kept = next(fact for fact in reply.facts if fact.temp_id == original["tempId"])
+        assert kept.literal_evidence[0].model_dump(by_alias=True) == original["literalEvidence"][0]
+        normalize_employment(captured, reply, normalize_candidate(captured, reply, RULES))
+    else:
+        assert len(reply.facts) == len(raw["facts"])
+        with pytest.raises(NormalizationFailure):
+            normalize_employment(captured, reply, normalize_candidate(captured, reply, RULES))
+
+
+@pytest.mark.parametrize("change", [None, "revision", "invented", "owned"])
+def test_unsupported_global_technology_keeps_one_verified_literal_without_tool_or_duration(change):
+    captured = source()
+    raw = employment_proposal(captured).model_dump(by_alias=True)
+    fact = next(row for row in raw["facts"] if row["tempId"] == "docker")
+    fact["value"].update(display="Invented Tool", canonicalId="invented-tool")
+    if change == "revision": fact["literalEvidence"][0]["unitRevision"] += 1
+    if change == "invented": fact["literalEvidence"][0]["text"] = "Invented citation"
+    if change == "owned":
+        fact.update(jobTempId="north")
+        fact["value"]["scope"] = "job"
+    reply = NormalizationTransport(captured).restore(GuiSemanticProposal.model_validate(raw))
+    kept = next(row for row in reply.facts if row.temp_id == fact["tempId"])
+    if change is None:
+        assert kept.kind == "text" and kept.value.text == "Docker"
+        assert kept.job_temp_id is None and kept.subproject_temp_id is None
+        normalize_employment(captured, reply, normalize_candidate(captured, reply, RULES))
+    else:
+        assert kept.kind == "technology"
+        with pytest.raises(NormalizationFailure):
+            normalize_employment(captured, reply, normalize_candidate(captured, reply, RULES))
+
+
+@pytest.mark.parametrize("change", ["alias", "canonical", "foreign", "unknown", "empty", "duplicate", "collision"])
+def test_job_unit_accounting_omits_only_its_own_redundant_source_label(change):
+    captured = source()
+    if change == "collision": captured.sources[0].id = captured.sources[0].units[1].id
+    raw = employment_proposal(captured).model_dump(by_alias=True)
+    transport = NormalizationTransport(captured)
+    job = raw["jobs"][0]
+    expected = list(job["unitIds"])
+    label = transport.source_aliases[job["sourceId"]]
+    if change == "canonical": label = job["sourceId"]
+    if change == "foreign": label = "s999"
+    if change == "unknown": label = "u999"
+    if change == "empty": job["unitIds"] = []
+    if change == "duplicate": label = job["unitIds"][0]
+    if change != "collision": job["unitIds"].insert(0, label)
+    reply = transport.restore(GuiSemanticProposal.model_validate(raw))
+    if change in {"alias", "canonical", "collision"}:
+        assert reply.jobs[0].unit_ids == expected
+        normalize_employment(captured, reply, normalize_candidate(captured, reply, RULES))
+    else:
+        with pytest.raises(NormalizationFailure) as error:
+            normalize_employment(captured, reply, normalize_candidate(captured, reply, RULES))
+        assert error.value.code == "INVALID_JOB_EVIDENCE"

@@ -68,7 +68,8 @@
         "factIds": [],
         "evidence": [],
         "origin": "generated"
-      }
+      },
+      "details": []
     },
     "profile": {
       "kind": "profile",

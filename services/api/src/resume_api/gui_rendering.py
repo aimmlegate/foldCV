@@ -8,7 +8,6 @@ import zipfile
 
 from packages.resume_core.models.recovery import DocxError
 from packages.resume_core.rendering.docx_errors import DocxFailure, failure
-from packages.resume_core.rendering.privacy import guard_render_document
 from packages.resume_core.rendering.template import RenderFailure, renderer_sha256
 from .lifecycle import OperationFiles
 from .rendering import WORKER, ALLOWED_ERRORS
@@ -16,7 +15,6 @@ from .rendering import WORKER, ALLOWED_ERRORS
 
 class GuiDocxRenderer:
     async def render(self, document, anchors, files: OperationFiles) -> bytes:
-        guard_render_document(document)
         if files.path is None:
             raise failure("DOCX_RENDER_FAILED")
         workspace = files.path

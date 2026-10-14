@@ -173,6 +173,7 @@ class CandidateRecord(Record):
     name: AuthoredField
     title: AuthoredField
     location: AuthoredField
+    details: list[AuthoredField] = Field(default_factory=list, max_length=100)
 
 
 class ProfileRecord(Record):
@@ -261,6 +262,8 @@ def record_slot(record: DocumentRecord) -> str:
 
 def authored_fields(record: DocumentRecord) -> list[AuthoredField]:
     fields = [value for value in record.__dict__.values() if isinstance(value, AuthoredField)]
+    if isinstance(record, CandidateRecord):
+        fields.extend(record.details)
     if isinstance(record, JobRecord):
         fields = [record.employer, record.role,
                   *(field for period in record.periods for field in (period.start_text, period.end_text)),

@@ -14,7 +14,6 @@ from .gui_selection import field_index, selection_fingerprint, normalized_text, 
 from .models.contracts import Id, Wire
 from .models.recovery import (RecoveryFact, Anchor, EditorialPlan, Annotation, Dependencies,
     FieldReplacement, RelatedUpdateSuggestion, NameAssessmentFact, authored_fields)
-from .privacy import private_output_text
 
 
 class GuiAnalysisRequest(Wire):
@@ -161,8 +160,6 @@ def validate_proposal(workspace, field_ids, proposal):
                 raise ValueError('ANALYSIS_SCOPE_INVALID')
         elif fact.kind == 'source_observation' or fact not in public_context_facts([fact]):
             raise ValueError('ANALYSIS_SCOPE_INVALID')
-        if private_output_text(str(fact.value.model_dump() if hasattr(fact.value, 'model_dump') else fact.value)):
-            raise ValueError('NO_SAFE_CONTENT')
         if fact.job_id is not None and fact.job_id not in ({job.id for job in workspace.project.document.jobs} | set(workspace.project.document.early_career.represented_job_ids)):
             raise ValueError('ANALYSIS_SCOPE_INVALID')
     mention_ids = {id for id, (field, _slot) in indexed.items() if field and set(field.fact_ids) & allowed}
@@ -172,7 +169,6 @@ def validate_proposal(workspace, field_ids, proposal):
     if len(suggestions) != len(proposal.suggestions): raise ValueError('ANALYSIS_SCOPE_INVALID')
     if len({mark.id for mark in proposal.annotations}) != len(proposal.annotations): raise ValueError('ANALYSIS_SCOPE_INVALID')
     for mark in proposal.annotations:
-        if private_output_text(mark.reason): raise ValueError('NO_SAFE_CONTENT')
         if not set(mark.fact_ids) <= public | facts.keys() or mark.update_suggestion_id not in suggestions | {None}:
             raise ValueError('ANALYSIS_SCOPE_INVALID')
         if mark.anchor.kind == 'field':
@@ -184,7 +180,6 @@ def validate_proposal(workspace, field_ids, proposal):
         elif mark.anchor.kind == 'section' and mark.anchor.section_id not in sections:
             raise ValueError('ANALYSIS_SCOPE_INVALID')
     for item in proposal.suggestions:
-        if private_output_text(item.reason): raise ValueError('NO_SAFE_CONTENT')
         if not set(item.fact_ids) <= public | facts.keys(): raise ValueError('ANALYSIS_SCOPE_INVALID')
         if len({replacement.field_id for replacement in item.replacements}) != len(item.replacements): raise ValueError('ANALYSIS_SCOPE_INVALID')
         for replacement in item.replacements:
@@ -192,7 +187,7 @@ def validate_proposal(workspace, field_ids, proposal):
             field = indexed[replacement.field_id][0]
             if replacement.range: utf16_slice(field.text, replacement.range.start, replacement.range.end)
             replacement.text = normalized_text(replacement.text)
-            if len(replacement.text) > 12000 or private_output_text(replacement.text): raise ValueError('NO_SAFE_CONTENT')
+            if len(replacement.text) > 12000: raise ValueError('NO_SAFE_CONTENT')
     if proposal.editorial_plan:
         plan_ids = [job.job_id for job in proposal.editorial_plan.jobs]
         if len(plan_ids) != len(set(plan_ids)) or set(plan_ids) != ({job.id for job in workspace.project.document.jobs} | set(workspace.project.document.early_career.represented_job_ids)):
@@ -200,9 +195,7 @@ def validate_proposal(workspace, field_ids, proposal):
         plan = proposal.editorial_plan
         if not set(plan.fact_ids) <= public | facts.keys() or any(not set(item.fact_ids) <= public | facts.keys() for item in [*plan.focus, *plan.technology_groups]):
             raise ValueError('ANALYSIS_SCOPE_INVALID')
-        if any(private_output_text(text) for text in [*(item.display for item in plan.focus), *(item.title for item in plan.technology_groups)]):
-            raise ValueError('NO_SAFE_CONTENT')
-    if any(len(text) > 2000 or private_output_text(text) for text in proposal.recommendations): raise ValueError('NO_SAFE_CONTENT')
+    if any(len(text) > 2000 for text in proposal.recommendations): raise ValueError('NO_SAFE_CONTENT')
     return proposal
 
 

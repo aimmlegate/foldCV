@@ -62,23 +62,22 @@ async def test_prepare_reports_description_limit_and_allows_missing_job_dates(tm
     ("LinkedIn: linkedin.com", "PROFILE"),
 ])
 @pytest.mark.asyncio
-async def test_private_visible_output_stops_prepare_and_direct_render_before_worker(tmp_path, monkeypatch, private, section):
+async def test_candidate_visible_output_reaches_prepare_and_direct_render_worker(tmp_path, monkeypatch, private, section):
     calls = []
 
-    async def forbidden_render(self, request, files):
+    async def accepted_render(self, request, files):
         calls.append(request)
-        raise AssertionError("renderer must not start")
+        return b"synthetic-document"
 
-    monkeypatch.setattr(DocumentRenderer, "render", forbidden_render)
+    monkeypatch.setattr(DocumentRenderer, "render", accepted_render)
     app = make_app(tmp_path)
     async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url=ORIGIN) as client:
         await client.post("/v1/session/exchange", headers={"Origin": ORIGIN}, json={"secret": SECRET})
         unsafe = deepcopy(PREPARE)
         unsafe["project"]["views"][1 if section == "JOB" else 0]["state"]["text"] = private
         rejected = await client.post("/v1/prepare-render", headers={"Origin": ORIGIN}, json=unsafe)
-        assert rejected.status_code == 422
-        assert rejected.json()["error"]["code"] == f"PRIVATE_OUTPUT_{section}"
-        assert private not in rejected.text
+        assert rejected.status_code == 200
+        assert private in rejected.text
         assert unsafe["project"]["views"][1 if section == "JOB" else 0]["state"]["text"] == private
 
         direct = prepare_document(PrepareRequest.model_validate(PREPARE))
@@ -89,10 +88,9 @@ async def test_private_visible_output_stops_prepare_and_direct_render_before_wor
         direct.snapshot.snapshot_sha256 = snapshot_digest(direct)
         blocked = await client.post("/v1/render", headers={"Origin": ORIGIN},
                                     json=direct.model_dump(mode="json", by_alias=True))
-        assert blocked.status_code == 422
-        assert blocked.json()["error"]["code"] == f"PRIVATE_OUTPUT_{section}"
-        assert private not in blocked.text
-    assert calls == []
+        assert blocked.status_code == 200 and blocked.content == b"synthetic-document"
+    assert len(calls) == 1
+    assert private in calls[0].document.model_dump_json()
     assert list((tmp_path / "operations").iterdir()) == []
 
 

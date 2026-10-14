@@ -56,3 +56,12 @@ def test_wrong_rule_or_source_hash_cannot_create_a_store(inputs):
     source.chmod(0o600)
     with pytest.raises(ValueError, match="CYCLE_HASH_MISMATCH"):
         verified_bytes(source, "0" * 64)
+
+
+def test_normal_store_cannot_be_selected_through_a_parent_alias(inputs):
+    from pathlib import Path
+    parent, profile, rules, digest = inputs
+    normal = Path.home() / 'Library/Application Support/FoldCV'
+    for root in (normal, normal.parent / 'alias/../FoldCV', normal / 'test'):
+        with pytest.raises(ValueError, match='CYCLE_NORMAL_STORE_DENIED'):
+            select_store(root, rules, digest, 'selected', profile, reuse=False)

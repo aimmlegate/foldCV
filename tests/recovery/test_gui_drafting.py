@@ -142,10 +142,10 @@ def test_focus_capacity_keeps_first_eight_in_supplied_order():
     assert len(request.normalized.facts) > len(result.document.skills_focus.focus)
 
 
-def test_draft_payload_omits_private_values_from_excerpts_and_facts():
+def test_draft_payload_and_skeleton_preserve_candidate_details():
     from packages.resume_core.gui_normalization import GuiSemanticProposal, normalize_candidate
     from packages.resume_core.gui_employment import normalize_employment
-    from packages.resume_core.gui_drafting import GuiDraftRequest
+    from packages.resume_core.gui_drafting import GuiDraftRequest, draft_skeleton
     from tests.recovery.candidate_fixtures import ROOT, request as normalization_request, value
     from tests.recovery.employment_fixtures import employment_proposal
 
@@ -156,7 +156,8 @@ def test_draft_payload_omits_private_values_from_excerpts_and_facts():
     normalized = normalize_employment(source, reply, normalize_candidate(source, reply, RULES))
     request = GuiDraftRequest.model_validate({"projectId": "private-draft", "projectRevision": 1, "documentRevision": 1,
         "normalized": normalized.model_dump(by_alias=True), "formattingAsOf": source.formatting_as_of.model_dump(by_alias=True)})
-    assert "fictional@example.invalid" not in drafting_input(request, RULES)
+    assert "fictional@example.invalid" in drafting_input(request, RULES)
+    assert draft_skeleton(normalized).candidate.details[0].text == "fictional@example.invalid"
     assert "fictional@example.invalid" in normalized.sources[0].units[-1].text
 
 

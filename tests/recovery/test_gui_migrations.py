@@ -164,12 +164,12 @@ def test_v2_explicit_early_job_membership_keeps_summary_without_age_inference():
     assert workspace.editorial_plan.jobs[0].disposition=='early-career'
 
 
-def test_legacy_contact_fact_is_absent_from_unrelated_content_input():
+def test_legacy_contact_category_does_not_filter_content_facts():
     def change(project):
         from copy import deepcopy
         block=deepcopy(next(block for block in project['views'] if block['kind']=='profile'));block.update(id='private_contact',kind='contact');block['state']['text']='private@example.invalid';project['views'].append(block)
     workspace,_,_=open_archive(legacy_v3(change),'private',frozen_now());private={ref for block in workspace.legacy_data.blocks if block.kind=='contact' for ref in block.state.fact_ids}
-    assert private and not private&{fact.id for fact in public_workspace_facts(workspace)}
+    assert private and private <= {fact.id for fact in public_workspace_facts(workspace)}
     assert 'private@example.invalid' in {item.text for item in migration_context(workspace).legacy_text}
 
 

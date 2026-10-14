@@ -38,12 +38,11 @@ from .rendering import DocumentRenderer
 from .extracting import MAX_BODY as MAX_EXTRACT_BODY, UploadFailure, parse_one_part, run_extract
 from packages.resume_core.rendering.template import PACKAGE_SHA256, ROOT as TEMPLATE_ROOT, MANIFEST as TEMPLATE_MANIFEST, RenderFailure, renderer_sha256, require_template
 from packages.resume_core.rendering.preparation import PreparationFailure, PrepareRequest, prepare_document
-from packages.resume_core.rendering.privacy import guard_render_document
 from packages.resume_core.normalization import FactRequest, FactSheet, fingerprint, literal_sheet, semantic_input
 from packages.resume_core.drafting import DraftRequest as ProseDraftRequest, DraftResult as ProseDraftResult, draft_input
 from packages.resume_core.rewriting import (RewritePreflightError, RewritePreflightFailure,
                                             RewriteRequest as ScopedRewriteRequest, RewriteResult as ScopedRewriteResult,
-                                            rewrite_input, withheld_rewrite_issues)
+                                            rewrite_input)
 from packages.resume_core.rules import PRESET_HEADINGS, RulesFailure, RulesStore, presets
 from packages.resume_core.models.recovery import SaveRulesRequest, RulesSettingsError, RulesSettings
 from .gui_projects import GuiProjectService, ProjectFailure
@@ -793,7 +792,7 @@ def create_app(*, origin: str, secret: str, temp_root: Path, dist: Path, runner:
                 failure = RewritePreflightFailure(error=RewritePreflightError(code="NO_SAFE_CONTENT", retryable=False,
                     stage="rewrite"), baseRevision=payload.base_revision,
                     blockId=payload.block_id, blockRevision=payload.block_revision,
-                    dependencyHash=payload.dependency_hash, issues=withheld_rewrite_issues(payload))
+                    dependencyHash=payload.dependency_hash, issues=[])
                 return JSONResponse(failure.model_dump(mode="json", by_alias=True), status_code=422,
                                     headers={"Cache-Control": "no-store"})
             return problem(code, 413 if code == "INPUT_TOO_LARGE" else 422, "rewrite")
@@ -870,16 +869,12 @@ def create_app(*, origin: str, secret: str, temp_root: Path, dist: Path, runner:
         except PreparationFailure as error:
             return problem(error.code, 422, "prepare")
         except RenderFailure as error:
-            return problem(error.code if error.code.startswith("PRIVATE_OUTPUT_") else "PREPARATION_FAILED", 422, "prepare")
+            return problem("PREPARATION_FAILED", 422, "prepare")
         except ValueError:
             return problem("PREPARATION_FAILED", 422, "prepare")
 
     async def render(request: Request, payload: RenderRequest):
         nonlocal active
-        try:
-            guard_render_document(payload.document)
-        except RenderFailure as error:
-            return problem(error.code, 422, "render")
         async with gate:
             if unsafe_cleanup or cancellation_pending or active >= MAX_CONCURRENT:
                 return problem("BUSY", 429, "render", True)
@@ -914,7 +909,7 @@ def create_app(*, origin: str, secret: str, temp_root: Path, dist: Path, runner:
                 return problem("OPERATION_TIMEOUT", 504, "render")
             return problem("RENDER_FAILED", 500, "render")
         except RenderFailure as error:
-            status = 422 if error.code in {"RENDER_UNSUPPORTED_CONTENT", "UNSUPPORTED_FOCUS_ICON"} or error.code.startswith("PRIVATE_OUTPUT_") else 503 if error.code.endswith(("UNAVAILABLE", "MISMATCH")) else 500
+            status = 422 if error.code in {"RENDER_UNSUPPORTED_CONTENT", "UNSUPPORTED_FOCUS_ICON"} else 503 if error.code.endswith(("UNAVAILABLE", "MISMATCH")) else 500
             return problem(error.code, status, "render")
         except SpikeError as error:
             return problem(lifecycle_code(error), 503, "render")

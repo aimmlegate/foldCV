@@ -18,6 +18,14 @@ from .technologies import resolve_technology
 FACT_TYPES = {"text": GuiTextFact, "technology": GuiTechnologyFact, "metric": GuiMetricFact,
               "leadership": GuiLeadershipFact, "date": GuiDateFact}
 PRESENT = re.compile(r"(?<!\w)(?:по\s+)?(?:настоящее\s+время|н\.?\s*в\.?|present|current|ongoing|to\s+date)(?!\w)", re.I)
+NEGATED_PRESENT = re.compile(r"(?<!\w)(?:not|no|never|не|нет)\s+"
+    r"(?:(?:longer|still|currently|уже|более)\s+)*" + PRESENT.pattern, re.I)
+
+
+def _explicit_present(text: str) -> bool:
+    negated = [match.span() for match in NEGATED_PRESENT.finditer(text)]
+    return any(not any(start <= match.start() < end for start, end in negated)
+               for match in PRESENT.finditer(text))
 
 
 def _supported_header(value, source_id, unit_ids, sources):
@@ -76,8 +84,9 @@ def normalize_employment(request: GuiNormalizeRequest, proposal: GuiSemanticProp
                     raise NormalizationFailure("UNSUPPORTED_EMPLOYMENT_DATE")
             if period.present and (period.start is None or period.end is not None):
                 raise NormalizationFailure("INVALID_PRESENT_PERIOD")
-            if period.present and (not PRESENT.search(evidence_text) or
-                    period.end_text and not PRESENT.fullmatch(period.end_text.strip())):
+            # Source endpoints may include duration text around the present phrase.
+            if period.present and (not _explicit_present(evidence_text) or
+                    period.end_text and not _explicit_present(period.end_text)):
                 raise NormalizationFailure("INVALID_PRESENT_PERIOD")
             if period.start and period.end and period.start.lower() > period.end.upper():
                 raise NormalizationFailure("INVALID_EMPLOYMENT_PERIOD")

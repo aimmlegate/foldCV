@@ -209,7 +209,15 @@ def _lines(text: str, width: float, font: str = "regular", size: float = 10) -> 
         current = ""
         for word in explicit_line.split():
             if pdfmetrics.stringWidth(word, font, size) > width:
-                raise ValueError("Unbreakable text exceeds the column width")
+                if current:
+                    count += 1
+                    current = ""
+                for char in word:
+                    if current and pdfmetrics.stringWidth(current + char, font, size) > width:
+                        count += 1
+                        current = ""
+                    current += char
+                continue
             trial = f"{current} {word}".strip()
             if current and pdfmetrics.stringWidth(trial, font, size) > width:
                 count += 1
@@ -253,6 +261,8 @@ def _flow_remaining(pages: list[list]) -> float:
 def _take_prefix(text: str, width: float, available: float, *, after: float,
                  prefix: str = "") -> tuple[str, str]:
     tokens = re.findall(r"\S+\s*", text)
+    tokens = [piece for token in tokens for piece in
+              (list(token) if pdfmetrics.stringWidth(token.rstrip(), "regular", 10) > width else [token])]
     if not tokens:
         return text, ""
     best = 0
@@ -446,8 +456,6 @@ def _paginate_side(data: dict) -> list[dict]:
 def render_docx(data: dict, target: Path) -> None:
     pdfmetrics.registerFont(TTFont("regular", str(ASSETS / "fonts/SourceSansPro-Regular.ttf")))
     pdfmetrics.registerFont(TTFont("bold", str(ASSETS / "fonts/SourceSansPro-Bold.ttf")))
-    if _lines(data["candidate"]["name"], 450, "bold", 18) > 1:
-        raise ValueError("Candidate display name exceeds one header line")
     if _lines(data["candidate"]["title"], 450, "bold", 16) > 2:
         raise ValueError("Candidate title exceeds two header lines")
     doc = Document()
@@ -464,6 +472,10 @@ def render_docx(data: dict, target: Path) -> None:
     normal.font.name = "Source Sans Pro"
     normal.font.size = Pt(10)
     normal.paragraph_format.space_after = Pt(0)
+    # Word's off value allows character wrapping without altering text or URLs.
+    wrap = OxmlElement("w:wordWrap")
+    wrap.set(qn("w:val"), "off")
+    normal.element.get_or_add_pPr().append(wrap)
     _header(doc, data["candidate"])
     side_pages, main_pages = _paginate_side(data), _paginate_main(data)
     for index in range(max(len(side_pages), len(main_pages))):

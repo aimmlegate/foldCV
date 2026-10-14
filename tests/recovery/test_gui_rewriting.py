@@ -60,6 +60,23 @@ def test_partial_utf16_newline_replacement_preserves_surrounding_text_and_restor
     assert workspace.project.document.profile.text.text == 'Alpha 😀é\nBeta'
 
 
+def test_direct_contact_edit_and_scoped_rewrite_preserve_other_authored_fields():
+    from packages.resume_core.models.recovery import AuthoredField
+    workspace = render_workspace()
+    detail = AuthoredField(fieldId='private/email/0', text='old@example.invalid',
+                          factIds=[], evidence=[], origin='user')
+    workspace.project.document.candidate.details.append(detail)
+    profile = workspace.project.document.profile.text.text
+    edit(workspace, detail.field_id, 'new@example.invalid', completion='slot')
+    captured = request(workspace, [detail.field_id], instruction='Use phone: +12345678901')
+    assert 'new@example.invalid' in rewriting_input(workspace, captured, workspace.rules_used)
+    result = apply_rewrite(workspace, captured, proposal(captured, 'phone: +12345678901'),
+                           workspace.project_revision, frozen_now().isoformat())
+    assert result.status == 'applied'
+    assert workspace.project.document.candidate.details[0].text == 'phone: +12345678901'
+    assert workspace.project.document.profile.text.text == profile
+
+
 @pytest.mark.parametrize('suffix', ['candidate/title', '/role', '/startText'])
 def test_authored_heading_structured_and_invalid_date_rewrite_keep_field_identity(suffix):
     workspace = render_workspace()
@@ -106,7 +123,7 @@ def test_rewrite_input_limits_context_to_current_authoritative_fields_and_public
         rewriting_input(workspace, captured, bad_rules)
 
 
-def test_mismatched_scope_surrogate_split_stale_counter_and_private_output_leave_text_unchanged():
+def test_mismatched_scope_surrogate_split_and_stale_counter_leave_text_unchanged():
     workspace = render_workspace()
     edit(workspace, 'profile/text', '😀 unchanged', completion='slot')
     captured = request(workspace)
@@ -114,9 +131,6 @@ def test_mismatched_scope_surrogate_split_stale_counter_and_private_output_leave
     wrong = proposal(captured, 'new');wrong.replacements[0].field_id = 'candidate/name'
     with pytest.raises(ValueError, match='REWRITE_SCOPE_INVALID'):
         apply_rewrite(workspace, captured, wrong, workspace.project_revision, frozen_now().isoformat())
-    private = proposal(captured, 'Call 555-123-4567')
-    with pytest.raises(ValueError, match='NO_SAFE_CONTENT'):
-        apply_rewrite(workspace, captured, private, workspace.project_revision, frozen_now().isoformat())
     split = captured.model_copy(deep=True);split.selection.spans[0].range.start = 1
     assert apply_rewrite(workspace, split, proposal(split, 'x'), workspace.project_revision, '').status == 'stale'
     assert apply_rewrite(workspace, captured, proposal(captured, 'x'), workspace.project_revision - 1, '').status == 'stale'
@@ -238,8 +252,6 @@ async def test_invalid_capture_and_instruction_are_zero_call_preflight_failures(
     captured = request(workspace, rules=store.rules.load());captured.selection.spans[0].captured_text = 'mismatched'
     result = await store.rewrite(workspace.project_id, captured)
     assert result.rejection_reason == 'SELECTION_STALE' and [op for op in workspace.project.operations if op.kind == "rewrite_prose"][-1].usage.logical_attempts == 0
-    private = request(workspace, rules=store.rules.load(), instruction='Call 555-123-4567')
-    assert (await store.rewrite(workspace.project_id, private)).rejection_reason == 'NO_SAFE_CONTENT'
     assert provider.calls == []
     with pytest.raises(ValidationError):
         request(workspace, rules=store.rules.load(), instruction='\ud800')

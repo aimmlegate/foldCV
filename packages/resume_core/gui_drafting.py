@@ -82,6 +82,8 @@ def draft_skeleton(normalized: GuiNormalizedResult) -> Document:
             role=_field(prefix + "/role", job.role, header_ids), periodsFieldId=prefix + "/periods", periods=periods,
             context=_field(prefix + "/context"), tasks=_field(prefix + "/tasks"), results=_field(prefix + "/results"),
             stack=_field(prefix + "/stack"), subprojectIds=[sub.id for sub in job.subprojects]))
+    doc["candidate"]["details"] = [_field(f"private/{row.kind}/{index}", row.value.text,
+        refs.get(f"private/{row.kind}/{index}")) for index, row in enumerate(normalized.private_details)]
     groups = [("education", "education", normalized.education, ("institution", "qualification", "specialty", "date_text")),
               ("certifications", "certification", normalized.certifications, ("name", "issuer", "date_text")),
               ("languages", "language", normalized.languages, ("name", "proficiency"))]
@@ -101,12 +103,7 @@ def drafting_input(request: GuiDraftRequest, rules: Rules) -> str:
     excerpts = []
     for source in request.normalized.sources:
         for unit in source.units:
-            text = unit.text
-            for item in request.normalized.private_details:
-                for span in item.value.evidence:
-                    if (source.id, unit.id) == (span.source_id, span.unit_id):
-                        text = text.replace(span.text, "")
-            excerpts.append({"sourceId": source.id, "unitId": unit.id, "text": text})
+            excerpts.append({"sourceId": source.id, "unitId": unit.id, "text": unit.text})
     blocked = {id for conflict in request.normalized.conflicts for id in conflict.fact_ids}
     facts = []
     for fact in public_context_facts(request.normalized.facts):
@@ -146,14 +143,13 @@ def validate_draft(request: GuiDraftRequest, proposal: GuiDraftProposal, rules: 
     plan = proposal.editorial_plan.model_copy(deep=True)
     jobs = {job.id for job in normalized.employment}
     facts = {fact.id: fact for fact in normalized.facts}
-    private = {fact.id for fact in normalized.facts if isinstance(fact, CandidateFact) and fact.value.field == "private_metadata"}
     blocked = {id for conflict in normalized.conflicts for id in conflict.fact_ids}
     if (plan.origin != "model" or plan.rules_revision != rules.revision or plan.formatting_as_of != request.formatting_as_of or
         {job.job_id for job in plan.jobs} != jobs):
         raise DraftFailure("INVALID_EDITORIAL_PLAN_CONTEXT")
     all_plan_refs = [*plan.fact_ids, *[id for job in plan.jobs for id in job.fact_ids],
                      *[id for focus in plan.focus for id in focus.fact_ids], *[id for group in plan.technology_groups for id in group.fact_ids]]
-    if not set(all_plan_refs) <= set(facts) or set(all_plan_refs) & private:
+    if not set(all_plan_refs) <= set(facts):
         raise DraftFailure("INVALID_EDITORIAL_FACT_REFERENCE")
     for job in plan.jobs:
         if any(facts[id].job_id not in (None, job.job_id) for id in job.fact_ids):
@@ -165,7 +161,7 @@ def validate_draft(request: GuiDraftRequest, proposal: GuiDraftProposal, rules: 
     if len({item.field_id for item in proposal.fields}) != len(proposal.fields):
         raise DraftFailure("DUPLICATE_DRAFT_FIELD")
     for item in proposal.fields:
-        if item.field_id not in fields or not set(item.fact_ids) <= set(facts) or set(item.fact_ids) & (private | blocked):
+        if item.field_id not in fields or not set(item.fact_ids) <= set(facts) or set(item.fact_ids) & blocked:
             raise DraftFailure("INVALID_DRAFT_FIELD_REFERENCE")
         field = fields[item.field_id]
         if item.field_id not in prose_ids:

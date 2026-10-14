@@ -28,8 +28,6 @@ export type Resolved = boolean;
 export type Type = "missing" | "conflicting" | "stale" | "warning";
 export type Updatesuggestionid = string | null;
 export type Annotations = Annotation[];
-export type Id1 = "candidate";
-export type Kind3 = "candidate";
 export type Sourceid1 = string;
 export type Sourcerevision1 = number;
 export type Unitid1 = string;
@@ -39,6 +37,12 @@ export type Factids1 = string[];
 export type Fieldid1 = string;
 export type Origin = "source" | "generated" | "user" | "migration";
 export type Text1 = string;
+/**
+ * @maxItems 100
+ */
+export type Details = AuthoredField[];
+export type Id1 = "candidate";
+export type Kind3 = "candidate";
 export type Revision = number;
 export type Visible = true;
 export type Id2 = string;
@@ -181,6 +185,7 @@ export interface Document {
   skillsFocus: SkillsFocusRecord;
 }
 export interface CandidateRecord {
+  details?: Details;
   id: Id1;
   kind: Kind3;
   location: AuthoredField;

@@ -171,7 +171,7 @@ def test_old_job_uses_compact_policy_row_and_keeps_detail_only_in_project():
     ("language", "Job board: hh.ru", "SIDEBAR"),
     ("skill", "Python, contact@example.com", "SKILLS"),
 ])
-def test_preparation_rejects_visible_private_output_without_changing_input(field, value, section):
+def test_preparation_preserves_visible_candidate_content_without_changing_input(field, value, section):
     data = example()
     if field == "job_prose":
         data["project"]["views"][1]["state"]["text"] = value
@@ -190,8 +190,8 @@ def test_preparation_rejects_visible_private_output_without_changing_input(field
     else:
         data["project"]["facts"][1]["value"]["display"] = value
     original = deepcopy(data)
-    with pytest.raises(RenderFailure, match=f"PRIVATE_OUTPUT_{section}"):
-        prepare_document(PrepareRequest.model_validate(data))
+    result = prepare_document(PrepareRequest.model_validate(data))
+    assert value in result.document.model_dump_json()
     assert data == original
 
 
@@ -202,6 +202,19 @@ def test_hidden_source_private_values_do_not_block_safe_visible_document():
     data["project"]["views"][1]["state"]["text"] = "Call 555-123-4567 for references."
     prepared = prepare_document(PrepareRequest.model_validate(data))
     assert all("555" not in item.description for item in prepared.document.projects)
+
+
+def test_visible_legacy_contact_block_is_editable_render_content_and_hidden_choice_is_kept():
+    data = example()
+    contact = deepcopy(data['project']['views'][0])
+    contact.update(id='contact-details', kind='contact')
+    contact['state'].update(text='Email: contact@example.invalid\nAge: 42', factIds=[], factRevisions={})
+    data['project']['views'].append(contact)
+    rendered = prepare_document(PrepareRequest.model_validate(data))
+    assert any(section.items == ['Email: contact@example.invalid\nAge: 42'] for section in rendered.document.sidebar)
+    contact['visible'] = False
+    hidden = prepare_document(PrepareRequest.model_validate(data))
+    assert 'contact@example.invalid' not in hidden.document.model_dump_json()
 
 
 def test_safe_metrics_and_dates_remain_renderable():

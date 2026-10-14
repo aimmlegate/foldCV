@@ -45,7 +45,7 @@ def verified_bytes(path: Path, sha256: str) -> bytes:
 
 def select_store(root: Path, rules_path: Path, rules_sha256: str, model: str,
                  profile: Path, *, reuse: bool) -> Path:
-    root = root.absolute()
+    root = Path(os.path.abspath(root))
     normal = Path.home() / "Library/Application Support/FoldCV"
     if root == normal or root.is_relative_to(normal) or normal.is_relative_to(root):
         raise ValueError("CYCLE_NORMAL_STORE_DENIED")

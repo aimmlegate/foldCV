@@ -11,7 +11,6 @@ from pydantic import Field, model_validator
 from .dates import month_bounds, old_job
 from .models.contracts import Fact, LeadershipFact, MetricFact, PartialDate, Wire
 from .normalization import FactSheet
-from .privacy import private_output_text
 
 
 class DraftRequest(Wire):
@@ -104,23 +103,7 @@ def _eligible_selection(request: DraftRequest) -> dict[str, list[Fact]]:
 
 
 def draft_selection(request: DraftRequest) -> dict[str, list[Fact]]:
-    return {block_id: safe for block_id, facts in _eligible_selection(request).items()
-            if (safe := [fact for fact in facts if not _contact(fact)])}
-
-
-def _text_values(value):
-    if isinstance(value, str):
-        yield value
-    elif isinstance(value, dict):
-        for item in value.values():
-            yield from _text_values(item)
-    elif isinstance(value, (list, tuple)):
-        for item in value:
-            yield from _text_values(item)
-
-
-def _contact(fact: Fact) -> bool:
-    return any(private_output_text(text) for text in _text_values(fact.value.model_dump(mode="python")))
+    return _eligible_selection(request)
 
 
 def _required(facts: list[Fact], corrected: set[str]) -> set[str]:
@@ -183,12 +166,6 @@ def validate_draft(request: DraftRequest, proposal: DraftProposal) -> DraftResul
         raise ValueError("draft block mismatch")
     issues: list[DraftIssue] = []
     corrected = set(request.sheet.user_corrections.values())
-    for block_id, facts in eligible.items():
-        required = _required(facts, corrected)
-        for fact in facts:
-            if fact.id in required and _contact(fact):
-                issues.append(DraftIssue(code="SOURCE_REVIEW", blockId=block_id, factId=fact.id,
-                                         message="Fact withheld from drafting because it may contain contact information. Review it manually."))
     for block_id, selected in selection.items():
         block = returned[block_id]
         allowed = {fact.id for fact in selected}

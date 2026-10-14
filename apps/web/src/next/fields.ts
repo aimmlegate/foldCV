@@ -7,6 +7,7 @@ export function documentFields(document: Document): FieldProjection[] {
   add("candidate", "Имя", document.candidate.name);
   add("candidate", "Должность", document.candidate.title);
   add("candidate", "Местоположение", document.candidate.location);
+  for (const detail of document.candidate.details ?? []) add("candidate", "Данные кандидата", detail);
   add("profile", "О специалисте", document.profile.text);
   for (const job of document.jobs) {
     const slot = `job:${job.id}`;

@@ -73,8 +73,8 @@ may describe a later version of the candidate's career.
   Split long lists into readable groups instead of one dense line.
 - Include education, certificates, location, and languages only when supported.
   Do not expand an institution's name or degree from the reference output.
-- Omit personal phone, email, messengers, birth date, age, and job-board metadata
-  from this client-facing template. The branded footer is template content.
+- Contact, personal and job-board categories describe source content; they do not
+  exclude it from the selected view. The branded footer is template content.
 - Omit unknown fields cleanly from the PDF and explain gaps in `review`. Do not
   put internal review comments into the candidate's public profile.
 

@@ -204,10 +204,7 @@ def test_each_known_writer_reason_maps_without_raw_exception(message, code, path
 def test_real_worker_header_and_unknown_icon_errors_preserve_identity(tmp_path):
     workspace = render_workspace()
     workspace.project.document.candidate.name.text = "Wide name " * 15
-    with pytest.raises(DocxFailure) as caught:
-        write(workspace, tmp_path / "name")
-    assert caught.value.error.code == "DOCX_NAME_LINE_LIMIT"
-    assert caught.value.error.anchor.field_id == "candidate/name"
+    write(workspace, tmp_path / "name")
     rendered, anchors, _ = render_input(render_workspace())
     data = rendered.model_dump(mode="json", by_alias=True)
     data["focus"][0]["icon"] = "missing"
@@ -218,15 +215,18 @@ def test_real_worker_header_and_unknown_icon_errors_preserve_identity(tmp_path):
 
 
 @pytest.mark.asyncio
-async def test_gui_renderer_retains_existing_private_output_guard(tmp_path):
+async def test_gui_renderer_preserves_contact_text_in_actual_docx(tmp_path):
     from resume_api.gui_rendering import GuiDocxRenderer
     from resume_api.lifecycle import OperationFiles
     workspace = render_workspace()
     workspace.project.document.profile.text.text = "Contact fictional@example.invalid"
     rendered, anchors, _ = render_input(workspace)
-    with pytest.raises(RenderFailure, match="PRIVATE_OUTPUT_PROFILE"):
-        await GuiDocxRenderer().render(rendered, anchors, OperationFiles(tmp_path))
-    assert not list(tmp_path.iterdir())
+    from io import BytesIO
+    from zipfile import ZipFile
+    with OperationFiles(tmp_path).open() as files:
+        result = await GuiDocxRenderer().render(rendered, anchors, files)
+    with ZipFile(BytesIO(result)) as archive:
+        assert b"fictional@example.invalid" in archive.read("word/document.xml")
 
 
 def test_unclassified_writer_failure_uses_typed_docx_error(tmp_path, monkeypatch):
@@ -238,3 +238,22 @@ def test_unclassified_writer_failure_uses_typed_docx_error(tmp_path, monkeypatch
         write(render_workspace(), tmp_path)
     assert caught.value.error.code == "DOCX_RENDER_FAILED"
     assert caught.value.error.anchor.kind == "document" and "private" not in caught.value.error.model_dump_json()
+
+
+def test_long_name_email_url_and_unbroken_tokens_wrap_without_character_loss(tmp_path):
+    from packages.resume_core.models.recovery import AuthoredField
+    workspace = render_workspace()
+    name = "Александрович" * 9
+    email = "long" * 35 + "@example.invalid"
+    url = "https://example.invalid/" + "path" * 70 + "?exact=1&case=Mixed"
+    token = "token" * 100
+    workspace.project.document.candidate.name.text = name
+    workspace.project.document.candidate.details = [AuthoredField(fieldId="detail/" + str(i), text=text,
+        factIds=[], evidence=[], origin="user") for i, text in enumerate((email, url, token))]
+    _, xml, _ = write(workspace, tmp_path / "long")
+    text = "".join(xml.xpath(".//w:t/text()", namespaces=W))
+    for value in (name, email, url, token):
+        assert value in text
+    with ZipFile(tmp_path / "long/resume.docx") as archive:
+        styles = etree.fromstring(archive.read("word/styles.xml"))
+    assert styles.xpath(".//w:style[@w:styleId='Normal']/w:pPr/w:wordWrap[@w:val='off']", namespaces=W)

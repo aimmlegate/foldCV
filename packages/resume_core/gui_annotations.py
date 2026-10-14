@@ -29,6 +29,10 @@ def initial_annotations(project_id: str, document: Document, normalized: GuiNorm
             factIds=fact_ids or [], reason=reason, evidence=evidence or [], resolved=False,
             updateSuggestionId=None, removedFocus=[]))
 
+    if normalized._native_recovery_count:
+        add("source_details_unresolved", "warning", {"kind": "document"},
+            "Some source details could not be structured. Review the saved source.")
+
     assessment = next(fact for fact in normalized.facts if isinstance(fact, NameAssessmentFact))
     if document.candidate.visible and document.candidate.name.text.strip() and assessment.value.missing_surname is True:
         add("missing_surname", "missing", {"kind": "field", "fieldId": document.candidate.name.field_id, "range": None},

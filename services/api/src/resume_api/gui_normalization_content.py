@@ -8,7 +8,7 @@ from packages.resume_core.models.recovery import Rules
 from packages.resume_core.gui_employment import normalize_employment
 
 from .gui_content import generate_admitted
-from .gui_normalization_transport import NormalizationTransport
+from .gui_native_transport import NativeNormalizationTransport
 from .lifecycle import OperationFiles
 from .providers.content import ContentFailure, ContentInput, ContentProvider, GenerationPolicy, MAX_GENERATION_SECONDS
 
@@ -20,7 +20,7 @@ class GuiNormalizationContentService:
 
     def run(self, request: GuiNormalizeRequest, rules: Rules, files: OperationFiles, cancel: threading.Event):
         captured = request.model_copy(deep=True)
-        transport = NormalizationTransport(captured)
+        transport = NativeNormalizationTransport(captured, rules)
         prompt = normalization_input(captured, rules)
         response = generate_admitted(self.provider, ContentInput(prompt, GuiSemanticProposal, self.policy, transport), files, cancel)
         if cancel.is_set():
@@ -29,6 +29,7 @@ class GuiNormalizationContentService:
             proposal = GuiSemanticProposal.model_validate(response.value)
             result = normalize_candidate(captured, proposal, rules)
             result = normalize_employment(captured, proposal, result)
+            result._native_recovery_count = transport.unresolved
         except NormalizationFailure as error:
             raise ContentFailure(error.code, logical_attempts=response.logical_attempts, usage=response.usage) from None
         except (ValidationError, ValueError):

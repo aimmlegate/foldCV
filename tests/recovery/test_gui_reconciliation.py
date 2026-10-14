@@ -399,13 +399,12 @@ def test_completed_name_assessment_clears_old_gap_and_restore_recovers_source_as
     assert restored.value==original.value and any(mark.code=='missing_surname' for mark in w.annotations)
 
 
-def test_private_assessment_reason_is_rejected_without_applying_metadata():
+def test_contact_text_in_assessment_reason_is_retained_without_rejection():
     w,job,fact=shared_claim();from tests.recovery.draft_fixtures import RULES
     w.rules_used=RULES;edit(w,job.tasks.field_id,'Mentored three trainees',completion='field')
     reply=claim_reply(w,job.tasks.field_id,fact);reply.annotations[0].reason='Call 555-123-4567'
-    original=w.model_dump()
-    with pytest.raises(ValueError,match='NO_SAFE_CONTENT'):apply_reconciliation(w,[job.tasks.field_id],reply,result_dependencies(w,RULES),RULES,'')
-    assert w.model_dump()==original
+    apply_reconciliation(w,[job.tasks.field_id],reply,result_dependencies(w,RULES),RULES,'')
+    assert any(mark.reason == 'Call 555-123-4567' for mark in w.annotations)
 
 
 def test_period_batch_assigns_facts_only_to_addressed_endpoints_without_other_job_fields():

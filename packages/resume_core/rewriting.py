@@ -7,9 +7,8 @@ from typing import Literal
 
 from pydantic import Field, model_validator
 
-from .drafting import _contact, _metric_terms, _term_present
+from .drafting import _metric_terms, _term_present
 from .models.contracts import Fact, LeadershipFact, MetricFact, Wire
-from .privacy import private_output_text
 
 
 class RewriteExcerpt(Wire):
@@ -90,26 +89,12 @@ class RewriteResult(Wire):
     issues: list[RewriteIssue]
 
 
-def _safe(request: RewriteRequest) -> list[Fact]:
-    return [fact for fact in request.facts if not _contact(fact)]
-
-
-def withheld_rewrite_issues(request: RewriteRequest) -> list[RewriteIssue]:
-    required = set(request.required_fact_ids)
-    withheld = {fact.id for fact in request.facts if fact.id in required and _contact(fact)}
-    withheld.update(item.fact_id for item in request.excerpts if item.fact_id in required and
-                    private_output_text(item.text))
-    return [RewriteIssue(code="SOURCE_REVIEW", blockId=request.block_id, factId=fact.id,
-                         message="Required fact or evidence withheld because it may contain contact information. Review manually.")
-            for fact in request.facts if fact.id in withheld]
-
-
 def rewrite_input(request: RewriteRequest) -> str:
-    safe = _safe(request)
-    if not safe or private_output_text(request.current_text) or private_output_text(request.instruction):
+    safe = request.facts
+    if not safe:
         raise ValueError("NO_SAFE_CONTENT")
     safe_ids = {fact.id for fact in safe}
-    excerpts = [item for item in request.excerpts if item.fact_id in safe_ids and not private_output_text(item.text)]
+    excerpts = [item for item in request.excerpts if item.fact_id in safe_ids]
     payload = {"instructionVersion": 1, "task": "rewrite_prose", "baseRevision": request.base_revision,
                "blockId": request.block_id,
                "blockKind": request.block_kind, "blockRevision": request.block_revision,
@@ -132,14 +117,12 @@ def rewrite_input(request: RewriteRequest) -> str:
 
 def validate_rewrite(request: RewriteRequest, proposal: RewriteProposal) -> RewriteResult:
     rewrite_input(request)
-    if proposal.block_id != request.block_id or not set(proposal.fact_ids) <= {fact.id for fact in _safe(request)}:
+    if proposal.block_id != request.block_id or not set(proposal.fact_ids) <= {fact.id for fact in request.facts}:
         raise ValueError("rewrite reference mismatch")
-    issues: list[RewriteIssue] = withheld_rewrite_issues(request)
+    issues: list[RewriteIssue] = []
     selected = set(proposal.fact_ids)
     required = set(request.required_fact_ids)
     for fact in request.facts:
-        if _contact(fact):
-            continue
         if fact.id in required and fact.id not in selected:
             issues.append(RewriteIssue(code="MISSING_REQUIRED", blockId=request.block_id, factId=fact.id,
                                        message="Required fact is missing from the proposed prose."))
@@ -163,8 +146,6 @@ def validate_rewrite(request: RewriteRequest, proposal: RewriteProposal) -> Rewr
             if fact.value.attribution != "unknown" and fact.value.attribution not in proposal.replacement_text.casefold():
                 issues.append(RewriteIssue(code="ATTRIBUTION_LOSS", blockId=request.block_id, factId=fact.id,
                                            message="Leadership attribution needs review."))
-    if private_output_text(proposal.replacement_text):
-        raise ValueError("private rewrite output")
     return RewriteResult(baseRevision=request.base_revision, blockId=request.block_id,
                          blockRevision=request.block_revision, dependencyHash=request.dependency_hash,
                          replacementText=proposal.replacement_text, factIds=proposal.fact_ids, issues=issues)

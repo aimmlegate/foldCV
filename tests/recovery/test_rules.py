@@ -135,3 +135,14 @@ def test_rule_seed_has_no_workflow_pdf_footer_or_storage_commands():
     assert normalized.markdown == DEFAULT_RULES
     with pytest.raises(RulesFailure, match="RULES_TOO_LARGE"):
         captured_rules(DEFAULT_RULES + "x" * 32768, 1)
+
+
+def test_scoped_exclusion_removal_preserves_every_surrounding_byte():
+    from packages.resume_core.rules import EXCLUSION_SENTENCE, remove_candidate_exclusion
+    wrapped = EXCLUSION_SENTENCE.replace("metadata from", "metadata\nfrom")
+    before = "Custom 15-year guidance.\n" + wrapped + " Keep eight logos.\n"
+    assert remove_candidate_exclusion(before) == "Custom 15-year guidance.\n Keep eight logos.\n"
+    for invalid in ("Custom rules only", EXCLUSION_SENTENCE * 2, EXCLUSION_SENTENCE.replace("Omit", "Remove")):
+        with pytest.raises(RulesFailure, match="RULES_EXCLUSION_MISMATCH"):
+            remove_candidate_exclusion(invalid)
+    assert "Omit personal" not in DEFAULT_RULES

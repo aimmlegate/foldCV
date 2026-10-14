@@ -14,7 +14,6 @@ from packages.resume_core.rendering.models import (Candidate, FocusItem, Project
                                                   RenderDocument, RenderIdentity, RenderRequest, RenderWire, SidebarSection,
                                                   SkillGroup, snapshot_digest)
 from packages.resume_core.rendering.template import PACKAGE_SHA256, renderer_sha256, require_template
-from packages.resume_core.rendering.privacy import guard_render_document
 
 
 class PreparationFailure(ValueError):
@@ -94,7 +93,7 @@ def prepare_document(payload: PrepareRequest) -> RenderRequest:
     profile = next(block for block in project.views if block.kind == "profile")
     if any(block.status == "stale" and block.visible for block in project.views if block.kind in {"profile", "job_prose"}):
         raise ValueError("visible prose needs review")
-    if any(block.kind in {"skills", "focus", "early_career", "contact"} and block.state.text.strip()
+    if any(block.kind in {"skills", "focus", "early_career"} and block.state.text.strip()
            for block in project.views):
         raise ValueError("unsupported structured edit")
     manifest = require_template()
@@ -136,6 +135,9 @@ def prepare_document(payload: PrepareRequest) -> RenderRequest:
             sidebar.append(SidebarSection(title="РАННИЙ ОПЫТ" if presentation.source_language == "ru" else "EARLY CAREER",
                                           items=[", ".join(format_early_career(row) for row in old_rows)]))
     for block in project.views:
+        if block.kind == "contact" and block.visible and block.state.text.strip():
+            sidebar.append(SidebarSection(title="КОНТАКТЫ И ДАННЫЕ" if presentation.source_language == "ru" else "CONTACTS AND DETAILS",
+                                          items=[block.state.text]))
         if block.kind == "education" and block.visible and block.state.text.strip():
             if len(block.state.text) > 4000:
                 raise PreparationFailure("EDUCATION_TOO_LONG")
@@ -153,7 +155,6 @@ def prepare_document(payload: PrepareRequest) -> RenderRequest:
                                                    summary=profile.state.text if profile.visible else ""),
                               focus=focus, sidebar=sidebar, projects=detailed, achievements=[],
                               skillGroups=groups, footer="")
-    guard_render_document(document)
     identity = RenderIdentity(id="render-" + hashlib.sha256((project.project_id + ":" + str(project.revision)).encode()).hexdigest()[:16],
                               projectRevision=project.revision, snapshotSha256="0" * 64,
                               templateId="generic", templateVersion="1.0.0",

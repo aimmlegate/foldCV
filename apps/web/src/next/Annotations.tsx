@@ -14,6 +14,7 @@ const labels: Readonly<Record<string, string>> = {
   missing_job_dates: "Уточните даты работы",
   team_size_conflict: "В исходнике указаны разные размеры команды",
   focus_entry_removed: "Часть технологий исключена из фокуса",
+  source_details_unresolved: "Часть данных не разобрана. Проверьте сохранённый исходник",
   editorial_plan_stale: "Редакторские рекомендации требуют обновления",
   name_assessment_stale: "Имя изменено. Оценку фамилии нужно обновить",
 };
