@@ -11,7 +11,8 @@ import type { RichMutation } from "../contracts/generated/rich_mutation";
 import type { ImageSessionRequest } from "../contracts/generated/image_session_request";
 import { documentCells, type StoredBlock } from "./document-cells";
 import { factCells, factsFromCells } from "./fact-cells";
-import { RichSynchronization } from "./synchronization";
+import { RichSynchronization, type PanelCommand } from "./synchronization";
+import { FactsPanel } from "./FactsPanel";
 import { selectedRange } from "./selection";
 import type { RichSelection } from "../contracts/generated/rich_selection";
 import type { RichCompletionRequest } from "../contracts/generated/rich_completion_request";
@@ -90,6 +91,7 @@ export function RichEditor({ initial, acknowledge, onStatus, ref }: { initial: R
   const project = initial.workspace.project;
   if (!project) throw new Error("Document is missing");
   const initialFacts = project.facts;
+  const [facts, setFacts] = useState(initialFacts);
   const [, refresh] = useState(0);
   const [selecting, setSelecting] = useState(false);
   const [instruction, setInstruction] = useState("");
@@ -104,7 +106,7 @@ export function RichEditor({ initial, acknowledge, onStatus, ref }: { initial: R
     lastTypingAt: 0, history: null as SessionHistory | null, queue: null as RichSaveQueue | null,
     fragments: new Map<string, string>(), projectionError: null as string | null,
     current: new Map<string, CellValue>(), values: new Map<string, Stored>(), original: new Map<string, RichBlock>(),
-    undo: () => {}, redo: () => {}, complete: () => {}, rewrite: async (_instruction: string): Promise<void> => {}, retry: async (_id: string): Promise<void> => {}, resolve: async (_id: string): Promise<void> => {}, timer: null as ReturnType<typeof setTimeout> | null }), []);
+    undo: () => {}, redo: () => {}, complete: () => {}, panel: async (_command: PanelCommand): Promise<void> => {}, rewrite: async (_instruction: string): Promise<void> => {}, retry: async (_id: string): Promise<void> => {}, resolve: async (_id: string): Promise<void> => {}, timer: null as ReturnType<typeof setTimeout> | null }), []);
   const assets = useMemo(() => ({ upload: async (_file: File, _block?: string, _after?: string): Promise<void> => {}, cancel: (_block: string) => {},
     paste: (_event: ClipboardEvent | DragEvent): boolean => false, command: (_command: string, _target?: string) => {} }), []);
   const extension = useMemo(() => createExtension({ key: "foldcv-rich-session", runsBefore: ["link"], tiptapExtensions: [tableIdentityAttributes, structureIdentityAttributes,
@@ -308,7 +310,9 @@ export function RichEditor({ initial, acknowledge, onStatus, ref }: { initial: R
           });
         } finally { bridge.replaying = false; }
       }
-      queue.update(document(), history.currentActionId ?? `${bridge.session}:typing`, bridge.kind, factsFromCells(bridge.current, queue.baseline.workspace.project?.facts ?? initialFacts)); schedule(); refresh(value => value + 1);
+      const nextFacts = factsFromCells(bridge.current, queue.baseline.workspace.project?.facts ?? initialFacts);
+      setFacts(nextFacts);
+      queue.update(document(), history.currentActionId ?? `${bridge.session}:typing`, bridge.kind, nextFacts); schedule(); refresh(value => value + 1);
       queueMicrotask(() => sync.invalidate());
       imageRevision++; queueMicrotask(() => { void publishImageReferences().catch(error => onStatus(error instanceof Error ? error.message : "IMAGE_IMPORT_FAILED")); });
     });
@@ -320,6 +324,7 @@ export function RichEditor({ initial, acknowledge, onStatus, ref }: { initial: R
       }, changed: () => { queue.update(document(), history.currentActionId ?? bridge.session, bridge.kind,
         factsFromCells(bridge.current, queue.baseline.workspace.project?.facts ?? initialFacts)); schedule(); },
       report: response => { setSyncRecords(response.workspace.syncRecords); },
+      failed: error => setEditorWarning(error instanceof Error ? error.message : "Синхронизация не завершена"),
     }, initial.workspace.projectId);
     let pendingAction: string | null = null;
     const pendingBlocks = new Set<string>(), movedBlocks = new Set<string>(), removedRecords = new Set<string>();
@@ -338,10 +343,11 @@ export function RichEditor({ initial, acknowledge, onStatus, ref }: { initial: R
       await sync.rewrite(captured, instruction);
     };
     bridge.resolve = id => sync.resolve(id);
+    bridge.panel = async command => { finishEdit(); bridge.group++; bridge.kind = "panel"; await sync.panel(command); bridge.kind = "typing"; };
     bridge.retry = async id => {
       const response = await projectRequest(`/${initial.workspace.projectId}`), record = response.workspace.syncRecords.find(item => item.id === id);
       if (!record) return;
-      if (record.kind === "rewrite" && record.selection && record.instruction) await sync.retry(record.id, record.blockIds);
+      if (record.kind === "panel" || record.kind === "rewrite" && record.selection && record.instruction) await sync.retry(record.id, record.blockIds);
       else {
         const marker = `request:${crypto.randomUUID()}`, action = history.commit("structure", [{ key: marker, before: null, after: "retry" }]);
         if (action) await sync.complete(action, record.blockIds.filter(id => !!editor.getBlock(id)), [], []);
@@ -545,6 +551,7 @@ export function RichEditor({ initial, acknowledge, onStatus, ref }: { initial: R
     await bridge.queue.flush(); return bridge.queue.baseline;
   }, undo: bridge.undo, redo: bridge.redo }), [bridge, bridge.history?.position]);
   return <ImageActions.Provider value={{ source: asset => imageSource(initial.workspace.projectId, asset), upload: assets.upload, cancel: assets.cancel }}>
+    <div className="rich-workspace"><FactsPanel facts={facts} submit={command => bridge.panel(command)} />
     <div className="cv-document" style={{ ...referenceVariables, color: "#171717" }} data-project-id={initial.workspace.projectId}>
       <div className="cv-structure-controls"><Popover.Root><Popover.Trigger asChild><button disabled={!selecting || rewriting}>Переписать выделенное</button></Popover.Trigger><Popover.Portal>
         <Popover.Content className="rich-block-menu"><label>Что изменить<textarea aria-label="Инструкция для фрагмента" value={instruction} onChange={event => setInstruction(event.currentTarget.value)} /></label>
@@ -572,6 +579,6 @@ export function RichEditor({ initial, acknowledge, onStatus, ref }: { initial: R
           { title: "Изображение", subtext: "Локальный PNG, JPEG или WebP", aliases: ["image", "photo"], group: "Media", onItemClick: () => imageInput.current?.click() }]
           .filter(item => `${item.title} ${item.aliases?.join(" ") ?? ""}`.toLowerCase().includes(query.toLowerCase()))} />
       </BlockNoteView>
-    </div>
+    </div></div>
   </ImageActions.Provider>;
 }

@@ -136,7 +136,7 @@ class RichSyncRecord(Wire):
     fact_ids: list[Id]
     dependencies: list[DependencyStamp]
     error_code: Id | None
-    kind: Literal["completion", "rewrite", "reconciliation", "conflict"] = "completion"
+    kind: Literal["completion", "rewrite", "reconciliation", "conflict", "panel"] = "completion"
     ready: bool = False
     proposed_steps: list[RichStep] = Field(default_factory=list, max_length=1000)
     selection: RichSelection | None = None

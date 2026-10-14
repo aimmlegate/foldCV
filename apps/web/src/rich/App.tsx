@@ -5,7 +5,8 @@ import type { GuiProjectListResponse } from "../contracts/generated/gui_project_
 import { SettingsPanel } from "../next/SettingsPanel";
 import { useTheme } from "../next/theme";
 import { RichEditor, type RichEditorHandle } from "./Editor";
-import { download, listProjects, projectRequest, RichApiFailure } from "./api";
+import { Projects } from "./Projects";
+import { deleteProject, download, listProjects, projectRequest, RichApiFailure } from "./api";
 import sample from "../../../../tests/fixtures/recovery/E1.txt?raw";
 import "../next/next.css";
 import "./reference-fonts.css";
@@ -44,6 +45,20 @@ export function App() {
       if (editor.current) await editor.current.flush();
       const ticket = ++epoch.current, next = await projectRequest(`/${id}`);
       if (ticket === epoch.current) acknowledge(next);
+    });
+  }
+  async function rename(id: string, title: string) {
+    await action(async () => {
+      const current = await projectRequest(`/${id}`);
+      await projectRequest(`/${id}/title`, "PUT", { title, baseRevision: current.workspace.projectRevision });
+      setProjects(await listProjects());
+    });
+  }
+  async function remove(id: string) {
+    await action(async () => {
+      const result = await deleteProject(id);
+      setProjects(await listProjects());
+      if (result.status === "cleanup_incomplete") throw new RichApiFailure(result.errorCode ?? "PROJECT_CLEANUP_INCOMPLETE");
     });
   }
   useEffect(() => {
@@ -112,9 +127,7 @@ export function App() {
     </> : <div className="next-start">
       <section className="next-intro"><span className="next-eyebrow">FOLDCV</span><h1>Резюме, с которым удобно работать</h1>
         <p>Добавьте файл или вставьте текст. После создания резюме можно редактировать и сохранить в Word.</p>
-        <section aria-label="Сохранённые проекты"><h2>Сохранённые проекты</h2>
-          {projects?.entries.map(entry => <div key={entry.projectId}><button disabled={busy || creating} onClick={() => void open(entry.projectId)}>{entry.title}</button>
-            {projects.errors.some(error => error.projectId === entry.projectId && error.errorCode === "PROJECT_VERSION_UNSUPPORTED") && <span> Другая версия</span>}</div>)}</section>
+        <Projects list={projects} busy={busy || creating} open={open} rename={rename} remove={remove} />
       </section>
       <section className="next-input">
         <div className="next-upload"><h2>Добавьте исходное резюме</h2><input type="file" aria-label="Исходное резюме" accept=".pdf,.docx,.txt" disabled={busy || creating}

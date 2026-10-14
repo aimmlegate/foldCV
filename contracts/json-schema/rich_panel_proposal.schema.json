@@ -1,0 +1,63 @@
+{
+  "$defs": {
+    "NarrativeUpdate": {
+      "additionalProperties": false,
+      "properties": {
+        "blockId": {
+          "minLength": 1,
+          "title": "Blockid",
+          "type": "string"
+        },
+        "cellId": {
+          "anyOf": [
+            {
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Cellid"
+        },
+        "text": {
+          "maxLength": 16000,
+          "title": "Text",
+          "type": "string"
+        }
+      },
+      "required": [
+        "blockId",
+        "text"
+      ],
+      "title": "NarrativeUpdate",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "uncertain": {
+      "items": {
+        "minLength": 1,
+        "type": "string"
+      },
+      "maxItems": 100,
+      "title": "Uncertain",
+      "type": "array"
+    },
+    "updates": {
+      "items": {
+        "$ref": "#/$defs/NarrativeUpdate"
+      },
+      "maxItems": 100,
+      "title": "Updates",
+      "type": "array"
+    }
+  },
+  "required": [
+    "updates"
+  ],
+  "title": "RichPanelProposal",
+  "type": "object"
+}

@@ -105,6 +105,7 @@ def exact_completion(workspace, request):
             continue
         cited = {link.record_id for link in block.provenance if link.kind == "citation"}
         exact_technologies = {group.record_id for group in groups.values() if identifier in group.block_ids and group.key == "display"}
+        cited.update(exact_technologies)
         for fact_id in cited:
             original = records.get(fact_id)
             if original is None or not hasattr(original, "job_id") or original.job_id == job_id:
@@ -182,7 +183,9 @@ def linked_field_steps(workspace, record_ids, field_keys=()):
 
 
 def sync_prompt(kind, payload, rules):
-    constraints = ("Rewrite only the captured rich selection. Preserve structure, formatting, field references and wording outside the requested change by default. "
+    constraints = ("Update only the supplied linked narrative to match the user's corrected facts. Return targeted text updates by block and optional cell ID. "
+        "Preserve unrelated claims and wording; do not introduce evidence, dates or job associations. If a correction is uncertain, list its block ID in uncertain. "
+        if kind == "panel" else "Rewrite only the captured rich selection. Preserve structure, formatting, field references and wording outside the requested change by default. "
         "Change structure or formatting only when the user's instruction asks for it. Return one replacement for each supplied block ID, in order. "
         "Do not copy surrounding blocks. Preserve fact-field references and citations; do not fabricate sources or assets. "
         if kind == "rewrite" else

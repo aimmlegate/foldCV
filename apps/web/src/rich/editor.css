@@ -32,3 +32,19 @@
 [data-app="foldcv-rich"] > .next-warning { max-width: 800px; margin: 10px auto; }
 [data-app="foldcv-rich"] .next-actions input[type="file"] { display: block; font-size: 12px; max-width: 200px; }
 @media (max-width: 840px) { .cv-document { margin-inline: 16px; } }
+.rich-workspace { display: flex; align-items: flex-start; gap: 20px; padding: 0 20px; }
+.rich-workspace .cv-document { flex: 0 0 auto; margin: 28px auto; }
+.rich-facts { box-sizing: border-box; flex: 0 0 248px; position: sticky; top: 12px; max-height: calc(100vh - 24px); overflow: auto; padding: 16px 12px; margin-top: 28px; background: var(--panel); border: 1px solid var(--outline); border-radius: 10px; font: 13px system-ui; }
+.rich-facts h2 { margin-bottom: 12px; font-size: 15px; font-weight: 600; }
+.rich-facts details { border-top: 1px solid var(--outline); padding: 10px 0; }
+.rich-facts summary { cursor: pointer; font-weight: 600; }
+.rich-facts label, .rich-facts small { display: block; margin-top: 6px; }
+.rich-facts small { color: var(--muted); font-size: 11px; }
+.rich-facts input:not([type="checkbox"]) { box-sizing: border-box; width: 100%; padding: 5px; background: var(--surface); border: 1px solid var(--outline); border-radius: 4px; }
+.rich-facts button { min-height: 28px; padding: 3px 6px; font-size: 12px; }
+.rich-fact-row { margin-top: 8px; }
+.rich-fact-title { max-width: 100%; text-align: left; overflow-wrap: anywhere; }
+.rich-facts-remove { opacity: .65; }
+.rich-job-technologies { margin: 6px 0 12px 10px; padding-left: 8px; border-left: 1px solid var(--outline); }
+.rich-facts-add { margin-top: 8px; }
+@media (max-width: 1050px) { .rich-workspace { display: block; padding: 0 16px; overflow-x: auto; } .rich-facts { position: static; width: min(100%, 740px); max-height: 360px; } .rich-workspace .cv-document { margin-left: 0; } }

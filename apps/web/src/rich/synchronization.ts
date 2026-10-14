@@ -3,6 +3,7 @@ import type { RichSelection } from "../contracts/generated/rich_selection";
 import type { RichProjectResponse } from "../contracts/generated/rich_project_response";
 import type { RichMutation } from "../contracts/generated/rich_mutation";
 import type { RichDocumentV1 } from "../contracts/generated/rich_document_v1";
+import type { RichPanelRequest } from "../contracts/generated/rich_panel_request";
 import { projectRequest, RichApiFailure } from "./api";
 import type { CellValue, DependencyCapture, SessionHistory } from "./history";
 import type { RichBlock, RichSaveQueue } from "./save-queue";
@@ -39,7 +40,9 @@ export type SyncAdapter = {
   current: () => ReadonlyMap<string, CellValue>;
   cells: (response: RichProjectResponse) => Map<string, CellValue>;
   changed: () => void; report: (response: RichProjectResponse) => void;
+  failed?: (error: unknown) => void;
 };
+export type PanelCommand = Omit<RichPanelRequest, "capture" | "factsRevision" | "documentRevision">;
 export class RichSynchronization {
   private closed = false;
   private readonly active = new Map<string, Capture>();
@@ -123,6 +126,43 @@ export class RichSynchronization {
       sessionId: history.session, actionId: action, actionToken: 0, dependencies: [] });
     const sync = response.workspace.syncRecords.at(-1), capture = sync ? this.capture(action, sync.blockIds) : null;
     if (sync && capture) await this.apply(sync, capture);
+    if (!this.closed) this.adapter.report(await projectRequest(`/${this.projectId}`));
+  }
+  async panel(command: PanelCommand): Promise<void> {
+    const adapter = this.adapter, history = adapter.history;
+    await adapter.queue.flush();
+    if (this.closed) return;
+    const before = adapter.cells(adapter.queue.baseline), project = adapter.queue.baseline.workspace.project;
+    if (!project) return;
+    const marker = `request:${crypto.randomUUID()}`, action = history.commit("panel", [{ key: marker, before: null, after: "panel" }]);
+    const initial = action ? history.capture(action, []) : null;
+    const epochs = new Map([...adapter.current().keys()].map(key => [key, history.revision(key)]));
+    if (!initial) return;
+    const response = await projectRequest(`/${this.projectId}/panel/preview`, "POST", { ...command,
+      factsRevision: project.facts.revision, documentRevision: project.document.revision, capture: this.wireCapture(initial) } satisfies RichPanelRequest);
+    const after = adapter.cells(response);
+    const changes = [...new Set([...before.keys(), ...after.keys()])].map(key => ({ key, before: before.get(key) ?? null, after: after.get(key) ?? null }))
+      .filter(change => change.before !== change.after);
+    const dependencies = new Map(changes.map(change => [change.key, epochs.get(change.key) ?? 0]));
+    if (this.closed || history.attach({ ...initial, dependencies }, changes) !== "applied") throw new Error("Изменения уже обновились. Повторите правку.");
+    adapter.changed(); await adapter.queue.flush();
+    const records = new Set<string>();
+    for (const change of changes) {
+      if (change.key.startsWith("fact:")) records.add(change.key.slice(5));
+      if (change.key.startsWith("fact-field:")) {
+        const pair: unknown = JSON.parse(change.key.slice(11));
+        if (Array.isArray(pair) && typeof pair[0] === "string") records.add(pair[0]);
+      }
+    }
+    const ids = [...adapter.current()].filter(([key, value]) => key.startsWith("block:") && value && [...records].some(id => value.includes(JSON.stringify(id))))
+      .map(([key]) => key.slice(6));
+    const capture = this.capture(initial.actionId, ids);
+    if (capture && records.size) void this.panelSync(capture, [...records]).catch(error => adapter.failed?.(error));
+  }
+  private async panelSync(capture: Capture, records: string[]): Promise<void> {
+    const response = await this.admitted(`/${this.projectId}/panel/sync`, { capture: this.wireCapture(capture), recordIds: records }, capture);
+    const sync = response.workspace.syncRecords.at(-1);
+    if (sync) await this.apply(sync, capture);
     if (!this.closed) this.adapter.report(await projectRequest(`/${this.projectId}`));
   }
   async retry(id: string, blockIds: string[]): Promise<void> {

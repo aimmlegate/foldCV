@@ -3825,7 +3825,8 @@
             "completion",
             "rewrite",
             "reconciliation",
-            "conflict"
+            "conflict",
+            "panel"
           ],
           "title": "Kind",
           "type": "string"

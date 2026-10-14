@@ -10,6 +10,7 @@ from packages.resume_core.gui_reconciliation import GuiReconcileProposal
 from packages.resume_core.gui_employment import normalize_employment
 from packages.resume_core.gui_derived import initial_derived
 from packages.resume_core.rich_sync import RichRewriteProposal, RichReconcileProposal
+from packages.resume_core.rich_panel import RichPanelProposal
 from packages.resume_core.models.recovery import WorkspaceV5, record_slot
 from packages.resume_core.rules import captured_rules
 from resume_api.providers.content import ContentResult, ContentFailure, ReportedUsage
@@ -42,6 +43,8 @@ class CreationProvider:
         if request.result_type is RichReconcileProposal:
             reply = RichReconcileProposal(updates=[])
             return ContentResult(reply, ReportedUsage(), "fixture", request.policy.model, .01, 1)
+        if request.result_type is RichPanelProposal:
+            return ContentResult(RichPanelProposal(updates=[]), ReportedUsage(), "fixture", request.policy.model, .01, 1)
         if request.result_type is RichRewriteProposal:
             if payload["input"]["instruction"] == "TEST_ERROR":
                 raise ContentFailure("MODEL_DENIED")

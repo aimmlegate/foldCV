@@ -7,6 +7,7 @@ import type { ImageSessionRequest } from "../contracts/generated/image_session_r
 import imageSessionSchema from "../../../../contracts/json-schema/image_session_request.schema.json" with { type: "json" };
 import { validateContract } from "../contracts/validate";
 import type { GuiProjectListResponse } from "../contracts/generated/gui_project_list_response";
+import type { GuiDeleteProjectResult } from "../contracts/generated/gui_delete_project_result";
 
 const ajv = new Ajv2020({ strict: false, allErrors: true });
 const responseShape = ajv.compile<RichProjectResponse>(schema);
@@ -39,6 +40,12 @@ export async function listProjects(): Promise<GuiProjectListResponse> {
   return response;
 }
 function isProjectList(value: unknown): value is GuiProjectListResponse { return validateContract("gui_project_list_response", value); }
+export async function deleteProject(id: string): Promise<GuiDeleteProjectResult> {
+  const value = await request(`/${id}/delete`, "POST", { confirmed: true });
+  if (!isDeleteResult(value)) throw new RichApiFailure("INVALID_RESULT");
+  return value;
+}
+function isDeleteResult(value: unknown): value is GuiDeleteProjectResult { return validateContract("gui_delete_project_result", value); }
 export function saveMutation(request: RichMutation): Promise<RichProjectResponse> {
   return projectRequest(`/${request.projectId}/mutations`, "POST", request);
 }

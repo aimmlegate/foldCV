@@ -399,3 +399,10 @@ NE07 adds scoped rich rewrite/completion, split-field roots, ownership correctio
 explicit exact-mention updates, restart interruption and stale-retry regressions.
 Python and Node checks are mapped under NE-SYNC/NE-HISTORY/NE-FACTS. Mounted T3
 results are retained separately; they do not stand in for native OS IME or Word.
+
+NE08 adds Python checks for five-group facts, exact cited FOCUS tokens, per-job
+technology isolation, precise/unresolved dates, reversible removal and one bounded
+linked-narrative batch. Node uses real Python mutations for composite history,
+late preview guards and unrelated typing. T3 covers mounted CRUD, date endpoints,
+project rename/delete, owned reopen and portable/DOCX transfer. Timeline warnings
+and cascades remain NE09; Word is a final manual gate.

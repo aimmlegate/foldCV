@@ -20,6 +20,46 @@ from .providers.content import ContentFailure, ContentInput, GenerationPolicy
 
 
 class RichSynchronization:
+    def panel_preview(self, identifier, request):
+        from packages.resume_core.rich_panel import panel_mutation
+        try:
+            mutation = panel_mutation(self.read(identifier), request)
+        except ValueError as error:
+            raise ProjectFailure(str(error), 409) from None
+        return self.preview(identifier, mutation)
+
+    async def panel_rich(self, identifier, request):
+        from packages.resume_core.rich_panel import RichPanelProposal, narrative_steps, has_exact_fields
+        workspace = self.read(identifier)
+        ids = set(request.record_ids)
+        records = {record.id: record for record in workspace.project.facts.records}
+        blocks = [block for block in workspace.project.document.blocks() if any(
+            link.kind == "citation" and link.record_id in ids for link in block.provenance)
+            and not any(link.kind == "field_binding" for link in block.provenance) and not has_exact_fields(block)]
+        sync = self.add_sync(identifier, request.capture, [block.id for block in blocks], "panel", sorted(ids & records.keys()))
+        sync.fact_ids = sorted(ids)
+        if any(link.kind == "citation" and link.record_id in ids - records.keys() for block in blocks for link in block.provenance):
+            sync.status, sync.error_code = "conflict", "DELETED_RECORD_MENTIONS"
+            self.publish_sync(identifier, sync)
+            return self.response(identifier)
+        if not blocks:
+            sync.status = "applied"
+            self.publish_sync(identifier, sync)
+            return self.response(identifier)
+        try:
+            proposal = await self.sync_content(identifier, sync, {"blocks": [block.model_dump(mode="json", by_alias=True) for block in blocks],
+                "facts": [records[id].model_dump(mode="json", by_alias=True) for id in sorted(ids & records.keys())],
+                "deletedRecordIds": sorted(ids - records.keys())}, RichPanelProposal)
+            sync.proposed_steps = narrative_steps(workspace, blocks, proposal)
+            sync.ready = bool(sync.proposed_steps)
+            sync.status = "conflict" if proposal.uncertain else "pending" if sync.ready else "applied"
+            if not dependencies_current(self.workspaces[identifier], sync.dependencies):
+                sync.status, sync.ready, sync.error_code = "stale", False, "STALE_SYNC"
+        except (ContentFailure, AdmissionCancelled, ProjectFailure, SpikeError, ValidationError, ValueError) as error:
+            sync.status, sync.error_code = "failed", getattr(error, "code", "INVALID_RESULT")
+        self.publish_sync(identifier, sync)
+        return self.response(identifier)
+
     def publish_sync(self, identifier, sync):
         if identifier in self.deleted_ids:
             return
@@ -61,7 +101,7 @@ class RichSynchronization:
             self.finish_operation(identifier, operation.id, "running")
             if self.persist(identifier) == "failed":
                 raise ProjectFailure("PROJECT_SAVE_FAILED", 503)
-        prompt = sync_prompt("rewrite" if sync.kind == "rewrite" else "reconcile", payload, self.workspaces[identifier].rules_used)
+        prompt = sync_prompt(sync.kind if sync.kind in {"rewrite", "panel"} else "reconcile", payload, self.workspaces[identifier].rules_used)
         request = ContentInput(prompt, result_type, GenerationPolicy(model=selected[1], timeout_seconds=180, allow_repair=False))
         def run():
             with files.open():
@@ -127,7 +167,13 @@ class RichSynchronization:
         workspace = self.read(identifier)
         sync = next((item for item in workspace.sync_records if item.id == sync_id), None)
         if sync is None or sync.selection is None or sync.instruction is None:
-            raise ProjectFailure("SYNC_NOT_FOUND", 404)
+            if sync is None or sync.kind != "panel":
+                raise ProjectFailure("SYNC_NOT_FOUND", 404)
+            if not dependencies_current(workspace, sync.dependencies):
+                self.disposition(identifier, sync_id, "stale")
+                raise ProjectFailure("STALE_SELECTION", 409)
+            from packages.resume_core.rich_panel import RichPanelSyncRequest
+            return await self.panel_rich(identifier, RichPanelSyncRequest(capture=capture, recordIds=sync.fact_ids))
         if not dependencies_current(workspace, sync.dependencies):
             self.disposition(identifier, sync_id, "stale")
             raise ProjectFailure("STALE_SELECTION", 409)

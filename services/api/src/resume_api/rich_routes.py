@@ -11,6 +11,7 @@ from .extracting import UploadFailure, parse_one_part
 from .gui_projects import ProjectFailure
 from .rich_assets import ImageSessionRequest, ImageUploadCapture
 from packages.resume_core.rich_sync import RichCompletionRequest, RichRewriteRequest, RichSyncDisposition
+from packages.resume_core.rich_panel import RichPanelRequest, RichPanelSyncRequest
 
 
 def mount_rich_projects(app, service, problem):
@@ -96,6 +97,15 @@ def mount_rich_projects(app, service, problem):
     @app.post(prefix + "/{identifier}/completion")
     async def completion(identifier: str, payload: RichCompletionRequest):
         await service.complete_rich(identifier, payload)
+        return response(identifier)
+
+    @app.post(prefix + "/{identifier}/panel/preview")
+    async def panel_preview(identifier: str, payload: RichPanelRequest):
+        return JSONResponse(service.panel_preview(identifier, payload).model_dump(mode="json", by_alias=True), headers={"Cache-Control": "no-store"})
+
+    @app.post(prefix + "/{identifier}/panel/sync")
+    async def panel_sync(identifier: str, payload: RichPanelSyncRequest):
+        await service.panel_rich(identifier, payload)
         return response(identifier)
 
     @app.post(prefix + "/{identifier}/rewrite")
