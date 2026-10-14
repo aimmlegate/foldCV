@@ -2948,6 +2948,11 @@
           "title": "Id",
           "type": "string"
         },
+        "rendererSha256": {
+          "pattern": "^[a-f0-9]{64}$",
+          "title": "Renderersha256",
+          "type": "string"
+        },
         "rendererVersion": {
           "minLength": 1,
           "title": "Rendererversion",
@@ -2965,6 +2970,7 @@
         "factsRevision",
         "templateSha256",
         "rendererVersion",
+        "rendererSha256",
         "docxSha256",
         "docxSize",
         "docxPath"

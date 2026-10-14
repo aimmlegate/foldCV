@@ -508,6 +508,7 @@ export type Docxsha256 = string;
 export type Docxsize = number;
 export type Factsrevision = number;
 export type Id36 = string;
+export type Renderersha256 = string;
 export type Rendererversion = string;
 export type Templatesha256 = string;
 export type Renders = RichRenderSnapshot[];
@@ -1034,6 +1035,7 @@ export interface RichRenderSnapshot {
   docxSize: Docxsize;
   factsRevision: Factsrevision;
   id: Id36;
+  rendererSha256: Renderersha256;
   rendererVersion: Rendererversion;
   templateSha256: Templatesha256;
 }

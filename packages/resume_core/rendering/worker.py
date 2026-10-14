@@ -26,6 +26,7 @@ from packages.resume_core.rendering.template import (APP_FONTS, PACKAGE_SHA256, 
                                                      renderer_sha256, sha256_file, require_docx_template)
 
 MAX_DOCX = 8 * 1024 * 1024
+MAX_RICH_DOCX = 32 * 1024 * 1024
 MAX_PDF = 12 * 1024 * 1024
 MAX_ZIP = 16 * 1024 * 1024
 
@@ -245,7 +246,18 @@ def render_docx_only(workspace: Path) -> None:
 def main() -> int:
     workspace = Path.cwd()
     try:
-        if (workspace / "docx-input.json").is_file():
+        if (workspace / "rich-docx-input.json").is_file():
+            from packages.resume_core.models.rich_document import RichDocumentV1
+            from packages.resume_core.rendering.rich_docx import render_rich_docx, renderer_sha256 as rich_renderer_sha256
+            payload = json.loads((workspace / "rich-docx-input.json").read_bytes())
+            if payload["rendererSha256"] != rich_renderer_sha256():
+                raise RenderFailure("RENDERER_MISMATCH")
+            document = RichDocumentV1.model_validate(payload["document"])
+            content = render_rich_docx(document)
+            if len(content) > MAX_RICH_DOCX:
+                raise RenderFailure("RENDER_OUTPUT_LIMIT")
+            (workspace / "resume.docx").write_bytes(content)
+        elif (workspace / "docx-input.json").is_file():
             render_docx_only(workspace)
         else:
             render(workspace)

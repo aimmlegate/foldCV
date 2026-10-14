@@ -2591,6 +2591,11 @@
           ],
           "title": "Block"
         },
+        "keepChildren": {
+          "default": false,
+          "title": "Keepchildren",
+          "type": "boolean"
+        },
         "kind": {
           "const": "put_block",
           "title": "Kind",

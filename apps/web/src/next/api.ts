@@ -123,6 +123,7 @@ export async function archiveDownload(id: string, body: GuiArchiveRequest): Prom
   return blob;
 }
 export async function docxDownload(path: string, expected: { sha256: string; size: number }): Promise<Blob> {
+  // Workspace v5 keeps its old bound. The rich GUI uses rich/api.ts and 32 MiB.
   const response = await fetch(path, { credentials: "same-origin", cache: "no-store" });
   if (!response.ok) { const raw: unknown = await response.json();throw new ApiFailure(errorCode(raw)); }
   if (!response.headers.get("Content-Type")?.startsWith("application/vnd.openxmlformats-officedocument.wordprocessingml.document")) throw new ApiFailure("INVALID_RESULT");

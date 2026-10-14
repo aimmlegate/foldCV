@@ -1,5 +1,5 @@
 import { createRoot } from "react-dom/client";
-import { App } from "./App";
+import { App } from "../rich/App";
 import { exchangeSession, errorLabel } from "./api";
 import "./next.css";
 

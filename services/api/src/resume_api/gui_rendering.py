@@ -46,3 +46,37 @@ class GuiDocxRenderer:
             return result.read_bytes()
         except (OSError, zipfile.BadZipFile):
             raise failure("DOCX_RENDER_FAILED") from None
+
+
+class RichDocxRenderer:
+    async def render(self, document, images, files: OperationFiles) -> bytes:
+        from packages.resume_core.rendering.rich_docx import renderer_sha256 as rich_renderer_sha256
+        from packages.resume_core.rich_limits import DOCX_BYTES
+        if files.path is None:
+            raise RenderFailure("RICH_RENDER_FAILED")
+        workspace = files.path
+        payload = {"document": document.model_dump(mode="json", by_alias=True), "rendererSha256": rich_renderer_sha256()}
+        (workspace / "rich-docx-input.json").write_text(json.dumps(payload, ensure_ascii=False), encoding="utf-8")
+        process = files.spawn(Path(sys.executable), (str(WORKER),), capture=False)
+        try:
+            code = await asyncio.wait_for(asyncio.to_thread(process.wait), timeout=30)
+        finally:
+            files.stop_worker()
+        if code:
+            try:
+                error = json.loads((workspace / "render-status.json").read_bytes())["code"]
+            except (OSError, ValueError, KeyError, TypeError):
+                error = "RICH_RENDER_FAILED"
+            allowed = {"RICH_EXPORT_UNSUPPORTED", "RICH_TEMPLATE_MISMATCH", "RICH_TEMPLATE_ASSET_MISMATCH",
+                "RICH_TEMPLATE_UNAVAILABLE", "RENDER_OUTPUT_LIMIT", "RENDERER_MISMATCH"}
+            raise RenderFailure(error if error in allowed else "RICH_RENDER_FAILED")
+        result = workspace / "resume.docx"
+        try:
+            if not result.is_file() or result.stat().st_size > DOCX_BYTES:
+                raise RenderFailure("RENDER_OUTPUT_LIMIT")
+            with zipfile.ZipFile(result) as archive:
+                if "word/document.xml" not in archive.namelist():
+                    raise RenderFailure("RICH_RENDER_FAILED")
+            return result.read_bytes()
+        except (OSError, zipfile.BadZipFile):
+            raise RenderFailure("RICH_RENDER_FAILED") from None

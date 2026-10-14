@@ -1,0 +1,24 @@
+.cv-document { box-sizing: border-box; width: var(--cv-page-width); margin: 28px auto; padding: 14pt 11.24pt 54pt var(--cv-body-left); background: #fff; color: #171717; border: 1px solid var(--outline); }
+.cv-document .bn-editor { padding: 0; color: #171717; background: #fff; font-family: "FoldCV Source Sans Pro", sans-serif; font-size: var(--cv-body-size); font-weight: 300; line-height: var(--cv-line-height); }
+.cv-document .bn-editor > .bn-block-group { display: grid; grid-template-columns: var(--cv-sidebar-width) var(--cv-main-width); column-gap: var(--cv-column-gap); }
+.cv-document .bn-editor > .bn-block-group > [data-id="header"] { grid-column: 1 / -1; grid-row: 1; margin-bottom: 24pt; }
+.cv-document .bn-editor > .bn-block-group > [data-id="sidebar"] { grid-column: 1; grid-row: 2; }
+.cv-document .bn-editor > .bn-block-group > [data-id="main"] { grid-column: 2; grid-row: 2; }
+.cv-document .bn-block-content { padding: 0; min-height: var(--cv-line-height); overflow-wrap: anywhere; }
+.cv-document .bn-block-group { margin-left: 0; }
+.cv-document .bn-block-outer { margin-bottom: 3pt; }
+.cv-document h1 { font-size: 18pt; font-weight: 900; line-height: 20.7pt; }
+.cv-document h2 { font-size: 12pt; font-weight: 600; line-height: 15.08pt; }
+.cv-document h3 { font-size: 10pt; font-weight: 600; }
+.cv-document [data-id="header"] h2 { font-size: 16pt; line-height: 18.4pt; }
+.cv-document .cv-section-title { font-size: 14pt; font-weight: 700; }
+.cv-document [data-id="sidebar"] .cv-section-title { font-size: 10pt; }
+.cv-region-marker { height: 0; }
+.cv-document [data-content-type="region"] { min-height: 0; }
+.cv-pending-block { border: 1px solid #ddd; padding: 8px; }
+.rich-settings { z-index: 60; box-sizing: border-box; width: min(760px, calc(100vw - 32px)); max-height: min(85vh, var(--radix-popover-content-available-height)); overflow: auto; padding: 24px; background: var(--panel); border: 1px solid var(--outline); border-radius: 10px; }
+.rich-settings .next-settings { margin: 0; padding: 0; max-width: none; }
+.rich-dialog-overlay { position: fixed; inset: 0; background: #0006; z-index: 50; }
+[data-app="foldcv-rich"] > .next-warning { max-width: 800px; margin: 10px auto; }
+[data-app="foldcv-rich"] .next-actions input[type="file"] { display: block; font-size: 12px; max-width: 200px; }
+@media (max-width: 840px) { .cv-document { margin-inline: 16px; } }

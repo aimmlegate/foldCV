@@ -177,8 +177,8 @@ class LocalBoundary:
                     return
                 part = message.get("body", b"")
                 size += len(part)
-                project_upload = path in {"/v1/projects/input", "/v1/projects/archive"} or (path.startswith("/v1/projects/") and path.endswith("/input"))
-                body_limit = 64 * 1024 * 1024 + 4096 if path == "/v1/projects/archive" else MAX_EXTRACT_BODY if path == "/v1/extract" or project_upload else MAX_BODY
+                project_upload = path in {"/v1/projects/input", "/v1/projects/archive", "/v1/rich/projects/input", "/v1/rich/projects/archive"} or (path.startswith("/v1/projects/") and path.endswith("/input"))
+                body_limit = 64 * 1024 * 1024 + 4096 if path in {"/v1/projects/archive", "/v1/rich/projects/archive"} else MAX_EXTRACT_BODY if path == "/v1/extract" or project_upload else MAX_BODY
                 if size > body_limit:
                     await problem("INPUT_TOO_LARGE", 413)(scope, receive, send)
                     return
@@ -186,7 +186,7 @@ class LocalBoundary:
                 if not message.get("more_body", False):
                     break
             body = b"".join(chunks)
-            project_json = (path == "/v1/projects" or path.startswith("/v1/projects/")) and not project_upload
+            project_json = (path == "/v1/projects" or path.startswith("/v1/projects/") or path == "/v1/rich/projects" or path.startswith("/v1/rich/projects/")) and not project_upload
             if (method == "POST" and path in JSON_POST_PATHS) or (method == "PUT" and path in JSON_PUT_PATHS) or project_json:
                 if not is_json_media_type(headers.get(b"content-type", b"")):
                     await problem("INVALID_REQUEST", 415)(scope, receive, send)
@@ -261,6 +261,7 @@ def create_app(*, origin: str, secret: str, temp_root: Path, dist: Path, runner:
     async def lifespan(_app: FastAPI):
         yield
         await gui_projects.shutdown()
+        await rich_projects.shutdown()
         for task, (files, cancel) in list(connection_work.items()):
             await stop_connection(task, files, cancel)
         for task, (files, cancel) in list(semantic_work.items()):
@@ -357,6 +358,12 @@ def create_app(*, origin: str, secret: str, temp_root: Path, dist: Path, runner:
         storage=ProjectStore(rules_store.root), preferences=preferences_store, **gui_options)
     app.state.gui_projects = gui_projects
     mount_projects(app, gui_projects, problem)
+    from .rich_projects import RichProjectService
+    from .rich_routes import mount_rich_projects
+    rich_projects = RichProjectService(temp_root, rules_store, gui_selected_provider,
+        worker_slot=gui_worker_slot, cleanup_error=lifecycle_code, preferences=preferences_store, **gui_options)
+    app.state.rich_projects = rich_projects
+    mount_rich_projects(app, rich_projects, problem)
 
     def execute_content(files, runner, payload, cancel, runner_epoch):
         worker_error = None

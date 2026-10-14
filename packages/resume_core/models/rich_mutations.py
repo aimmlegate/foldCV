@@ -51,6 +51,7 @@ class PutBlock(Wire):
     after_id: Id | None
     before_revision: Revision | None
     block: RichBlock
+    keep_children: bool = False
 
 
 class RemoveBlock(Wire):

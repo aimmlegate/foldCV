@@ -25,6 +25,7 @@ from packages.resume_core.models.rich_document import RichDocumentV1
 from packages.resume_core.models.rich_facts import WorkingFacts
 from packages.resume_core.models.rich_mutations import RichMutation, RichSelection, DateCascadeProposal
 from packages.resume_core.models.rich_workspace import ProjectV5, WorkspaceV6, ArchiveManifestV6, AssetReservation
+from packages.resume_core.rich_api import RichProjectResponse
 
 OUT = ROOT / "contracts" / "json-schema"
 RICH_CONTRACTS = {
@@ -33,6 +34,7 @@ RICH_CONTRACTS = {
     "date_cascade_proposal": DateCascadeProposal, "project_v5": ProjectV5,
     "workspace_v6": WorkspaceV6, "archive_manifest_v6": ArchiveManifestV6,
     "asset_reservation": AssetReservation,
+    "rich_project_response": RichProjectResponse,
 }
 RECOVERY_MODELS = {**RECOVERY_CONTRACTS, **GUI_NORMALIZATION_CONTRACTS, **GUI_DRAFT_CONTRACTS, **GUI_PROJECT_CONTRACTS, **GUI_REWRITE_CONTRACTS, **GUI_EXPORT_CONTRACTS, **GUI_RECONCILE_CONTRACTS, **RICH_CONTRACTS}
 

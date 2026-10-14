@@ -65,6 +65,7 @@ class RichRenderSnapshot(Wire):
     facts_revision: Revision
     template_sha256: Sha256
     renderer_version: Id
+    renderer_sha256: Sha256
     docx_sha256: Sha256
     docx_size: int = Field(gt=0, le=32 * 1024 * 1024)
     docx_path: str

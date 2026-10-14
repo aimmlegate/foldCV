@@ -353,6 +353,7 @@ export type Id18 = string;
 export type Provenance11 = (NarrativeCitation | FieldBinding | WorkingOwnership | SourceWitness)[];
 export type Revision13 = number;
 export type Type14 = "paragraph";
+export type Keepchildren = boolean;
 export type Kind6 = "put_block";
 export type Parentid = string;
 export type Beforerevision1 = number;
@@ -537,6 +538,7 @@ export interface PutBlock {
   afterId: Afterid;
   beforeRevision: Beforerevision;
   block: Block;
+  keepChildren?: Keepchildren;
   kind: Kind6;
   parentId: Parentid;
 }
