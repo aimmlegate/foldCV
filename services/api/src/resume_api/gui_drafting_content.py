@@ -23,7 +23,13 @@ class GuiDraftingContentService:
         transport = DraftingTransport(captured)
         recovered = False
         try:
-            response = generate_admitted(self.provider, ContentInput(drafting_input(captured, rules), GuiDraftProposal,
+            prompt = drafting_input(captured, rules)
+        except ValueError as error:
+            if str(error) not in {"INPUT_TOO_LARGE", "INVALID_CONTENT_INPUT"}:
+                raise
+            raise ContentFailure(str(error)) from None
+        try:
+            response = generate_admitted(self.provider, ContentInput(prompt, GuiDraftProposal,
                 self.policy, transport), files, cancel)
             value, attempts, usage, count = response.value, response.logical_attempts, response.usage, response.internal_inference_count
         except ContentFailure as error:

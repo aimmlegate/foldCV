@@ -223,3 +223,29 @@ def test_empty_prose_is_allowed_when_only_structured_source_facts_exist():
     result = validate_draft(request, reply, RULES)
     assert result.document.candidate.name.text == "Ирина Примерова"
     assert len(result.document.jobs) == 3
+
+
+def test_native_draft_budget_uses_compact_wire_input_without_dropping_long_fact_ids(tmp_path):
+    from packages.resume_core.models.contracts import TextFact
+
+    request = draft_request()
+    job = request.normalized.employment[0]
+    added = [TextFact(id=f"claim-{index}-" + "x" * 350, revision=1, kind="text",
+        value={"text": f"Supported user claim {index}"}, evidence=[], origin="user",
+        importance="normal", jobId=job.id, subprojectId=None) for index in range(180)]
+    request.normalized.facts.extend(added)
+
+    class WireProvider(DraftProvider):
+        def generate(self, content, files, cancel):
+            assert len(content.text.encode()) > content.policy.max_input_bytes
+            wire = json.loads(content.transport.encode(content.text))
+            assert len(content.transport.encode(content.text).encode()) <= content.policy.max_input_bytes
+            assert len(wire["input"]["facts"]) == len(request.normalized.facts) - 2
+            return super().generate(content, files, cancel)
+
+    provider = WireProvider(draft_reply(request, detailed_old=True))
+    result, usage = GuiDraftingContentService(provider, "fixture").run(request, RULES, OperationFiles(tmp_path), threading.Event())
+    assert usage["logicalAttempts"] == len(provider.calls) == 1
+    assert result.document.candidate.name.text == request.normalized.candidate.name.text
+    stack = next(record for record in result.document.jobs if record.id == job.id).stack
+    assert {fact.id for fact in added} <= set(stack.fact_ids)

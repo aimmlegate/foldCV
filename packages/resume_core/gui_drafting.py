@@ -135,7 +135,8 @@ def drafting_input(request: GuiDraftRequest, rules: Rules) -> str:
                "activeJobs": active_jobs,
                "facts": facts, "skeleton": skeleton.model_dump(by_alias=True), "sourceExcerpts": excerpts,
                "blockedConflictFactIds": sorted(blocked), "output": "Write prose fields only: profile/text, skills-focus/skillsText, early-career/text and job context/tasks/results/stack. Keep structured skeleton fields unchanged. Supply an EditorialPlan accounting for all active jobs. Do not omit supported prose or use blocked conflict claims for authored text."}
-    return content_input("draft_prose", payload, rules)
+    # The native transport checks its 64 KiB input limit after compacting references.
+    return content_input("draft_prose", payload, rules, max_bytes=262_144)
 
 
 def validate_draft(request: GuiDraftRequest, proposal: GuiDraftProposal, rules: Rules,
