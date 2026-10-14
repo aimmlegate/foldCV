@@ -47,4 +47,8 @@
 .rich-facts-remove { opacity: .65; }
 .rich-job-technologies { margin: 6px 0 12px 10px; padding-left: 8px; border-left: 1px solid var(--outline); }
 .rich-facts-add { margin-top: 8px; }
+.rich-timeline { margin-top: 12px; padding-top: 8px; border-top: 1px solid var(--outline); font-size: 11px; }
+.rich-timeline ul { padding-left: 16px; margin: 8px 0; }
+.rich-timeline li { margin-block: 6px; overflow-wrap: anywhere; }
+.rich-cascade { padding: 8px; margin-top: 8px; border: 1px solid var(--outline); border-radius: 6px; }
 @media (max-width: 1050px) { .rich-workspace { display: block; padding: 0 16px; overflow-x: auto; } .rich-facts { position: static; width: min(100%, 740px); max-height: 360px; } .rich-workspace .cv-document { margin-left: 0; } }

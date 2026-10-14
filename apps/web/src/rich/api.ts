@@ -8,9 +8,16 @@ import imageSessionSchema from "../../../../contracts/json-schema/image_session_
 import { validateContract } from "../contracts/validate";
 import type { GuiProjectListResponse } from "../contracts/generated/gui_project_list_response";
 import type { GuiDeleteProjectResult } from "../contracts/generated/gui_delete_project_result";
+import type { TimelineReport } from "../contracts/generated/timeline_report";
+import type { DateCascadeProposal } from "../contracts/generated/date_cascade_proposal";
+import type { CascadeRequest } from "../contracts/generated/cascade_request";
+import timelineSchema from "../../../../contracts/json-schema/timeline_report.schema.json" with { type: "json" };
+import cascadeSchema from "../../../../contracts/json-schema/date_cascade_proposal.schema.json" with { type: "json" };
 
 const ajv = new Ajv2020({ strict: false, allErrors: true });
 const responseShape = ajv.compile<RichProjectResponse>(schema);
+const timelineShape = ajv.compile<TimelineReport>(timelineSchema);
+const cascadeShape = ajv.compile<DateCascadeProposal>(cascadeSchema);
 export const validateImageSession = ajv.compile<ImageSessionRequest>(imageSessionSchema);
 const prefix = "/v1/rich/projects";
 export class RichApiFailure extends Error {
@@ -46,6 +53,16 @@ export async function deleteProject(id: string): Promise<GuiDeleteProjectResult>
   return value;
 }
 function isDeleteResult(value: unknown): value is GuiDeleteProjectResult { return validateContract("gui_delete_project_result", value); }
+export async function readTimeline(id: string): Promise<TimelineReport> {
+  const value = await request(`/${id}/timeline`);
+  if (!timelineShape(value)) throw new RichApiFailure("INVALID_RESULT");
+  return value;
+}
+export async function previewCascade(id: string, payload: CascadeRequest): Promise<DateCascadeProposal> {
+  const value = await request(`/${id}/cascade`, "POST", payload);
+  if (!cascadeShape(value)) throw new RichApiFailure("INVALID_RESULT");
+  return value;
+}
 export function saveMutation(request: RichMutation): Promise<RichProjectResponse> {
   return projectRequest(`/${request.projectId}/mutations`, "POST", request);
 }

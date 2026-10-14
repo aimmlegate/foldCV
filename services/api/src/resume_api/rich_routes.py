@@ -12,6 +12,7 @@ from .gui_projects import ProjectFailure
 from .rich_assets import ImageSessionRequest, ImageUploadCapture
 from packages.resume_core.rich_sync import RichCompletionRequest, RichRewriteRequest, RichSyncDisposition
 from packages.resume_core.rich_panel import RichPanelRequest, RichPanelSyncRequest
+from packages.resume_core.rich_timeline import CascadeRequest, CascadeApplyRequest, timeline_report, cascade_proposal, cascade_mutation
 
 
 def mount_rich_projects(app, service, problem):
@@ -107,6 +108,30 @@ def mount_rich_projects(app, service, problem):
     async def panel_sync(identifier: str, payload: RichPanelSyncRequest):
         await service.panel_rich(identifier, payload)
         return response(identifier)
+
+    @app.get(prefix + "/{identifier}/timeline")
+    async def timeline(identifier: str):
+        try:
+            report = timeline_report(service.read(identifier))
+        except ValueError as error:
+            raise ProjectFailure(str(error), 409) from None
+        return JSONResponse(report.model_dump(mode="json", by_alias=True), headers={"Cache-Control": "no-store"})
+
+    @app.post(prefix + "/{identifier}/cascade")
+    async def cascade(identifier: str, payload: CascadeRequest):
+        try:
+            proposal = cascade_proposal(service.read(identifier), payload)
+        except ValueError as error:
+            raise ProjectFailure(str(error), 409) from None
+        return JSONResponse(proposal.model_dump(mode="json", by_alias=True), headers={"Cache-Control": "no-store"})
+
+    @app.post(prefix + "/{identifier}/cascade/preview")
+    async def cascade_preview(identifier: str, payload: CascadeApplyRequest):
+        try:
+            mutation = cascade_mutation(service.read(identifier), payload)
+        except ValueError as error:
+            raise ProjectFailure(str(error), 409) from None
+        return JSONResponse(service.preview(identifier, mutation).model_dump(mode="json", by_alias=True), headers={"Cache-Control": "no-store"})
 
     @app.post(prefix + "/{identifier}/rewrite")
     async def rewrite(identifier: str, payload: RichRewriteRequest):

@@ -28,9 +28,11 @@ from packages.resume_core.models.rich_workspace import ProjectV5, WorkspaceV6, A
 from packages.resume_core.rich_api import RichProjectResponse, ImageSessionRequest, ImageUploadCapture
 from packages.resume_core.rich_sync import RichCompletionRequest, RichRewriteRequest, RichRewriteProposal, RichReconcileProposal, RichSyncDisposition
 from packages.resume_core.rich_panel import RichPanelRequest, RichPanelSyncRequest, RichPanelProposal
+from packages.resume_core.rich_timeline import TimelineReport, CascadeRequest, CascadeApplyRequest
 
 OUT = ROOT / "contracts" / "json-schema"
 RICH_CONTRACTS = {
+    "timeline_report": TimelineReport, "cascade_request": CascadeRequest, "cascade_apply_request": CascadeApplyRequest,
     "rich_panel_request": RichPanelRequest, "rich_panel_sync_request": RichPanelSyncRequest, "rich_panel_proposal": RichPanelProposal,
     "rich_completion_request": RichCompletionRequest, "rich_rewrite_request": RichRewriteRequest,
     "rich_rewrite_proposal": RichRewriteProposal, "rich_reconcile_proposal": RichReconcileProposal,

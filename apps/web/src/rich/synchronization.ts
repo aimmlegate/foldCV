@@ -4,8 +4,9 @@ import type { RichProjectResponse } from "../contracts/generated/rich_project_re
 import type { RichMutation } from "../contracts/generated/rich_mutation";
 import type { RichDocumentV1 } from "../contracts/generated/rich_document_v1";
 import type { RichPanelRequest } from "../contracts/generated/rich_panel_request";
-import { projectRequest, RichApiFailure } from "./api";
-import type { CellValue, DependencyCapture, SessionHistory } from "./history";
+import type { DateCascadeProposal } from "../contracts/generated/date_cascade_proposal";
+import { projectRequest, previewCascade, RichApiFailure } from "./api";
+import type { CellChange, CellValue, DependencyCapture, SessionHistory } from "./history";
 import type { RichBlock, RichSaveQueue } from "./save-queue";
 
 type Sync = RichProjectResponse["workspace"]["syncRecords"][number];
@@ -41,13 +42,15 @@ export type SyncAdapter = {
   cells: (response: RichProjectResponse) => Map<string, CellValue>;
   changed: () => void; report: (response: RichProjectResponse) => void;
   failed?: (error: unknown) => void;
+  applied?: (actionId: string, changes: CellChange[]) => void;
 };
 export type PanelCommand = Omit<RichPanelRequest, "capture" | "factsRevision" | "documentRevision">;
 export class RichSynchronization {
   private closed = false;
   private readonly active = new Map<string, Capture>();
+  private readonly cascades = new Map<string, DependencyCapture>();
   constructor(private readonly adapter: SyncAdapter, private readonly projectId: string) {}
-  close(): void { this.closed = true; this.invalidate(); }
+  close(): void { this.closed = true; this.cascades.clear(); this.invalidate(); }
   invalidate(): void {
     for (const [id, capture] of this.active) if (this.closed || !this.adapter.history.current(capture)) {
       this.active.delete(id);
@@ -146,6 +149,11 @@ export class RichSynchronization {
     const dependencies = new Map(changes.map(change => [change.key, epochs.get(change.key) ?? 0]));
     if (this.closed || history.attach({ ...initial, dependencies }, changes) !== "applied") throw new Error("Изменения уже обновились. Повторите правку.");
     adapter.changed(); await adapter.queue.flush();
+    adapter.applied?.(initial.actionId, changes);
+    this.synchronizePanelAction(initial.actionId, changes);
+  }
+  private synchronizePanelAction(actionId: string, changes: CellChange[]): void {
+    const adapter = this.adapter;
     const records = new Set<string>();
     for (const change of changes) {
       if (change.key.startsWith("fact:")) records.add(change.key.slice(5));
@@ -156,7 +164,7 @@ export class RichSynchronization {
     }
     const ids = [...adapter.current()].filter(([key, value]) => key.startsWith("block:") && value && [...records].some(id => value.includes(JSON.stringify(id))))
       .map(([key]) => key.slice(6));
-    const capture = this.capture(initial.actionId, ids);
+    const capture = this.capture(actionId, ids);
     if (capture && records.size) void this.panelSync(capture, [...records]).catch(error => adapter.failed?.(error));
   }
   private async panelSync(capture: Capture, records: string[]): Promise<void> {
@@ -164,6 +172,36 @@ export class RichSynchronization {
     const sync = response.workspace.syncRecords.at(-1);
     if (sync) await this.apply(sync, capture);
     if (!this.closed) this.adapter.report(await projectRequest(`/${this.projectId}`));
+  }
+  async cascadePreview(jobId: string, periodId: string, actionId: string): Promise<DateCascadeProposal> {
+    await this.adapter.queue.flush();
+    const history = this.adapter.history;
+    const keys = [...this.adapter.current().keys()].filter(key => key.startsWith("fact-field:") && key.includes('"period:'));
+    const capture = history.capture(actionId, keys);
+    if (!capture || this.closed) throw new Error("Предпросмотр устарел. Измените период заново.");
+    const proposal = await previewCascade(this.projectId, { anchorJobId: jobId, anchorPeriodId: periodId, capture: this.wireCapture(capture) });
+    if (!history.current(capture) || this.closed) throw new Error("Предпросмотр устарел. Обновите его.");
+    this.cascades.clear(); this.cascades.set(proposal.id, capture);
+    return proposal;
+  }
+  async cascadeApply(proposal: DateCascadeProposal): Promise<void> {
+    const adapter = this.adapter, history = adapter.history, origin = this.cascades.get(proposal.id);
+    if (!origin || !history.current(origin) || this.closed) throw new Error("Предпросмотр устарел. Обновите его.");
+    await adapter.queue.flush();
+    const before = adapter.cells(adapter.queue.baseline), marker = `request:${crypto.randomUUID()}`;
+    const action = history.commit("cascade", [{ key: marker, before: null, after: "cascade" }]);
+    const capture = action ? history.capture(action, []) : null;
+    if (!capture) return;
+    const epochs = new Map([...adapter.current().keys()].map(key => [key, history.revision(key)]));
+    const response = await projectRequest(`/${this.projectId}/cascade/preview`, "POST", { proposal, capture: this.wireCapture(capture) });
+    if (!history.current(origin) || this.closed) throw new Error("Предпросмотр устарел. Обновите его.");
+    const after = adapter.cells(response);
+    const changes = [...new Set([...before.keys(), ...after.keys()])].map(key => ({ key, before: before.get(key) ?? null, after: after.get(key) ?? null }))
+      .filter(change => change.before !== change.after);
+    const dependencies = new Map(changes.map(change => [change.key, epochs.get(change.key) ?? 0]));
+    if (history.attach({ ...capture, dependencies }, changes) !== "applied") throw new Error("Предпросмотр устарел. Обновите его.");
+    adapter.changed(); await adapter.queue.flush(); this.cascades.delete(proposal.id);
+    this.synchronizePanelAction(capture.actionId, changes);
   }
   async retry(id: string, blockIds: string[]): Promise<void> {
     const history = this.adapter.history, marker = `request:${crypto.randomUUID()}`;
@@ -197,7 +235,7 @@ export class RichSynchronization {
         for (const change of changes) if (!deps.has(change.key)) deps.set(change.key, original.epochs.get(change.key) ?? 0);
         disposition = this.closed ? "stale" : adapter.history.attach({ ...original, dependencies: deps }, changes);
         errorCode = disposition === "applied" ? null : disposition === "conflict" ? "SYNC_HISTORY_CONFLICT" : "STALE_SYNC";
-        if (disposition === "applied") { adapter.changed(); await adapter.queue.flush(); }
+        if (disposition === "applied") { adapter.changed(); await adapter.queue.flush(); adapter.applied?.(original.actionId, changes); }
       } catch (error) { disposition = "conflict"; errorCode = error instanceof RichApiFailure ? error.code : "SYNC_PREVIEW_FAILED"; }
     }
     if (!this.closed) {

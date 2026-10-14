@@ -13,12 +13,16 @@ import { documentCells, type StoredBlock } from "./document-cells";
 import { factCells, factsFromCells } from "./fact-cells";
 import { RichSynchronization, type PanelCommand } from "./synchronization";
 import { FactsPanel } from "./FactsPanel";
+import { Timeline, type TimelineControls } from "./Timeline";
+import { dateAnchors, type DateAnchor } from "./date-edit";
+import type { TimelineReport } from "../contracts/generated/timeline_report";
+import type { DateCascadeProposal } from "../contracts/generated/date_cascade_proposal";
 import { selectedRange } from "./selection";
 import type { RichSelection } from "../contracts/generated/rich_selection";
 import type { RichCompletionRequest } from "../contracts/generated/rich_completion_request";
 import { SessionHistory, type CellChange, type CellValue } from "./history";
 import { RichSaveQueue, type RichBlock } from "./save-queue";
-import { saveMutation, projectRequest, imageSource, uploadImage, validateImageSession } from "./api";
+import { saveMutation, projectRequest, imageSource, uploadImage, validateImageSession, readTimeline } from "./api";
 import { referenceVariables } from "./template";
 import { fromInline, toInline, wireColor } from "./inline";
 import { bindingIdentityPlugin } from "./binding-identity";
@@ -92,6 +96,8 @@ export function RichEditor({ initial, acknowledge, onStatus, ref }: { initial: R
   if (!project) throw new Error("Document is missing");
   const initialFacts = project.facts;
   const [facts, setFacts] = useState(initialFacts);
+  const [ready, setReady] = useState(false);
+  const [anchors, setAnchors] = useState<DateAnchor[]>([]);
   const [, refresh] = useState(0);
   const [selecting, setSelecting] = useState(false);
   const [instruction, setInstruction] = useState("");
@@ -104,11 +110,16 @@ export function RichEditor({ initial, acknowledge, onStatus, ref }: { initial: R
   const bridge = useMemo(() => ({ session: crypto.randomUUID(), group: 0, composing: false, observing: false, replaying: false,
     kind: "typing" as RichMutation["kind"],
     lastTypingAt: 0, history: null as SessionHistory | null, queue: null as RichSaveQueue | null,
+    timeline: async (): Promise<TimelineReport> => ({ warnings: [], estimates: [] }),
+    cascadePreview: async (_anchor: DateAnchor): Promise<DateCascadeProposal> => { throw new Error("Редактор ещё открывается"); },
+    cascadeApply: async (_proposal: DateCascadeProposal): Promise<void> => {},
     fragments: new Map<string, string>(), projectionError: null as string | null,
     current: new Map<string, CellValue>(), values: new Map<string, Stored>(), original: new Map<string, RichBlock>(),
     undo: () => {}, redo: () => {}, complete: () => {}, panel: async (_command: PanelCommand): Promise<void> => {}, rewrite: async (_instruction: string): Promise<void> => {}, retry: async (_id: string): Promise<void> => {}, resolve: async (_id: string): Promise<void> => {}, timer: null as ReturnType<typeof setTimeout> | null }), []);
   const assets = useMemo(() => ({ upload: async (_file: File, _block?: string, _after?: string): Promise<void> => {}, cancel: (_block: string) => {},
     paste: (_event: ClipboardEvent | DragEvent): boolean => false, command: (_command: string, _target?: string) => {} }), []);
+  const timelineControls = useMemo<TimelineControls>(() => ({ read: () => bridge.timeline(),
+    preview: anchor => bridge.cascadePreview(anchor), apply: proposal => bridge.cascadeApply(proposal) }), [bridge]);
   const extension = useMemo(() => createExtension({ key: "foldcv-rich-session", runsBefore: ["link"], tiptapExtensions: [tableIdentityAttributes, structureIdentityAttributes,
     Extension.create({ name: "foldcv-local-image-drop", priority: 1000, addProseMirrorPlugins: () => [new Plugin({ props: {
       handleDOMEvents: { drop: (_view, event) => assets.paste(event) },
@@ -325,6 +336,7 @@ export function RichEditor({ initial, acknowledge, onStatus, ref }: { initial: R
         factsFromCells(bridge.current, queue.baseline.workspace.project?.facts ?? initialFacts)); schedule(); },
       report: response => { setSyncRecords(response.workspace.syncRecords); },
       failed: error => setEditorWarning(error instanceof Error ? error.message : "Синхронизация не завершена"),
+      applied: (action, changes) => { const next = dateAnchors(action, changes); if (next.length) setAnchors(next); },
     }, initial.workspace.projectId);
     let pendingAction: string | null = null;
     const pendingBlocks = new Set<string>(), movedBlocks = new Set<string>(), removedRecords = new Set<string>();
@@ -343,6 +355,10 @@ export function RichEditor({ initial, acknowledge, onStatus, ref }: { initial: R
       await sync.rewrite(captured, instruction);
     };
     bridge.resolve = id => sync.resolve(id);
+    bridge.timeline = async () => { await queue.flush(); return readTimeline(initial.workspace.projectId); };
+    bridge.cascadePreview = anchor => sync.cascadePreview(anchor.jobId, anchor.periodId, anchor.actionId);
+    bridge.cascadeApply = async proposal => { bridge.group++; bridge.kind = "cascade";
+      try { await sync.cascadeApply(proposal); } finally { bridge.kind = "typing"; } };
     bridge.panel = async command => { finishEdit(); bridge.group++; bridge.kind = "panel"; await sync.panel(command); bridge.kind = "typing"; };
     bridge.retry = async id => {
       const response = await projectRequest(`/${initial.workspace.projectId}`), record = response.workspace.syncRecords.find(item => item.id === id);
@@ -541,6 +557,7 @@ export function RichEditor({ initial, acknowledge, onStatus, ref }: { initial: R
     bridge.complete = () => { observe(); schedule(); finishEdit(); };
     // Only initial normalization is queued; acknowledgments never replace the editor.
     queue.update(document(), `${bridge.session}:initial`);
+    setReady(true);
     return () => { stop(); sync.close(); open = false; imageRevision++; for (const upload of uploads.values()) upload.abort();
       window.removeEventListener("pagehide", closeOnUnload); void publishImageReferences().catch(() => {}); history.close(); queue.close(); if (bridge.timer) clearTimeout(bridge.timer); };
   }, [editor, bridge]);
@@ -551,7 +568,7 @@ export function RichEditor({ initial, acknowledge, onStatus, ref }: { initial: R
     await bridge.queue.flush(); return bridge.queue.baseline;
   }, undo: bridge.undo, redo: bridge.redo }), [bridge, bridge.history?.position]);
   return <ImageActions.Provider value={{ source: asset => imageSource(initial.workspace.projectId, asset), upload: assets.upload, cancel: assets.cancel }}>
-    <div className="rich-workspace"><FactsPanel facts={facts} submit={command => bridge.panel(command)} />
+    <div className="rich-workspace"><FactsPanel facts={facts} submit={command => bridge.panel(command)} timeline={ready ? <Timeline facts={facts} anchors={anchors} controls={timelineControls} /> : null} />
     <div className="cv-document" style={{ ...referenceVariables, color: "#171717" }} data-project-id={initial.workspace.projectId}>
       <div className="cv-structure-controls"><Popover.Root><Popover.Trigger asChild><button disabled={!selecting || rewriting}>Переписать выделенное</button></Popover.Trigger><Popover.Portal>
         <Popover.Content className="rich-block-menu"><label>Что изменить<textarea aria-label="Инструкция для фрагмента" value={instruction} onChange={event => setInstruction(event.currentTarget.value)} /></label>

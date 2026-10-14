@@ -406,3 +406,10 @@ linked-narrative batch. Node uses real Python mutations for composite history,
 late preview guards and unrelated typing. T3 covers mounted CRUD, date endpoints,
 project rename/delete, owned reopen and portable/DOCX transfer. Timeline warnings
 and cascades remain NE09; Word is a final manual gate.
+
+NE09 checks the frozen inclusive overlap/cascade examples, tied starts, invalid
+chains without partial apply, source-observed ongoing estimates, future bounds,
+all employment pairs and durable restart. Node uses real Python proposals and
+mutations for one-action cascade undo, stale equal-text guards and one linked
+reconciliation request per action. T3 verifies nonblocking export with overlap,
+preview/dismiss/apply, unrelated typing, undo/redo, restart and portable transfer.

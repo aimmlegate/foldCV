@@ -1,0 +1,144 @@
+{
+  "$defs": {
+    "TimelineEstimate": {
+      "additionalProperties": false,
+      "properties": {
+        "monthsMax": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Monthsmax"
+        },
+        "monthsMin": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Monthsmin"
+        },
+        "reason": {
+          "anyOf": [
+            {
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Reason"
+        },
+        "scopeId": {
+          "minLength": 1,
+          "title": "Scopeid",
+          "type": "string"
+        }
+      },
+      "required": [
+        "scopeId",
+        "monthsMin",
+        "monthsMax",
+        "reason"
+      ],
+      "title": "TimelineEstimate",
+      "type": "object"
+    },
+    "TimelineWarning": {
+      "additionalProperties": false,
+      "properties": {
+        "certainty": {
+          "anyOf": [
+            {
+              "enum": [
+                "possible",
+                "certain"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Certainty"
+        },
+        "code": {
+          "minLength": 1,
+          "title": "Code",
+          "type": "string"
+        },
+        "id": {
+          "minLength": 1,
+          "title": "Id",
+          "type": "string"
+        },
+        "jobIds": {
+          "items": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "title": "Jobids",
+          "type": "array"
+        },
+        "kind": {
+          "enum": [
+            "overlap",
+            "quality",
+            "future"
+          ],
+          "title": "Kind",
+          "type": "string"
+        },
+        "periodIds": {
+          "items": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "title": "Periodids",
+          "type": "array"
+        }
+      },
+      "required": [
+        "id",
+        "kind",
+        "code",
+        "certainty",
+        "jobIds",
+        "periodIds"
+      ],
+      "title": "TimelineWarning",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "estimates": {
+      "items": {
+        "$ref": "#/$defs/TimelineEstimate"
+      },
+      "title": "Estimates",
+      "type": "array"
+    },
+    "warnings": {
+      "items": {
+        "$ref": "#/$defs/TimelineWarning"
+      },
+      "title": "Warnings",
+      "type": "array"
+    }
+  },
+  "required": [
+    "warnings",
+    "estimates"
+  ],
+  "title": "TimelineReport",
+  "type": "object"
+}

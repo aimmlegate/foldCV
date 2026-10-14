@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import type { WorkingFacts } from "../contracts/generated/working_facts";
 import type { PanelCommand } from "./synchronization";
 
@@ -47,8 +47,9 @@ function RecordForm({ record, submit, close }: { record: RecordValue; submit: (c
   const inputs = fields(record);
   return <form onSubmit={event => {
     event.preventDefault(); const data = values(event.currentTarget);
-    inputs.filter(field => field.checked !== undefined).forEach(field => { data[field.key] = data[field.key] ? "по настоящее время" : ""; });
-    setBusy(true); void submit({ operation: "edit", recordId: record.id, values: data }).then(close).catch(() => {}).finally(() => setBusy(false));
+    const changed = Object.fromEntries(inputs.filter(field => field.checked === undefined ? data[field.key] !== field.text : !!data[field.key] !== field.checked)
+      .map(field => [field.key, field.checked === undefined ? data[field.key] ?? "" : data[field.key] ? "по настоящее время" : ""]));
+    setBusy(true); void submit({ operation: "edit", recordId: record.id, values: changed }).then(close).catch(() => {}).finally(() => setBusy(false));
   }}>
     {inputs.map(field => <label key={field.key}>{field.label}<input name={field.key} aria-label={field.label} type={field.checked === undefined ? "text" : "checkbox"}
       defaultValue={field.checked === undefined ? field.text : "present"} defaultChecked={field.checked} disabled={busy} /></label>)}
@@ -81,7 +82,7 @@ function RecordRow({ record, submit }: { record: RecordValue; submit: (command: 
     <button className="rich-facts-remove" aria-label={`Удалить: ${title(record)}`} onClick={() => void submit({ operation: "remove", recordId: record.id }).catch(() => {})}>Удалить</button>
   </div>;
 }
-export function FactsPanel({ facts, submit }: { facts: WorkingFacts; submit: (command: PanelCommand) => Promise<void> }) {
+export function FactsPanel({ facts, submit, timeline }: { facts: WorkingFacts; submit: (command: PanelCommand) => Promise<void>; timeline?: ReactNode }) {
   const [error, setError] = useState("");
   async function apply(command: PanelCommand) {
     setError("");
@@ -98,6 +99,7 @@ export function FactsPanel({ facts, submit }: { facts: WorkingFacts; submit: (co
           {facts.records.filter(item => item.kind === "technology" && item.jobId === record.id).map(item => <RecordRow key={item.id} record={item} submit={apply} />)}
           <AddForm kind="technology" job={record.id} submit={apply} /></div>}
       </div>)}
+      {kind === "employment" && timeline}
       {(kind !== "candidate" || !facts.records.some(record => record.kind === "candidate")) && <AddForm kind={kind} submit={apply} />}
     </details>)}
   </aside>;
