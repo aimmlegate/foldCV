@@ -281,3 +281,19 @@ def test_sparse_empty_native_reply_keeps_full_source_accounting_and_warning():
     assert count > 0 and not result.employment
     assert len(proposal.units) == sum(len(source.units) for source in captured.sources)
     assert all(unit.disposition == 'unresolved' for unit in proposal.units)
+
+
+def test_unrepresented_source_remains_warned_without_native_row_drops():
+    text = (Path(__file__).parents[1] / 'fixtures/recovery/E1.txt').read_text()
+    captured = request(text + '\nAdditional unsupported source detail.\n')
+    _, normalized, count = recover(captured, employment_proposal(captured).model_dump(mode='json', by_alias=True))
+    assert count == 0
+    document = draft_skeleton(normalized)
+    deps = Dependencies(projectRevision=1, documentRevision=1, rulesSha256=RULES.sha256,
+        sourceFingerprint=normalized.source_fingerprint, dependencyFingerprint='a' * 64)
+    before = document.model_dump()
+    marks = initial_annotations('unrepresented-source', document, normalized, [], deps)
+    assert any(mark.code == 'source_details_unresolved' and mark.type == 'warning' for mark in marks)
+    assert document.model_dump() == before
+    unit = normalized.sources[0].units[-1]
+    assert unit.disposition == 'unresolved' and unit.text == 'Additional unsupported source detail.\n'

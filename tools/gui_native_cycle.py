@@ -105,6 +105,24 @@ async def serve(args: argparse.Namespace) -> None:
         calls += 1
         number = calls
         emit(nativeCall=number, kind=request.result_type.__name__, status="started", selectedModel=request.policy.model)
+        original_run = provider.process.run
+
+        def capture(files, arguments, **kwargs):
+            accept = kwargs.get("on_line")
+            if arguments[0] == "exec" and "--help" not in arguments and accept:
+                def line(raw):
+                    try:
+                        event = json.loads(raw)
+                    except (ValueError, UnicodeError):
+                        return accept(raw)
+                    item = event.get("item") if isinstance(event, dict) else None
+                    if isinstance(item, dict) and item.get("type") == "agent_message" and isinstance(item.get("text"), str):
+                        atomic_write(evidence / f"provider-{number}.json", item["text"].encode())
+                    return accept(raw)
+                kwargs["on_line"] = line
+            return original_run(files, arguments, **kwargs)
+
+        provider.process.run = capture
         try:
             result = original_generate(provider, request, files, cancel)
             emit(nativeCall=number, status="completed", elapsedSeconds=round(result.elapsed_seconds, 2),
@@ -113,6 +131,8 @@ async def serve(args: argparse.Namespace) -> None:
         except Exception as error:
             emit(nativeCall=number, status="failed", code=getattr(error, "code", type(error).__name__))
             raise
+        finally:
+            provider.process.run = original_run
 
     CodexCliProvider._generate = generate
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as listener:

@@ -29,7 +29,11 @@ def initial_annotations(project_id: str, document: Document, normalized: GuiNorm
             factIds=fact_ids or [], reason=reason, evidence=evidence or [], resolved=False,
             updateSuggestionId=None, removedFocus=[]))
 
-    if normalized._native_recovery_count:
+    assessments = {fact.id for fact in normalized.facts if fact.kind == "name_assessment"
+        or fact.kind == "source_observation" and fact.value.source_observed_at is None}
+    unresolved_source = any(unit.text.strip() and unit.disposition == "unresolved"
+        and not set(unit.represented_fact_ids) - assessments for source in normalized.sources for unit in source.units)
+    if normalized._native_recovery_count or unresolved_source:
         add("source_details_unresolved", "warning", {"kind": "document"},
             "Some source details could not be structured. Review the saved source.")
 
