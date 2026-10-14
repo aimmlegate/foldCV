@@ -136,7 +136,7 @@ def drafting_input(request: GuiDraftRequest, rules: Rules) -> str:
                "sourceObservedAt": request.normalized.source_observed_at.model_dump(by_alias=True) if request.normalized.source_observed_at else None,
                "activeJobs": active_jobs,
                "facts": facts, "skeleton": skeleton.model_dump(by_alias=True), "sourceExcerpts": excerpts,
-               "blockedConflictFactIds": sorted(blocked), "output": "Write captured field IDs and an EditorialPlan; account for all active jobs. Do not use blocked conflict claims for authored text."}
+               "blockedConflictFactIds": sorted(blocked), "output": "Write prose fields only: profile/text, skills-focus/skillsText, early-career/text and job context/tasks/results/stack. Keep structured skeleton fields unchanged. Supply an EditorialPlan accounting for all active jobs. Do not omit supported prose or use blocked conflict claims for authored text."}
     return content_input("draft_prose", payload, rules)
 
 
@@ -160,20 +160,22 @@ def validate_draft(request: GuiDraftRequest, proposal: GuiDraftProposal, rules: 
             raise DraftFailure("EDITORIAL_FACT_OUTSIDE_JOB")
     document = draft_skeleton(normalized)
     fields = {field.field_id: field for record in document.records() for field in authored_fields(record)}
+    prose_ids = {"profile/text", "skills-focus/skillsText", "early-career/text"}
+    prose_ids.update(f"job:{id}/{key}" for id in jobs for key in ("context", "tasks", "results", "stack"))
     if len({item.field_id for item in proposal.fields}) != len(proposal.fields):
         raise DraftFailure("DUPLICATE_DRAFT_FIELD")
     for item in proposal.fields:
         if item.field_id not in fields or not set(item.fact_ids) <= set(facts) or set(item.fact_ids) & (private | blocked):
             raise DraftFailure("INVALID_DRAFT_FIELD_REFERENCE")
         field = fields[item.field_id]
+        if item.field_id not in prose_ids:
+            raise DraftFailure("DRAFT_STRUCTURED_FIELD")
         if item.text.strip() and not item.fact_ids:
             raise DraftFailure("DRAFT_TEXT_NEEDS_FACTS")
         if item.field_id.startswith("job:"):
             job_id = item.field_id.split("/", 1)[0].removeprefix("job:")
             if any(facts[id].job_id != job_id for id in item.fact_ids):
                 raise DraftFailure("DRAFT_FACT_OUTSIDE_JOB")
-        if "/period:" in item.field_id and item.text != field.text:
-            raise DraftFailure("DRAFT_CHANGED_SOURCE_DATE")
         field.text = item.text
         field.fact_ids = item.fact_ids
         field.evidence = [ref for id in item.fact_ids for ref in facts[id].evidence]
@@ -184,6 +186,21 @@ def validate_draft(request: GuiDraftRequest, proposal: GuiDraftProposal, rules: 
     required.update(f"job:{id}/{key}" for id in detailed for key in ("context", "tasks", "results", "stack"))
     if not required <= {item.field_id for item in proposal.fields}:
         raise DraftFailure("INCOMPLETE_DRAFT_FIELDS")
+    supported = [fact for fact in public_context_facts(normalized.facts) if fact.id not in blocked]
+    prose_kinds = {"text", "technology", "metric", "leadership"}
+    if any(fact.kind in prose_kinds for fact in supported) and not document.profile.text.text.strip():
+        raise DraftFailure("EMPTY_SUPPORTED_DRAFT_PROSE")
+    if any(fact.kind == "technology" and fact.value.scope == "global" for fact in supported) and not document.skills_focus.skills_text.text.strip():
+        raise DraftFailure("EMPTY_SUPPORTED_DRAFT_PROSE")
+    for job in document.jobs:
+        if job.id not in detailed:
+            continue
+        owned = [fact for fact in supported if fact.job_id == job.id]
+        if (any(fact.kind in {"text", "metric", "leadership"} for fact in owned)
+            and not any(field.text.strip() for field in (job.context, job.tasks, job.results))):
+            raise DraftFailure("EMPTY_SUPPORTED_DRAFT_PROSE")
+        if any(fact.kind == "technology" for fact in owned) and not job.stack.text.strip():
+            raise DraftFailure("EMPTY_SUPPORTED_DRAFT_PROSE")
     document.jobs = [next(job for job in document.jobs if job.id == id) for id in detailed]
     document.early_career.represented_job_ids = early
     if early and not document.early_career.text.text.strip():

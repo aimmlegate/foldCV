@@ -215,6 +215,21 @@ def test_authoritative_job_correction_keeps_profile_text_and_first_restore_branc
     assert not any(mark.type=='conflicting' for mark in w.annotations)
 
 
+def test_unrelated_title_reconciliation_retains_profile_recipe_without_revalidating_it():
+    from tests.recovery.test_gui_related import corrected
+    from tests.recovery.draft_fixtures import RULES
+    w, _job, _fact = corrected()
+    recipe = w.related_update_suggestions[0].model_copy(deep=True)
+    edit(w, 'candidate/title', 'Updated candidate title', completion='field')
+    field = w.project.document.candidate.title
+    reply = GuiReconcileProposal(facts=[], fieldFacts=[{'fieldId': field.field_id, 'factIds': field.fact_ids}],
+        annotations=[], suggestions=[], editorialPlan=None, recommendations=[])
+    apply_reconciliation(w, [field.field_id], reply, result_dependencies(w, RULES), RULES, '')
+    assert w.related_update_suggestions == [recipe]
+    assert any(mark.update_suggestion_id == recipe.id for mark in w.annotations)
+    assert recipe.dependencies != result_dependencies(w, RULES)
+
+
 def test_reconciliation_inside_session_preserves_baseline_and_user_addition_origin():
     w,job,fact=shared_claim();rules=__import__('tests.recovery.draft_fixtures',fromlist=['RULES']).RULES;w.rules_used=rules
     edit(w,job.tasks.field_id,'Mentored three trainees',completion='paragraph');baseline=w.edit_sessions['job:'+job.id].baseline.model_copy(deep=True)

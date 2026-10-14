@@ -10,7 +10,7 @@ import pytest
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "services/api/src"))
 
-from packages.resume_core.gui_drafting import GuiDraftProposal, drafting_input, validate_draft, replace_focus_warnings, DraftFailure
+from packages.resume_core.gui_drafting import DraftField, GuiDraftProposal, drafting_input, validate_draft, replace_focus_warnings, DraftFailure
 from packages.resume_core.rules import RulesStore
 from packages.resume_core.models.recovery import GuiTechnologyFact
 from resume_api.gui_drafting_content import GuiDraftingContentService
@@ -170,3 +170,45 @@ def test_editorial_context_has_exact_date_bounds_and_age_days_without_invented_c
     present = payload["activeJobs"][0]["periodBounds"][0]
     assert present["endLower"] is None and present["daysSinceEndBounds"] is None
     assert payload["activeJobs"][0]["periods"][0]["start"]["precision"] == "year"
+
+
+@pytest.mark.parametrize("field_id", ["candidate/name", "candidate/title", "candidate/location"])
+def test_drafting_cannot_replace_supported_identity_with_unrelated_facts(field_id):
+    request = draft_request()
+    reply = draft_reply(request)
+    title = next(fact for fact in request.normalized.facts
+                 if fact.kind == "candidate_detail" and fact.value.field == "title")
+    reply.fields.append(DraftField(fieldId=field_id, text="Invented Unsupported Surname", factIds=[title.id]))
+    with pytest.raises(DraftFailure, match="DRAFT_STRUCTURED_FIELD"):
+        validate_draft(request, reply, RULES)
+
+
+@pytest.mark.parametrize("scope", ["all", "profile", "job-prose", "job-stack", "skills"])
+def test_present_field_ids_cannot_hide_empty_supported_prose(scope):
+    request = draft_request()
+    reply = draft_reply(request, detailed_old=True)
+    first = request.normalized.employment[0].id
+    for field in reply.fields:
+        if (scope == "all" or scope == "profile" and field.field_id == "profile/text"
+            or scope == "job-prose" and field.field_id in {f"job:{first}/{key}" for key in ("context", "tasks", "results")}
+            or scope == "job-stack" and field.field_id == f"job:{first}/stack"
+            or scope == "skills" and field.field_id == "skills-focus/skillsText"):
+            field.text = " \n "
+            field.fact_ids = []
+    with pytest.raises(DraftFailure, match="EMPTY_SUPPORTED_DRAFT_PROSE"):
+        validate_draft(request, reply, RULES)
+
+
+def test_empty_prose_is_allowed_when_only_structured_source_facts_exist():
+    request = draft_request()
+    request.normalized.facts = [fact for fact in request.normalized.facts
+                                if fact.kind not in {"text", "technology", "metric", "leadership", "date"}]
+    reply = draft_reply(request, detailed_old=True)
+    reply.editorial_plan.focus = []
+    reply.editorial_plan.technology_groups = []
+    for field in reply.fields:
+        field.text = ""
+        field.fact_ids = []
+    result = validate_draft(request, reply, RULES)
+    assert result.document.candidate.name.text == "Ирина Примерова"
+    assert len(result.document.jobs) == 3

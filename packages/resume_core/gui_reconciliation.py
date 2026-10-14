@@ -236,13 +236,18 @@ def apply_reconciliation(workspace, field_ids, proposal, dependencies, rules, up
         'name_assessment_stale', 'focus_entry_removed', 'editorial_plan_stale'}
     candidate.annotations = [mark for mark in candidate.annotations if mark.code in pure or not
         (mark.anchor.kind == 'field' and mark.anchor.field_id in relevant or set(mark.fact_ids) & assessed_fact_ids)]
-    candidate.related_update_suggestions = []
+    retained = [item for item in candidate.related_update_suggestions if not
+        (set(item.fact_ids) & assessed_fact_ids or any(value.field_id in relevant for value in item.replacements))]
+    retained_ids = {item.id for item in retained}
+    if retained_ids & {item.id for item in proposal.suggestions}: raise ValueError('ANALYSIS_SCOPE_INVALID')
+    removed_ids = {item.id for item in candidate.related_update_suggestions} - retained_ids
+    candidate.annotations = [mark for mark in candidate.annotations if mark.update_suggestion_id not in removed_ids]
     provisional = result_dependencies(candidate, rules)
     candidate.annotations += [Annotation(id=mark.id, type=mark.type, code='reconcile_' + mark.code,
         anchor=mark.anchor, dependencies=provisional, factIds=mark.fact_ids, reason=mark.reason,
         evidence=[], resolved=False, updateSuggestionId=mark.update_suggestion_id, removedFocus=[]) for mark in proposal.annotations]
     refresh(candidate, [])
-    candidate.related_update_suggestions = [RelatedUpdateSuggestion(id=item.id, dependencies=provisional,
+    candidate.related_update_suggestions = retained + [RelatedUpdateSuggestion(id=item.id, dependencies=provisional,
         factIds=item.fact_ids, replacements=item.replacements, reason=item.reason) for item in proposal.suggestions]
     names = ('facts', 'document', 'views')
     def semantic(values): return [value.model_dump(exclude={'dependencies'}) for value in values]
@@ -256,7 +261,8 @@ def apply_reconciliation(workspace, field_ids, proposal, dependencies, rules, up
         refresh(candidate, [])
         deps = result_dependencies(candidate, rules)
         for mark in candidate.annotations: mark.dependencies = deps.model_copy(deep=True)
-        for suggestion in candidate.related_update_suggestions: suggestion.dependencies = deps.model_copy(deep=True)
+        for suggestion in candidate.related_update_suggestions:
+            if suggestion.id not in retained_ids: suggestion.dependencies = deps.model_copy(deep=True)
         for name in names: setattr(workspace.project, name, getattr(candidate.project, name))
         workspace.project.revision = candidate.project_revision
         for name in ('project_revision', 'updated_at', 'annotations', 'derived_state', 'related_update_suggestions', 'editorial_plan'):

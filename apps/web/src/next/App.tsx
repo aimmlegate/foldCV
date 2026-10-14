@@ -48,6 +48,7 @@ export function App() {
   const [sourceBusy, setSourceBusy] = useState(false);
   const [source, setSource] = useState<SourceContext | null>(null);
   const sourceEpoch = useRef(0);
+  const sourceCapture = useRef<{ revision: number; texts: Map<string, string> } | null>(null);
   const editor = useRef<FieldEditorHandle>(null);
   const lastSlot = useRef("profile");
   const requestEpoch = useRef(0);
@@ -69,8 +70,18 @@ export function App() {
   const portable = usePortable(edits);
   const editorKey = `${workspace?.projectId}:${fields.map(field => field.fieldId).join("|")}`;
   const initialArtifact = workspace?.project?.renders.find(render => render.artifactAvailable && render.docx);
+  function invalidateSource() {
+    if (!sourceCapture.current || !workspace) return;
+    ++sourceEpoch.current; sourceCapture.current = null; setSourceBusy(false);
+    setSource({ projectId: workspace.projectId, documentRevision: workspace.documentRevision,
+      status: "stale", excerpts: [], annotations: [], legacyText: [] });
+  }
+  useEffect(() => {
+    if (sourceCapture.current && sourceCapture.current.revision !== workspace?.documentRevision) invalidateSource();
+  }, [workspace?.documentRevision]);
   async function showMigration() {
     if (!workspace) return;
+    sourceCapture.current = null;
     rewrite.close();
     const epoch = ++sourceEpoch.current;setSourceOpen(true);setSourceBusy(true);setSource(null);
     try { const result = await migrationRequest(workspace.projectId);if (epoch === sourceEpoch.current) setSource(result); }
@@ -170,6 +181,10 @@ export function App() {
     rewrite.close();
     const captured = editor.current?.capture();
     const first = captured?.spans[0];
+    const targetIds = captured && first ? captured.spans.map(span => span.fieldId)
+      : fields.filter(field => field.slotId === (slot ?? lastSlot.current)).map(field => field.fieldId);
+    sourceCapture.current = { revision: workspace.documentRevision,
+      texts: new Map(editor.current?.read().filter(field => targetIds.includes(field.fieldId)).map(field => [field.fieldId, field.text]) ?? []) };
     const epoch = ++sourceEpoch.current;
     setSourceOpen(true); setSourceBusy(true); setSource(null);
     try {
@@ -178,6 +193,10 @@ export function App() {
           dependencyFingerprint: selectionFingerprint, spans: [first, ...captured.spans.slice(1)] } : null,
         fieldIds: captured && first ? [] : fields.filter(field => field.slotId === (slot ?? lastSlot.current)).map(field => field.fieldId) });
       if (epoch !== sourceEpoch.current) return;
+      const target = sourceCapture.current;
+      const live = new Map(editor.current?.read().map(field => [field.fieldId, field.text]) ?? []);
+      if (!target || edits.acknowledged()?.documentRevision !== target.revision
+        || [...target.texts].some(([id, text]) => live.get(id) !== text)) { invalidateSource(); return; }
       setSource(context);
       if (context.status === "stale") {
         const refreshed = await projectRequest(`/v1/projects/${workspace.projectId}`);
@@ -236,7 +255,11 @@ export function App() {
       </div>}>
       <FieldEditor ref={editor} key={editorKey} fields={edits.overlay(fields)} editable={!edits.locked} theme={theme.resolved} annotations={workspace?.annotations ?? []}
         derived={edits.pending ? null : workspace?.derivedState} callbacks={{
-        buffer: values => { rewrite.invalidate(); edits.buffer(values); }, selection: value => setHasSelection(value !== null), slot: value => { setSlot(value); if (value) lastSlot.current = value; }, departure: edits.departure,
+        buffer: values => {
+          if (values.some(field => sourceCapture.current?.texts.has(field.fieldId)
+            && sourceCapture.current.texts.get(field.fieldId) !== field.text)) invalidateSource();
+          rewrite.invalidate(); edits.buffer(values);
+        }, selection: value => setHasSelection(value !== null), slot: value => { setSlot(value); if (value) lastSlot.current = value; }, departure: edits.departure,
         restore: value => { rewrite.invalidate(); edits.restore(value); }, completion: edits.completion, compositionEnd: edits.compositionEnd,
       }} />
       </DocumentLayout>

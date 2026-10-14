@@ -47,7 +47,8 @@ export function useEdits(workspace: Workspace | null, editor: RefObject<FieldEdi
     if (!canonical) return;
     const saved = new Map(documentFields(canonical).map(field => [field.fieldId, field.text]));
     for (const field of fields) {
-      if (saved.get(field.fieldId) === field.text) { dirty.current.delete(field.fieldId); continue; }
+      const baseline = sentValues.current.get(field.fieldId) ?? saved.get(field.fieldId);
+      if (baseline === field.text) { dirty.current.delete(field.fieldId); continue; }
       if (!invalidated.current.has(field.fieldId)) {
         invalidated.current.add(field.fieldId);
         void enqueue(async () => {
@@ -102,7 +103,10 @@ export function useEdits(workspace: Workspace | null, editor: RefObject<FieldEdi
     if (response.workspace.project) {
       const patches = documentFields(response.workspace.project.document).filter(field => {
         const text = live.get(field.fieldId);
-        return text !== undefined && text !== field.text && (text === sent.get(field.fieldId) || text === previous.get(field.fieldId));
+        const buffered = dirty.current.get(field.fieldId);
+        const captured = sent.has(field.fieldId) ? sent.get(field.fieldId) : previous.get(field.fieldId);
+        return text !== undefined && text !== field.text && text === captured
+          && (!buffered || buffered.field.text === sent.get(field.fieldId));
       }).map(field => ({ fieldId: field.fieldId, text: field.text, capturedText: live.get(field.fieldId) ?? "" }));
       editor.current?.patch(patches);
     }

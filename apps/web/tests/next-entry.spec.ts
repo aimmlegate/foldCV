@@ -331,6 +331,96 @@ test("built E1 active composition sends no partial mutation and retains complete
   await expect(profile).toContainText("入力");
 });
 
+test("post-review delayed B acknowledgment retains return to A through durable reopen", async ({ page }) => {
+  let release = () => {}, admitted = () => {};
+  const held = new Promise<void>(ready => { release = ready; });
+  const written = new Promise<void>(ready => { admitted = ready; });
+  let first = true;
+  await page.route("**/mutations", async route => {
+    if (first) { first = false; const result = await route.fetch(); admitted(); await held; await route.fulfill({ response: result }); }
+    else await route.continue();
+  });
+  try {
+    await page.goto(`${origin}/next.html#secret=synthetic-next-secret-0123456789`);
+    await page.getByRole("button", { name: "Открыть пример" }).click();
+    await page.getByRole("button", { name: "Создать резюме" }).click();
+    await expect(page.getByText("Резюме готово", { exact: true })).toBeVisible({ timeout: 30000 });
+    const profile = page.locator('[data-field-content="profile/text"]');
+    const original = await profile.innerText();
+    await replaceFieldText(page, "profile/text", "Temporary B");
+    await written;
+    await replaceFieldText(page, "profile/text", original);
+    await expect(page.locator(".next-save")).not.toHaveText("Сохранено");
+    release();
+    await expect(profile).toHaveText(original);
+    await expect.poll(async () => (await currentWorkspace(page)).project?.document.profile.text.text).toBe(original);
+    await expect(page.getByText("Сохранено", { exact: true })).toBeVisible();
+    await page.reload();
+    await expect(profile).toHaveText(original);
+    const saved = await currentWorkspace(page);
+    await openProject(page, saved.projectId);
+    await expect(profile).toHaveText(original);
+    const downloaded = page.waitForEvent("download");
+    await page.getByRole("button", { name: "Сохранить проект", exact: true }).click();
+    const path = await (await downloaded).path();
+    if (!path) throw new Error("Missing portable download");
+    await projectMenu(page);
+    await page.getByLabel("Файл проекта", { exact: true }).setInputFiles({
+      name: "returned-to-A.foldcv", mimeType: "application/zip", buffer: readFileSync(path),
+    });
+    await expect.poll(() => new URL(page.url()).searchParams.get("project")).not.toBe(saved.projectId);
+    await expect(profile).toHaveText(original);
+    await exportCurrent(page);
+    await expect(page.getByRole("button", { name: "Скачать DOCX", exact: true })).toBeEnabled();
+    const docx = await downloadDocx(page, "returned-to-A.docx");
+    expect(docx.xml).toContain(original);
+    expect(docx.xml).not.toContain("Temporary B");
+  } finally { release(); }
+});
+
+test("post-review delayed successful source response is discarded after target editing", async ({ page }) => {
+  let release = () => {}, admitted = () => {};
+  const held = new Promise<void>(ready => { release = ready; });
+  const fetched = new Promise<void>(ready => { admitted = ready; });
+  await page.route("**/source-context", async route => {
+    const result = await route.fetch();
+    const raw: unknown = await result.json();
+    expect(typeof raw === "object" && raw !== null && "status" in raw && raw.status === "evidence").toBe(true);
+    admitted(); await held; await route.fulfill({ response: result });
+  });
+  try {
+    await page.goto(`${origin}/next.html#secret=synthetic-next-secret-0123456789`);
+    await page.getByRole("button", { name: "Открыть пример" }).click();
+    await page.getByRole("button", { name: "Создать резюме" }).click();
+    await expect(page.getByText("Резюме готово", { exact: true })).toBeVisible({ timeout: 30000 });
+    const field = page.locator('[data-field-content$="/context"]').first();
+    const id = await field.getAttribute("data-field-content");
+    if (!id) throw new Error("Missing context field");
+    await selectFields(page, id, 0, id, (await field.innerText()).length);
+    await page.getByRole("button", { name: "Показать исходник" }).click();
+    await fetched;
+    await replaceFieldText(page, id, "New local context");
+    const received = page.waitForResponse(result => result.url().endsWith("/source-context"));
+    release(); await received;
+    const panel = page.getByRole("complementary", { name: "Исходный контекст" });
+    await expect(panel.getByRole("status")).toContainText("Выделение устарело");
+    await expect(panel.locator("blockquote")).toHaveCount(0);
+    await expect(field).toHaveText("New local context");
+  } finally { release(); }
+});
+
+test("post-review progress combines assembly and render into four visible stages", async ({ page }) => {
+  await page.goto(`${origin}/next.html#secret=synthetic-next-secret-0123456789`);
+  await page.getByRole("button", { name: "Открыть пример" }).click();
+  await page.getByRole("button", { name: "Создать резюме" }).click();
+  await expect(page.getByText("Резюме готово", { exact: true })).toBeVisible({ timeout: 30000 });
+  await page.getByText("Этапы создания", { exact: true }).click();
+  const stages = page.getByRole("list", { name: "Этапы создания" });
+  await expect(stages.getByRole("listitem")).toHaveCount(4);
+  await expect(stages.getByText("Проверяем и оформляем", { exact: true })).toBeVisible();
+  await expect(stages.locator('[data-stage="assemble"]')).toHaveAttribute("data-status", "completed");
+});
+
 test("built E1 disk acknowledgment refresh retains open session and resumes its baseline", async ({ page }) => {
   await page.goto(`${origin}/next.html#secret=synthetic-next-secret-0123456789`);
   await page.getByRole("button", { name: "Открыть пример" }).click();await page.getByRole("button", { name: "Создать резюме" }).click();
