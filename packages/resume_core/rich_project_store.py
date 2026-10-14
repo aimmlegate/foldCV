@@ -30,6 +30,31 @@ def decode_rich_snapshot(raw: bytes) -> WorkspaceV6:
 
 
 class RichProjectStore(ProjectStore):
+    def reclaim_images(self, workspace):
+        try:
+            with locked_root(self.root, ".projects.lock"):
+                directory = self._directory(workspace.project_id)
+                target = directory / "workspace.json"
+                owned_file(target)
+                raw = target.read_bytes()
+                current = decode_rich_snapshot(raw)
+                if hashlib.sha256(raw).hexdigest() != self.expected.get(workspace.project_id):
+                    return
+                folder = directory / "images"
+                if not folder.exists():
+                    return
+                private_directory(folder)
+                keep = {asset.path for asset in current.project.assets} if current.project else set()
+                for path in folder.iterdir():
+                    if re.fullmatch(r"[0-9a-f]{64}\.(?:png|jpg)", path.name) is None:
+                        raise StorageFailure("UNSAFE_STORAGE")
+                    owned_file(path, 20 * 1024 * 1024)
+                for path in folder.iterdir():
+                    if "images/" + path.name not in keep:
+                        path.unlink()
+        except (ProjectStoreFailure, StorageFailure, OSError):
+            return
+
     def save(self, workspace, originals, artifacts, images=None):
         images = images or {}
         try:

@@ -47,12 +47,12 @@ def test_initial_docx_preserves_long_tokens_cyrillic_links_marks_and_full_font_f
         assert b"saveSubsetFonts" in archive.read("word/settings.xml")
 
 
-def test_unsupported_rich_nodes_remain_portable_but_never_offer_a_cached_plain_export():
+def test_rich_table_and_code_export_without_a_stale_plain_cache():
     workspace = without_sources()
-    with pytest.raises(RenderFailure, match="RICH_EXPORT_UNSUPPORTED"):
-        render_rich_docx(workspace.project.document)
-    with pytest.raises(RenderFailure, match="RICH_EXPORT_UNSUPPORTED"):
-        current_snapshot(workspace, {})
+    raw = render_rich_docx(workspace.project.document)
+    with ZipFile(BytesIO(raw)) as archive:
+        assert b"<w:tbl>" in archive.read("word/document.xml")
+    assert current_snapshot(workspace, {}) is None
     files = read_zip(export_rich_archive(workspace, {}, {}, {}))
     assert not any(path.startswith("renders/") for path in files)
     assert b'"type":"table"' in files["workspace.json"] and b'"type":"code"' in files["workspace.json"]

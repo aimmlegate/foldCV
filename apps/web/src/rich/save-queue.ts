@@ -23,28 +23,56 @@ function canonical(value: unknown): string {
   return JSON.stringify(value) ?? "null";
 }
 function logical(block: RichBlock): string {
-  return canonical({ type: block.type, props: block.props, content: block.content, provenance: block.provenance });
+  const content = block.type === "table" ? { ...block.content, rows: block.content.rows.map(row => ({ ...row,
+    cells: row.cells.map(({ revision: _revision, ...cell }) => cell) })) } : block.content;
+  return canonical({ type: block.type, props: block.props, content, provenance: block.provenance });
 }
 
 export function documentSteps(before: RichDocumentV1, after: RichDocumentV1): RichMutation["steps"][number][] {
   const old = placements(before), current = placements(after);
   const steps: RichMutation["steps"][number][] = [];
-  for (const [id, item] of old) if (!current.has(id) && !(!current.has(item.parentId) && old.has(item.parentId))) {
-    steps.push({ kind: "remove_block", blockId: id, beforeRevision: item.block.revision });
+  const parents = new Map([...old].map(([id, item]) => [id, item.parentId]));
+  const children = new Map<string, string[]>();
+  for (const [id, item] of old) children.set(item.parentId, [...(children.get(item.parentId) ?? []), id]);
+  function place(id: string, parent: string, previous: string | null) {
+    const oldParent = parents.get(id), siblings = oldParent ? children.get(oldParent) : undefined;
+    if (siblings) { const index = siblings.indexOf(id); if (index >= 0) siblings.splice(index, 1); }
+    const target = children.get(parent) ?? [];
+    target.splice(previous === null ? 0 : target.indexOf(previous) + 1, 0, id);
+    children.set(parent, target); parents.set(id, parent);
+  }
+  // New siblings keep their relative order while retained children escape deleted ancestors.
+  const lastNew = new Map<string, string>();
+  for (const [id, item] of current) if (!old.has(id)) {
+    const afterId = lastNew.get(item.parentId) ?? null;
+    steps.push({ kind: "put_block", parentId: item.parentId, afterId, beforeRevision: null, block: { ...item.block, children: [] } });
+    place(id, item.parentId, afterId); lastNew.set(item.parentId, id);
   }
   for (const [id, item] of current) {
     const previous = old.get(id);
-    if (!previous) {
-      steps.push({ kind: "put_block", parentId: item.parentId, afterId: item.afterId, beforeRevision: null, block: { ...item.block, children: [] } });
-      continue;
+    if (previous && previous.parentId !== item.parentId) {
+      steps.push({ kind: "move_block", blockId: id, beforeRevision: previous.block.revision, parentId: item.parentId, afterId: null });
+      place(id, item.parentId, null);
     }
+  }
+  for (const [id, item] of old) if (!current.has(id) && !(!current.has(item.parentId) && old.has(item.parentId))) {
+    steps.push({ kind: "remove_block", blockId: id, beforeRevision: item.block.revision });
+    const siblings = children.get(item.parentId), index = siblings?.indexOf(id);
+    if (siblings && index !== undefined && index >= 0) siblings.splice(index, 1);
+  }
+  for (const [id, item] of current) {
+    const previous = old.get(id);
+    if (!previous) continue;
     if (logical(previous.block) !== logical(item.block)) {
-      steps.push({ kind: "put_block", parentId: previous.parentId, afterId: item.afterId !== null && old.has(item.afterId) ? item.afterId : null,
+      steps.push({ kind: "put_block", parentId: item.parentId, afterId: null,
         beforeRevision: previous.block.revision, block: { ...item.block, children: [] }, keepChildren: true });
     }
-    if (previous.parentId !== item.parentId || previous.afterId !== item.afterId) {
+    const siblings = children.get(item.parentId) ?? [], index = siblings.indexOf(id);
+    const actualPrevious = index > 0 ? siblings[index - 1] : null;
+    if (parents.get(id) !== item.parentId || actualPrevious !== item.afterId) {
       steps.push({ kind: "move_block", blockId: id, beforeRevision: previous.block.revision,
         parentId: item.parentId, afterId: item.afterId });
+      place(id, item.parentId, item.afterId);
     }
   }
   return steps;

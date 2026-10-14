@@ -3,6 +3,7 @@
 import asyncio
 import hashlib
 import threading
+from pydantic import ValidationError
 
 from packages.resume_core.dates import partial_date
 from packages.resume_core.gui_archive_zip import ArchiveFailure
@@ -28,15 +29,17 @@ from .gui_projects import GuiProjectService, ProjectFailure, digest
 from .gui_rendering import RichDocxRenderer
 from .lifecycle import OperationFiles, SpikeError
 from .providers.content import ContentFailure
+from .rich_assets import RichAssets
 
 
-class RichProjectService(GuiProjectService):
+class RichProjectService(RichAssets, GuiProjectService):
     def __init__(self, temp_root, rules, provider_factory, **options):
         options.setdefault("storage", RichProjectStore(rules.root))
         options.setdefault("renderer", RichDocxRenderer())
         super().__init__(temp_root, rules, provider_factory, **options)
         self.images = {}
         self.generations = {}
+        self.initialize_images()
 
     def ensure_loaded(self):
         if self.loaded:
@@ -266,9 +269,12 @@ class RichProjectService(GuiProjectService):
                     {aid: blob for (pid, aid), blob in self.images.items() if pid == identifier})
             except (RichMutationFailure, ArchiveFailure) as error:
                 raise ProjectFailure(error.code, 409) from None
+            except ValidationError:
+                raise ProjectFailure("RICH_CONTENT_INVALID", 422) from None
             workspace.updated_at = self.clock().isoformat()
             self.workspaces[identifier] = workspace
             self.persist(identifier)
+            self.reclaim_images(identifier)
             return self.response(identifier)
 
     async def export(self, identifier, generation_id=None):
@@ -282,10 +288,12 @@ class RichProjectService(GuiProjectService):
             return cache
         operation = self.new_operation(identifier, "render")
         operation.status = "running"
-        cancel = self.cancels.get((identifier, generation_id), threading.Event())
+        key = (identifier, generation_id or operation.id)
+        cancel = self.cancels.get(key, threading.Event())
         files = OperationFiles(self.temp_root)
-        if generation_id:
-            self.files[(identifier, generation_id)] = files
+        self.files[key] = files
+        if not generation_id:
+            self.tasks[key], self.cancels[key] = asyncio.current_task(), cancel
         try:
             async with self.worker_slot(cancel):
                 with files.open():
@@ -293,7 +301,7 @@ class RichProjectService(GuiProjectService):
                         {aid: data for (pid, aid), data in self.images.items() if pid == identifier}, files)
             with self.state_lock:
                 current = self.workspaces[identifier]
-                if cancel.is_set() or current.document_revision != captured.document_revision or current.project.facts.revision != captured.project.facts.revision:
+                if identifier in self.deleted_ids or cancel.is_set() or current.document_revision != captured.document_revision or current.project.facts.revision != captured.project.facts.revision:
                     raise ProjectFailure("STALE_EXPORT")
                 snapshot = RichRenderSnapshot(id=identity("render"), documentRevision=captured.document_revision,
                     factsRevision=captured.project.facts.revision, templateSha256=PACKAGE_SHA256,
@@ -305,12 +313,21 @@ class RichProjectService(GuiProjectService):
                 self.persist(identifier)
                 return snapshot, blob
         except Exception as error:
-            self.finish_operation(identifier, operation.id, "failed", getattr(error, "code", "RICH_RENDER_FAILED"))
+            self.finish_operation(identifier, operation.id, "cancelled" if cancel.is_set() else "failed",
+                "CANCELLED" if cancel.is_set() else getattr(error, "code", "RICH_RENDER_FAILED"))
             self.persist(identifier)
             raise
         finally:
-            if generation_id:
-                self.files.pop((identifier, generation_id), None)
+            self.files.pop(key, None)
+            if not generation_id:
+                self.tasks.pop(key, None); self.cancels.pop(key, None)
+
+    async def shutdown(self):
+        for session in self.image_sessions.values():
+            session.closed = True
+        await super().shutdown()
+        if self.image_tasks:
+            await asyncio.gather(*list(self.image_tasks), return_exceptions=True)
 
     def portable(self, identifier):
         workspace = self.read(identifier)
@@ -335,12 +352,26 @@ class RichProjectService(GuiProjectService):
         self.persist(identifier)
         return identifier
 
+    async def delete_project(self, identifier):
+        # Verify the rich version before the shared tombstone can alter its registry entry.
+        self.read(identifier)
+        for (pid, _), session in self.image_sessions.items():
+            if pid == identifier:
+                session.closed = True
+        result = await super().delete_project(identifier)
+        if result.status == "deleted":
+            for key in list(self.images):
+                if key[0] == identifier:
+                    self.images.pop(key, None)
+        return result
+
     async def cancel(self, identifier, generation_id, **_options):
         key = (identifier, generation_id)
         task = self.tasks.get(key)
         if task is None or task.done():
             return
-        self.cancels[key].set()
+        cancel = self.cancels[key]
+        cancel.set()
         files = self.files.get(key)
         if files:
             files.stop_worker()
@@ -349,3 +380,6 @@ class RichProjectService(GuiProjectService):
         except asyncio.TimeoutError:
             self.cleanup_error(SpikeError("PROCESS_CLEANUP_FAILED"))
             raise ProjectFailure("PROCESS_CLEANUP_FAILED", 503) from None
+        except (ProjectFailure, RenderFailure, AdmissionCancelled) as error:
+            if getattr(error, "code", None) == "PROCESS_CLEANUP_FAILED" or not cancel.is_set():
+                raise

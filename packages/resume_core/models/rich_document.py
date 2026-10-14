@@ -131,20 +131,54 @@ class TableCell(Wire):
 
 class TableRow(Wire):
     id: Id
-    cells: list[TableCell] = Field(min_length=1)
+    cells: list[TableCell]
 
 
 class TableContent(Wire):
     rows: list[TableRow] = Field(min_length=1)
     column_widths: list[float | None] = Field(min_length=1)
     header_rows: int = Field(ge=0)
+    header_cols: int = Field(default=0, ge=0)
 
     @model_validator(mode="after")
     def valid_table(self) -> TableContent:
         if self.header_rows > len(self.rows):
             raise ValueError("table header exceeds rows")
+        if self.header_cols > len(self.column_widths):
+            raise ValueError("table header exceeds columns")
         if any(width is not None and width <= 0 for width in self.column_widths):
             raise ValueError("invalid table column width")
+        active, expires, coverage, cached = {}, {}, 0, None
+        for r, row in enumerate(self.rows):
+            for column in expires.pop(r, []):
+                end = active.pop(column)
+                coverage -= end - column
+                cached = None
+            if cached is None:
+                cached = []
+                for start, end in sorted(active.items()):
+                    if cached and cached[-1][1] == start:
+                        cached[-1] = (cached[-1][0], end)
+                    else:
+                        cached.append((start, end))
+            column, index, current, additions = 0, 0, coverage, []
+            for cell in row.cells:
+                while index < len(cached) and cached[index][0] <= column:
+                    column = max(column, cached[index][1]); index += 1
+                if r + cell.rowspan > len(self.rows) or column + cell.colspan > len(self.column_widths):
+                    raise ValueError("table span exceeds grid")
+                if index < len(cached) and column + cell.colspan > cached[index][0]:
+                    raise ValueError("overlapping table spans")
+                current += cell.colspan
+                if cell.rowspan > 1:
+                    additions.append((column, column + cell.colspan, r + cell.rowspan))
+                column += cell.colspan
+            if current != len(self.column_widths):
+                raise ValueError("incomplete table grid")
+            for start, end, expiry in additions:
+                active[start] = end; coverage += end - start
+                expires.setdefault(expiry, []).append(start)
+                cached = None
         return self
 
 

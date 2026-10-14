@@ -15,7 +15,17 @@
 .cv-document [data-id="sidebar"] .cv-section-title { font-size: 10pt; }
 .cv-region-marker { height: 0; }
 .cv-document [data-content-type="region"] { min-height: 0; }
-.cv-pending-block { border: 1px solid #ddd; padding: 8px; }
+.cv-image { margin: 0; max-width: 100%; }
+.cv-image img { object-fit: contain; }
+.cv-image-controls { display: flex; gap: 6px; flex-wrap: wrap; font: 12px system-ui; color: #171717; }
+.cv-image-controls input { max-width: 160px; }
+.cv-image-controls input[type="number"] { width: 70px; }
+.cv-insert-image { display: block; margin-bottom: 14px; font: 12px system-ui; }
+.cv-document .bn-block-content[data-content-type="table"] { max-width: 100%; overflow-x: auto; }
+.cv-structure-controls { display: flex; align-items: start; gap: 12px; color: #171717; }
+.cv-editor-warning { padding: 8px; font: 13px system-ui; color: #6b4d00; background: #fef3c7; }
+.cv-editor-warning button { margin-left: 8px; }
+.rich-block-menu { z-index: 60; display: flex; flex-direction: column; gap: 6px; padding: 12px; background: var(--panel); color: var(--content); border: 1px solid var(--outline); border-radius: 8px; }
 .rich-settings { z-index: 60; box-sizing: border-box; width: min(760px, calc(100vw - 32px)); max-height: min(85vh, var(--radix-popover-content-available-height)); overflow: auto; padding: 24px; background: var(--panel); border: 1px solid var(--outline); border-radius: 10px; }
 .rich-settings .next-settings { margin: 0; padding: 0; max-width: none; }
 .rich-dialog-overlay { position: fixed; inset: 0; background: #0006; z-index: 50; }

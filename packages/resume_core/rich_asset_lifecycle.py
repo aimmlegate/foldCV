@@ -34,8 +34,8 @@ class ImageRetention:
             raise ValueError("duplicate image reservation")
         if not 0 < input_size <= IMAGE_BYTES:
             raise ValueError("image input exceeds 10 MiB")
-        if retained_size <= 0:
-            raise ValueError("positive retained image reservation required")
+        if retained_size < 0:
+            raise ValueError("nonnegative retained image reservation required")
         reserved_bytes, reserved_blocks = self._reserved()
         blocks = 0 if replacement else 1
         retained_image_bytes(self.assets, self.references, reserved_bytes + retained_size, reserved_blocks + blocks)

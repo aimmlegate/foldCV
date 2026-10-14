@@ -107,15 +107,12 @@ export type Children9 = (
  * @minItems 1
  */
 export type Columnwidths = [number | null, ...(number | null)[]];
+export type Headercols = number;
 export type Headerrows = number;
 /**
  * @minItems 1
  */
 export type Rows = [TableRow, ...TableRow[]];
-/**
- * @minItems 1
- */
-export type Cells = [TableCell, ...TableCell[]];
 export type Alignment2 = "left" | "center" | "right" | "justify";
 export type Backgroundcolor2 = string;
 export type Colspan = number;
@@ -123,6 +120,7 @@ export type Content3 = (StyledText | Hyperlink | FactFieldSpan)[];
 export type Id6 = string;
 export type Revision2 = number;
 export type Rowspan = number;
+export type Cells = TableCell[];
 export type Id7 = string;
 export type Id8 = string;
 export type Alignment3 = "left" | "center" | "right" | "justify";
@@ -530,6 +528,7 @@ export interface ImageProps {
 }
 export interface TableContent {
   columnWidths: Columnwidths;
+  headerCols?: Headercols;
   headerRows: Headerrows;
   rows: Rows;
 }

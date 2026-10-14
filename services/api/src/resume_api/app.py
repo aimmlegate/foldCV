@@ -177,8 +177,9 @@ class LocalBoundary:
                     return
                 part = message.get("body", b"")
                 size += len(part)
-                project_upload = path in {"/v1/projects/input", "/v1/projects/archive", "/v1/rich/projects/input", "/v1/rich/projects/archive"} or (path.startswith("/v1/projects/") and path.endswith("/input"))
-                body_limit = 64 * 1024 * 1024 + 4096 if path in {"/v1/projects/archive", "/v1/rich/projects/archive"} else MAX_EXTRACT_BODY if path == "/v1/extract" or project_upload else MAX_BODY
+                image_upload = path.startswith("/v1/rich/projects/") and path.endswith("/images/upload")
+                project_upload = image_upload or path in {"/v1/projects/input", "/v1/projects/archive", "/v1/rich/projects/input", "/v1/rich/projects/archive"} or (path.startswith("/v1/projects/") and path.endswith("/input"))
+                body_limit = 10 * 1024 * 1024 + 64 * 1024 if image_upload else 64 * 1024 * 1024 + 4096 if path in {"/v1/projects/archive", "/v1/rich/projects/archive"} else MAX_EXTRACT_BODY if path == "/v1/extract" or project_upload else MAX_BODY
                 if size > body_limit:
                     await problem("INPUT_TOO_LARGE", 413)(scope, receive, send)
                     return

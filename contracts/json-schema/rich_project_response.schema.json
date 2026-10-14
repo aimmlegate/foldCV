@@ -4161,6 +4161,12 @@
           "title": "Columnwidths",
           "type": "array"
         },
+        "headerCols": {
+          "default": 0,
+          "minimum": 0,
+          "title": "Headercols",
+          "type": "integer"
+        },
         "headerRows": {
           "minimum": 0,
           "title": "Headerrows",
@@ -4190,7 +4196,6 @@
           "items": {
             "$ref": "#/$defs/TableCell"
           },
-          "minItems": 1,
           "title": "Cells",
           "type": "array"
         },

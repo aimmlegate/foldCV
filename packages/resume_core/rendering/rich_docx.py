@@ -10,6 +10,8 @@ from zipfile import ZipFile, ZIP_DEFLATED
 
 from docx import Document
 from docx.enum.text import WD_ALIGN_PARAGRAPH
+from docx.enum.table import WD_TABLE_ALIGNMENT
+from docx.table import _Cell
 from docx.oxml import OxmlElement
 from docx.oxml.ns import qn
 from docx.opc.constants import RELATIONSHIP_TYPE
@@ -22,7 +24,7 @@ from .rich_template import PACKAGE_SHA256, ROOT, require_rich_template
 from .template import RenderFailure
 
 RENDERER_VERSION = "1.0.0"
-INITIAL_BLOCKS = {"paragraph", "heading", "section", "bullet_list", "numbered_list", "check_list", "toggle_list", "quote", "code", "divider"}
+INITIAL_BLOCKS = {"paragraph", "heading", "section", "bullet_list", "numbered_list", "check_list", "toggle_list", "quote", "code", "divider", "table", "image"}
 
 
 def renderer_sha256():
@@ -114,8 +116,9 @@ def embed_fonts(raw, spec):
 
 
 class Writer:
-    def __init__(self, spec):
+    def __init__(self, spec, images=None):
         self.spec = spec
+        self.images = images or {}
         self.fonts = {face["face"]: face for face in spec["fonts"]}
         self.document = Document()
         self.numbering = self.document.part.numbering_part.element
@@ -199,6 +202,10 @@ class Writer:
             self.block(container, block, width, region, depth, focus, sequence)
 
     def block(self, container, block, width, region, depth=0, focus=False, sequence=None):
+        if block.type == "table":
+            self.table(container, block, max(24, width - min(depth * 18, max(0, width - 24))))
+            self.blocks(container, block.children, width, region, depth + 1)
+            return
         paragraph = container.add_paragraph()
         paragraph.paragraph_format.keep_together = False
         paragraph.paragraph_format.keep_with_next = False
@@ -256,6 +263,19 @@ class Writer:
         if block.type == "divider":
             border = element("w:pBdr"); border.append(element("w:bottom", val="single", sz=6, color="888888"))
             paragraph._p.get_or_add_pPr().append(border)
+        elif block.type == "image":
+            # Exact body line spacing clips a tall inline picture in Word-compatible readers.
+            paragraph.paragraph_format.line_spacing = 1.0
+            data = self.images.get(block.props.asset_id)
+            if data is None:
+                raise RenderFailure("RICH_IMAGE_MISSING")
+            available = max(24, width - min(depth * 18, max(0, width - 24)))
+            scale = min(1, available / block.props.width, 620 / block.props.height)
+            picture = paragraph.add_run().add_picture(BytesIO(data), width=Pt(block.props.width * scale), height=Pt(block.props.height * scale))
+            picture._inline.docPr.set("descr", block.props.alt)
+            if block.props.caption:
+                paragraph.add_run().add_break()
+                self.inline(paragraph, block.props.caption, "light", 10)
         elif block.type == "code":
             from ..models.rich_document import InlineStyles
             self.run(paragraph, block.content, InlineStyles(code=True), "regular", 10)
@@ -263,6 +283,56 @@ class Writer:
             self.inline(paragraph, block.content, face, size, getattr(block.props, "text_color", "default"))
         self.blocks(container, block.children, width, region, depth if block.type == "section" else depth + 1,
             block.type == "section" and block.props.presentation == "focus")
+
+    def table(self, container, block, width):
+        content = block.content
+        columns = len(content.column_widths)
+        preferred = [value or 80 for value in content.column_widths]
+        widths = [width * value / sum(preferred) for value in preferred]
+        table = container.add_table(rows=0, cols=columns)
+        table.autofit = False
+        table.alignment = {"left": WD_TABLE_ALIGNMENT.LEFT, "center": WD_TABLE_ALIGNMENT.CENTER,
+            "right": WD_TABLE_ALIGNMENT.RIGHT, "justify": WD_TABLE_ALIGNMENT.LEFT}[block.props.alignment]
+        table._tbl.tblPr.find(qn("w:tblW")).set(qn("w:w"), str(round(width * 20)))
+        for index, value in enumerate(widths):
+            table.columns[index].width = Pt(value)
+        active = {}
+        for row_index, row in enumerate(content.rows):
+            active = {column: value for column, value in active.items() if value[0] > row_index}
+            tr = element("w:tr")
+            table._tbl.append(tr)
+            if row_index < content.header_rows:
+                props = element("w:trPr"); props.append(element("w:tblHeader")); tr.append(props)
+            entries = [(column, source, True) for column, (_, source) in active.items()]
+            column = 0
+            for source in row.cells:
+                while column in active:
+                    column += active[column][1].colspan
+                if column + source.colspan > columns or row_index + source.rowspan > len(content.rows):
+                    raise RenderFailure("RICH_TABLE_INVALID")
+                entries.append((column, source, False))
+                if source.rowspan > 1:
+                    active[column] = (row_index + source.rowspan, source)
+                column += source.colspan
+            for column, source, continuation in sorted(entries, key=lambda item: item[0]):
+                tc = element("w:tc"); tr.append(tc)
+                cell = _Cell(tc, table)
+                cell.width = Pt(sum(widths[column:column + source.colspan]))
+                if source.colspan > 1:
+                    tc.get_or_add_tcPr().append(element("w:gridSpan", val=source.colspan))
+                if source.rowspan > 1:
+                    tc.get_or_add_tcPr().append(element("w:vMerge") if continuation else element("w:vMerge", val="restart"))
+                fill(cell._tc.get_or_add_tcPr(), source.background_color if source.background_color != "default" else block.props.background_color)
+                paragraph = cell.add_paragraph()
+                paragraph.alignment = {"left": WD_ALIGN_PARAGRAPH.LEFT, "center": WD_ALIGN_PARAGRAPH.CENTER,
+                    "right": WD_ALIGN_PARAGRAPH.RIGHT, "justify": WD_ALIGN_PARAGRAPH.JUSTIFY}[source.alignment]
+                paragraph.paragraph_format.keep_together = False
+                paragraph.paragraph_format.keep_with_next = False
+                paragraph._p.get_or_add_pPr().append(element("w:wordWrap", val="0"))
+                if not continuation:
+                    self.inline(paragraph, source.content, "semibold" if row_index < content.header_rows or column < content.header_cols else "light", 10, block.props.text_color)
+        # Word requires a paragraph after a nested table; it also separates adjacent tables.
+        container.add_paragraph().paragraph_format.space_after = Pt(0)
 
     def render(self, document):
         spec = self.spec
@@ -297,7 +367,7 @@ class Writer:
 
 def render_rich_docx(document: RichDocumentV1, images=None):
     validate_export(document)
-    content = Writer(require_rich_template().specification).render(document)
+    content = Writer(require_rich_template().specification, images).render(document)
     if len(content) > DOCX_BYTES:
         raise RenderFailure("RENDER_OUTPUT_LIMIT")
     return content

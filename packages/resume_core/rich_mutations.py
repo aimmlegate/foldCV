@@ -118,6 +118,7 @@ def apply_rich_mutation(workspace: WorkspaceV6, request):
                 block = step.block.model_copy(deep=True)
                 block.children = old.children
                 block.revision = max(document.revision, old.revision) + 1
+                update_cell_revisions(block, old, document.revision)
                 found[0][found[1]] = block
                 parent.revision += 1
                 continue
@@ -129,6 +130,7 @@ def apply_rich_mutation(workspace: WorkspaceV6, request):
                 raise RichMutationFailure("RICH_PARENT_MISSING")
             block = step.block.model_copy(deep=True) if isinstance(step, PutBlock) else old
             block.revision = max(document.revision, getattr(old, "revision", 0)) + 1
+            update_cell_revisions(block, old, document.revision)
             items.insert(positions[step.after_id] + 1 if step.after_id else 0, block)
             parent.revision += 1
         elif isinstance(step, RemoveBlock):
@@ -170,3 +172,17 @@ def subtree(block):
     yield block
     for child in block.children:
         yield from subtree(child)
+
+
+def update_cell_revisions(block, old, document_revision):
+    if not isinstance(block, TableBlock):
+        return
+    previous = {cell.id: cell for row in old.content.rows for cell in row.cells} if isinstance(old, TableBlock) else {}
+    for row in block.content.rows:
+        for cell in row.cells:
+            before = previous.get(cell.id)
+            if before is None:
+                cell.revision = max(document_revision, cell.revision) + 1
+            else:
+                value = cell.model_dump(exclude={"revision"})
+                cell.revision = before.revision if value == before.model_dump(exclude={"revision"}) else max(document_revision, before.revision) + 1

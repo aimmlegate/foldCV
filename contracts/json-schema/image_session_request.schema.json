@@ -1,0 +1,58 @@
+{
+  "additionalProperties": false,
+  "properties": {
+    "closed": {
+      "default": false,
+      "title": "Closed",
+      "type": "boolean"
+    },
+    "history": {
+      "items": {
+        "minLength": 1,
+        "type": "string"
+      },
+      "title": "History",
+      "type": "array"
+    },
+    "live": {
+      "items": {
+        "minLength": 1,
+        "type": "string"
+      },
+      "maxItems": 20,
+      "title": "Live",
+      "type": "array"
+    },
+    "previousSessionId": {
+      "anyOf": [
+        {
+          "minLength": 1,
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Previoussessionid"
+    },
+    "revision": {
+      "minimum": 1,
+      "title": "Revision",
+      "type": "integer"
+    },
+    "sessionId": {
+      "minLength": 1,
+      "title": "Sessionid",
+      "type": "string"
+    }
+  },
+  "required": [
+    "sessionId",
+    "revision",
+    "live",
+    "history"
+  ],
+  "title": "ImageSessionRequest",
+  "type": "object"
+}

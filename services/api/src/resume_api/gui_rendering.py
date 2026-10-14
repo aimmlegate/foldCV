@@ -1,6 +1,7 @@
 """Converter-free rendering with the existing owned-worker cleanup boundary."""
 
 import asyncio
+import hashlib
 import json
 from pathlib import Path
 import sys
@@ -56,6 +57,11 @@ class RichDocxRenderer:
             raise RenderFailure("RICH_RENDER_FAILED")
         workspace = files.path
         payload = {"document": document.model_dump(mode="json", by_alias=True), "rendererSha256": rich_renderer_sha256()}
+        payload["images"] = {}
+        for identifier, data in images.items():
+            checksum = hashlib.sha256(data).hexdigest()
+            (workspace / (checksum + ".image")).write_bytes(data)
+            payload["images"][identifier] = checksum
         (workspace / "rich-docx-input.json").write_text(json.dumps(payload, ensure_ascii=False), encoding="utf-8")
         process = files.spawn(Path(sys.executable), (str(WORKER),), capture=False)
         try:
@@ -68,7 +74,7 @@ class RichDocxRenderer:
             except (OSError, ValueError, KeyError, TypeError):
                 error = "RICH_RENDER_FAILED"
             allowed = {"RICH_EXPORT_UNSUPPORTED", "RICH_TEMPLATE_MISMATCH", "RICH_TEMPLATE_ASSET_MISMATCH",
-                "RICH_TEMPLATE_UNAVAILABLE", "RENDER_OUTPUT_LIMIT", "RENDERER_MISMATCH"}
+                "RICH_TEMPLATE_UNAVAILABLE", "RENDER_OUTPUT_LIMIT", "RENDERER_MISMATCH", "RICH_IMAGE_MISSING", "RICH_TABLE_INVALID"}
             raise RenderFailure(error if error in allowed else "RICH_RENDER_FAILED")
         result = workspace / "resume.docx"
         try:

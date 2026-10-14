@@ -77,3 +77,15 @@ def test_rich_image_failed_conversion_or_capacity_releases_its_reservation():
     assert ledger.references.live == ("old",) and ledger.references.history == ()
     assert ledger.reservations["publication"].status == "failed"
     ledger.reserve("remaining", "action-3", 10 * MIB, 10 * MIB)
+
+
+def test_rich_full_byte_budget_can_probe_a_duplicate_without_evicting_undo_bytes():
+    old = asset("old", 20 * MIB, "a")
+    ledger = ImageRetention(OWNER, [old], ImageReferences(live=("old",), history=("old",)))
+    ledger.reserve("duplicate", "action", MIB, 0, replacement=True)
+    assert ledger.publish("duplicate", old, OWNER, "old") == "published"
+    assert ledger.assets == [old] and ledger.references.live == ("old",)
+    ledger.reserve("different", "action-2", MIB, 0, replacement=True)
+    with pytest.raises(ValueError, match="retained image byte"):
+        ledger.publish("different", asset("new", MIB, "b"), OWNER, "old")
+    assert ledger.assets == [old] and ledger.references.live == ("old",)

@@ -253,7 +253,17 @@ def main() -> int:
             if payload["rendererSha256"] != rich_renderer_sha256():
                 raise RenderFailure("RENDERER_MISMATCH")
             document = RichDocumentV1.model_validate(payload["document"])
-            content = render_rich_docx(document)
+            import hashlib
+            import re
+            images = {}
+            for identifier, checksum in payload.get("images", {}).items():
+                if not isinstance(checksum, str) or not re.fullmatch(r"[0-9a-f]{64}", checksum):
+                    raise RenderFailure("RICH_IMAGE_MISSING")
+                data = (workspace / (checksum + ".image")).read_bytes()
+                if len(data) > 20 * 1024 * 1024 or hashlib.sha256(data).hexdigest() != checksum:
+                    raise RenderFailure("RICH_IMAGE_MISSING")
+                images[identifier] = data
+            content = render_rich_docx(document, images)
             if len(content) > MAX_RICH_DOCX:
                 raise RenderFailure("RENDER_OUTPUT_LIMIT")
             (workspace / "resume.docx").write_bytes(content)

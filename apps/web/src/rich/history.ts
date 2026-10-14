@@ -30,6 +30,9 @@ export class SessionHistory {
   get position(): number { return this.cursor; }
   get length(): number { return this.actions.length; }
   get currentActionId(): string | null { return this.actions[this.cursor - 1]?.id ?? null; }
+  retainedValues(): CellValue[] {
+    return [...this.cells.values(), ...this.actions.flatMap(action => action.changes.flatMap(change => [change.before, change.after]))];
+  }
 
   private valid(changes: readonly CellChange[]): boolean {
     return !this.closed && new Set(changes.map(change => change.key)).size === changes.length
