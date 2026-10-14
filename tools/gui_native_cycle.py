@@ -43,6 +43,16 @@ def verified_bytes(path: Path, sha256: str) -> bytes:
     return content
 
 
+def optional_portable(path: Path | None, sha256: str | None) -> bytes | None:
+    if path is None and sha256 is None:
+        return None
+    if path is None or sha256 is None:
+        raise ValueError("CYCLE_PORTABLE_CONFIG")
+    if private_path(path, directory=False).stat().st_size > 64 * 1024 * 1024:
+        raise ValueError("CYCLE_PORTABLE_LIMIT")
+    return verified_bytes(path, sha256)
+
+
 def select_store(root: Path, rules_path: Path, rules_sha256: str, model: str,
                  profile: Path, *, reuse: bool) -> Path:
     root = Path(os.path.abspath(root))
@@ -85,6 +95,7 @@ async def serve(args: argparse.Namespace) -> None:
     from resume_api.providers.codex_cli import CodexCliProvider
 
     source = verified_bytes(args.source, args.source_sha256)
+    portable = optional_portable(args.portable, args.portable_sha256)
     store = select_store(args.store, args.rules, args.rules_sha256, args.model, args.profile,
                          reuse=args.reuse_store)
     evidence = private_path(args.evidence, directory=True)
@@ -150,6 +161,13 @@ async def serve(args: argparse.Namespace) -> None:
 
         route = app.app.router.routes.pop()
         app.app.router.routes.insert(0, route)
+        if portable is not None:
+            @app.app.get("/v1/operator/portable")
+            async def portable_source():
+                return Response(portable, media_type="application/zip", headers={"Cache-Control": "no-store"})
+
+            route = app.app.router.routes.pop()
+            app.app.router.routes.insert(0, route)
         server = uvicorn.Server(uvicorn.Config(app, host="127.0.0.1", access_log=False, server_header=False,
                                              log_level="critical", timeout_graceful_shutdown=2))
         task = asyncio.create_task(server.serve(sockets=[listener]))
@@ -172,6 +190,8 @@ def main() -> None:
         parser.add_argument("--" + key, type=Path, required=True)
     for key in ("source-sha256", "rules-sha256", "model"):
         parser.add_argument("--" + key, required=True)
+    parser.add_argument("--portable", type=Path)
+    parser.add_argument("--portable-sha256")
     parser.add_argument("--mime", choices=("application/pdf",), required=True)
     parser.add_argument("--reuse-store", action="store_true")
     asyncio.run(serve(parser.parse_args()))

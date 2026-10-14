@@ -6,7 +6,7 @@ import pytest
 
 from packages.resume_core.rules import RulesStore
 from packages.resume_core.preferences import PreferencesStore
-from tools.gui_native_cycle import MARKER, select_store, verified_bytes
+from tools.gui_native_cycle import MARKER, select_store, verified_bytes, optional_portable
 
 
 @pytest.fixture
@@ -65,3 +65,23 @@ def test_normal_store_cannot_be_selected_through_a_parent_alias(inputs):
     for root in (normal, normal.parent / 'alias/../FoldCV', normal / 'test'):
         with pytest.raises(ValueError, match='CYCLE_NORMAL_STORE_DENIED'):
             select_store(root, rules, digest, 'selected', profile, reuse=False)
+
+
+def test_portable_operator_input_requires_both_path_and_verified_hash(inputs):
+    from hashlib import sha256
+    parent, *_ = inputs
+    archive = parent / "downloaded-project.foldcv"
+    archive.write_bytes(b"retained portable download")
+    archive.chmod(0o600)
+    digest = sha256(archive.read_bytes()).hexdigest()
+    assert optional_portable(None, None) is None
+    for path, value in [(archive, None), (None, digest)]:
+        with pytest.raises(ValueError, match="CYCLE_PORTABLE_CONFIG"):
+            optional_portable(path, value)
+    assert optional_portable(archive, digest) == archive.read_bytes()
+    with pytest.raises(ValueError, match="CYCLE_HASH_MISMATCH"):
+        optional_portable(archive, "0" * 64)
+    alias = parent / "alias.foldcv"
+    alias.symlink_to(archive)
+    with pytest.raises(ValueError, match="CYCLE_UNSAFE_PATH"):
+        optional_portable(alias, digest)
