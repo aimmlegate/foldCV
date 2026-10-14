@@ -52,7 +52,7 @@ class ImmutableFactEvidence(Wire):
 
 class RichOperation(Wire):
     id: Id
-    kind: Literal["extract", "normalize_semantics", "draft_prose", "render", "project_save", "rewrite_prose", "reconcile_edits"]
+    kind: Literal["extract", "assess_resume", "normalize_semantics", "draft_prose", "render", "project_save", "rewrite_prose", "reconcile_edits"]
     status: Literal["queued", "running", "completed", "failed", "cancelled", "interrupted"]
     action_id: Id | None
     dependencies: list[DependencyStamp]

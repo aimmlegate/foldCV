@@ -11,7 +11,7 @@ from .rich_presentation import RichPresentation
 class RichGenerationState(Wire):
     id: Id
     status: Literal["queued", "running", "completed", "failed", "cancelled", "interrupted"]
-    stage: Literal["normalize_semantics", "draft_prose", "assemble", "render"]
+    stage: Literal["assess_resume", "normalize_semantics", "draft_prose", "assemble", "render"]
     error_code: Id | None
 
 

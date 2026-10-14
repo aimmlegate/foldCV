@@ -1,0 +1,41 @@
+.rich-shell { padding-left: 272px; min-height: 100vh; }
+.rich-shell[hidden] { display: none; }
+.rich-main { min-width: 0; }
+.rich-main .next-header { flex-wrap: wrap; padding: 1rem 1.5rem; }
+.rich-main .next-actions { flex-wrap: wrap; }
+.rich-main > .next-warning { margin: 12px 24px; }
+.rich-main .rich-workspace { overflow-x: auto; }
+.rich-resume-sidebar { position: fixed; inset: 0 auto 0 0; box-sizing: border-box; width: 272px; display: flex; flex-direction: column; gap: 20px; padding: 20px 16px; border-right: 1px solid var(--outline); background: var(--panel); }
+.rich-resume-list { flex: 1; min-height: 0; overflow-y: auto; overflow-wrap: anywhere; }
+.rich-resume-list h2 { font-size: 1rem; font-weight: 500; }
+.rich-project-row { padding: 12px 0; border-bottom: 1px solid var(--outline); }
+.rich-project-title { display: block; width: 100%; text-align: left; overflow-wrap: anywhere; }
+.rich-project-title[aria-current="page"] { color: var(--accent); background: var(--soft); }
+.rich-project-actions { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 6px; }
+.rich-project-actions button { padding: 4px 6px; font-size: 11px; }
+.rich-project-row form { display: grid; gap: 6px; margin-top: 8px; }
+.rich-project-row input { width: 100%; box-sizing: border-box; padding: 6px; color: var(--content); background: var(--surface); border: 1px solid var(--outline); }
+.rich-sidebar-tools { display: grid; gap: 12px; font-size: 13px; }
+.rich-sidebar-tools input { display: block; width: 100%; margin-top: 6px; font: inherit; }
+.rich-new-resume { max-width: 660px; margin: 3rem auto; padding: 0 24px; }
+.rich-new-resume h1 { font-size: 2rem; font-weight: 500; }
+.rich-new-resume .next-paste-label { margin-top: 20px; }
+.rich-new-resume .next-create { margin-top: 16px; }
+.next-settings { box-sizing: border-box; max-width: 1120px; }
+.next-settings-layout { display: grid; grid-template-columns: 220px minmax(0, 1fr); gap: 32px; }
+.next-settings-nav { display: flex; flex-direction: column; align-items: stretch; gap: 8px; padding-right: 24px; border-right: 1px solid var(--outline); }
+.next-settings-nav button { text-align: left; }
+.next-settings-nav button[aria-current="page"] { color: var(--accent); background: var(--soft); }
+.next-settings-content { min-width: 0; }
+.next-settings-content .next-rules { margin-top: 0; border-top: 0; }
+.next-settings-content textarea { box-sizing: border-box; }
+.next-settings-content select { padding: .6rem; border: 1px solid var(--outline); background: var(--surface); color: var(--content); }
+.next-settings-content section[hidden], .next-settings-content div[hidden] { display: none; }
+@media (max-width: 760px) {
+  .rich-shell { padding-left: 220px; }
+  .rich-resume-sidebar { width: 220px; padding: 16px 12px; }
+  .rich-new-resume { padding: 0 16px; margin-block: 2rem; }
+  .rich-main .next-header { padding: 1rem; }
+  .next-settings-layout { grid-template-columns: 160px minmax(0, 1fr); gap: 16px; }
+  .next-settings-nav { padding-right: 12px; }
+}

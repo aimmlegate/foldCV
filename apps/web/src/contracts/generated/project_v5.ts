@@ -514,7 +514,14 @@ export type Dependencies = DependencyStamp[];
 export type Errorcode = string | null;
 export type Id35 = string;
 export type Kind17 =
-  "extract" | "normalize_semantics" | "draft_prose" | "render" | "project_save" | "rewrite_prose" | "reconcile_edits";
+  | "extract"
+  | "assess_resume"
+  | "normalize_semantics"
+  | "draft_prose"
+  | "render"
+  | "project_save"
+  | "rewrite_prose"
+  | "reconcile_edits";
 export type Status6 = "queued" | "running" | "completed" | "failed" | "cancelled" | "interrupted";
 export type Operations = RichOperation[];
 export type Projectid = string;

@@ -34,7 +34,7 @@ def date_field(text):
     return result
 
 
-def assemble_rich(workspace, normalized, draft, rules):
+def assemble_facts(normalized, details):
     records, evidence_records = [], []
     source_units = {(s.id, u.id): u for s in normalized.sources for u in s.units}
     evidence_by_fact = {}
@@ -55,15 +55,13 @@ def assemble_rich(workspace, normalized, draft, rules):
     def spans_for(authored):
         return [span for fact_id in authored.fact_ids for span in evidence_by_fact.get(fact_id, [])]
 
-    candidate = draft.document.candidate
     record("candidate", "candidate", [s.model_dump(by_alias=True) for part in (
         normalized.candidate.name, normalized.candidate.title, normalized.candidate.location) for s in part.evidence],
         name=field(normalized.candidate.name.text), title=field(normalized.candidate.title.text), location=field(normalized.candidate.location.text))
-    for index, detail in enumerate(candidate.details):
+    for index, detail in enumerate(details):
         detected = next((item.kind for item in normalized.private_details if item.value.text == detail.text), "other")
         record("detail", detail.field_id, spans_for(detail), detailType={"platform_metadata": "metadata"}.get(detected, detected),
             label="", value=field(detail.text))
-    jobs = {job.id: job for job in normalized.employment}
     for job in normalized.employment:
         periods = []
         for period in normalized.job_periods.get(job.id, []):
@@ -110,6 +108,22 @@ def assemble_rich(workspace, normalized, draft, rules):
         elif fact.kind not in {"employment", "candidate_detail", "name_assessment", "source_observation"}:
             record("unresolved", fact.id, evidence_by_fact[fact.id], category="other", status="unresolved")
             mapped_fact_ids.add(fact.id)
+
+    return records, evidence_records, evidence_by_fact, aliases, mapped_fact_ids
+
+
+def assemble_rich(workspace, normalized, draft, rules):
+    candidate = draft.document.candidate
+    records, evidence_records, evidence_by_fact, aliases, mapped_fact_ids = assemble_facts(normalized, candidate.details)
+    jobs = {job.id: job for job in normalized.employment}
+
+    def record(kind, identifier, evidence, **values):
+        item = {"id": identifier, "kind": kind, "revision": 1, "origin": "source", "evidence": evidence, **values}
+        records.append(item)
+        return item
+
+    def spans_for(authored):
+        return [span for fact_id in authored.fact_ids for span in evidence_by_fact.get(fact_id, [])]
 
     def inline(authored, owner=None, key=None):
         if owner is not None and key is not None:

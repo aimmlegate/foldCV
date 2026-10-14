@@ -194,7 +194,7 @@ def test_image_animation_format_and_normalized_dimensions_are_checked_before_pub
 
 @pytest.mark.asyncio
 async def test_fresh_rich_creation_initial_docx_restart_and_portable_without_inference(tmp_path):
-    provider = CreationProvider()
+    provider = CreationProvider(fail_kind="GuiDraftProposal")
     service = RichProjectService(tmp_path / "operations", RulesStore(tmp_path / "store"), lambda: (provider, "fixture"), clock=frozen_now)
     data = Path("tests/fixtures/recovery/E1.txt").read_bytes()
     selected = await service.select(data, "pasted.txt", True)
@@ -205,6 +205,13 @@ async def test_fresh_rich_creation_initial_docx_restart_and_portable_without_inf
     workspace = service.read(identifier)
     assert workspace.schema_version == 6 and workspace.project.schema_version == 5 and len(provider.calls) == 2
     assert service.durability(identifier) == "durable" and workspace.project.renders
+    from packages.resume_core.rich_presentation import authored_text
+    units = workspace.project.sources[0].units
+    assert [authored_text(block) for block in workspace.project.document.regions[2].blocks] == [unit.text for unit in units]
+    assert "".join(authored_text(block) for block in workspace.project.document.regions[2].blocks) == data.decode()
+    assert any(record.kind == "employment" for record in workspace.project.facts.records)
+    assert {operation.kind for operation in workspace.project.operations} == {"assess_resume", "normalize_semantics", "render"}
+    assert service.originals[(identifier, workspace.project.sources[0].id)] == data
     snapshot, docx = await service.export(identifier)
     with ZipFile(BytesIO(docx)) as archive:
         xml = archive.read("word/document.xml").decode()
@@ -238,21 +245,22 @@ async def test_technical_render_failure_keeps_imported_rich_content_but_cannot_c
     assert state.status == "failed" and state.error_code == "RENDER_OUTPUT_LIMIT"
     workspace = service.read(identifier)
     assert workspace.project is not None and workspace.project.renders == []
-    assert workspace.project.document.regions[0].blocks and service.durability(identifier) == "durable"
+    assert workspace.project.document.regions[2].blocks and service.durability(identifier) == "durable"
     assert len(provider.calls) == 2
 
 
 @pytest.mark.asyncio
 async def test_valid_empty_native_result_keeps_unresolved_source_editable_warned_and_portable(tmp_path):
     from packages.resume_core.gui_normalization import GuiSemanticProposal
-    from packages.resume_core.gui_drafting import GuiDraftProposal
     from resume_api.providers.content import ContentResult, ReportedUsage
-    from tests.recovery.draft_fixtures import draft_reply, draft_request
     from tests.recovery.employment_fixtures import employment_proposal
     from tests.recovery.candidate_fixtures import request as captured_source
 
     class EmptyProvider:
         def generate(self, request, _files, _cancel):
+            from packages.resume_core.resume_assessment import ResumeAssessment
+            if request.result_type is ResumeAssessment:
+                return ContentResult(ResumeAssessment(verdict="likely"), ReportedUsage(), "fixture", request.policy.model, .01, 1)
             if request.result_type is GuiSemanticProposal:
                 raw = employment_proposal(captured_source(data.decode())).model_dump(by_alias=True)
                 for key in ("jobs", "facts", "units", "education", "certifications", "languages", "privateDetails"):
@@ -262,9 +270,7 @@ async def test_valid_empty_native_result_keeps_unresolved_source_editable_warned
                 raw["observationAssessment"] = {"revision": 1, "sourceObservedAt": None, "evidence": None}
                 result = GuiSemanticProposal.model_validate(raw)
             else:
-                result = draft_reply(draft_request())
-                result.fields = [result.fields[0].model_copy(update={"text": "Generic profile", "fact_ids": []})]
-                result.editorial_plan.jobs = []; result.editorial_plan.focus = []
+                raise AssertionError("Import must not request generated prose")
             return ContentResult(result, ReportedUsage(), "fixture", request.policy.model, .01, 1)
 
     data = Path("tests/fixtures/recovery/E1.txt").read_bytes()
@@ -275,10 +281,10 @@ async def test_valid_empty_native_result_keeps_unresolved_source_editable_warned
     workspace = service.read(selected.project_id)
     assert "source_details_unresolved" in {warning.code for warning in workspace.warnings}
     assert not any(record.kind == "employment" for record in workspace.project.facts.records)
-    unresolved = next(block for block in workspace.project.document.regions[2].blocks if block.id == "unresolved-source")
+    literal = workspace.project.document.regions[2].blocks
     units = workspace.project.sources[0].units
-    assert [block.content[0].text for block in unresolved.children] == [unit.text for unit in units if unit.text.strip()]
-    assert all(block.provenance[0].evidence[0].text == block.content[0].text for block in unresolved.children)
+    assert [block.content[0].text for block in literal] == [unit.text for unit in units]
+    assert all(block.provenance[0].evidence[0].text == block.content[0].text for block in literal)
     reopened = RichProjectService(tmp_path / "operations-2", RulesStore(tmp_path / "store"), lambda: None, clock=frozen_now)
     assert reopened.read(selected.project_id) == workspace
     imported, *_ = open_rich_archive(reopened.portable(selected.project_id), "empty-import")

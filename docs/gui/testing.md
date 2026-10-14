@@ -1,5 +1,15 @@
 # Test strategy
 
+D082/D083 flow checks: full fast 1399 Python plus type/lint/contracts/map/build;
+separate Node state 154; render integration 176. T3 proves left history, settings,
+file/paste import, advisory negative assessment, unchanged source text, restart and
+opening the exact downloaded portable project without inference. See
+[the flow evidence](handoffs/FLOW-UI.md). No browser scenarios or new native
+streak ran; historical NE evidence stays tied to its retained revision and manual
+Word remains pending.
+
+The following NE11 result describes its original behavior revision:
+
 NE11 nonmanual gates pass on behavior revision `0dded31`: full fast 1381, shared
 render integration 176 and final T3 rich/panel/timeline/history/rewrite/table/image
 checks. Fresh actual CLI attempts 5/6/7 pass downloads, source coverage and owned

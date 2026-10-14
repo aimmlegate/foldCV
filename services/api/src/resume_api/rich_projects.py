@@ -7,14 +7,14 @@ from pydantic import ValidationError
 
 from packages.resume_core.dates import partial_date
 from packages.resume_core.gui_archive_zip import ArchiveFailure
-from packages.resume_core.gui_drafting import GuiDraftRequest
 from packages.resume_core.gui_normalization import GuiNormalizeRequest, canonical_source
 from packages.resume_core.models.contracts import Source
 from packages.resume_core.models.rich_workspace import RichOperation, RichRenderSnapshot, RichWarning, WorkspaceV6
 from packages.resume_core.project_store import ProjectStoreFailure
 from packages.resume_core.rich_api import RichGenerationState, RichProjectResponse
 from packages.resume_core.rich_archive import archive_payload, export_rich_archive, open_rich_archive
-from packages.resume_core.rich_assembly import assemble_rich, identity
+from packages.resume_core.rich_assembly import identity
+from packages.resume_core.rich_import import assemble_import
 from packages.resume_core.gui_annotations import unresolved_source_units
 from packages.resume_core.rich_mutations import RichMutationFailure, apply_rich_mutation
 from packages.resume_core.rich_project_store import RichProjectStore
@@ -24,7 +24,6 @@ from packages.resume_core.rendering.template import RenderFailure
 from packages.resume_core.rules import RulesFailure
 from .extracting import UploadFailure, run_extract
 from .gui_admission import AdmissionCancelled, QueuedProvider
-from .gui_drafting_content import GuiDraftingContentService
 from .gui_normalization_content import GuiNormalizationContentService
 from .gui_projects import GuiProjectService, ProjectFailure, digest
 from .gui_rendering import RichDocxRenderer
@@ -32,6 +31,7 @@ from .lifecycle import OperationFiles, SpikeError
 from .providers.content import ContentFailure
 from .rich_assets import RichAssets
 from .rich_synchronization import RichSynchronization
+from .resume_assessment_content import ResumeAssessmentContentService
 
 
 class RichProjectService(RichSynchronization, RichAssets, GuiProjectService):
@@ -172,7 +172,7 @@ class RichProjectService(RichSynchronization, RichAssets, GuiProjectService):
             rules = self.rules.load()
         except RulesFailure as error:
             raise ProjectFailure(error.code, 503) from None
-        generation = RichGenerationState(id=identity("generation"), status="queued", stage="normalize_semantics", errorCode=None)
+        generation = RichGenerationState(id=identity("generation"), status="queued", stage="assess_resume", errorCode=None)
         self.generations[identifier] = generation
         key = (identifier, generation.id)
         self.cancels[key] = threading.Event()
@@ -200,8 +200,8 @@ class RichProjectService(RichSynchronization, RichAssets, GuiProjectService):
                 operation.status = "running"
                 if self.persist(identifier) == "failed":
                     raise ProjectFailure("PROJECT_SAVE_FAILED", 503)
-        service = (GuiNormalizationContentService if generation.stage == "normalize_semantics" else GuiDraftingContentService)(
-            QueuedProvider(selected[0], admitted), selected[1])
+        service_type = ResumeAssessmentContentService if generation.stage == "assess_resume" else GuiNormalizationContentService
+        service = service_type(QueuedProvider(selected[0], admitted), selected[1])
         files = OperationFiles(self.temp_root)
         self.files[key] = files
         def run():
@@ -229,23 +229,28 @@ class RichProjectService(RichSynchronization, RichAssets, GuiProjectService):
         generation.status = "running"
         workspace = self.workspaces[identifier]
         try:
-            normalized = await self.content(identifier, generation, GuiNormalizeRequest(sources=sources,
-                formattingAsOf=workspace.formatting_as_of, revision=workspace.project_revision), rules, selected)
-            generation.stage = "draft_prose"
-            draft = await self.content(identifier, generation, GuiDraftRequest(projectId=identifier,
-                projectRevision=workspace.project_revision, documentRevision=workspace.document_revision,
-                normalized=normalized, formattingAsOf=workspace.formatting_as_of), rules, selected)
+            request = GuiNormalizeRequest(sources=sources, formattingAsOf=workspace.formatting_as_of, revision=workspace.project_revision)
+            assessment = await self.content(identifier, generation, request, rules, selected)
+            codes = {"unlikely": "source_not_resume", "uncertain": "source_resume_uncertain"}
+            if assessment.verdict in codes:
+                code = codes[assessment.verdict]
+                if not any(warning.code == code for warning in workspace.warnings):
+                    workspace.warnings.append(RichWarning(id=identity("warning"), code=code, blockIds=[], recordIds=[], evidence=[]))
+                if self.persist(identifier) == "failed":
+                    raise ProjectFailure("PROJECT_SAVE_FAILED", 503)
+            generation.stage = "normalize_semantics"
+            normalized = await self.content(identifier, generation, request, rules, selected)
             if self.cancels[(identifier, generation.id)].is_set():
                 raise AdmissionCancelled()
             generation.stage = "assemble"
-            project = assemble_rich(workspace, normalized, draft, rules)
+            project = assemble_import(workspace, normalized)
             workspace.project, workspace.pre_draft = project, None
             workspace.project_revision, workspace.document_revision = project.revision, project.document.revision
             workspace.rules_used, workspace.source_observed_at = rules, normalized.source_observed_at
             if not workspace.title_manually_set:
-                workspace.title = draft.document.candidate.name.text or workspace.title
+                workspace.title = normalized.candidate.name.text or workspace.title
             unresolved = ["source_details_unresolved"] if normalized._native_recovery_count or unresolved_source_units(normalized) else []
-            for code in dict.fromkeys([*[code for source in normalized.sources for code in source.warnings], *[a.code for a in draft.annotations], *unresolved]):
+            for code in dict.fromkeys([*[code for source in normalized.sources for code in source.warnings], *unresolved]):
                 workspace.warnings.append(RichWarning(id=identity("warning"), code=code, blockIds=[], recordIds=[], evidence=[]))
             if self.persist(identifier) == "failed":
                 raise ProjectFailure("PROJECT_SAVE_FAILED", 503)

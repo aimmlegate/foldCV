@@ -1,5 +1,10 @@
 # Resume editor architecture
 
+> D082/D083 import path: fixed left resume history, explicit new-resume processing,
+> advisory model assessment, then fact extraction and the original text in the
+> editor. No initial prose rewrite. Settings use a separate screen with left
+> section navigation. See [the current scope](handoffs/FLOW-UI.md).
+
 > D039: MVP exports DOCX only through the existing Python writer. PDF export and
 > paginated preview are deferred; the new flow must work without LibreOffice.
 > Portable project save/open and PDF source import remain supported.

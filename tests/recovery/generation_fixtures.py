@@ -11,6 +11,7 @@ from packages.resume_core.gui_employment import normalize_employment
 from packages.resume_core.gui_derived import initial_derived
 from packages.resume_core.rich_sync import RichRewriteProposal, RichReconcileProposal
 from packages.resume_core.rich_panel import RichPanelProposal
+from packages.resume_core.resume_assessment import ResumeAssessment
 from packages.resume_core.models.recovery import WorkspaceV5, record_slot
 from packages.resume_core.rules import captured_rules
 from resume_api.providers.content import ContentResult, ContentFailure, ReportedUsage
@@ -24,17 +25,21 @@ def frozen_now():
 
 
 class CreationProvider:
-    def __init__(self, example="E1", fail_kind=None, remove_focus=False):
+    def __init__(self, example="E1", fail_kind=None, remove_focus=False, assessment="likely"):
         self.example, self.fail_kind = example, fail_kind
         self.remove_focus = remove_focus
         self.calls = []
         self.normalized = None
+        self.assessment = assessment
 
     def generate_queued(self, request, files, cancel, admitted):
         admitted()
         return self.generate(request, files, cancel)
 
     def generate(self, request, _files, _cancel):
+        if request.result_type is ResumeAssessment:
+            self.calls.append({"task": "assess_resume"})
+            return ContentResult(ResumeAssessment(verdict=self.assessment), ReportedUsage(), "fixture", request.policy.model, .01, 1)
         payload = json.loads(request.text)
         self.calls.append(payload)
         assert request.policy.allow_repair is False

@@ -1,7 +1,7 @@
 export type Durability = "pending" | "durable" | "failed";
 export type Errorcode = string | null;
 export type Id = string;
-export type Stage = "normalize_semantics" | "draft_prose" | "assemble" | "render";
+export type Stage = "assess_resume" | "normalize_semantics" | "draft_prose" | "assemble" | "render";
 export type Status = "queued" | "running" | "completed" | "failed" | "cancelled" | "interrupted";
 export type Logo = string | null;
 export type Role =
@@ -192,7 +192,14 @@ export type Dependencies = DependencyStamp[];
 export type Errorcode1 = string | null;
 export type Id15 = string;
 export type Kind13 =
-  "extract" | "normalize_semantics" | "draft_prose" | "render" | "project_save" | "rewrite_prose" | "reconcile_edits";
+  | "extract"
+  | "assess_resume"
+  | "normalize_semantics"
+  | "draft_prose"
+  | "render"
+  | "project_save"
+  | "rewrite_prose"
+  | "reconcile_edits";
 export type Status7 = "queued" | "running" | "completed" | "failed" | "cancelled" | "interrupted";
 export type Operations = RichOperation[];
 export type Selectedinput = "text" | "file";

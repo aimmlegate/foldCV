@@ -178,10 +178,11 @@ def test_gui_creation_waits_past_thirty_seconds_but_keeps_bounded_deadline(fake,
     from tests.recovery.draft_fixtures import RULES, draft_request, draft_reply
 
     if operation == "normalize":
-        from resume_api.gui_normalization_transport import NormalizationTransport
+        from packages.resume_core.gui_normalization import normalization_input
+        from resume_api.gui_native_transport import NativeNormalizationTransport
         content_request = normalize_request((ROOT / "E1.txt").read_text())
         reply = proposal(content_request)
-        prompt = NormalizationTransport(content_request).prompt(RULES)
+        prompt = NativeNormalizationTransport(content_request, RULES).encode(normalization_input(content_request, RULES))
         service_type = GuiNormalizationContentService
     else:
         from resume_api.gui_drafting_transport import DraftingTransport

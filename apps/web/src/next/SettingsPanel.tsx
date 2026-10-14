@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { ConnectionWorkflow, type ConnectionState, type ConnectionView } from "../connection/workflow";
 import type { Preferences } from "../contracts/generated/preferences";
 import { preferencesRequest } from "./api";
@@ -19,7 +19,9 @@ const messages: Record<ConnectionState, string> = {
   cleanup_blocked: "Не удалось подтвердить остановку процесса. Проверьте CLI и перезапустите приложение.",
 };
 
-export function SettingsPanel({ close, analysisChanged }: { close: () => void; analysisChanged: (enabled: boolean) => void }) {
+type SettingsSection = "model" | "rules" | "analysis" | "appearance";
+export function SettingsPanel({ close, analysisChanged, appearance }: { close: () => void; analysisChanged: (enabled: boolean) => void; appearance?: ReactNode }) {
+  const [section, setSection] = useState<SettingsSection>("model");
   const [view, setView] = useState<ConnectionView>(() => new ConnectionWorkflow(() => {}).view);
   const [preferences, setPreferences] = useState<Preferences | null>(null);
   const [preferenceError, setPreferenceError] = useState(false);
@@ -45,7 +47,15 @@ export function SettingsPanel({ close, analysisChanged }: { close: () => void; a
   }, [workflow]);
   return <section className="next-settings" aria-label="Настройки">
     <button onClick={close}>Вернуться</button><h1>Настройки</h1>
-    <section aria-label="Подключение модели">
+    <div className="next-settings-layout">
+    <nav className="next-settings-nav" aria-label="Разделы настроек">
+      <button aria-current={section === "model" ? "page" : undefined} onClick={() => setSection("model")}>Модель и подключение</button>
+      <button aria-current={section === "rules" ? "page" : undefined} onClick={() => setSection("rules")}>Общие правила и пресеты</button>
+      <button aria-current={section === "analysis" ? "page" : undefined} onClick={() => setSection("analysis")}>Проверка изменений</button>
+      {appearance && <button aria-current={section === "appearance" ? "page" : undefined} onClick={() => setSection("appearance")}>Внешний вид</button>}
+    </nav>
+    <div className="next-settings-content">
+    <section aria-label="Подключение модели" hidden={section !== "model"}>
       <h2>Модель и подключение</h2>
       <p role="status">{view.detaching ? "Останавливаем операцию FoldCV…" : messages[snapshot.state]}</p>
       {snapshot.version && <p>Версия CLI: {snapshot.version}</p>}
@@ -78,11 +88,13 @@ export function SettingsPanel({ close, analysisChanged }: { close: () => void; a
       {preferences?.selectedModel && <p>Сохранённый выбор: {preferences.selectedModel}. Доступ подтверждается проверкой подключения.</p>}
       {preferenceError && <p role="alert" className="text-danger">Не удалось прочитать или сохранить настройки. Повторите действие.</p>}
     </section>
-    <section aria-label="Проверка изменений"><h2>Проверка изменений</h2>
+    <section aria-label="Проверка изменений" hidden={section !== "analysis"}><h2>Проверка изменений</h2>
       <label><input type="checkbox" checked={preferences?.automaticAnalysis ?? true} disabled={!preferences || savingAnalysis}
         onChange={event => { void changeAnalysis(event.target.checked); }} /> Автоматически проверять изменения</label>
       <p>Проверяем завершённые правки. Остальные упоминания меняются только по вашему действию.</p>
     </section>
-    <RulesPanel />
+    <div hidden={section !== "rules"}><RulesPanel /></div>
+    {appearance && <section aria-label="Внешний вид" hidden={section !== "appearance"}><h2>Внешний вид</h2>{appearance}</section>}
+    </div></div>
   </section>;
 }

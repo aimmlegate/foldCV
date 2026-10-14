@@ -3410,6 +3410,7 @@
         },
         "stage": {
           "enum": [
+            "assess_resume",
             "normalize_semantics",
             "draft_prose",
             "assemble",
@@ -3509,6 +3510,7 @@
         "kind": {
           "enum": [
             "extract",
+            "assess_resume",
             "normalize_semantics",
             "draft_prose",
             "render",
