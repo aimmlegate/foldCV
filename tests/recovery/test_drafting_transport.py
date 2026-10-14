@@ -64,7 +64,7 @@ def test_short_draft_references_round_trip_to_the_same_validated_document(exampl
 @pytest.mark.parametrize("kind,code", [("field", "INVALID_DRAFT_FIELD_REFERENCE"),
     ("structured", "DRAFT_STRUCTURED_FIELD"), ("fact", "INVALID_DRAFT_FIELD_REFERENCE"),
     ("job", "INVALID_EDITORIAL_PLAN_CONTEXT")])
-def test_draft_transport_does_not_drop_or_heal_invalid_references(kind, code):
+def test_draft_transport_keeps_invalid_content_for_nonblocking_assembly(kind, code):
     request = draft_request()
     raw = draft_reply(request).model_dump(by_alias=True)
     if kind == "field": raw["fields"][0]["fieldId"] = "unknown-field"
@@ -72,13 +72,11 @@ def test_draft_transport_does_not_drop_or_heal_invalid_references(kind, code):
     if kind == "fact": raw["fields"][0]["factIds"] = ["unknown-fact"]
     if kind == "job": raw["editorialPlan"]["jobs"][0]["jobId"] = "unknown-job"
     reply = DraftingTransport(request).restore(GuiDraftProposal.model_validate(raw))
-    with pytest.raises(DraftFailure) as error:
-        validate_draft(request, reply, RULES)
-    if kind == "structured":
-        assert error.value.code in {"DRAFT_STRUCTURED_FIELD", "INCOMPLETE_DRAFT_FIELDS"}
-        assert reply.fields[0].field_id == "candidate/name"
-    else:
-        assert error.value.code == code
+    result = validate_draft(request, reply, RULES)
+    assert code in {mark.code for mark in result.annotations}
+    assert result.document.candidate.name.text == request.normalized.candidate.name.text
+    assert {job.job_id for job in result.editorial_plan.jobs} == {job.id for job in request.normalized.employment}
+    assert "unknown-fact" not in result.document.profile.text.fact_ids
 
 
 def test_job_field_choices_keep_global_and_other_job_claims_out_without_filtering_context():
@@ -104,6 +102,9 @@ def test_job_field_choices_keep_global_and_other_job_claims_out_without_filterin
     reply = draft_reply(request)
     target = next(field for field in reply.fields if field.field_id == f'job:{first.id}/stack')
     target.fact_ids, target.text = ['global-claim'], 'General claim'
-    with pytest.raises(DraftFailure, match='DRAFT_FACT_OUTSIDE_JOB'):
-        validate_draft(request, reply, RULES)
+    result = validate_draft(request, reply, RULES)
+    stack = next(job for job in result.document.jobs if job.id == first.id).stack
+    assert stack.text == 'General claim' and stack.fact_ids == ['global-claim']
+    warning = next(mark for mark in result.annotations if mark.code == 'DRAFT_FACT_OUTSIDE_JOB')
+    assert warning.type == 'warning' and warning.anchor.field_id == stack.field_id
     assert request.model_dump() == before

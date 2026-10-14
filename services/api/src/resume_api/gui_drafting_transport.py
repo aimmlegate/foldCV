@@ -3,10 +3,12 @@
 import json
 
 from packages.resume_core.gui_drafting import GuiDraftRequest, GuiDraftProposal
+from .gui_draft_input import DraftInput
 
 
 class DraftingTransport:
     def __init__(self, request: GuiDraftRequest):
+        self.incoming = DraftInput(request)
         jobs = [job.id for job in request.normalized.employment]
         facts = [fact.id for fact in request.normalized.facts]
         fields = ["profile/text", "skills-focus/skillsText", "early-career/text"]
@@ -20,6 +22,12 @@ class DraftingTransport:
         self.facts = {prefix + "f" + str(i): value for i, value in enumerate(facts)}
         self.fields = {prefix + "p" + str(i): value for i, value in enumerate(fields)}
         self.aliases = {value: key for mapping in (self.jobs, self.facts, self.fields) for key, value in mapping.items()}
+
+    def bind_guard(self, guard):
+        self.incoming.guard = guard
+
+    def decode(self, value):
+        return self.incoming.parse(value)
 
     def encode(self, text: str) -> str:
         payload = json.loads(text)

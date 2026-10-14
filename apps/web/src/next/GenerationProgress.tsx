@@ -7,6 +7,7 @@ export function GenerationProgress({ generation, busy, control }: { generation: 
   const running = generation.status === "queued" || generation.status === "running";
   const failed = generation.status === "failed" || generation.status === "cancelled" || generation.status === "interrupted";
   const error = generation.stages.find(stage => stage.errorCode !== null && stage.docxError === null)?.errorCode;
+  const importedWithWarning = generation.status === "completed" && generation.stages.some(stage => stage.docxError);
   const stages = generation.stages.filter(stage => stage.kind !== "render" || !generation.stages.some(item => item.kind === "assemble"))
     .map(stage => stage.kind === "assemble"
       ? { ...stage, status: generation.stages.find(item => (item.kind === "assemble" || item.kind === "render") && item.status !== "completed")?.status ?? stage.status }
@@ -15,7 +16,7 @@ export function GenerationProgress({ generation, busy, control }: { generation: 
     <p role="status">{running ? labels[generation.stages.find(stage => stage.status === "queued" || stage.status === "running")?.kind ?? "render"]
       : generation.status === "completed" ? "Резюме готово" : generation.status === "cancelled" ? "Создание отменено" : "Создание не завершено"}</p>
     <details open={running || failed}><summary>Этапы создания</summary><ol aria-label="Этапы создания">{stages.map(stage => <li key={stage.kind} data-stage={stage.kind} data-status={stage.status}>
-      <span>{labels[stage.kind]}</span><span>{statuses[stage.status]}</span>
+      <span>{labels[stage.kind]}</span><span>{importedWithWarning && stage.kind === "assemble" ? "Предупреждение" : statuses[stage.status]}</span>
     </li>)}</ol></details>
     {running && <button disabled={busy} onClick={() => control("cancel")}>Отменить создание</button>}
     {failed && <button disabled={busy} onClick={() => control("retry")}>Повторить создание</button>}

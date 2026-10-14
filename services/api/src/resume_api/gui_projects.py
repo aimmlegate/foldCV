@@ -24,7 +24,7 @@ from packages.resume_core.project_store import ProjectStoreFailure
 from packages.resume_core.rules import RulesFailure
 from packages.resume_core.models.contracts import Source, Usage
 from packages.resume_core.models.recovery import (WorkspaceV5, ProjectV4, Generation, GenerationStage,
-    GuiOperation, GuiOperationEvent, Dependencies, RenderSnapshotV4, record_slot, MutationResult, MutationReplay)
+    GuiOperation, GuiOperationEvent, Dependencies, RenderSnapshotV4, Annotation, record_slot, MutationResult, MutationReplay)
 from packages.resume_core.rendering.docx_errors import DocxFailure
 from packages.resume_core.rendering.template import PACKAGE_SHA256, renderer_sha256, RenderFailure
 from .extracting import run_extract, UploadFailure
@@ -320,7 +320,8 @@ class GuiProjectService(GuiExportMixin, GuiAnalysisMixin, GuiManagementMixin, Gu
             if "portable_project_imported" not in workspace.migration_notices:
                 workspace.formatting_as_of = partial_date(self.clock().date().isoformat())
         else:
-            if old.status not in {"failed", "cancelled", "interrupted"}:
+            if old.status not in {"failed", "cancelled", "interrupted"} and not (
+                    old.status == "completed" and old.stages[-1].status == "failed" and old.stages[-1].docx_error):
                 raise ProjectFailure("GENERATION_NOT_RETRYABLE")
             if old.stages[3].status == "completed" and old.dependencies.document_revision != workspace.document_revision:
                 raise ProjectFailure("STALE_GENERATION")
@@ -540,6 +541,7 @@ class GuiProjectService(GuiExportMixin, GuiAnalysisMixin, GuiManagementMixin, Gu
                         docx={"path": "renders/" + generation.id + "/resume.docx", "sha256": hashlib.sha256(content).hexdigest(), "size": len(content)},
                         pdf=None, artifactAvailable=True)
                     workspace.project.renders.append(snapshot)
+                    workspace.annotations = [mark for mark in workspace.annotations if mark.code != "IMPORT_DOCX_WARNING"]
                     self.artifacts[(workspace.project_id, snapshot.id)] = content
                     result = snapshot
                 stage.status = "completed"
@@ -549,12 +551,25 @@ class GuiProjectService(GuiExportMixin, GuiAnalysisMixin, GuiManagementMixin, Gu
             generation.status = "completed"
         except (ContentFailure, AdmissionCancelled, ProjectFailure, UploadFailure, RenderFailure, DocxFailure, SpikeError, asyncio.TimeoutError) as error:
             cancelled = cancel.is_set() or isinstance(error, AdmissionCancelled)
-            generation.status = "cancelled" if cancelled else "failed"
+            content_warning = (isinstance(error, DocxFailure) and error.code != "DOCX_RENDER_FAILED"
+                and workspace.project is not None and stage.kind == "render" and not cancelled)
+            if content_warning and self.dependencies(workspace, generation.source_ids, generation.rules_used) != generation.dependencies:
+                content_warning = False
+                error = ProjectFailure("STALE_GENERATION")
+            generation.status = "cancelled" if cancelled else "completed" if content_warning else "failed"
             if not (isinstance(error, ProjectFailure) and error.code == "PROJECT_SAVE_FAILED" and stage.status == "completed"):
-                stage.status = generation.status
+                stage.status = "failed" if content_warning else generation.status
             stage.error_code = "CANCELLED" if cancelled else getattr(error, "code", "OPERATION_TIMEOUT")
             if isinstance(error, DocxFailure):
                 stage.docx_error = error.error
+            if content_warning:
+                workspace.annotations = [mark for mark in workspace.annotations if mark.code != "IMPORT_DOCX_WARNING"]
+                workspace.annotations.append(Annotation(id=identity("annotation"), type="warning", code="IMPORT_DOCX_WARNING",
+                    anchor={"kind": "document"}, dependencies=generation.dependencies.model_copy(deep=True),
+                    factIds=[], reason="The resume is imported. Review its text or layout before exporting DOCX.",
+                    evidence=[], resolved=False, updateSuggestionId=None, removedFocus=[]))
+                if self.persist(workspace.project_id) == "failed":
+                    generation.status, stage.error_code = "failed", "PROJECT_SAVE_FAILED"
             if isinstance(error, SpikeError):
                 self.cleanup_error(error)
         except Exception:

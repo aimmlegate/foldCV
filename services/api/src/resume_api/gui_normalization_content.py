@@ -22,17 +22,29 @@ class GuiNormalizationContentService:
         captured = request.model_copy(deep=True)
         transport = NativeNormalizationTransport(captured, rules)
         prompt = normalization_input(captured, rules)
-        response = generate_admitted(self.provider, ContentInput(prompt, GuiSemanticProposal, self.policy, transport), files, cancel)
-        if cancel.is_set():
-            raise ContentFailure("CANCELLED", logical_attempts=response.logical_attempts, usage=response.usage)
+        recovered = False
         try:
-            proposal = GuiSemanticProposal.model_validate(response.value)
+            response = generate_admitted(self.provider, ContentInput(prompt, GuiSemanticProposal, self.policy, transport), files, cancel)
+            value, attempts, usage, count = response.value, response.logical_attempts, response.usage, response.internal_inference_count
+        except ContentFailure as error:
+            if error.code != "INVALID_RESULT" or cancel.is_set():
+                raise
+            value, attempts, usage, count = {"candidate": {}}, error.logical_attempts, error.usage, None
+            recovered = True
+        if cancel.is_set():
+            raise ContentFailure("CANCELLED", logical_attempts=attempts, usage=usage)
+        try:
+            proposal = GuiSemanticProposal.model_validate(value)
             result = normalize_candidate(captured, proposal, rules)
             result = normalize_employment(captured, proposal, result)
-            result._native_recovery_count = transport.unresolved
-        except NormalizationFailure as error:
-            raise ContentFailure(error.code, logical_attempts=response.logical_attempts, usage=response.usage) from None
-        except (ValidationError, ValueError):
-            raise ContentFailure("INVALID_RESULT", logical_attempts=response.logical_attempts, usage=response.usage) from None
-        return result, {"logicalAttempts": response.logical_attempts, "inputTokens": response.usage.input_tokens,
-                        "outputTokens": response.usage.output_tokens, "inferenceCount": response.internal_inference_count}
+        except (NormalizationFailure, ValidationError, ValueError):
+            raw = value.model_dump(mode="json", by_alias=True) if isinstance(value, GuiSemanticProposal) else value
+            if not isinstance(raw, dict) or not {"candidate", "jobs", "facts"}.intersection(raw):
+                raw = {"candidate": {}}
+            raw = {**raw, "schemaVersion": 1}
+            proposal = transport.recovery.recover(transport.incoming.parse(raw))
+            result = normalize_employment(captured, proposal, normalize_candidate(captured, proposal, rules))
+            recovered = True
+        result._native_recovery_count = transport.unresolved + int(recovered)
+        return result, {"logicalAttempts": attempts, "inputTokens": usage.input_tokens,
+                        "outputTokens": usage.output_tokens, "inferenceCount": count}

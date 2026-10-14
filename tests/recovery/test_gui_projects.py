@@ -103,7 +103,7 @@ async def test_failed_draft_retry_reuses_normalization_without_extra_attempt(tmp
 
 
 @pytest.mark.asyncio
-async def test_render_failure_keeps_document_and_retry_uses_no_model_calls(tmp_path):
+async def test_docx_validation_warns_after_import_and_retry_uses_no_model_calls(tmp_path):
     class BrokenRenderer:
         async def render(self, *_args):
             raise failure("DOCX_BLOCK_PAGE_BUDGET")
@@ -113,6 +113,9 @@ async def test_render_failure_keeps_document_and_retry_uses_no_model_calls(tmp_p
     id = selected.project_id
     failed = await finish(store, id, store.start(id))
     assert failed.project is not None and failed.pre_draft is None
+    assert failed.generations[-1].status == "completed"
+    assert failed.generations[-1].stages[-1].status == "failed"
+    assert "IMPORT_DOCX_WARNING" in {mark.code for mark in failed.annotations}
     assert failed.generations[-1].stages[-1].docx_error.code == "DOCX_BLOCK_PAGE_BUDGET"
     from resume_api.gui_rendering import GuiDocxRenderer
     store.renderer = GuiDocxRenderer()

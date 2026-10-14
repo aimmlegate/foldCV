@@ -105,7 +105,7 @@ def test_focus_removals_are_located_replaceable_warnings_without_extra_calls():
     ("job", "INVALID_EDITORIAL_PLAN_CONTEXT"), ("facts", "INVALID_EDITORIAL_FACT_REFERENCE"),
     ("field", "INVALID_DRAFT_FIELD_REFERENCE"), ("fields", "INCOMPLETE_DRAFT_FIELDS"),
 ])
-def test_broken_plan_or_field_references_fail_without_repair(change, code, tmp_path):
+def test_broken_plan_or_field_references_warn_without_another_call(change, code, tmp_path):
     request = draft_request()
     raw = draft_reply(request).model_dump(by_alias=True)
     if change == "job": raw["editorialPlan"]["jobs"].pop()
@@ -113,10 +113,12 @@ def test_broken_plan_or_field_references_fail_without_repair(change, code, tmp_p
     if change == "field": raw["fields"][0]["fieldId"] = "foreign field"
     if change == "fields": raw["fields"].pop()
     provider = DraftProvider(GuiDraftProposal.model_validate(raw))
-    with pytest.raises(ContentFailure) as error:
-        GuiDraftingContentService(provider, "fixture").run(request, RULES, OperationFiles(tmp_path), threading.Event())
-    assert error.value.code == code and error.value.logical_attempts == 1
-    assert len(provider.calls) == 1
+    result, usage = GuiDraftingContentService(provider, "fixture").run(request, RULES, OperationFiles(tmp_path), threading.Event())
+    assert code in {mark.code for mark in result.annotations}
+    assert usage["logicalAttempts"] == len(provider.calls) == 1
+    assert result.document.candidate.name.text == request.normalized.candidate.name.text
+    assert {job.job_id for job in result.editorial_plan.jobs} == {job.id for job in request.normalized.employment}
+    assert result.document.profile.text.text
 
 
 def test_focus_capacity_keeps_first_eight_in_supplied_order():
@@ -180,12 +182,15 @@ def test_drafting_cannot_replace_supported_identity_with_unrelated_facts(field_i
     title = next(fact for fact in request.normalized.facts
                  if fact.kind == "candidate_detail" and fact.value.field == "title")
     reply.fields.append(DraftField(fieldId=field_id, text="Invented Unsupported Surname", factIds=[title.id]))
-    with pytest.raises(DraftFailure, match="DRAFT_STRUCTURED_FIELD"):
-        validate_draft(request, reply, RULES)
+    result = validate_draft(request, reply, RULES)
+    warning = next(mark for mark in result.annotations if mark.code == "DRAFT_STRUCTURED_FIELD")
+    assert warning.anchor.field_id == field_id
+    assert result.document.candidate.name.text == request.normalized.candidate.name.text
+    assert result.document.candidate.title.text == request.normalized.candidate.title.text
 
 
 @pytest.mark.parametrize("scope", ["all", "profile", "job-prose", "job-stack", "skills"])
-def test_present_field_ids_cannot_hide_empty_supported_prose(scope):
+def test_empty_supported_prose_is_recovered_with_located_warnings(scope):
     request = draft_request()
     reply = draft_reply(request, detailed_old=True)
     first = request.normalized.employment[0].id
@@ -196,8 +201,13 @@ def test_present_field_ids_cannot_hide_empty_supported_prose(scope):
             or scope == "skills" and field.field_id == "skills-focus/skillsText"):
             field.text = " \n "
             field.fact_ids = []
-    with pytest.raises(DraftFailure, match="EMPTY_SUPPORTED_DRAFT_PROSE"):
-        validate_draft(request, reply, RULES)
+    result = validate_draft(request, reply, RULES)
+    assert "EMPTY_SUPPORTED_DRAFT_PROSE" in {mark.code for mark in result.annotations}
+    assert result.document.profile.text.text.strip()
+    assert result.document.skills_focus.skills_text.text.strip()
+    job = next(job for job in result.document.jobs if job.id == first)
+    assert any(field.text.strip() for field in (job.context, job.tasks, job.results))
+    assert job.stack.text.strip()
 
 
 def test_empty_prose_is_allowed_when_only_structured_source_facts_exist():

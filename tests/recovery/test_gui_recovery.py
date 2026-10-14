@@ -70,7 +70,9 @@ class BrokenRenderer:
 async def test_render_retry_keeps_committed_document_and_facts_without_content_calls(tmp_path,change):
     provider=CreationProvider();store=service(tmp_path,provider);store.renderer=BrokenRenderer()
     selected=await store.select((ROOT/'E1.txt').read_bytes(),'pasted.txt',True);id=selected.project_id
-    failed=await finish(store,id,store.start(id));assert failed.project is not None and failed.generations[-1].status=='failed'
+    failed=await finish(store,id,store.start(id));assert failed.project is not None and failed.generations[-1].status=='completed'
+    assert failed.generations[-1].stages[-1].status=='failed'
+    assert 'IMPORT_DOCX_WARNING' in {mark.code for mark in failed.annotations}
     if change=='restart':store=service(tmp_path,provider)
     elif change=='rename':store.rename(id,GuiRenameProjectRequest(title='Manual title',baseRevision=failed.project_revision))
     else:

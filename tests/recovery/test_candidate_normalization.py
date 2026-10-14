@@ -96,7 +96,7 @@ def test_observation_date_requires_dated_source_evidence_and_has_one_producer():
     ("absent", "INVALID_SOURCE_EVIDENCE"), ("foreign", "INVALID_SOURCE_EVIDENCE"),
     ("future", "SOURCE_OBSERVATION_AFTER_FORMATTING_DATE"),
 ])
-def test_invalid_observation_fails_one_attempt_without_repair_or_source_mutation(change, code, tmp_path):
+def test_invalid_observation_warns_without_retry_or_source_mutation(change, code, tmp_path):
     source_request = request((ROOT / "E1.txt").read_text() + "Резюме обновлено 10.10.2026\n")
     raw = proposal(source_request).model_dump(by_alias=True)
     evidence = span(source_request.sources[0], "Резюме обновлено 10.10.2026")
@@ -105,11 +105,10 @@ def test_invalid_observation_fails_one_attempt_without_repair_or_source_mutation
     observed = {"precision": "day", "year": 2027 if change == "future" else 2026, "month": 10, "day": 10}
     raw["observationAssessment"] = {"sourceObservedAt": observed, "evidence": evidence, "revision": 1}
     provider = ControlledProvider(GuiSemanticProposal.model_validate(raw))
-    with pytest.raises(ContentFailure) as error:
-        GuiNormalizationContentService(provider, "fixture").run(source_request, RULES, OperationFiles(tmp_path), threading.Event())
-    assert error.value.code == code and error.value.logical_attempts == 1
-    assert len(provider.calls) == 1
-    assert "private source marker" not in str(error.value)
+    result, usage = GuiNormalizationContentService(provider, "fixture").run(source_request, RULES, OperationFiles(tmp_path), threading.Event())
+    assert result.source_observed_at is None and result._native_recovery_count > 0
+    assert result.candidate.name.text == "Ирина Примерова"
+    assert usage["logicalAttempts"] == len(provider.calls) == 1
     assert all(not unit.represented_fact_ids for unit in source_request.sources[0].units)
 
 

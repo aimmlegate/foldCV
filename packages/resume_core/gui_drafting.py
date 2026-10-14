@@ -9,12 +9,13 @@ from datetime import date
 
 from pydantic import Field
 
+from .gui_draft_recovery import DraftWarnings, fill_literal
 from .gui_normalization import GuiNormalizedResult, public_context_facts
 from .gui_prompts import content_input
 from .models.contracts import Id, PartialDate, Revision, Wire
 from .models.recovery import (
     Annotation, CandidateFact, Document, EditorialPlan, EmploymentFact, FocusEntry,
-    Rules, authored_fields,
+    Rules, JobDisposition, DocumentAnchor, authored_fields,
 )
 from .normalization import _id
 from .technologies import BY_ID
@@ -144,63 +145,108 @@ def validate_draft(request: GuiDraftRequest, proposal: GuiDraftProposal, rules: 
     jobs = {job.id for job in normalized.employment}
     facts = {fact.id: fact for fact in normalized.facts}
     blocked = {id for conflict in normalized.conflicts for id in conflict.fact_ids}
+    warnings = DraftWarnings(request, rules)
     if (plan.origin != "model" or plan.rules_revision != rules.revision or plan.formatting_as_of != request.formatting_as_of or
         {job.job_id for job in plan.jobs} != jobs):
-        raise DraftFailure("INVALID_EDITORIAL_PLAN_CONTEXT")
-    all_plan_refs = [*plan.fact_ids, *[id for job in plan.jobs for id in job.fact_ids],
-                     *[id for focus in plan.focus for id in focus.fact_ids], *[id for group in plan.technology_groups for id in group.fact_ids]]
-    if not set(all_plan_refs) <= set(facts):
-        raise DraftFailure("INVALID_EDITORIAL_FACT_REFERENCE")
+        warnings.add("INVALID_EDITORIAL_PLAN_CONTEXT")
+    plan.origin, plan.rules_revision, plan.formatting_as_of = "model", rules.revision, request.formatting_as_of
+    plan.profile_language = plan.profile_language or "ru"
+    plan.jobs = [job for job in plan.jobs if job.job_id in jobs]
+    represented = {job.job_id for job in plan.jobs}
+    plan.jobs.extend(JobDisposition(jobId=job.id, disposition="detailed", factIds=[])
+                     for job in normalized.employment if job.id not in represented)
+    all_plan_items = [plan, *plan.jobs, *plan.focus, *plan.technology_groups]
+    for item in all_plan_items:
+        if not set(item.fact_ids) <= set(facts):
+            warnings.add("INVALID_EDITORIAL_FACT_REFERENCE")
+        item.fact_ids = list(dict.fromkeys(id for id in item.fact_ids if id in facts))
     for job in plan.jobs:
         if any(facts[id].job_id not in (None, job.job_id) for id in job.fact_ids):
-            raise DraftFailure("EDITORIAL_FACT_OUTSIDE_JOB")
+            warnings.add("EDITORIAL_FACT_OUTSIDE_JOB")
     document = draft_skeleton(normalized)
     fields = {field.field_id: field for record in document.records() for field in authored_fields(record)}
     prose_ids = {"profile/text", "skills-focus/skillsText", "early-career/text"}
     prose_ids.update(f"job:{id}/{key}" for id in jobs for key in ("context", "tasks", "results", "stack"))
-    if len({item.field_id for item in proposal.fields}) != len(proposal.fields):
-        raise DraftFailure("DUPLICATE_DRAFT_FIELD")
+    seen, unplaced, texts = set(), [], {}
     for item in proposal.fields:
-        if item.field_id not in fields or not set(item.fact_ids) <= set(facts) or set(item.fact_ids) & blocked:
-            raise DraftFailure("INVALID_DRAFT_FIELD_REFERENCE")
+        if item.field_id not in fields:
+            warnings.add("INVALID_DRAFT_FIELD_REFERENCE")
+            if item.text.strip():
+                unplaced.append(item.text)
+            continue
         field = fields[item.field_id]
         if item.field_id not in prose_ids:
-            raise DraftFailure("DRAFT_STRUCTURED_FIELD")
-        if item.text.strip() and not item.fact_ids:
-            raise DraftFailure("DRAFT_TEXT_NEEDS_FACTS")
+            warnings.add("DRAFT_STRUCTURED_FIELD", item.field_id)
+            continue
+        if item.field_id in seen:
+            warnings.add("DUPLICATE_DRAFT_FIELD", item.field_id)
+        seen.add(item.field_id)
+        refs = list(dict.fromkeys(id for id in item.fact_ids if id in facts))
+        if len(refs) != len(item.fact_ids) or set(refs) & blocked:
+            warnings.add("INVALID_DRAFT_FIELD_REFERENCE", item.field_id)
+        if item.text.strip() and not refs:
+            warnings.add("DRAFT_TEXT_NEEDS_FACTS", item.field_id)
         if item.field_id.startswith("job:"):
             job_id = item.field_id.split("/", 1)[0].removeprefix("job:")
-            if any(facts[id].job_id != job_id for id in item.fact_ids):
-                raise DraftFailure("DRAFT_FACT_OUTSIDE_JOB")
-        field.text = item.text
-        field.fact_ids = item.fact_ids
-        field.evidence = [ref for id in item.fact_ids for ref in facts[id].evidence]
+            if any(facts[id].job_id != job_id for id in refs):
+                warnings.add("DRAFT_FACT_OUTSIDE_JOB", item.field_id)
+        paragraphs = texts.setdefault(item.field_id, [])
+        if item.text not in paragraphs:
+            paragraphs.append(item.text)
+        field.text = "\n".join(paragraphs)
+        field.fact_ids = list(dict.fromkeys([*field.fact_ids, *refs]))
+        field.evidence = [ref for id in field.fact_ids for ref in facts[id].evidence]
         field.origin = "generated"
+    if unplaced:
+        document.profile.text.text = "\n\n".join([document.profile.text.text, *unplaced]).strip()
+        warnings.add("DRAFT_TEXT_NEEDS_FACTS", "profile/text")
     required = {"profile/text", "skills-focus/skillsText", "early-career/text"}
     detailed = [item.job_id for item in plan.jobs if item.disposition == "detailed"]
     early = [item.job_id for item in plan.jobs if item.disposition == "early-career"]
     required.update(f"job:{id}/{key}" for id in detailed for key in ("context", "tasks", "results", "stack"))
-    if not required <= {item.field_id for item in proposal.fields}:
-        raise DraftFailure("INCOMPLETE_DRAFT_FIELDS")
-    supported = [fact for fact in public_context_facts(normalized.facts) if fact.id not in blocked]
+    for missing in required - seen:
+        warnings.add("INCOMPLETE_DRAFT_FIELDS", missing)
+    supported = public_context_facts(normalized.facts)
     prose_kinds = {"text", "technology", "metric", "leadership"}
     if any(fact.kind in prose_kinds for fact in supported) and not document.profile.text.text.strip():
-        raise DraftFailure("EMPTY_SUPPORTED_DRAFT_PROSE")
+        warnings.add("EMPTY_SUPPORTED_DRAFT_PROSE", "profile/text")
+        fill_literal(document.profile.text, [fact for fact in supported if fact.kind in prose_kinds])
     if any(fact.kind == "technology" and fact.value.scope == "global" for fact in supported) and not document.skills_focus.skills_text.text.strip():
-        raise DraftFailure("EMPTY_SUPPORTED_DRAFT_PROSE")
+        warnings.add("EMPTY_SUPPORTED_DRAFT_PROSE", "skills-focus/skillsText")
+        fill_literal(document.skills_focus.skills_text,
+                     [fact for fact in supported if fact.kind == "technology" and fact.value.scope == "global"])
     for job in document.jobs:
         if job.id not in detailed:
             continue
         owned = [fact for fact in supported if fact.job_id == job.id]
         if (any(fact.kind in {"text", "metric", "leadership"} for fact in owned)
             and not any(field.text.strip() for field in (job.context, job.tasks, job.results))):
-            raise DraftFailure("EMPTY_SUPPORTED_DRAFT_PROSE")
+            warnings.add("EMPTY_SUPPORTED_DRAFT_PROSE", job.context.field_id)
+            fill_literal(job.context, [fact for fact in owned if fact.kind != "technology"])
         if any(fact.kind == "technology" for fact in owned) and not job.stack.text.strip():
-            raise DraftFailure("EMPTY_SUPPORTED_DRAFT_PROSE")
+            warnings.add("EMPTY_SUPPORTED_DRAFT_PROSE", job.stack.field_id)
+            fill_literal(job.stack, [fact for fact in owned if fact.kind == "technology"])
+    if early and not document.early_career.text.text.strip():
+        warnings.add("EARLY_CAREER_NOT_REPRESENTED", "early-career/text")
+        # Keep missing early-career prose as editable job blocks rather than hiding the source jobs.
+        for job in plan.jobs:
+            if job.disposition == "early-career":
+                job.disposition = "detailed"
+                detailed.append(job.job_id)
+                record = next(record for record in document.jobs if record.id == job.job_id)
+                fill_literal(record.context, [fact for fact in supported if fact.job_id == job.job_id])
+        early = []
     document.jobs = [next(job for job in document.jobs if job.id == id) for id in detailed]
     document.early_career.represented_job_ids = early
-    if early and not document.early_career.text.text.strip():
-        raise DraftFailure("EARLY_CAREER_NOT_REPRESENTED")
+    visible_fields = {field.field_id for record in document.records() for field in authored_fields(record)}
+    for mark in warnings.marks.values():
+        if mark.anchor.kind == "field" and mark.anchor.field_id not in visible_fields:
+            mark.anchor = DocumentAnchor(kind="document")
+    if not any(field.text.strip() for record in document.records() for field in authored_fields(record)) or (
+            normalized._native_recovery_count and not document.profile.text.text.strip()):
+        document.profile.text.text = "\n".join(unit.text for source in normalized.sources for unit in source.units if unit.text.strip())
+        document.profile.text.origin = "source"
+        warnings.add("IMPORT_CONTENT_RECOVERED", "profile/text")
     logos = available_focus_ids() if available_logos is None else available_logos
     focus = []
     removed = []
@@ -213,7 +259,7 @@ def validate_draft(request: GuiDraftRequest, proposal: GuiDraftProposal, rules: 
             removed.append({"catalogId": item.catalog_id, "reason": reason})
             continue
         if not item.fact_ids or any(facts[id].kind != "technology" or facts[id].value.canonical_id != item.catalog_id for id in item.fact_ids):
-            raise DraftFailure("FOCUS_FACT_MISMATCH")
+            warnings.add("FOCUS_FACT_MISMATCH", "skills-focus/skillsText")
         accepted.append(item)
         id = _id("focus", item.catalog_id)
         focus.append({"id": id, "catalogId": item.catalog_id,
@@ -221,7 +267,7 @@ def validate_draft(request: GuiDraftRequest, proposal: GuiDraftProposal, rules: 
                       "factIds": item.fact_ids})
     plan.focus = accepted
     document.skills_focus.focus = [FocusEntry.model_validate(item) for item in focus]
-    annotations = []
+    annotations = list(warnings.marks.values())
     if removed:
         fingerprint = hashlib.sha256(drafting_input(request, rules).encode()).hexdigest()
         annotations.append(Annotation.model_validate({"id": _id("annotation", "focus-removals", request.project_id),

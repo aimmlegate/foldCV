@@ -3,7 +3,8 @@
 import threading
 from pydantic import ValidationError
 
-from packages.resume_core.gui_drafting import GuiDraftRequest, GuiDraftProposal, DraftFailure, drafting_input, validate_draft
+from packages.resume_core.gui_drafting import GuiDraftRequest, GuiDraftProposal, drafting_input, validate_draft
+from packages.resume_core.gui_draft_recovery import DraftWarnings
 from packages.resume_core.models.recovery import Rules
 
 from .gui_content import generate_admitted
@@ -19,16 +20,28 @@ class GuiDraftingContentService:
 
     def run(self, request: GuiDraftRequest, rules: Rules, files: OperationFiles, cancel: threading.Event):
         captured = request.model_copy(deep=True)
-        response = generate_admitted(self.provider, ContentInput(drafting_input(captured, rules), GuiDraftProposal,
-            self.policy, DraftingTransport(captured)), files, cancel)
-        if cancel.is_set():
-            raise ContentFailure("CANCELLED", logical_attempts=response.logical_attempts, usage=response.usage)
+        transport = DraftingTransport(captured)
+        recovered = False
         try:
-            proposal = GuiDraftProposal.model_validate(response.value)
-            result = validate_draft(captured, proposal, rules)
-        except DraftFailure as error:
-            raise ContentFailure(error.code, logical_attempts=response.logical_attempts, usage=response.usage) from None
+            response = generate_admitted(self.provider, ContentInput(drafting_input(captured, rules), GuiDraftProposal,
+                self.policy, transport), files, cancel)
+            value, attempts, usage, count = response.value, response.logical_attempts, response.usage, response.internal_inference_count
+        except ContentFailure as error:
+            if error.code != "INVALID_RESULT" or cancel.is_set():
+                raise
+            value, attempts, usage, count = {}, error.logical_attempts, error.usage, None
+            recovered = True
+        if cancel.is_set():
+            raise ContentFailure("CANCELLED", logical_attempts=attempts, usage=usage)
+        try:
+            proposal = GuiDraftProposal.model_validate(value)
         except (ValidationError, ValueError):
-            raise ContentFailure("INVALID_RESULT", logical_attempts=response.logical_attempts, usage=response.usage) from None
-        return result, {"logicalAttempts": response.logical_attempts, "inputTokens": response.usage.input_tokens,
-                        "outputTokens": response.usage.output_tokens, "inferenceCount": response.internal_inference_count}
+            proposal = transport.decode(value)
+            recovered = True
+        result = validate_draft(captured, proposal, rules)
+        if recovered or transport.incoming.unresolved:
+            warnings = DraftWarnings(captured, rules)
+            warnings.add("IMPORT_CONTENT_RECOVERED")
+            result.annotations.extend(warnings.marks.values())
+        return result, {"logicalAttempts": attempts, "inputTokens": usage.input_tokens,
+                        "outputTokens": usage.output_tokens, "inferenceCount": count}
