@@ -1,5 +1,67 @@
 # Test strategy
 
+## Full-editor follow-up
+
+D073–D077 and the NE contracts (including NE03A/NE03B) in the
+[current prompt](prompts/03-native-editor-template.md) override conflicting
+historical assertions below. Replace candidate-data exclusions, disabled history,
+previous-block restore, fixed field membership and required legacy migration with
+the newly agreed behavior. The Python renderer may change to support the measured
+template and all supported rich content. Word macOS is the current visual/editing
+target through a manual user gate; Windows is deferred. Durable reopen requires
+a service restart, not just a browser reload. Verify mixed-version listing without
+migration, one session history across document/facts, canonical education/language
+ownership, image limits and explicit DOCX mappings. The left facts panel replaces the outline and its
+explicit edits update linked document content. Employment overlaps remain valid
+with subdued warnings; date cascades require preview/explicit apply and affect
+only the necessary chain. Test per-job technology scope, synchronization/undo and
+stale cascade responses. Keep applicable evidence, lifecycle, storage,
+selection, IME and resource tests. Map replacements and remove deleted/renamed
+test selectors with their implementation, including legacy exclusion regressions;
+leave `tests/requirements.json` unchanged during planning. No new behavior or
+replacement check is claimed as passed by this note.
+
+D076 requires useful tests of observable behavior and concrete failure risks,
+including relevant edge cases, rather than implementation mirrors or test counts.
+Add a regression check for every review-discovered behavior defect, preferably
+with a deterministic nonbrowser test that reproduces the failure before the fix.
+For GUI-only defects, use reproducible T3 steps and record the checked revision,
+expected/actual results and why an automated regression was not appropriate.
+Documentation-only changes do not need artificial tests.
+
+Do not develop, extend or execute automated browser scenarios for the NE runs;
+the historical browser-test requirements below do not apply to this work. Use
+the internal T3 browser for required GUI acceptance and retain useful Python,
+Node state/contract, type/lint/build and affected rendering checks. The fast gate's
+`npm run test:browser -- --list` only validates mapped names and is allowed; it
+does not execute scenarios. Preserve historical specs/results, maintain obsolete
+selectors and new nonbrowser mappings, and record T3 evidence separately. Do not
+label an unrun browser suite passed or remove coverage merely to bypass the map.
+
+D077 freezes the [rich cases](handoffs/CLI-GUI-CYCLES/rich-contract.md),
+[date examples](handoffs/CLI-GUI-CYCLES/timeline-contract.md) and
+[execution details](handoffs/CLI-GUI-CYCLES/execution-contract.md).
+NE01 updates contradictory U01/A01/D01/P02 descriptions/selectors while retaining
+the 22 existing IDs. NE03A adds these IDs to this strategy, the requirement map
+and `tools/checks.py` together; mark future work unimplemented/partial honestly.
+
+| New ID | Behavior and owning checks |
+| --- | --- |
+| NE-RICH | Typed rich schema, one editor, free region/block movement, durable round trips; NE03A/NE04/NE05/NE06 |
+| NE-HISTORY | Composite document/fact session undo, no persisted history, late-result guards; NE03A/NE05/NE07 |
+| NE-ASSETS | Local-only image ingestion, archive roles, byte/entry limits and undo retention; NE04/NE06 |
+| NE-SYNC | Exact linked edits, bounded narrative update, dependency-based staleness and durable status; NE07/NE08 |
+| NE-FACTS | Five-group CRUD, per-job technology scope, typed authority and preserved other records; NE08 |
+| NE-DATES | Exact uncertainty predicates, monthly/daily cascade examples and nonblocking behavior; NE09 |
+| NE-TEMPLATE | Rich editable DOCX, font/geometry/overflow and manual Word result; NE04–NE06/NE10/NE11 |
+
+Use focused nonbrowser checks per patch and the full fast gate at each run's end.
+The old 60-second, strict candidate exclusions and block-restore assertions below
+are historical. Current GUI stages keep the 180-second single-attempt ceiling.
+Mounted history/layout requires T3 evidence; a headless false `undo()` result is
+not a reason to waive it. Native IME/drag/clipboard checks that T3 cannot perform
+remain manual, distinct from synthetic events and Word checks.
+
 ## Recovery iteration migration
 
 The [recovery plan](flow-recovery-plan.md) defines the next iteration. The table
