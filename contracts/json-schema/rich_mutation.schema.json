@@ -225,6 +225,11 @@
         },
         "title": {
           "$ref": "#/$defs/WorkingField_str_"
+        },
+        "userCorrected": {
+          "default": false,
+          "title": "Usercorrected",
+          "type": "boolean"
         }
       },
       "required": [
@@ -281,6 +286,11 @@
           "minimum": 1,
           "title": "Revision",
           "type": "integer"
+        },
+        "userCorrected": {
+          "default": false,
+          "title": "Usercorrected",
+          "type": "boolean"
         }
       },
       "required": [
@@ -538,6 +548,11 @@
             }
           ],
           "title": "Subprojectid"
+        },
+        "userCorrected": {
+          "default": false,
+          "title": "Usercorrected",
+          "type": "boolean"
         },
         "value": {
           "$ref": "#/$defs/WorkingField_str_"
@@ -805,6 +820,11 @@
           "title": "Revision",
           "type": "integer"
         },
+        "userCorrected": {
+          "default": false,
+          "title": "Usercorrected",
+          "type": "boolean"
+        },
         "value": {
           "$ref": "#/$defs/WorkingField_str_"
         }
@@ -994,6 +1014,11 @@
         },
         "specialty": {
           "$ref": "#/$defs/WorkingField_str_"
+        },
+        "userCorrected": {
+          "default": false,
+          "title": "Usercorrected",
+          "type": "boolean"
         }
       },
       "required": [
@@ -1055,6 +1080,11 @@
         },
         "role": {
           "$ref": "#/$defs/WorkingField_str_"
+        },
+        "userCorrected": {
+          "default": false,
+          "title": "Usercorrected",
+          "type": "boolean"
         }
       },
       "required": [
@@ -1122,6 +1152,19 @@
           "minLength": 1,
           "title": "Bindingid",
           "type": "string"
+        },
+        "bindingRootId": {
+          "anyOf": [
+            {
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Bindingrootid"
         },
         "fieldKey": {
           "minLength": 1,
@@ -1694,6 +1737,11 @@
           "minimum": 1,
           "title": "Revision",
           "type": "integer"
+        },
+        "userCorrected": {
+          "default": false,
+          "title": "Usercorrected",
+          "type": "boolean"
         }
       },
       "required": [
@@ -1764,6 +1812,11 @@
             }
           ],
           "title": "Subprojectid"
+        },
+        "userCorrected": {
+          "default": false,
+          "title": "Usercorrected",
+          "type": "boolean"
         },
         "value": {
           "$ref": "#/$defs/WorkingField_LeadershipValue_"
@@ -1874,6 +1927,11 @@
             }
           ],
           "title": "Subprojectid"
+        },
+        "userCorrected": {
+          "default": false,
+          "title": "Usercorrected",
+          "type": "boolean"
         },
         "value": {
           "$ref": "#/$defs/WorkingField_MetricValue_"
@@ -3310,6 +3368,11 @@
         },
         "role": {
           "$ref": "#/$defs/WorkingField_str_"
+        },
+        "userCorrected": {
+          "default": false,
+          "title": "Usercorrected",
+          "type": "boolean"
         }
       },
       "required": [
@@ -3660,6 +3723,11 @@
             }
           ],
           "title": "Subprojectid"
+        },
+        "userCorrected": {
+          "default": false,
+          "title": "Usercorrected",
+          "type": "boolean"
         }
       },
       "required": [
@@ -3878,6 +3946,11 @@
           ],
           "title": "Status",
           "type": "string"
+        },
+        "userCorrected": {
+          "default": false,
+          "title": "Usercorrected",
+          "type": "boolean"
         }
       },
       "required": [
@@ -3925,6 +3998,11 @@
           ],
           "title": "Status",
           "type": "string"
+        },
+        "userCorrected": {
+          "default": false,
+          "title": "Usercorrected",
+          "type": "boolean"
         },
         "value": {
           "anyOf": [
@@ -3981,6 +4059,11 @@
           "title": "Status",
           "type": "string"
         },
+        "userCorrected": {
+          "default": false,
+          "title": "Usercorrected",
+          "type": "boolean"
+        },
         "value": {
           "anyOf": [
             {
@@ -4035,6 +4118,11 @@
           ],
           "title": "Status",
           "type": "string"
+        },
+        "userCorrected": {
+          "default": false,
+          "title": "Usercorrected",
+          "type": "boolean"
         },
         "value": {
           "anyOf": [
@@ -4091,6 +4179,11 @@
           "title": "Status",
           "type": "string"
         },
+        "userCorrected": {
+          "default": false,
+          "title": "Usercorrected",
+          "type": "boolean"
+        },
         "value": {
           "anyOf": [
             {
@@ -4146,6 +4239,11 @@
           ],
           "title": "Status",
           "type": "string"
+        },
+        "userCorrected": {
+          "default": false,
+          "title": "Usercorrected",
+          "type": "boolean"
         },
         "value": {
           "anyOf": [

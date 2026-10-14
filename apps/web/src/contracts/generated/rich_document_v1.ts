@@ -26,6 +26,7 @@ export type Content1 = StyledText[];
 export type Href = string;
 export type Type1 = "link";
 export type Bindingid = string;
+export type Bindingrootid = string | null;
 export type Fieldkey = string;
 export type Recordid = string;
 export type Syncedfactrevision = number;
@@ -474,6 +475,7 @@ export interface Hyperlink {
 }
 export interface FactFieldSpan {
   bindingId: Bindingid;
+  bindingRootId?: Bindingrootid;
   fieldKey: Fieldkey;
   recordId: Recordid;
   styles: InlineStyles;

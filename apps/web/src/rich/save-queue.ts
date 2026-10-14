@@ -1,6 +1,9 @@
 import type { RichDocumentV1 } from "../contracts/generated/rich_document_v1";
 import type { RichMutation } from "../contracts/generated/rich_mutation";
 import type { RichProjectResponse } from "../contracts/generated/rich_project_response";
+import type { WorkingFacts } from "../contracts/generated/working_facts";
+import { semantic } from "./fact-cells";
+import { normalizedBlock } from "./normalize";
 
 export type RichBlock = RichDocumentV1["regions"][number]["blocks"][number];
 type Placement = { block: RichBlock; parentId: string; afterId: string | null };
@@ -23,9 +26,21 @@ function canonical(value: unknown): string {
   return JSON.stringify(value) ?? "null";
 }
 function logical(block: RichBlock): string {
+  block = normalizedBlock(block);
   const content = block.type === "table" ? { ...block.content, rows: block.content.rows.map(row => ({ ...row,
     cells: row.cells.map(({ revision: _revision, ...cell }) => cell) })) } : block.content;
-  return canonical({ type: block.type, props: block.props, content, provenance: block.provenance });
+  return canonical(semantic({ type: block.type, props: block.props, content, provenance: block.provenance }));
+}
+
+export function factSteps(before: WorkingFacts, after: WorkingFacts): RichMutation["steps"][number][] {
+  const old = new Map(before.records.map(record => [record.id, record]));
+  const current = new Map(after.records.map(record => [record.id, record]));
+  return [...before.records.filter(record => !current.has(record.id)).map(record => ({ kind: "remove_record" as const,
+    recordId: record.id, beforeRevision: record.revision })), ...after.records.flatMap(record => {
+    const previous = old.get(record.id);
+    return previous && canonical(semantic(previous)) === canonical(semantic(record)) ? [] : [{ kind: "put_record" as const,
+      beforeRevision: previous?.revision ?? before.tombstones.find(item => item.recordId === record.id)?.revision ?? null, record }];
+  })];
 }
 
 export function documentSteps(before: RichDocumentV1, after: RichDocumentV1): RichMutation["steps"][number][] {
@@ -81,6 +96,7 @@ export function documentSteps(before: RichDocumentV1, after: RichDocumentV1): Ri
 /** Replies update the save baseline; the mounted typing buffer always stays current. */
 export class RichSaveQueue {
   private target: RichDocumentV1;
+  private facts: WorkingFacts;
   private actionId: string;
   private kind: RichMutation["kind"] = "typing";
   private running: Promise<void> | null = null;
@@ -91,10 +107,11 @@ export class RichSaveQueue {
     private readonly acknowledged: (response: RichProjectResponse) => void) {
     if (!response.workspace.project) throw new Error("Document not created");
     this.target = response.workspace.project.document;
+    this.facts = response.workspace.project.facts;
     this.actionId = `${sessionId}:initial`;
   }
-  update(document: RichDocumentV1, actionId: string, kind: RichMutation["kind"] = "typing"): void {
-    this.target = document; this.actionId = actionId; this.kind = kind;
+  update(document: RichDocumentV1, actionId: string, kind: RichMutation["kind"] = "typing", facts?: WorkingFacts): void {
+    this.target = document; this.actionId = actionId; this.kind = kind; if (facts) this.facts = facts;
   }
   get baseline(): RichProjectResponse { return this.response; }
   close(): void { this.closed = true; }
@@ -107,7 +124,9 @@ export class RichSaveQueue {
     while (!this.closed) {
       const before = this.response.workspace.project?.document;
       if (!before) throw new Error("Document not created");
-      const steps = documentSteps(before, this.target);
+      const beforeFacts = this.response.workspace.project?.facts;
+      if (!beforeFacts) throw new Error("Facts not created");
+      const steps = [...documentSteps(before, this.target), ...factSteps(beforeFacts, this.facts)];
       const [first, ...rest] = steps;
       if (!first && !this.pendingRequest) return;
       const request: RichMutation | null = this.pendingRequest ?? (first ? { schemaVersion: 1, projectId: this.response.workspace.projectId,

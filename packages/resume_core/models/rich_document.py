@@ -43,6 +43,7 @@ class FactFieldSpan(Wire):
     text: str
     styles: InlineStyles
     synced_fact_revision: Revision
+    binding_root_id: Id | None = None
 
 
 RichInline = Annotated[Union[StyledText, Hyperlink, FactFieldSpan], Field(discriminator="type")]

@@ -27,6 +27,8 @@ def _revise(record: RichFact, previous: RichFact | None, floor: int) -> RichFact
             old_periods = {period.id: period for period in old} if isinstance(old, list) else {}
             for period in value:
                 old_period = old_periods.get(period.id)
+                if old_period is not None and period.evidence != old_period.evidence:
+                    raise ValueError("working edit cannot replace original period evidence")
                 same_period = old_period is not None and period.model_dump(exclude={"revision"}) == old_period.model_dump(exclude={"revision"})
                 period.revision = old_period.revision if same_period else max(getattr(old_period, "revision", 0), floor) + 1
                 for part in ("start", "end", "present"):

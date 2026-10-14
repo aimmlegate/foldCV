@@ -3,7 +3,7 @@ import test from "node:test";
 import { fromInline, toInline, wireColor, type EditorInline } from "../src/rich/inline";
 
 test("partially styled fact text keeps every mark and stable identity through rich round trips", () => {
-  const input: EditorInline[] = [{ type: "factField", props: { bindingId: "name-binding", recordId: "candidate", fieldKey: "name", syncedFactRevision: 4 },
+  const input: EditorInline[] = [{ type: "factField", props: { bindingId: "name-binding", recordId: "candidate", fieldKey: "name", syncedFactRevision: 4, bindingRootId: "name-binding" },
     content: [{ type: "text", text: "Alex ", styles: {} }, { type: "text", text: "Example", styles: { bold: true, italic: true, textColor: "red" } }] }];
   const ids = new Map<string, string>();
   const allocate = (base: string, key: string) => { const id = ids.get(base + key) ?? `fragment-${ids.size}`; ids.set(base + key, id); return id; };
@@ -35,7 +35,7 @@ test("links retain exact long targets and separately styled runs with explicit R
 });
 
 test("empty fact spans keep their binding while unsupported colors cannot silently become default", () => {
-  const result = fromInline([{ type: "factField", props: { bindingId: "empty", recordId: "candidate", fieldKey: "name", syncedFactRevision: 3 }, content: [] }], base => base);
+  const result = fromInline([{ type: "factField", props: { bindingId: "empty", recordId: "candidate", fieldKey: "name", syncedFactRevision: 3, bindingRootId: "empty" }, content: [] }], base => base);
   assert.ok(result[0]?.type === "fact_field");
   assert.equal(result[0].bindingId, "empty"); assert.equal(result[0].text, "");
   assert.equal(wireColor("#aBc", "text"), "#aabbcc");

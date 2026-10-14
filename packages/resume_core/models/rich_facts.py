@@ -18,6 +18,7 @@ class WorkingField(Wire, Generic[T]):
     status: Literal["known", "unknown", "unresolved", "pending", "conflict"]
     revision: Revision
     pending_raw_text: str | None
+    user_corrected: bool = False
 
     @model_validator(mode="after")
     def authority(self) -> WorkingField[T]:
@@ -40,6 +41,7 @@ class WorkingRecord(Wire):
     revision: Revision
     origin: Literal["source", "user"]
     evidence: list[EvidenceSpan]
+    user_corrected: bool = False
 
     @model_validator(mode="after")
     def coherent_revisions(self) -> WorkingRecord:

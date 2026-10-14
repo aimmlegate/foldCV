@@ -664,6 +664,19 @@
           "title": "Bindingid",
           "type": "string"
         },
+        "bindingRootId": {
+          "anyOf": [
+            {
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Bindingrootid"
+        },
         "fieldKey": {
           "minLength": 1,
           "title": "Fieldkey",

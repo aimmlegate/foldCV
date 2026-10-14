@@ -119,5 +119,11 @@ export class SessionHistory {
     return "applied";
   }
 
+  current(capture: DependencyCapture): boolean {
+    const index = this.actions.findIndex(action => action.id === capture.actionId), action = this.actions[index];
+    return !this.closed && capture.session === this.session && index >= 0 && index < this.cursor && !!action
+      && action.token === capture.actionToken && [...capture.dependencies].every(([key, revision]) => this.revision(key) === revision);
+  }
+
   close(): void { this.closed = true; }
 }

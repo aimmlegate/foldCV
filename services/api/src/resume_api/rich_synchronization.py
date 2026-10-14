@@ -1,0 +1,228 @@
+"""Durable scoped proposals with one admitted attempt and no publication on reply."""
+
+import asyncio
+import threading
+from pydantic import ValidationError
+
+from packages.resume_core.models.rich_mutations import RichMutation, PutRecord
+from packages.resume_core.models.rich_workspace import RichSyncRecord
+from packages.resume_core.rich_dependencies import dependencies_current
+from packages.resume_core.rich_fields import set_text, working_field, occurrences
+from packages.resume_core.rich_mutations import apply_rich_mutation
+from packages.resume_core.rich_assembly import identity
+from packages.resume_core.rich_sync import (RichRewriteProposal, RichReconcileProposal, exact_completion,
+    scoped_dependencies, selection_parts, selection_checksum, rewrite_steps, sync_prompt, linked_field_steps, RichCompletionRequest)
+from .gui_admission import QueuedProvider, AdmissionCancelled
+from .gui_content import generate_admitted
+from .gui_projects import ProjectFailure
+from .lifecycle import OperationFiles, SpikeError
+from .providers.content import ContentFailure, ContentInput, GenerationPolicy
+
+
+class RichSynchronization:
+    def publish_sync(self, identifier, sync):
+        if identifier in self.deleted_ids:
+            return
+        records = self.workspaces[identifier].sync_records
+        for index, item in enumerate(records):
+            if item.id == sync.id:
+                # Mutations replace the workspace while this request awaits its provider.
+                records[index] = sync
+                break
+        self.persist(identifier)
+
+    def preview(self, identifier, request):
+        workspace = self.read(identifier)
+        try:
+            result, _ = apply_rich_mutation(workspace, request)
+        except (ValueError, ValidationError) as error:
+            raise ProjectFailure(getattr(error, "code", "RICH_CONTENT_INVALID"), 409) from None
+        response = self.response(identifier)
+        response.workspace = result
+        return response
+
+    async def cancel_sync_action(self, identifier, capture):
+        workspace = self.read(identifier)
+        for sync in workspace.sync_records:
+            if sync.action_id == capture.action_id and (identifier, sync.id) in self.tasks:
+                await self.cancel(identifier, sync.id)
+        return self.response(identifier)
+
+    async def sync_content(self, identifier, sync, payload, result_type):
+        selected = self.provider_factory()
+        if selected is None:
+            raise ContentFailure("CONNECTION_REQUIRED")
+        key = (identifier, sync.id)
+        cancel, files = threading.Event(), OperationFiles(self.temp_root)
+        self.tasks[key], self.cancels[key], self.files[key] = asyncio.current_task(), cancel, files
+        operation = self.new_operation(identifier, "rewrite_prose" if sync.kind == "rewrite" else "reconcile_edits")
+        operation.action_id, operation.dependencies = sync.action_id, sync.dependencies
+        def admitted():
+            self.finish_operation(identifier, operation.id, "running")
+            if self.persist(identifier) == "failed":
+                raise ProjectFailure("PROJECT_SAVE_FAILED", 503)
+        prompt = sync_prompt("rewrite" if sync.kind == "rewrite" else "reconcile", payload, self.workspaces[identifier].rules_used)
+        request = ContentInput(prompt, result_type, GenerationPolicy(model=selected[1], timeout_seconds=180, allow_repair=False))
+        def run():
+            with files.open():
+                return generate_admitted(QueuedProvider(selected[0], admitted), request, files, cancel)
+        try:
+            async with self.worker_slot(cancel):
+                response = await asyncio.to_thread(run)
+            if cancel.is_set():
+                raise ContentFailure("CANCELLED")
+            self.finish_operation(identifier, operation.id, "completed")
+            return result_type.model_validate(response.value)
+        except Exception as error:
+            self.finish_operation(identifier, operation.id, "cancelled" if cancel.is_set() else "failed", getattr(error, "code", "INVALID_RESULT"))
+            if isinstance(error, SpikeError):
+                self.cleanup_error(error)
+            raise
+        finally:
+            self.tasks.pop(key, None); self.cancels.pop(key, None); self.files.pop(key, None)
+            self.persist(identifier)
+
+    def add_sync(self, identifier, capture, block_ids, kind, records=()):
+        workspace = self.read(identifier)
+        if not dependencies_current(workspace, capture.dependencies):
+            raise ProjectFailure("STALE_MUTATION", 409)
+        try:
+            stamps = scoped_dependencies(workspace, block_ids, records)
+        except ValueError:
+            raise ProjectFailure("STALE_SELECTION", 409) from None
+        sync = RichSyncRecord(id=identity("sync"), status="pending", actionId=capture.action_id,
+            blockIds=block_ids, fieldKeys=[], factIds=list(records), dependencies=stamps, errorCode=None, kind=kind)
+        self.workspaces[identifier].sync_records.append(sync)
+        if self.persist(identifier) == "failed":
+            raise ProjectFailure("PROJECT_SAVE_FAILED", 503)
+        return sync
+
+    def disposition(self, identifier, sync_id, status, error_code=None):
+        self.read(identifier)
+        sync = next((item for item in self.workspaces[identifier].sync_records if item.id == sync_id), None)
+        if sync is None:
+            raise ProjectFailure("SYNC_NOT_FOUND", 404)
+        sync.status, sync.ready, sync.proposed_steps = ("conflict" if status == "applied" and sync.status == "conflict" else status), False, []
+        sync.error_code = error_code
+        self.publish_sync(identifier, sync)
+        return self.response(identifier)
+
+    def resolve_conflict(self, identifier, sync_id, capture):
+        workspace = self.read(identifier)
+        original = next((item for item in workspace.sync_records if item.id == sync_id), None)
+        if original is None:
+            raise ProjectFailure("SYNC_NOT_FOUND", 404)
+        steps = linked_field_steps(workspace, original.fact_ids, original.field_keys)
+        current_ids = {record.id for record in workspace.project.facts.records}
+        sync = self.add_sync(identifier, capture, [step.block.id for step in steps], "conflict", [id for id in original.fact_ids if id in current_ids])
+        sync.proposed_steps, sync.ready = steps, bool(steps)
+        sync.status = "pending" if steps else "conflict"
+        if not steps:
+            sync.error_code = "NARRATIVE_REQUIRES_SCOPED_EDIT"
+        self.publish_sync(identifier, sync)
+        return self.response(identifier)
+
+    async def retry_rewrite(self, identifier, sync_id, capture):
+        from packages.resume_core.rich_sync import RichRewriteRequest
+        workspace = self.read(identifier)
+        sync = next((item for item in workspace.sync_records if item.id == sync_id), None)
+        if sync is None or sync.selection is None or sync.instruction is None:
+            raise ProjectFailure("SYNC_NOT_FOUND", 404)
+        if not dependencies_current(workspace, sync.dependencies):
+            self.disposition(identifier, sync_id, "stale")
+            raise ProjectFailure("STALE_SELECTION", 409)
+        selection = sync.selection.model_copy(deep=True)
+        selection.capture = capture
+        return await self.rewrite_rich(identifier, RichRewriteRequest(selection=selection, instruction=sync.instruction))
+
+    async def complete_rich(self, identifier, request):
+        workspace = self.read(identifier)
+        steps, conflicts = exact_completion(workspace, request)
+        touched = {step.record.id if isinstance(step, PutRecord) else step.record_id for step in steps}
+        blocks = [block for block in workspace.project.document.blocks() if block.id in request.block_ids]
+        linked = {link.record_id for block in blocks for link in block.provenance if link.kind == "citation"}
+        records = {record.id: record for record in workspace.project.facts.records}
+        sync = self.add_sync(identifier, request.capture, request.block_ids, "completion", sorted(touched | linked))
+        sync.proposed_steps, sync.ready = steps, bool(steps)
+        sync.field_keys = [key for _, key in conflicts]
+        sync.status = "conflict" if conflicts else "pending"
+        try:
+            # Exact fields and moves are deterministic. Only linked narrative needs interpretation.
+            exact_blocks = {identifier for group in occurrences(workspace.project.document).values() for identifier in group.block_ids}
+            narrative = [block for block in blocks if block.id not in exact_blocks and any(link.kind == "citation" for link in block.provenance)
+                and not any(link.kind == "field_binding" for link in block.provenance)]
+            if request.interpret and narrative and linked - touched:
+                sync.kind = "reconciliation"
+                proposal = await self.sync_content(identifier, sync, {"blocks": [block.model_dump(mode="json", by_alias=True) for block in narrative],
+                    "facts": [records[key].model_dump(mode="json", by_alias=True) for key in sorted(linked - touched) if key in records]}, RichReconcileProposal)
+                edits = {step.record.id: step.record for step in steps if isinstance(step, PutRecord)}
+                for record in proposal.records:
+                    original = records.get(record.id)
+                    if original is None or record.id not in linked or any(getattr(original, key, None) != getattr(record, key, None)
+                            for key in ("kind", "origin", "evidence", "job_id", "subproject_id")):
+                        raise ValueError("RECONCILE_SCOPE_INVALID")
+                    edits[record.id] = record
+                    record.user_corrected = True
+                for update in proposal.updates:
+                    original = records.get(update.record_id)
+                    if original is None or update.record_id not in linked:
+                        raise ValueError("RECONCILE_SCOPE_INVALID")
+                    target = working_field(original, update.field_key)
+                    if target is None or (target.value is not None and not isinstance(target.value, str)):
+                        raise ValueError("RECONCILE_SCOPE_INVALID")
+                    copy = edits.setdefault(original.id, original.model_copy(deep=True))
+                    set_text(copy, update.field_key, update.text)
+                for update in proposal.uncertain:
+                    original = records.get(update.record_id)
+                    if original is None or original.id not in linked:
+                        raise ValueError("RECONCILE_SCOPE_INVALID")
+                    copy = edits.setdefault(original.id, original.model_copy(deep=True))
+                    target = working_field(copy, update.field_key)
+                    if target is None:
+                        raise ValueError("RECONCILE_SCOPE_INVALID")
+                    target.status, target.pending_raw_text = "pending", update.text
+                    copy.user_corrected = True
+                    sync.status = "conflict"
+                    sync.field_keys.append(update.field_key)
+                sync.proposed_steps = [*[step for step in steps if not isinstance(step, PutRecord)],
+                    *[PutRecord(kind="put_record", beforeRevision=records[key].revision, record=value) for key, value in edits.items()]]
+                sync.ready = bool(sync.proposed_steps)
+            if not dependencies_current(self.workspaces[identifier], sync.dependencies):
+                sync.status, sync.ready, sync.error_code = "stale", False, "STALE_SYNC"
+            elif not sync.ready and sync.status != "conflict":
+                sync.status = "applied"
+        except (ContentFailure, AdmissionCancelled, ProjectFailure, SpikeError, ValidationError, ValueError) as error:
+            sync.status, sync.error_code = "failed", getattr(error, "code", "INVALID_RESULT")
+        self.publish_sync(identifier, sync)
+        return self.response(identifier)
+
+    async def rewrite_rich(self, identifier, request):
+        workspace = self.read(identifier)
+        try:
+            parts = selection_parts(workspace, request.selection)
+            if selection_checksum(parts) != request.selection.text_sha256:
+                raise ValueError("STALE_SELECTION")
+        except ValueError as error:
+            raise ProjectFailure(str(error), 409) from None
+        records = {link.record_id for block, *_ in parts for link in block.provenance if link.kind in {"citation", "field_binding"}}
+        sync = self.add_sync(identifier, request.selection.capture, request.selection.block_ids, "rewrite", sorted(records))
+        sync.selection, sync.instruction = request.selection, request.instruction
+        try:
+            proposal = await self.sync_content(identifier, sync, {"instruction": request.instruction,
+                "selection": [part[-1] for part in parts]}, RichRewriteProposal)
+            steps = rewrite_steps(workspace, request.selection, proposal)
+            preview = RichMutation(schemaVersion=1, projectId=identifier, clientMutationId=identity("preview"),
+                actionId=sync.action_id, kind="rewrite", capture=request.selection.capture, steps=steps)
+            candidate, _ = apply_rich_mutation(workspace, preview)
+            completion = RichCompletionRequest(capture=request.selection.capture, blockIds=[block.id for block in candidate.project.document.blocks()
+                if block.id not in {old.id for old in workspace.project.document.blocks()} or block.id in request.selection.block_ids],
+                movedIds=[], removedFields=[], interpret=False)
+            fact_steps, conflicts = exact_completion(candidate, completion)
+            sync.proposed_steps, sync.ready = [*steps, *fact_steps], True
+            sync.status = "conflict" if conflicts else "pending"
+            if not dependencies_current(self.workspaces[identifier], sync.dependencies):
+                sync.status, sync.ready, sync.error_code = "stale", False, "STALE_SYNC"
+        except (ContentFailure, AdmissionCancelled, ProjectFailure, SpikeError, ValidationError, ValueError) as error:
+            sync.status, sync.error_code = "failed", getattr(error, "code", "INVALID_RESULT")
+        self.publish_sync(identifier, sync)
+        return self.response(identifier)

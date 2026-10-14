@@ -9,6 +9,12 @@ import type { RichDocumentV1 } from "../contracts/generated/rich_document_v1";
 import type { RichProjectResponse } from "../contracts/generated/rich_project_response";
 import type { RichMutation } from "../contracts/generated/rich_mutation";
 import type { ImageSessionRequest } from "../contracts/generated/image_session_request";
+import { documentCells, type StoredBlock } from "./document-cells";
+import { factCells, factsFromCells } from "./fact-cells";
+import { RichSynchronization } from "./synchronization";
+import { selectedRange } from "./selection";
+import type { RichSelection } from "../contracts/generated/rich_selection";
+import type { RichCompletionRequest } from "../contracts/generated/rich_completion_request";
 import { SessionHistory, type CellChange, type CellValue } from "./history";
 import { RichSaveQueue, type RichBlock } from "./save-queue";
 import { saveMutation, projectRequest, imageSource, uploadImage, validateImageSession } from "./api";
@@ -32,6 +38,7 @@ const section = createReactBlockSpec({ type: "section", content: "inline", propS
 } }, { render: ({ contentRef }) => <h2 className="cv-section-title" ref={contentRef} /> });
 const factField = createReactInlineContentSpec({ type: "factField", content: "styled", propSchema: {
   bindingId: { default: "" }, recordId: { default: "" }, fieldKey: { default: "" }, syncedFactRevision: { default: 1 },
+  bindingRootId: { default: "" },
 } }, { render: ({ inlineContent, contentRef }) => <span data-binding-id={inlineContent.props.bindingId}
   data-record-id={inlineContent.props.recordId} data-field-key={inlineContent.props.fieldKey} ref={contentRef} /> });
 const heading = createReactBlockSpec({ type: "heading", content: "inline", propSchema: {
@@ -55,7 +62,7 @@ const schema = BlockNoteSchema.create({ blockSpecs: { paragraph: defaultBlockSpe
   table: defaultBlockSpecs.table, image: image(), region: region(), section: section() }, inlineContentSpecs: { ...defaultInlineContentSpecs, factField } });
 type EditorBlock = Block<typeof schema.blockSchema, typeof schema.inlineContentSchema, typeof schema.styleSchema>;
 type InputBlock = PartialBlock<typeof schema.blockSchema, typeof schema.inlineContentSchema, typeof schema.styleSchema>;
-type Stored = { block: RichBlock; children: string[] };
+type Stored = StoredBlock;
 
 function toBlock(block: RichBlock): InputBlock {
   const children = block.children.map(toBlock);
@@ -82,8 +89,13 @@ export function RichEditor({ initial, acknowledge, onStatus, ref }: { initial: R
   acknowledge: (response: RichProjectResponse) => void; onStatus: (status: string) => void; ref: Ref<RichEditorHandle> }) {
   const project = initial.workspace.project;
   if (!project) throw new Error("Document is missing");
+  const initialFacts = project.facts;
   const [, refresh] = useState(0);
   const [selecting, setSelecting] = useState(false);
+  const [instruction, setInstruction] = useState("");
+  const [rewriting, setRewriting] = useState(false);
+  const [syncRecords, setSyncRecords] = useState(initial.workspace.syncRecords);
+  const selection = useRef<ReturnType<typeof selectedRange>>(null);
   const [editorWarning, setEditorWarning] = useState("");
   const [targets, setTargets] = useState<{ id: string; label: string }[]>([]);
   const imageInput = useRef<HTMLInputElement>(null);
@@ -92,7 +104,7 @@ export function RichEditor({ initial, acknowledge, onStatus, ref }: { initial: R
     lastTypingAt: 0, history: null as SessionHistory | null, queue: null as RichSaveQueue | null,
     fragments: new Map<string, string>(), projectionError: null as string | null,
     current: new Map<string, CellValue>(), values: new Map<string, Stored>(), original: new Map<string, RichBlock>(),
-    undo: () => {}, redo: () => {}, complete: () => {}, timer: null as ReturnType<typeof setTimeout> | null }), []);
+    undo: () => {}, redo: () => {}, complete: () => {}, rewrite: async (_instruction: string): Promise<void> => {}, retry: async (_id: string): Promise<void> => {}, resolve: async (_id: string): Promise<void> => {}, timer: null as ReturnType<typeof setTimeout> | null }), []);
   const assets = useMemo(() => ({ upload: async (_file: File, _block?: string, _after?: string): Promise<void> => {}, cancel: (_block: string) => {},
     paste: (_event: ClipboardEvent | DragEvent): boolean => false, command: (_command: string, _target?: string) => {} }), []);
   const extension = useMemo(() => createExtension({ key: "foldcv-rich-session", runsBefore: ["link"], tiptapExtensions: [tableIdentityAttributes, structureIdentityAttributes,
@@ -123,12 +135,13 @@ export function RichEditor({ initial, acknowledge, onStatus, ref }: { initial: R
         const tr = deleteAcrossRegions(view.state);
         if (tr) { event.preventDefault(); bridge.group++; view.dispatch(tr); return true; }
       }
+      if (event.key === "Enter" && !bridge.composing) queueMicrotask(() => bridge.complete());
       if (!(event.metaKey || event.ctrlKey) || !["z", "y"].includes(event.key.toLowerCase())) return false;
       event.preventDefault(); if (!bridge.composing) { bridge.group++; if (event.shiftKey || event.key.toLowerCase() === "y") bridge.redo(); else bridge.undo(); } return true;
     }, handleDOMEvents: {
       compositionstart: () => { bridge.group++; bridge.composing = true; return false; },
       compositionend: () => { queueMicrotask(() => { bridge.composing = false; bridge.complete(); bridge.group++; }); return false; },
-      blur: () => { if (!bridge.composing) bridge.group++; return false; },
+      blur: () => { if (!bridge.composing) { bridge.complete(); bridge.group++; } return false; },
       beforeinput: (_view, event) => {
         if (!(event instanceof InputEvent) || !["historyUndo", "historyRedo"].includes(event.inputType)) return false;
         event.preventDefault(); if (!bridge.composing) { if (event.inputType === "historyUndo") bridge.undo(); else bridge.redo(); } return true;
@@ -149,6 +162,7 @@ export function RichEditor({ initial, acknowledge, onStatus, ref }: { initial: R
 
   useEffect(() => editor.onSelectionChange(() => {
     setSelecting(editor.transact(tr => !tr.selection.empty));
+    const next = editor.transact(tr => selectedRange(tr)); if (next) selection.current = next;
   }), [editor]);
 
   useEffect(() => {
@@ -255,16 +269,9 @@ export function RichEditor({ initial, acknowledge, onStatus, ref }: { initial: R
       }
       } catch (error) { setEditorWarning(error instanceof Error ? error.message : "Не удалось изменить блок"); }
     };
-    function cells(document: RichDocumentV1) {
-      const values = new Map<string, CellValue>();
-      const visit = (block: RichBlock) => {
-        const stored: Stored = { block: { ...block, children: [], revision: 1 }, children: block.children.map(child => child.id) };
-        const json = JSON.stringify(stored); bridge.values.set(json, stored); values.set(`block:${block.id}`, json); block.children.forEach(visit);
-      };
-      document.regions.forEach(region => { values.set(`region:${region.id}`, JSON.stringify(region.blocks.map(block => block.id))); region.blocks.forEach(visit); });
-      return values;
-    }
-    bridge.current = cells(document());
+    const cells = (document: RichDocumentV1) => documentCells(document, bridge.values);
+    const withFacts = (doc: RichDocumentV1, facts: typeof project.facts) => new Map([...cells(doc), ...factCells(facts)]);
+    bridge.current = withFacts(document(), project.facts);
     const queue = new RichSaveQueue(initial, bridge.session, saveMutation, acknowledge);
     bridge.queue = queue;
     function schedule() {
@@ -301,10 +308,46 @@ export function RichEditor({ initial, acknowledge, onStatus, ref }: { initial: R
           });
         } finally { bridge.replaying = false; }
       }
-      queue.update(document(), history.currentActionId ?? `${bridge.session}:typing`, bridge.kind); schedule(); refresh(value => value + 1);
+      queue.update(document(), history.currentActionId ?? `${bridge.session}:typing`, bridge.kind, factsFromCells(bridge.current, queue.baseline.workspace.project?.facts ?? initialFacts)); schedule(); refresh(value => value + 1);
+      queueMicrotask(() => sync.invalidate());
       imageRevision++; queueMicrotask(() => { void publishImageReferences().catch(error => onStatus(error instanceof Error ? error.message : "IMAGE_IMPORT_FAILED")); });
     });
     bridge.history = history;
+    const sync = new RichSynchronization({ history, queue, current: () => bridge.current,
+      cells: response => {
+        const current = response.workspace.project; if (!current) throw new Error("Document missing");
+        return withFacts(current.document, current.facts);
+      }, changed: () => { queue.update(document(), history.currentActionId ?? bridge.session, bridge.kind,
+        factsFromCells(bridge.current, queue.baseline.workspace.project?.facts ?? initialFacts)); schedule(); },
+      report: response => { setSyncRecords(response.workspace.syncRecords); },
+    }, initial.workspace.projectId);
+    let pendingAction: string | null = null;
+    const pendingBlocks = new Set<string>(), movedBlocks = new Set<string>(), removedRecords = new Set<string>();
+    const removedFields = new Map<string, RichCompletionRequest["removedFields"][number]>();
+    const completedActions = new Set<string>();
+    function finishEdit() {
+      if (!pendingAction || completedActions.has(pendingAction) || bridge.composing || !open) return;
+      const action = pendingAction, ids = [...pendingBlocks], moved = [...movedBlocks], removed = [...removedFields.values()], deleted = [...removedRecords];
+      completedActions.add(action); pendingAction = null; pendingBlocks.clear(); movedBlocks.clear(); removedFields.clear(); removedRecords.clear();
+      void sync.complete(action, ids.filter(id => !!editor.getBlock(id)), moved, removed, true, deleted).catch(error => setEditorWarning(error instanceof Error ? error.message : "Синхронизация не завершена"));
+    }
+    bridge.rewrite = async instruction => {
+      if (!selection.current || bridge.composing) throw new Error("Выделите фрагмент текста");
+      const captured: RichSelection = { ...selection.current, textSha256: "0".repeat(64), capture: { sessionId: bridge.session,
+        actionId: bridge.session, actionToken: 0, dependencies: [] } };
+      await sync.rewrite(captured, instruction);
+    };
+    bridge.resolve = id => sync.resolve(id);
+    bridge.retry = async id => {
+      const response = await projectRequest(`/${initial.workspace.projectId}`), record = response.workspace.syncRecords.find(item => item.id === id);
+      if (!record) return;
+      if (record.kind === "rewrite" && record.selection && record.instruction) await sync.retry(record.id, record.blockIds);
+      else {
+        const marker = `request:${crypto.randomUUID()}`, action = history.commit("structure", [{ key: marker, before: null, after: "retry" }]);
+        if (action) await sync.complete(action, record.blockIds.filter(id => !!editor.getBlock(id)), [], []);
+      }
+    };
+
     let imageRevision = 1, open = true, sessionUpdates: Promise<unknown> = Promise.resolve();
     let previousSessionId: string | null = null;
     try { const key = `foldcv-image-session:${initial.workspace.projectId}`; previousSessionId = sessionStorage.getItem(key); sessionStorage.setItem(key, bridge.session); } catch { /* Session close still releases refs when storage is unavailable. */ }
@@ -422,7 +465,8 @@ export function RichEditor({ initial, acknowledge, onStatus, ref }: { initial: R
     function observe() {
       if (bridge.replaying) return;
       let next: Map<string, CellValue>;
-      try { const doc = document(); next = cells(doc); bridge.projectionError = null;
+      try { const doc = document(); next = new Map([...bridge.current].filter(([key]) => !key.startsWith("block:") && !key.startsWith("region:")));
+        for (const [key, value] of cells(doc)) next.set(key, value); bridge.projectionError = null;
         const destinations: { id: string; label: string }[] = doc.regions.map(region => ({ id: region.id,
           label: region.role === "header" ? "Заголовок" : region.role === "sidebar" ? "Боковая колонка" : "Основная колонка" }));
         const title = (block: RichBlock): string => Array.isArray(block.content) ? block.content.map(span => span.type === "link"
@@ -453,15 +497,45 @@ export function RichEditor({ initial, acknowledge, onStatus, ref }: { initial: R
         const kind = bridge.composing ? "composition" : structure ? "structure" : "typing";
         bridge.kind = kind;
         const id = history.commit(kind, changes, kind === "typing" || kind === "composition" ? `typing:${bridge.group}` : null);
-        if (id) queue.update(document(), id, kind);
+        if (id) {
+          queue.update(document(), id, kind, factsFromCells(bridge.current, queue.baseline.workspace.project?.facts ?? initialFacts));
+          pendingAction = id; completedActions.delete(id);
+          for (const change of changes) {
+            if (change.key.startsWith("block:")) {
+              const blockId = change.key.slice(6); pendingBlocks.add(blockId);
+              const old = change.before ? bridge.values.get(change.before) : undefined;
+              const remember = (item: unknown) => {
+                if (Array.isArray(item)) item.forEach(remember);
+                else if (typeof item === "object" && item !== null) {
+                  if ("type" in item && item.type === "fact_field" && "recordId" in item && typeof item.recordId === "string"
+                    && "fieldKey" in item && typeof item.fieldKey === "string" && "bindingId" in item && typeof item.bindingId === "string") {
+                    const rootId = "bindingRootId" in item && typeof item.bindingRootId === "string" ? item.bindingRootId : item.bindingId;
+                    removedFields.set(rootId, { recordId: item.recordId, fieldKey: item.fieldKey, rootId });
+                  }
+                  Object.values(item).forEach(remember);
+                }
+              };
+              if (old) {
+                remember(old.block);
+                if (!change.after && old.block.type === "section" && old.block.props.recordId) removedRecords.add(old.block.props.recordId);
+              }
+            }
+            if ((change.key.startsWith("block:") || change.key.startsWith("region:")) && change.before && change.after) {
+              const ids = (value: string): string[] => { const stored = bridge.values.get(value); if (stored) return stored.children;
+                const parsed: unknown = JSON.parse(value); return Array.isArray(parsed) ? parsed.filter((id: unknown): id is string => typeof id === "string") : []; };
+              for (const child of ids(change.after)) if (!ids(change.before).includes(child) && bridge.original.has(child)) movedBlocks.add(child);
+            }
+          }
+          if (kind === "structure") queueMicrotask(finishEdit);
+        }
       } finally { bridge.observing = false; bridge.kind = "typing"; }
     }
     const stop = editor.onChange(observe);
     observe();
-    bridge.complete = () => { observe(); schedule(); };
+    bridge.complete = () => { observe(); schedule(); finishEdit(); };
     // Only initial normalization is queued; acknowledgments never replace the editor.
     queue.update(document(), `${bridge.session}:initial`);
-    return () => { stop(); open = false; imageRevision++; for (const upload of uploads.values()) upload.abort();
+    return () => { stop(); sync.close(); open = false; imageRevision++; for (const upload of uploads.values()) upload.abort();
       window.removeEventListener("pagehide", closeOnUnload); void publishImageReferences().catch(() => {}); history.close(); queue.close(); if (bridge.timer) clearTimeout(bridge.timer); };
   }, [editor, bridge]);
   useImperativeHandle(ref, () => ({ flush: async () => {
@@ -472,7 +546,10 @@ export function RichEditor({ initial, acknowledge, onStatus, ref }: { initial: R
   }, undo: bridge.undo, redo: bridge.redo }), [bridge, bridge.history?.position]);
   return <ImageActions.Provider value={{ source: asset => imageSource(initial.workspace.projectId, asset), upload: assets.upload, cancel: assets.cancel }}>
     <div className="cv-document" style={{ ...referenceVariables, color: "#171717" }} data-project-id={initial.workspace.projectId}>
-      <div className="cv-structure-controls"><Popover.Root><Popover.Trigger asChild><button>Блок</button></Popover.Trigger><Popover.Portal>
+      <div className="cv-structure-controls"><Popover.Root><Popover.Trigger asChild><button disabled={!selecting || rewriting}>Переписать выделенное</button></Popover.Trigger><Popover.Portal>
+        <Popover.Content className="rich-block-menu"><label>Что изменить<textarea aria-label="Инструкция для фрагмента" value={instruction} onChange={event => setInstruction(event.currentTarget.value)} /></label>
+          <button disabled={!instruction.trim() || rewriting} onClick={() => { setRewriting(true); void bridge.rewrite(instruction).catch(error => setEditorWarning(error instanceof Error ? error.message : "Не удалось переписать")).finally(() => setRewriting(false)); }}>Применить инструкцию</button>
+        </Popover.Content></Popover.Portal></Popover.Root><Popover.Root><Popover.Trigger asChild><button>Блок</button></Popover.Trigger><Popover.Portal>
         <Popover.Content className="rich-block-menu"><button onClick={() => assets.command("duplicate")}>Дублировать</button>
           <button onClick={() => assets.command("delete")}>Удалить</button><button onClick={() => assets.command("up")}>Выше</button>
           <button onClick={() => assets.command("down")}>Ниже</button><button onClick={() => assets.command("nest")}>Вложить</button>
@@ -484,6 +561,12 @@ export function RichEditor({ initial, acknowledge, onStatus, ref }: { initial: R
       <label className="cv-insert-image">Добавить изображение<input ref={imageInput} type="file" accept="image/png,image/jpeg,image/webp"
         onChange={event => { const file = event.currentTarget.files?.[0]; event.currentTarget.value = ""; if (file) void assets.upload(file).catch(error => setEditorWarning(error instanceof Error ? error.message : "Не удалось добавить изображение")); }} /></label>
       </div>{editorWarning && <p role="alert" className="cv-editor-warning">{editorWarning}<button onClick={() => setEditorWarning("")}>Закрыть</button></p>}
+      {syncRecords.filter(record => ["failed", "conflict", "pending", "stale"].includes(record.status)).map(record => <p key={record.id} className="cv-editor-warning" role="status">
+        {record.status === "failed" ? `Синхронизация не завершена: ${record.errorCode ?? "ошибка"}` : record.status === "conflict" ? "Есть другие упоминания. Проверьте связанные факты." : record.status === "stale" ? "Предложение устарело. Ваши изменения сохранены." : record.errorCode === "OPERATION_INTERRUPTED" ? "Синхронизация была прервана." : "Синхронизация…"}
+        {record.status === "conflict" && <button onClick={() => void bridge.resolve(record.id).catch(error => setEditorWarning(error instanceof Error ? error.message : "Не удалось обновить"))}>Обновить связанные поля</button>}
+        <button onClick={() => void bridge.retry(record.id).catch(error => setEditorWarning(error instanceof Error ? error.message : "Не удалось повторить"))}>Повторить</button>
+        <button onClick={() => void projectRequest(`/${initial.workspace.projectId}/sync/${record.id}`, "POST", { status: "stale" }).then(response => setSyncRecords(response.workspace.syncRecords))}>Закрыть</button>
+      </p>)}
       <BlockNoteView editor={editor} theme="light" linkToolbar={!selecting} filePanel={false} slashMenu={false}>
         <SuggestionMenuController triggerCharacter="/" getItems={async query => [...getDefaultReactSlashMenuItems(editor),
           { title: "Изображение", subtext: "Локальный PNG, JPEG или WebP", aliases: ["image", "photo"], group: "Media", onItemClick: () => imageInput.current?.click() }]

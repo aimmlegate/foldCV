@@ -394,3 +394,8 @@ editorial quality. The three examples used to develop the rules are regressions,
 not held-out evidence. Human review remains necessary for ambiguous prose and
 document appearance. Do not add a second paid model as an automatic test judge
 in the production path.
+
+NE07 adds scoped rich rewrite/completion, split-field roots, ownership corrections,
+explicit exact-mention updates, restart interruption and stale-retry regressions.
+Python and Node checks are mapped under NE-SYNC/NE-HISTORY/NE-FACTS. Mounted T3
+results are retained separately; they do not stand in for native OS IME or Word.

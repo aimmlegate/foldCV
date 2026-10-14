@@ -252,6 +252,11 @@
           "title": "Status",
           "type": "string"
         },
+        "userCorrected": {
+          "default": false,
+          "title": "Usercorrected",
+          "type": "boolean"
+        },
         "value": {
           "anyOf": [
             {
@@ -306,6 +311,11 @@
           ],
           "title": "Status",
           "type": "string"
+        },
+        "userCorrected": {
+          "default": false,
+          "title": "Usercorrected",
+          "type": "boolean"
         },
         "value": {
           "anyOf": [

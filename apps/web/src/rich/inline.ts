@@ -5,7 +5,7 @@ export type EditorMarks = { bold?: boolean; italic?: boolean; underline?: boolea
   textColor?: string; backgroundColor?: string };
 export type EditorText = { type: "text"; text: string; styles: EditorMarks };
 export type EditorInline = EditorText | { type: "link"; href: string; content: EditorText[] }
-  | { type: "factField"; props: { bindingId: string; recordId: string; fieldKey: string; syncedFactRevision: number }; content: EditorText[] };
+  | { type: "factField"; props: { bindingId: string; recordId: string; fieldKey: string; syncedFactRevision: number; bindingRootId: string }; content: EditorText[] };
 export type FragmentId = (bindingId: string, fragment: string) => string;
 
 export function wireColor(value: string | undefined, kind: "text" | "background"): string {
@@ -30,7 +30,7 @@ export function toInline(content: Content): EditorInline[] {
   return content.map(span => span.type === "link" ? { type: "link", href: span.href,
     content: span.content.map(child => ({ type: "text", text: child.text, styles: marks(child.styles) })) }
     : span.type === "fact_field" ? { type: "factField", props: { bindingId: span.bindingId, recordId: span.recordId,
-      fieldKey: span.fieldKey, syncedFactRevision: span.syncedFactRevision }, content: [{ type: "text", text: span.text, styles: marks(span.styles) }] }
+      fieldKey: span.fieldKey, syncedFactRevision: span.syncedFactRevision, bindingRootId: span.bindingRootId ?? span.bindingId }, content: [{ type: "text", text: span.text, styles: marks(span.styles) }] }
       : { type: "text", text: span.text, styles: marks(span.styles) });
 }
 export function fromInline(content: readonly EditorInline[], fragmentId: FragmentId): Content {
@@ -50,7 +50,7 @@ export function fromInline(content: readonly EditorInline[], fragmentId: Fragmen
       const bindingId = index === 0 ? span.props.bindingId : fragmentId(span.props.bindingId, `${offset}:${JSON.stringify(chunk.styles)}`);
       offset += chunk.text.length;
       return { type: "fact_field", bindingId, recordId: span.props.recordId, fieldKey: span.props.fieldKey,
-        syncedFactRevision: span.props.syncedFactRevision, text: chunk.text, styles: chunk.styles };
+        syncedFactRevision: span.props.syncedFactRevision, bindingRootId: span.props.bindingRootId || span.props.bindingId, text: chunk.text, styles: chunk.styles };
     });
   });
 }

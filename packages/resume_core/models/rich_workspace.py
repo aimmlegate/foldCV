@@ -11,7 +11,7 @@ from .contracts import Evidence, Id, PartialDate, Revision, Sha256, Source, Temp
 from .recovery import EvidenceSpan, Rules
 from .rich_document import ImageBlock, RichDocumentV1, SectionBlock
 from .rich_facts import WorkingFacts
-from .rich_mutations import DependencyStamp
+from .rich_mutations import DependencyStamp, RichStep, RichSelection
 
 
 class LocalImageAsset(Wire):
@@ -136,6 +136,11 @@ class RichSyncRecord(Wire):
     fact_ids: list[Id]
     dependencies: list[DependencyStamp]
     error_code: Id | None
+    kind: Literal["completion", "rewrite", "reconciliation", "conflict"] = "completion"
+    ready: bool = False
+    proposed_steps: list[RichStep] = Field(default_factory=list, max_length=1000)
+    selection: RichSelection | None = None
+    instruction: str | None = None
 
 
 class RichMutationReplay(Wire):

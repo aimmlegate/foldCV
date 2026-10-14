@@ -1,5 +1,40 @@
 {
   "$defs": {
+    "ActionCapture": {
+      "additionalProperties": false,
+      "properties": {
+        "actionId": {
+          "minLength": 1,
+          "title": "Actionid",
+          "type": "string"
+        },
+        "actionToken": {
+          "minimum": 0,
+          "title": "Actiontoken",
+          "type": "integer"
+        },
+        "dependencies": {
+          "items": {
+            "$ref": "#/$defs/DependencyStamp"
+          },
+          "title": "Dependencies",
+          "type": "array"
+        },
+        "sessionId": {
+          "minLength": 1,
+          "title": "Sessionid",
+          "type": "string"
+        }
+      },
+      "required": [
+        "sessionId",
+        "actionId",
+        "actionToken",
+        "dependencies"
+      ],
+      "title": "ActionCapture",
+      "type": "object"
+    },
     "AssetRef": {
       "additionalProperties": false,
       "properties": {
@@ -216,6 +251,11 @@
         },
         "title": {
           "$ref": "#/$defs/WorkingField_str_"
+        },
+        "userCorrected": {
+          "default": false,
+          "title": "Usercorrected",
+          "type": "boolean"
         }
       },
       "required": [
@@ -272,6 +312,11 @@
           "minimum": 1,
           "title": "Revision",
           "type": "integer"
+        },
+        "userCorrected": {
+          "default": false,
+          "title": "Usercorrected",
+          "type": "boolean"
         }
       },
       "required": [
@@ -529,6 +574,11 @@
             }
           ],
           "title": "Subprojectid"
+        },
+        "userCorrected": {
+          "default": false,
+          "title": "Usercorrected",
+          "type": "boolean"
         },
         "value": {
           "$ref": "#/$defs/WorkingField_str_"
@@ -796,6 +846,11 @@
           "title": "Revision",
           "type": "integer"
         },
+        "userCorrected": {
+          "default": false,
+          "title": "Usercorrected",
+          "type": "boolean"
+        },
         "value": {
           "$ref": "#/$defs/WorkingField_str_"
         }
@@ -985,6 +1040,11 @@
         },
         "specialty": {
           "$ref": "#/$defs/WorkingField_str_"
+        },
+        "userCorrected": {
+          "default": false,
+          "title": "Usercorrected",
+          "type": "boolean"
         }
       },
       "required": [
@@ -1046,6 +1106,11 @@
         },
         "role": {
           "$ref": "#/$defs/WorkingField_str_"
+        },
+        "userCorrected": {
+          "default": false,
+          "title": "Usercorrected",
+          "type": "boolean"
         }
       },
       "required": [
@@ -1146,6 +1211,19 @@
           "minLength": 1,
           "title": "Bindingid",
           "type": "string"
+        },
+        "bindingRootId": {
+          "anyOf": [
+            {
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Bindingrootid"
         },
         "fieldKey": {
           "minLength": 1,
@@ -1746,6 +1824,11 @@
           "minimum": 1,
           "title": "Revision",
           "type": "integer"
+        },
+        "userCorrected": {
+          "default": false,
+          "title": "Usercorrected",
+          "type": "boolean"
         }
       },
       "required": [
@@ -1816,6 +1899,11 @@
             }
           ],
           "title": "Subprojectid"
+        },
+        "userCorrected": {
+          "default": false,
+          "title": "Usercorrected",
+          "type": "boolean"
         },
         "value": {
           "$ref": "#/$defs/WorkingField_LeadershipValue_"
@@ -1981,6 +2069,11 @@
           ],
           "title": "Subprojectid"
         },
+        "userCorrected": {
+          "default": false,
+          "title": "Usercorrected",
+          "type": "boolean"
+        },
         "value": {
           "$ref": "#/$defs/WorkingField_MetricValue_"
         }
@@ -2106,6 +2199,52 @@
         "qualifiers"
       ],
       "title": "MetricValue",
+      "type": "object"
+    },
+    "MoveBlock": {
+      "additionalProperties": false,
+      "properties": {
+        "afterId": {
+          "anyOf": [
+            {
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Afterid"
+        },
+        "beforeRevision": {
+          "minimum": 1,
+          "title": "Beforerevision",
+          "type": "integer"
+        },
+        "blockId": {
+          "minLength": 1,
+          "title": "Blockid",
+          "type": "string"
+        },
+        "kind": {
+          "const": "move_block",
+          "title": "Kind",
+          "type": "string"
+        },
+        "parentId": {
+          "minLength": 1,
+          "title": "Parentid",
+          "type": "string"
+        }
+      },
+      "required": [
+        "kind",
+        "blockId",
+        "beforeRevision",
+        "parentId",
+        "afterId"
+      ],
+      "title": "MoveBlock",
       "type": "object"
     },
     "NarrativeCitation": {
@@ -2657,6 +2796,204 @@
       "title": "ProjectV5",
       "type": "object"
     },
+    "PutBlock": {
+      "additionalProperties": false,
+      "properties": {
+        "afterId": {
+          "anyOf": [
+            {
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Afterid"
+        },
+        "beforeRevision": {
+          "anyOf": [
+            {
+              "minimum": 1,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Beforerevision"
+        },
+        "block": {
+          "discriminator": {
+            "mapping": {
+              "bullet_list": "#/$defs/BulletBlock",
+              "check_list": "#/$defs/ChecklistBlock",
+              "code": "#/$defs/CodeBlock",
+              "divider": "#/$defs/DividerBlock",
+              "heading": "#/$defs/HeadingBlock",
+              "image": "#/$defs/ImageBlock",
+              "numbered_list": "#/$defs/NumberedBlock",
+              "paragraph": "#/$defs/ParagraphBlock",
+              "quote": "#/$defs/QuoteBlock",
+              "section": "#/$defs/SectionBlock",
+              "table": "#/$defs/TableBlock",
+              "toggle_list": "#/$defs/ToggleBlock"
+            },
+            "propertyName": "type"
+          },
+          "oneOf": [
+            {
+              "$ref": "#/$defs/ParagraphBlock"
+            },
+            {
+              "$ref": "#/$defs/HeadingBlock"
+            },
+            {
+              "$ref": "#/$defs/BulletBlock"
+            },
+            {
+              "$ref": "#/$defs/NumberedBlock"
+            },
+            {
+              "$ref": "#/$defs/ChecklistBlock"
+            },
+            {
+              "$ref": "#/$defs/ToggleBlock"
+            },
+            {
+              "$ref": "#/$defs/QuoteBlock"
+            },
+            {
+              "$ref": "#/$defs/CodeBlock"
+            },
+            {
+              "$ref": "#/$defs/DividerBlock"
+            },
+            {
+              "$ref": "#/$defs/TableBlock"
+            },
+            {
+              "$ref": "#/$defs/ImageBlock"
+            },
+            {
+              "$ref": "#/$defs/SectionBlock"
+            }
+          ],
+          "title": "Block"
+        },
+        "keepChildren": {
+          "default": false,
+          "title": "Keepchildren",
+          "type": "boolean"
+        },
+        "kind": {
+          "const": "put_block",
+          "title": "Kind",
+          "type": "string"
+        },
+        "parentId": {
+          "minLength": 1,
+          "title": "Parentid",
+          "type": "string"
+        }
+      },
+      "required": [
+        "kind",
+        "parentId",
+        "afterId",
+        "beforeRevision",
+        "block"
+      ],
+      "title": "PutBlock",
+      "type": "object"
+    },
+    "PutRecord": {
+      "additionalProperties": false,
+      "properties": {
+        "beforeRevision": {
+          "anyOf": [
+            {
+              "minimum": 1,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Beforerevision"
+        },
+        "kind": {
+          "const": "put_record",
+          "title": "Kind",
+          "type": "string"
+        },
+        "record": {
+          "discriminator": {
+            "mapping": {
+              "candidate": "#/$defs/CandidateRecord",
+              "certification": "#/$defs/CertificationRecord",
+              "claim": "#/$defs/ClaimRecord",
+              "detail": "#/$defs/DetailRecord",
+              "education": "#/$defs/EducationRecord",
+              "employment": "#/$defs/EmploymentRecord",
+              "language": "#/$defs/LanguageRecord",
+              "leadership": "#/$defs/LeadershipRecord",
+              "metric": "#/$defs/MetricRecord",
+              "subproject": "#/$defs/SubprojectRecord",
+              "technology": "#/$defs/TechnologyRecord",
+              "unresolved": "#/$defs/UnresolvedRecord"
+            },
+            "propertyName": "kind"
+          },
+          "oneOf": [
+            {
+              "$ref": "#/$defs/CandidateRecord"
+            },
+            {
+              "$ref": "#/$defs/DetailRecord"
+            },
+            {
+              "$ref": "#/$defs/EmploymentRecord"
+            },
+            {
+              "$ref": "#/$defs/SubprojectRecord"
+            },
+            {
+              "$ref": "#/$defs/TechnologyRecord"
+            },
+            {
+              "$ref": "#/$defs/EducationRecord"
+            },
+            {
+              "$ref": "#/$defs/LanguageRecord"
+            },
+            {
+              "$ref": "#/$defs/CertificationRecord"
+            },
+            {
+              "$ref": "#/$defs/ClaimRecord"
+            },
+            {
+              "$ref": "#/$defs/MetricRecord"
+            },
+            {
+              "$ref": "#/$defs/LeadershipRecord"
+            },
+            {
+              "$ref": "#/$defs/UnresolvedRecord"
+            }
+          ],
+          "title": "Record"
+        }
+      },
+      "required": [
+        "kind",
+        "beforeRevision",
+        "record"
+      ],
+      "title": "PutRecord",
+      "type": "object"
+    },
     "QuoteBlock": {
       "additionalProperties": false,
       "properties": {
@@ -2837,6 +3174,149 @@
         "orderIndex"
       ],
       "title": "RecordTombstone",
+      "type": "object"
+    },
+    "RemoveBlock": {
+      "additionalProperties": false,
+      "properties": {
+        "beforeRevision": {
+          "minimum": 1,
+          "title": "Beforerevision",
+          "type": "integer"
+        },
+        "blockId": {
+          "minLength": 1,
+          "title": "Blockid",
+          "type": "string"
+        },
+        "kind": {
+          "const": "remove_block",
+          "title": "Kind",
+          "type": "string"
+        }
+      },
+      "required": [
+        "kind",
+        "blockId",
+        "beforeRevision"
+      ],
+      "title": "RemoveBlock",
+      "type": "object"
+    },
+    "RemoveRecord": {
+      "additionalProperties": false,
+      "properties": {
+        "beforeRevision": {
+          "minimum": 1,
+          "title": "Beforerevision",
+          "type": "integer"
+        },
+        "kind": {
+          "const": "remove_record",
+          "title": "Kind",
+          "type": "string"
+        },
+        "recordId": {
+          "minLength": 1,
+          "title": "Recordid",
+          "type": "string"
+        }
+      },
+      "required": [
+        "kind",
+        "recordId",
+        "beforeRevision"
+      ],
+      "title": "RemoveRecord",
+      "type": "object"
+    },
+    "ReplaceInlineRange": {
+      "additionalProperties": false,
+      "properties": {
+        "beforeRevision": {
+          "minimum": 1,
+          "title": "Beforerevision",
+          "type": "integer"
+        },
+        "blockId": {
+          "minLength": 1,
+          "title": "Blockid",
+          "type": "string"
+        },
+        "cellId": {
+          "anyOf": [
+            {
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Cellid"
+        },
+        "content": {
+          "items": {
+            "discriminator": {
+              "mapping": {
+                "fact_field": "#/$defs/FactFieldSpan",
+                "link": "#/$defs/Hyperlink",
+                "text": "#/$defs/StyledText"
+              },
+              "propertyName": "type"
+            },
+            "oneOf": [
+              {
+                "$ref": "#/$defs/StyledText"
+              },
+              {
+                "$ref": "#/$defs/Hyperlink"
+              },
+              {
+                "$ref": "#/$defs/FactFieldSpan"
+              }
+            ]
+          },
+          "title": "Content",
+          "type": "array"
+        },
+        "end": {
+          "description": "UTF-16 code units within the selected inline field.",
+          "minimum": 0,
+          "title": "End",
+          "type": "integer"
+        },
+        "field": {
+          "enum": [
+            "content",
+            "caption"
+          ],
+          "title": "Field",
+          "type": "string"
+        },
+        "kind": {
+          "const": "replace_inline_range",
+          "title": "Kind",
+          "type": "string"
+        },
+        "start": {
+          "description": "UTF-16 code units within the selected inline field.",
+          "minimum": 0,
+          "title": "Start",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "kind",
+        "blockId",
+        "cellId",
+        "field",
+        "start",
+        "end",
+        "beforeRevision",
+        "content"
+      ],
+      "title": "ReplaceInlineRange",
       "type": "object"
     },
     "RichDocumentV1": {
@@ -3023,6 +3503,41 @@
         "errorCode"
       ],
       "title": "RichOperation",
+      "type": "object"
+    },
+    "RichPosition": {
+      "additionalProperties": false,
+      "properties": {
+        "blockId": {
+          "minLength": 1,
+          "title": "Blockid",
+          "type": "string"
+        },
+        "cellId": {
+          "anyOf": [
+            {
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Cellid"
+        },
+        "offset": {
+          "description": "UTF-16 code units within the block or cell.",
+          "minimum": 0,
+          "title": "Offset",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "blockId",
+        "cellId",
+        "offset"
+      ],
+      "title": "RichPosition",
       "type": "object"
     },
     "RichPreDraft": {
@@ -3241,6 +3756,53 @@
       "title": "RichRenderSnapshot",
       "type": "object"
     },
+    "RichSelection": {
+      "additionalProperties": false,
+      "properties": {
+        "anchor": {
+          "$ref": "#/$defs/RichPosition"
+        },
+        "blockIds": {
+          "items": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "minItems": 1,
+          "title": "Blockids",
+          "type": "array"
+        },
+        "capture": {
+          "$ref": "#/$defs/ActionCapture"
+        },
+        "head": {
+          "$ref": "#/$defs/RichPosition"
+        },
+        "kind": {
+          "enum": [
+            "text",
+            "blocks",
+            "table_cells"
+          ],
+          "title": "Kind",
+          "type": "string"
+        },
+        "textSha256": {
+          "pattern": "^[a-f0-9]{64}$",
+          "title": "Textsha256",
+          "type": "string"
+        }
+      },
+      "required": [
+        "kind",
+        "anchor",
+        "head",
+        "blockIds",
+        "capture",
+        "textSha256"
+      ],
+      "title": "RichSelection",
+      "type": "object"
+    },
     "RichSyncRecord": {
       "additionalProperties": false,
       "properties": {
@@ -3296,6 +3858,83 @@
           "minLength": 1,
           "title": "Id",
           "type": "string"
+        },
+        "instruction": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Instruction"
+        },
+        "kind": {
+          "default": "completion",
+          "enum": [
+            "completion",
+            "rewrite",
+            "reconciliation",
+            "conflict"
+          ],
+          "title": "Kind",
+          "type": "string"
+        },
+        "proposedSteps": {
+          "items": {
+            "discriminator": {
+              "mapping": {
+                "move_block": "#/$defs/MoveBlock",
+                "put_block": "#/$defs/PutBlock",
+                "put_record": "#/$defs/PutRecord",
+                "remove_block": "#/$defs/RemoveBlock",
+                "remove_record": "#/$defs/RemoveRecord",
+                "replace_inline_range": "#/$defs/ReplaceInlineRange"
+              },
+              "propertyName": "kind"
+            },
+            "oneOf": [
+              {
+                "$ref": "#/$defs/PutBlock"
+              },
+              {
+                "$ref": "#/$defs/RemoveBlock"
+              },
+              {
+                "$ref": "#/$defs/MoveBlock"
+              },
+              {
+                "$ref": "#/$defs/ReplaceInlineRange"
+              },
+              {
+                "$ref": "#/$defs/PutRecord"
+              },
+              {
+                "$ref": "#/$defs/RemoveRecord"
+              }
+            ]
+          },
+          "maxItems": 1000,
+          "title": "Proposedsteps",
+          "type": "array"
+        },
+        "ready": {
+          "default": false,
+          "title": "Ready",
+          "type": "boolean"
+        },
+        "selection": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/RichSelection"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
         },
         "status": {
           "enum": [
@@ -3924,6 +4563,11 @@
         },
         "role": {
           "$ref": "#/$defs/WorkingField_str_"
+        },
+        "userCorrected": {
+          "default": false,
+          "title": "Usercorrected",
+          "type": "boolean"
         }
       },
       "required": [
@@ -4274,6 +4918,11 @@
             }
           ],
           "title": "Subprojectid"
+        },
+        "userCorrected": {
+          "default": false,
+          "title": "Usercorrected",
+          "type": "boolean"
         }
       },
       "required": [
@@ -4531,6 +5180,11 @@
           ],
           "title": "Status",
           "type": "string"
+        },
+        "userCorrected": {
+          "default": false,
+          "title": "Usercorrected",
+          "type": "boolean"
         }
       },
       "required": [
@@ -4664,6 +5318,11 @@
           "title": "Status",
           "type": "string"
         },
+        "userCorrected": {
+          "default": false,
+          "title": "Usercorrected",
+          "type": "boolean"
+        },
         "value": {
           "anyOf": [
             {
@@ -4718,6 +5377,11 @@
           ],
           "title": "Status",
           "type": "string"
+        },
+        "userCorrected": {
+          "default": false,
+          "title": "Usercorrected",
+          "type": "boolean"
         },
         "value": {
           "anyOf": [
@@ -4774,6 +5438,11 @@
           "title": "Status",
           "type": "string"
         },
+        "userCorrected": {
+          "default": false,
+          "title": "Usercorrected",
+          "type": "boolean"
+        },
         "value": {
           "anyOf": [
             {
@@ -4828,6 +5497,11 @@
           ],
           "title": "Status",
           "type": "string"
+        },
+        "userCorrected": {
+          "default": false,
+          "title": "Usercorrected",
+          "type": "boolean"
         },
         "value": {
           "anyOf": [
@@ -4884,6 +5558,11 @@
           ],
           "title": "Status",
           "type": "string"
+        },
+        "userCorrected": {
+          "default": false,
+          "title": "Usercorrected",
+          "type": "boolean"
         },
         "value": {
           "anyOf": [

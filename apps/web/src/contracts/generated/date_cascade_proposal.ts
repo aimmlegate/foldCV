@@ -20,6 +20,7 @@ export type Pendingrawtext = string | null;
 export type Rawtext = string;
 export type Revision1 = number;
 export type Status = "known" | "unknown" | "unresolved" | "pending" | "conflict";
+export type Usercorrected = boolean;
 export type Sourceid = string;
 export type Sourcerevision = number;
 export type Text = string;
@@ -31,6 +32,7 @@ export type Pendingrawtext1 = string | null;
 export type Rawtext1 = string;
 export type Revision2 = number;
 export type Status1 = "known" | "unknown" | "unresolved" | "pending" | "conflict";
+export type Usercorrected1 = boolean;
 export type Value = boolean | null;
 export type Revision3 = number;
 export type Inclusivespan = number;
@@ -92,6 +94,7 @@ export interface WorkingFieldPartialDate {
   rawText: Rawtext;
   revision: Revision1;
   status: Status;
+  userCorrected?: Usercorrected;
   value: PartialDate | null;
 }
 export interface EvidenceSpan {
@@ -106,5 +109,6 @@ export interface WorkingFieldBool {
   rawText: Rawtext1;
   revision: Revision2;
   status: Status1;
+  userCorrected?: Usercorrected1;
   value: Value;
 }

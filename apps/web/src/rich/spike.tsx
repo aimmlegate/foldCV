@@ -18,6 +18,7 @@ const section = createReactBlockSpec({ type: "section", content: "inline",
 }, { render: ({ contentRef }) => <h2 className="rich-section-title" ref={contentRef} /> });
 const factField = createReactInlineContentSpec({ type: "factField", content: "styled", propSchema: {
   bindingId: { default: "" }, recordId: { default: "" }, fieldKey: { default: "" }, syncedFactRevision: { default: 1 },
+  bindingRootId: { default: "" },
 } }, { render: ({ inlineContent, contentRef }) => <span data-binding-id={inlineContent.props.bindingId}
   data-record-id={inlineContent.props.recordId} data-field-key={inlineContent.props.fieldKey} ref={contentRef} /> });
 const { file: _file, audio: _audio, video: _video, heading: defaultHeading, ...supported } = defaultBlockSpecs;
@@ -84,7 +85,7 @@ function Spike() {
   })] }), [bridge]);
   const editor = useCreateBlockNote({ schema, disableExtensions: ["history"], extensions: [extension], initialContent: [
     { id: "header", type: "region", props: { role: "header" }, children: [
-      { id: "name", type: "paragraph", content: [{ type: "factField", props: { bindingId: "name-binding", recordId: "candidate-1", fieldKey: "name", syncedFactRevision: 1 }, content: [{ type: "text", text: "Alex Example", styles: { italic: true } }] }] },
+      { id: "name", type: "paragraph", content: [{ type: "factField", props: { bindingId: "name-binding", recordId: "candidate-1", fieldKey: "name", syncedFactRevision: 1, bindingRootId: "name-binding" }, content: [{ type: "text", text: "Alex Example", styles: { italic: true } }] }] },
       { id: "title", type: "heading", props: { level: 1 }, content: "Engineer" },
     ] },
     { id: "sidebar", type: "region", props: { role: "sidebar" }, children: [
@@ -247,7 +248,7 @@ function Spike() {
     <nav className="rich-proof-controls">
       <button onClick={() => bridge.undo()}>Undo</button><button onClick={() => bridge.redo()}>Redo</button>
       <button onClick={() => command("panel", () => editor.updateBlock("name", { content: [{ type: "factField", props: {
-        bindingId: "name-binding", recordId: "candidate-1", fieldKey: "name", syncedFactRevision: 2 },
+        bindingId: "name-binding", recordId: "candidate-1", fieldKey: "name", syncedFactRevision: 2, bindingRootId: "name-binding" },
         content: [{ type: "text", text: "Sam Example", styles: { italic: true } }] }] }), { "fact:name": "Sam Example" })}>Panel name</button>
       <button onClick={() => command("rewrite", () => editor.updateBlock("narrative", { content: "A scoped rewrite" }))}>Rewrite</button>
       <button onClick={() => command("cascade", () => editor.updateBlock("period", { content: "May–July 2024" }), { "fact:period": "May–July 2024" })}>Cascade</button>

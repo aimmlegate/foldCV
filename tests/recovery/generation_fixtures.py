@@ -9,6 +9,7 @@ from packages.resume_core.gui_rewriting import GuiRewriteProposal
 from packages.resume_core.gui_reconciliation import GuiReconcileProposal
 from packages.resume_core.gui_employment import normalize_employment
 from packages.resume_core.gui_derived import initial_derived
+from packages.resume_core.rich_sync import RichRewriteProposal, RichReconcileProposal
 from packages.resume_core.models.recovery import WorkspaceV5, record_slot
 from packages.resume_core.rules import captured_rules
 from resume_api.providers.content import ContentResult, ContentFailure, ReportedUsage
@@ -38,6 +39,27 @@ class CreationProvider:
         assert request.policy.allow_repair is False
         if request.result_type.__name__ == self.fail_kind:
             raise ContentFailure("MODEL_DENIED")
+        if request.result_type is RichReconcileProposal:
+            reply = RichReconcileProposal(updates=[])
+            return ContentResult(reply, ReportedUsage(), "fixture", request.policy.model, .01, 1)
+        if request.result_type is RichRewriteProposal:
+            if payload["input"]["instruction"] == "TEST_ERROR":
+                raise ContentFailure("MODEL_DENIED")
+            replacements = []
+            for block in payload["input"]["selection"]:
+                output = json.loads(json.dumps(block))
+                cell = output.pop("cellId", None)
+                if cell:
+                    output = {"id": block["id"], "type": "paragraph", "revision": 1, "props": {}, "children": [], "provenance": [], "content": output["content"]}
+                if isinstance(output["content"], list):
+                    output["content"].insert(0, {"type": "text", "text": "Clearer: ", "styles": {}})
+                elif isinstance(output["content"], str):
+                    output["content"] = "Clearer: " + output["content"]
+                if "TEST_LIST" in payload["input"]["instruction"]:
+                    output["type"], output["props"] = "bullet_list", {}
+                replacements.append({"blockId": block["id"], "cellId": cell, "blocks": [output]})
+            reply = RichRewriteProposal.model_validate({"replacements": replacements})
+            return ContentResult(reply, ReportedUsage(), "fixture", request.policy.model, .01, 1)
         rules = captured_rules(payload["rulesUsed"]["markdown"], payload["rulesUsed"]["revision"])
         if request.result_type is GuiSemanticProposal:
             captured = GuiNormalizeRequest.model_validate({key: payload["input"][key] for key in ("sources", "formattingAsOf", "revision")})

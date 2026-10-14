@@ -1,11 +1,14 @@
 """Atomic bounded tree/fact patches; persistence acknowledgments do not edit content."""
 
 import hashlib
+import uuid
 
 from .models.rich_document import FactFieldSpan, Hyperlink, ImageBlock, TableBlock
 from .models.rich_mutations import MoveBlock, PutBlock, PutRecord, RemoveBlock, RemoveRecord, ReplaceInlineRange
 from .models.rich_workspace import RichMutationReplay, WorkspaceV6
 from .rich_fact_mutations import apply_record_mutations
+from .rich_dependencies import dependencies_current
+from .rich_fields import synchronize_binding_revisions
 
 
 class RichMutationFailure(Exception):
@@ -63,9 +66,8 @@ def cut_inline(content, start, end):
             else:
                 kept.text = utf16_slice(kept.text, lo, hi)
                 if isinstance(kept, FactFieldSpan) and (lo != 0 or hi != length):
-                    # A partial field selection is authored text, not another exact binding.
-                    from .models.rich_document import StyledText
-                    kept = StyledText(type="text", text=kept.text, styles=kept.styles)
+                    kept.binding_root_id = kept.binding_root_id or kept.binding_id
+                    kept.binding_id = "binding-" + uuid.uuid4().hex
             result.append(kept)
         cursor += length
     return result
@@ -91,10 +93,8 @@ def apply_rich_mutation(workspace: WorkspaceV6, request):
         original = blocks.get(identifier)
         if step.before_revision != (original.revision if original else None):
             raise RichMutationFailure("STALE_MUTATION")
-    for stamp in request.capture.dependencies:
-        target = blocks.get(stamp.id) if stamp.kind == "block" else facts.get(stamp.id) if stamp.kind == "record" else None
-        if stamp.kind in {"block", "record"} and (target is None or target.revision != stamp.revision):
-            raise RichMutationFailure("STALE_MUTATION")
+    if not dependencies_current(workspace, request.capture.dependencies):
+        raise RichMutationFailure("STALE_MUTATION")
     record_steps = [step for step in request.steps if isinstance(step, (PutRecord, RemoveRecord))]
     try:
         project.facts = apply_record_mutations(project.facts, record_steps, request.action_id).facts
@@ -163,6 +163,7 @@ def apply_rich_mutation(workspace: WorkspaceV6, request):
     result.project_revision += 1
     result.document_revision += 1
     project.revision, document.revision = result.project_revision, result.document_revision
+    synchronize_binding_revisions(project)
     result.mutation_replay.append(RichMutationReplay(clientMutationId=request.client_mutation_id,
         requestSha256=checksum, resultingRevision=result.project_revision))
     return WorkspaceV6.model_validate(result.model_dump(by_alias=True)), False

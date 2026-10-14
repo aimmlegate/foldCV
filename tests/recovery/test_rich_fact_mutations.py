@@ -77,3 +77,16 @@ def test_rich_composite_delete_inverse_restores_record_order():
     ], "delete-two")
     restored = apply_record_mutations(removed.facts, list(removed.inverse), "undo-two")
     assert [record.id for record in restored.facts.records] == [record.id for record in initial.records]
+
+
+def test_source_period_evidence_cannot_be_replaced_by_a_working_edit():
+    initial = facts()
+    job = initial.records[1].model_copy(deep=True)
+    old = job.periods[0].evidence[:]
+    from packages.resume_core.models.recovery import EvidenceSpan
+    job.periods[0].evidence = [] if old else [EvidenceSpan(sourceId="fabricated", sourceRevision=1, unitId="fabricated", unitRevision=1, text="fabricated")]
+    from packages.resume_core.models.rich_facts import EmploymentRecord
+    edited = EmploymentRecord.model_validate(job.model_dump(by_alias=True))
+    with pytest.raises(ValueError, match="original period evidence"):
+        apply_record_mutations(initial, [PutRecord(kind="put_record", beforeRevision=1, record=edited)], "bad-evidence")
+    assert initial.records[1].periods[0].evidence == old

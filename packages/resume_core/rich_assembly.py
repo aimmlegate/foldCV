@@ -12,6 +12,8 @@ def identity(prefix):
 
 
 def field(value, raw=None):
+    if raw is None and hasattr(value, "precision"):
+        raw = f"{value.year:04d}" + (f"-{value.month:02d}" if value.month is not None else "") + (f"-{value.day:02d}" if value.day is not None else "")
     if hasattr(value, "model_dump"):
         value = value.model_dump(by_alias=True)
     raw_text = raw if raw is not None else str(value) if value is not None else ""
@@ -71,7 +73,8 @@ def assemble_rich(workspace, normalized, draft, rules):
             employer=field(job.employer), role=field(job.role), periods=periods)
         for sub in job.subprojects:
             record("subproject", sub.id, [span for fact_id in sub.fact_ids for span in evidence_by_fact.get(fact_id, [])],
-                jobId=job.id, name=field(sub.name), role=field(None), periods=[])
+                jobId=job.id, name=field(sub.name), role=field(None), periods=([{"id": identity("period"), "revision": 1, "start": field(sub.period.start),
+                    "end": field(sub.period.end), "present": field(None), "evidence": []}] if sub.period else []))
     for item in normalized.education:
         record("education", item.id, [s.model_dump(by_alias=True) for part in (item.institution, item.qualification, item.specialty, item.date_text) for s in part.evidence],
             institution=field(item.institution.text), qualification=field(item.qualification.text), specialty=field(item.specialty.text),
@@ -82,7 +85,18 @@ def assemble_rich(workspace, normalized, draft, rules):
     for item in normalized.certifications:
         record("certification", item.id, [s.model_dump(by_alias=True) for part in (item.name, item.issuer, item.date_text) for s in part.evidence],
             name=field(item.name.text), issuer=field(item.issuer.text), date=date_field(item.date_text.text))
-    mapped_fact_ids = set()
+    aliases = {}
+    record_ids = {item["id"] for item in records}
+    for fact in normalized.facts:
+        if fact.kind == "employment":
+            aliases[fact.id] = fact.value.job_id
+        elif fact.kind == "candidate_detail":
+            target = fact.value.field_id
+            if fact.value.field in {"name", "title", "location"}:
+                target = "candidate"
+            if target in record_ids:
+                aliases[fact.id] = target
+    mapped_fact_ids = set(aliases)
     for fact in normalized.facts:
         if fact.kind in {"text", "technology", "metric", "leadership"}:
             values = {"jobId": fact.job_id, "subprojectId": fact.subproject_id}
@@ -102,12 +116,37 @@ def assemble_rich(workspace, normalized, draft, rules):
                 "fieldKey": key, "text": authored.text, "styles": {}, "syncedFactRevision": 1}]
         return [{"type": "text", "text": authored.text, "styles": {}}]
 
-    def block(authored, owner=None, key=None, kind="paragraph", level=1):
-        citations = [{"kind": "citation", "id": identity("citation"), "recordId": fact_id, "fieldKeys": [],
+    def block(authored, owner=None, key=None, kind="paragraph", level=1, technology_scope=None):
+        citations = [{"kind": "citation", "id": identity("citation"), "recordId": aliases.get(fact_id, fact_id), "fieldKeys": [],
             "evidence": evidence_by_fact.get(fact_id, [])} for fact_id in authored.fact_ids if fact_id in mapped_fact_ids]
+        uncited = [span for fact_id in authored.fact_ids if fact_id not in mapped_fact_ids for span in evidence_by_fact.get(fact_id, [])]
+        if uncited:
+            citations.append({"kind": "source", "id": identity("source-link"), "evidence": uncited})
         result = {"id": authored.field_id, "revision": 1, "type": kind,
             "props": {"level": level} if kind == "heading" else {}, "content": inline(authored, owner, key),
             "children": [], "provenance": citations}
+        if technology_scope is not None:
+            technologies = [item for item in records if item["kind"] == "technology" and item.get("jobId") == technology_scope
+                and item["id"] in authored.fact_ids and item["display"]["rawText"]]
+            # Only a scoped cited token is exact; narrative/global matching never creates an association.
+            text, cursor, spans = authored.text, 0, []
+            matches = []
+            import re
+            for item in technologies:
+                for match in re.finditer(r"(?<!\w)" + re.escape(item["display"]["rawText"]) + r"(?!\w)", text, re.I):
+                    matches.append((match.start(), match.end(), item))
+            for start, end, item in sorted(matches, key=lambda match: (match[0], -(match[1] - match[0]))):
+                if start < cursor:
+                    continue
+                if start > cursor:
+                    spans.append({"type": "text", "text": text[cursor:start], "styles": {}})
+                spans.append({"type": "fact_field", "bindingId": identity("binding"), "recordId": item["id"],
+                    "fieldKey": "display", "text": text[start:end], "styles": {}, "syncedFactRevision": 1})
+                cursor = end
+            if spans:
+                if cursor < len(text):
+                    spans.append({"type": "text", "text": text[cursor:], "styles": {}})
+                result["content"] = spans
         if owner is not None:
             result["provenance"].append({"kind": "field_binding", "id": identity("binding"), "recordId": owner, "fieldKey": key})
         return result
@@ -127,7 +166,13 @@ def assemble_rich(workspace, normalized, draft, rules):
         for item in group:
             if not item.visible:
                 continue
+            if item.id not in {record["id"] for record in records}:
+                record("unresolved", item.id, spans_for(item.legacy_text) if item.legacy_text else [],
+                    category="education" if "institution" in mapping else "language" if "proficiency" in mapping else "certification", status="unresolved")
             if item.legacy_text:
+                records[:] = [entry for entry in records if entry["id"] != item.id]
+                record("unresolved", item.id, spans_for(item.legacy_text),
+                    category="education" if "institution" in mapping else "language" if "proficiency" in mapping else "certification", status="unresolved")
                 # Unparsed source stays rich prose; it cannot become a competing typed field.
                 children = [block(item.legacy_text)]
             else:
@@ -139,9 +184,32 @@ def assemble_rich(workspace, normalized, draft, rules):
             continue
         children = [block(job.employer, job.id, "employer", "heading", 2), block(job.role, job.id, "role")]
         for period in job.periods:
-            children.extend([block(period.start_text, job.id, "period:" + period.id + ":start"),
-                             block(period.end_text, job.id, "period:" + period.id + ":end")])
-        children.extend(block(part) for part in (job.context, job.tasks, job.results, job.stack))
+            start = block(period.start_text, job.id, "period:" + period.id + ":start")
+            end_text = period.end_text.model_copy(deep=True)
+            if period.present and not end_text.text:
+                end_text.text = "Present" if draft.editorial_plan.source_language == "en" else "по настоящее время"
+            end = block(end_text, job.id, "period:" + period.id + (":present" if period.present else ":end"))
+            start["content"].extend([{"type": "text", "text": " — ", "styles": {}}, *end["content"]])
+            start["provenance"].extend(end["provenance"])
+            children.append(start)
+        children.extend(block(part) for part in (job.context, job.tasks, job.results))
+        children.append(block(job.stack, technology_scope=job.id))
+        for sub in jobs.get(job.id).subprojects if job.id in jobs else []:
+            from .models.recovery import AuthoredField
+            source_facts = [fact for fact in normalized.facts if fact.subproject_id == sub.id]
+            details = [block(AuthoredField(fieldId=identity("subproject-name"), text=sub.name, factIds=sub.fact_ids,
+                evidence=[], origin="source"), sub.id, "name", "heading", 3)]
+            working_sub = next(item for item in records if item["id"] == sub.id)
+            for period in working_sub["periods"]:
+                for part in ("start", "end"):
+                    details.append(block(AuthoredField(fieldId=identity("subproject-date"), text=period[part]["rawText"],
+                        factIds=sub.fact_ids, evidence=[], origin="source"), sub.id, "period:" + period["id"] + ":" + part))
+            for fact in source_facts:
+                text = fact.value.text if fact.kind == "text" else fact.value.display if fact.kind == "technology" else None
+                if text:
+                    details.append(block(AuthoredField(fieldId=identity("subproject-fact"), text=text, factIds=[fact.id], evidence=[], origin="source"),
+                        technology_scope=job.id if fact.kind == "technology" else None))
+            children.append(section("section-" + sub.id, "", details, sub.id))
         if job.id not in jobs:
             record("employment", job.id, spans_for(job.employer), employer=field(job.employer.text), role=field(job.role.text), periods=[])
         main.append(section("section-" + job.id, "", children, job.id))

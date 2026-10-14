@@ -4,12 +4,13 @@ from fastapi import Request
 from fastapi.responses import JSONResponse, Response
 
 from packages.resume_core.gui_projects import GuiCreateProjectRequest, GuiArchiveRequest, GuiRenameProjectRequest, GuiDeleteProjectRequest
-from packages.resume_core.models.rich_mutations import RichMutation
+from packages.resume_core.models.rich_mutations import RichMutation, ActionCapture
 from packages.resume_core.rendering.template import RenderFailure
 from .contracts import EmptyRequest
 from .extracting import UploadFailure, parse_one_part
 from .gui_projects import ProjectFailure
 from .rich_assets import ImageSessionRequest, ImageUploadCapture
+from packages.resume_core.rich_sync import RichCompletionRequest, RichRewriteRequest, RichSyncDisposition
 
 
 def mount_rich_projects(app, service, problem):
@@ -87,6 +88,40 @@ def mount_rich_projects(app, service, problem):
     async def mutate(identifier: str, payload: RichMutation):
         return JSONResponse(service.mutate(identifier, payload).model_dump(mode="json", by_alias=True),
             headers={"Cache-Control": "no-store"})
+
+    @app.post(prefix + "/{identifier}/preview")
+    async def preview(identifier: str, payload: RichMutation):
+        return JSONResponse(service.preview(identifier, payload).model_dump(mode="json", by_alias=True), headers={"Cache-Control": "no-store"})
+
+    @app.post(prefix + "/{identifier}/completion")
+    async def completion(identifier: str, payload: RichCompletionRequest):
+        await service.complete_rich(identifier, payload)
+        return response(identifier)
+
+    @app.post(prefix + "/{identifier}/rewrite")
+    async def rewrite(identifier: str, payload: RichRewriteRequest):
+        await service.rewrite_rich(identifier, payload)
+        return response(identifier)
+
+    @app.post(prefix + "/{identifier}/sync/{sync_id}")
+    async def disposition(identifier: str, sync_id: str, payload: RichSyncDisposition):
+        service.disposition(identifier, sync_id, payload.status, payload.error_code)
+        return response(identifier)
+
+    @app.post(prefix + "/{identifier}/sync/{sync_id}/resolve")
+    async def resolve_conflict(identifier: str, sync_id: str, payload: ActionCapture):
+        service.resolve_conflict(identifier, sync_id, payload)
+        return response(identifier)
+
+    @app.post(prefix + "/{identifier}/sync/{sync_id}/retry")
+    async def retry_rewrite(identifier: str, sync_id: str, payload: ActionCapture):
+        await service.retry_rewrite(identifier, sync_id, payload)
+        return response(identifier)
+
+    @app.post(prefix + "/{identifier}/cancel-action")
+    async def cancel_action(identifier: str, payload: ActionCapture):
+        await service.cancel_sync_action(identifier, payload)
+        return response(identifier)
 
     @app.post(prefix + "/{identifier}/images/session")
     async def image_session(identifier: str, payload: ImageSessionRequest):

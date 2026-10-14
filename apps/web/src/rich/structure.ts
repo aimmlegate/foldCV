@@ -1,9 +1,14 @@
 import type { RichDocumentV1, Content } from "../contracts/generated/rich_document_v1";
 import type { RichBlock } from "./save-queue";
 
-export function copyBlock(block: RichBlock, allocate: () => string = () => crypto.randomUUID()): RichBlock {
-  const inline = (content: Content): Content => content.map(span => span.type === "fact_field" ? { ...span, bindingId: allocate() } : structuredClone(span));
-  const base = { ...structuredClone(block), id: allocate(), revision: 1, children: block.children.map(child => copyBlock(child, allocate)),
+export function copyBlock(block: RichBlock, allocate: () => string = () => crypto.randomUUID(), roots = new Map<string, string>()): RichBlock {
+  const inline = (content: Content): Content => content.map(span => {
+    if (span.type !== "fact_field") return structuredClone(span);
+    const bindingId = allocate(), oldRoot = span.bindingRootId ?? span.bindingId;
+    const bindingRootId = roots.get(oldRoot) ?? bindingId; roots.set(oldRoot, bindingRootId);
+    return { ...span, bindingId, bindingRootId };
+  });
+  const base = { ...structuredClone(block), id: allocate(), revision: 1, children: block.children.map(child => copyBlock(child, allocate, roots)),
     provenance: block.provenance.filter(link => link.kind !== "working_owner").map(link => ({ ...structuredClone(link), id: allocate() })) };
   if (base.type === "section") return { ...base, props: { ...base.props, recordId: null }, content: inline(base.content) };
   if (base.type === "table") {

@@ -30,9 +30,10 @@ from .gui_rendering import RichDocxRenderer
 from .lifecycle import OperationFiles, SpikeError
 from .providers.content import ContentFailure
 from .rich_assets import RichAssets
+from .rich_synchronization import RichSynchronization
 
 
-class RichProjectService(RichAssets, GuiProjectService):
+class RichProjectService(RichSynchronization, RichAssets, GuiProjectService):
     def __init__(self, temp_root, rules, provider_factory, **options):
         options.setdefault("storage", RichProjectStore(rules.root))
         options.setdefault("renderer", RichDocxRenderer())
@@ -62,8 +63,8 @@ class RichProjectService(RichAssets, GuiProjectService):
                         operation.status, operation.error_code = "interrupted", "OPERATION_INTERRUPTED"
                         changed = True
                 for sync in workspace.sync_records:
-                    if sync.status == "pending" and sync.error_code is None:
-                        sync.error_code = "OPERATION_INTERRUPTED"; changed = True
+                    if sync.status == "pending":
+                        sync.error_code, sync.ready = "OPERATION_INTERRUPTED", False; changed = True
                 if workspace.pre_draft and "EXTRACT_PENDING" in workspace.pre_draft.warnings:
                     workspace.pre_draft.warnings = ["EXTRACT_INTERRUPTED", "NO_USABLE_TEXT"]; changed = True
                 self.saved_hashes[identifier] = digest(workspace.model_dump(mode="json", by_alias=True))
