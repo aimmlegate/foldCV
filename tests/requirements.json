@@ -29,7 +29,7 @@
     {"id": "NE-SYNC", "status": "partial", "tests": ["apps/web/unit/rich-history.test.ts::rich delayed reconciliation joins its origin and preserves unrelated typing", "apps/web/unit/rich-history.test.ts::rich dependency epochs reject undo redo deletion and equal-text replacement", "tests/recovery/test_rich_fact_mutations.py::test_rich_record_deletion_retains_evidence_and_blocks_old_reply_after_restore"]},
     {"id": "NE-FACTS", "status": "partial", "tests": ["tests/recovery/test_rich_contracts.py::test_rich_pending_fields_keep_last_known_value_and_removed_record_tombstone", "tests/recovery/test_rich_fact_mutations.py::test_rich_fact_composite_failure_is_atomic_and_cannot_change_evidence"]},
     {"id": "NE-DATES", "status": "partial", "tests": ["tests/recovery/test_rich_contracts.py::test_rich_date_proposal_cannot_move_anchor_or_offer_a_partial_unavailable_chain"]},
-    {"id": "NE-TEMPLATE", "status": "unimplemented", "tests": []}
+    {"id": "NE-TEMPLATE", "status": "partial", "tests": ["tests/recovery/test_rich_template.py::test_rich_template_matches_all_pages_fonts_and_fixed_roles", "tests/recovery/test_rich_template.py::test_rich_template_detects_changed_geometry_and_owned_asset_symlinks", "tests/recovery/test_rich_template.py::test_rich_template_rejects_legacy_identity_and_has_no_converter_dependency", "tests/recovery/test_reference_measurement.py::test_reference_image_alpha_is_compared_without_double_premultiplication"]}
   ],
   "foundation": {
     "syntheticSources": "tests/foundation/test_foundation.py::test_synthetic_manifest_has_independent_source_evidence",
@@ -105,7 +105,8 @@
     "NE-ASSETS": {"unproved": "Ingestion/normalization, cancellation/reservations, owned bytes and exact archive-reference dispatch remain pending.", "owner": "NE04–NE06", "check": "Test decode, ownership, quotas, cancellation/stale publication and archive bytes; inspect images in T3."},
     "NE-SYNC": {"unproved": "Production exact-span edits, scoped inference/coalescing and durable restart status remain pending.", "owner": "NE07–NE08", "check": "Prove no inference for deterministic linked fields, one bounded narrative request and explicit interrupted retry."},
     "NE-FACTS": {"unproved": "Five-group CRUD and per-job technology integration remain pending.", "owner": "NE08", "check": "Run panel CRUD/link/ownership and unresolved-value cases in Python and T3."},
-    "NE-DATES": {"unproved": "Only dependency-bound proposal types are checked; actual overlap/cascade arithmetic and UI remain pending.", "owner": "NE09", "check": "Run every frozen timeline example, precision/open/future boundary and explicit apply/undo in T3."}
+    "NE-DATES": {"unproved": "Only dependency-bound proposal types are checked; actual overlap/cascade arithmetic and UI remain pending.", "owner": "NE09", "check": "Run every frozen timeline example, precision/open/future boundary and explicit apply/undo in T3."},
+    "NE-TEMPLATE": {"unproved": "Reference geometry/assets/fonts are measured and checked; rich editable export, all-page fidelity and manual Word remain pending.", "owner": "NE04–NE06/NE10/NE11", "check": "Prove all enabled rich OOXML semantics and layout with synthetic content, then record actual manual Word open/edit/save/reopen."}
   },
   "recovery": {
     "task": "A21",

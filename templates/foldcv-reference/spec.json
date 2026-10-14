@@ -1,0 +1,464 @@
+{
+  "schemaVersion": 1,
+  "id": "foldcv-reference",
+  "version": "1.0.0",
+  "units": "pt",
+  "reference": {
+    "sha256": "cc0285e75c98690d894e0cbd576d29403a5c4bf9450eb661247c8515ad8be303",
+    "pages": 3,
+    "personalTextIncluded": false
+  },
+  "page": {
+    "width": 596,
+    "height": 842,
+    "bodyTopFirst": 95,
+    "bodyTopContinuation": 24,
+    "bodyBottom": 770,
+    "unlimitedPages": true
+  },
+  "regions": {
+    "readingOrder": [
+      "header",
+      "sidebar",
+      "main"
+    ],
+    "sidebar": {
+      "x": 26.5,
+      "width": 118
+    },
+    "main": {
+      "x": 160.76,
+      "width": 420
+    },
+    "gap": 16.26,
+    "fixedGeometry": true,
+    "membershipRestricted": false
+  },
+  "header": {
+    "name": {
+      "x": 21.26,
+      "top": 14,
+      "firstBaseline": 32,
+      "font": "black",
+      "size": 18,
+      "lineHeight": 20.7
+    },
+    "title": {
+      "x": 21.26,
+      "top": 40,
+      "firstBaseline": 56,
+      "font": "semibold",
+      "size": 16,
+      "lineHeight": 18.4
+    },
+    "textPreferredWidth": 450,
+    "overflow": "flow_header_then_body_without_truncation",
+    "brand": {
+      "path": "skills/format-resume/assets/images/foldcv.png",
+      "x": 487.6,
+      "top": 18.7,
+      "boxWidth": 104.9,
+      "boxHeight": 37.4,
+      "preserveAspect": true
+    },
+    "divider": {
+      "x1": 10,
+      "x2": 535,
+      "y": 79.5,
+      "width": 0.6,
+      "color": "#888888",
+      "flowWithExpandedHeader": true
+    }
+  },
+  "typography": {
+    "body": {
+      "font": "light",
+      "size": 10,
+      "lineHeight": 12.57
+    },
+    "support": {
+      "font": "regular",
+      "size": 10,
+      "lineHeight": 12.57
+    },
+    "jobHeading": {
+      "font": "semibold",
+      "size": 12,
+      "lineHeight": 15.08
+    },
+    "sectionHeading": {
+      "font": "bold",
+      "size": 14,
+      "lineHeight": 19
+    },
+    "smallHeading": {
+      "font": "semibold",
+      "size": 10,
+      "lineHeight": 12.57
+    },
+    "footer": {
+      "font": "light",
+      "size": 12
+    },
+    "code": {
+      "wordFamily": "Courier New",
+      "cssFamily": "monospace",
+      "size": 10,
+      "lineHeight": 12.57
+    }
+  },
+  "spacing": {
+    "sidebarItemAfter": 8,
+    "sidebarSectionAfter": 6,
+    "profileAfter": 10,
+    "jobAfter": 12.57,
+    "barToFirstJob": 14,
+    "earlyCareerBarAfter": 8,
+    "skillBarAfter": 5,
+    "skillParagraphAfter": 8
+  },
+  "sectionBand": {
+    "font": "bold",
+    "size": 14,
+    "height": 28,
+    "leftFromMain": -10,
+    "widthBeyondMain": 25,
+    "textXFromMain": -5,
+    "firstBaselineFromTop": 15,
+    "background": "#EFEFEF",
+    "referenceDrawings": [
+      "p1-drawing-2",
+      "p3-drawing-1",
+      "p3-drawing-2",
+      "p3-drawing-3"
+    ]
+  },
+  "lists": {
+    "bulletFont": "Helvetica",
+    "bulletSize": 14,
+    "bulletFromColumn": 18,
+    "textFromColumn": 36,
+    "nativeLevels": 9,
+    "deeper": "editable_marker_and_bounded_indent"
+  },
+  "focus": {
+    "minimumEntryHeight": 38,
+    "logoBox": {
+      "xFromSidebar": 4.5,
+      "width": 28,
+      "height": 32,
+      "preserveAspect": true
+    },
+    "textFromSidebar": 37,
+    "labelFont": "semibold",
+    "labelSize": 10,
+    "lineHeight": 12.57,
+    "maximumLogos": 8,
+    "entryCountLimit": null,
+    "textOnlyUsesSameSpacing": true,
+    "referenceLogoEntries": 8,
+    "referenceTextOnlyEntries": 2
+  },
+  "footer": {
+    "text": "mail@example.com",
+    "role": "installed_template_brand_contact",
+    "centerX": 275.65,
+    "baselineY": 800,
+    "repeat": true,
+    "candidateContactsRemainAuthoredSidebarContent": true
+  },
+  "fonts": [
+    {
+      "path": "skills/format-resume/assets/fonts/SourceSansPro-Black.ttf",
+      "sha256": "4183f9ae34bd50bde1ee5601302c0d1666638cad52ff2a8886d8c47535be1999",
+      "size": 253584,
+      "family": "Source Sans Pro Black",
+      "style": "Regular",
+      "fullName": "Source Sans Pro Black",
+      "postscriptName": "SourceSansPro-Black",
+      "preferredFamily": "Source Sans Pro",
+      "preferredStyle": "Black",
+      "weight": 900,
+      "fsType": 0,
+      "glyphCount": 1336,
+      "face": "black",
+      "cssFamily": "FoldCV Source Sans Pro",
+      "wordFamily": "Source Sans Pro Black",
+      "wordBold": false,
+      "embedFullFace": true
+    },
+    {
+      "path": "skills/format-resume/assets/fonts/SourceSansPro-Bold.ttf",
+      "sha256": "8d869f2aeac0220984a430120af819fbcb12a88e8ea4ad72aae4c5f6d6a2b985",
+      "size": 253344,
+      "family": "Source Sans Pro",
+      "style": "Bold",
+      "fullName": "Source Sans Pro Bold",
+      "postscriptName": "SourceSansPro-Bold",
+      "preferredFamily": null,
+      "preferredStyle": null,
+      "weight": 700,
+      "fsType": 0,
+      "glyphCount": 1336,
+      "face": "bold",
+      "cssFamily": "FoldCV Source Sans Pro",
+      "wordFamily": "Source Sans Pro",
+      "wordBold": true,
+      "embedFullFace": true
+    },
+    {
+      "path": "skills/format-resume/assets/fonts/SourceSansPro-Light.ttf",
+      "sha256": "ce323db75733028ec2961b442b3368117d4daf724e3217d120f1990da8533fd0",
+      "size": 252560,
+      "family": "Source Sans Pro Light",
+      "style": "Regular",
+      "fullName": "Source Sans Pro Light",
+      "postscriptName": "SourceSansPro-Light",
+      "preferredFamily": "Source Sans Pro",
+      "preferredStyle": "Light",
+      "weight": 300,
+      "fsType": 0,
+      "glyphCount": 1336,
+      "face": "light",
+      "cssFamily": "FoldCV Source Sans Pro",
+      "wordFamily": "Source Sans Pro Light",
+      "wordBold": false,
+      "embedFullFace": true
+    },
+    {
+      "path": "skills/format-resume/assets/fonts/SourceSansPro-Regular.ttf",
+      "sha256": "c6f835b6a6d942b196e2607bf73a7b086407ae8dbdc928c23a2fb4893ec383f6",
+      "size": 254076,
+      "family": "Source Sans Pro",
+      "style": "Regular",
+      "fullName": "Source Sans Pro",
+      "postscriptName": "SourceSansPro-Regular",
+      "preferredFamily": null,
+      "preferredStyle": null,
+      "weight": 400,
+      "fsType": 0,
+      "glyphCount": 1336,
+      "face": "regular",
+      "cssFamily": "FoldCV Source Sans Pro",
+      "wordFamily": "Source Sans Pro",
+      "wordBold": false,
+      "embedFullFace": true
+    },
+    {
+      "path": "skills/format-resume/assets/fonts/SourceSansPro-Semibold.ttf",
+      "sha256": "72bf9aa2e78b8c78444ae74b6be09411d5fb5bf0eb9bcdfd47082cc5d9b536df",
+      "size": 253832,
+      "family": "Source Sans Pro Semibold",
+      "style": "Regular",
+      "fullName": "Source Sans Pro Semibold",
+      "postscriptName": "SourceSansPro-Semibold",
+      "preferredFamily": "Source Sans Pro",
+      "preferredStyle": "Semibold",
+      "weight": 600,
+      "fsType": 0,
+      "glyphCount": 1336,
+      "face": "semibold",
+      "cssFamily": "FoldCV Source Sans Pro",
+      "wordFamily": "Source Sans Pro Semibold",
+      "wordBold": false,
+      "embedFullFace": true
+    }
+  ],
+  "helvetica": {
+    "path": "/System/Library/Fonts/Helvetica.ttc",
+    "exists": true,
+    "redistributed": false
+  },
+  "fontEmbedding": {
+    "fullUsedFaces": true,
+    "license": "skills/format-resume/assets/fonts/LICENSE.txt",
+    "fsType": 0,
+    "installOsFonts": false,
+    "manualWordRequired": true,
+    "guidance": "https://support.microsoft.com/en-us/office/fonts/benefits-of-embedding-custom-fonts"
+  },
+  "assetRoles": {
+    "referenceImages": [
+      {
+        "xref": 18,
+        "width": 283,
+        "height": 384,
+        "rgbSha256": "0863859f89bef59a03c0821ba874d5c39335e490a32bc10d8dfe318d712bcce9",
+        "matches": [
+          "skills/format-resume/assets/images/golang.png"
+        ],
+        "placements": [
+          [
+            33.20833206176758,
+            380.0,
+            56.791664123535156,
+            412.0
+          ]
+        ],
+        "role": "technology_logo",
+        "catalogId": "golang"
+      },
+      {
+        "xref": 6,
+        "width": 384,
+        "height": 384,
+        "rgbSha256": "7897eca696a1578d73d610ce60b9912f10b276a2ce1bd24c48d30e0546fa3e01",
+        "matches": [
+          "skills/format-resume/assets/devicon/dotnet.png"
+        ],
+        "placements": [
+          [
+            31.0,
+            154.0,
+            59.0,
+            182.0
+          ]
+        ],
+        "role": "technology_logo",
+        "catalogId": "dotnet"
+      },
+      {
+        "xref": 4,
+        "width": 384,
+        "height": 384,
+        "rgbSha256": "48b39988b1744193ee9dc39764cf540f2749c4129ca7aab32e361b0dc80b8917",
+        "matches": [
+          "skills/format-resume/assets/devicon/csharp.png"
+        ],
+        "placements": [
+          [
+            31.0,
+            116.0,
+            59.0,
+            144.0
+          ]
+        ],
+        "role": "technology_logo",
+        "catalogId": "csharp"
+      },
+      {
+        "xref": 10,
+        "width": 384,
+        "height": 328,
+        "rgbSha256": "2425976d71eb206ead928022bb346150dd63b2a547c8e5331f45b9737c013d1a",
+        "matches": [
+          "skills/format-resume/assets/images/redis.png"
+        ],
+        "placements": [
+          [
+            31.0,
+            232.04165649414062,
+            59.0,
+            255.9583282470703
+          ]
+        ],
+        "role": "technology_logo",
+        "catalogId": "redis"
+      },
+      {
+        "xref": 8,
+        "width": 372,
+        "height": 384,
+        "rgbSha256": "d11b1d7ceeb725edd7263fb5316d1a232412f06fd5c631f9ff66107028292d23",
+        "matches": [
+          "skills/format-resume/assets/images/postgresql.png"
+        ],
+        "placements": [
+          [
+            31.0,
+            191.5483856201172,
+            59.0,
+            220.4516143798828
+          ]
+        ],
+        "role": "technology_logo",
+        "catalogId": "postgresql"
+      },
+      {
+        "xref": 12,
+        "width": 154,
+        "height": 250,
+        "rgbSha256": "7ce007c212e9c1502a5e1f18f6f2cfda0e9f404bdeb8374290b461113bf3cbfa",
+        "matches": [
+          "skills/format-resume/assets/images/kafka.png"
+        ],
+        "placements": [
+          [
+            35.14400100708008,
+            266.0,
+            54.85600280761719,
+            298.0
+          ]
+        ],
+        "role": "technology_logo",
+        "catalogId": "kafka"
+      },
+      {
+        "xref": 14,
+        "width": 384,
+        "height": 384,
+        "rgbSha256": "487efd01039d73c9e4f2870b7d28435d15dbe88e5e8866df641a6a39418660a2",
+        "matches": [
+          "skills/format-resume/assets/images/rabbitmq.png"
+        ],
+        "placements": [
+          [
+            31.0,
+            306.0,
+            59.0,
+            334.0
+          ]
+        ],
+        "role": "technology_logo",
+        "catalogId": "rabbitmq"
+      },
+      {
+        "xref": 3,
+        "width": 180,
+        "height": 62,
+        "rgbSha256": "b8a051c21238ee380166f73b5d3690c0e56faca75caee31c4973d1bcdf55015b",
+        "matches": [
+          "skills/format-resume/assets/images/foldcv.png"
+        ],
+        "placements": [
+          [
+            487.6000061035156,
+            19.333904266357422,
+            592.5,
+            55.46612548828125
+          ]
+        ],
+        "role": "brand",
+        "catalogId": null
+      },
+      {
+        "xref": 16,
+        "width": 384,
+        "height": 384,
+        "rgbSha256": "31fdfefe67a5dac0df3133133542e5b5fd6df134d110371d42468f62a4c1045e",
+        "matches": [
+          "skills/format-resume/assets/devicon/docker.png"
+        ],
+        "placements": [
+          [
+            31.0,
+            344.0,
+            59.0,
+            372.0
+          ]
+        ],
+        "role": "technology_logo",
+        "catalogId": "docker"
+      }
+    ],
+    "userImages": "separate_project_assets_with_no_photo_field",
+    "templateAssetsChargeUserImageBudget": false
+  },
+  "pagination": {
+    "editor": "continuous_fixed_geometry",
+    "docx": "native_flowing_paragraphs_and_splittable_tables",
+    "referencePageBreaksAreMandatory": false,
+    "unboundedKeepTogether": false,
+    "estimatedBlockPageRejection": false
+  }
+}
