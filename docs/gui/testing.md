@@ -45,6 +45,11 @@ NE01 updates contradictory U01/A01/D01/P02 descriptions/selectors while retainin
 the 22 existing IDs. NE03A adds these IDs to this strategy, the requirement map
 and `tools/checks.py` together; mark future work unimplemented/partial honestly.
 
+NE03A now maps rich schema, Python inverse, shared history/dependency and admission
+checks below. The mounted synthetic T3 proof is retained in its task handoff.
+Production rich persistence, assets, sync, facts and dates remain partial;
+measured rendering/Word remain unimplemented until their owning tasks pass.
+
 | New ID | Behavior and owning checks |
 | --- | --- |
 | NE-RICH | Typed rich schema, one editor, free region/block movement, durable round trips; NE03A/NE04/NE05/NE06 |

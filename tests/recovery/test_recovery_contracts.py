@@ -151,7 +151,9 @@ def test_e2_oracle_rejects_changed_claim_or_foreign_evidence(change):
 def test_migration_inventory_accounts_for_all_requirements_and_browser_specs():
     inventory = json.loads((ROOT / "docs/gui/handoffs/A00/inventory.json").read_text())
     current = json.loads((ROOT / "tests/requirements.json").read_text())
-    assert {entry["requirement"] for entry in inventory["requirements"]} == {entry["id"] for entry in current["entries"]}
+    new_rich_ids = {"NE-RICH", "NE-HISTORY", "NE-ASSETS", "NE-SYNC", "NE-FACTS", "NE-DATES", "NE-TEMPLATE"}
+    assert {entry["requirement"] for entry in inventory["requirements"]} | new_rich_ids == {
+        entry["id"] for entry in current["entries"]}
     assert len(inventory["requirements"]) == 22
     assert {entry["path"] for entry in inventory["browserSpecs"] + inventory.get("recoveryBrowserSpecs", [])} == {
         str(path.relative_to(ROOT)) for path in (ROOT / "apps/web/tests").glob("*.spec.ts")}

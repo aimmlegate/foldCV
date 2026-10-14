@@ -1,0 +1,458 @@
+{
+  "$defs": {
+    "ActionCapture": {
+      "additionalProperties": false,
+      "properties": {
+        "actionId": {
+          "minLength": 1,
+          "title": "Actionid",
+          "type": "string"
+        },
+        "actionToken": {
+          "minimum": 0,
+          "title": "Actiontoken",
+          "type": "integer"
+        },
+        "dependencies": {
+          "items": {
+            "$ref": "#/$defs/DependencyStamp"
+          },
+          "title": "Dependencies",
+          "type": "array"
+        },
+        "sessionId": {
+          "minLength": 1,
+          "title": "Sessionid",
+          "type": "string"
+        }
+      },
+      "required": [
+        "sessionId",
+        "actionId",
+        "actionToken",
+        "dependencies"
+      ],
+      "title": "ActionCapture",
+      "type": "object"
+    },
+    "DateShift": {
+      "additionalProperties": false,
+      "properties": {
+        "after": {
+          "$ref": "#/$defs/WorkingPeriod"
+        },
+        "before": {
+          "$ref": "#/$defs/WorkingPeriod"
+        },
+        "inclusiveSpan": {
+          "minimum": 1,
+          "title": "Inclusivespan",
+          "type": "integer"
+        },
+        "jobId": {
+          "minLength": 1,
+          "title": "Jobid",
+          "type": "string"
+        },
+        "periodId": {
+          "minLength": 1,
+          "title": "Periodid",
+          "type": "string"
+        },
+        "unit": {
+          "enum": [
+            "month",
+            "day"
+          ],
+          "title": "Unit",
+          "type": "string"
+        }
+      },
+      "required": [
+        "jobId",
+        "periodId",
+        "before",
+        "after",
+        "unit",
+        "inclusiveSpan"
+      ],
+      "title": "DateShift",
+      "type": "object"
+    },
+    "DependencyStamp": {
+      "additionalProperties": false,
+      "properties": {
+        "fingerprint": {
+          "anyOf": [
+            {
+              "pattern": "^[a-f0-9]{64}$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Fingerprint"
+        },
+        "id": {
+          "minLength": 1,
+          "title": "Id",
+          "type": "string"
+        },
+        "kind": {
+          "enum": [
+            "block",
+            "record",
+            "field",
+            "period",
+            "ownership",
+            "source",
+            "rules",
+            "asset",
+            "timeline_order"
+          ],
+          "title": "Kind",
+          "type": "string"
+        },
+        "revision": {
+          "minimum": 1,
+          "title": "Revision",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "kind",
+        "id",
+        "revision",
+        "fingerprint"
+      ],
+      "title": "DependencyStamp",
+      "type": "object"
+    },
+    "EvidenceSpan": {
+      "additionalProperties": false,
+      "properties": {
+        "sourceId": {
+          "minLength": 1,
+          "title": "Sourceid",
+          "type": "string"
+        },
+        "sourceRevision": {
+          "minimum": 1,
+          "title": "Sourcerevision",
+          "type": "integer"
+        },
+        "text": {
+          "minLength": 1,
+          "title": "Text",
+          "type": "string"
+        },
+        "unitId": {
+          "minLength": 1,
+          "title": "Unitid",
+          "type": "string"
+        },
+        "unitRevision": {
+          "minimum": 1,
+          "title": "Unitrevision",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "sourceId",
+        "sourceRevision",
+        "unitId",
+        "unitRevision",
+        "text"
+      ],
+      "title": "EvidenceSpan",
+      "type": "object"
+    },
+    "PartialDate": {
+      "additionalProperties": false,
+      "properties": {
+        "day": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Day"
+        },
+        "month": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Month"
+        },
+        "precision": {
+          "enum": [
+            "year",
+            "month",
+            "day"
+          ],
+          "title": "Precision",
+          "type": "string"
+        },
+        "year": {
+          "maximum": 9999,
+          "minimum": 1,
+          "title": "Year",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "precision",
+        "year",
+        "month",
+        "day"
+      ],
+      "title": "PartialDate",
+      "type": "object"
+    },
+    "WorkingField_PartialDate_": {
+      "additionalProperties": false,
+      "properties": {
+        "pendingRawText": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Pendingrawtext"
+        },
+        "rawText": {
+          "title": "Rawtext",
+          "type": "string"
+        },
+        "revision": {
+          "minimum": 1,
+          "title": "Revision",
+          "type": "integer"
+        },
+        "status": {
+          "enum": [
+            "known",
+            "unknown",
+            "unresolved",
+            "pending",
+            "conflict"
+          ],
+          "title": "Status",
+          "type": "string"
+        },
+        "value": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/PartialDate"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "value",
+        "rawText",
+        "status",
+        "revision",
+        "pendingRawText"
+      ],
+      "title": "WorkingField[PartialDate]",
+      "type": "object"
+    },
+    "WorkingField_bool_": {
+      "additionalProperties": false,
+      "properties": {
+        "pendingRawText": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Pendingrawtext"
+        },
+        "rawText": {
+          "title": "Rawtext",
+          "type": "string"
+        },
+        "revision": {
+          "minimum": 1,
+          "title": "Revision",
+          "type": "integer"
+        },
+        "status": {
+          "enum": [
+            "known",
+            "unknown",
+            "unresolved",
+            "pending",
+            "conflict"
+          ],
+          "title": "Status",
+          "type": "string"
+        },
+        "value": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Value"
+        }
+      },
+      "required": [
+        "value",
+        "rawText",
+        "status",
+        "revision",
+        "pendingRawText"
+      ],
+      "title": "WorkingField[bool]",
+      "type": "object"
+    },
+    "WorkingPeriod": {
+      "additionalProperties": false,
+      "properties": {
+        "end": {
+          "$ref": "#/$defs/WorkingField_PartialDate_"
+        },
+        "evidence": {
+          "items": {
+            "$ref": "#/$defs/EvidenceSpan"
+          },
+          "title": "Evidence",
+          "type": "array"
+        },
+        "id": {
+          "minLength": 1,
+          "title": "Id",
+          "type": "string"
+        },
+        "present": {
+          "$ref": "#/$defs/WorkingField_bool_"
+        },
+        "revision": {
+          "minimum": 1,
+          "title": "Revision",
+          "type": "integer"
+        },
+        "start": {
+          "$ref": "#/$defs/WorkingField_PartialDate_"
+        }
+      },
+      "required": [
+        "id",
+        "revision",
+        "start",
+        "end",
+        "present",
+        "evidence"
+      ],
+      "title": "WorkingPeriod",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "anchorJobId": {
+      "minLength": 1,
+      "title": "Anchorjobid",
+      "type": "string"
+    },
+    "anchorPeriodId": {
+      "minLength": 1,
+      "title": "Anchorperiodid",
+      "type": "string"
+    },
+    "capture": {
+      "$ref": "#/$defs/ActionCapture"
+    },
+    "formattingAsOf": {
+      "$ref": "#/$defs/PartialDate"
+    },
+    "id": {
+      "minLength": 1,
+      "title": "Id",
+      "type": "string"
+    },
+    "periodOrder": {
+      "items": {
+        "minLength": 1,
+        "type": "string"
+      },
+      "title": "Periodorder",
+      "type": "array"
+    },
+    "reason": {
+      "anyOf": [
+        {
+          "minLength": 1,
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "title": "Reason"
+    },
+    "shifts": {
+      "items": {
+        "$ref": "#/$defs/DateShift"
+      },
+      "title": "Shifts",
+      "type": "array"
+    },
+    "status": {
+      "enum": [
+        "available",
+        "unavailable",
+        "stale",
+        "applied",
+        "dismissed"
+      ],
+      "title": "Status",
+      "type": "string"
+    },
+    "warnings": {
+      "items": {
+        "minLength": 1,
+        "type": "string"
+      },
+      "title": "Warnings",
+      "type": "array"
+    }
+  },
+  "required": [
+    "id",
+    "anchorJobId",
+    "anchorPeriodId",
+    "formattingAsOf",
+    "capture",
+    "periodOrder",
+    "shifts",
+    "status",
+    "reason",
+    "warnings"
+  ],
+  "title": "DateCascadeProposal",
+  "type": "object"
+}

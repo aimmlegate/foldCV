@@ -1,0 +1,816 @@
+{
+  "schemaVersion": 6,
+  "projectId": "project-1",
+  "projectRevision": 1,
+  "documentRevision": 1,
+  "title": "Synthetic rich fixture",
+  "titleManuallySet": false,
+  "createdAt": "2026-10-14T00:00:00Z",
+  "updatedAt": "2026-10-14T00:00:00Z",
+  "project": {
+    "schemaVersion": 5,
+    "projectId": "project-1",
+    "revision": 1,
+    "createdAt": "2026-10-14T00:00:00Z",
+    "sources": [],
+    "evidenceRecords": [],
+    "facts": {
+      "revision": 1,
+      "records": [
+        {
+          "id": "candidate-1",
+          "revision": 1,
+          "origin": "user",
+          "evidence": [],
+          "kind": "candidate",
+          "name": {
+            "value": "Alex Example",
+            "rawText": "Alex Example",
+            "status": "known",
+            "revision": 1,
+            "pendingRawText": null
+          },
+          "title": {
+            "value": "Engineer",
+            "rawText": "Engineer",
+            "status": "known",
+            "revision": 1,
+            "pendingRawText": null
+          },
+          "location": {
+            "value": "Example City and wider location",
+            "rawText": "Example City and wider location",
+            "status": "known",
+            "revision": 1,
+            "pendingRawText": null
+          }
+        },
+        {
+          "id": "job-1",
+          "revision": 1,
+          "origin": "user",
+          "evidence": [],
+          "kind": "employment",
+          "employer": {
+            "value": "Example Company",
+            "rawText": "Example Company",
+            "status": "known",
+            "revision": 1,
+            "pendingRawText": null
+          },
+          "role": {
+            "value": "Engineer",
+            "rawText": "Engineer",
+            "status": "known",
+            "revision": 1,
+            "pendingRawText": null
+          },
+          "periods": [
+            {
+              "id": "period-1",
+              "revision": 1,
+              "start": {
+                "value": {
+                  "precision": "month",
+                  "year": 2024,
+                  "month": 1,
+                  "day": null
+                },
+                "rawText": "{'precision': 'month', 'year': 2024, 'month': 1, 'day': None}",
+                "status": "known",
+                "revision": 1,
+                "pendingRawText": null
+              },
+              "end": {
+                "value": {
+                  "precision": "month",
+                  "year": 2024,
+                  "month": 4,
+                  "day": null
+                },
+                "rawText": "{'precision': 'month', 'year': 2024, 'month': 4, 'day': None}",
+                "status": "known",
+                "revision": 1,
+                "pendingRawText": null
+              },
+              "present": {
+                "value": false,
+                "rawText": "",
+                "status": "known",
+                "revision": 1,
+                "pendingRawText": null
+              },
+              "evidence": []
+            }
+          ]
+        },
+        {
+          "id": "education-1",
+          "revision": 1,
+          "origin": "user",
+          "evidence": [],
+          "kind": "education",
+          "institution": {
+            "value": "Example University",
+            "rawText": "Example University",
+            "status": "known",
+            "revision": 1,
+            "pendingRawText": null
+          },
+          "qualification": {
+            "value": "Bachelor",
+            "rawText": "Bachelor",
+            "status": "known",
+            "revision": 1,
+            "pendingRawText": null
+          },
+          "specialty": {
+            "value": "Computer Science",
+            "rawText": "Computer Science",
+            "status": "known",
+            "revision": 1,
+            "pendingRawText": null
+          },
+          "completion": {
+            "value": {
+              "precision": "day",
+              "year": 2018,
+              "month": 5,
+              "day": 23
+            },
+            "rawText": "{'precision': 'day', 'year': 2018, 'month': 5, 'day': 23}",
+            "status": "known",
+            "revision": 1,
+            "pendingRawText": null
+          }
+        },
+        {
+          "id": "language-1",
+          "revision": 1,
+          "origin": "user",
+          "evidence": [],
+          "kind": "language",
+          "language": {
+            "value": "English",
+            "rawText": "English",
+            "status": "known",
+            "revision": 1,
+            "pendingRawText": null
+          },
+          "level": {
+            "value": null,
+            "rawText": "",
+            "status": "unknown",
+            "revision": 1,
+            "pendingRawText": null
+          }
+        }
+      ],
+      "tombstones": []
+    },
+    "document": {
+      "schemaVersion": 1,
+      "revision": 1,
+      "regions": [
+        {
+          "id": "header",
+          "role": "header",
+          "revision": 1,
+          "blocks": [
+            {
+              "id": "name",
+              "revision": 1,
+              "provenance": [],
+              "children": [],
+              "type": "paragraph",
+              "props": {
+                "alignment": "left",
+                "textColor": "default",
+                "backgroundColor": "default"
+              },
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Alex Example",
+                  "styles": {
+                    "bold": false,
+                    "italic": false,
+                    "underline": false,
+                    "strike": false,
+                    "code": false,
+                    "textColor": "default",
+                    "backgroundColor": "default"
+                  }
+                }
+              ]
+            },
+            {
+              "id": "title",
+              "revision": 1,
+              "provenance": [],
+              "children": [],
+              "type": "heading",
+              "props": {
+                "alignment": "left",
+                "textColor": "default",
+                "backgroundColor": "default",
+                "level": 1
+              },
+              "content": [
+                {
+                  "type": "fact_field",
+                  "bindingId": "title-binding",
+                  "recordId": "candidate-1",
+                  "fieldKey": "title",
+                  "text": "Engineer",
+                  "styles": {
+                    "bold": false,
+                    "italic": false,
+                    "underline": false,
+                    "strike": false,
+                    "code": false,
+                    "textColor": "default",
+                    "backgroundColor": "default"
+                  },
+                  "syncedFactRevision": 1
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "sidebar",
+          "role": "sidebar",
+          "revision": 1,
+          "blocks": [
+            {
+              "id": "education-section",
+              "revision": 1,
+              "provenance": [],
+              "children": [
+                {
+                  "id": "degree",
+                  "revision": 1,
+                  "provenance": [],
+                  "children": [],
+                  "type": "paragraph",
+                  "props": {
+                    "alignment": "left",
+                    "textColor": "default",
+                    "backgroundColor": "default"
+                  },
+                  "content": [
+                    {
+                      "type": "text",
+                      "text": "Example University · 23 May 2018",
+                      "styles": {
+                        "bold": false,
+                        "italic": false,
+                        "underline": false,
+                        "strike": false,
+                        "code": false,
+                        "textColor": "default",
+                        "backgroundColor": "default"
+                      }
+                    }
+                  ]
+                }
+              ],
+              "type": "section",
+              "props": {
+                "alignment": "left",
+                "textColor": "default",
+                "backgroundColor": "default",
+                "recordId": "education-1"
+              },
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Education",
+                  "styles": {
+                    "bold": false,
+                    "italic": false,
+                    "underline": false,
+                    "strike": false,
+                    "code": false,
+                    "textColor": "default",
+                    "backgroundColor": "default"
+                  }
+                }
+              ]
+            },
+            {
+              "id": "language",
+              "revision": 1,
+              "provenance": [],
+              "children": [],
+              "type": "paragraph",
+              "props": {
+                "alignment": "left",
+                "textColor": "default",
+                "backgroundColor": "default"
+              },
+              "content": [
+                {
+                  "type": "text",
+                  "text": "English · level unknown",
+                  "styles": {
+                    "bold": false,
+                    "italic": false,
+                    "underline": false,
+                    "strike": false,
+                    "code": false,
+                    "textColor": "default",
+                    "backgroundColor": "default"
+                  }
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "main",
+          "role": "main",
+          "revision": 1,
+          "blocks": [
+            {
+              "id": "job-section",
+              "revision": 1,
+              "provenance": [],
+              "children": [
+                {
+                  "id": "narrative",
+                  "revision": 1,
+                  "provenance": [],
+                  "children": [],
+                  "type": "paragraph",
+                  "props": {
+                    "alignment": "left",
+                    "textColor": "default",
+                    "backgroundColor": "default"
+                  },
+                  "content": [
+                    {
+                      "type": "text",
+                      "text": "Styled work",
+                      "styles": {
+                        "bold": true,
+                        "italic": true,
+                        "underline": true,
+                        "strike": true,
+                        "code": true,
+                        "textColor": "#123456",
+                        "backgroundColor": "#fedcba"
+                      }
+                    },
+                    {
+                      "type": "link",
+                      "href": "https://example.com/path?q=exact",
+                      "content": [
+                        {
+                          "type": "text",
+                          "text": "Exact URL",
+                          "styles": {
+                            "bold": false,
+                            "italic": false,
+                            "underline": false,
+                            "strike": false,
+                            "code": false,
+                            "textColor": "default",
+                            "backgroundColor": "default"
+                          }
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "id": "heading",
+                  "revision": 1,
+                  "provenance": [],
+                  "children": [],
+                  "type": "heading",
+                  "props": {
+                    "alignment": "left",
+                    "textColor": "default",
+                    "backgroundColor": "default",
+                    "level": 2
+                  },
+                  "content": [
+                    {
+                      "type": "text",
+                      "text": "Details",
+                      "styles": {
+                        "bold": false,
+                        "italic": false,
+                        "underline": false,
+                        "strike": false,
+                        "code": false,
+                        "textColor": "default",
+                        "backgroundColor": "default"
+                      }
+                    }
+                  ]
+                },
+                {
+                  "id": "bullet",
+                  "revision": 1,
+                  "provenance": [],
+                  "children": [
+                    {
+                      "id": "nested",
+                      "revision": 1,
+                      "provenance": [],
+                      "children": [],
+                      "type": "numbered_list",
+                      "props": {
+                        "alignment": "left",
+                        "textColor": "default",
+                        "backgroundColor": "default",
+                        "start": 3
+                      },
+                      "content": [
+                        {
+                          "type": "text",
+                          "text": "Nested",
+                          "styles": {
+                            "bold": false,
+                            "italic": false,
+                            "underline": false,
+                            "strike": false,
+                            "code": false,
+                            "textColor": "default",
+                            "backgroundColor": "default"
+                          }
+                        }
+                      ]
+                    }
+                  ],
+                  "type": "bullet_list",
+                  "props": {
+                    "alignment": "left",
+                    "textColor": "default",
+                    "backgroundColor": "default"
+                  },
+                  "content": [
+                    {
+                      "type": "text",
+                      "text": "Outer",
+                      "styles": {
+                        "bold": false,
+                        "italic": false,
+                        "underline": false,
+                        "strike": false,
+                        "code": false,
+                        "textColor": "default",
+                        "backgroundColor": "default"
+                      }
+                    }
+                  ]
+                },
+                {
+                  "id": "check",
+                  "revision": 1,
+                  "provenance": [],
+                  "children": [],
+                  "type": "check_list",
+                  "props": {
+                    "alignment": "left",
+                    "textColor": "default",
+                    "backgroundColor": "default",
+                    "checked": true
+                  },
+                  "content": [
+                    {
+                      "type": "text",
+                      "text": "Done",
+                      "styles": {
+                        "bold": false,
+                        "italic": false,
+                        "underline": false,
+                        "strike": false,
+                        "code": false,
+                        "textColor": "default",
+                        "backgroundColor": "default"
+                      }
+                    }
+                  ]
+                },
+                {
+                  "id": "toggle",
+                  "revision": 1,
+                  "provenance": [],
+                  "children": [
+                    {
+                      "id": "toggle-child",
+                      "revision": 1,
+                      "provenance": [],
+                      "children": [],
+                      "type": "paragraph",
+                      "props": {
+                        "alignment": "left",
+                        "textColor": "default",
+                        "backgroundColor": "default"
+                      },
+                      "content": [
+                        {
+                          "type": "text",
+                          "text": "Hidden toggle detail survives",
+                          "styles": {
+                            "bold": false,
+                            "italic": false,
+                            "underline": false,
+                            "strike": false,
+                            "code": false,
+                            "textColor": "default",
+                            "backgroundColor": "default"
+                          }
+                        }
+                      ]
+                    }
+                  ],
+                  "type": "toggle_list",
+                  "props": {
+                    "alignment": "left",
+                    "textColor": "default",
+                    "backgroundColor": "default"
+                  },
+                  "content": [
+                    {
+                      "type": "text",
+                      "text": "Expanded on export",
+                      "styles": {
+                        "bold": false,
+                        "italic": false,
+                        "underline": false,
+                        "strike": false,
+                        "code": false,
+                        "textColor": "default",
+                        "backgroundColor": "default"
+                      }
+                    }
+                  ]
+                },
+                {
+                  "id": "quote",
+                  "revision": 1,
+                  "provenance": [],
+                  "children": [],
+                  "type": "quote",
+                  "props": {
+                    "alignment": "left",
+                    "textColor": "default",
+                    "backgroundColor": "default"
+                  },
+                  "content": [
+                    {
+                      "type": "text",
+                      "text": "Quoted work",
+                      "styles": {
+                        "bold": false,
+                        "italic": false,
+                        "underline": false,
+                        "strike": false,
+                        "code": false,
+                        "textColor": "default",
+                        "backgroundColor": "default"
+                      }
+                    }
+                  ]
+                },
+                {
+                  "id": "code",
+                  "revision": 1,
+                  "provenance": [],
+                  "children": [],
+                  "type": "code",
+                  "props": {
+                    "language": "python",
+                    "backgroundColor": "default"
+                  },
+                  "content": "print(\"Exact code\")"
+                },
+                {
+                  "id": "divider",
+                  "revision": 1,
+                  "provenance": [],
+                  "children": [],
+                  "type": "divider",
+                  "props": {},
+                  "content": null
+                }
+              ],
+              "type": "section",
+              "props": {
+                "alignment": "left",
+                "textColor": "default",
+                "backgroundColor": "default",
+                "recordId": "job-1"
+              },
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Example Company",
+                  "styles": {
+                    "bold": false,
+                    "italic": false,
+                    "underline": false,
+                    "strike": false,
+                    "code": false,
+                    "textColor": "default",
+                    "backgroundColor": "default"
+                  }
+                }
+              ]
+            },
+            {
+              "id": "table",
+              "revision": 1,
+              "provenance": [],
+              "children": [],
+              "type": "table",
+              "props": {
+                "alignment": "left",
+                "textColor": "default",
+                "backgroundColor": "default"
+              },
+              "content": {
+                "rows": [
+                  {
+                    "id": "row-a",
+                    "cells": [
+                      {
+                        "id": "cell-a",
+                        "revision": 1,
+                        "content": [
+                          {
+                            "type": "text",
+                            "text": "Header",
+                            "styles": {
+                              "bold": false,
+                              "italic": false,
+                              "underline": false,
+                              "strike": false,
+                              "code": false,
+                              "textColor": "default",
+                              "backgroundColor": "default"
+                            }
+                          }
+                        ],
+                        "backgroundColor": "default",
+                        "alignment": "left",
+                        "colspan": 1,
+                        "rowspan": 1
+                      },
+                      {
+                        "id": "cell-b",
+                        "revision": 1,
+                        "content": [
+                          {
+                            "type": "text",
+                            "text": "Scope",
+                            "styles": {
+                              "bold": false,
+                              "italic": false,
+                              "underline": false,
+                              "strike": false,
+                              "code": false,
+                              "textColor": "default",
+                              "backgroundColor": "default"
+                            }
+                          }
+                        ],
+                        "backgroundColor": "default",
+                        "alignment": "left",
+                        "colspan": 1,
+                        "rowspan": 1
+                      }
+                    ]
+                  },
+                  {
+                    "id": "row-b",
+                    "cells": [
+                      {
+                        "id": "cell-c",
+                        "revision": 1,
+                        "content": [
+                          {
+                            "type": "text",
+                            "text": "Python",
+                            "styles": {
+                              "bold": false,
+                              "italic": false,
+                              "underline": false,
+                              "strike": false,
+                              "code": false,
+                              "textColor": "default",
+                              "backgroundColor": "default"
+                            }
+                          }
+                        ],
+                        "backgroundColor": "default",
+                        "alignment": "left",
+                        "colspan": 1,
+                        "rowspan": 1
+                      },
+                      {
+                        "id": "cell-d",
+                        "revision": 1,
+                        "content": [
+                          {
+                            "type": "text",
+                            "text": "Work",
+                            "styles": {
+                              "bold": false,
+                              "italic": false,
+                              "underline": false,
+                              "strike": false,
+                              "code": false,
+                              "textColor": "default",
+                              "backgroundColor": "default"
+                            }
+                          }
+                        ],
+                        "backgroundColor": "default",
+                        "alignment": "left",
+                        "colspan": 1,
+                        "rowspan": 1
+                      }
+                    ]
+                  }
+                ],
+                "columnWidths": [
+                  120.0,
+                  180.0
+                ],
+                "headerRows": 1
+              }
+            },
+            {
+              "id": "image",
+              "revision": 1,
+              "provenance": [],
+              "children": [],
+              "type": "image",
+              "props": {
+                "assetId": "image-1",
+                "alt": "Synthetic rectangle",
+                "caption": [
+                  {
+                    "type": "text",
+                    "text": "Local caption",
+                    "styles": {
+                      "bold": false,
+                      "italic": false,
+                      "underline": false,
+                      "strike": false,
+                      "code": false,
+                      "textColor": "default",
+                      "backgroundColor": "default"
+                    }
+                  }
+                ],
+                "width": 160.0,
+                "height": 80.0,
+                "alignment": "left"
+              },
+              "content": null
+            }
+          ]
+        }
+      ]
+    },
+    "assets": [
+      {
+        "id": "image-1",
+        "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "path": "images/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.png",
+        "mimeType": "image/png",
+        "size": 100,
+        "width": 160,
+        "height": 80
+      }
+    ],
+    "operations": [],
+    "renders": [],
+    "template": {
+      "id": "foldcv-reference",
+      "version": "1.0.0",
+      "packageSha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "contentPolicyVersion": "rich-1",
+      "assets": []
+    }
+  },
+  "preDraft": null,
+  "formattingAsOf": {
+    "precision": "day",
+    "year": 2026,
+    "month": 10,
+    "day": 14
+  },
+  "sourceObservedAt": null,
+  "rulesUsed": null,
+  "syncRecords": [],
+  "mutationReplay": [],
+  "warnings": []
+}

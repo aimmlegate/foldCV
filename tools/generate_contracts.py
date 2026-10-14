@@ -21,9 +21,20 @@ from packages.resume_core.gui_projects import GUI_PROJECT_CONTRACTS
 from packages.resume_core.gui_rewriting import GUI_REWRITE_CONTRACTS
 from packages.resume_core.gui_exports import GUI_EXPORT_CONTRACTS
 from packages.resume_core.gui_reconciliation import GUI_RECONCILE_CONTRACTS
+from packages.resume_core.models.rich_document import RichDocumentV1
+from packages.resume_core.models.rich_facts import WorkingFacts
+from packages.resume_core.models.rich_mutations import RichMutation, RichSelection, DateCascadeProposal
+from packages.resume_core.models.rich_workspace import ProjectV5, WorkspaceV6, ArchiveManifestV6, AssetReservation
 
 OUT = ROOT / "contracts" / "json-schema"
-RECOVERY_MODELS = {**RECOVERY_CONTRACTS, **GUI_NORMALIZATION_CONTRACTS, **GUI_DRAFT_CONTRACTS, **GUI_PROJECT_CONTRACTS, **GUI_REWRITE_CONTRACTS, **GUI_EXPORT_CONTRACTS, **GUI_RECONCILE_CONTRACTS}
+RICH_CONTRACTS = {
+    "rich_document_v1": RichDocumentV1, "working_facts": WorkingFacts,
+    "rich_mutation": RichMutation, "rich_selection": RichSelection,
+    "date_cascade_proposal": DateCascadeProposal, "project_v5": ProjectV5,
+    "workspace_v6": WorkspaceV6, "archive_manifest_v6": ArchiveManifestV6,
+    "asset_reservation": AssetReservation,
+}
+RECOVERY_MODELS = {**RECOVERY_CONTRACTS, **GUI_NORMALIZATION_CONTRACTS, **GUI_DRAFT_CONTRACTS, **GUI_PROJECT_CONTRACTS, **GUI_REWRITE_CONTRACTS, **GUI_EXPORT_CONTRACTS, **GUI_RECONCILE_CONTRACTS, **RICH_CONTRACTS}
 
 
 def main() -> None:
