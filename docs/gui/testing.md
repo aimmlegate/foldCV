@@ -1,5 +1,15 @@
 # Test strategy
 
+NE11 nonmanual gates pass on behavior revision `0dded31`: full fast 1381, shared
+render integration 176 and final T3 rich/panel/timeline/history/rewrite/table/image
+checks. Fresh actual CLI attempts 5/6/7 pass downloads, source coverage and owned
+restart/reopen. Native and image-bearing portable transfer preserve every Word
+part. Retained failures and spent budgets remain in `state.json.native_editor_followup`.
+See `ne11-acceptance.json`, `ne11-t3.json` and `ne11-layout.json` in CLI-GUI-CYCLES.
+All 17 final rendered pages are inspected. Native Word font use/edit/save/reopen
+and native macOS clipboard/IME/pointer drag remain manual. Independent review is
+deferred under D078; no browser scenario or full acceptance is claimed.
+
 ## Full-editor follow-up
 
 D073–D077 and the NE contracts (including NE03A/NE03B) in the
