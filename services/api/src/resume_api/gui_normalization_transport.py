@@ -77,14 +77,13 @@ class NormalizationTransport:
             "units": [{"id": self.unit_aliases[(source.id, unit.id)], "revision": unit.revision,
                        "text": unit.text} for unit in source.units]} for source in self.request.sources]
         payload["input"]["transportInstructions"] = (
-            "Use the supplied short source/unit IDs for all references. Return compact JSON. "
-            "units is sparse: return only administrative or duplicate classifications; normally return units=[]. "
-            "The application derives complete unit fact accounting from literalEvidence and retains every other unit as unresolved. "
-            "Include every supported job and claim. Job unitIds must include employer, exact role, dates and all its claim evidence. "
-            "Text fact values, employer and role are exact source substrings, not rewritten prose. "
-            "Every candidate, education, certification, language and private-detail text must be an exact substring of its cited evidence. "
-            "Do not expand abbreviations, combine separate source fragments into a new value, or infer qualifications. Unknown text is empty with evidence=[]. "
-            "Copy evidence text exactly from its unit; do not join separate units into a literal span."
+            "Use supplied short source/unit IDs. Return compact JSON. "
+            "units: administrative/duplicate only; otherwise []. "
+            "The app derives fact coverage from literalEvidence; other units stay unresolved. "
+            "Include all supported jobs/claims. Job unitIds: employer, exact role, dates and every claim's evidence. "
+            "Text values, employer, role and candidate/detail fields must be literal cited source substrings. "
+            "Do not expand abbreviations, stitch separate fragments or infer qualifications. Unknown text: empty, evidence=[]. "
+            "Copy exact unit text as evidence; never join units into a literal span."
         )
         payload["constraints"].append(
             "Normalization creates NEW job and fact tempIds; these are local proposal IDs, not source references. "
@@ -97,6 +96,9 @@ class NormalizationTransport:
             "Qualitative outcomes without a literal number are text facts. "
             "Keep global skills separate. Technology value.scope must be global when jobTempId=null, "
             "job when jobTempId is set and subprojectTempId=null, and subproject when both owner IDs are set. "
+            "Technology display must be literal citation text, not a catalog label. "
+            "Retain each explicit general skill as a separate global fact with its own skill-list citation, "
+            "even when the same technology is also cited in a job. List each technology separately; do not omit duplicates across scopes. "
             "Create subprojects only with an explicit literal source name. "
             "Subproject unitIds include both its name and every evidence unit for its assigned facts."
         )

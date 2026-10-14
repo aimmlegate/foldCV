@@ -297,3 +297,28 @@ def test_unrepresented_source_remains_warned_without_native_row_drops():
     assert document.model_dump() == before
     unit = normalized.sources[0].units[-1]
     assert unit.disposition == 'unresolved' and unit.text == 'Additional unsupported source detail.\n'
+
+
+def test_unsupported_owned_technology_display_keeps_exact_claim_without_inventing_tool():
+    captured = source()
+    raw = employment_proposal(captured).model_dump(mode='json', by_alias=True)
+    row = next(row for row in raw['facts'] if row['tempId'] == 'postgres')
+    literal = '\n'.join(span['text'] for span in row['literalEvidence'])
+    owner = row['jobTempId']
+    row['value']['display'] = 'Unverified technology'
+    proposal, result, count = recover(captured, raw)
+    kept = next(fact for fact in proposal.facts if fact.temp_id == 'postgres')
+    assert kept.kind == 'text' and kept.value.text == literal and kept.job_temp_id == owner
+    assert count > 0 and len(result.employment) == 3
+    assert 'Unverified technology' not in result.model_dump_json()
+
+
+def test_literal_fallback_cannot_move_foreign_claim_inside_another_job():
+    captured = source()
+    raw = employment_proposal(captured).model_dump(mode='json', by_alias=True)
+    row = next(row for row in raw['facts'] if row['tempId'] == 'postgres')
+    row['value']['display'] = 'Unverified technology'
+    row['jobTempId'] = 'west'
+    proposal, result, count = recover(captured, raw)
+    assert not any(fact.temp_id == 'postgres' for fact in proposal.facts)
+    assert count > 0 and len(result.employment) == 3

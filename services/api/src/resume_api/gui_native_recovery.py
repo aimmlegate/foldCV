@@ -166,5 +166,12 @@ class NativeRecovery:
                 clean.facts.append(fact)
             else:
                 self.unresolved += 1
+                literal = "\n".join(span.text for span in spans)
+                if ids[fact.temp_id] == 1 and literal.strip() and len(literal) <= 500:
+                    data = fact.model_dump(mode="json", by_alias=True)
+                    data.update(kind="text", value={"text": literal})
+                    fallback = type(fact).model_validate(data)
+                    if self.accepts(base, clean, clean.jobs, [fallback]):
+                        clean.facts.append(fallback)
         clean.units = self.ledger(clean.facts)
         return clean
