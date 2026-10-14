@@ -91,11 +91,13 @@ class RichProjectService(RichSynchronization, RichAssets, GuiProjectService):
                 return "failed"
 
     def response(self, identifier):
+        from packages.resume_core.rich_presentation import presentation
         workspace = self.read(identifier)
         saved = self.saved_revisions.get(identifier)
         return RichProjectResponse(workspace=workspace, durability=self.durability(identifier),
             savedProjectRevision=saved[0] if saved else None, savedDocumentRevision=saved[1] if saved else None,
-            saveError=self.save_errors.get(identifier), generation=self.generations.get(identifier))
+            saveError=self.save_errors.get(identifier), generation=self.generations.get(identifier),
+            presentation=presentation(workspace.project.document, workspace.project.facts) if workspace.project else None)
 
     def allocate(self, title):
         self.ensure_loaded()
@@ -299,7 +301,7 @@ class RichProjectService(RichSynchronization, RichAssets, GuiProjectService):
             async with self.worker_slot(cancel):
                 with files.open():
                     blob = await self.renderer.render(captured.project.document,
-                        {aid: data for (pid, aid), data in self.images.items() if pid == identifier}, files)
+                        {aid: data for (pid, aid), data in self.images.items() if pid == identifier}, files, captured.project.facts)
             with self.state_lock:
                 current = self.workspaces[identifier]
                 if identifier in self.deleted_ids or cancel.is_set() or current.document_revision != captured.document_revision or current.project.facts.revision != captured.project.facts.revision:

@@ -69,6 +69,16 @@ remain manual, distinct from synthetic events and Word checks.
 
 ## NE01 current policy and checks
 
+NE10 adds measured flowing DOCX and shared editor presentation roles. Its mapped
+nonbrowser regressions cover eight-logo decoration without truncation, native
+Word geometry/footer/image identity, long Cyrillic content, merged tables and
+links, profile-language labels and exact job bindings. The public ProseMirror
+decoration test preserves authored marks/text and leaves history empty. T3 checks
+the real node-view wrappers, band geometry, fonts, editing/history and restart.
+The three-case internal converter tool checks every page for retained markers and
+page overflow; all page images are inspected. Native Word font use/edit/save and
+native macOS input remain manual under the linked checklist.
+
 NE01 removes candidate/contact content exclusions from GUI/legacy context, draft,
 rewrite, reconciliation, related changes, shared render and default/saved rules.
 Contact/personal/meta categories remain descriptive. Evidence, source ownership,

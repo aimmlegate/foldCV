@@ -15,6 +15,8 @@ import { RichSynchronization, type PanelCommand } from "./synchronization";
 import { FactsPanel } from "./FactsPanel";
 import { Timeline, type TimelineControls } from "./Timeline";
 import { dateAnchors, type DateAnchor } from "./date-edit";
+import { presentationPlugin, type PresentationBlocks } from "./presentation";
+import { brand, presentationLogos } from "./presentation-assets";
 import type { TimelineReport } from "../contracts/generated/timeline_report";
 import type { DateCascadeProposal } from "../contracts/generated/date_cascade_proposal";
 import { selectedRange } from "./selection";
@@ -106,6 +108,7 @@ export function RichEditor({ initial, acknowledge, onStatus, ref }: { initial: R
   const selection = useRef<ReturnType<typeof selectedRange>>(null);
   const [editorWarning, setEditorWarning] = useState("");
   const [targets, setTargets] = useState<{ id: string; label: string }[]>([]);
+  const presentation = useMemo<{ blocks: PresentationBlocks }>(() => ({ blocks: initial.presentation?.blocks ?? {} }), []);
   const imageInput = useRef<HTMLInputElement>(null);
   const bridge = useMemo(() => ({ session: crypto.randomUUID(), group: 0, composing: false, observing: false, replaying: false,
     kind: "typing" as RichMutation["kind"],
@@ -124,7 +127,7 @@ export function RichEditor({ initial, acknowledge, onStatus, ref }: { initial: R
     Extension.create({ name: "foldcv-local-image-drop", priority: 1000, addProseMirrorPlugins: () => [new Plugin({ props: {
       handleDOMEvents: { drop: (_view, event) => assets.paste(event) },
     } })] })],
-    prosemirrorPlugins: [tableIdentityPlugin(), bindingIdentityPlugin(), structureIdentityPlugin(), pastedRegionsPlugin(), new Plugin({
+    prosemirrorPlugins: [tableIdentityPlugin(), bindingIdentityPlugin(), structureIdentityPlugin(), pastedRegionsPlugin(), presentationPlugin(() => presentation.blocks, presentationLogos), new Plugin({
     key: new PluginKey("foldcv-rich-session"), filterTransaction: transaction => {
       if (!transaction.docChanged) return true;
       const root = transaction.doc.firstChild;
@@ -160,7 +163,7 @@ export function RichEditor({ initial, acknowledge, onStatus, ref }: { initial: R
         event.preventDefault(); if (!bridge.composing) { if (event.inputType === "historyUndo") bridge.undo(); else bridge.redo(); } return true;
       },
     } },
-  })] }), [bridge, assets]);
+  })] }), [bridge, assets, presentation]);
   const editor = useCreateBlockNote({ schema, disableExtensions: ["history"], extensions: [extension],
     pasteHandler: ({ event, defaultPasteHandler }) => assets.paste(event) || defaultPasteHandler(),
     tables: { splitCells: true, cellBackgroundColor: true, cellTextColor: true, headers: true }, links: {
@@ -177,6 +180,9 @@ export function RichEditor({ initial, acknowledge, onStatus, ref }: { initial: R
     setSelecting(editor.transact(tr => !tr.selection.empty));
     const next = editor.transact(tr => selectedRange(tr)); if (next) selection.current = next;
   }), [editor]);
+  useEffect(() => { presentation.blocks = initial.presentation?.blocks ?? {};
+    editor.transact(tr => { tr.setMeta("foldcv-presentation", true); });
+  }, [editor, initial.presentation, presentation]);
 
   useEffect(() => {
     const originalDocument = project.document;
@@ -569,7 +575,7 @@ export function RichEditor({ initial, acknowledge, onStatus, ref }: { initial: R
   }, undo: bridge.undo, redo: bridge.redo }), [bridge, bridge.history?.position]);
   return <ImageActions.Provider value={{ source: asset => imageSource(initial.workspace.projectId, asset), upload: assets.upload, cancel: assets.cancel }}>
     <div className="rich-workspace"><FactsPanel facts={facts} submit={command => bridge.panel(command)} timeline={ready ? <Timeline facts={facts} anchors={anchors} controls={timelineControls} /> : null} />
-    <div className="cv-document" style={{ ...referenceVariables, color: "#171717" }} data-project-id={initial.workspace.projectId}>
+    <div className="cv-document" style={{ ...referenceVariables, color: "#000000" }} data-project-id={initial.workspace.projectId}>
       <div className="cv-structure-controls"><Popover.Root><Popover.Trigger asChild><button disabled={!selecting || rewriting}>Переписать выделенное</button></Popover.Trigger><Popover.Portal>
         <Popover.Content className="rich-block-menu"><label>Что изменить<textarea aria-label="Инструкция для фрагмента" value={instruction} onChange={event => setInstruction(event.currentTarget.value)} /></label>
           <button disabled={!instruction.trim() || rewriting} onClick={() => { setRewriting(true); void bridge.rewrite(instruction).catch(error => setEditorWarning(error instanceof Error ? error.message : "Не удалось переписать")).finally(() => setRewriting(false)); }}>Применить инструкцию</button>
@@ -591,11 +597,13 @@ export function RichEditor({ initial, acknowledge, onStatus, ref }: { initial: R
         <button onClick={() => void bridge.retry(record.id).catch(error => setEditorWarning(error instanceof Error ? error.message : "Не удалось повторить"))}>Повторить</button>
         <button onClick={() => void projectRequest(`/${initial.workspace.projectId}/sync/${record.id}`, "POST", { status: "stale" }).then(response => setSyncRecords(response.workspace.syncRecords))}>Закрыть</button>
       </p>)}
+      <div className="cv-sheet"><img className="cv-template-brand" src={brand} alt="Generic" />
       <BlockNoteView editor={editor} theme="light" linkToolbar={!selecting} filePanel={false} slashMenu={false}>
         <SuggestionMenuController triggerCharacter="/" getItems={async query => [...getDefaultReactSlashMenuItems(editor),
           { title: "Изображение", subtext: "Локальный PNG, JPEG или WebP", aliases: ["image", "photo"], group: "Media", onItemClick: () => imageInput.current?.click() }]
           .filter(item => `${item.title} ${item.aliases?.join(" ") ?? ""}`.toLowerCase().includes(query.toLowerCase()))} />
       </BlockNoteView>
+      <div className="cv-template-footer">mail@example.com</div></div>
     </div></div>
   </ImageActions.Provider>;
 }

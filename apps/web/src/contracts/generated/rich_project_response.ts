@@ -3,6 +3,18 @@ export type Errorcode = string | null;
 export type Id = string;
 export type Stage = "normalize_semantics" | "draft_prose" | "assemble" | "render";
 export type Status = "queued" | "running" | "completed" | "failed" | "cancelled" | "interrupted";
+export type Logo = string | null;
+export type Role =
+  | "body"
+  | "support"
+  | "header_name"
+  | "header_title"
+  | "job_heading"
+  | "profile_heading"
+  | "section_heading"
+  | "focus_heading"
+  | "focus_entry"
+  | "group";
 export type Saveerror = string | null;
 export type Saveddocumentrevision = number | null;
 export type Savedprojectrevision = number | null;
@@ -538,7 +550,7 @@ export type Id37 = string;
 export type Provenance11 = (NarrativeCitation | FieldBinding | WorkingOwnership | SourceWitness)[];
 export type Revision36 = number;
 export type Type14 = "paragraph";
-export type Blocks = (
+export type Blocks1 = (
   | ParagraphBlock
   | HeadingBlock
   | BulletBlock
@@ -554,7 +566,7 @@ export type Blocks = (
 )[];
 export type Id38 = string;
 export type Revision37 = number;
-export type Role = "header" | "sidebar" | "main";
+export type Role1 = "header" | "sidebar" | "main";
 export type Revision38 = number;
 export type Schemaversion = 1;
 export type Evidence15 = EvidenceSpan[];
@@ -697,6 +709,7 @@ export type Warnings2 = RichWarning[];
 export interface RichProjectResponse {
   durability: Durability;
   generation: RichGenerationState | null;
+  presentation?: RichPresentation | null;
   saveError: Saveerror;
   savedDocumentRevision: Saveddocumentrevision;
   savedProjectRevision: Savedprojectrevision;
@@ -707,6 +720,16 @@ export interface RichGenerationState {
   id: Id;
   stage: Stage;
   status: Status;
+}
+export interface RichPresentation {
+  blocks: Blocks;
+}
+export interface Blocks {
+  [k: string]: BlockPresentation;
+}
+export interface BlockPresentation {
+  logo?: Logo;
+  role: Role;
 }
 export interface WorkspaceV6 {
   createdAt: Createdat;
@@ -1039,10 +1062,10 @@ export interface RichDocumentV1 {
   schemaVersion: Schemaversion;
 }
 export interface RichRegion {
-  blocks: Blocks;
+  blocks: Blocks1;
   id: Id38;
   revision: Revision37;
-  role: Role;
+  role: Role1;
 }
 export interface ParagraphBlock {
   children: Children;

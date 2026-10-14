@@ -50,7 +50,7 @@ def test_image_docx_keeps_exact_bytes_alt_aspect_alignment_and_styled_caption():
     with ZipFile(BytesIO(render_rich_docx(tree, {"asset": image}))) as archive:
         root = etree.fromstring(archive.read("word/document.xml"))
         media = [name for name in archive.namelist() if name.startswith("word/media/")]
-        assert len(media) == 1 and archive.read(media[0]) == image
+        assert sum(archive.read(name) == image for name in media) == 1
         assert root.xpath("//wp:docPr/@descr", namespaces=NS) == ["Exact alt"]
         assert root.xpath("//wp:extent/@cx", namespaces=NS) == [str(420 * 12700)]
         assert root.xpath("//wp:extent/@cy", namespaces=NS) == [str(210 * 12700)]

@@ -50,13 +50,15 @@ class GuiDocxRenderer:
 
 
 class RichDocxRenderer:
-    async def render(self, document, images, files: OperationFiles) -> bytes:
+    async def render(self, document, images, files: OperationFiles, facts=None) -> bytes:
         from packages.resume_core.rendering.rich_docx import renderer_sha256 as rich_renderer_sha256
         from packages.resume_core.rich_limits import DOCX_BYTES
         if files.path is None:
             raise RenderFailure("RICH_RENDER_FAILED")
         workspace = files.path
         payload = {"document": document.model_dump(mode="json", by_alias=True), "rendererSha256": rich_renderer_sha256()}
+        if facts is not None:
+            payload["facts"] = facts.model_dump(mode="json", by_alias=True)
         payload["images"] = {}
         for identifier, data in images.items():
             checksum = hashlib.sha256(data).hexdigest()

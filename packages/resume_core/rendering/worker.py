@@ -263,7 +263,9 @@ def main() -> int:
                 if len(data) > 20 * 1024 * 1024 or hashlib.sha256(data).hexdigest() != checksum:
                     raise RenderFailure("RICH_IMAGE_MISSING")
                 images[identifier] = data
-            content = render_rich_docx(document, images)
+            from packages.resume_core.models.rich_facts import WorkingFacts
+            facts = WorkingFacts.model_validate(payload["facts"]) if "facts" in payload else None
+            content = render_rich_docx(document, images, facts)
             if len(content) > MAX_RICH_DOCX:
                 raise RenderFailure("RENDER_OUTPUT_LIMIT")
             (workspace / "resume.docx").write_bytes(content)

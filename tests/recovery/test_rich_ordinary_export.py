@@ -38,7 +38,7 @@ def test_ordinary_export_has_real_headings_lists_restarts_shading_code_and_expan
         root = etree.fromstring(archive.read("word/document.xml"))
         paragraphs = {"".join(p.xpath(".//w:t/text()", namespaces=NS)): p for p in root.xpath("//w:p", namespaces=NS)}
         assert paragraphs["Heading"].xpath("w:pPr/w:pStyle[@w:val='Heading3']", namespaces=NS)
-        assert paragraphs["Heading"].xpath("w:r/w:rPr/w:color[@w:val='171717']", namespaces=NS)
+        assert paragraphs["Heading"].xpath("w:r/w:rPr/w:color[@w:val='000000']", namespaces=NS)
         ids = [paragraphs[text].xpath("w:pPr/w:numPr/w:numId/@w:val", namespaces=NS)[0] for text in ("Third item", "Fourth item", "Restarted item")]
         assert ids[0] == ids[1] and ids[2] != ids[0]
         numbering = etree.fromstring(archive.read("word/numbering.xml"))

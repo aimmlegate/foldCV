@@ -61,6 +61,44 @@
       "title": "AssetRef",
       "type": "object"
     },
+    "BlockPresentation": {
+      "additionalProperties": false,
+      "properties": {
+        "logo": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Logo"
+        },
+        "role": {
+          "enum": [
+            "body",
+            "support",
+            "header_name",
+            "header_title",
+            "job_heading",
+            "profile_heading",
+            "section_heading",
+            "focus_heading",
+            "focus_entry",
+            "group"
+          ],
+          "title": "Role",
+          "type": "string"
+        }
+      },
+      "required": [
+        "role"
+      ],
+      "title": "BlockPresentation",
+      "type": "object"
+    },
     "BulletBlock": {
       "additionalProperties": false,
       "properties": {
@@ -3600,6 +3638,26 @@
       "title": "RichPreDraft",
       "type": "object"
     },
+    "RichPresentation": {
+      "additionalProperties": false,
+      "properties": {
+        "blocks": {
+          "additionalProperties": {
+            "$ref": "#/$defs/BlockPresentation"
+          },
+          "propertyNames": {
+            "minLength": 1
+          },
+          "title": "Blocks",
+          "type": "object"
+        }
+      },
+      "required": [
+        "blocks"
+      ],
+      "title": "RichPresentation",
+      "type": "object"
+    },
     "RichRegion": {
       "additionalProperties": false,
       "properties": {
@@ -5801,6 +5859,17 @@
           "type": "null"
         }
       ]
+    },
+    "presentation": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/RichPresentation"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
     },
     "saveError": {
       "anyOf": [

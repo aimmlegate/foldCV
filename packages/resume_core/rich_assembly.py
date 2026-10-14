@@ -160,9 +160,13 @@ def assemble_rich(workspace, normalized, draft, rules):
     sidebar.extend(block(detail, detail.field_id, "value") for detail in candidate.details)
     focus = [block(entry.display) for entry in draft.document.skills_focus.focus]
     sidebar.append(section("focus", "FOCUS", focus, presentation="focus"))
+    english = draft.editorial_plan.profile_language == "en"
+    labels = {"education": "EDUCATION" if english else "ОБРАЗОВАНИЕ", "certifications": "CERTIFICATIONS" if english else "СЕРТИФИКАТЫ",
+        "languages": "LANGUAGES" if english else "ЯЗЫКИ"}
     for group, mapping in ((draft.document.education, {"institution": "institution", "qualification": "qualification", "specialty": "specialty", "date_text": "completion"}),
                            (draft.document.certifications, {"name": "name", "issuer": "issuer", "date_text": "date"}),
                            (draft.document.languages, {"name": "language", "proficiency": "level"})):
+        grouped = []
         for item in group:
             if not item.visible:
                 continue
@@ -177,23 +181,32 @@ def assemble_rich(workspace, normalized, draft, rules):
                 children = [block(item.legacy_text)]
             else:
                 children = [block(getattr(item, key), item.id, target) for key, target in mapping.items()]
-            sidebar.append(section("section-" + item.id, "", children, item.id))
-    main = [section("profile", "", [block(draft.document.profile.text)])]
+            grouped.append(section("section-" + item.id, "", children, item.id))
+        group_id = "education" if "institution" in mapping else "languages" if "proficiency" in mapping else "certifications"
+        if grouped:
+            sidebar.append(section(group_id, labels[group_id], grouped))
+    main = [section("profile", "PROFILE" if english else "О СЕБЕ", [block(draft.document.profile.text)])]
+    employment_blocks = []
     for job in draft.document.jobs:
         if not job.visible:
             continue
-        children = [block(job.employer, job.id, "employer", "heading", 2), block(job.role, job.id, "role")]
+        employer = block(job.employer, job.id, "employer", "heading", 2)
+        role = block(job.role, job.id, "role")
+        if job.role.text:
+            employer["content"].extend([{"type": "text", "text": " — ", "styles": {}}, *role["content"]])
+            employer["provenance"].extend(role["provenance"])
+        children = [employer]
         for period in job.periods:
             start = block(period.start_text, job.id, "period:" + period.id + ":start")
             end_text = period.end_text.model_copy(deep=True)
             if period.present and not end_text.text:
-                end_text.text = "Present" if draft.editorial_plan.source_language == "en" else "по настоящее время"
+                end_text.text = "Present" if english else "по настоящее время"
             end = block(end_text, job.id, "period:" + period.id + (":present" if period.present else ":end"))
             start["content"].extend([{"type": "text", "text": " — ", "styles": {}}, *end["content"]])
             start["provenance"].extend(end["provenance"])
             children.append(start)
-        children.extend(block(part) for part in (job.context, job.tasks, job.results))
         children.append(block(job.stack, technology_scope=job.id))
+        children.extend(block(part) for part in (job.context, job.tasks, job.results))
         for sub in jobs.get(job.id).subprojects if job.id in jobs else []:
             from .models.recovery import AuthoredField
             source_facts = [fact for fact in normalized.facts if fact.subproject_id == sub.id]
@@ -212,9 +225,11 @@ def assemble_rich(workspace, normalized, draft, rules):
             children.append(section("section-" + sub.id, "", details, sub.id))
         if job.id not in jobs:
             record("employment", job.id, spans_for(job.employer), employer=field(job.employer.text), role=field(job.role.text), periods=[])
-        main.append(section("section-" + job.id, "", children, job.id))
-    main.append(section("early-career", "", [block(draft.document.early_career.text)]))
-    main.append(section("skills", "", [block(draft.document.skills_focus.skills_text)]))
+        employment_blocks.append(section("section-" + job.id, "", children, job.id))
+    if employment_blocks:
+        main.append(section("experience", "EXPERIENCE" if english else "ОПЫТ", employment_blocks))
+    main.append(section("early-career", "EARLY CAREER" if english else "РАННИЙ ОПЫТ", [block(draft.document.early_career.text)]))
+    main.append(section("skills", "SKILLS" if english else "НАВЫКИ", [block(draft.document.skills_focus.skills_text)]))
     return ProjectV5.model_validate({"schemaVersion": 5, "projectId": workspace.project_id,
         "revision": workspace.project_revision + 1, "createdAt": workspace.created_at,
         "sources": [source.model_dump(by_alias=True) for source in normalized.sources], "evidenceRecords": evidence_records,
