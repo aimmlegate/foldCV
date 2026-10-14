@@ -79,3 +79,31 @@ def test_draft_transport_does_not_drop_or_heal_invalid_references(kind, code):
         assert reply.fields[0].field_id == "candidate/name"
     else:
         assert error.value.code == code
+
+
+def test_job_field_choices_keep_global_and_other_job_claims_out_without_filtering_context():
+    from packages.resume_core.models.contracts import TextFact
+    request = draft_request()
+    first, second = request.normalized.employment[:2]
+    for id, owner in [('global-claim', None), ('first-claim', first.id), ('second-claim', second.id)]:
+        request.normalized.facts.append(TextFact(id=id, revision=1, kind='text', value={'text': id},
+            evidence=[], origin='user', importance='normal', jobId=owner, subprojectId=None))
+    transport = DraftingTransport(request)
+    before = request.model_dump()
+    payload = json.loads(transport.encode(drafting_input(request, RULES)))['input']
+    global_id, first_id, second_id = [transport.aliases[id] for id in
+                                     ('global-claim', 'first-claim', 'second-claim')]
+    assert {global_id, first_id, second_id} <= {fact['id'] for fact in payload['facts']}
+    first_fields = [field for field in payload['writableFields'] if field['jobId'] == transport.aliases[first.id]]
+    second_fields = [field for field in payload['writableFields'] if field['jobId'] == transport.aliases[second.id]]
+    assert len(first_fields) == len(second_fields) == 4
+    assert all(first_id in field['allowedFactIds'] and global_id not in field['allowedFactIds']
+               and second_id not in field['allowedFactIds'] for field in first_fields)
+    assert all(second_id in field['allowedFactIds'] and global_id not in field['allowedFactIds']
+               and first_id not in field['allowedFactIds'] for field in second_fields)
+    reply = draft_reply(request)
+    target = next(field for field in reply.fields if field.field_id == f'job:{first.id}/stack')
+    target.fact_ids, target.text = ['global-claim'], 'General claim'
+    with pytest.raises(DraftFailure, match='DRAFT_FACT_OUTSIDE_JOB'):
+        validate_draft(request, reply, RULES)
+    assert request.model_dump() == before

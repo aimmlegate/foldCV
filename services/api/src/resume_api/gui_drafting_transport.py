@@ -30,6 +30,9 @@ class DraftingTransport:
         payload["input"]["writableFields"] = [
             {"fieldId": alias, "purpose": value.split("/")[-1],
              "jobId": self.aliases[value.split("/", 1)[0].removeprefix("job:")] if value.startswith("job:") else None,
+             **({"allowedFactIds": [fact["id"] for fact in payload["input"]["facts"]
+                 if fact["jobId"] == value.split("/", 1)[0].removeprefix("job:")]}
+                if value.startswith("job:") else {}),
              "section": value.split("/", 1)[0] if not value.startswith("job:") else "job"}
             for alias, value in self.fields.items()
         ]
@@ -47,7 +50,8 @@ class DraftingTransport:
             "These structured values are read-only context and the application preserves them. "
             "Use the short fieldId, jobId and fact IDs exactly. Return every non-job field, even when text is empty. "
             "For every detailed job return context, tasks, results and stack; empty text is allowed only when unsupported. "
-            "Every nonempty field needs supporting factIds; job fields use only facts owned by that job. "
+            "Every nonempty field needs supporting factIds. Job fields use only their listed allowedFactIds; "
+            "global and other-job IDs cannot support a job field. "
             "Account for all active jobs in editorialPlan.jobs. Keep formattingAsOf and rulesRevision unchanged. "
             "editorialPlan.focus entries must copy catalogId, display and factIds from focusOptions; "
             "choose at most eight supported technologies, or return focus=[]. Never attach text or employment facts to focus."
@@ -63,7 +67,7 @@ class DraftingTransport:
             for key, part in value.items():
                 if key in {"id", "jobId", "fieldId"} and isinstance(part, str):
                     result[key] = self.aliases.get(part, part)
-                elif key in {"factIds", "blockedConflictFactIds"} and isinstance(part, list):
+                elif key in {"factIds", "allowedFactIds", "blockedConflictFactIds"} and isinstance(part, list):
                     result[key] = [self.aliases.get(item, item) for item in part]
                 else:
                     result[key] = visit(part)
