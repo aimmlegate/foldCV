@@ -9,7 +9,7 @@ const ajv = new Ajv2020({ strict: false, allErrors: true });
 const responseShape = ajv.compile<RichProjectResponse>(schema);
 const prefix = "/v1/rich/projects";
 export class RichApiFailure extends Error {
-  constructor(readonly code: string) { super(code); }
+  constructor(readonly code: string, readonly status = 0) { super(code); }
 }
 export async function request(path: string, method = "GET", body?: unknown): Promise<unknown> {
   const init: RequestInit = { method, credentials: "same-origin", cache: "no-store" };
@@ -20,7 +20,7 @@ export async function request(path: string, method = "GET", body?: unknown): Pro
   if (!response.ok) {
     const code = typeof value === "object" && value !== null && "error" in value && typeof value.error === "object"
       && value.error !== null && "code" in value.error && typeof value.error.code === "string" ? value.error.code : "REQUEST_FAILED";
-    throw new RichApiFailure(code);
+    throw new RichApiFailure(code, response.status);
   }
   return value;
 }
@@ -46,7 +46,7 @@ export async function download(id: string, kind: "export" | "archive", revision:
     const value: unknown = await response.json();
     const code = typeof value === "object" && value !== null && "error" in value && typeof value.error === "object"
       && value.error !== null && "code" in value.error && typeof value.error.code === "string" ? value.error.code : "EXPORT_FAILED";
-    throw new RichApiFailure(code);
+    throw new RichApiFailure(code, response.status);
   }
   const blob = await response.blob();
   const maximum = (kind === "export" ? 32 : 64) * 1024 * 1024;

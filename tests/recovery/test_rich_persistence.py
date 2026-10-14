@@ -220,3 +220,23 @@ async def test_fresh_rich_creation_initial_docx_restart_and_portable_without_inf
     assert other.read(imported).project.document == workspace.project.document
     assert other.read(imported).project.renders == []
     assert len(provider.calls) == 2
+
+
+@pytest.mark.asyncio
+async def test_technical_render_failure_keeps_imported_rich_content_but_cannot_claim_completed_export(tmp_path):
+    from packages.resume_core.rendering.template import RenderFailure
+    class FailedRenderer:
+        async def render(self, *_args):
+            raise RenderFailure("RENDER_OUTPUT_LIMIT")
+    provider = CreationProvider()
+    service = RichProjectService(tmp_path / "operations", RulesStore(tmp_path / "store"), lambda: (provider, "fixture"),
+        clock=frozen_now, renderer=FailedRenderer())
+    selected = await service.select(Path("tests/fixtures/recovery/E1.txt").read_bytes(), "pasted.txt", True)
+    identifier = selected.project_id
+    generation = service.start(identifier); await service.tasks[(identifier, generation)]
+    state = service.generations[identifier]
+    assert state.status == "failed" and state.error_code == "RENDER_OUTPUT_LIMIT"
+    workspace = service.read(identifier)
+    assert workspace.project is not None and workspace.project.renders == []
+    assert workspace.project.document.regions[0].blocks and service.durability(identifier) == "durable"
+    assert len(provider.calls) == 2

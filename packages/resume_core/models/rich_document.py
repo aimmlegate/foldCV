@@ -89,7 +89,7 @@ class HeadingProps(ParagraphProps):
 
 
 class NumberedProps(ParagraphProps):
-    start: int = Field(default=1, ge=1)
+    start: int | None = Field(default=None, ge=1)
 
 
 class ChecklistProps(ParagraphProps):

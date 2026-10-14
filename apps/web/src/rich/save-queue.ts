@@ -54,6 +54,7 @@ export function documentSteps(before: RichDocumentV1, after: RichDocumentV1): Ri
 export class RichSaveQueue {
   private target: RichDocumentV1;
   private actionId: string;
+  private kind: RichMutation["kind"] = "typing";
   private running: Promise<void> | null = null;
   private closed = false;
   private pendingRequest: RichMutation | null = null;
@@ -64,7 +65,9 @@ export class RichSaveQueue {
     this.target = response.workspace.project.document;
     this.actionId = `${sessionId}:initial`;
   }
-  update(document: RichDocumentV1, actionId: string): void { this.target = document; this.actionId = actionId; }
+  update(document: RichDocumentV1, actionId: string, kind: RichMutation["kind"] = "typing"): void {
+    this.target = document; this.actionId = actionId; this.kind = kind;
+  }
   get baseline(): RichProjectResponse { return this.response; }
   close(): void { this.closed = true; }
   async flush(): Promise<void> {
@@ -80,12 +83,18 @@ export class RichSaveQueue {
       const [first, ...rest] = steps;
       if (!first && !this.pendingRequest) return;
       const request: RichMutation | null = this.pendingRequest ?? (first ? { schemaVersion: 1, projectId: this.response.workspace.projectId,
-        clientMutationId: crypto.randomUUID(), actionId: this.actionId, kind: "typing",
+        clientMutationId: crypto.randomUUID(), actionId: this.actionId, kind: this.kind,
         capture: { sessionId: this.sessionId, actionId: this.actionId, actionToken: 0, dependencies: [] }, steps: [first, ...rest] } : null);
       if (!request) return;
       if (new TextEncoder().encode(JSON.stringify(request)).length > 1024 * 1024) throw new Error("RICH_MUTATION_LIMIT");
       this.pendingRequest = request;
-      const response = await this.send(request);
+      let response: RichProjectResponse;
+      try { response = await this.send(request); }
+      catch (error) {
+        if (typeof error === "object" && error !== null && "status" in error && typeof error.status === "number"
+          && error.status >= 400 && error.status < 500) this.pendingRequest = null;
+        throw error;
+      }
       if (this.closed) return;
       this.response = response;
       this.acknowledged(response);

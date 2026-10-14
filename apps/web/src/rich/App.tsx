@@ -17,6 +17,8 @@ function label(error: unknown): string {
   if (error instanceof RichApiFailure && error.code === "RICH_EXPORT_UNSUPPORTED") return "Этот блок пока не поддерживает экспорт. Изменения сохранены.";
   return error instanceof Error ? error.message : "Не удалось выполнить действие";
 }
+const stageLabels = { normalize_semantics: "Готовим факты", draft_prose: "Редактируем текст",
+  assemble: "Собираем документ", render: "Готовим DOCX" };
 export function App() {
   const theme = useTheme();
   const [response, setResponse] = useState<RichProjectResponse | null>(null);
@@ -101,9 +103,10 @@ export function App() {
       </div>
     </header>
     {error && <p className="next-message" role="alert">{error}</p>}
-    {creating && response && <div className="next-progress" role="status"><span>Создаём резюме: {generation.stage}</span>
+    {creating && response && <div className="next-progress" role="status"><span>{stageLabels[generation.stage]}…</span>
       <button onClick={() => void action(async () => { acknowledge(await projectRequest(`/${response.workspace.projectId}/cancel`, "POST", {})); })}>Остановить</button></div>}
     {response?.workspace.project ? <>
+      {generation?.status === "failed" && <p className="next-warning" role="alert">Резюме импортировано. Операция не завершилась: {generation.errorCode}</p>}
       {response.workspace.warnings.map(warning => <p className="next-warning" key={warning.id}>Проверьте содержание: {warning.code}</p>)}
       <RichEditor key={response.workspace.projectId} initial={response} acknowledge={acknowledge} onStatus={setStatus} ref={editor} />
     </> : <div className="next-start">

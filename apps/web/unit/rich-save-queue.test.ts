@@ -99,3 +99,18 @@ test("a lost save reply retries the exact idempotency key before saving newer in
   assert.deepEqual(sent[1], sent[0]);
   assert.notEqual(sent[2]?.clientMutationId, sent[0]?.clientMutationId);
 });
+
+test("a definitive rejected patch lets corrected input use a new key and preserves the save baseline", async () => {
+  const initial = response(), sent: RichMutation[] = [];
+  const queue = new RichSaveQueue(initial, "session", async request => {
+    sent.push(request);
+    if (sent.length === 1) throw Object.assign(new Error("Invalid patch"), { status: 422 });
+    return apply(initial, request);
+  }, () => {});
+  queue.update(changed(initial, "Rejected input"), "first");
+  await assert.rejects(queue.flush(), /Invalid patch/);
+  assert.equal(queue.baseline, initial);
+  queue.update(changed(initial, "Corrected input"), "second", "structure"); await queue.flush();
+  assert.notEqual(sent[1]?.clientMutationId, sent[0]?.clientMutationId);
+  assert.equal(sent[1]?.kind, "structure");
+});

@@ -2289,10 +2289,17 @@
           "type": "string"
         },
         "start": {
-          "default": 1,
-          "minimum": 1,
-          "title": "Start",
-          "type": "integer"
+          "anyOf": [
+            {
+              "minimum": 1,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Start"
         },
         "textColor": {
           "default": "default",

@@ -1,14 +1,18 @@
-import { BlockNoteSchema, createExtension, defaultBlockSpecs, defaultInlineContentSpecs, type Block, type PartialBlock } from "@blocknote/core";
+import { BlockNoteSchema, createExtension, defaultBlockSpecs, defaultInlineContentSpecs, parseDefaultProps, type Block, type PartialBlock } from "@blocknote/core";
 import { createReactBlockSpec, createReactInlineContentSpec, useCreateBlockNote } from "@blocknote/react";
 import { BlockNoteView } from "@blocknote/shadcn";
 import { Plugin, PluginKey } from "@tiptap/pm/state";
 import { useEffect, useImperativeHandle, useMemo, useState, type Ref } from "react";
-import type { RichDocumentV1, Content, InlineStyles } from "../contracts/generated/rich_document_v1";
+import type { RichDocumentV1 } from "../contracts/generated/rich_document_v1";
 import type { RichProjectResponse } from "../contracts/generated/rich_project_response";
+import type { RichMutation } from "../contracts/generated/rich_mutation";
 import { SessionHistory, type CellChange, type CellValue } from "./history";
 import { RichSaveQueue, type RichBlock } from "./save-queue";
 import { saveMutation } from "./api";
 import { referenceVariables } from "./template";
+import { fromInline, toInline, wireColor } from "./inline";
+import { bindingIdentityPlugin } from "./binding-identity";
+import { authoredPasteTransaction } from "./paste-links";
 
 const region = createReactBlockSpec({ type: "region", content: "none", propSchema: {
   role: { default: "main", values: ["header", "sidebar", "main"] },
@@ -24,47 +28,43 @@ const factField = createReactInlineContentSpec({ type: "factField", content: "st
 const heading = createReactBlockSpec({ type: "heading", content: "inline", propSchema: {
   level: { default: 1, values: [1, 2, 3] }, textAlignment: { default: "left", values: ["left", "center", "right", "justify"] },
   textColor: { default: "default" }, backgroundColor: { default: "default" },
-} }, { render: ({ block, contentRef }) => block.props.level === 1 ? <h1 ref={contentRef} />
+} }, { parse: element => element.tagName === "H1" ? { ...parseDefaultProps(element), level: 1 }
+  : element.tagName === "H2" ? { ...parseDefaultProps(element), level: 2 }
+    : element.tagName === "H3" ? { ...parseDefaultProps(element), level: 3 } : undefined,
+  render: ({ block, contentRef }) => block.props.level === 1 ? <h1 ref={contentRef} />
   : block.props.level === 2 ? <h2 ref={contentRef} /> : <h3 ref={contentRef} /> });
 const pending = createReactBlockSpec({ type: "pendingRich", content: "none", propSchema: { label: { default: "" } } },
   { render: ({ block }) => <div contentEditable={false} className="cv-pending-block">{block.props.label}</div> });
+const quote = createReactBlockSpec({ type: "quote", content: "inline", propSchema: {
+  textAlignment: { default: "left", values: ["left", "center", "right", "justify"] }, textColor: { default: "default" }, backgroundColor: { default: "default" },
+} }, { parse: element => element.tagName === "BLOCKQUOTE" ? parseDefaultProps(element) : undefined,
+  render: ({ contentRef }) => <blockquote ref={contentRef} /> });
+const code = { ...defaultBlockSpecs.codeBlock, config: { ...defaultBlockSpecs.codeBlock.config,
+  propSchema: { ...defaultBlockSpecs.codeBlock.config.propSchema, backgroundColor: { default: "default" } } } };
 const schema = BlockNoteSchema.create({ blockSpecs: { paragraph: defaultBlockSpecs.paragraph, heading: heading(),
+  bulletListItem: defaultBlockSpecs.bulletListItem, numberedListItem: defaultBlockSpecs.numberedListItem,
+  checkListItem: defaultBlockSpecs.checkListItem, toggleListItem: defaultBlockSpecs.toggleListItem,
+  quote: quote(), codeBlock: code, divider: defaultBlockSpecs.divider,
   region: region(), section: section(), pendingRich: pending() }, inlineContentSpecs: { ...defaultInlineContentSpecs, factField } });
 type EditorBlock = Block<typeof schema.blockSchema, typeof schema.inlineContentSchema, typeof schema.styleSchema>;
 type InputBlock = PartialBlock<typeof schema.blockSchema, typeof schema.inlineContentSchema, typeof schema.styleSchema>;
-type EditorInline = Extract<EditorBlock, { type: "paragraph" }>["content"][number];
 type Stored = { block: RichBlock; children: string[] };
 
-function styles(value: InlineStyles) { return { bold: value.bold ?? false, italic: value.italic ?? false,
-  underline: value.underline ?? false, strike: value.strike ?? false, code: value.code ?? false,
-  textColor: value.textColor ?? "default", backgroundColor: value.backgroundColor ?? "default" }; }
-function toInline(content: Content): EditorInline[] {
-  return content.map(span => span.type === "link" ? { type: "link", href: span.href,
-    content: span.content.map(child => ({ type: "text", text: child.text, styles: styles(child.styles) })) }
-    : span.type === "fact_field" ? { type: "factField", props: { bindingId: span.bindingId, recordId: span.recordId,
-      fieldKey: span.fieldKey, syncedFactRevision: span.syncedFactRevision }, content: [{ type: "text", text: span.text, styles: styles(span.styles) }] }
-      : { type: "text", text: span.text, styles: styles(span.styles) });
-}
-function fromStyles(value: Extract<EditorInline, { type: "text" }>["styles"]): InlineStyles {
-  return { bold: value.bold ?? false, italic: value.italic ?? false, underline: value.underline ?? false,
-    strike: value.strike ?? false, code: value.code ?? false, textColor: value.textColor ?? "default", backgroundColor: value.backgroundColor ?? "default" };
-}
-function fromInline(content: EditorInline[]): Content {
-  return content.map(span => span.type === "link" ? { type: "link", href: span.href,
-    content: span.content.map(child => ({ type: "text", text: child.text, styles: fromStyles(child.styles) })) }
-    : span.type === "factField" ? { type: "fact_field", bindingId: span.props.bindingId, recordId: span.props.recordId,
-      fieldKey: span.props.fieldKey, syncedFactRevision: span.props.syncedFactRevision,
-      text: span.content.map(child => child.text).join(""), styles: fromStyles(span.content[0]?.styles ?? {}) }
-      : { type: "text", text: span.text, styles: fromStyles(span.styles) });
-}
 function toBlock(block: RichBlock): InputBlock {
   const children = block.children.map(toBlock);
-  if (block.type === "paragraph" || block.type === "heading" || block.type === "section") {
+  if (block.type !== "code" && block.type !== "divider" && block.type !== "table" && block.type !== "image") {
     const props = { textAlignment: block.props.alignment ?? "left", textColor: block.props.textColor ?? "default", backgroundColor: block.props.backgroundColor ?? "default" };
     if (block.type === "heading") return { id: block.id, type: "heading", props: { ...props, level: block.props.level }, content: toInline(block.content), children };
     if (block.type === "section") return { id: block.id, type: "section", props: { ...props, recordId: block.props.recordId ?? "", presentation: block.props.presentation ?? "standard" }, content: toInline(block.content), children };
+    if (block.type === "bullet_list") return { id: block.id, type: "bulletListItem", props, content: toInline(block.content), children };
+    if (block.type === "numbered_list") return { id: block.id, type: "numberedListItem", props: block.props.start === null || block.props.start === undefined ? props : { ...props, start: block.props.start }, content: toInline(block.content), children };
+    if (block.type === "check_list") return { id: block.id, type: "checkListItem", props: { ...props, checked: block.props.checked }, content: toInline(block.content), children };
+    if (block.type === "toggle_list") return { id: block.id, type: "toggleListItem", props, content: toInline(block.content), children };
+    if (block.type === "quote") return { id: block.id, type: "quote", props, content: toInline(block.content), children };
     return { id: block.id, type: "paragraph", props, content: toInline(block.content), children };
   }
+  if (block.type === "code") return { id: block.id, type: "codeBlock", props: { language: block.props.language, backgroundColor: block.props.backgroundColor ?? "default" }, content: block.content, children };
+  if (block.type === "divider") return { id: block.id, type: "divider", children };
   return { id: block.id, type: "pendingRich", props: { label: block.type }, children };
 }
 
@@ -74,11 +74,14 @@ export function RichEditor({ initial, acknowledge, onStatus, ref }: { initial: R
   const project = initial.workspace.project;
   if (!project) throw new Error("Document is missing");
   const [, refresh] = useState(0);
+  const [selecting, setSelecting] = useState(false);
   const bridge = useMemo(() => ({ session: crypto.randomUUID(), group: 0, composing: false, observing: false, replaying: false,
+    kind: "typing" as RichMutation["kind"],
     lastTypingAt: 0, history: null as SessionHistory | null, queue: null as RichSaveQueue | null,
+    fragments: new Map<string, string>(), projectionError: null as string | null,
     current: new Map<string, CellValue>(), values: new Map<string, Stored>(), original: new Map<string, RichBlock>(),
     undo: () => {}, redo: () => {}, complete: () => {}, timer: null as ReturnType<typeof setTimeout> | null }), []);
-  const extension = useMemo(() => createExtension({ key: "foldcv-rich-session", prosemirrorPlugins: [new Plugin({
+  const extension = useMemo(() => createExtension({ key: "foldcv-rich-session", runsBefore: ["link"], prosemirrorPlugins: [bindingIdentityPlugin(), new Plugin({
     key: new PluginKey("foldcv-rich-session"), filterTransaction: transaction => {
       if (!transaction.docChanged) return true;
       const root = transaction.doc.firstChild;
@@ -87,7 +90,11 @@ export function RichEditor({ initial, acknowledge, onStatus, ref }: { initial: R
         const item = root.child(index); const value: unknown = item.attrs["id"];
         return value === id && item.firstChild?.type.name === "region";
       });
-    }, props: { handleKeyDown: (_view, event) => {
+    }, props: { handlePaste: (view, _event, slice) => {
+      const tr = authoredPasteTransaction(view.state, slice);
+      if (!tr) return false;
+      bridge.group++; view.dispatch(tr); return true;
+    }, handleKeyDown: (_view, event) => {
       if (!(event.metaKey || event.ctrlKey) || !["z", "y"].includes(event.key.toLowerCase())) return false;
       event.preventDefault(); if (!bridge.composing) { bridge.group++; if (event.shiftKey || event.key.toLowerCase() === "y") bridge.redo(); else bridge.undo(); } return true;
     }, handleDOMEvents: {
@@ -100,8 +107,19 @@ export function RichEditor({ initial, acknowledge, onStatus, ref }: { initial: R
       },
     } },
   })] }), [bridge]);
-  const editor = useCreateBlockNote({ schema, disableExtensions: ["history"], extensions: [extension], initialContent:
+  const editor = useCreateBlockNote({ schema, disableExtensions: ["history"], extensions: [extension], links: {
+    onClick: event => {
+      event.preventDefault();
+      const anchor = event.target instanceof Element ? event.target.closest("a") : null;
+      if ((event.metaKey || event.ctrlKey) && anchor instanceof HTMLAnchorElement) window.open(anchor.href, "_blank", "noopener,noreferrer");
+      return false;
+    },
+  }, initialContent:
     project.document.regions.map(region => ({ id: region.id, type: "region", props: { role: region.role }, children: region.blocks.map(toBlock) })) }, []);
+
+  useEffect(() => editor.onSelectionChange(() => {
+    setSelecting(editor.transact(tr => !tr.selection.empty));
+  }), [editor]);
 
   useEffect(() => {
     const originalDocument = project.document;
@@ -116,10 +134,24 @@ export function RichEditor({ initial, acknowledge, onStatus, ref }: { initial: R
         if (!old) throw new Error("Unknown pending block");
         return { ...old, children: block.children.map(serialize) };
       }
-      const common = { id: block.id, revision: old?.revision ?? 1, provenance: old?.provenance ?? [], children: block.children.map(serialize), content: fromInline(block.content) };
-      const props = { alignment: block.props.textAlignment, textColor: block.props.textColor, backgroundColor: block.props.backgroundColor };
+      const identity = { id: block.id, revision: old?.revision ?? 1, provenance: old?.provenance ?? [], children: block.children.map(serialize) };
+      if (block.type === "divider") return { ...identity, type: "divider", props: {}, content: null };
+      if (block.type === "codeBlock") return { ...identity, type: "code", props: { language: block.props.language,
+        backgroundColor: wireColor(block.props.backgroundColor, "background") }, content: block.content.map(span => span.text).join("") };
+      const common = { ...identity, content: fromInline(block.content, (binding, part) => {
+        const key = `${binding}:${part}`;
+        let id = bridge.fragments.get(key);
+        if (!id) { id = crypto.randomUUID(); bridge.fragments.set(key, id); }
+        return id;
+      }) };
+      const props = { alignment: block.props.textAlignment, textColor: wireColor(block.props.textColor, "text"), backgroundColor: wireColor(block.props.backgroundColor, "background") };
       if (block.type === "heading") return { ...common, type: "heading", props: { ...props, level: block.props.level } };
       if (block.type === "section") return { ...common, type: "section", props: { ...props, recordId: block.props.recordId || null, presentation: block.props.presentation } };
+      if (block.type === "bulletListItem") return { ...common, type: "bullet_list", props };
+      if (block.type === "numberedListItem") return { ...common, type: "numbered_list", props: { ...props, start: block.props.start ?? null } };
+      if (block.type === "checkListItem") return { ...common, type: "check_list", props: { ...props, checked: block.props.checked } };
+      if (block.type === "toggleListItem") return { ...common, type: "toggle_list", props };
+      if (block.type === "quote") return { ...common, type: "quote", props };
       return { ...common, type: "paragraph", props };
     }
     function document(): RichDocumentV1 {
@@ -169,14 +201,16 @@ export function RichEditor({ initial, acknowledge, onStatus, ref }: { initial: R
           }));
         } finally { bridge.replaying = false; }
       }
-      queue.update(document(), history.currentActionId ?? `${bridge.session}:typing`); schedule(); refresh(value => value + 1);
+      queue.update(document(), history.currentActionId ?? `${bridge.session}:typing`, bridge.kind); schedule(); refresh(value => value + 1);
     });
     bridge.history = history;
-    bridge.undo = () => { history.undo(); };
-    bridge.redo = () => { history.redo(); };
+    bridge.undo = () => { if (bridge.composing || bridge.projectionError) return; bridge.kind = "undo"; try { history.undo(); } finally { bridge.kind = "typing"; } };
+    bridge.redo = () => { if (bridge.composing || bridge.projectionError) return; bridge.kind = "redo"; try { history.redo(); } finally { bridge.kind = "typing"; } };
     function observe() {
       if (bridge.replaying) return;
-      const next = cells(document());
+      let next: Map<string, CellValue>;
+      try { next = cells(document()); bridge.projectionError = null; }
+      catch (error) { bridge.projectionError = error instanceof Error ? error.message : "RICH_CONTENT_UNSUPPORTED"; onStatus(bridge.projectionError); return; }
       const changes: CellChange[] = [];
       for (const key of new Set([...next.keys(), ...bridge.current.keys()])) {
         const before = history.read(key), after = next.get(key) ?? null;
@@ -186,9 +220,20 @@ export function RichEditor({ initial, acknowledge, onStatus, ref }: { initial: R
       if (!bridge.composing && now - bridge.lastTypingAt > 500) bridge.group++;
       bridge.lastTypingAt = now; bridge.observing = true;
       try {
-        const id = history.commit(bridge.composing ? "composition" : "typing", changes, `typing:${bridge.group}`);
-        if (id) queue.update(document(), id);
-      } finally { bridge.observing = false; }
+        const structure = changes.some(change => {
+          if (change.key.startsWith("region:") || !change.before || !change.after) return true;
+          const before = bridge.values.get(change.before), after = bridge.values.get(change.after);
+          if (!before || !after) return true;
+          const text = (block: RichBlock): string => typeof block.content === "string" ? block.content
+            : Array.isArray(block.content) ? block.content.map(span => span.type === "link" ? span.content.map(part => part.text).join("") : span.text).join("") : "";
+          return before.block.type !== after.block.type || JSON.stringify(before.block.props) !== JSON.stringify(after.block.props)
+            || JSON.stringify(before.children) !== JSON.stringify(after.children) || text(before.block) === text(after.block);
+        });
+        const kind = bridge.composing ? "composition" : structure ? "structure" : "typing";
+        bridge.kind = kind;
+        const id = history.commit(kind, changes, kind === "typing" || kind === "composition" ? `typing:${bridge.group}` : null);
+        if (id) queue.update(document(), id, kind);
+      } finally { bridge.observing = false; bridge.kind = "typing"; }
     }
     const stop = editor.onChange(observe);
     bridge.complete = () => { observe(); schedule(); };
@@ -199,9 +244,10 @@ export function RichEditor({ initial, acknowledge, onStatus, ref }: { initial: R
   useImperativeHandle(ref, () => ({ flush: async () => {
     if (bridge.composing) throw new Error("Завершите ввод текста");
     if (!bridge.queue) throw new Error("Редактор ещё открывается");
+    if (bridge.projectionError) throw new Error(bridge.projectionError);
     await bridge.queue.flush(); return bridge.queue.baseline;
   }, undo: bridge.undo, redo: bridge.redo }), [bridge, bridge.history?.position]);
   return <div className="cv-document" style={{ ...referenceVariables, color: "#171717" }} data-project-id={initial.workspace.projectId}>
-    <BlockNoteView editor={editor} theme={document.documentElement.dataset.theme === "dark" ? "dark" : "light"} />
+    <BlockNoteView editor={editor} theme="light" linkToolbar={!selecting} />
   </div>;
 }

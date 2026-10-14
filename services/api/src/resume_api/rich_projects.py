@@ -245,6 +245,8 @@ class RichProjectService(GuiProjectService):
             try:
                 await self.export(identifier, generation.id)
             except RenderFailure as error:
+                if error.code != "RICH_EXPORT_UNSUPPORTED":
+                    raise
                 workspace.warnings.append(RichWarning(id=identity("warning"), code=error.code, blockIds=[], recordIds=[], evidence=[]))
             generation.status = "completed"
         except (ContentFailure, ProjectFailure, RenderFailure, SpikeError, AdmissionCancelled, asyncio.TimeoutError) as error:
