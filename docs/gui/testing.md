@@ -1,5 +1,14 @@
 # Test strategy
 
+D085 assistant work follows [its plan](agent-assistant-plan.md), AC01–AC18 and
+AG00–AG08. No assistant acceptance is claimed yet. Add the namespaced requirement
+mapping during AG01 with the seven grouped AG IDs and existing recovery suite
+directory specified there; use useful Python/Node checks and T3, with no new/executed
+browser scenarios. Native runtime proof and both final research/edit and
+check-only tasks are required within separate fixed budgets. Independent reviews
+are deferred by the user's explicit choice; historical proof counters and Word
+status do not change.
+
 D084 panel checks: full fast 1402 Python plus type/lint/contracts/map/build;
 Node state 156. T3 covers collapsible history, fact-derived headings and history,
 independent panel hiding, every moved block action and captured selection rewrite.
