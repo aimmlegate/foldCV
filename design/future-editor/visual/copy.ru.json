@@ -1,0 +1,2533 @@
+{
+  "editor.sampleProfile.01": {
+    "source": "prototype.js",
+    "line": 11,
+    "usage": "demo-content",
+    "parts": [
+      "Фронтенд-разработчик с опытом создания продуктовых интерфейсов. Разрабатываю приложения на React и TypeScript: от первых экранов до поддержки после запуска. В команде «Север» работаю над личным кабинетом и библиотекой компонентов. Люблю понятный код, внимателен к деталям и доступности."
+    ],
+    "slots": []
+  },
+  "editor.sampleJob.01": {
+    "source": "prototype.js",
+    "line": 12,
+    "usage": "demo-content",
+    "parts": [
+      "Разрабатываю личный кабинет на React и TypeScript. Создаю и поддерживаю общие компоненты интерфейса, подключаю API, покрываю ключевые сценарии тестами. Вместе с дизайнером улучшаю доступность и согласованность экранов."
+    ],
+    "slots": []
+  },
+  "editor.sampleOldJob.01": {
+    "source": "prototype.js",
+    "line": 13,
+    "usage": "demo-content",
+    "parts": [
+      "Создавал сайты и внутренние сервисы для небольших команд. Работал с адаптивной вёрсткой, подключал API и поддерживал выпущенные проекты."
+    ],
+    "slots": []
+  },
+  "editor.sampleText.01": {
+    "source": "prototype.js",
+    "line": 14,
+    "usage": "demo-content",
+    "parts": [
+      "Алексей Соколов\nФронтенд-разработчик\nСанкт-Петербург · alexey@example.com\n\nО специалисте\n",
+      "\n\nСевер · Фронтенд-разработчик\n2022-01 — настоящее время\n",
+      "\nReact, TypeScript, Jest\n\nСтудия Линия · Веб-разработчик\n2019-06 — 2022-03\n",
+      "\nJavaScript, HTML, CSS\n\nНавыки: React, TypeScript, JavaScript, Git\nОбразование: СПбПУ, Информатика и вычислительная техника, 2019\nЯзыки: Русский — родной, Английский — B2"
+    ],
+    "slots": [
+      "sampleProfile",
+      "sampleJob",
+      "sampleOldJob"
+    ]
+  },
+  "editor.initialRules.01": {
+    "source": "prototype.js",
+    "line": 15,
+    "usage": "demo-content",
+    "parts": [
+      "# Общие правила\nСохраняй факты, числа и личный вклад. Пиши ясно и по делу.\nНе добавляй неподтверждённые навыки.\n\n## Preset: shorten\nСократи повторы и вводные слова, сохрани смысл и все факты.\n\n## Preset: clarify\nУпрости длинные фразы. Сделай личный вклад понятнее."
+    ],
+    "slots": []
+  },
+  "editor.sampleProject.01": {
+    "source": "prototype.js",
+    "line": 27,
+    "usage": "demo-content",
+    "parts": [
+      "Алексей Соколов"
+    ],
+    "slots": []
+  },
+  "editor.sampleProject.02": {
+    "source": "prototype.js",
+    "line": 27,
+    "usage": "demo-content",
+    "parts": [
+      "Фронтенд-разработчик"
+    ],
+    "slots": []
+  },
+  "editor.facts.01": {
+    "source": "prototype.js",
+    "line": 29,
+    "usage": "interface",
+    "parts": [
+      "Санкт-Петербург"
+    ],
+    "slots": []
+  },
+  "editor.facts.02": {
+    "source": "prototype.js",
+    "line": 30,
+    "usage": "interface",
+    "parts": [
+      "Север"
+    ],
+    "slots": []
+  },
+  "editor.facts.03": {
+    "source": "prototype.js",
+    "line": 30,
+    "usage": "interface",
+    "parts": [
+      "Фронтенд-разработчик"
+    ],
+    "slots": []
+  },
+  "editor.facts.04": {
+    "source": "prototype.js",
+    "line": 30,
+    "usage": "interface",
+    "parts": [
+      "настоящее время"
+    ],
+    "slots": []
+  },
+  "editor.facts.05": {
+    "source": "prototype.js",
+    "line": 31,
+    "usage": "interface",
+    "parts": [
+      "Студия Линия"
+    ],
+    "slots": []
+  },
+  "editor.facts.06": {
+    "source": "prototype.js",
+    "line": 31,
+    "usage": "interface",
+    "parts": [
+      "Веб-разработчик"
+    ],
+    "slots": []
+  },
+  "editor.facts.07": {
+    "source": "prototype.js",
+    "line": 41,
+    "usage": "interface",
+    "parts": [
+      "СПбПУ"
+    ],
+    "slots": []
+  },
+  "editor.facts.08": {
+    "source": "prototype.js",
+    "line": 41,
+    "usage": "interface",
+    "parts": [
+      "Информатика и вычислительная техника"
+    ],
+    "slots": []
+  },
+  "editor.facts.09": {
+    "source": "prototype.js",
+    "line": 42,
+    "usage": "interface",
+    "parts": [
+      "Русский"
+    ],
+    "slots": []
+  },
+  "editor.facts.10": {
+    "source": "prototype.js",
+    "line": 42,
+    "usage": "interface",
+    "parts": [
+      "Родной"
+    ],
+    "slots": []
+  },
+  "editor.facts.11": {
+    "source": "prototype.js",
+    "line": 43,
+    "usage": "interface",
+    "parts": [
+      "Английский"
+    ],
+    "slots": []
+  },
+  "editor.sampleProject.03": {
+    "source": "prototype.js",
+    "line": 49,
+    "usage": "demo-content",
+    "parts": [
+      "Контакты"
+    ],
+    "slots": []
+  },
+  "editor.sampleProject.04": {
+    "source": "prototype.js",
+    "line": 50,
+    "usage": "demo-content",
+    "parts": [
+      "Санкт-Петербург"
+    ],
+    "slots": []
+  },
+  "editor.sampleProject.05": {
+    "source": "prototype.js",
+    "line": 51,
+    "usage": "demo-content",
+    "parts": [
+      "Технологии"
+    ],
+    "slots": []
+  },
+  "editor.sampleProject.06": {
+    "source": "prototype.js",
+    "line": 53,
+    "usage": "demo-content",
+    "parts": [
+      "Образование"
+    ],
+    "slots": []
+  },
+  "editor.sampleProject.07": {
+    "source": "prototype.js",
+    "line": 54,
+    "usage": "demo-content",
+    "parts": [
+      "СПбПУ"
+    ],
+    "slots": []
+  },
+  "editor.sampleProject.08": {
+    "source": "prototype.js",
+    "line": 54,
+    "usage": "demo-content",
+    "parts": [
+      "Информатика и вычислительная техника"
+    ],
+    "slots": []
+  },
+  "editor.sampleProject.09": {
+    "source": "prototype.js",
+    "line": 55,
+    "usage": "demo-content",
+    "parts": [
+      "Языки"
+    ],
+    "slots": []
+  },
+  "editor.sampleProject.10": {
+    "source": "prototype.js",
+    "line": 56,
+    "usage": "demo-content",
+    "parts": [
+      "Русский"
+    ],
+    "slots": []
+  },
+  "editor.sampleProject.11": {
+    "source": "prototype.js",
+    "line": 56,
+    "usage": "demo-content",
+    "parts": [
+      "Родной"
+    ],
+    "slots": []
+  },
+  "editor.sampleProject.12": {
+    "source": "prototype.js",
+    "line": 57,
+    "usage": "demo-content",
+    "parts": [
+      "Английский"
+    ],
+    "slots": []
+  },
+  "editor.sampleProject.13": {
+    "source": "prototype.js",
+    "line": 58,
+    "usage": "demo-content",
+    "parts": [
+      "О специалисте"
+    ],
+    "slots": []
+  },
+  "editor.sampleProject.14": {
+    "source": "prototype.js",
+    "line": 60,
+    "usage": "demo-content",
+    "parts": [
+      "Опыт работы"
+    ],
+    "slots": []
+  },
+  "editor.sampleProject.15": {
+    "source": "prototype.js",
+    "line": 68,
+    "usage": "demo-content",
+    "parts": [
+      "Алексей Соколов"
+    ],
+    "slots": []
+  },
+  "editor.sampleProject.16": {
+    "source": "prototype.js",
+    "line": 68,
+    "usage": "demo-content",
+    "parts": [
+      "Фронтенд-разработчик"
+    ],
+    "slots": []
+  },
+  "editor.sampleProject.17": {
+    "source": "prototype.js",
+    "line": 68,
+    "usage": "demo-content",
+    "parts": [
+      "Резюме — пример.txt"
+    ],
+    "slots": []
+  },
+  "editor.events.01": {
+    "source": "prototype.js",
+    "line": 70,
+    "usage": "interface",
+    "parts": [
+      "Мария Волкова"
+    ],
+    "slots": []
+  },
+  "editor.events.02": {
+    "source": "prototype.js",
+    "line": 70,
+    "usage": "interface",
+    "parts": [
+      "Дизайнер интерфейсов"
+    ],
+    "slots": []
+  },
+  "editor.projectName.01": {
+    "source": "prototype.js",
+    "line": 74,
+    "usage": "interface",
+    "parts": [
+      "Без имени"
+    ],
+    "slots": []
+  },
+  "editor.projectTitle.01": {
+    "source": "prototype.js",
+    "line": 75,
+    "usage": "interface",
+    "parts": [
+      "Специальность не указана"
+    ],
+    "slots": []
+  },
+  "editor.markChanged.01": {
+    "source": "prototype.js",
+    "line": 78,
+    "usage": "interface",
+    "parts": [
+      "Есть несохранённые изменения"
+    ],
+    "slots": []
+  },
+  "editor.updateChrome.01": {
+    "source": "prototype.js",
+    "line": 90,
+    "usage": "interface",
+    "parts": [
+      "Есть изменения"
+    ],
+    "slots": []
+  },
+  "editor.updateChrome.02": {
+    "source": "prototype.js",
+    "line": 90,
+    "usage": "interface",
+    "parts": [
+      "Рабочая версия"
+    ],
+    "slots": []
+  },
+  "editor.updateChrome.03": {
+    "source": "prototype.js",
+    "line": 92,
+    "usage": "interface",
+    "parts": [
+      "Новое резюме"
+    ],
+    "slots": []
+  },
+  "editor.updateChrome.04": {
+    "source": "prototype.js",
+    "line": 92,
+    "usage": "interface",
+    "parts": [
+      "Настройки"
+    ],
+    "slots": []
+  },
+  "editor.updateChrome.05": {
+    "source": "prototype.js",
+    "line": 93,
+    "usage": "interface",
+    "parts": [
+      "Настройки"
+    ],
+    "slots": []
+  },
+  "editor.updateChrome.06": {
+    "source": "prototype.js",
+    "line": 93,
+    "usage": "interface",
+    "parts": [
+      "Новый исходник"
+    ],
+    "slots": []
+  },
+  "editor.updateChrome.07": {
+    "source": "prototype.js",
+    "line": 96,
+    "usage": "interface",
+    "parts": [
+      "Есть изменения"
+    ],
+    "slots": []
+  },
+  "editor.updateChrome.08": {
+    "source": "prototype.js",
+    "line": 96,
+    "usage": "interface",
+    "parts": [
+      "Изменений нет"
+    ],
+    "slots": []
+  },
+  "editor.updateChrome.09": {
+    "source": "prototype.js",
+    "line": 98,
+    "usage": "interface",
+    "parts": [
+      "Codex · подписка"
+    ],
+    "slots": []
+  },
+  "editor.updateChrome.10": {
+    "source": "prototype.js",
+    "line": 98,
+    "usage": "interface",
+    "parts": [
+      "Модель отключена"
+    ],
+    "slots": []
+  },
+  "editor.navigate.01": {
+    "source": "prototype.js",
+    "line": 103,
+    "usage": "interface",
+    "parts": [
+      "Дождитесь обработки или отмените её."
+    ],
+    "slots": []
+  },
+  "editor.label.01": {
+    "source": "prototype.js",
+    "line": 116,
+    "usage": "interface",
+    "parts": [
+      "Имя кандидата"
+    ],
+    "slots": []
+  },
+  "editor.label.02": {
+    "source": "prototype.js",
+    "line": 116,
+    "usage": "interface",
+    "parts": [
+      "Специальность кандидата"
+    ],
+    "slots": []
+  },
+  "editor.label.03": {
+    "source": "prototype.js",
+    "line": 116,
+    "usage": "interface",
+    "parts": [
+      "Новый блок"
+    ],
+    "slots": []
+  },
+  "editor.dateLabel.01": {
+    "source": "prototype.js",
+    "line": 122,
+    "usage": "interface",
+    "parts": [
+      "Параллельная работа"
+    ],
+    "slots": []
+  },
+  "editor.dateLabel.02": {
+    "source": "prototype.js",
+    "line": 122,
+    "usage": "interface",
+    "parts": [
+      "Пересечение дат"
+    ],
+    "slots": []
+  },
+  "editor.dateLabel.03": {
+    "source": "prototype.js",
+    "line": 122,
+    "usage": "interface",
+    "parts": [
+      "Даты согласованы"
+    ],
+    "slots": []
+  },
+  "editor.dateLabel.04": {
+    "source": "prototype.js",
+    "line": 122,
+    "usage": "interface",
+    "parts": [
+      "Проверка дат"
+    ],
+    "slots": []
+  },
+  "editor.renderEditor.01": {
+    "source": "prototype.js",
+    "line": 123,
+    "usage": "interface",
+    "parts": [
+      "Есть несохранённые изменения"
+    ],
+    "slots": []
+  },
+  "editor.renderEditor.02": {
+    "source": "prototype.js",
+    "line": 123,
+    "usage": "interface",
+    "parts": [
+      "Исходный текст"
+    ],
+    "slots": []
+  },
+  "editor.groupNames.01": {
+    "source": "prototype.js",
+    "line": 126,
+    "usage": "interface",
+    "parts": [
+      "Кандидат"
+    ],
+    "slots": []
+  },
+  "editor.groupNames.02": {
+    "source": "prototype.js",
+    "line": 126,
+    "usage": "interface",
+    "parts": [
+      "Опыт работы"
+    ],
+    "slots": []
+  },
+  "editor.groupNames.03": {
+    "source": "prototype.js",
+    "line": 126,
+    "usage": "interface",
+    "parts": [
+      "Технологии"
+    ],
+    "slots": []
+  },
+  "editor.groupNames.04": {
+    "source": "prototype.js",
+    "line": 126,
+    "usage": "interface",
+    "parts": [
+      "Образование"
+    ],
+    "slots": []
+  },
+  "editor.groupNames.05": {
+    "source": "prototype.js",
+    "line": 126,
+    "usage": "interface",
+    "parts": [
+      "Языки"
+    ],
+    "slots": []
+  },
+  "editor.factRow.01": {
+    "source": "prototype.js",
+    "line": 130,
+    "usage": "interface",
+    "parts": [
+      "Без названия"
+    ],
+    "slots": []
+  },
+  "editor.label.04": {
+    "source": "prototype.js",
+    "line": 142,
+    "usage": "interface",
+    "parts": [
+      "Технологии: ",
+      ""
+    ],
+    "slots": [
+      "job?.employer || \"общий список\""
+    ]
+  },
+  "editor.label.05": {
+    "source": "prototype.js",
+    "line": 142,
+    "usage": "interface",
+    "parts": [
+      "общий список"
+    ],
+    "slots": []
+  },
+  "editor.technologySummary.01": {
+    "source": "prototype.js",
+    "line": 143,
+    "usage": "interface",
+    "parts": [
+      "Найти…"
+    ],
+    "slots": []
+  },
+  "editor.technologySummary.02": {
+    "source": "prototype.js",
+    "line": 143,
+    "usage": "interface",
+    "parts": [
+      "Выбрать технологии"
+    ],
+    "slots": []
+  },
+  "editor.technologySummary.03": {
+    "source": "prototype.js",
+    "line": 143,
+    "usage": "interface",
+    "parts": [
+      "общий список"
+    ],
+    "slots": []
+  },
+  "editor.factsHtml.01": {
+    "source": "prototype.js",
+    "line": 147,
+    "usage": "interface",
+    "parts": [
+      "Место работы"
+    ],
+    "slots": []
+  },
+  "editor.factsHtml.02": {
+    "source": "prototype.js",
+    "line": 147,
+    "usage": "interface",
+    "parts": [
+      "Язык"
+    ],
+    "slots": []
+  },
+  "editor.technologyOptions.01": {
+    "source": "prototype.js",
+    "line": 162,
+    "usage": "interface",
+    "parts": [
+      "Добавить «",
+      "»"
+    ],
+    "slots": [
+      "esc(choice.name)"
+    ]
+  },
+  "editor.setTechnologies.01": {
+    "source": "prototype.js",
+    "line": 206,
+    "usage": "interface",
+    "parts": [
+      "Технологии обновлены"
+    ],
+    "slots": []
+  },
+  "editor.renderBlockPanel.01": {
+    "source": "prototype.js",
+    "line": 239,
+    "usage": "interface",
+    "parts": [
+      "Выберите текст в документе"
+    ],
+    "slots": []
+  },
+  "editor.editBlock.01": {
+    "source": "prototype.js",
+    "line": 283,
+    "usage": "interface",
+    "parts": [
+      "Текст и связанные факты обновлены"
+    ],
+    "slots": []
+  },
+  "editor.historyAction.01": {
+    "source": "prototype.js",
+    "line": 293,
+    "usage": "interface",
+    "parts": [
+      "Изменение отменено"
+    ],
+    "slots": []
+  },
+  "editor.historyAction.02": {
+    "source": "prototype.js",
+    "line": 293,
+    "usage": "interface",
+    "parts": [
+      "Изменение повторено"
+    ],
+    "slots": []
+  },
+  "editor.blockCommand.01": {
+    "source": "prototype.js",
+    "line": 312,
+    "usage": "interface",
+    "parts": [
+      "Это первый блок в области."
+    ],
+    "slots": []
+  },
+  "editor.blockCommand.02": {
+    "source": "prototype.js",
+    "line": 313,
+    "usage": "interface",
+    "parts": [
+      "Это последний блок в области."
+    ],
+    "slots": []
+  },
+  "editor.blockCommand.03": {
+    "source": "prototype.js",
+    "line": 326,
+    "usage": "interface",
+    "parts": [
+      "Расположение блоков изменено"
+    ],
+    "slots": []
+  },
+  "editor.addBlock.01": {
+    "source": "prototype.js",
+    "line": 330,
+    "usage": "interface",
+    "parts": [
+      "Добавлен новый блок"
+    ],
+    "slots": []
+  },
+  "editor.factFields.01": {
+    "source": "prototype.js",
+    "line": 334,
+    "usage": "interface",
+    "parts": [
+      "Имя и фамилия"
+    ],
+    "slots": []
+  },
+  "editor.factFields.02": {
+    "source": "prototype.js",
+    "line": 334,
+    "usage": "interface",
+    "parts": [
+      "Специальность"
+    ],
+    "slots": []
+  },
+  "editor.factFields.03": {
+    "source": "prototype.js",
+    "line": 334,
+    "usage": "interface",
+    "parts": [
+      "Город"
+    ],
+    "slots": []
+  },
+  "editor.factFields.04": {
+    "source": "prototype.js",
+    "line": 334,
+    "usage": "interface",
+    "parts": [
+      "Электронная почта"
+    ],
+    "slots": []
+  },
+  "editor.factFields.05": {
+    "source": "prototype.js",
+    "line": 335,
+    "usage": "interface",
+    "parts": [
+      "Компания"
+    ],
+    "slots": []
+  },
+  "editor.factFields.06": {
+    "source": "prototype.js",
+    "line": 335,
+    "usage": "interface",
+    "parts": [
+      "Должность"
+    ],
+    "slots": []
+  },
+  "editor.factFields.07": {
+    "source": "prototype.js",
+    "line": 335,
+    "usage": "interface",
+    "parts": [
+      "Начало"
+    ],
+    "slots": []
+  },
+  "editor.factFields.08": {
+    "source": "prototype.js",
+    "line": 335,
+    "usage": "interface",
+    "parts": [
+      "Окончание"
+    ],
+    "slots": []
+  },
+  "editor.factFields.09": {
+    "source": "prototype.js",
+    "line": 336,
+    "usage": "interface",
+    "parts": [
+      "Технология"
+    ],
+    "slots": []
+  },
+  "editor.factFields.10": {
+    "source": "prototype.js",
+    "line": 336,
+    "usage": "interface",
+    "parts": [
+      "Учебное заведение"
+    ],
+    "slots": []
+  },
+  "editor.factFields.11": {
+    "source": "prototype.js",
+    "line": 336,
+    "usage": "interface",
+    "parts": [
+      "Специальность"
+    ],
+    "slots": []
+  },
+  "editor.factFields.12": {
+    "source": "prototype.js",
+    "line": 336,
+    "usage": "interface",
+    "parts": [
+      "Год окончания"
+    ],
+    "slots": []
+  },
+  "editor.factFields.13": {
+    "source": "prototype.js",
+    "line": 336,
+    "usage": "interface",
+    "parts": [
+      "Язык"
+    ],
+    "slots": []
+  },
+  "editor.factFields.14": {
+    "source": "prototype.js",
+    "line": 336,
+    "usage": "interface",
+    "parts": [
+      "Уровень"
+    ],
+    "slots": []
+  },
+  "editor.editFact.01": {
+    "source": "prototype.js",
+    "line": 351,
+    "usage": "interface",
+    "parts": [
+      "Изменить факт"
+    ],
+    "slots": []
+  },
+  "editor.editFact.02": {
+    "source": "prototype.js",
+    "line": 351,
+    "usage": "interface",
+    "parts": [
+      "Добавить факт"
+    ],
+    "slots": []
+  },
+  "editor.editFact.03": {
+    "source": "prototype.js",
+    "line": 351,
+    "usage": "interface",
+    "parts": [
+      "placeholder=\"2022-01 или настоящее время\""
+    ],
+    "slots": []
+  },
+  "editor.editFact.04": {
+    "source": "prototype.js",
+    "line": 360,
+    "usage": "interface",
+    "parts": [
+      "Факт сохранён"
+    ],
+    "slots": []
+  },
+  "editor.editFact.05": {
+    "source": "prototype.js",
+    "line": 361,
+    "usage": "interface",
+    "parts": [
+      "Факт сохранён"
+    ],
+    "slots": []
+  },
+  "editor.removeFact.01": {
+    "source": "prototype.js",
+    "line": 383,
+    "usage": "interface",
+    "parts": [
+      "Удалить факт?"
+    ],
+    "slots": []
+  },
+  "editor.removeFact.02": {
+    "source": "prototype.js",
+    "line": 387,
+    "usage": "interface",
+    "parts": [
+      "Факт удалён. Проверьте текст документа."
+    ],
+    "slots": []
+  },
+  "editor.labels.01": {
+    "source": "prototype.js",
+    "line": 407,
+    "usage": "interface",
+    "parts": [
+      "Проверяем текст"
+    ],
+    "slots": []
+  },
+  "editor.labels.02": {
+    "source": "prototype.js",
+    "line": 407,
+    "usage": "interface",
+    "parts": [
+      "Извлекаем факты"
+    ],
+    "slots": []
+  },
+  "editor.labels.03": {
+    "source": "prototype.js",
+    "line": 407,
+    "usage": "interface",
+    "parts": [
+      "Открываем редактор"
+    ],
+    "slots": []
+  },
+  "editor.renderProgress.01": {
+    "source": "prototype.js",
+    "line": 408,
+    "usage": "interface",
+    "parts": [
+      "Вставленный текст"
+    ],
+    "slots": []
+  },
+  "editor.renderCheck.01": {
+    "source": "prototype.js",
+    "line": 412,
+    "usage": "interface",
+    "parts": [
+      "Текст похож на резюме"
+    ],
+    "slots": []
+  },
+  "editor.renderCheck.02": {
+    "source": "prototype.js",
+    "line": 412,
+    "usage": "interface",
+    "parts": [
+      "Возможно, это не резюме"
+    ],
+    "slots": []
+  },
+  "editor.renderCheck.03": {
+    "source": "prototype.js",
+    "line": 412,
+    "usage": "interface",
+    "parts": [
+      "Найдены сведения о кандидате, работе, навыках, образовании и языках."
+    ],
+    "slots": []
+  },
+  "editor.renderCheck.04": {
+    "source": "prototype.js",
+    "line": 412,
+    "usage": "interface",
+    "parts": [
+      "В прототипе имя и специальность берутся из первых строк. Остальные сведения можно добавить вручную."
+    ],
+    "slots": []
+  },
+  "editor.renderCheck.05": {
+    "source": "prototype.js",
+    "line": 412,
+    "usage": "interface",
+    "parts": [
+      "Открыть редактор"
+    ],
+    "slots": []
+  },
+  "editor.renderCheck.06": {
+    "source": "prototype.js",
+    "line": 412,
+    "usage": "interface",
+    "parts": [
+      "Всё равно продолжить"
+    ],
+    "slots": []
+  },
+  "editor.name.01": {
+    "source": "prototype.js",
+    "line": 418,
+    "usage": "interface",
+    "parts": [
+      "Без имени"
+    ],
+    "slots": []
+  },
+  "editor.openProcessed.01": {
+    "source": "prototype.js",
+    "line": 425,
+    "usage": "interface",
+    "parts": [
+      "Вставленный текст"
+    ],
+    "slots": []
+  },
+  "editor.openProcessed.02": {
+    "source": "prototype.js",
+    "line": 427,
+    "usage": "interface",
+    "parts": [
+      "Вставленный текст"
+    ],
+    "slots": []
+  },
+  "editor.openProcessed.03": {
+    "source": "prototype.js",
+    "line": 429,
+    "usage": "interface",
+    "parts": [
+      "Резюме открыто"
+    ],
+    "slots": []
+  },
+  "editor.readSource.01": {
+    "source": "prototype.js",
+    "line": 433,
+    "usage": "interface",
+    "parts": [
+      "Выберите PDF, DOCX, TXT или Markdown."
+    ],
+    "slots": []
+  },
+  "editor.readSource.02": {
+    "source": "prototype.js",
+    "line": 434,
+    "usage": "interface",
+    "parts": [
+      "Для прототипа выберите текстовый файл до 2 МБ."
+    ],
+    "slots": []
+  },
+  "editor.readSource.03": {
+    "source": "prototype.js",
+    "line": 437,
+    "usage": "interface",
+    "parts": [
+      "Не удалось прочитать файл. Попробуйте вставить текст."
+    ],
+    "slots": []
+  },
+  "editor.renderSettings.01": {
+    "source": "prototype.js",
+    "line": 449,
+    "usage": "interface",
+    "parts": [
+      "Подписка подключена"
+    ],
+    "slots": []
+  },
+  "editor.renderSettings.02": {
+    "source": "prototype.js",
+    "line": 449,
+    "usage": "interface",
+    "parts": [
+      "Модель отключена"
+    ],
+    "slots": []
+  },
+  "editor.renderSettings.03": {
+    "source": "prototype.js",
+    "line": 449,
+    "usage": "interface",
+    "parts": [
+      "Подключите Codex для обработки текста"
+    ],
+    "slots": []
+  },
+  "editor.renderSettings.04": {
+    "source": "prototype.js",
+    "line": 449,
+    "usage": "interface",
+    "parts": [
+      "Проверяем…"
+    ],
+    "slots": []
+  },
+  "editor.renderSettings.05": {
+    "source": "prototype.js",
+    "line": 449,
+    "usage": "interface",
+    "parts": [
+      "Проверить подключение"
+    ],
+    "slots": []
+  },
+  "editor.renderSettings.06": {
+    "source": "prototype.js",
+    "line": 449,
+    "usage": "interface",
+    "parts": [
+      "Отключить модель"
+    ],
+    "slots": []
+  },
+  "editor.renderSettings.07": {
+    "source": "prototype.js",
+    "line": 449,
+    "usage": "interface",
+    "parts": [
+      "Подключить Codex"
+    ],
+    "slots": []
+  },
+  "editor.renderSettings.08": {
+    "source": "prototype.js",
+    "line": 452,
+    "usage": "interface",
+    "parts": [
+      "Есть несохранённые изменения"
+    ],
+    "slots": []
+  },
+  "editor.renderSettings.09": {
+    "source": "prototype.js",
+    "line": 452,
+    "usage": "interface",
+    "parts": [
+      "Изменения сохранены"
+    ],
+    "slots": []
+  },
+  "editor.updateSettingsDirty.01": {
+    "source": "prototype.js",
+    "line": 458,
+    "usage": "interface",
+    "parts": [
+      "Есть несохранённые изменения"
+    ],
+    "slots": []
+  },
+  "editor.updateSettingsDirty.02": {
+    "source": "prototype.js",
+    "line": 458,
+    "usage": "interface",
+    "parts": [
+      "Изменения сохранены"
+    ],
+    "slots": []
+  },
+  "editor.saveSettings.01": {
+    "source": "prototype.js",
+    "line": 461,
+    "usage": "interface",
+    "parts": [
+      "Добавьте оба раздела и инструкции под ними. Объём правил — не больше 32 КБ."
+    ],
+    "slots": []
+  },
+  "editor.saveSettings.02": {
+    "source": "prototype.js",
+    "line": 462,
+    "usage": "interface",
+    "parts": [
+      "Настройки сохранены"
+    ],
+    "slots": []
+  },
+  "editor.dateDialog.01": {
+    "source": "prototype.js",
+    "line": 482,
+    "usage": "interface",
+    "parts": [
+      "Пересечения не найдены"
+    ],
+    "slots": []
+  },
+  "editor.dateDialog.02": {
+    "source": "prototype.js",
+    "line": 482,
+    "usage": "interface",
+    "parts": [
+      "Проверьте периоды работы"
+    ],
+    "slots": []
+  },
+  "editor.dateDialog.03": {
+    "source": "prototype.js",
+    "line": 482,
+    "usage": "interface",
+    "parts": [
+      "Проверка дат"
+    ],
+    "slots": []
+  },
+  "editor.dateDialog.04": {
+    "source": "prototype.js",
+    "line": 482,
+    "usage": "interface",
+    "parts": [
+      "Эти два периода не пересекаются. Даты можно изменить в фактах."
+    ],
+    "slots": []
+  },
+  "editor.dateDialog.05": {
+    "source": "prototype.js",
+    "line": 482,
+    "usage": "interface",
+    "parts": [
+      "Для расчёта укажите месяц и год начала обоих мест работы и окончания предыдущего. Например, 2022-03. Даты можно изменить в фактах."
+    ],
+    "slots": []
+  },
+  "editor.dateDialog.06": {
+    "source": "prototype.js",
+    "line": 485,
+    "usage": "interface",
+    "parts": [
+      "Периоды пересекаются"
+    ],
+    "slots": []
+  },
+  "editor.dateDialog.07": {
+    "source": "prototype.js",
+    "line": 485,
+    "usage": "interface",
+    "parts": [
+      "Проверка дат"
+    ],
+    "slots": []
+  },
+  "editor.exportDialog.01": {
+    "source": "prototype.js",
+    "line": 488,
+    "usage": "interface",
+    "parts": [
+      "Сначала откройте резюме."
+    ],
+    "slots": []
+  },
+  "editor.exportDialog.02": {
+    "source": "prototype.js",
+    "line": 489,
+    "usage": "interface",
+    "parts": [
+      "Экспорт DOCX"
+    ],
+    "slots": []
+  },
+  "editor.saveDialog.01": {
+    "source": "prototype.js",
+    "line": 493,
+    "usage": "interface",
+    "parts": [
+      "Открыть проект"
+    ],
+    "slots": []
+  },
+  "editor.saveDialog.02": {
+    "source": "prototype.js",
+    "line": 493,
+    "usage": "interface",
+    "parts": [
+      "Сохранить проект"
+    ],
+    "slots": []
+  },
+  "editor.saveDialog.03": {
+    "source": "prototype.js",
+    "line": 493,
+    "usage": "interface",
+    "parts": [
+      "Продолжить работу"
+    ],
+    "slots": []
+  },
+  "editor.saveDialog.04": {
+    "source": "prototype.js",
+    "line": 493,
+    "usage": "interface",
+    "parts": [
+      "Файл .foldcv"
+    ],
+    "slots": []
+  },
+  "editor.saveDialog.05": {
+    "source": "prototype.js",
+    "line": 493,
+    "usage": "interface",
+    "parts": [
+      "Прототип открывает только свои файлы .demo.json. Файлы .foldcv открываются в основном приложении."
+    ],
+    "slots": []
+  },
+  "editor.saveDialog.06": {
+    "source": "prototype.js",
+    "line": 493,
+    "usage": "interface",
+    "parts": [
+      "Прототип сохраняет данные в .demo.json. Для работы в приложении нужен файл .foldcv."
+    ],
+    "slots": []
+  },
+  "editor.saveDialog.07": {
+    "source": "prototype.js",
+    "line": 493,
+    "usage": "interface",
+    "parts": [
+      "Файл .demo.json"
+    ],
+    "slots": []
+  },
+  "editor.saveDialog.08": {
+    "source": "prototype.js",
+    "line": 493,
+    "usage": "interface",
+    "parts": [
+      "Открыть .demo.json"
+    ],
+    "slots": []
+  },
+  "editor.saveDialog.09": {
+    "source": "prototype.js",
+    "line": 493,
+    "usage": "interface",
+    "parts": [
+      "Скачать .demo.json"
+    ],
+    "slots": []
+  },
+  "editor.downloadDemo.01": {
+    "source": "prototype.js",
+    "line": 499,
+    "usage": "interface",
+    "parts": [
+      "Файл .demo.json скачан"
+    ],
+    "slots": []
+  },
+  "editor.openDemo.01": {
+    "source": "prototype.js",
+    "line": 521,
+    "usage": "interface",
+    "parts": [
+      "Архив .foldcv открывается в основном приложении. Здесь нужен снимок .demo.json."
+    ],
+    "slots": []
+  },
+  "editor.openDemo.02": {
+    "source": "prototype.js",
+    "line": 522,
+    "usage": "interface",
+    "parts": [
+      "Демонстрационный снимок должен быть меньше 10 МБ."
+    ],
+    "slots": []
+  },
+  "editor.openDemo.03": {
+    "source": "prototype.js",
+    "line": 531,
+    "usage": "interface",
+    "parts": [
+      "Файл .demo.json открыт"
+    ],
+    "slots": []
+  },
+  "editor.openDemo.04": {
+    "source": "prototype.js",
+    "line": 532,
+    "usage": "interface",
+    "parts": [
+      "Этот файл не является поддерживаемым снимком прототипа."
+    ],
+    "slots": []
+  },
+  "editor.beginRewrite.01": {
+    "source": "prototype.js",
+    "line": 550,
+    "usage": "interface",
+    "parts": [
+      "Выберите текст в документе."
+    ],
+    "slots": []
+  },
+  "editor.beginRewrite.02": {
+    "source": "prototype.js",
+    "line": 552,
+    "usage": "interface",
+    "parts": [
+      "Сократи, сохрани смысл и факты"
+    ],
+    "slots": []
+  },
+  "editor.renderRewrite.01": {
+    "source": "prototype.js",
+    "line": 557,
+    "usage": "interface",
+    "parts": [
+      "этот блок"
+    ],
+    "slots": []
+  },
+  "editor.renderRewrite.02": {
+    "source": "prototype.js",
+    "line": 557,
+    "usage": "interface",
+    "parts": [
+      "выделенный фрагмент"
+    ],
+    "slots": []
+  },
+  "editor.prepareRewrite.01": {
+    "source": "prototype.js",
+    "line": 563,
+    "usage": "interface",
+    "parts": [
+      "Блок удалён. Выберите другой текст."
+    ],
+    "slots": []
+  },
+  "editor.prepareRewrite.02": {
+    "source": "prototype.js",
+    "line": 568,
+    "usage": "interface",
+    "parts": [
+      "Фронтенд-разработчик. Создаю продуктовые интерфейсы на React и TypeScript — от первых экранов до поддержки после запуска. В команде «Север» развиваю личный кабинет и библиотеку компонентов. Уделяю внимание доступности и качеству кода."
+    ],
+    "slots": []
+  },
+  "editor.prepareRewrite.03": {
+    "source": "prototype.js",
+    "line": 569,
+    "usage": "interface",
+    "parts": [
+      "Разрабатываю личный кабинет и общие компоненты на React и TypeScript. Подключаю API и покрываю ключевые сценарии тестами. Вместе с дизайнером улучшаю доступность и согласованность интерфейса."
+    ],
+    "slots": []
+  },
+  "editor.prepareRewrite.04": {
+    "source": "prototype.js",
+    "line": 570,
+    "usage": "interface",
+    "parts": [
+      "Фронтенд-разработчик продуктовых интерфейсов."
+    ],
+    "slots": []
+  },
+  "editor.applyRewrite.01": {
+    "source": "prototype.js",
+    "line": 601,
+    "usage": "interface",
+    "parts": [
+      "Выделение изменилось. Выберите текст заново."
+    ],
+    "slots": []
+  },
+  "editor.applyRewrite.02": {
+    "source": "prototype.js",
+    "line": 603,
+    "usage": "interface",
+    "parts": [
+      "Выделенный текст изменён"
+    ],
+    "slots": []
+  },
+  "editor.applyRewrite.03": {
+    "source": "prototype.js",
+    "line": 603,
+    "usage": "interface",
+    "parts": [
+      "Правка применена. Её можно отменить."
+    ],
+    "slots": []
+  },
+  "editor.openSource.01": {
+    "source": "prototype.js",
+    "line": 606,
+    "usage": "interface",
+    "parts": [
+      "Исходный текст"
+    ],
+    "slots": []
+  },
+  "editor.openSource.02": {
+    "source": "prototype.js",
+    "line": 606,
+    "usage": "interface",
+    "parts": [
+      "Источник"
+    ],
+    "slots": []
+  },
+  "editor.deleteProject.01": {
+    "source": "prototype.js",
+    "line": 609,
+    "usage": "interface",
+    "parts": [
+      "Удалить резюме?"
+    ],
+    "slots": []
+  },
+  "editor.deleteProject.02": {
+    "source": "prototype.js",
+    "line": 609,
+    "usage": "interface",
+    "parts": [
+      "История"
+    ],
+    "slots": []
+  },
+  "editor.deleteProject.03": {
+    "source": "prototype.js",
+    "line": 612,
+    "usage": "interface",
+    "parts": [
+      "Резюме удалено"
+    ],
+    "slots": []
+  },
+  "editor.aboutDialog.01": {
+    "source": "prototype.js",
+    "line": 616,
+    "usage": "interface",
+    "parts": [
+      "О прототипе"
+    ],
+    "slots": []
+  },
+  "editor.insertLink.01": {
+    "source": "prototype.js",
+    "line": 620,
+    "usage": "interface",
+    "parts": [
+      "Добавить ссылку"
+    ],
+    "slots": []
+  },
+  "editor.insertLink.02": {
+    "source": "prototype.js",
+    "line": 620,
+    "usage": "interface",
+    "parts": [
+      "Редактирование"
+    ],
+    "slots": []
+  },
+  "editor.insertLink.03": {
+    "source": "prototype.js",
+    "line": 620,
+    "usage": "interface",
+    "parts": [
+      "Портфолио"
+    ],
+    "slots": []
+  },
+  "editor.insertLink.04": {
+    "source": "prototype.js",
+    "line": 622,
+    "usage": "interface",
+    "parts": [
+      "Используйте адрес http:// или https://."
+    ],
+    "slots": []
+  },
+  "editor.insertTable.01": {
+    "source": "prototype.js",
+    "line": 632,
+    "usage": "interface",
+    "parts": [
+      "Добавить таблицу"
+    ],
+    "slots": []
+  },
+  "editor.insertTable.02": {
+    "source": "prototype.js",
+    "line": 632,
+    "usage": "interface",
+    "parts": [
+      "Редактирование"
+    ],
+    "slots": []
+  },
+  "editor.insertTable.03": {
+    "source": "prototype.js",
+    "line": 634,
+    "usage": "interface",
+    "parts": [
+      "Навык"
+    ],
+    "slots": []
+  },
+  "editor.insertTable.04": {
+    "source": "prototype.js",
+    "line": 634,
+    "usage": "interface",
+    "parts": [
+      "Уровень"
+    ],
+    "slots": []
+  },
+  "editor.readImage.01": {
+    "source": "prototype.js",
+    "line": 639,
+    "usage": "interface",
+    "parts": [
+      "Выберите PNG, JPEG или WebP."
+    ],
+    "slots": []
+  },
+  "editor.readImage.02": {
+    "source": "prototype.js",
+    "line": 640,
+    "usage": "interface",
+    "parts": [
+      "Для прототипа выберите изображение до 3 МБ."
+    ],
+    "slots": []
+  },
+  "editor.readImage.03": {
+    "source": "prototype.js",
+    "line": 643,
+    "usage": "interface",
+    "parts": [
+      "Не удалось прочитать изображение."
+    ],
+    "slots": []
+  },
+  "editor.readImage.04": {
+    "source": "prototype.js",
+    "line": 645,
+    "usage": "interface",
+    "parts": [
+      "Изображение добавлено локально."
+    ],
+    "slots": []
+  },
+  "editor.events.03": {
+    "source": "prototype.js",
+    "line": 677,
+    "usage": "interface",
+    "parts": [
+      "Сократи, сохрани смысл и факты"
+    ],
+    "slots": []
+  },
+  "editor.events.04": {
+    "source": "prototype.js",
+    "line": 677,
+    "usage": "interface",
+    "parts": [
+      "Сделай формулировку яснее, сохрани факты"
+    ],
+    "slots": []
+  },
+  "editor.events.05": {
+    "source": "prototype.js",
+    "line": 690,
+    "usage": "interface",
+    "parts": [
+      "Экспорт DOCX"
+    ],
+    "slots": []
+  },
+  "editor.events.06": {
+    "source": "prototype.js",
+    "line": 697,
+    "usage": "interface",
+    "parts": [
+      "Даты оставлены без изменений"
+    ],
+    "slots": []
+  },
+  "editor.events.07": {
+    "source": "prototype.js",
+    "line": 700,
+    "usage": "interface",
+    "parts": [
+      "Даты изменились. Откройте проверку заново."
+    ],
+    "slots": []
+  },
+  "editor.events.08": {
+    "source": "prototype.js",
+    "line": 701,
+    "usage": "interface",
+    "parts": [
+      "Даты изменены"
+    ],
+    "slots": []
+  },
+  "editor.events.09": {
+    "source": "prototype.js",
+    "line": 705,
+    "usage": "interface",
+    "parts": [
+      "Резюме — пример.txt"
+    ],
+    "slots": []
+  },
+  "editor.events.10": {
+    "source": "prototype.js",
+    "line": 711,
+    "usage": "interface",
+    "parts": [
+      "Изменения отменены."
+    ],
+    "slots": []
+  },
+  "editor.events.11": {
+    "source": "prototype.js",
+    "line": 712,
+    "usage": "interface",
+    "parts": [
+      "Подключение показано для примера. Вход не выполнялся."
+    ],
+    "slots": []
+  },
+  "editor.events.12": {
+    "source": "prototype.js",
+    "line": 712,
+    "usage": "interface",
+    "parts": [
+      "Модель отключена. Сохраните настройки."
+    ],
+    "slots": []
+  },
+  "editor.events.13": {
+    "source": "prototype.js",
+    "line": 713,
+    "usage": "interface",
+    "parts": [
+      "Это пример результата. Подключение к Codex не проверялось."
+    ],
+    "slots": []
+  },
+  "editor.events.14": {
+    "source": "prototype.js",
+    "line": 731,
+    "usage": "interface",
+    "parts": [
+      "Резюме — пример.txt"
+    ],
+    "slots": []
+  },
+  "chat.vacancy.01": {
+    "source": "agent-chat.js",
+    "line": 6,
+    "usage": "demo-content",
+    "parts": [
+      "Фронтенд-разработчик. React, TypeScript, доступность интерфейсов, тестирование и работа с дизайнером. Пример вакансии для прототипа."
+    ],
+    "slots": []
+  },
+  "chat.shortened.01": {
+    "source": "agent-chat.js",
+    "line": 7,
+    "usage": "demo-content",
+    "parts": [
+      "Фронтенд-разработчик. Создаю интерфейсы на React и TypeScript. В команде «Север» разрабатываю личный кабинет и библиотеку компонентов. Уделяю внимание доступности и качеству кода."
+    ],
+    "slots": []
+  },
+  "chat.chars.01": {
+    "source": "agent-chat.js",
+    "line": 9,
+    "usage": "interface",
+    "parts": [
+      "знак"
+    ],
+    "slots": []
+  },
+  "chat.chars.02": {
+    "source": "agent-chat.js",
+    "line": 9,
+    "usage": "interface",
+    "parts": [
+      "знака"
+    ],
+    "slots": []
+  },
+  "chat.chars.03": {
+    "source": "agent-chat.js",
+    "line": 9,
+    "usage": "interface",
+    "parts": [
+      "знаков"
+    ],
+    "slots": []
+  },
+  "chat.newThread.01": {
+    "source": "agent-chat.js",
+    "line": 10,
+    "usage": "interface",
+    "parts": [
+      "Новый диалог"
+    ],
+    "slots": []
+  },
+  "chat.captureContext.01": {
+    "source": "agent-chat.js",
+    "line": 24,
+    "usage": "interface",
+    "parts": [
+      "Фрагмент · ",
+      "",
+      ""
+    ],
+    "slots": [
+      "chars(selection.text.length)",
+      "icon(\"close\")"
+    ]
+  },
+  "chat.captureContext.02": {
+    "source": "agent-chat.js",
+    "line": 24,
+    "usage": "interface",
+    "parts": [
+      "Убрать выделенный фрагмент"
+    ],
+    "slots": []
+  },
+  "chat.messageHtml.01": {
+    "source": "agent-chat.js",
+    "line": 34,
+    "usage": "interface",
+    "parts": [
+      "Вы"
+    ],
+    "slots": []
+  },
+  "chat.messageHtml.02": {
+    "source": "agent-chat.js",
+    "line": 34,
+    "usage": "interface",
+    "parts": [
+      "Помощник"
+    ],
+    "slots": []
+  },
+  "chat.messageHtml.03": {
+    "source": "agent-chat.js",
+    "line": 34,
+    "usage": "interface",
+    "parts": [
+      "Работа остановлена"
+    ],
+    "slots": []
+  },
+  "chat.messageHtml.04": {
+    "source": "agent-chat.js",
+    "line": 34,
+    "usage": "interface",
+    "parts": [
+      "Не удалось завершить"
+    ],
+    "slots": []
+  },
+  "chat.messageHtml.05": {
+    "source": "agent-chat.js",
+    "line": 34,
+    "usage": "interface",
+    "parts": [
+      "",
+      " действия"
+    ],
+    "slots": [
+      "message.activity.length"
+    ]
+  },
+  "chat.messageHtml.06": {
+    "source": "agent-chat.js",
+    "line": 34,
+    "usage": "interface",
+    "parts": [
+      "Правка отменена"
+    ],
+    "slots": []
+  },
+  "chat.messageHtml.07": {
+    "source": "agent-chat.js",
+    "line": 34,
+    "usage": "interface",
+    "parts": [
+      "Изменён 1 блок"
+    ],
+    "slots": []
+  },
+  "chat.messageHtml.08": {
+    "source": "agent-chat.js",
+    "line": 34,
+    "usage": "interface",
+    "parts": [
+      "Скопировать ответ"
+    ],
+    "slots": []
+  },
+  "chat.messageHtml.09": {
+    "source": "agent-chat.js",
+    "line": 34,
+    "usage": "interface",
+    "parts": [
+      "Повторить"
+    ],
+    "slots": []
+  },
+  "chat.messageHtml.10": {
+    "source": "agent-chat.js",
+    "line": 34,
+    "usage": "interface",
+    "parts": [
+      "Ответить заново"
+    ],
+    "slots": []
+  },
+  "chat.scopeText.01": {
+    "source": "agent-chat.js",
+    "line": 51,
+    "usage": "interface",
+    "parts": [
+      "Фрагмент · ",
+      ""
+    ],
+    "slots": [
+      "chars(chat.scope.text.length)"
+    ]
+  },
+  "chat.scopeText.02": {
+    "source": "agent-chat.js",
+    "line": 51,
+    "usage": "interface",
+    "parts": [
+      "Всё резюме"
+    ],
+    "slots": []
+  },
+  "chat.render.01": {
+    "source": "agent-chat.js",
+    "line": 52,
+    "usage": "interface",
+    "parts": [
+      "Новый диалог"
+    ],
+    "slots": []
+  },
+  "chat.render.02": {
+    "source": "agent-chat.js",
+    "line": 52,
+    "usage": "interface",
+    "parts": [
+      "История диалогов"
+    ],
+    "slots": []
+  },
+  "chat.render.03": {
+    "source": "agent-chat.js",
+    "line": 52,
+    "usage": "interface",
+    "parts": [
+      "Уменьшить чат"
+    ],
+    "slots": []
+  },
+  "chat.render.04": {
+    "source": "agent-chat.js",
+    "line": 52,
+    "usage": "interface",
+    "parts": [
+      "Развернуть чат"
+    ],
+    "slots": []
+  },
+  "chat.render.05": {
+    "source": "agent-chat.js",
+    "line": 52,
+    "usage": "interface",
+    "parts": [
+      "Скрыть чат"
+    ],
+    "slots": []
+  },
+  "chat.render.06": {
+    "source": "agent-chat.js",
+    "line": 52,
+    "usage": "interface",
+    "parts": [
+      "Убрать выделенный фрагмент"
+    ],
+    "slots": []
+  },
+  "chat.render.07": {
+    "source": "agent-chat.js",
+    "line": 52,
+    "usage": "interface",
+    "parts": [
+      "Выделите текст в документе, чтобы обсудить его"
+    ],
+    "slots": []
+  },
+  "chat.render.08": {
+    "source": "agent-chat.js",
+    "line": 52,
+    "usage": "interface",
+    "parts": [
+      "Прикрепить текстовый файл"
+    ],
+    "slots": []
+  },
+  "chat.render.09": {
+    "source": "agent-chat.js",
+    "line": 52,
+    "usage": "interface",
+    "parts": [
+      "Модель выше — для следующего сообщения"
+    ],
+    "slots": []
+  },
+  "chat.render.10": {
+    "source": "agent-chat.js",
+    "line": 52,
+    "usage": "interface",
+    "parts": [
+      "Enter — отправить · Shift + Enter — новая строка"
+    ],
+    "slots": []
+  },
+  "chat.stop.01": {
+    "source": "agent-chat.js",
+    "line": 62,
+    "usage": "interface",
+    "parts": [
+      "Ответ остановлен."
+    ],
+    "slots": []
+  },
+  "chat.stop.02": {
+    "source": "agent-chat.js",
+    "line": 67,
+    "usage": "interface",
+    "parts": [
+      " Правка в резюме сохранена; её можно отменить."
+    ],
+    "slots": []
+  },
+  "chat.message.01": {
+    "source": "agent-chat.js",
+    "line": 79,
+    "usage": "interface",
+    "parts": [
+      "Читаю выделенный фрагмент"
+    ],
+    "slots": []
+  },
+  "chat.message.02": {
+    "source": "agent-chat.js",
+    "line": 79,
+    "usage": "interface",
+    "parts": [
+      "Читаю резюме и факты"
+    ],
+    "slots": []
+  },
+  "chat.send.01": {
+    "source": "agent-chat.js",
+    "line": 86,
+    "usage": "interface",
+    "parts": [
+      "Не удалось подключиться к модели. Сообщение сохранено. Проверьте подключение и попробуйте ещё раз."
+    ],
+    "slots": []
+  },
+  "chat.send.02": {
+    "source": "agent-chat.js",
+    "line": 89,
+    "usage": "interface",
+    "parts": [
+      "Прочитан фрагмент · ",
+      ""
+    ],
+    "slots": [
+      "chars(scope.text.length)"
+    ]
+  },
+  "chat.send.03": {
+    "source": "agent-chat.js",
+    "line": 89,
+    "usage": "interface",
+    "parts": [
+      "Прочитаны текст и факты: ",
+      ""
+    ],
+    "slots": [
+      "project.facts.length"
+    ]
+  },
+  "chat.send.04": {
+    "source": "agent-chat.js",
+    "line": 90,
+    "usage": "interface",
+    "parts": [
+      "Сопоставляю требования из вложения · пример"
+    ],
+    "slots": []
+  },
+  "chat.send.05": {
+    "source": "agent-chat.js",
+    "line": 90,
+    "usage": "interface",
+    "parts": [
+      "Проверяю факты и даты"
+    ],
+    "slots": []
+  },
+  "chat.finish.01": {
+    "source": "agent-chat.js",
+    "line": 94,
+    "usage": "interface",
+    "parts": [
+      "Работа остановлена: открыто другое резюме."
+    ],
+    "slots": []
+  },
+  "chat.finish.02": {
+    "source": "agent-chat.js",
+    "line": 101,
+    "usage": "interface",
+    "parts": [
+      "Текст изменился во время работы. Правка не внесена. Выделите нужный фрагмент и отправьте запрос заново."
+    ],
+    "slots": []
+  },
+  "chat.finish.03": {
+    "source": "agent-chat.js",
+    "line": 105,
+    "usage": "interface",
+    "parts": [
+      "Фронтенд-разработчик продуктовых интерфейсов."
+    ],
+    "slots": []
+  },
+  "chat.finish.04": {
+    "source": "agent-chat.js",
+    "line": 109,
+    "usage": "interface",
+    "parts": [
+      "Не удалось найти фрагмент. Выделите его заново."
+    ],
+    "slots": []
+  },
+  "chat.finish.05": {
+    "source": "agent-chat.js",
+    "line": 111,
+    "usage": "interface",
+    "parts": [
+      "Помощник изменил текст"
+    ],
+    "slots": []
+  },
+  "chat.finish.06": {
+    "source": "agent-chat.js",
+    "line": 112,
+    "usage": "interface",
+    "parts": [
+      "Выделенный фрагмент"
+    ],
+    "slots": []
+  },
+  "chat.finish.07": {
+    "source": "agent-chat.js",
+    "line": 112,
+    "usage": "interface",
+    "parts": [
+      "О специалисте"
+    ],
+    "slots": []
+  },
+  "chat.finish.08": {
+    "source": "agent-chat.js",
+    "line": 114,
+    "usage": "interface",
+    "parts": [
+      "Изменён 1 блок; проверены связанные факты"
+    ],
+    "slots": []
+  },
+  "chat.finish.09": {
+    "source": "agent-chat.js",
+    "line": 115,
+    "usage": "interface",
+    "parts": [
+      "Сократил выделенный фрагмент. Текст вокруг него сохранён."
+    ],
+    "slots": []
+  },
+  "chat.finish.10": {
+    "source": "agent-chat.js",
+    "line": 115,
+    "usage": "interface",
+    "parts": [
+      "Сократил раздел «О специалисте»: убрал повторы и общие формулировки. Опыт, технологии и названия компаний сохранены."
+    ],
+    "slots": []
+  },
+  "chat.finish.11": {
+    "source": "agent-chat.js",
+    "line": 116,
+    "usage": "interface",
+    "parts": [
+      "Для этого текста в скетче нет готовой правки. Резюме осталось без изменений."
+    ],
+    "slots": []
+  },
+  "chat.finish.12": {
+    "source": "agent-chat.js",
+    "line": 118,
+    "usage": "interface",
+    "parts": [
+      "Сопоставление завершено · пример"
+    ],
+    "slots": []
+  },
+  "chat.finish.13": {
+    "source": "agent-chat.js",
+    "line": 119,
+    "usage": "interface",
+    "parts": [
+      "В примере вакансии нужны React, TypeScript, тестирование и работа с дизайнером. Сопоставьте эти требования с описанием опыта.\n\nДля более точного отклика стоит уточнить личный вклад и результаты работы. Новые навыки и достижения не добавлены."
+    ],
+    "slots": []
+  },
+  "chat.finish.14": {
+    "source": "agent-chat.js",
+    "line": 119,
+    "usage": "interface",
+    "parts": [
+      "Файл «",
+      "» добавлен к сообщению. В нём ",
+      ".\n\nВ скетче можно просмотреть вложение. Анализ произвольного файла здесь не выполняется."
+    ],
+    "slots": [
+      "run.attachment.name",
+      "chars(run.attachment.text.length)"
+    ]
+  },
+  "chat.finish.15": {
+    "source": "agent-chat.js",
+    "line": 122,
+    "usage": "interface",
+    "parts": [
+      "Проверка завершена"
+    ],
+    "slots": []
+  },
+  "chat.finish.16": {
+    "source": "agent-chat.js",
+    "line": 123,
+    "usage": "interface",
+    "parts": [
+      "Прочитал выделенный фрагмент. В скетче можно запросить его сокращение. Текст не изменён."
+    ],
+    "slots": []
+  },
+  "chat.finish.17": {
+    "source": "agent-chat.js",
+    "line": 123,
+    "usage": "interface",
+    "parts": [
+      "Прочитал резюме: ",
+      ". Сверил сведения в панели фактов. Резюме не изменено."
+    ],
+    "slots": [
+      "projectName()"
+    ]
+  },
+  "chat.finish.18": {
+    "source": "agent-chat.js",
+    "line": 125,
+    "usage": "interface",
+    "parts": [
+      "Уточнить даты работы"
+    ],
+    "slots": []
+  },
+  "chat.finish.19": {
+    "source": "agent-chat.js",
+    "line": 125,
+    "usage": "interface",
+    "parts": [
+      "У «Севера» и «Студии Линия» пересекаются периоды. Это может быть параллельная работа."
+    ],
+    "slots": []
+  },
+  "chat.finish.20": {
+    "source": "agent-chat.js",
+    "line": 126,
+    "usage": "interface",
+    "parts": [
+      "Сократить общие формулировки"
+    ],
+    "slots": []
+  },
+  "chat.finish.21": {
+    "source": "agent-chat.js",
+    "line": 126,
+    "usage": "interface",
+    "parts": [
+      "В разделе «О специалисте» можно точнее описать вклад и убрать повторы."
+    ],
+    "slots": []
+  },
+  "chat.demo.01": {
+    "source": "agent-chat.js",
+    "line": 143,
+    "usage": "demo-content",
+    "parts": [
+      "Проверка резюме"
+    ],
+    "slots": []
+  },
+  "chat.demo.02": {
+    "source": "agent-chat.js",
+    "line": 145,
+    "usage": "demo-content",
+    "parts": [
+      "Проверь резюме. Что стоит уточнить перед отправкой?"
+    ],
+    "slots": []
+  },
+  "chat.demo.03": {
+    "source": "agent-chat.js",
+    "line": 146,
+    "usage": "demo-content",
+    "parts": [
+      "Прочитаны текст и факты резюме"
+    ],
+    "slots": []
+  },
+  "chat.demo.04": {
+    "source": "agent-chat.js",
+    "line": 146,
+    "usage": "demo-content",
+    "parts": [
+      "Проверены даты работы"
+    ],
+    "slots": []
+  },
+  "chat.demo.05": {
+    "source": "agent-chat.js",
+    "line": 146,
+    "usage": "demo-content",
+    "parts": [
+      "Проверены связанные сведения"
+    ],
+    "slots": []
+  },
+  "chat.demo.06": {
+    "source": "agent-chat.js",
+    "line": 146,
+    "usage": "demo-content",
+    "parts": [
+      "В примере нашлись два места для уточнения. Резюме не изменено."
+    ],
+    "slots": []
+  },
+  "chat.demo.07": {
+    "source": "agent-chat.js",
+    "line": 146,
+    "usage": "demo-content",
+    "parts": [
+      "Уточнить даты работы"
+    ],
+    "slots": []
+  },
+  "chat.demo.08": {
+    "source": "agent-chat.js",
+    "line": 146,
+    "usage": "demo-content",
+    "parts": [
+      "Два места работы пересекаются на 3 месяца. Если работа была параллельной, даты можно оставить."
+    ],
+    "slots": []
+  },
+  "chat.demo.09": {
+    "source": "agent-chat.js",
+    "line": 146,
+    "usage": "demo-content",
+    "parts": [
+      "Сократить описание"
+    ],
+    "slots": []
+  },
+  "chat.demo.10": {
+    "source": "agent-chat.js",
+    "line": 146,
+    "usage": "demo-content",
+    "parts": [
+      "В разделе «О специалисте» есть общие фразы. Можно оставить опыт, технологии и личный вклад."
+    ],
+    "slots": []
+  },
+  "chat.demo.11": {
+    "source": "agent-chat.js",
+    "line": 150,
+    "usage": "demo-content",
+    "parts": [
+      "Проверь резюме и укажи, что стоит уточнить."
+    ],
+    "slots": []
+  },
+  "chat.events.01": {
+    "source": "agent-chat.js",
+    "line": 158,
+    "usage": "interface",
+    "parts": [
+      "Работа остановлена при переходе на другой экран."
+    ],
+    "slots": []
+  },
+  "chat.events.02": {
+    "source": "agent-chat.js",
+    "line": 166,
+    "usage": "interface",
+    "parts": [
+      "Вакансия — пример.txt"
+    ],
+    "slots": []
+  },
+  "chat.events.03": {
+    "source": "agent-chat.js",
+    "line": 166,
+    "usage": "interface",
+    "parts": [
+      "Сравни резюме с требованиями вакансии."
+    ],
+    "slots": []
+  },
+  "chat.events.04": {
+    "source": "agent-chat.js",
+    "line": 171,
+    "usage": "interface",
+    "parts": [
+      "Этот блок уже удалён."
+    ],
+    "slots": []
+  },
+  "chat.events.05": {
+    "source": "agent-chat.js",
+    "line": 174,
+    "usage": "interface",
+    "parts": [
+      "Источник"
+    ],
+    "slots": []
+  },
+  "chat.events.06": {
+    "source": "agent-chat.js",
+    "line": 178,
+    "usage": "interface",
+    "parts": [
+      "После этой правки были другие изменения. Используйте общую отмену в редакторе."
+    ],
+    "slots": []
+  },
+  "chat.events.07": {
+    "source": "agent-chat.js",
+    "line": 192,
+    "usage": "interface",
+    "parts": [
+      "Ответ скопирован"
+    ],
+    "slots": []
+  },
+  "chat.events.08": {
+    "source": "agent-chat.js",
+    "line": 192,
+    "usage": "interface",
+    "parts": [
+      "Не удалось скопировать. Выделите текст ответа вручную."
+    ],
+    "slots": []
+  },
+  "chat.events.09": {
+    "source": "agent-chat.js",
+    "line": 203,
+    "usage": "interface",
+    "parts": [
+      "Выберите TXT или Markdown до 20 КБ."
+    ],
+    "slots": []
+  },
+  "chat.events.10": {
+    "source": "agent-chat.js",
+    "line": 204,
+    "usage": "interface",
+    "parts": [
+      "Не удалось прочитать файл."
+    ],
+    "slots": []
+  }
+}

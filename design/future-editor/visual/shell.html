@@ -1,0 +1,26 @@
+<main class="app-shell">
+    <aside class="history" id="history" aria-label="История резюме">
+      <div class="brand-row"><button class="brand" id="brand-button" aria-label="FoldCV — новый исходник"><svg><use href="visual/icons.svg#i-fold"/></svg>FoldCV<span>.</span></button><button class="icon" id="hide-history" aria-label="Свернуть историю" title="Свернуть историю"><svg><use href="visual/icons.svg#i-panel"/></svg></button></div>
+      <button class="button new-button" id="new-button"><svg><use href="visual/icons.svg#i-plus"/></svg>Новое резюме</button>
+      <div class="history-heading"><span class="eyebrow">Ваши резюме</span><span id="history-count">2</span></div>
+      <div id="project-list" class="project-list"></div>
+      <button class="history-open" id="open-project"><svg><use href="visual/icons.svg#i-upload"/></svg>Открыть .foldcv</button>
+      <footer class="history-footer"><div class="connection-mini"><span class="dot"></span><span>Codex · подписка</span></div><button id="settings-button"><svg><use href="visual/icons.svg#i-settings"/></svg>Настройки<svg class="trailing"><use href="visual/icons.svg#i-chevron"/></svg></button></footer>
+    </aside>
+    <section class="main-area">
+      <header class="app-header">
+        <button class="icon show-history" id="show-history" hidden aria-label="Развернуть историю" title="Развернуть историю"><svg><use href="visual/icons.svg#i-panel"/></svg></button>
+        <div class="project-heading"><span id="header-eyebrow">Рабочий документ</span><h1 id="header-title">Алексей Соколов</h1></div>
+        <div class="header-actions" id="header-actions"><span class="session-status" id="session-status"><span class="dot"></span>Изменений нет</span><button class="button quiet" id="save-project"><svg><use href="visual/icons.svg#i-download"/></svg><span>Сохранить</span></button><button class="button primary" id="export-button">Экспорт DOCX<svg><use href="visual/icons.svg#i-arrow"/></svg></button></div>
+      </header>
+      <div id="screen" class="screen"></div>
+    </section>
+  </main>
+
+  <dialog id="modal" class="modal"><div id="modal-content"></div></dialog>
+  <dialog id="rewrite" class="rewrite-panel" aria-labelledby="rewrite-title"></dialog>
+  <button class="selection-action" id="selection-action" hidden><svg><use href="visual/icons.svg#i-spark"/></svg>Изменить текст</button>
+  <input type="file" id="source-file" accept=".pdf,.docx,.txt,.md,.markdown" hidden>
+  <input type="file" id="project-file" accept=".foldcv,.json" hidden>
+  <input type="file" id="image-file" accept="image/png,image/jpeg,image/webp" hidden>
+  <div class="toast" id="toast" role="status" hidden></div>

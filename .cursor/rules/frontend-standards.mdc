@@ -13,8 +13,21 @@ alwaysApply: false
 - Keep components small and focused. Extract repeated controls and style variants.
 - Use shared semantic color tokens such as `bg-surface`, `text-content`,
   `border-outline`, and `text-danger`. Define theme values in one place.
-- Support light, dark, and system modes. Persist manual theme choices and follow
-  OS changes in system mode. Apply the resolved theme before the first UI paint.
+- For the approved UIR presentation, use the exact prototype CSS/geometry from
+  `design/future-editor/visual/`; `tokens.css` is the only source of its values.
+  Do not import old theme/next/rich styles into the UIR entry; map old semantic
+  names in separate `aliases.css`. Use Tailwind theme/utilities without Preflight
+  if needed. Follow the UIR execution contract's import graph and engine-control
+  overrides; prototype globals must not break menus, handles, icons or focus.
+  Native dialog/showModal and nonmodal rewrite show are allowed; do not add a
+  Radix Dialog Portal/focus trap. Engine-owned DOM may use a narrow adapter.
+- The adopted rich UI is light-only, including its assistant. This supersedes
+  earlier light/dark/system requirements in the AG plan and AG07 contract for
+  the new presentation; keep their historical evidence unchanged. Remove old
+  theme bootstraps from both rich HTML entries in UIR02, detach rich theme
+  listeners and remove the Settings theme selector. Set root `color-scheme: light`
+  on the proof and adopted entries. Keep the legacy entry/theme/specs until
+  UIR09 separately audits their consumers and test mappings.
 - Use complete Tailwind class names or explicit variant maps; do not construct
   class fragments dynamically.
 
@@ -26,7 +39,7 @@ alwaysApply: false
 - Do not use explicit or implicit `any`. Receive untyped external data as
   `unknown`, validate it, then narrow it before use.
 - Do not declare `enum` or `const enum`. Use literal unions or `as const` objects.
-- Example: `type ThemeMode = "light" | "dark" | "system"`.
+- Example: `type SaveState = "saved" | "pending" | "failed"`.
 - Do not use `@ts-ignore`, `@ts-nocheck`, double assertions, or lint suppressions
   to bypass these rules. Keep legitimate negative type tests separate.
 - Configure contract generation to emit literal unions rather than enum declarations.

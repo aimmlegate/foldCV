@@ -1,0 +1,1712 @@
+{
+  "editor.icon.01": {
+    "source": "prototype.js",
+    "line": 6,
+    "parts": [
+      "<svg aria-hidden=\"true\"><use href=\"visual/icons.svg#i-",
+      "\"/></svg>"
+    ],
+    "slots": [
+      "name"
+    ]
+  },
+  "editor.field.01": {
+    "source": "prototype.js",
+    "line": 24,
+    "parts": [
+      "<span data-record=\"",
+      "\" data-field=\"",
+      "\">",
+      "</span>"
+    ],
+    "slots": [
+      "esc(record)",
+      "esc(key)",
+      "esc(text)"
+    ]
+  },
+  "editor.sampleProject.01": {
+    "source": "prototype.js",
+    "line": 48,
+    "parts": [
+      "",
+      "<br>",
+      ""
+    ],
+    "slots": [
+      "field(\"candidate\", \"location\", \"Санкт-Петербург\")",
+      "field(\"candidate\", \"email\", \"alexey@example.com\")"
+    ]
+  },
+  "editor.sampleProject.02": {
+    "source": "prototype.js",
+    "line": 52,
+    "parts": [
+      "",
+      "<br>",
+      "<br>",
+      ""
+    ],
+    "slots": [
+      "field(\"edu-1\", \"school\", \"СПбПУ\")",
+      "field(\"edu-1\", \"program\", \"Информатика и вычислительная техника\")",
+      "field(\"edu-1\", \"year\", \"2019\")"
+    ]
+  },
+  "editor.sampleProject.03": {
+    "source": "prototype.js",
+    "line": 54,
+    "parts": [
+      "",
+      "<br>",
+      ""
+    ],
+    "slots": [
+      "field(\"lang-1\", \"name\", \"Русский\")",
+      "field(\"lang-1\", \"level\", \"Родной\")"
+    ]
+  },
+  "editor.sampleProject.04": {
+    "source": "prototype.js",
+    "line": 55,
+    "parts": [
+      "",
+      "<br>",
+      ""
+    ],
+    "slots": [
+      "field(\"lang-2\", \"name\", \"Английский\")",
+      "field(\"lang-2\", \"level\", \"B2\")"
+    ]
+  },
+  "editor.updateChrome.01": {
+    "source": "prototype.js",
+    "line": 88,
+    "parts": [
+      "<div class=\"project-row ",
+      "\"><button class=\"project-select\" data-project=\"",
+      "\" ",
+      " ",
+      "><strong>",
+      "</strong><small>",
+      "</small><em>",
+      "</em></button><button class=\"project-delete\" data-delete-project=\"",
+      "\" aria-label=\"Удалить проект: ",
+      "\" title=\"Удалить резюме\">",
+      "</button></div>"
+    ],
+    "slots": [
+      "item.id === state.active && state.view === \"editor\" ? \"active\" : \"\"",
+      "esc(item.id)",
+      "state.source.busy ? \"disabled\" : \"\"",
+      "item.id === state.active && state.view === \"editor\" ? 'aria-current=\"page\"' : \"\"",
+      "esc(projectName(item))",
+      "esc(projectTitle(item))",
+      "item.dirty ? \"Есть изменения\" : \"Рабочая версия\"",
+      "esc(item.id)",
+      "esc(projectName(item))",
+      "icon(\"trash\")"
+    ]
+  },
+  "editor.updateChrome.02": {
+    "source": "prototype.js",
+    "line": 88,
+    "parts": [
+      "<p class=\"empty-state\">Здесь появятся ваши резюме.</p>"
+    ],
+    "slots": []
+  },
+  "editor.updateChrome.03": {
+    "source": "prototype.js",
+    "line": 94,
+    "parts": [
+      "<span class=\"dot\"></span>",
+      ""
+    ],
+    "slots": [
+      "project?.dirty ? \"Есть изменения\" : \"Изменений нет\""
+    ]
+  },
+  "editor.updateChrome.04": {
+    "source": "prototype.js",
+    "line": 96,
+    "parts": [
+      "<span class=\"dot\"></span><span>",
+      "</span>"
+    ],
+    "slots": [
+      "state.settingsSaved.connected ? \"Codex · подписка\" : \"Модель отключена\""
+    ]
+  },
+  "editor.mono.01": {
+    "source": "prototype.js",
+    "line": 113,
+    "parts": [
+      "<span class=\"tech-monogram\" aria-hidden=\"true\">",
+      "</span>"
+    ],
+    "slots": [
+      "esc(plain(block.html).slice(0, 2).toUpperCase())"
+    ]
+  },
+  "editor.blockHtml.01": {
+    "source": "prototype.js",
+    "line": 115,
+    "parts": [
+      "<div class=\"cv-block ",
+      " ",
+      "\" data-block=\"",
+      "\" data-indent=\"",
+      "\"><button class=\"block-handle\" data-block-menu=\"",
+      "\" aria-label=\"Действия блока: ",
+      "\" title=\"Действия блока\">",
+      "</button>",
+      "<div class=\"block-content\" contenteditable=\"true\" role=\"textbox\" aria-multiline=\"true\" aria-label=\"",
+      "\" data-edit=\"",
+      "\" spellcheck=\"false\">",
+      "</div></div>"
+    ],
+    "slots": [
+      "kindClass",
+      "state.blockVisible && block.id === state.selected ? \"is-selected\" : \"\"",
+      "esc(block.id)",
+      "block.indent",
+      "esc(block.id)",
+      "esc(label)",
+      "icon(\"more\")",
+      "mono",
+      "esc(label)",
+      "esc(block.id)",
+      "block.html"
+    ]
+  },
+  "editor.renderEditor.01": {
+    "source": "prototype.js",
+    "line": 121,
+    "parts": [
+      "\n    <div class=\"editor-toolbar\" role=\"toolbar\" aria-label=\"Форматирование документа\">\n      <div class=\"tool-group\"><button class=\"tool\" id=\"undo\" title=\"Отменить (⌘Z)\" aria-label=\"Отменить\">",
+      "</button><button class=\"tool\" id=\"redo\" title=\"Повторить (⇧⌘Z)\" aria-label=\"Повторить\">",
+      "</button></div>\n      <span class=\"tool-divider\"></span>\n      <select class=\"toolbar-select\" id=\"text-style\" aria-label=\"Стиль текста\"><option value=\"p\">Обычный текст</option><option value=\"h2\">Заголовок</option><option value=\"h3\">Подзаголовок</option><option value=\"blockquote\">Цитата</option></select>\n      <div class=\"tool-group\"><button class=\"tool\" data-format=\"bold\" aria-label=\"Полужирный\" title=\"Полужирный\"><b>B</b></button><button class=\"tool italic\" data-format=\"italic\" aria-label=\"Курсив\" title=\"Курсив\">I</button><button class=\"tool underline\" data-format=\"underline\" aria-label=\"Подчёркнутый\" title=\"Подчёркнутый\">U</button><button class=\"tool\" data-format=\"insertUnorderedList\" aria-label=\"Маркированный список\" title=\"Маркированный список\">",
+      "</button></div>\n      <span class=\"tool-divider\"></span>\n      <div class=\"tool-group insert-tools\"><button class=\"tool\" id=\"insert-link\" aria-label=\"Вставить ссылку\" title=\"Ссылка\">",
+      "</button><button class=\"tool\" id=\"insert-table\" aria-label=\"Вставить таблицу\" title=\"Таблица\">",
+      "</button><button class=\"tool\" id=\"insert-image\" aria-label=\"Вставить изображение\" title=\"Изображение\">",
+      "</button></div>\n      <div class=\"tool-group panel-tools\"><button class=\"tool\" id=\"rewrite-button\" aria-label=\"Изменить выбранный текст\" title=\"Изменить выбранный текст\">",
+      "<span>Изменить текст</span></button><button class=\"tool\" id=\"facts-toggle\" aria-label=\"Показать или скрыть факты\" aria-pressed=\"",
+      "\" aria-controls=\"facts-panel\" title=\"Показать или скрыть факты\">",
+      "<span>Факты</span></button><button class=\"tool\" id=\"block-toggle\" aria-label=\"Показать или скрыть действия блока\" aria-pressed=\"",
+      "\" aria-controls=\"block-panel\" title=\"Показать или скрыть действия блока\">",
+      "<span>Блок</span></button></div>\n    </div>\n    <div class=\"editor-body\">\n      <div class=\"document-workspace\">\n        <div class=\"document-context\"><div class=\"context-left\"><span>Исходный текст</span><span>Шаблон FoldCV</span></div><button id=\"date-warning\">",
+      "",
+      "</button></div>\n        <div class=\"paper-scroll\"><article class=\"resume-paper\" aria-label=\"Редактируемое резюме, непрерывный документ\">\n          <div class=\"paper-kicker\"><span>РЕЗЮМЕ СПЕЦИАЛИСТА</span><span>F / РЕЗЮМЕ</span></div>\n          <header class=\"paper-heading\">",
+      "<span class=\"template-wordmark\" aria-label=\"generic\">generic</span></header>\n          <div class=\"paper-columns\"><aside class=\"paper-sidebar\" aria-label=\"Левая колонка резюме\">",
+      "</aside><div class=\"paper-main\" aria-label=\"Основной текст резюме\">",
+      "</div></div>\n          <footer class=\"paper-footer\"><span>mail@example.com</span><span>FoldCV</span></footer>\n        </article></div>\n        <footer class=\"editor-footer\"><span id=\"editor-status\">",
+      "</span><button id=\"source-button\">",
+      "Исходник</button></footer>\n        <div id=\"agent-chat-host\"></div>\n      </div>\n      <aside class=\"facts-panel\" id=\"facts-panel\" aria-label=\"Факты резюме\" ",
+      ">",
+      "</aside>\n    </div><aside class=\"block-panel\" id=\"block-panel\" aria-label=\"Действия блока\" ",
+      "></aside>"
+    ],
+    "slots": [
+      "icon(\"undo\")",
+      "icon(\"redo\")",
+      "icon(\"list\")",
+      "icon(\"link\")",
+      "icon(\"table\")",
+      "icon(\"image\")",
+      "icon(\"spark\")",
+      "state.factsVisible",
+      "icon(\"panel\")",
+      "state.blockVisible",
+      "icon(\"more\")",
+      "icon(\"info\")",
+      "dateLabel",
+      "project.blocks.filter(block => block.region === \"header\").map(blockHtml).join(\"\")",
+      "project.blocks.filter(block => block.region === \"sidebar\").map(blockHtml).join(\"\")",
+      "project.blocks.filter(block => block.region === \"main\").map(blockHtml).join(\"\")",
+      "project.dirty ? \"Есть несохранённые изменения\" : \"Исходный текст\"",
+      "icon(\"file\")",
+      "state.factsVisible ? \"\" : \"hidden\"",
+      "factsHtml()",
+      "state.blockVisible ? \"\" : \"hidden\""
+    ]
+  },
+  "editor.factRow.01": {
+    "source": "prototype.js",
+    "line": 151,
+    "parts": [
+      "<div class=\"fact-row\"><button class=\"fact-edit\" data-fact-edit=\"",
+      "\"><strong>",
+      "</strong>",
+      "</button><button class=\"icon\" data-fact-remove=\"",
+      "\" aria-label=\"Удалить факт: ",
+      "\" title=\"Удалить факт\">",
+      "</button></div>"
+    ],
+    "slots": [
+      "esc(fact.id)",
+      "esc(title || \"Без названия\")",
+      "sub ? `<small>${esc(sub)}</small>` : \"\"",
+      "esc(fact.id)",
+      "esc(title)",
+      "icon(\"close\")"
+    ]
+  },
+  "editor.factRow.02": {
+    "source": "prototype.js",
+    "line": 151,
+    "parts": [
+      "<small>",
+      "</small>"
+    ],
+    "slots": [
+      "esc(sub)"
+    ]
+  },
+  "editor.technologySummary.01": {
+    "source": "prototype.js",
+    "line": 164,
+    "parts": [
+      "<div class=\"technology-select\" data-technology-scope=\"",
+      "\">",
+      "<div class=\"technology-field\"><div class=\"technology-values\">",
+      "<input id=\"",
+      "\" class=\"technology-search\" role=\"combobox\" aria-label=\"",
+      "\" aria-autocomplete=\"list\" aria-expanded=\"",
+      "\" aria-controls=\"",
+      "-options\" autocomplete=\"off\" maxlength=\"80\" placeholder=\"",
+      "\" value=\"",
+      "\"></div><div class=\"technology-field-actions\">",
+      "<button type=\"button\" data-technology-toggle aria-label=\"Показать список технологий\" aria-expanded=\"",
+      "\" aria-controls=\"",
+      "-options\">",
+      "</button></div></div><div class=\"technology-menu\" id=\"",
+      "-options\" role=\"listbox\" aria-label=\"Список технологий\" aria-multiselectable=\"true\" ",
+      ">",
+      "</div></div>"
+    ],
+    "slots": [
+      "esc(jobId || \"\")",
+      "jobId ? '<span class=\"technology-label\">Технологии</span>' : \"\"",
+      "selected.map(name => `<span class=\"technology-chip\"><span>${esc(name)}</span><button type=\"button\" data-technology-remove=\"${esc(technologyKey(name))}\" aria-label=\"Убрать ${esc(name)}\">${icon(\"close\")}</button></span>`).join(\"\")",
+      "controlId",
+      "esc(label)",
+      "open",
+      "controlId",
+      "selected.length ? \"Найти…\" : \"Выбрать технологии\"",
+      "technologyPicker.jobId === jobId ? esc(technologyPicker.query) : \"\"",
+      "selected.length ? `<button type=\"button\" data-technology-clear aria-label=\"Убрать все технологии: ${esc(job?.employer || \"общий список\")}\" title=\"Убрать все\">${icon(\"close\")}</button>` : \"\"",
+      "open",
+      "controlId",
+      "icon(\"chevron\")",
+      "controlId",
+      "open ? \"\" : \"hidden\"",
+      "open ? technologyOptions(jobId) : \"\""
+    ]
+  },
+  "editor.technologySummary.02": {
+    "source": "prototype.js",
+    "line": 164,
+    "parts": [
+      "<span class=\"technology-label\">Технологии</span>"
+    ],
+    "slots": []
+  },
+  "editor.technologySummary.03": {
+    "source": "prototype.js",
+    "line": 164,
+    "parts": [
+      "<span class=\"technology-chip\"><span>",
+      "</span><button type=\"button\" data-technology-remove=\"",
+      "\" aria-label=\"Убрать ",
+      "\">",
+      "</button></span>"
+    ],
+    "slots": [
+      "esc(name)",
+      "esc(technologyKey(name))",
+      "esc(name)",
+      "icon(\"close\")"
+    ]
+  },
+  "editor.technologySummary.04": {
+    "source": "prototype.js",
+    "line": 164,
+    "parts": [
+      "<button type=\"button\" data-technology-clear aria-label=\"Убрать все технологии: ",
+      "\" title=\"Убрать все\">",
+      "</button>"
+    ],
+    "slots": [
+      "esc(job?.employer || \"общий список\")",
+      "icon(\"close\")"
+    ]
+  },
+  "editor.factsHtml.01": {
+    "source": "prototype.js",
+    "line": 168,
+    "parts": [
+      "<div class=\"panel-heading\"><h2>Факты</h2><button class=\"icon\" id=\"close-facts\" aria-label=\"Скрыть факты\">",
+      "</button></div>",
+      ""
+    ],
+    "slots": [
+      "icon(\"close\")",
+      "Object.entries(groupNames).map(([kind, label]) => `<details class=\"fact-group\" data-group=\"${kind}\" open><summary>${label}</summary>${kind === \"technology\" ? technologySummary() : facts.filter(fact => fact.kind === kind).map(fact => `${factRow(fact)}${kind === \"employment\" ? technologySummary(fact.id) : \"\"}`).join(\"\")}${kind !== \"technology\" && (kind !== \"candidate\" || !facts.some(fact => fact.kind === \"candidate\")) ? `<button class=\"text-button fact-add\" data-fact-add=\"${kind}\">+ ${kind === \"employment\" ? \"Место работы\" : kind === \"language\" ? \"Язык\" : label}</button>` : \"\"}</details>`).join(\"\")"
+    ]
+  },
+  "editor.factsHtml.02": {
+    "source": "prototype.js",
+    "line": 168,
+    "parts": [
+      "<details class=\"fact-group\" data-group=\"",
+      "\" open><summary>",
+      "</summary>",
+      "",
+      "</details>"
+    ],
+    "slots": [
+      "kind",
+      "label",
+      "kind === \"technology\" ? technologySummary() : facts.filter(fact => fact.kind === kind).map(fact => `${factRow(fact)}${kind === \"employment\" ? technologySummary(fact.id) : \"\"}`).join(\"\")",
+      "kind !== \"technology\" && (kind !== \"candidate\" || !facts.some(fact => fact.kind === \"candidate\")) ? `<button class=\"text-button fact-add\" data-fact-add=\"${kind}\">+ ${kind === \"employment\" ? \"Место работы\" : kind === \"language\" ? \"Язык\" : label}</button>` : \"\""
+    ]
+  },
+  "editor.factsHtml.03": {
+    "source": "prototype.js",
+    "line": 168,
+    "parts": [
+      "<button class=\"text-button fact-add\" data-fact-add=\"",
+      "\">+ ",
+      "</button>"
+    ],
+    "slots": [
+      "kind",
+      "kind === \"employment\" ? \"Место работы\" : kind === \"language\" ? \"Язык\" : label"
+    ]
+  },
+  "editor.technologyOptions.01": {
+    "source": "prototype.js",
+    "line": 183,
+    "parts": [
+      "<button type=\"button\" role=\"option\" tabindex=\"-1\" aria-selected=\"false\" id=\"",
+      "-option-",
+      "\" data-technology-option=\"",
+      "\" class=\"technology-option ",
+      "\">",
+      "</button>"
+    ],
+    "slots": [
+      "controlId",
+      "index",
+      "esc(choice.name)",
+      "index === technologyPicker.activeIndex ? \"active\" : \"\"",
+      "choice.custom ? `Добавить «${esc(choice.name)}»` : esc(choice.name)"
+    ]
+  },
+  "editor.technologyOptions.02": {
+    "source": "prototype.js",
+    "line": 183,
+    "parts": [
+      "<span class=\"technology-no-results\">Нет доступных вариантов</span>"
+    ],
+    "slots": []
+  },
+  "editor.renderBlockPanel.01": {
+    "source": "prototype.js",
+    "line": 260,
+    "parts": [
+      "<div class=\"panel-heading\"><h2>Блок</h2><button class=\"icon\" id=\"close-block\" aria-label=\"Скрыть действия блока\">",
+      "</button></div><p class=\"block-scope\">",
+      "</p><div class=\"block-actions\"><button data-command=\"duplicate\" ",
+      ">Дублировать</button><button data-command=\"delete\" class=\"danger\" ",
+      ">Удалить</button><button data-command=\"up\" ",
+      ">↑ Выше</button><button data-command=\"down\" ",
+      ">↓ Ниже</button><button data-command=\"nest\" ",
+      ">→ Добавить отступ</button><button data-command=\"unnest\" ",
+      ">← Убрать отступ</button><button class=\"wide\" data-command=\"merge\" ",
+      ">Объединить с предыдущим</button></div><label for=\"move-region\">Переместить в</label><select id=\"move-region\" ",
+      "><option value=\"\">Выберите область</option><option value=\"header\" ",
+      ">Шапка документа</option><option value=\"sidebar\" ",
+      ">Левая колонка</option><option value=\"main\" ",
+      ">Основной текст</option></select>"
+    ],
+    "slots": [
+      "icon(\"close\")",
+      "esc(block ? plain(block.html).slice(0, 90) : \"Выберите текст в документе\")",
+      "block ? \"\" : \"disabled\"",
+      "block ? \"\" : \"disabled\"",
+      "block ? \"\" : \"disabled\"",
+      "block ? \"\" : \"disabled\"",
+      "block && block.indent < 2 ? \"\" : \"disabled\"",
+      "block?.indent ? \"\" : \"disabled\"",
+      "block ? \"\" : \"disabled\"",
+      "block ? \"\" : \"disabled\"",
+      "block?.region === \"header\" ? \"disabled\" : \"\"",
+      "block?.region === \"sidebar\" ? \"disabled\" : \"\"",
+      "block?.region === \"main\" ? \"disabled\" : \"\""
+    ]
+  },
+  "editor.editBlock.01": {
+    "source": "prototype.js",
+    "line": 296,
+    "parts": [
+      "<span data-record=\"",
+      "\" data-field=\"",
+      "\">",
+      "</span>"
+    ],
+    "slots": [
+      "esc(binding.dataset.record)",
+      "esc(binding.dataset.field)",
+      "element.innerHTML"
+    ]
+  },
+  "editor.blockCommand.01": {
+    "source": "prototype.js",
+    "line": 345,
+    "parts": [
+      "<br>",
+      ""
+    ],
+    "slots": [
+      "block.html"
+    ]
+  },
+  "editor.modal.01": {
+    "source": "prototype.js",
+    "line": 364,
+    "parts": [
+      "<form id=\"dialog-form\"><div class=\"dialog-heading\"><div>",
+      "<h2 id=\"dialog-title\">",
+      "</h2></div><button class=\"icon\" type=\"button\" data-close-modal aria-label=\"Закрыть\">",
+      "</button></div>",
+      "",
+      "</form>"
+    ],
+    "slots": [
+      "eyebrow ? `<span class=\"eyebrow\">${esc(eyebrow)}</span>` : \"\"",
+      "esc(title)",
+      "icon(\"close\")",
+      "body",
+      "actions ? `<div class=\"dialog-actions\">${actions}</div>` : \"\""
+    ]
+  },
+  "editor.modal.02": {
+    "source": "prototype.js",
+    "line": 364,
+    "parts": [
+      "<span class=\"eyebrow\">",
+      "</span>"
+    ],
+    "slots": [
+      "esc(eyebrow)"
+    ]
+  },
+  "editor.modal.03": {
+    "source": "prototype.js",
+    "line": 364,
+    "parts": [
+      "<div class=\"dialog-actions\">",
+      "</div>"
+    ],
+    "slots": [
+      "actions"
+    ]
+  },
+  "editor.cancelButton.01": {
+    "source": "prototype.js",
+    "line": 369,
+    "parts": [
+      "<button class=\"button\" type=\"button\" data-close-modal>Отмена</button>"
+    ],
+    "slots": []
+  },
+  "editor.editFact.01": {
+    "source": "prototype.js",
+    "line": 372,
+    "parts": [
+      "<p class=\"dialog-subtitle\">Изменения появятся в документе после сохранения.</p><div class=\"fact-form-grid\">",
+      "</div>",
+      ""
+    ],
+    "slots": [
+      "factFields[factKind].map(([key, label], index) => `<div class=\"${key === \"name\" || key === \"program\" || key === \"school\" ? \"full\" : \"\"}\"><label for=\"fact-${key}\">${label}</label><input id=\"fact-${key}\" name=\"${key}\" value=\"${esc(fact?.[key] || \"\")}\" ${index === 0 ? \"required autofocus\" : \"\"} ${key === \"email\" ? 'type=\"email\"' : \"\"} ${key === \"start\" || key === \"end\" ? 'placeholder=\"2022-01 или настоящее время\"' : \"\"}></div>`).join(\"\")",
+      "factKind === \"employment\" ? '<p class=\"dialog-subtitle\">Укажите год, месяц или полную дату, как в исходнике.</p>' : \"\""
+    ]
+  },
+  "editor.editFact.02": {
+    "source": "prototype.js",
+    "line": 372,
+    "parts": [
+      "<div class=\"",
+      "\"><label for=\"fact-",
+      "\">",
+      "</label><input id=\"fact-",
+      "\" name=\"",
+      "\" value=\"",
+      "\" ",
+      " ",
+      " ",
+      "></div>"
+    ],
+    "slots": [
+      "key === \"name\" || key === \"program\" || key === \"school\" ? \"full\" : \"\"",
+      "key",
+      "label",
+      "key",
+      "key",
+      "esc(fact?.[key] || \"\")",
+      "index === 0 ? \"required autofocus\" : \"\"",
+      "key === \"email\" ? 'type=\"email\"' : \"\"",
+      "key === \"start\" || key === \"end\" ? 'placeholder=\"2022-01 или настоящее время\"' : \"\""
+    ]
+  },
+  "editor.editFact.03": {
+    "source": "prototype.js",
+    "line": 372,
+    "parts": [
+      "<p class=\"dialog-subtitle\">Укажите год, месяц или полную дату, как в исходнике.</p>"
+    ],
+    "slots": []
+  },
+  "editor.editFact.04": {
+    "source": "prototype.js",
+    "line": 372,
+    "parts": [
+      "",
+      "<button class=\"button primary\" type=\"submit\">Сохранить факт",
+      "</button>"
+    ],
+    "slots": [
+      "cancelButton",
+      "icon(\"check\")"
+    ]
+  },
+  "editor.insertFactBlocks.01": {
+    "source": "prototype.js",
+    "line": 387,
+    "parts": [
+      "",
+      "<br>",
+      ""
+    ],
+    "slots": [
+      "field(fact.id, \"location\", fact.location)",
+      "field(fact.id, \"email\", fact.email)"
+    ]
+  },
+  "editor.insertFactBlocks.02": {
+    "source": "prototype.js",
+    "line": 399,
+    "parts": [
+      "",
+      "<br>",
+      "<br>",
+      ""
+    ],
+    "slots": [
+      "field(fact.id, \"school\", fact.school)",
+      "field(fact.id, \"program\", fact.program)",
+      "field(fact.id, \"year\", fact.year)"
+    ]
+  },
+  "editor.insertFactBlocks.03": {
+    "source": "prototype.js",
+    "line": 400,
+    "parts": [
+      "",
+      "<br>",
+      ""
+    ],
+    "slots": [
+      "field(fact.id, \"name\", fact.name)",
+      "field(fact.id, \"level\", fact.level)"
+    ]
+  },
+  "editor.removeFact.01": {
+    "source": "prototype.js",
+    "line": 404,
+    "parts": [
+      "<p class=\"dialog-copy\">",
+      ". Связанные поля будут удалены из документа. Остальной текст сохранится.</p>"
+    ],
+    "slots": [
+      "esc(fact.name || fact.employer || fact.school)"
+    ]
+  },
+  "editor.removeFact.02": {
+    "source": "prototype.js",
+    "line": 404,
+    "parts": [
+      "",
+      "<button class=\"button danger\" type=\"submit\">Удалить факт</button>"
+    ],
+    "slots": [
+      "cancelButton"
+    ]
+  },
+  "editor.renderNew.01": {
+    "source": "prototype.js",
+    "line": 416,
+    "parts": [
+      "<section class=\"new-screen\" aria-label=\"Новое резюме\"><div class=\"source-form\"><h2>Добавить исходник</h2><p>Загрузите резюме или вставьте текст. Он откроется в редакторе без переписывания.</p><button class=\"dropzone\" id=\"choose-source\" type=\"button\"><span class=\"upload-mark\">",
+      "</span><span><strong>Выбрать файл</strong><small>PDF, DOCX, TXT, Markdown · можно перетащить сюда</small></span></button>",
+      "<label for=\"source-text\">Текст резюме</label><textarea class=\"source-text\" id=\"source-text\" placeholder=\"Имя, опыт работы, навыки…\" ",
+      ">",
+      "</textarea>",
+      "<div class=\"source-bottom\"><button class=\"text-button\" id=\"use-sample\">Вставить пример</button><button class=\"button primary\" id=\"process-source\" ",
+      ">Обработать",
+      "</button></div><p class=\"source-note muted\">В прототипе обработка показана на примере, без обращения к модели.</p></div></section>"
+    ],
+    "slots": [
+      "icon(\"upload\")",
+      "source.name ? `<div class=\"source-filename\">${icon(\"file\")}<span>${esc(source.name)}</span><button class=\"icon\" id=\"remove-source\" aria-label=\"Убрать файл\">${icon(\"close\")}</button></div>` : \"\"",
+      "source.unsupported ? \"disabled\" : \"\"",
+      "esc(source.text)",
+      "source.unsupported ? '<p class=\"notice warning\">Прототип не читает PDF и DOCX. Вставьте текст из файла или используйте пример.</p>' : \"\"",
+      "!source.text.trim() || source.unsupported ? \"disabled\" : \"\"",
+      "icon(\"arrow\")"
+    ]
+  },
+  "editor.renderNew.02": {
+    "source": "prototype.js",
+    "line": 416,
+    "parts": [
+      "<div class=\"source-filename\">",
+      "<span>",
+      "</span><button class=\"icon\" id=\"remove-source\" aria-label=\"Убрать файл\">",
+      "</button></div>"
+    ],
+    "slots": [
+      "icon(\"file\")",
+      "esc(source.name)",
+      "icon(\"close\")"
+    ]
+  },
+  "editor.renderNew.03": {
+    "source": "prototype.js",
+    "line": 416,
+    "parts": [
+      "<p class=\"notice warning\">Прототип не читает PDF и DOCX. Вставьте текст из файла или используйте пример.</p>"
+    ],
+    "slots": []
+  },
+  "editor.renderProgress.01": {
+    "source": "prototype.js",
+    "line": 429,
+    "parts": [
+      "<section class=\"progress-screen\" aria-label=\"Обработка резюме\"><div class=\"progress-content\"><div class=\"progress-icon\">",
+      "</div><h2>Обработка резюме</h2><p class=\"muted\">",
+      "</p><ol class=\"progress-list\" aria-live=\"polite\">",
+      "</ol><button class=\"text-button\" id=\"cancel-process\">Отменить обработку</button></div></section>"
+    ],
+    "slots": [
+      "icon(\"fold\")",
+      "esc(state.source.name || \"Вставленный текст\")",
+      "labels.map((label, index) => `<li class=\"${index < state.source.step ? \"done\" : index === state.source.step ? \"current\" : \"\"}\"><span class=\"step-indicator\">${index < state.source.step ? \"✓\" : index + 1}</span>${label}</li>`).join(\"\")"
+    ]
+  },
+  "editor.renderProgress.02": {
+    "source": "prototype.js",
+    "line": 429,
+    "parts": [
+      "<li class=\"",
+      "\"><span class=\"step-indicator\">",
+      "</span>",
+      "</li>"
+    ],
+    "slots": [
+      "index < state.source.step ? \"done\" : index === state.source.step ? \"current\" : \"\"",
+      "index < state.source.step ? \"✓\" : index + 1",
+      "label"
+    ]
+  },
+  "editor.renderCheck.01": {
+    "source": "prototype.js",
+    "line": 433,
+    "parts": [
+      "<section class=\"check-screen\" aria-label=\"Первичная проверка\"><div class=\"check-content\"><h2>Результат проверки</h2><div class=\"check-result\">",
+      "<div><strong>",
+      "</strong><p>",
+      "</p></div></div>",
+      "<div class=\"check-actions\"><button class=\"button primary\" id=\"open-processed\">",
+      "",
+      "</button><button class=\"text-button\" id=\"back-source\">Вернуться к исходнику</button></div></div></section>"
+    ],
+    "slots": [
+      "icon(looksLikeResume ? \"check\" : \"info\")",
+      "looksLikeResume ? \"Текст похож на резюме\" : \"Возможно, это не резюме\"",
+      "state.source.sample ? \"Найдены сведения о кандидате, работе, навыках, образовании и языках.\" : \"В прототипе имя и специальность берутся из первых строк. Остальные сведения можно добавить вручную.\"",
+      "state.source.sample ? '<div class=\"check-tags\"><span>Кандидат</span><span>2 места работы</span><span>Технологии</span><span>Образование</span><span>2 языка</span></div><p class=\"small muted\">Периоды работы пересекаются. Проверьте даты в редакторе.</p>' : '<p class=\"small muted\">Можно продолжить, даже если это не резюме.</p>'",
+      "looksLikeResume ? \"Открыть редактор\" : \"Всё равно продолжить\"",
+      "icon(\"arrow\")"
+    ]
+  },
+  "editor.renderCheck.02": {
+    "source": "prototype.js",
+    "line": 433,
+    "parts": [
+      "<div class=\"check-tags\"><span>Кандидат</span><span>2 места работы</span><span>Технологии</span><span>Образование</span><span>2 языка</span></div><p class=\"small muted\">Периоды работы пересекаются. Проверьте даты в редакторе.</p>"
+    ],
+    "slots": []
+  },
+  "editor.renderCheck.03": {
+    "source": "prototype.js",
+    "line": 433,
+    "parts": [
+      "<p class=\"small muted\">Можно продолжить, даже если это не резюме.</p>"
+    ],
+    "slots": []
+  },
+  "editor.renderSettings.01": {
+    "source": "prototype.js",
+    "line": 470,
+    "parts": [
+      "<h3>Модель и подключение</h3><p>Подключение через Codex по подписке ChatGPT.</p><div class=\"connection-status\"><span class=\"connection-check\">",
+      "</span><div><strong>",
+      "</strong><small>",
+      "</small></div></div><label for=\"model-select\">Модель</label><select class=\"model-select\" id=\"model-select\"><option value=\"gpt-5.4\" ",
+      ">gpt-5.4</option><option value=\"gpt-5.4-mini\" ",
+      ">gpt-5.4-mini</option></select><p class=\"small muted\">Модели показаны для примера.</p><div class=\"quota-line\"><span class=\"quota-bar\"><span></span></span>Использовано 24% · пример</div><div class=\"settings-actions\"><button class=\"button small\" id=\"check-connection\" ",
+      ">",
+      "</button><button class=\"text-button\" id=\"toggle-connection\">",
+      "</button></div><p class=\"settings-disclosure\">Пример подключения без входа в Codex.</p>"
+    ],
+    "slots": [
+      "icon(draft.connected ? \"check\" : \"info\")",
+      "draft.connected ? \"Подписка подключена\" : \"Модель отключена\"",
+      "draft.connected ? \"ChatGPT Plus · Codex CLI\" : \"Подключите Codex для обработки текста\"",
+      "draft.model === \"gpt-5.4\" ? \"selected\" : \"\"",
+      "draft.model === \"gpt-5.4-mini\" ? \"selected\" : \"\"",
+      "state.settingsBusy ? \"disabled\" : \"\"",
+      "state.settingsBusy ? \"Проверяем…\" : \"Проверить подключение\"",
+      "draft.connected ? \"Отключить модель\" : \"Подключить Codex\""
+    ]
+  },
+  "editor.renderSettings.02": {
+    "source": "prototype.js",
+    "line": 471,
+    "parts": [
+      "<h3>Общие правила и команды</h3><p>Эти правила действуют для всех резюме и применяются при следующей обработке текста.</p><label for=\"rules-text\">Правила в Markdown</label><textarea class=\"rules-text\" id=\"rules-text\" spellcheck=\"false\">",
+      "</textarea><p class=\"small muted\">Сохраните оба заголовка: <code>## Preset: shorten</code> и <code>## Preset: clarify</code> с инструкциями под ними.</p>"
+    ],
+    "slots": [
+      "esc(draft.rules)"
+    ]
+  },
+  "editor.renderSettings.03": {
+    "source": "prototype.js",
+    "line": 472,
+    "parts": [
+      "<h3>Проверка изменений</h3><p>Проверять факты и даты после редактирования.</p><div class=\"switch-line\"><label for=\"analysis-toggle\">Автоматически проверять изменения<small>Другие упоминания меняются только с вашего согласия.</small></label><input class=\"switch\" id=\"analysis-toggle\" type=\"checkbox\" ",
+      " role=\"switch\"></div><p class=\"settings-disclosure\">Параллельные периоды работы допустимы. Подсказки не блокируют редактирование, сохранение или экспорт.</p>"
+    ],
+    "slots": [
+      "draft.automatic ? \"checked\" : \"\""
+    ]
+  },
+  "editor.renderSettings.04": {
+    "source": "prototype.js",
+    "line": 473,
+    "parts": [
+      "<section class=\"settings-screen\" aria-label=\"Настройки\"><div class=\"settings-title\"><button class=\"text-button\" id=\"back-settings\">← Вернуться к резюме</button></div><div class=\"settings-layout\"><nav class=\"settings-nav\" aria-label=\"Разделы настроек\"><button data-settings=\"model\" class=\"",
+      "\" ",
+      ">Модель и подключение</button><button data-settings=\"rules\" class=\"",
+      "\" ",
+      ">Общие правила и команды</button><button data-settings=\"analysis\" class=\"",
+      "\" ",
+      ">Проверка изменений</button></nav><div class=\"settings-content\">",
+      "",
+      "",
+      "<div class=\"settings-actions\"><button class=\"button primary\" id=\"save-settings\" ",
+      ">Сохранить изменения</button><button class=\"button quiet\" id=\"cancel-settings\" ",
+      ">Отмена</button><span class=\"settings-saved\" id=\"settings-dirty\">",
+      "</span></div></div></div></section>"
+    ],
+    "slots": [
+      "section === \"model\" ? \"active\" : \"\"",
+      "section === \"model\" ? 'aria-current=\"page\"' : \"\"",
+      "section === \"rules\" ? \"active\" : \"\"",
+      "section === \"rules\" ? 'aria-current=\"page\"' : \"\"",
+      "section === \"analysis\" ? \"active\" : \"\"",
+      "section === \"analysis\" ? 'aria-current=\"page\"' : \"\"",
+      "content",
+      "state.settingsMessage ? `<p class=\"notice\" role=\"status\">${esc(state.settingsMessage)}</p>` : \"\"",
+      "state.settingsError ? `<p class=\"notice error\" role=\"alert\">${esc(state.settingsError)}</p>` : \"\"",
+      "dirty ? \"\" : \"disabled\"",
+      "dirty ? \"\" : \"disabled\"",
+      "dirty ? \"Есть несохранённые изменения\" : \"Изменения сохранены\""
+    ]
+  },
+  "editor.renderSettings.05": {
+    "source": "prototype.js",
+    "line": 473,
+    "parts": [
+      "<p class=\"notice\" role=\"status\">",
+      "</p>"
+    ],
+    "slots": [
+      "esc(state.settingsMessage)"
+    ]
+  },
+  "editor.renderSettings.06": {
+    "source": "prototype.js",
+    "line": 473,
+    "parts": [
+      "<p class=\"notice error\" role=\"alert\">",
+      "</p>"
+    ],
+    "slots": [
+      "esc(state.settingsError)"
+    ]
+  },
+  "editor.dateDialog.01": {
+    "source": "prototype.js",
+    "line": 503,
+    "parts": [
+      "<p class=\"dialog-copy\">",
+      "</p><p class=\"notice\">Редактирование и экспорт доступны.</p>"
+    ],
+    "slots": [
+      "preview?.noOverlap ? \"Эти два периода не пересекаются. Даты можно изменить в фактах.\" : \"Для расчёта укажите месяц и год начала обоих мест работы и окончания предыдущего. Например, 2022-03. Даты можно изменить в фактах.\""
+    ]
+  },
+  "editor.dateDialog.02": {
+    "source": "prototype.js",
+    "line": 503,
+    "parts": [
+      "<button class=\"button primary\" type=\"button\" data-close-modal>Понятно</button>"
+    ],
+    "slots": []
+  },
+  "editor.dateDialog.03": {
+    "source": "prototype.js",
+    "line": 506,
+    "parts": [
+      "<p class=\"dialog-copy\">",
+      " и ",
+      ": пересечение — ",
+      " мес. Параллельная работа допустима. Если это ошибка, проверьте предлагаемый сдвиг.</p><div class=\"timeline-pair\"><div><small>Сейчас</small><strong>",
+      "</strong><p>",
+      " — ",
+      "</p></div><div><small>После сдвига</small><strong>",
+      "</strong><p>",
+      " — ",
+      "</p></div></div><p class=\"dialog-subtitle\">Длительность периода сохранена: ",
+      " мес. Более поздний период остаётся без изменения.</p><div class=\"notice warning\">Редактирование и экспорт доступны при любом решении.</div>"
+    ],
+    "slots": [
+      "esc(preview.old.employer)",
+      "esc(preview.recent.employer)",
+      "preview.overlap",
+      "esc(preview.old.employer)",
+      "esc(preview.old.start)",
+      "esc(preview.old.end)",
+      "esc(preview.old.employer)",
+      "preview.start",
+      "preview.end",
+      "preview.duration"
+    ]
+  },
+  "editor.dateDialog.04": {
+    "source": "prototype.js",
+    "line": 506,
+    "parts": [
+      "<button class=\"text-button\" id=\"keep-dates\" type=\"button\">Оставить даты</button><button class=\"button primary\" id=\"apply-dates\" type=\"button\">Изменить даты</button>"
+    ],
+    "slots": []
+  },
+  "editor.exportDialog.01": {
+    "source": "prototype.js",
+    "line": 510,
+    "parts": [
+      "<p class=\"dialog-copy\">",
+      "<br>",
+      "</p><div class=\"export-format\"><span class=\"format-icon\">W</span><div><strong>Документ Word</strong><small>DOCX · редактируемый текст и таблицы</small></div>",
+      "</div><div class=\"export-summary\"><span>Шаблон</span><strong>FoldCV / две колонки</strong></div>",
+      "<p class=\"dialog-subtitle\">Прототип не создаёт DOCX. Скачать документ можно в основном приложении.</p>"
+    ],
+    "slots": [
+      "esc(projectName())",
+      "esc(projectTitle())",
+      "icon(\"check\")",
+      "timelinePreview()?.available && current().overlapDisposition !== \"kept\" ? '<p class=\"notice warning\">Есть пересечение дат. Оно не мешает экспорту; проверьте, что параллельная работа указана верно.</p>' : \"\""
+    ]
+  },
+  "editor.exportDialog.02": {
+    "source": "prototype.js",
+    "line": 510,
+    "parts": [
+      "<p class=\"notice warning\">Есть пересечение дат. Оно не мешает экспорту; проверьте, что параллельная работа указана верно.</p>"
+    ],
+    "slots": []
+  },
+  "editor.exportDialog.03": {
+    "source": "prototype.js",
+    "line": 510,
+    "parts": [
+      "<button class=\"text-button\" data-close-modal type=\"button\">Вернуться к тексту</button><button class=\"button primary\" id=\"simulate-export\" type=\"button\">Показать пример результата"
+    ],
+    "slots": []
+  },
+  "editor.exportDialog.04": {
+    "source": "prototype.js",
+    "line": 510,
+    "parts": [
+      "</button>"
+    ],
+    "slots": []
+  },
+  "editor.saveDialog.01": {
+    "source": "prototype.js",
+    "line": 514,
+    "parts": [
+      "<p class=\"dialog-copy\">Файл .foldcv хранит исходник, факты и документ.</p><p class=\"notice\">",
+      "</p><div class=\"demo-file-row\"><span>",
+      "</span><button class=\"button small\" type=\"button\" id=\"",
+      "\">",
+      "",
+      "</button></div>"
+    ],
+    "slots": [
+      "open ? \"Прототип открывает только свои файлы .demo.json. Файлы .foldcv открываются в основном приложении.\" : \"Прототип сохраняет данные в .demo.json. Для работы в приложении нужен файл .foldcv.\"",
+      "open ? \"Файл .demo.json\" : esc(projectName()) + \".demo.json\"",
+      "open ? \"choose-demo-project\" : \"download-demo\"",
+      "icon(open ? \"upload\" : \"download\")",
+      "open ? \"Открыть .demo.json\" : \"Скачать .demo.json\""
+    ]
+  },
+  "editor.saveDialog.02": {
+    "source": "prototype.js",
+    "line": 514,
+    "parts": [
+      "<button class=\"button\" data-close-modal type=\"button\">Закрыть</button>"
+    ],
+    "slots": []
+  },
+  "editor.renderRewrite.01": {
+    "source": "prototype.js",
+    "line": 578,
+    "parts": [
+      "<div class=\"dialog-heading\"><div><h2 id=\"rewrite-title\">Изменить текст</h2></div><button class=\"icon\" id=\"close-rewrite\" aria-label=\"Закрыть правку\">",
+      "</button></div><p class=\"rewrite-scope\">",
+      "Только ",
+      " · ",
+      " знаков</p><blockquote class=\"rewrite-source\">",
+      "</blockquote><label for=\"rewrite-instruction\">Что изменить?</label><textarea id=\"rewrite-instruction\" rows=\"2\">",
+      "</textarea><div class=\"rewrite-chips\"><button data-rewrite-preset=\"shorten\">Сократить</button><button data-rewrite-preset=\"clarify\">Сделать яснее</button></div>",
+      "<p class=\"rewrite-boundary\">Пример правки без обращения к модели. Своя инструкция здесь не обрабатывается.</p>"
+    ],
+    "slots": [
+      "icon(\"close\")",
+      "icon(\"file\")",
+      "proposal.start === 0 && proposal.end === plain(proposal.before).length ? \"этот блок\" : \"выделенный фрагмент\"",
+      "proposal.text.length",
+      "esc(proposal.text)",
+      "esc(proposal.instruction)",
+      "proposal.proposal === null ? '<button class=\"button primary\" id=\"prepare-rewrite\">Предложить правку'+icon(\"spark\")+'</button>' : `<div class=\"proposal-divider\"><span class=\"eyebrow\">Вариант правки</span><p class=\"proposal-text\">${esc(proposal.proposal)}</p>${proposal.proposal === proposal.text ? '<p class=\"notice\">Для этого фрагмента нет готового варианта. Текст не изменён.</p>' : \"\"}<p class=\"notice warning\" id=\"stale-warning\" ${proposal.stale ? \"\" : \"hidden\"}>Текст изменился. Запросите новую правку, чтобы сохранить свои изменения.</p><div class=\"dialog-actions\"><button class=\"text-button\" id=\"discard-rewrite\">Отклонить</button><button class=\"button primary\" id=\"apply-rewrite\" ${proposal.stale ? \"disabled\" : \"\"}>Применить${icon(\"check\")}</button></div><button class=\"text-button\" id=\"refresh-rewrite\">Предложить заново</button></div>`"
+    ]
+  },
+  "editor.renderRewrite.02": {
+    "source": "prototype.js",
+    "line": 578,
+    "parts": [
+      "<button class=\"button primary\" id=\"prepare-rewrite\">Предложить правку"
+    ],
+    "slots": []
+  },
+  "editor.renderRewrite.03": {
+    "source": "prototype.js",
+    "line": 578,
+    "parts": [
+      "</button>"
+    ],
+    "slots": []
+  },
+  "editor.renderRewrite.04": {
+    "source": "prototype.js",
+    "line": 578,
+    "parts": [
+      "<div class=\"proposal-divider\"><span class=\"eyebrow\">Вариант правки</span><p class=\"proposal-text\">",
+      "</p>",
+      "<p class=\"notice warning\" id=\"stale-warning\" ",
+      ">Текст изменился. Запросите новую правку, чтобы сохранить свои изменения.</p><div class=\"dialog-actions\"><button class=\"text-button\" id=\"discard-rewrite\">Отклонить</button><button class=\"button primary\" id=\"apply-rewrite\" ",
+      ">Применить",
+      "</button></div><button class=\"text-button\" id=\"refresh-rewrite\">Предложить заново</button></div>"
+    ],
+    "slots": [
+      "esc(proposal.proposal)",
+      "proposal.proposal === proposal.text ? '<p class=\"notice\">Для этого фрагмента нет готового варианта. Текст не изменён.</p>' : \"\"",
+      "proposal.stale ? \"\" : \"hidden\"",
+      "proposal.stale ? \"disabled\" : \"\"",
+      "icon(\"check\")"
+    ]
+  },
+  "editor.renderRewrite.05": {
+    "source": "prototype.js",
+    "line": 578,
+    "parts": [
+      "<p class=\"notice\">Для этого фрагмента нет готового варианта. Текст не изменён.</p>"
+    ],
+    "slots": []
+  },
+  "editor.openSource.01": {
+    "source": "prototype.js",
+    "line": 627,
+    "parts": [
+      "<p class=\"dialog-subtitle\">",
+      "</p><div class=\"source-original\">",
+      "</div>"
+    ],
+    "slots": [
+      "esc(current().sourceName)",
+      "esc(current().original)"
+    ]
+  },
+  "editor.openSource.02": {
+    "source": "prototype.js",
+    "line": 627,
+    "parts": [
+      "<button class=\"button\" type=\"button\" data-close-modal>Закрыть</button>"
+    ],
+    "slots": []
+  },
+  "editor.deleteProject.01": {
+    "source": "prototype.js",
+    "line": 630,
+    "parts": [
+      "<p class=\"dialog-copy\">",
+      "<br>Резюме будет удалено из списка.</p>"
+    ],
+    "slots": [
+      "esc(projectName(project))"
+    ]
+  },
+  "editor.deleteProject.02": {
+    "source": "prototype.js",
+    "line": 630,
+    "parts": [
+      "",
+      "<button class=\"button danger\" type=\"submit\">Удалить резюме</button>"
+    ],
+    "slots": [
+      "cancelButton"
+    ]
+  },
+  "editor.aboutDialog.01": {
+    "source": "prototype.js",
+    "line": 637,
+    "parts": [
+      "<p class=\"dialog-copy\">Все данные вымышлены. Обработка текста, подключение к модели и экспорт показаны для примера. Данные не отправляются в сеть. При перезагрузке несохранённые изменения теряются.</p>"
+    ],
+    "slots": []
+  },
+  "editor.aboutDialog.02": {
+    "source": "prototype.js",
+    "line": 637,
+    "parts": [
+      "<button class=\"button primary\" data-close-modal type=\"button\">Продолжить</button>"
+    ],
+    "slots": []
+  },
+  "editor.insertLink.01": {
+    "source": "prototype.js",
+    "line": 641,
+    "parts": [
+      "<label for=\"link-text\">Текст ссылки</label><input id=\"link-text\" name=\"text\" value=\"",
+      "\" required autofocus><label for=\"link-url\">Адрес</label><input id=\"link-url\" name=\"url\" type=\"url\" value=\"https://example.com\" required>"
+    ],
+    "slots": [
+      "esc(selected?.text || \"Портфолио\")"
+    ]
+  },
+  "editor.insertLink.02": {
+    "source": "prototype.js",
+    "line": 641,
+    "parts": [
+      "",
+      "<button class=\"button primary\" type=\"submit\">Вставить ссылку</button>"
+    ],
+    "slots": [
+      "cancelButton"
+    ]
+  },
+  "editor.insertLink.03": {
+    "source": "prototype.js",
+    "line": 648,
+    "parts": [
+      "<a href=\"",
+      "\">",
+      "</a>"
+    ],
+    "slots": [
+      "esc(url)",
+      "esc(data.get(\"text\"))"
+    ]
+  },
+  "editor.insertTable.01": {
+    "source": "prototype.js",
+    "line": 653,
+    "parts": [
+      "<div class=\"fact-form-grid\"><div><label for=\"table-rows\">Строк</label><input id=\"table-rows\" name=\"rows\" type=\"number\" value=\"3\" min=\"1\" max=\"10\" required></div><div><label for=\"table-columns\">Столбцов</label><input id=\"table-columns\" name=\"columns\" type=\"number\" value=\"2\" min=\"1\" max=\"5\" required></div></div>"
+    ],
+    "slots": []
+  },
+  "editor.insertTable.02": {
+    "source": "prototype.js",
+    "line": 653,
+    "parts": [
+      "",
+      "<button class=\"button primary\" type=\"submit\">Вставить таблицу</button>"
+    ],
+    "slots": [
+      "cancelButton"
+    ]
+  },
+  "editor.insertTable.03": {
+    "source": "prototype.js",
+    "line": 655,
+    "parts": [
+      "<table><tbody>",
+      "</tbody></table>"
+    ],
+    "slots": [
+      "Array.from({ length: rows }, (_, row) => `<tr>${Array.from({ length: columns }, (_, column) => `<td>${row === 0 ? column === 0 ? \"Навык\" : \"Уровень\" : \"…\"}</td>`).join(\"\")}</tr>`).join(\"\")"
+    ]
+  },
+  "editor.insertTable.04": {
+    "source": "prototype.js",
+    "line": 655,
+    "parts": [
+      "<tr>",
+      "</tr>"
+    ],
+    "slots": [
+      "Array.from({ length: columns }, (_, column) => `<td>${row === 0 ? column === 0 ? \"Навык\" : \"Уровень\" : \"…\"}</td>`).join(\"\")"
+    ]
+  },
+  "editor.insertTable.05": {
+    "source": "prototype.js",
+    "line": 655,
+    "parts": [
+      "<td>",
+      "</td>"
+    ],
+    "slots": [
+      "row === 0 ? column === 0 ? \"Навык\" : \"Уровень\" : \"…\""
+    ]
+  },
+  "editor.readImage.01": {
+    "source": "prototype.js",
+    "line": 666,
+    "parts": [
+      "<img src=\"",
+      "\" alt=\"",
+      "\"><p>",
+      "</p>"
+    ],
+    "slots": [
+      "esc(data)",
+      "esc(file.name)",
+      "esc(file.name)"
+    ]
+  },
+  "editor.events.01": {
+    "source": "prototype.js",
+    "line": 711,
+    "parts": [
+      "<div class=\"export-format\"><span class=\"connection-check\">"
+    ],
+    "slots": []
+  },
+  "editor.events.02": {
+    "source": "prototype.js",
+    "line": 711,
+    "parts": [
+      "</span><div><strong>Пример завершения экспорта</strong><small>Файл здесь не создаётся и не скачивается</small></div></div><p class=\"dialog-copy\">В основном приложении здесь скачивается документ Word.</p>"
+    ],
+    "slots": []
+  },
+  "editor.events.03": {
+    "source": "prototype.js",
+    "line": 711,
+    "parts": [
+      "<button class=\"button primary\" data-close-modal type=\"button\">Вернуться к резюме</button>"
+    ],
+    "slots": []
+  },
+  "chat.actionIcon.01": {
+    "source": "agent-chat.js",
+    "line": 18,
+    "parts": [
+      "<button class=\"chat-icon\" type=\"button\" data-chat-action=\"",
+      "\" aria-label=\"",
+      "\" title=\"",
+      "\" ",
+      ">",
+      "</button>"
+    ],
+    "slots": [
+      "action",
+      "label",
+      "label",
+      "extra",
+      "icon(name)"
+    ]
+  },
+  "chat.textHtml.01": {
+    "source": "agent-chat.js",
+    "line": 27,
+    "parts": [
+      "<p>",
+      "</p>"
+    ],
+    "slots": [
+      "paragraph.replace(/\\n/g, \"<br>\")"
+    ]
+  },
+  "chat.textHtml.02": {
+    "source": "agent-chat.js",
+    "line": 27,
+    "parts": [
+      "<br>"
+    ],
+    "slots": []
+  },
+  "chat.messageHtml.01": {
+    "source": "agent-chat.js",
+    "line": 34,
+    "parts": [
+      "<article class=\"chat-message ",
+      "\" data-chat-message=\"",
+      "\">\n      <div class=\"chat-message-heading\"><span>",
+      "</span>",
+      "</div>\n      ",
+      "\n      ",
+      "\n      ",
+      "\n      ",
+      "\n      ",
+      "\n      ",
+      "\n      ",
+      "\n    </article>"
+    ],
+    "slots": [
+      "user ? \"from-user\" : \"from-agent\"",
+      "esc(message.id)",
+      "user ? \"Вы\" : icon(\"spark\") + \"Помощник\"",
+      "!user ? `<small>${esc(message.model || ui.model)}</small>` : \"\"",
+      "message.activity?.length ? `<details class=\"chat-activity\" data-chat-activity=\"${esc(message.id)}\" ${message.activityOpen ? \"open\" : \"\"}><summary>${active ? '<span class=\"chat-spinner\"></span>' : icon(message.status === \"error\" ? \"info\" : \"check\")}<span>${active ? esc(message.activity.at(-1)) : message.status === \"stopped\" ? \"Работа остановлена\" : message.status === \"error\" ? \"Не удалось завершить\" : `${message.activity.length} действия`}</span>${icon(\"chevron\")}</summary><ol>${message.activity.map(item => `<li>${esc(item)}</li>`).join(\"\")}</ol></details>` : \"\"",
+      "message.text ? `<div class=\"chat-message-text ${message.status === \"error\" ? \"chat-error\" : \"\"}\">${textHtml(message.text)}</div>` : active ? '<div class=\"chat-thinking\" aria-label=\"Помощник работает\"><i></i><i></i><i></i></div>' : \"\"",
+      "user && message.attachmentName ? `<small class=\"chat-message-attachment\">${icon(\"file\")}${esc(message.attachmentName)}</small>` : \"\"",
+      "message.findings ? `<div class=\"chat-findings\">${message.findings.map(finding => `<button type=\"button\" data-chat-block=\"${esc(finding.blockId)}\">${icon(\"info\")}<span><strong>${esc(finding.title)}</strong><small>${esc(finding.detail)}</small></span>${icon(\"arrow\")}</button>`).join(\"\")}</div>` : \"\"",
+      "message.source ? `<button class=\"chat-source\" type=\"button\" data-chat-source=\"${esc(message.id)}\">${icon(\"file\")}<span>1. ${esc(message.source.name)}</span>${icon(\"arrow\")}</button>` : \"\"",
+      "receipt ? `<div class=\"chat-receipt\"><span>${icon(\"check\")}<strong>${undone ? \"Правка отменена\" : \"Изменён 1 блок\"}</strong><small>${esc(receipt.label)}</small></span><div><button type=\"button\" class=\"text-button\" data-chat-block=\"${esc(receipt.blockId)}\">Показать</button><button type=\"button\" class=\"text-button\" data-chat-undo=\"${esc(message.id)}\" ${canUndo ? \"\" : \"disabled\"}>Отменить правку</button></div></div>` : \"\"",
+      "!active && !user ? `<div class=\"chat-message-actions\">${actionIcon(\"copy\", \"Скопировать ответ\", \"copy\", `data-message=\"${esc(message.id)}\"`)}${index === thread().messages.length - 1 ? `<button type=\"button\" class=\"chat-retry\" data-chat-action=\"retry\" ${ui.run ? \"disabled\" : \"\"}>${icon(\"redo\")}${message.status === \"error\" || message.status === \"stopped\" ? \"Повторить\" : \"Ответить заново\"}</button>` : \"\"}${message.status === \"done\" ? '<span>Готово</span>' : \"\"}</div>` : \"\""
+    ]
+  },
+  "chat.messageHtml.02": {
+    "source": "agent-chat.js",
+    "line": 35,
+    "parts": [
+      "<small>",
+      "</small>"
+    ],
+    "slots": [
+      "esc(message.model || ui.model)"
+    ]
+  },
+  "chat.messageHtml.03": {
+    "source": "agent-chat.js",
+    "line": 36,
+    "parts": [
+      "<details class=\"chat-activity\" data-chat-activity=\"",
+      "\" ",
+      "><summary>",
+      "<span>",
+      "</span>",
+      "</summary><ol>",
+      "</ol></details>"
+    ],
+    "slots": [
+      "esc(message.id)",
+      "message.activityOpen ? \"open\" : \"\"",
+      "active ? '<span class=\"chat-spinner\"></span>' : icon(message.status === \"error\" ? \"info\" : \"check\")",
+      "active ? esc(message.activity.at(-1)) : message.status === \"stopped\" ? \"Работа остановлена\" : message.status === \"error\" ? \"Не удалось завершить\" : `${message.activity.length} действия`",
+      "icon(\"chevron\")",
+      "message.activity.map(item => `<li>${esc(item)}</li>`).join(\"\")"
+    ]
+  },
+  "chat.messageHtml.04": {
+    "source": "agent-chat.js",
+    "line": 36,
+    "parts": [
+      "<span class=\"chat-spinner\"></span>"
+    ],
+    "slots": []
+  },
+  "chat.messageHtml.05": {
+    "source": "agent-chat.js",
+    "line": 36,
+    "parts": [
+      "<li>",
+      "</li>"
+    ],
+    "slots": [
+      "esc(item)"
+    ]
+  },
+  "chat.messageHtml.06": {
+    "source": "agent-chat.js",
+    "line": 37,
+    "parts": [
+      "<div class=\"chat-message-text ",
+      "\">",
+      "</div>"
+    ],
+    "slots": [
+      "message.status === \"error\" ? \"chat-error\" : \"\"",
+      "textHtml(message.text)"
+    ]
+  },
+  "chat.messageHtml.07": {
+    "source": "agent-chat.js",
+    "line": 37,
+    "parts": [
+      "<div class=\"chat-thinking\" aria-label=\"Помощник работает\"><i></i><i></i><i></i></div>"
+    ],
+    "slots": []
+  },
+  "chat.messageHtml.08": {
+    "source": "agent-chat.js",
+    "line": 38,
+    "parts": [
+      "<small class=\"chat-message-attachment\">",
+      "",
+      "</small>"
+    ],
+    "slots": [
+      "icon(\"file\")",
+      "esc(message.attachmentName)"
+    ]
+  },
+  "chat.messageHtml.09": {
+    "source": "agent-chat.js",
+    "line": 39,
+    "parts": [
+      "<div class=\"chat-findings\">",
+      "</div>"
+    ],
+    "slots": [
+      "message.findings.map(finding => `<button type=\"button\" data-chat-block=\"${esc(finding.blockId)}\">${icon(\"info\")}<span><strong>${esc(finding.title)}</strong><small>${esc(finding.detail)}</small></span>${icon(\"arrow\")}</button>`).join(\"\")"
+    ]
+  },
+  "chat.messageHtml.10": {
+    "source": "agent-chat.js",
+    "line": 39,
+    "parts": [
+      "<button type=\"button\" data-chat-block=\"",
+      "\">",
+      "<span><strong>",
+      "</strong><small>",
+      "</small></span>",
+      "</button>"
+    ],
+    "slots": [
+      "esc(finding.blockId)",
+      "icon(\"info\")",
+      "esc(finding.title)",
+      "esc(finding.detail)",
+      "icon(\"arrow\")"
+    ]
+  },
+  "chat.messageHtml.11": {
+    "source": "agent-chat.js",
+    "line": 40,
+    "parts": [
+      "<button class=\"chat-source\" type=\"button\" data-chat-source=\"",
+      "\">",
+      "<span>1. ",
+      "</span>",
+      "</button>"
+    ],
+    "slots": [
+      "esc(message.id)",
+      "icon(\"file\")",
+      "esc(message.source.name)",
+      "icon(\"arrow\")"
+    ]
+  },
+  "chat.messageHtml.12": {
+    "source": "agent-chat.js",
+    "line": 41,
+    "parts": [
+      "<div class=\"chat-receipt\"><span>",
+      "<strong>",
+      "</strong><small>",
+      "</small></span><div><button type=\"button\" class=\"text-button\" data-chat-block=\"",
+      "\">Показать</button><button type=\"button\" class=\"text-button\" data-chat-undo=\"",
+      "\" ",
+      ">Отменить правку</button></div></div>"
+    ],
+    "slots": [
+      "icon(\"check\")",
+      "undone ? \"Правка отменена\" : \"Изменён 1 блок\"",
+      "esc(receipt.label)",
+      "esc(receipt.blockId)",
+      "esc(message.id)",
+      "canUndo ? \"\" : \"disabled\""
+    ]
+  },
+  "chat.messageHtml.13": {
+    "source": "agent-chat.js",
+    "line": 42,
+    "parts": [
+      "<div class=\"chat-message-actions\">",
+      "",
+      "",
+      "</div>"
+    ],
+    "slots": [
+      "actionIcon(\"copy\", \"Скопировать ответ\", \"copy\", `data-message=\"${esc(message.id)}\"`)",
+      "index === thread().messages.length - 1 ? `<button type=\"button\" class=\"chat-retry\" data-chat-action=\"retry\" ${ui.run ? \"disabled\" : \"\"}>${icon(\"redo\")}${message.status === \"error\" || message.status === \"stopped\" ? \"Повторить\" : \"Ответить заново\"}</button>` : \"\"",
+      "message.status === \"done\" ? '<span>Готово</span>' : \"\""
+    ]
+  },
+  "chat.messageHtml.14": {
+    "source": "agent-chat.js",
+    "line": 42,
+    "parts": [
+      "<button type=\"button\" class=\"chat-retry\" data-chat-action=\"retry\" ",
+      ">",
+      "",
+      "</button>"
+    ],
+    "slots": [
+      "ui.run ? \"disabled\" : \"\"",
+      "icon(\"redo\")",
+      "message.status === \"error\" || message.status === \"stopped\" ? \"Повторить\" : \"Ответить заново\""
+    ]
+  },
+  "chat.messageHtml.15": {
+    "source": "agent-chat.js",
+    "line": 42,
+    "parts": [
+      "<span>Готово</span>"
+    ],
+    "slots": []
+  },
+  "chat.render.01": {
+    "source": "agent-chat.js",
+    "line": 56,
+    "parts": [
+      "<button type=\"button\" class=\"chat-launcher\" id=\"chat-open\" aria-expanded=\"false\" aria-controls=\"agent-chat-panel\"><span>",
+      "Помощник</span><small>",
+      "</small>",
+      "</button>"
+    ],
+    "slots": [
+      "icon(\"chat\")",
+      "active ? '<span class=\"chat-spinner\"></span>Работает' : chat.unread ? '<span class=\"dot\"></span>Есть ответ' : \"\"",
+      "icon(\"chevron\")"
+    ]
+  },
+  "chat.render.02": {
+    "source": "agent-chat.js",
+    "line": 56,
+    "parts": [
+      "<span class=\"chat-spinner\"></span>Работает"
+    ],
+    "slots": []
+  },
+  "chat.render.03": {
+    "source": "agent-chat.js",
+    "line": 56,
+    "parts": [
+      "<span class=\"dot\"></span>Есть ответ"
+    ],
+    "slots": []
+  },
+  "chat.render.04": {
+    "source": "agent-chat.js",
+    "line": 61,
+    "parts": [
+      "<section class=\"agent-chat-panel\" id=\"agent-chat-panel\" aria-label=\"Чат с помощником\">\n      <header class=\"chat-header\"><div class=\"chat-title\">",
+      "<h2>Помощник</h2><span class=\"chat-access\"><span class=\"dot\"></span>Резюме открыто</span></div><div class=\"chat-header-actions\">",
+      "",
+      "",
+      "",
+      "</div></header>\n      ",
+      "\n      <div class=\"chat-messages\" id=\"chat-messages\" role=\"log\" aria-label=\"Переписка\" aria-live=\"polite\" aria-relevant=\"additions text\" aria-busy=\"",
+      "\">\n        ",
+      "\n      </div>\n      <form class=\"chat-composer\" id=\"chat-form\"><div class=\"chat-context\"><span class=\"chat-context-resume\" title=\"",
+      "\">",
+      "",
+      "</span><button type=\"button\" class=\"chat-scope ",
+      "\" data-chat-action=\"scope\" ",
+      " title=\"",
+      "\">",
+      "",
+      "</button>",
+      "</div>\n        <div class=\"chat-input-box\"><label class=\"visually-hidden\" for=\"chat-input\">Сообщение помощнику</label><textarea id=\"chat-input\" rows=\"2\" maxlength=\"5000\" placeholder=\"Спросите о резюме или опишите правку…\">",
+      "</textarea><div class=\"chat-composer-controls\"><div class=\"chat-controls-left\">",
+      "<label class=\"chat-model-label\" for=\"chat-model\"><span class=\"visually-hidden\">Модель помощника</span><select id=\"chat-model\" title=\"Модель помощника; меняется отдельно от модели обработки\"><option value=\"gpt-5.4\" ",
+      ">gpt-5.4</option><option value=\"gpt-5.4-mini\" ",
+      ">gpt-5.4-mini</option></select></label><label class=\"chat-mode\" title=\"Проверять резюме без изменений\"><input id=\"chat-check-only\" type=\"checkbox\" ",
+      " ",
+      ">Только проверка</label><label class=\"chat-mode chat-internet\" title=\"Разрешить поиск в интернете\"><input id=\"chat-internet\" type=\"checkbox\" ",
+      " ",
+      ">",
+      "<span>Интернет</span></label></div>",
+      "</div></div>\n        <footer class=\"chat-composer-footer\"><span>Скетч · ответы и действия на примере</span><span>",
+      "</span></footer>\n      </form><input id=\"chat-file\" type=\"file\" accept=\".txt,.md,.markdown\" hidden>\n    </section>"
+    ],
+    "slots": [
+      "icon(\"chat\")",
+      "actionIcon(\"plus\", \"Новый диалог\", \"new\", ui.run ? \"disabled\" : \"\")",
+      "actionIcon(\"list\", \"История диалогов\", \"history\", `aria-expanded=\"${ui.history}\"`)",
+      "actionIcon(\"expand\", ui.expanded ? \"Уменьшить чат\" : \"Развернуть чат\", \"expand\", `aria-pressed=\"${ui.expanded}\"`)",
+      "actionIcon(\"close\", \"Скрыть чат\", \"close\")",
+      "ui.history ? `<nav class=\"chat-thread-menu\" aria-label=\"Диалоги этого резюме\"><span>Диалоги</span>${session().threads.map(item => `<button type=\"button\" data-chat-thread=\"${esc(item.id)}\" ${item.id === chat.id ? 'aria-current=\"true\"' : \"\"} ${ui.run ? \"disabled\" : \"\"}>${icon(\"chat\")}<span>${esc(item.title)}</span></button>`).join(\"\")}</nav>` : \"\"",
+      "active",
+      "chat.messages.length ? chat.messages.map(messageHtml).join(\"\") : `<div class=\"chat-empty\"><span class=\"chat-empty-icon\">${icon(\"spark\")}</span><h3>Чат по этому резюме</h3><p>Помощник видит текст и факты. Напишите, что проверить или изменить.</p><div class=\"chat-suggestions\"><button type=\"button\" data-chat-prompt=\"Проверь резюме и укажи, что стоит уточнить.\">${icon(\"check\")}Проверить резюме</button><button type=\"button\" data-chat-prompt=\"Сократи раздел «О специалисте», сохрани факты.\">${icon(\"file\")}Сократить описание</button><button type=\"button\" data-chat-vacancy>${icon(\"link\")}Сравнить с вакансией</button></div></div>`",
+      "esc(projectName())",
+      "icon(\"file\")",
+      "esc(projectName())",
+      "chat.scope ? \"has-selection\" : \"\"",
+      "active ? \"disabled\" : \"\"",
+      "chat.scope ? \"Убрать выделенный фрагмент\" : \"Выделите текст в документе, чтобы обсудить его\"",
+      "scopeText",
+      "chat.scope ? icon(\"close\") : \"\"",
+      "chat.attachment ? `<span class=\"chat-attachment\">${icon(\"file\")}${esc(chat.attachment.name)}<button type=\"button\" data-chat-action=\"remove-attachment\" aria-label=\"Убрать вложение\" ${active ? \"disabled\" : \"\"}>${icon(\"close\")}</button></span>` : \"\"",
+      "esc(chat.draft)",
+      "actionIcon(\"plus\", \"Прикрепить текстовый файл\", \"attach\", active ? \"disabled\" : \"\")",
+      "ui.model === \"gpt-5.4\" ? \"selected\" : \"\"",
+      "ui.model === \"gpt-5.4-mini\" ? \"selected\" : \"\"",
+      "chat.checkOnly ? \"checked\" : \"\"",
+      "active ? \"disabled\" : \"\"",
+      "chat.internet ? \"checked\" : \"\"",
+      "active ? \"disabled\" : \"\"",
+      "icon(\"globe\")",
+      "active ? `<button class=\"chat-send is-stop\" type=\"button\" data-chat-action=\"stop\" aria-label=\"Остановить ответ\" title=\"Остановить ответ\">${icon(\"stop\")}</button>` : `<button class=\"chat-send\" id=\"chat-send\" type=\"submit\" aria-label=\"Отправить сообщение\" title=\"Отправить · Enter\" ${chat.draft.trim() ? \"\" : \"disabled\"}>${icon(\"arrow\")}</button>`",
+      "active ? \"Модель выше — для следующего сообщения\" : \"Enter — отправить · Shift + Enter — новая строка\""
+    ]
+  },
+  "chat.render.05": {
+    "source": "agent-chat.js",
+    "line": 63,
+    "parts": [
+      "<nav class=\"chat-thread-menu\" aria-label=\"Диалоги этого резюме\"><span>Диалоги</span>",
+      "</nav>"
+    ],
+    "slots": [
+      "session().threads.map(item => `<button type=\"button\" data-chat-thread=\"${esc(item.id)}\" ${item.id === chat.id ? 'aria-current=\"true\"' : \"\"} ${ui.run ? \"disabled\" : \"\"}>${icon(\"chat\")}<span>${esc(item.title)}</span></button>`).join(\"\")"
+    ]
+  },
+  "chat.render.06": {
+    "source": "agent-chat.js",
+    "line": 63,
+    "parts": [
+      "<button type=\"button\" data-chat-thread=\"",
+      "\" ",
+      " ",
+      ">",
+      "<span>",
+      "</span></button>"
+    ],
+    "slots": [
+      "esc(item.id)",
+      "item.id === chat.id ? 'aria-current=\"true\"' : \"\"",
+      "ui.run ? \"disabled\" : \"\"",
+      "icon(\"chat\")",
+      "esc(item.title)"
+    ]
+  },
+  "chat.render.07": {
+    "source": "agent-chat.js",
+    "line": 65,
+    "parts": [
+      "<div class=\"chat-empty\"><span class=\"chat-empty-icon\">",
+      "</span><h3>Чат по этому резюме</h3><p>Помощник видит текст и факты. Напишите, что проверить или изменить.</p><div class=\"chat-suggestions\"><button type=\"button\" data-chat-prompt=\"Проверь резюме и укажи, что стоит уточнить.\">",
+      "Проверить резюме</button><button type=\"button\" data-chat-prompt=\"Сократи раздел «О специалисте», сохрани факты.\">",
+      "Сократить описание</button><button type=\"button\" data-chat-vacancy>",
+      "Сравнить с вакансией</button></div></div>"
+    ],
+    "slots": [
+      "icon(\"spark\")",
+      "icon(\"check\")",
+      "icon(\"file\")",
+      "icon(\"link\")"
+    ]
+  },
+  "chat.render.08": {
+    "source": "agent-chat.js",
+    "line": 67,
+    "parts": [
+      "<span class=\"chat-attachment\">",
+      "",
+      "<button type=\"button\" data-chat-action=\"remove-attachment\" aria-label=\"Убрать вложение\" ",
+      ">",
+      "</button></span>"
+    ],
+    "slots": [
+      "icon(\"file\")",
+      "esc(chat.attachment.name)",
+      "active ? \"disabled\" : \"\"",
+      "icon(\"close\")"
+    ]
+  },
+  "chat.render.09": {
+    "source": "agent-chat.js",
+    "line": 68,
+    "parts": [
+      "<button class=\"chat-send is-stop\" type=\"button\" data-chat-action=\"stop\" aria-label=\"Остановить ответ\" title=\"Остановить ответ\">",
+      "</button>"
+    ],
+    "slots": [
+      "icon(\"stop\")"
+    ]
+  },
+  "chat.render.10": {
+    "source": "agent-chat.js",
+    "line": 68,
+    "parts": [
+      "<button class=\"chat-send\" id=\"chat-send\" type=\"submit\" aria-label=\"Отправить сообщение\" title=\"Отправить · Enter\" ",
+      ">",
+      "</button>"
+    ],
+    "slots": [
+      "chat.draft.trim() ? \"\" : \"disabled\"",
+      "icon(\"arrow\")"
+    ]
+  },
+  "chat.events.01": {
+    "source": "agent-chat.js",
+    "line": 193,
+    "parts": [
+      "<div class=\"source-original\">",
+      "</div>",
+      ""
+    ],
+    "slots": [
+      "esc(source.text)",
+      "source.sample ? '<p class=\"dialog-subtitle\">Вымышленная вакансия. Интернет-запрос не выполнялся.</p>' : \"\""
+    ]
+  },
+  "chat.events.02": {
+    "source": "agent-chat.js",
+    "line": 193,
+    "parts": [
+      "<p class=\"dialog-subtitle\">Вымышленная вакансия. Интернет-запрос не выполнялся.</p>"
+    ],
+    "slots": []
+  },
+  "chat.events.03": {
+    "source": "agent-chat.js",
+    "line": 193,
+    "parts": [
+      "<button class=\"button\" type=\"button\" data-close-modal>Закрыть</button>"
+    ],
+    "slots": []
+  }
+}
