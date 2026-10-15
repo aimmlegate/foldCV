@@ -66,6 +66,8 @@ class AgentService:
         self.leases = AgentLeases(self.store, projects.state_lock, clock=lease_clock, active=self.active)
         from .publication import AgentPublication
         self.publication = AgentPublication(self)
+        from .events import AgentEvents
+        self.events = AgentEvents()
 
     def recover(self):
         self.unresolved, self.startup_errors = self.store.recover_all()
@@ -227,6 +229,7 @@ class AgentService:
                 "timestamp": datetime.now(timezone.utc).isoformat(), "type": kind, "payload": payload})
             journal.events.append(event)
         self.store.update(control.project_id, append)
+        self.events.changed(control.run_id)
 
     def before_start(self, control):
         with self.projects.state_lock:
@@ -244,6 +247,8 @@ class AgentService:
                     raise AgentFailure("AGENT_INTERRUPTED")
                 run.state = "running"
             self.store.update(control.project_id, running)
+            self.event(control, "run.state_changed", {"state": "running", "error": None,
+                "savedBatchId": None, "outcomeUnknown": False})
 
     async def _watch(self, control):
         while control.task is not None and not control.task.done():

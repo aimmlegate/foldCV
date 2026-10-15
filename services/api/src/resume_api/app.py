@@ -66,7 +66,7 @@ POST_ONLY_PATHS = frozenset({"session/exchange", "extract", "facts", "facts/norm
                             "validate", "prepare-render", "render", "host/discover", "host/status", "host/login",
                             "host/detach", "host/models", "host/select", "host/cancel-login"})
 JSON_POST_PATHS = frozenset("/v1/" + path for path in POST_ONLY_PATHS if path != "extract")
-JSON_PUT_PATHS = frozenset({"/v1/settings/rules"})
+JSON_PUT_PATHS = frozenset({"/v1/settings/rules", "/v1/settings/assistant"})
 
 
 class OperationTimeout(Exception):
@@ -159,6 +159,15 @@ class LocalBoundary:
         if response is not None:
             await response(scope, receive, send)
             return
+
+        rich = getattr(self.app.state, "rich_projects", None)
+        project_prefix = "/v1/rich/projects/"
+        if rich is not None and path.startswith(project_prefix) and method in {"POST", "PUT", "PATCH", "DELETE"}:
+            parts = path[len(project_prefix):].split("/", 1)
+            tail = parts[1] if len(parts) == 2 else ""
+            if parts[0] in rich.agent_recovery_fences and not tail.startswith("assistant/") and tail not in {"cancel", "cancel-action", "delete", "images/session"}:
+                await problem("AGENT_OUTCOME_UNKNOWN", 409)(scope, receive, send)
+                return
 
         if is_api and sum(key.lower() == b"content-type" for key, _ in raw_headers) > 1:
             await problem("INVALID_REQUEST", 422)(scope, receive, send)
@@ -399,6 +408,8 @@ def create_app(*, origin: str, secret: str, temp_root: Path, dist: Path, runner:
         agent.tools = AgentTools(agent)
     rich_projects.agent = agent
     app.state.agent = agent
+    from .agent.routes import mount_agent
+    mount_agent(app, agent)
 
     def execute_content(files, runner, payload, cancel, runner_epoch):
         worker_error = None

@@ -460,3 +460,33 @@ class AgentStore:
                 break
             selected = candidate
         return result
+
+    def latest_messages_page(self, project_id, conversation_id, request):
+        conversation = conversation_in(self.load(project_id), conversation_id)
+        scope = project_id + ":" + conversation_id + ":latest:" + digest(request.ids)
+        items = conversation.messages
+        if request.ids:
+            items = [item for item in items if item.id in request.ids]
+            if {item.id for item in items} != set(request.ids):
+                raise AgentFailure("AGENT_NOT_FOUND")
+        anchor, start = len(items), 0
+        if request.cursor is not None:
+            try:
+                version, key, anchor, start = strict_json(base64.b64decode(request.cursor + "=" * (-len(request.cursor) % 4), altchars=b"-_", validate=True))
+                if version != "tail1" or key != digest(scope) or type(anchor) is not int or type(start) is not int or not 0 <= start <= anchor <= len(items):
+                    raise ValueError()
+            except (ValueError, TypeError):
+                raise AgentFailure("AGENT_NOT_FOUND") from None
+        selected, result = [], AgentMessagePage(items=[], nextCursor=None)
+        for item in list(reversed(items[:anchor]))[start:start + request.limit]:
+            candidate = [*selected, item]
+            cursor = (base64.urlsafe_b64encode(json.dumps(["tail1", digest(scope), anchor, start + len(candidate)],
+                separators=(",", ":")).encode()).decode().rstrip("=") if start + len(candidate) < anchor else None)
+            try:
+                result = AgentMessagePage(items=list(reversed(candidate)), nextCursor=cursor)
+            except ValidationError:
+                if not selected:
+                    raise AgentFailure("AGENT_STORE_CORRUPT") from None
+                break
+            selected = candidate
+        return result
