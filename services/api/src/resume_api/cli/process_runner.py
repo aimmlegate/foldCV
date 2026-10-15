@@ -36,8 +36,11 @@ class ProcessRunner:
     def run(self, files: OperationFiles, arguments: tuple[str, ...], *, data: bytes = b"",
             deadline: float, cancel: threading.Event,
             on_line: Callable[[bytes], bytes | None] | None = None,
-            interactive: bool = False, max_output: int = MAX_OUTPUT) -> tuple[bytes, bytes]:
-        if not math.isfinite(deadline):
+            interactive: bool = False, max_output: int = MAX_OUTPUT,
+            max_line: int = MAX_LINE, max_stdout: int | None = None,
+            max_stderr: int | None = None) -> tuple[bytes, bytes]:
+        if (not math.isfinite(deadline) or any(type(value) is not int or value <= 0
+                for value in (max_output, max_line, max_stdout, max_stderr) if value is not None)):
             raise SpikeError("INVALID_LIMIT")
         self._check(deadline, cancel)
         process: subprocess.Popen[bytes] | None = None
@@ -82,12 +85,15 @@ class ProcessRunner:
                         target.extend(chunk)
                         if len(output) + len(errors) > max_output:
                             raise SpikeError("OUTPUT_TOO_LARGE")
+                        if ((max_stdout is not None and len(output) > max_stdout)
+                                or (max_stderr is not None and len(errors) > max_stderr)):
+                            raise SpikeError("OUTPUT_TOO_LARGE")
                         if kind == "stdout" and on_line is not None:
                             line.extend(chunk)
                             while b"\n" in line:
                                 raw, _, rest = line.partition(b"\n")
                                 line = bytearray(rest)
-                                if not raw or len(raw) > MAX_LINE:
+                                if not raw or len(raw) > max_line:
                                     raise SpikeError("INVALID_RESULT")
                                 reply = on_line(bytes(raw))
                                 if reply is not None:
@@ -97,7 +103,7 @@ class ProcessRunner:
                                         raise SpikeError("INVALID_RESULT")
                                     if process.stdin not in [entry.fileobj for entry in selector.get_map().values()]:
                                         selector.register(process.stdin, selectors.EVENT_WRITE, "stdin")
-                            if len(line) > MAX_LINE:
+                            if len(line) > max_line:
                                 raise SpikeError("OUTPUT_TOO_LARGE")
                 self._check(deadline, cancel)
                 if line:

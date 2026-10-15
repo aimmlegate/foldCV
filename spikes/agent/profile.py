@@ -59,6 +59,7 @@ class AgentProofProfile(ExperimentalCliProfile):
         values = [
             'features.code_mode=true',
             'features.code_mode_host=true',
+            'features.code_mode_prewarm=true',
             'approvals_reviewer="user"',
             'web_search="live"' if allow_web else 'web_search="disabled"',
             'features.guardian_approval=false',

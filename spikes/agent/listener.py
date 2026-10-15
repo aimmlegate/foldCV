@@ -135,6 +135,8 @@ class ProofMcp:
     async def close(self):
         self.active = False
         self.server.should_exit = True
-        if self.task is not None:
-            await asyncio.wait_for(self.task, 3)
-        self.listener.close()
+        try:
+            if self.task is not None:
+                await asyncio.wait_for(self.task, 3)
+        finally:
+            self.listener.close()

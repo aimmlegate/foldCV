@@ -69,6 +69,17 @@ def test_native_final_text_without_tools_does_not_pass_capability():
                              "answer": "I cannot access the tools.", "items": [], "toolCalls": []})
 
 
+def test_started_search_without_completed_search_does_not_pass_capability():
+    result = {"phase": "capability", "turnStatus": "completed", "source": {"id": "source"},
+              "ownedProcessCleaned": True, "operationCleaned": True,
+              "ownedHostChildrenCleaned": True, "mcpListenerClosed": True,
+              "toolCalls": ["get_resume_context", "read_public_page", "check_resume"],
+              "items": [{"type": "webSearch", "event": "item/started"}]}
+    assert not proof_passed(result)
+    result["items"].append({"type": "webSearch", "event": "item/completed"})
+    assert proof_passed(result)
+
+
 def test_failed_repair_cannot_spend_the_last_required_proof_slot(tmp_path, monkeypatch):
     state = tmp_path / "state.json"
     state.write_text(json.dumps({"status": "AG00_in_progress", "nativeBudgets": {
