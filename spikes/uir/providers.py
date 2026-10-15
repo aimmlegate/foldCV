@@ -2,6 +2,7 @@
 
 import hashlib
 import json
+import threading
 
 from packages.resume_core.models.agent import AgentWebSource
 from packages.resume_core.resume_assessment import ResumeAssessment
@@ -24,7 +25,23 @@ class ScriptedConnection:
 
 
 class ScriptedContent(CreationProvider):
+    def __init__(self):
+        super().__init__()
+        self.pause_type = None
+        self.entered = threading.Event()
+        self.release = threading.Event(); self.release.set()
+        self.attempts = []
+
     def generate(self, request, files, cancel):
+        kind = request.result_type.__name__
+        self.attempts.append(kind)
+        if kind == self.pause_type:
+            self.entered.set()
+            while not self.release.wait(.02):
+                if cancel.is_set():
+                    raise ContentFailure("CANCELLED")
+        if kind == self.fail_kind:
+            raise ContentFailure("MODEL_DENIED")
         if request.result_type in {ResumeAssessment} or request.result_type.__name__ in {
                 "RichRewriteProposal", "RichReconcileProposal", "RichPanelProposal"}:
             return super().generate(request, files, cancel)

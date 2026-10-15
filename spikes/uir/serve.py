@@ -140,9 +140,27 @@ async def main(args):
     def diagnostics():
         return {**info, "callCounts": {"connection": len(connection.calls), "content": len(content.calls),
             "agent": len(runtime.calls), "web": len(web.calls), "nativeStarts": 0},
-            "contentTypes": [call.get("task", call.get("kind", "structured")) for call in content.calls]}
+            "contentTypes": [call.get("task", call.get("kind", "structured")) for call in content.calls],
+            "scriptedAttempts": content.attempts, "scriptedGateEntered": content.entered.is_set()}
     @app.app.get("/v1/uir/diagnostics")
     async def read_diagnostics(): return diagnostics()
+    app.app.router.routes.insert(0, app.app.router.routes.pop())
+    @app.app.post("/v1/uir/control")
+    async def control(request: Request):
+        value = await request.json()
+        if not isinstance(value, dict) or set(value) - {"pauseType", "failKind", "assessment", "release"}:
+            raise HTTPException(422)
+        for key in ("pauseType", "failKind"):
+            if value.get(key) not in {None, "ResumeAssessment", "GuiSemanticProposal"}:
+                raise HTTPException(422)
+        if value.get("assessment", "likely") not in {"likely", "unlikely", "uncertain"}:
+            raise HTTPException(422)
+        content.pause_type = value.get("pauseType"); content.fail_kind = value.get("failKind")
+        content.assessment = value.get("assessment", "likely")
+        content.entered.clear()
+        if value.get("release", True): content.release.set()
+        else: content.release.clear()
+        return diagnostics()
     app.app.router.routes.insert(0, app.app.router.routes.pop())
     @app.app.post("/v1/uir/artifacts/{name}")
     async def retain_download(name: str, request: Request):

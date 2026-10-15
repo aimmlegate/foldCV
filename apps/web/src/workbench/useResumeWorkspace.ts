@@ -18,12 +18,15 @@ export const stageLabels = { assess_resume: "Проверяем, похоже л
 export function warningLabel(code: string): string {
   if (code === "source_not_resume") return "Модель считает, что исходный текст не похож на резюме. Проверьте выбранный источник. Импорт продолжен.";
   if (code === "source_resume_uncertain") return "Модель не смогла уверенно определить, похоже ли содержимое на резюме. Импорт продолжен.";
-  return `Проверьте содержание: ${code}`;
+  if (code === "source_details_unresolved") return "Часть сведений требует проверки. Сверьте факты с исходником.";
+  return "Исходник сохранён. Часть сведений требует проверки.";
 }
 export function useResumeWorkspace() {
   const [response, setResponse] = useState<RichProjectResponse | null>(null);
   const [projects, setProjects] = useState<GuiProjectListResponse | null>(null);
-  const [input, setInput] = useState<ResumeInput>({ kind: "text", text: "" });
+  const [input, storeInput] = useState<ResumeInput>({ kind: "text", text: "" });
+  const [textDraft, setTextDraft] = useState("");
+  function setInput(next: ResumeInput) { storeInput(next); if (next.kind === "text") setTextDraft(next.text); }
   const [error, setError] = useState("");
   const [status, setStatus] = useState("Сохранено");
   const [busy, setBusy] = useState(false);
@@ -106,7 +109,7 @@ export function useResumeWorkspace() {
     await action(async () => {
       let id = response?.workspace.preDraft?.selectedSourceId ? response.workspace.projectId : null;
       if (hasInput(input)) {
-        if (prepared.current?.input === input) id = prepared.current.projectId;
+        if (prepared.current?.input === input && !response?.workspace.project) id = prepared.current.projectId;
         else {
           const selected = await projectRequest("/input", "POST", importBody(input));
           acknowledge(selected); id = selected.workspace.projectId;
@@ -136,6 +139,6 @@ export function useResumeWorkspace() {
       anchor.click(); setTimeout(() => URL.revokeObjectURL(url), 1000);
     });
   }
-  return { response, projects, input, setInput, error, status, setStatus, busy, settings, setSettings,
+  return { response, projects, input, setInput, textDraft, error, status, setStatus, busy, settings, setSettings,
     editor, assistant, acknowledge, action, fresh, open, remove, process, upload, exportFile };
 }
