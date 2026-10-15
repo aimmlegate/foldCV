@@ -12,7 +12,7 @@ import socket
 
 from mcp.server.fastmcp import FastMCP
 from mcp.server.transport_security import TransportSecuritySettings
-from starlette.responses import Response
+from starlette.responses import JSONResponse, Response
 import uvicorn
 from resume_api.providers.codex_cli import strict_json
 
@@ -81,9 +81,19 @@ class PrivateMcp:
             if declared is not None and int(declared) != len(body):
                 return await Response(status_code=400)(scope, receive, send)
             try:
-                strict_json(bytes(body), max_bytes=65536)
+                payload = strict_json(bytes(body), max_bytes=65536)
             except (ValueError, UnicodeError, RecursionError):
                 return await Response(status_code=400)(scope, receive, send)
+            if not isinstance(payload, dict):
+                return await Response(status_code=400)(scope, receive, send)
+            if payload.get("method") == "tools/call":
+                error = self.dispatcher.preflight(payload.get("params"))
+                if error is not None:
+                    identifier = payload.get("id")
+                    if not (type(identifier) is int or isinstance(identifier, str) and len(identifier) <= 128):
+                        return await Response(status_code=400)(scope, receive, send)
+                    result = self.dispatcher.wire({"error": {"code": error}}).model_dump(mode="json", by_alias=True, exclude_none=True)
+                    return await JSONResponse({"jsonrpc": "2.0", "id": identifier, "result": result})(scope, receive, send)
             delivered = False
             original = receive
             async def replay():

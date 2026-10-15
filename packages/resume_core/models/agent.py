@@ -10,6 +10,7 @@ from pydantic import AfterValidator, ConfigDict, Field, RootModel, model_validat
 from .. import agent_limits as limits
 from .contracts import MetricValue, PartialDate, Revision, Sha256, Wire, _unique
 from .rich_mutations import DependencyStamp, RichMutation, RichSelection
+from ..rich_api import RichProjectResponse
 
 AgentId = Annotated[str, Field(min_length=1, max_length=128, pattern=r"^[A-Za-z0-9_-]+$")]
 ReferenceId = Annotated[str, Field(min_length=1, max_length=256)]
@@ -532,6 +533,25 @@ class AgentResultRequest(AgentOwnerRequest):
     receipt: AgentEditReceipt
 
 
+class AgentCommitResult(AgentWire):
+    receipt: AgentEditReceipt
+    project: RichProjectResponse
+
+    @model_validator(mode="after")
+    def exact_saved_proof(self):
+        if self.receipt.durable:
+            proof = next((item for item in self.project.workspace.mutation_replay
+                if item.client_mutation_id == self.receipt.client_mutation_id), None)
+            current = self.project.workspace
+            if (self.project.durability != "durable" or current.project is None or proof is None
+                    or proof.request_sha256 != self.receipt.request_sha256 or proof.resulting_revision != self.receipt.project_revision
+                    or current.project_revision < self.receipt.project_revision or current.document_revision < self.receipt.document_revision
+                    or current.project.facts.revision < self.receipt.facts_revision
+                    or self.project.saved_project_revision != current.project_revision or self.project.saved_document_revision != current.document_revision):
+                raise ValueError("saved publication needs exact canonical replay proof")
+        return self
+
+
 class EventBase(AgentWire):
     schema_version: Literal[1]
     id: AgentId
@@ -747,12 +767,30 @@ class AgentJournalRequest(AgentWire):
     facts_revision: Revision
 
 
+class AgentHistoryAction(AgentWire):
+    kind: Literal["undo", "redo"]
+    client_mutation_id: AgentId
+    request_sha256: Sha256
+    project_revision: Revision
+    timestamp: Timestamp
+
+
+class AgentPublicationStamp(AgentWire):
+    workspace_sha256: Sha256
+    project_revision: Revision
+    document_revision: Revision
+    facts_revision: Revision
+
+
 class AgentBatchJournal(AgentWire):
     key: AgentId
     payload_sha256: Sha256
     result: AgentPrepareResult
     batch: AgentEditBatch | None
     receipt: AgentEditReceipt | None
+    publication: AgentPublicationStamp | None = None
+    history_actions: list[AgentHistoryAction] = Field(default_factory=list, max_length=100)
+    history_actions_omitted: int = Field(default=0, ge=0)
 
 
 class AgentRunJournal(AgentWire):
@@ -829,7 +867,7 @@ AGENT_CONTRACTS = {
     "agent_conversation_page": AgentConversationPage, "agent_message_page": AgentMessagePage,
     "agent_resource_page": AgentResourcePage, "agent_lease_open": AgentLeaseOpen,
     "agent_lease": AgentLease, "agent_owner_request": AgentOwnerRequest,
-    "agent_commit_request": AgentCommitRequest, "agent_claim_result": AgentClaimResult,
+    "agent_commit_request": AgentCommitRequest, "agent_commit_result": AgentCommitResult, "agent_claim_result": AgentClaimResult,
     "agent_result_request": AgentResultRequest, "agent_events_request": AgentEventsRequest,
     "agent_run_read": AgentRunRead, "agent_tool_read": AgentToolRead,
     "agent_tool_result": AgentToolResult, "agent_fetch_request": AgentFetchRequest,

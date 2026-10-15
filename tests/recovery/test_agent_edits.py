@@ -59,6 +59,9 @@ async def test_partial_utf16_cell_preserves_other_cells_marks_and_unpublished_wo
         table = next(block for block in workspace.project.document.blocks() if block.id == "table")
         table.content.rows[1].cells[0].content = [StyledText(type="text", text="A😀B", styles={"bold": True})]
         read = session.book.read(AgentQuery(kind="document", ids=["cell-c"]))
+        table.content.rows[1].cells[1].content[0].text = "Unrelated cell typing"
+        table.content.rows[1].cells[1].revision += 1
+        table.revision += 1
         before = workspace.model_dump_json()
         changed, batch = candidate(session, service, workspace, command(replace(read.snapshot, "table", 1, 3, "🌿", cell="cell-c")))
         result = next(block for block in changed.project.document.blocks() if block.id == "table")

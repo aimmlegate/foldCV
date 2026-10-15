@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import hashlib
+import os
 import re
 
 from .models.rich_workspace import WorkspaceV6
@@ -55,7 +56,7 @@ class RichProjectStore(ProjectStore):
         except (ProjectStoreFailure, StorageFailure, OSError):
             return
 
-    def save(self, workspace, originals, artifacts, images=None):
+    def save(self, workspace, originals, artifacts, images=None, *, before_workspace=None, after_workspace=None):
         images = images or {}
         try:
             raw = rich_snapshot_bytes(WorkspaceV6.model_validate(workspace.model_dump(by_alias=True)))
@@ -120,8 +121,12 @@ class RichProjectStore(ProjectStore):
                             verify_image_bytes(asset, path.read_bytes())
                         else:
                             atomic_write(path, blob)
+                if before_workspace is not None:
+                    before_workspace()
                 atomic_write(target, raw)
                 self.expected[workspace.project_id] = hashlib.sha256(raw).hexdigest()
+                if after_workspace is not None:
+                    after_workspace(self.expected[workspace.project_id])
                 self._write_registry(registry)
         except ProjectStoreFailure:
             raise
@@ -131,6 +136,42 @@ class RichProjectStore(ProjectStore):
             raise ProjectStoreFailure("PROJECT_UNSAFE_STORAGE") from None
         except (OSError, UnicodeError, ValueError, RecursionError):
             raise ProjectStoreFailure("PROJECT_SAVE_FAILED") from None
+
+    def read_committed(self, identifier, *, synchronize=False):
+        try:
+            with locked_root(self.root, ".projects.lock"):
+                entry = next((entry for entry in self._registry().entries if entry.project_id == identifier), None)
+                if entry is None or entry.tombstoned:
+                    raise ProjectStoreFailure("PROJECT_DELETED")
+                directory = self._directory(identifier)
+                path = directory / "workspace.json"
+                owned_file(path, WORKSPACE_BYTES)
+                descriptor = os.open(path, os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0))
+                with os.fdopen(descriptor, "rb") as stream:
+                    before = os.fstat(stream.fileno())
+                    if before.st_nlink != 1 or before.st_uid != os.getuid() or before.st_mode & 0o077:
+                        raise StorageFailure("UNSAFE_STORAGE")
+                    raw = stream.read(WORKSPACE_BYTES + 1)
+                    after = os.fstat(stream.fileno())
+                    if len(raw) > WORKSPACE_BYTES or (before.st_ino, before.st_size, before.st_mtime_ns, before.st_nlink) != (
+                            after.st_ino, after.st_size, after.st_mtime_ns, after.st_nlink):
+                        raise StorageFailure("UNSAFE_STORAGE")
+                    workspace = decode_rich_snapshot(raw)
+                    if workspace.project_id != identifier:
+                        raise StorageFailure("UNSAFE_STORAGE")
+                    if synchronize:
+                        # Confirm existing bytes; never reapply or replace an uncertain command.
+                        os.fsync(stream.fileno())
+                        folder = os.open(directory, os.O_RDONLY | getattr(os, "O_DIRECTORY", 0))
+                        try:
+                            os.fsync(folder)
+                        finally:
+                            os.close(folder)
+                return workspace, hashlib.sha256(raw).hexdigest()
+        except ProjectStoreFailure:
+            raise
+        except (StorageFailure, OSError, ValueError):
+            raise ProjectStoreFailure("PROJECT_LOAD_FAILED") from None
 
     def _load(self, id):
         directory = self._directory(id)

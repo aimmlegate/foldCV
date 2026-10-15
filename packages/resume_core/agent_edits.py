@@ -215,6 +215,8 @@ def compile_batch(workspace, run, journal, request, book, session_id):
         if operation.kind == "replace_text":
             target = operation.target
             original = require_block(book, target.snapshot_id, target.block_id, target.cell_id)
+            if target.cell_id is not None:
+                original = blocks[target.block_id]
             groups = dict(inline_groups(original))
             content = groups.get(target.cell_id or target.field)
             if content is None or target.field == "caption" and target.cell_id is not None:

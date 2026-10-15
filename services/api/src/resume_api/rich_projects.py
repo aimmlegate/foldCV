@@ -42,7 +42,16 @@ class RichProjectService(RichSynchronization, RichAssets, GuiProjectService):
         super().__init__(temp_root, rules, provider_factory, **options)
         self.images = {}
         self.generations = {}
+        self.agent_recovery_fences = set()
         self.initialize_images()
+
+    def require_agent_writable(self, identifier):
+        if identifier in self.agent_recovery_fences:
+            raise ProjectFailure("AGENT_OUTCOME_UNKNOWN", 409)
+
+    def rename(self, identifier, request):
+        self.require_agent_writable(identifier)
+        return super().rename(identifier, request)
 
     def ensure_loaded(self):
         if self.loaded:
@@ -79,6 +88,9 @@ class RichProjectService(RichSynchronization, RichAssets, GuiProjectService):
 
     def persist(self, identifier):
         with self.state_lock:
+            if identifier in self.agent_recovery_fences:
+                self.save_errors[identifier] = "AGENT_OUTCOME_UNKNOWN"
+                return "failed"
             if identifier in self.deleted_ids:
                 self.save_errors[identifier] = "PROJECT_DELETED"; return "failed"
             try:
@@ -170,6 +182,7 @@ class RichProjectService(RichSynchronization, RichAssets, GuiProjectService):
         return self.read(identifier)
 
     def start(self, identifier, previous=None):
+        self.require_agent_writable(identifier)
         workspace = self.read(identifier)
         if self.persist(identifier) == "failed":
             raise ProjectFailure("PROJECT_SAVE_FAILED", 503)
@@ -287,7 +300,11 @@ class RichProjectService(RichSynchronization, RichAssets, GuiProjectService):
 
     def mutate(self, identifier, request):
         with self.state_lock:
+            self.require_agent_writable(identifier)
             self.read(identifier)
+            agent = getattr(self, "agent", None)
+            if agent is not None and not agent.publication.manual_allowed(identifier, request):
+                raise ProjectFailure("AGENT_TICKET_INVALID", 409)
             try:
                 workspace, replay = apply_rich_mutation(self.workspaces[identifier], request)
                 archive_payload(workspace, {sid: blob for (pid, sid), blob in self.originals.items() if pid == identifier},
@@ -299,10 +316,13 @@ class RichProjectService(RichSynchronization, RichAssets, GuiProjectService):
             workspace.updated_at = self.clock().isoformat()
             self.workspaces[identifier] = workspace
             self.persist(identifier)
+            if agent is not None and self.durability(identifier) == "durable":
+                agent.publication.record_history(identifier, request)
             self.reclaim_images(identifier)
             return self.response(identifier)
 
     async def export(self, identifier, generation_id=None):
+        self.require_agent_writable(identifier)
         captured = self.read(identifier)
         if captured.project is None:
             raise ProjectFailure("DOCUMENT_NOT_CREATED")
@@ -361,6 +381,7 @@ class RichProjectService(RichSynchronization, RichAssets, GuiProjectService):
             await asyncio.gather(*list(self.image_tasks), return_exceptions=True)
 
     def portable(self, identifier):
+        self.require_agent_writable(identifier)
         workspace = self.read(identifier)
         artifacts = {rid: blob for (pid, rid), blob in self.artifacts.items() if pid == identifier}
         try:

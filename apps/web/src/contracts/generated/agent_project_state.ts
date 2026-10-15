@@ -1049,10 +1049,24 @@ export type State1 =
   | "save_failed"
   | "outcome_unknown";
 export type Toolkey = string;
+export type Clientmutationid1 = string;
+export type Kind30 = "undo" | "redo";
+export type Projectrevision = number;
+export type Requestsha2561 = string;
+export type Timestamp = string;
+/**
+ * @maxItems 100
+ */
+export type Historyactions = AgentHistoryAction[];
+export type Historyactionsomitted = number;
 export type Key = string;
 export type Payloadsha256 = string;
+export type Documentrevision = number;
+export type Factsrevision = number;
+export type Projectrevision1 = number;
+export type Workspacesha256 = string;
 export type Batchid = string;
-export type Clientmutationid1 = string;
+export type Clientmutationid2 = string;
 export type Disposition =
   | "prepared"
   | "offered"
@@ -1063,11 +1077,11 @@ export type Disposition =
   | "cancelled"
   | "save_failed"
   | "outcome_unknown";
-export type Documentrevision = number | null;
+export type Documentrevision1 = number | null;
 export type Durable = boolean;
-export type Factsrevision = number | null;
-export type Projectrevision = number | null;
-export type Requestsha2561 = string;
+export type Factsrevision1 = number | null;
+export type Projectrevision2 = number | null;
+export type Requestsha2562 = string;
 export type Runid3 = string;
 export type Toolkey1 = string;
 /**
@@ -1089,7 +1103,7 @@ export type Projectid3 = string;
 export type Runid4 = string;
 export type Schemaversion2 = 1;
 export type Sequence = number;
-export type Timestamp = string;
+export type Timestamp1 = string;
 export type Type15 = "message.delta";
 export type Conversationid2 = string;
 export type Id38 = string;
@@ -1099,7 +1113,7 @@ export type Projectid4 = string;
 export type Runid5 = string;
 export type Schemaversion3 = 1;
 export type Sequence1 = number;
-export type Timestamp1 = string;
+export type Timestamp2 = string;
 export type Type16 = "tool.started" | "tool.completed" | "tool.failed";
 export type Conversationid3 = string;
 export type Id39 = string;
@@ -1108,7 +1122,7 @@ export type Projectid5 = string;
 export type Runid6 = string;
 export type Schemaversion4 = 1;
 export type Sequence2 = number;
-export type Timestamp2 = string;
+export type Timestamp3 = string;
 export type Type17 = "source.ready" | "finding.ready";
 export type Conversationid4 = string;
 export type Id41 = string;
@@ -1127,7 +1141,7 @@ export type Projectid6 = string;
 export type Runid7 = string;
 export type Schemaversion5 = 1;
 export type Sequence3 = number;
-export type Timestamp3 = string;
+export type Timestamp4 = string;
 export type Type18 = "edit.offered" | "edit.result";
 export type Conversationid5 = string;
 export type Id42 = string;
@@ -1135,7 +1149,7 @@ export type Projectid7 = string;
 export type Runid8 = string;
 export type Schemaversion6 = 1;
 export type Sequence4 = number;
-export type Timestamp4 = string;
+export type Timestamp5 = string;
 export type Type19 = "usage.reported";
 export type Conversationid6 = string;
 export type Id43 = string;
@@ -1147,20 +1161,20 @@ export type Projectid8 = string;
 export type Runid9 = string;
 export type Schemaversion7 = 1;
 export type Sequence5 = number;
-export type Timestamp5 = string;
+export type Timestamp6 = string;
 export type Type20 = "run.state_changed";
 export type Events = AgentEvent[];
 export type Allowedits1 = boolean;
 export type Allowweb1 = boolean;
 export type Clientrequestid1 = string;
 export type Conversationid7 = string;
-export type Documentrevision1 = number;
-export type Factsrevision1 = number;
+export type Documentrevision2 = number;
+export type Factsrevision2 = number;
 export type Message1 = string;
-export type Projectrevision1 = number;
+export type Projectrevision3 = number;
 export type Scope3 = WholeResumeScope | SelectionScope;
 export type Settingsrevision1 = number;
-export type Requestsha2562 = string;
+export type Requestsha2563 = string;
 export type Reserved = boolean;
 export type Runid10 = string;
 export type Contentsha2561 = string;
@@ -1297,15 +1311,18 @@ export interface AgentRunJournal {
   batches: Batches;
   events: Events;
   request: AgentJournalRequest;
-  requestSha256: Requestsha2562;
+  requestSha256: Requestsha2563;
   reserved: Reserved;
   runId: Runid10;
   snapshots: Snapshots;
 }
 export interface AgentBatchJournal {
   batch: AgentEditBatch | null;
+  historyActions?: Historyactions;
+  historyActionsOmitted?: Historyactionsomitted;
   key: Key;
   payloadSha256: Payloadsha256;
+  publication?: AgentPublicationStamp | null;
   receipt: AgentEditReceipt | null;
   result: AgentPrepareResult;
 }
@@ -1822,16 +1839,29 @@ export interface RemoveRecord {
   kind: Kind29;
   recordId: Recordid6;
 }
-export interface AgentEditReceipt {
-  batchId: Batchid;
+export interface AgentHistoryAction {
   clientMutationId: Clientmutationid1;
-  disposition: Disposition;
-  documentRevision: Documentrevision;
-  durable: Durable;
-  error: AgentError | null;
-  factsRevision: Factsrevision;
+  kind: Kind30;
   projectRevision: Projectrevision;
   requestSha256: Requestsha2561;
+  timestamp: Timestamp;
+}
+export interface AgentPublicationStamp {
+  documentRevision: Documentrevision;
+  factsRevision: Factsrevision;
+  projectRevision: Projectrevision1;
+  workspaceSha256: Workspacesha256;
+}
+export interface AgentEditReceipt {
+  batchId: Batchid;
+  clientMutationId: Clientmutationid2;
+  disposition: Disposition;
+  documentRevision: Documentrevision1;
+  durable: Durable;
+  error: AgentError | null;
+  factsRevision: Factsrevision1;
+  projectRevision: Projectrevision2;
+  requestSha256: Requestsha2562;
   runId: Runid3;
   toolKey: Toolkey1;
 }
@@ -1849,7 +1879,7 @@ export interface MessageDelta {
   runId: Runid4;
   schemaVersion: Schemaversion2;
   sequence: Sequence;
-  timestamp: Timestamp;
+  timestamp: Timestamp1;
   type: Type15;
 }
 export interface MessageDeltaPayload {
@@ -1863,7 +1893,7 @@ export interface ToolEvent {
   runId: Runid5;
   schemaVersion: Schemaversion3;
   sequence: Sequence1;
-  timestamp: Timestamp1;
+  timestamp: Timestamp2;
   type: Type16;
 }
 export interface ToolPayload {
@@ -1879,7 +1909,7 @@ export interface ResourceEvent {
   runId: Runid6;
   schemaVersion: Schemaversion4;
   sequence: Sequence2;
-  timestamp: Timestamp2;
+  timestamp: Timestamp3;
   type: Type17;
 }
 export interface ResourcePayload {
@@ -1893,7 +1923,7 @@ export interface EditEvent {
   runId: Runid7;
   schemaVersion: Schemaversion5;
   sequence: Sequence3;
-  timestamp: Timestamp3;
+  timestamp: Timestamp4;
   type: Type18;
 }
 export interface EditPayload {
@@ -1909,7 +1939,7 @@ export interface UsageEvent {
   runId: Runid8;
   schemaVersion: Schemaversion6;
   sequence: Sequence4;
-  timestamp: Timestamp4;
+  timestamp: Timestamp5;
   type: Type19;
 }
 export interface RunStateEvent {
@@ -1920,7 +1950,7 @@ export interface RunStateEvent {
   runId: Runid9;
   schemaVersion: Schemaversion7;
   sequence: Sequence5;
-  timestamp: Timestamp5;
+  timestamp: Timestamp6;
   type: Type20;
 }
 export interface RunStatePayload {
@@ -1934,10 +1964,10 @@ export interface AgentJournalRequest {
   allowWeb: Allowweb1;
   clientRequestId: Clientrequestid1;
   conversationId: Conversationid7;
-  documentRevision: Documentrevision1;
-  factsRevision: Factsrevision1;
+  documentRevision: Documentrevision2;
+  factsRevision: Factsrevision2;
   message: Message1;
-  projectRevision: Projectrevision1;
+  projectRevision: Projectrevision3;
   scope: Scope3;
   settingsRevision: Settingsrevision1;
 }

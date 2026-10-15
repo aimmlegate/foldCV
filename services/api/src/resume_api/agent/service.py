@@ -64,10 +64,13 @@ class AgentService:
         self.startup_errors = {}
         self.unresolved = {}
         self.leases = AgentLeases(self.store, projects.state_lock, clock=lease_clock, active=self.active)
+        from .publication import AgentPublication
+        self.publication = AgentPublication(self)
 
     def recover(self):
         self.unresolved, self.startup_errors = self.store.recover_all()
         self.leases.invalidate()
+        self.publication.recover_all()
 
     def active(self, project_id):
         return any(control.project_id == project_id and control.task is not None and not control.task.done()

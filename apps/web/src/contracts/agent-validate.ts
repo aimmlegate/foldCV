@@ -25,6 +25,7 @@ import agent_resource_page from "../../../../contracts/json-schema/agent_resourc
 import agent_lease_open from "../../../../contracts/json-schema/agent_lease_open.schema.json" with { type: "json" };
 import agent_lease from "../../../../contracts/json-schema/agent_lease.schema.json" with { type: "json" };
 import agent_owner_request from "../../../../contracts/json-schema/agent_owner_request.schema.json" with { type: "json" };
+import agent_commit_result from "../../../../contracts/json-schema/agent_commit_result.schema.json" with { type: "json" };
 import agent_commit_request from "../../../../contracts/json-schema/agent_commit_request.schema.json" with { type: "json" };
 import agent_claim_result from "../../../../contracts/json-schema/agent_claim_result.schema.json" with { type: "json" };
 import agent_result_request from "../../../../contracts/json-schema/agent_result_request.schema.json" with { type: "json" };
@@ -48,7 +49,7 @@ ajv.addKeyword({ keyword: "x-maxSerializedBytes", schemaType: "number",
   } });
 ajv.addKeyword({ keyword: "x-maxUtf8Bytes", schemaType: "number", type: "string",
   validate: (limit: number, value: string): boolean => encoder.encode(value).length <= limit });
-const schemas = { agent_error, agent_empty_request, agent_capabilities, agent_settings, agent_settings_request, agent_conversation, agent_message, agent_run_request, agent_run, agent_read_snapshot, agent_web_source, agent_finding, agent_prepare_request, agent_prepare_result, agent_apply_request, agent_edit_batch, agent_edit_receipt, agent_event, agent_page_request, agent_conversation_page, agent_message_page, agent_resource_page, agent_lease_open, agent_lease, agent_owner_request, agent_commit_request, agent_claim_result, agent_result_request, agent_events_request, agent_run_read, agent_tool_read, agent_tool_result, agent_fetch_request, agent_publish_findings, agent_project_state };
+const schemas = { agent_error, agent_empty_request, agent_capabilities, agent_settings, agent_settings_request, agent_conversation, agent_message, agent_run_request, agent_run, agent_read_snapshot, agent_web_source, agent_finding, agent_prepare_request, agent_prepare_result, agent_apply_request, agent_edit_batch, agent_edit_receipt, agent_event, agent_page_request, agent_conversation_page, agent_message_page, agent_resource_page, agent_lease_open, agent_lease, agent_owner_request, agent_commit_request, agent_commit_result, agent_claim_result, agent_result_request, agent_events_request, agent_run_read, agent_tool_read, agent_tool_result, agent_fetch_request, agent_publish_findings, agent_project_state };
 const schemaByName = new Map<string, object>(Object.entries(schemas));
 const validators = new Map<string, ValidateFunction<unknown>>();
 
@@ -98,6 +99,17 @@ function semantics(value: unknown): boolean {
     if (terminal !== (value.finishedAt !== null)) return false;
     if (value.state === "completed" && (value.error !== null || value.outcomeUnknown === true)) return false;
     if (value.allowEdits === false && (value.savedBatchId !== null || value.outcomeUnknown === true)) return false;
+  }
+  if (record(value.receipt) && value.receipt.durable === true && record(value.project)) {
+    const workspace = value.project.workspace;
+    if (value.project.durability !== "durable" || !record(workspace) || !record(workspace.project) || !record(workspace.project.facts)
+      || typeof workspace.projectRevision !== "number" || typeof value.receipt.projectRevision !== "number" || workspace.projectRevision < value.receipt.projectRevision
+      || typeof workspace.documentRevision !== "number" || typeof value.receipt.documentRevision !== "number" || workspace.documentRevision < value.receipt.documentRevision
+      || typeof workspace.project.facts.revision !== "number" || typeof value.receipt.factsRevision !== "number" || workspace.project.facts.revision < value.receipt.factsRevision
+      || value.project.savedProjectRevision !== workspace.projectRevision || value.project.savedDocumentRevision !== workspace.documentRevision
+      || !list(workspace.mutationReplay).some((proof: unknown) =>
+      record(proof) && record(value.receipt) && proof.clientMutationId === value.receipt.clientMutationId &&
+      proof.requestSha256 === value.receipt.requestSha256 && proof.resultingRevision === value.receipt.projectRevision)) return false;
   }
   if ("durable" in value && "disposition" in value) {
     if (value.durable !== (value.disposition === "saved")) return false;

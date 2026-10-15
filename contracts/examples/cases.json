@@ -2946,5 +2946,45 @@
         ]
       }
     ]
+  },
+  {
+    "name": "agent saved commit has exact canonical proof",
+    "contract": "agent_commit_result",
+    "base": "agent_commit_result",
+    "valid": true,
+    "edits": []
+  },
+  {
+    "name": "agent saved commit rejects a missing canonical replay",
+    "contract": "agent_commit_result",
+    "base": "agent_commit_result",
+    "valid": false,
+    "edits": [
+      {
+        "op": "set",
+        "path": [
+          "project",
+          "workspace",
+          "mutationReplay"
+        ],
+        "value": []
+      }
+    ]
+  },
+  {
+    "name": "agent saved commit rejects failed durability",
+    "contract": "agent_commit_result",
+    "base": "agent_commit_result",
+    "valid": false,
+    "edits": [
+      {
+        "op": "set",
+        "path": [
+          "project",
+          "durability"
+        ],
+        "value": "failed"
+      }
+    ]
   }
 ]

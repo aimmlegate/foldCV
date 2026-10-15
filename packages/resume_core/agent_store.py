@@ -287,6 +287,8 @@ class AgentStore:
                 raise AgentFailure("AGENT_EDIT_LIMIT")
             item.receipt = receipt
             item.batch.state = receipt.disposition
+            if run.state == "waiting_for_editor":
+                run.state = "running"
             if receipt.durable:
                 run.saved_batch_id = receipt.batch_id
             run.outcome_unknown = any(part.batch is not None and part.batch.state == "outcome_unknown"

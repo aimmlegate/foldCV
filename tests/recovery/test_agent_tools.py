@@ -207,6 +207,26 @@ async def test_tool_and_fetch_exact_counts_and_cumulative_results(tmp_path, monk
 
 
 @pytest.mark.asyncio
+async def test_mcp_text_exact_bytes_are_single_copy_and_failure_cannot_overrun_the_total(tmp_path, monkeypatch):
+    session, _, _, _ = tools_setup(tmp_path)
+    try:
+        # A single JSON string field has twelve bytes of framing.
+        monkeypatch.setattr(session, "check", lambda: {"value": "x" * (limits.TOOL_BYTES - 12)})
+        for _ in range(4):
+            result = await session.call("check_resume", None)
+            wire = session.wire(result)
+            assert len(wire.content[0].text.encode()) == limits.TOOL_BYTES
+            assert wire.structuredContent is None
+        assert session.result_bytes == limits.TOOL_TOTAL_BYTES
+        error = await session.call("check_resume", None)
+        final = session.wire(error)
+        assert final.isError and final.content == []
+        assert session.result_bytes == limits.TOOL_TOTAL_BYTES and session.control.cancel.is_set()
+    finally:
+        await session.close()
+
+
+@pytest.mark.asyncio
 async def test_private_mcp_rejects_host_origin_duplicate_auth_and_oversized_body_before_sdk(tmp_path):
     session, _, _, _ = tools_setup(tmp_path)
     session.application = session.sdk.streamable_http_app()
@@ -226,10 +246,16 @@ async def test_private_mcp_rejects_host_origin_duplicate_auth_and_oversized_body
                 assert {tool["name"] for tool in tools.json()["result"]["tools"]} == set(session.names)
                 bad = await client.post("/mcp", json={"jsonrpc": "2.0", "id": 3, "method": "tools/call",
                     "params": {"name": "get_working_facts", "arguments": {"query": {"kind": "facts", "projectId": "foreign"}}}})
-                assert bad.json()["result"]["isError"] and session.calls == 0
+                assert bad.json()["result"]["isError"] and session.calls == 1
+                malicious = await client.post("/mcp", json={"jsonrpc": "2.0", "id": 5, "method": "tools/call",
+                    "params": {"name": "get_working_facts", "arguments": {"query": {"kind": "facts",
+                        **{"unknown_" + str(index): "CANDIDATE_CANARY" for index in range(1000)}}}}})
+                assert malicious.json()["result"]["isError"] and len(malicious.content) < 512
+                assert "CANDIDATE_CANARY" not in malicious.text
                 good = await client.post("/mcp", json={"jsonrpc": "2.0", "id": 4, "method": "tools/call",
                     "params": {"name": "get_resume_context", "arguments": {}}})
                 result = json.loads(good.json()["result"]["content"][0]["text"])
-                assert "snapshot" in result and session.calls == 1
+                assert "snapshot" in result and session.calls == 3
+                assert "structuredContent" not in good.json()["result"]
     finally:
         await session.close()

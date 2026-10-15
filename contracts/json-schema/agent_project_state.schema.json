@@ -154,6 +154,20 @@
             }
           ]
         },
+        "historyActions": {
+          "items": {
+            "$ref": "#/$defs/AgentHistoryAction"
+          },
+          "maxItems": 100,
+          "title": "Historyactions",
+          "type": "array"
+        },
+        "historyActionsOmitted": {
+          "default": 0,
+          "minimum": 0,
+          "title": "Historyactionsomitted",
+          "type": "integer"
+        },
         "key": {
           "maxLength": 128,
           "minLength": 1,
@@ -165,6 +179,17 @@
           "pattern": "^[a-f0-9]{64}$",
           "title": "Payloadsha256",
           "type": "string"
+        },
+        "publication": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/AgentPublicationStamp"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
         },
         "receipt": {
           "anyOf": [
@@ -720,6 +745,51 @@
       "type": "object",
       "x-maxSerializedBytes": 16384
     },
+    "AgentHistoryAction": {
+      "additionalProperties": false,
+      "properties": {
+        "clientMutationId": {
+          "maxLength": 128,
+          "minLength": 1,
+          "pattern": "^[A-Za-z0-9_-]+$",
+          "title": "Clientmutationid",
+          "type": "string"
+        },
+        "kind": {
+          "enum": [
+            "undo",
+            "redo"
+          ],
+          "title": "Kind",
+          "type": "string"
+        },
+        "projectRevision": {
+          "minimum": 1,
+          "title": "Projectrevision",
+          "type": "integer"
+        },
+        "requestSha256": {
+          "pattern": "^[a-f0-9]{64}$",
+          "title": "Requestsha256",
+          "type": "string"
+        },
+        "timestamp": {
+          "format": "date-time",
+          "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(?:\\.\\d+)?(?:Z|\\+00:00)$",
+          "title": "Timestamp",
+          "type": "string"
+        }
+      },
+      "required": [
+        "kind",
+        "clientMutationId",
+        "requestSha256",
+        "projectRevision",
+        "timestamp"
+      ],
+      "title": "AgentHistoryAction",
+      "type": "object"
+    },
     "AgentJournalRequest": {
       "additionalProperties": false,
       "properties": {
@@ -969,6 +1039,39 @@
       "title": "AgentPrepareResult",
       "type": "object",
       "x-maxSerializedBytes": 65536
+    },
+    "AgentPublicationStamp": {
+      "additionalProperties": false,
+      "properties": {
+        "documentRevision": {
+          "minimum": 1,
+          "title": "Documentrevision",
+          "type": "integer"
+        },
+        "factsRevision": {
+          "minimum": 1,
+          "title": "Factsrevision",
+          "type": "integer"
+        },
+        "projectRevision": {
+          "minimum": 1,
+          "title": "Projectrevision",
+          "type": "integer"
+        },
+        "workspaceSha256": {
+          "pattern": "^[a-f0-9]{64}$",
+          "title": "Workspacesha256",
+          "type": "string"
+        }
+      },
+      "required": [
+        "workspaceSha256",
+        "projectRevision",
+        "documentRevision",
+        "factsRevision"
+      ],
+      "title": "AgentPublicationStamp",
+      "type": "object"
     },
     "AgentQuery": {
       "additionalProperties": false,

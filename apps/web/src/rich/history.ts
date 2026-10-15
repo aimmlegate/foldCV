@@ -9,6 +9,8 @@ export type DependencyCapture = {
   dependencies: ReadonlyMap<string, number>;
 };
 export type HistoryEffect = (changes: readonly CellChange[]) => void;
+export type HistoryEffectContext = { mode: "ordinary" | "prepared" | "assistant_history"; actionId: string | null; kind: HistoryKind | "undo" | "redo" };
+export type HistoryReservation = { id: string; actionId: string; clock: number; position: number };
 
 /** Stable cells let an inverse preserve edits to unrelated blocks and facts. */
 export class SessionHistory {
@@ -19,8 +21,11 @@ export class SessionHistory {
   private sequence = 0;
   private clock = 0;
   private closed = false;
+  private reservation: HistoryReservation | null = null;
+  private readonly assistantActions = new Set<string>();
 
-  constructor(readonly session: string, initial: ReadonlyMap<string, CellValue>, private readonly effect: HistoryEffect = () => {}) {
+  constructor(readonly session: string, initial: ReadonlyMap<string, CellValue>,
+    private readonly effect: (changes: readonly CellChange[], context: HistoryEffectContext) => void = () => {}) {
     for (const [key, value] of initial) this.cells.set(key, value);
   }
 
@@ -39,10 +44,11 @@ export class SessionHistory {
       && changes.every(change => this.read(change.key) === change.before);
   }
 
-  private apply(changes: readonly CellChange[]): boolean {
-    if (!this.valid(changes)) return false;
+  private apply(changes: readonly CellChange[], context: HistoryEffectContext = { mode: "ordinary", actionId: null, kind: "typing" },
+    reservation: HistoryReservation | null = null): boolean {
+    if (this.reservation !== reservation || !this.valid(changes)) return false;
     // The adapter validates and applies the whole transaction before publishing cells.
-    this.effect(changes);
+    this.effect(changes, context);
     for (const change of changes) {
       this.cells.set(change.key, change.after);
       this.epochs.set(change.key, ++this.clock);
@@ -72,7 +78,8 @@ export class SessionHistory {
 
   undo(): boolean {
     const action = this.actions[this.cursor - 1];
-    if (!action || !this.apply(action.changes.map(change => ({ key: change.key, before: change.after, after: change.before })))) return false;
+    if (!action || !this.apply(action.changes.map(change => ({ key: change.key, before: change.after, after: change.before })),
+      { mode: this.assistantActions.has(action.id) ? "assistant_history" : "ordinary", actionId: action.id, kind: "undo" })) return false;
     action.token++;
     this.cursor--;
     return true;
@@ -80,7 +87,8 @@ export class SessionHistory {
 
   redo(): boolean {
     const action = this.actions[this.cursor];
-    if (!action || !this.apply(action.changes)) return false;
+    if (!action || !this.apply(action.changes,
+      { mode: this.assistantActions.has(action.id) ? "assistant_history" : "ordinary", actionId: action.id, kind: "redo" })) return false;
     action.token++;
     this.cursor++;
     return true;
@@ -125,5 +133,32 @@ export class SessionHistory {
       && action.token === capture.actionToken && [...capture.dependencies].every(([key, revision]) => this.revision(key) === revision);
   }
 
-  close(): void { this.closed = true; }
+  reserve(actionId: string): HistoryReservation | null {
+    if (this.closed || this.reservation || this.actions.some(action => action.id === actionId)) return null;
+    this.reservation = { id: crypto.randomUUID(), actionId, clock: this.clock, position: this.cursor };
+    return this.reservation;
+  }
+
+  reserved(reservation: HistoryReservation): boolean {
+    return !this.closed && this.reservation === reservation && reservation.clock === this.clock && reservation.position === this.cursor;
+  }
+
+  publish(reservation: HistoryReservation, changes: readonly CellChange[]): boolean {
+    const effective = changes.filter(change => change.before !== change.after);
+    if (!effective.length || !this.reserved(reservation) || !this.apply(effective,
+      { mode: "prepared", actionId: reservation.actionId, kind: "structure" }, reservation)) return false;
+    this.actions.splice(this.cursor);
+    this.actions.push({ id: reservation.actionId, token: 0, kind: "structure", group: null,
+      changes: effective.map(change => ({ ...change })) });
+    this.assistantActions.add(reservation.actionId);
+    this.cursor++;
+    this.reservation = null;
+    return true;
+  }
+
+  discard(reservation: HistoryReservation): void {
+    if (this.reservation === reservation) this.reservation = null;
+  }
+
+  close(): void { this.closed = true; this.reservation = null; }
 }

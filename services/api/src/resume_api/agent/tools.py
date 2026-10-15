@@ -8,10 +8,11 @@ import json
 import threading
 
 from pydantic import ValidationError
+from mcp.types import CallToolResult, TextContent
 
 from packages.resume_core import agent_limits as limits
 from packages.resume_core.agent_store import AgentFailure, digest, identity, run_in
-from packages.resume_core.models.agent import AgentAnchor, AgentApplyRequest, AgentFinding, AgentPrepareRequest, AgentPublishFindings, AgentQuery, TERMINAL_RUNS
+from packages.resume_core.models.agent import AgentAnchor, AgentApplyRequest, AgentFetchRequest, AgentFinding, AgentPrepareRequest, AgentPublishFindings, AgentQuery, TERMINAL_RUNS
 from packages.resume_core.rich_dependencies import dependency
 from packages.resume_core.rich_fields import inline_groups, working_field
 from packages.resume_core.rich_mutations import inline_text, utf16_slice
@@ -100,37 +101,81 @@ class ToolSession(PrivateMcp):
 
     def register(self):
         def reader(name, kind):
-            async def read(query: AgentQuery | None = None) -> dict:
+            async def read(query: AgentQuery | None = None) -> CallToolResult:
                 """Read a bounded page. Use snapshot IDs and nextCursor for full target reads; document IDs request full blocks/cells."""
-                return await self.call(name, query or AgentQuery(kind=kind))
-            self.sdk.tool(name=name)(read)
+                return self.wire(await self.call(name, query or AgentQuery(kind=kind)))
+            self.sdk.tool(name=name, structured_output=False)(read)
         for name, kind in READ_TOOLS.items():
             reader(name, kind)
 
-        @self.sdk.tool()
-        async def check_resume() -> dict:
+        @self.sdk.tool(structured_output=False)
+        async def check_resume() -> CallToolResult:
             """Check current timeline, links, structure and export readiness without inference or edits."""
-            return await self.call("check_resume", None)
+            return self.wire(await self.call("check_resume", None))
 
-        @self.sdk.tool()
-        async def read_public_page(url: str) -> dict:
+        @self.sdk.tool(structured_output=False)
+        async def read_public_page(url: str) -> CallToolResult:
             """Fetch public HTML/plain text. Only returned stored source IDs can support final citations."""
-            return await self.call("read_public_page", url)
+            return self.wire(await self.call("read_public_page", url))
 
-        @self.sdk.tool()
-        async def publish_findings(request: AgentPublishFindings) -> dict:
+        @self.sdk.tool(structured_output=False)
+        async def publish_findings(request: AgentPublishFindings) -> CallToolResult:
             """Store anchored observations from full read snapshots, with optional stored source IDs. Does not edit the resume."""
-            return await self.call("publish_findings", request)
+            return self.wire(await self.call("publish_findings", request))
 
-        @self.sdk.tool()
-        async def prepare_edit_batch(request: AgentPrepareRequest) -> dict:
+        @self.sdk.tool(structured_output=False)
+        async def prepare_edit_batch(request: AgentPrepareRequest) -> CallToolResult:
             """Compile typed operations from full current read snapshots. No resume changes occur here. One saved batch per turn."""
-            return await self.call("prepare_edit_batch", request)
+            return self.wire(await self.call("prepare_edit_batch", request))
 
-        @self.sdk.tool()
-        async def apply_edit_batch(request: AgentApplyRequest) -> dict:
+        @self.sdk.tool(structured_output=False)
+        async def apply_edit_batch(request: AgentApplyRequest) -> CallToolResult:
             """Offer a prepared batch to the mounted editor and wait for a durable receipt. Check-only mode forbids writes."""
-            return await self.call("apply_edit_batch", request)
+            return self.wire(await self.call("apply_edit_batch", request))
+
+    def wire(self, value):
+        text = json_text(value)
+        if set(value) == {"error"}:
+            size = len(text.encode())
+            if self.result_bytes + size > limits.TOOL_TOTAL_BYTES:
+                self.service.revoke(self.control, "AGENT_TOOL_LIMIT")
+                return CallToolResult(content=[], isError=True)
+            self.result_bytes += size
+        return CallToolResult(content=[TextContent(type="text", text=text)], isError=value.get("error") is not None)
+
+    def preflight(self, params):
+        try:
+            self.guard()
+            if self.calls >= limits.TOOL_CALLS:
+                raise AgentFailure("AGENT_TOOL_LIMIT")
+            if not isinstance(params, dict) or params.keys() - {"name", "arguments", "_meta"}:
+                raise ValueError("invalid tool envelope")
+            name, arguments = params.get("name"), params.get("arguments", {})
+            if not isinstance(arguments, dict):
+                raise ValueError("invalid tool arguments")
+            if name in READ_TOOLS:
+                if arguments.keys() - {"query"}:
+                    raise ValueError("invalid read envelope")
+                if arguments.get("query") is not None:
+                    AgentQuery.model_validate(arguments["query"])
+            elif name == "check_resume":
+                if arguments:
+                    raise ValueError("invalid check envelope")
+            elif name == "read_public_page":
+                AgentFetchRequest.model_validate(arguments)
+            elif name in {"prepare_edit_batch", "apply_edit_batch", "publish_findings"}:
+                if set(arguments) != {"request"}:
+                    raise ValueError("invalid request envelope")
+                {"prepare_edit_batch": AgentPrepareRequest, "apply_edit_batch": AgentApplyRequest,
+                    "publish_findings": AgentPublishFindings}[name].model_validate(arguments["request"])
+            else:
+                raise ValueError("unknown tool")
+            return None
+        except AgentFailure as error:
+            return error.code
+        except (ValidationError, ValueError, TypeError):
+            self.calls += 1
+            return "AGENT_TOOL_DENIED"
 
     async def call(self, name, arguments):
         try:
@@ -139,6 +184,8 @@ class ToolSession(PrivateMcp):
                 if self.calls >= limits.TOOL_CALLS:
                     raise AgentFailure("AGENT_TOOL_LIMIT")
                 self.calls += 1
+                if self.result_bytes >= limits.TOOL_TOTAL_BYTES:
+                    raise AgentFailure("AGENT_TOOL_LIMIT")
                 if name in READ_TOOLS:
                     if name == "get_resume_context" and arguments.kind == "context" and arguments.ids:
                         arguments = arguments.model_copy(update={"kind": "document"})
@@ -181,7 +228,9 @@ class ToolSession(PrivateMcp):
                     from .edits import prepare
                     result = prepare(self, arguments)
                 elif name == "apply_edit_batch":
-                    raise AgentFailure("AGENT_TOOL_DENIED")
+                    if not self.run.allow_edits:
+                        raise AgentFailure("AGENT_TOOL_DENIED")
+                    result = await self.service.publication.offer(self, arguments.batch_id)
                 else:
                     raise AgentFailure("AGENT_TOOL_DENIED")
                 self.guard()

@@ -102,6 +102,8 @@ export class RichSaveQueue {
   private running: Promise<void> | null = null;
   private closed = false;
   private pendingRequest: RichMutation | null = null;
+  private prepared: string | null = null;
+  private fenced = false;
   constructor(private response: RichProjectResponse, readonly sessionId: string,
     private readonly send: (request: RichMutation) => Promise<RichProjectResponse>,
     private readonly acknowledged: (response: RichProjectResponse) => void) {
@@ -111,15 +113,43 @@ export class RichSaveQueue {
     this.actionId = `${sessionId}:initial`;
   }
   update(document: RichDocumentV1, actionId: string, kind: RichMutation["kind"] = "typing", facts?: WorkingFacts): void {
+    if (this.prepared !== null || this.fenced) throw new Error("AGENT_OUTCOME_UNKNOWN");
     this.target = document; this.actionId = actionId; this.kind = kind; if (facts) this.facts = facts;
   }
   get baseline(): RichProjectResponse { return this.response; }
+  refreshMetadata(response: RichProjectResponse): void {
+    const previous = this.response.workspace.project, current = response.workspace.project;
+    if (this.closed || this.fenced || this.prepared !== null || !previous || !current || response.durability !== "durable"
+      || response.workspace.projectId !== this.response.workspace.projectId || documentSteps(previous.document, current.document).length
+      || factSteps(previous.facts, current.facts).length) throw new Error("AGENT_STALE_READ");
+    this.response = response;
+    this.acknowledged(response);
+  }
   close(): void { this.closed = true; }
   async flush(): Promise<void> {
+    if (this.prepared !== null || this.fenced) throw new Error("AGENT_OUTCOME_UNKNOWN");
     if (this.running) return this.running;
     const operation = this.drain(); this.running = operation;
     try { await operation; } finally { this.running = null; }
   }
+  beginPrepared(key: string): void {
+    const project = this.response.workspace.project;
+    if (this.closed || this.fenced || this.prepared !== null || this.running || this.pendingRequest || !project
+      || documentSteps(project.document, this.target).length || factSteps(project.facts, this.facts).length) throw new Error("AGENT_STALE_READ");
+    this.prepared = key;
+  }
+  adoptPrepared(key: string, response: RichProjectResponse): void {
+    const project = response.workspace.project;
+    if (this.closed || this.fenced || this.prepared !== key || response.durability !== "durable" || !project
+      || response.workspace.projectId !== this.response.workspace.projectId) throw new Error("AGENT_OUTCOME_UNKNOWN");
+    this.response = response;
+    this.target = project.document;
+    this.facts = project.facts;
+    this.pendingRequest = null;
+    this.acknowledged(response);
+  }
+  endPrepared(key: string): void { if (this.prepared === key && !this.fenced) this.prepared = null; }
+  fencePrepared(): void { this.fenced = true; }
   private async drain(): Promise<void> {
     while (!this.closed) {
       const before = this.response.workspace.project?.document;
