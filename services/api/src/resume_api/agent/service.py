@@ -235,6 +235,8 @@ class AgentService:
                 raise AgentFailure("AGENT_CONNECTION_CHANGED")
             def running(state):
                 _, run, _ = run_in(state, control.run_id)
+                if state.owner_epoch != control.owner_epoch:
+                    raise AgentFailure("AGENT_OWNER_MISMATCH")
                 if run.state != "queued":
                     raise AgentFailure("AGENT_INTERRUPTED")
                 run.state = "running"
@@ -248,6 +250,8 @@ class AgentService:
             try:
                 with self.projects.state_lock:
                     self.leases.require(control.project_id, epoch=control.owner_epoch)
+                    if self.store.load(control.project_id).owner_epoch != control.owner_epoch:
+                        raise AgentFailure("AGENT_OWNER_MISMATCH")
                     if self.connection().epoch != control.connection_epoch:
                         raise AgentFailure("AGENT_CONNECTION_CHANGED")
                     if control.project_id in self.projects.deleted_ids:

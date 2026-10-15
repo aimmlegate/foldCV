@@ -394,6 +394,9 @@ def create_app(*, origin: str, secret: str, temp_root: Path, dist: Path, runner:
             resolved_agent_runtime = None
     agent = AgentService(rich_projects, resolved_agent_runtime, agent_connection, tools=agent_tools,
         cleanup_error=lambda _code: INFERENCE.block())
+    if agent_tools is None:
+        from .agent.tools import AgentTools
+        agent.tools = AgentTools(agent)
     rich_projects.agent = agent
     app.state.agent = agent
 
