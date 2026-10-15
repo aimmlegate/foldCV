@@ -10,6 +10,7 @@ output/
 node_modules/
 .pytest_cache/
 apps/web/dist/
+apps/web/dist-uir-proof/
 apps/web/test-results/
 apps/web/playwright-report/
 .coverage

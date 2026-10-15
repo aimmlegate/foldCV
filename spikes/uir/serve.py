@@ -16,6 +16,7 @@ ROOT = Path(__file__).resolve().parents[2]
 sys.path[:0] = [str(ROOT), str(ROOT / "services/api/src")]
 
 import httpx
+from fastapi import HTTPException, Request
 from starlette.routing import Mount
 from starlette.staticfiles import StaticFiles
 import uvicorn
@@ -103,6 +104,9 @@ async def main(args):
     if root.parent != Path("/private/tmp") or not root.name.startswith("foldcv-uir-"):
         raise ValueError("A dedicated /private/tmp/foldcv-uir-* root is required")
     root.mkdir(parents=True, exist_ok=True)
+    checkpoint = json.loads((HANDOFF / "state.json").read_text())
+    if checkpoint["slices"][args.slice]["status"] == "accepted_with_review_debt" and not args.no_checkpoint:
+        raise ValueError("Use --no-checkpoint to open retained proof without changing accepted evidence")
     (HANDOFF / "evidence").mkdir(exist_ok=True)
     dist = args.dist.resolve() if args.dist else root / "uir00-ui"
     if not args.dist:
@@ -139,22 +143,48 @@ async def main(args):
             "contentTypes": [call.get("task", call.get("kind", "structured")) for call in content.calls]}
     @app.app.get("/v1/uir/diagnostics")
     async def read_diagnostics(): return diagnostics()
+    app.app.router.routes.insert(0, app.app.router.routes.pop())
+    @app.app.post("/v1/uir/artifacts/{name}")
+    async def retain_download(name: str, request: Request):
+        if name not in {"structured.docx", "structured.foldcv", "fresh.docx", "fresh.foldcv"}:
+            raise HTTPException(404)
+        blob = await request.body()
+        if not blob.startswith(b"PK") or len(blob) > 1_048_576:
+            raise HTTPException(422)
+        directory = root / "downloads"; directory.mkdir(exist_ok=True)
+        (directory / name).write_bytes(blob)
+        return {"bytes": len(blob), "sha256": hashlib.sha256(blob).hexdigest()}
+    app.app.router.routes.insert(0, app.app.router.routes.pop())
     if args.freeze: await freeze(app, origin, secret, content)
     else:
         async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url=origin, headers={"Origin": origin}) as client:
             (await client.post("/v1/session/exchange", json={"secret": secret})).raise_for_status()
             (await client.post("/v1/host/status", json={})).raise_for_status()
+            service = app.app.state.rich_projects
+            service.ensure_loaded()
+            if not service.workspaces:
+                projects = {}
+                for name in ("structured", "fresh-import"):
+                    opened = await client.post("/v1/rich/projects/archive", files={"file":
+                        (name + ".foldcv", (FIXTURES / (name + ".foldcv")).read_bytes(), "application/zip")})
+                    opened.raise_for_status(); projects[name] = opened.json()["workspace"]["projectId"]
+                write_json(root / "fixture-projects.json", projects)
     # Session exchange is one-shot. Give the browser its own unspent startup secret.
     app.session = None; app.secret = secret
+    projects_path = root / "fixture-projects.json"
+    projects = json.loads(projects_path.read_text()) if projects_path.exists() else json.loads((FIXTURES / "manifest.json").read_text())["projects"]
+    proof_url = origin + "/uir-proof.html?project=" + projects["structured"] if args.slice == "UIR01" else origin + "/reference/"
+    info["proofUrl"] = proof_url
     launch = root / "launch.json"
-    write_json(launch, {"origin": origin, "url": origin + "/#secret=" + secret, "pid": os.getpid()}); launch.chmod(0o600)
+    write_json(launch, {"origin": origin, "url": proof_url + "#secret=" + secret, "pid": os.getpid()}); launch.chmod(0o600)
     write_json(root / "isolation.json", diagnostics())
     evidence = f"docs/gui/handoffs/PROTOTYPE-ADOPTION/evidence/{args.slice.lower()}-isolation.json"
-    write_json(ROOT / evidence, diagnostics())
-    state_path = HANDOFF / "state.json"; state = json.loads(state_path.read_text()); state["isolation"] = {**info,
-        "evidence": evidence}
-    write_json(state_path, state)
-    print(origin, flush=True)
+    if not args.no_checkpoint:
+        write_json(ROOT / evidence, diagnostics())
+        state_path = HANDOFF / "state.json"; state = json.loads(state_path.read_text()); state["isolation"] = {**info,
+            "evidence": evidence}
+        write_json(state_path, state)
+    print(proof_url, flush=True)
     try:
         await uvicorn.Server(uvicorn.Config(app, host="127.0.0.1", port=listener.getsockname()[1], proxy_headers=False,
             access_log=False, server_header=False, log_level="warning", timeout_graceful_shutdown=2)).serve(sockets=[listener])
@@ -168,4 +198,5 @@ if __name__ == "__main__":
     parser.add_argument("--root", type=Path, required=True); parser.add_argument("--port", type=int, default=0)
     parser.add_argument("--dist", type=Path); parser.add_argument("--freeze", action="store_true")
     parser.add_argument("--slice", choices=["UIR00", "UIR01"], default="UIR00")
+    parser.add_argument("--no-checkpoint", action="store_true")
     asyncio.run(main(parser.parse_args()))

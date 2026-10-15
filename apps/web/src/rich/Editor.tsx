@@ -3,7 +3,7 @@ import { createReactBlockSpec, createReactInlineContentSpec, useCreateBlockNote,
 import { BlockNoteView } from "@blocknote/shadcn";
 import { AllSelection, TextSelection, Plugin, PluginKey } from "@tiptap/pm/state";
 import { Extension } from "@tiptap/core";
-import { useCallback, useEffect, useImperativeHandle, useMemo, useRef, useState, type Ref } from "react";
+import { createContext, useCallback, useContext, useEffect, useImperativeHandle, useMemo, useRef, useState, type Ref } from "react";
 import * as Popover from "@radix-ui/react-popover";
 import type { RichDocumentV1 } from "../contracts/generated/rich_document_v1";
 import type { RichProjectResponse } from "../contracts/generated/rich_project_response";
@@ -41,10 +41,22 @@ import { deleteAcrossRegions, pastedRegionsPlugin, flattenPastedRegions } from "
 import { BlockPanel } from "./BlockPanel";
 import { BlockSideMenu, SelectionToolbar } from "./ContextMenus";
 import { commandBlock } from "./block-target";
+import { prototypePresentation } from "../workbench/editor/presentation";
+import { Toolbar, type ToolbarCommand } from "../workbench/editor/Toolbar";
+import { RewritePanel } from "../workbench/editor/RewritePanel";
+import { LinkDialog } from "../workbench/editor/LinkDialog";
+import { Icon } from "../workbench/ui/Icon";
+import { restoreEmptyRegions } from "../workbench/editor/regions";
 
+const EditorAppearance = createContext<{ appearance: "reference" | "prototype"; addText: (id: string) => void }>({ appearance: "reference", addText: () => {} });
 const region = createReactBlockSpec({ type: "region", content: "none", propSchema: {
   role: { default: "main", values: ["header", "sidebar", "main"] },
-} }, { render: () => <div className="cv-region-marker" contentEditable={false} /> });
+} }, { render: function RegionMarker({ block }) {
+  const { appearance, addText } = useContext(EditorAppearance);
+  const label = block.props.role === "header" ? "шапку" : block.props.role === "sidebar" ? "левую колонку" : "основной текст";
+  return <div className="cv-region-marker" contentEditable={false}>{appearance === "prototype" && !block.children.length &&
+    <button type="button" className="uir-empty-region" aria-label={`Добавить текст в ${label}`} onClick={() => addText(block.id)}>Добавить текст</button>}</div>;
+} });
 const section = createReactBlockSpec({ type: "section", content: "inline", propSchema: {
   recordId: { default: "" }, presentation: { default: "standard", values: ["standard", "focus"] },
   textAlignment: { default: "left", values: ["left", "center", "right", "justify"] }, textColor: { default: "default" }, backgroundColor: { default: "default" },
@@ -103,13 +115,15 @@ export type RichEditorHandle = { flush: () => Promise<RichProjectResponse>; undo
   assistantBaseline: (captured: CapturedEditorSelection | null) => Promise<{ response: RichProjectResponse; selection: RichSelection | null }>;
   focusFinding: (anchor: AgentFinding["anchors"][number]) => boolean;
   applyAssistant: (batchId: string, api: PreparedApi) => Promise<void> };
-export function RichEditor({ initial, acknowledge, onStatus, ref, onHistoryNavigation, onAssistantFence }: { initial: RichProjectResponse;
+export function RichEditor({ initial, acknowledge, onStatus, ref, onHistoryNavigation, onAssistantFence, appearance = "reference", portalHost }: { initial: RichProjectResponse;
   acknowledge: (response: RichProjectResponse) => void; onStatus: (status: string) => void; ref: Ref<RichEditorHandle>;
-  onHistoryNavigation?: () => void; onAssistantFence?: (saved: boolean) => void }) {
+  onHistoryNavigation?: () => void; onAssistantFence?: (saved: boolean) => void; appearance?: "reference" | "prototype"; portalHost?: HTMLElement }) {
   const project = initial.workspace.project;
   if (!project) throw new Error("Document is missing");
   const initialFacts = project.facts;
   const [facts, setFacts] = useState(initialFacts);
+  const prototypeFacts = useRef(initialFacts);
+  prototypeFacts.current = facts;
   const [ready, setReady] = useState(false);
   const [anchors, setAnchors] = useState<DateAnchor[]>([]);
   const [, refresh] = useState(0);
@@ -117,7 +131,9 @@ export function RichEditor({ initial, acknowledge, onStatus, ref, onHistoryNavig
   const [instruction, setInstruction] = useState("");
   const [rewriting, setRewriting] = useState(false);
   const [rewriteOpen, setRewriteOpen] = useState(false);
-  const [factsVisible, setFactsVisible] = useState(true);
+  const [factsVisible, setFactsVisible] = useState(() => appearance !== "prototype" || window.innerWidth > 600);
+  const [linkOpen, setLinkOpen] = useState(false);
+  const [rewriteSource, setRewriteSource] = useState("");
   const [blockTarget, setBlockTarget] = useState<string | null>(null);
   const [syncRecords, setSyncRecords] = useState(initial.workspace.syncRecords);
   const rewriteSelection = useRef<ReturnType<typeof selectedRange>>(null);
@@ -150,7 +166,8 @@ export function RichEditor({ initial, acknowledge, onStatus, ref, onHistoryNavig
     Extension.create({ name: "foldcv-local-image-drop", priority: 1000, addProseMirrorPlugins: () => [new Plugin({ props: {
       handleDOMEvents: { drop: (_view, event) => assets.paste(event) },
     } })] })],
-    prosemirrorPlugins: [tableIdentityPlugin(), bindingIdentityPlugin(), structureIdentityPlugin(), pastedRegionsPlugin(), presentationPlugin(() => presentation.blocks, presentationLogos), new Plugin({
+    prosemirrorPlugins: [tableIdentityPlugin(), bindingIdentityPlugin(), structureIdentityPlugin(), pastedRegionsPlugin(), presentationPlugin(() => presentation.blocks, presentationLogos),
+      ...(appearance === "prototype" ? [prototypePresentation(() => prototypeFacts.current)] : []), new Plugin({
     key: new PluginKey("foldcv-rich-session"), filterTransaction: transaction => {
       if (!transaction.docChanged) return true;
       if ((bridge.applying || bridge.fenced) && !bridge.replaying) return false;
@@ -187,7 +204,7 @@ export function RichEditor({ initial, acknowledge, onStatus, ref, onHistoryNavig
         event.preventDefault(); if (!bridge.composing) { if (event.inputType === "historyUndo") bridge.undo(); else bridge.redo(); } return true;
       },
     } },
-  })] }), [bridge, assets, presentation]);
+  })] }), [bridge, assets, presentation, appearance]);
   const editor = useCreateBlockNote({ schema, disableExtensions: ["history"], extensions: [extension],
     pasteHandler: ({ event, defaultPasteHandler }) => assets.paste(event) || defaultPasteHandler(),
     tables: { splitCells: true, cellBackgroundColor: true, cellTextColor: true, headers: true }, links: {
@@ -208,6 +225,7 @@ export function RichEditor({ initial, acknowledge, onStatus, ref, onHistoryNavig
     if (!selected || !browserSelection?.rangeCount) return;
     const rect = browserSelection.getRangeAt(0).getBoundingClientRect();
     rewriteAnchor.current = { getBoundingClientRect: () => rect };
+    setRewriteSource(browserSelection.toString());
     rewriteSelection.current = structuredClone(selected); setRewriteOpen(true);
   }, [editor]);
   const selectionToolbar = useCallback(() => selecting ? <SelectionToolbar rewrite={openRewrite} disabled={rewriting} /> : null, [openRewrite, selecting, rewriting]);
@@ -288,6 +306,7 @@ export function RichEditor({ initial, acknowledge, onStatus, ref, onHistoryNavig
       document.regions.forEach(region => region.blocks.forEach(remember));
       editor.transact(tr => {
         document.regions.forEach(region => editor.updateBlock(region.id, { children: region.blocks.map(toBlock) }));
+        if (appearance === "prototype") restoreEmptyRegions(tr, new Set(document.regions.filter(region => !region.blocks.length).map(region => region.id)));
         restoreTableIdentities(tr, tableIds(document));
       });
     }
@@ -343,13 +362,18 @@ export function RichEditor({ initial, acknowledge, onStatus, ref, onHistoryNavig
       if (!bridge.observing) {
         bridge.replaying = true;
         try {
-          editor.transact(() => originalDocument.regions.forEach(region => {
+          editor.transact(tr => {
+            const empty = new Set<string>();
+            originalDocument.regions.forEach(region => {
             const value = bridge.current.get(`region:${region.id}`);
             const ids: unknown = value ? JSON.parse(value) : [];
             if (!Array.isArray(ids) || !ids.every((id: unknown) => typeof id === "string")) throw new Error("History region is invalid");
             const children = ids.map((id: string) => toBlock(rebuild(id)));
+            if (!children.length) empty.add(region.id);
             editor.updateBlock(region.id, { children });
-          }));
+            });
+            if (appearance === "prototype") restoreEmptyRegions(tr, empty);
+          });
           editor.transact(tr => {
             const tables = new Map<string, TableRowIdentity[]>();
             for (const value of bridge.current.values()) {
@@ -718,8 +742,43 @@ export function RichEditor({ initial, acknowledge, onStatus, ref, onHistoryNavig
     if (!bridge.prepared) throw new Error("Редактор ещё открывается");
     await bridge.prepared.apply(batchId, api);
   } }), [bridge]);
-  return <ImageActions.Provider value={{ source: asset => imageSource(initial.workspace.projectId, asset), upload: assets.upload, cancel: assets.cancel }}>
-    <Popover.Root open={rewriteOpen} onOpenChange={setRewriteOpen}>
+  function submitRewrite() {
+    setRewriting(true);
+    void bridge.rewrite(instruction).then(() => setRewriteOpen(false)).catch(error => setEditorWarning(error instanceof Error ? error.message : "Не удалось переписать"))
+      .finally(() => setRewriting(false));
+  }
+  function toolbarCommand(command: ToolbarCommand) {
+    try {
+    if (command === "undo") bridge.undo();
+    else if (command === "redo") bridge.redo();
+    else if (command === "facts") setFactsVisible(value => !value);
+    else if (command === "block") setBlockTarget(value => value ? null : commandBlock(editor.getTextCursorPosition().block.id, id => editor.getBlock(id)).id);
+    else if (command === "rewrite") openRewrite();
+    else if (command === "image") imageInput.current?.click();
+    else if (command === "link") setLinkOpen(true);
+    else if (command === "table") {
+      const block = commandBlock(editor.getTextCursorPosition().block.id, id => editor.getBlock(id));
+      const inserted = editor.insertBlocks([{ type: "table", content: { type: "tableContent", rows: [{ cells: ["", ""] }, { cells: ["", ""] }] } }], block, "after");
+      const table = inserted[0]; if (table) editor.setTextCursorPosition(table.id, "start");
+      bridge.complete(); editor.focus();
+    } else if (command === "list") {
+      const block = commandBlock(editor.getTextCursorPosition().block.id, id => editor.getBlock(id));
+      if (block.type !== "table" && block.type !== "image") editor.updateBlock(block, { type: "bulletListItem" });
+      bridge.complete(); editor.focus();
+    } else { editor.toggleStyles({ [command]: true }); bridge.complete(); editor.focus(); }
+    } catch (error) { setEditorWarning(error instanceof Error ? error.message : "Не удалось выполнить действие"); }
+  }
+  return <EditorAppearance.Provider value={{ appearance, addText: id => {
+    const target = editor.getBlock(id);
+    if (!target || target.type !== "region" || target.children.length) return;
+    bridge.kind = "structure";
+    const updated = editor.updateBlock(id, { children: [{ type: "paragraph", content: "" }] });
+    const child = updated.children[0]; if (child) editor.setTextCursorPosition(child.id, "start");
+    bridge.complete(); editor.focus();
+  } }}><ImageActions.Provider value={{ source: asset => imageSource(initial.workspace.projectId, asset), upload: assets.upload, cancel: assets.cancel }}>
+    {appearance === "prototype" ? <><RewritePanel open={rewriteOpen} close={() => setRewriteOpen(false)} instruction={instruction} change={setInstruction}
+      submit={submitRewrite} busy={rewriting} source={rewriteSource} />
+      <LinkDialog open={linkOpen} close={() => { setLinkOpen(false); editor.focus(); }} apply={href => { editor.createLink(href); bridge.complete(); }} /></> : <Popover.Root open={rewriteOpen} onOpenChange={setRewriteOpen}>
       <Popover.Anchor virtualRef={rewriteAnchor} />
       <Popover.Portal><Popover.Content className="rich-block-menu rich-rewrite-popover" side="top" aria-label="Переписать выделение">
         <label>Что изменить<textarea aria-label="Инструкция для фрагмента" value={instruction} onChange={event => setInstruction(event.currentTarget.value)} /></label>
@@ -728,17 +787,32 @@ export function RichEditor({ initial, acknowledge, onStatus, ref, onHistoryNavig
             .finally(() => setRewriting(false)); }}>Применить инструкцию</button>
         <Popover.Close>Закрыть</Popover.Close>
       </Popover.Content></Popover.Portal>
-    </Popover.Root>
+    </Popover.Root>}
     {applying && <p role="status">Сохраняю правки помощника…</p>}
-    <fieldset className="contents" disabled={applying || recovery}>
-    <div className="rich-editor-toolbar">
+    <fieldset className={appearance === "prototype" ? "contents uir-editor-session" : "contents"} disabled={applying || recovery}>
+    {appearance === "prototype" ? <><Toolbar command={toolbarCommand} factsVisible={factsVisible} blockVisible={blockTarget !== null}
+      canUndo={(bridge.history?.position ?? 0) > 0} canRedo={(bridge.history?.position ?? 0) < (bridge.history?.length ?? 0)} selecting={selecting}
+      textStyle={style => {
+        try {
+        const block = commandBlock(editor.getTextCursorPosition().block.id, id => editor.getBlock(id));
+        if (block.type === "table" || block.type === "image") return;
+        if (style === "h2" || style === "h3") editor.updateBlock(block, { type: "heading", props: { level: style === "h2" ? 2 : 3 } });
+        else editor.updateBlock(block, { type: style === "blockquote" ? "quote" : "paragraph" });
+        bridge.complete(); editor.focus();
+        } catch (error) { setEditorWarning(error instanceof Error ? error.message : "Не удалось изменить стиль"); }
+      }} />
+      <input hidden ref={imageInput} type="file" accept="image/png,image/jpeg,image/webp" aria-label="Файл изображения"
+        onChange={event => { const file = event.currentTarget.files?.[0]; event.currentTarget.value = ""; if (file) void assets.upload(file).catch(error => setEditorWarning(error instanceof Error ? error.message : "Не удалось добавить изображение")); }} /></> : <div className="rich-editor-toolbar">
       <button aria-expanded={factsVisible} aria-controls="rich-facts-panel" onClick={() => setFactsVisible(value => !value)}>{factsVisible ? "Скрыть факты" : "Показать факты"}</button>
       <label className="cv-insert-image">Добавить изображение<input ref={imageInput} type="file" accept="image/png,image/jpeg,image/webp"
         onChange={event => { const file = event.currentTarget.files?.[0]; event.currentTarget.value = ""; if (file) void assets.upload(file).catch(error => setEditorWarning(error instanceof Error ? error.message : "Не удалось добавить изображение")); }} /></label>
-    </div>
-    <div className="rich-workspace"><FactsPanel facts={facts} submit={command => bridge.panel(command)} hidden={!factsVisible} close={() => setFactsVisible(false)}
+    </div>}
+    <div className={appearance === "prototype" ? "editor-body uir-editor-body" : "rich-workspace"}><FactsPanel facts={facts} submit={command => bridge.panel(command)} hidden={!factsVisible} close={() => setFactsVisible(false)}
       timeline={ready ? <Timeline facts={facts} anchors={anchors} controls={timelineControls} /> : null} />
-    <div className="rich-editor-document"><div className="cv-document" style={{ ...referenceVariables, color: "#000000" }} data-project-id={initial.workspace.projectId}
+    <div className={appearance === "prototype" ? "document-workspace" : "rich-editor-document"}>
+    {appearance === "prototype" && <div className="document-context"><div className="context-left"><span>Исходный текст</span><span>Шаблон FoldCV</span></div></div>}
+    <div className={appearance === "prototype" ? "paper-scroll" : undefined}>
+    <div className={appearance === "prototype" ? "cv-document resume-paper uir-prototype" : "cv-document"} style={appearance === "prototype" ? undefined : { ...referenceVariables, color: "#000000" }} data-project-id={initial.workspace.projectId}
       data-history-position={bridge.history?.position ?? 0} data-history-length={bridge.history?.length ?? 0} data-composing={bridge.composing}>
       {editorWarning && <p role="alert" className="cv-editor-warning">{editorWarning}<button onClick={() => setEditorWarning("")}>Закрыть</button></p>}
       {syncRecords.filter(record => ["failed", "conflict", "pending", "stale"].includes(record.status)).map(record => <p key={record.id} className="cv-editor-warning" role="status">
@@ -747,19 +821,24 @@ export function RichEditor({ initial, acknowledge, onStatus, ref, onHistoryNavig
         <button onClick={() => void bridge.retry(record.id).catch(error => setEditorWarning(error instanceof Error ? error.message : "Не удалось повторить"))}>Повторить</button>
         <button onClick={() => void projectRequest(`/${initial.workspace.projectId}/sync/${record.id}`, "POST", { status: "stale" }).then(response => setSyncRecords(response.workspace.syncRecords))}>Закрыть</button>
       </p>)}
-      <div className="cv-sheet"><img className="cv-template-brand" src={brand} alt="Generic" />
-      <BlockNoteView editor={editor} theme="light" linkToolbar={!selecting} filePanel={false} slashMenu={false} formattingToolbar={false} sideMenu={false}>
-        <FormattingToolbarController formattingToolbar={selectionToolbar} portalElement={window.document.body} />
-        <SideMenuController sideMenu={blockSideMenu} portalElement={window.document.body} />
+      {appearance === "prototype" && <div className="paper-kicker"><span>РЕЗЮМЕ СПЕЦИАЛИСТА</span><span>F / РЕЗЮМЕ</span></div>}
+      <div className={appearance === "prototype" ? "uir-engine-sheet" : "cv-sheet"}>{appearance === "prototype" ? <span className="template-wordmark" aria-label="generic">generic</span> : <img className="cv-template-brand" src={brand} alt="Generic" />}
+      <BlockNoteView editor={editor} theme="light" linkToolbar={!selecting} filePanel={false} slashMenu={false} formattingToolbar={false} sideMenu={false}
+        {...(portalHost ? { portalElements: { default: portalHost } } : {})}>
+        <FormattingToolbarController formattingToolbar={selectionToolbar} portalElement={portalHost ?? window.document.body} />
+        <SideMenuController sideMenu={blockSideMenu} portalElement={portalHost ?? window.document.body} />
         <SuggestionMenuController triggerCharacter="/" getItems={async query => [...getDefaultReactSlashMenuItems(editor),
           { title: "Изображение", subtext: "Локальный PNG, JPEG или WebP", aliases: ["image", "photo"], group: "Media", onItemClick: () => imageInput.current?.click() }]
           .filter(item => `${item.title} ${item.aliases?.join(" ") ?? ""}`.toLowerCase().includes(query.toLowerCase()))} />
       </BlockNoteView>
-      <div className="cv-template-footer">mail@example.com</div></div>
+      {appearance !== "prototype" && <div className="cv-template-footer">mail@example.com</div>}</div>
+      {appearance === "prototype" && <footer className="paper-footer"><span>mail@example.com</span><span>FoldCV</span></footer>}
     </div></div>
+    {appearance === "prototype" && <><footer className="editor-footer"><span>Исходный текст</span><span><Icon name="file" />Исходник</span></footer><div className="uir-chat-reservation" aria-hidden="true" /></>}
+    </div>
     {blockTarget && <BlockPanel id={blockTarget} available={!!editor.getBlock(blockTarget)} close={() => setBlockTarget(null)}
       command={(command, target) => assets.command(blockTarget, command, target)} destinations={targets} />}
     </div>
     </fieldset>
-  </ImageActions.Provider>;
+  </ImageActions.Provider></EditorAppearance.Provider>;
 }

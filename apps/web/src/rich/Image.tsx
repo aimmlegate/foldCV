@@ -15,7 +15,7 @@ export const image = createReactBlockSpec({ type: "image", content: "inline", pr
     <div contentEditable={false}>
       {block.props.assetId && <img src={actions.source(block.props.assetId)} alt={block.props.alt}
         style={{ width: `${block.props.width}pt`, maxWidth: "100%", height: "auto" }} />}
-      <div className="cv-image-controls">
+      <div className="cv-image-controls" data-uir-engine-ui="true">
         <label>{block.props.assetId ? "Заменить изображение" : "Выбрать изображение"}<input type="file" accept="image/png,image/jpeg,image/webp" disabled={busy}
           onChange={event => { const file = event.currentTarget.files?.[0]; event.currentTarget.value = "";
             if (file) { setBusy(true); setError(""); void actions.upload(file, block.id).catch(error => setError(error instanceof Error ? error.message : "IMAGE_INVALID")).finally(() => setBusy(false)); } }} /></label>
