@@ -50,6 +50,23 @@ def paragraph(workspace):
 
 
 @pytest.mark.asyncio
+async def test_check_only_reads_full_stored_sources_by_id_without_fetch_or_write_authority(tmp_path):
+    session, service, workspace, fetcher = tools_setup(tmp_path, allow_web=False, allow_edits=False)
+    try:
+        source = AgentWebSource(id="source_prior", runId=session.run.id, requestedUrl="https://public.example/job",
+            finalUrl="https://public.example/job", title="Stored vacancy", retrievedAt="2026-10-15T00:00:00Z",
+            contentSha256="a" * 64, text="Python and pytest are required.", truncated=False, originalBytes=30)
+        service.store.update(workspace.project_id, lambda state: run_in(state, session.run.id)[0].sources.append(source))
+        result = await session.call("get_conversation_context", AgentQuery(kind="history", ids=[source.id]))
+        assert json.loads(result["content"])["sources"][0]["text"] == source.text
+        assert not fetcher.calls and result["snapshot"]["dependencies"] == []
+        denied = await session.call("get_conversation_context", AgentQuery(kind="history", ids=["foreign_source"]))
+        assert denied["error"]["code"] == "AGENT_NOT_FOUND"
+    finally:
+        await session.close()
+
+
+@pytest.mark.asyncio
 async def test_seeded_outline_and_all_reads_guard_empty_queries_and_membership(tmp_path):
     session, service, workspace, _ = tools_setup(tmp_path)
     try:
@@ -257,5 +274,33 @@ async def test_private_mcp_rejects_host_origin_duplicate_auth_and_oversized_body
                 result = json.loads(good.json()["result"]["content"][0]["text"])
                 assert "snapshot" in result and session.calls == 3
                 assert "structuredContent" not in good.json()["result"]
+    finally:
+        await session.close()
+
+
+@pytest.mark.asyncio
+async def test_prepare_schema_errors_explain_shape_without_echoing_values_and_valid_retry_prepares_once(tmp_path):
+    from tests.recovery.test_agent_edits import command, replace
+    session, service, workspace, _ = tools_setup(tmp_path)
+    session.application = session.sdk.streamable_http_app()
+    read = session.book.read(AgentQuery(kind="document", ids=["narrative"]))
+    request = command(replace(read.snapshot, "narrative", 0, 6, "Clear")).model_dump(mode="json", by_alias=True)
+    invalid = json.loads(json.dumps(request)); invalid["operations"][0]["target"].pop("cellId")
+    invalid["operations"][0]["content"][0]["CANDIDATE_CANARY"] = "PRIVATE_VALUE_CANARY"
+    headers = {"Authorization": "Bearer " + session.token, "Accept": "application/json, text/event-stream"}
+    try:
+        async with session.application.router.lifespan_context(session.application):
+            async with httpx.AsyncClient(transport=httpx.ASGITransport(app=session), base_url="http://" + session.host, headers=headers) as client:
+                result = await client.post("/mcp", json={"jsonrpc": "2.0", "id": 1, "method": "tools/call",
+                    "params": {"name": "prepare_edit_batch", "arguments": {"request": invalid}}})
+                body = json.loads(result.json()["result"]["content"][0]["text"])
+                assert body["error"]["code"] == "AGENT_EDIT_INVALID" and body["argumentIssues"]
+                assert all(value not in result.text for value in ("CANDIDATE_CANARY", "PRIVATE_VALUE_CANARY"))
+                valid = {"jsonrpc": "2.0", "id": 2, "method": "tools/call", "params": {"name": "prepare_edit_batch", "arguments": {"request": request}}}
+                prepared = json.loads((await client.post("/mcp", json=valid)).json()["result"]["content"][0]["text"])
+                repeated = json.loads((await client.post("/mcp", json=valid)).json()["result"]["content"][0]["text"])
+                assert prepared == repeated and prepared["disposition"] == "prepared"
+                assert len(run_in(service.store.load(workspace.project_id), session.run.id)[2].batches) == 1
+                assert service.projects.read(workspace.project_id).document_revision == 1
     finally:
         await session.close()

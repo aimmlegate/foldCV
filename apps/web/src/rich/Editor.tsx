@@ -641,7 +641,7 @@ export function RichEditor({ initial, acknowledge, onStatus, ref, onHistoryNavig
     if (!bridge.queue) throw new Error("Редактор ещё открывается");
     if (bridge.projectionError) throw new Error(bridge.projectionError);
     await bridge.queue.flush(); return bridge.queue.baseline;
-  }, undo: bridge.undo, redo: bridge.redo, sessionId: bridge.session,
+  }, undo: () => bridge.undo(), redo: () => bridge.redo(), sessionId: bridge.session,
   focusFinding: anchor => {
     if (bridge.applying || !bridge.queue || !anchorCurrent(anchor, bridge.queue.baseline, bridge.current)) return false;
     if (anchor.blockId) {
@@ -717,7 +717,7 @@ export function RichEditor({ initial, acknowledge, onStatus, ref, onHistoryNavig
   }, applyAssistant: async (batchId, api) => {
     if (!bridge.prepared) throw new Error("Редактор ещё открывается");
     await bridge.prepared.apply(batchId, api);
-  } }), [bridge, bridge.history?.position]);
+  } }), [bridge]);
   return <ImageActions.Provider value={{ source: asset => imageSource(initial.workspace.projectId, asset), upload: assets.upload, cancel: assets.cancel }}>
     <Popover.Root open={rewriteOpen} onOpenChange={setRewriteOpen}>
       <Popover.Anchor virtualRef={rewriteAnchor} />
@@ -738,7 +738,8 @@ export function RichEditor({ initial, acknowledge, onStatus, ref, onHistoryNavig
     </div>
     <div className="rich-workspace"><FactsPanel facts={facts} submit={command => bridge.panel(command)} hidden={!factsVisible} close={() => setFactsVisible(false)}
       timeline={ready ? <Timeline facts={facts} anchors={anchors} controls={timelineControls} /> : null} />
-    <div className="rich-editor-document"><div className="cv-document" style={{ ...referenceVariables, color: "#000000" }} data-project-id={initial.workspace.projectId}>
+    <div className="rich-editor-document"><div className="cv-document" style={{ ...referenceVariables, color: "#000000" }} data-project-id={initial.workspace.projectId}
+      data-history-position={bridge.history?.position ?? 0} data-history-length={bridge.history?.length ?? 0} data-composing={bridge.composing}>
       {editorWarning && <p role="alert" className="cv-editor-warning">{editorWarning}<button onClick={() => setEditorWarning("")}>Закрыть</button></p>}
       {syncRecords.filter(record => ["failed", "conflict", "pending", "stale"].includes(record.status)).map(record => <p key={record.id} className="cv-editor-warning" role="status">
         {record.status === "failed" ? `Синхронизация не завершена: ${record.errorCode ?? "ошибка"}` : record.status === "conflict" ? "Есть другие упоминания. Проверьте связанные факты." : record.status === "stale" ? "Предложение устарело. Ваши изменения сохранены." : record.errorCode === "OPERATION_INTERRUPTED" ? "Синхронизация была прервана." : "Синхронизация…"}

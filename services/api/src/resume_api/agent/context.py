@@ -146,9 +146,15 @@ class ReadBook:
                 workspace = self.service.projects.read(self.control.project_id)
                 if query.kind == "history":
                     conversation, _, _ = run_in(self.service.store.load(self.control.project_id), self.control.run_id)
-                    payload = {"messages": conversation.messages, "runs": conversation.runs,
-                        "sources": [{"id": source.id, "title": source.title} for source in conversation.sources],
-                        "findings": [{"id": finding.id, "message": finding.message} for finding in conversation.findings]}
+                    if query.ids:
+                        payload = {key: [item for item in getattr(conversation, key) if item.id in query.ids]
+                            for key in ("messages", "runs", "sources", "findings")}
+                        if {item.id for items in payload.values() for item in items} != set(query.ids):
+                            raise AgentFailure("AGENT_NOT_FOUND")
+                    else:
+                        payload = {"messages": conversation.messages, "runs": conversation.runs,
+                            "sources": [{"id": source.id, "title": source.title} for source in conversation.sources],
+                            "findings": [{"id": finding.id, "message": finding.message} for finding in conversation.findings]}
                     deps = []
                 else:
                     payload = query_value(workspace, query)

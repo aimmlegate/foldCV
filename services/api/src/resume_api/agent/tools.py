@@ -50,6 +50,7 @@ class ToolSession(PrivateMcp):
         self.book = ReadBook(service, control)
         self.calls, self.fetches, self.result_bytes = 0, 0, 0
         self.cache = {}
+        self.argument_issues = []
         self.fetch_cancel = threading.Event()
         self.fetch_tasks = set()
         self.gate = asyncio.Lock()
@@ -102,7 +103,7 @@ class ToolSession(PrivateMcp):
     def register(self):
         def reader(name, kind):
             async def read(query: AgentQuery | None = None) -> CallToolResult:
-                """Read a bounded page. Use snapshot IDs and nextCursor for full target reads; document IDs request full blocks/cells."""
+                """Read a bounded page. Document IDs load blocks/cells. History IDs load full stored sources/findings/messages without network. Use nextCursor with the same query for later pages."""
                 return self.wire(await self.call(name, query or AgentQuery(kind=kind)))
             self.sdk.tool(name=name, structured_output=False)(read)
         for name, kind in READ_TOOLS.items():
@@ -120,12 +121,12 @@ class ToolSession(PrivateMcp):
 
         @self.sdk.tool(structured_output=False)
         async def publish_findings(request: AgentPublishFindings) -> CallToolResult:
-            """Store anchored observations from full read snapshots, with optional stored source IDs. Does not edit the resume."""
+            """Store observations without editing. Use targets from a full document read, not the initial outline snapshot. A prose target has snapshotId, blockId, cellId:null, recordId:null, fieldKey:null, start:null, end:null. sourceIds are stored IDs returned by read_public_page, never URLs. findings use targets, not anchors."""
             return self.wire(await self.call("publish_findings", request))
 
         @self.sdk.tool(structured_output=False)
         async def prepare_edit_batch(request: AgentPrepareRequest) -> CallToolResult:
-            """Compile typed operations from full current read snapshots. No resume changes occur here. One saved batch per turn."""
+            """Compile edits without saving. Example arguments: {"request":{"key":"edit_1","snapshotIds":["read_id"],"operations":[{"kind":"replace_text","target":{"snapshotId":"read_id","blockId":"block_id","cellId":null,"field":"content","start":0,"end":1},"content":[{"text":"Existing claim rephrased"}]}]}}. Read real IDs/ranges first. cellId is required: use null outside tables. Content uses text/marks, not document styles. One saved batch per turn."""
             return self.wire(await self.call("prepare_edit_batch", request))
 
         @self.sdk.tool(structured_output=False)
@@ -135,7 +136,7 @@ class ToolSession(PrivateMcp):
 
     def wire(self, value):
         text = json_text(value)
-        if set(value) == {"error"}:
+        if value.get("error") is not None:
             size = len(text.encode())
             if self.result_bytes + size > limits.TOOL_TOTAL_BYTES:
                 self.service.revoke(self.control, "AGENT_TOOL_LIMIT")
@@ -144,6 +145,8 @@ class ToolSession(PrivateMcp):
         return CallToolResult(content=[TextContent(type="text", text=text)], isError=value.get("error") is not None)
 
     def preflight(self, params):
+        self.argument_issues = []
+        name = None
         try:
             self.guard()
             if self.calls >= limits.TOOL_CALLS:
@@ -173,9 +176,28 @@ class ToolSession(PrivateMcp):
             return None
         except AgentFailure as error:
             return error.code
-        except (ValidationError, ValueError, TypeError):
+        except ValidationError as error:
             self.calls += 1
+            if name == "prepare_edit_batch":
+                safe = {"operations", "target", "content", "text", "marks", "snapshotId", "blockId", "cellId", "field", "start", "end", "key", "snapshotIds", "kind", "replace_text"}
+                self.argument_issues = [{"path": ".".join(str(part) if type(part) is int and 0 <= part <= 100 else part if part in safe else "*" for part in issue["loc"])[:160],
+                    "issue": issue["type"] if issue["type"] in {"missing", "extra_forbidden", "string_type", "list_type", "int_type", "literal_error", "union_tag_invalid", "union_tag_not_found", "too_long", "value_error", "greater_than_equal", "string_too_long"} else "invalid"}
+                    for issue in error.errors(include_input=False, include_context=False, include_url=False)[:3]]
+                return "AGENT_EDIT_INVALID"
             return "AGENT_TOOL_DENIED"
+        except (ValueError, TypeError):
+            self.calls += 1
+            if name == "prepare_edit_batch":
+                self.argument_issues = [{"path": "request", "issue": "expected_object"}]
+                return "AGENT_EDIT_INVALID"
+            return "AGENT_TOOL_DENIED"
+
+    def preflight_failure(self, code):
+        result = {"error": {"code": code}}
+        if self.argument_issues:
+            result["argumentIssues"] = self.argument_issues
+            result["format"] = "Use the advertised request wrapper. replace_text target requires snapshotId, blockId, cellId (null outside tables), field, start, end. content contains text and optional marks, not styles. Correct shape errors only; never retry permission denial."
+        return result
 
     async def call(self, name, arguments):
         try:
@@ -244,7 +266,10 @@ class ToolSession(PrivateMcp):
             if error.code == "AGENT_CLEANUP_FAILED":
                 self.service.revoke(self.control, error.code)
                 self.service.cleanup_error(error.code)
-            return {"error": {"code": error.code}}
+            failure = {"error": {"code": error.code}}
+            if name == "publish_findings" and error.code == "AGENT_EVIDENCE_INVALID":
+                failure["format"] = "Use a full document read snapshot. Prose targets require cellId, recordId, fieldKey, start and end all null for the whole block. sourceIds must be stored IDs, not URLs."
+            return failure
         except (ValidationError, ValueError):
             return {"error": {"code": "AGENT_TOOL_DENIED"}}
         except Exception:

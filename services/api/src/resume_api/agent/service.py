@@ -12,18 +12,19 @@ import time
 from packages.resume_core.agent_store import AgentFailure, AgentStore, digest, identity, run_in
 from packages.resume_core.agent_settings import AgentSettingsStore
 from packages.resume_core.models.agent import (
-    AgentCapabilities, AgentError, AgentEvent, AgentModelCapability, AgentReference, TERMINAL_RUNS,
+    AgentCapabilities, AgentError, AgentEvent, AgentModelCapability, AgentReference, AgentUsage, TERMINAL_RUNS,
 )
 from resume_api.cli.experimental_profile import BINARY_SHA256, VERSION
 from resume_api.inference_admission import AdmissionCancelled, AdmissionTimeout, AdmissionBlocked, INFERENCE
 from spikes.agent.profile import HOST_SHA256, MANIFEST_SHA256
 
 from .leases import AgentLeases
-from .runtime import RuntimeInput, RuntimeResult
+from .runtime import RuntimeInput, RuntimeResult, BASE_INSTRUCTIONS, DEVELOPER_INSTRUCTIONS
 from .admission import worker_slot
 
 PROTOCOL_SHA256 = "26aaabfe28f09dc31c88045a92791b39c446918042a7f5b9c73960d29a0b091c"
 CONFIG_SHA256 = digest({"runtime": "agent-v1", "host": "D086", "protocol": PROTOCOL_SHA256,
+    "instructionsSha256": hashlib.sha256((BASE_INSTRUCTIONS + DEVELOPER_INSTRUCTIONS).encode()).hexdigest(),
     "hostSha256": HOST_SHA256, "manifestSha256": MANIFEST_SHA256,
     "approvals": "never/user", "sandbox": "read-only", "fallback": False})
 
@@ -227,6 +228,8 @@ class AgentService:
             event = AgentEvent.model_validate({"schemaVersion": 1, "id": identity("event"), "sequence": sequence,
                 "projectId": control.project_id, "conversationId": run.conversation_id, "runId": run.id,
                 "timestamp": datetime.now(timezone.utc).isoformat(), "type": kind, "payload": payload})
+            if kind == "usage.reported":
+                run.usage = AgentUsage.model_validate(payload)
             journal.events.append(event)
         self.store.update(control.project_id, append)
         self.events.changed(control.run_id)

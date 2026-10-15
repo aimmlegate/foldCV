@@ -139,11 +139,13 @@ async def test_native_permit_remains_owned_through_deterministic_tool_cleanup(tm
     async def script(value, cancel, emit):
         assert INFERENCE.locked()
         order.append("turn")
+        emit("usage.reported", {"inputTokens": 10, "cachedInputTokens": 2, "outputTokens": 3, "totalTokens": 13})
         return RuntimeResult(state="completed", text="Checked", native_started=True)
     service, _, _, workspace, _, request, _ = setup(tmp_path, script, on_close=closed)
     run, _ = service.submit(workspace.project_id, request)
     await asyncio.wait_for(service.start(workspace.project_id, run.id).task, 2)
     assert order == ["turn", "tool cleanup"] and not INFERENCE.locked()
+    assert service.store.find_request(workspace.project_id, request).usage.total_tokens == 13
 
 
 @pytest.mark.asyncio

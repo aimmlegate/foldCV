@@ -3,4 +3,5 @@ fastapi==0.143.0
 starlette==1.7.0
 uvicorn==0.54.0
 httpx==0.28.1
+certifi==2026.7.22
 mcp==1.30.0

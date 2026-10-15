@@ -16,6 +16,7 @@ import sys
 import time
 from urllib.parse import urljoin, urlsplit, urlunsplit
 import zlib
+import certifi
 
 from packages.resume_core.agent_store import AgentFailure, identity, timestamp
 from packages.resume_core.models.agent import AgentWebSource
@@ -61,7 +62,7 @@ class PinnedConnection(http.client.HTTPConnection):
         try:
             # Numeric connect never performs a second hostname lookup.
             stream.connect((self.address, self.port))
-            self.sock = ssl.create_default_context().wrap_socket(stream, server_hostname=self.host) if self.secure else stream
+            self.sock = ssl.create_default_context(cafile=certifi.where()).wrap_socket(stream, server_hostname=self.host) if self.secure else stream
         except BaseException:
             stream.close()
             raise

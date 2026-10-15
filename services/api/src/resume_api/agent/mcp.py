@@ -92,7 +92,8 @@ class PrivateMcp:
                     identifier = payload.get("id")
                     if not (type(identifier) is int or isinstance(identifier, str) and len(identifier) <= 128):
                         return await Response(status_code=400)(scope, receive, send)
-                    result = self.dispatcher.wire({"error": {"code": error}}).model_dump(mode="json", by_alias=True, exclude_none=True)
+                    failure = self.dispatcher.preflight_failure(error)
+                    result = self.dispatcher.wire(failure).model_dump(mode="json", by_alias=True, exclude_none=True)
                     return await JSONResponse({"jsonrpc": "2.0", "id": identifier, "result": result})(scope, receive, send)
             delivered = False
             original = receive

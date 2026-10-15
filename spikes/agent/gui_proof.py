@@ -68,7 +68,7 @@ async def script(value, cancel, emit):
             "message": "Синтетическая проверка: проверьте, достаточно ли конкретно описана работа с Python API.",
             "targets": [{"snapshotId": snapshot, "blockId": block_id, "cellId": cell, "recordId": None,
                 "fieldKey": None, "start": None, "end": None}], "sourceIds": [source["source"]["id"]] if source and not source.get("error") else []}]}})
-        for _ in range(80):
+        for _ in range(400 if "конкур" in message else 80):
             if cancel.is_set(): return RuntimeResult(state="cancelled", error="AGENT_CANCELLED", tool_calls=count)
             await asyncio.sleep(.05)
         edited = False
