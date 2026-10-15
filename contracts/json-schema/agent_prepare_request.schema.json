@@ -69,6 +69,14 @@
           ],
           "title": "Ownerrecordid"
         },
+        "periods": {
+          "items": {
+            "$ref": "#/$defs/AgentNewPeriod"
+          },
+          "maxItems": 20,
+          "title": "Periods",
+          "type": "array"
+        },
         "recordKind": {
           "enum": [
             "candidate",
@@ -108,7 +116,10 @@
               "language",
               "level",
               "issuer",
-              "date"
+              "date",
+              "start",
+              "end",
+              "present"
             ]
           },
           "title": "Values",
@@ -396,6 +407,27 @@
       "title": "AgentNewBlock",
       "type": "object"
     },
+    "AgentNewPeriod": {
+      "additionalProperties": false,
+      "properties": {
+        "end": {
+          "$ref": "#/$defs/AgentFactValue"
+        },
+        "present": {
+          "$ref": "#/$defs/AgentFactValue"
+        },
+        "start": {
+          "$ref": "#/$defs/AgentFactValue"
+        }
+      },
+      "required": [
+        "start",
+        "end",
+        "present"
+      ],
+      "title": "AgentNewPeriod",
+      "type": "object"
+    },
     "AgentRange": {
       "additionalProperties": false,
       "properties": {
@@ -560,7 +592,10 @@
             "language",
             "level",
             "issuer",
-            "date"
+            "date",
+            "start",
+            "end",
+            "present"
           ],
           "title": "Fieldkey",
           "type": "string"
@@ -569,6 +604,20 @@
           "const": "update_fact",
           "title": "Kind",
           "type": "string"
+        },
+        "periodId": {
+          "anyOf": [
+            {
+              "maxLength": 256,
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Periodid"
         },
         "recordId": {
           "maxLength": 256,

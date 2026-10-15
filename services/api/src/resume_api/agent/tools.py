@@ -11,7 +11,7 @@ from pydantic import ValidationError
 
 from packages.resume_core import agent_limits as limits
 from packages.resume_core.agent_store import AgentFailure, digest, identity, run_in
-from packages.resume_core.models.agent import AgentAnchor, AgentFinding, AgentPublishFindings, AgentQuery, TERMINAL_RUNS
+from packages.resume_core.models.agent import AgentAnchor, AgentApplyRequest, AgentFinding, AgentPrepareRequest, AgentPublishFindings, AgentQuery, TERMINAL_RUNS
 from packages.resume_core.rich_dependencies import dependency
 from packages.resume_core.rich_fields import inline_groups, working_field
 from packages.resume_core.rich_mutations import inline_text, utf16_slice
@@ -24,7 +24,7 @@ from .web import PublicFetcher
 
 READ_TOOLS = {"get_resume_context": "context", "find_resume_content": "find", "get_working_facts": "facts",
     "get_original_source": "source", "get_conversation_context": "history"}
-TOOL_NAMES = (*READ_TOOLS, "check_resume", "read_public_page", "publish_findings")
+TOOL_NAMES = (*READ_TOOLS, "check_resume", "read_public_page", "publish_findings", "prepare_edit_batch", "apply_edit_batch")
 
 
 class AgentTools:
@@ -122,6 +122,16 @@ class ToolSession(PrivateMcp):
             """Store anchored observations from full read snapshots, with optional stored source IDs. Does not edit the resume."""
             return await self.call("publish_findings", request)
 
+        @self.sdk.tool()
+        async def prepare_edit_batch(request: AgentPrepareRequest) -> dict:
+            """Compile typed operations from full current read snapshots. No resume changes occur here. One saved batch per turn."""
+            return await self.call("prepare_edit_batch", request)
+
+        @self.sdk.tool()
+        async def apply_edit_batch(request: AgentApplyRequest) -> dict:
+            """Offer a prepared batch to the mounted editor and wait for a durable receipt. Check-only mode forbids writes."""
+            return await self.call("apply_edit_batch", request)
+
     async def call(self, name, arguments):
         try:
             async with self.gate:
@@ -165,6 +175,13 @@ class ToolSession(PrivateMcp):
                     result["source"].pop("text")
                 elif name == "publish_findings":
                     result = self.findings(arguments)
+                elif name == "prepare_edit_batch":
+                    if not self.run.allow_edits:
+                        raise AgentFailure("AGENT_TOOL_DENIED")
+                    from .edits import prepare
+                    result = prepare(self, arguments)
+                elif name == "apply_edit_batch":
+                    raise AgentFailure("AGENT_TOOL_DENIED")
                 else:
                     raise AgentFailure("AGENT_TOOL_DENIED")
                 self.guard()

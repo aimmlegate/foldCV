@@ -32,7 +32,10 @@ class Fetcher:
 
 
 def tools_setup(tmp_path, **changes):
+    scope_builder = changes.pop("scope_builder", None)
     service, _, projects, workspace, conversation, request, connection = setup(tmp_path, None)
+    if scope_builder is not None:
+        changes["scope"] = scope_builder(workspace)
     request = request.model_copy(update=changes)
     run, _ = service.submit(workspace.project_id, request)
     control = RunControl(workspace.project_id, run.id, run.owner_epoch, run.connection_epoch, time.monotonic())

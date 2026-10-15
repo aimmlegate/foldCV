@@ -342,8 +342,12 @@ export type Fieldkey =
   | "language"
   | "level"
   | "issuer"
-  | "date";
+  | "date"
+  | "start"
+  | "end"
+  | "present";
 export type Kind8 = "update_fact";
+export type Periodid = string | null;
 export type Recordid1 = string;
 export type Snapshotid4 = string;
 export type Status = "known" | "uncertain";
@@ -366,6 +370,226 @@ export type Uppernumber = number | null;
 export type Key2 = string;
 export type Kind9 = "create_fact";
 export type Ownerrecordid = string | null;
+/**
+ * @maxItems 20
+ */
+export type Periods =
+  | []
+  | [AgentNewPeriod]
+  | [AgentNewPeriod, AgentNewPeriod]
+  | [AgentNewPeriod, AgentNewPeriod, AgentNewPeriod]
+  | [AgentNewPeriod, AgentNewPeriod, AgentNewPeriod, AgentNewPeriod]
+  | [AgentNewPeriod, AgentNewPeriod, AgentNewPeriod, AgentNewPeriod, AgentNewPeriod]
+  | [AgentNewPeriod, AgentNewPeriod, AgentNewPeriod, AgentNewPeriod, AgentNewPeriod, AgentNewPeriod]
+  | [AgentNewPeriod, AgentNewPeriod, AgentNewPeriod, AgentNewPeriod, AgentNewPeriod, AgentNewPeriod, AgentNewPeriod]
+  | [
+      AgentNewPeriod,
+      AgentNewPeriod,
+      AgentNewPeriod,
+      AgentNewPeriod,
+      AgentNewPeriod,
+      AgentNewPeriod,
+      AgentNewPeriod,
+      AgentNewPeriod
+    ]
+  | [
+      AgentNewPeriod,
+      AgentNewPeriod,
+      AgentNewPeriod,
+      AgentNewPeriod,
+      AgentNewPeriod,
+      AgentNewPeriod,
+      AgentNewPeriod,
+      AgentNewPeriod,
+      AgentNewPeriod
+    ]
+  | [
+      AgentNewPeriod,
+      AgentNewPeriod,
+      AgentNewPeriod,
+      AgentNewPeriod,
+      AgentNewPeriod,
+      AgentNewPeriod,
+      AgentNewPeriod,
+      AgentNewPeriod,
+      AgentNewPeriod,
+      AgentNewPeriod
+    ]
+  | [
+      AgentNewPeriod,
+      AgentNewPeriod,
+      AgentNewPeriod,
+      AgentNewPeriod,
+      AgentNewPeriod,
+      AgentNewPeriod,
+      AgentNewPeriod,
+      AgentNewPeriod,
+      AgentNewPeriod,
+      AgentNewPeriod,
+      AgentNewPeriod
+    ]
+  | [
+      AgentNewPeriod,
+      AgentNewPeriod,
+      AgentNewPeriod,
+      AgentNewPeriod,
+      AgentNewPeriod,
+      AgentNewPeriod,
+      AgentNewPeriod,
+      AgentNewPeriod,
+      AgentNewPeriod,
+      AgentNewPeriod,
+      AgentNewPeriod,
+      AgentNewPeriod
+    ]
+  | [
+      AgentNewPeriod,
+      AgentNewPeriod,
+      AgentNewPeriod,
+      AgentNewPeriod,
+      AgentNewPeriod,
+      AgentNewPeriod,
+      AgentNewPeriod,
+      AgentNewPeriod,
+      AgentNewPeriod,
+      AgentNewPeriod,
+      AgentNewPeriod,
+      AgentNewPeriod,
+      AgentNewPeriod
+    ]
+  | [
+      AgentNewPeriod,
+      AgentNewPeriod,
+      AgentNewPeriod,
+      AgentNewPeriod,
+      AgentNewPeriod,
+      AgentNewPeriod,
+      AgentNewPeriod,
+      AgentNewPeriod,
+      AgentNewPeriod,
+      AgentNewPeriod,
+      AgentNewPeriod,
+      AgentNewPeriod,
+      AgentNewPeriod,
+      AgentNewPeriod
+    ]
+  | [
+      AgentNewPeriod,
+      AgentNewPeriod,
+      AgentNewPeriod,
+      AgentNewPeriod,
+      AgentNewPeriod,
+      AgentNewPeriod,
+      AgentNewPeriod,
+      AgentNewPeriod,
+      AgentNewPeriod,
+      AgentNewPeriod,
+      AgentNewPeriod,
+      AgentNewPeriod,
+      AgentNewPeriod,
+      AgentNewPeriod,
+      AgentNewPeriod
+    ]
+  | [
+      AgentNewPeriod,
+      AgentNewPeriod,
+      AgentNewPeriod,
+      AgentNewPeriod,
+      AgentNewPeriod,
+      AgentNewPeriod,
+      AgentNewPeriod,
+      AgentNewPeriod,
+      AgentNewPeriod,
+      AgentNewPeriod,
+      AgentNewPeriod,
+      AgentNewPeriod,
+      AgentNewPeriod,
+      AgentNewPeriod,
+      AgentNewPeriod,
+      AgentNewPeriod
+    ]
+  | [
+      AgentNewPeriod,
+      AgentNewPeriod,
+      AgentNewPeriod,
+      AgentNewPeriod,
+      AgentNewPeriod,
+      AgentNewPeriod,
+      AgentNewPeriod,
+      AgentNewPeriod,
+      AgentNewPeriod,
+      AgentNewPeriod,
+      AgentNewPeriod,
+      AgentNewPeriod,
+      AgentNewPeriod,
+      AgentNewPeriod,
+      AgentNewPeriod,
+      AgentNewPeriod,
+      AgentNewPeriod
+    ]
+  | [
+      AgentNewPeriod,
+      AgentNewPeriod,
+      AgentNewPeriod,
+      AgentNewPeriod,
+      AgentNewPeriod,
+      AgentNewPeriod,
+      AgentNewPeriod,
+      AgentNewPeriod,
+      AgentNewPeriod,
+      AgentNewPeriod,
+      AgentNewPeriod,
+      AgentNewPeriod,
+      AgentNewPeriod,
+      AgentNewPeriod,
+      AgentNewPeriod,
+      AgentNewPeriod,
+      AgentNewPeriod,
+      AgentNewPeriod
+    ]
+  | [
+      AgentNewPeriod,
+      AgentNewPeriod,
+      AgentNewPeriod,
+      AgentNewPeriod,
+      AgentNewPeriod,
+      AgentNewPeriod,
+      AgentNewPeriod,
+      AgentNewPeriod,
+      AgentNewPeriod,
+      AgentNewPeriod,
+      AgentNewPeriod,
+      AgentNewPeriod,
+      AgentNewPeriod,
+      AgentNewPeriod,
+      AgentNewPeriod,
+      AgentNewPeriod,
+      AgentNewPeriod,
+      AgentNewPeriod,
+      AgentNewPeriod
+    ]
+  | [
+      AgentNewPeriod,
+      AgentNewPeriod,
+      AgentNewPeriod,
+      AgentNewPeriod,
+      AgentNewPeriod,
+      AgentNewPeriod,
+      AgentNewPeriod,
+      AgentNewPeriod,
+      AgentNewPeriod,
+      AgentNewPeriod,
+      AgentNewPeriod,
+      AgentNewPeriod,
+      AgentNewPeriod,
+      AgentNewPeriod,
+      AgentNewPeriod,
+      AgentNewPeriod,
+      AgentNewPeriod,
+      AgentNewPeriod,
+      AgentNewPeriod,
+      AgentNewPeriod
+    ];
 export type Recordkind =
   | "candidate"
   | "detail"
@@ -448,6 +672,7 @@ export interface AgentUpdateFact {
   evidence: Evidence;
   fieldKey: Fieldkey;
   kind: Kind8;
+  periodId?: Periodid;
   recordId: Recordid1;
   snapshotId: Snapshotid4;
   value: AgentFactValue;
@@ -493,8 +718,14 @@ export interface AgentCreateFact {
   key: Key2;
   kind: Kind9;
   ownerRecordId: Ownerrecordid;
+  periods?: Periods;
   recordKind: Recordkind;
   values: Values;
+}
+export interface AgentNewPeriod {
+  end: AgentFactValue;
+  present: AgentFactValue;
+  start: AgentFactValue;
 }
 export interface Values {
   [k: string]: AgentFactValue;

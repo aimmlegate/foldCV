@@ -13,8 +13,8 @@ from packages.resume_core.models.agent import (
     AgentEntityDependency, AgentQueryDependency, AgentQuery, AgentReadSnapshot, AgentToolResult, wire_bytes,
 )
 from packages.resume_core.rich_dependencies import dependency, dependencies_current, placements
-from packages.resume_core.rich_fields import inline_groups
-from packages.resume_core.rich_mutations import inline_text
+from packages.resume_core.rich_fields import inline_groups, occurrences
+from packages.resume_core.rich_mutations import inline_text, subtree
 
 
 def json_text(value):
@@ -47,7 +47,7 @@ def query_value(workspace, query):
         if not query.ids:
             raise AgentFailure("AGENT_SCOPE_INVALID")
         selected = [block for block in blocks if block.id in query.ids]
-        cells = [{"blockId": block.id, "cell": cell} for block in blocks if block.type == "table"
+        cells = [{"blockId": block.id, "provenance": block.provenance, "cell": cell} for block in blocks if block.type == "table"
             for row in block.content.rows for cell in row.cells if cell.id in query.ids]
         found = {block.id for block in selected} | {part["cell"].id for part in cells}
         if found != set(query.ids):
@@ -57,7 +57,17 @@ def query_value(workspace, query):
         records = [record for record in project.facts.records if not query.ids or record.id in query.ids]
         if query.ids and {record.id for record in records} != set(query.ids):
             raise AgentFailure("AGENT_NOT_FOUND")
-        return {"records": records}
+        result = {"records": records}
+        if query.parent_id == "linked":
+            ids = {record.id for record in records}
+            result["linkedOccurrences"] = [{"recordId": group.record_id, "fieldKey": group.key,
+                "root": group.root, "blockIds": group.block_ids, "text": group.text}
+                for group in occurrences(project.document).values() if group.record_id in ids]
+            result["relatedBlocks"] = [{"id": block.id, "provenance": block.provenance,
+                "ownerId": getattr(block.props, "record_id", None)} for block in project.document.blocks()
+                if getattr(block.props, "record_id", None) in ids or
+                    any(getattr(link, "record_id", None) in ids for link in block.provenance)]
+        return result
     if query.kind == "source":
         selected, found = [], set()
         for source in project.sources:
@@ -147,6 +157,12 @@ class ReadBook:
                         deps += [AgentEntityDependency(kind="entity", stamp=dependency(workspace, "block", block.id)) for block in payload["blocks"]]
                         deps += [AgentEntityDependency(kind="entity", stamp=dependency(workspace, "field", json_text(["cell", part["blockId"], part["cell"].id])))
                             for part in payload["cells"]]
+                        linked = {getattr(span, "record_id", None) for block in payload["blocks"] for node in subtree(block)
+                            for _, content in inline_groups(node) for span in content}
+                        linked.update(getattr(link, "record_id", None) for block in payload["blocks"] for node in subtree(block) for link in node.provenance)
+                        linked.update(getattr(span, "record_id", None) for part in payload["cells"] for span in part["cell"].content)
+                        linked.update(getattr(link, "record_id", None) for part in payload["cells"] for link in part["provenance"])
+                        deps += [AgentEntityDependency(kind="entity", stamp=dependency(workspace, "record", identifier)) for identifier in linked if identifier is not None]
                 capture = ReadCapture(query, workspace, payload, deps)
                 key, offset = digest(query), 0
                 old = self.captures.get(key)

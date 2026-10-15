@@ -406,7 +406,7 @@ class AgentFactValue(AgentWire):
         return self
 
 
-FactKey = Literal["name", "title", "location", "label", "value", "employer", "role", "display", "canonical_id", "institution", "qualification", "specialty", "completion", "language", "level", "issuer", "date"]
+FactKey = Literal["name", "title", "location", "label", "value", "employer", "role", "display", "canonical_id", "institution", "qualification", "specialty", "completion", "language", "level", "issuer", "date", "start", "end", "present"]
 
 
 class AgentUpdateFact(AgentWire):
@@ -414,8 +414,15 @@ class AgentUpdateFact(AgentWire):
     snapshot_id: AgentId
     record_id: ReferenceId
     field_key: FactKey
+    period_id: ReferenceId | None = None
     value: AgentFactValue
     evidence: list[AgentEvidence] = Field(min_length=1, max_length=20)
+
+
+class AgentNewPeriod(AgentWire):
+    start: AgentFactValue
+    end: AgentFactValue
+    present: AgentFactValue
 
 
 class AgentCreateFact(AgentWire):
@@ -425,6 +432,7 @@ class AgentCreateFact(AgentWire):
     owner_record_id: ReferenceId | None
     values: dict[FactKey, AgentFactValue] = Field(min_length=1, max_length=20)
     correction: AgentUserCorrection
+    periods: list[AgentNewPeriod] = Field(default_factory=list, max_length=20)
 
 
 class AgentDeleteFact(AgentWire):

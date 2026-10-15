@@ -2868,6 +2868,83 @@
         "value": true
       }
     ]
+  },
+  {
+    "name": "agent typed period correction",
+    "contract": "agent_prepare_request",
+    "base": "agent_prepare_request",
+    "valid": true,
+    "edits": [
+      {
+        "op": "set",
+        "path": [
+          "operations"
+        ],
+        "value": [
+          {
+            "kind": "update_fact",
+            "snapshotId": "read_1",
+            "recordId": "job_1",
+            "fieldKey": "start",
+            "periodId": "period_1",
+            "value": {
+              "status": "known",
+              "value": {
+                "precision": "year",
+                "year": 2023,
+                "month": null,
+                "day": null
+              },
+              "text": "2023"
+            },
+            "evidence": [
+              {
+                "kind": "user_correction",
+                "quote": "Start in 2023"
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "name": "agent malformed period identity",
+    "contract": "agent_prepare_request",
+    "base": "agent_prepare_request",
+    "valid": false,
+    "edits": [
+      {
+        "op": "set",
+        "path": [
+          "operations"
+        ],
+        "value": [
+          {
+            "kind": "update_fact",
+            "snapshotId": "read_1",
+            "recordId": "job_1",
+            "fieldKey": "start",
+            "periodId": true,
+            "value": {
+              "status": "known",
+              "value": {
+                "precision": "year",
+                "year": 2023,
+                "month": null,
+                "day": null
+              },
+              "text": "2023"
+            },
+            "evidence": [
+              {
+                "kind": "user_correction",
+                "quote": "Start in 2023"
+              }
+            ]
+          }
+        ]
+      }
+    ]
   }
-
 ]

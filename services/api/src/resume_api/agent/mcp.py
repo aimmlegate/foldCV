@@ -6,6 +6,7 @@ import asyncio
 from contextlib import contextmanager
 import hashlib
 import hmac
+import logging
 import secrets
 import socket
 
@@ -34,7 +35,8 @@ class PrivateMcp:
         self.listener.listen(16)
         self.host = "127.0.0.1:" + str(self.listener.getsockname()[1])
         self.url = "http://" + self.host + "/mcp"
-        self.sdk = FastMCP("foldcv", stateless_http=True, json_response=True,
+        logging.getLogger("mcp").setLevel(logging.CRITICAL)
+        self.sdk = FastMCP("foldcv", stateless_http=True, json_response=True, log_level="CRITICAL",
             max_request_body_size=65536, transport_security=TransportSecuritySettings(
                 allowed_hosts=[self.host], allowed_origins=[]))
         self.application = None
