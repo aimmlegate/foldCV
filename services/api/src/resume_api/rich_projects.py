@@ -347,7 +347,13 @@ class RichProjectService(RichSynchronization, RichAssets, GuiProjectService):
             if not generation_id:
                 self.tasks.pop(key, None); self.cancels.pop(key, None)
 
-    async def shutdown(self):
+    async def shutdown(self, *, close_agent=True):
+        agent = getattr(self, "agent", None)
+        if agent is not None:
+            if close_agent:
+                await agent.shutdown()
+            else:
+                await agent.stop_all()
         for session in self.image_sessions.values():
             session.closed = True
         await super().shutdown()
@@ -379,11 +385,36 @@ class RichProjectService(RichSynchronization, RichAssets, GuiProjectService):
 
     async def delete_project(self, identifier):
         # Verify the rich version before the shared tombstone can alter its registry entry.
-        self.read(identifier)
+        self.ensure_loaded()
+        tombstoned = any(entry.project_id == identifier and entry.tombstoned for entry in self.storage.registry().entries)
+        if not tombstoned:
+            self.read(identifier)
+        agent = getattr(self, "agent", None)
+        agent_error = None
+        if agent is not None:
+            from packages.resume_core.agent_store import AgentFailure
+            try:
+                with self.state_lock:
+                    self.storage.tombstone(identifier)
+                    self.deleted_ids.add(identifier)
+                    agent.request_project_stop(identifier)
+                await agent.stop_project(identifier)
+            except AgentFailure as error:
+                agent_error = error.code
+            except ProjectStoreFailure as error:
+                raise ProjectFailure(error.code, 409) from None
         for (pid, _), session in self.image_sessions.items():
             if pid == identifier:
                 session.closed = True
         result = await super().delete_project(identifier)
+        if agent is not None:
+            try:
+                agent.store.cleanup_deleted(identifier)
+            except AgentFailure as error:
+                agent_error = agent_error or error.code
+        if agent_error is not None:
+            from packages.resume_core.gui_projects import GuiDeleteProjectResult
+            return GuiDeleteProjectResult(projectId=identifier, status="cleanup_incomplete", errorCode=agent_error)
         if result.status == "deleted":
             for key in list(self.images):
                 if key[0] == identifier:

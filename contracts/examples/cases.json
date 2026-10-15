@@ -2853,6 +2853,21 @@
         "value": "foreign_project"
       }
     ]
+  },
+  {
+    "name": "agent boolean version is rejected",
+    "contract": "agent_settings",
+    "base": "agent_settings",
+    "valid": false,
+    "edits": [
+      {
+        "op": "set",
+        "path": [
+          "schemaVersion"
+        ],
+        "value": true
+      }
+    ]
   }
 
 ]

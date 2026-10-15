@@ -1,16 +1,7 @@
-"""One FIFO GUI queue in front of the provider's shared generation lock."""
-
-from collections import deque
-import threading
+"""Structured providers enter the same permit as assistant turns, exactly once."""
 
 from .providers.content import ContentFailure
-
-_CONDITION = threading.Condition()
-_WAITING = deque()
-
-
-class AdmissionCancelled(Exception):
-    pass
+from .inference_admission import AdmissionCancelled, AdmissionBlocked, INFERENCE
 
 
 class QueuedProvider:
@@ -19,35 +10,26 @@ class QueuedProvider:
         self.admitted = admitted
 
     def generate(self, request, files, cancel):
-        ticket = object()
-        with _CONDITION:
-            _WAITING.append(ticket)
-            while _WAITING[0] is not ticket:
-                if cancel.is_set():
-                    _WAITING.remove(ticket)
-                    _CONDITION.notify_all()
-                    raise AdmissionCancelled()
-                _CONDITION.wait(0.025)
+        queued = getattr(self.provider, "generate_queued", None)
+        if queued is not None:
+            return queued(request, files, cancel, self.admitted)
         try:
+            with INFERENCE.hold(cancel):
+                return self._generate(request, files, cancel)
+        except AdmissionBlocked:
+            raise ContentFailure("PROCESS_CLEANUP_FAILED") from None
+
+    def _generate(self, request, files, cancel):
+        while True:
             if cancel.is_set():
                 raise AdmissionCancelled()
-            queued = getattr(self.provider, "generate_queued", None)
-            if queued is not None:
-                return queued(request, files, cancel, self.admitted)
-            while True:
-                if cancel.is_set():
-                    raise AdmissionCancelled()
-                try:
-                    result = self.provider.generate(request, files, cancel)
-                except ContentFailure as error:
-                    if error.code == "BUSY":
-                        cancel.wait(0.025)
-                        continue
-                    self.admitted()
-                    raise
+            try:
+                result = self.provider.generate(request, files, cancel)
+            except ContentFailure as error:
+                if error.code == "BUSY":
+                    cancel.wait(0.025)
+                    continue
                 self.admitted()
-                return result
-        finally:
-            with _CONDITION:
-                _WAITING.remove(ticket)
-                _CONDITION.notify_all()
+                raise
+            self.admitted()
+            return result

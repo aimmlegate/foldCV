@@ -52,6 +52,13 @@ def bounded(value: Wire | RootModel, maximum: int) -> None:
 
 
 class AgentWire(Wire):
+    @model_validator(mode="before")
+    @classmethod
+    def literal_version_is_not_boolean(cls, value):
+        if isinstance(value, dict) and type(value.get("schemaVersion")) is bool:
+            raise ValueError("assistant schema version must be an integer")
+        return value
+
     @model_validator(mode="after")
     def valid_unicode(self):
         def visit(value):

@@ -231,6 +231,16 @@ class AgentStore:
             self._write(directory, state)
             return run, True
 
+    def find_request(self, project_id: str, request: AgentRunRequest):
+        state = self.load(project_id)
+        existing = next((item for item in state.journals if
+            item.request.client_request_id == request.client_request_id), None)
+        if existing is None:
+            return None
+        if existing.request_sha256 != digest(journal_request(request)):
+            raise AgentFailure("AGENT_IDEMPOTENCY_CONFLICT")
+        return run_in(state, existing.run_id)[1]
+
     def prepare(self, project_id: str, run_id: str, request, compile_batch):
         request_hash = digest(request)
         def prepare_batch(state):
@@ -357,19 +367,30 @@ class AgentStore:
 
     def cleanup_deleted(self, project_id: str):
         with self._guard(project_id, deleted=True) as directory:
+            def cleanup_status(status):
+                registry = self.canonical._registry()
+                entry = next(item for item in registry.entries if item.project_id == project_id)
+                entry.cleanup_status = status
+                self.canonical._write_registry(registry)
             try:
-                if not directory.exists():
-                    return
-                private_directory(directory)
-                files = list(directory.iterdir())
-                for path in files:
-                    if path.name != "state.json" and not path.name.startswith(".foldcv-write-"):
-                        raise StorageFailure("UNSAFE_STORAGE")
-                    owned_file(path, limits.PROJECT_BYTES)
-                for path in files:
-                    path.unlink()
-                directory.rmdir()
+                if directory.exists():
+                    private_directory(directory)
+                    files = list(directory.iterdir())
+                    for path in files:
+                        if path.name != "state.json" and not path.name.startswith(".foldcv-write-"):
+                            raise StorageFailure("UNSAFE_STORAGE")
+                        owned_file(path, limits.PROJECT_BYTES)
+                    for path in files:
+                        path.unlink()
+                    directory.rmdir()
+                canonical = self.canonical.projects / project_id
+                if not canonical.exists() and not canonical.is_symlink():
+                    cleanup_status("complete")
             except (StorageFailure, OSError):
+                try:
+                    cleanup_status("failed")
+                except (StorageFailure, OSError):
+                    pass
                 raise AgentFailure("AGENT_CLEANUP_INCOMPLETE") from None
 
     def recover_all(self):

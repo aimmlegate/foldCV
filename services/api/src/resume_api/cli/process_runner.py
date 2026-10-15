@@ -38,7 +38,9 @@ class ProcessRunner:
             on_line: Callable[[bytes], bytes | None] | None = None,
             interactive: bool = False, max_output: int = MAX_OUTPUT,
             max_line: int = MAX_LINE, max_stdout: int | None = None,
-            max_stderr: int | None = None) -> tuple[bytes, bytes]:
+            max_stderr: int | None = None,
+            poll_input: Callable[[], bytes | None] | None = None,
+            before_cleanup: Callable[[], None] | None = None) -> tuple[bytes, bytes]:
         if (not math.isfinite(deadline) or any(type(value) is not int or value <= 0
                 for value in (max_output, max_line, max_stdout, max_stderr) if value is not None)):
             raise SpikeError("INVALID_LIMIT")
@@ -61,6 +63,15 @@ class ProcessRunner:
                     selector.register(stream, selectors.EVENT_WRITE if kind == "stdin" else selectors.EVENT_READ, kind)
                 while selector.get_map() or process.poll() is None:
                     self._check(deadline, cancel)
+                    if poll_input is not None:
+                        reply = poll_input()
+                        if reply is not None:
+                            pending.extend(reply)
+                            close_input = not reply
+                            if process.stdin.closed:
+                                raise SpikeError("INVALID_RESULT")
+                            if process.stdin not in [entry.fileobj for entry in selector.get_map().values()]:
+                                selector.register(process.stdin, selectors.EVENT_WRITE, "stdin")
                     for key, _ in selector.select(min(0.02, max(0, deadline - self.clock()))):
                         stream = key.fileobj
                         kind = key.data
@@ -93,8 +104,10 @@ class ProcessRunner:
                             while b"\n" in line:
                                 raw, _, rest = line.partition(b"\n")
                                 line = bytearray(rest)
-                                if not raw or len(raw) > max_line:
+                                if not raw:
                                     raise SpikeError("INVALID_RESULT")
+                                if len(raw) > max_line:
+                                    raise SpikeError("OUTPUT_TOO_LARGE")
                                 reply = on_line(bytes(raw))
                                 if reply is not None:
                                     pending.extend(reply)
@@ -117,7 +130,11 @@ class ProcessRunner:
             raise SpikeError("CLI_FAILED") from None
         finally:
             if process is not None:
-                files.stop_worker(final=False)
+                try:
+                    if before_cleanup is not None:
+                        before_cleanup()
+                finally:
+                    files.stop_worker(final=False)
 
     def _check(self, deadline: float, cancel: threading.Event) -> None:
         if cancel.is_set():

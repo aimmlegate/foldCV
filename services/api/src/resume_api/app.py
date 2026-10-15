@@ -49,6 +49,11 @@ from .gui_projects import GuiProjectService, ProjectFailure
 from packages.resume_core.preferences import PreferencesStore, PreferencesFailure
 from packages.resume_core.project_store import ProjectStore
 from .gui_routes import mount_projects
+from .inference_admission import INFERENCE, AdmissionBlocked, AdmissionTimeout, AdmissionCancelled
+from .profile_ownership import native_profile, recover_profile
+from packages.resume_core.agent_store import AgentFailure
+from .agent.service import AgentService, AgentConnection
+from .agent.runtime import CodexAgentRuntime
 
 
 MAX_BODY = 1_048_576
@@ -241,7 +246,7 @@ def create_app(*, origin: str, secret: str, temp_root: Path, dist: Path, runner:
                semantic_runner: SemanticRunner | None = None, draft_runner: ProseDraftRunner | None = None,
                rewrite_runner: ProseRewriteRunner | None = None, fixture_generation_ready: bool = False,
                experimental_profile: ExperimentalCliProfile | None = None, data_root: Path | None = None,
-               gui_provider=None, gui_clock=None, gui_renderer=None):
+               gui_provider=None, gui_clock=None, gui_renderer=None, agent_runtime=None, agent_tools=None):
     if not origin.startswith("http://127.0.0.1:") or not origin.rsplit(":", 1)[-1].isdigit():
         raise ValueError("A concrete IPv4 loopback origin is required")
     if len(secret) < 32:
@@ -249,10 +254,10 @@ def create_app(*, origin: str, secret: str, temp_root: Path, dist: Path, runner:
     if fixture_generation_ready and (semantic_runner is None or draft_runner is None):
         raise ValueError("Fixture generation requires both injected runners")
     if experimental_profile is not None and (fixture_generation_ready or any(
-            runner is not None for runner in (semantic_runner, draft_runner, rewrite_runner, gui_provider))):
+            runner is not None for runner in (semantic_runner, draft_runner, rewrite_runner, gui_provider, agent_runtime))):
         raise ValueError("Experimental CLI cannot use injected generation runners")
     reap_owned(temp_root)
-    blocked_on_start = has_blocked_owned(temp_root)
+    blocked_on_start = has_blocked_owned(temp_root) or recover_profile(experimental_profile, temp_root)
     operations: dict[asyncio.Task, OperationFiles] = {}
     cancellation_pending: set[asyncio.Task] = set()
     connection_work: dict[asyncio.Task, tuple[OperationFiles, threading.Event]] = {}
@@ -260,7 +265,11 @@ def create_app(*, origin: str, secret: str, temp_root: Path, dist: Path, runner:
 
     @asynccontextmanager
     async def lifespan(_app: FastAPI):
+        agent.recover()
         yield
+        gui_projects.request_shutdown()
+        rich_projects.request_shutdown()
+        agent.request_stop(reason="AGENT_INTERRUPTED")
         await gui_projects.shutdown()
         await rich_projects.shutdown()
         for task, (files, cancel) in list(connection_work.items()):
@@ -288,9 +297,10 @@ def create_app(*, origin: str, secret: str, temp_root: Path, dist: Path, runner:
                 if experimental_profile else None)
     connection_state = ConnectionPayload(state="unchecked")
     connection_epoch = 0
+    connection_namespace = secrets.token_hex(12)
 
     def experimental_authorized() -> bool:
-        return (experimental_profile is not None and not unsafe_cleanup
+        return (experimental_profile is not None and not unsafe_cleanup and not INFERENCE.blocked
                 and connection_state.state == "connected" and connection_state.metadataReady
                 and connection_state.quota.state == "available"
                 and connection_state.selectedModel in connection_state.models)
@@ -365,6 +375,27 @@ def create_app(*, origin: str, secret: str, temp_root: Path, dist: Path, runner:
         worker_slot=gui_worker_slot, cleanup_error=lifecycle_code, preferences=preferences_store, **gui_options)
     app.state.rich_projects = rich_projects
     mount_rich_projects(app, rich_projects, problem)
+
+    def agent_connection():
+        reason = ("AGENT_CLEANUP_FAILED" if unsafe_cleanup or INFERENCE.blocked else
+            "AGENT_AUTH_REQUIRED" if connection_state.state in {"login_required", "login_pending", "detached"} else
+            "AGENT_QUOTA" if connection_state.quota.state == "exhausted" else "AGENT_CONNECTION_UNAVAILABLE")
+        ready = (not unsafe_cleanup and not INFERENCE.blocked and connection_state.state == "connected"
+            and connection_state.metadataReady and connection_state.quota.state == "available"
+            and not connection_work)
+        return AgentConnection(ready, tuple(connection_state.models),
+            "connection_" + connection_namespace + "_" + str(connection_epoch), None if ready else reason)
+
+    resolved_agent_runtime = agent_runtime
+    if resolved_agent_runtime is None and experimental_profile is not None:
+        try:
+            resolved_agent_runtime = CodexAgentRuntime(connection, temp_root)
+        except AgentFailure:
+            resolved_agent_runtime = None
+    agent = AgentService(rich_projects, resolved_agent_runtime, agent_connection, tools=agent_tools,
+        cleanup_error=lambda _code: INFERENCE.block())
+    rich_projects.agent = agent
+    app.state.agent = agent
 
     def execute_content(files, runner, payload, cancel, runner_epoch):
         worker_error = None
@@ -967,6 +998,11 @@ def create_app(*, origin: str, secret: str, temp_root: Path, dist: Path, runner:
             if unsafe_cleanup:
                 connection_state = ConnectionPayload(state="cleanup_blocked")
                 return connection_response()
+            if INFERENCE.blocked:
+                connection_state = ConnectionPayload(state="cleanup_blocked")
+                return connection_response()
+            if INFERENCE.locked():
+                return connection_response() if kind != "login" else problem("BUSY", 429, "host", True)
             if cancellation_pending or active >= MAX_CONCURRENT or connection_work:
                 return problem("BUSY", 429, "host", True)
             active += 1
@@ -975,14 +1011,20 @@ def create_app(*, origin: str, secret: str, temp_root: Path, dist: Path, runner:
             cancel = threading.Event()
 
             def execute():
-                with files.open():
-                    return work(files, cancel)
+                with INFERENCE.hold(cancel, deadline=time.monotonic() + 15), native_profile(
+                        experimental_profile, cancel, deadline=time.monotonic() + 15, blocking=False,
+                        operations_root=temp_root):
+                    with files.open():
+                        return work(files, cancel)
 
             task = asyncio.create_task(asyncio.to_thread(execute))
             operations[task] = files
             connection_work[task] = (files, cancel)
             task.add_done_callback(operation_done)
             if kind == "login":
+                connection_epoch += 1
+                epoch = connection_epoch
+                agent.request_stop(reason="AGENT_CONNECTION_CHANGED")
                 login_task = task
                 connection_state = ConnectionPayload(state="login_pending", version=connection_state.version)
         try:
@@ -1010,6 +1052,12 @@ def create_app(*, origin: str, secret: str, temp_root: Path, dist: Path, runner:
                                                      models=list(result.models), selectedModel=selected, quota=quota,
                                                      metadataReady=kind != "discover")
                 return connection_response()
+        except (AdmissionTimeout, AdmissionCancelled):
+            return connection_response()
+        except AdmissionBlocked:
+            INFERENCE.block()
+            connection_state = ConnectionPayload(state="cleanup_blocked")
+            return connection_response()
         except ConnectionFailure as error:
             if error.code in {"PROCESS_CLEANUP_FAILED", "CLEANUP_FAILED"}:
                 lifecycle_code(SpikeError(error.code))
@@ -1081,13 +1129,16 @@ def create_app(*, origin: str, secret: str, temp_root: Path, dist: Path, runner:
             current = list(connection_work.items())
             generating = list(semantic_work.items())
             gui_projects.request_shutdown()
+            rich_projects.request_shutdown()
+            agent.request_stop(reason="AGENT_CONNECTION_CHANGED")
         codes = await asyncio.gather(*(stop_connection(task, files, cancel)
                                        for task, (files, cancel) in current),
                                      *(stop_semantic(task, files, cancel)
                                        for task, (files, cancel) in generating))
         try:
             await gui_projects.shutdown()
-        except ProjectFailure:
+            await rich_projects.shutdown(close_agent=False)
+        except (ProjectFailure, AgentFailure):
             unsafe_code = SpikeError("PROCESS_CLEANUP_FAILED")
             lifecycle_code(unsafe_code)
         if any(code is not None for code in codes) or unsafe_cleanup:
@@ -1101,9 +1152,14 @@ def create_app(*, origin: str, secret: str, temp_root: Path, dist: Path, runner:
             if current is None or current not in connection_work:
                 return connection_response()
             connection_epoch += 1
+            agent.request_stop(reason="AGENT_CONNECTION_CHANGED")
             connection_state = ConnectionPayload(state="login_required", version=connection_state.version)
             files, cancel = connection_work[current]
         code = await stop_connection(current, files, cancel)
+        try:
+            await agent.stop_all(reason="AGENT_CONNECTION_CHANGED")
+        except AgentFailure:
+            connection_state = ConnectionPayload(state="cleanup_blocked")
         if code is not None or unsafe_cleanup:
             connection_state = ConnectionPayload(state="cleanup_blocked")
         return connection_response()

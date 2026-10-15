@@ -39,7 +39,7 @@ def run_request(conversation_id, **changes):
 
 
 def fake_agent_cli(root, steps, *, fragment_bytes=None):
-    root.mkdir()
+    root.mkdir(parents=True)
     source = Path("tests/cli_spike")
     for name in ("fake_cli.py", "fake_agent.py"):
         shutil.copyfile(source / name, root / name)

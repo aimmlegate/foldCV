@@ -11,12 +11,16 @@ import shutil
 import threading
 import time
 from typing import Callable
+from contextlib import contextmanager
 
 from pydantic import BaseModel, ValidationError
 
 from resume_api.cli.process_runner import ProcessExit, ProcessRunner
 from resume_api.cli.experimental_profile import ExperimentalCliProfile, ExperimentalProfileError, VERSION as EXPERIMENTAL_VERSION
 from resume_api.lifecycle import OperationFiles, SpikeError
+from resume_api.inference_admission import INFERENCE, AdmissionTimeout, AdmissionBlocked
+from resume_api.profile_ownership import native_profile
+from packages.resume_core.storage import StorageFailure
 from resume_api.providers.content import (ContentFailure, ContentInput, ContentResult,
                                           ReportedUsage, ResultT)
 from resume_api.providers.structured_schema import StructuredSchema
@@ -28,7 +32,7 @@ MAX_SCHEMA = 65_536
 MAX_RESULT = 65_536
 MAX_DEPTH = 32
 REPAIR_FEEDBACK = "The completed response was invalid JSON or did not match the schema. Return only a valid JSON object matching the schema."
-_GENERATION_LOCK = threading.Lock()
+_GENERATION_LOCK = INFERENCE
 
 
 def strict_json(raw: bytes | str, *, max_bytes: int = MAX_RESULT) -> object:
@@ -301,26 +305,36 @@ class CodexCliProvider:
     def generate(self, request: ContentInput[ResultT], files: OperationFiles,
                  cancel: threading.Event) -> ContentResult[ResultT]:
         if not _GENERATION_LOCK.acquire(blocking=False):
-            raise ContentFailure("BUSY")
+            raise ContentFailure("PROCESS_CLEANUP_FAILED" if INFERENCE.blocked else "BUSY")
         try:
-            return self._generate(request, files, cancel)
+            with self._profile_owner(cancel, files.root):
+                return self._generate(request, files, cancel)
         finally:
             _GENERATION_LOCK.release()
 
     def generate_queued(self, request: ContentInput[ResultT], files: OperationFiles,
                         cancel: threading.Event, admitted) -> ContentResult[ResultT]:
-        while not _GENERATION_LOCK.acquire(timeout=0.025):
-            if cancel.is_set():
-                from ..gui_admission import AdmissionCancelled
-                raise AdmissionCancelled()
         try:
-            if cancel.is_set():
-                from ..gui_admission import AdmissionCancelled
-                raise AdmissionCancelled()
-            admitted()
-            return self._generate(request, files, cancel)
-        finally:
-            _GENERATION_LOCK.release()
+            with INFERENCE.hold(cancel):
+                with self._profile_owner(cancel, files.root):
+                    admitted()
+                    return self._generate(request, files, cancel)
+        except AdmissionBlocked:
+            raise ContentFailure("PROCESS_CLEANUP_FAILED") from None
+
+    @contextmanager
+    def _profile_owner(self, cancel, operations_root):
+        try:
+            with native_profile(self.experimental_profile, cancel, deadline=time.monotonic() + 30,
+                    operations_root=operations_root):
+                yield
+        except AdmissionBlocked:
+            INFERENCE.block()
+            raise ContentFailure("PROCESS_CLEANUP_FAILED") from None
+        except AdmissionTimeout:
+            raise ContentFailure("BUSY") from None
+        except (StorageFailure, ExperimentalProfileError, OSError):
+            raise ContentFailure("CLI_PROFILE_UNSAFE") from None
 
     def _generate(self, request: ContentInput[ResultT], files: OperationFiles,
                   cancel: threading.Event) -> ContentResult[ResultT]:
