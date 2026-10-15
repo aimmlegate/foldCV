@@ -1,0 +1,15 @@
+{
+  "schemaVersion": 1,
+  "id": "event_1",
+  "sequence": 1,
+  "projectId": "project_1",
+  "conversationId": "conversation_1",
+  "runId": "run_1",
+  "timestamp": "2026-10-15T12:00:00+00:00",
+  "type": "edit.offered",
+  "payload": {
+    "batchId": "batch_1",
+    "disposition": "offered",
+    "error": null
+  }
+}

@@ -1,0 +1,17 @@
+{
+  "additionalProperties": false,
+  "properties": {
+    "batchId": {
+      "maxLength": 128,
+      "minLength": 1,
+      "pattern": "^[A-Za-z0-9_-]+$",
+      "title": "Batchid",
+      "type": "string"
+    }
+  },
+  "required": [
+    "batchId"
+  ],
+  "title": "AgentApplyRequest",
+  "type": "object"
+}

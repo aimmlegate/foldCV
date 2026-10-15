@@ -1,0 +1,24 @@
+{
+  "disposition": "prepared",
+  "batchId": "batch_1",
+  "affected": [
+    {
+      "blockId": "profile",
+      "cellId": null,
+      "recordId": null,
+      "fieldKey": null,
+      "start": 0,
+      "end": 16,
+      "text": "Python developer",
+      "dependencies": [
+        {
+          "kind": "block",
+          "id": "profile",
+          "revision": 1,
+          "fingerprint": null
+        }
+      ]
+    }
+  ],
+  "preview": "Improve the existing Python wording."
+}

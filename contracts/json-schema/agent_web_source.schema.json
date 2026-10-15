@@ -1,0 +1,75 @@
+{
+  "additionalProperties": false,
+  "properties": {
+    "contentSha256": {
+      "pattern": "^[a-f0-9]{64}$",
+      "title": "Contentsha256",
+      "type": "string"
+    },
+    "finalUrl": {
+      "maxLength": 4096,
+      "minLength": 1,
+      "title": "Finalurl",
+      "type": "string"
+    },
+    "id": {
+      "maxLength": 128,
+      "minLength": 1,
+      "pattern": "^[A-Za-z0-9_-]+$",
+      "title": "Id",
+      "type": "string"
+    },
+    "originalBytes": {
+      "minimum": 0,
+      "title": "Originalbytes",
+      "type": "integer"
+    },
+    "requestedUrl": {
+      "maxLength": 4096,
+      "minLength": 1,
+      "title": "Requestedurl",
+      "type": "string"
+    },
+    "retrievedAt": {
+      "format": "date-time",
+      "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(?:\\.\\d+)?(?:Z|\\+00:00)$",
+      "title": "Retrievedat",
+      "type": "string"
+    },
+    "runId": {
+      "maxLength": 128,
+      "minLength": 1,
+      "pattern": "^[A-Za-z0-9_-]+$",
+      "title": "Runid",
+      "type": "string"
+    },
+    "text": {
+      "title": "Text",
+      "type": "string"
+    },
+    "title": {
+      "maxLength": 512,
+      "title": "Title",
+      "type": "string"
+    },
+    "truncated": {
+      "title": "Truncated",
+      "type": "boolean"
+    }
+  },
+  "required": [
+    "id",
+    "runId",
+    "requestedUrl",
+    "finalUrl",
+    "title",
+    "retrievedAt",
+    "contentSha256",
+    "text",
+    "truncated",
+    "originalBytes"
+  ],
+  "title": "AgentWebSource",
+  "type": "object",
+  "x-maxSerializedBytes": 65536
+}

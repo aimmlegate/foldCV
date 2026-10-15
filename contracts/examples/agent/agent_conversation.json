@@ -1,0 +1,110 @@
+{
+  "schemaVersion": 1,
+  "id": "conversation_1",
+  "projectId": "project_1",
+  "createdAt": "2026-10-15T12:00:00+00:00",
+  "updatedAt": "2026-10-15T12:00:01+00:00",
+  "messages": [
+    {
+      "id": "user_message_1",
+      "role": "user",
+      "text": "Check the Python evidence.",
+      "runId": "run_1",
+      "timestamp": "2026-10-15T12:00:00+00:00",
+      "sources": [],
+      "findings": [],
+      "truncated": false,
+      "error": null
+    },
+    {
+      "id": "message_1",
+      "role": "assistant",
+      "text": "The resume supports Python. Asyncio evidence is missing.",
+      "runId": "run_1",
+      "timestamp": "2026-10-15T12:00:00+00:00",
+      "sources": [
+        {
+          "id": "source_1",
+          "label": "Public vacancy"
+        }
+      ],
+      "findings": [
+        {
+          "id": "finding_1",
+          "label": "Missing evidence"
+        }
+      ],
+      "truncated": false,
+      "error": null
+    }
+  ],
+  "runs": [
+    {
+      "id": "run_1",
+      "conversationId": "conversation_1",
+      "projectId": "project_1",
+      "clientRequestId": "send_1",
+      "ownerEpoch": 1,
+      "state": "completed",
+      "allowEdits": true,
+      "allowWeb": true,
+      "scope": {
+        "kind": "resume"
+      },
+      "model": "assistant-model",
+      "connectionEpoch": "account_1",
+      "settingsRevision": 1,
+      "createdAt": "2026-10-15T12:00:00+00:00",
+      "deadline": "2026-10-15T12:03:00+00:00",
+      "finishedAt": "2026-10-15T12:00:01+00:00",
+      "usage": null,
+      "error": null,
+      "savedBatchId": null,
+      "outcomeUnknown": false
+    }
+  ],
+  "sources": [
+    {
+      "id": "source_1",
+      "runId": "run_1",
+      "requestedUrl": "https://example.invalid/vacancy",
+      "finalUrl": "https://example.invalid/vacancy",
+      "title": "Synthetic vacancy",
+      "retrievedAt": "2026-10-15T12:00:00+00:00",
+      "contentSha256": "ab022ccd37d56152d7d4cbcd2671e9ab5f0d218d34bc4ff2dccf81e615387e35",
+      "text": "Python and asyncio",
+      "truncated": false,
+      "originalBytes": 18
+    }
+  ],
+  "findings": [
+    {
+      "id": "finding_1",
+      "runId": "run_1",
+      "severity": "warning",
+      "message": "No asyncio evidence in the captured resume.",
+      "anchors": [
+        {
+          "blockId": "profile",
+          "cellId": null,
+          "recordId": null,
+          "fieldKey": null,
+          "start": 0,
+          "end": 16,
+          "text": "Python developer",
+          "dependencies": [
+            {
+              "kind": "block",
+              "id": "profile",
+              "revision": 1,
+              "fingerprint": null
+            }
+          ]
+        }
+      ],
+      "sourceIds": [
+        "source_1"
+      ]
+    }
+  ]
+}

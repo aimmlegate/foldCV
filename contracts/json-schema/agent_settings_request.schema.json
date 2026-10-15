@@ -1,0 +1,33 @@
+{
+  "additionalProperties": false,
+  "properties": {
+    "enabled": {
+      "title": "Enabled",
+      "type": "boolean"
+    },
+    "expectedRevision": {
+      "minimum": 1,
+      "title": "Expectedrevision",
+      "type": "integer"
+    },
+    "selectedAgentModel": {
+      "anyOf": [
+        {
+          "pattern": "^[a-zA-Z0-9][a-zA-Z0-9._-]{0,79}$",
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "title": "Selectedagentmodel"
+    }
+  },
+  "required": [
+    "expectedRevision",
+    "enabled",
+    "selectedAgentModel"
+  ],
+  "title": "AgentSettingsRequest",
+  "type": "object"
+}

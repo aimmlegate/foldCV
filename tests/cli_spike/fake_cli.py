@@ -47,6 +47,10 @@ if args == ["login", "status"]:
     print("Logged in using an API key: synthetic-secret" if case == "api_key" else "Logged in using ChatGPT", file=sys.stderr)
     sys.exit(0)
 if args and args[0] == "app-server":
+    if config.get("agent"):
+        from fake_agent import serve
+        serve(config, base)
+        sys.exit(0)
     for raw in sys.stdin:
         event = json.loads(raw)
         method = event["method"]

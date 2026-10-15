@@ -1,4 +1,5 @@
 import { validateRecoveryShape } from "./recovery-validate.js";
+import { validateAgentShape } from "./agent-validate.js";
 import Ajv2020 from "ajv/dist/2020.js";
 import addFormats from "ajv-formats";
 import projectSchema from "../../../../contracts/json-schema/project.schema.json" with { type: "json" };
@@ -466,6 +467,7 @@ function safePrepare(data: unknown): boolean {
 
 export function validateContract(kind: string, data: unknown): boolean {
   if (!finiteJson(data)) return false;
+  if (kind.startsWith("agent_")) return wellFormedUnicode(data) && validateAgentShape(kind, data) && recoveryDatesOk(data);
   switch (kind) {
     case "project": return projectShape(data) && semanticProject(data);
     case "proposal": return proposalShape(data);

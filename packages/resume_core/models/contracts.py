@@ -604,10 +604,12 @@ def validate_contract(kind: str, data: object) -> Wire:
     from ..gui_normalization import GUI_NORMALIZATION_CONTRACTS
     from ..gui_drafting import GUI_DRAFT_CONTRACTS
     from ..gui_projects import GUI_PROJECT_CONTRACTS
+    from .agent import AGENT_CONTRACTS
     models.update(RECOVERY_CONTRACTS)
     models.update(GUI_NORMALIZATION_CONTRACTS)
     models.update(GUI_DRAFT_CONTRACTS)
     models.update(GUI_PROJECT_CONTRACTS)
+    models.update(AGENT_CONTRACTS)
     if kind not in models:
         raise ValueError("unknown contract")
     result = models[kind].model_validate(data)

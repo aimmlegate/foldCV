@@ -73,10 +73,14 @@ def cut_inline(content, start, end):
     return result
 
 
+def mutation_sha256(request):
+    return hashlib.sha256(request.model_dump_json(by_alias=True).encode()).hexdigest()
+
+
 def apply_rich_mutation(workspace: WorkspaceV6, request):
     if request.project_id != workspace.project_id or workspace.project is None:
         raise RichMutationFailure("RICH_PROJECT_MISMATCH")
-    checksum = hashlib.sha256(request.model_dump_json(by_alias=True).encode()).hexdigest()
+    checksum = mutation_sha256(request)
     replay = next((item for item in workspace.mutation_replay if item.client_mutation_id == request.client_mutation_id), None)
     if replay:
         if replay.request_sha256 != checksum:

@@ -152,7 +152,8 @@ def test_migration_inventory_accounts_for_all_requirements_and_browser_specs():
     inventory = json.loads((ROOT / "docs/gui/handoffs/A00/inventory.json").read_text())
     current = json.loads((ROOT / "tests/requirements.json").read_text())
     new_rich_ids = {"NE-RICH", "NE-HISTORY", "NE-ASSETS", "NE-SYNC", "NE-FACTS", "NE-DATES", "NE-TEMPLATE"}
-    assert {entry["requirement"] for entry in inventory["requirements"]} | new_rich_ids == {
+    agent_ids = {"AG-RUNTIME", "AG-MODELS", "AG-WEB", "AG-EDITS", "AG-HISTORY", "AG-STORAGE", "AG-UI"}
+    assert {entry["requirement"] for entry in inventory["requirements"]} | new_rich_ids | agent_ids == {
         entry["id"] for entry in current["entries"]}
     assert len(inventory["requirements"]) == 22
     assert {entry["path"] for entry in inventory["browserSpecs"] + inventory.get("recoveryBrowserSpecs", [])} == {

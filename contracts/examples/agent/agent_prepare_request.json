@@ -1,0 +1,108 @@
+{
+  "key": "prepare_1",
+  "snapshotIds": [
+    "read_1"
+  ],
+  "operations": [
+    {
+      "kind": "replace_text",
+      "target": {
+        "snapshotId": "read_1",
+        "blockId": "profile",
+        "cellId": null,
+        "field": "content",
+        "start": 0,
+        "end": 16
+      },
+      "content": [
+        {
+          "text": "Python developer",
+          "marks": []
+        }
+      ]
+    },
+    {
+      "kind": "insert_blocks",
+      "destination": {
+        "snapshotId": "read_1",
+        "parentId": "body",
+        "afterId": "profile"
+      },
+      "blocks": [
+        {
+          "key": "new_note",
+          "kind": "paragraph",
+          "content": [
+            {
+              "text": "Built HTTP APIs.",
+              "marks": []
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "kind": "delete_blocks",
+      "snapshotId": "read_1",
+      "blockIds": [
+        "old_note"
+      ]
+    },
+    {
+      "kind": "move_blocks",
+      "snapshotId": "read_1",
+      "blockIds": [
+        "skills"
+      ],
+      "destination": {
+        "snapshotId": "read_1",
+        "parentId": "body",
+        "afterId": "new_note"
+      }
+    },
+    {
+      "kind": "update_fact",
+      "snapshotId": "read_1",
+      "recordId": "candidate",
+      "fieldKey": "title",
+      "value": {
+        "status": "known",
+        "value": "Python developer",
+        "text": "Python developer"
+      },
+      "evidence": [
+        {
+          "kind": "source",
+          "sourceId": "source_resume",
+          "unitId": "unit_1"
+        }
+      ]
+    },
+    {
+      "kind": "create_fact",
+      "key": "new_language",
+      "recordKind": "language",
+      "ownerRecordId": null,
+      "values": {
+        "language": {
+          "status": "known",
+          "value": "English",
+          "text": "English"
+        }
+      },
+      "correction": {
+        "kind": "user_correction",
+        "quote": "Add English"
+      }
+    },
+    {
+      "kind": "delete_fact",
+      "snapshotId": "read_1",
+      "recordId": "old_language",
+      "correction": {
+        "kind": "user_correction",
+        "quote": "Remove the old language"
+      }
+    }
+  ]
+}

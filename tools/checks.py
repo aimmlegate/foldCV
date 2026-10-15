@@ -122,7 +122,8 @@ def validate_map() -> None:
     ids = {entry["id"] for entry in entries}
     expected = {"C01", "X01", "X02", "F01", "P01", "P02", "G01", "G02", "G03", "S01",
                 "U01", "U02", "D01", "D02", "A01", "A02", "E01", "E02", "R01", "B01", "N01", "L01",
-                "NE-RICH", "NE-HISTORY", "NE-ASSETS", "NE-SYNC", "NE-FACTS", "NE-DATES", "NE-TEMPLATE"}
+                "NE-RICH", "NE-HISTORY", "NE-ASSETS", "NE-SYNC", "NE-FACTS", "NE-DATES", "NE-TEMPLATE",
+                "AG-RUNTIME", "AG-MODELS", "AG-WEB", "AG-EDITS", "AG-HISTORY", "AG-STORAGE", "AG-UI"}
     if ids != expected or len(entries) != len(expected):
         raise SystemExit("Requirement map IDs do not match docs/gui/testing.md")
     assert_partial_checks(entries, data.get("partialChecks"))

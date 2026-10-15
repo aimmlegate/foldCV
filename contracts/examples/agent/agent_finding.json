@@ -1,0 +1,28 @@
+{
+  "id": "finding_1",
+  "runId": "run_1",
+  "severity": "warning",
+  "message": "No asyncio evidence in the captured resume.",
+  "anchors": [
+    {
+      "blockId": "profile",
+      "cellId": null,
+      "recordId": null,
+      "fieldKey": null,
+      "start": 0,
+      "end": 16,
+      "text": "Python developer",
+      "dependencies": [
+        {
+          "kind": "block",
+          "id": "profile",
+          "revision": 1,
+          "fingerprint": null
+        }
+      ]
+    }
+  ],
+  "sourceIds": [
+    "source_1"
+  ]
+}

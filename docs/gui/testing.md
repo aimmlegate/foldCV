@@ -96,6 +96,21 @@ measured rendering/Word remain unimplemented until their owning tasks pass.
 | NE-DATES | Exact uncertainty predicates, monthly/daily cascade examples and nonblocking behavior; NE09 |
 | NE-TEMPLATE | Rich editable DOCX, font/geometry/overflow and manual Word result; NE04–NE06/NE10/NE11 |
 
+AG01 adds seven grouped assistant IDs, preserving the historical inventory:
+
+- `AG-RUNTIME`: native tools, restrictions, lifecycle and provider errors; AC01/02/04/13.
+- `AG-MODELS`: independent persisted choices and captured runtime model; AC18.
+- `AG-WEB`: research, fetch bounds and enforced check-only mode; AC05/06/07.
+- `AG-EDITS`: scoped typed edits, fact authority and canonical validation; AC08/09/10.
+- `AG-HISTORY`: idempotency, concurrency and durable shared-history outcomes; AC03/11/12.
+- `AG-STORAGE`: recovery, bounded records/pages and capacity reservations; AC14/15.
+- `AG-UI`: T3 assistant behavior and existing workflow regression; AC16/17.
+
+Use `tests/recovery/test_agent_*.py` and `apps/web/unit/agent-*.test.ts` for
+nonbrowser checks. Keep unimplemented groups empty and partial checks explicit.
+AG00/AG02 share three native starts; AG08 has three separate starts. AG00's
+feasibility proof does not mark product runtime/UI groups implemented.
+
 Use focused nonbrowser checks per patch and the full fast gate at each run's end.
 The old 60-second, strict candidate exclusions and block-restore assertions below
 are historical. Current GUI stages keep the 180-second single-attempt ceiling.
@@ -137,7 +152,7 @@ The [recovery plan](flow-recovery-plan.md) defines the next iteration. The table
 below overrides conflicting assertions in the legacy T00–T17 strategy that follows.
 It is a migration contract, not a claim that replacement tests already exist.
 
-`tests/requirements.json` currently accounts for 22 requirement IDs, including
+The original recovery `tests/requirements.json` accounts for 22 requirement IDs, including
 links to 10 browser spec files. `tools/checks.py` checks that mapped tests actually
 exist. A00 inventories those mappings; each implementation task adds its tests
 and updates affected mappings together. Leave the map unchanged during planning.

@@ -2220,5 +2220,639 @@
       "value": 0
     }
   ]
-}
+},
+  {
+    "name": "agent agent_settings valid",
+    "contract": "agent_settings",
+    "base": "agent_settings",
+    "valid": true,
+    "edits": []
+  },
+  {
+    "name": "agent agent_run_request valid",
+    "contract": "agent_run_request",
+    "base": "agent_run_request",
+    "valid": true,
+    "edits": []
+  },
+  {
+    "name": "agent agent_run valid",
+    "contract": "agent_run",
+    "base": "agent_run",
+    "valid": true,
+    "edits": []
+  },
+  {
+    "name": "agent agent_read_snapshot valid",
+    "contract": "agent_read_snapshot",
+    "base": "agent_read_snapshot",
+    "valid": true,
+    "edits": []
+  },
+  {
+    "name": "agent agent_message valid",
+    "contract": "agent_message",
+    "base": "agent_message",
+    "valid": true,
+    "edits": []
+  },
+  {
+    "name": "agent agent_web_source valid",
+    "contract": "agent_web_source",
+    "base": "agent_web_source",
+    "valid": true,
+    "edits": []
+  },
+  {
+    "name": "agent agent_finding valid",
+    "contract": "agent_finding",
+    "base": "agent_finding",
+    "valid": true,
+    "edits": []
+  },
+  {
+    "name": "agent agent_event valid",
+    "contract": "agent_event",
+    "base": "agent_event",
+    "valid": true,
+    "edits": []
+  },
+  {
+    "name": "agent agent_prepare_result valid",
+    "contract": "agent_prepare_result",
+    "base": "agent_prepare_result",
+    "valid": true,
+    "edits": []
+  },
+  {
+    "name": "agent agent_edit_receipt valid",
+    "contract": "agent_edit_receipt",
+    "base": "agent_edit_receipt",
+    "valid": true,
+    "edits": []
+  },
+  {
+    "name": "agent agent_prepare_request valid",
+    "contract": "agent_prepare_request",
+    "base": "agent_prepare_request",
+    "valid": true,
+    "edits": []
+  },
+  {
+    "name": "agent settings rejects inherited processing field",
+    "contract": "agent_settings",
+    "base": "agent_settings",
+    "valid": false,
+    "edits": [
+      {
+        "op": "set",
+        "path": [
+          "selectedModel"
+        ],
+        "value": "processing-model"
+      }
+    ]
+  },
+  {
+    "name": "agent settings requires explicit nullable choice",
+    "contract": "agent_settings",
+    "base": "agent_settings",
+    "valid": false,
+    "edits": [
+      {
+        "op": "remove",
+        "path": [
+          "selectedAgentModel"
+        ]
+      }
+    ]
+  },
+  {
+    "name": "agent settings revision positive",
+    "contract": "agent_settings",
+    "base": "agent_settings",
+    "valid": false,
+    "edits": [
+      {
+        "op": "set",
+        "path": [
+          "revision"
+        ],
+        "value": 0
+      }
+    ]
+  },
+  {
+    "name": "agent request counts Unicode points at exact limit",
+    "contract": "agent_run_request",
+    "base": "agent_run_request",
+    "valid": true,
+    "edits": [
+      {
+        "op": "repeat_text",
+        "path": [
+          "message"
+        ],
+        "text": "\ud83d\ude00",
+        "count": 8000
+      }
+    ]
+  },
+  {
+    "name": "agent request rejects one extra Unicode point",
+    "contract": "agent_run_request",
+    "base": "agent_run_request",
+    "valid": false,
+    "edits": [
+      {
+        "op": "repeat_text",
+        "path": [
+          "message"
+        ],
+        "text": "\ud83d\ude00",
+        "count": 8001
+      }
+    ]
+  },
+  {
+    "name": "agent request rejects lone surrogate",
+    "contract": "agent_run_request",
+    "base": "agent_run_request",
+    "valid": false,
+    "edits": [
+      {
+        "op": "set",
+        "path": [
+          "message"
+        ],
+        "value": "\ud800"
+      }
+    ]
+  },
+  {
+    "name": "agent request rejects raw path in identity",
+    "contract": "agent_run_request",
+    "base": "agent_run_request",
+    "valid": false,
+    "edits": [
+      {
+        "op": "set",
+        "path": [
+          "conversationId"
+        ],
+        "value": "../other"
+      }
+    ]
+  },
+  {
+    "name": "agent message exact UTF8 ceiling",
+    "contract": "agent_message",
+    "base": "agent_message",
+    "valid": true,
+    "edits": [
+      {
+        "op": "repeat_text",
+        "path": [
+          "text"
+        ],
+        "text": "\ud83d\ude00",
+        "count": 16384
+      }
+    ]
+  },
+  {
+    "name": "agent message one over UTF8 ceiling",
+    "contract": "agent_message",
+    "base": "agent_message",
+    "valid": false,
+    "edits": [
+      {
+        "op": "repeat_text",
+        "path": [
+          "text"
+        ],
+        "text": "\ud83d\ude00",
+        "count": 16385
+      }
+    ]
+  },
+  {
+    "name": "agent message escaped bytes bounded",
+    "contract": "agent_message",
+    "base": "agent_message",
+    "valid": false,
+    "edits": [
+      {
+        "op": "repeat_text",
+        "path": [
+          "text"
+        ],
+        "text": "\u0000",
+        "count": 22000
+      }
+    ]
+  },
+  {
+    "name": "agent source escaped bytes bounded",
+    "contract": "agent_web_source",
+    "base": "agent_web_source",
+    "valid": false,
+    "edits": [
+      {
+        "op": "repeat_text",
+        "path": [
+          "text"
+        ],
+        "text": "\u0000",
+        "count": 11000
+      }
+    ]
+  },
+  {
+    "name": "agent source rejects malformed UTC time",
+    "contract": "agent_web_source",
+    "base": "agent_web_source",
+    "valid": false,
+    "edits": [
+      {
+        "op": "set",
+        "path": [
+          "retrievedAt"
+        ],
+        "value": "2026-02-30T12:00:00+00:00"
+      }
+    ]
+  },
+  {
+    "name": "agent finding escaped bytes bounded",
+    "contract": "agent_finding",
+    "base": "agent_finding",
+    "valid": false,
+    "edits": [
+      {
+        "op": "repeat_text",
+        "path": [
+          "message"
+        ],
+        "text": "\u0000",
+        "count": 2800
+      }
+    ]
+  },
+  {
+    "name": "agent anchor UTF16 end cannot precede start",
+    "contract": "agent_finding",
+    "base": "agent_finding",
+    "valid": false,
+    "edits": [
+      {
+        "op": "set",
+        "path": [
+          "anchors",
+          0,
+          "end"
+        ],
+        "value": 0
+      },
+      {
+        "op": "set",
+        "path": [
+          "anchors",
+          0,
+          "start"
+        ],
+        "value": 1
+      }
+    ]
+  },
+  {
+    "name": "agent no hidden reasoning event",
+    "contract": "agent_event",
+    "base": "agent_event",
+    "valid": false,
+    "edits": [
+      {
+        "op": "set",
+        "path": [
+          "type"
+        ],
+        "value": "reasoning.delta"
+      },
+      {
+        "op": "set",
+        "path": [
+          "payload"
+        ],
+        "value": {
+          "text": "hidden"
+        }
+      }
+    ]
+  },
+  {
+    "name": "agent edit event has no mutation body",
+    "contract": "agent_event",
+    "base": "agent_event",
+    "valid": false,
+    "edits": [
+      {
+        "op": "set",
+        "path": [
+          "payload",
+          "mutation"
+        ],
+        "value": {}
+      }
+    ]
+  },
+  {
+    "name": "agent operation rejects raw provenance",
+    "contract": "agent_prepare_request",
+    "base": "agent_prepare_request",
+    "valid": false,
+    "edits": [
+      {
+        "op": "set",
+        "path": [
+          "operations",
+          0,
+          "provenance"
+        ],
+        "value": []
+      }
+    ]
+  },
+  {
+    "name": "agent operation rejects asset download",
+    "contract": "agent_prepare_request",
+    "base": "agent_prepare_request",
+    "valid": false,
+    "edits": [
+      {
+        "op": "set",
+        "path": [
+          "operations",
+          0,
+          "kind"
+        ],
+        "value": "create_image"
+      }
+    ]
+  },
+  {
+    "name": "agent operation rejects fabricated inline binding",
+    "contract": "agent_prepare_request",
+    "base": "agent_prepare_request",
+    "valid": false,
+    "edits": [
+      {
+        "op": "set",
+        "path": [
+          "operations",
+          0,
+          "content",
+          0,
+          "bindingId"
+        ],
+        "value": "forged"
+      }
+    ]
+  },
+  {
+    "name": "agent new fact needs user correction",
+    "contract": "agent_prepare_request",
+    "base": "agent_prepare_request",
+    "valid": false,
+    "edits": [
+      {
+        "op": "remove",
+        "path": [
+          "operations",
+          5,
+          "correction"
+        ]
+      }
+    ]
+  },
+  {
+    "name": "agent uncertain value cannot claim a fact",
+    "contract": "agent_prepare_request",
+    "base": "agent_prepare_request",
+    "valid": false,
+    "edits": [
+      {
+        "op": "set",
+        "path": [
+          "operations",
+          4,
+          "value",
+          "status"
+        ],
+        "value": "uncertain"
+      }
+    ]
+  },
+  {
+    "name": "agent empty operations are a valid no-op input",
+    "contract": "agent_prepare_request",
+    "base": "agent_prepare_request",
+    "valid": true,
+    "edits": [
+      {
+        "op": "set",
+        "path": [
+          "operations"
+        ],
+        "value": []
+      }
+    ]
+  },
+  {
+    "name": "agent no-change returns no batch",
+    "contract": "agent_prepare_result",
+    "base": "agent_prepare_result",
+    "valid": true,
+    "edits": [
+      {
+        "op": "set",
+        "path": [
+          "disposition"
+        ],
+        "value": "no_change"
+      },
+      {
+        "op": "set",
+        "path": [
+          "batchId"
+        ],
+        "value": null
+      }
+    ]
+  },
+  {
+    "name": "agent no-change cannot retain a batch",
+    "contract": "agent_prepare_result",
+    "base": "agent_prepare_result",
+    "valid": false,
+    "edits": [
+      {
+        "op": "set",
+        "path": [
+          "disposition"
+        ],
+        "value": "no_change"
+      }
+    ]
+  },
+  {
+    "name": "agent saved receipt needs durability",
+    "contract": "agent_edit_receipt",
+    "base": "agent_edit_receipt",
+    "valid": false,
+    "edits": [
+      {
+        "op": "set",
+        "path": [
+          "durable"
+        ],
+        "value": false
+      }
+    ]
+  },
+  {
+    "name": "agent saved receipt needs exact revisions",
+    "contract": "agent_edit_receipt",
+    "base": "agent_edit_receipt",
+    "valid": false,
+    "edits": [
+      {
+        "op": "set",
+        "path": [
+          "factsRevision"
+        ],
+        "value": null
+      }
+    ]
+  },
+  {
+    "name": "agent unknown outcome cannot claim durability",
+    "contract": "agent_edit_receipt",
+    "base": "agent_edit_receipt",
+    "valid": false,
+    "edits": [
+      {
+        "op": "set",
+        "path": [
+          "disposition"
+        ],
+        "value": "outcome_unknown"
+      }
+    ]
+  },
+  {
+    "name": "agent final delta alone is not terminal",
+    "contract": "agent_run",
+    "base": "agent_run",
+    "valid": false,
+    "edits": [
+      {
+        "op": "set",
+        "path": [
+          "state"
+        ],
+        "value": "completed"
+      }
+    ]
+  },
+  {
+    "name": "agent completion cannot hide uncertain save",
+    "contract": "agent_run",
+    "base": "agent_run",
+    "valid": false,
+    "edits": [
+      {
+        "op": "set",
+        "path": [
+          "state"
+        ],
+        "value": "completed"
+      },
+      {
+        "op": "set",
+        "path": [
+          "finishedAt"
+        ],
+        "value": "2026-10-15T12:00:00+00:00"
+      },
+      {
+        "op": "set",
+        "path": [
+          "outcomeUnknown"
+        ],
+        "value": true
+      }
+    ]
+  },
+  {
+    "name": "agent read query has no raw rich enum extension",
+    "contract": "agent_read_snapshot",
+    "base": "agent_read_snapshot",
+    "valid": false,
+    "edits": [
+      {
+        "op": "set",
+        "path": [
+          "dependencies",
+          0,
+          "stamp",
+          "kind"
+        ],
+        "value": "query"
+      }
+    ]
+  },
+  {
+    "name": "agent conversation references valid",
+    "contract": "agent_conversation",
+    "base": "agent_conversation",
+    "valid": true,
+    "edits": []
+  },
+  {
+    "name": "agent conversation rejects an unstored source",
+    "contract": "agent_conversation",
+    "base": "agent_conversation",
+    "valid": false,
+    "edits": [
+      {
+        "op": "set",
+        "path": [
+          "messages",
+          1,
+          "sources",
+          0,
+          "id"
+        ],
+        "value": "fabricated_source"
+      }
+    ]
+  },
+  {
+    "name": "agent conversation rejects a foreign run",
+    "contract": "agent_conversation",
+    "base": "agent_conversation",
+    "valid": false,
+    "edits": [
+      {
+        "op": "set",
+        "path": [
+          "runs",
+          0,
+          "projectId"
+        ],
+        "value": "foreign_project"
+      }
+    ]
+  }
+
 ]

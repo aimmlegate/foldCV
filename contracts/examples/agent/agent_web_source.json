@@ -1,0 +1,12 @@
+{
+  "id": "source_1",
+  "runId": "run_1",
+  "requestedUrl": "https://example.invalid/vacancy",
+  "finalUrl": "https://example.invalid/vacancy",
+  "title": "Synthetic vacancy",
+  "retrievedAt": "2026-10-15T12:00:00+00:00",
+  "contentSha256": "ab022ccd37d56152d7d4cbcd2671e9ab5f0d218d34bc4ff2dccf81e615387e35",
+  "text": "Python and asyncio",
+  "truncated": false,
+  "originalBytes": 18
+}

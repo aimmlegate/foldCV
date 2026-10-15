@@ -1,0 +1,233 @@
+{
+  "$defs": {
+    "AgentEntityDependency": {
+      "additionalProperties": false,
+      "properties": {
+        "kind": {
+          "const": "entity",
+          "title": "Kind",
+          "type": "string"
+        },
+        "stamp": {
+          "$ref": "#/$defs/DependencyStamp"
+        }
+      },
+      "required": [
+        "kind",
+        "stamp"
+      ],
+      "title": "AgentEntityDependency",
+      "type": "object"
+    },
+    "AgentQuery": {
+      "additionalProperties": false,
+      "properties": {
+        "cursor": {
+          "anyOf": [
+            {
+              "maxLength": 512,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Cursor"
+        },
+        "ids": {
+          "items": {
+            "maxLength": 256,
+            "minLength": 1,
+            "type": "string"
+          },
+          "maxItems": 100,
+          "title": "Ids",
+          "type": "array"
+        },
+        "kind": {
+          "enum": [
+            "context",
+            "document",
+            "find",
+            "facts",
+            "source",
+            "history"
+          ],
+          "title": "Kind",
+          "type": "string"
+        },
+        "parentId": {
+          "anyOf": [
+            {
+              "maxLength": 256,
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Parentid"
+        },
+        "text": {
+          "default": "",
+          "maxLength": 1000,
+          "title": "Text",
+          "type": "string"
+        }
+      },
+      "required": [
+        "kind"
+      ],
+      "title": "AgentQuery",
+      "type": "object"
+    },
+    "AgentQueryDependency": {
+      "additionalProperties": false,
+      "properties": {
+        "fingerprint": {
+          "pattern": "^[a-f0-9]{64}$",
+          "title": "Fingerprint",
+          "type": "string"
+        },
+        "kind": {
+          "const": "query",
+          "title": "Kind",
+          "type": "string"
+        },
+        "query": {
+          "$ref": "#/$defs/AgentQuery"
+        }
+      },
+      "required": [
+        "kind",
+        "query",
+        "fingerprint"
+      ],
+      "title": "AgentQueryDependency",
+      "type": "object"
+    },
+    "DependencyStamp": {
+      "additionalProperties": false,
+      "properties": {
+        "fingerprint": {
+          "anyOf": [
+            {
+              "pattern": "^[a-f0-9]{64}$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Fingerprint"
+        },
+        "id": {
+          "minLength": 1,
+          "title": "Id",
+          "type": "string"
+        },
+        "kind": {
+          "enum": [
+            "block",
+            "record",
+            "field",
+            "period",
+            "ownership",
+            "source",
+            "rules",
+            "asset",
+            "timeline_order"
+          ],
+          "title": "Kind",
+          "type": "string"
+        },
+        "revision": {
+          "minimum": 1,
+          "title": "Revision",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "kind",
+        "id",
+        "revision",
+        "fingerprint"
+      ],
+      "title": "DependencyStamp",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "contentSha256": {
+      "pattern": "^[a-f0-9]{64}$",
+      "title": "Contentsha256",
+      "type": "string"
+    },
+    "dependencies": {
+      "items": {
+        "discriminator": {
+          "mapping": {
+            "entity": "#/$defs/AgentEntityDependency",
+            "query": "#/$defs/AgentQueryDependency"
+          },
+          "propertyName": "kind"
+        },
+        "oneOf": [
+          {
+            "$ref": "#/$defs/AgentEntityDependency"
+          },
+          {
+            "$ref": "#/$defs/AgentQueryDependency"
+          }
+        ]
+      },
+      "maxItems": 2000,
+      "title": "Dependencies",
+      "type": "array"
+    },
+    "id": {
+      "maxLength": 128,
+      "minLength": 1,
+      "pattern": "^[A-Za-z0-9_-]+$",
+      "title": "Id",
+      "type": "string"
+    },
+    "nextCursor": {
+      "anyOf": [
+        {
+          "maxLength": 512,
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "title": "Nextcursor"
+    },
+    "runId": {
+      "maxLength": 128,
+      "minLength": 1,
+      "pattern": "^[A-Za-z0-9_-]+$",
+      "title": "Runid",
+      "type": "string"
+    },
+    "truncated": {
+      "title": "Truncated",
+      "type": "boolean"
+    }
+  },
+  "required": [
+    "id",
+    "runId",
+    "contentSha256",
+    "dependencies",
+    "truncated",
+    "nextCursor"
+  ],
+  "title": "AgentReadSnapshot",
+  "type": "object"
+}

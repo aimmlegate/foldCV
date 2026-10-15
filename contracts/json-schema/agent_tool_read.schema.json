@@ -1,0 +1,80 @@
+{
+  "$defs": {
+    "AgentQuery": {
+      "additionalProperties": false,
+      "properties": {
+        "cursor": {
+          "anyOf": [
+            {
+              "maxLength": 512,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Cursor"
+        },
+        "ids": {
+          "items": {
+            "maxLength": 256,
+            "minLength": 1,
+            "type": "string"
+          },
+          "maxItems": 100,
+          "title": "Ids",
+          "type": "array"
+        },
+        "kind": {
+          "enum": [
+            "context",
+            "document",
+            "find",
+            "facts",
+            "source",
+            "history"
+          ],
+          "title": "Kind",
+          "type": "string"
+        },
+        "parentId": {
+          "anyOf": [
+            {
+              "maxLength": 256,
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Parentid"
+        },
+        "text": {
+          "default": "",
+          "maxLength": 1000,
+          "title": "Text",
+          "type": "string"
+        }
+      },
+      "required": [
+        "kind"
+      ],
+      "title": "AgentQuery",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "query": {
+      "$ref": "#/$defs/AgentQuery"
+    }
+  },
+  "required": [
+    "query"
+  ],
+  "title": "AgentToolRead",
+  "type": "object"
+}
