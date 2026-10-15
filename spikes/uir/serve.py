@@ -173,7 +173,7 @@ async def main(args):
     app.session = None; app.secret = secret
     projects_path = root / "fixture-projects.json"
     projects = json.loads(projects_path.read_text()) if projects_path.exists() else json.loads((FIXTURES / "manifest.json").read_text())["projects"]
-    proof_url = origin + "/uir-proof.html?project=" + projects["structured"] if args.slice == "UIR01" else origin + "/reference/"
+    proof_url = origin + "/uir-proof.html?project=" + projects["structured"] if args.slice != "UIR00" else origin + "/reference/"
     info["proofUrl"] = proof_url
     launch = root / "launch.json"
     write_json(launch, {"origin": origin, "url": proof_url + "#secret=" + secret, "pid": os.getpid()}); launch.chmod(0o600)
@@ -197,6 +197,6 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--root", type=Path, required=True); parser.add_argument("--port", type=int, default=0)
     parser.add_argument("--dist", type=Path); parser.add_argument("--freeze", action="store_true")
-    parser.add_argument("--slice", choices=["UIR00", "UIR01"], default="UIR00")
+    parser.add_argument("--slice", choices=[f"UIR{i:02}" for i in range(10)], default="UIR00")
     parser.add_argument("--no-checkpoint", action="store_true")
     asyncio.run(main(parser.parse_args()))

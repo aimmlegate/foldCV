@@ -1,6 +1,5 @@
 import type { ResumeInput } from "./import-source";
 import { hasInput } from "./import-source";
-import sample from "../../../../tests/fixtures/recovery/E1.txt?raw";
 
 export function NewResume({ input, change, busy, sourceName, process }: {
   input: ResumeInput; change: (input: ResumeInput) => void; busy: boolean; sourceName: string | null;
@@ -16,7 +15,6 @@ export function NewResume({ input, change, busy, sourceName, process }: {
     </div>
     <label className="next-paste-label">Или вставьте текст<textarea aria-label="Текст резюме" value={input.kind === "text" ? input.text : ""}
       disabled={busy} onChange={event => change({ kind: "text", text: event.target.value })} rows={12} /></label>
-    <button disabled={busy} onClick={() => change({ kind: "text", text: sample })}>Вставить пример</button>
     {!hasInput(input) && sourceName && <p className="next-selected">Выбран источник: {sourceName}</p>}
     <button className="next-create" disabled={busy || (!hasInput(input) && !sourceName)} onClick={process}>Обработать</button>
   </section>;

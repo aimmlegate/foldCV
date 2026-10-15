@@ -3,7 +3,7 @@ import { createReactBlockSpec, createReactInlineContentSpec, useCreateBlockNote,
 import { BlockNoteView } from "@blocknote/shadcn";
 import { AllSelection, TextSelection, Plugin, PluginKey } from "@tiptap/pm/state";
 import { Extension } from "@tiptap/core";
-import { createContext, useCallback, useContext, useEffect, useImperativeHandle, useMemo, useRef, useState, type Ref } from "react";
+import { createContext, useCallback, useContext, useEffect, useImperativeHandle, useMemo, useRef, useState, type ReactNode, type Ref } from "react";
 import * as Popover from "@radix-ui/react-popover";
 import type { RichDocumentV1 } from "../contracts/generated/rich_document_v1";
 import type { RichProjectResponse } from "../contracts/generated/rich_project_response";
@@ -115,9 +115,9 @@ export type RichEditorHandle = { flush: () => Promise<RichProjectResponse>; undo
   assistantBaseline: (captured: CapturedEditorSelection | null) => Promise<{ response: RichProjectResponse; selection: RichSelection | null }>;
   focusFinding: (anchor: AgentFinding["anchors"][number]) => boolean;
   applyAssistant: (batchId: string, api: PreparedApi) => Promise<void> };
-export function RichEditor({ initial, acknowledge, onStatus, ref, onHistoryNavigation, onAssistantFence, appearance = "reference", portalHost }: { initial: RichProjectResponse;
+export function RichEditor({ initial, acknowledge, onStatus, ref, onHistoryNavigation, onAssistantFence, appearance = "reference", portalHost, contextActions }: { initial: RichProjectResponse;
   acknowledge: (response: RichProjectResponse) => void; onStatus: (status: string) => void; ref: Ref<RichEditorHandle>;
-  onHistoryNavigation?: () => void; onAssistantFence?: (saved: boolean) => void; appearance?: "reference" | "prototype"; portalHost?: HTMLElement }) {
+  onHistoryNavigation?: () => void; onAssistantFence?: (saved: boolean) => void; appearance?: "reference" | "prototype"; portalHost?: HTMLElement; contextActions?: ReactNode }) {
   const project = initial.workspace.project;
   if (!project) throw new Error("Document is missing");
   const initialFacts = project.facts;
@@ -810,7 +810,7 @@ export function RichEditor({ initial, acknowledge, onStatus, ref, onHistoryNavig
     <div className={appearance === "prototype" ? "editor-body uir-editor-body" : "rich-workspace"}><FactsPanel facts={facts} submit={command => bridge.panel(command)} hidden={!factsVisible} close={() => setFactsVisible(false)}
       timeline={ready ? <Timeline facts={facts} anchors={anchors} controls={timelineControls} /> : null} />
     <div className={appearance === "prototype" ? "document-workspace" : "rich-editor-document"}>
-    {appearance === "prototype" && <div className="document-context"><div className="context-left"><span>Исходный текст</span><span>Шаблон FoldCV</span></div></div>}
+    {appearance === "prototype" && <div className="document-context"><div className="context-left"><span>Исходный текст</span><span>Шаблон FoldCV</span></div>{contextActions}</div>}
     <div className={appearance === "prototype" ? "paper-scroll" : undefined}>
     <div className={appearance === "prototype" ? "cv-document resume-paper uir-prototype" : "cv-document"} style={appearance === "prototype" ? undefined : { ...referenceVariables, color: "#000000" }} data-project-id={initial.workspace.projectId}
       data-history-position={bridge.history?.position ?? 0} data-history-length={bridge.history?.length ?? 0} data-composing={bridge.composing}>
