@@ -3,6 +3,8 @@ export type Errorcode = string | null;
 export type Id = string;
 export type Stage = "assess_resume" | "normalize_semantics" | "draft_prose" | "assemble" | "render";
 export type Status = "queued" | "running" | "completed" | "failed" | "cancelled" | "interrupted";
+export type Subtitle = string;
+export type Title = string;
 export type Logo = string | null;
 export type Role =
   | "body"
@@ -699,7 +701,7 @@ export type Kind26 = "text" | "blocks" | "table_cells";
 export type Textsha256 = string;
 export type Status8 = "pending" | "failed" | "conflict" | "applied" | "stale";
 export type Syncrecords = RichSyncRecord[];
-export type Title = string;
+export type Title1 = string;
 export type Titlemanuallyset = boolean;
 export type Updatedat = string;
 export type Blockids2 = string[];
@@ -716,6 +718,7 @@ export type Warnings2 = RichWarning[];
 export interface RichProjectResponse {
   durability: Durability;
   generation: RichGenerationState | null;
+  identity?: ResumeIdentity | null;
   presentation?: RichPresentation | null;
   saveError: Saveerror;
   savedDocumentRevision: Saveddocumentrevision;
@@ -727,6 +730,10 @@ export interface RichGenerationState {
   id: Id;
   stage: Stage;
   status: Status;
+}
+export interface ResumeIdentity {
+  subtitle: Subtitle;
+  title: Title;
 }
 export interface RichPresentation {
   blocks: Blocks;
@@ -751,7 +758,7 @@ export interface WorkspaceV6 {
   schemaVersion: Schemaversion2;
   sourceObservedAt: PartialDate | null;
   syncRecords: Syncrecords;
-  title: Title;
+  title: Title1;
   titleManuallySet: Titlemanuallyset;
   updatedAt: Updatedat;
   warnings: Warnings2;

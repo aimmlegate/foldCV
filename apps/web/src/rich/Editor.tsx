@@ -1,9 +1,9 @@
 import { BlockNoteSchema, createExtension, defaultBlockSpecs, defaultInlineContentSpecs, parseDefaultProps, type Block, type PartialBlock } from "@blocknote/core";
-import { createReactBlockSpec, createReactInlineContentSpec, useCreateBlockNote, SuggestionMenuController, getDefaultReactSlashMenuItems } from "@blocknote/react";
+import { createReactBlockSpec, createReactInlineContentSpec, useCreateBlockNote, SuggestionMenuController, getDefaultReactSlashMenuItems, FormattingToolbarController, SideMenuController } from "@blocknote/react";
 import { BlockNoteView } from "@blocknote/shadcn";
 import { AllSelection, Plugin, PluginKey } from "@tiptap/pm/state";
 import { Extension } from "@tiptap/core";
-import { useEffect, useImperativeHandle, useMemo, useRef, useState, type Ref } from "react";
+import { useCallback, useEffect, useImperativeHandle, useMemo, useRef, useState, type Ref } from "react";
 import * as Popover from "@radix-ui/react-popover";
 import type { RichDocumentV1 } from "../contracts/generated/rich_document_v1";
 import type { RichProjectResponse } from "../contracts/generated/rich_project_response";
@@ -35,6 +35,9 @@ import { image, ImageActions } from "./Image";
 import { structureIdentityAttributes, structureIdentityPlugin, readBlockSources } from "./structure-identity";
 import { copyBlock, moveBlock, mergeBlocks } from "./structure";
 import { deleteAcrossRegions, pastedRegionsPlugin, flattenPastedRegions } from "./regions";
+import { BlockPanel } from "./BlockPanel";
+import { BlockSideMenu, SelectionToolbar } from "./ContextMenus";
+import { commandBlock } from "./block-target";
 
 const region = createReactBlockSpec({ type: "region", content: "none", propSchema: {
   role: { default: "main", values: ["header", "sidebar", "main"] },
@@ -104,8 +107,12 @@ export function RichEditor({ initial, acknowledge, onStatus, ref }: { initial: R
   const [selecting, setSelecting] = useState(false);
   const [instruction, setInstruction] = useState("");
   const [rewriting, setRewriting] = useState(false);
+  const [rewriteOpen, setRewriteOpen] = useState(false);
+  const [factsVisible, setFactsVisible] = useState(true);
+  const [blockTarget, setBlockTarget] = useState<string | null>(null);
   const [syncRecords, setSyncRecords] = useState(initial.workspace.syncRecords);
-  const selection = useRef<ReturnType<typeof selectedRange>>(null);
+  const rewriteSelection = useRef<ReturnType<typeof selectedRange>>(null);
+  const rewriteAnchor = useRef({ getBoundingClientRect: () => new DOMRect() });
   const [editorWarning, setEditorWarning] = useState("");
   const [targets, setTargets] = useState<{ id: string; label: string }[]>([]);
   const presentation = useMemo<{ blocks: PresentationBlocks }>(() => ({ blocks: initial.presentation?.blocks ?? {} }), []);
@@ -120,7 +127,7 @@ export function RichEditor({ initial, acknowledge, onStatus, ref }: { initial: R
     current: new Map<string, CellValue>(), values: new Map<string, Stored>(), original: new Map<string, RichBlock>(),
     undo: () => {}, redo: () => {}, complete: () => {}, panel: async (_command: PanelCommand): Promise<void> => {}, rewrite: async (_instruction: string): Promise<void> => {}, retry: async (_id: string): Promise<void> => {}, resolve: async (_id: string): Promise<void> => {}, timer: null as ReturnType<typeof setTimeout> | null }), []);
   const assets = useMemo(() => ({ upload: async (_file: File, _block?: string, _after?: string): Promise<void> => {}, cancel: (_block: string) => {},
-    paste: (_event: ClipboardEvent | DragEvent): boolean => false, command: (_command: string, _target?: string) => {} }), []);
+    paste: (_event: ClipboardEvent | DragEvent): boolean => false, command: (_id: string, _command: string, _target?: string) => {} }), []);
   const timelineControls = useMemo<TimelineControls>(() => ({ read: () => bridge.timeline(),
     preview: anchor => bridge.cascadePreview(anchor), apply: proposal => bridge.cascadeApply(proposal) }), [bridge]);
   const extension = useMemo(() => createExtension({ key: "foldcv-rich-session", runsBefore: ["link"], tiptapExtensions: [tableIdentityAttributes, structureIdentityAttributes,
@@ -177,9 +184,17 @@ export function RichEditor({ initial, acknowledge, onStatus, ref }: { initial: R
     project.document.regions.map(region => ({ id: region.id, type: "region", props: { role: region.role }, children: region.blocks.map(toBlock) })) }, []);
 
   useEffect(() => editor.onSelectionChange(() => {
-    setSelecting(editor.transact(tr => !tr.selection.empty));
-    const next = editor.transact(tr => selectedRange(tr)); if (next) selection.current = next;
+    const next = editor.transact(tr => selectedRange(tr)); setSelecting(next !== null);
   }), [editor]);
+  const openRewrite = useCallback(() => {
+    const selected = editor.transact(tr => selectedRange(tr)), browserSelection = window.getSelection();
+    if (!selected || !browserSelection?.rangeCount) return;
+    const rect = browserSelection.getRangeAt(0).getBoundingClientRect();
+    rewriteAnchor.current = { getBoundingClientRect: () => rect };
+    rewriteSelection.current = structuredClone(selected); setRewriteOpen(true);
+  }, [editor]);
+  const selectionToolbar = useCallback(() => selecting ? <SelectionToolbar rewrite={openRewrite} disabled={rewriting} /> : null, [openRewrite, selecting, rewriting]);
+  const blockSideMenu = useCallback(() => <BlockSideMenu open={setBlockTarget} />, []);
   useEffect(() => { presentation.blocks = initial.presentation?.blocks ?? {};
     editor.transact(tr => { tr.setMeta("foldcv-presentation", true); });
   }, [editor, initial.presentation, presentation]);
@@ -259,10 +274,10 @@ export function RichEditor({ initial, acknowledge, onStatus, ref }: { initial: R
         restoreTableIdentities(tr, tableIds(document));
       });
     }
-    assets.command = (command, target) => {
+    assets.command = (id, command, target) => {
       try {
-      const selected = editor.getTextCursorPosition().block;
-      if (selected.type === "region") return;
+      const selected = commandBlock(id, block => editor.getBlock(block));
+      editor.setTextCursorPosition(selected.id, "start");
       bridge.group++;
       if (command === "delete") editor.removeBlocks([selected.id]);
       else if (command === "up") editor.moveBlocksUp(selected.id);
@@ -355,8 +370,8 @@ export function RichEditor({ initial, acknowledge, onStatus, ref }: { initial: R
       void sync.complete(action, ids.filter(id => !!editor.getBlock(id)), moved, removed, true, deleted).catch(error => setEditorWarning(error instanceof Error ? error.message : "Синхронизация не завершена"));
     }
     bridge.rewrite = async instruction => {
-      if (!selection.current || bridge.composing) throw new Error("Выделите фрагмент текста");
-      const captured: RichSelection = { ...selection.current, textSha256: "0".repeat(64), capture: { sessionId: bridge.session,
+      if (!rewriteSelection.current || bridge.composing) throw new Error("Выделите фрагмент текста");
+      const captured: RichSelection = { ...rewriteSelection.current, textSha256: "0".repeat(64), capture: { sessionId: bridge.session,
         actionId: bridge.session, actionToken: 0, dependencies: [] } };
       await sync.rewrite(captured, instruction);
     };
@@ -574,23 +589,25 @@ export function RichEditor({ initial, acknowledge, onStatus, ref }: { initial: R
     await bridge.queue.flush(); return bridge.queue.baseline;
   }, undo: bridge.undo, redo: bridge.redo }), [bridge, bridge.history?.position]);
   return <ImageActions.Provider value={{ source: asset => imageSource(initial.workspace.projectId, asset), upload: assets.upload, cancel: assets.cancel }}>
-    <div className="rich-workspace"><FactsPanel facts={facts} submit={command => bridge.panel(command)} timeline={ready ? <Timeline facts={facts} anchors={anchors} controls={timelineControls} /> : null} />
-    <div className="cv-document" style={{ ...referenceVariables, color: "#000000" }} data-project-id={initial.workspace.projectId}>
-      <div className="cv-structure-controls"><Popover.Root><Popover.Trigger asChild><button disabled={!selecting || rewriting}>Переписать выделенное</button></Popover.Trigger><Popover.Portal>
-        <Popover.Content className="rich-block-menu"><label>Что изменить<textarea aria-label="Инструкция для фрагмента" value={instruction} onChange={event => setInstruction(event.currentTarget.value)} /></label>
-          <button disabled={!instruction.trim() || rewriting} onClick={() => { setRewriting(true); void bridge.rewrite(instruction).catch(error => setEditorWarning(error instanceof Error ? error.message : "Не удалось переписать")).finally(() => setRewriting(false)); }}>Применить инструкцию</button>
-        </Popover.Content></Popover.Portal></Popover.Root><Popover.Root><Popover.Trigger asChild><button>Блок</button></Popover.Trigger><Popover.Portal>
-        <Popover.Content className="rich-block-menu"><button onClick={() => assets.command("duplicate")}>Дублировать</button>
-          <button onClick={() => assets.command("delete")}>Удалить</button><button onClick={() => assets.command("up")}>Выше</button>
-          <button onClick={() => assets.command("down")}>Ниже</button><button onClick={() => assets.command("nest")}>Вложить</button>
-          <button onClick={() => assets.command("unnest")}>Убрать вложенность</button>
-          <button onClick={() => assets.command("merge")}>Объединить с предыдущим</button>
-          <label>Переместить в<select aria-label="Переместить блок" value="" onChange={event => { assets.command("move", event.currentTarget.value); }}>
-            <option value="">Выберите раздел</option>{targets.map(target => <option key={target.id} value={target.id}>{target.label}</option>)}</select></label>
-        </Popover.Content></Popover.Portal></Popover.Root>
+    <Popover.Root open={rewriteOpen} onOpenChange={setRewriteOpen}>
+      <Popover.Anchor virtualRef={rewriteAnchor} />
+      <Popover.Portal><Popover.Content className="rich-block-menu rich-rewrite-popover" side="top" aria-label="Переписать выделение">
+        <label>Что изменить<textarea aria-label="Инструкция для фрагмента" value={instruction} onChange={event => setInstruction(event.currentTarget.value)} /></label>
+        <button disabled={!instruction.trim() || rewriting} onClick={() => { setRewriting(true);
+          void bridge.rewrite(instruction).then(() => setRewriteOpen(false)).catch(error => setEditorWarning(error instanceof Error ? error.message : "Не удалось переписать"))
+            .finally(() => setRewriting(false)); }}>Применить инструкцию</button>
+        <Popover.Close>Закрыть</Popover.Close>
+      </Popover.Content></Popover.Portal>
+    </Popover.Root>
+    <div className="rich-editor-toolbar">
+      <button aria-expanded={factsVisible} aria-controls="rich-facts-panel" onClick={() => setFactsVisible(value => !value)}>{factsVisible ? "Скрыть факты" : "Показать факты"}</button>
       <label className="cv-insert-image">Добавить изображение<input ref={imageInput} type="file" accept="image/png,image/jpeg,image/webp"
         onChange={event => { const file = event.currentTarget.files?.[0]; event.currentTarget.value = ""; if (file) void assets.upload(file).catch(error => setEditorWarning(error instanceof Error ? error.message : "Не удалось добавить изображение")); }} /></label>
-      </div>{editorWarning && <p role="alert" className="cv-editor-warning">{editorWarning}<button onClick={() => setEditorWarning("")}>Закрыть</button></p>}
+    </div>
+    <div className="rich-workspace"><FactsPanel facts={facts} submit={command => bridge.panel(command)} hidden={!factsVisible} close={() => setFactsVisible(false)}
+      timeline={ready ? <Timeline facts={facts} anchors={anchors} controls={timelineControls} /> : null} />
+    <div className="rich-editor-document"><div className="cv-document" style={{ ...referenceVariables, color: "#000000" }} data-project-id={initial.workspace.projectId}>
+      {editorWarning && <p role="alert" className="cv-editor-warning">{editorWarning}<button onClick={() => setEditorWarning("")}>Закрыть</button></p>}
       {syncRecords.filter(record => ["failed", "conflict", "pending", "stale"].includes(record.status)).map(record => <p key={record.id} className="cv-editor-warning" role="status">
         {record.status === "failed" ? `Синхронизация не завершена: ${record.errorCode ?? "ошибка"}` : record.status === "conflict" ? "Есть другие упоминания. Проверьте связанные факты." : record.status === "stale" ? "Предложение устарело. Ваши изменения сохранены." : record.errorCode === "OPERATION_INTERRUPTED" ? "Синхронизация была прервана." : "Синхронизация…"}
         {record.status === "conflict" && <button onClick={() => void bridge.resolve(record.id).catch(error => setEditorWarning(error instanceof Error ? error.message : "Не удалось обновить"))}>Обновить связанные поля</button>}
@@ -598,12 +615,17 @@ export function RichEditor({ initial, acknowledge, onStatus, ref }: { initial: R
         <button onClick={() => void projectRequest(`/${initial.workspace.projectId}/sync/${record.id}`, "POST", { status: "stale" }).then(response => setSyncRecords(response.workspace.syncRecords))}>Закрыть</button>
       </p>)}
       <div className="cv-sheet"><img className="cv-template-brand" src={brand} alt="Generic" />
-      <BlockNoteView editor={editor} theme="light" linkToolbar={!selecting} filePanel={false} slashMenu={false}>
+      <BlockNoteView editor={editor} theme="light" linkToolbar={!selecting} filePanel={false} slashMenu={false} formattingToolbar={false} sideMenu={false}>
+        <FormattingToolbarController formattingToolbar={selectionToolbar} portalElement={window.document.body} />
+        <SideMenuController sideMenu={blockSideMenu} portalElement={window.document.body} />
         <SuggestionMenuController triggerCharacter="/" getItems={async query => [...getDefaultReactSlashMenuItems(editor),
           { title: "Изображение", subtext: "Локальный PNG, JPEG или WebP", aliases: ["image", "photo"], group: "Media", onItemClick: () => imageInput.current?.click() }]
           .filter(item => `${item.title} ${item.aliases?.join(" ") ?? ""}`.toLowerCase().includes(query.toLowerCase()))} />
       </BlockNoteView>
       <div className="cv-template-footer">mail@example.com</div></div>
     </div></div>
+    {blockTarget && <BlockPanel id={blockTarget} available={!!editor.getBlock(blockTarget)} close={() => setBlockTarget(null)}
+      command={(command, target) => assets.command(blockTarget, command, target)} destinations={targets} />}
+    </div>
   </ImageActions.Provider>;
 }

@@ -15,6 +15,7 @@ from packages.resume_core.rich_api import RichGenerationState, RichProjectRespon
 from packages.resume_core.rich_archive import archive_payload, export_rich_archive, open_rich_archive
 from packages.resume_core.rich_assembly import identity
 from packages.resume_core.rich_import import assemble_import
+from packages.resume_core.rich_identity import resume_identity
 from packages.resume_core.gui_annotations import unresolved_source_units
 from packages.resume_core.rich_mutations import RichMutationFailure, apply_rich_mutation
 from packages.resume_core.rich_project_store import RichProjectStore
@@ -98,7 +99,21 @@ class RichProjectService(RichSynchronization, RichAssets, GuiProjectService):
         return RichProjectResponse(workspace=workspace, durability=self.durability(identifier),
             savedProjectRevision=saved[0] if saved else None, savedDocumentRevision=saved[1] if saved else None,
             saveError=self.save_errors.get(identifier), generation=self.generations.get(identifier),
-            presentation=presentation(workspace.project.document, workspace.project.facts) if workspace.project else None)
+            presentation=presentation(workspace.project.document, workspace.project.facts) if workspace.project else None,
+            identity=resume_identity(workspace))
+
+    def listing(self):
+        self.ensure_loaded()
+        entries = []
+        for entry in self.storage.registry().entries:
+            if entry.tombstoned:
+                continue
+            value = entry.model_dump(mode="json", by_alias=True)
+            if entry.project_id in self.workspaces:
+                identity = resume_identity(self.workspaces[entry.project_id])
+                value.update(title=identity.title, subtitle=identity.subtitle)
+            entries.append(value)
+        return {"entries": entries, "errors": [{"projectId": identifier, "errorCode": code} for identifier, code in self.load_errors.items()]}
 
     def allocate(self, title):
         self.ensure_loaded()

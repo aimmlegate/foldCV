@@ -23,11 +23,7 @@ def mount_rich_projects(app, service, problem):
 
     @app.get(prefix)
     async def projects():
-        service.ensure_loaded()
-        registry = service.storage.registry()
-        return JSONResponse({"entries": [e.model_dump(mode="json", by_alias=True) for e in registry.entries if not e.tombstoned],
-            "errors": [{"projectId": identifier, "errorCode": code} for identifier, code in service.load_errors.items()]},
-            headers={"Cache-Control": "no-store"})
+        return JSONResponse(service.listing(), headers={"Cache-Control": "no-store"})
 
     @app.post(prefix)
     async def create(payload: GuiCreateProjectRequest):

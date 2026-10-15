@@ -82,13 +82,15 @@ function RecordRow({ record, submit }: { record: RecordValue; submit: (command: 
     <button className="rich-facts-remove" aria-label={`Удалить: ${title(record)}`} onClick={() => void submit({ operation: "remove", recordId: record.id }).catch(() => {})}>Удалить</button>
   </div>;
 }
-export function FactsPanel({ facts, submit, timeline }: { facts: WorkingFacts; submit: (command: PanelCommand) => Promise<void>; timeline?: ReactNode }) {
+export function FactsPanel({ facts, submit, timeline, hidden = false, close }: { facts: WorkingFacts; submit: (command: PanelCommand) => Promise<void>; timeline?: ReactNode;
+  hidden?: boolean; close?: () => void }) {
   const [error, setError] = useState("");
   async function apply(command: PanelCommand) {
     setError("");
     try { await submit(command); } catch (error) { setError(error instanceof Error ? error.message : "Не удалось обновить факт"); throw error; }
   }
-  return <aside className="rich-facts bg-surface text-content border-outline" aria-label="Факты резюме"><h2>Факты</h2>
+  return <aside className="rich-facts bg-surface text-content border-outline" aria-label="Факты резюме" id="rich-facts-panel" hidden={hidden}>
+    <header><h2>Факты</h2>{close && <button aria-label="Скрыть панель фактов" onClick={close}>×</button>}</header>
     {error && <p role="alert">{error}</p>}
     {(["candidate", "employment", "technology", "education", "language"] as const).map(kind => <details key={kind} open>
       <summary>{labels[kind]}</summary>

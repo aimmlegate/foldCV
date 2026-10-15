@@ -35,8 +35,12 @@ class ProjectReadError(Wire):
     error_code: Id
 
 
+class GuiProjectListEntry(RegistryEntry):
+    subtitle: str | None = None
+
+
 class GuiProjectListResponse(Wire):
-    entries: list[RegistryEntry]
+    entries: list[GuiProjectListEntry]
     errors: list[ProjectReadError]
 
 

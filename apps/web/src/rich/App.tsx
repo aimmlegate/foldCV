@@ -36,11 +36,14 @@ export function App() {
   const [status, setStatus] = useState("Сохранено");
   const [busy, setBusy] = useState(false);
   const [settings, setSettings] = useState(false);
+  const [historyCollapsed, setHistoryCollapsed] = useState(false);
   const editor = useRef<RichEditorHandle>(null);
   const epoch = useRef(0), acting = useRef(false);
   const prepared = useRef<{ input: ResumeInput; projectId: string } | null>(null);
   const acknowledge = useCallback((next: RichProjectResponse) => {
     setResponse(next);
+    if (next.identity) setProjects(current => current ? { ...current, entries: current.entries.map(entry => entry.projectId === next.workspace.projectId
+      ? { ...entry, title: next.identity?.title ?? entry.title, subtitle: next.identity?.subtitle ?? "" } : entry) } : current);
     const url = new URL(location.href); url.searchParams.set("project", next.workspace.projectId);
     history.replaceState(null, "", url.pathname + url.search);
   }, []);
@@ -69,14 +72,6 @@ export function App() {
         acknowledge(next); setStatus("Сохранено"); prepared.current = null;
         setInput({ kind: "text", text: "" });
       }
-    });
-  }
-  async function rename(id: string, title: string) {
-    return action(async () => {
-      if (editor.current) await editor.current.flush();
-      const current = await projectRequest(`/${id}`);
-      await projectRequest(`/${id}/title`, "PUT", { title, baseRevision: current.workspace.projectRevision });
-      setProjects(await listProjects());
     });
   }
   async function remove(id: string) {
@@ -146,13 +141,14 @@ export function App() {
     });
   }
   const selectedSource = response?.workspace.preDraft?.sources.find(source => source.id === response.workspace.preDraft?.selectedSourceId);
-  const title = projects?.entries.find(entry => entry.projectId === response?.workspace.projectId)?.title ?? response?.workspace.title ?? "Новое резюме";
+  const title = response?.identity?.title ?? response?.workspace.title ?? "Новое резюме";
+  const subtitle = response?.identity?.subtitle;
   return <main data-app="foldcv-rich">
-    <div className="rich-shell" hidden={settings}>
+    <div className="rich-shell" hidden={settings} data-history-collapsed={historyCollapsed}>
       <div className="rich-main">
         <header className="next-header">
           <button className="next-brand" disabled={busy || creating} onClick={() => void fresh()}>FoldCV</button>
-          <span>{title}</span>
+          <div className="rich-resume-heading"><span>{title}</span>{subtitle && <small>{subtitle}</small>}</div>
           {response?.workspace.project && <span className="next-save" role="status">{status}</span>}
           {response?.workspace.project && <div className="next-actions">
             <button disabled={busy} onClick={() => editor.current?.undo()}>Отменить</button>
@@ -176,10 +172,13 @@ export function App() {
           {response?.workspace.preDraft?.warnings.map((warning, index) => <p className="next-warning" role="alert" key={`${warning}:${index}`}>{warning}</p>)}
         </>}
       </div>
-      <aside className="rich-resume-sidebar" aria-label="История резюме">
+      <aside className="rich-resume-sidebar" aria-label="История резюме" data-collapsed={historyCollapsed}>
+        <button className="rich-history-toggle" aria-expanded={!historyCollapsed} aria-controls="rich-resume-navigation"
+          aria-label={historyCollapsed ? "Развернуть историю резюме" : "Свернуть историю резюме"} onClick={() => setHistoryCollapsed(value => !value)}>{historyCollapsed ? "›" : "‹"}</button>
+        <div className="rich-sidebar-content" id="rich-resume-navigation" hidden={historyCollapsed}>
         <button className="next-create" disabled={busy || creating} onClick={() => void fresh()}>Новое резюме</button>
         <div className="rich-resume-list"><Projects list={projects} busy={busy || creating} activeId={response?.workspace.projectId ?? null}
-          open={open} rename={rename} remove={remove} /></div>
+          open={open} remove={remove} /></div>
         <div className="rich-sidebar-tools">
           <label>Открыть проект<input aria-label="Открыть файл проекта" type="file" accept=".foldcv,.zip" disabled={busy || creating}
             onChange={event => { const file = event.currentTarget.files?.[0]; if (file) void upload(file); event.currentTarget.value = ""; }} /></label>
@@ -187,7 +186,7 @@ export function App() {
             if (editor.current) await editor.current.flush();
             setSettings(true);
           })}>Настройки</button>
-        </div>
+        </div></div>
       </aside>
     </div>
     {settings && <SettingsPanel close={() => setSettings(false)} analysisChanged={() => {}} appearance={<label>Тема<select aria-label="Тема" value={theme.mode}

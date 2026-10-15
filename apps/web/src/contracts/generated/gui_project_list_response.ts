@@ -1,9 +1,10 @@
 export type Cleanupstatus = "none" | "pending" | "complete" | "failed";
 export type Projectid = string;
+export type Subtitle = string | null;
 export type Title = string;
 export type Tombstoned = boolean;
 export type Updatedat = string;
-export type Entries = RegistryEntry[];
+export type Entries = GuiProjectListEntry[];
 export type Errorcode = string;
 export type Projectid1 = string;
 export type Errors = ProjectReadError[];
@@ -12,9 +13,10 @@ export interface GuiProjectListResponse {
   entries: Entries;
   errors: Errors;
 }
-export interface RegistryEntry {
+export interface GuiProjectListEntry {
   cleanupStatus: Cleanupstatus;
   projectId: Projectid;
+  subtitle?: Subtitle;
   title: Title;
   tombstoned: Tombstoned;
   updatedAt: Updatedat;

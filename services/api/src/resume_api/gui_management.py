@@ -16,8 +16,9 @@ class GuiManagementMixin:
             try: entries = self.storage.registry().entries
             except ProjectStoreFailure as error: raise ProjectFailure(error.code, 503) from None
             self.deleted_ids.update(entry.project_id for entry in entries if entry.tombstoned)
-        return GuiProjectListResponse(entries=sorted([entry for entry in entries if not entry.tombstoned or entry.cleanup_status != 'complete'],
-            key=lambda entry: (entry.updated_at, entry.project_id), reverse=True),
+        visible = sorted([entry for entry in entries if not entry.tombstoned or entry.cleanup_status != 'complete'],
+            key=lambda entry: (entry.updated_at, entry.project_id), reverse=True)
+        return GuiProjectListResponse(entries=[entry.model_dump(by_alias=True) for entry in visible],
             errors=[{'projectId':id,'errorCode':code} for id,code in self.load_errors.items() if id not in self.deleted_ids])
 
     async def delete_project(self, id):

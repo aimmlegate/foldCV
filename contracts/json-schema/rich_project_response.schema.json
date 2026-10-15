@@ -3357,6 +3357,25 @@
       "title": "ReplaceInlineRange",
       "type": "object"
     },
+    "ResumeIdentity": {
+      "additionalProperties": false,
+      "properties": {
+        "subtitle": {
+          "title": "Subtitle",
+          "type": "string"
+        },
+        "title": {
+          "title": "Title",
+          "type": "string"
+        }
+      },
+      "required": [
+        "title",
+        "subtitle"
+      ],
+      "title": "ResumeIdentity",
+      "type": "object"
+    },
     "RichDocumentV1": {
       "additionalProperties": false,
       "properties": {
@@ -5861,6 +5880,17 @@
           "type": "null"
         }
       ]
+    },
+    "identity": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/ResumeIdentity"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
     },
     "presentation": {
       "anyOf": [

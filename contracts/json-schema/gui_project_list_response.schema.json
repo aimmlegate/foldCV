@@ -1,27 +1,6 @@
 {
   "$defs": {
-    "ProjectReadError": {
-      "additionalProperties": false,
-      "properties": {
-        "errorCode": {
-          "minLength": 1,
-          "title": "Errorcode",
-          "type": "string"
-        },
-        "projectId": {
-          "minLength": 1,
-          "title": "Projectid",
-          "type": "string"
-        }
-      },
-      "required": [
-        "projectId",
-        "errorCode"
-      ],
-      "title": "ProjectReadError",
-      "type": "object"
-    },
-    "RegistryEntry": {
+    "GuiProjectListEntry": {
       "additionalProperties": false,
       "properties": {
         "cleanupStatus": {
@@ -38,6 +17,18 @@
           "minLength": 1,
           "title": "Projectid",
           "type": "string"
+        },
+        "subtitle": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Subtitle"
         },
         "title": {
           "title": "Title",
@@ -59,7 +50,28 @@
         "tombstoned",
         "cleanupStatus"
       ],
-      "title": "RegistryEntry",
+      "title": "GuiProjectListEntry",
+      "type": "object"
+    },
+    "ProjectReadError": {
+      "additionalProperties": false,
+      "properties": {
+        "errorCode": {
+          "minLength": 1,
+          "title": "Errorcode",
+          "type": "string"
+        },
+        "projectId": {
+          "minLength": 1,
+          "title": "Projectid",
+          "type": "string"
+        }
+      },
+      "required": [
+        "projectId",
+        "errorCode"
+      ],
+      "title": "ProjectReadError",
       "type": "object"
     }
   },
@@ -67,7 +79,7 @@
   "properties": {
     "entries": {
       "items": {
-        "$ref": "#/$defs/RegistryEntry"
+        "$ref": "#/$defs/GuiProjectListEntry"
       },
       "title": "Entries",
       "type": "array"

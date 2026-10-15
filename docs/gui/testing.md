@@ -1,5 +1,12 @@
 # Test strategy
 
+D084 panel checks: full fast 1402 Python plus type/lint/contracts/map/build;
+Node state 156. T3 covers collapsible history, fact-derived headings and history,
+independent panel hiding, every moved block action and captured selection rewrite.
+The legacy list response regression passes its existing recovery tests. See
+[the panel evidence](handoffs/PANEL-UI.md). No renderer change, new native streak,
+browser scenario or manual Word result is claimed.
+
 D082/D083 flow checks: full fast 1399 Python plus type/lint/contracts/map/build;
 separate Node state 154; render integration 176. T3 proves left history, settings,
 file/paste import, advisory negative assessment, unchanged source text, restart and

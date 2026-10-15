@@ -6,6 +6,7 @@ from pydantic import Field
 from .models.contracts import Id, Revision, Wire
 from .models.rich_workspace import WorkspaceV6
 from .rich_presentation import RichPresentation
+from .rich_identity import ResumeIdentity
 
 
 class RichGenerationState(Wire):
@@ -23,6 +24,7 @@ class RichProjectResponse(Wire):
     save_error: Id | None
     generation: RichGenerationState | None
     presentation: RichPresentation | None = None
+    identity: ResumeIdentity | None = None
 
 
 class ImageSessionRequest(Wire):
