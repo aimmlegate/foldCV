@@ -4,6 +4,8 @@ import type { GuiProjectListResponse } from "../contracts/generated/gui_project_
 import { SettingsPanel } from "../next/SettingsPanel";
 import { useTheme } from "../next/theme";
 import { RichEditor, type RichEditorHandle } from "./Editor";
+import { AssistantDrawer, type AssistantHandle } from "../assistant/Drawer";
+import { AssistantSettings } from "../assistant/Settings";
 import { Projects } from "./Projects";
 import { NewResume } from "./NewResume";
 import { hasInput, importBody, type ResumeInput } from "./import-source";
@@ -38,6 +40,7 @@ export function App() {
   const [settings, setSettings] = useState(false);
   const [historyCollapsed, setHistoryCollapsed] = useState(false);
   const editor = useRef<RichEditorHandle>(null);
+  const assistant = useRef<AssistantHandle>(null);
   const epoch = useRef(0), acting = useRef(false);
   const prepared = useRef<{ input: ResumeInput; projectId: string } | null>(null);
   const acknowledge = useCallback((next: RichProjectResponse) => {
@@ -59,6 +62,7 @@ export function App() {
   }
   async function fresh() {
     await action(async () => {
+      await assistant.current?.stop();
       if (editor.current) await editor.current.flush();
       clear(); setSettings(false);
     });
@@ -66,6 +70,7 @@ export function App() {
   async function open(id: string) {
     return action(async () => {
       if (response?.workspace.projectId === id) return;
+      await assistant.current?.stop();
       if (editor.current) await editor.current.flush();
       const ticket = ++epoch.current, next = await projectRequest(`/${id}`);
       if (ticket === epoch.current) {
@@ -76,6 +81,7 @@ export function App() {
   }
   async function remove(id: string) {
     return action(async () => {
+      await assistant.current?.stop();
       if (editor.current) await editor.current.flush();
       const result = await deleteProject(id);
       if (response?.workspace.projectId === id) clear();
@@ -124,6 +130,7 @@ export function App() {
   }
   async function upload(file: File) {
     await action(async () => {
+      await assistant.current?.stop();
       if (editor.current) await editor.current.flush();
       const body = new FormData(); body.append("file", file);
       ++epoch.current; acknowledge(await projectRequest("/archive", "POST", body));
@@ -166,7 +173,10 @@ export function App() {
         {generation?.status === "failed" && <p className="next-warning" role="alert">Обработка не завершилась: {generation.errorCode}. Исходник сохранён.</p>}
         {response?.workspace.project ? <>
           {response.workspace.warnings.map(warning => <p className="next-warning" key={warning.id}>{warningLabel(warning.code)}</p>)}
-          <RichEditor key={response.workspace.projectId} initial={response} acknowledge={acknowledge} onStatus={setStatus} ref={editor} />
+          <div className="rich-editor-scroll"><RichEditor key={response.workspace.projectId} initial={response} acknowledge={acknowledge} onStatus={setStatus} ref={editor}
+            onHistoryNavigation={() => assistant.current?.history()} onAssistantFence={saved => assistant.current?.fence(saved)} /></div>
+          <AssistantDrawer key={response.workspace.projectId} projectId={response.workspace.projectId} editor={editor} settingsOpen={settings} ref={assistant}
+            settings={() => void action(async () => { await editor.current?.flush(); setSettings(true); })} />
         </> : <>
           <NewResume input={input} change={setInput} busy={busy || creating} sourceName={selectedSource?.originalName ?? null} process={() => void process()} />
           {response?.workspace.preDraft?.warnings.map((warning, index) => <p className="next-warning" role="alert" key={`${warning}:${index}`}>{warning}</p>)}
@@ -189,7 +199,7 @@ export function App() {
         </div></div>
       </aside>
     </div>
-    {settings && <SettingsPanel close={() => setSettings(false)} analysisChanged={() => {}} appearance={<label>Тема<select aria-label="Тема" value={theme.mode}
+    {settings && <SettingsPanel close={() => setSettings(false)} analysisChanged={() => {}} assistant={models => <AssistantSettings models={models} />} appearance={<label>Тема<select aria-label="Тема" value={theme.mode}
       onChange={event => theme.select(event.target.value)}><option value="system">Системная</option><option value="light">Светлая</option><option value="dark">Тёмная</option></select></label>} />}
   </main>;
 }

@@ -20,7 +20,8 @@ const messages: Record<ConnectionState, string> = {
 };
 
 type SettingsSection = "model" | "rules" | "analysis" | "appearance";
-export function SettingsPanel({ close, analysisChanged, appearance }: { close: () => void; analysisChanged: (enabled: boolean) => void; appearance?: ReactNode }) {
+export function SettingsPanel({ close, analysisChanged, appearance, assistant }: { close: () => void; analysisChanged: (enabled: boolean) => void; appearance?: ReactNode;
+  assistant?: (models: readonly string[]) => ReactNode }) {
   const [section, setSection] = useState<SettingsSection>("model");
   const [view, setView] = useState<ConnectionView>(() => new ConnectionWorkflow(() => {}).view);
   const [preferences, setPreferences] = useState<Preferences | null>(null);
@@ -69,8 +70,8 @@ export function SettingsPanel({ close, analysisChanged, appearance }: { close: (
       </div>
       {view.pending && <p role="status">{view.detaching ? "Останавливаем…" : "Проверяем…"}</p>}
       {view.error && <p role="alert" className="text-danger">Не удалось завершить действие подключения. Повторите проверку.</p>}
-      {snapshot.metadataReady && <label className="next-settings-model">Модель
-        <select aria-label="Модель" disabled={view.pending} value={snapshot.selectedModel ?? ""}
+      {snapshot.metadataReady && <label className="next-settings-model">{assistant ? "Модель обработки" : "Модель"}
+        <select aria-label={assistant ? "Модель обработки" : "Модель"} disabled={view.pending} value={snapshot.selectedModel ?? ""}
           onChange={event => { void workflow.select(event.target.value).then(readPreferences); }}>
           <option value="">Выберите модель</option>{snapshot.models.map(model => <option key={model} value={model}>{model}</option>)}
         </select>
@@ -87,6 +88,7 @@ export function SettingsPanel({ close, analysisChanged, appearance }: { close: (
       {!snapshot.generationReady && snapshot.experimentalMode && <p>Генерация пока недоступна. Проверьте вход, модель и лимит.</p>}
       {preferences?.selectedModel && <p>Сохранённый выбор: {preferences.selectedModel}. Доступ подтверждается проверкой подключения.</p>}
       {preferenceError && <p role="alert" className="text-danger">Не удалось прочитать или сохранить настройки. Повторите действие.</p>}
+      {assistant?.(snapshot.models)}
     </section>
     <section aria-label="Проверка изменений" hidden={section !== "analysis"}><h2>Проверка изменений</h2>
       <label><input type="checkbox" checked={preferences?.automaticAnalysis ?? true} disabled={!preferences || savingAnalysis}

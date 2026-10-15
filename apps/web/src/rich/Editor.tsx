@@ -1,7 +1,7 @@
 import { BlockNoteSchema, createExtension, defaultBlockSpecs, defaultInlineContentSpecs, parseDefaultProps, type Block, type PartialBlock } from "@blocknote/core";
 import { createReactBlockSpec, createReactInlineContentSpec, useCreateBlockNote, SuggestionMenuController, getDefaultReactSlashMenuItems, FormattingToolbarController, SideMenuController } from "@blocknote/react";
 import { BlockNoteView } from "@blocknote/shadcn";
-import { AllSelection, Plugin, PluginKey } from "@tiptap/pm/state";
+import { AllSelection, TextSelection, Plugin, PluginKey } from "@tiptap/pm/state";
 import { Extension } from "@tiptap/core";
 import { useCallback, useEffect, useImperativeHandle, useMemo, useRef, useState, type Ref } from "react";
 import * as Popover from "@radix-ui/react-popover";
@@ -13,6 +13,8 @@ import { documentCells, type StoredBlock } from "./document-cells";
 import { factCells, factsFromCells } from "./fact-cells";
 import { RichSynchronization, selectionChecksum, type PanelCommand } from "./synchronization";
 import { PreparedEditorBridge, type PreparedApi } from "../assistant/editor-bridge";
+import { anchorCurrent } from "../assistant/presentation";
+import type { AgentFinding } from "../contracts/generated/agent_finding";
 import { FactsPanel } from "./FactsPanel";
 import { Timeline, type TimelineControls } from "./Timeline";
 import { dateAnchors, type DateAnchor } from "./date-edit";
@@ -99,6 +101,7 @@ export type CapturedEditorSelection = { selection: Omit<RichSelection, "capture"
 export type RichEditorHandle = { flush: () => Promise<RichProjectResponse>; undo: () => void; redo: () => void;
   sessionId: string; captureSelection: () => CapturedEditorSelection | null;
   assistantBaseline: (captured: CapturedEditorSelection | null) => Promise<{ response: RichProjectResponse; selection: RichSelection | null }>;
+  focusFinding: (anchor: AgentFinding["anchors"][number]) => boolean;
   applyAssistant: (batchId: string, api: PreparedApi) => Promise<void> };
 export function RichEditor({ initial, acknowledge, onStatus, ref, onHistoryNavigation, onAssistantFence }: { initial: RichProjectResponse;
   acknowledge: (response: RichProjectResponse) => void; onStatus: (status: string) => void; ref: Ref<RichEditorHandle>;
@@ -639,7 +642,38 @@ export function RichEditor({ initial, acknowledge, onStatus, ref, onHistoryNavig
     if (bridge.projectionError) throw new Error(bridge.projectionError);
     await bridge.queue.flush(); return bridge.queue.baseline;
   }, undo: bridge.undo, redo: bridge.redo, sessionId: bridge.session,
-  captureSelection: () => {
+  focusFinding: anchor => {
+    if (bridge.applying || !bridge.queue || !anchorCurrent(anchor, bridge.queue.baseline, bridge.current)) return false;
+    if (anchor.blockId) {
+      const blockId = anchor.blockId, block = editor.getBlock(blockId);
+      if (!block) return false;
+      const element = window.document.querySelector(`.cv-document[data-project-id="${CSS.escape(initial.workspace.projectId)}"] [data-id="${CSS.escape(blockId)}"]`);
+      if (!element) return false;
+      if (anchor.cellId) {
+        const cellId = anchor.cellId;
+        let position: number | null = null;
+        editor.transact(tr => {
+          tr.doc.descendants((node, pos) => {
+            if (node.type.name !== "blockContainer" || node.attrs["id"] !== blockId) return;
+            node.firstChild?.descendants((cell, offset) => {
+              if (cell.attrs["foldcvNodeId"] === cellId) position = pos + offset + 4;
+            });
+          });
+          if (position !== null) tr.setSelection(TextSelection.near(tr.doc.resolve(position))).scrollIntoView();
+        });
+        if (position === null) return false;
+      } else editor.setTextCursorPosition(blockId, "start");
+      editor.focus(); element.scrollIntoView({ block: "center", behavior: "smooth" }); return true;
+    }
+    if (!anchor.recordId) return false;
+    setFactsVisible(true);
+    requestAnimationFrame(() => {
+      const element = window.document.querySelector<HTMLElement>(`.rich-fact-row[data-fact-id="${CSS.escape(anchor.recordId ?? "")}"]`);
+      const details = element?.closest("details"); if (details) details.open = true;
+      element?.scrollIntoView({ block: "center", behavior: "smooth" }); element?.querySelector("button")?.focus();
+    });
+    return true;
+  }, captureSelection: () => {
     if (!bridge.latestSelection || !bridge.history) return null;
     const keys = new Set(bridge.latestSelection.blockIds.map(id => `block:${id}`));
     let expanded = true;

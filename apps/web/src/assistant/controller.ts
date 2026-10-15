@@ -15,7 +15,7 @@ import type { PreparedApi } from "./editor-bridge";
 export const terminal = (run: AgentRun | null): boolean => run !== null && ["completed", "failed", "cancelled", "interrupted"].includes(run.state);
 export type AssistantView = {
   settings: AgentSettings | null; capabilities: AgentCapabilities | null; flags: AgentFlags;
-  conversations: AgentConversationPage["items"]; conversationId: string | null; messages: AgentMessage[];
+  conversations: AgentConversationPage["items"][number][]; conversationCursor: string | null; conversationId: string | null; messages: AgentMessage[];
   messageCursor: string | null; sources: AgentWebSource[]; findings: AgentFinding[]; run: AgentRun | null;
   receipts: AgentEditReceipt[]; activity: AgentEvent[]; partial: string; partialTruncated: boolean;
   draft: string; submitting: boolean; pendingSend: boolean; error: string | null;
@@ -29,7 +29,7 @@ function code(error: unknown): string { return error instanceof AgentApiFailure 
 
 export class AssistantController {
   view: AssistantView = { settings: null, capabilities: null, flags: { allowEdits: true, allowWeb: true }, conversations: [],
-    conversationId: null, messages: [], messageCursor: null, sources: [], findings: [], run: null, receipts: [], activity: [],
+    conversationCursor: null, conversationId: null, messages: [], messageCursor: null, sources: [], findings: [], run: null, receipts: [], activity: [],
     partial: "", partialTruncated: false, draft: "", submitting: false, pendingSend: false, error: null };
   private owner: AgentOwner | null = null;
   private beat: ReturnType<typeof setTimeout> | null = null;
@@ -55,13 +55,13 @@ export class AssistantController {
   async refresh(): Promise<void> {
     const epoch = ++this.metadataEpoch;
     const [settings, capabilities, conversations] = await Promise.all([this.api.settings(), this.api.capabilities(this.view.flags), this.api.conversations()]);
-    if (epoch === this.metadataEpoch) this.publish({ settings, capabilities, conversations: conversations.items });
+    if (epoch === this.metadataEpoch) this.publish({ settings, capabilities, conversations: conversations.items, conversationCursor: conversations.nextCursor });
   }
   async init(): Promise<void> {
     try {
       await this.refresh();
       if (!this.closed && !this.view.conversationId && this.view.conversations.length) {
-        const id = this.view.conversations.at(-1)?.id;
+        const id = this.view.conversations[0]?.id;
         if (id) await this.select(id);
       }
     } catch (error) { this.publish({ error: code(error) }); }
@@ -136,6 +136,14 @@ export class AssistantController {
     if (epoch !== this.epoch || this.closed) return;
     const known = new Set(this.view.messages.map(message => message.id));
     this.publish({ messages: [...page.items.filter(message => !known.has(message.id)), ...this.view.messages], messageCursor: page.nextCursor });
+  }
+  async moreConversations(): Promise<void> {
+    const cursor = this.view.conversationCursor;
+    if (!cursor) return;
+    const page = await this.api.conversations(cursor), known = new Set(this.view.conversations.map(item => item.id));
+    const items = [...this.view.conversations, ...page.items.filter(item => !known.has(item.id))];
+    // Each response is bounded; the visible selector may contain several pages.
+    this.publish({ conversations: items, conversationCursor: page.nextCursor });
   }
   async resource(kind: "sources" | "findings", id: string): Promise<void> {
     const conversation = this.view.conversationId, epoch = this.epoch;
@@ -231,6 +239,9 @@ export class AssistantController {
         finishedAt: ["completed", "failed", "cancelled", "interrupted"].includes(event.payload.state) ? event.timestamp : null };
     } else if (event.type === "source.ready" || event.type === "finding.ready") {
       void this.resource(event.type === "source.ready" ? "sources" : "findings", event.payload.id).catch(error => this.publish({ error: code(error) }));
+    } else if (event.type === "edit.result") {
+      const epoch = this.epoch;
+      void this.api.read(event.runId).then(read => { if (epoch === this.epoch) this.publish({ receipts: read.receipts }); }).catch(error => this.publish({ error: code(error) }));
     } else if (event.type === "edit.offered" && !terminal(this.view.run) && !this.applying.has(event.payload.batchId)
       && !this.view.receipts.some(receipt => receipt.batchId === event.payload.batchId)) {
       const id = event.payload.batchId, epoch = this.epoch;

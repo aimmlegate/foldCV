@@ -56,11 +56,12 @@ function page(cursor: string | null = null, ids: string[] = []): AgentPageReques
 
 export class AgentBrowserApi {
   readonly prefix: string;
-  constructor(readonly projectId: string, private readonly transport: typeof fetch = fetch) {
+  constructor(readonly projectId: string, private readonly transport: typeof fetch = (input, init) => fetch(input, init)) {
     this.prefix = `/v1/rich/projects/${encodeURIComponent(projectId)}/assistant`;
   }
-  private async request<K extends keyof Replies>(kind: K, path: string, method = "POST", body: unknown = {}, headers: Record<string, string> = {}): Promise<Replies[K]> {
+  private async request<K extends keyof Replies>(kind: K, path: string, method = "POST", body: unknown = {}, headers: Record<string, string> = {}, keepalive = false): Promise<Replies[K]> {
     const response = await successful(await this.transport(path, { method, credentials: "same-origin", cache: "no-store",
+      ...(keepalive ? { keepalive: true } : {}),
       headers: method === "GET" ? headers : { ...headers, "Content-Type": "application/json" }, ...(method === "GET" ? {} : { body: JSON.stringify(body) }) }));
     const value: unknown = await response.json();
     if (!shape(kind, value)) throw new AgentApiFailure("INVALID_RESULT");
@@ -80,7 +81,7 @@ export class AgentBrowserApi {
   }
   open(sessionId: string): Promise<AgentLease> { return this.request("agent_lease", this.prefix + "/lease/open", "POST", { sessionId }); }
   renew(owner: AgentOwner): Promise<AgentLease> { return this.request("agent_lease", this.prefix + "/lease/renew", "POST", { owner }); }
-  close(owner: AgentOwner): Promise<Record<string, never>> { return this.request("agent_empty_request", this.prefix + "/lease/close", "POST", { owner }); }
+  close(owner: AgentOwner): Promise<Record<string, never>> { return this.request("agent_empty_request", this.prefix + "/lease/close", "POST", { owner }, {}, true); }
   submit(request: AgentRunRequest): Promise<AgentRun> { return this.request("agent_run", `${this.prefix}/conversations/${encodeURIComponent(request.conversationId)}/runs`, "POST", request); }
   read(runId: string): Promise<AgentRunRead> { return this.request("agent_run_read", `${this.prefix}/runs/${encodeURIComponent(runId)}/read`); }
   cancel(runId: string, owner: AgentOwner): Promise<AgentRun> { return this.request("agent_run", `${this.prefix}/runs/${encodeURIComponent(runId)}/cancel`, "POST", { owner }); }

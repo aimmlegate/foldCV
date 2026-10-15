@@ -194,6 +194,16 @@ def test_latest_pages_keep_their_anchor_while_new_messages_arrive(tmp_path):
     assert not {message.id for message in first.items} & {message.id for message in second.items}
 
 
+def test_conversation_pages_open_the_latest_and_keep_older_pages_stable_after_append(tmp_path):
+    store, _, workspace, first = isolated_project(tmp_path / "FoldCV")
+    second = store.create_conversation(workspace.project_id)
+    latest = store.conversations_page(workspace.project_id, AgentPageRequest(limit=1))
+    assert latest.items[0].id == second.id
+    store.create_conversation(workspace.project_id)
+    older = store.conversations_page(workspace.project_id, AgentPageRequest(limit=1, cursor=latest.next_cursor))
+    assert older.items[0].id == first.id and older.next_cursor is None
+
+
 @pytest.mark.asyncio
 async def test_routes_page_maximum_escaped_records_without_inference_or_hidden_fetches(tmp_path):
     async with application(tmp_path, None) as (client, _, service, workspace, conversation, prefix, runtime, _):

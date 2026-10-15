@@ -1,0 +1,66 @@
+import type { AgentFinding } from "../contracts/generated/agent_finding";
+import type { RichProjectResponse } from "../contracts/generated/rich_project_response";
+import { documentCells } from "../rich/document-cells";
+import { factCells } from "../rich/fact-cells";
+import type { CellValue } from "../rich/history";
+import type { AssistantView } from "./controller";
+
+export function errorText(code: string | null): string {
+  if (!code) return "";
+  const labels: Record<string, string> = {
+    AGENT_DISABLED: "Включите помощника в Настройках.", AGENT_MODEL_REQUIRED: "Выберите модель помощника.",
+    AGENT_MODEL_UNAVAILABLE: "Сохранённая модель сейчас недоступна. Выберите доступную модель.",
+    AGENT_MODEL_INCOMPATIBLE: "Эта модель не поддерживает нужные инструменты. Выберите другую модель.",
+    AGENT_CONNECTION_UNAVAILABLE: "Проверьте подключение в Настройках.", AGENT_CONNECTION_CHANGED: "Подключение изменилось. Задача прервана.",
+    AGENT_AUTH_REQUIRED: "Войдите через существующее подключение в Настройках.", AGENT_QUOTA: "Лимит подписки исчерпан. Дождитесь его сброса.",
+    AGENT_BUSY: "Дождитесь завершения текущей операции.", AGENT_STALE_READ: "Фрагмент изменён. Выделите его снова и отправьте новую задачу.",
+    AGENT_OWNER_MISMATCH: "Помощник открыт в другом окне. Завершите задачу там.", AGENT_LEASE_EXPIRED: "Связь с редактором потеряна. Задача прервана.",
+    AGENT_NO_OWNER: "Редактор закрыт. Откройте резюме и отправьте новую задачу.",
+    AGENT_SETTINGS_CONFLICT: "Настройки изменились. Проверьте выбор и повторите отправку.",
+    AGENT_OUTCOME_UNKNOWN: "Результат сохранения пока не подтверждён. Откройте резюме заново для проверки сохранения.",
+    AGENT_SAVE_FAILED: "Изменения не сохранены. Проверьте сохранение резюме перед новой задачей.",
+    AGENT_CLEANUP_FAILED: "Остановка не подтверждена. Перезапустите приложение перед новой задачей.",
+    AGENT_CONVERSATION_FULL: "Диалог заполнен. Начните новый диалог.", AGENT_PROJECT_FULL: "Хранилище диалогов заполнено.",
+    AGENT_SOURCE_UNAVAILABLE: "Не удалось открыть страницу.", AGENT_SOURCE_DENIED: "Эту страницу нельзя открыть.",
+    AGENT_WEB_DISABLED: "Интернет выключен для этой задачи.", AGENT_TOOL_DENIED: "Это действие недоступно в выбранном режиме.",
+    AGENT_CANCELLED: "Задача остановлена.", AGENT_INTERRUPTED: "Задача прервана.",
+    AGENT_DEADLINE: "Время задачи истекло. Сохранённые изменения остаются в резюме.",
+  };
+  return labels[code] ?? "Не удалось завершить задачу. Сохранённые результаты доступны в диалоге.";
+}
+export function runText(view: AssistantView): string {
+  if (view.submitting) return "Отправляем задачу…";
+  if (view.pendingSend) return "Ответ на отправку потерян. Повторите ту же отправку или остановите задачу.";
+  const labels = { queued: "Ожидает очереди", running: "Выполняется", waiting_for_editor: "Сохраняем изменения",
+    cancelling: "Останавливаем…", cancelled: "Остановлено", interrupted: "Прервано", failed: "Не удалось завершить", completed: "Завершено" };
+  return view.run ? labels[view.run.state] : "";
+}
+export function canSend(view: AssistantView, applying = false): boolean {
+  return !view.submitting && !applying && (!view.run || ["completed", "failed", "cancelled", "interrupted"].includes(view.run.state))
+    && (view.pendingSend || view.capabilities?.ready === true) && !!view.draft.trim() && [...view.draft].length <= 8000;
+}
+export function submitKey(key: string, shift: boolean, composing: boolean, nativeComposing: boolean, keyCode: number): boolean {
+  return key === "Enter" && !shift && !composing && !nativeComposing && keyCode !== 229;
+}
+export function sourceUrl(value: string): string | null {
+  try { const url = new URL(value); return ["http:", "https:"].includes(url.protocol) && !url.username && !url.password ? url.href : null; }
+  catch { return null; }
+}
+export type DrawerSize = { collapsed: boolean; height: number };
+export function drawerSize(value: unknown): DrawerSize {
+  if (typeof value !== "object" || value === null) return { collapsed: true, height: 320 };
+  return { collapsed: "collapsed" in value && typeof value.collapsed === "boolean" ? value.collapsed : true,
+    height: "height" in value && typeof value.height === "number" && Number.isFinite(value.height) ? Math.max(200, Math.min(520, value.height)) : 320 };
+}
+export function anchorCurrent(anchor: AgentFinding["anchors"][number], response: RichProjectResponse, current: ReadonlyMap<string, CellValue>): boolean {
+  const project = response.workspace.project;
+  if (!project || !anchor.dependencies.length) return false;
+  const blocks = new Map<string, number>();
+  const visit = (items: typeof project.document.regions[number]["blocks"]) => { for (const block of items) { blocks.set(block.id, block.revision); visit(block.children); } };
+  project.document.regions.forEach(region => visit(region.blocks));
+  if (!anchor.dependencies.every(dep => dep.kind === "block" ? blocks.get(dep.id) === dep.revision
+    : dep.kind === "record" && project.facts.records.find(record => record.id === dep.id)?.revision === dep.revision)) return false;
+  const baseline = new Map([...documentCells(project.document, new Map()), ...factCells(project.facts)]);
+  const keys = anchor.blockId ? [`block:${anchor.blockId}`] : [...baseline.keys()].filter(key => key === `fact:${anchor.recordId}` || key.startsWith(`fact-field:["${anchor.recordId ?? ""}",`));
+  return keys.length > 0 && keys.every(key => baseline.has(key) && current.get(key) === baseline.get(key));
+}

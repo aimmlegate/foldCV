@@ -426,13 +426,22 @@ class AgentStore:
 
     def conversations_page(self, project_id: str, request: AgentPageRequest):
         state = self.load(project_id)
-        scope = project_id + ":conversations"
-        start = self._offset(scope, request.cursor)
-        selected = state.conversations[start:start + request.limit]
+        scope = project_id + ":conversations:tail"
+        anchor, start = len(state.conversations), 0
+        if request.cursor is not None:
+            try:
+                version, key, anchor, start = strict_json(base64.b64decode(request.cursor + "=" * (-len(request.cursor) % 4), altchars=b"-_", validate=True))
+                if version != "cv1" or key != digest(scope) or type(anchor) is not int or type(start) is not int or not 0 <= start <= anchor <= len(state.conversations):
+                    raise ValueError()
+            except (ValueError, TypeError):
+                raise AgentFailure("AGENT_NOT_FOUND") from None
+        selected = list(reversed(state.conversations[:anchor]))[start:start + request.limit]
+        cursor = (base64.urlsafe_b64encode(json.dumps(["cv1", digest(scope), anchor, start + len(selected)],
+            separators=(",", ":")).encode()).decode().rstrip("=") if start + len(selected) < anchor else None)
         return AgentConversationPage(items=[AgentConversationSummary(id=item.id, createdAt=item.created_at,
             updatedAt=item.updated_at, title=next((msg.text[:120] for msg in item.messages if msg.role == "user"), ""),
             activeRunId=next((run.id for run in item.runs if run.state not in TERMINAL_RUNS), None)) for item in selected],
-            nextCursor=self._cursor(scope, start + len(selected)) if start + len(selected) < len(state.conversations) else None)
+            nextCursor=cursor)
 
     def page(self, project_id: str, conversation_id: str, kind: str, request: AgentPageRequest):
         if kind not in {"messages", "sources", "findings"}:
