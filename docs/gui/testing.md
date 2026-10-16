@@ -14,7 +14,9 @@ synthetic process terminations and three disposable guard mutants. NB02b adds 10
 variants for every writer route/internal callback, fixed payload ownership,
 portable history, pinned exports, asset GC and private retention. NB03 adds 120
 variants for resumable writers, bounded barriers, drafts, history ownership and
-independent navigation. All 428 due variants have exact Python or Node bindings.
+independent navigation. NB05 adds 31 variants for existing fixed services, queue fairness, stale captures,
+reversed replies, overlap and processing stage cuts. All 459 due variants have
+exact Python or Node bindings.
 Additional checks cover pin corruption, late callbacks, namespace loss, repeated
 saves, engine marks and callback ownership after resume. Real API cases also
 cover clean lease expiry at/after the deadline, a timed out renewal and explicit
@@ -25,8 +27,9 @@ Manual T3 also verifies no secondary-tab API requests. Additional checks
 include guarded sole-tab resume after a lost unload notification, fresh
 tab resume markers, exact dirty IDs and rejection after losing tab ownership.
 The shared contract
-corpus has 425 cases, including 72 new writer-wire boundaries. These bindings
-require a passing source-bound report before slice acceptance. `NB-FIXED`,
+corpus has 446 cases, including 72 new writer-wire boundaries. These bindings
+require a passing source-bound report before slice acceptance. `NB-FIXED` maps real two-stage processing and scoped rewrite/reconciliation jobs,
+exact TypeScript-to-Python reply identity and admission/account cutpoints.
 `NB-UI` and `NB-PARALLEL` await their slice bindings.
 
 The existing fast gate writes exact Python setup/call/teardown results through
@@ -525,3 +528,8 @@ all employment pairs and durable restart. Node uses real Python proposals and
 mutations for one-action cascade undo, stale equal-text guards and one linked
 reconciliation request per action. T3 verifies nonblocking export with overlap,
 preview/dismiss/apply, unrelated typing, undo/redo, restart and portable transfer.
+
+NB05 also checks retained request identity, Undo before metadata and server
+acceptance, history action IDs, epoch expiry and the denied legacy fixed routes.
+The 31 due fixed-operation variants and 89 cumulative extra groups require exact
+executed evidence; declarations alone do not accept them.

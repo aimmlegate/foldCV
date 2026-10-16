@@ -151,6 +151,29 @@ class Bridge:
             await asyncio.wait_for(asyncio.shield(self.service.supervisor.controls[job.id].task), 20)
             return {"job": self.service.store.read(project, job.id).model_dump(mode="json", by_alias=True),
                 "apply": self.results.get(job.submission.identity.request_id)}
+        if kind == "fixed_fixture":
+            from spikes.background.fixed_fixtures import prepare_fixed
+            return await asyncio.to_thread(prepare_fixed, self, frame.get("project", self.project))
+        if kind == "wait_fixed":
+            project, identifier = frame.get("project", self.project), frame["job"]
+            changed = asyncio.Event()
+            self.service.supervisor.listeners.add(changed)
+            try:
+                while True:
+                    changed.clear()
+                    job = self.service.store.read(project, identifier)
+                    if job.execution in {"completed", "failed", "cancelled", "interrupted"}:
+                        break
+                    await asyncio.wait_for(changed.wait(), 20)
+                control = self.service.supervisor.controls.get(identifier)
+                if control and control.task:
+                    await asyncio.wait_for(asyncio.shield(control.task), 20)
+                task = self.service.publication_tasks.get(project)
+                if task:
+                    await asyncio.wait_for(asyncio.shield(task), 20)
+                return self.service.fixed.reply(self.service.store.read(project, identifier)).model_dump(mode="json", by_alias=True)
+            finally:
+                self.service.supervisor.listeners.discard(changed)
         if kind == "clone":
             from packages.resume_core.rich_archive import export_rich_archive
             def clone():
@@ -172,6 +195,7 @@ class Bridge:
         state = self.service.store.load(project)
         return {"workspace": workspace.model_dump(mode="json", by_alias=True), "workspaceSha256": checksum,
             "state": state.model_dump(mode="json", by_alias=True), "syntheticStarts": len(self.factory.calls),
+            "fixedStarts": len(getattr(getattr(self, "fixed_provider", None), "calls", [])),
             "activeSlots": sum(bool(control.slot_granted and control.task and not control.task.done())
                 for control in self.service.supervisor.controls.values()), "metadataInspections": self.adapter.inspections,
             "admissionHeld": self.service.admission.locked()}

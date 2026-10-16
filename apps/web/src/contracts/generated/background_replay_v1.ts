@@ -39,7 +39,21 @@ export type Code =
   | "WRITER_UNKNOWN"
   | "SAVE_FAILED"
   | "OUTCOME_UNKNOWN"
-  | "PROJECT_DELETED";
+  | "PROJECT_DELETED"
+  | "INVALID_RESULT"
+  | "TEMP_FAILED"
+  | "CLI_MISSING"
+  | "CLI_UNSUPPORTED"
+  | "CLI_PROFILE_UNSAFE"
+  | "AUTH_MODE_MISMATCH"
+  | "INPUT_TOO_LARGE"
+  | "OUTPUT_TOO_LARGE"
+  | "BUDGET_EXCEEDED"
+  | "INVALID_INPUT"
+  | "INVALID_SCHEMA"
+  | "CLI_FAILED"
+  | "UNSAFE_TEMP_ROOT"
+  | "INCOMPLETE_STREAM";
 export type Executiongeneration = number;
 export type Id = string;
 export type Nativestarted = boolean;
@@ -48,6 +62,7 @@ export type Stage = "agent" | "assessment" | "extraction" | "rewrite" | "reconci
 export type Startupdeadline = string;
 export type State =
   "reserved" | "starting" | "running" | "completed" | "failed" | "cancelled" | "interrupted" | "cleanup_failed";
+export type Captureinvalidated = boolean;
 export type Createdat = string;
 export type Eventcursor = number;
 export type Execution =
@@ -852,6 +867,7 @@ export interface JobEventV1 {
 export interface JobSnapshotV1 {
   assetPinsSha256?: Assetpinssha256;
   attempts: Attempts;
+  captureInvalidated?: Captureinvalidated;
   createdAt: Createdat;
   error: JobFailure | null;
   eventCursor: Eventcursor;

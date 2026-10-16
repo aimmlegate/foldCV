@@ -182,9 +182,11 @@ class RichProjectService(RichSynchronization, RichAssets, GuiProjectService):
         from packages.resume_core.rich_presentation import presentation
         workspace = self.read(identifier)
         saved = self.saved_revisions.get(identifier)
+        jobs = getattr(self, "background_jobs", None)
+        generation = jobs.fixed.generation(identifier) if jobs is not None and jobs.enabled else None
         return RichProjectResponse(workspace=workspace, durability=self.durability(identifier),
             savedProjectRevision=saved[0] if saved else None, savedDocumentRevision=saved[1] if saved else None,
-            saveError=self.save_errors.get(identifier), generation=self.generations.get(identifier),
+            saveError=self.save_errors.get(identifier), generation=generation or self.generations.get(identifier),
             presentation=presentation(workspace.project.document, workspace.project.facts) if workspace.project else None,
             identity=resume_identity(workspace))
 

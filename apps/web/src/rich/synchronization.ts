@@ -10,6 +10,9 @@ import type { CellChange, CellValue, DependencyCapture, SessionHistory } from ".
 import type { RichBlock, RichSaveQueue } from "./save-queue";
 import { AppliedIntentFailure } from "./intent-queue";
 import { currentPanelIntent } from "./panel-intents";
+import { FixedOperations, operationSync, type FixedCommand } from "../background/fixed";
+import { projectJobs, type ProjectJobs } from "../background/jobs";
+import type { JobSnapshotV1 } from "../contracts/generated/background_snapshot_v1";
 
 type Sync = RichProjectResponse["workspace"]["syncRecords"][number];
 type Capture = DependencyCapture & { epochs: ReadonlyMap<string, number> };
@@ -45,21 +48,63 @@ export type SyncAdapter = {
   changed: () => void; report: (response: RichProjectResponse) => void;
   failed?: (error: unknown) => void;
   applied?: (actionId: string, changes: CellChange[]) => void;
+  background?: boolean;
 };
 export type PanelCommand = Omit<RichPanelRequest, "capture" | "factsRevision" | "documentRevision">;
 export class RichSynchronization {
   private closed = false;
   private readonly active = new Map<string, Capture>();
+  private readonly invalidated = new Set<string>();
   private readonly cascades = new Map<string, DependencyCapture>();
-  constructor(private readonly adapter: SyncAdapter, private readonly projectId: string) {}
-  close(): void { this.closed = true; this.cascades.clear(); this.invalidate(); }
+  private readonly fixed: FixedOperations | null;
+  private readonly jobs: ProjectJobs | null;
+  private readonly submitted = new Map<string, string>();
+  private readonly unsubscribe: (() => void) | null;
+  constructor(private readonly adapter: SyncAdapter, private readonly projectId: string) {
+    this.fixed = adapter.background ? new FixedOperations(projectId) : null;
+    this.jobs = this.fixed ? projectJobs(projectId) : null;
+    this.unsubscribe = this.jobs?.subscribe(view => this.finished(view.project?.jobs ?? [])) ?? null;
+  }
+  close(): void {
+    this.invalidate();
+    this.closed = true; this.unsubscribe?.(); this.cascades.clear(); this.invalidate(); this.submitted.clear();
+  }
+  private finished(jobs: JobSnapshotV1[]): void {
+    if (this.closed) return;
+    for (const job of jobs) {
+      const action = this.submitted.get(job.id);
+      if (!action || !job.proposalId && !["completed", "failed", "cancelled", "interrupted"].includes(job.execution)) continue;
+      this.submitted.delete(job.id); this.active.delete(action); this.adapter.history.discardPending(action);
+    }
+  }
+  private async background(command: FixedCommand, capture: Capture): Promise<boolean> {
+    if (!this.fixed || !this.jobs) return false;
+    this.active.set(capture.actionId, capture);
+    try {
+      const reply = await this.fixed.submit(command,
+        () => !this.invalidated.has(capture.actionId) && (this.closed || this.adapter.history.current(capture)));
+      if (this.invalidated.has(capture.actionId) || !this.closed && !this.adapter.history.current(capture)) {
+        await projectRequest(`/${this.projectId}/cancel-action`, "POST", this.wireCapture(capture));
+        this.adapter.history.discardPending(capture.actionId);
+      }
+      if (this.closed) return true;
+      this.submitted.set(reply.job.id, capture.actionId);
+      this.finished([reply.job, ...(this.jobs.view.project?.jobs ?? [])]);
+      void this.jobs.refresh().catch(() => {});
+      return true;
+    } catch (error) { this.active.delete(capture.actionId); throw error; }
+  }
   invalidate(): void {
     for (const [id, capture] of this.active) if (this.closed || !this.adapter.history.current(capture)) {
       this.active.delete(id);
+      if (this.closed && this.fixed) continue;
+      this.invalidated.add(id);
       void projectRequest(`/${this.projectId}/cancel-action`, "POST", this.wireCapture(capture)).catch(() => {});
+      if (this.fixed) this.adapter.history.discardPending(id);
     }
   }
   private async admitted(path: string, body: unknown, capture: Capture): Promise<RichProjectResponse> {
+    if (this.closed || !this.adapter.history.current(capture)) throw new RichApiFailure("STALE_SELECTION");
     this.active.set(capture.actionId, capture);
     try { return await projectRequest(path, "POST", body); }
     finally { this.active.delete(capture.actionId); }
@@ -96,16 +141,17 @@ export class RichSynchronization {
     if (!capture || this.closed) return;
     await this.adapter.queue.flush();
     if (!this.adapter.history.current(capture) || this.closed) return;
-    const response = await this.admitted(`/${this.projectId}/completion`, {
-      capture: this.wireCapture(capture), blockIds, movedIds, removedFields, removedRecordIds, interpret } satisfies RichCompletionRequest, capture);
-    const sync = response.workspace.syncRecords.at(-1);
-    if (sync) await this.apply(sync, capture);
+    const request = { capture: this.wireCapture(capture), blockIds, movedIds, removedFields, removedRecordIds, interpret } satisfies RichCompletionRequest;
+    if (await this.background({ kind: "completion", request }, capture)) return;
+    const response = await this.admitted(`/${this.projectId}/completion`, request, capture);
+    await this.apply(operationSync(response, this.projectId, capture.actionId), capture);
     if (!this.closed) this.adapter.report(await projectRequest(`/${this.projectId}`));
   }
   async rewrite(selection: RichSelection, instruction: string): Promise<void> {
     const marker = `request:${crypto.randomUUID()}`, history = this.adapter.history;
     const action = history.commit("rewrite", [{ key: marker, before: null, after: "pending" }]);
     if (!action) return;
+    let queued = false;
     try {
     const capture = this.capture(action, selection.blockIds);
     if (!capture) return;
@@ -114,29 +160,32 @@ export class RichSynchronization {
     const project = this.adapter.queue.baseline.workspace.project;
     if (!project) return;
     selection.textSha256 = await selectionChecksum(project.document, selection);
+    if (!history.current(capture) || this.closed) return;
     const blocks = new Map<string, number>();
     function visit(items: RichBlock[]) { for (const block of items) { blocks.set(block.id, block.revision); visit(block.children); } }
     project.document.regions.forEach(region => visit(region.blocks));
     selection.capture = { ...this.wireCapture(capture), dependencies: selection.blockIds.map(id => ({ kind: "block", id, revision: blocks.get(id) ?? 1, fingerprint: null })) };
+    if (await this.background({ kind: "rewrite", request: { selection, instruction } }, capture)) { queued = true; return; }
     const response = await this.admitted(`/${this.projectId}/rewrite`, { selection, instruction }, capture);
-    const sync = response.workspace.syncRecords.at(-1);
-    if (!sync) throw new Error("Не удалось получить результат правки.");
+    const sync = operationSync(response, this.projectId, capture.actionId);
     if (sync.status === "failed" || sync.status === "stale") {
       this.adapter.report(response); throw new RichApiFailure(sync.errorCode ?? "REWRITE_FAILED");
     }
     const disposition = await this.apply(sync, capture);
     if (disposition && disposition !== "applied") throw new Error("Правка устарела. Запросите её заново.");
     if (!this.closed) this.adapter.report(await projectRequest(`/${this.projectId}`));
-    } finally { history.discardPending(action); }
+    } finally { if (!queued) history.discardPending(action); }
   }
   async resolve(id: string): Promise<void> {
     const history = this.adapter.history, marker = `request:${crypto.randomUUID()}`;
     const action = history.commit("panel", [{ key: marker, before: null, after: "resolve" }]);
     if (!action || this.closed) return;
     await this.adapter.queue.flush();
-    const response = await projectRequest(`/${this.projectId}/sync/${id}/resolve`, "POST", {
-      sessionId: history.session, actionId: action, actionToken: 0, dependencies: [] });
-    const sync = response.workspace.syncRecords.at(-1), capture = sync ? this.capture(action, sync.blockIds) : null;
+    const origin = this.capture(action, this.adapter.queue.baseline.workspace.syncRecords.find(sync => sync.id === id)?.blockIds ?? []);
+    if (!origin) return;
+    if (await this.background({ kind: "resolve", syncId: id, capture: this.wireCapture(origin) }, origin)) return;
+    const response = await projectRequest(`/${this.projectId}/sync/${id}/resolve`, "POST", this.wireCapture(origin));
+    const sync = operationSync(response, this.projectId, action), capture = this.capture(action, sync.blockIds);
     if (sync && capture) await this.apply(sync, capture);
     if (!this.closed) this.adapter.report(await projectRequest(`/${this.projectId}`));
   }
@@ -185,9 +234,12 @@ export class RichSynchronization {
     if (capture && records.size) void this.panelSync(capture, [...records]).catch(error => adapter.failed?.(error));
   }
   private async panelSync(capture: Capture, records: string[]): Promise<void> {
-    const response = await this.admitted(`/${this.projectId}/panel/sync`, { capture: this.wireCapture(capture), recordIds: records }, capture);
-    const sync = response.workspace.syncRecords.at(-1);
-    if (sync) await this.apply(sync, capture);
+    const [first, ...rest] = records;
+    if (!first) return;
+    const request = { capture: this.wireCapture(capture), recordIds: [first, ...rest] } satisfies Extract<FixedCommand, { kind: "panel" }>["request"];
+    if (await this.background({ kind: "panel", request }, capture)) return;
+    const response = await this.admitted(`/${this.projectId}/panel/sync`, request, capture);
+    await this.apply(operationSync(response, this.projectId, capture.actionId), capture);
     if (!this.closed) this.adapter.report(await projectRequest(`/${this.projectId}`));
   }
   async cascadePreview(jobId: string, periodId: string, actionId: string): Promise<DateCascadeProposal> {
@@ -231,9 +283,9 @@ export class RichSynchronization {
     const capture = action ? this.capture(action, blockIds) : null;
     if (!capture || this.closed) return;
     await this.adapter.queue.flush();
+    if (await this.background({ kind: "retry", syncId: id, capture: this.wireCapture(capture) }, capture)) return;
     const response = await this.admitted(`/${this.projectId}/sync/${id}/retry`, this.wireCapture(capture), capture);
-    const sync = response.workspace.syncRecords.at(-1);
-    if (sync) await this.apply(sync, capture);
+    await this.apply(operationSync(response, this.projectId, capture.actionId), capture);
     if (!this.closed) this.adapter.report(await projectRequest(`/${this.projectId}`));
   }
   private async apply(sync: Sync, original: Capture): Promise<"applied" | "stale" | "conflict" | null> {

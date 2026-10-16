@@ -48,7 +48,7 @@ def job_in(state: BackgroundSidecarV1, job_id: str) -> JobSnapshotV1:
 
 
 def records(state: BackgroundSidecarV1) -> int:
-    return (sum(len(getattr(state, key)) for key in ("jobs", "requests", "proposals", "drafts", "generations", "intents", "inverses", "manual_intents", "asset_pins", "orphan_assets", "cleanup_refs", "writer_touches", "history_commands"))
+    return (sum(len(getattr(state, key)) for key in ("jobs", "requests", "proposals", "drafts", "generations", "intents", "inverses", "manual_intents", "asset_pins", "orphan_assets", "cleanup_refs", "writer_touches", "history_commands", "fixed_invalidations"))
         + int(state.writer is not None) + int(state.barrier is not None)
         + (1 + len(state.history.definitions) if state.history is not None else 0))
 
@@ -432,7 +432,7 @@ class JobStore:
             if proposal.account_generation != account_generation and proposal.authority == "active":
                 proposal.authority, proposal.revocation = "revoked", "account_changed"
 
-    def submit(self, submission: JobSubmissionV1) -> tuple[JobSnapshotV1, bool]:
+    def submit(self, submission: JobSubmissionV1, *, supersede_ids=()) -> tuple[JobSnapshotV1, bool]:
         project_id = submission.identity.project_id
         with self.guard(project_id) as directory:
             state = self._read(project_id, directory)
@@ -455,7 +455,13 @@ class JobStore:
                     self._read_dispatch(self.background / "dispatch.json").account_generation):
                 raise BackgroundFailure("ACCOUNT_CHANGED")
             states = self._all()
-            pending = [job for value in states.values() for job in value.jobs if job.execution == "queued"]
+            superseded = [job for job in state.jobs if job.id in supersede_ids]
+            if (len(set(supersede_ids)) != len(supersede_ids) or len(superseded) != len(supersede_ids)
+                    or any(job.execution != "queued" or job.submission.kind != "reconciliation"
+                        or job.proposal_id is not None for job in superseded)):
+                raise BackgroundFailure("JOB_SCOPE_INVALID")
+            pending = [job for value in states.values() for job in value.jobs
+                if job.execution == "queued" and job.id not in supersede_ids]
             local = [job for job in pending if job.submission.identity.project_id == project_id]
             unknown = len(set(self.fences) - states.keys())
             noninteractive = submission.scheduling_class != "interactive"
@@ -468,6 +474,9 @@ class JobStore:
                 publication="none", executionGeneration=1, attempts=[], eventCursor=1, proposalId=None,
                 receipt=None, error=None, createdAt=now, updatedAt=now)
             state.jobs.append(job)
+            for previous in superseded:
+                previous.execution, previous.publication = "cancelled", "cancelled"
+                previous.error, previous.event_cursor, previous.updated_at = JobFailure(code="CANCELLED"), previous.event_cursor + 1, now
             from .background_assets import pin_snapshot
             from .rich_project_store import RichProjectStore
             canonical = RichProjectStore(self.root)
@@ -565,7 +574,8 @@ class JobStore:
             if (not state.tombstoned or any(job.execution not in TERMINAL_EXECUTION
                     or any(not attempt.cleanup_verified for attempt in job.attempts) for job in state.jobs)):
                 raise BackgroundFailure("CLEANUP_FAILED")
-            allowed = {"agent-artifacts", "canonical-candidates", "proposal-intents", "events", "drafts"}
+            allowed = {"agent-artifacts", "canonical-candidates", "proposal-intents", "events", "drafts",
+                "fixed-inputs", "processing-candidates"}
             files, folders = [], []
             for path in directory.iterdir():
                 if path.name in {"state.json", ".canonical.lock", "history-activation.json"}:
@@ -582,7 +592,7 @@ class JobStore:
                 else:
                     raise BackgroundFailure("JOB_STORE_UNAVAILABLE")
             for name in ("jobs", "requests", "proposals", "drafts", "generations", "intents", "inverses",
-                    "manual_intents", "asset_pins", "orphan_assets", "cleanup_refs", "writer_touches", "history_commands"):
+                    "manual_intents", "asset_pins", "orphan_assets", "cleanup_refs", "writer_touches", "history_commands", "fixed_invalidations"):
                 setattr(state, name, [])
             state.writer, state.barrier, state.history = None, None, None
             self._write(directory, state, self._all())

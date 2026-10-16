@@ -92,6 +92,9 @@ class RichSynchronization:
         return response
 
     async def cancel_sync_action(self, identifier, capture):
+        jobs = getattr(self, "background_jobs", None)
+        if jobs is not None and jobs.enabled:
+            return await jobs.fixed.invalidate_action(identifier, capture)
         workspace = self.read(identifier)
         for sync in workspace.sync_records:
             if sync.action_id == capture.action_id:

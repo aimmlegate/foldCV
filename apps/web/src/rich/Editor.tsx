@@ -469,7 +469,7 @@ export function RichEditor({ initial, acknowledge, onStatus, ref, onHistoryNavig
       if (context.mode !== "prepared") queueMicrotask(() => { void publishImageReferences().catch(error => onStatus(error instanceof Error ? error.message : "IMAGE_IMPORT_FAILED")); });
     }, context => !bridge.writer || bridge.writer.writable || context.mode === "prepared" || bridge.backgroundHistory);
     bridge.history = history;
-    const sync = new RichSynchronization({ history, queue, current: () => bridge.current,
+    const sync = new RichSynchronization({ history, queue, current: () => bridge.current, background: writerConnection !== null,
       cells: response => {
         const current = response.workspace.project; if (!current) throw new Error("Document missing");
         return withFacts(current.document, current.facts);
@@ -789,6 +789,7 @@ export function RichEditor({ initial, acknowledge, onStatus, ref, onHistoryNavig
       const pending = view.project.jobs;
       jobsWork = jobsWork.catch(() => {}).then(async () => {
         for (const job of pending) {
+          if (job.submission.kind === "processing") continue;
           if (["closed", "detached", "read_only"].includes(writer.mode)) return;
           writer.observeJob(job);
           if (writer.mode === "recovering") { await writer.recoverPublication(job); continue; }

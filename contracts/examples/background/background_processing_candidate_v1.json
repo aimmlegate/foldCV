@@ -1,0 +1,5416 @@
+{
+  "schemaVersion": 1,
+  "id": "processing_bb3a8c46b2e473a190c8778bd20808b1",
+  "inputId": "fixed_bb3a8c46b2e473a190c8778bd20808b1",
+  "assessment": {
+    "verdict": "likely"
+  },
+  "normalized": {
+    "sources": [
+      {
+        "id": "source-8d0151e899974479a6070258b9da4d24",
+        "revision": 1,
+        "originalName": "pasted.txt",
+        "mimeType": "text/plain",
+        "byteSha256": "dc297781ca355d302cd6f084bed031e74a1a80530ddae82a96949c5efcff4c35",
+        "byteRef": "sources/source-8d0151e899974479a6070258b9da4d24/original",
+        "parser": "utf8",
+        "parserVersion": "1",
+        "units": [
+          {
+            "id": "source-8d0151e899974479a6070258b9da4d24/unit_1",
+            "revision": 1,
+            "order": 0,
+            "text": "Ирина Примерова, backend-разработчик.\n",
+            "location": {
+              "kind": "pasted",
+              "index": 0,
+              "row": null,
+              "column": null
+            },
+            "disposition": "unresolved",
+            "representedFactIds": [
+              "fact_b5b7674c33a05ad0fec9b6bc",
+              "fact_442d7e6e3a97f5bb602ebe0c",
+              "fact_404857bd48e40d94387d1f9f",
+              "fact_533afe622c5e111554483411"
+            ]
+          },
+          {
+            "id": "source-8d0151e899974479a6070258b9da4d24/unit_2",
+            "revision": 1,
+            "order": 1,
+            "text": "Север, backend-разработчик, 2021 — настоящее время.\n",
+            "location": {
+              "kind": "pasted",
+              "index": 1,
+              "row": null,
+              "column": null
+            },
+            "disposition": "unresolved",
+            "representedFactIds": [
+              "fact_533afe622c5e111554483411",
+              "fact_fd31811ccf08e1ee755e829e"
+            ]
+          },
+          {
+            "id": "source-8d0151e899974479a6070258b9da4d24/unit_3",
+            "revision": 1,
+            "order": 2,
+            "text": "Сервис обработки заказов. Python, PostgreSQL.\n",
+            "location": {
+              "kind": "pasted",
+              "index": 2,
+              "row": null,
+              "column": null
+            },
+            "disposition": "shown",
+            "representedFactIds": [
+              "fact_533afe622c5e111554483411",
+              "fact_41cf597cca510ae855907b14",
+              "fact_962e4cb4357a0e628ef32a17",
+              "fact_85ad80f80cbf10e55b236227",
+              "fact_fd31811ccf08e1ee755e829e"
+            ]
+          },
+          {
+            "id": "source-8d0151e899974479a6070258b9da4d24/unit_4",
+            "revision": 1,
+            "order": 3,
+            "text": "Делала REST API для заказов, писала интеграционные тесты.\n",
+            "location": {
+              "kind": "pasted",
+              "index": 3,
+              "row": null,
+              "column": null
+            },
+            "disposition": "shown",
+            "representedFactIds": [
+              "fact_533afe622c5e111554483411",
+              "fact_b7453cc530e0cd750d6d3be3",
+              "fact_fd31811ccf08e1ee755e829e"
+            ]
+          },
+          {
+            "id": "source-8d0151e899974479a6070258b9da4d24/unit_5",
+            "revision": 1,
+            "order": 4,
+            "text": "Командой сократили время обработки со 100 до 70 мс, на 30%.\n",
+            "location": {
+              "kind": "pasted",
+              "index": 4,
+              "row": null,
+              "column": null
+            },
+            "disposition": "shown",
+            "representedFactIds": [
+              "fact_533afe622c5e111554483411",
+              "fact_2a07c45464f4dd20474c04dc",
+              "fact_fd31811ccf08e1ee755e829e"
+            ]
+          },
+          {
+            "id": "source-8d0151e899974479a6070258b9da4d24/unit_6",
+            "revision": 1,
+            "order": 5,
+            "text": "Обучила двух новых разработчиков.\n",
+            "location": {
+              "kind": "pasted",
+              "index": 5,
+              "row": null,
+              "column": null
+            },
+            "disposition": "shown",
+            "representedFactIds": [
+              "fact_533afe622c5e111554483411",
+              "fact_3c57dc93658d8c97ce86891c",
+              "fact_fd31811ccf08e1ee755e829e"
+            ]
+          },
+          {
+            "id": "source-8d0151e899974479a6070258b9da4d24/unit_7",
+            "revision": 1,
+            "order": 6,
+            "text": "Запад, разработчик, 2017–2020. Внутренняя CRM. Java, MySQL.\n",
+            "location": {
+              "kind": "pasted",
+              "index": 6,
+              "row": null,
+              "column": null
+            },
+            "disposition": "shown",
+            "representedFactIds": [
+              "fact_533afe622c5e111554483411",
+              "fact_ed7cec6f27c328f4fbc83c7a",
+              "fact_6cb36d3669b2c2e096dc9ee5",
+              "fact_eeead18f45220ea511b4542f"
+            ]
+          },
+          {
+            "id": "source-8d0151e899974479a6070258b9da4d24/unit_8",
+            "revision": 1,
+            "order": 7,
+            "text": "Поддерживала CRM и исправляла ошибки.\n",
+            "location": {
+              "kind": "pasted",
+              "index": 7,
+              "row": null,
+              "column": null
+            },
+            "disposition": "shown",
+            "representedFactIds": [
+              "fact_533afe622c5e111554483411",
+              "fact_8f450a88df47102aafbbdf89",
+              "fact_eeead18f45220ea511b4542f"
+            ]
+          },
+          {
+            "id": "source-8d0151e899974479a6070258b9da4d24/unit_9",
+            "revision": 1,
+            "order": 8,
+            "text": "Восток, разработчик, 2008–2009. PHP. Разрабатывала отчёты.\n",
+            "location": {
+              "kind": "pasted",
+              "index": 8,
+              "row": null,
+              "column": null
+            },
+            "disposition": "shown",
+            "representedFactIds": [
+              "fact_533afe622c5e111554483411",
+              "fact_f0d8e8bcc7cd4fb14683d4fd",
+              "fact_f9ca9eb92e527767156d8c05",
+              "fact_c33faeac01464dbedbfe90fb"
+            ]
+          },
+          {
+            "id": "source-8d0151e899974479a6070258b9da4d24/unit_10",
+            "revision": 1,
+            "order": 9,
+            "text": "Образование: Учебный технический университет, прикладная информатика, 2016.\n",
+            "location": {
+              "kind": "pasted",
+              "index": 9,
+              "row": null,
+              "column": null
+            },
+            "disposition": "unresolved",
+            "representedFactIds": [
+              "fact_c61fec381ccd7dd42ad06b3b",
+              "fact_959538b1fc7a2bd86a98c32e",
+              "fact_7947b828808541930764e0d2",
+              "fact_533afe622c5e111554483411"
+            ]
+          },
+          {
+            "id": "source-8d0151e899974479a6070258b9da4d24/unit_11",
+            "revision": 1,
+            "order": 10,
+            "text": "Языки: русский — родной, английский — B2.\n",
+            "location": {
+              "kind": "pasted",
+              "index": 10,
+              "row": null,
+              "column": null
+            },
+            "disposition": "unresolved",
+            "representedFactIds": [
+              "fact_fd1dbd489cab9201a7f03624",
+              "fact_f191804ef60311842489ff51",
+              "fact_3b04895a9cc243f26ea72fc9",
+              "fact_94d2f975bf8b159af256ad32",
+              "fact_533afe622c5e111554483411"
+            ]
+          },
+          {
+            "id": "source-8d0151e899974479a6070258b9da4d24/unit_12",
+            "revision": 1,
+            "order": 11,
+            "text": "Общие навыки: Docker.\n",
+            "location": {
+              "kind": "pasted",
+              "index": 11,
+              "row": null,
+              "column": null
+            },
+            "disposition": "shown",
+            "representedFactIds": [
+              "fact_533afe622c5e111554483411",
+              "fact_a0defc7a3e861422830184e6"
+            ]
+          }
+        ],
+        "overlays": [],
+        "warnings": []
+      }
+    ],
+    "facts": [
+      {
+        "id": "fact_b5b7674c33a05ad0fec9b6bc",
+        "revision": 1,
+        "kind": "candidate_detail",
+        "value": {
+          "field": "name",
+          "text": "Ирина Примерова",
+          "fieldId": "candidate/name"
+        },
+        "evidence": [
+          {
+            "sourceId": "source-8d0151e899974479a6070258b9da4d24",
+            "sourceRevision": 1,
+            "unitId": "source-8d0151e899974479a6070258b9da4d24/unit_1",
+            "unitRevision": 1
+          }
+        ],
+        "origin": "source",
+        "importance": "normal",
+        "jobId": null,
+        "subprojectId": null
+      },
+      {
+        "id": "fact_442d7e6e3a97f5bb602ebe0c",
+        "revision": 1,
+        "kind": "candidate_detail",
+        "value": {
+          "field": "title",
+          "text": "backend-разработчик",
+          "fieldId": "candidate/title"
+        },
+        "evidence": [
+          {
+            "sourceId": "source-8d0151e899974479a6070258b9da4d24",
+            "sourceRevision": 1,
+            "unitId": "source-8d0151e899974479a6070258b9da4d24/unit_1",
+            "unitRevision": 1
+          }
+        ],
+        "origin": "source",
+        "importance": "normal",
+        "jobId": null,
+        "subprojectId": null
+      },
+      {
+        "id": "fact_c61fec381ccd7dd42ad06b3b",
+        "revision": 1,
+        "kind": "candidate_detail",
+        "value": {
+          "field": "education",
+          "text": "Учебный технический университет",
+          "fieldId": "education:education_67a93261f331146418c83b3d/institution"
+        },
+        "evidence": [
+          {
+            "sourceId": "source-8d0151e899974479a6070258b9da4d24",
+            "sourceRevision": 1,
+            "unitId": "source-8d0151e899974479a6070258b9da4d24/unit_10",
+            "unitRevision": 1
+          }
+        ],
+        "origin": "source",
+        "importance": "normal",
+        "jobId": null,
+        "subprojectId": null
+      },
+      {
+        "id": "fact_959538b1fc7a2bd86a98c32e",
+        "revision": 1,
+        "kind": "candidate_detail",
+        "value": {
+          "field": "education",
+          "text": "прикладная информатика",
+          "fieldId": "education:education_67a93261f331146418c83b3d/specialty"
+        },
+        "evidence": [
+          {
+            "sourceId": "source-8d0151e899974479a6070258b9da4d24",
+            "sourceRevision": 1,
+            "unitId": "source-8d0151e899974479a6070258b9da4d24/unit_10",
+            "unitRevision": 1
+          }
+        ],
+        "origin": "source",
+        "importance": "normal",
+        "jobId": null,
+        "subprojectId": null
+      },
+      {
+        "id": "fact_7947b828808541930764e0d2",
+        "revision": 1,
+        "kind": "candidate_detail",
+        "value": {
+          "field": "education",
+          "text": "2016",
+          "fieldId": "education:education_67a93261f331146418c83b3d/dateText"
+        },
+        "evidence": [
+          {
+            "sourceId": "source-8d0151e899974479a6070258b9da4d24",
+            "sourceRevision": 1,
+            "unitId": "source-8d0151e899974479a6070258b9da4d24/unit_10",
+            "unitRevision": 1
+          }
+        ],
+        "origin": "source",
+        "importance": "normal",
+        "jobId": null,
+        "subprojectId": null
+      },
+      {
+        "id": "fact_fd1dbd489cab9201a7f03624",
+        "revision": 1,
+        "kind": "candidate_detail",
+        "value": {
+          "field": "language",
+          "text": "русский",
+          "fieldId": "language:language_98f055188453b531e626f9dc/name"
+        },
+        "evidence": [
+          {
+            "sourceId": "source-8d0151e899974479a6070258b9da4d24",
+            "sourceRevision": 1,
+            "unitId": "source-8d0151e899974479a6070258b9da4d24/unit_11",
+            "unitRevision": 1
+          }
+        ],
+        "origin": "source",
+        "importance": "normal",
+        "jobId": null,
+        "subprojectId": null
+      },
+      {
+        "id": "fact_f191804ef60311842489ff51",
+        "revision": 1,
+        "kind": "candidate_detail",
+        "value": {
+          "field": "language",
+          "text": "родной",
+          "fieldId": "language:language_98f055188453b531e626f9dc/proficiency"
+        },
+        "evidence": [
+          {
+            "sourceId": "source-8d0151e899974479a6070258b9da4d24",
+            "sourceRevision": 1,
+            "unitId": "source-8d0151e899974479a6070258b9da4d24/unit_11",
+            "unitRevision": 1
+          }
+        ],
+        "origin": "source",
+        "importance": "normal",
+        "jobId": null,
+        "subprojectId": null
+      },
+      {
+        "id": "fact_3b04895a9cc243f26ea72fc9",
+        "revision": 1,
+        "kind": "candidate_detail",
+        "value": {
+          "field": "language",
+          "text": "английский",
+          "fieldId": "language:language_6f8e2d4cffc9f46d4e687770/name"
+        },
+        "evidence": [
+          {
+            "sourceId": "source-8d0151e899974479a6070258b9da4d24",
+            "sourceRevision": 1,
+            "unitId": "source-8d0151e899974479a6070258b9da4d24/unit_11",
+            "unitRevision": 1
+          }
+        ],
+        "origin": "source",
+        "importance": "normal",
+        "jobId": null,
+        "subprojectId": null
+      },
+      {
+        "id": "fact_94d2f975bf8b159af256ad32",
+        "revision": 1,
+        "kind": "candidate_detail",
+        "value": {
+          "field": "language",
+          "text": "B2",
+          "fieldId": "language:language_6f8e2d4cffc9f46d4e687770/proficiency"
+        },
+        "evidence": [
+          {
+            "sourceId": "source-8d0151e899974479a6070258b9da4d24",
+            "sourceRevision": 1,
+            "unitId": "source-8d0151e899974479a6070258b9da4d24/unit_11",
+            "unitRevision": 1
+          }
+        ],
+        "origin": "source",
+        "importance": "normal",
+        "jobId": null,
+        "subprojectId": null
+      },
+      {
+        "id": "fact_404857bd48e40d94387d1f9f",
+        "revision": 1,
+        "kind": "name_assessment",
+        "value": {
+          "missingSurname": false,
+          "evidence": [
+            {
+              "sourceId": "source-8d0151e899974479a6070258b9da4d24",
+              "sourceRevision": 1,
+              "unitId": "source-8d0151e899974479a6070258b9da4d24/unit_1",
+              "unitRevision": 1,
+              "text": "Ирина Примерова"
+            }
+          ],
+          "revision": 1
+        },
+        "evidence": [
+          {
+            "sourceId": "source-8d0151e899974479a6070258b9da4d24",
+            "sourceRevision": 1,
+            "unitId": "source-8d0151e899974479a6070258b9da4d24/unit_1",
+            "unitRevision": 1
+          }
+        ],
+        "origin": "source",
+        "importance": "normal",
+        "jobId": null,
+        "subprojectId": null
+      },
+      {
+        "id": "fact_533afe622c5e111554483411",
+        "revision": 1,
+        "kind": "source_observation",
+        "value": {
+          "sourceObservedAt": null,
+          "evidence": null,
+          "revision": 1
+        },
+        "evidence": [
+          {
+            "sourceId": "source-8d0151e899974479a6070258b9da4d24",
+            "sourceRevision": 1,
+            "unitId": "source-8d0151e899974479a6070258b9da4d24/unit_1",
+            "unitRevision": 1
+          },
+          {
+            "sourceId": "source-8d0151e899974479a6070258b9da4d24",
+            "sourceRevision": 1,
+            "unitId": "source-8d0151e899974479a6070258b9da4d24/unit_2",
+            "unitRevision": 1
+          },
+          {
+            "sourceId": "source-8d0151e899974479a6070258b9da4d24",
+            "sourceRevision": 1,
+            "unitId": "source-8d0151e899974479a6070258b9da4d24/unit_3",
+            "unitRevision": 1
+          },
+          {
+            "sourceId": "source-8d0151e899974479a6070258b9da4d24",
+            "sourceRevision": 1,
+            "unitId": "source-8d0151e899974479a6070258b9da4d24/unit_4",
+            "unitRevision": 1
+          },
+          {
+            "sourceId": "source-8d0151e899974479a6070258b9da4d24",
+            "sourceRevision": 1,
+            "unitId": "source-8d0151e899974479a6070258b9da4d24/unit_5",
+            "unitRevision": 1
+          },
+          {
+            "sourceId": "source-8d0151e899974479a6070258b9da4d24",
+            "sourceRevision": 1,
+            "unitId": "source-8d0151e899974479a6070258b9da4d24/unit_6",
+            "unitRevision": 1
+          },
+          {
+            "sourceId": "source-8d0151e899974479a6070258b9da4d24",
+            "sourceRevision": 1,
+            "unitId": "source-8d0151e899974479a6070258b9da4d24/unit_7",
+            "unitRevision": 1
+          },
+          {
+            "sourceId": "source-8d0151e899974479a6070258b9da4d24",
+            "sourceRevision": 1,
+            "unitId": "source-8d0151e899974479a6070258b9da4d24/unit_8",
+            "unitRevision": 1
+          },
+          {
+            "sourceId": "source-8d0151e899974479a6070258b9da4d24",
+            "sourceRevision": 1,
+            "unitId": "source-8d0151e899974479a6070258b9da4d24/unit_9",
+            "unitRevision": 1
+          },
+          {
+            "sourceId": "source-8d0151e899974479a6070258b9da4d24",
+            "sourceRevision": 1,
+            "unitId": "source-8d0151e899974479a6070258b9da4d24/unit_10",
+            "unitRevision": 1
+          },
+          {
+            "sourceId": "source-8d0151e899974479a6070258b9da4d24",
+            "sourceRevision": 1,
+            "unitId": "source-8d0151e899974479a6070258b9da4d24/unit_11",
+            "unitRevision": 1
+          },
+          {
+            "sourceId": "source-8d0151e899974479a6070258b9da4d24",
+            "sourceRevision": 1,
+            "unitId": "source-8d0151e899974479a6070258b9da4d24/unit_12",
+            "unitRevision": 1
+          }
+        ],
+        "origin": "source",
+        "importance": "normal",
+        "jobId": null,
+        "subprojectId": null
+      },
+      {
+        "id": "fact_41cf597cca510ae855907b14",
+        "revision": 1,
+        "kind": "technology",
+        "value": {
+          "canonicalId": "python",
+          "display": "Python",
+          "scope": "job"
+        },
+        "evidence": [
+          {
+            "sourceId": "source-8d0151e899974479a6070258b9da4d24",
+            "sourceRevision": 1,
+            "unitId": "source-8d0151e899974479a6070258b9da4d24/unit_3",
+            "unitRevision": 1
+          }
+        ],
+        "origin": "source",
+        "importance": "normal",
+        "jobId": "job_a0e569c711a6351e14c2bfb2",
+        "subprojectId": null,
+        "literalEvidence": [
+          {
+            "sourceId": "source-8d0151e899974479a6070258b9da4d24",
+            "sourceRevision": 1,
+            "unitId": "source-8d0151e899974479a6070258b9da4d24/unit_3",
+            "unitRevision": 1,
+            "text": "Python"
+          }
+        ]
+      },
+      {
+        "id": "fact_962e4cb4357a0e628ef32a17",
+        "revision": 1,
+        "kind": "technology",
+        "value": {
+          "canonicalId": "postgresql",
+          "display": "PostgreSQL",
+          "scope": "job"
+        },
+        "evidence": [
+          {
+            "sourceId": "source-8d0151e899974479a6070258b9da4d24",
+            "sourceRevision": 1,
+            "unitId": "source-8d0151e899974479a6070258b9da4d24/unit_3",
+            "unitRevision": 1
+          }
+        ],
+        "origin": "source",
+        "importance": "normal",
+        "jobId": "job_a0e569c711a6351e14c2bfb2",
+        "subprojectId": null,
+        "literalEvidence": [
+          {
+            "sourceId": "source-8d0151e899974479a6070258b9da4d24",
+            "sourceRevision": 1,
+            "unitId": "source-8d0151e899974479a6070258b9da4d24/unit_3",
+            "unitRevision": 1,
+            "text": "PostgreSQL"
+          }
+        ]
+      },
+      {
+        "id": "fact_ed7cec6f27c328f4fbc83c7a",
+        "revision": 1,
+        "kind": "technology",
+        "value": {
+          "canonicalId": "unknown_c1ba60ce13586503a21a05e9",
+          "display": "Java",
+          "scope": "job"
+        },
+        "evidence": [
+          {
+            "sourceId": "source-8d0151e899974479a6070258b9da4d24",
+            "sourceRevision": 1,
+            "unitId": "source-8d0151e899974479a6070258b9da4d24/unit_7",
+            "unitRevision": 1
+          }
+        ],
+        "origin": "source",
+        "importance": "normal",
+        "jobId": "job_c6b580d533aadc71a253e817",
+        "subprojectId": null,
+        "literalEvidence": [
+          {
+            "sourceId": "source-8d0151e899974479a6070258b9da4d24",
+            "sourceRevision": 1,
+            "unitId": "source-8d0151e899974479a6070258b9da4d24/unit_7",
+            "unitRevision": 1,
+            "text": "Java"
+          }
+        ]
+      },
+      {
+        "id": "fact_6cb36d3669b2c2e096dc9ee5",
+        "revision": 1,
+        "kind": "technology",
+        "value": {
+          "canonicalId": "unknown_211906c1c32db77e3082ad28",
+          "display": "MySQL",
+          "scope": "job"
+        },
+        "evidence": [
+          {
+            "sourceId": "source-8d0151e899974479a6070258b9da4d24",
+            "sourceRevision": 1,
+            "unitId": "source-8d0151e899974479a6070258b9da4d24/unit_7",
+            "unitRevision": 1
+          }
+        ],
+        "origin": "source",
+        "importance": "normal",
+        "jobId": "job_c6b580d533aadc71a253e817",
+        "subprojectId": null,
+        "literalEvidence": [
+          {
+            "sourceId": "source-8d0151e899974479a6070258b9da4d24",
+            "sourceRevision": 1,
+            "unitId": "source-8d0151e899974479a6070258b9da4d24/unit_7",
+            "unitRevision": 1,
+            "text": "MySQL"
+          }
+        ]
+      },
+      {
+        "id": "fact_f0d8e8bcc7cd4fb14683d4fd",
+        "revision": 1,
+        "kind": "technology",
+        "value": {
+          "canonicalId": "php",
+          "display": "PHP",
+          "scope": "job"
+        },
+        "evidence": [
+          {
+            "sourceId": "source-8d0151e899974479a6070258b9da4d24",
+            "sourceRevision": 1,
+            "unitId": "source-8d0151e899974479a6070258b9da4d24/unit_9",
+            "unitRevision": 1
+          }
+        ],
+        "origin": "source",
+        "importance": "normal",
+        "jobId": "job_a216842e8c97dd0af74f998e",
+        "subprojectId": null,
+        "literalEvidence": [
+          {
+            "sourceId": "source-8d0151e899974479a6070258b9da4d24",
+            "sourceRevision": 1,
+            "unitId": "source-8d0151e899974479a6070258b9da4d24/unit_9",
+            "unitRevision": 1,
+            "text": "PHP"
+          }
+        ]
+      },
+      {
+        "id": "fact_a0defc7a3e861422830184e6",
+        "revision": 1,
+        "kind": "technology",
+        "value": {
+          "canonicalId": "docker",
+          "display": "Docker",
+          "scope": "global"
+        },
+        "evidence": [
+          {
+            "sourceId": "source-8d0151e899974479a6070258b9da4d24",
+            "sourceRevision": 1,
+            "unitId": "source-8d0151e899974479a6070258b9da4d24/unit_12",
+            "unitRevision": 1
+          }
+        ],
+        "origin": "source",
+        "importance": "normal",
+        "jobId": null,
+        "subprojectId": null,
+        "literalEvidence": [
+          {
+            "sourceId": "source-8d0151e899974479a6070258b9da4d24",
+            "sourceRevision": 1,
+            "unitId": "source-8d0151e899974479a6070258b9da4d24/unit_12",
+            "unitRevision": 1,
+            "text": "Docker"
+          }
+        ]
+      },
+      {
+        "id": "fact_85ad80f80cbf10e55b236227",
+        "revision": 1,
+        "kind": "text",
+        "value": {
+          "text": "Сервис обработки заказов."
+        },
+        "evidence": [
+          {
+            "sourceId": "source-8d0151e899974479a6070258b9da4d24",
+            "sourceRevision": 1,
+            "unitId": "source-8d0151e899974479a6070258b9da4d24/unit_3",
+            "unitRevision": 1
+          }
+        ],
+        "origin": "source",
+        "importance": "normal",
+        "jobId": "job_a0e569c711a6351e14c2bfb2",
+        "subprojectId": null,
+        "literalEvidence": [
+          {
+            "sourceId": "source-8d0151e899974479a6070258b9da4d24",
+            "sourceRevision": 1,
+            "unitId": "source-8d0151e899974479a6070258b9da4d24/unit_3",
+            "unitRevision": 1,
+            "text": "Сервис обработки заказов."
+          }
+        ]
+      },
+      {
+        "id": "fact_b7453cc530e0cd750d6d3be3",
+        "revision": 1,
+        "kind": "text",
+        "value": {
+          "text": "Делала REST API для заказов, писала интеграционные тесты."
+        },
+        "evidence": [
+          {
+            "sourceId": "source-8d0151e899974479a6070258b9da4d24",
+            "sourceRevision": 1,
+            "unitId": "source-8d0151e899974479a6070258b9da4d24/unit_4",
+            "unitRevision": 1
+          }
+        ],
+        "origin": "source",
+        "importance": "normal",
+        "jobId": "job_a0e569c711a6351e14c2bfb2",
+        "subprojectId": null,
+        "literalEvidence": [
+          {
+            "sourceId": "source-8d0151e899974479a6070258b9da4d24",
+            "sourceRevision": 1,
+            "unitId": "source-8d0151e899974479a6070258b9da4d24/unit_4",
+            "unitRevision": 1,
+            "text": "Делала REST API для заказов, писала интеграционные тесты."
+          }
+        ]
+      },
+      {
+        "id": "fact_2a07c45464f4dd20474c04dc",
+        "revision": 1,
+        "kind": "metric",
+        "value": {
+          "number": 70.0,
+          "upperNumber": null,
+          "comparator": "exact",
+          "unit": "мс",
+          "period": null,
+          "baseline": "100",
+          "result": "70",
+          "scope": null,
+          "attribution": "team",
+          "qualifiers": [
+            "на 30%"
+          ]
+        },
+        "evidence": [
+          {
+            "sourceId": "source-8d0151e899974479a6070258b9da4d24",
+            "sourceRevision": 1,
+            "unitId": "source-8d0151e899974479a6070258b9da4d24/unit_5",
+            "unitRevision": 1
+          }
+        ],
+        "origin": "source",
+        "importance": "normal",
+        "jobId": "job_a0e569c711a6351e14c2bfb2",
+        "subprojectId": null,
+        "literalEvidence": [
+          {
+            "sourceId": "source-8d0151e899974479a6070258b9da4d24",
+            "sourceRevision": 1,
+            "unitId": "source-8d0151e899974479a6070258b9da4d24/unit_5",
+            "unitRevision": 1,
+            "text": "Командой сократили время обработки со 100 до 70 мс, на 30%."
+          }
+        ]
+      },
+      {
+        "id": "fact_3c57dc93658d8c97ce86891c",
+        "revision": 1,
+        "kind": "leadership",
+        "value": {
+          "action": "Обучила двух новых разработчиков",
+          "teamSize": {
+            "number": 2.0,
+            "upperNumber": null,
+            "comparator": "exact",
+            "unit": "разработчиков",
+            "period": null,
+            "baseline": null,
+            "result": null,
+            "scope": null,
+            "attribution": "personal",
+            "qualifiers": []
+          },
+          "attribution": "personal"
+        },
+        "evidence": [
+          {
+            "sourceId": "source-8d0151e899974479a6070258b9da4d24",
+            "sourceRevision": 1,
+            "unitId": "source-8d0151e899974479a6070258b9da4d24/unit_6",
+            "unitRevision": 1
+          }
+        ],
+        "origin": "source",
+        "importance": "normal",
+        "jobId": "job_a0e569c711a6351e14c2bfb2",
+        "subprojectId": null,
+        "literalEvidence": [
+          {
+            "sourceId": "source-8d0151e899974479a6070258b9da4d24",
+            "sourceRevision": 1,
+            "unitId": "source-8d0151e899974479a6070258b9da4d24/unit_6",
+            "unitRevision": 1,
+            "text": "Обучила двух новых разработчиков."
+          }
+        ]
+      },
+      {
+        "id": "fact_8f450a88df47102aafbbdf89",
+        "revision": 1,
+        "kind": "text",
+        "value": {
+          "text": "Поддерживала CRM и исправляла ошибки."
+        },
+        "evidence": [
+          {
+            "sourceId": "source-8d0151e899974479a6070258b9da4d24",
+            "sourceRevision": 1,
+            "unitId": "source-8d0151e899974479a6070258b9da4d24/unit_8",
+            "unitRevision": 1
+          }
+        ],
+        "origin": "source",
+        "importance": "normal",
+        "jobId": "job_c6b580d533aadc71a253e817",
+        "subprojectId": null,
+        "literalEvidence": [
+          {
+            "sourceId": "source-8d0151e899974479a6070258b9da4d24",
+            "sourceRevision": 1,
+            "unitId": "source-8d0151e899974479a6070258b9da4d24/unit_8",
+            "unitRevision": 1,
+            "text": "Поддерживала CRM и исправляла ошибки."
+          }
+        ]
+      },
+      {
+        "id": "fact_f9ca9eb92e527767156d8c05",
+        "revision": 1,
+        "kind": "text",
+        "value": {
+          "text": "Разрабатывала отчёты."
+        },
+        "evidence": [
+          {
+            "sourceId": "source-8d0151e899974479a6070258b9da4d24",
+            "sourceRevision": 1,
+            "unitId": "source-8d0151e899974479a6070258b9da4d24/unit_9",
+            "unitRevision": 1
+          }
+        ],
+        "origin": "source",
+        "importance": "normal",
+        "jobId": "job_a216842e8c97dd0af74f998e",
+        "subprojectId": null,
+        "literalEvidence": [
+          {
+            "sourceId": "source-8d0151e899974479a6070258b9da4d24",
+            "sourceRevision": 1,
+            "unitId": "source-8d0151e899974479a6070258b9da4d24/unit_9",
+            "unitRevision": 1,
+            "text": "Разрабатывала отчёты."
+          }
+        ]
+      },
+      {
+        "id": "fact_fd31811ccf08e1ee755e829e",
+        "revision": 1,
+        "kind": "employment",
+        "value": {
+          "jobId": "job_a0e569c711a6351e14c2bfb2",
+          "employer": "Север",
+          "role": "backend-разработчик",
+          "periods": [
+            {
+              "id": "period_a8ab5b282340c012c544652a",
+              "start": {
+                "precision": "year",
+                "year": 2021,
+                "month": null,
+                "day": null
+              },
+              "end": null,
+              "startText": "2021",
+              "endText": "",
+              "present": true,
+              "evidence": [
+                {
+                  "sourceId": "source-8d0151e899974479a6070258b9da4d24",
+                  "sourceRevision": 1,
+                  "unitId": "source-8d0151e899974479a6070258b9da4d24/unit_2",
+                  "unitRevision": 1,
+                  "text": "Север, backend-разработчик, 2021 — настоящее время."
+                }
+              ]
+            }
+          ],
+          "subprojects": []
+        },
+        "evidence": [
+          {
+            "sourceId": "source-8d0151e899974479a6070258b9da4d24",
+            "sourceRevision": 1,
+            "unitId": "source-8d0151e899974479a6070258b9da4d24/unit_2",
+            "unitRevision": 1
+          },
+          {
+            "sourceId": "source-8d0151e899974479a6070258b9da4d24",
+            "sourceRevision": 1,
+            "unitId": "source-8d0151e899974479a6070258b9da4d24/unit_3",
+            "unitRevision": 1
+          },
+          {
+            "sourceId": "source-8d0151e899974479a6070258b9da4d24",
+            "sourceRevision": 1,
+            "unitId": "source-8d0151e899974479a6070258b9da4d24/unit_4",
+            "unitRevision": 1
+          },
+          {
+            "sourceId": "source-8d0151e899974479a6070258b9da4d24",
+            "sourceRevision": 1,
+            "unitId": "source-8d0151e899974479a6070258b9da4d24/unit_5",
+            "unitRevision": 1
+          },
+          {
+            "sourceId": "source-8d0151e899974479a6070258b9da4d24",
+            "sourceRevision": 1,
+            "unitId": "source-8d0151e899974479a6070258b9da4d24/unit_6",
+            "unitRevision": 1
+          }
+        ],
+        "origin": "source",
+        "importance": "essential",
+        "jobId": "job_a0e569c711a6351e14c2bfb2",
+        "subprojectId": null,
+        "literalEvidence": [
+          {
+            "sourceId": "source-8d0151e899974479a6070258b9da4d24",
+            "sourceRevision": 1,
+            "unitId": "source-8d0151e899974479a6070258b9da4d24/unit_2",
+            "unitRevision": 1,
+            "text": "Север, backend-разработчик, 2021 — настоящее время.\n"
+          },
+          {
+            "sourceId": "source-8d0151e899974479a6070258b9da4d24",
+            "sourceRevision": 1,
+            "unitId": "source-8d0151e899974479a6070258b9da4d24/unit_3",
+            "unitRevision": 1,
+            "text": "Сервис обработки заказов. Python, PostgreSQL.\n"
+          },
+          {
+            "sourceId": "source-8d0151e899974479a6070258b9da4d24",
+            "sourceRevision": 1,
+            "unitId": "source-8d0151e899974479a6070258b9da4d24/unit_4",
+            "unitRevision": 1,
+            "text": "Делала REST API для заказов, писала интеграционные тесты.\n"
+          },
+          {
+            "sourceId": "source-8d0151e899974479a6070258b9da4d24",
+            "sourceRevision": 1,
+            "unitId": "source-8d0151e899974479a6070258b9da4d24/unit_5",
+            "unitRevision": 1,
+            "text": "Командой сократили время обработки со 100 до 70 мс, на 30%.\n"
+          },
+          {
+            "sourceId": "source-8d0151e899974479a6070258b9da4d24",
+            "sourceRevision": 1,
+            "unitId": "source-8d0151e899974479a6070258b9da4d24/unit_6",
+            "unitRevision": 1,
+            "text": "Обучила двух новых разработчиков.\n"
+          }
+        ]
+      },
+      {
+        "id": "fact_eeead18f45220ea511b4542f",
+        "revision": 1,
+        "kind": "employment",
+        "value": {
+          "jobId": "job_c6b580d533aadc71a253e817",
+          "employer": "Запад",
+          "role": "разработчик",
+          "periods": [
+            {
+              "id": "period_286975ff76d76ae6f566b46d",
+              "start": {
+                "precision": "year",
+                "year": 2017,
+                "month": null,
+                "day": null
+              },
+              "end": {
+                "precision": "year",
+                "year": 2020,
+                "month": null,
+                "day": null
+              },
+              "startText": "2017",
+              "endText": "2020",
+              "present": false,
+              "evidence": [
+                {
+                  "sourceId": "source-8d0151e899974479a6070258b9da4d24",
+                  "sourceRevision": 1,
+                  "unitId": "source-8d0151e899974479a6070258b9da4d24/unit_7",
+                  "unitRevision": 1,
+                  "text": "Запад, разработчик, 2017–2020. Внутренняя CRM. Java, MySQL."
+                }
+              ]
+            }
+          ],
+          "subprojects": []
+        },
+        "evidence": [
+          {
+            "sourceId": "source-8d0151e899974479a6070258b9da4d24",
+            "sourceRevision": 1,
+            "unitId": "source-8d0151e899974479a6070258b9da4d24/unit_7",
+            "unitRevision": 1
+          },
+          {
+            "sourceId": "source-8d0151e899974479a6070258b9da4d24",
+            "sourceRevision": 1,
+            "unitId": "source-8d0151e899974479a6070258b9da4d24/unit_8",
+            "unitRevision": 1
+          }
+        ],
+        "origin": "source",
+        "importance": "essential",
+        "jobId": "job_c6b580d533aadc71a253e817",
+        "subprojectId": null,
+        "literalEvidence": [
+          {
+            "sourceId": "source-8d0151e899974479a6070258b9da4d24",
+            "sourceRevision": 1,
+            "unitId": "source-8d0151e899974479a6070258b9da4d24/unit_7",
+            "unitRevision": 1,
+            "text": "Запад, разработчик, 2017–2020. Внутренняя CRM. Java, MySQL.\n"
+          },
+          {
+            "sourceId": "source-8d0151e899974479a6070258b9da4d24",
+            "sourceRevision": 1,
+            "unitId": "source-8d0151e899974479a6070258b9da4d24/unit_8",
+            "unitRevision": 1,
+            "text": "Поддерживала CRM и исправляла ошибки.\n"
+          }
+        ]
+      },
+      {
+        "id": "fact_c33faeac01464dbedbfe90fb",
+        "revision": 1,
+        "kind": "employment",
+        "value": {
+          "jobId": "job_a216842e8c97dd0af74f998e",
+          "employer": "Восток",
+          "role": "разработчик",
+          "periods": [
+            {
+              "id": "period_29c253085740472c06a74ea0",
+              "start": {
+                "precision": "year",
+                "year": 2008,
+                "month": null,
+                "day": null
+              },
+              "end": {
+                "precision": "year",
+                "year": 2009,
+                "month": null,
+                "day": null
+              },
+              "startText": "2008",
+              "endText": "2009",
+              "present": false,
+              "evidence": [
+                {
+                  "sourceId": "source-8d0151e899974479a6070258b9da4d24",
+                  "sourceRevision": 1,
+                  "unitId": "source-8d0151e899974479a6070258b9da4d24/unit_9",
+                  "unitRevision": 1,
+                  "text": "Восток, разработчик, 2008–2009. PHP. Разрабатывала отчёты."
+                }
+              ]
+            }
+          ],
+          "subprojects": []
+        },
+        "evidence": [
+          {
+            "sourceId": "source-8d0151e899974479a6070258b9da4d24",
+            "sourceRevision": 1,
+            "unitId": "source-8d0151e899974479a6070258b9da4d24/unit_9",
+            "unitRevision": 1
+          }
+        ],
+        "origin": "source",
+        "importance": "essential",
+        "jobId": "job_a216842e8c97dd0af74f998e",
+        "subprojectId": null,
+        "literalEvidence": [
+          {
+            "sourceId": "source-8d0151e899974479a6070258b9da4d24",
+            "sourceRevision": 1,
+            "unitId": "source-8d0151e899974479a6070258b9da4d24/unit_9",
+            "unitRevision": 1,
+            "text": "Восток, разработчик, 2008–2009. PHP. Разрабатывала отчёты.\n"
+          }
+        ]
+      }
+    ],
+    "candidate": {
+      "name": {
+        "text": "Ирина Примерова",
+        "evidence": [
+          {
+            "sourceId": "source-8d0151e899974479a6070258b9da4d24",
+            "sourceRevision": 1,
+            "unitId": "source-8d0151e899974479a6070258b9da4d24/unit_1",
+            "unitRevision": 1,
+            "text": "Ирина Примерова"
+          }
+        ]
+      },
+      "title": {
+        "text": "backend-разработчик",
+        "evidence": [
+          {
+            "sourceId": "source-8d0151e899974479a6070258b9da4d24",
+            "sourceRevision": 1,
+            "unitId": "source-8d0151e899974479a6070258b9da4d24/unit_1",
+            "unitRevision": 1,
+            "text": "backend-разработчик"
+          }
+        ]
+      },
+      "location": {
+        "text": "",
+        "evidence": []
+      }
+    },
+    "education": [
+      {
+        "id": "education_67a93261f331146418c83b3d",
+        "institution": {
+          "text": "Учебный технический университет",
+          "evidence": [
+            {
+              "sourceId": "source-8d0151e899974479a6070258b9da4d24",
+              "sourceRevision": 1,
+              "unitId": "source-8d0151e899974479a6070258b9da4d24/unit_10",
+              "unitRevision": 1,
+              "text": "Учебный технический университет"
+            }
+          ]
+        },
+        "qualification": {
+          "text": "",
+          "evidence": []
+        },
+        "specialty": {
+          "text": "прикладная информатика",
+          "evidence": [
+            {
+              "sourceId": "source-8d0151e899974479a6070258b9da4d24",
+              "sourceRevision": 1,
+              "unitId": "source-8d0151e899974479a6070258b9da4d24/unit_10",
+              "unitRevision": 1,
+              "text": "прикладная информатика"
+            }
+          ]
+        },
+        "dateText": {
+          "text": "2016",
+          "evidence": [
+            {
+              "sourceId": "source-8d0151e899974479a6070258b9da4d24",
+              "sourceRevision": 1,
+              "unitId": "source-8d0151e899974479a6070258b9da4d24/unit_10",
+              "unitRevision": 1,
+              "text": "2016"
+            }
+          ]
+        }
+      }
+    ],
+    "certifications": [],
+    "languages": [
+      {
+        "id": "language_98f055188453b531e626f9dc",
+        "name": {
+          "text": "русский",
+          "evidence": [
+            {
+              "sourceId": "source-8d0151e899974479a6070258b9da4d24",
+              "sourceRevision": 1,
+              "unitId": "source-8d0151e899974479a6070258b9da4d24/unit_11",
+              "unitRevision": 1,
+              "text": "русский"
+            }
+          ]
+        },
+        "proficiency": {
+          "text": "родной",
+          "evidence": [
+            {
+              "sourceId": "source-8d0151e899974479a6070258b9da4d24",
+              "sourceRevision": 1,
+              "unitId": "source-8d0151e899974479a6070258b9da4d24/unit_11",
+              "unitRevision": 1,
+              "text": "родной"
+            }
+          ]
+        }
+      },
+      {
+        "id": "language_6f8e2d4cffc9f46d4e687770",
+        "name": {
+          "text": "английский",
+          "evidence": [
+            {
+              "sourceId": "source-8d0151e899974479a6070258b9da4d24",
+              "sourceRevision": 1,
+              "unitId": "source-8d0151e899974479a6070258b9da4d24/unit_11",
+              "unitRevision": 1,
+              "text": "английский"
+            }
+          ]
+        },
+        "proficiency": {
+          "text": "B2",
+          "evidence": [
+            {
+              "sourceId": "source-8d0151e899974479a6070258b9da4d24",
+              "sourceRevision": 1,
+              "unitId": "source-8d0151e899974479a6070258b9da4d24/unit_11",
+              "unitRevision": 1,
+              "text": "B2"
+            }
+          ]
+        }
+      }
+    ],
+    "privateDetails": [],
+    "nameAssessment": {
+      "missingSurname": false,
+      "evidence": [
+        {
+          "sourceId": "source-8d0151e899974479a6070258b9da4d24",
+          "sourceRevision": 1,
+          "unitId": "source-8d0151e899974479a6070258b9da4d24/unit_1",
+          "unitRevision": 1,
+          "text": "Ирина Примерова"
+        }
+      ],
+      "revision": 1
+    },
+    "observationAssessment": {
+      "sourceObservedAt": null,
+      "evidence": null,
+      "revision": 1
+    },
+    "sourceObservedAt": null,
+    "fieldFactIds": {
+      "candidate/location": [],
+      "candidate/name": [
+        "fact_b5b7674c33a05ad0fec9b6bc"
+      ],
+      "candidate/title": [
+        "fact_442d7e6e3a97f5bb602ebe0c"
+      ],
+      "education:education_67a93261f331146418c83b3d/dateText": [
+        "fact_7947b828808541930764e0d2"
+      ],
+      "education:education_67a93261f331146418c83b3d/institution": [
+        "fact_c61fec381ccd7dd42ad06b3b"
+      ],
+      "education:education_67a93261f331146418c83b3d/qualification": [],
+      "education:education_67a93261f331146418c83b3d/specialty": [
+        "fact_959538b1fc7a2bd86a98c32e"
+      ],
+      "language:language_6f8e2d4cffc9f46d4e687770/name": [
+        "fact_3b04895a9cc243f26ea72fc9"
+      ],
+      "language:language_6f8e2d4cffc9f46d4e687770/proficiency": [
+        "fact_94d2f975bf8b159af256ad32"
+      ],
+      "language:language_98f055188453b531e626f9dc/name": [
+        "fact_fd1dbd489cab9201a7f03624"
+      ],
+      "language:language_98f055188453b531e626f9dc/proficiency": [
+        "fact_f191804ef60311842489ff51"
+      ]
+    },
+    "sourceFingerprint": "1ac343bf2a6abe29f39a539e2f93c65441ce104b0880d89109f0740359b641e4",
+    "rulesRevision": 1,
+    "semanticProposal": {
+      "schemaVersion": 1,
+      "jobs": [
+        {
+          "tempId": "north",
+          "employer": "Север",
+          "role": "backend-разработчик",
+          "periods": [
+            {
+              "start": {
+                "precision": "year",
+                "year": 2021,
+                "month": null,
+                "day": null
+              },
+              "end": null,
+              "present": true,
+              "startText": null,
+              "endText": null,
+              "evidence": [
+                {
+                  "sourceId": "source-8d0151e899974479a6070258b9da4d24",
+                  "sourceRevision": 1,
+                  "unitId": "source-8d0151e899974479a6070258b9da4d24/unit_2",
+                  "unitRevision": 1,
+                  "text": "Север, backend-разработчик, 2021 — настоящее время."
+                }
+              ]
+            }
+          ],
+          "sourceId": "source-8d0151e899974479a6070258b9da4d24",
+          "unitIds": [
+            "source-8d0151e899974479a6070258b9da4d24/unit_2",
+            "source-8d0151e899974479a6070258b9da4d24/unit_3",
+            "source-8d0151e899974479a6070258b9da4d24/unit_4",
+            "source-8d0151e899974479a6070258b9da4d24/unit_5",
+            "source-8d0151e899974479a6070258b9da4d24/unit_6"
+          ],
+          "subprojects": []
+        },
+        {
+          "tempId": "west",
+          "employer": "Запад",
+          "role": "разработчик",
+          "periods": [
+            {
+              "start": {
+                "precision": "year",
+                "year": 2017,
+                "month": null,
+                "day": null
+              },
+              "end": {
+                "precision": "year",
+                "year": 2020,
+                "month": null,
+                "day": null
+              },
+              "present": false,
+              "startText": null,
+              "endText": null,
+              "evidence": [
+                {
+                  "sourceId": "source-8d0151e899974479a6070258b9da4d24",
+                  "sourceRevision": 1,
+                  "unitId": "source-8d0151e899974479a6070258b9da4d24/unit_7",
+                  "unitRevision": 1,
+                  "text": "Запад, разработчик, 2017–2020. Внутренняя CRM. Java, MySQL."
+                }
+              ]
+            }
+          ],
+          "sourceId": "source-8d0151e899974479a6070258b9da4d24",
+          "unitIds": [
+            "source-8d0151e899974479a6070258b9da4d24/unit_7",
+            "source-8d0151e899974479a6070258b9da4d24/unit_8"
+          ],
+          "subprojects": []
+        },
+        {
+          "tempId": "east",
+          "employer": "Восток",
+          "role": "разработчик",
+          "periods": [
+            {
+              "start": {
+                "precision": "year",
+                "year": 2008,
+                "month": null,
+                "day": null
+              },
+              "end": {
+                "precision": "year",
+                "year": 2009,
+                "month": null,
+                "day": null
+              },
+              "present": false,
+              "startText": null,
+              "endText": null,
+              "evidence": [
+                {
+                  "sourceId": "source-8d0151e899974479a6070258b9da4d24",
+                  "sourceRevision": 1,
+                  "unitId": "source-8d0151e899974479a6070258b9da4d24/unit_9",
+                  "unitRevision": 1,
+                  "text": "Восток, разработчик, 2008–2009. PHP. Разрабатывала отчёты."
+                }
+              ]
+            }
+          ],
+          "sourceId": "source-8d0151e899974479a6070258b9da4d24",
+          "unitIds": [
+            "source-8d0151e899974479a6070258b9da4d24/unit_9"
+          ],
+          "subprojects": []
+        }
+      ],
+      "facts": [
+        {
+          "tempId": "python",
+          "kind": "technology",
+          "value": {
+            "canonicalId": "python",
+            "display": "Python",
+            "scope": "job"
+          },
+          "sourceId": "source-8d0151e899974479a6070258b9da4d24",
+          "unitIds": [
+            "source-8d0151e899974479a6070258b9da4d24/unit_3"
+          ],
+          "jobTempId": "north",
+          "subprojectTempId": null,
+          "importance": "normal",
+          "literalEvidence": [
+            {
+              "sourceId": "source-8d0151e899974479a6070258b9da4d24",
+              "sourceRevision": 1,
+              "unitId": "source-8d0151e899974479a6070258b9da4d24/unit_3",
+              "unitRevision": 1,
+              "text": "Python"
+            }
+          ]
+        },
+        {
+          "tempId": "postgres",
+          "kind": "technology",
+          "value": {
+            "canonicalId": "postgres",
+            "display": "PostgreSQL",
+            "scope": "job"
+          },
+          "sourceId": "source-8d0151e899974479a6070258b9da4d24",
+          "unitIds": [
+            "source-8d0151e899974479a6070258b9da4d24/unit_3"
+          ],
+          "jobTempId": "north",
+          "subprojectTempId": null,
+          "importance": "normal",
+          "literalEvidence": [
+            {
+              "sourceId": "source-8d0151e899974479a6070258b9da4d24",
+              "sourceRevision": 1,
+              "unitId": "source-8d0151e899974479a6070258b9da4d24/unit_3",
+              "unitRevision": 1,
+              "text": "PostgreSQL"
+            }
+          ]
+        },
+        {
+          "tempId": "java",
+          "kind": "technology",
+          "value": {
+            "canonicalId": "java",
+            "display": "Java",
+            "scope": "job"
+          },
+          "sourceId": "source-8d0151e899974479a6070258b9da4d24",
+          "unitIds": [
+            "source-8d0151e899974479a6070258b9da4d24/unit_7"
+          ],
+          "jobTempId": "west",
+          "subprojectTempId": null,
+          "importance": "normal",
+          "literalEvidence": [
+            {
+              "sourceId": "source-8d0151e899974479a6070258b9da4d24",
+              "sourceRevision": 1,
+              "unitId": "source-8d0151e899974479a6070258b9da4d24/unit_7",
+              "unitRevision": 1,
+              "text": "Java"
+            }
+          ]
+        },
+        {
+          "tempId": "mysql",
+          "kind": "technology",
+          "value": {
+            "canonicalId": "mysql",
+            "display": "MySQL",
+            "scope": "job"
+          },
+          "sourceId": "source-8d0151e899974479a6070258b9da4d24",
+          "unitIds": [
+            "source-8d0151e899974479a6070258b9da4d24/unit_7"
+          ],
+          "jobTempId": "west",
+          "subprojectTempId": null,
+          "importance": "normal",
+          "literalEvidence": [
+            {
+              "sourceId": "source-8d0151e899974479a6070258b9da4d24",
+              "sourceRevision": 1,
+              "unitId": "source-8d0151e899974479a6070258b9da4d24/unit_7",
+              "unitRevision": 1,
+              "text": "MySQL"
+            }
+          ]
+        },
+        {
+          "tempId": "php",
+          "kind": "technology",
+          "value": {
+            "canonicalId": "php",
+            "display": "PHP",
+            "scope": "job"
+          },
+          "sourceId": "source-8d0151e899974479a6070258b9da4d24",
+          "unitIds": [
+            "source-8d0151e899974479a6070258b9da4d24/unit_9"
+          ],
+          "jobTempId": "east",
+          "subprojectTempId": null,
+          "importance": "normal",
+          "literalEvidence": [
+            {
+              "sourceId": "source-8d0151e899974479a6070258b9da4d24",
+              "sourceRevision": 1,
+              "unitId": "source-8d0151e899974479a6070258b9da4d24/unit_9",
+              "unitRevision": 1,
+              "text": "PHP"
+            }
+          ]
+        },
+        {
+          "tempId": "docker",
+          "kind": "technology",
+          "value": {
+            "canonicalId": "docker",
+            "display": "Docker",
+            "scope": "global"
+          },
+          "sourceId": "source-8d0151e899974479a6070258b9da4d24",
+          "unitIds": [
+            "source-8d0151e899974479a6070258b9da4d24/unit_12"
+          ],
+          "jobTempId": null,
+          "subprojectTempId": null,
+          "importance": "normal",
+          "literalEvidence": [
+            {
+              "sourceId": "source-8d0151e899974479a6070258b9da4d24",
+              "sourceRevision": 1,
+              "unitId": "source-8d0151e899974479a6070258b9da4d24/unit_12",
+              "unitRevision": 1,
+              "text": "Docker"
+            }
+          ]
+        },
+        {
+          "tempId": "north-context",
+          "kind": "text",
+          "value": {
+            "text": "Сервис обработки заказов."
+          },
+          "sourceId": "source-8d0151e899974479a6070258b9da4d24",
+          "unitIds": [
+            "source-8d0151e899974479a6070258b9da4d24/unit_3"
+          ],
+          "jobTempId": "north",
+          "subprojectTempId": null,
+          "importance": "normal",
+          "literalEvidence": [
+            {
+              "sourceId": "source-8d0151e899974479a6070258b9da4d24",
+              "sourceRevision": 1,
+              "unitId": "source-8d0151e899974479a6070258b9da4d24/unit_3",
+              "unitRevision": 1,
+              "text": "Сервис обработки заказов."
+            }
+          ]
+        },
+        {
+          "tempId": "north-task",
+          "kind": "text",
+          "value": {
+            "text": "Делала REST API для заказов, писала интеграционные тесты."
+          },
+          "sourceId": "source-8d0151e899974479a6070258b9da4d24",
+          "unitIds": [
+            "source-8d0151e899974479a6070258b9da4d24/unit_4"
+          ],
+          "jobTempId": "north",
+          "subprojectTempId": null,
+          "importance": "normal",
+          "literalEvidence": [
+            {
+              "sourceId": "source-8d0151e899974479a6070258b9da4d24",
+              "sourceRevision": 1,
+              "unitId": "source-8d0151e899974479a6070258b9da4d24/unit_4",
+              "unitRevision": 1,
+              "text": "Делала REST API для заказов, писала интеграционные тесты."
+            }
+          ]
+        },
+        {
+          "tempId": "north-result",
+          "kind": "metric",
+          "value": {
+            "number": 70.0,
+            "upperNumber": null,
+            "comparator": "exact",
+            "unit": "мс",
+            "period": null,
+            "baseline": "100",
+            "result": "70",
+            "scope": null,
+            "attribution": "team",
+            "qualifiers": [
+              "на 30%"
+            ]
+          },
+          "sourceId": "source-8d0151e899974479a6070258b9da4d24",
+          "unitIds": [
+            "source-8d0151e899974479a6070258b9da4d24/unit_5"
+          ],
+          "jobTempId": "north",
+          "subprojectTempId": null,
+          "importance": "normal",
+          "literalEvidence": [
+            {
+              "sourceId": "source-8d0151e899974479a6070258b9da4d24",
+              "sourceRevision": 1,
+              "unitId": "source-8d0151e899974479a6070258b9da4d24/unit_5",
+              "unitRevision": 1,
+              "text": "Командой сократили время обработки со 100 до 70 мс, на 30%."
+            }
+          ]
+        },
+        {
+          "tempId": "trainees",
+          "kind": "leadership",
+          "value": {
+            "action": "Обучила двух новых разработчиков",
+            "teamSize": {
+              "number": 2.0,
+              "upperNumber": null,
+              "comparator": "exact",
+              "unit": "разработчиков",
+              "period": null,
+              "baseline": null,
+              "result": null,
+              "scope": null,
+              "attribution": "personal",
+              "qualifiers": []
+            },
+            "attribution": "personal"
+          },
+          "sourceId": "source-8d0151e899974479a6070258b9da4d24",
+          "unitIds": [
+            "source-8d0151e899974479a6070258b9da4d24/unit_6"
+          ],
+          "jobTempId": "north",
+          "subprojectTempId": null,
+          "importance": "normal",
+          "literalEvidence": [
+            {
+              "sourceId": "source-8d0151e899974479a6070258b9da4d24",
+              "sourceRevision": 1,
+              "unitId": "source-8d0151e899974479a6070258b9da4d24/unit_6",
+              "unitRevision": 1,
+              "text": "Обучила двух новых разработчиков."
+            }
+          ]
+        },
+        {
+          "tempId": "west-task",
+          "kind": "text",
+          "value": {
+            "text": "Поддерживала CRM и исправляла ошибки."
+          },
+          "sourceId": "source-8d0151e899974479a6070258b9da4d24",
+          "unitIds": [
+            "source-8d0151e899974479a6070258b9da4d24/unit_8"
+          ],
+          "jobTempId": "west",
+          "subprojectTempId": null,
+          "importance": "normal",
+          "literalEvidence": [
+            {
+              "sourceId": "source-8d0151e899974479a6070258b9da4d24",
+              "sourceRevision": 1,
+              "unitId": "source-8d0151e899974479a6070258b9da4d24/unit_8",
+              "unitRevision": 1,
+              "text": "Поддерживала CRM и исправляла ошибки."
+            }
+          ]
+        },
+        {
+          "tempId": "east-task",
+          "kind": "text",
+          "value": {
+            "text": "Разрабатывала отчёты."
+          },
+          "sourceId": "source-8d0151e899974479a6070258b9da4d24",
+          "unitIds": [
+            "source-8d0151e899974479a6070258b9da4d24/unit_9"
+          ],
+          "jobTempId": "east",
+          "subprojectTempId": null,
+          "importance": "normal",
+          "literalEvidence": [
+            {
+              "sourceId": "source-8d0151e899974479a6070258b9da4d24",
+              "sourceRevision": 1,
+              "unitId": "source-8d0151e899974479a6070258b9da4d24/unit_9",
+              "unitRevision": 1,
+              "text": "Разрабатывала отчёты."
+            }
+          ]
+        }
+      ],
+      "units": [
+        {
+          "sourceId": "source-8d0151e899974479a6070258b9da4d24",
+          "unitId": "source-8d0151e899974479a6070258b9da4d24/unit_1",
+          "disposition": "unresolved",
+          "factTempIds": [],
+          "duplicateOf": null
+        },
+        {
+          "sourceId": "source-8d0151e899974479a6070258b9da4d24",
+          "unitId": "source-8d0151e899974479a6070258b9da4d24/unit_2",
+          "disposition": "unresolved",
+          "factTempIds": [],
+          "duplicateOf": null
+        },
+        {
+          "sourceId": "source-8d0151e899974479a6070258b9da4d24",
+          "unitId": "source-8d0151e899974479a6070258b9da4d24/unit_3",
+          "disposition": "facts",
+          "factTempIds": [
+            "python",
+            "postgres",
+            "north-context"
+          ],
+          "duplicateOf": null
+        },
+        {
+          "sourceId": "source-8d0151e899974479a6070258b9da4d24",
+          "unitId": "source-8d0151e899974479a6070258b9da4d24/unit_4",
+          "disposition": "facts",
+          "factTempIds": [
+            "north-task"
+          ],
+          "duplicateOf": null
+        },
+        {
+          "sourceId": "source-8d0151e899974479a6070258b9da4d24",
+          "unitId": "source-8d0151e899974479a6070258b9da4d24/unit_5",
+          "disposition": "facts",
+          "factTempIds": [
+            "north-result"
+          ],
+          "duplicateOf": null
+        },
+        {
+          "sourceId": "source-8d0151e899974479a6070258b9da4d24",
+          "unitId": "source-8d0151e899974479a6070258b9da4d24/unit_6",
+          "disposition": "facts",
+          "factTempIds": [
+            "trainees"
+          ],
+          "duplicateOf": null
+        },
+        {
+          "sourceId": "source-8d0151e899974479a6070258b9da4d24",
+          "unitId": "source-8d0151e899974479a6070258b9da4d24/unit_7",
+          "disposition": "facts",
+          "factTempIds": [
+            "java",
+            "mysql"
+          ],
+          "duplicateOf": null
+        },
+        {
+          "sourceId": "source-8d0151e899974479a6070258b9da4d24",
+          "unitId": "source-8d0151e899974479a6070258b9da4d24/unit_8",
+          "disposition": "facts",
+          "factTempIds": [
+            "west-task"
+          ],
+          "duplicateOf": null
+        },
+        {
+          "sourceId": "source-8d0151e899974479a6070258b9da4d24",
+          "unitId": "source-8d0151e899974479a6070258b9da4d24/unit_9",
+          "disposition": "facts",
+          "factTempIds": [
+            "php",
+            "east-task"
+          ],
+          "duplicateOf": null
+        },
+        {
+          "sourceId": "source-8d0151e899974479a6070258b9da4d24",
+          "unitId": "source-8d0151e899974479a6070258b9da4d24/unit_10",
+          "disposition": "unresolved",
+          "factTempIds": [],
+          "duplicateOf": null
+        },
+        {
+          "sourceId": "source-8d0151e899974479a6070258b9da4d24",
+          "unitId": "source-8d0151e899974479a6070258b9da4d24/unit_11",
+          "disposition": "unresolved",
+          "factTempIds": [],
+          "duplicateOf": null
+        },
+        {
+          "sourceId": "source-8d0151e899974479a6070258b9da4d24",
+          "unitId": "source-8d0151e899974479a6070258b9da4d24/unit_12",
+          "disposition": "facts",
+          "factTempIds": [
+            "docker"
+          ],
+          "duplicateOf": null
+        }
+      ],
+      "candidate": {
+        "name": {
+          "text": "Ирина Примерова",
+          "evidence": [
+            {
+              "sourceId": "source-8d0151e899974479a6070258b9da4d24",
+              "sourceRevision": 1,
+              "unitId": "source-8d0151e899974479a6070258b9da4d24/unit_1",
+              "unitRevision": 1,
+              "text": "Ирина Примерова"
+            }
+          ]
+        },
+        "title": {
+          "text": "backend-разработчик",
+          "evidence": [
+            {
+              "sourceId": "source-8d0151e899974479a6070258b9da4d24",
+              "sourceRevision": 1,
+              "unitId": "source-8d0151e899974479a6070258b9da4d24/unit_1",
+              "unitRevision": 1,
+              "text": "backend-разработчик"
+            }
+          ]
+        },
+        "location": {
+          "text": "",
+          "evidence": []
+        }
+      },
+      "education": [
+        {
+          "id": "school",
+          "institution": {
+            "text": "Учебный технический университет",
+            "evidence": [
+              {
+                "sourceId": "source-8d0151e899974479a6070258b9da4d24",
+                "sourceRevision": 1,
+                "unitId": "source-8d0151e899974479a6070258b9da4d24/unit_10",
+                "unitRevision": 1,
+                "text": "Учебный технический университет"
+              }
+            ]
+          },
+          "qualification": {
+            "text": "",
+            "evidence": []
+          },
+          "specialty": {
+            "text": "прикладная информатика",
+            "evidence": [
+              {
+                "sourceId": "source-8d0151e899974479a6070258b9da4d24",
+                "sourceRevision": 1,
+                "unitId": "source-8d0151e899974479a6070258b9da4d24/unit_10",
+                "unitRevision": 1,
+                "text": "прикладная информатика"
+              }
+            ]
+          },
+          "dateText": {
+            "text": "2016",
+            "evidence": [
+              {
+                "sourceId": "source-8d0151e899974479a6070258b9da4d24",
+                "sourceRevision": 1,
+                "unitId": "source-8d0151e899974479a6070258b9da4d24/unit_10",
+                "unitRevision": 1,
+                "text": "2016"
+              }
+            ]
+          }
+        }
+      ],
+      "certifications": [],
+      "languages": [
+        {
+          "id": "ru",
+          "name": {
+            "text": "русский",
+            "evidence": [
+              {
+                "sourceId": "source-8d0151e899974479a6070258b9da4d24",
+                "sourceRevision": 1,
+                "unitId": "source-8d0151e899974479a6070258b9da4d24/unit_11",
+                "unitRevision": 1,
+                "text": "русский"
+              }
+            ]
+          },
+          "proficiency": {
+            "text": "родной",
+            "evidence": [
+              {
+                "sourceId": "source-8d0151e899974479a6070258b9da4d24",
+                "sourceRevision": 1,
+                "unitId": "source-8d0151e899974479a6070258b9da4d24/unit_11",
+                "unitRevision": 1,
+                "text": "родной"
+              }
+            ]
+          }
+        },
+        {
+          "id": "en",
+          "name": {
+            "text": "английский",
+            "evidence": [
+              {
+                "sourceId": "source-8d0151e899974479a6070258b9da4d24",
+                "sourceRevision": 1,
+                "unitId": "source-8d0151e899974479a6070258b9da4d24/unit_11",
+                "unitRevision": 1,
+                "text": "английский"
+              }
+            ]
+          },
+          "proficiency": {
+            "text": "B2",
+            "evidence": [
+              {
+                "sourceId": "source-8d0151e899974479a6070258b9da4d24",
+                "sourceRevision": 1,
+                "unitId": "source-8d0151e899974479a6070258b9da4d24/unit_11",
+                "unitRevision": 1,
+                "text": "B2"
+              }
+            ]
+          }
+        }
+      ],
+      "privateDetails": [],
+      "nameAssessment": {
+        "missingSurname": false,
+        "evidence": [
+          {
+            "sourceId": "source-8d0151e899974479a6070258b9da4d24",
+            "sourceRevision": 1,
+            "unitId": "source-8d0151e899974479a6070258b9da4d24/unit_1",
+            "unitRevision": 1,
+            "text": "Ирина Примерова"
+          }
+        ],
+        "revision": 1
+      },
+      "observationAssessment": {
+        "sourceObservedAt": null,
+        "evidence": null,
+        "revision": 1
+      }
+    },
+    "employment": [
+      {
+        "id": "job_a0e569c711a6351e14c2bfb2",
+        "employer": "Север",
+        "role": "backend-разработчик",
+        "periods": [
+          {
+            "start": {
+              "precision": "year",
+              "year": 2021,
+              "month": null,
+              "day": null
+            },
+            "end": null
+          }
+        ],
+        "subprojects": [],
+        "factIds": [
+          "fact_41cf597cca510ae855907b14",
+          "fact_962e4cb4357a0e628ef32a17",
+          "fact_85ad80f80cbf10e55b236227",
+          "fact_b7453cc530e0cd750d6d3be3",
+          "fact_2a07c45464f4dd20474c04dc",
+          "fact_3c57dc93658d8c97ce86891c",
+          "fact_fd31811ccf08e1ee755e829e"
+        ]
+      },
+      {
+        "id": "job_c6b580d533aadc71a253e817",
+        "employer": "Запад",
+        "role": "разработчик",
+        "periods": [
+          {
+            "start": {
+              "precision": "year",
+              "year": 2017,
+              "month": null,
+              "day": null
+            },
+            "end": {
+              "precision": "year",
+              "year": 2020,
+              "month": null,
+              "day": null
+            }
+          }
+        ],
+        "subprojects": [],
+        "factIds": [
+          "fact_ed7cec6f27c328f4fbc83c7a",
+          "fact_6cb36d3669b2c2e096dc9ee5",
+          "fact_8f450a88df47102aafbbdf89",
+          "fact_eeead18f45220ea511b4542f"
+        ]
+      },
+      {
+        "id": "job_a216842e8c97dd0af74f998e",
+        "employer": "Восток",
+        "role": "разработчик",
+        "periods": [
+          {
+            "start": {
+              "precision": "year",
+              "year": 2008,
+              "month": null,
+              "day": null
+            },
+            "end": {
+              "precision": "year",
+              "year": 2009,
+              "month": null,
+              "day": null
+            }
+          }
+        ],
+        "subprojects": [],
+        "factIds": [
+          "fact_f0d8e8bcc7cd4fb14683d4fd",
+          "fact_f9ca9eb92e527767156d8c05",
+          "fact_c33faeac01464dbedbfe90fb"
+        ]
+      }
+    ],
+    "jobPeriods": {
+      "job_a0e569c711a6351e14c2bfb2": [
+        {
+          "id": "period_a8ab5b282340c012c544652a",
+          "start": {
+            "precision": "year",
+            "year": 2021,
+            "month": null,
+            "day": null
+          },
+          "end": null,
+          "startText": "2021",
+          "endText": "",
+          "present": true,
+          "evidence": [
+            {
+              "sourceId": "source-8d0151e899974479a6070258b9da4d24",
+              "sourceRevision": 1,
+              "unitId": "source-8d0151e899974479a6070258b9da4d24/unit_2",
+              "unitRevision": 1,
+              "text": "Север, backend-разработчик, 2021 — настоящее время."
+            }
+          ]
+        }
+      ],
+      "job_a216842e8c97dd0af74f998e": [
+        {
+          "id": "period_29c253085740472c06a74ea0",
+          "start": {
+            "precision": "year",
+            "year": 2008,
+            "month": null,
+            "day": null
+          },
+          "end": {
+            "precision": "year",
+            "year": 2009,
+            "month": null,
+            "day": null
+          },
+          "startText": "2008",
+          "endText": "2009",
+          "present": false,
+          "evidence": [
+            {
+              "sourceId": "source-8d0151e899974479a6070258b9da4d24",
+              "sourceRevision": 1,
+              "unitId": "source-8d0151e899974479a6070258b9da4d24/unit_9",
+              "unitRevision": 1,
+              "text": "Восток, разработчик, 2008–2009. PHP. Разрабатывала отчёты."
+            }
+          ]
+        }
+      ],
+      "job_c6b580d533aadc71a253e817": [
+        {
+          "id": "period_286975ff76d76ae6f566b46d",
+          "start": {
+            "precision": "year",
+            "year": 2017,
+            "month": null,
+            "day": null
+          },
+          "end": {
+            "precision": "year",
+            "year": 2020,
+            "month": null,
+            "day": null
+          },
+          "startText": "2017",
+          "endText": "2020",
+          "present": false,
+          "evidence": [
+            {
+              "sourceId": "source-8d0151e899974479a6070258b9da4d24",
+              "sourceRevision": 1,
+              "unitId": "source-8d0151e899974479a6070258b9da4d24/unit_7",
+              "unitRevision": 1,
+              "text": "Запад, разработчик, 2017–2020. Внутренняя CRM. Java, MySQL."
+            }
+          ]
+        }
+      ]
+    },
+    "conflicts": []
+  },
+  "workspace": {
+    "schemaVersion": 6,
+    "projectId": "project-59ac83c243e3465c85556c790ba73709",
+    "projectRevision": 2,
+    "documentRevision": 2,
+    "title": "Ирина Примерова",
+    "titleManuallySet": false,
+    "createdAt": "2026-10-16T16:50:24.814671+00:00",
+    "updatedAt": "2026-10-16T16:50:24.859115+00:00",
+    "project": {
+      "schemaVersion": 5,
+      "projectId": "project-59ac83c243e3465c85556c790ba73709",
+      "revision": 2,
+      "createdAt": "2026-10-16T16:50:24.814671+00:00",
+      "sources": [
+        {
+          "id": "source-8d0151e899974479a6070258b9da4d24",
+          "revision": 1,
+          "originalName": "pasted.txt",
+          "mimeType": "text/plain",
+          "byteSha256": "dc297781ca355d302cd6f084bed031e74a1a80530ddae82a96949c5efcff4c35",
+          "byteRef": "sources/source-8d0151e899974479a6070258b9da4d24/original",
+          "parser": "utf8",
+          "parserVersion": "1",
+          "units": [
+            {
+              "id": "source-8d0151e899974479a6070258b9da4d24/unit_1",
+              "revision": 1,
+              "order": 0,
+              "text": "Ирина Примерова, backend-разработчик.\n",
+              "location": {
+                "kind": "pasted",
+                "index": 0,
+                "row": null,
+                "column": null
+              },
+              "disposition": "unresolved",
+              "representedFactIds": [
+                "fact_b5b7674c33a05ad0fec9b6bc",
+                "fact_442d7e6e3a97f5bb602ebe0c",
+                "fact_404857bd48e40d94387d1f9f",
+                "fact_533afe622c5e111554483411"
+              ]
+            },
+            {
+              "id": "source-8d0151e899974479a6070258b9da4d24/unit_2",
+              "revision": 1,
+              "order": 1,
+              "text": "Север, backend-разработчик, 2021 — настоящее время.\n",
+              "location": {
+                "kind": "pasted",
+                "index": 1,
+                "row": null,
+                "column": null
+              },
+              "disposition": "unresolved",
+              "representedFactIds": [
+                "fact_533afe622c5e111554483411",
+                "fact_fd31811ccf08e1ee755e829e"
+              ]
+            },
+            {
+              "id": "source-8d0151e899974479a6070258b9da4d24/unit_3",
+              "revision": 1,
+              "order": 2,
+              "text": "Сервис обработки заказов. Python, PostgreSQL.\n",
+              "location": {
+                "kind": "pasted",
+                "index": 2,
+                "row": null,
+                "column": null
+              },
+              "disposition": "shown",
+              "representedFactIds": [
+                "fact_533afe622c5e111554483411",
+                "fact_41cf597cca510ae855907b14",
+                "fact_962e4cb4357a0e628ef32a17",
+                "fact_85ad80f80cbf10e55b236227",
+                "fact_fd31811ccf08e1ee755e829e"
+              ]
+            },
+            {
+              "id": "source-8d0151e899974479a6070258b9da4d24/unit_4",
+              "revision": 1,
+              "order": 3,
+              "text": "Делала REST API для заказов, писала интеграционные тесты.\n",
+              "location": {
+                "kind": "pasted",
+                "index": 3,
+                "row": null,
+                "column": null
+              },
+              "disposition": "shown",
+              "representedFactIds": [
+                "fact_533afe622c5e111554483411",
+                "fact_b7453cc530e0cd750d6d3be3",
+                "fact_fd31811ccf08e1ee755e829e"
+              ]
+            },
+            {
+              "id": "source-8d0151e899974479a6070258b9da4d24/unit_5",
+              "revision": 1,
+              "order": 4,
+              "text": "Командой сократили время обработки со 100 до 70 мс, на 30%.\n",
+              "location": {
+                "kind": "pasted",
+                "index": 4,
+                "row": null,
+                "column": null
+              },
+              "disposition": "shown",
+              "representedFactIds": [
+                "fact_533afe622c5e111554483411",
+                "fact_2a07c45464f4dd20474c04dc",
+                "fact_fd31811ccf08e1ee755e829e"
+              ]
+            },
+            {
+              "id": "source-8d0151e899974479a6070258b9da4d24/unit_6",
+              "revision": 1,
+              "order": 5,
+              "text": "Обучила двух новых разработчиков.\n",
+              "location": {
+                "kind": "pasted",
+                "index": 5,
+                "row": null,
+                "column": null
+              },
+              "disposition": "shown",
+              "representedFactIds": [
+                "fact_533afe622c5e111554483411",
+                "fact_3c57dc93658d8c97ce86891c",
+                "fact_fd31811ccf08e1ee755e829e"
+              ]
+            },
+            {
+              "id": "source-8d0151e899974479a6070258b9da4d24/unit_7",
+              "revision": 1,
+              "order": 6,
+              "text": "Запад, разработчик, 2017–2020. Внутренняя CRM. Java, MySQL.\n",
+              "location": {
+                "kind": "pasted",
+                "index": 6,
+                "row": null,
+                "column": null
+              },
+              "disposition": "shown",
+              "representedFactIds": [
+                "fact_533afe622c5e111554483411",
+                "fact_ed7cec6f27c328f4fbc83c7a",
+                "fact_6cb36d3669b2c2e096dc9ee5",
+                "fact_eeead18f45220ea511b4542f"
+              ]
+            },
+            {
+              "id": "source-8d0151e899974479a6070258b9da4d24/unit_8",
+              "revision": 1,
+              "order": 7,
+              "text": "Поддерживала CRM и исправляла ошибки.\n",
+              "location": {
+                "kind": "pasted",
+                "index": 7,
+                "row": null,
+                "column": null
+              },
+              "disposition": "shown",
+              "representedFactIds": [
+                "fact_533afe622c5e111554483411",
+                "fact_8f450a88df47102aafbbdf89",
+                "fact_eeead18f45220ea511b4542f"
+              ]
+            },
+            {
+              "id": "source-8d0151e899974479a6070258b9da4d24/unit_9",
+              "revision": 1,
+              "order": 8,
+              "text": "Восток, разработчик, 2008–2009. PHP. Разрабатывала отчёты.\n",
+              "location": {
+                "kind": "pasted",
+                "index": 8,
+                "row": null,
+                "column": null
+              },
+              "disposition": "shown",
+              "representedFactIds": [
+                "fact_533afe622c5e111554483411",
+                "fact_f0d8e8bcc7cd4fb14683d4fd",
+                "fact_f9ca9eb92e527767156d8c05",
+                "fact_c33faeac01464dbedbfe90fb"
+              ]
+            },
+            {
+              "id": "source-8d0151e899974479a6070258b9da4d24/unit_10",
+              "revision": 1,
+              "order": 9,
+              "text": "Образование: Учебный технический университет, прикладная информатика, 2016.\n",
+              "location": {
+                "kind": "pasted",
+                "index": 9,
+                "row": null,
+                "column": null
+              },
+              "disposition": "unresolved",
+              "representedFactIds": [
+                "fact_c61fec381ccd7dd42ad06b3b",
+                "fact_959538b1fc7a2bd86a98c32e",
+                "fact_7947b828808541930764e0d2",
+                "fact_533afe622c5e111554483411"
+              ]
+            },
+            {
+              "id": "source-8d0151e899974479a6070258b9da4d24/unit_11",
+              "revision": 1,
+              "order": 10,
+              "text": "Языки: русский — родной, английский — B2.\n",
+              "location": {
+                "kind": "pasted",
+                "index": 10,
+                "row": null,
+                "column": null
+              },
+              "disposition": "unresolved",
+              "representedFactIds": [
+                "fact_fd1dbd489cab9201a7f03624",
+                "fact_f191804ef60311842489ff51",
+                "fact_3b04895a9cc243f26ea72fc9",
+                "fact_94d2f975bf8b159af256ad32",
+                "fact_533afe622c5e111554483411"
+              ]
+            },
+            {
+              "id": "source-8d0151e899974479a6070258b9da4d24/unit_12",
+              "revision": 1,
+              "order": 11,
+              "text": "Общие навыки: Docker.\n",
+              "location": {
+                "kind": "pasted",
+                "index": 11,
+                "row": null,
+                "column": null
+              },
+              "disposition": "shown",
+              "representedFactIds": [
+                "fact_533afe622c5e111554483411",
+                "fact_a0defc7a3e861422830184e6"
+              ]
+            }
+          ],
+          "overlays": [],
+          "warnings": []
+        }
+      ],
+      "evidenceRecords": [
+        {
+          "id": "fact_b5b7674c33a05ad0fec9b6bc",
+          "evidence": [
+            {
+              "sourceId": "source-8d0151e899974479a6070258b9da4d24",
+              "sourceRevision": 1,
+              "unitId": "source-8d0151e899974479a6070258b9da4d24/unit_1",
+              "unitRevision": 1,
+              "text": "Ирина Примерова, backend-разработчик.\n"
+            }
+          ],
+          "rawText": "Ирина Примерова, backend-разработчик.\n"
+        },
+        {
+          "id": "fact_442d7e6e3a97f5bb602ebe0c",
+          "evidence": [
+            {
+              "sourceId": "source-8d0151e899974479a6070258b9da4d24",
+              "sourceRevision": 1,
+              "unitId": "source-8d0151e899974479a6070258b9da4d24/unit_1",
+              "unitRevision": 1,
+              "text": "Ирина Примерова, backend-разработчик.\n"
+            }
+          ],
+          "rawText": "Ирина Примерова, backend-разработчик.\n"
+        },
+        {
+          "id": "fact_c61fec381ccd7dd42ad06b3b",
+          "evidence": [
+            {
+              "sourceId": "source-8d0151e899974479a6070258b9da4d24",
+              "sourceRevision": 1,
+              "unitId": "source-8d0151e899974479a6070258b9da4d24/unit_10",
+              "unitRevision": 1,
+              "text": "Образование: Учебный технический университет, прикладная информатика, 2016.\n"
+            }
+          ],
+          "rawText": "Образование: Учебный технический университет, прикладная информатика, 2016.\n"
+        },
+        {
+          "id": "fact_959538b1fc7a2bd86a98c32e",
+          "evidence": [
+            {
+              "sourceId": "source-8d0151e899974479a6070258b9da4d24",
+              "sourceRevision": 1,
+              "unitId": "source-8d0151e899974479a6070258b9da4d24/unit_10",
+              "unitRevision": 1,
+              "text": "Образование: Учебный технический университет, прикладная информатика, 2016.\n"
+            }
+          ],
+          "rawText": "Образование: Учебный технический университет, прикладная информатика, 2016.\n"
+        },
+        {
+          "id": "fact_7947b828808541930764e0d2",
+          "evidence": [
+            {
+              "sourceId": "source-8d0151e899974479a6070258b9da4d24",
+              "sourceRevision": 1,
+              "unitId": "source-8d0151e899974479a6070258b9da4d24/unit_10",
+              "unitRevision": 1,
+              "text": "Образование: Учебный технический университет, прикладная информатика, 2016.\n"
+            }
+          ],
+          "rawText": "Образование: Учебный технический университет, прикладная информатика, 2016.\n"
+        },
+        {
+          "id": "fact_fd1dbd489cab9201a7f03624",
+          "evidence": [
+            {
+              "sourceId": "source-8d0151e899974479a6070258b9da4d24",
+              "sourceRevision": 1,
+              "unitId": "source-8d0151e899974479a6070258b9da4d24/unit_11",
+              "unitRevision": 1,
+              "text": "Языки: русский — родной, английский — B2.\n"
+            }
+          ],
+          "rawText": "Языки: русский — родной, английский — B2.\n"
+        },
+        {
+          "id": "fact_f191804ef60311842489ff51",
+          "evidence": [
+            {
+              "sourceId": "source-8d0151e899974479a6070258b9da4d24",
+              "sourceRevision": 1,
+              "unitId": "source-8d0151e899974479a6070258b9da4d24/unit_11",
+              "unitRevision": 1,
+              "text": "Языки: русский — родной, английский — B2.\n"
+            }
+          ],
+          "rawText": "Языки: русский — родной, английский — B2.\n"
+        },
+        {
+          "id": "fact_3b04895a9cc243f26ea72fc9",
+          "evidence": [
+            {
+              "sourceId": "source-8d0151e899974479a6070258b9da4d24",
+              "sourceRevision": 1,
+              "unitId": "source-8d0151e899974479a6070258b9da4d24/unit_11",
+              "unitRevision": 1,
+              "text": "Языки: русский — родной, английский — B2.\n"
+            }
+          ],
+          "rawText": "Языки: русский — родной, английский — B2.\n"
+        },
+        {
+          "id": "fact_94d2f975bf8b159af256ad32",
+          "evidence": [
+            {
+              "sourceId": "source-8d0151e899974479a6070258b9da4d24",
+              "sourceRevision": 1,
+              "unitId": "source-8d0151e899974479a6070258b9da4d24/unit_11",
+              "unitRevision": 1,
+              "text": "Языки: русский — родной, английский — B2.\n"
+            }
+          ],
+          "rawText": "Языки: русский — родной, английский — B2.\n"
+        },
+        {
+          "id": "fact_404857bd48e40d94387d1f9f",
+          "evidence": [
+            {
+              "sourceId": "source-8d0151e899974479a6070258b9da4d24",
+              "sourceRevision": 1,
+              "unitId": "source-8d0151e899974479a6070258b9da4d24/unit_1",
+              "unitRevision": 1,
+              "text": "Ирина Примерова, backend-разработчик.\n"
+            }
+          ],
+          "rawText": "Ирина Примерова, backend-разработчик.\n"
+        },
+        {
+          "id": "fact_533afe622c5e111554483411",
+          "evidence": [
+            {
+              "sourceId": "source-8d0151e899974479a6070258b9da4d24",
+              "sourceRevision": 1,
+              "unitId": "source-8d0151e899974479a6070258b9da4d24/unit_1",
+              "unitRevision": 1,
+              "text": "Ирина Примерова, backend-разработчик.\n"
+            },
+            {
+              "sourceId": "source-8d0151e899974479a6070258b9da4d24",
+              "sourceRevision": 1,
+              "unitId": "source-8d0151e899974479a6070258b9da4d24/unit_2",
+              "unitRevision": 1,
+              "text": "Север, backend-разработчик, 2021 — настоящее время.\n"
+            },
+            {
+              "sourceId": "source-8d0151e899974479a6070258b9da4d24",
+              "sourceRevision": 1,
+              "unitId": "source-8d0151e899974479a6070258b9da4d24/unit_3",
+              "unitRevision": 1,
+              "text": "Сервис обработки заказов. Python, PostgreSQL.\n"
+            },
+            {
+              "sourceId": "source-8d0151e899974479a6070258b9da4d24",
+              "sourceRevision": 1,
+              "unitId": "source-8d0151e899974479a6070258b9da4d24/unit_4",
+              "unitRevision": 1,
+              "text": "Делала REST API для заказов, писала интеграционные тесты.\n"
+            },
+            {
+              "sourceId": "source-8d0151e899974479a6070258b9da4d24",
+              "sourceRevision": 1,
+              "unitId": "source-8d0151e899974479a6070258b9da4d24/unit_5",
+              "unitRevision": 1,
+              "text": "Командой сократили время обработки со 100 до 70 мс, на 30%.\n"
+            },
+            {
+              "sourceId": "source-8d0151e899974479a6070258b9da4d24",
+              "sourceRevision": 1,
+              "unitId": "source-8d0151e899974479a6070258b9da4d24/unit_6",
+              "unitRevision": 1,
+              "text": "Обучила двух новых разработчиков.\n"
+            },
+            {
+              "sourceId": "source-8d0151e899974479a6070258b9da4d24",
+              "sourceRevision": 1,
+              "unitId": "source-8d0151e899974479a6070258b9da4d24/unit_7",
+              "unitRevision": 1,
+              "text": "Запад, разработчик, 2017–2020. Внутренняя CRM. Java, MySQL.\n"
+            },
+            {
+              "sourceId": "source-8d0151e899974479a6070258b9da4d24",
+              "sourceRevision": 1,
+              "unitId": "source-8d0151e899974479a6070258b9da4d24/unit_8",
+              "unitRevision": 1,
+              "text": "Поддерживала CRM и исправляла ошибки.\n"
+            },
+            {
+              "sourceId": "source-8d0151e899974479a6070258b9da4d24",
+              "sourceRevision": 1,
+              "unitId": "source-8d0151e899974479a6070258b9da4d24/unit_9",
+              "unitRevision": 1,
+              "text": "Восток, разработчик, 2008–2009. PHP. Разрабатывала отчёты.\n"
+            },
+            {
+              "sourceId": "source-8d0151e899974479a6070258b9da4d24",
+              "sourceRevision": 1,
+              "unitId": "source-8d0151e899974479a6070258b9da4d24/unit_10",
+              "unitRevision": 1,
+              "text": "Образование: Учебный технический университет, прикладная информатика, 2016.\n"
+            },
+            {
+              "sourceId": "source-8d0151e899974479a6070258b9da4d24",
+              "sourceRevision": 1,
+              "unitId": "source-8d0151e899974479a6070258b9da4d24/unit_11",
+              "unitRevision": 1,
+              "text": "Языки: русский — родной, английский — B2.\n"
+            },
+            {
+              "sourceId": "source-8d0151e899974479a6070258b9da4d24",
+              "sourceRevision": 1,
+              "unitId": "source-8d0151e899974479a6070258b9da4d24/unit_12",
+              "unitRevision": 1,
+              "text": "Общие навыки: Docker.\n"
+            }
+          ],
+          "rawText": "Ирина Примерова, backend-разработчик.\n\nСевер, backend-разработчик, 2021 — настоящее время.\n\nСервис обработки заказов. Python, PostgreSQL.\n\nДелала REST API для заказов, писала интеграционные тесты.\n\nКомандой сократили время обработки со 100 до 70 мс, на 30%.\n\nОбучила двух новых разработчиков.\n\nЗапад, разработчик, 2017–2020. Внутренняя CRM. Java, MySQL.\n\nПоддерживала CRM и исправляла ошибки.\n\nВосток, разработчик, 2008–2009. PHP. Разрабатывала отчёты.\n\nОбразование: Учебный технический университет, прикладная информатика, 2016.\n\nЯзыки: русский — родной, английский — B2.\n\nОбщие навыки: Docker.\n"
+        },
+        {
+          "id": "fact_41cf597cca510ae855907b14",
+          "evidence": [
+            {
+              "sourceId": "source-8d0151e899974479a6070258b9da4d24",
+              "sourceRevision": 1,
+              "unitId": "source-8d0151e899974479a6070258b9da4d24/unit_3",
+              "unitRevision": 1,
+              "text": "Python"
+            }
+          ],
+          "rawText": "Python"
+        },
+        {
+          "id": "fact_962e4cb4357a0e628ef32a17",
+          "evidence": [
+            {
+              "sourceId": "source-8d0151e899974479a6070258b9da4d24",
+              "sourceRevision": 1,
+              "unitId": "source-8d0151e899974479a6070258b9da4d24/unit_3",
+              "unitRevision": 1,
+              "text": "PostgreSQL"
+            }
+          ],
+          "rawText": "PostgreSQL"
+        },
+        {
+          "id": "fact_ed7cec6f27c328f4fbc83c7a",
+          "evidence": [
+            {
+              "sourceId": "source-8d0151e899974479a6070258b9da4d24",
+              "sourceRevision": 1,
+              "unitId": "source-8d0151e899974479a6070258b9da4d24/unit_7",
+              "unitRevision": 1,
+              "text": "Java"
+            }
+          ],
+          "rawText": "Java"
+        },
+        {
+          "id": "fact_6cb36d3669b2c2e096dc9ee5",
+          "evidence": [
+            {
+              "sourceId": "source-8d0151e899974479a6070258b9da4d24",
+              "sourceRevision": 1,
+              "unitId": "source-8d0151e899974479a6070258b9da4d24/unit_7",
+              "unitRevision": 1,
+              "text": "MySQL"
+            }
+          ],
+          "rawText": "MySQL"
+        },
+        {
+          "id": "fact_f0d8e8bcc7cd4fb14683d4fd",
+          "evidence": [
+            {
+              "sourceId": "source-8d0151e899974479a6070258b9da4d24",
+              "sourceRevision": 1,
+              "unitId": "source-8d0151e899974479a6070258b9da4d24/unit_9",
+              "unitRevision": 1,
+              "text": "PHP"
+            }
+          ],
+          "rawText": "PHP"
+        },
+        {
+          "id": "fact_a0defc7a3e861422830184e6",
+          "evidence": [
+            {
+              "sourceId": "source-8d0151e899974479a6070258b9da4d24",
+              "sourceRevision": 1,
+              "unitId": "source-8d0151e899974479a6070258b9da4d24/unit_12",
+              "unitRevision": 1,
+              "text": "Docker"
+            }
+          ],
+          "rawText": "Docker"
+        },
+        {
+          "id": "fact_85ad80f80cbf10e55b236227",
+          "evidence": [
+            {
+              "sourceId": "source-8d0151e899974479a6070258b9da4d24",
+              "sourceRevision": 1,
+              "unitId": "source-8d0151e899974479a6070258b9da4d24/unit_3",
+              "unitRevision": 1,
+              "text": "Сервис обработки заказов."
+            }
+          ],
+          "rawText": "Сервис обработки заказов."
+        },
+        {
+          "id": "fact_b7453cc530e0cd750d6d3be3",
+          "evidence": [
+            {
+              "sourceId": "source-8d0151e899974479a6070258b9da4d24",
+              "sourceRevision": 1,
+              "unitId": "source-8d0151e899974479a6070258b9da4d24/unit_4",
+              "unitRevision": 1,
+              "text": "Делала REST API для заказов, писала интеграционные тесты."
+            }
+          ],
+          "rawText": "Делала REST API для заказов, писала интеграционные тесты."
+        },
+        {
+          "id": "fact_2a07c45464f4dd20474c04dc",
+          "evidence": [
+            {
+              "sourceId": "source-8d0151e899974479a6070258b9da4d24",
+              "sourceRevision": 1,
+              "unitId": "source-8d0151e899974479a6070258b9da4d24/unit_5",
+              "unitRevision": 1,
+              "text": "Командой сократили время обработки со 100 до 70 мс, на 30%."
+            }
+          ],
+          "rawText": "Командой сократили время обработки со 100 до 70 мс, на 30%."
+        },
+        {
+          "id": "fact_3c57dc93658d8c97ce86891c",
+          "evidence": [
+            {
+              "sourceId": "source-8d0151e899974479a6070258b9da4d24",
+              "sourceRevision": 1,
+              "unitId": "source-8d0151e899974479a6070258b9da4d24/unit_6",
+              "unitRevision": 1,
+              "text": "Обучила двух новых разработчиков."
+            }
+          ],
+          "rawText": "Обучила двух новых разработчиков."
+        },
+        {
+          "id": "fact_8f450a88df47102aafbbdf89",
+          "evidence": [
+            {
+              "sourceId": "source-8d0151e899974479a6070258b9da4d24",
+              "sourceRevision": 1,
+              "unitId": "source-8d0151e899974479a6070258b9da4d24/unit_8",
+              "unitRevision": 1,
+              "text": "Поддерживала CRM и исправляла ошибки."
+            }
+          ],
+          "rawText": "Поддерживала CRM и исправляла ошибки."
+        },
+        {
+          "id": "fact_f9ca9eb92e527767156d8c05",
+          "evidence": [
+            {
+              "sourceId": "source-8d0151e899974479a6070258b9da4d24",
+              "sourceRevision": 1,
+              "unitId": "source-8d0151e899974479a6070258b9da4d24/unit_9",
+              "unitRevision": 1,
+              "text": "Разрабатывала отчёты."
+            }
+          ],
+          "rawText": "Разрабатывала отчёты."
+        },
+        {
+          "id": "fact_fd31811ccf08e1ee755e829e",
+          "evidence": [
+            {
+              "sourceId": "source-8d0151e899974479a6070258b9da4d24",
+              "sourceRevision": 1,
+              "unitId": "source-8d0151e899974479a6070258b9da4d24/unit_2",
+              "unitRevision": 1,
+              "text": "Север, backend-разработчик, 2021 — настоящее время.\n"
+            },
+            {
+              "sourceId": "source-8d0151e899974479a6070258b9da4d24",
+              "sourceRevision": 1,
+              "unitId": "source-8d0151e899974479a6070258b9da4d24/unit_3",
+              "unitRevision": 1,
+              "text": "Сервис обработки заказов. Python, PostgreSQL.\n"
+            },
+            {
+              "sourceId": "source-8d0151e899974479a6070258b9da4d24",
+              "sourceRevision": 1,
+              "unitId": "source-8d0151e899974479a6070258b9da4d24/unit_4",
+              "unitRevision": 1,
+              "text": "Делала REST API для заказов, писала интеграционные тесты.\n"
+            },
+            {
+              "sourceId": "source-8d0151e899974479a6070258b9da4d24",
+              "sourceRevision": 1,
+              "unitId": "source-8d0151e899974479a6070258b9da4d24/unit_5",
+              "unitRevision": 1,
+              "text": "Командой сократили время обработки со 100 до 70 мс, на 30%.\n"
+            },
+            {
+              "sourceId": "source-8d0151e899974479a6070258b9da4d24",
+              "sourceRevision": 1,
+              "unitId": "source-8d0151e899974479a6070258b9da4d24/unit_6",
+              "unitRevision": 1,
+              "text": "Обучила двух новых разработчиков.\n"
+            }
+          ],
+          "rawText": "Север, backend-разработчик, 2021 — настоящее время.\n\nСервис обработки заказов. Python, PostgreSQL.\n\nДелала REST API для заказов, писала интеграционные тесты.\n\nКомандой сократили время обработки со 100 до 70 мс, на 30%.\n\nОбучила двух новых разработчиков.\n"
+        },
+        {
+          "id": "fact_eeead18f45220ea511b4542f",
+          "evidence": [
+            {
+              "sourceId": "source-8d0151e899974479a6070258b9da4d24",
+              "sourceRevision": 1,
+              "unitId": "source-8d0151e899974479a6070258b9da4d24/unit_7",
+              "unitRevision": 1,
+              "text": "Запад, разработчик, 2017–2020. Внутренняя CRM. Java, MySQL.\n"
+            },
+            {
+              "sourceId": "source-8d0151e899974479a6070258b9da4d24",
+              "sourceRevision": 1,
+              "unitId": "source-8d0151e899974479a6070258b9da4d24/unit_8",
+              "unitRevision": 1,
+              "text": "Поддерживала CRM и исправляла ошибки.\n"
+            }
+          ],
+          "rawText": "Запад, разработчик, 2017–2020. Внутренняя CRM. Java, MySQL.\n\nПоддерживала CRM и исправляла ошибки.\n"
+        },
+        {
+          "id": "fact_c33faeac01464dbedbfe90fb",
+          "evidence": [
+            {
+              "sourceId": "source-8d0151e899974479a6070258b9da4d24",
+              "sourceRevision": 1,
+              "unitId": "source-8d0151e899974479a6070258b9da4d24/unit_9",
+              "unitRevision": 1,
+              "text": "Восток, разработчик, 2008–2009. PHP. Разрабатывала отчёты.\n"
+            }
+          ],
+          "rawText": "Восток, разработчик, 2008–2009. PHP. Разрабатывала отчёты.\n"
+        }
+      ],
+      "facts": {
+        "revision": 1,
+        "records": [
+          {
+            "id": "candidate",
+            "revision": 1,
+            "origin": "source",
+            "evidence": [
+              {
+                "sourceId": "source-8d0151e899974479a6070258b9da4d24",
+                "sourceRevision": 1,
+                "unitId": "source-8d0151e899974479a6070258b9da4d24/unit_1",
+                "unitRevision": 1,
+                "text": "Ирина Примерова"
+              },
+              {
+                "sourceId": "source-8d0151e899974479a6070258b9da4d24",
+                "sourceRevision": 1,
+                "unitId": "source-8d0151e899974479a6070258b9da4d24/unit_1",
+                "unitRevision": 1,
+                "text": "backend-разработчик"
+              }
+            ],
+            "userCorrected": false,
+            "kind": "candidate",
+            "name": {
+              "value": "Ирина Примерова",
+              "rawText": "Ирина Примерова",
+              "status": "known",
+              "revision": 1,
+              "pendingRawText": null,
+              "userCorrected": false
+            },
+            "title": {
+              "value": "backend-разработчик",
+              "rawText": "backend-разработчик",
+              "status": "known",
+              "revision": 1,
+              "pendingRawText": null,
+              "userCorrected": false
+            },
+            "location": {
+              "value": null,
+              "rawText": "",
+              "status": "unknown",
+              "revision": 1,
+              "pendingRawText": null,
+              "userCorrected": false
+            }
+          },
+          {
+            "id": "job_a0e569c711a6351e14c2bfb2",
+            "revision": 1,
+            "origin": "source",
+            "evidence": [
+              {
+                "sourceId": "source-8d0151e899974479a6070258b9da4d24",
+                "sourceRevision": 1,
+                "unitId": "source-8d0151e899974479a6070258b9da4d24/unit_3",
+                "unitRevision": 1,
+                "text": "Python"
+              },
+              {
+                "sourceId": "source-8d0151e899974479a6070258b9da4d24",
+                "sourceRevision": 1,
+                "unitId": "source-8d0151e899974479a6070258b9da4d24/unit_3",
+                "unitRevision": 1,
+                "text": "PostgreSQL"
+              },
+              {
+                "sourceId": "source-8d0151e899974479a6070258b9da4d24",
+                "sourceRevision": 1,
+                "unitId": "source-8d0151e899974479a6070258b9da4d24/unit_3",
+                "unitRevision": 1,
+                "text": "Сервис обработки заказов."
+              },
+              {
+                "sourceId": "source-8d0151e899974479a6070258b9da4d24",
+                "sourceRevision": 1,
+                "unitId": "source-8d0151e899974479a6070258b9da4d24/unit_4",
+                "unitRevision": 1,
+                "text": "Делала REST API для заказов, писала интеграционные тесты."
+              },
+              {
+                "sourceId": "source-8d0151e899974479a6070258b9da4d24",
+                "sourceRevision": 1,
+                "unitId": "source-8d0151e899974479a6070258b9da4d24/unit_5",
+                "unitRevision": 1,
+                "text": "Командой сократили время обработки со 100 до 70 мс, на 30%."
+              },
+              {
+                "sourceId": "source-8d0151e899974479a6070258b9da4d24",
+                "sourceRevision": 1,
+                "unitId": "source-8d0151e899974479a6070258b9da4d24/unit_6",
+                "unitRevision": 1,
+                "text": "Обучила двух новых разработчиков."
+              },
+              {
+                "sourceId": "source-8d0151e899974479a6070258b9da4d24",
+                "sourceRevision": 1,
+                "unitId": "source-8d0151e899974479a6070258b9da4d24/unit_2",
+                "unitRevision": 1,
+                "text": "Север, backend-разработчик, 2021 — настоящее время.\n"
+              },
+              {
+                "sourceId": "source-8d0151e899974479a6070258b9da4d24",
+                "sourceRevision": 1,
+                "unitId": "source-8d0151e899974479a6070258b9da4d24/unit_3",
+                "unitRevision": 1,
+                "text": "Сервис обработки заказов. Python, PostgreSQL.\n"
+              },
+              {
+                "sourceId": "source-8d0151e899974479a6070258b9da4d24",
+                "sourceRevision": 1,
+                "unitId": "source-8d0151e899974479a6070258b9da4d24/unit_4",
+                "unitRevision": 1,
+                "text": "Делала REST API для заказов, писала интеграционные тесты.\n"
+              },
+              {
+                "sourceId": "source-8d0151e899974479a6070258b9da4d24",
+                "sourceRevision": 1,
+                "unitId": "source-8d0151e899974479a6070258b9da4d24/unit_5",
+                "unitRevision": 1,
+                "text": "Командой сократили время обработки со 100 до 70 мс, на 30%.\n"
+              },
+              {
+                "sourceId": "source-8d0151e899974479a6070258b9da4d24",
+                "sourceRevision": 1,
+                "unitId": "source-8d0151e899974479a6070258b9da4d24/unit_6",
+                "unitRevision": 1,
+                "text": "Обучила двух новых разработчиков.\n"
+              }
+            ],
+            "userCorrected": false,
+            "kind": "employment",
+            "employer": {
+              "value": "Север",
+              "rawText": "Север",
+              "status": "known",
+              "revision": 1,
+              "pendingRawText": null,
+              "userCorrected": false
+            },
+            "role": {
+              "value": "backend-разработчик",
+              "rawText": "backend-разработчик",
+              "status": "known",
+              "revision": 1,
+              "pendingRawText": null,
+              "userCorrected": false
+            },
+            "periods": [
+              {
+                "id": "period_a8ab5b282340c012c544652a",
+                "revision": 1,
+                "start": {
+                  "value": {
+                    "precision": "year",
+                    "year": 2021,
+                    "month": null,
+                    "day": null
+                  },
+                  "rawText": "2021",
+                  "status": "known",
+                  "revision": 1,
+                  "pendingRawText": null,
+                  "userCorrected": false
+                },
+                "end": {
+                  "value": null,
+                  "rawText": "",
+                  "status": "unknown",
+                  "revision": 1,
+                  "pendingRawText": null,
+                  "userCorrected": false
+                },
+                "present": {
+                  "value": true,
+                  "rawText": "",
+                  "status": "known",
+                  "revision": 1,
+                  "pendingRawText": null,
+                  "userCorrected": false
+                },
+                "evidence": [
+                  {
+                    "sourceId": "source-8d0151e899974479a6070258b9da4d24",
+                    "sourceRevision": 1,
+                    "unitId": "source-8d0151e899974479a6070258b9da4d24/unit_2",
+                    "unitRevision": 1,
+                    "text": "Север, backend-разработчик, 2021 — настоящее время."
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "id": "job_c6b580d533aadc71a253e817",
+            "revision": 1,
+            "origin": "source",
+            "evidence": [
+              {
+                "sourceId": "source-8d0151e899974479a6070258b9da4d24",
+                "sourceRevision": 1,
+                "unitId": "source-8d0151e899974479a6070258b9da4d24/unit_7",
+                "unitRevision": 1,
+                "text": "Java"
+              },
+              {
+                "sourceId": "source-8d0151e899974479a6070258b9da4d24",
+                "sourceRevision": 1,
+                "unitId": "source-8d0151e899974479a6070258b9da4d24/unit_7",
+                "unitRevision": 1,
+                "text": "MySQL"
+              },
+              {
+                "sourceId": "source-8d0151e899974479a6070258b9da4d24",
+                "sourceRevision": 1,
+                "unitId": "source-8d0151e899974479a6070258b9da4d24/unit_8",
+                "unitRevision": 1,
+                "text": "Поддерживала CRM и исправляла ошибки."
+              },
+              {
+                "sourceId": "source-8d0151e899974479a6070258b9da4d24",
+                "sourceRevision": 1,
+                "unitId": "source-8d0151e899974479a6070258b9da4d24/unit_7",
+                "unitRevision": 1,
+                "text": "Запад, разработчик, 2017–2020. Внутренняя CRM. Java, MySQL.\n"
+              },
+              {
+                "sourceId": "source-8d0151e899974479a6070258b9da4d24",
+                "sourceRevision": 1,
+                "unitId": "source-8d0151e899974479a6070258b9da4d24/unit_8",
+                "unitRevision": 1,
+                "text": "Поддерживала CRM и исправляла ошибки.\n"
+              }
+            ],
+            "userCorrected": false,
+            "kind": "employment",
+            "employer": {
+              "value": "Запад",
+              "rawText": "Запад",
+              "status": "known",
+              "revision": 1,
+              "pendingRawText": null,
+              "userCorrected": false
+            },
+            "role": {
+              "value": "разработчик",
+              "rawText": "разработчик",
+              "status": "known",
+              "revision": 1,
+              "pendingRawText": null,
+              "userCorrected": false
+            },
+            "periods": [
+              {
+                "id": "period_286975ff76d76ae6f566b46d",
+                "revision": 1,
+                "start": {
+                  "value": {
+                    "precision": "year",
+                    "year": 2017,
+                    "month": null,
+                    "day": null
+                  },
+                  "rawText": "2017",
+                  "status": "known",
+                  "revision": 1,
+                  "pendingRawText": null,
+                  "userCorrected": false
+                },
+                "end": {
+                  "value": {
+                    "precision": "year",
+                    "year": 2020,
+                    "month": null,
+                    "day": null
+                  },
+                  "rawText": "2020",
+                  "status": "known",
+                  "revision": 1,
+                  "pendingRawText": null,
+                  "userCorrected": false
+                },
+                "present": {
+                  "value": false,
+                  "rawText": "False",
+                  "status": "known",
+                  "revision": 1,
+                  "pendingRawText": null,
+                  "userCorrected": false
+                },
+                "evidence": [
+                  {
+                    "sourceId": "source-8d0151e899974479a6070258b9da4d24",
+                    "sourceRevision": 1,
+                    "unitId": "source-8d0151e899974479a6070258b9da4d24/unit_7",
+                    "unitRevision": 1,
+                    "text": "Запад, разработчик, 2017–2020. Внутренняя CRM. Java, MySQL."
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "id": "job_a216842e8c97dd0af74f998e",
+            "revision": 1,
+            "origin": "source",
+            "evidence": [
+              {
+                "sourceId": "source-8d0151e899974479a6070258b9da4d24",
+                "sourceRevision": 1,
+                "unitId": "source-8d0151e899974479a6070258b9da4d24/unit_9",
+                "unitRevision": 1,
+                "text": "PHP"
+              },
+              {
+                "sourceId": "source-8d0151e899974479a6070258b9da4d24",
+                "sourceRevision": 1,
+                "unitId": "source-8d0151e899974479a6070258b9da4d24/unit_9",
+                "unitRevision": 1,
+                "text": "Разрабатывала отчёты."
+              },
+              {
+                "sourceId": "source-8d0151e899974479a6070258b9da4d24",
+                "sourceRevision": 1,
+                "unitId": "source-8d0151e899974479a6070258b9da4d24/unit_9",
+                "unitRevision": 1,
+                "text": "Восток, разработчик, 2008–2009. PHP. Разрабатывала отчёты.\n"
+              }
+            ],
+            "userCorrected": false,
+            "kind": "employment",
+            "employer": {
+              "value": "Восток",
+              "rawText": "Восток",
+              "status": "known",
+              "revision": 1,
+              "pendingRawText": null,
+              "userCorrected": false
+            },
+            "role": {
+              "value": "разработчик",
+              "rawText": "разработчик",
+              "status": "known",
+              "revision": 1,
+              "pendingRawText": null,
+              "userCorrected": false
+            },
+            "periods": [
+              {
+                "id": "period_29c253085740472c06a74ea0",
+                "revision": 1,
+                "start": {
+                  "value": {
+                    "precision": "year",
+                    "year": 2008,
+                    "month": null,
+                    "day": null
+                  },
+                  "rawText": "2008",
+                  "status": "known",
+                  "revision": 1,
+                  "pendingRawText": null,
+                  "userCorrected": false
+                },
+                "end": {
+                  "value": {
+                    "precision": "year",
+                    "year": 2009,
+                    "month": null,
+                    "day": null
+                  },
+                  "rawText": "2009",
+                  "status": "known",
+                  "revision": 1,
+                  "pendingRawText": null,
+                  "userCorrected": false
+                },
+                "present": {
+                  "value": false,
+                  "rawText": "False",
+                  "status": "known",
+                  "revision": 1,
+                  "pendingRawText": null,
+                  "userCorrected": false
+                },
+                "evidence": [
+                  {
+                    "sourceId": "source-8d0151e899974479a6070258b9da4d24",
+                    "sourceRevision": 1,
+                    "unitId": "source-8d0151e899974479a6070258b9da4d24/unit_9",
+                    "unitRevision": 1,
+                    "text": "Восток, разработчик, 2008–2009. PHP. Разрабатывала отчёты."
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "id": "education_67a93261f331146418c83b3d",
+            "revision": 1,
+            "origin": "source",
+            "evidence": [
+              {
+                "sourceId": "source-8d0151e899974479a6070258b9da4d24",
+                "sourceRevision": 1,
+                "unitId": "source-8d0151e899974479a6070258b9da4d24/unit_10",
+                "unitRevision": 1,
+                "text": "Учебный технический университет"
+              },
+              {
+                "sourceId": "source-8d0151e899974479a6070258b9da4d24",
+                "sourceRevision": 1,
+                "unitId": "source-8d0151e899974479a6070258b9da4d24/unit_10",
+                "unitRevision": 1,
+                "text": "прикладная информатика"
+              },
+              {
+                "sourceId": "source-8d0151e899974479a6070258b9da4d24",
+                "sourceRevision": 1,
+                "unitId": "source-8d0151e899974479a6070258b9da4d24/unit_10",
+                "unitRevision": 1,
+                "text": "2016"
+              }
+            ],
+            "userCorrected": false,
+            "kind": "education",
+            "institution": {
+              "value": "Учебный технический университет",
+              "rawText": "Учебный технический университет",
+              "status": "known",
+              "revision": 1,
+              "pendingRawText": null,
+              "userCorrected": false
+            },
+            "qualification": {
+              "value": null,
+              "rawText": "",
+              "status": "unknown",
+              "revision": 1,
+              "pendingRawText": null,
+              "userCorrected": false
+            },
+            "specialty": {
+              "value": "прикладная информатика",
+              "rawText": "прикладная информатика",
+              "status": "known",
+              "revision": 1,
+              "pendingRawText": null,
+              "userCorrected": false
+            },
+            "completion": {
+              "value": {
+                "precision": "year",
+                "year": 2016,
+                "month": null,
+                "day": null
+              },
+              "rawText": "2016",
+              "status": "known",
+              "revision": 1,
+              "pendingRawText": null,
+              "userCorrected": false
+            }
+          },
+          {
+            "id": "language_98f055188453b531e626f9dc",
+            "revision": 1,
+            "origin": "source",
+            "evidence": [
+              {
+                "sourceId": "source-8d0151e899974479a6070258b9da4d24",
+                "sourceRevision": 1,
+                "unitId": "source-8d0151e899974479a6070258b9da4d24/unit_11",
+                "unitRevision": 1,
+                "text": "русский"
+              },
+              {
+                "sourceId": "source-8d0151e899974479a6070258b9da4d24",
+                "sourceRevision": 1,
+                "unitId": "source-8d0151e899974479a6070258b9da4d24/unit_11",
+                "unitRevision": 1,
+                "text": "родной"
+              }
+            ],
+            "userCorrected": false,
+            "kind": "language",
+            "language": {
+              "value": "русский",
+              "rawText": "русский",
+              "status": "known",
+              "revision": 1,
+              "pendingRawText": null,
+              "userCorrected": false
+            },
+            "level": {
+              "value": "родной",
+              "rawText": "родной",
+              "status": "known",
+              "revision": 1,
+              "pendingRawText": null,
+              "userCorrected": false
+            }
+          },
+          {
+            "id": "language_6f8e2d4cffc9f46d4e687770",
+            "revision": 1,
+            "origin": "source",
+            "evidence": [
+              {
+                "sourceId": "source-8d0151e899974479a6070258b9da4d24",
+                "sourceRevision": 1,
+                "unitId": "source-8d0151e899974479a6070258b9da4d24/unit_11",
+                "unitRevision": 1,
+                "text": "английский"
+              },
+              {
+                "sourceId": "source-8d0151e899974479a6070258b9da4d24",
+                "sourceRevision": 1,
+                "unitId": "source-8d0151e899974479a6070258b9da4d24/unit_11",
+                "unitRevision": 1,
+                "text": "B2"
+              }
+            ],
+            "userCorrected": false,
+            "kind": "language",
+            "language": {
+              "value": "английский",
+              "rawText": "английский",
+              "status": "known",
+              "revision": 1,
+              "pendingRawText": null,
+              "userCorrected": false
+            },
+            "level": {
+              "value": "B2",
+              "rawText": "B2",
+              "status": "known",
+              "revision": 1,
+              "pendingRawText": null,
+              "userCorrected": false
+            }
+          },
+          {
+            "id": "fact_41cf597cca510ae855907b14",
+            "revision": 1,
+            "origin": "source",
+            "evidence": [
+              {
+                "sourceId": "source-8d0151e899974479a6070258b9da4d24",
+                "sourceRevision": 1,
+                "unitId": "source-8d0151e899974479a6070258b9da4d24/unit_3",
+                "unitRevision": 1,
+                "text": "Python"
+              }
+            ],
+            "userCorrected": false,
+            "kind": "technology",
+            "jobId": "job_a0e569c711a6351e14c2bfb2",
+            "subprojectId": null,
+            "display": {
+              "value": "Python",
+              "rawText": "Python",
+              "status": "known",
+              "revision": 1,
+              "pendingRawText": null,
+              "userCorrected": false
+            },
+            "canonicalId": {
+              "value": "python",
+              "rawText": "python",
+              "status": "known",
+              "revision": 1,
+              "pendingRawText": null,
+              "userCorrected": false
+            }
+          },
+          {
+            "id": "fact_962e4cb4357a0e628ef32a17",
+            "revision": 1,
+            "origin": "source",
+            "evidence": [
+              {
+                "sourceId": "source-8d0151e899974479a6070258b9da4d24",
+                "sourceRevision": 1,
+                "unitId": "source-8d0151e899974479a6070258b9da4d24/unit_3",
+                "unitRevision": 1,
+                "text": "PostgreSQL"
+              }
+            ],
+            "userCorrected": false,
+            "kind": "technology",
+            "jobId": "job_a0e569c711a6351e14c2bfb2",
+            "subprojectId": null,
+            "display": {
+              "value": "PostgreSQL",
+              "rawText": "PostgreSQL",
+              "status": "known",
+              "revision": 1,
+              "pendingRawText": null,
+              "userCorrected": false
+            },
+            "canonicalId": {
+              "value": "postgresql",
+              "rawText": "postgresql",
+              "status": "known",
+              "revision": 1,
+              "pendingRawText": null,
+              "userCorrected": false
+            }
+          },
+          {
+            "id": "fact_ed7cec6f27c328f4fbc83c7a",
+            "revision": 1,
+            "origin": "source",
+            "evidence": [
+              {
+                "sourceId": "source-8d0151e899974479a6070258b9da4d24",
+                "sourceRevision": 1,
+                "unitId": "source-8d0151e899974479a6070258b9da4d24/unit_7",
+                "unitRevision": 1,
+                "text": "Java"
+              }
+            ],
+            "userCorrected": false,
+            "kind": "technology",
+            "jobId": "job_c6b580d533aadc71a253e817",
+            "subprojectId": null,
+            "display": {
+              "value": "Java",
+              "rawText": "Java",
+              "status": "known",
+              "revision": 1,
+              "pendingRawText": null,
+              "userCorrected": false
+            },
+            "canonicalId": {
+              "value": "unknown_c1ba60ce13586503a21a05e9",
+              "rawText": "unknown_c1ba60ce13586503a21a05e9",
+              "status": "known",
+              "revision": 1,
+              "pendingRawText": null,
+              "userCorrected": false
+            }
+          },
+          {
+            "id": "fact_6cb36d3669b2c2e096dc9ee5",
+            "revision": 1,
+            "origin": "source",
+            "evidence": [
+              {
+                "sourceId": "source-8d0151e899974479a6070258b9da4d24",
+                "sourceRevision": 1,
+                "unitId": "source-8d0151e899974479a6070258b9da4d24/unit_7",
+                "unitRevision": 1,
+                "text": "MySQL"
+              }
+            ],
+            "userCorrected": false,
+            "kind": "technology",
+            "jobId": "job_c6b580d533aadc71a253e817",
+            "subprojectId": null,
+            "display": {
+              "value": "MySQL",
+              "rawText": "MySQL",
+              "status": "known",
+              "revision": 1,
+              "pendingRawText": null,
+              "userCorrected": false
+            },
+            "canonicalId": {
+              "value": "unknown_211906c1c32db77e3082ad28",
+              "rawText": "unknown_211906c1c32db77e3082ad28",
+              "status": "known",
+              "revision": 1,
+              "pendingRawText": null,
+              "userCorrected": false
+            }
+          },
+          {
+            "id": "fact_f0d8e8bcc7cd4fb14683d4fd",
+            "revision": 1,
+            "origin": "source",
+            "evidence": [
+              {
+                "sourceId": "source-8d0151e899974479a6070258b9da4d24",
+                "sourceRevision": 1,
+                "unitId": "source-8d0151e899974479a6070258b9da4d24/unit_9",
+                "unitRevision": 1,
+                "text": "PHP"
+              }
+            ],
+            "userCorrected": false,
+            "kind": "technology",
+            "jobId": "job_a216842e8c97dd0af74f998e",
+            "subprojectId": null,
+            "display": {
+              "value": "PHP",
+              "rawText": "PHP",
+              "status": "known",
+              "revision": 1,
+              "pendingRawText": null,
+              "userCorrected": false
+            },
+            "canonicalId": {
+              "value": "php",
+              "rawText": "php",
+              "status": "known",
+              "revision": 1,
+              "pendingRawText": null,
+              "userCorrected": false
+            }
+          },
+          {
+            "id": "fact_a0defc7a3e861422830184e6",
+            "revision": 1,
+            "origin": "source",
+            "evidence": [
+              {
+                "sourceId": "source-8d0151e899974479a6070258b9da4d24",
+                "sourceRevision": 1,
+                "unitId": "source-8d0151e899974479a6070258b9da4d24/unit_12",
+                "unitRevision": 1,
+                "text": "Docker"
+              }
+            ],
+            "userCorrected": false,
+            "kind": "technology",
+            "jobId": null,
+            "subprojectId": null,
+            "display": {
+              "value": "Docker",
+              "rawText": "Docker",
+              "status": "known",
+              "revision": 1,
+              "pendingRawText": null,
+              "userCorrected": false
+            },
+            "canonicalId": {
+              "value": "docker",
+              "rawText": "docker",
+              "status": "known",
+              "revision": 1,
+              "pendingRawText": null,
+              "userCorrected": false
+            }
+          },
+          {
+            "id": "fact_85ad80f80cbf10e55b236227",
+            "revision": 1,
+            "origin": "source",
+            "evidence": [
+              {
+                "sourceId": "source-8d0151e899974479a6070258b9da4d24",
+                "sourceRevision": 1,
+                "unitId": "source-8d0151e899974479a6070258b9da4d24/unit_3",
+                "unitRevision": 1,
+                "text": "Сервис обработки заказов."
+              }
+            ],
+            "userCorrected": false,
+            "kind": "claim",
+            "jobId": "job_a0e569c711a6351e14c2bfb2",
+            "subprojectId": null,
+            "value": {
+              "value": "Сервис обработки заказов.",
+              "rawText": "Сервис обработки заказов.",
+              "status": "known",
+              "revision": 1,
+              "pendingRawText": null,
+              "userCorrected": false
+            }
+          },
+          {
+            "id": "fact_b7453cc530e0cd750d6d3be3",
+            "revision": 1,
+            "origin": "source",
+            "evidence": [
+              {
+                "sourceId": "source-8d0151e899974479a6070258b9da4d24",
+                "sourceRevision": 1,
+                "unitId": "source-8d0151e899974479a6070258b9da4d24/unit_4",
+                "unitRevision": 1,
+                "text": "Делала REST API для заказов, писала интеграционные тесты."
+              }
+            ],
+            "userCorrected": false,
+            "kind": "claim",
+            "jobId": "job_a0e569c711a6351e14c2bfb2",
+            "subprojectId": null,
+            "value": {
+              "value": "Делала REST API для заказов, писала интеграционные тесты.",
+              "rawText": "Делала REST API для заказов, писала интеграционные тесты.",
+              "status": "known",
+              "revision": 1,
+              "pendingRawText": null,
+              "userCorrected": false
+            }
+          },
+          {
+            "id": "fact_2a07c45464f4dd20474c04dc",
+            "revision": 1,
+            "origin": "source",
+            "evidence": [
+              {
+                "sourceId": "source-8d0151e899974479a6070258b9da4d24",
+                "sourceRevision": 1,
+                "unitId": "source-8d0151e899974479a6070258b9da4d24/unit_5",
+                "unitRevision": 1,
+                "text": "Командой сократили время обработки со 100 до 70 мс, на 30%."
+              }
+            ],
+            "userCorrected": false,
+            "kind": "metric",
+            "jobId": "job_a0e569c711a6351e14c2bfb2",
+            "subprojectId": null,
+            "value": {
+              "value": {
+                "number": 70.0,
+                "upperNumber": null,
+                "comparator": "exact",
+                "unit": "мс",
+                "period": null,
+                "baseline": "100",
+                "result": "70",
+                "scope": null,
+                "attribution": "team",
+                "qualifiers": [
+                  "на 30%"
+                ]
+              },
+              "rawText": "{'number': 70.0, 'upperNumber': None, 'comparator': 'exact', 'unit': 'мс', 'period': None, 'baseline': '100', 'result': '70', 'scope': None, 'attribution': 'team', 'qualifiers': ['на 30%']}",
+              "status": "known",
+              "revision": 1,
+              "pendingRawText": null,
+              "userCorrected": false
+            }
+          },
+          {
+            "id": "fact_3c57dc93658d8c97ce86891c",
+            "revision": 1,
+            "origin": "source",
+            "evidence": [
+              {
+                "sourceId": "source-8d0151e899974479a6070258b9da4d24",
+                "sourceRevision": 1,
+                "unitId": "source-8d0151e899974479a6070258b9da4d24/unit_6",
+                "unitRevision": 1,
+                "text": "Обучила двух новых разработчиков."
+              }
+            ],
+            "userCorrected": false,
+            "kind": "leadership",
+            "jobId": "job_a0e569c711a6351e14c2bfb2",
+            "subprojectId": null,
+            "value": {
+              "value": {
+                "action": "Обучила двух новых разработчиков",
+                "teamSize": {
+                  "number": 2.0,
+                  "upperNumber": null,
+                  "comparator": "exact",
+                  "unit": "разработчиков",
+                  "period": null,
+                  "baseline": null,
+                  "result": null,
+                  "scope": null,
+                  "attribution": "personal",
+                  "qualifiers": []
+                },
+                "attribution": "personal"
+              },
+              "rawText": "{'action': 'Обучила двух новых разработчиков', 'teamSize': {'number': 2.0, 'upperNumber': None, 'comparator': 'exact', 'unit': 'разработчиков', 'period': None, 'baseline': None, 'result': None, 'scope': None, 'attribution': 'personal', 'qualifiers': []}, 'attribution': 'personal'}",
+              "status": "known",
+              "revision": 1,
+              "pendingRawText": null,
+              "userCorrected": false
+            }
+          },
+          {
+            "id": "fact_8f450a88df47102aafbbdf89",
+            "revision": 1,
+            "origin": "source",
+            "evidence": [
+              {
+                "sourceId": "source-8d0151e899974479a6070258b9da4d24",
+                "sourceRevision": 1,
+                "unitId": "source-8d0151e899974479a6070258b9da4d24/unit_8",
+                "unitRevision": 1,
+                "text": "Поддерживала CRM и исправляла ошибки."
+              }
+            ],
+            "userCorrected": false,
+            "kind": "claim",
+            "jobId": "job_c6b580d533aadc71a253e817",
+            "subprojectId": null,
+            "value": {
+              "value": "Поддерживала CRM и исправляла ошибки.",
+              "rawText": "Поддерживала CRM и исправляла ошибки.",
+              "status": "known",
+              "revision": 1,
+              "pendingRawText": null,
+              "userCorrected": false
+            }
+          },
+          {
+            "id": "fact_f9ca9eb92e527767156d8c05",
+            "revision": 1,
+            "origin": "source",
+            "evidence": [
+              {
+                "sourceId": "source-8d0151e899974479a6070258b9da4d24",
+                "sourceRevision": 1,
+                "unitId": "source-8d0151e899974479a6070258b9da4d24/unit_9",
+                "unitRevision": 1,
+                "text": "Разрабатывала отчёты."
+              }
+            ],
+            "userCorrected": false,
+            "kind": "claim",
+            "jobId": "job_a216842e8c97dd0af74f998e",
+            "subprojectId": null,
+            "value": {
+              "value": "Разрабатывала отчёты.",
+              "rawText": "Разрабатывала отчёты.",
+              "status": "known",
+              "revision": 1,
+              "pendingRawText": null,
+              "userCorrected": false
+            }
+          }
+        ],
+        "tombstones": []
+      },
+      "document": {
+        "schemaVersion": 1,
+        "revision": 2,
+        "regions": [
+          {
+            "id": "header",
+            "role": "header",
+            "revision": 1,
+            "blocks": []
+          },
+          {
+            "id": "sidebar",
+            "role": "sidebar",
+            "revision": 1,
+            "blocks": []
+          },
+          {
+            "id": "main",
+            "role": "main",
+            "revision": 1,
+            "blocks": [
+              {
+                "id": "source-literal-d3d236df6ef3420790b6e47520989375",
+                "revision": 1,
+                "provenance": [
+                  {
+                    "kind": "source",
+                    "id": "source-link-6e8dadc9597c43ae9217aa7f6e4fc4f0",
+                    "evidence": [
+                      {
+                        "sourceId": "source-8d0151e899974479a6070258b9da4d24",
+                        "sourceRevision": 1,
+                        "unitId": "source-8d0151e899974479a6070258b9da4d24/unit_1",
+                        "unitRevision": 1,
+                        "text": "Ирина Примерова, backend-разработчик.\n"
+                      }
+                    ]
+                  }
+                ],
+                "children": [],
+                "type": "paragraph",
+                "props": {
+                  "alignment": "left",
+                  "textColor": "default",
+                  "backgroundColor": "default"
+                },
+                "content": [
+                  {
+                    "type": "fact_field",
+                    "bindingId": "binding-99eae0650ee84fa5a600287655126979",
+                    "recordId": "candidate",
+                    "fieldKey": "name",
+                    "text": "Ирина Примерова",
+                    "styles": {
+                      "bold": false,
+                      "italic": false,
+                      "underline": false,
+                      "strike": false,
+                      "code": false,
+                      "textColor": "default",
+                      "backgroundColor": "default"
+                    },
+                    "syncedFactRevision": 1,
+                    "bindingRootId": null
+                  },
+                  {
+                    "type": "text",
+                    "text": ", ",
+                    "styles": {
+                      "bold": false,
+                      "italic": false,
+                      "underline": false,
+                      "strike": false,
+                      "code": false,
+                      "textColor": "default",
+                      "backgroundColor": "default"
+                    }
+                  },
+                  {
+                    "type": "fact_field",
+                    "bindingId": "binding-6adfcf5529c94b0aa55c04b796835974",
+                    "recordId": "candidate",
+                    "fieldKey": "title",
+                    "text": "backend-разработчик",
+                    "styles": {
+                      "bold": false,
+                      "italic": false,
+                      "underline": false,
+                      "strike": false,
+                      "code": false,
+                      "textColor": "default",
+                      "backgroundColor": "default"
+                    },
+                    "syncedFactRevision": 1,
+                    "bindingRootId": null
+                  },
+                  {
+                    "type": "text",
+                    "text": ".\n",
+                    "styles": {
+                      "bold": false,
+                      "italic": false,
+                      "underline": false,
+                      "strike": false,
+                      "code": false,
+                      "textColor": "default",
+                      "backgroundColor": "default"
+                    }
+                  }
+                ]
+              },
+              {
+                "id": "source-literal-f3ad6749a1d04cfc91571fda1a429244",
+                "revision": 1,
+                "provenance": [
+                  {
+                    "kind": "source",
+                    "id": "source-link-73bef9a813d645e69d206920e4110ec8",
+                    "evidence": [
+                      {
+                        "sourceId": "source-8d0151e899974479a6070258b9da4d24",
+                        "sourceRevision": 1,
+                        "unitId": "source-8d0151e899974479a6070258b9da4d24/unit_2",
+                        "unitRevision": 1,
+                        "text": "Север, backend-разработчик, 2021 — настоящее время.\n"
+                      }
+                    ]
+                  }
+                ],
+                "children": [],
+                "type": "paragraph",
+                "props": {
+                  "alignment": "left",
+                  "textColor": "default",
+                  "backgroundColor": "default"
+                },
+                "content": [
+                  {
+                    "type": "fact_field",
+                    "bindingId": "binding-2dec10af55dd4d48a047ba20ac202ae9",
+                    "recordId": "job_a0e569c711a6351e14c2bfb2",
+                    "fieldKey": "employer",
+                    "text": "Север",
+                    "styles": {
+                      "bold": false,
+                      "italic": false,
+                      "underline": false,
+                      "strike": false,
+                      "code": false,
+                      "textColor": "default",
+                      "backgroundColor": "default"
+                    },
+                    "syncedFactRevision": 1,
+                    "bindingRootId": null
+                  },
+                  {
+                    "type": "text",
+                    "text": ", ",
+                    "styles": {
+                      "bold": false,
+                      "italic": false,
+                      "underline": false,
+                      "strike": false,
+                      "code": false,
+                      "textColor": "default",
+                      "backgroundColor": "default"
+                    }
+                  },
+                  {
+                    "type": "fact_field",
+                    "bindingId": "binding-a386a2fc27894d3991e20bf0623a83ec",
+                    "recordId": "job_a0e569c711a6351e14c2bfb2",
+                    "fieldKey": "role",
+                    "text": "backend-разработчик",
+                    "styles": {
+                      "bold": false,
+                      "italic": false,
+                      "underline": false,
+                      "strike": false,
+                      "code": false,
+                      "textColor": "default",
+                      "backgroundColor": "default"
+                    },
+                    "syncedFactRevision": 1,
+                    "bindingRootId": null
+                  },
+                  {
+                    "type": "text",
+                    "text": ", ",
+                    "styles": {
+                      "bold": false,
+                      "italic": false,
+                      "underline": false,
+                      "strike": false,
+                      "code": false,
+                      "textColor": "default",
+                      "backgroundColor": "default"
+                    }
+                  },
+                  {
+                    "type": "fact_field",
+                    "bindingId": "binding-2163a111bfae4390bcd2ab43d47da0d4",
+                    "recordId": "job_a0e569c711a6351e14c2bfb2",
+                    "fieldKey": "period:period_a8ab5b282340c012c544652a:start",
+                    "text": "2021",
+                    "styles": {
+                      "bold": false,
+                      "italic": false,
+                      "underline": false,
+                      "strike": false,
+                      "code": false,
+                      "textColor": "default",
+                      "backgroundColor": "default"
+                    },
+                    "syncedFactRevision": 1,
+                    "bindingRootId": null
+                  },
+                  {
+                    "type": "text",
+                    "text": " — настоящее время.\n",
+                    "styles": {
+                      "bold": false,
+                      "italic": false,
+                      "underline": false,
+                      "strike": false,
+                      "code": false,
+                      "textColor": "default",
+                      "backgroundColor": "default"
+                    }
+                  }
+                ]
+              },
+              {
+                "id": "source-literal-9b7c697e584a4b77826d31e5d0f72fd5",
+                "revision": 1,
+                "provenance": [
+                  {
+                    "kind": "source",
+                    "id": "source-link-b7a8016ae86246eea4e413bfa288166d",
+                    "evidence": [
+                      {
+                        "sourceId": "source-8d0151e899974479a6070258b9da4d24",
+                        "sourceRevision": 1,
+                        "unitId": "source-8d0151e899974479a6070258b9da4d24/unit_3",
+                        "unitRevision": 1,
+                        "text": "Сервис обработки заказов. Python, PostgreSQL.\n"
+                      }
+                    ]
+                  }
+                ],
+                "children": [],
+                "type": "paragraph",
+                "props": {
+                  "alignment": "left",
+                  "textColor": "default",
+                  "backgroundColor": "default"
+                },
+                "content": [
+                  {
+                    "type": "fact_field",
+                    "bindingId": "binding-fc764ff361de4f608d25b0948847a28e",
+                    "recordId": "fact_85ad80f80cbf10e55b236227",
+                    "fieldKey": "value",
+                    "text": "Сервис обработки заказов.",
+                    "styles": {
+                      "bold": false,
+                      "italic": false,
+                      "underline": false,
+                      "strike": false,
+                      "code": false,
+                      "textColor": "default",
+                      "backgroundColor": "default"
+                    },
+                    "syncedFactRevision": 1,
+                    "bindingRootId": null
+                  },
+                  {
+                    "type": "text",
+                    "text": " ",
+                    "styles": {
+                      "bold": false,
+                      "italic": false,
+                      "underline": false,
+                      "strike": false,
+                      "code": false,
+                      "textColor": "default",
+                      "backgroundColor": "default"
+                    }
+                  },
+                  {
+                    "type": "fact_field",
+                    "bindingId": "binding-cf2f8ea824a74788a034ea5c7c6ddae2",
+                    "recordId": "fact_41cf597cca510ae855907b14",
+                    "fieldKey": "display",
+                    "text": "Python",
+                    "styles": {
+                      "bold": false,
+                      "italic": false,
+                      "underline": false,
+                      "strike": false,
+                      "code": false,
+                      "textColor": "default",
+                      "backgroundColor": "default"
+                    },
+                    "syncedFactRevision": 1,
+                    "bindingRootId": null
+                  },
+                  {
+                    "type": "text",
+                    "text": ", ",
+                    "styles": {
+                      "bold": false,
+                      "italic": false,
+                      "underline": false,
+                      "strike": false,
+                      "code": false,
+                      "textColor": "default",
+                      "backgroundColor": "default"
+                    }
+                  },
+                  {
+                    "type": "fact_field",
+                    "bindingId": "binding-fcad13970f914b3d8ea9eb2c980adc51",
+                    "recordId": "fact_962e4cb4357a0e628ef32a17",
+                    "fieldKey": "display",
+                    "text": "PostgreSQL",
+                    "styles": {
+                      "bold": false,
+                      "italic": false,
+                      "underline": false,
+                      "strike": false,
+                      "code": false,
+                      "textColor": "default",
+                      "backgroundColor": "default"
+                    },
+                    "syncedFactRevision": 1,
+                    "bindingRootId": null
+                  },
+                  {
+                    "type": "text",
+                    "text": ".\n",
+                    "styles": {
+                      "bold": false,
+                      "italic": false,
+                      "underline": false,
+                      "strike": false,
+                      "code": false,
+                      "textColor": "default",
+                      "backgroundColor": "default"
+                    }
+                  }
+                ]
+              },
+              {
+                "id": "source-literal-c6d8e6dad9b349959628bfd5549f37c8",
+                "revision": 1,
+                "provenance": [
+                  {
+                    "kind": "source",
+                    "id": "source-link-195b52ba8af2462b803ea2f7d7397944",
+                    "evidence": [
+                      {
+                        "sourceId": "source-8d0151e899974479a6070258b9da4d24",
+                        "sourceRevision": 1,
+                        "unitId": "source-8d0151e899974479a6070258b9da4d24/unit_4",
+                        "unitRevision": 1,
+                        "text": "Делала REST API для заказов, писала интеграционные тесты.\n"
+                      }
+                    ]
+                  }
+                ],
+                "children": [],
+                "type": "paragraph",
+                "props": {
+                  "alignment": "left",
+                  "textColor": "default",
+                  "backgroundColor": "default"
+                },
+                "content": [
+                  {
+                    "type": "fact_field",
+                    "bindingId": "binding-3ff0789764974339bdcb386d84264601",
+                    "recordId": "fact_b7453cc530e0cd750d6d3be3",
+                    "fieldKey": "value",
+                    "text": "Делала REST API для заказов, писала интеграционные тесты.",
+                    "styles": {
+                      "bold": false,
+                      "italic": false,
+                      "underline": false,
+                      "strike": false,
+                      "code": false,
+                      "textColor": "default",
+                      "backgroundColor": "default"
+                    },
+                    "syncedFactRevision": 1,
+                    "bindingRootId": null
+                  },
+                  {
+                    "type": "text",
+                    "text": "\n",
+                    "styles": {
+                      "bold": false,
+                      "italic": false,
+                      "underline": false,
+                      "strike": false,
+                      "code": false,
+                      "textColor": "default",
+                      "backgroundColor": "default"
+                    }
+                  }
+                ]
+              },
+              {
+                "id": "source-literal-2bf30fa4b5b74105ae32cd1d68a6f2a9",
+                "revision": 1,
+                "provenance": [
+                  {
+                    "kind": "source",
+                    "id": "source-link-72b0080315894364b1503f93c9975692",
+                    "evidence": [
+                      {
+                        "sourceId": "source-8d0151e899974479a6070258b9da4d24",
+                        "sourceRevision": 1,
+                        "unitId": "source-8d0151e899974479a6070258b9da4d24/unit_5",
+                        "unitRevision": 1,
+                        "text": "Командой сократили время обработки со 100 до 70 мс, на 30%.\n"
+                      }
+                    ]
+                  }
+                ],
+                "children": [],
+                "type": "paragraph",
+                "props": {
+                  "alignment": "left",
+                  "textColor": "default",
+                  "backgroundColor": "default"
+                },
+                "content": [
+                  {
+                    "type": "text",
+                    "text": "Командой сократили время обработки со 100 до 70 мс, на 30%.\n",
+                    "styles": {
+                      "bold": false,
+                      "italic": false,
+                      "underline": false,
+                      "strike": false,
+                      "code": false,
+                      "textColor": "default",
+                      "backgroundColor": "default"
+                    }
+                  }
+                ]
+              },
+              {
+                "id": "source-literal-86ad68295b40463697fb379b03dc0fc2",
+                "revision": 1,
+                "provenance": [
+                  {
+                    "kind": "source",
+                    "id": "source-link-0550a8a833eb4b03b15f2f71b6c69c9f",
+                    "evidence": [
+                      {
+                        "sourceId": "source-8d0151e899974479a6070258b9da4d24",
+                        "sourceRevision": 1,
+                        "unitId": "source-8d0151e899974479a6070258b9da4d24/unit_6",
+                        "unitRevision": 1,
+                        "text": "Обучила двух новых разработчиков.\n"
+                      }
+                    ]
+                  }
+                ],
+                "children": [],
+                "type": "paragraph",
+                "props": {
+                  "alignment": "left",
+                  "textColor": "default",
+                  "backgroundColor": "default"
+                },
+                "content": [
+                  {
+                    "type": "text",
+                    "text": "Обучила двух новых разработчиков.\n",
+                    "styles": {
+                      "bold": false,
+                      "italic": false,
+                      "underline": false,
+                      "strike": false,
+                      "code": false,
+                      "textColor": "default",
+                      "backgroundColor": "default"
+                    }
+                  }
+                ]
+              },
+              {
+                "id": "source-literal-3379f8d08f034f02a1565b4623c840af",
+                "revision": 1,
+                "provenance": [
+                  {
+                    "kind": "source",
+                    "id": "source-link-8d860bbcc1e148e0bb1463d9e562f1dc",
+                    "evidence": [
+                      {
+                        "sourceId": "source-8d0151e899974479a6070258b9da4d24",
+                        "sourceRevision": 1,
+                        "unitId": "source-8d0151e899974479a6070258b9da4d24/unit_7",
+                        "unitRevision": 1,
+                        "text": "Запад, разработчик, 2017–2020. Внутренняя CRM. Java, MySQL.\n"
+                      }
+                    ]
+                  }
+                ],
+                "children": [],
+                "type": "paragraph",
+                "props": {
+                  "alignment": "left",
+                  "textColor": "default",
+                  "backgroundColor": "default"
+                },
+                "content": [
+                  {
+                    "type": "fact_field",
+                    "bindingId": "binding-709d4770817a440cabafb18d5765d276",
+                    "recordId": "job_c6b580d533aadc71a253e817",
+                    "fieldKey": "employer",
+                    "text": "Запад",
+                    "styles": {
+                      "bold": false,
+                      "italic": false,
+                      "underline": false,
+                      "strike": false,
+                      "code": false,
+                      "textColor": "default",
+                      "backgroundColor": "default"
+                    },
+                    "syncedFactRevision": 1,
+                    "bindingRootId": null
+                  },
+                  {
+                    "type": "text",
+                    "text": ", ",
+                    "styles": {
+                      "bold": false,
+                      "italic": false,
+                      "underline": false,
+                      "strike": false,
+                      "code": false,
+                      "textColor": "default",
+                      "backgroundColor": "default"
+                    }
+                  },
+                  {
+                    "type": "fact_field",
+                    "bindingId": "binding-b5a59ea1b8d84ab4b7c9a8e9f30d8184",
+                    "recordId": "job_c6b580d533aadc71a253e817",
+                    "fieldKey": "role",
+                    "text": "разработчик",
+                    "styles": {
+                      "bold": false,
+                      "italic": false,
+                      "underline": false,
+                      "strike": false,
+                      "code": false,
+                      "textColor": "default",
+                      "backgroundColor": "default"
+                    },
+                    "syncedFactRevision": 1,
+                    "bindingRootId": null
+                  },
+                  {
+                    "type": "text",
+                    "text": ", ",
+                    "styles": {
+                      "bold": false,
+                      "italic": false,
+                      "underline": false,
+                      "strike": false,
+                      "code": false,
+                      "textColor": "default",
+                      "backgroundColor": "default"
+                    }
+                  },
+                  {
+                    "type": "fact_field",
+                    "bindingId": "binding-fe903bce6a8b4df194ca9ce0035a8908",
+                    "recordId": "job_c6b580d533aadc71a253e817",
+                    "fieldKey": "period:period_286975ff76d76ae6f566b46d:start",
+                    "text": "2017",
+                    "styles": {
+                      "bold": false,
+                      "italic": false,
+                      "underline": false,
+                      "strike": false,
+                      "code": false,
+                      "textColor": "default",
+                      "backgroundColor": "default"
+                    },
+                    "syncedFactRevision": 1,
+                    "bindingRootId": null
+                  },
+                  {
+                    "type": "text",
+                    "text": "–",
+                    "styles": {
+                      "bold": false,
+                      "italic": false,
+                      "underline": false,
+                      "strike": false,
+                      "code": false,
+                      "textColor": "default",
+                      "backgroundColor": "default"
+                    }
+                  },
+                  {
+                    "type": "fact_field",
+                    "bindingId": "binding-de1bba38059144a5a367139efefde851",
+                    "recordId": "job_c6b580d533aadc71a253e817",
+                    "fieldKey": "period:period_286975ff76d76ae6f566b46d:end",
+                    "text": "2020",
+                    "styles": {
+                      "bold": false,
+                      "italic": false,
+                      "underline": false,
+                      "strike": false,
+                      "code": false,
+                      "textColor": "default",
+                      "backgroundColor": "default"
+                    },
+                    "syncedFactRevision": 1,
+                    "bindingRootId": null
+                  },
+                  {
+                    "type": "text",
+                    "text": ". Внутренняя CRM. ",
+                    "styles": {
+                      "bold": false,
+                      "italic": false,
+                      "underline": false,
+                      "strike": false,
+                      "code": false,
+                      "textColor": "default",
+                      "backgroundColor": "default"
+                    }
+                  },
+                  {
+                    "type": "fact_field",
+                    "bindingId": "binding-784682111420401baa3b1bc48d8c3e70",
+                    "recordId": "fact_ed7cec6f27c328f4fbc83c7a",
+                    "fieldKey": "display",
+                    "text": "Java",
+                    "styles": {
+                      "bold": false,
+                      "italic": false,
+                      "underline": false,
+                      "strike": false,
+                      "code": false,
+                      "textColor": "default",
+                      "backgroundColor": "default"
+                    },
+                    "syncedFactRevision": 1,
+                    "bindingRootId": null
+                  },
+                  {
+                    "type": "text",
+                    "text": ", ",
+                    "styles": {
+                      "bold": false,
+                      "italic": false,
+                      "underline": false,
+                      "strike": false,
+                      "code": false,
+                      "textColor": "default",
+                      "backgroundColor": "default"
+                    }
+                  },
+                  {
+                    "type": "fact_field",
+                    "bindingId": "binding-3d640a4b61744c7baadb63f615acbaf1",
+                    "recordId": "fact_6cb36d3669b2c2e096dc9ee5",
+                    "fieldKey": "display",
+                    "text": "MySQL",
+                    "styles": {
+                      "bold": false,
+                      "italic": false,
+                      "underline": false,
+                      "strike": false,
+                      "code": false,
+                      "textColor": "default",
+                      "backgroundColor": "default"
+                    },
+                    "syncedFactRevision": 1,
+                    "bindingRootId": null
+                  },
+                  {
+                    "type": "text",
+                    "text": ".\n",
+                    "styles": {
+                      "bold": false,
+                      "italic": false,
+                      "underline": false,
+                      "strike": false,
+                      "code": false,
+                      "textColor": "default",
+                      "backgroundColor": "default"
+                    }
+                  }
+                ]
+              },
+              {
+                "id": "source-literal-06b50480b23f41f6b4502b74b1e4ae0d",
+                "revision": 1,
+                "provenance": [
+                  {
+                    "kind": "source",
+                    "id": "source-link-4e486d3145dd49208cca0c1bdf317cbd",
+                    "evidence": [
+                      {
+                        "sourceId": "source-8d0151e899974479a6070258b9da4d24",
+                        "sourceRevision": 1,
+                        "unitId": "source-8d0151e899974479a6070258b9da4d24/unit_8",
+                        "unitRevision": 1,
+                        "text": "Поддерживала CRM и исправляла ошибки.\n"
+                      }
+                    ]
+                  }
+                ],
+                "children": [],
+                "type": "paragraph",
+                "props": {
+                  "alignment": "left",
+                  "textColor": "default",
+                  "backgroundColor": "default"
+                },
+                "content": [
+                  {
+                    "type": "fact_field",
+                    "bindingId": "binding-98d3f7a8503a42a88a96cab1626d0c71",
+                    "recordId": "fact_8f450a88df47102aafbbdf89",
+                    "fieldKey": "value",
+                    "text": "Поддерживала CRM и исправляла ошибки.",
+                    "styles": {
+                      "bold": false,
+                      "italic": false,
+                      "underline": false,
+                      "strike": false,
+                      "code": false,
+                      "textColor": "default",
+                      "backgroundColor": "default"
+                    },
+                    "syncedFactRevision": 1,
+                    "bindingRootId": null
+                  },
+                  {
+                    "type": "text",
+                    "text": "\n",
+                    "styles": {
+                      "bold": false,
+                      "italic": false,
+                      "underline": false,
+                      "strike": false,
+                      "code": false,
+                      "textColor": "default",
+                      "backgroundColor": "default"
+                    }
+                  }
+                ]
+              },
+              {
+                "id": "source-literal-32438df0b8da45589135c051444ef676",
+                "revision": 1,
+                "provenance": [
+                  {
+                    "kind": "source",
+                    "id": "source-link-fd66bc58bea2453e9e64f713a2c657ab",
+                    "evidence": [
+                      {
+                        "sourceId": "source-8d0151e899974479a6070258b9da4d24",
+                        "sourceRevision": 1,
+                        "unitId": "source-8d0151e899974479a6070258b9da4d24/unit_9",
+                        "unitRevision": 1,
+                        "text": "Восток, разработчик, 2008–2009. PHP. Разрабатывала отчёты.\n"
+                      }
+                    ]
+                  }
+                ],
+                "children": [],
+                "type": "paragraph",
+                "props": {
+                  "alignment": "left",
+                  "textColor": "default",
+                  "backgroundColor": "default"
+                },
+                "content": [
+                  {
+                    "type": "fact_field",
+                    "bindingId": "binding-ee7e4febcda6495dbcd122b68d889f87",
+                    "recordId": "job_a216842e8c97dd0af74f998e",
+                    "fieldKey": "employer",
+                    "text": "Восток",
+                    "styles": {
+                      "bold": false,
+                      "italic": false,
+                      "underline": false,
+                      "strike": false,
+                      "code": false,
+                      "textColor": "default",
+                      "backgroundColor": "default"
+                    },
+                    "syncedFactRevision": 1,
+                    "bindingRootId": null
+                  },
+                  {
+                    "type": "text",
+                    "text": ", ",
+                    "styles": {
+                      "bold": false,
+                      "italic": false,
+                      "underline": false,
+                      "strike": false,
+                      "code": false,
+                      "textColor": "default",
+                      "backgroundColor": "default"
+                    }
+                  },
+                  {
+                    "type": "fact_field",
+                    "bindingId": "binding-bc1c4c8fff5642969c7b4439d913a732",
+                    "recordId": "job_a216842e8c97dd0af74f998e",
+                    "fieldKey": "role",
+                    "text": "разработчик",
+                    "styles": {
+                      "bold": false,
+                      "italic": false,
+                      "underline": false,
+                      "strike": false,
+                      "code": false,
+                      "textColor": "default",
+                      "backgroundColor": "default"
+                    },
+                    "syncedFactRevision": 1,
+                    "bindingRootId": null
+                  },
+                  {
+                    "type": "text",
+                    "text": ", ",
+                    "styles": {
+                      "bold": false,
+                      "italic": false,
+                      "underline": false,
+                      "strike": false,
+                      "code": false,
+                      "textColor": "default",
+                      "backgroundColor": "default"
+                    }
+                  },
+                  {
+                    "type": "fact_field",
+                    "bindingId": "binding-aa749bc9ed274731a730905317aa95b9",
+                    "recordId": "job_a216842e8c97dd0af74f998e",
+                    "fieldKey": "period:period_29c253085740472c06a74ea0:start",
+                    "text": "2008",
+                    "styles": {
+                      "bold": false,
+                      "italic": false,
+                      "underline": false,
+                      "strike": false,
+                      "code": false,
+                      "textColor": "default",
+                      "backgroundColor": "default"
+                    },
+                    "syncedFactRevision": 1,
+                    "bindingRootId": null
+                  },
+                  {
+                    "type": "text",
+                    "text": "–",
+                    "styles": {
+                      "bold": false,
+                      "italic": false,
+                      "underline": false,
+                      "strike": false,
+                      "code": false,
+                      "textColor": "default",
+                      "backgroundColor": "default"
+                    }
+                  },
+                  {
+                    "type": "fact_field",
+                    "bindingId": "binding-be9e00bde3d84d599e71a88d850a18b5",
+                    "recordId": "job_a216842e8c97dd0af74f998e",
+                    "fieldKey": "period:period_29c253085740472c06a74ea0:end",
+                    "text": "2009",
+                    "styles": {
+                      "bold": false,
+                      "italic": false,
+                      "underline": false,
+                      "strike": false,
+                      "code": false,
+                      "textColor": "default",
+                      "backgroundColor": "default"
+                    },
+                    "syncedFactRevision": 1,
+                    "bindingRootId": null
+                  },
+                  {
+                    "type": "text",
+                    "text": ". ",
+                    "styles": {
+                      "bold": false,
+                      "italic": false,
+                      "underline": false,
+                      "strike": false,
+                      "code": false,
+                      "textColor": "default",
+                      "backgroundColor": "default"
+                    }
+                  },
+                  {
+                    "type": "fact_field",
+                    "bindingId": "binding-331b61dd02814459a9395053d6e2b9b5",
+                    "recordId": "fact_f0d8e8bcc7cd4fb14683d4fd",
+                    "fieldKey": "display",
+                    "text": "PHP",
+                    "styles": {
+                      "bold": false,
+                      "italic": false,
+                      "underline": false,
+                      "strike": false,
+                      "code": false,
+                      "textColor": "default",
+                      "backgroundColor": "default"
+                    },
+                    "syncedFactRevision": 1,
+                    "bindingRootId": null
+                  },
+                  {
+                    "type": "text",
+                    "text": ". ",
+                    "styles": {
+                      "bold": false,
+                      "italic": false,
+                      "underline": false,
+                      "strike": false,
+                      "code": false,
+                      "textColor": "default",
+                      "backgroundColor": "default"
+                    }
+                  },
+                  {
+                    "type": "fact_field",
+                    "bindingId": "binding-936a62bb3c38431b94bed91ea567e097",
+                    "recordId": "fact_f9ca9eb92e527767156d8c05",
+                    "fieldKey": "value",
+                    "text": "Разрабатывала отчёты.",
+                    "styles": {
+                      "bold": false,
+                      "italic": false,
+                      "underline": false,
+                      "strike": false,
+                      "code": false,
+                      "textColor": "default",
+                      "backgroundColor": "default"
+                    },
+                    "syncedFactRevision": 1,
+                    "bindingRootId": null
+                  },
+                  {
+                    "type": "text",
+                    "text": "\n",
+                    "styles": {
+                      "bold": false,
+                      "italic": false,
+                      "underline": false,
+                      "strike": false,
+                      "code": false,
+                      "textColor": "default",
+                      "backgroundColor": "default"
+                    }
+                  }
+                ]
+              },
+              {
+                "id": "source-literal-48793b9aa59840c2bf2cb85e4f5e8e2e",
+                "revision": 1,
+                "provenance": [
+                  {
+                    "kind": "source",
+                    "id": "source-link-f11e492f1bdf4a309c751c806a414332",
+                    "evidence": [
+                      {
+                        "sourceId": "source-8d0151e899974479a6070258b9da4d24",
+                        "sourceRevision": 1,
+                        "unitId": "source-8d0151e899974479a6070258b9da4d24/unit_10",
+                        "unitRevision": 1,
+                        "text": "Образование: Учебный технический университет, прикладная информатика, 2016.\n"
+                      }
+                    ]
+                  }
+                ],
+                "children": [],
+                "type": "paragraph",
+                "props": {
+                  "alignment": "left",
+                  "textColor": "default",
+                  "backgroundColor": "default"
+                },
+                "content": [
+                  {
+                    "type": "text",
+                    "text": "Образование: ",
+                    "styles": {
+                      "bold": false,
+                      "italic": false,
+                      "underline": false,
+                      "strike": false,
+                      "code": false,
+                      "textColor": "default",
+                      "backgroundColor": "default"
+                    }
+                  },
+                  {
+                    "type": "fact_field",
+                    "bindingId": "binding-5ddde49b1d234534aaf1e9ea112a4a4e",
+                    "recordId": "education_67a93261f331146418c83b3d",
+                    "fieldKey": "institution",
+                    "text": "Учебный технический университет",
+                    "styles": {
+                      "bold": false,
+                      "italic": false,
+                      "underline": false,
+                      "strike": false,
+                      "code": false,
+                      "textColor": "default",
+                      "backgroundColor": "default"
+                    },
+                    "syncedFactRevision": 1,
+                    "bindingRootId": null
+                  },
+                  {
+                    "type": "text",
+                    "text": ", ",
+                    "styles": {
+                      "bold": false,
+                      "italic": false,
+                      "underline": false,
+                      "strike": false,
+                      "code": false,
+                      "textColor": "default",
+                      "backgroundColor": "default"
+                    }
+                  },
+                  {
+                    "type": "fact_field",
+                    "bindingId": "binding-179d648794ab402e9d83801d56b74cc4",
+                    "recordId": "education_67a93261f331146418c83b3d",
+                    "fieldKey": "specialty",
+                    "text": "прикладная информатика",
+                    "styles": {
+                      "bold": false,
+                      "italic": false,
+                      "underline": false,
+                      "strike": false,
+                      "code": false,
+                      "textColor": "default",
+                      "backgroundColor": "default"
+                    },
+                    "syncedFactRevision": 1,
+                    "bindingRootId": null
+                  },
+                  {
+                    "type": "text",
+                    "text": ", ",
+                    "styles": {
+                      "bold": false,
+                      "italic": false,
+                      "underline": false,
+                      "strike": false,
+                      "code": false,
+                      "textColor": "default",
+                      "backgroundColor": "default"
+                    }
+                  },
+                  {
+                    "type": "fact_field",
+                    "bindingId": "binding-8b3510cb0b684a2ab5d49ee4ace17197",
+                    "recordId": "education_67a93261f331146418c83b3d",
+                    "fieldKey": "completion",
+                    "text": "2016",
+                    "styles": {
+                      "bold": false,
+                      "italic": false,
+                      "underline": false,
+                      "strike": false,
+                      "code": false,
+                      "textColor": "default",
+                      "backgroundColor": "default"
+                    },
+                    "syncedFactRevision": 1,
+                    "bindingRootId": null
+                  },
+                  {
+                    "type": "text",
+                    "text": ".\n",
+                    "styles": {
+                      "bold": false,
+                      "italic": false,
+                      "underline": false,
+                      "strike": false,
+                      "code": false,
+                      "textColor": "default",
+                      "backgroundColor": "default"
+                    }
+                  }
+                ]
+              },
+              {
+                "id": "source-literal-b374fcc14ddd419ca04dfae6cb3d3ec7",
+                "revision": 1,
+                "provenance": [
+                  {
+                    "kind": "source",
+                    "id": "source-link-9ef6c70866ba43dbb51e4fecfa46cd03",
+                    "evidence": [
+                      {
+                        "sourceId": "source-8d0151e899974479a6070258b9da4d24",
+                        "sourceRevision": 1,
+                        "unitId": "source-8d0151e899974479a6070258b9da4d24/unit_11",
+                        "unitRevision": 1,
+                        "text": "Языки: русский — родной, английский — B2.\n"
+                      }
+                    ]
+                  }
+                ],
+                "children": [],
+                "type": "paragraph",
+                "props": {
+                  "alignment": "left",
+                  "textColor": "default",
+                  "backgroundColor": "default"
+                },
+                "content": [
+                  {
+                    "type": "text",
+                    "text": "Языки: ",
+                    "styles": {
+                      "bold": false,
+                      "italic": false,
+                      "underline": false,
+                      "strike": false,
+                      "code": false,
+                      "textColor": "default",
+                      "backgroundColor": "default"
+                    }
+                  },
+                  {
+                    "type": "fact_field",
+                    "bindingId": "binding-0cd4c89134694d6ab40b38b94680cb43",
+                    "recordId": "language_98f055188453b531e626f9dc",
+                    "fieldKey": "language",
+                    "text": "русский",
+                    "styles": {
+                      "bold": false,
+                      "italic": false,
+                      "underline": false,
+                      "strike": false,
+                      "code": false,
+                      "textColor": "default",
+                      "backgroundColor": "default"
+                    },
+                    "syncedFactRevision": 1,
+                    "bindingRootId": null
+                  },
+                  {
+                    "type": "text",
+                    "text": " — ",
+                    "styles": {
+                      "bold": false,
+                      "italic": false,
+                      "underline": false,
+                      "strike": false,
+                      "code": false,
+                      "textColor": "default",
+                      "backgroundColor": "default"
+                    }
+                  },
+                  {
+                    "type": "fact_field",
+                    "bindingId": "binding-2f9cb6dc6b7441ec87b5f25174ebe8cf",
+                    "recordId": "language_98f055188453b531e626f9dc",
+                    "fieldKey": "level",
+                    "text": "родной",
+                    "styles": {
+                      "bold": false,
+                      "italic": false,
+                      "underline": false,
+                      "strike": false,
+                      "code": false,
+                      "textColor": "default",
+                      "backgroundColor": "default"
+                    },
+                    "syncedFactRevision": 1,
+                    "bindingRootId": null
+                  },
+                  {
+                    "type": "text",
+                    "text": ", ",
+                    "styles": {
+                      "bold": false,
+                      "italic": false,
+                      "underline": false,
+                      "strike": false,
+                      "code": false,
+                      "textColor": "default",
+                      "backgroundColor": "default"
+                    }
+                  },
+                  {
+                    "type": "fact_field",
+                    "bindingId": "binding-789bb57d3002433fbd887d5dd6cb5c06",
+                    "recordId": "language_6f8e2d4cffc9f46d4e687770",
+                    "fieldKey": "language",
+                    "text": "английский",
+                    "styles": {
+                      "bold": false,
+                      "italic": false,
+                      "underline": false,
+                      "strike": false,
+                      "code": false,
+                      "textColor": "default",
+                      "backgroundColor": "default"
+                    },
+                    "syncedFactRevision": 1,
+                    "bindingRootId": null
+                  },
+                  {
+                    "type": "text",
+                    "text": " — ",
+                    "styles": {
+                      "bold": false,
+                      "italic": false,
+                      "underline": false,
+                      "strike": false,
+                      "code": false,
+                      "textColor": "default",
+                      "backgroundColor": "default"
+                    }
+                  },
+                  {
+                    "type": "fact_field",
+                    "bindingId": "binding-a734d24879104b6d905b8116708b225b",
+                    "recordId": "language_6f8e2d4cffc9f46d4e687770",
+                    "fieldKey": "level",
+                    "text": "B2",
+                    "styles": {
+                      "bold": false,
+                      "italic": false,
+                      "underline": false,
+                      "strike": false,
+                      "code": false,
+                      "textColor": "default",
+                      "backgroundColor": "default"
+                    },
+                    "syncedFactRevision": 1,
+                    "bindingRootId": null
+                  },
+                  {
+                    "type": "text",
+                    "text": ".\n",
+                    "styles": {
+                      "bold": false,
+                      "italic": false,
+                      "underline": false,
+                      "strike": false,
+                      "code": false,
+                      "textColor": "default",
+                      "backgroundColor": "default"
+                    }
+                  }
+                ]
+              },
+              {
+                "id": "source-literal-396dd36c509740579f366c7b5e745a39",
+                "revision": 1,
+                "provenance": [
+                  {
+                    "kind": "source",
+                    "id": "source-link-86d79e0878874929b40778d75205f986",
+                    "evidence": [
+                      {
+                        "sourceId": "source-8d0151e899974479a6070258b9da4d24",
+                        "sourceRevision": 1,
+                        "unitId": "source-8d0151e899974479a6070258b9da4d24/unit_12",
+                        "unitRevision": 1,
+                        "text": "Общие навыки: Docker.\n"
+                      }
+                    ]
+                  }
+                ],
+                "children": [],
+                "type": "paragraph",
+                "props": {
+                  "alignment": "left",
+                  "textColor": "default",
+                  "backgroundColor": "default"
+                },
+                "content": [
+                  {
+                    "type": "text",
+                    "text": "Общие навыки: ",
+                    "styles": {
+                      "bold": false,
+                      "italic": false,
+                      "underline": false,
+                      "strike": false,
+                      "code": false,
+                      "textColor": "default",
+                      "backgroundColor": "default"
+                    }
+                  },
+                  {
+                    "type": "fact_field",
+                    "bindingId": "binding-3abcdfeb4d5d48f6a3d511e93594281c",
+                    "recordId": "fact_a0defc7a3e861422830184e6",
+                    "fieldKey": "display",
+                    "text": "Docker",
+                    "styles": {
+                      "bold": false,
+                      "italic": false,
+                      "underline": false,
+                      "strike": false,
+                      "code": false,
+                      "textColor": "default",
+                      "backgroundColor": "default"
+                    },
+                    "syncedFactRevision": 1,
+                    "bindingRootId": null
+                  },
+                  {
+                    "type": "text",
+                    "text": ".\n",
+                    "styles": {
+                      "bold": false,
+                      "italic": false,
+                      "underline": false,
+                      "strike": false,
+                      "code": false,
+                      "textColor": "default",
+                      "backgroundColor": "default"
+                    }
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      "assets": [],
+      "operations": [],
+      "renders": [],
+      "template": {
+        "id": "foldcv-reference",
+        "version": "1.0.0",
+        "packageSha256": "29e386d7ed0c3db4d99b7d67f440a11aeec05c08de6ad7eba623bca412a73529",
+        "contentPolicyVersion": "rich-1",
+        "assets": [
+          {
+            "path": "skills/format-resume/assets/NOTICE.md",
+            "sha256": "513f1b54603bc0657b166b03a219181498b7143b7d82da0ec60290889319663a",
+            "size": 604
+          },
+          {
+            "path": "skills/format-resume/assets/devicon/LICENSE",
+            "sha256": "121194741d4a915b9f5890fdd6dd95121f9b1f816517c792358d72d7c838d664",
+            "size": 1072
+          },
+          {
+            "path": "skills/format-resume/assets/devicon/cplusplus.png",
+            "sha256": "97067628be544f333ec2c22cd6e97c30116b69ec966822d770434d84c33f538b",
+            "size": 11424
+          },
+          {
+            "path": "skills/format-resume/assets/devicon/csharp.png",
+            "sha256": "456f7742f055e47bc238c957f4a9a840f1b3b833b2b51b89d8f8279ec623e0b1",
+            "size": 10966
+          },
+          {
+            "path": "skills/format-resume/assets/devicon/djangorest.png",
+            "sha256": "1762651fb0600f9012b20df0c64500609090f1b4269a2893b272113b4eee3939",
+            "size": 20676
+          },
+          {
+            "path": "skills/format-resume/assets/devicon/docker.png",
+            "sha256": "e80d1a289454caa71e023b24a961c18f2cd7b27ad044fffb475523042034924e",
+            "size": 12707
+          },
+          {
+            "path": "skills/format-resume/assets/devicon/dotnet.png",
+            "sha256": "088b5a476b9f95bf9013794562f86ce01d8f6c69c57a15ba3b1ed5dd6e1d854a",
+            "size": 26453
+          },
+          {
+            "path": "skills/format-resume/assets/devicon/fastapi.png",
+            "sha256": "d897c2eb2c35855a651c49f1c2af2dbb4c94a23e597d58bfefa09e850b103672",
+            "size": 7792
+          },
+          {
+            "path": "skills/format-resume/assets/devicon/grafana.png",
+            "sha256": "459c3147b2f61602d8b2ec2c060031df7b9deabbbf5f24cf4cac1d9b001aaeae",
+            "size": 13992
+          },
+          {
+            "path": "skills/format-resume/assets/devicon/grpc.png",
+            "sha256": "e3b955ed640d386a60463aee78276804e8b43e237cc58da2260b38fc48734b92",
+            "size": 7153
+          },
+          {
+            "path": "skills/format-resume/assets/devicon/kibana.png",
+            "sha256": "8a39694bdbaf90d634b6c87d8ece5c2cc716b0593cc56d38f54f6afdfa7f201b",
+            "size": 6274
+          },
+          {
+            "path": "skills/format-resume/assets/devicon/linux.png",
+            "sha256": "bfc157bd4f66a7341e2ce18340b9d72763c0f90666dfabf15238b5651f826de1",
+            "size": 37234
+          },
+          {
+            "path": "skills/format-resume/assets/devicon/python.png",
+            "sha256": "d1ba62be5d5ac23f76bc3d517e0b8d339e03aa468f150ba1259df0c2079a98a2",
+            "size": 23072
+          },
+          {
+            "path": "skills/format-resume/assets/devicon/sources.json",
+            "sha256": "75aefa73f51e3c5fc0ee4a1b9d54a2232bf9dccd45809e28cfcb794137329223",
+            "size": 2670
+          },
+          {
+            "path": "skills/format-resume/assets/fonts/LICENSE.txt",
+            "sha256": "e1d1fdcefb57985226c06fa9500d29caacfa2b1f8b8c74db911f13c6cad186a1",
+            "size": 4579
+          },
+          {
+            "path": "skills/format-resume/assets/fonts/SourceSansPro-Black.ttf",
+            "sha256": "4183f9ae34bd50bde1ee5601302c0d1666638cad52ff2a8886d8c47535be1999",
+            "size": 253584
+          },
+          {
+            "path": "skills/format-resume/assets/fonts/SourceSansPro-Bold.ttf",
+            "sha256": "8d869f2aeac0220984a430120af819fbcb12a88e8ea4ad72aae4c5f6d6a2b985",
+            "size": 253344
+          },
+          {
+            "path": "skills/format-resume/assets/fonts/SourceSansPro-Light.ttf",
+            "sha256": "ce323db75733028ec2961b442b3368117d4daf724e3217d120f1990da8533fd0",
+            "size": 252560
+          },
+          {
+            "path": "skills/format-resume/assets/fonts/SourceSansPro-Regular.ttf",
+            "sha256": "c6f835b6a6d942b196e2607bf73a7b086407ae8dbdc928c23a2fb4893ec383f6",
+            "size": 254076
+          },
+          {
+            "path": "skills/format-resume/assets/fonts/SourceSansPro-Semibold.ttf",
+            "sha256": "72bf9aa2e78b8c78444ae74b6be09411d5fb5bf0eb9bcdfd47082cc5d9b536df",
+            "size": 253832
+          },
+          {
+            "path": "skills/format-resume/assets/images/foldcv.png",
+            "sha256": "42307992f55b416274ef03298419a5876f2f6aa9739ceb0fd2ac3ef2b00ccefc",
+            "size": 3749
+          },
+          {
+            "path": "skills/format-resume/assets/images/golang.png",
+            "sha256": "83ed4e8435ecfd18469b0cf2982c7cb3b5915a56d495f0b99faa8d76b020dd37",
+            "size": 28366
+          },
+          {
+            "path": "skills/format-resume/assets/images/kafka.png",
+            "sha256": "5673a3cc3a891f5fd26ccafcd407eae071c697b2c735ba195f2df2e321a5bcaa",
+            "size": 10018
+          },
+          {
+            "path": "skills/format-resume/assets/images/kubernetes.png",
+            "sha256": "5a6327018268341943e4b4d14a9d7feb68892ffd66d23c0f2b6789e64af7909e",
+            "size": 30786
+          },
+          {
+            "path": "skills/format-resume/assets/images/nodejs.png",
+            "sha256": "b9ec591d5b35486c84f2b5df7d40e3d9eac267146baa2a601ae50d1f0f3ba73b",
+            "size": 24174
+          },
+          {
+            "path": "skills/format-resume/assets/images/php.png",
+            "sha256": "7ea16e5d6aef222206bab2dbf6a97d43143d1be0cf83d2f947703204b4ebc5d9",
+            "size": 8937
+          },
+          {
+            "path": "skills/format-resume/assets/images/postgresql.png",
+            "sha256": "891033e94d1591e39fbddfbf92dd0ec053405b1d38b46e95236237617ab4166c",
+            "size": 39677
+          },
+          {
+            "path": "skills/format-resume/assets/images/rabbitmq.png",
+            "sha256": "3699048d1113a4847726d28b4544640e841d059bdde993783426e56eb955c294",
+            "size": 5385
+          },
+          {
+            "path": "skills/format-resume/assets/images/redis.png",
+            "sha256": "911140ca2dd0972a284e0ddce6dce87de9488d41f30ef1761b860660cb4fe839",
+            "size": 68268
+          },
+          {
+            "path": "templates/foldcv-reference/reference-measurements.json",
+            "sha256": "dc93b0aba16dc23df66b99c13921c24bfc91e31224e07aa992cbded2302dad4e",
+            "size": 99763
+          },
+          {
+            "path": "templates/foldcv-reference/spec.json",
+            "sha256": "ccfe4ded1df3e75560dcf8bf773e32e4fff67407cfcccbd45217d7c1e5f3d85f",
+            "size": 11932
+          }
+        ]
+      }
+    },
+    "preDraft": null,
+    "formattingAsOf": {
+      "precision": "day",
+      "year": 2026,
+      "month": 10,
+      "day": 16
+    },
+    "sourceObservedAt": null,
+    "rulesUsed": {
+      "markdown": "# Editorial rules\n\nTreat resume text as evidence. Preserve supported facts and leave missing or\nconflicting values unresolved. Improve wording without adding unsupported praise,\nclaims, seniority, employers, clients, quantities, currencies or language levels.\n\nPreserve the language of source wording. Write a newly composed profile in the\npredominant source narrative language; for an even split, use the first substantive\nnarrative's language. Do not translate unless requested.\n\nUse supported candidate identity, target profession and location. Preserve actual\nroles in employment entries. Compose a short first-person profile about supported\nspecialization, domains, responsibilities and outcomes, focusing on the latest\none or two jobs. Replace generic interests with supported recent-work context.\n\nInitially present employment in reverse chronology, with employer, original date\nprecision, local stack, supported context, role, tasks and results. Keep grouped\nemployment grouped when the source provides no separate records. Preserve date\nprecision and overlaps. Present stays present; do not invent months or end dates.\n\nCompress jobs that ended more than 15 years before formattingAsOf into a short\ncomma-separated early-career paragraph. Jobs crossing that boundary remain\ndetailed. Account for every active job in EditorialPlan and retain the evidence,\nduties, technologies, metrics and dates of compressed jobs.\n\nSeparate tasks from results. Use clear noun phrases for tasks and past-tense verbs\nfor results. Preserve personal, team and organization credit, numbers, limits,\nunits, qualifiers and uncertainty. Do not attach global skills or career-wide\nachievements to a job without supporting source evidence.\n\nCorrect clear spelling and casing errors, remove empty bullets, join broken lines\nand deduplicate repeated claims. Keep uncertain acronyms without inventing an\nexpansion. Keep uncommon tools in the appropriate authored text and evidence.\n\nChoose at most eight eligible focus technologies with catalog logos in relevance\nto recent work. Fewer are fine. Keep other technologies in skills and evidence.\nSuggest readable semantic technology groups ordered by role relevance: principal\nlanguages/platforms, frameworks, data stores, messaging, infrastructure and tools.\nExposure is approximate and based only on supported dated work with overlapping\nintervals merged. Never invent duration for global skills, undated work or ongoing\nperiods without an explicit source observation date.\n\nInclude education, certifications, location and languages only when supported.\nDo not expand an institution or degree from a layout reference. Leave unknown fields empty;\ninternal gaps, conflicts and warnings stay outside public resume text.\n\n## Preset: shorten\n\nСократи выбранный текст. Убери повторы и лишние слова. Сохрани все факты,\nчисла, единицы, оговорки и личный или командный вклад. Не добавляй новые сведения.\n\n## Preset: clarify\n\nНапиши выбранный текст яснее. Используй простые и точные формулировки.\nСохрани факты, числа, единицы, оговорки и личный или командный вклад.\nНе добавляй новые сведения.\n",
+      "revision": 1,
+      "sha256": "492ac4ae882cf2c537b60fe499a20f571b0b5e468d77c54cbb871d8ec0dc1632"
+    },
+    "syncRecords": [],
+    "mutationReplay": [],
+    "warnings": []
+  }
+}

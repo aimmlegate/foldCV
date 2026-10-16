@@ -39,14 +39,20 @@ class JobService:
         self.store = JobStore(projects.storage.root)
         self.artifacts = JobArtifacts(self.store)
         self.history = ScopeHistory(self.store, query_fingerprint)
-        self.publisher = CanonicalCoordinator(self.store, self.history, projects.storage, self.artifacts.payload_unlocked)
+        self.publisher = CanonicalCoordinator(self.store, self.history, projects.storage, self.load_payload)
         self.publication = JobPublication(self)
         self.writers = WriterSessions(self.publisher, blocked=lambda project: project in self.projects.agent_recovery_fences)
         self.artifacts.prepare_capture = self.capture_preparation
         self.settings = AgentSettingsStore(projects.storage.root)
         self.proposals = {}
         self.publication_tasks, self.publication_wakes = {}, set()
-        self.supervisor = JobSupervisor(self.store, factory or (lambda job, model: JobRuntime(self, job, model)),
+        from .fixed import FixedJobs
+        from .fixed_runtime import FixedRuntime
+        self.fixed = FixedJobs(self)
+        self.publisher.processing_validator = self.fixed.validate_processing
+        agent_factory = factory or (lambda job, model: JobRuntime(self, job, model))
+        self.supervisor = JobSupervisor(self.store,
+            lambda job, model: agent_factory(job, model) if job.submission.kind == "agent" else FixedRuntime(self, job, model),
             clock=clock, preflight=self.preflight, admit=self.admit, eligible=self.eligible,
             **({"observer": observer} if observer else {}))
         self.tools = JobTools(self, fetcher=fetcher or PublicFetcher(projects.temp_root))
@@ -94,8 +100,14 @@ class JobService:
     def proposals_for(self, project):
         if project not in self.proposals:
             self.proposals[project] = JobProposals(self.supervisor,
-                lambda reference: self.artifacts.payload_for(project, reference))
+                lambda reference: self.artifacts.payload_for(project, reference) if reference.kind == "agent_journal"
+                    else self.fixed.payload(project, reference))
         return self.proposals[project]
+
+    def load_payload(self, state, directory, reference):
+        if reference.kind == "processing":
+            return self.fixed.inputs.payload(state, directory, reference)
+        return self.artifacts.payload_unlocked(state, directory, reference)
 
     def preflight(self, job):
         connection = self.connection()
@@ -105,6 +117,8 @@ class JobService:
             self.writers.initialize(job.submission.identity.project_id)
         except BackgroundFailure as error:
             return error.code
+        if job.submission.kind != "agent":
+            return self.fixed.preflight(job)
         _job, artifact = self.artifacts.record(job.submission.identity.project_id, job.id)
         if connection.epoch != artifact.connection_epoch:
             return "ACCOUNT_CHANGED"
@@ -209,6 +223,7 @@ class JobService:
             await proposal.shutdown()
         if self.publication_tasks:
             await asyncio.gather(*tuple(self.publication_tasks.values()), return_exceptions=True)
+        await self.fixed.shutdown()
         for changed in tuple(self.supervisor.listeners):
             changed.set()
 
@@ -225,6 +240,7 @@ class JobService:
                     updated = await asyncio.to_thread(self.publish_waiting, project)
                     for job in updated:
                         await self.supervisor._emit(job)
+                        self.fixed.render(job)
             except Exception as error:
                 self.store.fences.setdefault(project, getattr(error, "code", "OUTCOME_UNKNOWN"))
             finally:

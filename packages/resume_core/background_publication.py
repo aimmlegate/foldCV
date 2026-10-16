@@ -99,6 +99,8 @@ class CanonicalCoordinator:
         if (proposal.authority != "active" or job.publication in {"cancelled", "discarded"}
                 or proposal.execution_generation != job.execution_generation):
             raise BackgroundFailure("CANCELLED")
+        if job.capture_invalidated:
+            raise BackgroundFailure("DEPENDENCY_CHANGED")
 
     def _payload(self, state, directory, proposal):
         from .agent_store import AgentFailure
@@ -130,6 +132,13 @@ class CanonicalCoordinator:
         if record is not None:
             from .background_fixed import fixed_mutation
             return fixed_mutation(state.project_id, record)
+        if proposal.payload.kind == "processing":
+            from .models.background import ProcessingCandidateV1
+            value = ProcessingCandidateV1.model_validate(strict_json(raw))
+            if (value.id != proposal.payload.candidate_id or value.workspace is None or value.normalized is None
+                    or value.workspace.project_id != state.project_id or value.workspace.project is None):
+                raise BackgroundFailure("OUTCOME_UNKNOWN")
+            return value
         if proposal.payload.kind != "agent_journal":
             raise BackgroundFailure("JOB_SCOPE_INVALID")
         batch = AgentEditBatch.model_validate(strict_json(raw))
@@ -163,7 +172,7 @@ class CanonicalCoordinator:
         from .background_assets import guard_removal
         guard_removal(state, before, after)
         inverse = inverse_mutation(before, after, mutation_id="inverse_" + mutation.client_mutation_id,
-            session_id=mutation.capture.session_id) if job or history_binding else None
+            session_id=mutation.capture.session_id) if mutation is not None and (job or history_binding) else None
         if inverse is not None:
             self.history.register(state, before, mutation_selectors(before, inverse), write=True)
             from .models.agent import AgentEntityDependency
@@ -306,10 +315,17 @@ class CanonicalCoordinator:
         if isinstance(intent, PublicationIntentV1):
             job = job_in(state, intent.job_id)
             proposal = proposal_in(state, job)
-            actual = self._actual(self._payload(state, directory, proposal), state, job)
+            original = self._payload(state, directory, proposal)
+            expected_request = (snapshot_request(value.client_mutation_id, value.before_workspace_sha256, value.after_workspace_sha256)
+                if proposal.payload.kind == "processing" else mutation_sha256(self._actual(original, state, job)))
             if ((value.job_id, value.proposal_id, value.proposal_sha256, value.payload) !=
                     (job.id, proposal.id, proposal.payload_sha256, proposal.payload)
-                    or mutation_sha256(actual) != value.request_sha256):
+                    or expected_request != value.request_sha256):
+                raise BackgroundFailure("OUTCOME_UNKNOWN")
+            if proposal.payload.kind == "processing" and (not value.snapshot_write
+                    or value.workspace.project != original.workspace.project
+                    or value.workspace.rules_used != original.workspace.rules_used
+                    or value.workspace.source_observed_at != original.workspace.source_observed_at):
                 raise BackgroundFailure("OUTCOME_UNKNOWN")
         else:
             expected = (snapshot_request(value.client_mutation_id, value.before_workspace_sha256, value.after_workspace_sha256)
@@ -347,6 +363,10 @@ class CanonicalCoordinator:
                         raise BackgroundFailure("OUTCOME_UNKNOWN")
                     return job
                 self._writable(state)
+                if job.capture_invalidated:
+                    self._publication(job, "needs_review", "DEPENDENCY_CHANGED")
+                    self._persist(directory, state)
+                    return job
                 self._gate(state, job, proposal)
                 if job.publication == "needs_review":
                     return job
@@ -375,8 +395,31 @@ class CanonicalCoordinator:
                     self._publication(job, "waiting_for_sync", "WRITER_UNKNOWN")
                     self._persist(directory, state)
                     return job
-                actual = self._actual(original, state, job)
-                after = self._apply(current, actual, validate=True)
+                actual, snapshot_id = None, None
+                if proposal.payload.kind == "processing":
+                    validator = getattr(self, "processing_validator", None)
+                    if validator is None:
+                        raise BackgroundFailure("JOB_SCOPE_INVALID")
+                    try:
+                        validator(state, directory, job, original, current)
+                    except BackgroundFailure as error:
+                        if error.code != "DEPENDENCY_CHANGED":
+                            raise
+                        self._publication(job, "needs_review", error.code)
+                        self._persist(directory, state)
+                        return job
+                    after = current.model_copy(deep=True)
+                    after.project, after.pre_draft = original.workspace.project.model_copy(deep=True), None
+                    after.project_revision, after.document_revision = original.workspace.project_revision, original.workspace.document_revision
+                    after.rules_used, after.source_observed_at = original.workspace.rules_used, original.workspace.source_observed_at
+                    if not after.title_manually_set:
+                        after.title = original.workspace.title
+                    after.warnings += [w.model_copy(deep=True) for w in original.workspace.warnings
+                        if w.code not in {old.code for old in after.warnings}]
+                    snapshot_id = "background_" + digest([state.lineage, job.id, job.proposal_id])[:40]
+                else:
+                    actual = self._actual(original, state, job)
+                    after = self._apply(current, actual, validate=True)
                 if proposal.payload.kind == "rich_sync":
                     record = next(item for item in after.sync_records if item.id == proposal.payload.sync_id)
                     record.ready = False
@@ -395,7 +438,7 @@ class CanonicalCoordinator:
                 self.history.validate(state, directory, latest, proposal.guards)
                 if self.authority.require(state, latest, now=self.jobs.clock()) != claim:
                     raise BackgroundFailure("WRITER_UNKNOWN")
-                candidate = self._candidate(state, directory, current, after, actual, job, proposal)
+                candidate = self._candidate(state, directory, current, after, actual, job, proposal, snapshot_id=snapshot_id)
                 intent = self._store_intent(state, directory, candidate, claim)
             return self._commit(project, intent.id, candidate, prepared)
 
@@ -572,6 +615,8 @@ class CanonicalCoordinator:
                         job, proposal = job_in(state, candidate.job_id), proposal_in(state, job_in(state, candidate.job_id))
                         self._gate(state, job, proposal)
                         self.history.validate(state, directory, before, proposal.guards)
+                        if proposal.payload.kind == "processing":
+                            self.processing_validator(state, directory, job, self._payload(state, directory, proposal), before)
                         claim = self.authority.require(state, before, now=self.jobs.clock())
                         if (claim.epoch, claim.incarnation, claim.generation) != (intent.writer_epoch, intent.incarnation, intent.barrier_generation):
                             raise BackgroundFailure("WRITER_UNKNOWN")

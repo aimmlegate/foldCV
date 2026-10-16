@@ -12,5 +12,9 @@
   "acknowledgedCursor": 0,
   "touchGeneration": 0,
   "barrierGeneration": 0,
-  "draftId": null
+  "draftId": null,
+  "touchFloor": 0,
+  "draftSequenceFloor": 0,
+  "abandonedEpoch": null,
+  "acknowledgedSha256": null
 }

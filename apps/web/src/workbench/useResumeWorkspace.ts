@@ -6,6 +6,8 @@ import type { AssistantHandle } from "../assistant/Drawer";
 import { hasInput, importBody, type ResumeInput } from "../rich/import-source";
 import { deleteProject, download, listProjects, projectRequest, RichApiFailure } from "../rich/api";
 import { attachExclusiveWriter, type AttachedWriter } from "../background/connection";
+import { FixedOperations } from "../background/fixed";
+import { JobsApi } from "../background/api";
 
 function label(error: unknown): string {
   if (error instanceof RichApiFailure && error.code === "PROJECT_VERSION_UNSUPPORTED") return "Версия проекта не поддерживается. Исходные файлы сохранены.";
@@ -27,6 +29,7 @@ export function warningLabel(code: string): string {
 export function useResumeWorkspace() {
   const [response, setResponse] = useState<RichProjectResponse | null>(null);
   const [writer, setWriter] = useState<AttachedWriter | null>(null);
+  const [background, setBackground] = useState(false);
   const [projects, setProjects] = useState<GuiProjectListResponse | null>(null);
   const [input, storeInput] = useState<ResumeInput>({ kind: "text", text: "" });
   const [textDraft, setTextDraft] = useState("");
@@ -48,11 +51,16 @@ export function useResumeWorkspace() {
     const url = new URL(location.href); url.searchParams.set("project", next.workspace.projectId);
     history.replaceState(null, "", url.pathname + url.search);
   }, []);
-  function select(next: RichProjectResponse) { activeProject.current = next.workspace.projectId; acknowledge(next); }
+  function select(next: RichProjectResponse, available = false) { setBackground(available); activeProject.current = next.workspace.projectId; acknowledge(next); }
   async function load(id: string) {
     const next = await projectRequest(`/${id}`);
     const connection = next.workspace.project ? await attachExclusiveWriter(id) : null;
-    return { next: connection?.view.response ?? next, connection };
+    let available = connection !== null;
+    if (!next.workspace.project) {
+      try { await new JobsApi(id).projectJobs(); available = true; }
+      catch (error) { if (!(error instanceof RichApiFailure) || error.code !== "JOB_DISABLED") throw error; }
+    }
+    return { next: connection?.view.response ?? next, connection, available };
   }
   async function leave() {
     if (!editor.current?.background) await assistant.current?.stop();
@@ -72,7 +80,7 @@ export function useResumeWorkspace() {
     finally { acting.current = false; setBusy(false); }
   }
   function clear() {
-    ++epoch.current; activeProject.current = null; setResponse(null); setWriter(null); setStatus("Сохранено"); prepared.current = null;
+    ++epoch.current; activeProject.current = null; setResponse(null); setWriter(null); setBackground(false); setStatus("Сохранено"); prepared.current = null;
     setInput({ kind: "text", text: "" }); history.replaceState(null, "", location.pathname);
   }
   async function fresh() {
@@ -85,9 +93,9 @@ export function useResumeWorkspace() {
     return action(async () => {
       if (response?.workspace.projectId === id) { await editor.current?.resume(); setSettings(false); return; }
       await leave();
-      const ticket = ++epoch.current, { next, connection } = await load(id);
+      const ticket = ++epoch.current, { next, connection, available } = await load(id);
       if (ticket === epoch.current) {
-        setWriter(connection); select(next); setStatus("Сохранено"); prepared.current = null;
+        setWriter(connection); select(next, available); setStatus("Сохранено"); prepared.current = null;
         setInput({ kind: "text", text: "" }); setSettings(false);
       }
     });
@@ -104,7 +112,7 @@ export function useResumeWorkspace() {
   useEffect(() => {
     const ticket = ++epoch.current;
     const id = new URLSearchParams(location.search).get("project");
-    if (id) void load(id).then(({ next, connection }) => { if (ticket === epoch.current) { setWriter(connection); select(next); } }).catch(error => { if (ticket === epoch.current) setError(label(error)); });
+    if (id) void load(id).then(({ next, connection, available }) => { if (ticket === epoch.current) { setWriter(connection); select(next, available); } }).catch(error => { if (ticket === epoch.current) setError(label(error)); });
     void listProjects().then(setProjects).catch(error => setError(label(error)));
     return () => { ++epoch.current; };
   }, [acknowledge]);
@@ -141,7 +149,13 @@ export function useResumeWorkspace() {
           setProjects(await listProjects());
         }
       }
-      if (id) select(await projectRequest(`/${id}/generation`, "POST", {}));
+      if (id) {
+        try { await new FixedOperations(id).submit({ kind: "processing" }); select(await projectRequest(`/${id}`), true); }
+        catch (error) {
+          if (error instanceof RichApiFailure && error.code === "JOB_DISABLED") select(await projectRequest(`/${id}/generation`, "POST", {}));
+          else throw error;
+        }
+      }
     });
   }
   async function upload(file: File) {
@@ -151,7 +165,7 @@ export function useResumeWorkspace() {
       ++epoch.current;
       const imported = await projectRequest("/archive", "POST", body);
       const connection = imported.workspace.project ? await attachExclusiveWriter(imported.workspace.projectId) : null;
-      setWriter(connection); select(connection?.view.response ?? imported);
+      setWriter(connection); select(connection?.view.response ?? imported, connection !== null);
       prepared.current = null; setInput({ kind: "text", text: "" }); setSettings(false); setProjects(await listProjects());
     });
   }
@@ -165,6 +179,6 @@ export function useResumeWorkspace() {
       anchor.click(); setTimeout(() => URL.revokeObjectURL(url), 1000);
     });
   }
-  return { response, writer, projects, input, setInput, textDraft, error, status, setStatus, busy, settings, setSettings,
+  return { response, writer, background, projects, input, setInput, textDraft, error, status, setStatus, busy, settings, setSettings,
     editor, assistant, acknowledge, action, fresh, open, remove, process, upload, exportFile, dismissError };
 }

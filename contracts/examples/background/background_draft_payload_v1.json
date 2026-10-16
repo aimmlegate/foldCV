@@ -95,7 +95,7 @@
                 "content": [
                   {
                     "type": "text",
-                    "text": "Example University · 23 May 2018",
+                    "text": "Example University \u00b7 23 May 2018",
                     "styles": {
                       "bold": false,
                       "italic": false,
@@ -147,7 +147,7 @@
             "content": [
               {
                 "type": "text",
-                "text": "English · level unknown",
+                "text": "English \u00b7 level unknown",
                 "styles": {
                   "bold": false,
                   "italic": false,
@@ -789,5 +789,7 @@
     "tombstones": []
   },
   "outbox": [],
-  "assetPins": []
+  "assetPins": [],
+  "touches": [],
+  "historyOutbox": []
 }

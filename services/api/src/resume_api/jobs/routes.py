@@ -5,7 +5,7 @@ from fastapi.responses import JSONResponse, StreamingResponse
 
 from packages.resume_core.background_store import BackgroundFailure
 from packages.resume_core.models.agent import AgentEmptyRequest
-from packages.resume_core.models.background import JobAgentRequestV1, JobReplayRequestV1, JobReplayV1
+from packages.resume_core.models.background import JobAgentRequestV1, JobReplayRequestV1, JobReplayV1, JobFixedRequestV1
 
 
 def mount_jobs(app, service):
@@ -31,6 +31,16 @@ def mount_jobs(app, service):
     async def submit(project_id: str, payload: JobAgentRequestV1):
         job, created = await service.submit(project_id, payload)
         return response(job, 202 if created else 200)
+
+    @app.post(prefix + "/fixed")
+    async def fixed(project_id: str, payload: JobFixedRequestV1):
+        value, created = await service.fixed.submit(project_id, payload)
+        return response(value, 202 if created else 200)
+
+    @app.get(prefix + "/{job_id}/fixed")
+    async def fixed_result(project_id: str, job_id: str):
+        service.project(project_id)
+        return response(service.fixed.reply(service.store.read(project_id, job_id)))
 
     @app.post(prefix + "/{job_id}/read")
     async def read(project_id: str, job_id: str, payload: AgentEmptyRequest):

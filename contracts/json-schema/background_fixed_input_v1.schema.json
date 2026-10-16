@@ -1,0 +1,6173 @@
+{
+  "$defs": {
+    "ActionCapture": {
+      "additionalProperties": false,
+      "properties": {
+        "actionId": {
+          "minLength": 1,
+          "title": "Actionid",
+          "type": "string"
+        },
+        "actionToken": {
+          "minimum": 0,
+          "title": "Actiontoken",
+          "type": "integer"
+        },
+        "dependencies": {
+          "items": {
+            "$ref": "#/$defs/DependencyStamp"
+          },
+          "title": "Dependencies",
+          "type": "array"
+        },
+        "sessionId": {
+          "minLength": 1,
+          "title": "Sessionid",
+          "type": "string"
+        }
+      },
+      "required": [
+        "sessionId",
+        "actionId",
+        "actionToken",
+        "dependencies"
+      ],
+      "title": "ActionCapture",
+      "type": "object"
+    },
+    "AssetRef": {
+      "additionalProperties": false,
+      "properties": {
+        "path": {
+          "title": "Path",
+          "type": "string"
+        },
+        "sha256": {
+          "pattern": "^[a-f0-9]{64}$",
+          "title": "Sha256",
+          "type": "string"
+        },
+        "size": {
+          "minimum": 0,
+          "title": "Size",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "path",
+        "sha256",
+        "size"
+      ],
+      "title": "AssetRef",
+      "type": "object"
+    },
+    "BulletBlock": {
+      "additionalProperties": false,
+      "properties": {
+        "children": {
+          "items": {
+            "discriminator": {
+              "mapping": {
+                "bullet_list": "#/$defs/BulletBlock",
+                "check_list": "#/$defs/ChecklistBlock",
+                "code": "#/$defs/CodeBlock",
+                "divider": "#/$defs/DividerBlock",
+                "heading": "#/$defs/HeadingBlock",
+                "image": "#/$defs/ImageBlock",
+                "numbered_list": "#/$defs/NumberedBlock",
+                "paragraph": "#/$defs/ParagraphBlock",
+                "quote": "#/$defs/QuoteBlock",
+                "section": "#/$defs/SectionBlock",
+                "table": "#/$defs/TableBlock",
+                "toggle_list": "#/$defs/ToggleBlock"
+              },
+              "propertyName": "type"
+            },
+            "oneOf": [
+              {
+                "$ref": "#/$defs/ParagraphBlock"
+              },
+              {
+                "$ref": "#/$defs/HeadingBlock"
+              },
+              {
+                "$ref": "#/$defs/BulletBlock"
+              },
+              {
+                "$ref": "#/$defs/NumberedBlock"
+              },
+              {
+                "$ref": "#/$defs/ChecklistBlock"
+              },
+              {
+                "$ref": "#/$defs/ToggleBlock"
+              },
+              {
+                "$ref": "#/$defs/QuoteBlock"
+              },
+              {
+                "$ref": "#/$defs/CodeBlock"
+              },
+              {
+                "$ref": "#/$defs/DividerBlock"
+              },
+              {
+                "$ref": "#/$defs/TableBlock"
+              },
+              {
+                "$ref": "#/$defs/ImageBlock"
+              },
+              {
+                "$ref": "#/$defs/SectionBlock"
+              }
+            ]
+          },
+          "title": "Children",
+          "type": "array"
+        },
+        "content": {
+          "items": {
+            "discriminator": {
+              "mapping": {
+                "fact_field": "#/$defs/FactFieldSpan",
+                "link": "#/$defs/Hyperlink",
+                "text": "#/$defs/StyledText"
+              },
+              "propertyName": "type"
+            },
+            "oneOf": [
+              {
+                "$ref": "#/$defs/StyledText"
+              },
+              {
+                "$ref": "#/$defs/Hyperlink"
+              },
+              {
+                "$ref": "#/$defs/FactFieldSpan"
+              }
+            ]
+          },
+          "title": "Content",
+          "type": "array"
+        },
+        "id": {
+          "minLength": 1,
+          "title": "Id",
+          "type": "string"
+        },
+        "props": {
+          "$ref": "#/$defs/ParagraphProps"
+        },
+        "provenance": {
+          "items": {
+            "discriminator": {
+              "mapping": {
+                "citation": "#/$defs/NarrativeCitation",
+                "field_binding": "#/$defs/FieldBinding",
+                "source": "#/$defs/SourceWitness",
+                "working_owner": "#/$defs/WorkingOwnership"
+              },
+              "propertyName": "kind"
+            },
+            "oneOf": [
+              {
+                "$ref": "#/$defs/NarrativeCitation"
+              },
+              {
+                "$ref": "#/$defs/FieldBinding"
+              },
+              {
+                "$ref": "#/$defs/WorkingOwnership"
+              },
+              {
+                "$ref": "#/$defs/SourceWitness"
+              }
+            ]
+          },
+          "title": "Provenance",
+          "type": "array"
+        },
+        "revision": {
+          "minimum": 1,
+          "title": "Revision",
+          "type": "integer"
+        },
+        "type": {
+          "const": "bullet_list",
+          "title": "Type",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "revision",
+        "provenance",
+        "children",
+        "type",
+        "props",
+        "content"
+      ],
+      "title": "BulletBlock",
+      "type": "object"
+    },
+    "CandidateRecord": {
+      "additionalProperties": false,
+      "properties": {
+        "evidence": {
+          "items": {
+            "$ref": "#/$defs/EvidenceSpan"
+          },
+          "title": "Evidence",
+          "type": "array"
+        },
+        "id": {
+          "minLength": 1,
+          "title": "Id",
+          "type": "string"
+        },
+        "kind": {
+          "const": "candidate",
+          "title": "Kind",
+          "type": "string"
+        },
+        "location": {
+          "$ref": "#/$defs/WorkingField_str_"
+        },
+        "name": {
+          "$ref": "#/$defs/WorkingField_str_"
+        },
+        "origin": {
+          "enum": [
+            "source",
+            "user"
+          ],
+          "title": "Origin",
+          "type": "string"
+        },
+        "revision": {
+          "minimum": 1,
+          "title": "Revision",
+          "type": "integer"
+        },
+        "title": {
+          "$ref": "#/$defs/WorkingField_str_"
+        },
+        "userCorrected": {
+          "default": false,
+          "title": "Usercorrected",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "id",
+        "revision",
+        "origin",
+        "evidence",
+        "kind",
+        "name",
+        "title",
+        "location"
+      ],
+      "title": "CandidateRecord",
+      "type": "object"
+    },
+    "CertificationRecord": {
+      "additionalProperties": false,
+      "properties": {
+        "date": {
+          "$ref": "#/$defs/WorkingField_PartialDate_"
+        },
+        "evidence": {
+          "items": {
+            "$ref": "#/$defs/EvidenceSpan"
+          },
+          "title": "Evidence",
+          "type": "array"
+        },
+        "id": {
+          "minLength": 1,
+          "title": "Id",
+          "type": "string"
+        },
+        "issuer": {
+          "$ref": "#/$defs/WorkingField_str_"
+        },
+        "kind": {
+          "const": "certification",
+          "title": "Kind",
+          "type": "string"
+        },
+        "name": {
+          "$ref": "#/$defs/WorkingField_str_"
+        },
+        "origin": {
+          "enum": [
+            "source",
+            "user"
+          ],
+          "title": "Origin",
+          "type": "string"
+        },
+        "revision": {
+          "minimum": 1,
+          "title": "Revision",
+          "type": "integer"
+        },
+        "userCorrected": {
+          "default": false,
+          "title": "Usercorrected",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "id",
+        "revision",
+        "origin",
+        "evidence",
+        "kind",
+        "name",
+        "issuer",
+        "date"
+      ],
+      "title": "CertificationRecord",
+      "type": "object"
+    },
+    "ChecklistBlock": {
+      "additionalProperties": false,
+      "properties": {
+        "children": {
+          "items": {
+            "discriminator": {
+              "mapping": {
+                "bullet_list": "#/$defs/BulletBlock",
+                "check_list": "#/$defs/ChecklistBlock",
+                "code": "#/$defs/CodeBlock",
+                "divider": "#/$defs/DividerBlock",
+                "heading": "#/$defs/HeadingBlock",
+                "image": "#/$defs/ImageBlock",
+                "numbered_list": "#/$defs/NumberedBlock",
+                "paragraph": "#/$defs/ParagraphBlock",
+                "quote": "#/$defs/QuoteBlock",
+                "section": "#/$defs/SectionBlock",
+                "table": "#/$defs/TableBlock",
+                "toggle_list": "#/$defs/ToggleBlock"
+              },
+              "propertyName": "type"
+            },
+            "oneOf": [
+              {
+                "$ref": "#/$defs/ParagraphBlock"
+              },
+              {
+                "$ref": "#/$defs/HeadingBlock"
+              },
+              {
+                "$ref": "#/$defs/BulletBlock"
+              },
+              {
+                "$ref": "#/$defs/NumberedBlock"
+              },
+              {
+                "$ref": "#/$defs/ChecklistBlock"
+              },
+              {
+                "$ref": "#/$defs/ToggleBlock"
+              },
+              {
+                "$ref": "#/$defs/QuoteBlock"
+              },
+              {
+                "$ref": "#/$defs/CodeBlock"
+              },
+              {
+                "$ref": "#/$defs/DividerBlock"
+              },
+              {
+                "$ref": "#/$defs/TableBlock"
+              },
+              {
+                "$ref": "#/$defs/ImageBlock"
+              },
+              {
+                "$ref": "#/$defs/SectionBlock"
+              }
+            ]
+          },
+          "title": "Children",
+          "type": "array"
+        },
+        "content": {
+          "items": {
+            "discriminator": {
+              "mapping": {
+                "fact_field": "#/$defs/FactFieldSpan",
+                "link": "#/$defs/Hyperlink",
+                "text": "#/$defs/StyledText"
+              },
+              "propertyName": "type"
+            },
+            "oneOf": [
+              {
+                "$ref": "#/$defs/StyledText"
+              },
+              {
+                "$ref": "#/$defs/Hyperlink"
+              },
+              {
+                "$ref": "#/$defs/FactFieldSpan"
+              }
+            ]
+          },
+          "title": "Content",
+          "type": "array"
+        },
+        "id": {
+          "minLength": 1,
+          "title": "Id",
+          "type": "string"
+        },
+        "props": {
+          "$ref": "#/$defs/ChecklistProps"
+        },
+        "provenance": {
+          "items": {
+            "discriminator": {
+              "mapping": {
+                "citation": "#/$defs/NarrativeCitation",
+                "field_binding": "#/$defs/FieldBinding",
+                "source": "#/$defs/SourceWitness",
+                "working_owner": "#/$defs/WorkingOwnership"
+              },
+              "propertyName": "kind"
+            },
+            "oneOf": [
+              {
+                "$ref": "#/$defs/NarrativeCitation"
+              },
+              {
+                "$ref": "#/$defs/FieldBinding"
+              },
+              {
+                "$ref": "#/$defs/WorkingOwnership"
+              },
+              {
+                "$ref": "#/$defs/SourceWitness"
+              }
+            ]
+          },
+          "title": "Provenance",
+          "type": "array"
+        },
+        "revision": {
+          "minimum": 1,
+          "title": "Revision",
+          "type": "integer"
+        },
+        "type": {
+          "const": "check_list",
+          "title": "Type",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "revision",
+        "provenance",
+        "children",
+        "type",
+        "props",
+        "content"
+      ],
+      "title": "ChecklistBlock",
+      "type": "object"
+    },
+    "ChecklistProps": {
+      "additionalProperties": false,
+      "properties": {
+        "alignment": {
+          "default": "left",
+          "enum": [
+            "left",
+            "center",
+            "right",
+            "justify"
+          ],
+          "title": "Alignment",
+          "type": "string"
+        },
+        "backgroundColor": {
+          "default": "default",
+          "pattern": "^(default|#[a-fA-F0-9]{6})$",
+          "title": "Backgroundcolor",
+          "type": "string"
+        },
+        "checked": {
+          "title": "Checked",
+          "type": "boolean"
+        },
+        "textColor": {
+          "default": "default",
+          "pattern": "^(default|#[a-fA-F0-9]{6})$",
+          "title": "Textcolor",
+          "type": "string"
+        }
+      },
+      "required": [
+        "checked"
+      ],
+      "title": "ChecklistProps",
+      "type": "object"
+    },
+    "ClaimRecord": {
+      "additionalProperties": false,
+      "properties": {
+        "evidence": {
+          "items": {
+            "$ref": "#/$defs/EvidenceSpan"
+          },
+          "title": "Evidence",
+          "type": "array"
+        },
+        "id": {
+          "minLength": 1,
+          "title": "Id",
+          "type": "string"
+        },
+        "jobId": {
+          "anyOf": [
+            {
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Jobid"
+        },
+        "kind": {
+          "const": "claim",
+          "title": "Kind",
+          "type": "string"
+        },
+        "origin": {
+          "enum": [
+            "source",
+            "user"
+          ],
+          "title": "Origin",
+          "type": "string"
+        },
+        "revision": {
+          "minimum": 1,
+          "title": "Revision",
+          "type": "integer"
+        },
+        "subprojectId": {
+          "anyOf": [
+            {
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Subprojectid"
+        },
+        "userCorrected": {
+          "default": false,
+          "title": "Usercorrected",
+          "type": "boolean"
+        },
+        "value": {
+          "$ref": "#/$defs/WorkingField_str_"
+        }
+      },
+      "required": [
+        "id",
+        "revision",
+        "origin",
+        "evidence",
+        "kind",
+        "jobId",
+        "subprojectId",
+        "value"
+      ],
+      "title": "ClaimRecord",
+      "type": "object"
+    },
+    "CodeBlock": {
+      "additionalProperties": false,
+      "properties": {
+        "children": {
+          "items": {
+            "discriminator": {
+              "mapping": {
+                "bullet_list": "#/$defs/BulletBlock",
+                "check_list": "#/$defs/ChecklistBlock",
+                "code": "#/$defs/CodeBlock",
+                "divider": "#/$defs/DividerBlock",
+                "heading": "#/$defs/HeadingBlock",
+                "image": "#/$defs/ImageBlock",
+                "numbered_list": "#/$defs/NumberedBlock",
+                "paragraph": "#/$defs/ParagraphBlock",
+                "quote": "#/$defs/QuoteBlock",
+                "section": "#/$defs/SectionBlock",
+                "table": "#/$defs/TableBlock",
+                "toggle_list": "#/$defs/ToggleBlock"
+              },
+              "propertyName": "type"
+            },
+            "oneOf": [
+              {
+                "$ref": "#/$defs/ParagraphBlock"
+              },
+              {
+                "$ref": "#/$defs/HeadingBlock"
+              },
+              {
+                "$ref": "#/$defs/BulletBlock"
+              },
+              {
+                "$ref": "#/$defs/NumberedBlock"
+              },
+              {
+                "$ref": "#/$defs/ChecklistBlock"
+              },
+              {
+                "$ref": "#/$defs/ToggleBlock"
+              },
+              {
+                "$ref": "#/$defs/QuoteBlock"
+              },
+              {
+                "$ref": "#/$defs/CodeBlock"
+              },
+              {
+                "$ref": "#/$defs/DividerBlock"
+              },
+              {
+                "$ref": "#/$defs/TableBlock"
+              },
+              {
+                "$ref": "#/$defs/ImageBlock"
+              },
+              {
+                "$ref": "#/$defs/SectionBlock"
+              }
+            ]
+          },
+          "title": "Children",
+          "type": "array"
+        },
+        "content": {
+          "title": "Content",
+          "type": "string"
+        },
+        "id": {
+          "minLength": 1,
+          "title": "Id",
+          "type": "string"
+        },
+        "props": {
+          "$ref": "#/$defs/CodeProps"
+        },
+        "provenance": {
+          "items": {
+            "discriminator": {
+              "mapping": {
+                "citation": "#/$defs/NarrativeCitation",
+                "field_binding": "#/$defs/FieldBinding",
+                "source": "#/$defs/SourceWitness",
+                "working_owner": "#/$defs/WorkingOwnership"
+              },
+              "propertyName": "kind"
+            },
+            "oneOf": [
+              {
+                "$ref": "#/$defs/NarrativeCitation"
+              },
+              {
+                "$ref": "#/$defs/FieldBinding"
+              },
+              {
+                "$ref": "#/$defs/WorkingOwnership"
+              },
+              {
+                "$ref": "#/$defs/SourceWitness"
+              }
+            ]
+          },
+          "title": "Provenance",
+          "type": "array"
+        },
+        "revision": {
+          "minimum": 1,
+          "title": "Revision",
+          "type": "integer"
+        },
+        "type": {
+          "const": "code",
+          "title": "Type",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "revision",
+        "provenance",
+        "children",
+        "type",
+        "props",
+        "content"
+      ],
+      "title": "CodeBlock",
+      "type": "object"
+    },
+    "CodeProps": {
+      "additionalProperties": false,
+      "properties": {
+        "backgroundColor": {
+          "default": "default",
+          "pattern": "^(default|#[a-fA-F0-9]{6})$",
+          "title": "Backgroundcolor",
+          "type": "string"
+        },
+        "language": {
+          "title": "Language",
+          "type": "string"
+        }
+      },
+      "required": [
+        "language"
+      ],
+      "title": "CodeProps",
+      "type": "object"
+    },
+    "DependencyStamp": {
+      "additionalProperties": false,
+      "properties": {
+        "fingerprint": {
+          "anyOf": [
+            {
+              "pattern": "^[a-f0-9]{64}$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Fingerprint"
+        },
+        "id": {
+          "minLength": 1,
+          "title": "Id",
+          "type": "string"
+        },
+        "kind": {
+          "enum": [
+            "block",
+            "record",
+            "field",
+            "period",
+            "ownership",
+            "source",
+            "rules",
+            "asset",
+            "timeline_order"
+          ],
+          "title": "Kind",
+          "type": "string"
+        },
+        "revision": {
+          "minimum": 1,
+          "title": "Revision",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "kind",
+        "id",
+        "revision",
+        "fingerprint"
+      ],
+      "title": "DependencyStamp",
+      "type": "object"
+    },
+    "DetailRecord": {
+      "additionalProperties": false,
+      "properties": {
+        "detailType": {
+          "enum": [
+            "phone",
+            "email",
+            "url",
+            "messenger",
+            "age",
+            "birth_date",
+            "metadata",
+            "other"
+          ],
+          "title": "Detailtype",
+          "type": "string"
+        },
+        "evidence": {
+          "items": {
+            "$ref": "#/$defs/EvidenceSpan"
+          },
+          "title": "Evidence",
+          "type": "array"
+        },
+        "id": {
+          "minLength": 1,
+          "title": "Id",
+          "type": "string"
+        },
+        "kind": {
+          "const": "detail",
+          "title": "Kind",
+          "type": "string"
+        },
+        "label": {
+          "title": "Label",
+          "type": "string"
+        },
+        "origin": {
+          "enum": [
+            "source",
+            "user"
+          ],
+          "title": "Origin",
+          "type": "string"
+        },
+        "revision": {
+          "minimum": 1,
+          "title": "Revision",
+          "type": "integer"
+        },
+        "userCorrected": {
+          "default": false,
+          "title": "Usercorrected",
+          "type": "boolean"
+        },
+        "value": {
+          "$ref": "#/$defs/WorkingField_str_"
+        }
+      },
+      "required": [
+        "id",
+        "revision",
+        "origin",
+        "evidence",
+        "kind",
+        "detailType",
+        "label",
+        "value"
+      ],
+      "title": "DetailRecord",
+      "type": "object"
+    },
+    "DividerBlock": {
+      "additionalProperties": false,
+      "properties": {
+        "children": {
+          "items": {
+            "discriminator": {
+              "mapping": {
+                "bullet_list": "#/$defs/BulletBlock",
+                "check_list": "#/$defs/ChecklistBlock",
+                "code": "#/$defs/CodeBlock",
+                "divider": "#/$defs/DividerBlock",
+                "heading": "#/$defs/HeadingBlock",
+                "image": "#/$defs/ImageBlock",
+                "numbered_list": "#/$defs/NumberedBlock",
+                "paragraph": "#/$defs/ParagraphBlock",
+                "quote": "#/$defs/QuoteBlock",
+                "section": "#/$defs/SectionBlock",
+                "table": "#/$defs/TableBlock",
+                "toggle_list": "#/$defs/ToggleBlock"
+              },
+              "propertyName": "type"
+            },
+            "oneOf": [
+              {
+                "$ref": "#/$defs/ParagraphBlock"
+              },
+              {
+                "$ref": "#/$defs/HeadingBlock"
+              },
+              {
+                "$ref": "#/$defs/BulletBlock"
+              },
+              {
+                "$ref": "#/$defs/NumberedBlock"
+              },
+              {
+                "$ref": "#/$defs/ChecklistBlock"
+              },
+              {
+                "$ref": "#/$defs/ToggleBlock"
+              },
+              {
+                "$ref": "#/$defs/QuoteBlock"
+              },
+              {
+                "$ref": "#/$defs/CodeBlock"
+              },
+              {
+                "$ref": "#/$defs/DividerBlock"
+              },
+              {
+                "$ref": "#/$defs/TableBlock"
+              },
+              {
+                "$ref": "#/$defs/ImageBlock"
+              },
+              {
+                "$ref": "#/$defs/SectionBlock"
+              }
+            ]
+          },
+          "title": "Children",
+          "type": "array"
+        },
+        "content": {
+          "title": "Content",
+          "type": "null"
+        },
+        "id": {
+          "minLength": 1,
+          "title": "Id",
+          "type": "string"
+        },
+        "props": {
+          "$ref": "#/$defs/EmptyProps"
+        },
+        "provenance": {
+          "items": {
+            "discriminator": {
+              "mapping": {
+                "citation": "#/$defs/NarrativeCitation",
+                "field_binding": "#/$defs/FieldBinding",
+                "source": "#/$defs/SourceWitness",
+                "working_owner": "#/$defs/WorkingOwnership"
+              },
+              "propertyName": "kind"
+            },
+            "oneOf": [
+              {
+                "$ref": "#/$defs/NarrativeCitation"
+              },
+              {
+                "$ref": "#/$defs/FieldBinding"
+              },
+              {
+                "$ref": "#/$defs/WorkingOwnership"
+              },
+              {
+                "$ref": "#/$defs/SourceWitness"
+              }
+            ]
+          },
+          "title": "Provenance",
+          "type": "array"
+        },
+        "revision": {
+          "minimum": 1,
+          "title": "Revision",
+          "type": "integer"
+        },
+        "type": {
+          "const": "divider",
+          "title": "Type",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "revision",
+        "provenance",
+        "children",
+        "type",
+        "props",
+        "content"
+      ],
+      "title": "DividerBlock",
+      "type": "object"
+    },
+    "EducationRecord": {
+      "additionalProperties": false,
+      "properties": {
+        "completion": {
+          "$ref": "#/$defs/WorkingField_PartialDate_"
+        },
+        "evidence": {
+          "items": {
+            "$ref": "#/$defs/EvidenceSpan"
+          },
+          "title": "Evidence",
+          "type": "array"
+        },
+        "id": {
+          "minLength": 1,
+          "title": "Id",
+          "type": "string"
+        },
+        "institution": {
+          "$ref": "#/$defs/WorkingField_str_"
+        },
+        "kind": {
+          "const": "education",
+          "title": "Kind",
+          "type": "string"
+        },
+        "origin": {
+          "enum": [
+            "source",
+            "user"
+          ],
+          "title": "Origin",
+          "type": "string"
+        },
+        "qualification": {
+          "$ref": "#/$defs/WorkingField_str_"
+        },
+        "revision": {
+          "minimum": 1,
+          "title": "Revision",
+          "type": "integer"
+        },
+        "specialty": {
+          "$ref": "#/$defs/WorkingField_str_"
+        },
+        "userCorrected": {
+          "default": false,
+          "title": "Usercorrected",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "id",
+        "revision",
+        "origin",
+        "evidence",
+        "kind",
+        "institution",
+        "qualification",
+        "specialty",
+        "completion"
+      ],
+      "title": "EducationRecord",
+      "type": "object"
+    },
+    "EmploymentRecord": {
+      "additionalProperties": false,
+      "properties": {
+        "employer": {
+          "$ref": "#/$defs/WorkingField_str_"
+        },
+        "evidence": {
+          "items": {
+            "$ref": "#/$defs/EvidenceSpan"
+          },
+          "title": "Evidence",
+          "type": "array"
+        },
+        "id": {
+          "minLength": 1,
+          "title": "Id",
+          "type": "string"
+        },
+        "kind": {
+          "const": "employment",
+          "title": "Kind",
+          "type": "string"
+        },
+        "origin": {
+          "enum": [
+            "source",
+            "user"
+          ],
+          "title": "Origin",
+          "type": "string"
+        },
+        "periods": {
+          "items": {
+            "$ref": "#/$defs/WorkingPeriod"
+          },
+          "title": "Periods",
+          "type": "array"
+        },
+        "revision": {
+          "minimum": 1,
+          "title": "Revision",
+          "type": "integer"
+        },
+        "role": {
+          "$ref": "#/$defs/WorkingField_str_"
+        },
+        "userCorrected": {
+          "default": false,
+          "title": "Usercorrected",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "id",
+        "revision",
+        "origin",
+        "evidence",
+        "kind",
+        "employer",
+        "role",
+        "periods"
+      ],
+      "title": "EmploymentRecord",
+      "type": "object"
+    },
+    "EmptyProps": {
+      "additionalProperties": false,
+      "properties": {},
+      "title": "EmptyProps",
+      "type": "object"
+    },
+    "Evidence": {
+      "additionalProperties": false,
+      "properties": {
+        "sourceId": {
+          "minLength": 1,
+          "title": "Sourceid",
+          "type": "string"
+        },
+        "sourceRevision": {
+          "minimum": 1,
+          "title": "Sourcerevision",
+          "type": "integer"
+        },
+        "unitId": {
+          "minLength": 1,
+          "title": "Unitid",
+          "type": "string"
+        },
+        "unitRevision": {
+          "minimum": 1,
+          "title": "Unitrevision",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "sourceId",
+        "sourceRevision",
+        "unitId",
+        "unitRevision"
+      ],
+      "title": "Evidence",
+      "type": "object"
+    },
+    "EvidenceSpan": {
+      "additionalProperties": false,
+      "properties": {
+        "sourceId": {
+          "minLength": 1,
+          "title": "Sourceid",
+          "type": "string"
+        },
+        "sourceRevision": {
+          "minimum": 1,
+          "title": "Sourcerevision",
+          "type": "integer"
+        },
+        "text": {
+          "minLength": 1,
+          "title": "Text",
+          "type": "string"
+        },
+        "unitId": {
+          "minLength": 1,
+          "title": "Unitid",
+          "type": "string"
+        },
+        "unitRevision": {
+          "minimum": 1,
+          "title": "Unitrevision",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "sourceId",
+        "sourceRevision",
+        "unitId",
+        "unitRevision",
+        "text"
+      ],
+      "title": "EvidenceSpan",
+      "type": "object"
+    },
+    "FactFieldSpan": {
+      "additionalProperties": false,
+      "properties": {
+        "bindingId": {
+          "minLength": 1,
+          "title": "Bindingid",
+          "type": "string"
+        },
+        "bindingRootId": {
+          "anyOf": [
+            {
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Bindingrootid"
+        },
+        "fieldKey": {
+          "minLength": 1,
+          "title": "Fieldkey",
+          "type": "string"
+        },
+        "recordId": {
+          "minLength": 1,
+          "title": "Recordid",
+          "type": "string"
+        },
+        "styles": {
+          "$ref": "#/$defs/InlineStyles"
+        },
+        "syncedFactRevision": {
+          "minimum": 1,
+          "title": "Syncedfactrevision",
+          "type": "integer"
+        },
+        "text": {
+          "title": "Text",
+          "type": "string"
+        },
+        "type": {
+          "const": "fact_field",
+          "title": "Type",
+          "type": "string"
+        }
+      },
+      "required": [
+        "type",
+        "bindingId",
+        "recordId",
+        "fieldKey",
+        "text",
+        "styles",
+        "syncedFactRevision"
+      ],
+      "title": "FactFieldSpan",
+      "type": "object"
+    },
+    "FieldBinding": {
+      "additionalProperties": false,
+      "properties": {
+        "fieldKey": {
+          "minLength": 1,
+          "title": "Fieldkey",
+          "type": "string"
+        },
+        "id": {
+          "minLength": 1,
+          "title": "Id",
+          "type": "string"
+        },
+        "kind": {
+          "const": "field_binding",
+          "title": "Kind",
+          "type": "string"
+        },
+        "recordId": {
+          "minLength": 1,
+          "title": "Recordid",
+          "type": "string"
+        }
+      },
+      "required": [
+        "kind",
+        "id",
+        "recordId",
+        "fieldKey"
+      ],
+      "title": "FieldBinding",
+      "type": "object"
+    },
+    "FieldReference": {
+      "additionalProperties": false,
+      "properties": {
+        "fieldKey": {
+          "minLength": 1,
+          "title": "Fieldkey",
+          "type": "string"
+        },
+        "recordId": {
+          "minLength": 1,
+          "title": "Recordid",
+          "type": "string"
+        },
+        "rootId": {
+          "minLength": 1,
+          "title": "Rootid",
+          "type": "string"
+        }
+      },
+      "required": [
+        "recordId",
+        "fieldKey",
+        "rootId"
+      ],
+      "title": "FieldReference",
+      "type": "object"
+    },
+    "FixedCompletionCommand": {
+      "additionalProperties": false,
+      "properties": {
+        "kind": {
+          "const": "completion",
+          "title": "Kind",
+          "type": "string"
+        },
+        "request": {
+          "$ref": "#/$defs/RichCompletionRequest"
+        }
+      },
+      "required": [
+        "kind",
+        "request"
+      ],
+      "title": "FixedCompletionCommand",
+      "type": "object"
+    },
+    "FixedPanelCommand": {
+      "additionalProperties": false,
+      "properties": {
+        "kind": {
+          "const": "panel",
+          "title": "Kind",
+          "type": "string"
+        },
+        "request": {
+          "$ref": "#/$defs/RichPanelSyncRequest"
+        }
+      },
+      "required": [
+        "kind",
+        "request"
+      ],
+      "title": "FixedPanelCommand",
+      "type": "object"
+    },
+    "FixedProcessingCommand": {
+      "additionalProperties": false,
+      "properties": {
+        "kind": {
+          "const": "processing",
+          "title": "Kind",
+          "type": "string"
+        }
+      },
+      "required": [
+        "kind"
+      ],
+      "title": "FixedProcessingCommand",
+      "type": "object"
+    },
+    "FixedRetryCommand": {
+      "additionalProperties": false,
+      "properties": {
+        "capture": {
+          "$ref": "#/$defs/ActionCapture"
+        },
+        "kind": {
+          "enum": [
+            "retry",
+            "resolve"
+          ],
+          "title": "Kind",
+          "type": "string"
+        },
+        "syncId": {
+          "maxLength": 128,
+          "minLength": 1,
+          "pattern": "^[A-Za-z0-9_-]+$",
+          "title": "Syncid",
+          "type": "string"
+        }
+      },
+      "required": [
+        "kind",
+        "syncId",
+        "capture"
+      ],
+      "title": "FixedRetryCommand",
+      "type": "object"
+    },
+    "FixedRewriteCommand": {
+      "additionalProperties": false,
+      "properties": {
+        "kind": {
+          "const": "rewrite",
+          "title": "Kind",
+          "type": "string"
+        },
+        "request": {
+          "$ref": "#/$defs/RichRewriteRequest"
+        }
+      },
+      "required": [
+        "kind",
+        "request"
+      ],
+      "title": "FixedRewriteCommand",
+      "type": "object"
+    },
+    "HeadingBlock": {
+      "additionalProperties": false,
+      "properties": {
+        "children": {
+          "items": {
+            "discriminator": {
+              "mapping": {
+                "bullet_list": "#/$defs/BulletBlock",
+                "check_list": "#/$defs/ChecklistBlock",
+                "code": "#/$defs/CodeBlock",
+                "divider": "#/$defs/DividerBlock",
+                "heading": "#/$defs/HeadingBlock",
+                "image": "#/$defs/ImageBlock",
+                "numbered_list": "#/$defs/NumberedBlock",
+                "paragraph": "#/$defs/ParagraphBlock",
+                "quote": "#/$defs/QuoteBlock",
+                "section": "#/$defs/SectionBlock",
+                "table": "#/$defs/TableBlock",
+                "toggle_list": "#/$defs/ToggleBlock"
+              },
+              "propertyName": "type"
+            },
+            "oneOf": [
+              {
+                "$ref": "#/$defs/ParagraphBlock"
+              },
+              {
+                "$ref": "#/$defs/HeadingBlock"
+              },
+              {
+                "$ref": "#/$defs/BulletBlock"
+              },
+              {
+                "$ref": "#/$defs/NumberedBlock"
+              },
+              {
+                "$ref": "#/$defs/ChecklistBlock"
+              },
+              {
+                "$ref": "#/$defs/ToggleBlock"
+              },
+              {
+                "$ref": "#/$defs/QuoteBlock"
+              },
+              {
+                "$ref": "#/$defs/CodeBlock"
+              },
+              {
+                "$ref": "#/$defs/DividerBlock"
+              },
+              {
+                "$ref": "#/$defs/TableBlock"
+              },
+              {
+                "$ref": "#/$defs/ImageBlock"
+              },
+              {
+                "$ref": "#/$defs/SectionBlock"
+              }
+            ]
+          },
+          "title": "Children",
+          "type": "array"
+        },
+        "content": {
+          "items": {
+            "discriminator": {
+              "mapping": {
+                "fact_field": "#/$defs/FactFieldSpan",
+                "link": "#/$defs/Hyperlink",
+                "text": "#/$defs/StyledText"
+              },
+              "propertyName": "type"
+            },
+            "oneOf": [
+              {
+                "$ref": "#/$defs/StyledText"
+              },
+              {
+                "$ref": "#/$defs/Hyperlink"
+              },
+              {
+                "$ref": "#/$defs/FactFieldSpan"
+              }
+            ]
+          },
+          "title": "Content",
+          "type": "array"
+        },
+        "id": {
+          "minLength": 1,
+          "title": "Id",
+          "type": "string"
+        },
+        "props": {
+          "$ref": "#/$defs/HeadingProps"
+        },
+        "provenance": {
+          "items": {
+            "discriminator": {
+              "mapping": {
+                "citation": "#/$defs/NarrativeCitation",
+                "field_binding": "#/$defs/FieldBinding",
+                "source": "#/$defs/SourceWitness",
+                "working_owner": "#/$defs/WorkingOwnership"
+              },
+              "propertyName": "kind"
+            },
+            "oneOf": [
+              {
+                "$ref": "#/$defs/NarrativeCitation"
+              },
+              {
+                "$ref": "#/$defs/FieldBinding"
+              },
+              {
+                "$ref": "#/$defs/WorkingOwnership"
+              },
+              {
+                "$ref": "#/$defs/SourceWitness"
+              }
+            ]
+          },
+          "title": "Provenance",
+          "type": "array"
+        },
+        "revision": {
+          "minimum": 1,
+          "title": "Revision",
+          "type": "integer"
+        },
+        "type": {
+          "const": "heading",
+          "title": "Type",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "revision",
+        "provenance",
+        "children",
+        "type",
+        "props",
+        "content"
+      ],
+      "title": "HeadingBlock",
+      "type": "object"
+    },
+    "HeadingProps": {
+      "additionalProperties": false,
+      "properties": {
+        "alignment": {
+          "default": "left",
+          "enum": [
+            "left",
+            "center",
+            "right",
+            "justify"
+          ],
+          "title": "Alignment",
+          "type": "string"
+        },
+        "backgroundColor": {
+          "default": "default",
+          "pattern": "^(default|#[a-fA-F0-9]{6})$",
+          "title": "Backgroundcolor",
+          "type": "string"
+        },
+        "level": {
+          "enum": [
+            1,
+            2,
+            3
+          ],
+          "title": "Level",
+          "type": "integer"
+        },
+        "textColor": {
+          "default": "default",
+          "pattern": "^(default|#[a-fA-F0-9]{6})$",
+          "title": "Textcolor",
+          "type": "string"
+        }
+      },
+      "required": [
+        "level"
+      ],
+      "title": "HeadingProps",
+      "type": "object"
+    },
+    "Hyperlink": {
+      "additionalProperties": false,
+      "properties": {
+        "content": {
+          "items": {
+            "$ref": "#/$defs/StyledText"
+          },
+          "title": "Content",
+          "type": "array"
+        },
+        "href": {
+          "minLength": 1,
+          "title": "Href",
+          "type": "string"
+        },
+        "type": {
+          "const": "link",
+          "title": "Type",
+          "type": "string"
+        }
+      },
+      "required": [
+        "type",
+        "href",
+        "content"
+      ],
+      "title": "Hyperlink",
+      "type": "object"
+    },
+    "ImageBlock": {
+      "additionalProperties": false,
+      "properties": {
+        "children": {
+          "items": {
+            "discriminator": {
+              "mapping": {
+                "bullet_list": "#/$defs/BulletBlock",
+                "check_list": "#/$defs/ChecklistBlock",
+                "code": "#/$defs/CodeBlock",
+                "divider": "#/$defs/DividerBlock",
+                "heading": "#/$defs/HeadingBlock",
+                "image": "#/$defs/ImageBlock",
+                "numbered_list": "#/$defs/NumberedBlock",
+                "paragraph": "#/$defs/ParagraphBlock",
+                "quote": "#/$defs/QuoteBlock",
+                "section": "#/$defs/SectionBlock",
+                "table": "#/$defs/TableBlock",
+                "toggle_list": "#/$defs/ToggleBlock"
+              },
+              "propertyName": "type"
+            },
+            "oneOf": [
+              {
+                "$ref": "#/$defs/ParagraphBlock"
+              },
+              {
+                "$ref": "#/$defs/HeadingBlock"
+              },
+              {
+                "$ref": "#/$defs/BulletBlock"
+              },
+              {
+                "$ref": "#/$defs/NumberedBlock"
+              },
+              {
+                "$ref": "#/$defs/ChecklistBlock"
+              },
+              {
+                "$ref": "#/$defs/ToggleBlock"
+              },
+              {
+                "$ref": "#/$defs/QuoteBlock"
+              },
+              {
+                "$ref": "#/$defs/CodeBlock"
+              },
+              {
+                "$ref": "#/$defs/DividerBlock"
+              },
+              {
+                "$ref": "#/$defs/TableBlock"
+              },
+              {
+                "$ref": "#/$defs/ImageBlock"
+              },
+              {
+                "$ref": "#/$defs/SectionBlock"
+              }
+            ]
+          },
+          "title": "Children",
+          "type": "array"
+        },
+        "content": {
+          "title": "Content",
+          "type": "null"
+        },
+        "id": {
+          "minLength": 1,
+          "title": "Id",
+          "type": "string"
+        },
+        "props": {
+          "$ref": "#/$defs/ImageProps"
+        },
+        "provenance": {
+          "items": {
+            "discriminator": {
+              "mapping": {
+                "citation": "#/$defs/NarrativeCitation",
+                "field_binding": "#/$defs/FieldBinding",
+                "source": "#/$defs/SourceWitness",
+                "working_owner": "#/$defs/WorkingOwnership"
+              },
+              "propertyName": "kind"
+            },
+            "oneOf": [
+              {
+                "$ref": "#/$defs/NarrativeCitation"
+              },
+              {
+                "$ref": "#/$defs/FieldBinding"
+              },
+              {
+                "$ref": "#/$defs/WorkingOwnership"
+              },
+              {
+                "$ref": "#/$defs/SourceWitness"
+              }
+            ]
+          },
+          "title": "Provenance",
+          "type": "array"
+        },
+        "revision": {
+          "minimum": 1,
+          "title": "Revision",
+          "type": "integer"
+        },
+        "type": {
+          "const": "image",
+          "title": "Type",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "revision",
+        "provenance",
+        "children",
+        "type",
+        "props",
+        "content"
+      ],
+      "title": "ImageBlock",
+      "type": "object"
+    },
+    "ImageProps": {
+      "additionalProperties": false,
+      "properties": {
+        "alignment": {
+          "enum": [
+            "left",
+            "center",
+            "right"
+          ],
+          "title": "Alignment",
+          "type": "string"
+        },
+        "alt": {
+          "title": "Alt",
+          "type": "string"
+        },
+        "assetId": {
+          "minLength": 1,
+          "title": "Assetid",
+          "type": "string"
+        },
+        "caption": {
+          "items": {
+            "discriminator": {
+              "mapping": {
+                "fact_field": "#/$defs/FactFieldSpan",
+                "link": "#/$defs/Hyperlink",
+                "text": "#/$defs/StyledText"
+              },
+              "propertyName": "type"
+            },
+            "oneOf": [
+              {
+                "$ref": "#/$defs/StyledText"
+              },
+              {
+                "$ref": "#/$defs/Hyperlink"
+              },
+              {
+                "$ref": "#/$defs/FactFieldSpan"
+              }
+            ]
+          },
+          "title": "Caption",
+          "type": "array"
+        },
+        "height": {
+          "exclusiveMinimum": 0,
+          "title": "Height",
+          "type": "number"
+        },
+        "width": {
+          "exclusiveMinimum": 0,
+          "title": "Width",
+          "type": "number"
+        }
+      },
+      "required": [
+        "assetId",
+        "alt",
+        "caption",
+        "width",
+        "height",
+        "alignment"
+      ],
+      "title": "ImageProps",
+      "type": "object"
+    },
+    "ImmutableFactEvidence": {
+      "additionalProperties": false,
+      "properties": {
+        "evidence": {
+          "items": {
+            "$ref": "#/$defs/EvidenceSpan"
+          },
+          "title": "Evidence",
+          "type": "array"
+        },
+        "id": {
+          "minLength": 1,
+          "title": "Id",
+          "type": "string"
+        },
+        "rawText": {
+          "title": "Rawtext",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "evidence",
+        "rawText"
+      ],
+      "title": "ImmutableFactEvidence",
+      "type": "object"
+    },
+    "InlineStyles": {
+      "additionalProperties": false,
+      "properties": {
+        "backgroundColor": {
+          "default": "default",
+          "pattern": "^(default|#[a-fA-F0-9]{6})$",
+          "title": "Backgroundcolor",
+          "type": "string"
+        },
+        "bold": {
+          "default": false,
+          "title": "Bold",
+          "type": "boolean"
+        },
+        "code": {
+          "default": false,
+          "title": "Code",
+          "type": "boolean"
+        },
+        "italic": {
+          "default": false,
+          "title": "Italic",
+          "type": "boolean"
+        },
+        "strike": {
+          "default": false,
+          "title": "Strike",
+          "type": "boolean"
+        },
+        "textColor": {
+          "default": "default",
+          "pattern": "^(default|#[a-fA-F0-9]{6})$",
+          "title": "Textcolor",
+          "type": "string"
+        },
+        "underline": {
+          "default": false,
+          "title": "Underline",
+          "type": "boolean"
+        }
+      },
+      "title": "InlineStyles",
+      "type": "object"
+    },
+    "JobFixedRequestV1": {
+      "additionalProperties": false,
+      "properties": {
+        "clientRequestId": {
+          "maxLength": 128,
+          "minLength": 1,
+          "pattern": "^[A-Za-z0-9_-]+$",
+          "title": "Clientrequestid",
+          "type": "string"
+        },
+        "command": {
+          "discriminator": {
+            "mapping": {
+              "completion": "#/$defs/FixedCompletionCommand",
+              "panel": "#/$defs/FixedPanelCommand",
+              "processing": "#/$defs/FixedProcessingCommand",
+              "resolve": "#/$defs/FixedRetryCommand",
+              "retry": "#/$defs/FixedRetryCommand",
+              "rewrite": "#/$defs/FixedRewriteCommand"
+            },
+            "propertyName": "kind"
+          },
+          "oneOf": [
+            {
+              "$ref": "#/$defs/FixedProcessingCommand"
+            },
+            {
+              "$ref": "#/$defs/FixedCompletionCommand"
+            },
+            {
+              "$ref": "#/$defs/FixedRewriteCommand"
+            },
+            {
+              "$ref": "#/$defs/FixedPanelCommand"
+            },
+            {
+              "$ref": "#/$defs/FixedRetryCommand"
+            }
+          ],
+          "title": "Command"
+        },
+        "lineage": {
+          "maxLength": 128,
+          "minLength": 1,
+          "pattern": "^[A-Za-z0-9_-]+$",
+          "title": "Lineage",
+          "type": "string"
+        },
+        "requestEpoch": {
+          "minimum": 1,
+          "title": "Requestepoch",
+          "type": "integer"
+        },
+        "schemaVersion": {
+          "const": 1,
+          "title": "Schemaversion",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "schemaVersion",
+        "lineage",
+        "requestEpoch",
+        "clientRequestId",
+        "command"
+      ],
+      "title": "JobFixedRequestV1",
+      "type": "object"
+    },
+    "JobIdentity": {
+      "additionalProperties": false,
+      "properties": {
+        "lineage": {
+          "maxLength": 128,
+          "minLength": 1,
+          "pattern": "^[A-Za-z0-9_-]+$",
+          "title": "Lineage",
+          "type": "string"
+        },
+        "projectId": {
+          "maxLength": 128,
+          "minLength": 1,
+          "pattern": "^[A-Za-z0-9_-]+$",
+          "title": "Projectid",
+          "type": "string"
+        },
+        "requestEpoch": {
+          "minimum": 1,
+          "title": "Requestepoch",
+          "type": "integer"
+        },
+        "requestId": {
+          "maxLength": 128,
+          "minLength": 1,
+          "pattern": "^[A-Za-z0-9_-]+$",
+          "title": "Requestid",
+          "type": "string"
+        }
+      },
+      "required": [
+        "projectId",
+        "lineage",
+        "requestEpoch",
+        "requestId"
+      ],
+      "title": "JobIdentity",
+      "type": "object"
+    },
+    "LanguageRecord": {
+      "additionalProperties": false,
+      "properties": {
+        "evidence": {
+          "items": {
+            "$ref": "#/$defs/EvidenceSpan"
+          },
+          "title": "Evidence",
+          "type": "array"
+        },
+        "id": {
+          "minLength": 1,
+          "title": "Id",
+          "type": "string"
+        },
+        "kind": {
+          "const": "language",
+          "title": "Kind",
+          "type": "string"
+        },
+        "language": {
+          "$ref": "#/$defs/WorkingField_str_"
+        },
+        "level": {
+          "$ref": "#/$defs/WorkingField_str_"
+        },
+        "origin": {
+          "enum": [
+            "source",
+            "user"
+          ],
+          "title": "Origin",
+          "type": "string"
+        },
+        "revision": {
+          "minimum": 1,
+          "title": "Revision",
+          "type": "integer"
+        },
+        "userCorrected": {
+          "default": false,
+          "title": "Usercorrected",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "id",
+        "revision",
+        "origin",
+        "evidence",
+        "kind",
+        "language",
+        "level"
+      ],
+      "title": "LanguageRecord",
+      "type": "object"
+    },
+    "LeadershipRecord": {
+      "additionalProperties": false,
+      "properties": {
+        "evidence": {
+          "items": {
+            "$ref": "#/$defs/EvidenceSpan"
+          },
+          "title": "Evidence",
+          "type": "array"
+        },
+        "id": {
+          "minLength": 1,
+          "title": "Id",
+          "type": "string"
+        },
+        "jobId": {
+          "anyOf": [
+            {
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Jobid"
+        },
+        "kind": {
+          "const": "leadership",
+          "title": "Kind",
+          "type": "string"
+        },
+        "origin": {
+          "enum": [
+            "source",
+            "user"
+          ],
+          "title": "Origin",
+          "type": "string"
+        },
+        "revision": {
+          "minimum": 1,
+          "title": "Revision",
+          "type": "integer"
+        },
+        "subprojectId": {
+          "anyOf": [
+            {
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Subprojectid"
+        },
+        "userCorrected": {
+          "default": false,
+          "title": "Usercorrected",
+          "type": "boolean"
+        },
+        "value": {
+          "$ref": "#/$defs/WorkingField_LeadershipValue_"
+        }
+      },
+      "required": [
+        "id",
+        "revision",
+        "origin",
+        "evidence",
+        "kind",
+        "jobId",
+        "subprojectId",
+        "value"
+      ],
+      "title": "LeadershipRecord",
+      "type": "object"
+    },
+    "LeadershipValue": {
+      "additionalProperties": false,
+      "properties": {
+        "action": {
+          "title": "Action",
+          "type": "string"
+        },
+        "attribution": {
+          "enum": [
+            "personal",
+            "team",
+            "organization",
+            "unknown"
+          ],
+          "title": "Attribution",
+          "type": "string"
+        },
+        "teamSize": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/MetricValue"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "action",
+        "teamSize",
+        "attribution"
+      ],
+      "title": "LeadershipValue",
+      "type": "object"
+    },
+    "LocalImageAsset": {
+      "additionalProperties": false,
+      "properties": {
+        "height": {
+          "minimum": 1,
+          "title": "Height",
+          "type": "integer"
+        },
+        "id": {
+          "minLength": 1,
+          "title": "Id",
+          "type": "string"
+        },
+        "mimeType": {
+          "enum": [
+            "image/png",
+            "image/jpeg"
+          ],
+          "title": "Mimetype",
+          "type": "string"
+        },
+        "path": {
+          "title": "Path",
+          "type": "string"
+        },
+        "sha256": {
+          "pattern": "^[a-f0-9]{64}$",
+          "title": "Sha256",
+          "type": "string"
+        },
+        "size": {
+          "exclusiveMinimum": 0,
+          "maximum": 20971520,
+          "title": "Size",
+          "type": "integer"
+        },
+        "width": {
+          "minimum": 1,
+          "title": "Width",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "id",
+        "sha256",
+        "path",
+        "mimeType",
+        "size",
+        "width",
+        "height"
+      ],
+      "title": "LocalImageAsset",
+      "type": "object"
+    },
+    "MetricRecord": {
+      "additionalProperties": false,
+      "properties": {
+        "evidence": {
+          "items": {
+            "$ref": "#/$defs/EvidenceSpan"
+          },
+          "title": "Evidence",
+          "type": "array"
+        },
+        "id": {
+          "minLength": 1,
+          "title": "Id",
+          "type": "string"
+        },
+        "jobId": {
+          "anyOf": [
+            {
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Jobid"
+        },
+        "kind": {
+          "const": "metric",
+          "title": "Kind",
+          "type": "string"
+        },
+        "origin": {
+          "enum": [
+            "source",
+            "user"
+          ],
+          "title": "Origin",
+          "type": "string"
+        },
+        "revision": {
+          "minimum": 1,
+          "title": "Revision",
+          "type": "integer"
+        },
+        "subprojectId": {
+          "anyOf": [
+            {
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Subprojectid"
+        },
+        "userCorrected": {
+          "default": false,
+          "title": "Usercorrected",
+          "type": "boolean"
+        },
+        "value": {
+          "$ref": "#/$defs/WorkingField_MetricValue_"
+        }
+      },
+      "required": [
+        "id",
+        "revision",
+        "origin",
+        "evidence",
+        "kind",
+        "jobId",
+        "subprojectId",
+        "value"
+      ],
+      "title": "MetricRecord",
+      "type": "object"
+    },
+    "MetricValue": {
+      "additionalProperties": false,
+      "properties": {
+        "attribution": {
+          "enum": [
+            "personal",
+            "team",
+            "organization",
+            "unknown"
+          ],
+          "title": "Attribution",
+          "type": "string"
+        },
+        "baseline": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Baseline"
+        },
+        "comparator": {
+          "enum": [
+            "exact",
+            "at_least",
+            "at_most",
+            "approximately",
+            "range"
+          ],
+          "title": "Comparator",
+          "type": "string"
+        },
+        "number": {
+          "title": "Number",
+          "type": "number"
+        },
+        "period": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Period"
+        },
+        "qualifiers": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Qualifiers",
+          "type": "array"
+        },
+        "result": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Result"
+        },
+        "scope": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Scope"
+        },
+        "unit": {
+          "title": "Unit",
+          "type": "string"
+        },
+        "upperNumber": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Uppernumber"
+        }
+      },
+      "required": [
+        "number",
+        "upperNumber",
+        "comparator",
+        "unit",
+        "period",
+        "baseline",
+        "result",
+        "scope",
+        "attribution",
+        "qualifiers"
+      ],
+      "title": "MetricValue",
+      "type": "object"
+    },
+    "MoveBlock": {
+      "additionalProperties": false,
+      "properties": {
+        "afterId": {
+          "anyOf": [
+            {
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Afterid"
+        },
+        "beforeRevision": {
+          "minimum": 1,
+          "title": "Beforerevision",
+          "type": "integer"
+        },
+        "blockId": {
+          "minLength": 1,
+          "title": "Blockid",
+          "type": "string"
+        },
+        "kind": {
+          "const": "move_block",
+          "title": "Kind",
+          "type": "string"
+        },
+        "parentId": {
+          "minLength": 1,
+          "title": "Parentid",
+          "type": "string"
+        }
+      },
+      "required": [
+        "kind",
+        "blockId",
+        "beforeRevision",
+        "parentId",
+        "afterId"
+      ],
+      "title": "MoveBlock",
+      "type": "object"
+    },
+    "NarrativeCitation": {
+      "additionalProperties": false,
+      "properties": {
+        "evidence": {
+          "items": {
+            "$ref": "#/$defs/EvidenceSpan"
+          },
+          "title": "Evidence",
+          "type": "array"
+        },
+        "fieldKeys": {
+          "items": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "title": "Fieldkeys",
+          "type": "array"
+        },
+        "id": {
+          "minLength": 1,
+          "title": "Id",
+          "type": "string"
+        },
+        "kind": {
+          "const": "citation",
+          "title": "Kind",
+          "type": "string"
+        },
+        "recordId": {
+          "minLength": 1,
+          "title": "Recordid",
+          "type": "string"
+        }
+      },
+      "required": [
+        "kind",
+        "id",
+        "recordId",
+        "fieldKeys",
+        "evidence"
+      ],
+      "title": "NarrativeCitation",
+      "type": "object"
+    },
+    "NumberedBlock": {
+      "additionalProperties": false,
+      "properties": {
+        "children": {
+          "items": {
+            "discriminator": {
+              "mapping": {
+                "bullet_list": "#/$defs/BulletBlock",
+                "check_list": "#/$defs/ChecklistBlock",
+                "code": "#/$defs/CodeBlock",
+                "divider": "#/$defs/DividerBlock",
+                "heading": "#/$defs/HeadingBlock",
+                "image": "#/$defs/ImageBlock",
+                "numbered_list": "#/$defs/NumberedBlock",
+                "paragraph": "#/$defs/ParagraphBlock",
+                "quote": "#/$defs/QuoteBlock",
+                "section": "#/$defs/SectionBlock",
+                "table": "#/$defs/TableBlock",
+                "toggle_list": "#/$defs/ToggleBlock"
+              },
+              "propertyName": "type"
+            },
+            "oneOf": [
+              {
+                "$ref": "#/$defs/ParagraphBlock"
+              },
+              {
+                "$ref": "#/$defs/HeadingBlock"
+              },
+              {
+                "$ref": "#/$defs/BulletBlock"
+              },
+              {
+                "$ref": "#/$defs/NumberedBlock"
+              },
+              {
+                "$ref": "#/$defs/ChecklistBlock"
+              },
+              {
+                "$ref": "#/$defs/ToggleBlock"
+              },
+              {
+                "$ref": "#/$defs/QuoteBlock"
+              },
+              {
+                "$ref": "#/$defs/CodeBlock"
+              },
+              {
+                "$ref": "#/$defs/DividerBlock"
+              },
+              {
+                "$ref": "#/$defs/TableBlock"
+              },
+              {
+                "$ref": "#/$defs/ImageBlock"
+              },
+              {
+                "$ref": "#/$defs/SectionBlock"
+              }
+            ]
+          },
+          "title": "Children",
+          "type": "array"
+        },
+        "content": {
+          "items": {
+            "discriminator": {
+              "mapping": {
+                "fact_field": "#/$defs/FactFieldSpan",
+                "link": "#/$defs/Hyperlink",
+                "text": "#/$defs/StyledText"
+              },
+              "propertyName": "type"
+            },
+            "oneOf": [
+              {
+                "$ref": "#/$defs/StyledText"
+              },
+              {
+                "$ref": "#/$defs/Hyperlink"
+              },
+              {
+                "$ref": "#/$defs/FactFieldSpan"
+              }
+            ]
+          },
+          "title": "Content",
+          "type": "array"
+        },
+        "id": {
+          "minLength": 1,
+          "title": "Id",
+          "type": "string"
+        },
+        "props": {
+          "$ref": "#/$defs/NumberedProps"
+        },
+        "provenance": {
+          "items": {
+            "discriminator": {
+              "mapping": {
+                "citation": "#/$defs/NarrativeCitation",
+                "field_binding": "#/$defs/FieldBinding",
+                "source": "#/$defs/SourceWitness",
+                "working_owner": "#/$defs/WorkingOwnership"
+              },
+              "propertyName": "kind"
+            },
+            "oneOf": [
+              {
+                "$ref": "#/$defs/NarrativeCitation"
+              },
+              {
+                "$ref": "#/$defs/FieldBinding"
+              },
+              {
+                "$ref": "#/$defs/WorkingOwnership"
+              },
+              {
+                "$ref": "#/$defs/SourceWitness"
+              }
+            ]
+          },
+          "title": "Provenance",
+          "type": "array"
+        },
+        "revision": {
+          "minimum": 1,
+          "title": "Revision",
+          "type": "integer"
+        },
+        "type": {
+          "const": "numbered_list",
+          "title": "Type",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "revision",
+        "provenance",
+        "children",
+        "type",
+        "props",
+        "content"
+      ],
+      "title": "NumberedBlock",
+      "type": "object"
+    },
+    "NumberedProps": {
+      "additionalProperties": false,
+      "properties": {
+        "alignment": {
+          "default": "left",
+          "enum": [
+            "left",
+            "center",
+            "right",
+            "justify"
+          ],
+          "title": "Alignment",
+          "type": "string"
+        },
+        "backgroundColor": {
+          "default": "default",
+          "pattern": "^(default|#[a-fA-F0-9]{6})$",
+          "title": "Backgroundcolor",
+          "type": "string"
+        },
+        "start": {
+          "anyOf": [
+            {
+              "minimum": 1,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Start"
+        },
+        "textColor": {
+          "default": "default",
+          "pattern": "^(default|#[a-fA-F0-9]{6})$",
+          "title": "Textcolor",
+          "type": "string"
+        }
+      },
+      "title": "NumberedProps",
+      "type": "object"
+    },
+    "ParagraphBlock": {
+      "additionalProperties": false,
+      "properties": {
+        "children": {
+          "items": {
+            "discriminator": {
+              "mapping": {
+                "bullet_list": "#/$defs/BulletBlock",
+                "check_list": "#/$defs/ChecklistBlock",
+                "code": "#/$defs/CodeBlock",
+                "divider": "#/$defs/DividerBlock",
+                "heading": "#/$defs/HeadingBlock",
+                "image": "#/$defs/ImageBlock",
+                "numbered_list": "#/$defs/NumberedBlock",
+                "paragraph": "#/$defs/ParagraphBlock",
+                "quote": "#/$defs/QuoteBlock",
+                "section": "#/$defs/SectionBlock",
+                "table": "#/$defs/TableBlock",
+                "toggle_list": "#/$defs/ToggleBlock"
+              },
+              "propertyName": "type"
+            },
+            "oneOf": [
+              {
+                "$ref": "#/$defs/ParagraphBlock"
+              },
+              {
+                "$ref": "#/$defs/HeadingBlock"
+              },
+              {
+                "$ref": "#/$defs/BulletBlock"
+              },
+              {
+                "$ref": "#/$defs/NumberedBlock"
+              },
+              {
+                "$ref": "#/$defs/ChecklistBlock"
+              },
+              {
+                "$ref": "#/$defs/ToggleBlock"
+              },
+              {
+                "$ref": "#/$defs/QuoteBlock"
+              },
+              {
+                "$ref": "#/$defs/CodeBlock"
+              },
+              {
+                "$ref": "#/$defs/DividerBlock"
+              },
+              {
+                "$ref": "#/$defs/TableBlock"
+              },
+              {
+                "$ref": "#/$defs/ImageBlock"
+              },
+              {
+                "$ref": "#/$defs/SectionBlock"
+              }
+            ]
+          },
+          "title": "Children",
+          "type": "array"
+        },
+        "content": {
+          "items": {
+            "discriminator": {
+              "mapping": {
+                "fact_field": "#/$defs/FactFieldSpan",
+                "link": "#/$defs/Hyperlink",
+                "text": "#/$defs/StyledText"
+              },
+              "propertyName": "type"
+            },
+            "oneOf": [
+              {
+                "$ref": "#/$defs/StyledText"
+              },
+              {
+                "$ref": "#/$defs/Hyperlink"
+              },
+              {
+                "$ref": "#/$defs/FactFieldSpan"
+              }
+            ]
+          },
+          "title": "Content",
+          "type": "array"
+        },
+        "id": {
+          "minLength": 1,
+          "title": "Id",
+          "type": "string"
+        },
+        "props": {
+          "$ref": "#/$defs/ParagraphProps"
+        },
+        "provenance": {
+          "items": {
+            "discriminator": {
+              "mapping": {
+                "citation": "#/$defs/NarrativeCitation",
+                "field_binding": "#/$defs/FieldBinding",
+                "source": "#/$defs/SourceWitness",
+                "working_owner": "#/$defs/WorkingOwnership"
+              },
+              "propertyName": "kind"
+            },
+            "oneOf": [
+              {
+                "$ref": "#/$defs/NarrativeCitation"
+              },
+              {
+                "$ref": "#/$defs/FieldBinding"
+              },
+              {
+                "$ref": "#/$defs/WorkingOwnership"
+              },
+              {
+                "$ref": "#/$defs/SourceWitness"
+              }
+            ]
+          },
+          "title": "Provenance",
+          "type": "array"
+        },
+        "revision": {
+          "minimum": 1,
+          "title": "Revision",
+          "type": "integer"
+        },
+        "type": {
+          "const": "paragraph",
+          "title": "Type",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "revision",
+        "provenance",
+        "children",
+        "type",
+        "props",
+        "content"
+      ],
+      "title": "ParagraphBlock",
+      "type": "object"
+    },
+    "ParagraphProps": {
+      "additionalProperties": false,
+      "properties": {
+        "alignment": {
+          "default": "left",
+          "enum": [
+            "left",
+            "center",
+            "right",
+            "justify"
+          ],
+          "title": "Alignment",
+          "type": "string"
+        },
+        "backgroundColor": {
+          "default": "default",
+          "pattern": "^(default|#[a-fA-F0-9]{6})$",
+          "title": "Backgroundcolor",
+          "type": "string"
+        },
+        "textColor": {
+          "default": "default",
+          "pattern": "^(default|#[a-fA-F0-9]{6})$",
+          "title": "Textcolor",
+          "type": "string"
+        }
+      },
+      "title": "ParagraphProps",
+      "type": "object"
+    },
+    "PartialDate": {
+      "additionalProperties": false,
+      "properties": {
+        "day": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Day"
+        },
+        "month": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Month"
+        },
+        "precision": {
+          "enum": [
+            "year",
+            "month",
+            "day"
+          ],
+          "title": "Precision",
+          "type": "string"
+        },
+        "year": {
+          "maximum": 9999,
+          "minimum": 1,
+          "title": "Year",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "precision",
+        "year",
+        "month",
+        "day"
+      ],
+      "title": "PartialDate",
+      "type": "object"
+    },
+    "ProjectV5": {
+      "additionalProperties": false,
+      "properties": {
+        "assets": {
+          "items": {
+            "$ref": "#/$defs/LocalImageAsset"
+          },
+          "title": "Assets",
+          "type": "array"
+        },
+        "createdAt": {
+          "title": "Createdat",
+          "type": "string"
+        },
+        "document": {
+          "$ref": "#/$defs/RichDocumentV1"
+        },
+        "evidenceRecords": {
+          "items": {
+            "$ref": "#/$defs/ImmutableFactEvidence"
+          },
+          "title": "Evidencerecords",
+          "type": "array"
+        },
+        "facts": {
+          "$ref": "#/$defs/WorkingFacts"
+        },
+        "operations": {
+          "items": {
+            "$ref": "#/$defs/RichOperation"
+          },
+          "title": "Operations",
+          "type": "array"
+        },
+        "projectId": {
+          "minLength": 1,
+          "title": "Projectid",
+          "type": "string"
+        },
+        "renders": {
+          "items": {
+            "$ref": "#/$defs/RichRenderSnapshot"
+          },
+          "title": "Renders",
+          "type": "array"
+        },
+        "revision": {
+          "minimum": 1,
+          "title": "Revision",
+          "type": "integer"
+        },
+        "schemaVersion": {
+          "const": 5,
+          "title": "Schemaversion",
+          "type": "integer"
+        },
+        "sources": {
+          "items": {
+            "$ref": "#/$defs/Source"
+          },
+          "title": "Sources",
+          "type": "array"
+        },
+        "template": {
+          "$ref": "#/$defs/TemplateManifest"
+        }
+      },
+      "required": [
+        "schemaVersion",
+        "projectId",
+        "revision",
+        "createdAt",
+        "sources",
+        "evidenceRecords",
+        "facts",
+        "document",
+        "assets",
+        "operations",
+        "renders",
+        "template"
+      ],
+      "title": "ProjectV5",
+      "type": "object"
+    },
+    "PutBlock": {
+      "additionalProperties": false,
+      "properties": {
+        "afterId": {
+          "anyOf": [
+            {
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Afterid"
+        },
+        "beforeRevision": {
+          "anyOf": [
+            {
+              "minimum": 1,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Beforerevision"
+        },
+        "block": {
+          "discriminator": {
+            "mapping": {
+              "bullet_list": "#/$defs/BulletBlock",
+              "check_list": "#/$defs/ChecklistBlock",
+              "code": "#/$defs/CodeBlock",
+              "divider": "#/$defs/DividerBlock",
+              "heading": "#/$defs/HeadingBlock",
+              "image": "#/$defs/ImageBlock",
+              "numbered_list": "#/$defs/NumberedBlock",
+              "paragraph": "#/$defs/ParagraphBlock",
+              "quote": "#/$defs/QuoteBlock",
+              "section": "#/$defs/SectionBlock",
+              "table": "#/$defs/TableBlock",
+              "toggle_list": "#/$defs/ToggleBlock"
+            },
+            "propertyName": "type"
+          },
+          "oneOf": [
+            {
+              "$ref": "#/$defs/ParagraphBlock"
+            },
+            {
+              "$ref": "#/$defs/HeadingBlock"
+            },
+            {
+              "$ref": "#/$defs/BulletBlock"
+            },
+            {
+              "$ref": "#/$defs/NumberedBlock"
+            },
+            {
+              "$ref": "#/$defs/ChecklistBlock"
+            },
+            {
+              "$ref": "#/$defs/ToggleBlock"
+            },
+            {
+              "$ref": "#/$defs/QuoteBlock"
+            },
+            {
+              "$ref": "#/$defs/CodeBlock"
+            },
+            {
+              "$ref": "#/$defs/DividerBlock"
+            },
+            {
+              "$ref": "#/$defs/TableBlock"
+            },
+            {
+              "$ref": "#/$defs/ImageBlock"
+            },
+            {
+              "$ref": "#/$defs/SectionBlock"
+            }
+          ],
+          "title": "Block"
+        },
+        "keepChildren": {
+          "default": false,
+          "title": "Keepchildren",
+          "type": "boolean"
+        },
+        "kind": {
+          "const": "put_block",
+          "title": "Kind",
+          "type": "string"
+        },
+        "parentId": {
+          "minLength": 1,
+          "title": "Parentid",
+          "type": "string"
+        }
+      },
+      "required": [
+        "kind",
+        "parentId",
+        "afterId",
+        "beforeRevision",
+        "block"
+      ],
+      "title": "PutBlock",
+      "type": "object"
+    },
+    "PutRecord": {
+      "additionalProperties": false,
+      "properties": {
+        "beforeRevision": {
+          "anyOf": [
+            {
+              "minimum": 1,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Beforerevision"
+        },
+        "kind": {
+          "const": "put_record",
+          "title": "Kind",
+          "type": "string"
+        },
+        "record": {
+          "discriminator": {
+            "mapping": {
+              "candidate": "#/$defs/CandidateRecord",
+              "certification": "#/$defs/CertificationRecord",
+              "claim": "#/$defs/ClaimRecord",
+              "detail": "#/$defs/DetailRecord",
+              "education": "#/$defs/EducationRecord",
+              "employment": "#/$defs/EmploymentRecord",
+              "language": "#/$defs/LanguageRecord",
+              "leadership": "#/$defs/LeadershipRecord",
+              "metric": "#/$defs/MetricRecord",
+              "subproject": "#/$defs/SubprojectRecord",
+              "technology": "#/$defs/TechnologyRecord",
+              "unresolved": "#/$defs/UnresolvedRecord"
+            },
+            "propertyName": "kind"
+          },
+          "oneOf": [
+            {
+              "$ref": "#/$defs/CandidateRecord"
+            },
+            {
+              "$ref": "#/$defs/DetailRecord"
+            },
+            {
+              "$ref": "#/$defs/EmploymentRecord"
+            },
+            {
+              "$ref": "#/$defs/SubprojectRecord"
+            },
+            {
+              "$ref": "#/$defs/TechnologyRecord"
+            },
+            {
+              "$ref": "#/$defs/EducationRecord"
+            },
+            {
+              "$ref": "#/$defs/LanguageRecord"
+            },
+            {
+              "$ref": "#/$defs/CertificationRecord"
+            },
+            {
+              "$ref": "#/$defs/ClaimRecord"
+            },
+            {
+              "$ref": "#/$defs/MetricRecord"
+            },
+            {
+              "$ref": "#/$defs/LeadershipRecord"
+            },
+            {
+              "$ref": "#/$defs/UnresolvedRecord"
+            }
+          ],
+          "title": "Record"
+        }
+      },
+      "required": [
+        "kind",
+        "beforeRevision",
+        "record"
+      ],
+      "title": "PutRecord",
+      "type": "object"
+    },
+    "QuoteBlock": {
+      "additionalProperties": false,
+      "properties": {
+        "children": {
+          "items": {
+            "discriminator": {
+              "mapping": {
+                "bullet_list": "#/$defs/BulletBlock",
+                "check_list": "#/$defs/ChecklistBlock",
+                "code": "#/$defs/CodeBlock",
+                "divider": "#/$defs/DividerBlock",
+                "heading": "#/$defs/HeadingBlock",
+                "image": "#/$defs/ImageBlock",
+                "numbered_list": "#/$defs/NumberedBlock",
+                "paragraph": "#/$defs/ParagraphBlock",
+                "quote": "#/$defs/QuoteBlock",
+                "section": "#/$defs/SectionBlock",
+                "table": "#/$defs/TableBlock",
+                "toggle_list": "#/$defs/ToggleBlock"
+              },
+              "propertyName": "type"
+            },
+            "oneOf": [
+              {
+                "$ref": "#/$defs/ParagraphBlock"
+              },
+              {
+                "$ref": "#/$defs/HeadingBlock"
+              },
+              {
+                "$ref": "#/$defs/BulletBlock"
+              },
+              {
+                "$ref": "#/$defs/NumberedBlock"
+              },
+              {
+                "$ref": "#/$defs/ChecklistBlock"
+              },
+              {
+                "$ref": "#/$defs/ToggleBlock"
+              },
+              {
+                "$ref": "#/$defs/QuoteBlock"
+              },
+              {
+                "$ref": "#/$defs/CodeBlock"
+              },
+              {
+                "$ref": "#/$defs/DividerBlock"
+              },
+              {
+                "$ref": "#/$defs/TableBlock"
+              },
+              {
+                "$ref": "#/$defs/ImageBlock"
+              },
+              {
+                "$ref": "#/$defs/SectionBlock"
+              }
+            ]
+          },
+          "title": "Children",
+          "type": "array"
+        },
+        "content": {
+          "items": {
+            "discriminator": {
+              "mapping": {
+                "fact_field": "#/$defs/FactFieldSpan",
+                "link": "#/$defs/Hyperlink",
+                "text": "#/$defs/StyledText"
+              },
+              "propertyName": "type"
+            },
+            "oneOf": [
+              {
+                "$ref": "#/$defs/StyledText"
+              },
+              {
+                "$ref": "#/$defs/Hyperlink"
+              },
+              {
+                "$ref": "#/$defs/FactFieldSpan"
+              }
+            ]
+          },
+          "title": "Content",
+          "type": "array"
+        },
+        "id": {
+          "minLength": 1,
+          "title": "Id",
+          "type": "string"
+        },
+        "props": {
+          "$ref": "#/$defs/ParagraphProps"
+        },
+        "provenance": {
+          "items": {
+            "discriminator": {
+              "mapping": {
+                "citation": "#/$defs/NarrativeCitation",
+                "field_binding": "#/$defs/FieldBinding",
+                "source": "#/$defs/SourceWitness",
+                "working_owner": "#/$defs/WorkingOwnership"
+              },
+              "propertyName": "kind"
+            },
+            "oneOf": [
+              {
+                "$ref": "#/$defs/NarrativeCitation"
+              },
+              {
+                "$ref": "#/$defs/FieldBinding"
+              },
+              {
+                "$ref": "#/$defs/WorkingOwnership"
+              },
+              {
+                "$ref": "#/$defs/SourceWitness"
+              }
+            ]
+          },
+          "title": "Provenance",
+          "type": "array"
+        },
+        "revision": {
+          "minimum": 1,
+          "title": "Revision",
+          "type": "integer"
+        },
+        "type": {
+          "const": "quote",
+          "title": "Type",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "revision",
+        "provenance",
+        "children",
+        "type",
+        "props",
+        "content"
+      ],
+      "title": "QuoteBlock",
+      "type": "object"
+    },
+    "RecordTombstone": {
+      "additionalProperties": false,
+      "properties": {
+        "actionId": {
+          "minLength": 1,
+          "title": "Actionid",
+          "type": "string"
+        },
+        "orderIndex": {
+          "minimum": 0,
+          "title": "Orderindex",
+          "type": "integer"
+        },
+        "recordId": {
+          "minLength": 1,
+          "title": "Recordid",
+          "type": "string"
+        },
+        "revision": {
+          "minimum": 1,
+          "title": "Revision",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "recordId",
+        "revision",
+        "actionId",
+        "orderIndex"
+      ],
+      "title": "RecordTombstone",
+      "type": "object"
+    },
+    "RemoveBlock": {
+      "additionalProperties": false,
+      "properties": {
+        "beforeRevision": {
+          "minimum": 1,
+          "title": "Beforerevision",
+          "type": "integer"
+        },
+        "blockId": {
+          "minLength": 1,
+          "title": "Blockid",
+          "type": "string"
+        },
+        "kind": {
+          "const": "remove_block",
+          "title": "Kind",
+          "type": "string"
+        }
+      },
+      "required": [
+        "kind",
+        "blockId",
+        "beforeRevision"
+      ],
+      "title": "RemoveBlock",
+      "type": "object"
+    },
+    "RemoveRecord": {
+      "additionalProperties": false,
+      "properties": {
+        "beforeRevision": {
+          "minimum": 1,
+          "title": "Beforerevision",
+          "type": "integer"
+        },
+        "kind": {
+          "const": "remove_record",
+          "title": "Kind",
+          "type": "string"
+        },
+        "recordId": {
+          "minLength": 1,
+          "title": "Recordid",
+          "type": "string"
+        }
+      },
+      "required": [
+        "kind",
+        "recordId",
+        "beforeRevision"
+      ],
+      "title": "RemoveRecord",
+      "type": "object"
+    },
+    "ReplaceInlineRange": {
+      "additionalProperties": false,
+      "properties": {
+        "beforeRevision": {
+          "minimum": 1,
+          "title": "Beforerevision",
+          "type": "integer"
+        },
+        "blockId": {
+          "minLength": 1,
+          "title": "Blockid",
+          "type": "string"
+        },
+        "cellId": {
+          "anyOf": [
+            {
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Cellid"
+        },
+        "content": {
+          "items": {
+            "discriminator": {
+              "mapping": {
+                "fact_field": "#/$defs/FactFieldSpan",
+                "link": "#/$defs/Hyperlink",
+                "text": "#/$defs/StyledText"
+              },
+              "propertyName": "type"
+            },
+            "oneOf": [
+              {
+                "$ref": "#/$defs/StyledText"
+              },
+              {
+                "$ref": "#/$defs/Hyperlink"
+              },
+              {
+                "$ref": "#/$defs/FactFieldSpan"
+              }
+            ]
+          },
+          "title": "Content",
+          "type": "array"
+        },
+        "end": {
+          "description": "UTF-16 code units within the selected inline field.",
+          "minimum": 0,
+          "title": "End",
+          "type": "integer"
+        },
+        "field": {
+          "enum": [
+            "content",
+            "caption"
+          ],
+          "title": "Field",
+          "type": "string"
+        },
+        "kind": {
+          "const": "replace_inline_range",
+          "title": "Kind",
+          "type": "string"
+        },
+        "start": {
+          "description": "UTF-16 code units within the selected inline field.",
+          "minimum": 0,
+          "title": "Start",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "kind",
+        "blockId",
+        "cellId",
+        "field",
+        "start",
+        "end",
+        "beforeRevision",
+        "content"
+      ],
+      "title": "ReplaceInlineRange",
+      "type": "object"
+    },
+    "RichCompletionRequest": {
+      "additionalProperties": false,
+      "properties": {
+        "blockIds": {
+          "items": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "maxItems": 100,
+          "title": "Blockids",
+          "type": "array"
+        },
+        "capture": {
+          "$ref": "#/$defs/ActionCapture"
+        },
+        "interpret": {
+          "default": true,
+          "title": "Interpret",
+          "type": "boolean"
+        },
+        "movedIds": {
+          "items": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "maxItems": 100,
+          "title": "Movedids",
+          "type": "array"
+        },
+        "removedFields": {
+          "items": {
+            "$ref": "#/$defs/FieldReference"
+          },
+          "maxItems": 100,
+          "title": "Removedfields",
+          "type": "array"
+        },
+        "removedRecordIds": {
+          "items": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "maxItems": 100,
+          "title": "Removedrecordids",
+          "type": "array"
+        }
+      },
+      "required": [
+        "capture",
+        "blockIds",
+        "movedIds",
+        "removedFields"
+      ],
+      "title": "RichCompletionRequest",
+      "type": "object"
+    },
+    "RichDocumentV1": {
+      "additionalProperties": false,
+      "properties": {
+        "regions": {
+          "items": {
+            "$ref": "#/$defs/RichRegion"
+          },
+          "maxItems": 3,
+          "minItems": 3,
+          "title": "Regions",
+          "type": "array"
+        },
+        "revision": {
+          "minimum": 1,
+          "title": "Revision",
+          "type": "integer"
+        },
+        "schemaVersion": {
+          "const": 1,
+          "title": "Schemaversion",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "schemaVersion",
+        "revision",
+        "regions"
+      ],
+      "title": "RichDocumentV1",
+      "type": "object"
+    },
+    "RichMutationReplay": {
+      "additionalProperties": false,
+      "properties": {
+        "clientMutationId": {
+          "minLength": 1,
+          "title": "Clientmutationid",
+          "type": "string"
+        },
+        "requestSha256": {
+          "pattern": "^[a-f0-9]{64}$",
+          "title": "Requestsha256",
+          "type": "string"
+        },
+        "resultingRevision": {
+          "minimum": 1,
+          "title": "Resultingrevision",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "clientMutationId",
+        "requestSha256",
+        "resultingRevision"
+      ],
+      "title": "RichMutationReplay",
+      "type": "object"
+    },
+    "RichOperation": {
+      "additionalProperties": false,
+      "properties": {
+        "actionId": {
+          "anyOf": [
+            {
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Actionid"
+        },
+        "dependencies": {
+          "items": {
+            "$ref": "#/$defs/DependencyStamp"
+          },
+          "title": "Dependencies",
+          "type": "array"
+        },
+        "errorCode": {
+          "anyOf": [
+            {
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Errorcode"
+        },
+        "id": {
+          "minLength": 1,
+          "title": "Id",
+          "type": "string"
+        },
+        "kind": {
+          "enum": [
+            "extract",
+            "assess_resume",
+            "normalize_semantics",
+            "draft_prose",
+            "render",
+            "project_save",
+            "rewrite_prose",
+            "reconcile_edits"
+          ],
+          "title": "Kind",
+          "type": "string"
+        },
+        "status": {
+          "enum": [
+            "queued",
+            "running",
+            "completed",
+            "failed",
+            "cancelled",
+            "interrupted"
+          ],
+          "title": "Status",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "kind",
+        "status",
+        "actionId",
+        "dependencies",
+        "errorCode"
+      ],
+      "title": "RichOperation",
+      "type": "object"
+    },
+    "RichPanelSyncRequest": {
+      "additionalProperties": false,
+      "properties": {
+        "capture": {
+          "$ref": "#/$defs/ActionCapture"
+        },
+        "recordIds": {
+          "items": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "maxItems": 100,
+          "minItems": 1,
+          "title": "Recordids",
+          "type": "array"
+        }
+      },
+      "required": [
+        "capture",
+        "recordIds"
+      ],
+      "title": "RichPanelSyncRequest",
+      "type": "object"
+    },
+    "RichPosition": {
+      "additionalProperties": false,
+      "properties": {
+        "blockId": {
+          "minLength": 1,
+          "title": "Blockid",
+          "type": "string"
+        },
+        "cellId": {
+          "anyOf": [
+            {
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Cellid"
+        },
+        "offset": {
+          "description": "UTF-16 code units within the block or cell.",
+          "minimum": 0,
+          "title": "Offset",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "blockId",
+        "cellId",
+        "offset"
+      ],
+      "title": "RichPosition",
+      "type": "object"
+    },
+    "RichPreDraft": {
+      "additionalProperties": false,
+      "properties": {
+        "facts": {
+          "$ref": "#/$defs/WorkingFacts"
+        },
+        "operations": {
+          "items": {
+            "$ref": "#/$defs/RichOperation"
+          },
+          "title": "Operations",
+          "type": "array"
+        },
+        "selectedInput": {
+          "enum": [
+            "text",
+            "file"
+          ],
+          "title": "Selectedinput",
+          "type": "string"
+        },
+        "selectedSourceId": {
+          "anyOf": [
+            {
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Selectedsourceid"
+        },
+        "sources": {
+          "items": {
+            "$ref": "#/$defs/Source"
+          },
+          "title": "Sources",
+          "type": "array"
+        },
+        "warnings": {
+          "items": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "title": "Warnings",
+          "type": "array"
+        }
+      },
+      "required": [
+        "selectedInput",
+        "selectedSourceId",
+        "sources",
+        "facts",
+        "operations",
+        "warnings"
+      ],
+      "title": "RichPreDraft",
+      "type": "object"
+    },
+    "RichRegion": {
+      "additionalProperties": false,
+      "properties": {
+        "blocks": {
+          "items": {
+            "discriminator": {
+              "mapping": {
+                "bullet_list": "#/$defs/BulletBlock",
+                "check_list": "#/$defs/ChecklistBlock",
+                "code": "#/$defs/CodeBlock",
+                "divider": "#/$defs/DividerBlock",
+                "heading": "#/$defs/HeadingBlock",
+                "image": "#/$defs/ImageBlock",
+                "numbered_list": "#/$defs/NumberedBlock",
+                "paragraph": "#/$defs/ParagraphBlock",
+                "quote": "#/$defs/QuoteBlock",
+                "section": "#/$defs/SectionBlock",
+                "table": "#/$defs/TableBlock",
+                "toggle_list": "#/$defs/ToggleBlock"
+              },
+              "propertyName": "type"
+            },
+            "oneOf": [
+              {
+                "$ref": "#/$defs/ParagraphBlock"
+              },
+              {
+                "$ref": "#/$defs/HeadingBlock"
+              },
+              {
+                "$ref": "#/$defs/BulletBlock"
+              },
+              {
+                "$ref": "#/$defs/NumberedBlock"
+              },
+              {
+                "$ref": "#/$defs/ChecklistBlock"
+              },
+              {
+                "$ref": "#/$defs/ToggleBlock"
+              },
+              {
+                "$ref": "#/$defs/QuoteBlock"
+              },
+              {
+                "$ref": "#/$defs/CodeBlock"
+              },
+              {
+                "$ref": "#/$defs/DividerBlock"
+              },
+              {
+                "$ref": "#/$defs/TableBlock"
+              },
+              {
+                "$ref": "#/$defs/ImageBlock"
+              },
+              {
+                "$ref": "#/$defs/SectionBlock"
+              }
+            ]
+          },
+          "title": "Blocks",
+          "type": "array"
+        },
+        "id": {
+          "minLength": 1,
+          "title": "Id",
+          "type": "string"
+        },
+        "revision": {
+          "minimum": 1,
+          "title": "Revision",
+          "type": "integer"
+        },
+        "role": {
+          "enum": [
+            "header",
+            "sidebar",
+            "main"
+          ],
+          "title": "Role",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "role",
+        "revision",
+        "blocks"
+      ],
+      "title": "RichRegion",
+      "type": "object"
+    },
+    "RichRenderSnapshot": {
+      "additionalProperties": false,
+      "properties": {
+        "documentRevision": {
+          "minimum": 1,
+          "title": "Documentrevision",
+          "type": "integer"
+        },
+        "docxPath": {
+          "title": "Docxpath",
+          "type": "string"
+        },
+        "docxSha256": {
+          "pattern": "^[a-f0-9]{64}$",
+          "title": "Docxsha256",
+          "type": "string"
+        },
+        "docxSize": {
+          "exclusiveMinimum": 0,
+          "maximum": 33554432,
+          "title": "Docxsize",
+          "type": "integer"
+        },
+        "factsRevision": {
+          "minimum": 1,
+          "title": "Factsrevision",
+          "type": "integer"
+        },
+        "id": {
+          "minLength": 1,
+          "title": "Id",
+          "type": "string"
+        },
+        "rendererSha256": {
+          "pattern": "^[a-f0-9]{64}$",
+          "title": "Renderersha256",
+          "type": "string"
+        },
+        "rendererVersion": {
+          "minLength": 1,
+          "title": "Rendererversion",
+          "type": "string"
+        },
+        "templateSha256": {
+          "pattern": "^[a-f0-9]{64}$",
+          "title": "Templatesha256",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "documentRevision",
+        "factsRevision",
+        "templateSha256",
+        "rendererVersion",
+        "rendererSha256",
+        "docxSha256",
+        "docxSize",
+        "docxPath"
+      ],
+      "title": "RichRenderSnapshot",
+      "type": "object"
+    },
+    "RichRewriteRequest": {
+      "additionalProperties": false,
+      "properties": {
+        "instruction": {
+          "maxLength": 4000,
+          "minLength": 1,
+          "title": "Instruction",
+          "type": "string"
+        },
+        "selection": {
+          "$ref": "#/$defs/RichSelection"
+        }
+      },
+      "required": [
+        "selection",
+        "instruction"
+      ],
+      "title": "RichRewriteRequest",
+      "type": "object"
+    },
+    "RichSelection": {
+      "additionalProperties": false,
+      "properties": {
+        "anchor": {
+          "$ref": "#/$defs/RichPosition"
+        },
+        "blockIds": {
+          "items": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "minItems": 1,
+          "title": "Blockids",
+          "type": "array"
+        },
+        "capture": {
+          "$ref": "#/$defs/ActionCapture"
+        },
+        "head": {
+          "$ref": "#/$defs/RichPosition"
+        },
+        "kind": {
+          "enum": [
+            "text",
+            "blocks",
+            "table_cells"
+          ],
+          "title": "Kind",
+          "type": "string"
+        },
+        "textSha256": {
+          "pattern": "^[a-f0-9]{64}$",
+          "title": "Textsha256",
+          "type": "string"
+        }
+      },
+      "required": [
+        "kind",
+        "anchor",
+        "head",
+        "blockIds",
+        "capture",
+        "textSha256"
+      ],
+      "title": "RichSelection",
+      "type": "object"
+    },
+    "RichSyncRecord": {
+      "additionalProperties": false,
+      "properties": {
+        "actionId": {
+          "minLength": 1,
+          "title": "Actionid",
+          "type": "string"
+        },
+        "blockIds": {
+          "items": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "title": "Blockids",
+          "type": "array"
+        },
+        "dependencies": {
+          "items": {
+            "$ref": "#/$defs/DependencyStamp"
+          },
+          "title": "Dependencies",
+          "type": "array"
+        },
+        "errorCode": {
+          "anyOf": [
+            {
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Errorcode"
+        },
+        "factIds": {
+          "items": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "title": "Factids",
+          "type": "array"
+        },
+        "fieldKeys": {
+          "items": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "title": "Fieldkeys",
+          "type": "array"
+        },
+        "id": {
+          "minLength": 1,
+          "title": "Id",
+          "type": "string"
+        },
+        "instruction": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Instruction"
+        },
+        "kind": {
+          "default": "completion",
+          "enum": [
+            "completion",
+            "rewrite",
+            "reconciliation",
+            "conflict",
+            "panel"
+          ],
+          "title": "Kind",
+          "type": "string"
+        },
+        "proposedSteps": {
+          "items": {
+            "discriminator": {
+              "mapping": {
+                "move_block": "#/$defs/MoveBlock",
+                "put_block": "#/$defs/PutBlock",
+                "put_record": "#/$defs/PutRecord",
+                "remove_block": "#/$defs/RemoveBlock",
+                "remove_record": "#/$defs/RemoveRecord",
+                "replace_inline_range": "#/$defs/ReplaceInlineRange"
+              },
+              "propertyName": "kind"
+            },
+            "oneOf": [
+              {
+                "$ref": "#/$defs/PutBlock"
+              },
+              {
+                "$ref": "#/$defs/RemoveBlock"
+              },
+              {
+                "$ref": "#/$defs/MoveBlock"
+              },
+              {
+                "$ref": "#/$defs/ReplaceInlineRange"
+              },
+              {
+                "$ref": "#/$defs/PutRecord"
+              },
+              {
+                "$ref": "#/$defs/RemoveRecord"
+              }
+            ]
+          },
+          "maxItems": 1000,
+          "title": "Proposedsteps",
+          "type": "array"
+        },
+        "ready": {
+          "default": false,
+          "title": "Ready",
+          "type": "boolean"
+        },
+        "selection": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/RichSelection"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "status": {
+          "enum": [
+            "pending",
+            "failed",
+            "conflict",
+            "applied",
+            "stale"
+          ],
+          "title": "Status",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "status",
+        "actionId",
+        "blockIds",
+        "fieldKeys",
+        "factIds",
+        "dependencies",
+        "errorCode"
+      ],
+      "title": "RichSyncRecord",
+      "type": "object"
+    },
+    "RichWarning": {
+      "additionalProperties": false,
+      "properties": {
+        "blockIds": {
+          "items": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "title": "Blockids",
+          "type": "array"
+        },
+        "code": {
+          "minLength": 1,
+          "title": "Code",
+          "type": "string"
+        },
+        "evidence": {
+          "items": {
+            "$ref": "#/$defs/Evidence"
+          },
+          "title": "Evidence",
+          "type": "array"
+        },
+        "id": {
+          "minLength": 1,
+          "title": "Id",
+          "type": "string"
+        },
+        "recordIds": {
+          "items": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "title": "Recordids",
+          "type": "array"
+        }
+      },
+      "required": [
+        "id",
+        "code",
+        "blockIds",
+        "recordIds",
+        "evidence"
+      ],
+      "title": "RichWarning",
+      "type": "object"
+    },
+    "Rules": {
+      "additionalProperties": false,
+      "properties": {
+        "markdown": {
+          "title": "Markdown",
+          "type": "string"
+        },
+        "revision": {
+          "minimum": 1,
+          "title": "Revision",
+          "type": "integer"
+        },
+        "sha256": {
+          "pattern": "^[a-f0-9]{64}$",
+          "title": "Sha256",
+          "type": "string"
+        }
+      },
+      "required": [
+        "markdown",
+        "revision",
+        "sha256"
+      ],
+      "title": "Rules",
+      "type": "object"
+    },
+    "SectionBlock": {
+      "additionalProperties": false,
+      "properties": {
+        "children": {
+          "items": {
+            "discriminator": {
+              "mapping": {
+                "bullet_list": "#/$defs/BulletBlock",
+                "check_list": "#/$defs/ChecklistBlock",
+                "code": "#/$defs/CodeBlock",
+                "divider": "#/$defs/DividerBlock",
+                "heading": "#/$defs/HeadingBlock",
+                "image": "#/$defs/ImageBlock",
+                "numbered_list": "#/$defs/NumberedBlock",
+                "paragraph": "#/$defs/ParagraphBlock",
+                "quote": "#/$defs/QuoteBlock",
+                "section": "#/$defs/SectionBlock",
+                "table": "#/$defs/TableBlock",
+                "toggle_list": "#/$defs/ToggleBlock"
+              },
+              "propertyName": "type"
+            },
+            "oneOf": [
+              {
+                "$ref": "#/$defs/ParagraphBlock"
+              },
+              {
+                "$ref": "#/$defs/HeadingBlock"
+              },
+              {
+                "$ref": "#/$defs/BulletBlock"
+              },
+              {
+                "$ref": "#/$defs/NumberedBlock"
+              },
+              {
+                "$ref": "#/$defs/ChecklistBlock"
+              },
+              {
+                "$ref": "#/$defs/ToggleBlock"
+              },
+              {
+                "$ref": "#/$defs/QuoteBlock"
+              },
+              {
+                "$ref": "#/$defs/CodeBlock"
+              },
+              {
+                "$ref": "#/$defs/DividerBlock"
+              },
+              {
+                "$ref": "#/$defs/TableBlock"
+              },
+              {
+                "$ref": "#/$defs/ImageBlock"
+              },
+              {
+                "$ref": "#/$defs/SectionBlock"
+              }
+            ]
+          },
+          "title": "Children",
+          "type": "array"
+        },
+        "content": {
+          "items": {
+            "discriminator": {
+              "mapping": {
+                "fact_field": "#/$defs/FactFieldSpan",
+                "link": "#/$defs/Hyperlink",
+                "text": "#/$defs/StyledText"
+              },
+              "propertyName": "type"
+            },
+            "oneOf": [
+              {
+                "$ref": "#/$defs/StyledText"
+              },
+              {
+                "$ref": "#/$defs/Hyperlink"
+              },
+              {
+                "$ref": "#/$defs/FactFieldSpan"
+              }
+            ]
+          },
+          "title": "Content",
+          "type": "array"
+        },
+        "id": {
+          "minLength": 1,
+          "title": "Id",
+          "type": "string"
+        },
+        "props": {
+          "$ref": "#/$defs/SectionProps"
+        },
+        "provenance": {
+          "items": {
+            "discriminator": {
+              "mapping": {
+                "citation": "#/$defs/NarrativeCitation",
+                "field_binding": "#/$defs/FieldBinding",
+                "source": "#/$defs/SourceWitness",
+                "working_owner": "#/$defs/WorkingOwnership"
+              },
+              "propertyName": "kind"
+            },
+            "oneOf": [
+              {
+                "$ref": "#/$defs/NarrativeCitation"
+              },
+              {
+                "$ref": "#/$defs/FieldBinding"
+              },
+              {
+                "$ref": "#/$defs/WorkingOwnership"
+              },
+              {
+                "$ref": "#/$defs/SourceWitness"
+              }
+            ]
+          },
+          "title": "Provenance",
+          "type": "array"
+        },
+        "revision": {
+          "minimum": 1,
+          "title": "Revision",
+          "type": "integer"
+        },
+        "type": {
+          "const": "section",
+          "title": "Type",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "revision",
+        "provenance",
+        "children",
+        "type",
+        "props",
+        "content"
+      ],
+      "title": "SectionBlock",
+      "type": "object"
+    },
+    "SectionProps": {
+      "additionalProperties": false,
+      "properties": {
+        "alignment": {
+          "default": "left",
+          "enum": [
+            "left",
+            "center",
+            "right",
+            "justify"
+          ],
+          "title": "Alignment",
+          "type": "string"
+        },
+        "backgroundColor": {
+          "default": "default",
+          "pattern": "^(default|#[a-fA-F0-9]{6})$",
+          "title": "Backgroundcolor",
+          "type": "string"
+        },
+        "presentation": {
+          "default": "standard",
+          "enum": [
+            "standard",
+            "focus"
+          ],
+          "title": "Presentation",
+          "type": "string"
+        },
+        "recordId": {
+          "anyOf": [
+            {
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Recordid"
+        },
+        "textColor": {
+          "default": "default",
+          "pattern": "^(default|#[a-fA-F0-9]{6})$",
+          "title": "Textcolor",
+          "type": "string"
+        }
+      },
+      "required": [
+        "recordId"
+      ],
+      "title": "SectionProps",
+      "type": "object"
+    },
+    "Source": {
+      "additionalProperties": false,
+      "properties": {
+        "byteRef": {
+          "title": "Byteref",
+          "type": "string"
+        },
+        "byteSha256": {
+          "pattern": "^[a-f0-9]{64}$",
+          "title": "Bytesha256",
+          "type": "string"
+        },
+        "id": {
+          "minLength": 1,
+          "title": "Id",
+          "type": "string"
+        },
+        "mimeType": {
+          "title": "Mimetype",
+          "type": "string"
+        },
+        "originalName": {
+          "title": "Originalname",
+          "type": "string"
+        },
+        "overlays": {
+          "items": {
+            "$ref": "#/$defs/SourceOverlay"
+          },
+          "title": "Overlays",
+          "type": "array"
+        },
+        "parser": {
+          "title": "Parser",
+          "type": "string"
+        },
+        "parserVersion": {
+          "title": "Parserversion",
+          "type": "string"
+        },
+        "revision": {
+          "minimum": 1,
+          "title": "Revision",
+          "type": "integer"
+        },
+        "units": {
+          "items": {
+            "$ref": "#/$defs/SourceUnit"
+          },
+          "title": "Units",
+          "type": "array"
+        },
+        "warnings": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Warnings",
+          "type": "array"
+        }
+      },
+      "required": [
+        "id",
+        "revision",
+        "originalName",
+        "mimeType",
+        "byteSha256",
+        "byteRef",
+        "parser",
+        "parserVersion",
+        "units",
+        "overlays",
+        "warnings"
+      ],
+      "title": "Source",
+      "type": "object"
+    },
+    "SourceLocation": {
+      "additionalProperties": false,
+      "properties": {
+        "column": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Column"
+        },
+        "index": {
+          "minimum": 0,
+          "title": "Index",
+          "type": "integer"
+        },
+        "kind": {
+          "enum": [
+            "page",
+            "paragraph",
+            "table_cell",
+            "pasted"
+          ],
+          "title": "Kind",
+          "type": "string"
+        },
+        "row": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Row"
+        }
+      },
+      "required": [
+        "kind",
+        "index",
+        "row",
+        "column"
+      ],
+      "title": "SourceLocation",
+      "type": "object"
+    },
+    "SourceOverlay": {
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "minLength": 1,
+          "title": "Id",
+          "type": "string"
+        },
+        "origin": {
+          "const": "user",
+          "title": "Origin",
+          "type": "string"
+        },
+        "revision": {
+          "minimum": 1,
+          "title": "Revision",
+          "type": "integer"
+        },
+        "text": {
+          "title": "Text",
+          "type": "string"
+        },
+        "unitId": {
+          "minLength": 1,
+          "title": "Unitid",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "revision",
+        "unitId",
+        "text",
+        "origin"
+      ],
+      "title": "SourceOverlay",
+      "type": "object"
+    },
+    "SourceUnit": {
+      "additionalProperties": false,
+      "properties": {
+        "disposition": {
+          "enum": [
+            "shown",
+            "condensed",
+            "archived",
+            "duplicate",
+            "unresolved",
+            "administrative"
+          ],
+          "title": "Disposition",
+          "type": "string"
+        },
+        "id": {
+          "minLength": 1,
+          "title": "Id",
+          "type": "string"
+        },
+        "location": {
+          "$ref": "#/$defs/SourceLocation"
+        },
+        "order": {
+          "minimum": 0,
+          "title": "Order",
+          "type": "integer"
+        },
+        "representedFactIds": {
+          "items": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "title": "Representedfactids",
+          "type": "array"
+        },
+        "revision": {
+          "minimum": 1,
+          "title": "Revision",
+          "type": "integer"
+        },
+        "text": {
+          "title": "Text",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "revision",
+        "order",
+        "text",
+        "location",
+        "disposition",
+        "representedFactIds"
+      ],
+      "title": "SourceUnit",
+      "type": "object"
+    },
+    "SourceWitness": {
+      "additionalProperties": false,
+      "properties": {
+        "evidence": {
+          "items": {
+            "$ref": "#/$defs/EvidenceSpan"
+          },
+          "minItems": 1,
+          "title": "Evidence",
+          "type": "array"
+        },
+        "id": {
+          "minLength": 1,
+          "title": "Id",
+          "type": "string"
+        },
+        "kind": {
+          "const": "source",
+          "title": "Kind",
+          "type": "string"
+        }
+      },
+      "required": [
+        "kind",
+        "id",
+        "evidence"
+      ],
+      "title": "SourceWitness",
+      "type": "object"
+    },
+    "StyledText": {
+      "additionalProperties": false,
+      "properties": {
+        "styles": {
+          "$ref": "#/$defs/InlineStyles"
+        },
+        "text": {
+          "title": "Text",
+          "type": "string"
+        },
+        "type": {
+          "const": "text",
+          "title": "Type",
+          "type": "string"
+        }
+      },
+      "required": [
+        "type",
+        "text",
+        "styles"
+      ],
+      "title": "StyledText",
+      "type": "object"
+    },
+    "SubprojectRecord": {
+      "additionalProperties": false,
+      "properties": {
+        "evidence": {
+          "items": {
+            "$ref": "#/$defs/EvidenceSpan"
+          },
+          "title": "Evidence",
+          "type": "array"
+        },
+        "id": {
+          "minLength": 1,
+          "title": "Id",
+          "type": "string"
+        },
+        "jobId": {
+          "minLength": 1,
+          "title": "Jobid",
+          "type": "string"
+        },
+        "kind": {
+          "const": "subproject",
+          "title": "Kind",
+          "type": "string"
+        },
+        "name": {
+          "$ref": "#/$defs/WorkingField_str_"
+        },
+        "origin": {
+          "enum": [
+            "source",
+            "user"
+          ],
+          "title": "Origin",
+          "type": "string"
+        },
+        "periods": {
+          "items": {
+            "$ref": "#/$defs/WorkingPeriod"
+          },
+          "title": "Periods",
+          "type": "array"
+        },
+        "revision": {
+          "minimum": 1,
+          "title": "Revision",
+          "type": "integer"
+        },
+        "role": {
+          "$ref": "#/$defs/WorkingField_str_"
+        },
+        "userCorrected": {
+          "default": false,
+          "title": "Usercorrected",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "id",
+        "revision",
+        "origin",
+        "evidence",
+        "kind",
+        "jobId",
+        "name",
+        "role",
+        "periods"
+      ],
+      "title": "SubprojectRecord",
+      "type": "object"
+    },
+    "TableBlock": {
+      "additionalProperties": false,
+      "properties": {
+        "children": {
+          "items": {
+            "discriminator": {
+              "mapping": {
+                "bullet_list": "#/$defs/BulletBlock",
+                "check_list": "#/$defs/ChecklistBlock",
+                "code": "#/$defs/CodeBlock",
+                "divider": "#/$defs/DividerBlock",
+                "heading": "#/$defs/HeadingBlock",
+                "image": "#/$defs/ImageBlock",
+                "numbered_list": "#/$defs/NumberedBlock",
+                "paragraph": "#/$defs/ParagraphBlock",
+                "quote": "#/$defs/QuoteBlock",
+                "section": "#/$defs/SectionBlock",
+                "table": "#/$defs/TableBlock",
+                "toggle_list": "#/$defs/ToggleBlock"
+              },
+              "propertyName": "type"
+            },
+            "oneOf": [
+              {
+                "$ref": "#/$defs/ParagraphBlock"
+              },
+              {
+                "$ref": "#/$defs/HeadingBlock"
+              },
+              {
+                "$ref": "#/$defs/BulletBlock"
+              },
+              {
+                "$ref": "#/$defs/NumberedBlock"
+              },
+              {
+                "$ref": "#/$defs/ChecklistBlock"
+              },
+              {
+                "$ref": "#/$defs/ToggleBlock"
+              },
+              {
+                "$ref": "#/$defs/QuoteBlock"
+              },
+              {
+                "$ref": "#/$defs/CodeBlock"
+              },
+              {
+                "$ref": "#/$defs/DividerBlock"
+              },
+              {
+                "$ref": "#/$defs/TableBlock"
+              },
+              {
+                "$ref": "#/$defs/ImageBlock"
+              },
+              {
+                "$ref": "#/$defs/SectionBlock"
+              }
+            ]
+          },
+          "title": "Children",
+          "type": "array"
+        },
+        "content": {
+          "$ref": "#/$defs/TableContent"
+        },
+        "id": {
+          "minLength": 1,
+          "title": "Id",
+          "type": "string"
+        },
+        "props": {
+          "$ref": "#/$defs/ParagraphProps"
+        },
+        "provenance": {
+          "items": {
+            "discriminator": {
+              "mapping": {
+                "citation": "#/$defs/NarrativeCitation",
+                "field_binding": "#/$defs/FieldBinding",
+                "source": "#/$defs/SourceWitness",
+                "working_owner": "#/$defs/WorkingOwnership"
+              },
+              "propertyName": "kind"
+            },
+            "oneOf": [
+              {
+                "$ref": "#/$defs/NarrativeCitation"
+              },
+              {
+                "$ref": "#/$defs/FieldBinding"
+              },
+              {
+                "$ref": "#/$defs/WorkingOwnership"
+              },
+              {
+                "$ref": "#/$defs/SourceWitness"
+              }
+            ]
+          },
+          "title": "Provenance",
+          "type": "array"
+        },
+        "revision": {
+          "minimum": 1,
+          "title": "Revision",
+          "type": "integer"
+        },
+        "type": {
+          "const": "table",
+          "title": "Type",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "revision",
+        "provenance",
+        "children",
+        "type",
+        "props",
+        "content"
+      ],
+      "title": "TableBlock",
+      "type": "object"
+    },
+    "TableCell": {
+      "additionalProperties": false,
+      "properties": {
+        "alignment": {
+          "default": "left",
+          "enum": [
+            "left",
+            "center",
+            "right",
+            "justify"
+          ],
+          "title": "Alignment",
+          "type": "string"
+        },
+        "backgroundColor": {
+          "default": "default",
+          "pattern": "^(default|#[a-fA-F0-9]{6})$",
+          "title": "Backgroundcolor",
+          "type": "string"
+        },
+        "colspan": {
+          "default": 1,
+          "minimum": 1,
+          "title": "Colspan",
+          "type": "integer"
+        },
+        "content": {
+          "items": {
+            "discriminator": {
+              "mapping": {
+                "fact_field": "#/$defs/FactFieldSpan",
+                "link": "#/$defs/Hyperlink",
+                "text": "#/$defs/StyledText"
+              },
+              "propertyName": "type"
+            },
+            "oneOf": [
+              {
+                "$ref": "#/$defs/StyledText"
+              },
+              {
+                "$ref": "#/$defs/Hyperlink"
+              },
+              {
+                "$ref": "#/$defs/FactFieldSpan"
+              }
+            ]
+          },
+          "title": "Content",
+          "type": "array"
+        },
+        "id": {
+          "minLength": 1,
+          "title": "Id",
+          "type": "string"
+        },
+        "revision": {
+          "minimum": 1,
+          "title": "Revision",
+          "type": "integer"
+        },
+        "rowspan": {
+          "default": 1,
+          "minimum": 1,
+          "title": "Rowspan",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "id",
+        "revision",
+        "content"
+      ],
+      "title": "TableCell",
+      "type": "object"
+    },
+    "TableContent": {
+      "additionalProperties": false,
+      "properties": {
+        "columnWidths": {
+          "items": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "minItems": 1,
+          "title": "Columnwidths",
+          "type": "array"
+        },
+        "headerCols": {
+          "default": 0,
+          "minimum": 0,
+          "title": "Headercols",
+          "type": "integer"
+        },
+        "headerRows": {
+          "minimum": 0,
+          "title": "Headerrows",
+          "type": "integer"
+        },
+        "rows": {
+          "items": {
+            "$ref": "#/$defs/TableRow"
+          },
+          "minItems": 1,
+          "title": "Rows",
+          "type": "array"
+        }
+      },
+      "required": [
+        "rows",
+        "columnWidths",
+        "headerRows"
+      ],
+      "title": "TableContent",
+      "type": "object"
+    },
+    "TableRow": {
+      "additionalProperties": false,
+      "properties": {
+        "cells": {
+          "items": {
+            "$ref": "#/$defs/TableCell"
+          },
+          "title": "Cells",
+          "type": "array"
+        },
+        "id": {
+          "minLength": 1,
+          "title": "Id",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "cells"
+      ],
+      "title": "TableRow",
+      "type": "object"
+    },
+    "TechnologyRecord": {
+      "additionalProperties": false,
+      "properties": {
+        "canonicalId": {
+          "$ref": "#/$defs/WorkingField_str_"
+        },
+        "display": {
+          "$ref": "#/$defs/WorkingField_str_"
+        },
+        "evidence": {
+          "items": {
+            "$ref": "#/$defs/EvidenceSpan"
+          },
+          "title": "Evidence",
+          "type": "array"
+        },
+        "id": {
+          "minLength": 1,
+          "title": "Id",
+          "type": "string"
+        },
+        "jobId": {
+          "anyOf": [
+            {
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Jobid"
+        },
+        "kind": {
+          "const": "technology",
+          "title": "Kind",
+          "type": "string"
+        },
+        "origin": {
+          "enum": [
+            "source",
+            "user"
+          ],
+          "title": "Origin",
+          "type": "string"
+        },
+        "revision": {
+          "minimum": 1,
+          "title": "Revision",
+          "type": "integer"
+        },
+        "subprojectId": {
+          "anyOf": [
+            {
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Subprojectid"
+        },
+        "userCorrected": {
+          "default": false,
+          "title": "Usercorrected",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "id",
+        "revision",
+        "origin",
+        "evidence",
+        "kind",
+        "jobId",
+        "subprojectId",
+        "display",
+        "canonicalId"
+      ],
+      "title": "TechnologyRecord",
+      "type": "object"
+    },
+    "TemplateManifest": {
+      "additionalProperties": false,
+      "properties": {
+        "assets": {
+          "items": {
+            "$ref": "#/$defs/AssetRef"
+          },
+          "title": "Assets",
+          "type": "array"
+        },
+        "contentPolicyVersion": {
+          "title": "Contentpolicyversion",
+          "type": "string"
+        },
+        "id": {
+          "minLength": 1,
+          "title": "Id",
+          "type": "string"
+        },
+        "packageSha256": {
+          "pattern": "^[a-f0-9]{64}$",
+          "title": "Packagesha256",
+          "type": "string"
+        },
+        "version": {
+          "title": "Version",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "version",
+        "packageSha256",
+        "contentPolicyVersion",
+        "assets"
+      ],
+      "title": "TemplateManifest",
+      "type": "object"
+    },
+    "ToggleBlock": {
+      "additionalProperties": false,
+      "properties": {
+        "children": {
+          "items": {
+            "discriminator": {
+              "mapping": {
+                "bullet_list": "#/$defs/BulletBlock",
+                "check_list": "#/$defs/ChecklistBlock",
+                "code": "#/$defs/CodeBlock",
+                "divider": "#/$defs/DividerBlock",
+                "heading": "#/$defs/HeadingBlock",
+                "image": "#/$defs/ImageBlock",
+                "numbered_list": "#/$defs/NumberedBlock",
+                "paragraph": "#/$defs/ParagraphBlock",
+                "quote": "#/$defs/QuoteBlock",
+                "section": "#/$defs/SectionBlock",
+                "table": "#/$defs/TableBlock",
+                "toggle_list": "#/$defs/ToggleBlock"
+              },
+              "propertyName": "type"
+            },
+            "oneOf": [
+              {
+                "$ref": "#/$defs/ParagraphBlock"
+              },
+              {
+                "$ref": "#/$defs/HeadingBlock"
+              },
+              {
+                "$ref": "#/$defs/BulletBlock"
+              },
+              {
+                "$ref": "#/$defs/NumberedBlock"
+              },
+              {
+                "$ref": "#/$defs/ChecklistBlock"
+              },
+              {
+                "$ref": "#/$defs/ToggleBlock"
+              },
+              {
+                "$ref": "#/$defs/QuoteBlock"
+              },
+              {
+                "$ref": "#/$defs/CodeBlock"
+              },
+              {
+                "$ref": "#/$defs/DividerBlock"
+              },
+              {
+                "$ref": "#/$defs/TableBlock"
+              },
+              {
+                "$ref": "#/$defs/ImageBlock"
+              },
+              {
+                "$ref": "#/$defs/SectionBlock"
+              }
+            ]
+          },
+          "title": "Children",
+          "type": "array"
+        },
+        "content": {
+          "items": {
+            "discriminator": {
+              "mapping": {
+                "fact_field": "#/$defs/FactFieldSpan",
+                "link": "#/$defs/Hyperlink",
+                "text": "#/$defs/StyledText"
+              },
+              "propertyName": "type"
+            },
+            "oneOf": [
+              {
+                "$ref": "#/$defs/StyledText"
+              },
+              {
+                "$ref": "#/$defs/Hyperlink"
+              },
+              {
+                "$ref": "#/$defs/FactFieldSpan"
+              }
+            ]
+          },
+          "title": "Content",
+          "type": "array"
+        },
+        "id": {
+          "minLength": 1,
+          "title": "Id",
+          "type": "string"
+        },
+        "props": {
+          "$ref": "#/$defs/ParagraphProps"
+        },
+        "provenance": {
+          "items": {
+            "discriminator": {
+              "mapping": {
+                "citation": "#/$defs/NarrativeCitation",
+                "field_binding": "#/$defs/FieldBinding",
+                "source": "#/$defs/SourceWitness",
+                "working_owner": "#/$defs/WorkingOwnership"
+              },
+              "propertyName": "kind"
+            },
+            "oneOf": [
+              {
+                "$ref": "#/$defs/NarrativeCitation"
+              },
+              {
+                "$ref": "#/$defs/FieldBinding"
+              },
+              {
+                "$ref": "#/$defs/WorkingOwnership"
+              },
+              {
+                "$ref": "#/$defs/SourceWitness"
+              }
+            ]
+          },
+          "title": "Provenance",
+          "type": "array"
+        },
+        "revision": {
+          "minimum": 1,
+          "title": "Revision",
+          "type": "integer"
+        },
+        "type": {
+          "const": "toggle_list",
+          "title": "Type",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "revision",
+        "provenance",
+        "children",
+        "type",
+        "props",
+        "content"
+      ],
+      "title": "ToggleBlock",
+      "type": "object"
+    },
+    "UnresolvedRecord": {
+      "additionalProperties": false,
+      "properties": {
+        "category": {
+          "enum": [
+            "education",
+            "certification",
+            "language",
+            "employment",
+            "detail",
+            "other"
+          ],
+          "title": "Category",
+          "type": "string"
+        },
+        "evidence": {
+          "items": {
+            "$ref": "#/$defs/EvidenceSpan"
+          },
+          "title": "Evidence",
+          "type": "array"
+        },
+        "id": {
+          "minLength": 1,
+          "title": "Id",
+          "type": "string"
+        },
+        "kind": {
+          "const": "unresolved",
+          "title": "Kind",
+          "type": "string"
+        },
+        "origin": {
+          "enum": [
+            "source",
+            "user"
+          ],
+          "title": "Origin",
+          "type": "string"
+        },
+        "revision": {
+          "minimum": 1,
+          "title": "Revision",
+          "type": "integer"
+        },
+        "status": {
+          "enum": [
+            "unresolved",
+            "pending",
+            "conflict"
+          ],
+          "title": "Status",
+          "type": "string"
+        },
+        "userCorrected": {
+          "default": false,
+          "title": "Usercorrected",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "id",
+        "revision",
+        "origin",
+        "evidence",
+        "kind",
+        "category",
+        "status"
+      ],
+      "title": "UnresolvedRecord",
+      "type": "object"
+    },
+    "WorkingFacts": {
+      "additionalProperties": false,
+      "properties": {
+        "records": {
+          "items": {
+            "discriminator": {
+              "mapping": {
+                "candidate": "#/$defs/CandidateRecord",
+                "certification": "#/$defs/CertificationRecord",
+                "claim": "#/$defs/ClaimRecord",
+                "detail": "#/$defs/DetailRecord",
+                "education": "#/$defs/EducationRecord",
+                "employment": "#/$defs/EmploymentRecord",
+                "language": "#/$defs/LanguageRecord",
+                "leadership": "#/$defs/LeadershipRecord",
+                "metric": "#/$defs/MetricRecord",
+                "subproject": "#/$defs/SubprojectRecord",
+                "technology": "#/$defs/TechnologyRecord",
+                "unresolved": "#/$defs/UnresolvedRecord"
+              },
+              "propertyName": "kind"
+            },
+            "oneOf": [
+              {
+                "$ref": "#/$defs/CandidateRecord"
+              },
+              {
+                "$ref": "#/$defs/DetailRecord"
+              },
+              {
+                "$ref": "#/$defs/EmploymentRecord"
+              },
+              {
+                "$ref": "#/$defs/SubprojectRecord"
+              },
+              {
+                "$ref": "#/$defs/TechnologyRecord"
+              },
+              {
+                "$ref": "#/$defs/EducationRecord"
+              },
+              {
+                "$ref": "#/$defs/LanguageRecord"
+              },
+              {
+                "$ref": "#/$defs/CertificationRecord"
+              },
+              {
+                "$ref": "#/$defs/ClaimRecord"
+              },
+              {
+                "$ref": "#/$defs/MetricRecord"
+              },
+              {
+                "$ref": "#/$defs/LeadershipRecord"
+              },
+              {
+                "$ref": "#/$defs/UnresolvedRecord"
+              }
+            ]
+          },
+          "title": "Records",
+          "type": "array"
+        },
+        "revision": {
+          "minimum": 1,
+          "title": "Revision",
+          "type": "integer"
+        },
+        "tombstones": {
+          "items": {
+            "$ref": "#/$defs/RecordTombstone"
+          },
+          "title": "Tombstones",
+          "type": "array"
+        }
+      },
+      "required": [
+        "revision",
+        "records",
+        "tombstones"
+      ],
+      "title": "WorkingFacts",
+      "type": "object"
+    },
+    "WorkingField_LeadershipValue_": {
+      "additionalProperties": false,
+      "properties": {
+        "pendingRawText": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Pendingrawtext"
+        },
+        "rawText": {
+          "title": "Rawtext",
+          "type": "string"
+        },
+        "revision": {
+          "minimum": 1,
+          "title": "Revision",
+          "type": "integer"
+        },
+        "status": {
+          "enum": [
+            "known",
+            "unknown",
+            "unresolved",
+            "pending",
+            "conflict"
+          ],
+          "title": "Status",
+          "type": "string"
+        },
+        "userCorrected": {
+          "default": false,
+          "title": "Usercorrected",
+          "type": "boolean"
+        },
+        "value": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/LeadershipValue"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "value",
+        "rawText",
+        "status",
+        "revision",
+        "pendingRawText"
+      ],
+      "title": "WorkingField[LeadershipValue]",
+      "type": "object"
+    },
+    "WorkingField_MetricValue_": {
+      "additionalProperties": false,
+      "properties": {
+        "pendingRawText": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Pendingrawtext"
+        },
+        "rawText": {
+          "title": "Rawtext",
+          "type": "string"
+        },
+        "revision": {
+          "minimum": 1,
+          "title": "Revision",
+          "type": "integer"
+        },
+        "status": {
+          "enum": [
+            "known",
+            "unknown",
+            "unresolved",
+            "pending",
+            "conflict"
+          ],
+          "title": "Status",
+          "type": "string"
+        },
+        "userCorrected": {
+          "default": false,
+          "title": "Usercorrected",
+          "type": "boolean"
+        },
+        "value": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/MetricValue"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "value",
+        "rawText",
+        "status",
+        "revision",
+        "pendingRawText"
+      ],
+      "title": "WorkingField[MetricValue]",
+      "type": "object"
+    },
+    "WorkingField_PartialDate_": {
+      "additionalProperties": false,
+      "properties": {
+        "pendingRawText": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Pendingrawtext"
+        },
+        "rawText": {
+          "title": "Rawtext",
+          "type": "string"
+        },
+        "revision": {
+          "minimum": 1,
+          "title": "Revision",
+          "type": "integer"
+        },
+        "status": {
+          "enum": [
+            "known",
+            "unknown",
+            "unresolved",
+            "pending",
+            "conflict"
+          ],
+          "title": "Status",
+          "type": "string"
+        },
+        "userCorrected": {
+          "default": false,
+          "title": "Usercorrected",
+          "type": "boolean"
+        },
+        "value": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/PartialDate"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "value",
+        "rawText",
+        "status",
+        "revision",
+        "pendingRawText"
+      ],
+      "title": "WorkingField[PartialDate]",
+      "type": "object"
+    },
+    "WorkingField_bool_": {
+      "additionalProperties": false,
+      "properties": {
+        "pendingRawText": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Pendingrawtext"
+        },
+        "rawText": {
+          "title": "Rawtext",
+          "type": "string"
+        },
+        "revision": {
+          "minimum": 1,
+          "title": "Revision",
+          "type": "integer"
+        },
+        "status": {
+          "enum": [
+            "known",
+            "unknown",
+            "unresolved",
+            "pending",
+            "conflict"
+          ],
+          "title": "Status",
+          "type": "string"
+        },
+        "userCorrected": {
+          "default": false,
+          "title": "Usercorrected",
+          "type": "boolean"
+        },
+        "value": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Value"
+        }
+      },
+      "required": [
+        "value",
+        "rawText",
+        "status",
+        "revision",
+        "pendingRawText"
+      ],
+      "title": "WorkingField[bool]",
+      "type": "object"
+    },
+    "WorkingField_str_": {
+      "additionalProperties": false,
+      "properties": {
+        "pendingRawText": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Pendingrawtext"
+        },
+        "rawText": {
+          "title": "Rawtext",
+          "type": "string"
+        },
+        "revision": {
+          "minimum": 1,
+          "title": "Revision",
+          "type": "integer"
+        },
+        "status": {
+          "enum": [
+            "known",
+            "unknown",
+            "unresolved",
+            "pending",
+            "conflict"
+          ],
+          "title": "Status",
+          "type": "string"
+        },
+        "userCorrected": {
+          "default": false,
+          "title": "Usercorrected",
+          "type": "boolean"
+        },
+        "value": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Value"
+        }
+      },
+      "required": [
+        "value",
+        "rawText",
+        "status",
+        "revision",
+        "pendingRawText"
+      ],
+      "title": "WorkingField[str]",
+      "type": "object"
+    },
+    "WorkingOwnership": {
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "minLength": 1,
+          "title": "Id",
+          "type": "string"
+        },
+        "kind": {
+          "const": "working_owner",
+          "title": "Kind",
+          "type": "string"
+        },
+        "recordId": {
+          "minLength": 1,
+          "title": "Recordid",
+          "type": "string"
+        }
+      },
+      "required": [
+        "kind",
+        "id",
+        "recordId"
+      ],
+      "title": "WorkingOwnership",
+      "type": "object"
+    },
+    "WorkingPeriod": {
+      "additionalProperties": false,
+      "properties": {
+        "end": {
+          "$ref": "#/$defs/WorkingField_PartialDate_"
+        },
+        "evidence": {
+          "items": {
+            "$ref": "#/$defs/EvidenceSpan"
+          },
+          "title": "Evidence",
+          "type": "array"
+        },
+        "id": {
+          "minLength": 1,
+          "title": "Id",
+          "type": "string"
+        },
+        "present": {
+          "$ref": "#/$defs/WorkingField_bool_"
+        },
+        "revision": {
+          "minimum": 1,
+          "title": "Revision",
+          "type": "integer"
+        },
+        "start": {
+          "$ref": "#/$defs/WorkingField_PartialDate_"
+        }
+      },
+      "required": [
+        "id",
+        "revision",
+        "start",
+        "end",
+        "present",
+        "evidence"
+      ],
+      "title": "WorkingPeriod",
+      "type": "object"
+    },
+    "WorkspaceV6": {
+      "additionalProperties": false,
+      "properties": {
+        "createdAt": {
+          "title": "Createdat",
+          "type": "string"
+        },
+        "documentRevision": {
+          "minimum": 1,
+          "title": "Documentrevision",
+          "type": "integer"
+        },
+        "formattingAsOf": {
+          "$ref": "#/$defs/PartialDate"
+        },
+        "mutationReplay": {
+          "items": {
+            "$ref": "#/$defs/RichMutationReplay"
+          },
+          "title": "Mutationreplay",
+          "type": "array"
+        },
+        "preDraft": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/RichPreDraft"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "project": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ProjectV5"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "projectId": {
+          "minLength": 1,
+          "title": "Projectid",
+          "type": "string"
+        },
+        "projectRevision": {
+          "minimum": 1,
+          "title": "Projectrevision",
+          "type": "integer"
+        },
+        "rulesUsed": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Rules"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "schemaVersion": {
+          "const": 6,
+          "title": "Schemaversion",
+          "type": "integer"
+        },
+        "sourceObservedAt": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/PartialDate"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "syncRecords": {
+          "items": {
+            "$ref": "#/$defs/RichSyncRecord"
+          },
+          "title": "Syncrecords",
+          "type": "array"
+        },
+        "title": {
+          "title": "Title",
+          "type": "string"
+        },
+        "titleManuallySet": {
+          "title": "Titlemanuallyset",
+          "type": "boolean"
+        },
+        "updatedAt": {
+          "title": "Updatedat",
+          "type": "string"
+        },
+        "warnings": {
+          "items": {
+            "$ref": "#/$defs/RichWarning"
+          },
+          "title": "Warnings",
+          "type": "array"
+        }
+      },
+      "required": [
+        "schemaVersion",
+        "projectId",
+        "projectRevision",
+        "documentRevision",
+        "title",
+        "titleManuallySet",
+        "createdAt",
+        "updatedAt",
+        "project",
+        "preDraft",
+        "formattingAsOf",
+        "sourceObservedAt",
+        "rulesUsed",
+        "syncRecords",
+        "mutationReplay",
+        "warnings"
+      ],
+      "title": "WorkspaceV6",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "actionId": {
+      "anyOf": [
+        {
+          "minLength": 1,
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "title": "Actionid"
+    },
+    "connectionEpoch": {
+      "maxLength": 128,
+      "minLength": 1,
+      "pattern": "^[A-Za-z0-9_-]+$",
+      "title": "Connectionepoch",
+      "type": "string"
+    },
+    "id": {
+      "maxLength": 128,
+      "minLength": 1,
+      "pattern": "^[A-Za-z0-9_-]+$",
+      "title": "Id",
+      "type": "string"
+    },
+    "identity": {
+      "$ref": "#/$defs/JobIdentity"
+    },
+    "model": {
+      "pattern": "^[a-zA-Z0-9][a-zA-Z0-9._-]{0,79}$",
+      "title": "Model",
+      "type": "string"
+    },
+    "originalSync": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/RichSyncRecord"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
+    },
+    "request": {
+      "$ref": "#/$defs/JobFixedRequestV1"
+    },
+    "rules": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/Rules"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "schemaVersion": {
+      "const": 1,
+      "title": "Schemaversion",
+      "type": "integer"
+    },
+    "sourceSha256": {
+      "pattern": "^[a-f0-9]{64}$",
+      "title": "Sourcesha256",
+      "type": "string"
+    },
+    "syncId": {
+      "anyOf": [
+        {
+          "maxLength": 128,
+          "minLength": 1,
+          "pattern": "^[A-Za-z0-9_-]+$",
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "title": "Syncid"
+    },
+    "workspace": {
+      "$ref": "#/$defs/WorkspaceV6"
+    }
+  },
+  "required": [
+    "schemaVersion",
+    "id",
+    "identity",
+    "request",
+    "workspace",
+    "rules",
+    "connectionEpoch",
+    "model",
+    "sourceSha256",
+    "syncId",
+    "actionId"
+  ],
+  "title": "FixedInputV1",
+  "type": "object"
+}

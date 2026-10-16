@@ -1,8 +1,6 @@
 {
   "schemaVersion": 1,
   "id": "intent-one",
-  "jobId": "job-one",
-  "proposalId": "proposal-one",
   "projectId": "project-one",
   "lineage": "lineage-one",
   "clientMutationId": "mutation-one",
@@ -18,5 +16,9 @@
   "phase": "intent_stored",
   "assetPins": [],
   "candidateSha256": null,
-  "beforeGenerationsSha256": null
+  "beforeGenerationsSha256": null,
+  "resolvedAt": null,
+  "reconciledReason": null,
+  "jobId": "job-one",
+  "proposalId": "proposal-one"
 }

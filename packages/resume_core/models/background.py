@@ -15,7 +15,13 @@ from .contracts import Id, Revision, Sha256
 from .rich_document import RichDocumentV1
 from .rich_facts import WorkingFacts
 from .rich_mutations import RichMutation
-from .rich_workspace import WorkspaceV6
+from .rich_workspace import WorkspaceV6, RichSyncRecord
+from ..rich_sync import RichCompletionRequest, RichRewriteRequest
+from ..rich_panel import RichPanelSyncRequest
+from .rich_mutations import ActionCapture
+from .recovery import Rules
+from ..resume_assessment import ResumeAssessment
+from ..gui_normalization import GuiNormalizedResult
 
 Execution = Literal["queued", "starting", "running", "cancelling", "completed", "failed", "cancelled", "interrupted"]
 Publication = Literal["none", "ready", "waiting_for_sync", "needs_review", "committing", "saved", "no_change",
@@ -33,7 +39,7 @@ class BackgroundWire(AgentWire):
     @classmethod
     def literal_booleans(cls, value):
         if isinstance(value, dict):
-            for key in ("durable", "proposalStored", "snapshotWrite"):
+            for key in ("durable", "proposalStored", "snapshotWrite", "captureInvalidated"):
                 if key in value and type(value[key]) is not bool:
                     raise ValueError("background boolean must be explicit")
         return value
@@ -527,7 +533,10 @@ class JobFailure(BackgroundWire):
         "STARTUP_TIMEOUT", "PROCESS_FAILED", "CLEANUP_FAILED", "INTERRUPTED", "PROTOCOL",
         "JOB_QUEUE_FULL", "JOB_STORAGE_FULL", "JOB_IDEMPOTENCY_CONFLICT", "REQUEST_EXPIRED",
         "JOB_NOT_FOUND", "JOB_STORE_CORRUPT", "JOB_STORE_UNAVAILABLE", "JOB_DISABLED", "JOB_SCOPE_INVALID", "ACCOUNT_CHANGED",
-        "DEPENDENCY_CHANGED", "WRITER_UNKNOWN", "SAVE_FAILED", "OUTCOME_UNKNOWN", "PROJECT_DELETED"]
+        "DEPENDENCY_CHANGED", "WRITER_UNKNOWN", "SAVE_FAILED", "OUTCOME_UNKNOWN", "PROJECT_DELETED",
+        "INVALID_RESULT", "TEMP_FAILED", "CLI_MISSING", "CLI_UNSUPPORTED", "CLI_PROFILE_UNSAFE",
+        "AUTH_MODE_MISMATCH", "INPUT_TOO_LARGE", "OUTPUT_TOO_LARGE", "BUDGET_EXCEEDED",
+        "INVALID_INPUT", "INVALID_SCHEMA", "CLI_FAILED", "UNSAFE_TEMP_ROOT", "INCOMPLETE_STREAM"]
 
 
 class JobAttemptV1(BackgroundWire):
@@ -570,6 +579,7 @@ class JobSnapshotV1(BackgroundWire):
     publication_error: JobFailure | None = None
     undo_expired: bool = False
     asset_pins_sha256: Sha256 | None = None
+    capture_invalidated: bool = False
 
     @model_validator(mode="after")
     def exact_saved(self):
@@ -830,7 +840,11 @@ class CanonicalCandidateV1(BackgroundWire):
         job_fields = (self.job_id, self.proposal_id, self.proposal_sha256, self.payload)
         if any(part is None for part in job_fields) and not all(part is None for part in job_fields):
             raise ValueError("candidate needs complete proposal identity")
-        if (self.job_id is None) != (self.manual_mutation is not None or self.snapshot_write):
+        processing = self.payload is not None and self.payload.kind == "processing"
+        if self.job_id is None:
+            if self.manual_mutation is None and not self.snapshot_write:
+                raise ValueError("a manual candidate needs its exact command")
+        elif self.manual_mutation is not None or self.snapshot_write != processing:
             raise ValueError("a job candidate references its original payload exactly once")
         if self.snapshot_write and self.manual_mutation is not None:
             raise ValueError("a snapshot write cannot also execute a mutation")
@@ -874,6 +888,13 @@ class OrphanAssetV1(BackgroundWire):
     orphaned_at: Timestamp
 
 
+class FixedInvalidationV1(BackgroundWire):
+    request_epoch: Revision
+    session_id: Id
+    action_id: Id
+    action_token: Counter
+
+
 class BackgroundSidecarV1(BackgroundWire):
     model_config = ConfigDict(json_schema_extra={"x-maxSerializedBytes": LIMITS.sidecar_project_bytes,
         "x-maxMetadataRecords": LIMITS.metadata_project_records})
@@ -903,11 +924,16 @@ class BackgroundSidecarV1(BackgroundWire):
     writer_touches: list[WriterTouchReceiptV1] = Field(default_factory=list, max_length=LIMITS.metadata_project_records)
     writer_epoch: Counter = 0
     history_commands: list[HistoryCommandReceiptV1] = Field(default_factory=list, max_length=LIMITS.metadata_project_records)
+    fixed_invalidations: list[FixedInvalidationV1] = Field(default_factory=list, max_length=LIMITS.metadata_project_records)
 
     @model_validator(mode="after")
     def bounded_authority(self):
         groups = (self.jobs, self.requests, self.proposals, self.drafts, self.generations, self.intents, self.inverses,
-            self.manual_intents, self.asset_pins, self.orphan_assets, self.cleanup_refs, self.writer_touches, self.history_commands)
+            self.manual_intents, self.asset_pins, self.orphan_assets, self.cleanup_refs, self.writer_touches, self.history_commands,
+            self.fixed_invalidations)
+        keys = [(item.request_epoch, item.session_id, item.action_id, item.action_token) for item in self.fixed_invalidations]
+        if len(set(keys)) != len(keys) or any(item.request_epoch > self.active_request_epoch for item in self.fixed_invalidations):
+            raise ValueError("invalid fixed action invalidation identity")
         if self.history is not None and self.history_namespace is not None and self.history_namespace != self.history.namespace:
             raise ValueError("history namespace changed")
         if (len({(pin.kind, pin.owner) for pin in self.asset_pins}) != len(self.asset_pins)
@@ -915,7 +941,7 @@ class BackgroundSidecarV1(BackgroundWire):
             raise ValueError("duplicate asset owner or orphan")
         import re
         if len(set(self.cleanup_refs)) != len(self.cleanup_refs) or any(re.fullmatch(
-                r"(?:canonical-candidates|agent-artifacts|proposal-intents|events|drafts)/[A-Za-z0-9_-]{1,128}\.json", path) is None
+                r"(?:canonical-candidates|agent-artifacts|proposal-intents|events|drafts|fixed-inputs|processing-candidates)/[A-Za-z0-9_-]{1,128}\.json", path) is None
                 for path in self.cleanup_refs):
             raise ValueError("cleanup must name unique owned private blobs")
         if (len({item.cursor for item in self.writer_touches}) != len(self.writer_touches)
@@ -1032,6 +1058,109 @@ class WriterHistoryOfferV1(BackgroundWire):
         return self
 
 
+class FixedProcessingCommand(BackgroundWire):
+    kind: Literal["processing"]
+
+
+class FixedCompletionCommand(BackgroundWire):
+    kind: Literal["completion"]
+    request: RichCompletionRequest
+
+
+class FixedRewriteCommand(BackgroundWire):
+    kind: Literal["rewrite"]
+    request: RichRewriteRequest
+
+
+class FixedPanelCommand(BackgroundWire):
+    kind: Literal["panel"]
+    request: RichPanelSyncRequest
+
+
+class FixedRetryCommand(BackgroundWire):
+    kind: Literal["retry", "resolve"]
+    sync_id: AgentId
+    capture: ActionCapture
+
+
+FixedCommand = Annotated[Union[FixedProcessingCommand, FixedCompletionCommand, FixedRewriteCommand,
+    FixedPanelCommand, FixedRetryCommand], Field(discriminator="kind")]
+
+
+class JobFixedRequestV1(BackgroundWire):
+    schema_version: Literal[1]
+    lineage: AgentId
+    request_epoch: Revision
+    client_request_id: AgentId
+    command: FixedCommand
+
+
+class FixedInputV1(BackgroundWire):
+    schema_version: Literal[1]
+    id: AgentId
+    identity: JobIdentity
+    request: JobFixedRequestV1
+    workspace: WorkspaceV6
+    rules: Rules | None
+    connection_epoch: AgentId
+    model: ModelId
+    source_sha256: Sha256
+    sync_id: AgentId | None
+    action_id: Id | None
+    original_sync: RichSyncRecord | None = None
+
+    @model_validator(mode="after")
+    def exact_capture(self):
+        if ((self.identity.lineage, self.identity.request_epoch, self.identity.request_id) !=
+                (self.request.lineage, self.request.request_epoch, self.request.client_request_id)
+                or self.workspace.project_id != self.identity.project_id or self.workspace.sync_records
+                or self.original_sync is not None and self.original_sync.proposed_steps):
+            raise ValueError("fixed input needs one exact request and no proposal copy")
+        processing = self.request.command.kind == "processing"
+        if ((self.sync_id is None) != (self.action_id is None)
+                or processing != (self.sync_id is None) or not processing and self.sync_id != self.id):
+            raise ValueError("fixed input needs exact operation identity")
+        if self.request.command.kind in {"retry", "resolve"}:
+            if self.original_sync is None or self.original_sync.id != self.request.command.sync_id:
+                raise ValueError("retry needs its original explanation")
+        elif self.original_sync is not None:
+            raise ValueError("only retry/resolve captures an old explanation")
+        return self
+
+
+class ProcessingCandidateV1(BackgroundWire):
+    schema_version: Literal[1]
+    id: AgentId
+    input_id: AgentId
+    assessment: ResumeAssessment
+    normalized: GuiNormalizedResult | None
+    workspace: WorkspaceV6 | None
+
+    @model_validator(mode="after")
+    def complete_assembly(self):
+        if (self.normalized is None) != (self.workspace is None) or self.workspace is not None and self.workspace.project is None:
+            raise ValueError("processing candidate needs the complete original assembly")
+        return self
+
+
+class JobFixedReplyV1(BackgroundWire):
+    schema_version: Literal[1]
+    project_id: AgentId
+    job: JobSnapshotV1
+    sync_id: AgentId | None
+    action_id: Id | None
+
+    @model_validator(mode="after")
+    def exact_operation(self):
+        if self.project_id != self.job.submission.identity.project_id:
+            raise ValueError("fixed response belongs to another project")
+        if self.job.submission.kind == "agent" or (self.sync_id is None) != (self.action_id is None):
+            raise ValueError("fixed response needs its exact operation identity")
+        if (self.job.submission.kind == "processing") != (self.sync_id is None) or self.sync_id is not None and self.sync_id != self.job.submission.input.id:
+            raise ValueError("fixed response must identify its captured input")
+        return self
+
+
 BACKGROUND_CONTRACTS = {"background_submission_v1": JobSubmissionV1, "background_snapshot_v1": JobSnapshotV1,
     "background_proposal_v1": ProposalBindingV1, "background_scope_guard_v1": ScopeGuardV1,
     "background_writer_v1": WriterSessionV1, "background_barrier_v1": PublicationBarrierV1,
@@ -1057,3 +1186,6 @@ BACKGROUND_CONTRACTS.update({"background_writer_proof_v1": WriterProofV1, "backg
     "background_writer_draft_reference_v1": WriterDraftReferenceV1,
     "background_writer_draft_command_v1": WriterDraftCommandV1, "background_writer_draft_read_v1": WriterDraftReadV1})
 BACKGROUND_CONTRACTS["background_writer_draft_resolve_v1"] = WriterDraftResolveV1
+BACKGROUND_CONTRACTS.update({"background_fixed_request_v1": JobFixedRequestV1,
+    "background_fixed_reply_v1": JobFixedReplyV1, "background_fixed_input_v1": FixedInputV1,
+    "background_processing_candidate_v1": ProcessingCandidateV1})

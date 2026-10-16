@@ -47,6 +47,11 @@ import background_writer_draft_command_v1 from "../../../../contracts/json-schem
 import background_writer_draft_read_v1 from "../../../../contracts/json-schema/background_writer_draft_read_v1.schema.json" with { type: "json" };
 import background_writer_draft_resolve_v1 from "../../../../contracts/json-schema/background_writer_draft_resolve_v1.schema.json" with { type: "json" };
 
+import background_fixed_request_v1 from "../../../../contracts/json-schema/background_fixed_request_v1.schema.json" with { type: "json" };
+import background_fixed_reply_v1 from "../../../../contracts/json-schema/background_fixed_reply_v1.schema.json" with { type: "json" };
+import background_fixed_input_v1 from "../../../../contracts/json-schema/background_fixed_input_v1.schema.json" with { type: "json" };
+import background_processing_candidate_v1 from "../../../../contracts/json-schema/background_processing_candidate_v1.schema.json" with { type: "json" };
+
 const ajv = new Ajv2020({ allErrors: true, strict: false });
 addFormats(ajv);
 ajv.addKeyword({ keyword: "x-maxSerializedBytes", schemaType: "number",
@@ -54,7 +59,7 @@ ajv.addKeyword({ keyword: "x-maxSerializedBytes", schemaType: "number",
 const schemas = new Map<string, object>(Object.entries({ background_submission_v1, background_snapshot_v1,
   background_proposal_v1, background_scope_guard_v1, background_writer_v1, background_barrier_v1,
   background_draft_v1, background_receipt_v1, background_apply_v2, background_event_v1, background_intent_v1,
-  background_undo_v1, background_sidecar_v1, background_attempt_v1, background_draft_payload_v1, background_dispatch_v1, background_agent_request_v1, background_artifact_v1, background_legacy_run_v2, background_project_v1, background_replay_request_v1, background_replay_v1, background_writer_proof_v1, background_writer_open_v1, background_writer_advance_v1, background_writer_barrier_ack_v1, background_writer_barrier_command_v1, background_writer_checkpoint_v1, background_writer_abandon_v1, background_writer_view_v1, background_writer_mutation_v1, background_writer_publish_v1, background_writer_publication_v1, background_writer_history_request_v1, background_writer_history_offer_v1, background_writer_history_command_v1, background_writer_history_result_v1, background_writer_draft_reference_v1, background_writer_draft_command_v1, background_writer_draft_read_v1, background_writer_draft_resolve_v1 }));
+  background_undo_v1, background_sidecar_v1, background_attempt_v1, background_draft_payload_v1, background_dispatch_v1, background_agent_request_v1, background_artifact_v1, background_legacy_run_v2, background_project_v1, background_replay_request_v1, background_replay_v1, background_writer_proof_v1, background_writer_open_v1, background_writer_advance_v1, background_writer_barrier_ack_v1, background_writer_barrier_command_v1, background_writer_checkpoint_v1, background_writer_abandon_v1, background_writer_view_v1, background_writer_mutation_v1, background_writer_publish_v1, background_writer_publication_v1, background_writer_history_request_v1, background_writer_history_offer_v1, background_writer_history_command_v1, background_writer_history_result_v1, background_writer_draft_reference_v1, background_writer_draft_command_v1, background_writer_draft_read_v1, background_writer_draft_resolve_v1, background_fixed_request_v1, background_fixed_reply_v1, background_fixed_input_v1, background_processing_candidate_v1 }));
 const validators = new Map<string, ValidateFunction<unknown>>();
 const mutationShape = ajv.compile<unknown>(rich_mutation);
 export function prepareWriterContracts(): void {
@@ -79,6 +84,29 @@ function earlier(left: string, right: string): boolean {
 function semantics(value: unknown): boolean {
   if (Array.isArray(value)) return value.every(semantics);
   if (!record(value)) return true;
+  if ("syncId" in value && "actionId" in value && record(value.job)) {
+    const job = value.job;
+    if (!record(job.submission) || !record(job.submission.identity) || !record(job.submission.input)
+      || value.projectId !== job.submission.identity.projectId || job.submission.kind === "agent"
+      || (value.syncId === null) !== (value.actionId === null)
+      || (job.submission.kind === "processing") !== (value.syncId === null)
+      || value.syncId !== null && value.syncId !== job.submission.input.id) return false;
+  }
+  if ("originalSync" in value && record(value.identity) && record(value.request) && record(value.workspace)) {
+    if (value.identity.lineage !== value.request.lineage || value.identity.requestEpoch !== value.request.requestEpoch
+      || value.identity.requestId !== value.request.clientRequestId || value.workspace.projectId !== value.identity.projectId
+      || list(value.workspace.syncRecords).length || record(value.originalSync) && list(value.originalSync.proposedSteps).length
+      || !record(value.request.command)) return false;
+    const processing = value.request.command.kind === "processing";
+    if ((value.syncId === null) !== (value.actionId === null) || processing !== (value.syncId === null)
+      || !processing && value.syncId !== value.id) return false;
+    if (["retry", "resolve"].includes(String(value.request.command.kind))) {
+      if (!record(value.originalSync) || value.originalSync.id !== value.request.command.syncId) return false;
+    } else if (value.originalSync !== null) return false;
+  }
+  if ("normalized" in value && "inputId" in value && "assessment" in value) {
+    if ((value.normalized === null) !== (value.workspace === null) || record(value.workspace) && value.workspace.project === null) return false;
+  }
   if ("reads" in value && "writes" in value) {
     for (const group of [list(value.reads), list(value.writes)]) {
       if (new Set(group.map((item: unknown) => record(item) ? JSON.stringify([item.kind, item.key]) : null)).size !== group.length) return false;
@@ -208,7 +236,10 @@ function semantics(value: unknown): boolean {
   }
   if ("activeRequestEpoch" in value) {
     if (typeof value.activeRequestEpoch !== "number" || typeof value.expiredThroughEpoch !== "number" || value.activeRequestEpoch <= value.expiredThroughEpoch) return false;
-    const groups = ["jobs", "requests", "proposals", "drafts", "generations", "intents", "inverses", "manualIntents", "assetPins", "orphanAssets", "cleanupRefs", "writerTouches", "historyCommands"];
+    const groups = ["jobs", "requests", "proposals", "drafts", "generations", "intents", "inverses", "manualIntents", "assetPins", "orphanAssets", "cleanupRefs", "writerTouches", "historyCommands", "fixedInvalidations"];
+    const invalidations = list(value.fixedInvalidations);
+    if (new Set(invalidations.map(item => record(item) ? JSON.stringify([item.requestEpoch, item.sessionId, item.actionId, item.actionToken]) : null)).size !== invalidations.length
+      || invalidations.some(item => !record(item) || Number(item.requestEpoch) > Number(value.activeRequestEpoch))) return false;
     const historyRecords = record(value.history) ? 1 + list(value.history.definitions).length : 0;
     if (groups.reduce((count, key) => count + list(value[key]).length, 0) + Number(value.writer !== null) + Number(value.barrier !== null) + historyRecords > background_sidecar_v1["x-maxMetadataRecords"]) return false;
     if (record(value.history) && value.historyNamespace !== undefined && value.historyNamespace !== null && value.historyNamespace !== value.history.namespace) return false;
@@ -216,7 +247,7 @@ function semantics(value: unknown): boolean {
     if (new Set(pins.map((pin) => record(pin) ? JSON.stringify([pin.kind, pin.owner]) : null)).size !== pins.length ||
         new Set(orphans.map((orphan) => record(orphan) ? orphan.path : null)).size !== orphans.length || new Set(cleanup).size !== cleanup.length) return false;
     if (cleanup.some((reference) => typeof reference !== "string" ||
-        /^(?:canonical-candidates|agent-artifacts|proposal-intents|events|drafts)\/[A-Za-z0-9_-]{1,128}\.json$/u.exec(reference)?.[0] !== reference)) return false;
+        /^(?:canonical-candidates|agent-artifacts|proposal-intents|events|drafts|fixed-inputs|processing-candidates)\/[A-Za-z0-9_-]{1,128}\.json$/u.exec(reference)?.[0] !== reference)) return false;
     const scoped: unknown[] = [value.writer, value.barrier, ...["jobs", "requests", "proposals", "drafts", "intents", "manualIntents"].flatMap((key) => list(value[key]))].filter((item) => item !== null);
     for (const item of scoped) {
       if (!record(item)) return false;

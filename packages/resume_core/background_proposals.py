@@ -99,8 +99,8 @@ class JobProposals:
             if job.proposal_id is not None:
                 raise BackgroundFailure("JOB_SCOPE_INVALID")
             job.proposal_id = accepted.id
-            job.publication = "needs_review" if needs_review else "waiting_for_sync"
-            if needs_review:
+            job.publication = "needs_review" if needs_review or job.capture_invalidated else "waiting_for_sync"
+            if needs_review or job.capture_invalidated:
                 job.publication_error = JobFailure(code="DEPENDENCY_CHANGED")
             state.proposals.append(accepted)
         control.job = self.store.update(project, control.job.id, bind)

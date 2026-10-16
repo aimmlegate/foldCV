@@ -28,5 +28,10 @@
         "fingerprint": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
       }
     ]
-  }
+  },
+  "assetPinsSha256": null,
+  "direction": "undo",
+  "commandRef": null,
+  "commandInverseSha256": null,
+  "commandInverseBytes": null
 }

@@ -192,7 +192,6 @@ class JobSupervisor:
             control = JobControl(self, job)
             self.controls[job.id] = control
             self.active = control
-            self.order.dispatched(job)
             control.task = asyncio.create_task(self._drive(control))
 
     async def _emit(self, job):
@@ -291,6 +290,7 @@ class JobSupervisor:
             reason = self.preflight(control.job)
             if reason:
                 if reason in {"RATE_LIMITED", "AUTH_REQUIRED"}:
+                    self.pause(reason)
                     outcome = ExecutionOutcome("queued", reason)
                     return
                 raise BackgroundFailure(reason)
@@ -301,14 +301,20 @@ class JobSupervisor:
                 reason = self.preflight(control.job)
                 if reason:
                     if reason in {"RATE_LIMITED", "AUTH_REQUIRED"}:
+                        self.pause(reason)
                         outcome = ExecutionOutcome("queued", reason)
                         return
                     raise BackgroundFailure(reason)
             control.slot_granted = True
+            self.order.dispatched(control.job)
             await self.observer("slot_granted", control.job.id)
             for stage, model in enumerate(control.job.submission.models):
                 if control.cancel.is_set():
                     raise BackgroundFailure("CANCELLED")
+                if stage:
+                    reason = self.preflight(control.job)
+                    if reason:
+                        raise BackgroundFailure(reason)
                 control.stage, control.ready, control.revoked = stage, asyncio.Event(), False
                 control.attempt_id = identity("attempt")
                 control.startup_deadline = self.clock.now() + LIMITS.startup_seconds
@@ -360,6 +366,8 @@ class JobSupervisor:
                 if outcome.error:
                     break
         except BackgroundFailure as error:
+            if error.code in {"RATE_LIMITED", "AUTH_REQUIRED"}:
+                self.pause(error.code)
             outcome = ExecutionOutcome("cancelled" if error.code == "CANCELLED" else "failed", error.code)
         except Exception:
             outcome = ExecutionOutcome("failed", "PROCESS_FAILED")

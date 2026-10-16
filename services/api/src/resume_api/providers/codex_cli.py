@@ -201,6 +201,7 @@ class CodexCliProvider:
         self.fixture_transport = fixture_transport
         self.experimental_profile = experimental_profile
         self.clock = clock
+        self.model_started = None
         self.process = ProcessRunner(self.executable, clock=clock,
                                      launch=experimental_profile.launch if experimental_profile else None)
 
@@ -322,6 +323,18 @@ class CodexCliProvider:
         except AdmissionBlocked:
             raise ContentFailure("PROCESS_CLEANUP_FAILED") from None
 
+    @property
+    def native(self):
+        return self.fixture_transport is None
+
+    def generate_owned(self, request, files, cancel, permit):
+        try:
+            with permit.hold(cancel):
+                with self._profile_owner(cancel, files.root):
+                    return self._generate(request, files, cancel)
+        except AdmissionBlocked:
+            raise ContentFailure("PROCESS_CLEANUP_FAILED") from None
+
     @contextmanager
     def _profile_owner(self, cancel, operations_root):
         try:
@@ -395,6 +408,7 @@ class CodexCliProvider:
                                 if self.experimental_profile else tuple(exec_arguments(files.path, policy.model)))
                         output, errors = self._run(files, args, deadline, cancel,
                                                    data=prompt, on_line=events.accept,
+                                                   on_spawn=self.model_started,
                                                    max_output=policy.max_total_output_bytes - consumed_output)
                     finally:
                         usages.append(events.usage)

@@ -10,6 +10,8 @@ import type { WriterBarrierCommandV1 } from "../contracts/generated/background_w
 import type { WriterCheckpointV1 } from "../contracts/generated/background_writer_checkpoint_v1";
 import type { WriterDraftCommandV1 } from "../contracts/generated/background_writer_draft_command_v1";
 import type { WriterDraftResolveV1 } from "../contracts/generated/background_writer_draft_resolve_v1";
+import type { JobFixedRequestV1 } from "../contracts/generated/background_fixed_request_v1";
+import type { JobFixedReplyV1 } from "../contracts/generated/background_fixed_reply_v1";
 import type { WriterDraftReadV1 } from "../contracts/generated/background_writer_draft_read_v1";
 import type { WriterAbandonV1 } from "../contracts/generated/background_writer_abandon_v1";
 import type { WriterMutationV1 } from "../contracts/generated/background_writer_mutation_v1";
@@ -36,7 +38,8 @@ type Replies = { background_writer_view_v1: WriterViewV1; background_barrier_v1:
   background_writer_publication_v1: WriterPublicationV1; background_writer_history_offer_v1: WriterHistoryOfferV1;
   background_undo_v1: UndoOwnershipV1; background_writer_history_result_v1: WriterHistoryResultV1;
   background_project_v1: JobProjectV1; background_snapshot_v1: JobSnapshotV1; background_replay_v1: JobReplayV1;
-  background_proposal_v1: ProposalBindingV1; background_legacy_run_v2: JobLegacyRunV2 };
+  background_proposal_v1: ProposalBindingV1; background_legacy_run_v2: JobLegacyRunV2;
+  background_fixed_reply_v1: JobFixedReplyV1 };
 export type BackgroundConversation = Omit<AgentConversation, "messages"> & { messages: AgentMessage[] };
 export type BackgroundRequest = (path: string, method?: string, body?: unknown) => Promise<unknown>;
 
@@ -83,6 +86,7 @@ export class JobsApi {
   }
   projectJobs(): Promise<JobProjectV1> { return this.call("background_project_v1", ""); }
   submit(body: JobAgentRequestV1): Promise<JobSnapshotV1> { return this.call("background_snapshot_v1", "/agent", body); }
+  fixed(body: JobFixedRequestV1): Promise<JobFixedReplyV1> { return this.call("background_fixed_reply_v1", "/fixed", body); }
   read(id: string): Promise<JobSnapshotV1> { return this.call("background_snapshot_v1", `/${encodeURIComponent(id)}/read`, {}); }
   cancel(id: string): Promise<JobSnapshotV1> { return this.call("background_snapshot_v1", `/${encodeURIComponent(id)}/cancel`, {}); }
   proposal(id: string): Promise<ProposalBindingV1> { return this.call("background_proposal_v1", `/${encodeURIComponent(id)}/proposal/read`, {}); }

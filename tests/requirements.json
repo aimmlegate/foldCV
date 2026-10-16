@@ -2662,8 +2662,56 @@
     },
     {
       "id": "NB-FIXED",
-      "status": "unimplemented",
-      "tests": []
+      "status": "implemented",
+      "tests": [
+        "apps/web/unit/background-fixed.test.ts::concurrent fixed submissions retain one request identity and one model attempt",
+        "apps/web/unit/background-fixed.test.ts::fixed reversed replies keep exact operation identity NB-F01:v01",
+        "apps/web/unit/background-fixed.test.ts::fixed reversed replies keep exact operation identity NB-F01:v02",
+        "apps/web/unit/background-fixed.test.ts::fixed reversed replies keep exact operation identity NB-F01:v03",
+        "apps/web/unit/background-fixed.test.ts::fixed reversed replies keep exact operation identity NB-F01:v04",
+        "apps/web/unit/background-fixed.test.ts::fixed reversed replies keep exact operation identity NB-F01:v05",
+        "apps/web/unit/background-fixed.test.ts::fixed reversed replies keep exact operation identity NB-F01:v06",
+        "apps/web/unit/background-fixed.test.ts::fixed submission validates its capture before metadata",
+        "apps/web/unit/background-fixed.test.ts::fixed submission validates its capture before server acceptance",
+        "apps/web/unit/background-fixed.test.ts::fixed submission validates its capture valid metadata delay",
+        "tests/recovery/test_background_fixed_jobs.py::test_account_preflight_pauses_dispatch_without_repeated_attempts[AUTH_REQUIRED-before-dispatch]",
+        "tests/recovery/test_background_fixed_jobs.py::test_account_preflight_pauses_dispatch_without_repeated_attempts[AUTH_REQUIRED-between-stages]",
+        "tests/recovery/test_background_fixed_jobs.py::test_account_preflight_pauses_dispatch_without_repeated_attempts[RATE_LIMITED-before-dispatch]",
+        "tests/recovery/test_background_fixed_jobs.py::test_account_preflight_pauses_dispatch_without_repeated_attempts[RATE_LIMITED-between-stages]",
+        "tests/recovery/test_background_fixed_jobs.py::test_cancelled_capture_survives_reload_before_fixed_submission",
+        "tests/recovery/test_background_fixed_jobs.py::test_failed_automatic_replacement_keeps_the_old_job_and_removes_inert_input",
+        "tests/recovery/test_background_fixed_jobs.py::test_fixed_processing_reuses_two_stages_and_original_assembly",
+        "tests/recovery/test_background_fixed_jobs.py::test_fixed_publication_keeps_independence_and_exact_proposal_ownership[NB-F02:v01]",
+        "tests/recovery/test_background_fixed_jobs.py::test_fixed_publication_keeps_independence_and_exact_proposal_ownership[NB-F02:v02]",
+        "tests/recovery/test_background_fixed_jobs.py::test_fixed_publication_keeps_independence_and_exact_proposal_ownership[NB-F02:v03]",
+        "tests/recovery/test_background_fixed_jobs.py::test_fixed_publication_keeps_independence_and_exact_proposal_ownership[NB-F02:v04]",
+        "tests/recovery/test_background_fixed_jobs.py::test_fixed_publication_keeps_independence_and_exact_proposal_ownership[NB-F02:v05]",
+        "tests/recovery/test_background_fixed_jobs.py::test_fixed_publication_keeps_independence_and_exact_proposal_ownership[NB-F02:v06]",
+        "tests/recovery/test_background_fixed_jobs.py::test_fixed_queue_invalidates_stale_work_without_hidden_model_retries[NB-Q07:v01]",
+        "tests/recovery/test_background_fixed_jobs.py::test_fixed_queue_invalidates_stale_work_without_hidden_model_retries[NB-Q07:v02]",
+        "tests/recovery/test_background_fixed_jobs.py::test_fixed_queue_invalidates_stale_work_without_hidden_model_retries[NB-Q07:v03]",
+        "tests/recovery/test_background_fixed_jobs.py::test_fixed_queue_invalidates_stale_work_without_hidden_model_retries[NB-Q07:v04]",
+        "tests/recovery/test_background_fixed_jobs.py::test_fixed_rewrite_uses_the_existing_service_and_one_owned_permit",
+        "tests/recovery/test_background_fixed_jobs.py::test_processing_stage_boundaries_keep_captured_input_and_stop_authority[NB-F03:v01]",
+        "tests/recovery/test_background_fixed_jobs.py::test_processing_stage_boundaries_keep_captured_input_and_stop_authority[NB-F03:v02]",
+        "tests/recovery/test_background_fixed_jobs.py::test_processing_stage_boundaries_keep_captured_input_and_stop_authority[NB-F03:v03]",
+        "tests/recovery/test_background_fixed_jobs.py::test_processing_stage_boundaries_keep_captured_input_and_stop_authority[NB-F03:v04]",
+        "tests/recovery/test_background_fixed_jobs.py::test_processing_stage_boundaries_keep_captured_input_and_stop_authority[NB-F03:v05]",
+        "tests/recovery/test_background_fixed_jobs.py::test_processing_stage_boundaries_keep_captured_input_and_stop_authority[NB-F03:v06]",
+        "tests/recovery/test_background_fixed_jobs.py::test_processing_stage_boundaries_keep_captured_input_and_stop_authority[NB-F03:v07]",
+        "tests/recovery/test_background_fixed_jobs.py::test_processing_stage_boundaries_keep_captured_input_and_stop_authority[NB-F03:v08]",
+        "tests/recovery/test_background_fixed_jobs.py::test_real_fixed_dispatch_respects_project_fairness_and_eligibility[NB-Q04:v01]",
+        "tests/recovery/test_background_fixed_jobs.py::test_real_fixed_dispatch_respects_project_fairness_and_eligibility[NB-Q04:v02]",
+        "tests/recovery/test_background_fixed_jobs.py::test_real_fixed_dispatch_respects_project_fairness_and_eligibility[NB-Q04:v03]",
+        "tests/recovery/test_background_fixed_jobs.py::test_real_fixed_dispatch_respects_project_fairness_and_eligibility[NB-Q04:v04]",
+        "tests/recovery/test_background_fixed_jobs.py::test_real_fixed_dispatch_respects_project_fairness_and_eligibility[NB-Q04:v05]",
+        "tests/recovery/test_background_fixed_jobs.py::test_real_fixed_dispatch_respects_project_fairness_and_eligibility[NB-Q04:v06]",
+        "tests/recovery/test_background_fixed_jobs.py::test_real_fixed_dispatch_respects_project_fairness_and_eligibility[NB-Q04:v07]",
+        "tests/recovery/test_background_offline.py::test_versioned_background_contract_round_trip[background_fixed_input_v1]",
+        "tests/recovery/test_background_offline.py::test_versioned_background_contract_round_trip[background_fixed_reply_v1]",
+        "tests/recovery/test_background_offline.py::test_versioned_background_contract_round_trip[background_fixed_request_v1]",
+        "tests/recovery/test_background_offline.py::test_versioned_background_contract_round_trip[background_processing_candidate_v1]"
+      ]
     },
     {
       "id": "NB-UI",
@@ -2807,7 +2855,8 @@
       "NB01",
       "NB02a",
       "NB02b",
-      "NB03"
+      "NB03",
+      "NB05"
     ],
     "bindings": {
       "NB-R03:v01": [
@@ -4166,6 +4215,99 @@
       ],
       "NB-W12:v08": [
         "apps/web/unit/background-proof.test.ts::NB-W12:v08 a true older receipt adopts only its inverse and preserves the newer canonical snapshot"
+      ],
+      "NB-Q04:v01": [
+        "tests/recovery/test_background_fixed_jobs.py::test_real_fixed_dispatch_respects_project_fairness_and_eligibility[NB-Q04:v01]"
+      ],
+      "NB-Q04:v02": [
+        "tests/recovery/test_background_fixed_jobs.py::test_real_fixed_dispatch_respects_project_fairness_and_eligibility[NB-Q04:v02]"
+      ],
+      "NB-Q04:v03": [
+        "tests/recovery/test_background_fixed_jobs.py::test_real_fixed_dispatch_respects_project_fairness_and_eligibility[NB-Q04:v03]"
+      ],
+      "NB-Q04:v04": [
+        "tests/recovery/test_background_fixed_jobs.py::test_real_fixed_dispatch_respects_project_fairness_and_eligibility[NB-Q04:v04]"
+      ],
+      "NB-Q04:v05": [
+        "tests/recovery/test_background_fixed_jobs.py::test_real_fixed_dispatch_respects_project_fairness_and_eligibility[NB-Q04:v05]"
+      ],
+      "NB-Q04:v06": [
+        "tests/recovery/test_background_fixed_jobs.py::test_real_fixed_dispatch_respects_project_fairness_and_eligibility[NB-Q04:v06]"
+      ],
+      "NB-Q04:v07": [
+        "tests/recovery/test_background_fixed_jobs.py::test_real_fixed_dispatch_respects_project_fairness_and_eligibility[NB-Q04:v07]"
+      ],
+      "NB-Q07:v01": [
+        "tests/recovery/test_background_fixed_jobs.py::test_fixed_queue_invalidates_stale_work_without_hidden_model_retries[NB-Q07:v01]"
+      ],
+      "NB-Q07:v02": [
+        "tests/recovery/test_background_fixed_jobs.py::test_fixed_queue_invalidates_stale_work_without_hidden_model_retries[NB-Q07:v02]"
+      ],
+      "NB-Q07:v03": [
+        "tests/recovery/test_background_fixed_jobs.py::test_fixed_queue_invalidates_stale_work_without_hidden_model_retries[NB-Q07:v03]"
+      ],
+      "NB-Q07:v04": [
+        "tests/recovery/test_background_fixed_jobs.py::test_fixed_queue_invalidates_stale_work_without_hidden_model_retries[NB-Q07:v04]"
+      ],
+      "NB-F01:v01": [
+        "apps/web/unit/background-fixed.test.ts::fixed reversed replies keep exact operation identity NB-F01:v01"
+      ],
+      "NB-F01:v02": [
+        "apps/web/unit/background-fixed.test.ts::fixed reversed replies keep exact operation identity NB-F01:v02"
+      ],
+      "NB-F01:v03": [
+        "apps/web/unit/background-fixed.test.ts::fixed reversed replies keep exact operation identity NB-F01:v03"
+      ],
+      "NB-F01:v04": [
+        "apps/web/unit/background-fixed.test.ts::fixed reversed replies keep exact operation identity NB-F01:v04"
+      ],
+      "NB-F01:v05": [
+        "apps/web/unit/background-fixed.test.ts::fixed reversed replies keep exact operation identity NB-F01:v05"
+      ],
+      "NB-F01:v06": [
+        "apps/web/unit/background-fixed.test.ts::fixed reversed replies keep exact operation identity NB-F01:v06"
+      ],
+      "NB-F02:v01": [
+        "tests/recovery/test_background_fixed_jobs.py::test_fixed_publication_keeps_independence_and_exact_proposal_ownership[NB-F02:v01]"
+      ],
+      "NB-F02:v02": [
+        "tests/recovery/test_background_fixed_jobs.py::test_fixed_publication_keeps_independence_and_exact_proposal_ownership[NB-F02:v02]"
+      ],
+      "NB-F02:v03": [
+        "tests/recovery/test_background_fixed_jobs.py::test_fixed_publication_keeps_independence_and_exact_proposal_ownership[NB-F02:v03]"
+      ],
+      "NB-F02:v04": [
+        "tests/recovery/test_background_fixed_jobs.py::test_fixed_publication_keeps_independence_and_exact_proposal_ownership[NB-F02:v04]"
+      ],
+      "NB-F02:v05": [
+        "tests/recovery/test_background_fixed_jobs.py::test_fixed_publication_keeps_independence_and_exact_proposal_ownership[NB-F02:v05]"
+      ],
+      "NB-F02:v06": [
+        "tests/recovery/test_background_fixed_jobs.py::test_fixed_publication_keeps_independence_and_exact_proposal_ownership[NB-F02:v06]"
+      ],
+      "NB-F03:v01": [
+        "tests/recovery/test_background_fixed_jobs.py::test_processing_stage_boundaries_keep_captured_input_and_stop_authority[NB-F03:v01]"
+      ],
+      "NB-F03:v02": [
+        "tests/recovery/test_background_fixed_jobs.py::test_processing_stage_boundaries_keep_captured_input_and_stop_authority[NB-F03:v02]"
+      ],
+      "NB-F03:v03": [
+        "tests/recovery/test_background_fixed_jobs.py::test_processing_stage_boundaries_keep_captured_input_and_stop_authority[NB-F03:v03]"
+      ],
+      "NB-F03:v04": [
+        "tests/recovery/test_background_fixed_jobs.py::test_processing_stage_boundaries_keep_captured_input_and_stop_authority[NB-F03:v04]"
+      ],
+      "NB-F03:v05": [
+        "tests/recovery/test_background_fixed_jobs.py::test_processing_stage_boundaries_keep_captured_input_and_stop_authority[NB-F03:v05]"
+      ],
+      "NB-F03:v06": [
+        "tests/recovery/test_background_fixed_jobs.py::test_processing_stage_boundaries_keep_captured_input_and_stop_authority[NB-F03:v06]"
+      ],
+      "NB-F03:v07": [
+        "tests/recovery/test_background_fixed_jobs.py::test_processing_stage_boundaries_keep_captured_input_and_stop_authority[NB-F03:v07]"
+      ],
+      "NB-F03:v08": [
+        "tests/recovery/test_background_fixed_jobs.py::test_processing_stage_boundaries_keep_captured_input_and_stop_authority[NB-F03:v08]"
       ]
     },
     "checks": {
@@ -5021,6 +5163,30 @@
         "apps/web/unit/background-python-bridge.test.ts::a fresh sole tab uses the shared dirty resume marker without sessionStorage",
         "apps/web/unit/background-python-bridge.test.ts::a lost application tab lock stops writer attachment before bootstrap",
         "apps/web/unit/background-python-bridge.test.ts::a lost application tab lock stops writer attachment after bootstrap"
+      ],
+      "NB05:fixed-controls": [
+        "tests/recovery/test_background_fixed_jobs.py::test_fixed_rewrite_uses_the_existing_service_and_one_owned_permit",
+        "tests/recovery/test_background_fixed_jobs.py::test_fixed_processing_reuses_two_stages_and_original_assembly",
+        "tests/recovery/test_background_fixed_jobs.py::test_account_preflight_pauses_dispatch_without_repeated_attempts[AUTH_REQUIRED-before-dispatch]",
+        "tests/recovery/test_background_fixed_jobs.py::test_account_preflight_pauses_dispatch_without_repeated_attempts[AUTH_REQUIRED-between-stages]",
+        "tests/recovery/test_background_fixed_jobs.py::test_account_preflight_pauses_dispatch_without_repeated_attempts[RATE_LIMITED-before-dispatch]",
+        "tests/recovery/test_background_fixed_jobs.py::test_account_preflight_pauses_dispatch_without_repeated_attempts[RATE_LIMITED-between-stages]",
+        "tests/recovery/test_background_fixed_jobs.py::test_failed_automatic_replacement_keeps_the_old_job_and_removes_inert_input"
+      ],
+      "NB05:fixed-wire-roundtrips": [
+        "tests/recovery/test_background_offline.py::test_versioned_background_contract_round_trip[background_fixed_request_v1]",
+        "tests/recovery/test_background_offline.py::test_versioned_background_contract_round_trip[background_fixed_reply_v1]",
+        "tests/recovery/test_background_offline.py::test_versioned_background_contract_round_trip[background_fixed_input_v1]",
+        "tests/recovery/test_background_offline.py::test_versioned_background_contract_round_trip[background_processing_candidate_v1]"
+      ],
+      "NB05:fixed-request-replay": [
+        "apps/web/unit/background-fixed.test.ts::concurrent fixed submissions retain one request identity and one model attempt"
+      ],
+      "NB05:capture-submission-races": [
+        "tests/recovery/test_background_fixed_jobs.py::test_cancelled_capture_survives_reload_before_fixed_submission",
+        "apps/web/unit/background-fixed.test.ts::fixed submission validates its capture before metadata",
+        "apps/web/unit/background-fixed.test.ts::fixed submission validates its capture before server acceptance",
+        "apps/web/unit/background-fixed.test.ts::fixed submission validates its capture valid metadata delay"
       ]
     },
     "sources": [
@@ -5030,6 +5196,7 @@
       "apps/web/src/background/api.ts",
       "apps/web/src/background/connection.ts",
       "apps/web/src/background/drafts.ts",
+      "apps/web/src/background/fixed.ts",
       "apps/web/src/background/jobs.ts",
       "apps/web/src/background/tab.ts",
       "apps/web/src/background/wire.ts",
@@ -5045,8 +5212,12 @@
       "apps/web/src/contracts/generated/background_draft_payload_v1.ts",
       "apps/web/src/contracts/generated/background_draft_v1.ts",
       "apps/web/src/contracts/generated/background_event_v1.ts",
+      "apps/web/src/contracts/generated/background_fixed_input_v1.ts",
+      "apps/web/src/contracts/generated/background_fixed_reply_v1.ts",
+      "apps/web/src/contracts/generated/background_fixed_request_v1.ts",
       "apps/web/src/contracts/generated/background_intent_v1.ts",
       "apps/web/src/contracts/generated/background_legacy_run_v2.ts",
+      "apps/web/src/contracts/generated/background_processing_candidate_v1.ts",
       "apps/web/src/contracts/generated/background_project_v1.ts",
       "apps/web/src/contracts/generated/background_proposal_v1.ts",
       "apps/web/src/contracts/generated/background_receipt_v1.ts",
@@ -5083,6 +5254,7 @@
       "apps/web/src/rich/history.ts",
       "apps/web/src/rich/save-queue.ts",
       "apps/web/src/rich/styles.ts",
+      "apps/web/src/rich/synchronization.ts",
       "apps/web/src/workbench/App.tsx",
       "apps/web/src/workbench/BlockedTab.tsx",
       "apps/web/src/workbench/main.tsx",
@@ -5090,6 +5262,7 @@
       "apps/web/src/workbench/useResumeWorkspace.ts",
       "apps/web/unit/background-drafts.test.ts",
       "apps/web/unit/background-editor-schema.test.ts",
+      "apps/web/unit/background-fixed.test.ts",
       "apps/web/unit/background-guard.test.ts",
       "apps/web/unit/background-jobs.test.ts",
       "apps/web/unit/background-orders.test.ts",
@@ -5111,11 +5284,15 @@
       "contracts/examples/background/background_draft_payload_v1.json",
       "contracts/examples/background/background_draft_v1.json",
       "contracts/examples/background/background_event_v1.json",
+      "contracts/examples/background/background_fixed_input_v1.json",
+      "contracts/examples/background/background_fixed_reply_v1.json",
+      "contracts/examples/background/background_fixed_request_v1.json",
       "contracts/examples/background/background_history_metadata_full_v1.json",
       "contracts/examples/background/background_history_sidecar_v1.json",
       "contracts/examples/background/background_intent_v1.json",
       "contracts/examples/background/background_legacy_run_v2.json",
       "contracts/examples/background/background_manual_sidecar_v1.json",
+      "contracts/examples/background/background_processing_candidate_v1.json",
       "contracts/examples/background/background_project_v1.json",
       "contracts/examples/background/background_proposal_v1.json",
       "contracts/examples/background/background_receipt_v1.json",
@@ -5159,8 +5336,12 @@
       "contracts/json-schema/background_draft_payload_v1.schema.json",
       "contracts/json-schema/background_draft_v1.schema.json",
       "contracts/json-schema/background_event_v1.schema.json",
+      "contracts/json-schema/background_fixed_input_v1.schema.json",
+      "contracts/json-schema/background_fixed_reply_v1.schema.json",
+      "contracts/json-schema/background_fixed_request_v1.schema.json",
       "contracts/json-schema/background_intent_v1.schema.json",
       "contracts/json-schema/background_legacy_run_v2.schema.json",
+      "contracts/json-schema/background_processing_candidate_v1.schema.json",
       "contracts/json-schema/background_project_v1.schema.json",
       "contracts/json-schema/background_proposal_v1.schema.json",
       "contracts/json-schema/background_receipt_v1.schema.json",
@@ -5213,6 +5394,7 @@
       "packages/resume_core/background_drafts.py",
       "packages/resume_core/background_events.py",
       "packages/resume_core/background_fixed.py",
+      "packages/resume_core/background_fixed_inputs.py",
       "packages/resume_core/background_history.py",
       "packages/resume_core/background_history_commands.py",
       "packages/resume_core/background_history_owner.py",
@@ -5350,6 +5532,9 @@
       "services/api/src/resume_api/gui_routes.py",
       "services/api/src/resume_api/inference_admission.py",
       "services/api/src/resume_api/jobs/__init__.py",
+      "services/api/src/resume_api/jobs/fixed.py",
+      "services/api/src/resume_api/jobs/fixed_projection.py",
+      "services/api/src/resume_api/jobs/fixed_runtime.py",
       "services/api/src/resume_api/jobs/publication.py",
       "services/api/src/resume_api/jobs/routes.py",
       "services/api/src/resume_api/jobs/runtime.py",
@@ -5375,6 +5560,7 @@
       "spikes/background/corpus.py",
       "spikes/background/fake_child.py",
       "spikes/background/fake_publication_child.py",
+      "spikes/background/fixed_fixtures.py",
       "spikes/background/fixtures.py",
       "spikes/background/harness.py",
       "spikes/background/integration.py",
@@ -5393,6 +5579,7 @@
       "tests/recovery/test_background_conflicts.py",
       "tests/recovery/test_background_events.py",
       "tests/recovery/test_background_exports.py",
+      "tests/recovery/test_background_fixed_jobs.py",
       "tests/recovery/test_background_fixed_storage.py",
       "tests/recovery/test_background_guard_sensitivity.py",
       "tests/recovery/test_background_handoff_cuts.py",
@@ -5708,7 +5895,7 @@
       "claim_before_timeout",
       "runtime_exit_before_publication"
     ],
-    "scope": "NB00a specification oracle; NB01 capacity-one Jobs; NB02a conditional publisher; NB02b coordinated writers/export/retention; NB03 resumable browser writers, barriers, drafts, exact history, independent navigation and real API production traces. Normal rollout stays off; fixed native adapters remain NB05.",
+    "scope": "Exact implemented variants through NB05; capacity one with real fixed/agent services, writer/compiler/store traces and separate specification traces. Final serial/parallel native and platform gates retain their own deadlines.",
     "reportSchema": "docs/gui/handoffs/BACKGROUND-WORK/nb00a-execution-report.schema.json"
   }
 }

@@ -139,6 +139,8 @@ class JobRetention:
                 state.expired_through_epoch = state.active_request_epoch
                 state.active_request_epoch += 1
                 state.request_epoch_expires_at = expiration(now, LIMITS.request_replay_seconds)
+            state.fixed_invalidations = [item for item in state.fixed_invalidations
+                if item.request_epoch > state.expired_through_epoch]
             for request in list(state.requests):
                 job = job_in(state, request.job_id)
                 if (not complete(job) or job.id in active or job.id in retained_inverse
@@ -152,6 +154,10 @@ class JobRetention:
                     removed_files.append(directory / "proposal-intents" / (proposal.id + ".json"))
                 if job.submission.input.kind == "agent_journal":
                     removed_files.append(directory / "agent-artifacts" / (job.submission.input.id + ".json"))
+                else:
+                    removed_files.append(directory / "fixed-inputs" / (job.submission.input.id + ".json"))
+                    if job.submission.kind == "processing":
+                        removed_files.append(directory / "processing-candidates" / ("processing_" + job.submission.input.id[6:] + ".json"))
                 removed_files.append(directory / "events" / (job.id + ".json"))
                 state.intents = [intent for intent in state.intents if intent.job_id != job.id]
                 state.proposals = [proposal for proposal in state.proposals if proposal.job_id != job.id]

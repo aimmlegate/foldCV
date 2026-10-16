@@ -1,5 +1,7 @@
 """Authenticated new-format endpoints, separate from retained legacy wire types."""
 
+import asyncio
+
 from fastapi import Request
 from fastapi.responses import JSONResponse, Response
 
@@ -21,12 +23,19 @@ def mount_rich_projects(app, service, problem):
         return JSONResponse(service.response(identifier).model_dump(mode="json", by_alias=True),
             status_code=status, headers={"Cache-Control": "no-store"})
 
+    def legacy_fixed():
+        jobs = getattr(service, "background_jobs", None)
+        if jobs is not None and jobs.enabled:
+            from packages.resume_core.background_store import BackgroundFailure
+            raise BackgroundFailure("JOB_SCOPE_INVALID")
+
     @app.get(prefix)
     async def projects():
         return JSONResponse(service.listing(), headers={"Cache-Control": "no-store"})
 
     @app.post(prefix)
     async def create(payload: GuiCreateProjectRequest):
+        legacy_fixed()
         workspace = await service.select(payload.text.encode(), "pasted.txt", True)
         if service.durability(workspace.project_id) != "failed":
             service.start(workspace.project_id)
@@ -72,11 +81,20 @@ def mount_rich_projects(app, service, problem):
 
     @app.post(prefix + "/{identifier}/generation")
     async def generation(identifier: str, _payload: EmptyRequest):
+        legacy_fixed()
         service.start(identifier)
         return response(identifier, 202)
 
     @app.post(prefix + "/{identifier}/cancel")
     async def cancel(identifier: str, _payload: EmptyRequest):
+        jobs = getattr(service, "background_jobs", None)
+        generation = jobs.fixed.generation(identifier) if jobs is not None and jobs.enabled else None
+        if generation is not None:
+            await jobs.supervisor.cancel(identifier, generation.id)
+            control = jobs.supervisor.controls.get(generation.id)
+            if control is not None and control.task is not None:
+                await asyncio.shield(control.task)
+            return response(identifier)
         for pid, operation in list(service.tasks):
             if pid == identifier:
                 await service.cancel(identifier, operation)
@@ -93,6 +111,7 @@ def mount_rich_projects(app, service, problem):
 
     @app.post(prefix + "/{identifier}/completion")
     async def completion(identifier: str, payload: RichCompletionRequest):
+        legacy_fixed()
         await service.complete_rich(identifier, payload)
         return response(identifier)
 
@@ -102,6 +121,7 @@ def mount_rich_projects(app, service, problem):
 
     @app.post(prefix + "/{identifier}/panel/sync")
     async def panel_sync(identifier: str, payload: RichPanelSyncRequest):
+        legacy_fixed()
         await service.panel_rich(identifier, payload)
         return response(identifier)
 
@@ -131,6 +151,7 @@ def mount_rich_projects(app, service, problem):
 
     @app.post(prefix + "/{identifier}/rewrite")
     async def rewrite(identifier: str, payload: RichRewriteRequest):
+        legacy_fixed()
         await service.rewrite_rich(identifier, payload)
         return response(identifier)
 
@@ -141,11 +162,13 @@ def mount_rich_projects(app, service, problem):
 
     @app.post(prefix + "/{identifier}/sync/{sync_id}/resolve")
     async def resolve_conflict(identifier: str, sync_id: str, payload: ActionCapture):
+        legacy_fixed()
         service.resolve_conflict(identifier, sync_id, payload)
         return response(identifier)
 
     @app.post(prefix + "/{identifier}/sync/{sync_id}/retry")
     async def retry_rewrite(identifier: str, sync_id: str, payload: ActionCapture):
+        legacy_fixed()
         await service.retry_rewrite(identifier, sync_id, payload)
         return response(identifier)
 

@@ -59,6 +59,14 @@ export type Writerepoch1 = number;
  */
 export type Drafts = DraftCheckpointV1[];
 export type Expiredthroughepoch = number;
+export type Actionid = string;
+export type Actiontoken = number;
+export type Requestepoch = number;
+export type Sessionid = string;
+/**
+ * @maxItems 512
+ */
+export type Fixedinvalidations = FixedInvalidationV1[];
 /**
  * @maxItems 512
  */
@@ -157,7 +165,21 @@ export type Code =
   | "WRITER_UNKNOWN"
   | "SAVE_FAILED"
   | "OUTCOME_UNKNOWN"
-  | "PROJECT_DELETED";
+  | "PROJECT_DELETED"
+  | "INVALID_RESULT"
+  | "TEMP_FAILED"
+  | "CLI_MISSING"
+  | "CLI_UNSUPPORTED"
+  | "CLI_PROFILE_UNSAFE"
+  | "AUTH_MODE_MISMATCH"
+  | "INPUT_TOO_LARGE"
+  | "OUTPUT_TOO_LARGE"
+  | "BUDGET_EXCEEDED"
+  | "INVALID_INPUT"
+  | "INVALID_SCHEMA"
+  | "CLI_FAILED"
+  | "UNSAFE_TEMP_ROOT"
+  | "INCOMPLETE_STREAM";
 export type Requestsha2561 = string;
 export type Resolvedat = string | null;
 export type Schemaversion3 = 1;
@@ -436,6 +458,7 @@ export type Stage = "agent" | "assessment" | "extraction" | "rewrite" | "reconci
 export type Startupdeadline = string;
 export type State1 =
   "reserved" | "starting" | "running" | "completed" | "failed" | "cancelled" | "interrupted" | "cleanup_failed";
+export type Captureinvalidated = boolean;
 export type Createdat = string;
 export type Eventcursor = number;
 export type Execution =
@@ -476,7 +499,7 @@ export type Allowedits = boolean;
 export type Allowweb = boolean;
 export type Lineage4 = string;
 export type Projectid4 = string;
-export type Requestepoch = number;
+export type Requestepoch1 = number;
 export type Requestid = string;
 export type Id6 = string;
 export type Kind7 = "agent_journal" | "rich_sync" | "processing";
@@ -506,10 +529,10 @@ export type Offset = number;
  * @minItems 1
  */
 export type Blockids = [string, ...string[]];
-export type Actionid = string;
-export type Actiontoken = number;
+export type Actionid1 = string;
+export type Actiontoken1 = number;
 export type Dependencies = DependencyStamp[];
-export type Sessionid = string;
+export type Sessionid1 = string;
 export type Kind11 = "text" | "blocks" | "table_cells";
 export type Textsha256 = string;
 export type Submittedat = string;
@@ -1203,7 +1226,7 @@ export type Updatedat = string;
  */
 export type Jobs = JobSnapshotV1[];
 export type Lineage5 = string;
-export type Actionid1 = string | null;
+export type Actionid2 = string | null;
 export type Aftergenerationssha2561 = string;
 export type Afterworkspacesha2561 = string;
 /**
@@ -1300,7 +1323,7 @@ export type Lineage8 = string;
 export type Projectid8 = string;
 export type Resumecredentialsha256 = string;
 export type Schemaversion13 = 1;
-export type Sessionid1 = string;
+export type Sessionid2 = string;
 export type Status = "attached" | "recovering" | "clean_detached" | "fenced";
 export type Touchfloor = number;
 export type Touchgeneration1 = number;
@@ -1320,6 +1343,7 @@ export interface BackgroundSidecarV1 {
   cleanupRefs?: Cleanuprefs;
   drafts: Drafts;
   expiredThroughEpoch: Expiredthroughepoch;
+  fixedInvalidations?: Fixedinvalidations;
   generations: Generations;
   history?: BackgroundHistoryV1 | null;
   historyCommands?: Historycommands;
@@ -1389,6 +1413,12 @@ export interface GenerationStamp {
   generation: Generation1;
   key: Key;
   kind: Kind2;
+}
+export interface FixedInvalidationV1 {
+  actionId: Actionid;
+  actionToken: Actiontoken;
+  requestEpoch: Requestepoch;
+  sessionId: Sessionid;
 }
 export interface BackgroundHistoryV1 {
   definitions: Definitions;
@@ -1488,6 +1518,7 @@ export interface ScopeGuardV1 {
 export interface JobSnapshotV1 {
   assetPinsSha256?: Assetpinssha2562;
   attempts: Attempts;
+  captureInvalidated?: Captureinvalidated;
   createdAt: Createdat;
   error: JobFailure | null;
   eventCursor: Eventcursor;
@@ -1553,7 +1584,7 @@ export interface JobSubmissionV1 {
 export interface JobIdentity {
   lineage: Lineage4;
   projectId: Projectid4;
-  requestEpoch: Requestepoch;
+  requestEpoch: Requestepoch1;
   requestId: Requestid;
 }
 export interface InputReference {
@@ -1587,13 +1618,13 @@ export interface RichPosition {
   offset: Offset;
 }
 export interface ActionCapture {
-  actionId: Actionid;
-  actionToken: Actiontoken;
+  actionId: Actionid1;
+  actionToken: Actiontoken1;
   dependencies: Dependencies;
-  sessionId: Sessionid;
+  sessionId: Sessionid1;
 }
 export interface ManualIntentV1 {
-  actionId?: Actionid1;
+  actionId?: Actionid2;
   afterGenerationsSha256: Aftergenerationssha2561;
   afterWorkspaceSha256: Afterworkspacesha2561;
   assetPins: Assetpins2;
@@ -1677,7 +1708,7 @@ export interface WriterSessionV1 {
   projectId: Projectid8;
   resumeCredentialSha256: Resumecredentialsha256;
   schemaVersion: Schemaversion13;
-  sessionId: Sessionid1;
+  sessionId: Sessionid2;
   status: Status;
   touchFloor?: Touchfloor;
   touchGeneration: Touchgeneration1;

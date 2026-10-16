@@ -26,6 +26,7 @@ from tests.recovery.test_rich_images_service import png
 from tests.recovery.test_rich_synchronization import capture, selection
 from tests.recovery.test_rich_timeline import timeline
 from tests.support.background_publication import PublicationFixture
+from tests.recovery.test_background_fixed_jobs import fixed_request, settled
 
 
 class HeldProvider(CreationProvider):
@@ -63,9 +64,19 @@ async def boundary(fixture, tmp_path, provider=None):
         async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url=origin,
                 headers={"Origin": origin}) as client:
             assert (await client.post("/v1/session/exchange", json={"secret": secret})).status_code == 200
+            assert (await client.post("/v1/host/status", json={})).status_code == 200
+            assert (await client.post("/v1/host/select", json={"model": "processing-model"})).status_code == 200
             service.read(fixture.project)
-            yield client, service, jobs
-    assert not service.files and all(task.done() for task in service.tasks.values()) and not jobs.supervisor.controls
+            try:
+                yield client, service, jobs
+            finally:
+                await jobs.shutdown()
+                service.request_shutdown()
+                await service.shutdown()
+    assert not service.files and all(task.done() for task in service.tasks.values())
+    assert jobs.supervisor.active is None and not jobs.supervisor.fenced
+    assert all(control.task.done() and (control.owned is None or control.owned.verified_dead())
+        for control in jobs.supervisor.controls.values())
 
 
 @pytest.mark.asyncio
@@ -101,7 +112,9 @@ async def test_source_import_and_fixed_generation_routes_keep_independent_public
             return
         if variant == "NB-P08:v01":
             response = await client.post(prefix, json={"text": data.decode()})
-            assert response.status_code == 202, response.text
+            assert response.status_code == 409 and response.json()["error"]["code"] == "JOB_SCOPE_INVALID"
+            response = await client.post(prefix + "/input", files={"file": ("pasted.txt", data, "text/plain")})
+            assert response.status_code == 201, response.text
             identifier = response.json()["workspace"]["projectId"]
         elif variant == "NB-P08:v02":
             task = asyncio.create_task(client.post(prefix + "/input", files={"file": ("pasted.txt", data, "text/plain")}))
@@ -111,8 +124,9 @@ async def test_source_import_and_fixed_generation_routes_keep_independent_public
             selected = await service.select(data, "pasted.txt", True)
             identifier = selected.project_id
             response = await client.post(prefix + f"/{identifier}/generation", json={})
-            assert response.status_code == 202, response.text
+            assert response.status_code == 409 and response.json()["error"]["code"] == "JOB_SCOPE_INVALID"
         if variant != "NB-P08:v02":
+            reply, _created = await jobs.fixed.submit(identifier, fixed_request(jobs, identifier, "route-process", {"kind": "processing"}))
             assert await asyncio.to_thread(provider.entered.wait, 10)
         before, checksum = service.storage.read_committed(identifier)
         changed = before.model_copy(deep=True)
@@ -129,16 +143,16 @@ async def test_source_import_and_fixed_generation_routes_keep_independent_public
         else:
             if variant == "NB-P08:v08":
                 cancel_task = asyncio.create_task(client.post(prefix + f"/{identifier}/cancel", json={}))
-                key = next(key for key in service.cancels if key[0] == identifier)
-                assert await asyncio.to_thread(service.cancels[key].wait, 10)
+                await asyncio.wait_for(jobs.supervisor.controls[reply.job.id].cancelled.wait(), 10)
             provider.release.set()
-            generation_id = service.generations[identifier].id
-            await asyncio.wait_for(service.tasks[(identifier, generation_id)], 10)
             if variant == "NB-P08:v08":
-                assert (await cancel_task).status_code == 200
-                assert service.generations[identifier].status == "cancelled" and len(provider.calls) == 1
+                cancelled = await cancel_task
+                assert cancelled.status_code == 200 and cancelled.json()["generation"]["status"] == "cancelled"
+                done = await settled(jobs, identifier, reply.job.id)
+                assert done.execution == "cancelled" and len(provider.calls) == 1
             else:
-                assert service.generations[identifier].status == "completed", service.generations[identifier]
+                done = await settled(jobs, identifier, reply.job.id, publication="saved")
+                await asyncio.wait_for(jobs.fixed.renders[done.id], 10)
                 assert len(provider.calls) == 2 and service.read(identifier).project
         current, checksum = service.storage.read_committed(identifier)
         assert current.title == "Keep the interleaved title" and current.title_manually_set
@@ -232,15 +246,34 @@ async def test_each_existing_canonical_http_entry_preserves_an_interleaved_chang
             path = "/export"
         else:
             path, payload = "/archive", {"projectRevision": committed.project_revision, "documentRevision": committed.document_revision}
+        fixed_variants = {"NB-P08:v11", "NB-P08:v13", "NB-P08:v16", "NB-P08:v18", "NB-P08:v19", "NB-P08:v20"}
+        if variant in fixed_variants:
+            denied = await client.post(prefix + path, json=payload)
+            assert denied.status_code == 409 and denied.json()["error"]["code"] == "JOB_SCOPE_INVALID"
+            assert fixture.current() == committed and len(provider.calls) == model_calls
+            if variant in {"NB-P08:v11", "NB-P08:v13", "NB-P08:v16", "NB-P08:v20"}:
+                command = {"kind": "completion" if variant == "NB-P08:v11" else "panel" if variant == "NB-P08:v13" else "rewrite", "request": payload}
+            else:
+                command = {"kind": "resolve" if variant == "NB-P08:v18" else "retry", "syncId": record.id, "capture": payload}
+            submitted = await client.post(prefix + "/jobs/fixed", json=fixed_request(jobs, fixture.project, variant.replace(":", "_"), command).model_dump(mode="json", by_alias=True))
+            assert submitted.status_code == 202, submitted.text
+            job_id = submitted.json()["job"]["id"]
         if variant == "NB-P08:v20":
-            task = asyncio.create_task(client.post(prefix + path, json=payload))
             assert await asyncio.to_thread(provider.entered.wait, 10)
-            cancelled = asyncio.create_task(client.post(prefix + "/cancel-action", json=capture()))
-            key = next(key for key in service.cancels if key[0] == fixture.project)
-            assert await asyncio.to_thread(service.cancels[key].wait, 10)
+            cancelled = await client.post(prefix + "/cancel-action", json=capture())
+            assert cancelled.status_code == 200
+            assert jobs.store.read(fixture.project, job_id).capture_invalidated
             provider.release.set()
-            response = await task
-            assert (await cancelled).status_code == 200
+            done = await settled(jobs, fixture.project, job_id, publication="needs_review")
+            assert done.execution == "completed" and len(done.attempts) == 1
+            response = await client.get(prefix)
+        elif variant in fixed_variants:
+            done = await settled(jobs, fixture.project, job_id)
+            task = jobs.publication_tasks.get(fixture.project)
+            if task:
+                await asyncio.wait_for(task, 10)
+            assert done.execution == "completed"
+            response = await client.get(prefix)
         elif files:
             response = await client.request(method, prefix + path, files=files, headers=headers)
         else:

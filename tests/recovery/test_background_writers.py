@@ -18,7 +18,7 @@ def projects_for(fixture, directory):
     from resume_api.rich_projects import RichProjectService
     service = RichProjectService(directory / "operations", RulesStore(fixture.root), lambda: None, storage=fixture.canonical)
     jobs = SimpleNamespace(enabled=True, store=fixture.jobs, publisher=fixture.coordinator, projects=service,
-        artifacts=fixture.artifacts)
+        artifacts=fixture.artifacts, fixed=SimpleNamespace(generation=lambda _project: None))
     jobs.publication = JobPublication(jobs)
     service.background_jobs = jobs
     service.ensure_loaded()

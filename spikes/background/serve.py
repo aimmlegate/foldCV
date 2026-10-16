@@ -17,8 +17,9 @@ from spikes.background.writer_bridge import Bridge
 
 async def main(args):
     root = args.root.resolve()
-    if root.parent != Path("/private/tmp") or not root.name.startswith("foldcv-nb03-") or root.exists():
-        raise ValueError("Use a new /private/tmp/foldcv-nb03-* proof root")
+    prefix = "foldcv-nb05-" if args.fixed_operations else "foldcv-nb03-"
+    if root.parent != Path("/private/tmp") or not root.name.startswith(prefix) or root.exists():
+        raise ValueError("Use a new owned /private/tmp proof root")
     root.mkdir(mode=0o700)
     listener = socket.socket()
     listener.bind(("127.0.0.1", args.port)); listener.listen(128)
@@ -35,9 +36,16 @@ async def main(args):
 async def serve(args, root, listener, origin, bridge):
     # HTTP submissions use the same script as the pipe-driven API integration.
     def factory(job, model):
+        if job.submission.kind != "agent":
+            from resume_api.jobs.fixed_runtime import FixedRuntime
+            return FixedRuntime(bridge.service, job, model)
         bridge.script(job.submission.identity.request_id, "Scripted background edit")
         return bridge.factory(job, model)
     bridge.service.supervisor.factory = factory
+    if args.fixed_operations:
+        from spikes.background.fixed_fixtures import FixedProofProvider
+        bridge.fixed_provider = FixedProofProvider()
+        bridge.service.projects.provider_factory = lambda: (bridge.fixed_provider, "processing-model")
     token = "t3-controlled-model"
     if args.hold_model:
         def reached(value):
@@ -45,7 +53,7 @@ async def serve(args, root, listener, origin, bridge):
                 (root / "model-gate.json").write_text(json.dumps({"name": value["name"],
                     "job": value["job"], "status": "reached"}, indent=2) + "\n")
         bridge.send = reached
-        await bridge.handle({"kind": "hold", "name": "scripted_model_ready", "family": "job", "token": token})
+        await bridge.handle({"kind": "hold", "name": "fixed_model_ready" if args.fixed_operations else "scripted_model_ready", "family": "job", "token": token})
     other = await bridge.handle({"kind": "clone"})
     secret = secrets.token_urlsafe(32)
     bridge.application.session, bridge.application.secret = None, secret
@@ -56,7 +64,8 @@ async def serve(args, root, listener, origin, bridge):
         "otherProject": other["project"], "backgroundEnabled": True, "parallelEnabled": False,
         "capacity": 1, "nativeStarts": 0, "providers": ["MetadataAdapter", "ScriptedAgentRuntime", "PipeExecutions"],
         "dist": str(args.dist.resolve()), "status": "running", "holdModel": args.hold_model,
-        "stopSignal": "SIGUSR1", "releaseModelSignal": "SIGUSR2" if args.hold_model else None}
+        "stopSignal": "SIGUSR1", "releaseModelSignal": "SIGUSR2" if args.hold_model else None,
+        "fixedOperations": args.fixed_operations}
     isolation = root / "isolation.json"; isolation.write_text(json.dumps(info, indent=2) + "\n")
     server = uvicorn.Server(uvicorn.Config(bridge.application, host="127.0.0.1", port=listener.getsockname()[1],
         log_level="warning", lifespan="off"))
@@ -79,7 +88,8 @@ async def serve(args, root, listener, origin, bridge):
             info.update(status="cleanup_failed", syntheticStarts=len(bridge.factory.calls))
             raise
         else:
-            info.update(status="stopped", syntheticStarts=len(bridge.factory.calls), verifiedChildrenDead=True)
+            info.update(status="stopped", syntheticStarts=len(bridge.factory.calls), verifiedChildrenDead=True,
+                fixedSyntheticStarts=len(getattr(getattr(bridge, "fixed_provider", None), "calls", [])))
         finally:
             listener.close()
             isolation.write_text(json.dumps(info, indent=2) + "\n")
@@ -91,4 +101,5 @@ if __name__ == "__main__":
     parser.add_argument("--dist", type=Path, required=True)
     parser.add_argument("--port", type=int, default=0)
     parser.add_argument("--hold-model", action="store_true")
+    parser.add_argument("--fixed-operations", action="store_true")
     asyncio.run(main(parser.parse_args()))

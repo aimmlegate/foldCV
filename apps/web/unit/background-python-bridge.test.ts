@@ -10,6 +10,7 @@ import { deferred, harness } from "./support/background-writer";
 import { attachWriter, retainResume } from "../src/background/connection";
 import { semantic } from "../src/rich/fact-cells";
 import { applicationTabActive, claimApplicationTab, type TabLease } from "../src/background/tab";
+import { FixedOperations } from "../src/background/fixed";
 
 function block(items: RichBlock[], id: string): RichBlock | undefined {
   for (const item of items) { if (item.id === id) return item; const child = block(item.children, id); if (child) return child; }
@@ -72,11 +73,13 @@ test("the Node writer API validates real Python HTTP saves, exact byte replay an
 for (const heartbeat of [true, false]) {
   test(`independent real sync metadata preserves local input and clean detach ${heartbeat ? "after heartbeat" : "before heartbeat"}`, { timeout: 60000 }, async t => {
     const { bridge, ready } = await PythonBridge.start(); let passed = false; t.after(() => bridge.close(!passed));
+    await bridge.call({ kind: "fixed_fixture" });
     const { api, view, proof } = await opened(bridge, ready.project), h = harness({ initialView: view, proof, transport: api });
     try {
-      await bridge.http(`/v1/rich/projects/${ready.project}/completion`, "POST", {
+      const reply = await new FixedOperations(ready.project, bridge.jobs(ready.project)).submit({ kind: "completion", request: {
         capture: { sessionId: proof.sessionId, actionId: "metadata-only", actionToken: 0, dependencies: [] },
-        blockIds: [], movedIds: [], removedFields: [], removedRecordIds: [], interpret: false });
+        blockIds: [], movedIds: [], removedFields: [], removedRecordIds: [], interpret: false } });
+      await bridge.call({ kind: "wait_fixed", job: reply.job.id });
       const updated = await api.read(proof);
       assert.notEqual(updated.workspaceSha256, view.workspaceSha256);
       assert.deepEqual(updated.response.workspace.project?.document, view.response.workspace.project?.document);

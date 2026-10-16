@@ -17,5 +17,13 @@
   "intents": [],
   "inverses": [],
   "history": null,
-  "manualIntents": []
+  "historyNamespace": null,
+  "manualIntents": [],
+  "assetPins": [],
+  "orphanAssets": [],
+  "cleanupRefs": [],
+  "writerTouches": [],
+  "writerEpoch": 0,
+  "historyCommands": [],
+  "fixedInvalidations": []
 }

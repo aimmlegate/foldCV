@@ -18,7 +18,7 @@ import { projectFilename } from "./files/filename";
 
 export function App({ portalHost }: { portalHost: HTMLElement }) {
   const workspace = useResumeWorkspace();
-  const { response, writer, projects, input, setInput, textDraft, error, status, setStatus, busy, settings, setSettings,
+  const { response, writer, background, projects, input, setInput, textDraft, error, status, setStatus, busy, settings, setSettings,
     editor, assistant, acknowledge, action, fresh, open, remove, process, upload, exportFile } = workspace;
   const [collapsed, setCollapsed] = useState(() => innerWidth <= 600);
   const [warningsOpen, setWarningsOpen] = useState(false);
@@ -56,7 +56,7 @@ export function App({ portalHost }: { portalHost: HTMLElement }) {
   const filename = projectFilename(projectTitle, fileMode === "export" ? "docx" : "foldcv");
   const navigate = (id: string) => open(id).then(done => { if (done) { setSourceOpen(false); if (innerWidth <= 600) setCollapsed(true); } return done; });
   return <main className={`app-shell${collapsed ? " history-collapsed" : ""}`} data-app="foldcv">
-    <History projects={projects} activeId={response?.workspace.projectId ?? null} busy={busy || creating} collapse={() => setCollapsed(true)}
+    <History projects={projects} activeId={response?.workspace.projectId ?? null} busy={busy || creating && !background} collapse={() => setCollapsed(true)}
       fresh={() => { void fresh(); setSourceOpen(false); if (innerWidth <= 600) setCollapsed(true); }} open={navigate} remove={remove} openFile={() => openFile("open")} settings={openSettings}
       connection={connection?.snapshot.state === "connected" ? "Codex · подписка" : connection?.snapshot.state === "unchecked" ? "Подключение не проверено" : "Модель отключена"} />
     <section className="main-area">
