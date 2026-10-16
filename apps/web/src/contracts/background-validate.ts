@@ -1,6 +1,8 @@
 import Ajv2020, { type ValidateFunction } from "ajv/dist/2020.js";
 import addFormats from "ajv-formats";
 import { validateAgentShape } from "./agent-validate.js";
+import { sameValue, sha256 } from "../background/wire.js";
+import rich_mutation from "../../../../contracts/json-schema/rich_mutation.schema.json" with { type: "json" };
 import background_submission_v1 from "../../../../contracts/json-schema/background_submission_v1.schema.json" with { type: "json" };
 import background_snapshot_v1 from "../../../../contracts/json-schema/background_snapshot_v1.schema.json" with { type: "json" };
 import background_proposal_v1 from "../../../../contracts/json-schema/background_proposal_v1.schema.json" with { type: "json" };
@@ -25,6 +27,26 @@ import background_project_v1 from "../../../../contracts/json-schema/background_
 import background_replay_request_v1 from "../../../../contracts/json-schema/background_replay_request_v1.schema.json" with { type: "json" };
 import background_replay_v1 from "../../../../contracts/json-schema/background_replay_v1.schema.json" with { type: "json" };
 
+import background_writer_proof_v1 from "../../../../contracts/json-schema/background_writer_proof_v1.schema.json" with { type: "json" };
+import background_writer_open_v1 from "../../../../contracts/json-schema/background_writer_open_v1.schema.json" with { type: "json" };
+import background_writer_advance_v1 from "../../../../contracts/json-schema/background_writer_advance_v1.schema.json" with { type: "json" };
+import background_writer_barrier_ack_v1 from "../../../../contracts/json-schema/background_writer_barrier_ack_v1.schema.json" with { type: "json" };
+import background_writer_barrier_command_v1 from "../../../../contracts/json-schema/background_writer_barrier_command_v1.schema.json" with { type: "json" };
+import background_writer_checkpoint_v1 from "../../../../contracts/json-schema/background_writer_checkpoint_v1.schema.json" with { type: "json" };
+import background_writer_abandon_v1 from "../../../../contracts/json-schema/background_writer_abandon_v1.schema.json" with { type: "json" };
+import background_writer_view_v1 from "../../../../contracts/json-schema/background_writer_view_v1.schema.json" with { type: "json" };
+import background_writer_mutation_v1 from "../../../../contracts/json-schema/background_writer_mutation_v1.schema.json" with { type: "json" };
+import background_writer_publish_v1 from "../../../../contracts/json-schema/background_writer_publish_v1.schema.json" with { type: "json" };
+import background_writer_publication_v1 from "../../../../contracts/json-schema/background_writer_publication_v1.schema.json" with { type: "json" };
+import background_writer_history_request_v1 from "../../../../contracts/json-schema/background_writer_history_request_v1.schema.json" with { type: "json" };
+import background_writer_history_offer_v1 from "../../../../contracts/json-schema/background_writer_history_offer_v1.schema.json" with { type: "json" };
+import background_writer_history_command_v1 from "../../../../contracts/json-schema/background_writer_history_command_v1.schema.json" with { type: "json" };
+import background_writer_history_result_v1 from "../../../../contracts/json-schema/background_writer_history_result_v1.schema.json" with { type: "json" };
+import background_writer_draft_reference_v1 from "../../../../contracts/json-schema/background_writer_draft_reference_v1.schema.json" with { type: "json" };
+import background_writer_draft_command_v1 from "../../../../contracts/json-schema/background_writer_draft_command_v1.schema.json" with { type: "json" };
+import background_writer_draft_read_v1 from "../../../../contracts/json-schema/background_writer_draft_read_v1.schema.json" with { type: "json" };
+import background_writer_draft_resolve_v1 from "../../../../contracts/json-schema/background_writer_draft_resolve_v1.schema.json" with { type: "json" };
+
 const ajv = new Ajv2020({ allErrors: true, strict: false });
 addFormats(ajv);
 ajv.addKeyword({ keyword: "x-maxSerializedBytes", schemaType: "number",
@@ -32,8 +54,16 @@ ajv.addKeyword({ keyword: "x-maxSerializedBytes", schemaType: "number",
 const schemas = new Map<string, object>(Object.entries({ background_submission_v1, background_snapshot_v1,
   background_proposal_v1, background_scope_guard_v1, background_writer_v1, background_barrier_v1,
   background_draft_v1, background_receipt_v1, background_apply_v2, background_event_v1, background_intent_v1,
-  background_undo_v1, background_sidecar_v1, background_attempt_v1, background_draft_payload_v1, background_dispatch_v1, background_agent_request_v1, background_artifact_v1, background_legacy_run_v2, background_project_v1, background_replay_request_v1, background_replay_v1 }));
+  background_undo_v1, background_sidecar_v1, background_attempt_v1, background_draft_payload_v1, background_dispatch_v1, background_agent_request_v1, background_artifact_v1, background_legacy_run_v2, background_project_v1, background_replay_request_v1, background_replay_v1, background_writer_proof_v1, background_writer_open_v1, background_writer_advance_v1, background_writer_barrier_ack_v1, background_writer_barrier_command_v1, background_writer_checkpoint_v1, background_writer_abandon_v1, background_writer_view_v1, background_writer_mutation_v1, background_writer_publish_v1, background_writer_publication_v1, background_writer_history_request_v1, background_writer_history_offer_v1, background_writer_history_command_v1, background_writer_history_result_v1, background_writer_draft_reference_v1, background_writer_draft_command_v1, background_writer_draft_read_v1, background_writer_draft_resolve_v1 }));
 const validators = new Map<string, ValidateFunction<unknown>>();
+const mutationShape = ajv.compile<unknown>(rich_mutation);
+export function prepareWriterContracts(): void {
+  for (const kind of ["background_writer_view_v1", "background_barrier_v1", "background_draft_v1", "background_writer_draft_read_v1",
+    "background_writer_publication_v1", "background_writer_history_offer_v1", "background_undo_v1", "background_writer_history_result_v1"]) {
+    const schema = schemas.get(kind);
+    if (schema && !validators.has(kind)) validators.set(kind, ajv.compile<unknown>(schema));
+  }
+}
 function record(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
@@ -69,6 +99,38 @@ function semantics(value: unknown): boolean {
   if ("authority" in value && ((value.authority === "revoked") !== (value.revocation !== null) ||
       typeof value.acceptedAt !== "string" || typeof value.executionDeadline !== "string" || !earlier(value.acceptedAt, value.executionDeadline))) return false;
   if (value.status === "clean_detached" && value.draftId !== null) return false;
+  if (typeof value.touchFloor === "number" && typeof value.acknowledgedCursor === "number" && value.touchFloor > value.acknowledgedCursor) return false;
+  if ("draftSequence" in value && "draftId" in value && "actionCursor" in value && !("proof" in value)) {
+    const parts = [value.draftId, value.draftSequence, value.draftSha256];
+    if (parts.some(item => item === null) && !parts.every(item => item === null)) return false;
+  }
+  if ("historyOutbox" in value && list(value.historyOutbox).length + list(value.outbox).length > 100) return false;
+  if ("canonicalReady" in value) {
+    if (!record(value.response) || !record(value.response.workspace) || !record(value.writer)) return false;
+    const workspace = value.response.workspace, writer = value.writer;
+    if (writer.projectId !== workspace.projectId || list(value.drafts).some(item => !record(item)
+      || item.projectId !== workspace.projectId || item.lineage !== writer.lineage)) return false;
+    if (value.canonicalReady === true ? value.response.durability !== "durable"
+      || value.response.savedProjectRevision !== workspace.projectRevision
+      || value.response.savedDocumentRevision !== workspace.documentRevision : value.response.durability === "durable") return false;
+  }
+  if ("savedWire" in value) {
+    if (!record(value.job) || !record(value.job.receipt) || !record(value.proposal) || !record(value.proposal.payload)
+      || !record(value.ownership) || !record(value.saved) || !record(value.saved.workspace) || !record(value.saved.workspace.project)
+      || !record(value.saved.workspace.project.facts) || !record(value.preview) || !record(value.preview.workspace)
+      || !record(value.view) || !record(value.view.response) || !record(value.view.response.workspace) || !record(value.view.writer)) return false;
+    const receipt = value.job.receipt, workspace = value.saved.workspace;
+    if (value.view.canonicalReady !== true || value.saved.durability !== "durable" || value.preview.durability !== "pending"
+      || receipt.projectId !== value.view.response.workspace.projectId || receipt.lineage !== value.view.writer.lineage
+      || receipt.jobId !== value.job.id || receipt.proposalId !== value.proposal.id || value.proposal.jobId !== value.job.id
+      || value.ownership.jobId !== value.job.id || value.ownership.proposalId !== value.proposal.id || value.job.proposalId !== value.proposal.id
+      || value.proposal.payloadSha256 !== receipt.proposalSha256 || value.saved.savedProjectRevision !== receipt.projectRevision
+      || value.saved.savedDocumentRevision !== receipt.documentRevision || workspace.projectRevision !== receipt.projectRevision
+      || workspace.documentRevision !== receipt.documentRevision || value.saved.workspace.project.facts.revision !== receipt.factsRevision
+      || value.preview.workspace.projectId !== receipt.projectId || value.batchId !== (value.proposal.payload.kind === "agent_journal" ? value.proposal.payload.batchId : null)
+      || !list(workspace.mutationReplay).some(item => record(item) && item.clientMutationId === receipt.clientMutationId
+        && item.requestSha256 === receipt.requestSha256 && item.resultingRevision === receipt.projectRevision)) return false;
+  }
   if ("execution" in value && "publication" in value) {
     if (value.undoExpired === true && value.receipt === null) return false;
     if (["saved", "no_change", "none"].includes(String(value.publication)) && value.publicationError !== null && value.publicationError !== undefined) return false;
@@ -137,6 +199,8 @@ function semantics(value: unknown): boolean {
     if ((value.writerEpoch === null) !== (value.incarnation === null) ||
         (value.owner === "session" && value.writerEpoch === null) ||
         (["backend", "expired"].includes(String(value.owner)) && value.writerEpoch !== null)) return false;
+    const command = [value.commandRef ?? null, value.commandInverseSha256 ?? null, value.commandInverseBytes ?? null];
+    if (command.some(item => item === null) && !command.every(item => item === null)) return false;
   }
   if ("namespace" in value && "definitions" in value) {
     const definitions = list(value.definitions);
@@ -144,7 +208,7 @@ function semantics(value: unknown): boolean {
   }
   if ("activeRequestEpoch" in value) {
     if (typeof value.activeRequestEpoch !== "number" || typeof value.expiredThroughEpoch !== "number" || value.activeRequestEpoch <= value.expiredThroughEpoch) return false;
-    const groups = ["jobs", "requests", "proposals", "drafts", "generations", "intents", "inverses", "manualIntents", "assetPins", "orphanAssets", "cleanupRefs"];
+    const groups = ["jobs", "requests", "proposals", "drafts", "generations", "intents", "inverses", "manualIntents", "assetPins", "orphanAssets", "cleanupRefs", "writerTouches", "historyCommands"];
     const historyRecords = record(value.history) ? 1 + list(value.history.definitions).length : 0;
     if (groups.reduce((count, key) => count + list(value[key]).length, 0) + Number(value.writer !== null) + Number(value.barrier !== null) + historyRecords > background_sidecar_v1["x-maxMetadataRecords"]) return false;
     if (record(value.history) && value.historyNamespace !== undefined && value.historyNamespace !== null && value.historyNamespace !== value.history.namespace) return false;
@@ -152,7 +216,7 @@ function semantics(value: unknown): boolean {
     if (new Set(pins.map((pin) => record(pin) ? JSON.stringify([pin.kind, pin.owner]) : null)).size !== pins.length ||
         new Set(orphans.map((orphan) => record(orphan) ? orphan.path : null)).size !== orphans.length || new Set(cleanup).size !== cleanup.length) return false;
     if (cleanup.some((reference) => typeof reference !== "string" ||
-        /^(?:canonical-candidates|agent-artifacts|proposal-intents|events)\/[A-Za-z0-9_-]{1,128}\.json$/u.exec(reference)?.[0] !== reference)) return false;
+        /^(?:canonical-candidates|agent-artifacts|proposal-intents|events|drafts)\/[A-Za-z0-9_-]{1,128}\.json$/u.exec(reference)?.[0] !== reference)) return false;
     const scoped: unknown[] = [value.writer, value.barrier, ...["jobs", "requests", "proposals", "drafts", "intents", "manualIntents"].flatMap((key) => list(value[key]))].filter((item) => item !== null);
     for (const item of scoped) {
       if (!record(item)) return false;
@@ -188,4 +252,47 @@ export function validateBackgroundShape(kind: string, value: unknown): boolean {
     validators.set(kind, validate);
   }
   return validate(value) && semantics(value);
+}
+
+async function proofBytes(value: Record<string, unknown>): Promise<boolean> {
+  if (typeof value.workspaceWire === "string") {
+    if (!record(value.response) || await sha256(value.workspaceWire) !== value.workspaceSha256
+      || !sameValue(JSON.parse(value.workspaceWire), value.response.workspace)) return false;
+    if (typeof value.mutationWire === "string") {
+      const mutation: unknown = JSON.parse(value.mutationWire), workspace = value.response.workspace;
+      if (!mutationShape(mutation) || !record(mutation) || !record(workspace) || mutation.projectId !== workspace.projectId) return false;
+      const checksum = await sha256(value.mutationWire);
+      if (!list(workspace.mutationReplay).some(item => record(item) && item.clientMutationId === mutation.clientMutationId
+        && item.requestSha256 === checksum && typeof item.resultingRevision === "number" && typeof workspace.projectRevision === "number"
+        && item.resultingRevision <= workspace.projectRevision)) return false;
+    }
+  }
+  if (typeof value.savedWire === "string") {
+    if (!record(value.job) || !record(value.job.receipt) || !record(value.saved) || !record(value.ownership)
+      || typeof value.mutationWire !== "string" || await sha256(value.savedWire) !== value.job.receipt.workspaceSha256
+      || !sameValue(JSON.parse(value.savedWire), value.saved.workspace)
+      || await sha256(value.mutationWire) !== (value.ownership.commandInverseSha256 ?? value.ownership.inverseSha256)
+      || new TextEncoder().encode(value.mutationWire).length !== (value.ownership.commandInverseBytes ?? value.ownership.inverseBytes)) return false;
+    const mutation: unknown = JSON.parse(value.mutationWire);
+    if (!record(mutation) || !record(value.saved.workspace) || mutation.projectId !== value.saved.workspace.projectId) return false;
+  }
+  return true;
+}
+
+async function exactBytes(value: unknown): Promise<boolean> {
+  const proofs: Record<string, unknown>[] = [];
+  const visit = (item: unknown): void => {
+    if (Array.isArray(item)) item.forEach(visit);
+    else if (record(item)) {
+      if ("workspaceWire" in item || "savedWire" in item) proofs.push(item);
+      Object.values(item).forEach(visit);
+    }
+  };
+  visit(value);
+  return (await Promise.all(proofs.map(proofBytes))).every(Boolean);
+}
+
+export async function validateBackgroundWire(kind: string, value: unknown): Promise<boolean> {
+  try { return validateBackgroundShape(kind, value) && await exactBytes(value); }
+  catch { return false; }
 }

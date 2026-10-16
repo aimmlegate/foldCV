@@ -140,16 +140,20 @@ class JobAssets:
     def bytes_for(self, project, kind, owner):
         with self.jobs.guard(project) as directory:
             state = self.jobs._read(project, directory)
-            pin = next((item for item in state.asset_pins if (item.kind, item.owner) == (kind, owner)), None)
-            images, sources = {}, {}
-            for ref in pin.references if pin else []:
-                path = self.canonical._directory(project) / ref.path
-                owned_file(path, 32 * 1024 * 1024)
-                raw = path.read_bytes()
-                if len(raw) != ref.size or hashlib.sha256(raw).hexdigest() != ref.sha256:
-                    raise BackgroundFailure("OUTCOME_UNKNOWN")
-                (images if ref.kind == "image" else sources)[ref.id] = raw
-            return images, sources
+            return self.read_pin(state, kind, owner)
+
+    def read_pin(self, state, kind, owner):
+        """The caller already owns the project guard when reading a bound draft."""
+        pin = next((item for item in state.asset_pins if (item.kind, item.owner) == (kind, owner)), None)
+        images, sources = {}, {}
+        for ref in pin.references if pin else []:
+            path = self.canonical._directory(state.project_id) / ref.path
+            owned_file(path, 32 * 1024 * 1024)
+            raw = path.read_bytes()
+            if len(raw) != ref.size or hashlib.sha256(raw).hexdigest() != ref.sha256:
+                raise BackgroundFailure("OUTCOME_UNKNOWN")
+            (images if ref.kind == "image" else sources)[ref.id] = raw
+        return images, sources
 
     def collectable(self, project, live):
         with self.jobs.guard(project) as directory:

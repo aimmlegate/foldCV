@@ -1,0 +1,15 @@
+{
+  "schemaVersion": 1,
+  "proof": {
+    "schemaVersion": 1,
+    "lineage": "lineage_2d845c6516af8f57fc565be5",
+    "epoch": 2,
+    "sessionId": "editor-session",
+    "incarnation": "connection-one",
+    "credential": "synthetic_writer_credential_0123456789"
+  },
+  "generation": 1,
+  "token": "synthetic_barrier_token_012345678901234",
+  "jobId": "job_49f3d72d3476dcdd74416413",
+  "proposalSha256": "af093719b5cf2c5a049d094cdab20bf9aca8b31c9c84f8adc5d709bf69abb1c3"
+}

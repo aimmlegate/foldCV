@@ -1,4 +1,5 @@
 export type Actioncursor = number;
+export type Assetpinssha256 = string | null;
 export type Baserevision = number;
 export type Basesha256 = string;
 export type Checkpointedat = string;
@@ -23,6 +24,7 @@ export type Writerepoch = number;
 
 export interface DraftCheckpointV1 {
   actionCursor: Actioncursor;
+  assetPinsSha256?: Assetpinssha256;
   baseRevision: Baserevision;
   baseSha256: Basesha256;
   checkpointedAt: Checkpointedat;

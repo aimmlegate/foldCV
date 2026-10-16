@@ -112,4 +112,11 @@ def examples():
         "requestEpoch": 1, "jobs": [snapshot()]}
     result["background_replay_request_v1"] = {"schemaVersion": 1, "generation": 1, "after": 0}
     result["background_replay_v1"] = {"schemaVersion": 1, "events": [result["background_event_v1"]]}
+    from packages.resume_core.models.background import BACKGROUND_CONTRACTS
+    directory = Path(__file__).resolve().parents[2] / "contracts/examples/background"
+    for name, model in BACKGROUND_CONTRACTS.items():
+        value = result.get(name)
+        if value is None:
+            value = json.loads((directory / (name + ".json")).read_text())
+        result[name] = model.model_validate(value).model_dump(mode="json", by_alias=True)
     return deepcopy(result)

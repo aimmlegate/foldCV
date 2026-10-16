@@ -90,6 +90,58 @@
       "default": null,
       "title": "Assetpinssha256"
     },
+    "commandInverseBytes": {
+      "anyOf": [
+        {
+          "maximum": 524288,
+          "minimum": 1,
+          "type": "integer"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Commandinversebytes"
+    },
+    "commandInverseSha256": {
+      "anyOf": [
+        {
+          "pattern": "^[a-f0-9]{64}$",
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Commandinversesha256"
+    },
+    "commandRef": {
+      "anyOf": [
+        {
+          "maxLength": 128,
+          "minLength": 1,
+          "pattern": "^[A-Za-z0-9_-]+$",
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Commandref"
+    },
+    "direction": {
+      "default": "undo",
+      "enum": [
+        "undo",
+        "redo",
+        "closed"
+      ],
+      "title": "Direction",
+      "type": "string"
+    },
     "expiresAt": {
       "format": "date-time",
       "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(?:\\.\\d+)?(?:Z|\\+00:00)$",

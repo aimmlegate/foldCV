@@ -18,7 +18,7 @@ import { projectFilename } from "./files/filename";
 
 export function App({ portalHost }: { portalHost: HTMLElement }) {
   const workspace = useResumeWorkspace();
-  const { response, projects, input, setInput, textDraft, error, status, setStatus, busy, settings, setSettings,
+  const { response, writer, projects, input, setInput, textDraft, error, status, setStatus, busy, settings, setSettings,
     editor, assistant, acknowledge, action, fresh, open, remove, process, upload, exportFile } = workspace;
   const [collapsed, setCollapsed] = useState(() => innerWidth <= 600);
   const [warningsOpen, setWarningsOpen] = useState(false);
@@ -42,7 +42,7 @@ export function App({ portalHost }: { portalHost: HTMLElement }) {
     window.addEventListener("keydown", save); return () => window.removeEventListener("keydown", save);
   }, [settings, view, busy, workspace.dismissError]);
   const openSettings = () => void action(async () => {
-    await editor.current?.flush(); setSettingsVisited(true); setSettings(true); if (innerWidth <= 600) setCollapsed(true);
+    await editor.current?.navigate(); setSettingsVisited(true); setSettings(true); if (innerWidth <= 600) setCollapsed(true);
   });
   function openFile(mode: FileMode) {
     workspace.dismissError();
@@ -70,9 +70,9 @@ export function App({ portalHost }: { portalHost: HTMLElement }) {
         {view === "assessment" && response && <Assessment response={response} open={() => setReviewed(reviewId(response))} back={() => setSourceOpen(true)} />}
         {view === "editor" && response?.workspace.project && <>
           {status !== "Сохранено" && status !== "Изменения сохраняются…" && <button className="text-button" disabled={busy} onClick={() => void action(async () => { await editor.current?.flush(); setStatus("Сохранено"); })}>Повторить сохранение</button>}
-          <RichEditor key={response.workspace.projectId} initial={response} acknowledge={acknowledge} onStatus={setStatus} ref={editor} portalHost={portalHost}
+          <RichEditor key={response.workspace.projectId} initial={response} writer={writer} acknowledge={acknowledge} onStatus={setStatus} ref={editor} portalHost={portalHost}
             onHistoryNavigation={() => assistant.current?.history()} onAssistantFence={saved => assistant.current?.fence(saved)}
-            assistant={<AssistantDrawer key={response.workspace.projectId} projectId={response.workspace.projectId} editor={editor} settingsOpen={settings} ref={assistant}
+            assistant={<AssistantDrawer key={response.workspace.projectId} projectId={response.workspace.projectId} editor={editor} settingsOpen={settings} ref={assistant} background={writer !== null}
               title={projectTitle} settings={openSettings} />}
             contextActions={response.workspace.warnings.length > 0 && <button onClick={() => setWarningsOpen(true)}>Замечания к исходнику</button>} />
         </>}
@@ -80,7 +80,7 @@ export function App({ portalHost }: { portalHost: HTMLElement }) {
           process={() => { setSourceOpen(false); void process(); }} warnings={response?.workspace.preDraft?.warnings.map(warningLabel) ?? []}
           failure={generation?.status === "failed" ? "Не удалось завершить обработку." : generation?.status === "cancelled" ? "Обработка отменена." : generation?.status === "interrupted" ? "Обработка прервана." : null} />}
       </div>
-      {settingsVisited && <div className="screen" hidden={!settings}><Settings close={() => setSettings(false)} connectionChanged={setConnection} /></div>}
+      {settingsVisited && <div className="screen" hidden={!settings}><Settings close={() => void action(async () => { await editor.current?.resume(); setSettings(false); })} connectionChanged={setConnection} /></div>}
       <Dialog open={warningsOpen} close={() => setWarningsOpen(false)} title="Замечания к исходнику">
         {response?.workspace.warnings.map(warning => <p className="dialog-copy" key={warning.id}>{warningLabel(warning.code)}</p>)}
       </Dialog>

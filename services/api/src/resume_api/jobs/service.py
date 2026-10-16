@@ -9,8 +9,9 @@ from packages.resume_core.agent_store import AgentFailure, digest
 from packages.resume_core.background_proposals import JobProposals
 from packages.resume_core.background_history import ScopeHistory
 from packages.resume_core.background_publication import CanonicalCoordinator
+from packages.resume_core.background_writers import WriterSessions
 from packages.resume_core.background_scopes import mutation_selectors
-from packages.resume_core.background_store import BackgroundFailure, JobStore, TERMINAL_EXECUTION, job_in
+from packages.resume_core.background_store import BackgroundFailure, JobStore, RESOLVED_PUBLICATION, TERMINAL_EXECUTION, job_in
 from packages.resume_core.background_supervisor import JobSupervisor
 from packages.resume_core.models.background import JobIdentity, JobProjectV1, JobSubmissionV1, ScopeGuardV1
 from packages.resume_core.models.agent import wire_bytes
@@ -40,9 +41,11 @@ class JobService:
         self.history = ScopeHistory(self.store, query_fingerprint)
         self.publisher = CanonicalCoordinator(self.store, self.history, projects.storage, self.artifacts.payload_unlocked)
         self.publication = JobPublication(self)
+        self.writers = WriterSessions(self.publisher, blocked=lambda project: project in self.projects.agent_recovery_fences)
         self.artifacts.prepare_capture = self.capture_preparation
         self.settings = AgentSettingsStore(projects.storage.root)
         self.proposals = {}
+        self.publication_tasks, self.publication_wakes = {}, set()
         self.supervisor = JobSupervisor(self.store, factory or (lambda job, model: JobRuntime(self, job, model)),
             clock=clock, preflight=self.preflight, admit=self.admit, eligible=self.eligible,
             **({"observer": observer} if observer else {}))
@@ -58,6 +61,7 @@ class JobService:
                     except BackgroundFailure:
                         self.store.fences.setdefault(project, "OUTCOME_UNKNOWN")
             from packages.resume_core.background_retention import JobRetention
+            self.writers.recover_all()
             JobRetention(self.store).sweep_all()
             await self.supervisor.start()
 
@@ -98,7 +102,7 @@ class JobService:
         if not connection.ready:
             return "RATE_LIMITED" if connection.reason == "AGENT_QUOTA" else "AUTH_REQUIRED"
         try:
-            self.history.open(job.submission.identity.project_id)
+            self.writers.initialize(job.submission.identity.project_id)
         except BackgroundFailure as error:
             return error.code
         _job, artifact = self.artifacts.record(job.submission.identity.project_id, job.id)
@@ -191,8 +195,10 @@ class JobService:
                     after, generation = event.cursor, event.generation
                     yield raw
                 job = self.store.read(project, job_id)
-                if job.execution in TERMINAL_EXECUTION:
+                if job.execution in TERMINAL_EXECUTION and job.publication in RESOLVED_PUBLICATION and after >= job.event_cursor and generation == job.execution_generation:
                     return
+                if after < job.event_cursor or generation != job.execution_generation:
+                    continue
                 await changed.wait()
         finally:
             self.supervisor.listeners.discard(changed)
@@ -201,8 +207,46 @@ class JobService:
         await self.supervisor.shutdown()
         for proposal in self.proposals.values():
             await proposal.shutdown()
+        if self.publication_tasks:
+            await asyncio.gather(*tuple(self.publication_tasks.values()), return_exceptions=True)
         for changed in tuple(self.supervisor.listeners):
             changed.set()
+
+    def wake_publication(self, project):
+        if not self.enabled or self.supervisor.closed:
+            return
+        self.publication_wakes.add(project)
+        if project in self.publication_tasks and not self.publication_tasks[project].done():
+            return
+        async def reconcile():
+            try:
+                while project in self.publication_wakes:
+                    self.publication_wakes.discard(project)
+                    updated = await asyncio.to_thread(self.publish_waiting, project)
+                    for job in updated:
+                        await self.supervisor._emit(job)
+            except Exception as error:
+                self.store.fences.setdefault(project, getattr(error, "code", "OUTCOME_UNKNOWN"))
+            finally:
+                self.publication_tasks.pop(project, None)
+        task = asyncio.create_task(reconcile())
+        self.publication_tasks[project] = task
+
+    def publish_waiting(self, project):
+        updated = []
+        try:
+            state = self.store.load(project)
+            for job in state.jobs:
+                if job.publication not in {"ready", "waiting_for_sync", "save_failed"} or job.proposal_id is None:
+                    continue
+                proposal = next(item for item in state.proposals if item.id == job.proposal_id)
+                result = self.publication.publish(project, job.id, proposal.payload_sha256)
+                if result.event_cursor != job.event_cursor:
+                    updated.append(result)
+        except BackgroundFailure as error:
+            if error.code not in {"PROJECT_DELETED", "JOB_NOT_FOUND"}:
+                self.store.fences.setdefault(project, error.code)
+        return updated
 
     async def stop_project(self, project):
         controls = [control for control in self.supervisor.controls.values()

@@ -1,0 +1,2533 @@
+export type Batchid = string | null;
+export type Assetpinssha256 = string | null;
+/**
+ * @maxItems 2
+ */
+export type Attempts = [] | [JobAttemptV1] | [JobAttemptV1, JobAttemptV1];
+export type Activedeadline = string;
+export type Childstartedat = string | null;
+export type Cleanupverified = boolean;
+export type Dispatchedat = string;
+export type Code =
+  | "AUTH_REQUIRED"
+  | "RATE_LIMITED"
+  | "BUSY"
+  | "MODEL_DENIED"
+  | "CANCELLED"
+  | "DEADLINE"
+  | "STARTUP_TIMEOUT"
+  | "PROCESS_FAILED"
+  | "CLEANUP_FAILED"
+  | "INTERRUPTED"
+  | "PROTOCOL"
+  | "JOB_QUEUE_FULL"
+  | "JOB_STORAGE_FULL"
+  | "JOB_IDEMPOTENCY_CONFLICT"
+  | "REQUEST_EXPIRED"
+  | "JOB_NOT_FOUND"
+  | "JOB_STORE_CORRUPT"
+  | "JOB_STORE_UNAVAILABLE"
+  | "JOB_DISABLED"
+  | "JOB_SCOPE_INVALID"
+  | "ACCOUNT_CHANGED"
+  | "DEPENDENCY_CHANGED"
+  | "WRITER_UNKNOWN"
+  | "SAVE_FAILED"
+  | "OUTCOME_UNKNOWN"
+  | "PROJECT_DELETED";
+export type Executiongeneration = number;
+export type Id = string;
+export type Nativestarted = boolean;
+export type Schemaversion = 1;
+export type Stage = "agent" | "assessment" | "extraction" | "rewrite" | "reconciliation";
+export type Startupdeadline = string;
+export type State =
+  "reserved" | "starting" | "running" | "completed" | "failed" | "cancelled" | "interrupted" | "cleanup_failed";
+export type Createdat = string;
+export type Eventcursor = number;
+export type Execution =
+  "queued" | "starting" | "running" | "cancelling" | "completed" | "failed" | "cancelled" | "interrupted";
+export type Executiongeneration1 = number;
+export type Id1 = string;
+export type Proposalid = string | null;
+export type Publication =
+  | "none"
+  | "ready"
+  | "waiting_for_sync"
+  | "needs_review"
+  | "committing"
+  | "saved"
+  | "no_change"
+  | "save_failed"
+  | "outcome_unknown"
+  | "discarded"
+  | "cancelled";
+export type Clientmutationid = string;
+export type Documentrevision = number;
+export type Durable = true;
+export type Factsrevision = number;
+export type Generationssha256 = string;
+export type Jobid = string;
+export type Lineage = string;
+export type Persistedat = string;
+export type Projectid = string;
+export type Projectrevision = number;
+export type Proposalid1 = string;
+export type Proposalsha256 = string;
+export type Requestsha256 = string;
+export type Schemaversion1 = 1;
+export type Workspacesha256 = string;
+export type Schemaversion2 = 1;
+export type Accountgeneration = number;
+export type Allowedits = boolean;
+export type Allowweb = boolean;
+export type Fingerprint = string;
+export type Generation = number;
+export type Key = string;
+export type Kind = "entity" | "structure" | "query" | "source" | "rules";
+/**
+ * @maxItems 100
+ */
+export type Reads = GenerationStamp[];
+export type Schemaversion3 = 1;
+/**
+ * @maxItems 100
+ */
+export type Writes = GenerationStamp[];
+export type Lineage1 = string;
+export type Projectid1 = string;
+export type Requestepoch = number;
+export type Requestid = string;
+export type Id2 = string;
+export type Kind1 = "agent_journal" | "rich_sync" | "processing";
+export type Sha256 = string;
+export type Kind2 = "agent" | "processing" | "rewrite" | "reconciliation";
+/**
+ * @minItems 1
+ * @maxItems 2
+ */
+export type Models = [ModelCapture] | [ModelCapture, ModelCapture];
+export type Configsha256 = string;
+export type Model = string;
+export type Stage1 = "agent" | "assessment" | "extraction" | "rewrite" | "reconciliation";
+export type Payloadsha256 = string;
+export type Schedulingclass = "background" | "interactive" | "reconciliation";
+export type Schemaversion4 = 1;
+export type Scope = WholeResumeScope | SelectionScope;
+export type Kind3 = "resume";
+export type Kind4 = "selection";
+export type Blockid = string;
+export type Cellid = string | null;
+/**
+ * UTF-16 code units within the block or cell.
+ */
+export type Offset = number;
+/**
+ * @minItems 1
+ */
+export type Blockids = [string, ...string[]];
+export type Actionid = string;
+export type Actiontoken = number;
+export type Fingerprint1 = string | null;
+export type Id3 = string;
+export type Kind5 =
+  "block" | "record" | "field" | "period" | "ownership" | "source" | "rules" | "asset" | "timeline_order";
+export type Revision = number;
+export type Dependencies = DependencyStamp[];
+export type Sessionid = string;
+export type Kind6 = "text" | "blocks" | "table_cells";
+export type Textsha256 = string;
+export type Submittedat = string;
+/**
+ * @maxItems 10
+ */
+export type Tools =
+  | []
+  | [
+      | "get_resume_context"
+      | "find_resume_content"
+      | "get_working_facts"
+      | "get_original_source"
+      | "get_conversation_context"
+      | "check_resume"
+      | "read_public_page"
+      | "publish_findings"
+      | "prepare_edit_batch"
+      | "apply_edit_batch"
+    ]
+  | [
+      (
+        | "get_resume_context"
+        | "find_resume_content"
+        | "get_working_facts"
+        | "get_original_source"
+        | "get_conversation_context"
+        | "check_resume"
+        | "read_public_page"
+        | "publish_findings"
+        | "prepare_edit_batch"
+        | "apply_edit_batch"
+      ),
+      (
+        | "get_resume_context"
+        | "find_resume_content"
+        | "get_working_facts"
+        | "get_original_source"
+        | "get_conversation_context"
+        | "check_resume"
+        | "read_public_page"
+        | "publish_findings"
+        | "prepare_edit_batch"
+        | "apply_edit_batch"
+      )
+    ]
+  | [
+      (
+        | "get_resume_context"
+        | "find_resume_content"
+        | "get_working_facts"
+        | "get_original_source"
+        | "get_conversation_context"
+        | "check_resume"
+        | "read_public_page"
+        | "publish_findings"
+        | "prepare_edit_batch"
+        | "apply_edit_batch"
+      ),
+      (
+        | "get_resume_context"
+        | "find_resume_content"
+        | "get_working_facts"
+        | "get_original_source"
+        | "get_conversation_context"
+        | "check_resume"
+        | "read_public_page"
+        | "publish_findings"
+        | "prepare_edit_batch"
+        | "apply_edit_batch"
+      ),
+      (
+        | "get_resume_context"
+        | "find_resume_content"
+        | "get_working_facts"
+        | "get_original_source"
+        | "get_conversation_context"
+        | "check_resume"
+        | "read_public_page"
+        | "publish_findings"
+        | "prepare_edit_batch"
+        | "apply_edit_batch"
+      )
+    ]
+  | [
+      (
+        | "get_resume_context"
+        | "find_resume_content"
+        | "get_working_facts"
+        | "get_original_source"
+        | "get_conversation_context"
+        | "check_resume"
+        | "read_public_page"
+        | "publish_findings"
+        | "prepare_edit_batch"
+        | "apply_edit_batch"
+      ),
+      (
+        | "get_resume_context"
+        | "find_resume_content"
+        | "get_working_facts"
+        | "get_original_source"
+        | "get_conversation_context"
+        | "check_resume"
+        | "read_public_page"
+        | "publish_findings"
+        | "prepare_edit_batch"
+        | "apply_edit_batch"
+      ),
+      (
+        | "get_resume_context"
+        | "find_resume_content"
+        | "get_working_facts"
+        | "get_original_source"
+        | "get_conversation_context"
+        | "check_resume"
+        | "read_public_page"
+        | "publish_findings"
+        | "prepare_edit_batch"
+        | "apply_edit_batch"
+      ),
+      (
+        | "get_resume_context"
+        | "find_resume_content"
+        | "get_working_facts"
+        | "get_original_source"
+        | "get_conversation_context"
+        | "check_resume"
+        | "read_public_page"
+        | "publish_findings"
+        | "prepare_edit_batch"
+        | "apply_edit_batch"
+      )
+    ]
+  | [
+      (
+        | "get_resume_context"
+        | "find_resume_content"
+        | "get_working_facts"
+        | "get_original_source"
+        | "get_conversation_context"
+        | "check_resume"
+        | "read_public_page"
+        | "publish_findings"
+        | "prepare_edit_batch"
+        | "apply_edit_batch"
+      ),
+      (
+        | "get_resume_context"
+        | "find_resume_content"
+        | "get_working_facts"
+        | "get_original_source"
+        | "get_conversation_context"
+        | "check_resume"
+        | "read_public_page"
+        | "publish_findings"
+        | "prepare_edit_batch"
+        | "apply_edit_batch"
+      ),
+      (
+        | "get_resume_context"
+        | "find_resume_content"
+        | "get_working_facts"
+        | "get_original_source"
+        | "get_conversation_context"
+        | "check_resume"
+        | "read_public_page"
+        | "publish_findings"
+        | "prepare_edit_batch"
+        | "apply_edit_batch"
+      ),
+      (
+        | "get_resume_context"
+        | "find_resume_content"
+        | "get_working_facts"
+        | "get_original_source"
+        | "get_conversation_context"
+        | "check_resume"
+        | "read_public_page"
+        | "publish_findings"
+        | "prepare_edit_batch"
+        | "apply_edit_batch"
+      ),
+      (
+        | "get_resume_context"
+        | "find_resume_content"
+        | "get_working_facts"
+        | "get_original_source"
+        | "get_conversation_context"
+        | "check_resume"
+        | "read_public_page"
+        | "publish_findings"
+        | "prepare_edit_batch"
+        | "apply_edit_batch"
+      )
+    ]
+  | [
+      (
+        | "get_resume_context"
+        | "find_resume_content"
+        | "get_working_facts"
+        | "get_original_source"
+        | "get_conversation_context"
+        | "check_resume"
+        | "read_public_page"
+        | "publish_findings"
+        | "prepare_edit_batch"
+        | "apply_edit_batch"
+      ),
+      (
+        | "get_resume_context"
+        | "find_resume_content"
+        | "get_working_facts"
+        | "get_original_source"
+        | "get_conversation_context"
+        | "check_resume"
+        | "read_public_page"
+        | "publish_findings"
+        | "prepare_edit_batch"
+        | "apply_edit_batch"
+      ),
+      (
+        | "get_resume_context"
+        | "find_resume_content"
+        | "get_working_facts"
+        | "get_original_source"
+        | "get_conversation_context"
+        | "check_resume"
+        | "read_public_page"
+        | "publish_findings"
+        | "prepare_edit_batch"
+        | "apply_edit_batch"
+      ),
+      (
+        | "get_resume_context"
+        | "find_resume_content"
+        | "get_working_facts"
+        | "get_original_source"
+        | "get_conversation_context"
+        | "check_resume"
+        | "read_public_page"
+        | "publish_findings"
+        | "prepare_edit_batch"
+        | "apply_edit_batch"
+      ),
+      (
+        | "get_resume_context"
+        | "find_resume_content"
+        | "get_working_facts"
+        | "get_original_source"
+        | "get_conversation_context"
+        | "check_resume"
+        | "read_public_page"
+        | "publish_findings"
+        | "prepare_edit_batch"
+        | "apply_edit_batch"
+      ),
+      (
+        | "get_resume_context"
+        | "find_resume_content"
+        | "get_working_facts"
+        | "get_original_source"
+        | "get_conversation_context"
+        | "check_resume"
+        | "read_public_page"
+        | "publish_findings"
+        | "prepare_edit_batch"
+        | "apply_edit_batch"
+      )
+    ]
+  | [
+      (
+        | "get_resume_context"
+        | "find_resume_content"
+        | "get_working_facts"
+        | "get_original_source"
+        | "get_conversation_context"
+        | "check_resume"
+        | "read_public_page"
+        | "publish_findings"
+        | "prepare_edit_batch"
+        | "apply_edit_batch"
+      ),
+      (
+        | "get_resume_context"
+        | "find_resume_content"
+        | "get_working_facts"
+        | "get_original_source"
+        | "get_conversation_context"
+        | "check_resume"
+        | "read_public_page"
+        | "publish_findings"
+        | "prepare_edit_batch"
+        | "apply_edit_batch"
+      ),
+      (
+        | "get_resume_context"
+        | "find_resume_content"
+        | "get_working_facts"
+        | "get_original_source"
+        | "get_conversation_context"
+        | "check_resume"
+        | "read_public_page"
+        | "publish_findings"
+        | "prepare_edit_batch"
+        | "apply_edit_batch"
+      ),
+      (
+        | "get_resume_context"
+        | "find_resume_content"
+        | "get_working_facts"
+        | "get_original_source"
+        | "get_conversation_context"
+        | "check_resume"
+        | "read_public_page"
+        | "publish_findings"
+        | "prepare_edit_batch"
+        | "apply_edit_batch"
+      ),
+      (
+        | "get_resume_context"
+        | "find_resume_content"
+        | "get_working_facts"
+        | "get_original_source"
+        | "get_conversation_context"
+        | "check_resume"
+        | "read_public_page"
+        | "publish_findings"
+        | "prepare_edit_batch"
+        | "apply_edit_batch"
+      ),
+      (
+        | "get_resume_context"
+        | "find_resume_content"
+        | "get_working_facts"
+        | "get_original_source"
+        | "get_conversation_context"
+        | "check_resume"
+        | "read_public_page"
+        | "publish_findings"
+        | "prepare_edit_batch"
+        | "apply_edit_batch"
+      ),
+      (
+        | "get_resume_context"
+        | "find_resume_content"
+        | "get_working_facts"
+        | "get_original_source"
+        | "get_conversation_context"
+        | "check_resume"
+        | "read_public_page"
+        | "publish_findings"
+        | "prepare_edit_batch"
+        | "apply_edit_batch"
+      )
+    ]
+  | [
+      (
+        | "get_resume_context"
+        | "find_resume_content"
+        | "get_working_facts"
+        | "get_original_source"
+        | "get_conversation_context"
+        | "check_resume"
+        | "read_public_page"
+        | "publish_findings"
+        | "prepare_edit_batch"
+        | "apply_edit_batch"
+      ),
+      (
+        | "get_resume_context"
+        | "find_resume_content"
+        | "get_working_facts"
+        | "get_original_source"
+        | "get_conversation_context"
+        | "check_resume"
+        | "read_public_page"
+        | "publish_findings"
+        | "prepare_edit_batch"
+        | "apply_edit_batch"
+      ),
+      (
+        | "get_resume_context"
+        | "find_resume_content"
+        | "get_working_facts"
+        | "get_original_source"
+        | "get_conversation_context"
+        | "check_resume"
+        | "read_public_page"
+        | "publish_findings"
+        | "prepare_edit_batch"
+        | "apply_edit_batch"
+      ),
+      (
+        | "get_resume_context"
+        | "find_resume_content"
+        | "get_working_facts"
+        | "get_original_source"
+        | "get_conversation_context"
+        | "check_resume"
+        | "read_public_page"
+        | "publish_findings"
+        | "prepare_edit_batch"
+        | "apply_edit_batch"
+      ),
+      (
+        | "get_resume_context"
+        | "find_resume_content"
+        | "get_working_facts"
+        | "get_original_source"
+        | "get_conversation_context"
+        | "check_resume"
+        | "read_public_page"
+        | "publish_findings"
+        | "prepare_edit_batch"
+        | "apply_edit_batch"
+      ),
+      (
+        | "get_resume_context"
+        | "find_resume_content"
+        | "get_working_facts"
+        | "get_original_source"
+        | "get_conversation_context"
+        | "check_resume"
+        | "read_public_page"
+        | "publish_findings"
+        | "prepare_edit_batch"
+        | "apply_edit_batch"
+      ),
+      (
+        | "get_resume_context"
+        | "find_resume_content"
+        | "get_working_facts"
+        | "get_original_source"
+        | "get_conversation_context"
+        | "check_resume"
+        | "read_public_page"
+        | "publish_findings"
+        | "prepare_edit_batch"
+        | "apply_edit_batch"
+      ),
+      (
+        | "get_resume_context"
+        | "find_resume_content"
+        | "get_working_facts"
+        | "get_original_source"
+        | "get_conversation_context"
+        | "check_resume"
+        | "read_public_page"
+        | "publish_findings"
+        | "prepare_edit_batch"
+        | "apply_edit_batch"
+      )
+    ]
+  | [
+      (
+        | "get_resume_context"
+        | "find_resume_content"
+        | "get_working_facts"
+        | "get_original_source"
+        | "get_conversation_context"
+        | "check_resume"
+        | "read_public_page"
+        | "publish_findings"
+        | "prepare_edit_batch"
+        | "apply_edit_batch"
+      ),
+      (
+        | "get_resume_context"
+        | "find_resume_content"
+        | "get_working_facts"
+        | "get_original_source"
+        | "get_conversation_context"
+        | "check_resume"
+        | "read_public_page"
+        | "publish_findings"
+        | "prepare_edit_batch"
+        | "apply_edit_batch"
+      ),
+      (
+        | "get_resume_context"
+        | "find_resume_content"
+        | "get_working_facts"
+        | "get_original_source"
+        | "get_conversation_context"
+        | "check_resume"
+        | "read_public_page"
+        | "publish_findings"
+        | "prepare_edit_batch"
+        | "apply_edit_batch"
+      ),
+      (
+        | "get_resume_context"
+        | "find_resume_content"
+        | "get_working_facts"
+        | "get_original_source"
+        | "get_conversation_context"
+        | "check_resume"
+        | "read_public_page"
+        | "publish_findings"
+        | "prepare_edit_batch"
+        | "apply_edit_batch"
+      ),
+      (
+        | "get_resume_context"
+        | "find_resume_content"
+        | "get_working_facts"
+        | "get_original_source"
+        | "get_conversation_context"
+        | "check_resume"
+        | "read_public_page"
+        | "publish_findings"
+        | "prepare_edit_batch"
+        | "apply_edit_batch"
+      ),
+      (
+        | "get_resume_context"
+        | "find_resume_content"
+        | "get_working_facts"
+        | "get_original_source"
+        | "get_conversation_context"
+        | "check_resume"
+        | "read_public_page"
+        | "publish_findings"
+        | "prepare_edit_batch"
+        | "apply_edit_batch"
+      ),
+      (
+        | "get_resume_context"
+        | "find_resume_content"
+        | "get_working_facts"
+        | "get_original_source"
+        | "get_conversation_context"
+        | "check_resume"
+        | "read_public_page"
+        | "publish_findings"
+        | "prepare_edit_batch"
+        | "apply_edit_batch"
+      ),
+      (
+        | "get_resume_context"
+        | "find_resume_content"
+        | "get_working_facts"
+        | "get_original_source"
+        | "get_conversation_context"
+        | "check_resume"
+        | "read_public_page"
+        | "publish_findings"
+        | "prepare_edit_batch"
+        | "apply_edit_batch"
+      ),
+      (
+        | "get_resume_context"
+        | "find_resume_content"
+        | "get_working_facts"
+        | "get_original_source"
+        | "get_conversation_context"
+        | "check_resume"
+        | "read_public_page"
+        | "publish_findings"
+        | "prepare_edit_batch"
+        | "apply_edit_batch"
+      )
+    ]
+  | [
+      (
+        | "get_resume_context"
+        | "find_resume_content"
+        | "get_working_facts"
+        | "get_original_source"
+        | "get_conversation_context"
+        | "check_resume"
+        | "read_public_page"
+        | "publish_findings"
+        | "prepare_edit_batch"
+        | "apply_edit_batch"
+      ),
+      (
+        | "get_resume_context"
+        | "find_resume_content"
+        | "get_working_facts"
+        | "get_original_source"
+        | "get_conversation_context"
+        | "check_resume"
+        | "read_public_page"
+        | "publish_findings"
+        | "prepare_edit_batch"
+        | "apply_edit_batch"
+      ),
+      (
+        | "get_resume_context"
+        | "find_resume_content"
+        | "get_working_facts"
+        | "get_original_source"
+        | "get_conversation_context"
+        | "check_resume"
+        | "read_public_page"
+        | "publish_findings"
+        | "prepare_edit_batch"
+        | "apply_edit_batch"
+      ),
+      (
+        | "get_resume_context"
+        | "find_resume_content"
+        | "get_working_facts"
+        | "get_original_source"
+        | "get_conversation_context"
+        | "check_resume"
+        | "read_public_page"
+        | "publish_findings"
+        | "prepare_edit_batch"
+        | "apply_edit_batch"
+      ),
+      (
+        | "get_resume_context"
+        | "find_resume_content"
+        | "get_working_facts"
+        | "get_original_source"
+        | "get_conversation_context"
+        | "check_resume"
+        | "read_public_page"
+        | "publish_findings"
+        | "prepare_edit_batch"
+        | "apply_edit_batch"
+      ),
+      (
+        | "get_resume_context"
+        | "find_resume_content"
+        | "get_working_facts"
+        | "get_original_source"
+        | "get_conversation_context"
+        | "check_resume"
+        | "read_public_page"
+        | "publish_findings"
+        | "prepare_edit_batch"
+        | "apply_edit_batch"
+      ),
+      (
+        | "get_resume_context"
+        | "find_resume_content"
+        | "get_working_facts"
+        | "get_original_source"
+        | "get_conversation_context"
+        | "check_resume"
+        | "read_public_page"
+        | "publish_findings"
+        | "prepare_edit_batch"
+        | "apply_edit_batch"
+      ),
+      (
+        | "get_resume_context"
+        | "find_resume_content"
+        | "get_working_facts"
+        | "get_original_source"
+        | "get_conversation_context"
+        | "check_resume"
+        | "read_public_page"
+        | "publish_findings"
+        | "prepare_edit_batch"
+        | "apply_edit_batch"
+      ),
+      (
+        | "get_resume_context"
+        | "find_resume_content"
+        | "get_working_facts"
+        | "get_original_source"
+        | "get_conversation_context"
+        | "check_resume"
+        | "read_public_page"
+        | "publish_findings"
+        | "prepare_edit_batch"
+        | "apply_edit_batch"
+      ),
+      (
+        | "get_resume_context"
+        | "find_resume_content"
+        | "get_working_facts"
+        | "get_original_source"
+        | "get_conversation_context"
+        | "check_resume"
+        | "read_public_page"
+        | "publish_findings"
+        | "prepare_edit_batch"
+        | "apply_edit_batch"
+      )
+    ];
+export type Undoexpired = boolean;
+export type Updatedat = string;
+export type Mutationwire = string;
+export type Assetpinssha2561 = string | null;
+export type Commandinversebytes = number | null;
+export type Commandinversesha256 = string | null;
+export type Commandref = string | null;
+export type Direction = "undo" | "redo" | "closed";
+export type Expiresat = string;
+export type Incarnation = string | null;
+export type Inversebytes = number;
+export type Inverseref = string;
+export type Inversesha256 = string;
+export type Jobid1 = string;
+export type Owner = "session" | "backend" | "transferring" | "expired";
+export type Proposalid2 = string;
+export type Schemaversion5 = 1;
+export type Transferid = string;
+export type Writerepoch = number | null;
+export type Durability = "pending" | "durable" | "failed";
+export type Errorcode = string | null;
+export type Id4 = string;
+export type Stage2 = "assess_resume" | "normalize_semantics" | "draft_prose" | "assemble" | "render";
+export type Status = "queued" | "running" | "completed" | "failed" | "cancelled" | "interrupted";
+export type Subtitle = string;
+export type Title = string;
+export type Logo = string | null;
+export type Role =
+  | "body"
+  | "support"
+  | "header_name"
+  | "header_title"
+  | "job_heading"
+  | "profile_heading"
+  | "section_heading"
+  | "focus_heading"
+  | "focus_entry"
+  | "group";
+export type Saveerror = string | null;
+export type Saveddocumentrevision = number | null;
+export type Savedprojectrevision = number | null;
+export type Createdat1 = string;
+export type Documentrevision1 = number;
+export type Day = number | null;
+export type Month = number | null;
+export type Precision = "year" | "month" | "day";
+export type Year = number;
+export type Clientmutationid1 = string;
+export type Requestsha2561 = string;
+export type Resultingrevision = number;
+export type Mutationreplay = RichMutationReplay[];
+export type Sourceid = string;
+export type Sourcerevision = number;
+export type Text = string;
+export type Unitid = string;
+export type Unitrevision = number;
+export type Evidence = EvidenceSpan[];
+export type Id5 = string;
+export type Kind7 = "candidate";
+export type Pendingrawtext = string | null;
+export type Rawtext = string;
+export type Revision1 = number;
+export type Status1 = "known" | "unknown" | "unresolved" | "pending" | "conflict";
+export type Usercorrected = boolean;
+export type Value = string | null;
+export type Origin = "source" | "user";
+export type Revision2 = number;
+export type Usercorrected1 = boolean;
+export type Detailtype = "phone" | "email" | "url" | "messenger" | "age" | "birth_date" | "metadata" | "other";
+export type Evidence1 = EvidenceSpan[];
+export type Id6 = string;
+export type Kind8 = "detail";
+export type Label = string;
+export type Origin1 = "source" | "user";
+export type Revision3 = number;
+export type Usercorrected2 = boolean;
+export type Evidence2 = EvidenceSpan[];
+export type Id7 = string;
+export type Kind9 = "employment";
+export type Origin2 = "source" | "user";
+export type Pendingrawtext1 = string | null;
+export type Rawtext1 = string;
+export type Revision4 = number;
+export type Status2 = "known" | "unknown" | "unresolved" | "pending" | "conflict";
+export type Usercorrected3 = boolean;
+export type Evidence3 = EvidenceSpan[];
+export type Id8 = string;
+export type Pendingrawtext2 = string | null;
+export type Rawtext2 = string;
+export type Revision5 = number;
+export type Status3 = "known" | "unknown" | "unresolved" | "pending" | "conflict";
+export type Usercorrected4 = boolean;
+export type Value1 = boolean | null;
+export type Revision6 = number;
+export type Periods = WorkingPeriod[];
+export type Revision7 = number;
+export type Usercorrected5 = boolean;
+export type Evidence4 = EvidenceSpan[];
+export type Id9 = string;
+export type Jobid2 = string;
+export type Kind10 = "subproject";
+export type Origin3 = "source" | "user";
+export type Periods1 = WorkingPeriod[];
+export type Revision8 = number;
+export type Usercorrected6 = boolean;
+export type Evidence5 = EvidenceSpan[];
+export type Id10 = string;
+export type Jobid3 = string | null;
+export type Kind11 = "technology";
+export type Origin4 = "source" | "user";
+export type Revision9 = number;
+export type Subprojectid = string | null;
+export type Usercorrected7 = boolean;
+export type Evidence6 = EvidenceSpan[];
+export type Id11 = string;
+export type Kind12 = "education";
+export type Origin5 = "source" | "user";
+export type Revision10 = number;
+export type Usercorrected8 = boolean;
+export type Evidence7 = EvidenceSpan[];
+export type Id12 = string;
+export type Kind13 = "language";
+export type Origin6 = "source" | "user";
+export type Revision11 = number;
+export type Usercorrected9 = boolean;
+export type Evidence8 = EvidenceSpan[];
+export type Id13 = string;
+export type Kind14 = "certification";
+export type Origin7 = "source" | "user";
+export type Revision12 = number;
+export type Usercorrected10 = boolean;
+export type Evidence9 = EvidenceSpan[];
+export type Id14 = string;
+export type Jobid4 = string | null;
+export type Kind15 = "claim";
+export type Origin8 = "source" | "user";
+export type Revision13 = number;
+export type Subprojectid1 = string | null;
+export type Usercorrected11 = boolean;
+export type Evidence10 = EvidenceSpan[];
+export type Id15 = string;
+export type Jobid5 = string | null;
+export type Kind16 = "metric";
+export type Origin9 = "source" | "user";
+export type Revision14 = number;
+export type Subprojectid2 = string | null;
+export type Usercorrected12 = boolean;
+export type Pendingrawtext3 = string | null;
+export type Rawtext3 = string;
+export type Revision15 = number;
+export type Status4 = "known" | "unknown" | "unresolved" | "pending" | "conflict";
+export type Usercorrected13 = boolean;
+export type Attribution = "personal" | "team" | "organization" | "unknown";
+export type Baseline = string | null;
+export type Comparator = "exact" | "at_least" | "at_most" | "approximately" | "range";
+export type Number = number;
+export type Period = string | null;
+export type Qualifiers = string[];
+export type Result = string | null;
+export type Scope1 = string | null;
+export type Unit = string;
+export type Uppernumber = number | null;
+export type Evidence11 = EvidenceSpan[];
+export type Id16 = string;
+export type Jobid6 = string | null;
+export type Kind17 = "leadership";
+export type Origin10 = "source" | "user";
+export type Revision16 = number;
+export type Subprojectid3 = string | null;
+export type Usercorrected14 = boolean;
+export type Pendingrawtext4 = string | null;
+export type Rawtext4 = string;
+export type Revision17 = number;
+export type Status5 = "known" | "unknown" | "unresolved" | "pending" | "conflict";
+export type Usercorrected15 = boolean;
+export type Action = string;
+export type Attribution1 = "personal" | "team" | "organization" | "unknown";
+export type Category = "education" | "certification" | "language" | "employment" | "detail" | "other";
+export type Evidence12 = EvidenceSpan[];
+export type Id17 = string;
+export type Kind18 = "unresolved";
+export type Origin11 = "source" | "user";
+export type Revision18 = number;
+export type Status6 = "unresolved" | "pending" | "conflict";
+export type Usercorrected16 = boolean;
+export type Records = (
+  | CandidateRecord
+  | DetailRecord
+  | EmploymentRecord
+  | SubprojectRecord
+  | TechnologyRecord
+  | EducationRecord
+  | LanguageRecord
+  | CertificationRecord
+  | ClaimRecord
+  | MetricRecord
+  | LeadershipRecord
+  | UnresolvedRecord
+)[];
+export type Revision19 = number;
+export type Actionid1 = string;
+export type Orderindex = number;
+export type Recordid = string;
+export type Revision20 = number;
+export type Tombstones = RecordTombstone[];
+export type Actionid2 = string | null;
+export type Dependencies1 = DependencyStamp[];
+export type Errorcode1 = string | null;
+export type Id18 = string;
+export type Kind19 =
+  | "extract"
+  | "assess_resume"
+  | "normalize_semantics"
+  | "draft_prose"
+  | "render"
+  | "project_save"
+  | "rewrite_prose"
+  | "reconcile_edits";
+export type Status7 = "queued" | "running" | "completed" | "failed" | "cancelled" | "interrupted";
+export type Operations = RichOperation[];
+export type Selectedinput = "text" | "file";
+export type Selectedsourceid = string | null;
+export type Byteref = string;
+export type Bytesha256 = string;
+export type Id19 = string;
+export type Mimetype = string;
+export type Originalname = string;
+export type Id20 = string;
+export type Origin12 = "user";
+export type Revision21 = number;
+export type Text1 = string;
+export type Unitid1 = string;
+export type Overlays = SourceOverlay[];
+export type Parser = string;
+export type Parserversion = string;
+export type Revision22 = number;
+export type Disposition = "shown" | "condensed" | "archived" | "duplicate" | "unresolved" | "administrative";
+export type Id21 = string;
+export type Column = number | null;
+export type Index = number;
+export type Kind20 = "page" | "paragraph" | "table_cell" | "pasted";
+export type Row = number | null;
+export type Order = number;
+export type Representedfactids = string[];
+export type Revision23 = number;
+export type Text2 = string;
+export type Units = SourceUnit[];
+export type Warnings = string[];
+export type Sources = Source[];
+export type Warnings1 = string[];
+export type Height = number;
+export type Id22 = string;
+export type Mimetype1 = "image/png" | "image/jpeg";
+export type Path = string;
+export type Sha2561 = string;
+export type Size = number;
+export type Width = number;
+export type Assets = LocalImageAsset[];
+export type Createdat2 = string;
+/**
+ * @minItems 3
+ * @maxItems 3
+ */
+export type Regions = [RichRegion, RichRegion, RichRegion];
+export type Children11 = (
+  | ParagraphBlock
+  | HeadingBlock
+  | BulletBlock
+  | NumberedBlock
+  | ChecklistBlock
+  | ToggleBlock
+  | QuoteBlock
+  | CodeBlock
+  | DividerBlock
+  | TableBlock
+  | ImageBlock
+  | SectionBlock
+)[];
+export type Backgroundcolor = string;
+export type Bold = boolean;
+export type Code1 = boolean;
+export type Italic = boolean;
+export type Strike = boolean;
+export type Textcolor = string;
+export type Underline = boolean;
+export type Text3 = string;
+export type Type = "text";
+export type Content1 = StyledText[];
+export type Href = string;
+export type Type1 = "link";
+export type Bindingid = string;
+export type Bindingrootid = string | null;
+export type Fieldkey = string;
+export type Recordid1 = string;
+export type Syncedfactrevision = number;
+export type Text4 = string;
+export type Type2 = "fact_field";
+export type Content = (StyledText | Hyperlink | FactFieldSpan)[];
+export type Id23 = string;
+export type Alignment = "left" | "center" | "right" | "justify";
+export type Backgroundcolor1 = string;
+export type Presentation = "standard" | "focus";
+export type Recordid2 = string | null;
+export type Textcolor1 = string;
+export type Evidence13 = EvidenceSpan[];
+export type Fieldkeys = string[];
+export type Id24 = string;
+export type Kind21 = "citation";
+export type Recordid3 = string;
+export type Fieldkey1 = string;
+export type Id25 = string;
+export type Kind22 = "field_binding";
+export type Recordid4 = string;
+export type Id26 = string;
+export type Kind23 = "working_owner";
+export type Recordid5 = string;
+/**
+ * @minItems 1
+ */
+export type Evidence14 = [EvidenceSpan, ...EvidenceSpan[]];
+export type Id27 = string;
+export type Kind24 = "source";
+export type Provenance = (NarrativeCitation | FieldBinding | WorkingOwnership | SourceWitness)[];
+export type Revision24 = number;
+export type Type3 = "section";
+export type Children10 = (
+  | ParagraphBlock
+  | HeadingBlock
+  | BulletBlock
+  | NumberedBlock
+  | ChecklistBlock
+  | ToggleBlock
+  | QuoteBlock
+  | CodeBlock
+  | DividerBlock
+  | TableBlock
+  | ImageBlock
+  | SectionBlock
+)[];
+export type Content2 = null;
+export type Id28 = string;
+export type Alignment1 = "left" | "center" | "right";
+export type Alt = string;
+export type Assetid = string;
+export type Caption = (StyledText | Hyperlink | FactFieldSpan)[];
+export type Height1 = number;
+export type Width1 = number;
+export type Provenance1 = (NarrativeCitation | FieldBinding | WorkingOwnership | SourceWitness)[];
+export type Revision25 = number;
+export type Type4 = "image";
+export type Children9 = (
+  | ParagraphBlock
+  | HeadingBlock
+  | BulletBlock
+  | NumberedBlock
+  | ChecklistBlock
+  | ToggleBlock
+  | QuoteBlock
+  | CodeBlock
+  | DividerBlock
+  | TableBlock
+  | ImageBlock
+  | SectionBlock
+)[];
+/**
+ * @minItems 1
+ */
+export type Columnwidths = [number | null, ...(number | null)[]];
+export type Headercols = number;
+export type Headerrows = number;
+/**
+ * @minItems 1
+ */
+export type Rows = [TableRow, ...TableRow[]];
+export type Alignment2 = "left" | "center" | "right" | "justify";
+export type Backgroundcolor2 = string;
+export type Colspan = number;
+export type Content3 = (StyledText | Hyperlink | FactFieldSpan)[];
+export type Id29 = string;
+export type Revision26 = number;
+export type Rowspan = number;
+export type Cells = TableCell[];
+export type Id30 = string;
+export type Id31 = string;
+export type Alignment3 = "left" | "center" | "right" | "justify";
+export type Backgroundcolor3 = string;
+export type Textcolor2 = string;
+export type Provenance2 = (NarrativeCitation | FieldBinding | WorkingOwnership | SourceWitness)[];
+export type Revision27 = number;
+export type Type5 = "table";
+export type Children8 = (
+  | ParagraphBlock
+  | HeadingBlock
+  | BulletBlock
+  | NumberedBlock
+  | ChecklistBlock
+  | ToggleBlock
+  | QuoteBlock
+  | CodeBlock
+  | DividerBlock
+  | TableBlock
+  | ImageBlock
+  | SectionBlock
+)[];
+export type Content4 = null;
+export type Id32 = string;
+export type Provenance3 = (NarrativeCitation | FieldBinding | WorkingOwnership | SourceWitness)[];
+export type Revision28 = number;
+export type Type6 = "divider";
+export type Children7 = (
+  | ParagraphBlock
+  | HeadingBlock
+  | BulletBlock
+  | NumberedBlock
+  | ChecklistBlock
+  | ToggleBlock
+  | QuoteBlock
+  | CodeBlock
+  | DividerBlock
+  | TableBlock
+  | ImageBlock
+  | SectionBlock
+)[];
+export type Content5 = string;
+export type Id33 = string;
+export type Backgroundcolor4 = string;
+export type Language = string;
+export type Provenance4 = (NarrativeCitation | FieldBinding | WorkingOwnership | SourceWitness)[];
+export type Revision29 = number;
+export type Type7 = "code";
+export type Children6 = (
+  | ParagraphBlock
+  | HeadingBlock
+  | BulletBlock
+  | NumberedBlock
+  | ChecklistBlock
+  | ToggleBlock
+  | QuoteBlock
+  | CodeBlock
+  | DividerBlock
+  | TableBlock
+  | ImageBlock
+  | SectionBlock
+)[];
+export type Content6 = (StyledText | Hyperlink | FactFieldSpan)[];
+export type Id34 = string;
+export type Provenance5 = (NarrativeCitation | FieldBinding | WorkingOwnership | SourceWitness)[];
+export type Revision30 = number;
+export type Type8 = "quote";
+export type Children5 = (
+  | ParagraphBlock
+  | HeadingBlock
+  | BulletBlock
+  | NumberedBlock
+  | ChecklistBlock
+  | ToggleBlock
+  | QuoteBlock
+  | CodeBlock
+  | DividerBlock
+  | TableBlock
+  | ImageBlock
+  | SectionBlock
+)[];
+export type Content7 = (StyledText | Hyperlink | FactFieldSpan)[];
+export type Id35 = string;
+export type Provenance6 = (NarrativeCitation | FieldBinding | WorkingOwnership | SourceWitness)[];
+export type Revision31 = number;
+export type Type9 = "toggle_list";
+export type Children4 = (
+  | ParagraphBlock
+  | HeadingBlock
+  | BulletBlock
+  | NumberedBlock
+  | ChecklistBlock
+  | ToggleBlock
+  | QuoteBlock
+  | CodeBlock
+  | DividerBlock
+  | TableBlock
+  | ImageBlock
+  | SectionBlock
+)[];
+export type Content8 = (StyledText | Hyperlink | FactFieldSpan)[];
+export type Id36 = string;
+export type Alignment4 = "left" | "center" | "right" | "justify";
+export type Backgroundcolor5 = string;
+export type Checked = boolean;
+export type Textcolor3 = string;
+export type Provenance7 = (NarrativeCitation | FieldBinding | WorkingOwnership | SourceWitness)[];
+export type Revision32 = number;
+export type Type10 = "check_list";
+export type Children3 = (
+  | ParagraphBlock
+  | HeadingBlock
+  | BulletBlock
+  | NumberedBlock
+  | ChecklistBlock
+  | ToggleBlock
+  | QuoteBlock
+  | CodeBlock
+  | DividerBlock
+  | TableBlock
+  | ImageBlock
+  | SectionBlock
+)[];
+export type Content9 = (StyledText | Hyperlink | FactFieldSpan)[];
+export type Id37 = string;
+export type Alignment5 = "left" | "center" | "right" | "justify";
+export type Backgroundcolor6 = string;
+export type Start = number | null;
+export type Textcolor4 = string;
+export type Provenance8 = (NarrativeCitation | FieldBinding | WorkingOwnership | SourceWitness)[];
+export type Revision33 = number;
+export type Type11 = "numbered_list";
+export type Children2 = (
+  | ParagraphBlock
+  | HeadingBlock
+  | BulletBlock
+  | NumberedBlock
+  | ChecklistBlock
+  | ToggleBlock
+  | QuoteBlock
+  | CodeBlock
+  | DividerBlock
+  | TableBlock
+  | ImageBlock
+  | SectionBlock
+)[];
+export type Content10 = (StyledText | Hyperlink | FactFieldSpan)[];
+export type Id38 = string;
+export type Provenance9 = (NarrativeCitation | FieldBinding | WorkingOwnership | SourceWitness)[];
+export type Revision34 = number;
+export type Type12 = "bullet_list";
+export type Children1 = (
+  | ParagraphBlock
+  | HeadingBlock
+  | BulletBlock
+  | NumberedBlock
+  | ChecklistBlock
+  | ToggleBlock
+  | QuoteBlock
+  | CodeBlock
+  | DividerBlock
+  | TableBlock
+  | ImageBlock
+  | SectionBlock
+)[];
+export type Content11 = (StyledText | Hyperlink | FactFieldSpan)[];
+export type Id39 = string;
+export type Alignment6 = "left" | "center" | "right" | "justify";
+export type Backgroundcolor7 = string;
+export type Level = 1 | 2 | 3;
+export type Textcolor5 = string;
+export type Provenance10 = (NarrativeCitation | FieldBinding | WorkingOwnership | SourceWitness)[];
+export type Revision35 = number;
+export type Type13 = "heading";
+export type Children = (
+  | ParagraphBlock
+  | HeadingBlock
+  | BulletBlock
+  | NumberedBlock
+  | ChecklistBlock
+  | ToggleBlock
+  | QuoteBlock
+  | CodeBlock
+  | DividerBlock
+  | TableBlock
+  | ImageBlock
+  | SectionBlock
+)[];
+export type Content12 = (StyledText | Hyperlink | FactFieldSpan)[];
+export type Id40 = string;
+export type Provenance11 = (NarrativeCitation | FieldBinding | WorkingOwnership | SourceWitness)[];
+export type Revision36 = number;
+export type Type14 = "paragraph";
+export type Blocks1 = (
+  | ParagraphBlock
+  | HeadingBlock
+  | BulletBlock
+  | NumberedBlock
+  | ChecklistBlock
+  | ToggleBlock
+  | QuoteBlock
+  | CodeBlock
+  | DividerBlock
+  | TableBlock
+  | ImageBlock
+  | SectionBlock
+)[];
+export type Id41 = string;
+export type Revision37 = number;
+export type Role1 = "header" | "sidebar" | "main";
+export type Revision38 = number;
+export type Schemaversion6 = 1;
+export type Evidence15 = EvidenceSpan[];
+export type Id42 = string;
+export type Rawtext5 = string;
+export type Evidencerecords = ImmutableFactEvidence[];
+export type Operations1 = RichOperation[];
+export type Projectid2 = string;
+export type Documentrevision2 = number;
+export type Docxpath = string;
+export type Docxsha256 = string;
+export type Docxsize = number;
+export type Factsrevision1 = number;
+export type Id43 = string;
+export type Renderersha256 = string;
+export type Rendererversion = string;
+export type Templatesha256 = string;
+export type Renders = RichRenderSnapshot[];
+export type Revision39 = number;
+export type Schemaversion7 = 5;
+export type Sources1 = Source[];
+export type Path1 = string;
+export type Sha2562 = string;
+export type Size1 = number;
+export type Assets1 = AssetRef[];
+export type Contentpolicyversion = string;
+export type Id44 = string;
+export type Packagesha256 = string;
+export type Version = string;
+export type Projectid3 = string;
+export type Projectrevision1 = number;
+export type Markdown = string;
+export type Revision40 = number;
+export type Sha2563 = string;
+export type Schemaversion8 = 6;
+export type Actionid3 = string;
+export type Blockids1 = string[];
+export type Dependencies2 = DependencyStamp[];
+export type Errorcode2 = string | null;
+export type Factids = string[];
+export type Fieldkeys1 = string[];
+export type Id45 = string;
+export type Instruction = string | null;
+export type Kind25 = "completion" | "rewrite" | "reconciliation" | "conflict" | "panel";
+export type Afterid = string | null;
+export type Beforerevision = number | null;
+export type Block =
+  | ParagraphBlock
+  | HeadingBlock
+  | BulletBlock
+  | NumberedBlock
+  | ChecklistBlock
+  | ToggleBlock
+  | QuoteBlock
+  | CodeBlock
+  | DividerBlock
+  | TableBlock
+  | ImageBlock
+  | SectionBlock;
+export type Keepchildren = boolean;
+export type Kind26 = "put_block";
+export type Parentid = string;
+export type Beforerevision1 = number;
+export type Blockid1 = string;
+export type Kind27 = "remove_block";
+export type Afterid1 = string | null;
+export type Beforerevision2 = number;
+export type Blockid2 = string;
+export type Kind28 = "move_block";
+export type Parentid1 = string;
+export type Beforerevision3 = number;
+export type Blockid3 = string;
+export type Cellid1 = string | null;
+export type Content13 = (StyledText | Hyperlink | FactFieldSpan)[];
+/**
+ * UTF-16 code units within the selected inline field.
+ */
+export type End = number;
+export type Field = "content" | "caption";
+export type Kind29 = "replace_inline_range";
+/**
+ * UTF-16 code units within the selected inline field.
+ */
+export type Start1 = number;
+export type Beforerevision4 = number | null;
+export type Kind30 = "put_record";
+export type Record =
+  | CandidateRecord
+  | DetailRecord
+  | EmploymentRecord
+  | SubprojectRecord
+  | TechnologyRecord
+  | EducationRecord
+  | LanguageRecord
+  | CertificationRecord
+  | ClaimRecord
+  | MetricRecord
+  | LeadershipRecord
+  | UnresolvedRecord;
+export type Beforerevision5 = number;
+export type Kind31 = "remove_record";
+export type Recordid6 = string;
+/**
+ * @maxItems 1000
+ */
+export type Proposedsteps = (PutBlock | RemoveBlock | MoveBlock | ReplaceInlineRange | PutRecord | RemoveRecord)[];
+export type Ready = boolean;
+export type Status8 = "pending" | "failed" | "conflict" | "applied" | "stale";
+export type Syncrecords = RichSyncRecord[];
+export type Title1 = string;
+export type Titlemanuallyset = boolean;
+export type Updatedat1 = string;
+export type Blockids2 = string[];
+export type Code2 = string;
+export type Sourceid1 = string;
+export type Sourcerevision1 = number;
+export type Unitid2 = string;
+export type Unitrevision1 = number;
+export type Evidence16 = Evidence17[];
+export type Id46 = string;
+export type Recordids = string[];
+export type Warnings2 = RichWarning[];
+export type Acceptedat = string;
+export type Accountgeneration1 = number;
+export type Authority = "active" | "revoked";
+export type Executiondeadline = string;
+export type Executiongeneration2 = number;
+export type Id47 = string;
+export type Jobid7 = string;
+export type Lineage2 = string;
+export type Payload = AgentPayloadReference | FixedPayloadReference | ProcessingPayloadReference;
+export type Batchid1 = string;
+export type Conversationid = string;
+export type Kind32 = "agent_journal";
+export type Runid = string;
+export type Kind33 = "rich_sync";
+export type Syncid = string;
+export type Candidateid = string;
+export type Kind34 = "processing";
+export type Payloadbytes = number;
+export type Payloadsha2561 = string;
+export type Projectid4 = string;
+export type Revocation = ("stop" | "discard" | "superseded" | "deleted" | "account_changed") | null;
+export type Schemaversion9 = 1;
+export type Scope2 = WholeResumeScope | SelectionScope;
+export type Turnid = string;
+export type Savedwire = string;
+export type Schemaversion10 = 1;
+export type Canonicalready = boolean;
+export type Actioncursor = number;
+export type Assetpinssha2562 = string | null;
+export type Baserevision = number;
+export type Basesha256 = string;
+export type Checkpointedat = string;
+export type Id48 = string;
+export type Incarnation1 = string;
+export type Lineage3 = string;
+export type Payloadbytes1 = number;
+export type Payloadref = string;
+export type Payloadsha2562 = string;
+export type Projectid5 = string;
+export type Schemaversion11 = 1;
+export type Sequence = number;
+/**
+ * @maxItems 100
+ */
+export type Touches = GenerationStamp[];
+export type Writerepoch1 = number;
+export type Drafts = DraftCheckpointV1[];
+export type Inverses = UndoOwnershipV1[];
+export type Mutationwire1 = string | null;
+export type Replayed = boolean;
+export type Schemaversion12 = 1;
+export type Workspacesha2561 = string;
+export type Workspacewire = string;
+export type Abandonedepoch = number | null;
+export type Acknowledgedcursor = number;
+export type Acknowledgedrevision = number;
+export type Acknowledgedsha256 = string | null;
+export type Barriergeneration = number;
+export type Draftid = string | null;
+export type Draftsequencefloor = number;
+export type Epoch = number;
+export type Incarnation2 = string;
+export type Leaseexpiresat = string;
+export type Lineage4 = string;
+export type Projectid6 = string;
+export type Resumecredentialsha256 = string;
+export type Schemaversion13 = 1;
+export type Sessionid1 = string;
+export type Status9 = "attached" | "recovering" | "clean_detached" | "fenced";
+export type Touchfloor = number;
+export type Touchgeneration = number;
+
+export interface WriterHistoryOfferV1 {
+  batchId: Batchid;
+  job: JobSnapshotV1;
+  mutationWire: Mutationwire;
+  ownership: UndoOwnershipV1;
+  preview: RichProjectResponse;
+  proposal: ProposalBindingV1;
+  saved: RichProjectResponse;
+  savedWire: Savedwire;
+  schemaVersion: Schemaversion10;
+  view: WriterViewV1;
+}
+export interface JobSnapshotV1 {
+  assetPinsSha256?: Assetpinssha256;
+  attempts: Attempts;
+  createdAt: Createdat;
+  error: JobFailure | null;
+  eventCursor: Eventcursor;
+  execution: Execution;
+  executionGeneration: Executiongeneration1;
+  id: Id1;
+  proposalId: Proposalid;
+  publication: Publication;
+  publicationError?: JobFailure | null;
+  receipt: CanonicalReceiptV1 | null;
+  schemaVersion: Schemaversion2;
+  submission: JobSubmissionV1;
+  undoExpired?: Undoexpired;
+  updatedAt: Updatedat;
+}
+export interface JobAttemptV1 {
+  activeDeadline: Activedeadline;
+  childStartedAt: Childstartedat;
+  cleanupVerified: Cleanupverified;
+  dispatchedAt: Dispatchedat;
+  error: JobFailure | null;
+  executionGeneration: Executiongeneration;
+  id: Id;
+  nativeStarted: Nativestarted;
+  schemaVersion: Schemaversion;
+  stage: Stage;
+  startupDeadline: Startupdeadline;
+  state: State;
+}
+export interface JobFailure {
+  code: Code;
+}
+export interface CanonicalReceiptV1 {
+  clientMutationId: Clientmutationid;
+  documentRevision: Documentrevision;
+  durable: Durable;
+  factsRevision: Factsrevision;
+  generationsSha256: Generationssha256;
+  jobId: Jobid;
+  lineage: Lineage;
+  persistedAt: Persistedat;
+  projectId: Projectid;
+  projectRevision: Projectrevision;
+  proposalId: Proposalid1;
+  proposalSha256: Proposalsha256;
+  requestSha256: Requestsha256;
+  schemaVersion: Schemaversion1;
+  workspaceSha256: Workspacesha256;
+}
+export interface JobSubmissionV1 {
+  accountGeneration: Accountgeneration;
+  allowEdits: Allowedits;
+  allowWeb: Allowweb;
+  guards: ScopeGuardV1;
+  identity: JobIdentity;
+  input: InputReference;
+  kind: Kind2;
+  models: Models;
+  payloadSha256: Payloadsha256;
+  schedulingClass: Schedulingclass;
+  schemaVersion: Schemaversion4;
+  scope: Scope;
+  submittedAt: Submittedat;
+  tools: Tools;
+}
+export interface ScopeGuardV1 {
+  reads: Reads;
+  schemaVersion: Schemaversion3;
+  writes: Writes;
+}
+export interface GenerationStamp {
+  fingerprint: Fingerprint;
+  generation: Generation;
+  key: Key;
+  kind: Kind;
+}
+export interface JobIdentity {
+  lineage: Lineage1;
+  projectId: Projectid1;
+  requestEpoch: Requestepoch;
+  requestId: Requestid;
+}
+export interface InputReference {
+  id: Id2;
+  kind: Kind1;
+  sha256: Sha256;
+}
+export interface ModelCapture {
+  configSha256: Configsha256;
+  model: Model;
+  stage: Stage1;
+}
+export interface WholeResumeScope {
+  kind: Kind3;
+}
+export interface SelectionScope {
+  kind: Kind4;
+  selection: RichSelection;
+}
+export interface RichSelection {
+  anchor: RichPosition;
+  blockIds: Blockids;
+  capture: ActionCapture;
+  head: RichPosition;
+  kind: Kind6;
+  textSha256: Textsha256;
+}
+export interface RichPosition {
+  blockId: Blockid;
+  cellId: Cellid;
+  offset: Offset;
+}
+export interface ActionCapture {
+  actionId: Actionid;
+  actionToken: Actiontoken;
+  dependencies: Dependencies;
+  sessionId: Sessionid;
+}
+export interface DependencyStamp {
+  fingerprint: Fingerprint1;
+  id: Id3;
+  kind: Kind5;
+  revision: Revision;
+}
+export interface UndoOwnershipV1 {
+  assetPinsSha256?: Assetpinssha2561;
+  commandInverseBytes?: Commandinversebytes;
+  commandInverseSha256?: Commandinversesha256;
+  commandRef?: Commandref;
+  direction?: Direction;
+  expiresAt: Expiresat;
+  guards: ScopeGuardV1;
+  incarnation: Incarnation;
+  inverseBytes: Inversebytes;
+  inverseRef: Inverseref;
+  inverseSha256: Inversesha256;
+  jobId: Jobid1;
+  owner: Owner;
+  proposalId: Proposalid2;
+  schemaVersion: Schemaversion5;
+  transferId: Transferid;
+  writerEpoch: Writerepoch;
+}
+export interface RichProjectResponse {
+  durability: Durability;
+  generation: RichGenerationState | null;
+  identity?: ResumeIdentity | null;
+  presentation?: RichPresentation | null;
+  saveError: Saveerror;
+  savedDocumentRevision: Saveddocumentrevision;
+  savedProjectRevision: Savedprojectrevision;
+  workspace: WorkspaceV6;
+}
+export interface RichGenerationState {
+  errorCode: Errorcode;
+  id: Id4;
+  stage: Stage2;
+  status: Status;
+}
+export interface ResumeIdentity {
+  subtitle: Subtitle;
+  title: Title;
+}
+export interface RichPresentation {
+  blocks: Blocks;
+}
+export interface Blocks {
+  [k: string]: BlockPresentation;
+}
+export interface BlockPresentation {
+  logo?: Logo;
+  role: Role;
+}
+export interface WorkspaceV6 {
+  createdAt: Createdat1;
+  documentRevision: Documentrevision1;
+  formattingAsOf: PartialDate;
+  mutationReplay: Mutationreplay;
+  preDraft: RichPreDraft | null;
+  project: ProjectV5 | null;
+  projectId: Projectid3;
+  projectRevision: Projectrevision1;
+  rulesUsed: Rules | null;
+  schemaVersion: Schemaversion8;
+  sourceObservedAt: PartialDate | null;
+  syncRecords: Syncrecords;
+  title: Title1;
+  titleManuallySet: Titlemanuallyset;
+  updatedAt: Updatedat1;
+  warnings: Warnings2;
+}
+export interface PartialDate {
+  day: Day;
+  month: Month;
+  precision: Precision;
+  year: Year;
+}
+export interface RichMutationReplay {
+  clientMutationId: Clientmutationid1;
+  requestSha256: Requestsha2561;
+  resultingRevision: Resultingrevision;
+}
+export interface RichPreDraft {
+  facts: WorkingFacts;
+  operations: Operations;
+  selectedInput: Selectedinput;
+  selectedSourceId: Selectedsourceid;
+  sources: Sources;
+  warnings: Warnings1;
+}
+export interface WorkingFacts {
+  records: Records;
+  revision: Revision19;
+  tombstones: Tombstones;
+}
+export interface CandidateRecord {
+  evidence: Evidence;
+  id: Id5;
+  kind: Kind7;
+  location: WorkingFieldStr;
+  name: WorkingFieldStr;
+  origin: Origin;
+  revision: Revision2;
+  title: WorkingFieldStr;
+  userCorrected?: Usercorrected1;
+}
+export interface EvidenceSpan {
+  sourceId: Sourceid;
+  sourceRevision: Sourcerevision;
+  text: Text;
+  unitId: Unitid;
+  unitRevision: Unitrevision;
+}
+export interface WorkingFieldStr {
+  pendingRawText: Pendingrawtext;
+  rawText: Rawtext;
+  revision: Revision1;
+  status: Status1;
+  userCorrected?: Usercorrected;
+  value: Value;
+}
+export interface DetailRecord {
+  detailType: Detailtype;
+  evidence: Evidence1;
+  id: Id6;
+  kind: Kind8;
+  label: Label;
+  origin: Origin1;
+  revision: Revision3;
+  userCorrected?: Usercorrected2;
+  value: WorkingFieldStr;
+}
+export interface EmploymentRecord {
+  employer: WorkingFieldStr;
+  evidence: Evidence2;
+  id: Id7;
+  kind: Kind9;
+  origin: Origin2;
+  periods: Periods;
+  revision: Revision7;
+  role: WorkingFieldStr;
+  userCorrected?: Usercorrected5;
+}
+export interface WorkingPeriod {
+  end: WorkingFieldPartialDate;
+  evidence: Evidence3;
+  id: Id8;
+  present: WorkingFieldBool;
+  revision: Revision6;
+  start: WorkingFieldPartialDate;
+}
+export interface WorkingFieldPartialDate {
+  pendingRawText: Pendingrawtext1;
+  rawText: Rawtext1;
+  revision: Revision4;
+  status: Status2;
+  userCorrected?: Usercorrected3;
+  value: PartialDate | null;
+}
+export interface WorkingFieldBool {
+  pendingRawText: Pendingrawtext2;
+  rawText: Rawtext2;
+  revision: Revision5;
+  status: Status3;
+  userCorrected?: Usercorrected4;
+  value: Value1;
+}
+export interface SubprojectRecord {
+  evidence: Evidence4;
+  id: Id9;
+  jobId: Jobid2;
+  kind: Kind10;
+  name: WorkingFieldStr;
+  origin: Origin3;
+  periods: Periods1;
+  revision: Revision8;
+  role: WorkingFieldStr;
+  userCorrected?: Usercorrected6;
+}
+export interface TechnologyRecord {
+  canonicalId: WorkingFieldStr;
+  display: WorkingFieldStr;
+  evidence: Evidence5;
+  id: Id10;
+  jobId: Jobid3;
+  kind: Kind11;
+  origin: Origin4;
+  revision: Revision9;
+  subprojectId: Subprojectid;
+  userCorrected?: Usercorrected7;
+}
+export interface EducationRecord {
+  completion: WorkingFieldPartialDate;
+  evidence: Evidence6;
+  id: Id11;
+  institution: WorkingFieldStr;
+  kind: Kind12;
+  origin: Origin5;
+  qualification: WorkingFieldStr;
+  revision: Revision10;
+  specialty: WorkingFieldStr;
+  userCorrected?: Usercorrected8;
+}
+export interface LanguageRecord {
+  evidence: Evidence7;
+  id: Id12;
+  kind: Kind13;
+  language: WorkingFieldStr;
+  level: WorkingFieldStr;
+  origin: Origin6;
+  revision: Revision11;
+  userCorrected?: Usercorrected9;
+}
+export interface CertificationRecord {
+  date: WorkingFieldPartialDate;
+  evidence: Evidence8;
+  id: Id13;
+  issuer: WorkingFieldStr;
+  kind: Kind14;
+  name: WorkingFieldStr;
+  origin: Origin7;
+  revision: Revision12;
+  userCorrected?: Usercorrected10;
+}
+export interface ClaimRecord {
+  evidence: Evidence9;
+  id: Id14;
+  jobId: Jobid4;
+  kind: Kind15;
+  origin: Origin8;
+  revision: Revision13;
+  subprojectId: Subprojectid1;
+  userCorrected?: Usercorrected11;
+  value: WorkingFieldStr;
+}
+export interface MetricRecord {
+  evidence: Evidence10;
+  id: Id15;
+  jobId: Jobid5;
+  kind: Kind16;
+  origin: Origin9;
+  revision: Revision14;
+  subprojectId: Subprojectid2;
+  userCorrected?: Usercorrected12;
+  value: WorkingFieldMetricValue;
+}
+export interface WorkingFieldMetricValue {
+  pendingRawText: Pendingrawtext3;
+  rawText: Rawtext3;
+  revision: Revision15;
+  status: Status4;
+  userCorrected?: Usercorrected13;
+  value: MetricValue | null;
+}
+export interface MetricValue {
+  attribution: Attribution;
+  baseline: Baseline;
+  comparator: Comparator;
+  number: Number;
+  period: Period;
+  qualifiers: Qualifiers;
+  result: Result;
+  scope: Scope1;
+  unit: Unit;
+  upperNumber: Uppernumber;
+}
+export interface LeadershipRecord {
+  evidence: Evidence11;
+  id: Id16;
+  jobId: Jobid6;
+  kind: Kind17;
+  origin: Origin10;
+  revision: Revision16;
+  subprojectId: Subprojectid3;
+  userCorrected?: Usercorrected14;
+  value: WorkingFieldLeadershipValue;
+}
+export interface WorkingFieldLeadershipValue {
+  pendingRawText: Pendingrawtext4;
+  rawText: Rawtext4;
+  revision: Revision17;
+  status: Status5;
+  userCorrected?: Usercorrected15;
+  value: LeadershipValue | null;
+}
+export interface LeadershipValue {
+  action: Action;
+  attribution: Attribution1;
+  teamSize: MetricValue | null;
+}
+export interface UnresolvedRecord {
+  category: Category;
+  evidence: Evidence12;
+  id: Id17;
+  kind: Kind18;
+  origin: Origin11;
+  revision: Revision18;
+  status: Status6;
+  userCorrected?: Usercorrected16;
+}
+export interface RecordTombstone {
+  actionId: Actionid1;
+  orderIndex: Orderindex;
+  recordId: Recordid;
+  revision: Revision20;
+}
+export interface RichOperation {
+  actionId: Actionid2;
+  dependencies: Dependencies1;
+  errorCode: Errorcode1;
+  id: Id18;
+  kind: Kind19;
+  status: Status7;
+}
+export interface Source {
+  byteRef: Byteref;
+  byteSha256: Bytesha256;
+  id: Id19;
+  mimeType: Mimetype;
+  originalName: Originalname;
+  overlays: Overlays;
+  parser: Parser;
+  parserVersion: Parserversion;
+  revision: Revision22;
+  units: Units;
+  warnings: Warnings;
+}
+export interface SourceOverlay {
+  id: Id20;
+  origin: Origin12;
+  revision: Revision21;
+  text: Text1;
+  unitId: Unitid1;
+}
+export interface SourceUnit {
+  disposition: Disposition;
+  id: Id21;
+  location: SourceLocation;
+  order: Order;
+  representedFactIds: Representedfactids;
+  revision: Revision23;
+  text: Text2;
+}
+export interface SourceLocation {
+  column: Column;
+  index: Index;
+  kind: Kind20;
+  row: Row;
+}
+export interface ProjectV5 {
+  assets: Assets;
+  createdAt: Createdat2;
+  document: RichDocumentV1;
+  evidenceRecords: Evidencerecords;
+  facts: WorkingFacts;
+  operations: Operations1;
+  projectId: Projectid2;
+  renders: Renders;
+  revision: Revision39;
+  schemaVersion: Schemaversion7;
+  sources: Sources1;
+  template: TemplateManifest;
+}
+export interface LocalImageAsset {
+  height: Height;
+  id: Id22;
+  mimeType: Mimetype1;
+  path: Path;
+  sha256: Sha2561;
+  size: Size;
+  width: Width;
+}
+export interface RichDocumentV1 {
+  regions: Regions;
+  revision: Revision38;
+  schemaVersion: Schemaversion6;
+}
+export interface RichRegion {
+  blocks: Blocks1;
+  id: Id41;
+  revision: Revision37;
+  role: Role1;
+}
+export interface ParagraphBlock {
+  children: Children;
+  content: Content12;
+  id: Id40;
+  props: ParagraphProps;
+  provenance: Provenance11;
+  revision: Revision36;
+  type: Type14;
+}
+export interface HeadingBlock {
+  children: Children1;
+  content: Content11;
+  id: Id39;
+  props: HeadingProps;
+  provenance: Provenance10;
+  revision: Revision35;
+  type: Type13;
+}
+export interface BulletBlock {
+  children: Children2;
+  content: Content10;
+  id: Id38;
+  props: ParagraphProps;
+  provenance: Provenance9;
+  revision: Revision34;
+  type: Type12;
+}
+export interface NumberedBlock {
+  children: Children3;
+  content: Content9;
+  id: Id37;
+  props: NumberedProps;
+  provenance: Provenance8;
+  revision: Revision33;
+  type: Type11;
+}
+export interface ChecklistBlock {
+  children: Children4;
+  content: Content8;
+  id: Id36;
+  props: ChecklistProps;
+  provenance: Provenance7;
+  revision: Revision32;
+  type: Type10;
+}
+export interface ToggleBlock {
+  children: Children5;
+  content: Content7;
+  id: Id35;
+  props: ParagraphProps;
+  provenance: Provenance6;
+  revision: Revision31;
+  type: Type9;
+}
+export interface QuoteBlock {
+  children: Children6;
+  content: Content6;
+  id: Id34;
+  props: ParagraphProps;
+  provenance: Provenance5;
+  revision: Revision30;
+  type: Type8;
+}
+export interface CodeBlock {
+  children: Children7;
+  content: Content5;
+  id: Id33;
+  props: CodeProps;
+  provenance: Provenance4;
+  revision: Revision29;
+  type: Type7;
+}
+export interface DividerBlock {
+  children: Children8;
+  content: Content4;
+  id: Id32;
+  props: EmptyProps;
+  provenance: Provenance3;
+  revision: Revision28;
+  type: Type6;
+}
+export interface TableBlock {
+  children: Children9;
+  content: TableContent;
+  id: Id31;
+  props: ParagraphProps;
+  provenance: Provenance2;
+  revision: Revision27;
+  type: Type5;
+}
+export interface ImageBlock {
+  children: Children10;
+  content: Content2;
+  id: Id28;
+  props: ImageProps;
+  provenance: Provenance1;
+  revision: Revision25;
+  type: Type4;
+}
+export interface SectionBlock {
+  children: Children11;
+  content: Content;
+  id: Id23;
+  props: SectionProps;
+  provenance: Provenance;
+  revision: Revision24;
+  type: Type3;
+}
+export interface StyledText {
+  styles: InlineStyles;
+  text: Text3;
+  type: Type;
+}
+export interface InlineStyles {
+  backgroundColor?: Backgroundcolor;
+  bold?: Bold;
+  code?: Code1;
+  italic?: Italic;
+  strike?: Strike;
+  textColor?: Textcolor;
+  underline?: Underline;
+}
+export interface Hyperlink {
+  content: Content1;
+  href: Href;
+  type: Type1;
+}
+export interface FactFieldSpan {
+  bindingId: Bindingid;
+  bindingRootId?: Bindingrootid;
+  fieldKey: Fieldkey;
+  recordId: Recordid1;
+  styles: InlineStyles;
+  syncedFactRevision: Syncedfactrevision;
+  text: Text4;
+  type: Type2;
+}
+export interface SectionProps {
+  alignment?: Alignment;
+  backgroundColor?: Backgroundcolor1;
+  presentation?: Presentation;
+  recordId: Recordid2;
+  textColor?: Textcolor1;
+}
+export interface NarrativeCitation {
+  evidence: Evidence13;
+  fieldKeys: Fieldkeys;
+  id: Id24;
+  kind: Kind21;
+  recordId: Recordid3;
+}
+export interface FieldBinding {
+  fieldKey: Fieldkey1;
+  id: Id25;
+  kind: Kind22;
+  recordId: Recordid4;
+}
+export interface WorkingOwnership {
+  id: Id26;
+  kind: Kind23;
+  recordId: Recordid5;
+}
+export interface SourceWitness {
+  evidence: Evidence14;
+  id: Id27;
+  kind: Kind24;
+}
+export interface ImageProps {
+  alignment: Alignment1;
+  alt: Alt;
+  assetId: Assetid;
+  caption: Caption;
+  height: Height1;
+  width: Width1;
+}
+export interface TableContent {
+  columnWidths: Columnwidths;
+  headerCols?: Headercols;
+  headerRows: Headerrows;
+  rows: Rows;
+}
+export interface TableRow {
+  cells: Cells;
+  id: Id30;
+}
+export interface TableCell {
+  alignment?: Alignment2;
+  backgroundColor?: Backgroundcolor2;
+  colspan?: Colspan;
+  content: Content3;
+  id: Id29;
+  revision: Revision26;
+  rowspan?: Rowspan;
+}
+export interface ParagraphProps {
+  alignment?: Alignment3;
+  backgroundColor?: Backgroundcolor3;
+  textColor?: Textcolor2;
+}
+export interface EmptyProps {}
+export interface CodeProps {
+  backgroundColor?: Backgroundcolor4;
+  language: Language;
+}
+export interface ChecklistProps {
+  alignment?: Alignment4;
+  backgroundColor?: Backgroundcolor5;
+  checked: Checked;
+  textColor?: Textcolor3;
+}
+export interface NumberedProps {
+  alignment?: Alignment5;
+  backgroundColor?: Backgroundcolor6;
+  start?: Start;
+  textColor?: Textcolor4;
+}
+export interface HeadingProps {
+  alignment?: Alignment6;
+  backgroundColor?: Backgroundcolor7;
+  level: Level;
+  textColor?: Textcolor5;
+}
+export interface ImmutableFactEvidence {
+  evidence: Evidence15;
+  id: Id42;
+  rawText: Rawtext5;
+}
+export interface RichRenderSnapshot {
+  documentRevision: Documentrevision2;
+  docxPath: Docxpath;
+  docxSha256: Docxsha256;
+  docxSize: Docxsize;
+  factsRevision: Factsrevision1;
+  id: Id43;
+  rendererSha256: Renderersha256;
+  rendererVersion: Rendererversion;
+  templateSha256: Templatesha256;
+}
+export interface TemplateManifest {
+  assets: Assets1;
+  contentPolicyVersion: Contentpolicyversion;
+  id: Id44;
+  packageSha256: Packagesha256;
+  version: Version;
+}
+export interface AssetRef {
+  path: Path1;
+  sha256: Sha2562;
+  size: Size1;
+}
+export interface Rules {
+  markdown: Markdown;
+  revision: Revision40;
+  sha256: Sha2563;
+}
+export interface RichSyncRecord {
+  actionId: Actionid3;
+  blockIds: Blockids1;
+  dependencies: Dependencies2;
+  errorCode: Errorcode2;
+  factIds: Factids;
+  fieldKeys: Fieldkeys1;
+  id: Id45;
+  instruction?: Instruction;
+  kind?: Kind25;
+  proposedSteps?: Proposedsteps;
+  ready?: Ready;
+  selection?: RichSelection | null;
+  status: Status8;
+}
+export interface PutBlock {
+  afterId: Afterid;
+  beforeRevision: Beforerevision;
+  block: Block;
+  keepChildren?: Keepchildren;
+  kind: Kind26;
+  parentId: Parentid;
+}
+export interface RemoveBlock {
+  beforeRevision: Beforerevision1;
+  blockId: Blockid1;
+  kind: Kind27;
+}
+export interface MoveBlock {
+  afterId: Afterid1;
+  beforeRevision: Beforerevision2;
+  blockId: Blockid2;
+  kind: Kind28;
+  parentId: Parentid1;
+}
+export interface ReplaceInlineRange {
+  beforeRevision: Beforerevision3;
+  blockId: Blockid3;
+  cellId: Cellid1;
+  content: Content13;
+  end: End;
+  field: Field;
+  kind: Kind29;
+  start: Start1;
+}
+export interface PutRecord {
+  beforeRevision: Beforerevision4;
+  kind: Kind30;
+  record: Record;
+}
+export interface RemoveRecord {
+  beforeRevision: Beforerevision5;
+  kind: Kind31;
+  recordId: Recordid6;
+}
+export interface RichWarning {
+  blockIds: Blockids2;
+  code: Code2;
+  evidence: Evidence16;
+  id: Id46;
+  recordIds: Recordids;
+}
+export interface Evidence17 {
+  sourceId: Sourceid1;
+  sourceRevision: Sourcerevision1;
+  unitId: Unitid2;
+  unitRevision: Unitrevision1;
+}
+export interface ProposalBindingV1 {
+  acceptedAt: Acceptedat;
+  accountGeneration: Accountgeneration1;
+  authority: Authority;
+  executionDeadline: Executiondeadline;
+  executionGeneration: Executiongeneration2;
+  guards: ScopeGuardV1;
+  id: Id47;
+  jobId: Jobid7;
+  lineage: Lineage2;
+  payload: Payload;
+  payloadBytes: Payloadbytes;
+  payloadSha256: Payloadsha2561;
+  projectId: Projectid4;
+  revocation: Revocation;
+  schemaVersion: Schemaversion9;
+  scope: Scope2;
+  turnId: Turnid;
+}
+export interface AgentPayloadReference {
+  batchId: Batchid1;
+  conversationId: Conversationid;
+  kind: Kind32;
+  runId: Runid;
+}
+export interface FixedPayloadReference {
+  kind: Kind33;
+  syncId: Syncid;
+}
+export interface ProcessingPayloadReference {
+  candidateId: Candidateid;
+  kind: Kind34;
+}
+export interface WriterViewV1 {
+  canonicalReady: Canonicalready;
+  drafts: Drafts;
+  inverses?: Inverses;
+  mutationWire?: Mutationwire1;
+  replayed?: Replayed;
+  response: RichProjectResponse;
+  schemaVersion: Schemaversion12;
+  workspaceSha256: Workspacesha2561;
+  workspaceWire: Workspacewire;
+  writer: WriterSessionV1;
+}
+export interface DraftCheckpointV1 {
+  actionCursor: Actioncursor;
+  assetPinsSha256?: Assetpinssha2562;
+  baseRevision: Baserevision;
+  baseSha256: Basesha256;
+  checkpointedAt: Checkpointedat;
+  id: Id48;
+  incarnation: Incarnation1;
+  lineage: Lineage3;
+  payloadBytes: Payloadbytes1;
+  payloadRef: Payloadref;
+  payloadSha256: Payloadsha2562;
+  projectId: Projectid5;
+  schemaVersion: Schemaversion11;
+  sequence: Sequence;
+  touches: Touches;
+  writerEpoch: Writerepoch1;
+}
+export interface WriterSessionV1 {
+  abandonedEpoch?: Abandonedepoch;
+  acknowledgedCursor: Acknowledgedcursor;
+  acknowledgedRevision: Acknowledgedrevision;
+  acknowledgedSha256?: Acknowledgedsha256;
+  barrierGeneration: Barriergeneration;
+  draftId: Draftid;
+  draftSequenceFloor?: Draftsequencefloor;
+  epoch: Epoch;
+  incarnation: Incarnation2;
+  leaseExpiresAt: Leaseexpiresat;
+  lineage: Lineage4;
+  projectId: Projectid6;
+  resumeCredentialSha256: Resumecredentialsha256;
+  schemaVersion: Schemaversion13;
+  sessionId: Sessionid1;
+  status: Status9;
+  touchFloor?: Touchfloor;
+  touchGeneration: Touchgeneration;
+}

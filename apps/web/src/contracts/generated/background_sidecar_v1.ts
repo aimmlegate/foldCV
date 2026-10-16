@@ -32,6 +32,7 @@ export type Writerepoch = number;
  */
 export type Cleanuprefs = string[];
 export type Actioncursor1 = number;
+export type Assetpinssha256 = string | null;
 export type Baserevision = number;
 export type Basesha256 = string;
 export type Checkpointedat = string;
@@ -88,6 +89,19 @@ export type Namespace = string;
 export type Phase = "initializing" | "ready" | "fenced";
 export type Schemaversion2 = 1;
 export type Workspacesha256 = string;
+export type Candidateref = string;
+export type Clientmutationid = string;
+export type Commandid = string;
+export type Commandsha256 = string;
+export type Completedat = string;
+export type Jobid = string;
+export type Proposalid = string;
+export type Requestsha256 = string;
+export type Resultingrevision = number;
+/**
+ * @maxItems 512
+ */
+export type Historycommands = HistoryCommandReceiptV1[];
 export type Historynamespace = string | null;
 export type Aftergenerationssha256 = string;
 export type Afterworkspacesha256 = string;
@@ -98,12 +112,12 @@ export type Assetpins1 = string[];
 export type Barriergeneration = number | null;
 export type Beforegenerationssha256 = string | null;
 export type Beforeworkspacesha256 = string;
-export type Candidateref = string;
+export type Candidateref1 = string;
 export type Candidatesha256 = string | null;
-export type Clientmutationid = string;
+export type Clientmutationid1 = string;
 export type Id3 = string;
 export type Incarnation2 = string | null;
-export type Jobid = string;
+export type Jobid1 = string;
 export type Lineage2 = string;
 export type Phase1 =
   | "intent_stored"
@@ -116,8 +130,35 @@ export type Phase1 =
   | "reconciled";
 export type Previousref = string;
 export type Projectid2 = string;
-export type Proposalid = string;
-export type Requestsha256 = string;
+export type Proposalid1 = string;
+export type Code =
+  | "AUTH_REQUIRED"
+  | "RATE_LIMITED"
+  | "BUSY"
+  | "MODEL_DENIED"
+  | "CANCELLED"
+  | "DEADLINE"
+  | "STARTUP_TIMEOUT"
+  | "PROCESS_FAILED"
+  | "CLEANUP_FAILED"
+  | "INTERRUPTED"
+  | "PROTOCOL"
+  | "JOB_QUEUE_FULL"
+  | "JOB_STORAGE_FULL"
+  | "JOB_IDEMPOTENCY_CONFLICT"
+  | "REQUEST_EXPIRED"
+  | "JOB_NOT_FOUND"
+  | "JOB_STORE_CORRUPT"
+  | "JOB_STORE_UNAVAILABLE"
+  | "JOB_DISABLED"
+  | "JOB_SCOPE_INVALID"
+  | "ACCOUNT_CHANGED"
+  | "DEPENDENCY_CHANGED"
+  | "WRITER_UNKNOWN"
+  | "SAVE_FAILED"
+  | "OUTCOME_UNKNOWN"
+  | "PROJECT_DELETED";
+export type Requestsha2561 = string;
 export type Resolvedat = string | null;
 export type Schemaversion3 = 1;
 export type Writerepoch2 = number | null;
@@ -353,7 +394,11 @@ export type Inverses =
       UndoOwnershipV1,
       UndoOwnershipV1
     ];
-export type Assetpinssha256 = string | null;
+export type Assetpinssha2561 = string | null;
+export type Commandinversebytes = number | null;
+export type Commandinversesha256 = string | null;
+export type Commandref = string | null;
+export type Direction = "undo" | "redo" | "closed";
 export type Expiresat1 = string;
 /**
  * @maxItems 100
@@ -368,13 +413,13 @@ export type Incarnation3 = string | null;
 export type Inversebytes = number;
 export type Inverseref = string;
 export type Inversesha256 = string;
-export type Jobid1 = string;
+export type Jobid2 = string;
 export type Owner1 = "session" | "backend" | "transferring" | "expired";
-export type Proposalid1 = string;
+export type Proposalid2 = string;
 export type Schemaversion5 = 1;
 export type Transferid = string;
 export type Writerepoch3 = number | null;
-export type Assetpinssha2561 = string | null;
+export type Assetpinssha2562 = string | null;
 /**
  * @maxItems 2
  */
@@ -383,33 +428,6 @@ export type Activedeadline = string;
 export type Childstartedat = string | null;
 export type Cleanupverified = boolean;
 export type Dispatchedat = string;
-export type Code =
-  | "AUTH_REQUIRED"
-  | "RATE_LIMITED"
-  | "BUSY"
-  | "MODEL_DENIED"
-  | "CANCELLED"
-  | "DEADLINE"
-  | "STARTUP_TIMEOUT"
-  | "PROCESS_FAILED"
-  | "CLEANUP_FAILED"
-  | "INTERRUPTED"
-  | "PROTOCOL"
-  | "JOB_QUEUE_FULL"
-  | "JOB_STORAGE_FULL"
-  | "JOB_IDEMPOTENCY_CONFLICT"
-  | "REQUEST_EXPIRED"
-  | "JOB_NOT_FOUND"
-  | "JOB_STORE_CORRUPT"
-  | "JOB_STORE_UNAVAILABLE"
-  | "JOB_DISABLED"
-  | "JOB_SCOPE_INVALID"
-  | "ACCOUNT_CHANGED"
-  | "DEPENDENCY_CHANGED"
-  | "WRITER_UNKNOWN"
-  | "SAVE_FAILED"
-  | "OUTCOME_UNKNOWN"
-  | "PROJECT_DELETED";
 export type Executiongeneration = number;
 export type Id4 = string;
 export type Nativestarted = boolean;
@@ -424,7 +442,7 @@ export type Execution =
   "queued" | "starting" | "running" | "cancelling" | "completed" | "failed" | "cancelled" | "interrupted";
 export type Executiongeneration1 = number;
 export type Id5 = string;
-export type Proposalid2 = string | null;
+export type Proposalid3 = string | null;
 export type Publication =
   | "none"
   | "ready"
@@ -437,19 +455,19 @@ export type Publication =
   | "outcome_unknown"
   | "discarded"
   | "cancelled";
-export type Clientmutationid1 = string;
+export type Clientmutationid2 = string;
 export type Documentrevision = number;
 export type Durable = true;
 export type Factsrevision = number;
 export type Generationssha256 = string;
-export type Jobid2 = string;
+export type Jobid3 = string;
 export type Lineage3 = string;
 export type Persistedat = string;
 export type Projectid3 = string;
 export type Projectrevision = number;
-export type Proposalid3 = string;
+export type Proposalid4 = string;
 export type Proposalsha256 = string;
-export type Requestsha2561 = string;
+export type Requestsha2562 = string;
 export type Schemaversion7 = 1;
 export type Workspacesha2561 = string;
 export type Schemaversion8 = 1;
@@ -1196,9 +1214,10 @@ export type Barriergeneration1 = number | null;
 export type Beforegenerationssha2561 = string | null;
 export type Beforeworkspacesha2561 = string;
 export type Candidatepruned = boolean;
-export type Candidateref1 = string;
+export type Candidateref2 = string;
 export type Candidatesha2561 = string | null;
-export type Clientmutationid2 = string;
+export type Clientmutationid3 = string;
+export type Historyjobid = string | null;
 export type Id7 = string;
 export type Incarnation4 = string | null;
 export type Lineage6 = string;
@@ -1213,7 +1232,7 @@ export type Phase2 =
   | "reconciled";
 export type Previousref1 = string;
 export type Projectid5 = string;
-export type Requestsha2562 = string;
+export type Requestsha2563 = string;
 export type Resolvedat1 = string | null;
 export type Schemaversion10 = 1;
 export type Stepssha256 = string | null;
@@ -1235,7 +1254,7 @@ export type Authority = "active" | "revoked";
 export type Executiondeadline = string;
 export type Executiongeneration2 = number;
 export type Id8 = string;
-export type Jobid3 = string;
+export type Jobid4 = string;
 export type Lineage7 = string;
 export type Payload = AgentPayloadReference | FixedPayloadReference | ProcessingPayloadReference;
 export type Batchid = string;
@@ -1259,7 +1278,7 @@ export type Turnid = string;
 export type Proposals = ProposalBindingV1[];
 export type Requestepochexpiresat = string;
 export type Expiresat2 = string;
-export type Jobid4 = string;
+export type Jobid5 = string;
 export type Payloadsha2563 = string;
 /**
  * @maxItems 512
@@ -1267,10 +1286,13 @@ export type Payloadsha2563 = string;
 export type Requests = RequestReplayV1[];
 export type Schemaversion12 = 1;
 export type Tombstoned = boolean;
+export type Abandonedepoch = number | null;
 export type Acknowledgedcursor = number;
 export type Acknowledgedrevision1 = number;
+export type Acknowledgedsha256 = string | null;
 export type Barriergeneration2 = number;
 export type Draftid = string | null;
+export type Draftsequencefloor = number;
 export type Epoch = number;
 export type Incarnation5 = string;
 export type Leaseexpiresat = string;
@@ -1280,7 +1302,15 @@ export type Resumecredentialsha256 = string;
 export type Schemaversion13 = 1;
 export type Sessionid1 = string;
 export type Status = "attached" | "recovering" | "clean_detached" | "fenced";
+export type Touchfloor = number;
 export type Touchgeneration1 = number;
+export type Writerepoch5 = number;
+export type Cursor1 = number;
+export type Sha2562 = string;
+/**
+ * @maxItems 512
+ */
+export type Writertouches = WriterTouchReceiptV1[];
 
 export interface BackgroundSidecarV1 {
   accountGeneration: Accountgeneration;
@@ -1292,6 +1322,7 @@ export interface BackgroundSidecarV1 {
   expiredThroughEpoch: Expiredthroughepoch;
   generations: Generations;
   history?: BackgroundHistoryV1 | null;
+  historyCommands?: Historycommands;
   historyNamespace?: Historynamespace;
   intents: Intents;
   inverses: Inverses;
@@ -1306,6 +1337,8 @@ export interface BackgroundSidecarV1 {
   schemaVersion: Schemaversion12;
   tombstoned: Tombstoned;
   writer: WriterSessionV1 | null;
+  writerEpoch?: Writerepoch5;
+  writerTouches?: Writertouches;
 }
 export interface AssetPinV1 {
   kind: Kind;
@@ -1335,6 +1368,7 @@ export interface PublicationBarrierV1 {
 }
 export interface DraftCheckpointV1 {
   actionCursor: Actioncursor1;
+  assetPinsSha256?: Assetpinssha256;
   baseRevision: Baserevision;
   baseSha256: Basesha256;
   checkpointedAt: Checkpointedat;
@@ -1389,6 +1423,17 @@ export interface AgentQuery {
   parentId?: Parentid;
   text?: Text;
 }
+export interface HistoryCommandReceiptV1 {
+  candidateRef: Candidateref;
+  clientMutationId: Clientmutationid;
+  commandId: Commandid;
+  commandSha256: Commandsha256;
+  completedAt: Completedat;
+  jobId: Jobid;
+  proposalId: Proposalid;
+  requestSha256: Requestsha256;
+  resultingRevision: Resultingrevision;
+}
 export interface PublicationIntentV1 {
   afterGenerationsSha256: Aftergenerationssha256;
   afterWorkspaceSha256: Afterworkspacesha256;
@@ -1396,33 +1441,41 @@ export interface PublicationIntentV1 {
   barrierGeneration: Barriergeneration;
   beforeGenerationsSha256?: Beforegenerationssha256;
   beforeWorkspaceSha256: Beforeworkspacesha256;
-  candidateRef: Candidateref;
+  candidateRef: Candidateref1;
   candidateSha256?: Candidatesha256;
-  clientMutationId: Clientmutationid;
+  clientMutationId: Clientmutationid1;
   id: Id3;
   incarnation: Incarnation2;
-  jobId: Jobid;
+  jobId: Jobid1;
   lineage: Lineage2;
   phase: Phase1;
   previousRef: Previousref;
   projectId: Projectid2;
-  proposalId: Proposalid;
-  requestSha256: Requestsha256;
+  proposalId: Proposalid1;
+  reconciledReason?: JobFailure | null;
+  requestSha256: Requestsha2561;
   resolvedAt?: Resolvedat;
   schemaVersion: Schemaversion3;
   writerEpoch: Writerepoch2;
 }
+export interface JobFailure {
+  code: Code;
+}
 export interface UndoOwnershipV1 {
-  assetPinsSha256?: Assetpinssha256;
+  assetPinsSha256?: Assetpinssha2561;
+  commandInverseBytes?: Commandinversebytes;
+  commandInverseSha256?: Commandinversesha256;
+  commandRef?: Commandref;
+  direction?: Direction;
   expiresAt: Expiresat1;
   guards: ScopeGuardV1;
   incarnation: Incarnation3;
   inverseBytes: Inversebytes;
   inverseRef: Inverseref;
   inverseSha256: Inversesha256;
-  jobId: Jobid1;
+  jobId: Jobid2;
   owner: Owner1;
-  proposalId: Proposalid1;
+  proposalId: Proposalid2;
   schemaVersion: Schemaversion5;
   transferId: Transferid;
   writerEpoch: Writerepoch3;
@@ -1433,7 +1486,7 @@ export interface ScopeGuardV1 {
   writes: Writes;
 }
 export interface JobSnapshotV1 {
-  assetPinsSha256?: Assetpinssha2561;
+  assetPinsSha256?: Assetpinssha2562;
   attempts: Attempts;
   createdAt: Createdat;
   error: JobFailure | null;
@@ -1441,7 +1494,7 @@ export interface JobSnapshotV1 {
   execution: Execution;
   executionGeneration: Executiongeneration1;
   id: Id5;
-  proposalId: Proposalid2;
+  proposalId: Proposalid3;
   publication: Publication;
   publicationError?: JobFailure | null;
   receipt: CanonicalReceiptV1 | null;
@@ -1464,23 +1517,20 @@ export interface JobAttemptV1 {
   startupDeadline: Startupdeadline;
   state: State1;
 }
-export interface JobFailure {
-  code: Code;
-}
 export interface CanonicalReceiptV1 {
-  clientMutationId: Clientmutationid1;
+  clientMutationId: Clientmutationid2;
   documentRevision: Documentrevision;
   durable: Durable;
   factsRevision: Factsrevision;
   generationsSha256: Generationssha256;
-  jobId: Jobid2;
+  jobId: Jobid3;
   lineage: Lineage3;
   persistedAt: Persistedat;
   projectId: Projectid3;
   projectRevision: Projectrevision;
-  proposalId: Proposalid3;
+  proposalId: Proposalid4;
   proposalSha256: Proposalsha256;
-  requestSha256: Requestsha2561;
+  requestSha256: Requestsha2562;
   schemaVersion: Schemaversion7;
   workspaceSha256: Workspacesha2561;
 }
@@ -1551,16 +1601,18 @@ export interface ManualIntentV1 {
   beforeGenerationsSha256?: Beforegenerationssha2561;
   beforeWorkspaceSha256: Beforeworkspacesha2561;
   candidatePruned?: Candidatepruned;
-  candidateRef: Candidateref1;
+  candidateRef: Candidateref2;
   candidateSha256?: Candidatesha2561;
-  clientMutationId: Clientmutationid2;
+  clientMutationId: Clientmutationid3;
+  historyJobId?: Historyjobid;
   id: Id7;
   incarnation: Incarnation4;
   lineage: Lineage6;
   phase: Phase2;
   previousRef: Previousref1;
   projectId: Projectid5;
-  requestSha256: Requestsha2562;
+  reconciledReason?: JobFailure | null;
+  requestSha256: Requestsha2563;
   resolvedAt?: Resolvedat1;
   schemaVersion: Schemaversion10;
   stepsSha256?: Stepssha256;
@@ -1578,7 +1630,7 @@ export interface ProposalBindingV1 {
   executionGeneration: Executiongeneration2;
   guards: ScopeGuardV1;
   id: Id8;
-  jobId: Jobid3;
+  jobId: Jobid4;
   lineage: Lineage7;
   payload: Payload;
   payloadBytes: Payloadbytes1;
@@ -1607,14 +1659,17 @@ export interface RequestReplayV1 {
   archivedResult: JobSnapshotV1 | null;
   expiresAt: Expiresat2;
   identity: JobIdentity;
-  jobId: Jobid4;
+  jobId: Jobid5;
   payloadSha256: Payloadsha2563;
 }
 export interface WriterSessionV1 {
+  abandonedEpoch?: Abandonedepoch;
   acknowledgedCursor: Acknowledgedcursor;
   acknowledgedRevision: Acknowledgedrevision1;
+  acknowledgedSha256?: Acknowledgedsha256;
   barrierGeneration: Barriergeneration2;
   draftId: Draftid;
+  draftSequenceFloor?: Draftsequencefloor;
   epoch: Epoch;
   incarnation: Incarnation5;
   leaseExpiresAt: Leaseexpiresat;
@@ -1624,5 +1679,10 @@ export interface WriterSessionV1 {
   schemaVersion: Schemaversion13;
   sessionId: Sessionid1;
   status: Status;
+  touchFloor?: Touchfloor;
   touchGeneration: Touchgeneration1;
+}
+export interface WriterTouchReceiptV1 {
+  cursor: Cursor1;
+  sha256: Sha2562;
 }

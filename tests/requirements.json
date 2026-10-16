@@ -25,6 +25,78 @@
         "tests/contracts/test_contracts.py::test_shared_case[background_owned_asset_pins]",
         "tests/contracts/test_contracts.py::test_shared_case[background_saved_undo_expiry_notice]",
         "tests/contracts/test_contracts.py::test_shared_case[background_undo_expiry_without_saved]",
+        "tests/contracts/test_contracts.py::test_shared_case[nb03_background_writer_abandon_v1_unknown_field]",
+        "tests/contracts/test_contracts.py::test_shared_case[nb03_background_writer_abandon_v1_valid]",
+        "tests/contracts/test_contracts.py::test_shared_case[nb03_background_writer_abandon_v1_wrong_version]",
+        "tests/contracts/test_contracts.py::test_shared_case[nb03_background_writer_advance_v1_unknown_field]",
+        "tests/contracts/test_contracts.py::test_shared_case[nb03_background_writer_advance_v1_valid]",
+        "tests/contracts/test_contracts.py::test_shared_case[nb03_background_writer_advance_v1_wrong_version]",
+        "tests/contracts/test_contracts.py::test_shared_case[nb03_background_writer_barrier_ack_v1_unknown_field]",
+        "tests/contracts/test_contracts.py::test_shared_case[nb03_background_writer_barrier_ack_v1_valid]",
+        "tests/contracts/test_contracts.py::test_shared_case[nb03_background_writer_barrier_ack_v1_wrong_version]",
+        "tests/contracts/test_contracts.py::test_shared_case[nb03_background_writer_barrier_command_v1_unknown_field]",
+        "tests/contracts/test_contracts.py::test_shared_case[nb03_background_writer_barrier_command_v1_valid]",
+        "tests/contracts/test_contracts.py::test_shared_case[nb03_background_writer_barrier_command_v1_wrong_version]",
+        "tests/contracts/test_contracts.py::test_shared_case[nb03_background_writer_checkpoint_v1_unknown_field]",
+        "tests/contracts/test_contracts.py::test_shared_case[nb03_background_writer_checkpoint_v1_valid]",
+        "tests/contracts/test_contracts.py::test_shared_case[nb03_background_writer_checkpoint_v1_wrong_version]",
+        "tests/contracts/test_contracts.py::test_shared_case[nb03_background_writer_draft_command_v1_unknown_field]",
+        "tests/contracts/test_contracts.py::test_shared_case[nb03_background_writer_draft_command_v1_valid]",
+        "tests/contracts/test_contracts.py::test_shared_case[nb03_background_writer_draft_command_v1_wrong_version]",
+        "tests/contracts/test_contracts.py::test_shared_case[nb03_background_writer_draft_read_v1_unknown_field]",
+        "tests/contracts/test_contracts.py::test_shared_case[nb03_background_writer_draft_read_v1_valid]",
+        "tests/contracts/test_contracts.py::test_shared_case[nb03_background_writer_draft_read_v1_wrong_version]",
+        "tests/contracts/test_contracts.py::test_shared_case[nb03_background_writer_draft_reference_v1_unknown_field]",
+        "tests/contracts/test_contracts.py::test_shared_case[nb03_background_writer_draft_reference_v1_valid]",
+        "tests/contracts/test_contracts.py::test_shared_case[nb03_background_writer_draft_reference_v1_wrong_version]",
+        "tests/contracts/test_contracts.py::test_shared_case[nb03_background_writer_draft_resolve_v1_unknown_field]",
+        "tests/contracts/test_contracts.py::test_shared_case[nb03_background_writer_draft_resolve_v1_valid]",
+        "tests/contracts/test_contracts.py::test_shared_case[nb03_background_writer_draft_resolve_v1_wrong_version]",
+        "tests/contracts/test_contracts.py::test_shared_case[nb03_background_writer_history_command_v1_unknown_field]",
+        "tests/contracts/test_contracts.py::test_shared_case[nb03_background_writer_history_command_v1_valid]",
+        "tests/contracts/test_contracts.py::test_shared_case[nb03_background_writer_history_command_v1_wrong_version]",
+        "tests/contracts/test_contracts.py::test_shared_case[nb03_background_writer_history_offer_v1_unknown_field]",
+        "tests/contracts/test_contracts.py::test_shared_case[nb03_background_writer_history_offer_v1_valid]",
+        "tests/contracts/test_contracts.py::test_shared_case[nb03_background_writer_history_offer_v1_wrong_version]",
+        "tests/contracts/test_contracts.py::test_shared_case[nb03_background_writer_history_request_v1_unknown_field]",
+        "tests/contracts/test_contracts.py::test_shared_case[nb03_background_writer_history_request_v1_valid]",
+        "tests/contracts/test_contracts.py::test_shared_case[nb03_background_writer_history_request_v1_wrong_version]",
+        "tests/contracts/test_contracts.py::test_shared_case[nb03_background_writer_history_result_v1_unknown_field]",
+        "tests/contracts/test_contracts.py::test_shared_case[nb03_background_writer_history_result_v1_valid]",
+        "tests/contracts/test_contracts.py::test_shared_case[nb03_background_writer_history_result_v1_wrong_version]",
+        "tests/contracts/test_contracts.py::test_shared_case[nb03_background_writer_mutation_v1_unknown_field]",
+        "tests/contracts/test_contracts.py::test_shared_case[nb03_background_writer_mutation_v1_valid]",
+        "tests/contracts/test_contracts.py::test_shared_case[nb03_background_writer_mutation_v1_wrong_version]",
+        "tests/contracts/test_contracts.py::test_shared_case[nb03_background_writer_open_v1_unknown_field]",
+        "tests/contracts/test_contracts.py::test_shared_case[nb03_background_writer_open_v1_valid]",
+        "tests/contracts/test_contracts.py::test_shared_case[nb03_background_writer_open_v1_wrong_version]",
+        "tests/contracts/test_contracts.py::test_shared_case[nb03_background_writer_proof_v1_unknown_field]",
+        "tests/contracts/test_contracts.py::test_shared_case[nb03_background_writer_proof_v1_valid]",
+        "tests/contracts/test_contracts.py::test_shared_case[nb03_background_writer_proof_v1_wrong_version]",
+        "tests/contracts/test_contracts.py::test_shared_case[nb03_background_writer_publication_v1_unknown_field]",
+        "tests/contracts/test_contracts.py::test_shared_case[nb03_background_writer_publication_v1_valid]",
+        "tests/contracts/test_contracts.py::test_shared_case[nb03_background_writer_publication_v1_wrong_version]",
+        "tests/contracts/test_contracts.py::test_shared_case[nb03_background_writer_publish_v1_unknown_field]",
+        "tests/contracts/test_contracts.py::test_shared_case[nb03_background_writer_publish_v1_valid]",
+        "tests/contracts/test_contracts.py::test_shared_case[nb03_background_writer_publish_v1_wrong_version]",
+        "tests/contracts/test_contracts.py::test_shared_case[nb03_background_writer_view_v1_unknown_field]",
+        "tests/contracts/test_contracts.py::test_shared_case[nb03_background_writer_view_v1_valid]",
+        "tests/contracts/test_contracts.py::test_shared_case[nb03_background_writer_view_v1_wrong_version]",
+        "tests/contracts/test_contracts.py::test_shared_case[nb03_writer_changed_workspace_wire]",
+        "tests/contracts/test_contracts.py::test_shared_case[nb03_writer_draft_floor_survives_resolution]",
+        "tests/contracts/test_contracts.py::test_shared_case[nb03_writer_false_durable_view]",
+        "tests/contracts/test_contracts.py::test_shared_case[nb03_writer_foreign_draft]",
+        "tests/contracts/test_contracts.py::test_shared_case[nb03_writer_history_credential_in_outbox]",
+        "tests/contracts/test_contracts.py::test_shared_case[nb03_writer_history_unsafe_direction]",
+        "tests/contracts/test_contracts.py::test_shared_case[nb03_writer_history_wrong_batch]",
+        "tests/contracts/test_contracts.py::test_shared_case[nb03_writer_history_wrong_hash]",
+        "tests/contracts/test_contracts.py::test_shared_case[nb03_writer_history_wrong_wire]",
+        "tests/contracts/test_contracts.py::test_shared_case[nb03_writer_negative_cursor]",
+        "tests/contracts/test_contracts.py::test_shared_case[nb03_writer_negative_draft_floor]",
+        "tests/contracts/test_contracts.py::test_shared_case[nb03_writer_negative_sequence]",
+        "tests/contracts/test_contracts.py::test_shared_case[nb03_writer_short_credential]",
+        "tests/contracts/test_contracts.py::test_shared_case[nb03_writer_touch_replay_floor]",
+        "tests/contracts/test_contracts.py::test_shared_case[nb03_writer_wrong_workspace_hash]",
         "tests/docx/test_export_mapping.py::test_all_authored_sections_order_hidden_rows_and_legacy_text_keep_actual_word_breaks",
         "tests/docx/test_export_mapping.py::test_each_empty_required_string_uses_only_localized_render_labels",
         "tests/docx/test_export_mapping.py::test_multiple_partial_present_periods_and_incomplete_exposure_export_verbatim",
@@ -1871,21 +1943,47 @@
         "tests/recovery/test_background_offline.py::test_sidecar_keeps_request_identity_retention_and_foreign_authority_separate[missing-request]",
         "tests/recovery/test_background_offline.py::test_sidecar_keeps_request_identity_retention_and_foreign_authority_separate[none]",
         "tests/recovery/test_background_offline.py::test_unreached_controlled_hook_cannot_pass_teardown",
+        "tests/recovery/test_background_offline.py::test_versioned_background_contract_round_trip[background_agent_request_v1]",
         "tests/recovery/test_background_offline.py::test_versioned_background_contract_round_trip[background_apply_v2]",
+        "tests/recovery/test_background_offline.py::test_versioned_background_contract_round_trip[background_artifact_v1]",
         "tests/recovery/test_background_offline.py::test_versioned_background_contract_round_trip[background_attempt_v1]",
         "tests/recovery/test_background_offline.py::test_versioned_background_contract_round_trip[background_barrier_v1]",
+        "tests/recovery/test_background_offline.py::test_versioned_background_contract_round_trip[background_dispatch_v1]",
         "tests/recovery/test_background_offline.py::test_versioned_background_contract_round_trip[background_draft_payload_v1]",
         "tests/recovery/test_background_offline.py::test_versioned_background_contract_round_trip[background_draft_v1]",
         "tests/recovery/test_background_offline.py::test_versioned_background_contract_round_trip[background_event_v1]",
         "tests/recovery/test_background_offline.py::test_versioned_background_contract_round_trip[background_intent_v1]",
+        "tests/recovery/test_background_offline.py::test_versioned_background_contract_round_trip[background_legacy_run_v2]",
+        "tests/recovery/test_background_offline.py::test_versioned_background_contract_round_trip[background_project_v1]",
         "tests/recovery/test_background_offline.py::test_versioned_background_contract_round_trip[background_proposal_v1]",
         "tests/recovery/test_background_offline.py::test_versioned_background_contract_round_trip[background_receipt_v1]",
+        "tests/recovery/test_background_offline.py::test_versioned_background_contract_round_trip[background_replay_request_v1]",
+        "tests/recovery/test_background_offline.py::test_versioned_background_contract_round_trip[background_replay_v1]",
         "tests/recovery/test_background_offline.py::test_versioned_background_contract_round_trip[background_scope_guard_v1]",
         "tests/recovery/test_background_offline.py::test_versioned_background_contract_round_trip[background_sidecar_v1]",
         "tests/recovery/test_background_offline.py::test_versioned_background_contract_round_trip[background_snapshot_v1]",
         "tests/recovery/test_background_offline.py::test_versioned_background_contract_round_trip[background_submission_v1]",
         "tests/recovery/test_background_offline.py::test_versioned_background_contract_round_trip[background_undo_v1]",
-        "tests/recovery/test_background_offline.py::test_versioned_background_contract_round_trip[background_writer_v1]"
+        "tests/recovery/test_background_offline.py::test_versioned_background_contract_round_trip[background_writer_abandon_v1]",
+        "tests/recovery/test_background_offline.py::test_versioned_background_contract_round_trip[background_writer_advance_v1]",
+        "tests/recovery/test_background_offline.py::test_versioned_background_contract_round_trip[background_writer_barrier_ack_v1]",
+        "tests/recovery/test_background_offline.py::test_versioned_background_contract_round_trip[background_writer_barrier_command_v1]",
+        "tests/recovery/test_background_offline.py::test_versioned_background_contract_round_trip[background_writer_checkpoint_v1]",
+        "tests/recovery/test_background_offline.py::test_versioned_background_contract_round_trip[background_writer_draft_command_v1]",
+        "tests/recovery/test_background_offline.py::test_versioned_background_contract_round_trip[background_writer_draft_read_v1]",
+        "tests/recovery/test_background_offline.py::test_versioned_background_contract_round_trip[background_writer_draft_reference_v1]",
+        "tests/recovery/test_background_offline.py::test_versioned_background_contract_round_trip[background_writer_draft_resolve_v1]",
+        "tests/recovery/test_background_offline.py::test_versioned_background_contract_round_trip[background_writer_history_command_v1]",
+        "tests/recovery/test_background_offline.py::test_versioned_background_contract_round_trip[background_writer_history_offer_v1]",
+        "tests/recovery/test_background_offline.py::test_versioned_background_contract_round_trip[background_writer_history_request_v1]",
+        "tests/recovery/test_background_offline.py::test_versioned_background_contract_round_trip[background_writer_history_result_v1]",
+        "tests/recovery/test_background_offline.py::test_versioned_background_contract_round_trip[background_writer_mutation_v1]",
+        "tests/recovery/test_background_offline.py::test_versioned_background_contract_round_trip[background_writer_open_v1]",
+        "tests/recovery/test_background_offline.py::test_versioned_background_contract_round_trip[background_writer_proof_v1]",
+        "tests/recovery/test_background_offline.py::test_versioned_background_contract_round_trip[background_writer_publication_v1]",
+        "tests/recovery/test_background_offline.py::test_versioned_background_contract_round_trip[background_writer_publish_v1]",
+        "tests/recovery/test_background_offline.py::test_versioned_background_contract_round_trip[background_writer_v1]",
+        "tests/recovery/test_background_offline.py::test_versioned_background_contract_round_trip[background_writer_view_v1]"
       ]
     },
     {
@@ -2286,8 +2384,281 @@
     },
     {
       "id": "NB-WRITER",
-      "status": "unimplemented",
-      "tests": []
+      "status": "implemented",
+      "tests": [
+        "apps/web/unit/background-drafts.test.ts::NB-A04:v31 valid local draft bytes at boundary -1 retain the prior buffer on rejection",
+        "apps/web/unit/background-drafts.test.ts::NB-A04:v32 valid local draft bytes at boundary 0 retain the prior buffer on rejection",
+        "apps/web/unit/background-drafts.test.ts::NB-A04:v33 valid local draft bytes at boundary 1 retain the prior buffer on rejection",
+        "apps/web/unit/background-drafts.test.ts::NB-W11:v01 local draft quota preserves the retained record and watermark",
+        "apps/web/unit/background-drafts.test.ts::NB-W11:v02 local draft rejected preserves the retained record and watermark",
+        "apps/web/unit/background-drafts.test.ts::NB-W11:v03 local draft partial preserves the retained record and watermark",
+        "apps/web/unit/background-drafts.test.ts::NB-W11:v04 local draft unsupported preserves the retained record and watermark",
+        "apps/web/unit/background-drafts.test.ts::NB-W11:v05 local draft missing-blob preserves the retained record and watermark",
+        "apps/web/unit/background-drafts.test.ts::NB-W11:v06 local draft wrong-project preserves the retained record and watermark",
+        "apps/web/unit/background-drafts.test.ts::NB-W11:v07 local draft late-checkpoint preserves the retained record and watermark",
+        "apps/web/unit/background-drafts.test.ts::NB-W11:v08 local draft corrupt preserves the retained record and watermark",
+        "apps/web/unit/background-drafts.test.ts::a failed deletion cannot remove a newer local buffer",
+        "apps/web/unit/background-drafts.test.ts::a resumed connection selects its own durable input even after the old connection writes a larger sequence",
+        "apps/web/unit/background-drafts.test.ts::a returning old epoch keeps its draft without replacing the new writer buffer",
+        "apps/web/unit/background-drafts.test.ts::explicit owner replacement is atomic and refuses a draft that changed after review",
+        "apps/web/unit/background-drafts.test.ts::the global draft cap rejects another project without evicting four full project buffers",
+        "apps/web/unit/background-editor-schema.test.ts::rich history adoption accepts code, emphasis and colors in the actual engine schema",
+        "apps/web/unit/background-guard.test.ts::NB-G03:v03 a disposable late-adoption mutant fails the actual timeout regression",
+        "apps/web/unit/background-jobs.test.ts::NB-W10:v03 an old editor save callback cannot replace the next visible buffer",
+        "apps/web/unit/background-jobs.test.ts::NB-W10:v04 old project metadata cannot publish into another project",
+        "apps/web/unit/background-jobs.test.ts::NB-W10:v05 an old editor receipt callback cannot replace the next visible buffer",
+        "apps/web/unit/background-jobs.test.ts::NB-W10:v06 old project metadata cannot publish into a new instance",
+        "apps/web/unit/background-jobs.test.ts::a cached conversation projection for one job cannot regress another job's completed state",
+        "apps/web/unit/background-jobs.test.ts::background Send retries keep the captured request and never acquire or stop a legacy owner",
+        "apps/web/unit/background-jobs.test.ts::changing conversations and closing the assistant never stops a background job or opens a legacy lease",
+        "apps/web/unit/background-jobs.test.ts::screen-independent jobs keep their original accepted order and reject older snapshot cursors",
+        "apps/web/unit/background-orders.test.ts::NB-M01:v02 timeout input late-reply order input/reply/timeout preserves its independent oracle",
+        "apps/web/unit/background-orders.test.ts::NB-M01:v02 timeout input late-reply order input/timeout/reply preserves its independent oracle",
+        "apps/web/unit/background-orders.test.ts::NB-M01:v02 timeout input late-reply order reply/input/timeout preserves its independent oracle",
+        "apps/web/unit/background-orders.test.ts::NB-M01:v02 timeout input late-reply order reply/timeout/input preserves its independent oracle",
+        "apps/web/unit/background-orders.test.ts::NB-M01:v02 timeout input late-reply order timeout/input/reply preserves its independent oracle",
+        "apps/web/unit/background-orders.test.ts::NB-M01:v02 timeout input late-reply order timeout/reply/input preserves its independent oracle",
+        "apps/web/unit/background-proof.test.ts::NB-W12:v01 invalid saved proof cannot authorize adoption or a saved notice",
+        "apps/web/unit/background-proof.test.ts::NB-W12:v02 invalid saved proof cannot authorize adoption or a saved notice",
+        "apps/web/unit/background-proof.test.ts::NB-W12:v03 invalid saved proof cannot authorize adoption or a saved notice",
+        "apps/web/unit/background-proof.test.ts::NB-W12:v04 invalid saved proof cannot authorize adoption or a saved notice",
+        "apps/web/unit/background-proof.test.ts::NB-W12:v05 invalid saved proof cannot authorize adoption or a saved notice",
+        "apps/web/unit/background-proof.test.ts::NB-W12:v06 invalid saved proof cannot authorize adoption or a saved notice",
+        "apps/web/unit/background-proof.test.ts::NB-W12:v07 invalid saved proof cannot authorize adoption or a saved notice",
+        "apps/web/unit/background-proof.test.ts::NB-W12:v08 a true older receipt adopts only its inverse and preserves the newer canonical snapshot",
+        "apps/web/unit/background-proof.test.ts::saved snapshot bytes reject hash-preserving structural substitution",
+        "apps/web/unit/background-python-bridge.test.ts::NB-H01:v04 a lost durable history ACK recovers one inverse owner and one mounted action",
+        "apps/web/unit/background-python-bridge.test.ts::NB-W02:v01 real saved receipt outlives a lost HTTP reply and preserves later input",
+        "apps/web/unit/background-python-bridge.test.ts::NB-W02:v02 real saved receipt outlives a lost HTTP reply and recovers once",
+        "apps/web/unit/background-python-bridge.test.ts::NB-W05:v01 navigation waits for a real manual save ACK without accepting input past its protected boundary",
+        "apps/web/unit/background-python-bridge.test.ts::NB-W08:v01 dirty reload retains an exact committed outbox without restamping it",
+        "apps/web/unit/background-python-bridge.test.ts::NB-W08:v02 dirty reload retains an exact uncommitted outbox without restamping it",
+        "apps/web/unit/background-python-bridge.test.ts::NB-W08:v03 explicit abandonment exits a lost tab and keeps selected local input",
+        "apps/web/unit/background-python-bridge.test.ts::NB-W08:v04 explicit abandonment exits a lost tab and rejects its late checkpoint",
+        "apps/web/unit/background-python-bridge.test.ts::a foreign cursor cannot claim the previous writer's clean acknowledged handoff",
+        "apps/web/unit/background-python-bridge.test.ts::a real capacity-one Job releases its synthetic child before Node publishes and adopts its exact compiler result",
+        "apps/web/unit/background-python-bridge.test.ts::a real clean autosave and heartbeat reopen without a recovery draft",
+        "apps/web/unit/background-python-bridge.test.ts::a real clean detach reopens a new writer epoch after acknowledged input",
+        "apps/web/unit/background-python-bridge.test.ts::a real clean detach reopens a new writer epoch after headless publication",
+        "apps/web/unit/background-python-bridge.test.ts::a real heartbeat reply racing a heartbeat cannot regress the acknowledged writer",
+        "apps/web/unit/background-python-bridge.test.ts::a real save reply racing a heartbeat cannot regress the acknowledged writer",
+        "apps/web/unit/background-python-bridge.test.ts::capacity-one API controls with a blocked model and a full background queue",
+        "apps/web/unit/background-python-bridge.test.ts::capacity-one API controls with a blocked model and a full background queue::NB-Q09:v01 manual save on another project completes while inference remains held",
+        "apps/web/unit/background-python-bridge.test.ts::capacity-one API controls with a blocked model and a full background queue::NB-Q09:v04 read API completes while inference remains held",
+        "apps/web/unit/background-python-bridge.test.ts::capacity-one API controls with a blocked model and a full background queue::NB-Q09:v06 host status API completes without opening another runtime",
+        "apps/web/unit/background-python-bridge.test.ts::capacity-one API controls with a blocked model and a full background queue::NB-Q09:v07 cancel API removes queued work without waiting for the held model",
+        "apps/web/unit/background-python-bridge.test.ts::independent real sync metadata preserves local input and clean detach after heartbeat",
+        "apps/web/unit/background-python-bridge.test.ts::independent real sync metadata preserves local input and clean detach before heartbeat",
+        "apps/web/unit/background-python-bridge.test.ts::the Node writer API validates real Python HTTP saves, exact byte replay and clean detach",
+        "apps/web/unit/background-writer.test.ts::NB-A04:v41 inverse expiry visibly intercepts Undo without falling back to a fresh local mutation",
+        "apps/web/unit/background-writer.test.ts::NB-H01:v01 mounted publication adopts one compiler result with one history action and no second save",
+        "apps/web/unit/background-writer.test.ts::NB-H01:v02 headless adoption adds the retained inverse without applying committed cells twice",
+        "apps/web/unit/background-writer.test.ts::NB-W02:v01 a won commit and lost reply retain the timeout buffer until exact recovery",
+        "apps/web/unit/background-writer.test.ts::NB-W02:v02 a won commit and lost reply retain the timeout buffer until exact recovery",
+        "apps/web/unit/background-writer.test.ts::NB-W02:v03 failed exact recovery keeps the local buffer and emits no saved notice",
+        "apps/web/unit/background-writer.test.ts::NB-W02:v04 event-first delivery creates one adoption and notice",
+        "apps/web/unit/background-writer.test.ts::NB-W02:v05 reply-first delivery creates one adoption and notice",
+        "apps/web/unit/background-writer.test.ts::NB-W02:v06 duplicates delivery creates one adoption and notice",
+        "apps/web/unit/background-writer.test.ts::NB-W03:v01 shared transaction guard rejects a mutation between ACK and adoption",
+        "apps/web/unit/background-writer.test.ts::NB-W03:v02 shared transaction guard rejects a mutation between ACK and adoption",
+        "apps/web/unit/background-writer.test.ts::NB-W03:v03 shared transaction guard rejects a mutation between ACK and adoption",
+        "apps/web/unit/background-writer.test.ts::NB-W03:v04 shared transaction guard rejects a mutation between ACK and adoption",
+        "apps/web/unit/background-writer.test.ts::NB-W03:v05 shared transaction guard rejects a mutation between ACK and adoption",
+        "apps/web/unit/background-writer.test.ts::NB-W03:v06 shared transaction guard rejects a mutation between ACK and adoption",
+        "apps/web/unit/background-writer.test.ts::NB-W03:v07 shared transaction guard rejects a mutation between ACK and adoption",
+        "apps/web/unit/background-writer.test.ts::NB-W03:v08 shared transaction guard rejects a mutation between ACK and adoption",
+        "apps/web/unit/background-writer.test.ts::NB-W03:v09 shared transaction guard rejects a mutation between ACK and adoption",
+        "apps/web/unit/background-writer.test.ts::NB-W03:v10 shared transaction guard rejects a mutation between ACK and adoption",
+        "apps/web/unit/background-writer.test.ts::NB-W04:v01 composition respects composition and the bounded local window",
+        "apps/web/unit/background-writer.test.ts::NB-W04:v02 flush respects composition and the bounded local window",
+        "apps/web/unit/background-writer.test.ts::NB-W04:v03 continuous-input respects composition and the bounded local window",
+        "apps/web/unit/background-writer.test.ts::NB-W04:v04 budget respects composition and the bounded local window",
+        "apps/web/unit/background-writer.test.ts::NB-W05:v02 SAVE_FAILED navigation keeps a durable local checkpoint",
+        "apps/web/unit/background-writer.test.ts::NB-W05:v03 OUTCOME_UNKNOWN navigation keeps a durable local checkpoint",
+        "apps/web/unit/background-writer.test.ts::NB-W05:v04 WRITER_UNKNOWN navigation keeps a durable local checkpoint",
+        "apps/web/unit/background-writer.test.ts::NB-W05:v05 a lost detach ACK cannot unlock an old canonical save or replace later recovery input",
+        "apps/web/unit/background-writer.test.ts::NB-W05:v06 input after the final touch flush cannot enter the protected detach boundary",
+        "apps/web/unit/background-writer.test.ts::NB-W07:v04 a heartbeat reply from the previous connection cannot fence a resumed writer",
+        "apps/web/unit/background-writer.test.ts::a clean writer needs no unload prompt while its dirty durable draft still retains image ownership",
+        "apps/web/unit/background-writer.test.ts::a late local write from the old proof cannot advance the current writer's durable cursor",
+        "apps/web/unit/background-writer.test.ts::an ineligible old headless inverse keeps the current editor usable and creates no new saved notice",
+        "apps/web/unit/background-writer.test.ts::continuous zero-diff input flushes before its bounded touch queue can silently drop more typing",
+        "apps/web/unit/background-writer.test.ts::exact recovery waits for a checkpoint still persisting its local payload before server delivery",
+        "apps/web/unit/background-writer.test.ts::timeout after history reservation releases local input while the stale adoption callback remains blocked",
+        "tests/foundation/test_runner_gates.py::test_all_prototype_regressions_receive_network_guard",
+        "tests/foundation/test_runner_gates.py::test_background_fast_uses_one_context_and_retains_raw_reports_before_combining",
+        "tests/foundation/test_runner_gates.py::test_background_node_binding_requires_exact_execution_identity_and_phases[browser]",
+        "tests/foundation/test_runner_gates.py::test_background_node_binding_requires_exact_execution_identity_and_phases[empty]",
+        "tests/foundation/test_runner_gates.py::test_background_node_binding_requires_exact_execution_identity_and_phases[file]",
+        "tests/foundation/test_runner_gates.py::test_background_node_binding_requires_exact_execution_identity_and_phases[hook]",
+        "tests/foundation/test_runner_gates.py::test_background_node_binding_requires_exact_execution_identity_and_phases[parameter]",
+        "tests/foundation/test_runner_gates.py::test_background_node_binding_requires_exact_execution_identity_and_phases[parent]",
+        "tests/foundation/test_runner_gates.py::test_background_node_binding_requires_exact_execution_identity_and_phases[retry]",
+        "tests/foundation/test_runner_gates.py::test_background_node_binding_requires_exact_execution_identity_and_phases[skip]",
+        "tests/foundation/test_runner_gates.py::test_background_node_binding_requires_exact_execution_identity_and_phases[suite]",
+        "tests/foundation/test_runner_gates.py::test_background_node_binding_requires_exact_execution_identity_and_phases[todo]",
+        "tests/foundation/test_runner_gates.py::test_background_node_reporter_retains_real_hook_failures_skips_and_nested_names",
+        "tests/foundation/test_runner_gates.py::test_background_raw_report_merge_preserves_files_and_refuses_rewrite_or_source_drift",
+        "tests/foundation/test_runner_gates.py::test_background_report_cannot_finish_before_its_bound_start",
+        "tests/foundation/test_runner_gates.py::test_background_report_rejects_broken_files_and_erased_failures[cancelled]",
+        "tests/foundation/test_runner_gates.py::test_background_report_rejects_broken_files_and_erased_failures[duplicate-key]",
+        "tests/foundation/test_runner_gates.py::test_background_report_rejects_broken_files_and_erased_failures[duplicate-trace]",
+        "tests/foundation/test_runner_gates.py::test_background_report_rejects_broken_files_and_erased_failures[empty-bindings]",
+        "tests/foundation/test_runner_gates.py::test_background_report_rejects_broken_files_and_erased_failures[empty]",
+        "tests/foundation/test_runner_gates.py::test_background_report_rejects_broken_files_and_erased_failures[incomplete]",
+        "tests/foundation/test_runner_gates.py::test_background_report_rejects_broken_files_and_erased_failures[initial-failure]",
+        "tests/foundation/test_runner_gates.py::test_background_report_rejects_broken_files_and_erased_failures[missing-parameter]",
+        "tests/foundation/test_runner_gates.py::test_background_report_rejects_broken_files_and_erased_failures[missing]",
+        "tests/foundation/test_runner_gates.py::test_background_report_rejects_broken_files_and_erased_failures[off-suite]",
+        "tests/foundation/test_runner_gates.py::test_background_report_rejects_broken_files_and_erased_failures[timeout]",
+        "tests/foundation/test_runner_gates.py::test_background_report_rejects_broken_files_and_erased_failures[truncated]",
+        "tests/foundation/test_runner_gates.py::test_background_report_rejects_broken_files_and_erased_failures[uncollected-result]",
+        "tests/foundation/test_runner_gates.py::test_background_report_rejects_broken_files_and_erased_failures[wrong-trace-hash]",
+        "tests/foundation/test_runner_gates.py::test_background_report_rejects_broken_files_and_erased_failures[wrong-trace-length]",
+        "tests/foundation/test_runner_gates.py::test_background_report_rejects_broken_files_and_erased_failures[wrong-trace-owner]",
+        "tests/foundation/test_runner_gates.py::test_background_report_rejects_broken_files_and_erased_failures[wrong-trace-seed]",
+        "tests/foundation/test_runner_gates.py::test_background_report_rejects_false_coverage[NB-G02:v01]",
+        "tests/foundation/test_runner_gates.py::test_background_report_rejects_false_coverage[NB-G02:v02]",
+        "tests/foundation/test_runner_gates.py::test_background_report_rejects_false_coverage[NB-G02:v03]",
+        "tests/foundation/test_runner_gates.py::test_background_report_rejects_false_coverage[NB-G02:v04]",
+        "tests/foundation/test_runner_gates.py::test_background_report_rejects_false_coverage[NB-G02:v05]",
+        "tests/foundation/test_runner_gates.py::test_background_report_rejects_false_coverage[NB-G02:v06]",
+        "tests/foundation/test_runner_gates.py::test_background_report_rejects_false_coverage[NB-G02:v07]",
+        "tests/foundation/test_runner_gates.py::test_background_report_rejects_false_coverage[NB-G02:v08]",
+        "tests/foundation/test_runner_gates.py::test_background_report_rejects_false_coverage[NB-G02:v09]",
+        "tests/foundation/test_runner_gates.py::test_background_report_rejects_false_coverage[NB-G02:v10]",
+        "tests/foundation/test_runner_gates.py::test_background_report_rejects_false_coverage[NB-G02:v11]",
+        "tests/foundation/test_runner_gates.py::test_background_report_rejects_false_coverage[NB-G02:v12]",
+        "tests/foundation/test_runner_gates.py::test_background_report_rejects_false_coverage[NB-G02:v13]",
+        "tests/foundation/test_runner_gates.py::test_background_report_rejects_false_coverage[NB-G02:v14]",
+        "tests/foundation/test_runner_gates.py::test_background_report_rejects_false_coverage[NB-G02:v15]",
+        "tests/foundation/test_runner_gates.py::test_background_report_rejects_false_coverage[NB-G02:v16]",
+        "tests/foundation/test_runner_gates.py::test_background_reporter_retains_real_skips_and_failed_phases",
+        "tests/foundation/test_runner_gates.py::test_background_retry_cannot_forget_a_prior_failed_run",
+        "tests/foundation/test_runner_gates.py::test_missing_prototype_regression_fails_collection_gate",
+        "tests/foundation/test_runner_gates.py::test_partial_requirement_cannot_lose_its_remaining_check",
+        "tests/foundation/test_runner_gates.py::test_requirement_map_cannot_claim_collected_python_tests_outside_required_gates",
+        "tests/foundation/test_runner_gates.py::test_requirement_map_does_not_accept_a_test_name_prefix[entry]",
+        "tests/foundation/test_runner_gates.py::test_requirement_map_does_not_accept_a_test_name_prefix[foundation]",
+        "tests/recovery/test_background_guard_sensitivity.py::test_critical_guard_omission_breaks_the_actual_regression[NB-G03:v01]",
+        "tests/recovery/test_background_guard_sensitivity.py::test_critical_guard_omission_breaks_the_actual_regression[NB-G03:v02]",
+        "tests/recovery/test_background_guard_sensitivity.py::test_critical_guard_omission_breaks_the_actual_regression[NB-G03:v05]",
+        "tests/recovery/test_background_guard_sensitivity.py::test_zero_diff_touch_guard_omission_breaks_the_scoped_aba_regression",
+        "tests/recovery/test_background_history_commands.py::test_a_new_background_save_closes_the_previous_redo_branch",
+        "tests/recovery/test_background_history_commands.py::test_compensation_preserves_independent_edits_rejects_overlap_aba_and_closes_redo[NB-H02:v01]",
+        "tests/recovery/test_background_history_commands.py::test_compensation_preserves_independent_edits_rejects_overlap_aba_and_closes_redo[NB-H02:v02]",
+        "tests/recovery/test_background_history_commands.py::test_compensation_preserves_independent_edits_rejects_overlap_aba_and_closes_redo[NB-H02:v03]",
+        "tests/recovery/test_background_history_commands.py::test_compensation_preserves_independent_edits_rejects_overlap_aba_and_closes_redo[NB-H02:v04]",
+        "tests/recovery/test_background_history_commands.py::test_history_command_reuse_with_another_direction_is_an_idempotency_conflict",
+        "tests/recovery/test_background_history_commands.py::test_undo_redo_and_duplicate_commands_have_one_owner_and_exact_canonical_proof",
+        "tests/recovery/test_background_history_commands.py::test_unreceipted_compensation_keeps_ownership_and_assets_until_exact_recovery",
+        "tests/recovery/test_background_history_transfer.py::test_duplicate_reload_has_one_connection_and_one_idempotent_inverse_ack",
+        "tests/recovery/test_background_history_transfer.py::test_leaving_the_writer_returns_its_inverse_to_the_journal[detach]",
+        "tests/recovery/test_background_history_transfer.py::test_leaving_the_writer_returns_its_inverse_to_the_journal[restart]",
+        "tests/recovery/test_background_history_transfer.py::test_leaving_the_writer_returns_its_inverse_to_the_journal[suspend]",
+        "tests/recovery/test_background_history_transfer.py::test_offer_preserves_exact_saved_proof_and_transfers_one_inverse_owner[headless]",
+        "tests/recovery/test_background_history_transfer.py::test_offer_preserves_exact_saved_proof_and_transfers_one_inverse_owner[mounted]",
+        "tests/recovery/test_background_history_transfer.py::test_transfer_crash_cut_retains_one_recoverable_owner_without_another_edit[NB-D01:v41]",
+        "tests/recovery/test_background_history_transfer.py::test_transfer_crash_cut_retains_one_recoverable_owner_without_another_edit[NB-D01:v42]",
+        "tests/recovery/test_background_history_transfer.py::test_transfer_crash_cut_retains_one_recoverable_owner_without_another_edit[NB-D01:v43]",
+        "tests/recovery/test_background_history_transfer.py::test_transfer_crash_cut_retains_one_recoverable_owner_without_another_edit[NB-D01:v44]",
+        "tests/recovery/test_background_integration_corpus.py::test_capacity_one_production_corpus_preserves_the_independent_oracle[seed-00]",
+        "tests/recovery/test_background_integration_corpus.py::test_capacity_one_production_corpus_preserves_the_independent_oracle[seed-01]",
+        "tests/recovery/test_background_integration_corpus.py::test_capacity_one_production_corpus_preserves_the_independent_oracle[seed-02]",
+        "tests/recovery/test_background_integration_corpus.py::test_capacity_one_production_corpus_preserves_the_independent_oracle[seed-03]",
+        "tests/recovery/test_background_integration_corpus.py::test_capacity_one_production_corpus_preserves_the_independent_oracle[seed-04]",
+        "tests/recovery/test_background_integration_corpus.py::test_capacity_one_production_corpus_preserves_the_independent_oracle[seed-05]",
+        "tests/recovery/test_background_integration_corpus.py::test_capacity_one_production_corpus_preserves_the_independent_oracle[seed-06]",
+        "tests/recovery/test_background_integration_corpus.py::test_capacity_one_production_corpus_preserves_the_independent_oracle[seed-07]",
+        "tests/recovery/test_background_integration_corpus.py::test_capacity_one_production_corpus_preserves_the_independent_oracle[seed-08]",
+        "tests/recovery/test_background_integration_corpus.py::test_capacity_one_production_corpus_preserves_the_independent_oracle[seed-09]",
+        "tests/recovery/test_background_integration_corpus.py::test_capacity_one_production_corpus_preserves_the_independent_oracle[seed-10]",
+        "tests/recovery/test_background_integration_corpus.py::test_capacity_one_production_corpus_preserves_the_independent_oracle[seed-11]",
+        "tests/recovery/test_background_integration_corpus.py::test_capacity_one_production_corpus_preserves_the_independent_oracle[seed-12]",
+        "tests/recovery/test_background_integration_corpus.py::test_capacity_one_production_corpus_preserves_the_independent_oracle[seed-13]",
+        "tests/recovery/test_background_integration_corpus.py::test_capacity_one_production_corpus_preserves_the_independent_oracle[seed-14]",
+        "tests/recovery/test_background_integration_corpus.py::test_capacity_one_production_corpus_preserves_the_independent_oracle[seed-15]",
+        "tests/recovery/test_background_writer_api.py::test_writer_api_saves_only_through_the_current_connection_and_exact_watermark[disabled]",
+        "tests/recovery/test_background_writer_api.py::test_writer_api_saves_only_through_the_current_connection_and_exact_watermark[opt-in]",
+        "tests/recovery/test_background_writer_drafts.py::test_abandonment_moves_exact_image_pins_before_releasing_the_old_connection",
+        "tests/recovery/test_background_writer_drafts.py::test_explicit_abandonment_revokes_the_old_epoch_and_preserves_available_input[False]",
+        "tests/recovery/test_background_writer_drafts.py::test_explicit_abandonment_revokes_the_old_epoch_and_preserves_available_input[True]",
+        "tests/recovery/test_background_writer_drafts.py::test_explicit_draft_discard_keeps_touch_invalidation_without_changing_canonical_text",
+        "tests/recovery/test_background_writer_drafts.py::test_explicit_resolution_cannot_reactivate_a_late_pending_history_command[draft]",
+        "tests/recovery/test_background_writer_drafts.py::test_explicit_resolution_cannot_reactivate_a_late_pending_history_command[saved]",
+        "tests/recovery/test_background_writer_drafts.py::test_explicit_use_draft_commits_conditionally_and_resolves_only_with_the_durable_receipt[None]",
+        "tests/recovery/test_background_writer_drafts.py::test_explicit_use_draft_commits_conditionally_and_resolves_only_with_the_durable_receipt[before_receipt_stored]",
+        "tests/recovery/test_background_writer_drafts.py::test_invalid_private_draft_never_becomes_a_recovered_buffer[changed]",
+        "tests/recovery/test_background_writer_drafts.py::test_invalid_private_draft_never_becomes_a_recovered_buffer[missing]",
+        "tests/recovery/test_background_writer_drafts.py::test_invalid_private_draft_never_becomes_a_recovered_buffer[partial]",
+        "tests/recovery/test_background_writer_drafts.py::test_invalid_private_draft_never_becomes_a_recovered_buffer[unsupported]",
+        "tests/recovery/test_background_writer_drafts.py::test_late_checkpoint_cannot_replace_a_newer_durable_payload_or_watermark",
+        "tests/recovery/test_background_writer_drafts.py::test_local_checkpoint_on_a_fenced_project_does_not_claim_a_canonical_save[NB-D04:v03]",
+        "tests/recovery/test_background_writer_drafts.py::test_local_checkpoint_on_a_fenced_project_does_not_claim_a_canonical_save[NB-D04:v04]",
+        "tests/recovery/test_background_writer_drafts.py::test_resolved_draft_floor_survives_late_checkpoint_and_service_reconstruction[discard]",
+        "tests/recovery/test_background_writer_drafts.py::test_resolved_draft_floor_survives_late_checkpoint_and_service_reconstruction[recover]",
+        "tests/recovery/test_background_writer_drafts.py::test_resolved_draft_floor_survives_late_checkpoint_and_service_reconstruction[use]",
+        "tests/recovery/test_background_writer_drafts.py::test_use_draft_rejects_stale_canonical_and_a_different_selected_payload",
+        "tests/recovery/test_background_writer_limits.py::test_inverse_count_admission_keeps_all_existing_unexpired_owners[NB-A04:v28]",
+        "tests/recovery/test_background_writer_limits.py::test_inverse_count_admission_keeps_all_existing_unexpired_owners[NB-A04:v29]",
+        "tests/recovery/test_background_writer_limits.py::test_inverse_count_admission_keeps_all_existing_unexpired_owners[NB-A04:v30]",
+        "tests/recovery/test_background_writer_limits.py::test_inverse_expiry_keeps_the_original_receipt_and_never_extends_on_a_read[NB-A04:v25]",
+        "tests/recovery/test_background_writer_limits.py::test_inverse_expiry_keeps_the_original_receipt_and_never_extends_on_a_read[NB-A04:v26]",
+        "tests/recovery/test_background_writer_limits.py::test_inverse_expiry_keeps_the_original_receipt_and_never_extends_on_a_read[NB-A04:v27]",
+        "tests/recovery/test_background_writer_limits.py::test_real_typed_inverse_enforces_its_exact_byte_boundary[NB-A04:v16]",
+        "tests/recovery/test_background_writer_limits.py::test_real_typed_inverse_enforces_its_exact_byte_boundary[NB-A04:v17]",
+        "tests/recovery/test_background_writer_limits.py::test_real_typed_inverse_enforces_its_exact_byte_boundary[NB-A04:v18]",
+        "tests/recovery/test_background_writer_orders.py::test_attach_and_headless_commit_use_one_real_canonical_order[NB-W10:v01]",
+        "tests/recovery/test_background_writer_orders.py::test_attach_and_headless_commit_use_one_real_canonical_order[NB-W10:v02]",
+        "tests/recovery/test_background_writer_orders.py::test_delete_restart_and_late_callback_schedules_never_resurrect_authority[callback-delete-restart]",
+        "tests/recovery/test_background_writer_orders.py::test_delete_restart_and_late_callback_schedules_never_resurrect_authority[callback-restart-delete]",
+        "tests/recovery/test_background_writer_orders.py::test_delete_restart_and_late_callback_schedules_never_resurrect_authority[delete-callback-restart]",
+        "tests/recovery/test_background_writer_orders.py::test_delete_restart_and_late_callback_schedules_never_resurrect_authority[delete-restart-callback]",
+        "tests/recovery/test_background_writer_orders.py::test_delete_restart_and_late_callback_schedules_never_resurrect_authority[restart-callback-delete]",
+        "tests/recovery/test_background_writer_orders.py::test_delete_restart_and_late_callback_schedules_never_resurrect_authority[restart-delete-callback]",
+        "tests/recovery/test_background_writer_orders.py::test_edit_undo_detach_schedules_preserve_the_independent_input_oracle[detach-edit-undo]",
+        "tests/recovery/test_background_writer_orders.py::test_edit_undo_detach_schedules_preserve_the_independent_input_oracle[detach-undo-edit]",
+        "tests/recovery/test_background_writer_orders.py::test_edit_undo_detach_schedules_preserve_the_independent_input_oracle[edit-detach-undo]",
+        "tests/recovery/test_background_writer_orders.py::test_edit_undo_detach_schedules_preserve_the_independent_input_oracle[edit-undo-detach]",
+        "tests/recovery/test_background_writer_orders.py::test_edit_undo_detach_schedules_preserve_the_independent_input_oracle[undo-detach-edit]",
+        "tests/recovery/test_background_writer_orders.py::test_edit_undo_detach_schedules_preserve_the_independent_input_oracle[undo-edit-detach]",
+        "tests/recovery/test_background_writer_orders.py::test_save_crash_duplicate_schedules_keep_one_commit_and_exact_recovery[crash-save-duplicate]",
+        "tests/recovery/test_background_writer_orders.py::test_save_crash_duplicate_schedules_keep_one_commit_and_exact_recovery[save-crash-duplicate]",
+        "tests/recovery/test_background_writer_orders.py::test_save_crash_duplicate_schedules_keep_one_commit_and_exact_recovery[save-duplicate-crash]",
+        "tests/recovery/test_background_writer_save.py::test_all_typed_manual_commands_are_refused_inside_the_acked_barrier",
+        "tests/recovery/test_background_writer_save.py::test_draft_recovery_cannot_autosave_against_the_old_baseline",
+        "tests/recovery/test_background_writer_save.py::test_expired_writer_before_claim_cannot_save_or_reuse_its_failed_identity",
+        "tests/recovery/test_background_writer_save.py::test_restart_recovers_the_saved_writer_watermark_without_reapplying_input",
+        "tests/recovery/test_background_writer_save.py::test_writer_save_and_exact_replay_have_one_commit_and_one_touch_ack",
+        "tests/recovery/test_background_writer_save.py::test_writer_save_preserves_independent_metadata_since_its_acknowledged_base",
+        "tests/recovery/test_background_writer_sessions.py::test_clean_detach_can_publish_headlessly_without_a_browser_receipt",
+        "tests/recovery/test_background_writer_sessions.py::test_clean_resume_reconciles_a_new_incarnation_without_native_replay[NB-W07:v01]",
+        "tests/recovery/test_background_writer_sessions.py::test_clean_resume_reconciles_a_new_incarnation_without_native_replay[NB-W07:v02]",
+        "tests/recovery/test_background_writer_sessions.py::test_clean_resume_reconciles_a_new_incarnation_without_native_replay[NB-W07:v03]",
+        "tests/recovery/test_background_writer_sessions.py::test_clean_resume_reconciles_a_new_incarnation_without_native_replay[NB-W07:v04]",
+        "tests/recovery/test_background_writer_sessions.py::test_clean_resume_reconciles_a_new_incarnation_without_native_replay[NB-W07:v05]",
+        "tests/recovery/test_background_writer_sessions.py::test_clean_resume_reconciles_a_new_incarnation_without_native_replay[NB-W07:v06]",
+        "tests/recovery/test_background_writer_sessions.py::test_copied_identity_and_old_requests_never_gain_a_second_writer[NB-W09:v01]",
+        "tests/recovery/test_background_writer_sessions.py::test_copied_identity_and_old_requests_never_gain_a_second_writer[NB-W09:v02]",
+        "tests/recovery/test_background_writer_sessions.py::test_copied_identity_and_old_requests_never_gain_a_second_writer[NB-W09:v03]",
+        "tests/recovery/test_background_writer_sessions.py::test_copied_identity_and_old_requests_never_gain_a_second_writer[NB-W09:v04]",
+        "tests/recovery/test_background_writer_sessions.py::test_copied_identity_and_old_requests_never_gain_a_second_writer[NB-W09:v05]",
+        "tests/recovery/test_background_writer_sessions.py::test_real_writer_barrier_checks_expiry_revocation_and_exact_watermarks[NB-W01:v01]",
+        "tests/recovery/test_background_writer_sessions.py::test_real_writer_barrier_checks_expiry_revocation_and_exact_watermarks[NB-W01:v02]",
+        "tests/recovery/test_background_writer_sessions.py::test_real_writer_barrier_checks_expiry_revocation_and_exact_watermarks[NB-W01:v03]",
+        "tests/recovery/test_background_writer_sessions.py::test_real_writer_barrier_checks_expiry_revocation_and_exact_watermarks[NB-W01:v04]",
+        "tests/recovery/test_background_writer_sessions.py::test_real_writer_barrier_checks_expiry_revocation_and_exact_watermarks[NB-W01:v05]",
+        "tests/recovery/test_background_writer_sessions.py::test_real_writer_barrier_checks_expiry_revocation_and_exact_watermarks[NB-W01:v06]",
+        "tests/recovery/test_background_writer_sessions.py::test_real_writer_barrier_checks_expiry_revocation_and_exact_watermarks[NB-W01:v07]",
+        "tests/recovery/test_background_writer_sessions.py::test_zero_diff_touch_is_durable_scoped_and_idempotent",
+        "tests/recovery/test_background_writer_sessions.py::test_zero_diff_watermarks_retain_each_scoped_edit_and_never_regress[NB-W06:v01]",
+        "tests/recovery/test_background_writer_sessions.py::test_zero_diff_watermarks_retain_each_scoped_edit_and_never_regress[NB-W06:v02]",
+        "tests/recovery/test_background_writer_sessions.py::test_zero_diff_watermarks_retain_each_scoped_edit_and_never_regress[NB-W06:v03]",
+        "tests/recovery/test_background_writer_sessions.py::test_zero_diff_watermarks_retain_each_scoped_edit_and_never_regress[NB-W06:v04]",
+        "tests/recovery/test_background_writer_sessions.py::test_zero_diff_watermarks_retain_each_scoped_edit_and_never_regress[NB-W06:v05]",
+        "tests/recovery/test_background_writer_sessions.py::test_zero_diff_watermarks_retain_each_scoped_edit_and_never_regress[NB-W06:v06]",
+        "tests/recovery/test_background_writer_sessions.py::test_zero_diff_watermarks_retain_each_scoped_edit_and_never_regress[NB-W06:v07]"
+      ]
     },
     {
       "id": "NB-FIXED",
@@ -2435,7 +2806,8 @@
       "NB00a",
       "NB01",
       "NB02a",
-      "NB02b"
+      "NB02b",
+      "NB03"
     ],
     "bindings": {
       "NB-R03:v01": [
@@ -3361,6 +3733,439 @@
       ],
       "NB-P08:v24": [
         "tests/recovery/test_background_writer_routes.py::test_each_existing_canonical_http_entry_preserves_an_interleaved_change[NB-P08:v24]"
+      ],
+      "NB-A04:v16": [
+        "tests/recovery/test_background_writer_limits.py::test_real_typed_inverse_enforces_its_exact_byte_boundary[NB-A04:v16]"
+      ],
+      "NB-A04:v17": [
+        "tests/recovery/test_background_writer_limits.py::test_real_typed_inverse_enforces_its_exact_byte_boundary[NB-A04:v17]"
+      ],
+      "NB-A04:v18": [
+        "tests/recovery/test_background_writer_limits.py::test_real_typed_inverse_enforces_its_exact_byte_boundary[NB-A04:v18]"
+      ],
+      "NB-A04:v25": [
+        "tests/recovery/test_background_writer_limits.py::test_inverse_expiry_keeps_the_original_receipt_and_never_extends_on_a_read[NB-A04:v25]"
+      ],
+      "NB-A04:v26": [
+        "tests/recovery/test_background_writer_limits.py::test_inverse_expiry_keeps_the_original_receipt_and_never_extends_on_a_read[NB-A04:v26]"
+      ],
+      "NB-A04:v27": [
+        "tests/recovery/test_background_writer_limits.py::test_inverse_expiry_keeps_the_original_receipt_and_never_extends_on_a_read[NB-A04:v27]"
+      ],
+      "NB-A04:v28": [
+        "tests/recovery/test_background_writer_limits.py::test_inverse_count_admission_keeps_all_existing_unexpired_owners[NB-A04:v28]"
+      ],
+      "NB-A04:v29": [
+        "tests/recovery/test_background_writer_limits.py::test_inverse_count_admission_keeps_all_existing_unexpired_owners[NB-A04:v29]"
+      ],
+      "NB-A04:v30": [
+        "tests/recovery/test_background_writer_limits.py::test_inverse_count_admission_keeps_all_existing_unexpired_owners[NB-A04:v30]"
+      ],
+      "NB-A04:v31": [
+        "apps/web/unit/background-drafts.test.ts::NB-A04:v31 valid local draft bytes at boundary -1 retain the prior buffer on rejection"
+      ],
+      "NB-A04:v32": [
+        "apps/web/unit/background-drafts.test.ts::NB-A04:v32 valid local draft bytes at boundary 0 retain the prior buffer on rejection"
+      ],
+      "NB-A04:v33": [
+        "apps/web/unit/background-drafts.test.ts::NB-A04:v33 valid local draft bytes at boundary 1 retain the prior buffer on rejection"
+      ],
+      "NB-A04:v41": [
+        "apps/web/unit/background-writer.test.ts::NB-A04:v41 inverse expiry visibly intercepts Undo without falling back to a fresh local mutation"
+      ],
+      "NB-D01:v41": [
+        "tests/recovery/test_background_history_transfer.py::test_transfer_crash_cut_retains_one_recoverable_owner_without_another_edit[NB-D01:v41]"
+      ],
+      "NB-D01:v42": [
+        "tests/recovery/test_background_history_transfer.py::test_transfer_crash_cut_retains_one_recoverable_owner_without_another_edit[NB-D01:v42]"
+      ],
+      "NB-D01:v43": [
+        "tests/recovery/test_background_history_transfer.py::test_transfer_crash_cut_retains_one_recoverable_owner_without_another_edit[NB-D01:v43]"
+      ],
+      "NB-D01:v44": [
+        "tests/recovery/test_background_history_transfer.py::test_transfer_crash_cut_retains_one_recoverable_owner_without_another_edit[NB-D01:v44]"
+      ],
+      "NB-D04:v03": [
+        "tests/recovery/test_background_writer_drafts.py::test_local_checkpoint_on_a_fenced_project_does_not_claim_a_canonical_save[NB-D04:v03]"
+      ],
+      "NB-D04:v04": [
+        "tests/recovery/test_background_writer_drafts.py::test_local_checkpoint_on_a_fenced_project_does_not_claim_a_canonical_save[NB-D04:v04]"
+      ],
+      "NB-G03:v03": [
+        "apps/web/unit/background-guard.test.ts::NB-G03:v03 a disposable late-adoption mutant fails the actual timeout regression"
+      ],
+      "NB-G03:v04": [
+        "tests/recovery/test_background_guard_sensitivity.py::test_zero_diff_touch_guard_omission_breaks_the_scoped_aba_regression"
+      ],
+      "NB-H01:v01": [
+        "apps/web/unit/background-writer.test.ts::NB-H01:v01 mounted publication adopts one compiler result with one history action and no second save"
+      ],
+      "NB-H01:v02": [
+        "apps/web/unit/background-python-bridge.test.ts::a real clean detach reopens a new writer epoch after headless publication",
+        "apps/web/unit/background-writer.test.ts::NB-H01:v02 headless adoption adds the retained inverse without applying committed cells twice"
+      ],
+      "NB-H01:v03": [
+        "tests/recovery/test_background_history_transfer.py::test_duplicate_reload_has_one_connection_and_one_idempotent_inverse_ack",
+        "tests/recovery/test_background_history_transfer.py::test_offer_preserves_exact_saved_proof_and_transfers_one_inverse_owner[headless]",
+        "tests/recovery/test_background_history_transfer.py::test_offer_preserves_exact_saved_proof_and_transfers_one_inverse_owner[mounted]"
+      ],
+      "NB-H01:v04": [
+        "apps/web/unit/background-python-bridge.test.ts::NB-H01:v04 a lost durable history ACK recovers one inverse owner and one mounted action"
+      ],
+      "NB-H02:v01": [
+        "tests/recovery/test_background_history_commands.py::test_compensation_preserves_independent_edits_rejects_overlap_aba_and_closes_redo[NB-H02:v01]"
+      ],
+      "NB-H02:v02": [
+        "tests/recovery/test_background_history_commands.py::test_compensation_preserves_independent_edits_rejects_overlap_aba_and_closes_redo[NB-H02:v02]"
+      ],
+      "NB-H02:v03": [
+        "tests/recovery/test_background_history_commands.py::test_compensation_preserves_independent_edits_rejects_overlap_aba_and_closes_redo[NB-H02:v03]"
+      ],
+      "NB-H02:v04": [
+        "tests/recovery/test_background_history_commands.py::test_compensation_preserves_independent_edits_rejects_overlap_aba_and_closes_redo[NB-H02:v04]"
+      ],
+      "NB-H03:v01": [
+        "tests/recovery/test_background_history_transfer.py::test_transfer_crash_cut_retains_one_recoverable_owner_without_another_edit[NB-D01:v41]",
+        "tests/recovery/test_background_history_transfer.py::test_transfer_crash_cut_retains_one_recoverable_owner_without_another_edit[NB-D01:v42]"
+      ],
+      "NB-H03:v02": [
+        "tests/recovery/test_background_history_transfer.py::test_transfer_crash_cut_retains_one_recoverable_owner_without_another_edit[NB-D01:v43]",
+        "tests/recovery/test_background_history_transfer.py::test_transfer_crash_cut_retains_one_recoverable_owner_without_another_edit[NB-D01:v44]"
+      ],
+      "NB-H03:v03": [
+        "tests/recovery/test_background_history_transfer.py::test_duplicate_reload_has_one_connection_and_one_idempotent_inverse_ack"
+      ],
+      "NB-H03:v04": [
+        "tests/recovery/test_background_history_transfer.py::test_transfer_crash_cut_retains_one_recoverable_owner_without_another_edit[NB-D01:v41]",
+        "tests/recovery/test_background_history_transfer.py::test_transfer_crash_cut_retains_one_recoverable_owner_without_another_edit[NB-D01:v42]",
+        "tests/recovery/test_background_history_transfer.py::test_transfer_crash_cut_retains_one_recoverable_owner_without_another_edit[NB-D01:v43]",
+        "tests/recovery/test_background_history_transfer.py::test_transfer_crash_cut_retains_one_recoverable_owner_without_another_edit[NB-D01:v44]"
+      ],
+      "NB-H03:v05": [
+        "apps/web/unit/background-python-bridge.test.ts::NB-H01:v04 a lost durable history ACK recovers one inverse owner and one mounted action",
+        "tests/recovery/test_background_history_transfer.py::test_duplicate_reload_has_one_connection_and_one_idempotent_inverse_ack",
+        "tests/recovery/test_background_history_transfer.py::test_offer_preserves_exact_saved_proof_and_transfers_one_inverse_owner[headless]",
+        "tests/recovery/test_background_history_transfer.py::test_offer_preserves_exact_saved_proof_and_transfers_one_inverse_owner[mounted]"
+      ],
+      "NB-M01:v01": [
+        "tests/recovery/test_background_integration_corpus.py::test_capacity_one_production_corpus_preserves_the_independent_oracle[seed-00]",
+        "tests/recovery/test_background_integration_corpus.py::test_capacity_one_production_corpus_preserves_the_independent_oracle[seed-01]",
+        "tests/recovery/test_background_integration_corpus.py::test_capacity_one_production_corpus_preserves_the_independent_oracle[seed-02]",
+        "tests/recovery/test_background_integration_corpus.py::test_capacity_one_production_corpus_preserves_the_independent_oracle[seed-03]",
+        "tests/recovery/test_background_integration_corpus.py::test_capacity_one_production_corpus_preserves_the_independent_oracle[seed-04]",
+        "tests/recovery/test_background_integration_corpus.py::test_capacity_one_production_corpus_preserves_the_independent_oracle[seed-05]",
+        "tests/recovery/test_background_integration_corpus.py::test_capacity_one_production_corpus_preserves_the_independent_oracle[seed-06]",
+        "tests/recovery/test_background_integration_corpus.py::test_capacity_one_production_corpus_preserves_the_independent_oracle[seed-07]",
+        "tests/recovery/test_background_integration_corpus.py::test_capacity_one_production_corpus_preserves_the_independent_oracle[seed-08]",
+        "tests/recovery/test_background_integration_corpus.py::test_capacity_one_production_corpus_preserves_the_independent_oracle[seed-09]",
+        "tests/recovery/test_background_integration_corpus.py::test_capacity_one_production_corpus_preserves_the_independent_oracle[seed-10]",
+        "tests/recovery/test_background_integration_corpus.py::test_capacity_one_production_corpus_preserves_the_independent_oracle[seed-11]",
+        "tests/recovery/test_background_integration_corpus.py::test_capacity_one_production_corpus_preserves_the_independent_oracle[seed-12]",
+        "tests/recovery/test_background_integration_corpus.py::test_capacity_one_production_corpus_preserves_the_independent_oracle[seed-13]",
+        "tests/recovery/test_background_integration_corpus.py::test_capacity_one_production_corpus_preserves_the_independent_oracle[seed-14]",
+        "tests/recovery/test_background_integration_corpus.py::test_capacity_one_production_corpus_preserves_the_independent_oracle[seed-15]",
+        "tests/recovery/test_background_writer_orders.py::test_attach_and_headless_commit_use_one_real_canonical_order[NB-W10:v01]",
+        "tests/recovery/test_background_writer_orders.py::test_attach_and_headless_commit_use_one_real_canonical_order[NB-W10:v02]",
+        "tests/recovery/test_background_writer_sessions.py::test_real_writer_barrier_checks_expiry_revocation_and_exact_watermarks[NB-W01:v01]",
+        "tests/recovery/test_background_writer_sessions.py::test_real_writer_barrier_checks_expiry_revocation_and_exact_watermarks[NB-W01:v02]",
+        "tests/recovery/test_background_writer_sessions.py::test_real_writer_barrier_checks_expiry_revocation_and_exact_watermarks[NB-W01:v03]",
+        "tests/recovery/test_background_writer_sessions.py::test_real_writer_barrier_checks_expiry_revocation_and_exact_watermarks[NB-W01:v04]",
+        "tests/recovery/test_background_writer_sessions.py::test_real_writer_barrier_checks_expiry_revocation_and_exact_watermarks[NB-W01:v05]",
+        "tests/recovery/test_background_writer_sessions.py::test_real_writer_barrier_checks_expiry_revocation_and_exact_watermarks[NB-W01:v06]",
+        "tests/recovery/test_background_writer_sessions.py::test_real_writer_barrier_checks_expiry_revocation_and_exact_watermarks[NB-W01:v07]"
+      ],
+      "NB-M01:v02": [
+        "apps/web/unit/background-orders.test.ts::NB-M01:v02 timeout input late-reply order input/reply/timeout preserves its independent oracle",
+        "apps/web/unit/background-orders.test.ts::NB-M01:v02 timeout input late-reply order input/timeout/reply preserves its independent oracle",
+        "apps/web/unit/background-orders.test.ts::NB-M01:v02 timeout input late-reply order reply/input/timeout preserves its independent oracle",
+        "apps/web/unit/background-orders.test.ts::NB-M01:v02 timeout input late-reply order reply/timeout/input preserves its independent oracle",
+        "apps/web/unit/background-orders.test.ts::NB-M01:v02 timeout input late-reply order timeout/input/reply preserves its independent oracle",
+        "apps/web/unit/background-orders.test.ts::NB-M01:v02 timeout input late-reply order timeout/reply/input preserves its independent oracle"
+      ],
+      "NB-M01:v03": [
+        "tests/recovery/test_background_writer_orders.py::test_edit_undo_detach_schedules_preserve_the_independent_input_oracle[edit-undo-detach]",
+        "tests/recovery/test_background_writer_orders.py::test_edit_undo_detach_schedules_preserve_the_independent_input_oracle[edit-detach-undo]",
+        "tests/recovery/test_background_writer_orders.py::test_edit_undo_detach_schedules_preserve_the_independent_input_oracle[undo-edit-detach]",
+        "tests/recovery/test_background_writer_orders.py::test_edit_undo_detach_schedules_preserve_the_independent_input_oracle[undo-detach-edit]",
+        "tests/recovery/test_background_writer_orders.py::test_edit_undo_detach_schedules_preserve_the_independent_input_oracle[detach-edit-undo]",
+        "tests/recovery/test_background_writer_orders.py::test_edit_undo_detach_schedules_preserve_the_independent_input_oracle[detach-undo-edit]"
+      ],
+      "NB-M01:v04": [
+        "tests/recovery/test_background_writer_orders.py::test_delete_restart_and_late_callback_schedules_never_resurrect_authority[delete-restart-callback]",
+        "tests/recovery/test_background_writer_orders.py::test_delete_restart_and_late_callback_schedules_never_resurrect_authority[delete-callback-restart]",
+        "tests/recovery/test_background_writer_orders.py::test_delete_restart_and_late_callback_schedules_never_resurrect_authority[restart-delete-callback]",
+        "tests/recovery/test_background_writer_orders.py::test_delete_restart_and_late_callback_schedules_never_resurrect_authority[restart-callback-delete]",
+        "tests/recovery/test_background_writer_orders.py::test_delete_restart_and_late_callback_schedules_never_resurrect_authority[callback-delete-restart]",
+        "tests/recovery/test_background_writer_orders.py::test_delete_restart_and_late_callback_schedules_never_resurrect_authority[callback-restart-delete]"
+      ],
+      "NB-M01:v05": [
+        "tests/recovery/test_background_writer_orders.py::test_save_crash_duplicate_schedules_keep_one_commit_and_exact_recovery[save-crash-duplicate]",
+        "tests/recovery/test_background_writer_orders.py::test_save_crash_duplicate_schedules_keep_one_commit_and_exact_recovery[save-duplicate-crash]",
+        "tests/recovery/test_background_writer_orders.py::test_save_crash_duplicate_schedules_keep_one_commit_and_exact_recovery[crash-save-duplicate]"
+      ],
+      "NB-Q09:v01": [
+        "apps/web/unit/background-python-bridge.test.ts::capacity-one API controls with a blocked model and a full background queue::NB-Q09:v01 manual save on another project completes while inference remains held"
+      ],
+      "NB-Q09:v04": [
+        "apps/web/unit/background-python-bridge.test.ts::capacity-one API controls with a blocked model and a full background queue::NB-Q09:v04 read API completes while inference remains held"
+      ],
+      "NB-Q09:v06": [
+        "apps/web/unit/background-python-bridge.test.ts::capacity-one API controls with a blocked model and a full background queue::NB-Q09:v06 host status API completes without opening another runtime"
+      ],
+      "NB-Q09:v07": [
+        "apps/web/unit/background-python-bridge.test.ts::capacity-one API controls with a blocked model and a full background queue::NB-Q09:v07 cancel API removes queued work without waiting for the held model"
+      ],
+      "NB-W01:v01": [
+        "tests/recovery/test_background_writer_sessions.py::test_real_writer_barrier_checks_expiry_revocation_and_exact_watermarks[NB-W01:v01]"
+      ],
+      "NB-W01:v02": [
+        "tests/recovery/test_background_writer_sessions.py::test_real_writer_barrier_checks_expiry_revocation_and_exact_watermarks[NB-W01:v02]"
+      ],
+      "NB-W01:v03": [
+        "tests/recovery/test_background_writer_sessions.py::test_real_writer_barrier_checks_expiry_revocation_and_exact_watermarks[NB-W01:v03]"
+      ],
+      "NB-W01:v04": [
+        "tests/recovery/test_background_writer_sessions.py::test_real_writer_barrier_checks_expiry_revocation_and_exact_watermarks[NB-W01:v04]"
+      ],
+      "NB-W01:v05": [
+        "tests/recovery/test_background_writer_sessions.py::test_real_writer_barrier_checks_expiry_revocation_and_exact_watermarks[NB-W01:v05]"
+      ],
+      "NB-W01:v06": [
+        "tests/recovery/test_background_writer_sessions.py::test_real_writer_barrier_checks_expiry_revocation_and_exact_watermarks[NB-W01:v06]"
+      ],
+      "NB-W01:v07": [
+        "tests/recovery/test_background_writer_sessions.py::test_real_writer_barrier_checks_expiry_revocation_and_exact_watermarks[NB-W01:v07]"
+      ],
+      "NB-W02:v01": [
+        "apps/web/unit/background-python-bridge.test.ts::NB-W02:v01 real saved receipt outlives a lost HTTP reply and preserves later input",
+        "apps/web/unit/background-writer.test.ts::NB-W02:v01 a won commit and lost reply retain the timeout buffer until exact recovery"
+      ],
+      "NB-W02:v02": [
+        "apps/web/unit/background-python-bridge.test.ts::NB-W02:v02 real saved receipt outlives a lost HTTP reply and recovers once",
+        "apps/web/unit/background-writer.test.ts::NB-W02:v02 a won commit and lost reply retain the timeout buffer until exact recovery"
+      ],
+      "NB-W02:v03": [
+        "apps/web/unit/background-writer.test.ts::NB-W02:v03 failed exact recovery keeps the local buffer and emits no saved notice"
+      ],
+      "NB-W02:v04": [
+        "apps/web/unit/background-writer.test.ts::NB-W02:v04 event-first delivery creates one adoption and notice"
+      ],
+      "NB-W02:v05": [
+        "apps/web/unit/background-writer.test.ts::NB-W02:v05 reply-first delivery creates one adoption and notice"
+      ],
+      "NB-W02:v06": [
+        "apps/web/unit/background-writer.test.ts::NB-W02:v06 duplicates delivery creates one adoption and notice"
+      ],
+      "NB-W03:v01": [
+        "apps/web/unit/background-writer.test.ts::NB-W03:v01 shared transaction guard rejects a mutation between ACK and adoption"
+      ],
+      "NB-W03:v02": [
+        "apps/web/unit/background-writer.test.ts::NB-W03:v02 shared transaction guard rejects a mutation between ACK and adoption"
+      ],
+      "NB-W03:v03": [
+        "apps/web/unit/background-writer.test.ts::NB-W03:v03 shared transaction guard rejects a mutation between ACK and adoption"
+      ],
+      "NB-W03:v04": [
+        "apps/web/unit/background-writer.test.ts::NB-W03:v04 shared transaction guard rejects a mutation between ACK and adoption"
+      ],
+      "NB-W03:v05": [
+        "apps/web/unit/background-writer.test.ts::NB-W03:v05 shared transaction guard rejects a mutation between ACK and adoption"
+      ],
+      "NB-W03:v06": [
+        "apps/web/unit/background-writer.test.ts::NB-W03:v06 shared transaction guard rejects a mutation between ACK and adoption"
+      ],
+      "NB-W03:v07": [
+        "apps/web/unit/background-writer.test.ts::NB-W03:v07 shared transaction guard rejects a mutation between ACK and adoption"
+      ],
+      "NB-W03:v08": [
+        "apps/web/unit/background-writer.test.ts::NB-W03:v08 shared transaction guard rejects a mutation between ACK and adoption"
+      ],
+      "NB-W03:v09": [
+        "apps/web/unit/background-writer.test.ts::NB-W03:v09 shared transaction guard rejects a mutation between ACK and adoption"
+      ],
+      "NB-W03:v10": [
+        "apps/web/unit/background-writer.test.ts::NB-W03:v10 shared transaction guard rejects a mutation between ACK and adoption"
+      ],
+      "NB-W04:v01": [
+        "apps/web/unit/background-writer.test.ts::NB-W04:v01 composition respects composition and the bounded local window"
+      ],
+      "NB-W04:v02": [
+        "apps/web/unit/background-writer.test.ts::NB-W04:v02 flush respects composition and the bounded local window"
+      ],
+      "NB-W04:v03": [
+        "apps/web/unit/background-writer.test.ts::NB-W04:v03 continuous-input respects composition and the bounded local window"
+      ],
+      "NB-W04:v04": [
+        "apps/web/unit/background-writer.test.ts::NB-W04:v04 budget respects composition and the bounded local window"
+      ],
+      "NB-W05:v01": [
+        "apps/web/unit/background-python-bridge.test.ts::NB-W05:v01 navigation waits for a real manual save ACK without accepting input past its protected boundary"
+      ],
+      "NB-W05:v02": [
+        "apps/web/unit/background-writer.test.ts::NB-W05:v02 SAVE_FAILED navigation keeps a durable local checkpoint"
+      ],
+      "NB-W05:v03": [
+        "apps/web/unit/background-writer.test.ts::NB-W05:v03 OUTCOME_UNKNOWN navigation keeps a durable local checkpoint"
+      ],
+      "NB-W05:v04": [
+        "apps/web/unit/background-writer.test.ts::NB-W05:v04 WRITER_UNKNOWN navigation keeps a durable local checkpoint"
+      ],
+      "NB-W05:v05": [
+        "apps/web/unit/background-writer.test.ts::NB-W05:v05 a lost detach ACK cannot unlock an old canonical save or replace later recovery input"
+      ],
+      "NB-W05:v06": [
+        "apps/web/unit/background-writer.test.ts::NB-W05:v06 input after the final touch flush cannot enter the protected detach boundary"
+      ],
+      "NB-W06:v01": [
+        "tests/recovery/test_background_writer_sessions.py::test_zero_diff_watermarks_retain_each_scoped_edit_and_never_regress[NB-W06:v01]"
+      ],
+      "NB-W06:v02": [
+        "tests/recovery/test_background_writer_sessions.py::test_zero_diff_watermarks_retain_each_scoped_edit_and_never_regress[NB-W06:v02]"
+      ],
+      "NB-W06:v03": [
+        "tests/recovery/test_background_writer_sessions.py::test_zero_diff_watermarks_retain_each_scoped_edit_and_never_regress[NB-W06:v03]"
+      ],
+      "NB-W06:v04": [
+        "tests/recovery/test_background_writer_sessions.py::test_zero_diff_watermarks_retain_each_scoped_edit_and_never_regress[NB-W06:v04]"
+      ],
+      "NB-W06:v05": [
+        "tests/recovery/test_background_writer_sessions.py::test_zero_diff_watermarks_retain_each_scoped_edit_and_never_regress[NB-W06:v05]"
+      ],
+      "NB-W06:v06": [
+        "tests/recovery/test_background_writer_sessions.py::test_zero_diff_watermarks_retain_each_scoped_edit_and_never_regress[NB-W06:v06]"
+      ],
+      "NB-W06:v07": [
+        "tests/recovery/test_background_writer_sessions.py::test_zero_diff_watermarks_retain_each_scoped_edit_and_never_regress[NB-W06:v07]"
+      ],
+      "NB-W07:v01": [
+        "tests/recovery/test_background_writer_sessions.py::test_clean_resume_reconciles_a_new_incarnation_without_native_replay[NB-W07:v01]",
+        "apps/web/unit/background-python-bridge.test.ts::a real clean autosave and heartbeat reopen without a recovery draft",
+        "apps/web/unit/background-python-bridge.test.ts::the sole active tab resumes clean input when its unload notification is lost"
+      ],
+      "NB-W07:v02": [
+        "tests/recovery/test_background_writer_sessions.py::test_clean_resume_reconciles_a_new_incarnation_without_native_replay[NB-W07:v02]",
+        "apps/web/unit/background-python-bridge.test.ts::a clean mounted writer resumes at real lease expiry and keeps session history"
+      ],
+      "NB-W07:v03": [
+        "tests/recovery/test_background_writer_sessions.py::test_clean_resume_reconciles_a_new_incarnation_without_native_replay[NB-W07:v03]",
+        "apps/web/unit/background-python-bridge.test.ts::a clean mounted writer resumes after real lease expiry and keeps session history"
+      ],
+      "NB-W07:v04": [
+        "apps/web/unit/background-writer.test.ts::NB-W07:v04 a heartbeat reply from the previous connection cannot fence a resumed writer",
+        "tests/recovery/test_background_writer_sessions.py::test_clean_resume_reconciles_a_new_incarnation_without_native_replay[NB-W07:v04]",
+        "apps/web/unit/background-python-bridge.test.ts::a timed out real lease resume cannot adopt over retained input"
+      ],
+      "NB-W07:v05": [
+        "apps/web/unit/background-python-bridge.test.ts::a real clean detach reopens a new writer epoch after acknowledged input",
+        "apps/web/unit/background-python-bridge.test.ts::a real clean detach reopens a new writer epoch after headless publication",
+        "tests/recovery/test_background_writer_sessions.py::test_clean_resume_reconciles_a_new_incarnation_without_native_replay[NB-W07:v05]"
+      ],
+      "NB-W07:v06": [
+        "tests/recovery/test_background_writer_sessions.py::test_clean_resume_reconciles_a_new_incarnation_without_native_replay[NB-W07:v06]"
+      ],
+      "NB-W08:v01": [
+        "apps/web/unit/background-python-bridge.test.ts::NB-W08:v01 dirty reload retains an exact committed outbox without restamping it"
+      ],
+      "NB-W08:v02": [
+        "apps/web/unit/background-python-bridge.test.ts::NB-W08:v02 dirty reload retains an exact uncommitted outbox without restamping it"
+      ],
+      "NB-W08:v03": [
+        "apps/web/unit/background-python-bridge.test.ts::NB-W08:v03 explicit abandonment exits a lost tab and keeps selected local input",
+        "apps/web/unit/background-python-bridge.test.ts::explicit saved choice recovers a real expired writer without reload",
+        "apps/web/unit/background-python-bridge.test.ts::explicit draft choice recovers a real expired writer without reload",
+        "apps/web/unit/background-python-bridge.test.ts::the sole active tab resumes a dirty outbox when its unload notification is lost",
+        "apps/web/unit/background-python-bridge.test.ts::a fresh sole tab uses the shared dirty resume marker without sessionStorage"
+      ],
+      "NB-W08:v04": [
+        "apps/web/unit/background-python-bridge.test.ts::NB-W08:v04 explicit abandonment exits a lost tab and rejects its late checkpoint",
+        "apps/web/unit/background-python-bridge.test.ts::explicit saved choice recovers a real revoked writer without reload",
+        "apps/web/unit/background-python-bridge.test.ts::explicit draft choice recovers a real revoked writer without reload"
+      ],
+      "NB-W09:v01": [
+        "tests/recovery/test_background_writer_sessions.py::test_copied_identity_and_old_requests_never_gain_a_second_writer[NB-W09:v01]",
+        "apps/web/unit/background-tab.test.ts::one application tab excludes every other tab before mounting actions",
+        "apps/web/unit/background-python-bridge.test.ts::a fresh sole tab uses the shared clean resume marker without sessionStorage",
+        "apps/web/unit/background-python-bridge.test.ts::a fresh sole tab uses the shared dirty resume marker without sessionStorage"
+      ],
+      "NB-W09:v02": [
+        "tests/recovery/test_background_writer_sessions.py::test_copied_identity_and_old_requests_never_gain_a_second_writer[NB-W09:v02]",
+        "apps/web/unit/background-tab.test.ts::simultaneous tab claims grant exactly one active interface"
+      ],
+      "NB-W09:v03": [
+        "tests/recovery/test_background_writer_sessions.py::test_copied_identity_and_old_requests_never_gain_a_second_writer[NB-W09:v03]"
+      ],
+      "NB-W09:v04": [
+        "tests/recovery/test_background_writer_sessions.py::test_copied_identity_and_old_requests_never_gain_a_second_writer[NB-W09:v04]"
+      ],
+      "NB-W09:v05": [
+        "tests/recovery/test_background_writer_sessions.py::test_copied_identity_and_old_requests_never_gain_a_second_writer[NB-W09:v05]"
+      ],
+      "NB-W10:v01": [
+        "tests/recovery/test_background_writer_orders.py::test_attach_and_headless_commit_use_one_real_canonical_order[NB-W10:v01]"
+      ],
+      "NB-W10:v02": [
+        "apps/web/unit/background-python-bridge.test.ts::a real clean detach reopens a new writer epoch after headless publication",
+        "tests/recovery/test_background_writer_orders.py::test_attach_and_headless_commit_use_one_real_canonical_order[NB-W10:v02]"
+      ],
+      "NB-W10:v03": [
+        "apps/web/unit/background-jobs.test.ts::NB-W10:v03 an old editor save callback cannot replace the next visible buffer"
+      ],
+      "NB-W10:v04": [
+        "apps/web/unit/background-jobs.test.ts::NB-W10:v04 old project metadata cannot publish into another project"
+      ],
+      "NB-W10:v05": [
+        "apps/web/unit/background-jobs.test.ts::NB-W10:v05 an old editor receipt callback cannot replace the next visible buffer"
+      ],
+      "NB-W10:v06": [
+        "apps/web/unit/background-jobs.test.ts::NB-W10:v06 old project metadata cannot publish into a new instance"
+      ],
+      "NB-W11:v01": [
+        "apps/web/unit/background-drafts.test.ts::NB-W11:v01 local draft quota preserves the retained record and watermark"
+      ],
+      "NB-W11:v02": [
+        "apps/web/unit/background-drafts.test.ts::NB-W11:v02 local draft rejected preserves the retained record and watermark"
+      ],
+      "NB-W11:v03": [
+        "apps/web/unit/background-drafts.test.ts::NB-W11:v03 local draft partial preserves the retained record and watermark"
+      ],
+      "NB-W11:v04": [
+        "apps/web/unit/background-drafts.test.ts::NB-W11:v04 local draft unsupported preserves the retained record and watermark"
+      ],
+      "NB-W11:v05": [
+        "apps/web/unit/background-drafts.test.ts::NB-W11:v05 local draft missing-blob preserves the retained record and watermark"
+      ],
+      "NB-W11:v06": [
+        "apps/web/unit/background-drafts.test.ts::NB-W11:v06 local draft wrong-project preserves the retained record and watermark"
+      ],
+      "NB-W11:v07": [
+        "apps/web/unit/background-drafts.test.ts::NB-W11:v07 local draft late-checkpoint preserves the retained record and watermark"
+      ],
+      "NB-W11:v08": [
+        "apps/web/unit/background-drafts.test.ts::NB-W11:v08 local draft corrupt preserves the retained record and watermark"
+      ],
+      "NB-W12:v01": [
+        "apps/web/unit/background-proof.test.ts::NB-W12:v01 invalid saved proof cannot authorize adoption or a saved notice"
+      ],
+      "NB-W12:v02": [
+        "apps/web/unit/background-proof.test.ts::NB-W12:v02 invalid saved proof cannot authorize adoption or a saved notice"
+      ],
+      "NB-W12:v03": [
+        "apps/web/unit/background-proof.test.ts::NB-W12:v03 invalid saved proof cannot authorize adoption or a saved notice"
+      ],
+      "NB-W12:v04": [
+        "apps/web/unit/background-proof.test.ts::NB-W12:v04 invalid saved proof cannot authorize adoption or a saved notice"
+      ],
+      "NB-W12:v05": [
+        "apps/web/unit/background-proof.test.ts::NB-W12:v05 invalid saved proof cannot authorize adoption or a saved notice"
+      ],
+      "NB-W12:v06": [
+        "apps/web/unit/background-proof.test.ts::NB-W12:v06 invalid saved proof cannot authorize adoption or a saved notice"
+      ],
+      "NB-W12:v07": [
+        "apps/web/unit/background-proof.test.ts::NB-W12:v07 invalid saved proof cannot authorize adoption or a saved notice"
+      ],
+      "NB-W12:v08": [
+        "apps/web/unit/background-proof.test.ts::NB-W12:v08 a true older receipt adopts only its inverse and preserves the newer canonical snapshot"
       ]
     },
     "checks": {
@@ -3839,10 +4644,396 @@
       ],
       "NB02b:test_legacy_applied_requires_the_saved_witness_after_full_candidate_compaction[past-retention]": [
         "tests/recovery/test_background_writer_review.py::test_legacy_applied_requires_the_saved_witness_after_full_candidate_compaction[past-retention]"
+      ],
+      "NB03:background-drafts.test": [
+        "apps/web/unit/background-drafts.test.ts::NB-A04:v31 valid local draft bytes at boundary -1 retain the prior buffer on rejection",
+        "apps/web/unit/background-drafts.test.ts::NB-A04:v32 valid local draft bytes at boundary 0 retain the prior buffer on rejection",
+        "apps/web/unit/background-drafts.test.ts::NB-A04:v33 valid local draft bytes at boundary 1 retain the prior buffer on rejection",
+        "apps/web/unit/background-drafts.test.ts::NB-W11:v01 local draft quota preserves the retained record and watermark",
+        "apps/web/unit/background-drafts.test.ts::NB-W11:v02 local draft rejected preserves the retained record and watermark",
+        "apps/web/unit/background-drafts.test.ts::NB-W11:v03 local draft partial preserves the retained record and watermark",
+        "apps/web/unit/background-drafts.test.ts::NB-W11:v04 local draft unsupported preserves the retained record and watermark",
+        "apps/web/unit/background-drafts.test.ts::NB-W11:v05 local draft missing-blob preserves the retained record and watermark",
+        "apps/web/unit/background-drafts.test.ts::NB-W11:v06 local draft wrong-project preserves the retained record and watermark",
+        "apps/web/unit/background-drafts.test.ts::NB-W11:v07 local draft late-checkpoint preserves the retained record and watermark",
+        "apps/web/unit/background-drafts.test.ts::NB-W11:v08 local draft corrupt preserves the retained record and watermark",
+        "apps/web/unit/background-drafts.test.ts::a failed deletion cannot remove a newer local buffer",
+        "apps/web/unit/background-drafts.test.ts::a resumed connection selects its own durable input even after the old connection writes a larger sequence",
+        "apps/web/unit/background-drafts.test.ts::a returning old epoch keeps its draft without replacing the new writer buffer",
+        "apps/web/unit/background-drafts.test.ts::explicit owner replacement is atomic and refuses a draft that changed after review",
+        "apps/web/unit/background-drafts.test.ts::the global draft cap rejects another project without evicting four full project buffers"
+      ],
+      "NB03:background-editor-schema.test": [
+        "apps/web/unit/background-editor-schema.test.ts::rich history adoption accepts code, emphasis and colors in the actual engine schema"
+      ],
+      "NB03:background-guard.test": [
+        "apps/web/unit/background-guard.test.ts::NB-G03:v03 a disposable late-adoption mutant fails the actual timeout regression"
+      ],
+      "NB03:background-jobs.test": [
+        "apps/web/unit/background-jobs.test.ts::NB-W10:v03 an old editor save callback cannot replace the next visible buffer",
+        "apps/web/unit/background-jobs.test.ts::NB-W10:v04 old project metadata cannot publish into another project",
+        "apps/web/unit/background-jobs.test.ts::NB-W10:v05 an old editor receipt callback cannot replace the next visible buffer",
+        "apps/web/unit/background-jobs.test.ts::NB-W10:v06 old project metadata cannot publish into a new instance",
+        "apps/web/unit/background-jobs.test.ts::a cached conversation projection for one job cannot regress another job's completed state",
+        "apps/web/unit/background-jobs.test.ts::background Send retries keep the captured request and never acquire or stop a legacy owner",
+        "apps/web/unit/background-jobs.test.ts::changing conversations and closing the assistant never stops a background job or opens a legacy lease",
+        "apps/web/unit/background-jobs.test.ts::screen-independent jobs keep their original accepted order and reject older snapshot cursors"
+      ],
+      "NB03:background-orders.test": [
+        "apps/web/unit/background-orders.test.ts::NB-M01:v02 timeout input late-reply order input/reply/timeout preserves its independent oracle",
+        "apps/web/unit/background-orders.test.ts::NB-M01:v02 timeout input late-reply order input/timeout/reply preserves its independent oracle",
+        "apps/web/unit/background-orders.test.ts::NB-M01:v02 timeout input late-reply order reply/input/timeout preserves its independent oracle",
+        "apps/web/unit/background-orders.test.ts::NB-M01:v02 timeout input late-reply order reply/timeout/input preserves its independent oracle",
+        "apps/web/unit/background-orders.test.ts::NB-M01:v02 timeout input late-reply order timeout/input/reply preserves its independent oracle",
+        "apps/web/unit/background-orders.test.ts::NB-M01:v02 timeout input late-reply order timeout/reply/input preserves its independent oracle"
+      ],
+      "NB03:background-proof.test": [
+        "apps/web/unit/background-proof.test.ts::NB-W12:v01 invalid saved proof cannot authorize adoption or a saved notice",
+        "apps/web/unit/background-proof.test.ts::NB-W12:v02 invalid saved proof cannot authorize adoption or a saved notice",
+        "apps/web/unit/background-proof.test.ts::NB-W12:v03 invalid saved proof cannot authorize adoption or a saved notice",
+        "apps/web/unit/background-proof.test.ts::NB-W12:v04 invalid saved proof cannot authorize adoption or a saved notice",
+        "apps/web/unit/background-proof.test.ts::NB-W12:v05 invalid saved proof cannot authorize adoption or a saved notice",
+        "apps/web/unit/background-proof.test.ts::NB-W12:v06 invalid saved proof cannot authorize adoption or a saved notice",
+        "apps/web/unit/background-proof.test.ts::NB-W12:v07 invalid saved proof cannot authorize adoption or a saved notice",
+        "apps/web/unit/background-proof.test.ts::NB-W12:v08 a true older receipt adopts only its inverse and preserves the newer canonical snapshot",
+        "apps/web/unit/background-proof.test.ts::saved snapshot bytes reject hash-preserving structural substitution"
+      ],
+      "NB03:background-python-bridge.test": [
+        "apps/web/unit/background-python-bridge.test.ts::NB-H01:v04 a lost durable history ACK recovers one inverse owner and one mounted action",
+        "apps/web/unit/background-python-bridge.test.ts::NB-W02:v01 real saved receipt outlives a lost HTTP reply and preserves later input",
+        "apps/web/unit/background-python-bridge.test.ts::NB-W02:v02 real saved receipt outlives a lost HTTP reply and recovers once",
+        "apps/web/unit/background-python-bridge.test.ts::NB-W05:v01 navigation waits for a real manual save ACK without accepting input past its protected boundary",
+        "apps/web/unit/background-python-bridge.test.ts::NB-W08:v01 dirty reload retains an exact committed outbox without restamping it",
+        "apps/web/unit/background-python-bridge.test.ts::NB-W08:v02 dirty reload retains an exact uncommitted outbox without restamping it",
+        "apps/web/unit/background-python-bridge.test.ts::NB-W08:v03 explicit abandonment exits a lost tab and keeps selected local input",
+        "apps/web/unit/background-python-bridge.test.ts::NB-W08:v04 explicit abandonment exits a lost tab and rejects its late checkpoint",
+        "apps/web/unit/background-python-bridge.test.ts::a foreign cursor cannot claim the previous writer's clean acknowledged handoff",
+        "apps/web/unit/background-python-bridge.test.ts::a real capacity-one Job releases its synthetic child before Node publishes and adopts its exact compiler result",
+        "apps/web/unit/background-python-bridge.test.ts::a real clean autosave and heartbeat reopen without a recovery draft",
+        "apps/web/unit/background-python-bridge.test.ts::a real clean detach reopens a new writer epoch after acknowledged input",
+        "apps/web/unit/background-python-bridge.test.ts::a real clean detach reopens a new writer epoch after headless publication",
+        "apps/web/unit/background-python-bridge.test.ts::a real heartbeat reply racing a heartbeat cannot regress the acknowledged writer",
+        "apps/web/unit/background-python-bridge.test.ts::a real save reply racing a heartbeat cannot regress the acknowledged writer",
+        "apps/web/unit/background-python-bridge.test.ts::capacity-one API controls with a blocked model and a full background queue",
+        "apps/web/unit/background-python-bridge.test.ts::capacity-one API controls with a blocked model and a full background queue::NB-Q09:v01 manual save on another project completes while inference remains held",
+        "apps/web/unit/background-python-bridge.test.ts::capacity-one API controls with a blocked model and a full background queue::NB-Q09:v04 read API completes while inference remains held",
+        "apps/web/unit/background-python-bridge.test.ts::capacity-one API controls with a blocked model and a full background queue::NB-Q09:v06 host status API completes without opening another runtime",
+        "apps/web/unit/background-python-bridge.test.ts::capacity-one API controls with a blocked model and a full background queue::NB-Q09:v07 cancel API removes queued work without waiting for the held model",
+        "apps/web/unit/background-python-bridge.test.ts::independent real sync metadata preserves local input and clean detach after heartbeat",
+        "apps/web/unit/background-python-bridge.test.ts::independent real sync metadata preserves local input and clean detach before heartbeat",
+        "apps/web/unit/background-python-bridge.test.ts::the Node writer API validates real Python HTTP saves, exact byte replay and clean detach"
+      ],
+      "NB03:background-writer.test": [
+        "apps/web/unit/background-writer.test.ts::NB-A04:v41 inverse expiry visibly intercepts Undo without falling back to a fresh local mutation",
+        "apps/web/unit/background-writer.test.ts::NB-H01:v01 mounted publication adopts one compiler result with one history action and no second save",
+        "apps/web/unit/background-writer.test.ts::NB-H01:v02 headless adoption adds the retained inverse without applying committed cells twice",
+        "apps/web/unit/background-writer.test.ts::NB-W02:v01 a won commit and lost reply retain the timeout buffer until exact recovery",
+        "apps/web/unit/background-writer.test.ts::NB-W02:v02 a won commit and lost reply retain the timeout buffer until exact recovery",
+        "apps/web/unit/background-writer.test.ts::NB-W02:v03 failed exact recovery keeps the local buffer and emits no saved notice",
+        "apps/web/unit/background-writer.test.ts::NB-W02:v04 event-first delivery creates one adoption and notice",
+        "apps/web/unit/background-writer.test.ts::NB-W02:v05 reply-first delivery creates one adoption and notice",
+        "apps/web/unit/background-writer.test.ts::NB-W02:v06 duplicates delivery creates one adoption and notice",
+        "apps/web/unit/background-writer.test.ts::NB-W03:v01 shared transaction guard rejects a mutation between ACK and adoption",
+        "apps/web/unit/background-writer.test.ts::NB-W03:v02 shared transaction guard rejects a mutation between ACK and adoption",
+        "apps/web/unit/background-writer.test.ts::NB-W03:v03 shared transaction guard rejects a mutation between ACK and adoption",
+        "apps/web/unit/background-writer.test.ts::NB-W03:v04 shared transaction guard rejects a mutation between ACK and adoption",
+        "apps/web/unit/background-writer.test.ts::NB-W03:v05 shared transaction guard rejects a mutation between ACK and adoption",
+        "apps/web/unit/background-writer.test.ts::NB-W03:v06 shared transaction guard rejects a mutation between ACK and adoption",
+        "apps/web/unit/background-writer.test.ts::NB-W03:v07 shared transaction guard rejects a mutation between ACK and adoption",
+        "apps/web/unit/background-writer.test.ts::NB-W03:v08 shared transaction guard rejects a mutation between ACK and adoption",
+        "apps/web/unit/background-writer.test.ts::NB-W03:v09 shared transaction guard rejects a mutation between ACK and adoption",
+        "apps/web/unit/background-writer.test.ts::NB-W03:v10 shared transaction guard rejects a mutation between ACK and adoption",
+        "apps/web/unit/background-writer.test.ts::NB-W04:v01 composition respects composition and the bounded local window",
+        "apps/web/unit/background-writer.test.ts::NB-W04:v02 flush respects composition and the bounded local window",
+        "apps/web/unit/background-writer.test.ts::NB-W04:v03 continuous-input respects composition and the bounded local window",
+        "apps/web/unit/background-writer.test.ts::NB-W04:v04 budget respects composition and the bounded local window",
+        "apps/web/unit/background-writer.test.ts::NB-W05:v02 SAVE_FAILED navigation keeps a durable local checkpoint",
+        "apps/web/unit/background-writer.test.ts::NB-W05:v03 OUTCOME_UNKNOWN navigation keeps a durable local checkpoint",
+        "apps/web/unit/background-writer.test.ts::NB-W05:v04 WRITER_UNKNOWN navigation keeps a durable local checkpoint",
+        "apps/web/unit/background-writer.test.ts::NB-W05:v05 a lost detach ACK cannot unlock an old canonical save or replace later recovery input",
+        "apps/web/unit/background-writer.test.ts::NB-W05:v06 input after the final touch flush cannot enter the protected detach boundary",
+        "apps/web/unit/background-writer.test.ts::NB-W07:v04 a heartbeat reply from the previous connection cannot fence a resumed writer",
+        "apps/web/unit/background-writer.test.ts::a clean writer needs no unload prompt while its dirty durable draft still retains image ownership",
+        "apps/web/unit/background-writer.test.ts::a late local write from the old proof cannot advance the current writer's durable cursor",
+        "apps/web/unit/background-writer.test.ts::an ineligible old headless inverse keeps the current editor usable and creates no new saved notice",
+        "apps/web/unit/background-writer.test.ts::continuous zero-diff input flushes before its bounded touch queue can silently drop more typing",
+        "apps/web/unit/background-writer.test.ts::exact recovery waits for a checkpoint still persisting its local payload before server delivery",
+        "apps/web/unit/background-writer.test.ts::timeout after history reservation releases local input while the stale adoption callback remains blocked"
+      ],
+      "NB03:test_runner_gates": [
+        "tests/foundation/test_runner_gates.py::test_all_prototype_regressions_receive_network_guard",
+        "tests/foundation/test_runner_gates.py::test_background_fast_uses_one_context_and_retains_raw_reports_before_combining",
+        "tests/foundation/test_runner_gates.py::test_background_node_binding_requires_exact_execution_identity_and_phases[browser]",
+        "tests/foundation/test_runner_gates.py::test_background_node_binding_requires_exact_execution_identity_and_phases[empty]",
+        "tests/foundation/test_runner_gates.py::test_background_node_binding_requires_exact_execution_identity_and_phases[file]",
+        "tests/foundation/test_runner_gates.py::test_background_node_binding_requires_exact_execution_identity_and_phases[hook]",
+        "tests/foundation/test_runner_gates.py::test_background_node_binding_requires_exact_execution_identity_and_phases[parameter]",
+        "tests/foundation/test_runner_gates.py::test_background_node_binding_requires_exact_execution_identity_and_phases[parent]",
+        "tests/foundation/test_runner_gates.py::test_background_node_binding_requires_exact_execution_identity_and_phases[retry]",
+        "tests/foundation/test_runner_gates.py::test_background_node_binding_requires_exact_execution_identity_and_phases[skip]",
+        "tests/foundation/test_runner_gates.py::test_background_node_binding_requires_exact_execution_identity_and_phases[suite]",
+        "tests/foundation/test_runner_gates.py::test_background_node_binding_requires_exact_execution_identity_and_phases[todo]",
+        "tests/foundation/test_runner_gates.py::test_background_node_reporter_retains_real_hook_failures_skips_and_nested_names",
+        "tests/foundation/test_runner_gates.py::test_background_raw_report_merge_preserves_files_and_refuses_rewrite_or_source_drift",
+        "tests/foundation/test_runner_gates.py::test_background_report_cannot_finish_before_its_bound_start",
+        "tests/foundation/test_runner_gates.py::test_background_report_rejects_broken_files_and_erased_failures[cancelled]",
+        "tests/foundation/test_runner_gates.py::test_background_report_rejects_broken_files_and_erased_failures[duplicate-key]",
+        "tests/foundation/test_runner_gates.py::test_background_report_rejects_broken_files_and_erased_failures[duplicate-trace]",
+        "tests/foundation/test_runner_gates.py::test_background_report_rejects_broken_files_and_erased_failures[empty-bindings]",
+        "tests/foundation/test_runner_gates.py::test_background_report_rejects_broken_files_and_erased_failures[empty]",
+        "tests/foundation/test_runner_gates.py::test_background_report_rejects_broken_files_and_erased_failures[incomplete]",
+        "tests/foundation/test_runner_gates.py::test_background_report_rejects_broken_files_and_erased_failures[initial-failure]",
+        "tests/foundation/test_runner_gates.py::test_background_report_rejects_broken_files_and_erased_failures[missing-parameter]",
+        "tests/foundation/test_runner_gates.py::test_background_report_rejects_broken_files_and_erased_failures[missing]",
+        "tests/foundation/test_runner_gates.py::test_background_report_rejects_broken_files_and_erased_failures[off-suite]",
+        "tests/foundation/test_runner_gates.py::test_background_report_rejects_broken_files_and_erased_failures[timeout]",
+        "tests/foundation/test_runner_gates.py::test_background_report_rejects_broken_files_and_erased_failures[truncated]",
+        "tests/foundation/test_runner_gates.py::test_background_report_rejects_broken_files_and_erased_failures[uncollected-result]",
+        "tests/foundation/test_runner_gates.py::test_background_report_rejects_broken_files_and_erased_failures[wrong-trace-hash]",
+        "tests/foundation/test_runner_gates.py::test_background_report_rejects_broken_files_and_erased_failures[wrong-trace-length]",
+        "tests/foundation/test_runner_gates.py::test_background_report_rejects_broken_files_and_erased_failures[wrong-trace-owner]",
+        "tests/foundation/test_runner_gates.py::test_background_report_rejects_broken_files_and_erased_failures[wrong-trace-seed]",
+        "tests/foundation/test_runner_gates.py::test_background_report_rejects_false_coverage[NB-G02:v01]",
+        "tests/foundation/test_runner_gates.py::test_background_report_rejects_false_coverage[NB-G02:v02]",
+        "tests/foundation/test_runner_gates.py::test_background_report_rejects_false_coverage[NB-G02:v03]",
+        "tests/foundation/test_runner_gates.py::test_background_report_rejects_false_coverage[NB-G02:v04]",
+        "tests/foundation/test_runner_gates.py::test_background_report_rejects_false_coverage[NB-G02:v05]",
+        "tests/foundation/test_runner_gates.py::test_background_report_rejects_false_coverage[NB-G02:v06]",
+        "tests/foundation/test_runner_gates.py::test_background_report_rejects_false_coverage[NB-G02:v07]",
+        "tests/foundation/test_runner_gates.py::test_background_report_rejects_false_coverage[NB-G02:v08]",
+        "tests/foundation/test_runner_gates.py::test_background_report_rejects_false_coverage[NB-G02:v09]",
+        "tests/foundation/test_runner_gates.py::test_background_report_rejects_false_coverage[NB-G02:v10]",
+        "tests/foundation/test_runner_gates.py::test_background_report_rejects_false_coverage[NB-G02:v11]",
+        "tests/foundation/test_runner_gates.py::test_background_report_rejects_false_coverage[NB-G02:v12]",
+        "tests/foundation/test_runner_gates.py::test_background_report_rejects_false_coverage[NB-G02:v13]",
+        "tests/foundation/test_runner_gates.py::test_background_report_rejects_false_coverage[NB-G02:v14]",
+        "tests/foundation/test_runner_gates.py::test_background_report_rejects_false_coverage[NB-G02:v15]",
+        "tests/foundation/test_runner_gates.py::test_background_report_rejects_false_coverage[NB-G02:v16]",
+        "tests/foundation/test_runner_gates.py::test_background_reporter_retains_real_skips_and_failed_phases",
+        "tests/foundation/test_runner_gates.py::test_background_retry_cannot_forget_a_prior_failed_run",
+        "tests/foundation/test_runner_gates.py::test_missing_prototype_regression_fails_collection_gate",
+        "tests/foundation/test_runner_gates.py::test_partial_requirement_cannot_lose_its_remaining_check",
+        "tests/foundation/test_runner_gates.py::test_requirement_map_cannot_claim_collected_python_tests_outside_required_gates",
+        "tests/foundation/test_runner_gates.py::test_requirement_map_does_not_accept_a_test_name_prefix[entry]",
+        "tests/foundation/test_runner_gates.py::test_requirement_map_does_not_accept_a_test_name_prefix[foundation]"
+      ],
+      "NB03:test_background_guard_sensitivity": [
+        "tests/recovery/test_background_guard_sensitivity.py::test_critical_guard_omission_breaks_the_actual_regression[NB-G03:v01]",
+        "tests/recovery/test_background_guard_sensitivity.py::test_critical_guard_omission_breaks_the_actual_regression[NB-G03:v02]",
+        "tests/recovery/test_background_guard_sensitivity.py::test_critical_guard_omission_breaks_the_actual_regression[NB-G03:v05]",
+        "tests/recovery/test_background_guard_sensitivity.py::test_zero_diff_touch_guard_omission_breaks_the_scoped_aba_regression"
+      ],
+      "NB03:test_background_history_commands": [
+        "tests/recovery/test_background_history_commands.py::test_a_new_background_save_closes_the_previous_redo_branch",
+        "tests/recovery/test_background_history_commands.py::test_compensation_preserves_independent_edits_rejects_overlap_aba_and_closes_redo[NB-H02:v01]",
+        "tests/recovery/test_background_history_commands.py::test_compensation_preserves_independent_edits_rejects_overlap_aba_and_closes_redo[NB-H02:v02]",
+        "tests/recovery/test_background_history_commands.py::test_compensation_preserves_independent_edits_rejects_overlap_aba_and_closes_redo[NB-H02:v03]",
+        "tests/recovery/test_background_history_commands.py::test_compensation_preserves_independent_edits_rejects_overlap_aba_and_closes_redo[NB-H02:v04]",
+        "tests/recovery/test_background_history_commands.py::test_history_command_reuse_with_another_direction_is_an_idempotency_conflict",
+        "tests/recovery/test_background_history_commands.py::test_undo_redo_and_duplicate_commands_have_one_owner_and_exact_canonical_proof",
+        "tests/recovery/test_background_history_commands.py::test_unreceipted_compensation_keeps_ownership_and_assets_until_exact_recovery"
+      ],
+      "NB03:test_background_history_transfer": [
+        "tests/recovery/test_background_history_transfer.py::test_duplicate_reload_has_one_connection_and_one_idempotent_inverse_ack",
+        "tests/recovery/test_background_history_transfer.py::test_leaving_the_writer_returns_its_inverse_to_the_journal[detach]",
+        "tests/recovery/test_background_history_transfer.py::test_leaving_the_writer_returns_its_inverse_to_the_journal[restart]",
+        "tests/recovery/test_background_history_transfer.py::test_leaving_the_writer_returns_its_inverse_to_the_journal[suspend]",
+        "tests/recovery/test_background_history_transfer.py::test_offer_preserves_exact_saved_proof_and_transfers_one_inverse_owner[headless]",
+        "tests/recovery/test_background_history_transfer.py::test_offer_preserves_exact_saved_proof_and_transfers_one_inverse_owner[mounted]",
+        "tests/recovery/test_background_history_transfer.py::test_transfer_crash_cut_retains_one_recoverable_owner_without_another_edit[NB-D01:v41]",
+        "tests/recovery/test_background_history_transfer.py::test_transfer_crash_cut_retains_one_recoverable_owner_without_another_edit[NB-D01:v42]",
+        "tests/recovery/test_background_history_transfer.py::test_transfer_crash_cut_retains_one_recoverable_owner_without_another_edit[NB-D01:v43]",
+        "tests/recovery/test_background_history_transfer.py::test_transfer_crash_cut_retains_one_recoverable_owner_without_another_edit[NB-D01:v44]"
+      ],
+      "NB03:test_background_integration_corpus": [
+        "tests/recovery/test_background_integration_corpus.py::test_capacity_one_production_corpus_preserves_the_independent_oracle[seed-00]",
+        "tests/recovery/test_background_integration_corpus.py::test_capacity_one_production_corpus_preserves_the_independent_oracle[seed-01]",
+        "tests/recovery/test_background_integration_corpus.py::test_capacity_one_production_corpus_preserves_the_independent_oracle[seed-02]",
+        "tests/recovery/test_background_integration_corpus.py::test_capacity_one_production_corpus_preserves_the_independent_oracle[seed-03]",
+        "tests/recovery/test_background_integration_corpus.py::test_capacity_one_production_corpus_preserves_the_independent_oracle[seed-04]",
+        "tests/recovery/test_background_integration_corpus.py::test_capacity_one_production_corpus_preserves_the_independent_oracle[seed-05]",
+        "tests/recovery/test_background_integration_corpus.py::test_capacity_one_production_corpus_preserves_the_independent_oracle[seed-06]",
+        "tests/recovery/test_background_integration_corpus.py::test_capacity_one_production_corpus_preserves_the_independent_oracle[seed-07]",
+        "tests/recovery/test_background_integration_corpus.py::test_capacity_one_production_corpus_preserves_the_independent_oracle[seed-08]",
+        "tests/recovery/test_background_integration_corpus.py::test_capacity_one_production_corpus_preserves_the_independent_oracle[seed-09]",
+        "tests/recovery/test_background_integration_corpus.py::test_capacity_one_production_corpus_preserves_the_independent_oracle[seed-10]",
+        "tests/recovery/test_background_integration_corpus.py::test_capacity_one_production_corpus_preserves_the_independent_oracle[seed-11]",
+        "tests/recovery/test_background_integration_corpus.py::test_capacity_one_production_corpus_preserves_the_independent_oracle[seed-12]",
+        "tests/recovery/test_background_integration_corpus.py::test_capacity_one_production_corpus_preserves_the_independent_oracle[seed-13]",
+        "tests/recovery/test_background_integration_corpus.py::test_capacity_one_production_corpus_preserves_the_independent_oracle[seed-14]",
+        "tests/recovery/test_background_integration_corpus.py::test_capacity_one_production_corpus_preserves_the_independent_oracle[seed-15]"
+      ],
+      "NB03:test_background_writer_api": [
+        "tests/recovery/test_background_writer_api.py::test_writer_api_saves_only_through_the_current_connection_and_exact_watermark[disabled]",
+        "tests/recovery/test_background_writer_api.py::test_writer_api_saves_only_through_the_current_connection_and_exact_watermark[opt-in]"
+      ],
+      "NB03:test_background_writer_drafts": [
+        "tests/recovery/test_background_writer_drafts.py::test_abandonment_moves_exact_image_pins_before_releasing_the_old_connection",
+        "tests/recovery/test_background_writer_drafts.py::test_explicit_abandonment_revokes_the_old_epoch_and_preserves_available_input[False]",
+        "tests/recovery/test_background_writer_drafts.py::test_explicit_abandonment_revokes_the_old_epoch_and_preserves_available_input[True]",
+        "tests/recovery/test_background_writer_drafts.py::test_explicit_draft_discard_keeps_touch_invalidation_without_changing_canonical_text",
+        "tests/recovery/test_background_writer_drafts.py::test_explicit_resolution_cannot_reactivate_a_late_pending_history_command[draft]",
+        "tests/recovery/test_background_writer_drafts.py::test_explicit_resolution_cannot_reactivate_a_late_pending_history_command[saved]",
+        "tests/recovery/test_background_writer_drafts.py::test_explicit_use_draft_commits_conditionally_and_resolves_only_with_the_durable_receipt[None]",
+        "tests/recovery/test_background_writer_drafts.py::test_explicit_use_draft_commits_conditionally_and_resolves_only_with_the_durable_receipt[before_receipt_stored]",
+        "tests/recovery/test_background_writer_drafts.py::test_invalid_private_draft_never_becomes_a_recovered_buffer[changed]",
+        "tests/recovery/test_background_writer_drafts.py::test_invalid_private_draft_never_becomes_a_recovered_buffer[missing]",
+        "tests/recovery/test_background_writer_drafts.py::test_invalid_private_draft_never_becomes_a_recovered_buffer[partial]",
+        "tests/recovery/test_background_writer_drafts.py::test_invalid_private_draft_never_becomes_a_recovered_buffer[unsupported]",
+        "tests/recovery/test_background_writer_drafts.py::test_late_checkpoint_cannot_replace_a_newer_durable_payload_or_watermark",
+        "tests/recovery/test_background_writer_drafts.py::test_local_checkpoint_on_a_fenced_project_does_not_claim_a_canonical_save[NB-D04:v03]",
+        "tests/recovery/test_background_writer_drafts.py::test_local_checkpoint_on_a_fenced_project_does_not_claim_a_canonical_save[NB-D04:v04]",
+        "tests/recovery/test_background_writer_drafts.py::test_resolved_draft_floor_survives_late_checkpoint_and_service_reconstruction[discard]",
+        "tests/recovery/test_background_writer_drafts.py::test_resolved_draft_floor_survives_late_checkpoint_and_service_reconstruction[recover]",
+        "tests/recovery/test_background_writer_drafts.py::test_resolved_draft_floor_survives_late_checkpoint_and_service_reconstruction[use]",
+        "tests/recovery/test_background_writer_drafts.py::test_use_draft_rejects_stale_canonical_and_a_different_selected_payload"
+      ],
+      "NB03:test_background_writer_limits": [
+        "tests/recovery/test_background_writer_limits.py::test_inverse_count_admission_keeps_all_existing_unexpired_owners[NB-A04:v28]",
+        "tests/recovery/test_background_writer_limits.py::test_inverse_count_admission_keeps_all_existing_unexpired_owners[NB-A04:v29]",
+        "tests/recovery/test_background_writer_limits.py::test_inverse_count_admission_keeps_all_existing_unexpired_owners[NB-A04:v30]",
+        "tests/recovery/test_background_writer_limits.py::test_inverse_expiry_keeps_the_original_receipt_and_never_extends_on_a_read[NB-A04:v25]",
+        "tests/recovery/test_background_writer_limits.py::test_inverse_expiry_keeps_the_original_receipt_and_never_extends_on_a_read[NB-A04:v26]",
+        "tests/recovery/test_background_writer_limits.py::test_inverse_expiry_keeps_the_original_receipt_and_never_extends_on_a_read[NB-A04:v27]",
+        "tests/recovery/test_background_writer_limits.py::test_real_typed_inverse_enforces_its_exact_byte_boundary[NB-A04:v16]",
+        "tests/recovery/test_background_writer_limits.py::test_real_typed_inverse_enforces_its_exact_byte_boundary[NB-A04:v17]",
+        "tests/recovery/test_background_writer_limits.py::test_real_typed_inverse_enforces_its_exact_byte_boundary[NB-A04:v18]"
+      ],
+      "NB03:test_background_writer_orders": [
+        "tests/recovery/test_background_writer_orders.py::test_attach_and_headless_commit_use_one_real_canonical_order[NB-W10:v01]",
+        "tests/recovery/test_background_writer_orders.py::test_attach_and_headless_commit_use_one_real_canonical_order[NB-W10:v02]",
+        "tests/recovery/test_background_writer_orders.py::test_delete_restart_and_late_callback_schedules_never_resurrect_authority[callback-delete-restart]",
+        "tests/recovery/test_background_writer_orders.py::test_delete_restart_and_late_callback_schedules_never_resurrect_authority[callback-restart-delete]",
+        "tests/recovery/test_background_writer_orders.py::test_delete_restart_and_late_callback_schedules_never_resurrect_authority[delete-callback-restart]",
+        "tests/recovery/test_background_writer_orders.py::test_delete_restart_and_late_callback_schedules_never_resurrect_authority[delete-restart-callback]",
+        "tests/recovery/test_background_writer_orders.py::test_delete_restart_and_late_callback_schedules_never_resurrect_authority[restart-callback-delete]",
+        "tests/recovery/test_background_writer_orders.py::test_delete_restart_and_late_callback_schedules_never_resurrect_authority[restart-delete-callback]",
+        "tests/recovery/test_background_writer_orders.py::test_edit_undo_detach_schedules_preserve_the_independent_input_oracle[detach-edit-undo]",
+        "tests/recovery/test_background_writer_orders.py::test_edit_undo_detach_schedules_preserve_the_independent_input_oracle[detach-undo-edit]",
+        "tests/recovery/test_background_writer_orders.py::test_edit_undo_detach_schedules_preserve_the_independent_input_oracle[edit-detach-undo]",
+        "tests/recovery/test_background_writer_orders.py::test_edit_undo_detach_schedules_preserve_the_independent_input_oracle[edit-undo-detach]",
+        "tests/recovery/test_background_writer_orders.py::test_edit_undo_detach_schedules_preserve_the_independent_input_oracle[undo-detach-edit]",
+        "tests/recovery/test_background_writer_orders.py::test_edit_undo_detach_schedules_preserve_the_independent_input_oracle[undo-edit-detach]",
+        "tests/recovery/test_background_writer_orders.py::test_save_crash_duplicate_schedules_keep_one_commit_and_exact_recovery[crash-save-duplicate]",
+        "tests/recovery/test_background_writer_orders.py::test_save_crash_duplicate_schedules_keep_one_commit_and_exact_recovery[save-crash-duplicate]",
+        "tests/recovery/test_background_writer_orders.py::test_save_crash_duplicate_schedules_keep_one_commit_and_exact_recovery[save-duplicate-crash]"
+      ],
+      "NB03:test_background_writer_save": [
+        "tests/recovery/test_background_writer_save.py::test_all_typed_manual_commands_are_refused_inside_the_acked_barrier",
+        "tests/recovery/test_background_writer_save.py::test_draft_recovery_cannot_autosave_against_the_old_baseline",
+        "tests/recovery/test_background_writer_save.py::test_expired_writer_before_claim_cannot_save_or_reuse_its_failed_identity",
+        "tests/recovery/test_background_writer_save.py::test_restart_recovers_the_saved_writer_watermark_without_reapplying_input",
+        "tests/recovery/test_background_writer_save.py::test_writer_save_and_exact_replay_have_one_commit_and_one_touch_ack",
+        "tests/recovery/test_background_writer_save.py::test_writer_save_preserves_independent_metadata_since_its_acknowledged_base"
+      ],
+      "NB03:test_background_writer_sessions": [
+        "tests/recovery/test_background_writer_sessions.py::test_clean_detach_can_publish_headlessly_without_a_browser_receipt",
+        "tests/recovery/test_background_writer_sessions.py::test_clean_resume_reconciles_a_new_incarnation_without_native_replay[NB-W07:v01]",
+        "tests/recovery/test_background_writer_sessions.py::test_clean_resume_reconciles_a_new_incarnation_without_native_replay[NB-W07:v02]",
+        "tests/recovery/test_background_writer_sessions.py::test_clean_resume_reconciles_a_new_incarnation_without_native_replay[NB-W07:v03]",
+        "tests/recovery/test_background_writer_sessions.py::test_clean_resume_reconciles_a_new_incarnation_without_native_replay[NB-W07:v04]",
+        "tests/recovery/test_background_writer_sessions.py::test_clean_resume_reconciles_a_new_incarnation_without_native_replay[NB-W07:v05]",
+        "tests/recovery/test_background_writer_sessions.py::test_clean_resume_reconciles_a_new_incarnation_without_native_replay[NB-W07:v06]",
+        "tests/recovery/test_background_writer_sessions.py::test_copied_identity_and_old_requests_never_gain_a_second_writer[NB-W09:v01]",
+        "tests/recovery/test_background_writer_sessions.py::test_copied_identity_and_old_requests_never_gain_a_second_writer[NB-W09:v02]",
+        "tests/recovery/test_background_writer_sessions.py::test_copied_identity_and_old_requests_never_gain_a_second_writer[NB-W09:v03]",
+        "tests/recovery/test_background_writer_sessions.py::test_copied_identity_and_old_requests_never_gain_a_second_writer[NB-W09:v04]",
+        "tests/recovery/test_background_writer_sessions.py::test_copied_identity_and_old_requests_never_gain_a_second_writer[NB-W09:v05]",
+        "tests/recovery/test_background_writer_sessions.py::test_real_writer_barrier_checks_expiry_revocation_and_exact_watermarks[NB-W01:v01]",
+        "tests/recovery/test_background_writer_sessions.py::test_real_writer_barrier_checks_expiry_revocation_and_exact_watermarks[NB-W01:v02]",
+        "tests/recovery/test_background_writer_sessions.py::test_real_writer_barrier_checks_expiry_revocation_and_exact_watermarks[NB-W01:v03]",
+        "tests/recovery/test_background_writer_sessions.py::test_real_writer_barrier_checks_expiry_revocation_and_exact_watermarks[NB-W01:v04]",
+        "tests/recovery/test_background_writer_sessions.py::test_real_writer_barrier_checks_expiry_revocation_and_exact_watermarks[NB-W01:v05]",
+        "tests/recovery/test_background_writer_sessions.py::test_real_writer_barrier_checks_expiry_revocation_and_exact_watermarks[NB-W01:v06]",
+        "tests/recovery/test_background_writer_sessions.py::test_real_writer_barrier_checks_expiry_revocation_and_exact_watermarks[NB-W01:v07]",
+        "tests/recovery/test_background_writer_sessions.py::test_zero_diff_touch_is_durable_scoped_and_idempotent",
+        "tests/recovery/test_background_writer_sessions.py::test_zero_diff_watermarks_retain_each_scoped_edit_and_never_regress[NB-W06:v01]",
+        "tests/recovery/test_background_writer_sessions.py::test_zero_diff_watermarks_retain_each_scoped_edit_and_never_regress[NB-W06:v02]",
+        "tests/recovery/test_background_writer_sessions.py::test_zero_diff_watermarks_retain_each_scoped_edit_and_never_regress[NB-W06:v03]",
+        "tests/recovery/test_background_writer_sessions.py::test_zero_diff_watermarks_retain_each_scoped_edit_and_never_regress[NB-W06:v04]",
+        "tests/recovery/test_background_writer_sessions.py::test_zero_diff_watermarks_retain_each_scoped_edit_and_never_regress[NB-W06:v05]",
+        "tests/recovery/test_background_writer_sessions.py::test_zero_diff_watermarks_retain_each_scoped_edit_and_never_regress[NB-W06:v06]",
+        "tests/recovery/test_background_writer_sessions.py::test_zero_diff_watermarks_retain_each_scoped_edit_and_never_regress[NB-W06:v07]"
+      ],
+      "NB03:private-wire-roundtrips": [
+        "tests/recovery/test_background_offline.py::test_versioned_background_contract_round_trip[background_agent_request_v1]",
+        "tests/recovery/test_background_offline.py::test_versioned_background_contract_round_trip[background_apply_v2]",
+        "tests/recovery/test_background_offline.py::test_versioned_background_contract_round_trip[background_artifact_v1]",
+        "tests/recovery/test_background_offline.py::test_versioned_background_contract_round_trip[background_attempt_v1]",
+        "tests/recovery/test_background_offline.py::test_versioned_background_contract_round_trip[background_barrier_v1]",
+        "tests/recovery/test_background_offline.py::test_versioned_background_contract_round_trip[background_dispatch_v1]",
+        "tests/recovery/test_background_offline.py::test_versioned_background_contract_round_trip[background_draft_payload_v1]",
+        "tests/recovery/test_background_offline.py::test_versioned_background_contract_round_trip[background_draft_v1]",
+        "tests/recovery/test_background_offline.py::test_versioned_background_contract_round_trip[background_event_v1]",
+        "tests/recovery/test_background_offline.py::test_versioned_background_contract_round_trip[background_intent_v1]",
+        "tests/recovery/test_background_offline.py::test_versioned_background_contract_round_trip[background_legacy_run_v2]",
+        "tests/recovery/test_background_offline.py::test_versioned_background_contract_round_trip[background_project_v1]",
+        "tests/recovery/test_background_offline.py::test_versioned_background_contract_round_trip[background_proposal_v1]",
+        "tests/recovery/test_background_offline.py::test_versioned_background_contract_round_trip[background_receipt_v1]",
+        "tests/recovery/test_background_offline.py::test_versioned_background_contract_round_trip[background_replay_request_v1]",
+        "tests/recovery/test_background_offline.py::test_versioned_background_contract_round_trip[background_replay_v1]",
+        "tests/recovery/test_background_offline.py::test_versioned_background_contract_round_trip[background_scope_guard_v1]",
+        "tests/recovery/test_background_offline.py::test_versioned_background_contract_round_trip[background_sidecar_v1]",
+        "tests/recovery/test_background_offline.py::test_versioned_background_contract_round_trip[background_snapshot_v1]",
+        "tests/recovery/test_background_offline.py::test_versioned_background_contract_round_trip[background_submission_v1]",
+        "tests/recovery/test_background_offline.py::test_versioned_background_contract_round_trip[background_undo_v1]",
+        "tests/recovery/test_background_offline.py::test_versioned_background_contract_round_trip[background_writer_abandon_v1]",
+        "tests/recovery/test_background_offline.py::test_versioned_background_contract_round_trip[background_writer_advance_v1]",
+        "tests/recovery/test_background_offline.py::test_versioned_background_contract_round_trip[background_writer_barrier_ack_v1]",
+        "tests/recovery/test_background_offline.py::test_versioned_background_contract_round_trip[background_writer_barrier_command_v1]",
+        "tests/recovery/test_background_offline.py::test_versioned_background_contract_round_trip[background_writer_checkpoint_v1]",
+        "tests/recovery/test_background_offline.py::test_versioned_background_contract_round_trip[background_writer_draft_command_v1]",
+        "tests/recovery/test_background_offline.py::test_versioned_background_contract_round_trip[background_writer_draft_read_v1]",
+        "tests/recovery/test_background_offline.py::test_versioned_background_contract_round_trip[background_writer_draft_reference_v1]",
+        "tests/recovery/test_background_offline.py::test_versioned_background_contract_round_trip[background_writer_draft_resolve_v1]",
+        "tests/recovery/test_background_offline.py::test_versioned_background_contract_round_trip[background_writer_history_command_v1]",
+        "tests/recovery/test_background_offline.py::test_versioned_background_contract_round_trip[background_writer_history_offer_v1]",
+        "tests/recovery/test_background_offline.py::test_versioned_background_contract_round_trip[background_writer_history_request_v1]",
+        "tests/recovery/test_background_offline.py::test_versioned_background_contract_round_trip[background_writer_history_result_v1]",
+        "tests/recovery/test_background_offline.py::test_versioned_background_contract_round_trip[background_writer_mutation_v1]",
+        "tests/recovery/test_background_offline.py::test_versioned_background_contract_round_trip[background_writer_open_v1]",
+        "tests/recovery/test_background_offline.py::test_versioned_background_contract_round_trip[background_writer_proof_v1]",
+        "tests/recovery/test_background_offline.py::test_versioned_background_contract_round_trip[background_writer_publication_v1]",
+        "tests/recovery/test_background_offline.py::test_versioned_background_contract_round_trip[background_writer_publish_v1]",
+        "tests/recovery/test_background_offline.py::test_versioned_background_contract_round_trip[background_writer_v1]",
+        "tests/recovery/test_background_offline.py::test_versioned_background_contract_round_trip[background_writer_view_v1]"
+      ],
+      "NB03:lease-and-explicit-recovery": [
+        "apps/web/unit/background-python-bridge.test.ts::a clean mounted writer resumes at real lease expiry and keeps session history",
+        "apps/web/unit/background-python-bridge.test.ts::a clean mounted writer resumes after real lease expiry and keeps session history",
+        "apps/web/unit/background-python-bridge.test.ts::a timed out real lease resume cannot adopt over retained input",
+        "apps/web/unit/background-python-bridge.test.ts::explicit saved choice recovers a real expired writer without reload",
+        "apps/web/unit/background-python-bridge.test.ts::explicit draft choice recovers a real expired writer without reload",
+        "apps/web/unit/background-python-bridge.test.ts::explicit saved choice recovers a real revoked writer without reload",
+        "apps/web/unit/background-python-bridge.test.ts::explicit draft choice recovers a real revoked writer without reload"
+      ],
+      "NB03:one-active-application-tab": [
+        "apps/web/unit/background-tab.test.ts::one application tab excludes every other tab before mounting actions",
+        "apps/web/unit/background-tab.test.ts::closing the active tab allows a later tab to acquire the same application lock",
+        "apps/web/unit/background-tab.test.ts::simultaneous tab claims grant exactly one active interface",
+        "apps/web/unit/background-tab.test.ts::an unavailable or failed tab lock never grants application access"
+      ],
+      "NB03:sole-tab-resume": [
+        "apps/web/unit/background-python-bridge.test.ts::the sole active tab resumes clean input when its unload notification is lost",
+        "apps/web/unit/background-python-bridge.test.ts::the sole active tab resumes a dirty outbox when its unload notification is lost",
+        "apps/web/unit/background-python-bridge.test.ts::the sole tab cannot revoke a writer with an invalid resume credential",
+        "apps/web/unit/background-python-bridge.test.ts::a fresh sole tab uses the shared clean resume marker without sessionStorage",
+        "apps/web/unit/background-python-bridge.test.ts::a fresh sole tab uses the shared dirty resume marker without sessionStorage",
+        "apps/web/unit/background-python-bridge.test.ts::a lost application tab lock stops writer attachment before bootstrap",
+        "apps/web/unit/background-python-bridge.test.ts::a lost application tab lock stops writer attachment after bootstrap"
       ]
     },
     "sources": [
       "apps/web/package.json",
+      "apps/web/src/assistant/Drawer.tsx",
+      "apps/web/src/assistant/controller.ts",
+      "apps/web/src/background/api.ts",
+      "apps/web/src/background/connection.ts",
+      "apps/web/src/background/drafts.ts",
+      "apps/web/src/background/jobs.ts",
+      "apps/web/src/background/tab.ts",
+      "apps/web/src/background/wire.ts",
+      "apps/web/src/background/writer.ts",
       "apps/web/src/contracts/background-validate.ts",
       "apps/web/src/contracts/check-fixtures.ts",
       "apps/web/src/contracts/generated/background_agent_request_v1.ts",
@@ -3866,8 +5057,49 @@
       "apps/web/src/contracts/generated/background_snapshot_v1.ts",
       "apps/web/src/contracts/generated/background_submission_v1.ts",
       "apps/web/src/contracts/generated/background_undo_v1.ts",
+      "apps/web/src/contracts/generated/background_writer_abandon_v1.ts",
+      "apps/web/src/contracts/generated/background_writer_advance_v1.ts",
+      "apps/web/src/contracts/generated/background_writer_barrier_ack_v1.ts",
+      "apps/web/src/contracts/generated/background_writer_barrier_command_v1.ts",
+      "apps/web/src/contracts/generated/background_writer_checkpoint_v1.ts",
+      "apps/web/src/contracts/generated/background_writer_draft_command_v1.ts",
+      "apps/web/src/contracts/generated/background_writer_draft_read_v1.ts",
+      "apps/web/src/contracts/generated/background_writer_draft_reference_v1.ts",
+      "apps/web/src/contracts/generated/background_writer_draft_resolve_v1.ts",
+      "apps/web/src/contracts/generated/background_writer_history_command_v1.ts",
+      "apps/web/src/contracts/generated/background_writer_history_offer_v1.ts",
+      "apps/web/src/contracts/generated/background_writer_history_request_v1.ts",
+      "apps/web/src/contracts/generated/background_writer_history_result_v1.ts",
+      "apps/web/src/contracts/generated/background_writer_mutation_v1.ts",
+      "apps/web/src/contracts/generated/background_writer_open_v1.ts",
+      "apps/web/src/contracts/generated/background_writer_proof_v1.ts",
+      "apps/web/src/contracts/generated/background_writer_publication_v1.ts",
+      "apps/web/src/contracts/generated/background_writer_publish_v1.ts",
       "apps/web/src/contracts/generated/background_writer_v1.ts",
+      "apps/web/src/contracts/generated/background_writer_view_v1.ts",
       "apps/web/src/contracts/validate.ts",
+      "apps/web/src/main.tsx",
+      "apps/web/src/rich/Editor.tsx",
+      "apps/web/src/rich/history.ts",
+      "apps/web/src/rich/save-queue.ts",
+      "apps/web/src/rich/styles.ts",
+      "apps/web/src/workbench/App.tsx",
+      "apps/web/src/workbench/BlockedTab.tsx",
+      "apps/web/src/workbench/main.tsx",
+      "apps/web/src/workbench/proof.tsx",
+      "apps/web/src/workbench/useResumeWorkspace.ts",
+      "apps/web/unit/background-drafts.test.ts",
+      "apps/web/unit/background-editor-schema.test.ts",
+      "apps/web/unit/background-guard.test.ts",
+      "apps/web/unit/background-jobs.test.ts",
+      "apps/web/unit/background-orders.test.ts",
+      "apps/web/unit/background-proof.test.ts",
+      "apps/web/unit/background-python-bridge.test.ts",
+      "apps/web/unit/background-tab.test.ts",
+      "apps/web/unit/background-writer.test.ts",
+      "apps/web/unit/support/background-jobs.ts",
+      "apps/web/unit/support/background-writer.ts",
+      "apps/web/unit/support/python-bridge.ts",
       "contracts/examples/background/background_agent_request_v1.json",
       "contracts/examples/background/background_apply_v2.json",
       "contracts/examples/background/background_artifact_v1.json",
@@ -3896,7 +5128,27 @@
       "contracts/examples/background/background_snapshot_v1.json",
       "contracts/examples/background/background_submission_v1.json",
       "contracts/examples/background/background_undo_v1.json",
+      "contracts/examples/background/background_writer_abandon_v1.json",
+      "contracts/examples/background/background_writer_advance_v1.json",
+      "contracts/examples/background/background_writer_barrier_ack_v1.json",
+      "contracts/examples/background/background_writer_barrier_command_v1.json",
+      "contracts/examples/background/background_writer_bridge.json",
+      "contracts/examples/background/background_writer_checkpoint_v1.json",
+      "contracts/examples/background/background_writer_draft_command_v1.json",
+      "contracts/examples/background/background_writer_draft_read_v1.json",
+      "contracts/examples/background/background_writer_draft_reference_v1.json",
+      "contracts/examples/background/background_writer_draft_resolve_v1.json",
+      "contracts/examples/background/background_writer_history_command_v1.json",
+      "contracts/examples/background/background_writer_history_offer_v1.json",
+      "contracts/examples/background/background_writer_history_request_v1.json",
+      "contracts/examples/background/background_writer_history_result_v1.json",
+      "contracts/examples/background/background_writer_mutation_v1.json",
+      "contracts/examples/background/background_writer_open_v1.json",
+      "contracts/examples/background/background_writer_proof_v1.json",
+      "contracts/examples/background/background_writer_publication_v1.json",
+      "contracts/examples/background/background_writer_publish_v1.json",
       "contracts/examples/background/background_writer_v1.json",
+      "contracts/examples/background/background_writer_view_v1.json",
       "contracts/examples/cases.json",
       "contracts/json-schema/background_agent_request_v1.schema.json",
       "contracts/json-schema/background_apply_v2.schema.json",
@@ -3919,7 +5171,26 @@
       "contracts/json-schema/background_snapshot_v1.schema.json",
       "contracts/json-schema/background_submission_v1.schema.json",
       "contracts/json-schema/background_undo_v1.schema.json",
+      "contracts/json-schema/background_writer_abandon_v1.schema.json",
+      "contracts/json-schema/background_writer_advance_v1.schema.json",
+      "contracts/json-schema/background_writer_barrier_ack_v1.schema.json",
+      "contracts/json-schema/background_writer_barrier_command_v1.schema.json",
+      "contracts/json-schema/background_writer_checkpoint_v1.schema.json",
+      "contracts/json-schema/background_writer_draft_command_v1.schema.json",
+      "contracts/json-schema/background_writer_draft_read_v1.schema.json",
+      "contracts/json-schema/background_writer_draft_reference_v1.schema.json",
+      "contracts/json-schema/background_writer_draft_resolve_v1.schema.json",
+      "contracts/json-schema/background_writer_history_command_v1.schema.json",
+      "contracts/json-schema/background_writer_history_offer_v1.schema.json",
+      "contracts/json-schema/background_writer_history_request_v1.schema.json",
+      "contracts/json-schema/background_writer_history_result_v1.schema.json",
+      "contracts/json-schema/background_writer_mutation_v1.schema.json",
+      "contracts/json-schema/background_writer_open_v1.schema.json",
+      "contracts/json-schema/background_writer_proof_v1.schema.json",
+      "contracts/json-schema/background_writer_publication_v1.schema.json",
+      "contracts/json-schema/background_writer_publish_v1.schema.json",
       "contracts/json-schema/background_writer_v1.schema.json",
+      "contracts/json-schema/background_writer_view_v1.schema.json",
       "docs/gui/background-work-contracts.md",
       "docs/gui/background-work-plan.md",
       "docs/gui/background-work-tests.md",
@@ -3929,6 +5200,7 @@
       "docs/gui/handoffs/BACKGROUND-WORK/nb02a-contract.md",
       "docs/gui/handoffs/BACKGROUND-WORK/nb02b-contract.md",
       "docs/gui/handoffs/BACKGROUND-WORK/test-matrix.json",
+      "docs/gui/testing.md",
       "packages/resume_core/__init__.py",
       "packages/resume_core/agent_artifacts.py",
       "packages/resume_core/agent_edits.py",
@@ -3938,9 +5210,12 @@
       "packages/resume_core/background_assets.py",
       "packages/resume_core/background_authority.py",
       "packages/resume_core/background_clock.py",
+      "packages/resume_core/background_drafts.py",
       "packages/resume_core/background_events.py",
       "packages/resume_core/background_fixed.py",
       "packages/resume_core/background_history.py",
+      "packages/resume_core/background_history_commands.py",
+      "packages/resume_core/background_history_owner.py",
       "packages/resume_core/background_inverse.py",
       "packages/resume_core/background_limits.py",
       "packages/resume_core/background_proposals.py",
@@ -3950,6 +5225,7 @@
       "packages/resume_core/background_scopes.py",
       "packages/resume_core/background_store.py",
       "packages/resume_core/background_supervisor.py",
+      "packages/resume_core/background_writers.py",
       "packages/resume_core/checks.py",
       "packages/resume_core/dates.py",
       "packages/resume_core/drafting.py",
@@ -4079,6 +5355,7 @@
       "services/api/src/resume_api/jobs/runtime.py",
       "services/api/src/resume_api/jobs/service.py",
       "services/api/src/resume_api/jobs/tools.py",
+      "services/api/src/resume_api/jobs/writers.py",
       "services/api/src/resume_api/launcher.py",
       "services/api/src/resume_api/lifecycle.py",
       "services/api/src/resume_api/normalization_content.py",
@@ -4097,9 +5374,14 @@
       "spikes/background/__init__.py",
       "spikes/background/corpus.py",
       "spikes/background/fake_child.py",
+      "spikes/background/fake_publication_child.py",
       "spikes/background/fixtures.py",
       "spikes/background/harness.py",
+      "spikes/background/integration.py",
       "spikes/background/protocol.py",
+      "spikes/background/serve.py",
+      "spikes/background/writer_bridge.py",
+      "spikes/background/writer_fixture.py",
       "tests/contracts/test_contracts.py",
       "tests/fixtures/rich_workspace.json",
       "tests/foundation/test_runner_gates.py",
@@ -4115,6 +5397,9 @@
       "tests/recovery/test_background_guard_sensitivity.py",
       "tests/recovery/test_background_handoff_cuts.py",
       "tests/recovery/test_background_history.py",
+      "tests/recovery/test_background_history_commands.py",
+      "tests/recovery/test_background_history_transfer.py",
+      "tests/recovery/test_background_integration_corpus.py",
       "tests/recovery/test_background_integrity.py",
       "tests/recovery/test_background_internal_writers.py",
       "tests/recovery/test_background_inverse.py",
@@ -4132,9 +5417,15 @@
       "tests/recovery/test_background_store.py",
       "tests/recovery/test_background_supervisor.py",
       "tests/recovery/test_background_tool_publication.py",
+      "tests/recovery/test_background_writer_api.py",
       "tests/recovery/test_background_writer_cuts.py",
+      "tests/recovery/test_background_writer_drafts.py",
+      "tests/recovery/test_background_writer_limits.py",
+      "tests/recovery/test_background_writer_orders.py",
       "tests/recovery/test_background_writer_review.py",
       "tests/recovery/test_background_writer_routes.py",
+      "tests/recovery/test_background_writer_save.py",
+      "tests/recovery/test_background_writer_sessions.py",
       "tests/recovery/test_background_writers.py",
       "tests/recovery/test_recovery_contracts.py",
       "tests/recovery/test_rich_asset_lifecycle.py",
@@ -4161,6 +5452,7 @@
       "tests/support/foundation.py",
       "tests/support/recovery.py",
       "tools/background_evidence.py",
+      "tools/background_node_reporter.mjs",
       "tools/background_pytest.py",
       "tools/check_contract_drift.py",
       "tools/checks.py",
@@ -4278,6 +5570,118 @@
         "capacity": 1,
         "transitions": 200,
         "scope": "specification_oracle_only"
+      },
+      "NB03:production:1:0": {
+        "nodeId": "tests/recovery/test_background_integration_corpus.py::test_capacity_one_production_corpus_preserves_the_independent_oracle[seed-00]",
+        "seed": 0,
+        "capacity": 1,
+        "transitions": 200,
+        "scope": "production_integration"
+      },
+      "NB03:production:1:1": {
+        "nodeId": "tests/recovery/test_background_integration_corpus.py::test_capacity_one_production_corpus_preserves_the_independent_oracle[seed-01]",
+        "seed": 1,
+        "capacity": 1,
+        "transitions": 200,
+        "scope": "production_integration"
+      },
+      "NB03:production:1:2": {
+        "nodeId": "tests/recovery/test_background_integration_corpus.py::test_capacity_one_production_corpus_preserves_the_independent_oracle[seed-02]",
+        "seed": 2,
+        "capacity": 1,
+        "transitions": 200,
+        "scope": "production_integration"
+      },
+      "NB03:production:1:3": {
+        "nodeId": "tests/recovery/test_background_integration_corpus.py::test_capacity_one_production_corpus_preserves_the_independent_oracle[seed-03]",
+        "seed": 3,
+        "capacity": 1,
+        "transitions": 200,
+        "scope": "production_integration"
+      },
+      "NB03:production:1:4": {
+        "nodeId": "tests/recovery/test_background_integration_corpus.py::test_capacity_one_production_corpus_preserves_the_independent_oracle[seed-04]",
+        "seed": 4,
+        "capacity": 1,
+        "transitions": 200,
+        "scope": "production_integration"
+      },
+      "NB03:production:1:5": {
+        "nodeId": "tests/recovery/test_background_integration_corpus.py::test_capacity_one_production_corpus_preserves_the_independent_oracle[seed-05]",
+        "seed": 5,
+        "capacity": 1,
+        "transitions": 200,
+        "scope": "production_integration"
+      },
+      "NB03:production:1:6": {
+        "nodeId": "tests/recovery/test_background_integration_corpus.py::test_capacity_one_production_corpus_preserves_the_independent_oracle[seed-06]",
+        "seed": 6,
+        "capacity": 1,
+        "transitions": 200,
+        "scope": "production_integration"
+      },
+      "NB03:production:1:7": {
+        "nodeId": "tests/recovery/test_background_integration_corpus.py::test_capacity_one_production_corpus_preserves_the_independent_oracle[seed-07]",
+        "seed": 7,
+        "capacity": 1,
+        "transitions": 200,
+        "scope": "production_integration"
+      },
+      "NB03:production:1:8": {
+        "nodeId": "tests/recovery/test_background_integration_corpus.py::test_capacity_one_production_corpus_preserves_the_independent_oracle[seed-08]",
+        "seed": 8,
+        "capacity": 1,
+        "transitions": 200,
+        "scope": "production_integration"
+      },
+      "NB03:production:1:9": {
+        "nodeId": "tests/recovery/test_background_integration_corpus.py::test_capacity_one_production_corpus_preserves_the_independent_oracle[seed-09]",
+        "seed": 9,
+        "capacity": 1,
+        "transitions": 200,
+        "scope": "production_integration"
+      },
+      "NB03:production:1:10": {
+        "nodeId": "tests/recovery/test_background_integration_corpus.py::test_capacity_one_production_corpus_preserves_the_independent_oracle[seed-10]",
+        "seed": 10,
+        "capacity": 1,
+        "transitions": 200,
+        "scope": "production_integration"
+      },
+      "NB03:production:1:11": {
+        "nodeId": "tests/recovery/test_background_integration_corpus.py::test_capacity_one_production_corpus_preserves_the_independent_oracle[seed-11]",
+        "seed": 11,
+        "capacity": 1,
+        "transitions": 200,
+        "scope": "production_integration"
+      },
+      "NB03:production:1:12": {
+        "nodeId": "tests/recovery/test_background_integration_corpus.py::test_capacity_one_production_corpus_preserves_the_independent_oracle[seed-12]",
+        "seed": 12,
+        "capacity": 1,
+        "transitions": 200,
+        "scope": "production_integration"
+      },
+      "NB03:production:1:13": {
+        "nodeId": "tests/recovery/test_background_integration_corpus.py::test_capacity_one_production_corpus_preserves_the_independent_oracle[seed-13]",
+        "seed": 13,
+        "capacity": 1,
+        "transitions": 200,
+        "scope": "production_integration"
+      },
+      "NB03:production:1:14": {
+        "nodeId": "tests/recovery/test_background_integration_corpus.py::test_capacity_one_production_corpus_preserves_the_independent_oracle[seed-14]",
+        "seed": 14,
+        "capacity": 1,
+        "transitions": 200,
+        "scope": "production_integration"
+      },
+      "NB03:production:1:15": {
+        "nodeId": "tests/recovery/test_background_integration_corpus.py::test_capacity_one_production_corpus_preserves_the_independent_oracle[seed-15]",
+        "seed": 15,
+        "capacity": 1,
+        "transitions": 200,
+        "scope": "production_integration"
       }
     },
     "requiredActions": [
@@ -4304,7 +5708,7 @@
       "claim_before_timeout",
       "runtime_exit_before_publication"
     ],
-    "scope": "NB00a specification oracle; NB01 capacity-one Job ownership; NB02a conditional publisher; NB02b complete coordinated writer/export/asset/retention coverage. Normal rollout stays off. Browser writer and product trace integration remain NB03; fixed native adapters remain NB05.",
+    "scope": "NB00a specification oracle; NB01 capacity-one Jobs; NB02a conditional publisher; NB02b coordinated writers/export/retention; NB03 resumable browser writers, barriers, drafts, exact history, independent navigation and real API production traces. Normal rollout stays off; fixed native adapters remain NB05.",
     "reportSchema": "docs/gui/handoffs/BACKGROUND-WORK/nb00a-execution-report.schema.json"
   }
 }

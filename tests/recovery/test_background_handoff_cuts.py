@@ -11,8 +11,9 @@ from packages.resume_core.models.agent import AgentApplyRequest, AgentQuery, Age
 from packages.resume_core.models.background import WriterSessionV1
 from spikes.background.fixtures import TIME
 from tests.recovery.test_agent_edits import command, replace
-from tests.recovery.test_background_agent import environment
+from tests.recovery.test_background_agent import environment, hold_writer
 from tests.recovery.test_background_inverse import block, mutation, put
+from tests.support.background import save_input
 
 CUTS = [(f"NB-D01:v{number:02d}", phase, side, writer)
     for start, phase in [(1, "payload_stored"), (5, "binding_stored")]
@@ -80,6 +81,7 @@ async def test_page_membership_and_partial_rereads_preserve_all_old_dependencies
         block(current, "narrative").content[0].text = "Q" * 60000
         service.publisher.snapshot(workspace.project_id, checksum, current, "long-input")
         payload.request.project_revision = current.project_revision
+    proof = hold_writer(service, workspace)
     checked = []
     async def execute(control, _actor):
         session = service.tools.session(control)
@@ -91,8 +93,8 @@ async def test_page_membership_and_partial_rereads_preserve_all_old_dependencies
             if variant == "NB-P06:v03":
                 assert first.snapshot.truncated and first.snapshot.next_cursor
                 value = block(current, "quote").model_copy(update={"id": "new-child", "children": []})
-                service.projects.mutate(workspace.project_id, mutation(current, [{"kind": "put_block", "parentId": "narrative",
-                    "afterId": None, "beforeRevision": None, "block": value}], "membership-between-pages"))
+                save_input(service, mutation(current, [{"kind": "put_block", "parentId": "narrative",
+                    "afterId": None, "beforeRevision": None, "block": value}], "membership-between-pages"), proof)
                 result = first
                 pages = 1
                 while result.snapshot.truncated:
@@ -100,7 +102,7 @@ async def test_page_membership_and_partial_rereads_preserve_all_old_dependencies
                     pages += 1
                 assert pages > 1
             else:
-                service.projects.mutate(workspace.project_id, mutation(current, [put(current, "quote", text="Old query is stale")], "stale-other-query"))
+                save_input(service, mutation(current, [put(current, "quote", text="Old query is stale")], "stale-other-query"), proof)
                 first = session.book.read(AgentQuery(kind="document", ids=["narrative"]))
             denied = await session.call("prepare_edit_batch", command(replace(first.snapshot, "narrative", 0, 1, "Changed")))
             assert denied["error"]["code"] == "AGENT_STALE_READ", denied

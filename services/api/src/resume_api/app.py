@@ -165,7 +165,7 @@ class LocalBoundary:
         if rich is not None and path.startswith(project_prefix) and method in {"POST", "PUT", "PATCH", "DELETE"}:
             parts = path[len(project_prefix):].split("/", 1)
             tail = parts[1] if len(parts) == 2 else ""
-            if parts[0] in rich.agent_recovery_fences and not tail.startswith("assistant/") and tail not in {"cancel", "cancel-action", "delete", "images/session"}:
+            if parts[0] in rich.agent_recovery_fences and not tail.startswith(("assistant/", "writer/")) and tail not in {"cancel", "cancel-action", "delete", "images/session"}:
                 await problem("AGENT_OUTCOME_UNKNOWN", 409)(scope, receive, send)
                 return
 
@@ -192,8 +192,13 @@ class LocalBoundary:
                 part = message.get("body", b"")
                 size += len(part)
                 image_upload = path.startswith("/v1/rich/projects/") and path.endswith("/images/upload")
+                writer_payload = path.startswith("/v1/rich/projects/") and any(path.endswith("/writer/" + command)
+                    for command in ("checkpoint", "save", "flush", "barrier", "reconcile", "detach", "draft/use"))
                 project_upload = image_upload or path in {"/v1/projects/input", "/v1/projects/archive", "/v1/rich/projects/input", "/v1/rich/projects/archive"} or (path.startswith("/v1/projects/") and path.endswith("/input"))
                 body_limit = 10 * 1024 * 1024 + 64 * 1024 if image_upload else 64 * 1024 * 1024 + 4096 if path in {"/v1/projects/archive", "/v1/rich/projects/archive"} else MAX_EXTRACT_BODY if path == "/v1/extract" or project_upload else MAX_BODY
+                if writer_payload:
+                    from packages.resume_core.background_limits import LIMITS
+                    body_limit = LIMITS.draft_project_bytes + MAX_BODY
                 if size > body_limit:
                     await problem("INPUT_TOO_LARGE", 413)(scope, receive, send)
                     return

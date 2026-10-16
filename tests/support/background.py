@@ -6,6 +6,22 @@ from packages.resume_core.background_supervisor import ExecutionOutcome
 from spikes.background.harness import OfflineGuard
 
 
+def save_input(service, request, proof):
+    from packages.resume_core.models.background import WriterMutationV1
+    project = request.project_id
+    view = service.writers.read_snapshot(project, proof)
+    command = request.model_copy(deep=True)
+    command.capture.session_id = proof.session_id
+    replayed = any(item.client_mutation_id == command.client_mutation_id for item in view.workspace.mutation_replay)
+    cursor = view.writer.acknowledged_cursor + int(not replayed)
+    saved = service.writers.save(project, WriterMutationV1(schemaVersion=1, proof=proof,
+        canonicalRevision=view.writer.acknowledged_revision, canonicalSha256=view.writer.acknowledged_sha256,
+        actionCursor=cursor, touches=[] if replayed else [{"cursor": cursor, "mutation": command}], mutation=command),
+        originals=service.projects.originals, artifacts=service.projects.artifacts, images=service.projects.images)
+    service.publication.adopt(project, saved.workspace, saved.workspace_sha256)
+    return saved.response
+
+
 class PipeExecution:
     def __init__(self, factory, job, model):
         self.factory, self.job, self.model = factory, job, model

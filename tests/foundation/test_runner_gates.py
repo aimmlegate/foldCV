@@ -13,7 +13,7 @@ import pytest
 
 from tools import checks
 from tools.checks import PROTOTYPE_TESTS, assert_mapped_python_suites, assert_partial_checks, assert_prototype_collection
-from tools.background_evidence import assert_report, digest, failure_history, read_report
+from tools.background_evidence import assert_report, digest, failure_history, merge_reports, read_report
 from spikes.background.corpus import ACTIONS, ORDERS, reached_orders, trace
 
 
@@ -105,6 +105,147 @@ def nb_report_fixture(tmp_path):
         "required_traces": {"fixed:1:0": {"seed": 0, "capacity": 1, "transitions": 200,
             "scope": "specification_oracle_only", "nodeId": node}}, "required_actions": set(ACTIONS), "required_orders": set(ORDERS)}
     return tmp_path / "execution-report.json", report, options
+
+
+@pytest.mark.parametrize("fault", ["file", "parameter", "parent", "skip", "todo", "hook", "retry", "suite", "empty", "browser"])
+def test_background_node_binding_requires_exact_execution_identity_and_phases(tmp_path, fault):
+    path, report, options = nb_report_fixture(tmp_path)
+    node = "apps/web/unit/background-writer.test.ts::writer suite::barrier [case=one]"
+    report["collected"], report["traces"] = [node], []
+    report["records"][0]["nodeId"] = node
+    options.update(bindings={"variant-one": [node]}, required_traces={}, required_actions=set(), required_orders=set())
+    path.write_text(json.dumps(report))
+    assert assert_report(path, **options)["variant-one"]["nodes"] == [node]
+    changed = deepcopy(report)
+    if fault in {"file", "parameter", "parent"}:
+        wrong = node.replace("background-writer.test.ts", "background-other.test.ts") if fault == "file" else (
+            node.replace("case=one", "case=two") if fault == "parameter" else node.replace("writer suite", "other suite"))
+        changed["collected"], changed["records"][0]["nodeId"] = [wrong], wrong
+    elif fault in {"skip", "todo"}:
+        changed["records"][0]["markers"] = [fault]
+    elif fault == "hook":
+        changed["records"][0]["phases"]["teardown"] = "unknown"
+    elif fault == "retry":
+        changed["records"].append(deepcopy(changed["records"][0]))
+    elif fault == "suite":
+        changed["suite"] = "integration-render"
+    elif fault == "empty":
+        changed["collected"], changed["records"] = [], []
+    else:
+        wrong = node.replace("unit/background-writer.test.ts", "tests/background.spec.ts")
+        changed["collected"], changed["records"][0]["nodeId"] = [wrong], wrong
+        options["bindings"] = {"variant-one": [wrong]}
+    path.write_text(json.dumps(changed))
+    with pytest.raises(SystemExit):
+        assert_report(path, **options)
+
+
+def test_background_node_reporter_retains_real_hook_failures_skips_and_nested_names(tmp_path):
+    probe = tmp_path / "node-proof.test.mjs"
+    probe.write_text('''import { test, beforeEach, afterEach } from "node:test";
+beforeEach(t => { if (t.name === "setup failure") throw new Error("Setup cut"); });
+afterEach(t => { if (t.name === "teardown failure") throw new Error("Teardown cut"); });
+test("exact name [case=A]", () => {});
+test("exact name [case=B]", () => {});
+test("setup failure", () => {});
+test("teardown failure", () => {});
+test("skipped", { skip: true }, () => {});
+test("todo", { todo: true }, () => {});
+test("parent", async t => { await t.test("child [case=A]", () => {}); });
+test("concurrent parent", { concurrency: 2 }, async t => {
+  let release; const held = new Promise(resolve => { release = resolve; });
+  await Promise.all([t.test("first", async () => { await held; }), t.test("second", () => { release(); })]);
+});
+''')
+    context = checks.background_context(tmp_path, "fast", {"node-proof.test.mjs": hashlib.sha256(probe.read_bytes()).hexdigest()})
+    context_file = tmp_path / "context-node.json"
+    context_file.write_text(json.dumps(context))
+    env = {**checks.safe_env(), "FOLDCV_BACKGROUND_NODE_CONTEXT": str(context_file)}
+    result = subprocess.run(["node", "--test", "--test-reporter=" + str(ROOT / "tools/background_node_reporter.mjs"), str(probe)],
+        cwd=ROOT, env=env, capture_output=True, text=True, timeout=30)
+    assert result.returncode != 0
+    report = read_report(Path(context["reportPath"]))
+    assert report.complete and report.exit_status != 0 and len(report.records) == 11
+    outcomes = {record.node_id.split("::", 1)[1]: record for record in report.records}
+    assert outcomes["exact name [case=A]"].phases == outcomes["exact name [case=B]"].phases == {
+        "setup": "passed", "call": "passed", "teardown": "passed"}
+    assert outcomes["skipped"].markers == ["skip"] and outcomes["todo"].markers == ["todo"]
+    assert outcomes["skipped"].phases == {"setup": "skipped", "call": "skipped", "teardown": "skipped"}
+    assert outcomes["setup failure"].phases != outcomes["exact name [case=A]"].phases
+    assert outcomes["teardown failure"].phases != outcomes["exact name [case=A]"].phases
+    assert "parent::child [case=A]" in outcomes
+    assert "concurrent parent::first" in outcomes and "concurrent parent::second" in outcomes
+    raw = Path(context["reportPath"] + ".events.jsonl").read_text()
+    assert "Setup cut" in raw and "Teardown cut" in raw
+
+
+def test_background_raw_report_merge_preserves_files_and_refuses_rewrite_or_source_drift(tmp_path):
+    first, report, _options = nb_report_fixture(tmp_path)
+    first.write_text(json.dumps(report))
+    node = deepcopy(report)
+    identity = "apps/web/unit/background-writer.test.ts::exact parameter [case=A]"
+    node["collected"], node["records"][0]["nodeId"], node["traces"] = [identity], identity, []
+    second = tmp_path / "node.json"; second.write_text(json.dumps(node))
+    combined = tmp_path / "combined.json"
+    original = first.read_bytes(), second.read_bytes()
+    merge_reports([first, second], combined)
+    assert len(read_report(combined).records) == 2
+    assert original == (first.read_bytes(), second.read_bytes())
+    with pytest.raises(SystemExit, match="never rewrite"):
+        merge_reports([first, second], combined)
+    node["sourceHashes"] = {"node-proof.test.mjs": "b" * 64}; second.write_text(json.dumps(node))
+    with pytest.raises(SystemExit, match="different run/source identity"):
+        merge_reports([first, second], tmp_path / "wrong.json")
+
+
+def test_background_fast_uses_one_context_and_retains_raw_reports_before_combining(tmp_path, monkeypatch):
+    node = "apps/web/unit/background-proof.test.ts::exact [case=A]"
+    python = "tests/recovery/test_background_probe.py::exact_python"
+    spec = {"sources": ["probe.py"], "bindings": {"node": [node], "python": [python]}, "checks": {},
+        "requiredTraces": {}, "requiredActions": [], "requiredOrders": []}
+    (tmp_path / "probe.py").write_text("retained source\n")
+    source_sha = hashlib.sha256((tmp_path / "probe.py").read_bytes()).hexdigest()
+    monkeypatch.setattr(checks, "ROOT", tmp_path)
+    monkeypatch.setattr(checks, "require_node", lambda: None)
+    monkeypatch.setattr(checks, "require_python", lambda: None)
+    monkeypatch.setattr(checks, "background_spec", lambda: spec)
+    monkeypatch.setattr(checks, "background_source_hashes", lambda _names: {"probe.py": source_sha})
+    calls = []
+    def write_report(context, identity):
+        path = Path(context["reportPath"])
+        value = {**{key: val for key, val in context.items() if key != "reportPath"}, "schemaVersion": 1,
+            "finishedAt": context["startedAt"], "complete": True, "exitStatus": 0, "collected": [identity],
+            "records": [{"nodeId": identity, "phases": {"setup": "passed", "call": "passed", "teardown": "passed"},
+                "markers": [], "attempt": 1}], "traces": []}
+        path.write_text(json.dumps(value))
+    def validate(context_file):
+        write_report(json.loads(context_file.read_text()), node)
+    def run(argv, cwd=checks.ROOT, env=None):
+        calls.append(argv)
+        if "pytest" in argv:
+            write_report(json.loads(Path(env["FOLDCV_BACKGROUND_CONTEXT"]).read_text()), python)
+        return ""
+    monkeypatch.setattr(checks, "validate_map", validate)
+    monkeypatch.setattr(checks, "run", run)
+    evidence = tmp_path / "retained" / "proof"
+    checks.fast(evidence, None)
+    combined = read_report(evidence / "execution.json")
+    raw_node, raw_python = read_report(evidence / "execution-node.json"), read_report(evidence / "execution-python.json")
+    assert combined.collected == [node, python]
+    assert raw_node.run_id == raw_python.run_id == combined.run_id
+    assert raw_node.source_hashes == raw_python.source_hashes == {"probe.py": source_sha}
+    assert raw_node.started_at == raw_python.started_at == combined.started_at
+    validation = json.loads((evidence / "validation.json").read_text())
+    assert validation["outcome"] == "passed" and validation["reportSha256"] == hashlib.sha256((evidence / "execution.json").read_bytes()).hexdigest()
+    assert len(calls) == 6
+
+
+def test_background_report_cannot_finish_before_its_bound_start(tmp_path):
+    path, report, options = nb_report_fixture(tmp_path)
+    report["finishedAt"] = "2026-10-16T11:59:59Z"
+    path.write_text(json.dumps(report))
+    with pytest.raises(SystemExit, match="old/wrong run"):
+        assert_report(path, **options)
 
 
 @pytest.mark.parametrize("variant", [f"NB-G02:v{i:02}" for i in range(1, 17)])

@@ -12,12 +12,22 @@ publisher, monotonic scoped history, manual-save boundary, exact receipts and
 typed inverses. Its 103 due variants include real persistence cuts, six owned
 synthetic process terminations and three disposable guard mutants. NB02b adds 105
 variants for every writer route/internal callback, fixed payload ownership,
-portable history, pinned exports, asset GC and private retention. All 308 due
-variants have exact Python bindings. Additional checks cover pin corruption,
-late callbacks, namespace loss and 200 repeated saves without snapshot growth.
-The shared contract corpus has 353 cases, including 16 private-wire boundaries.
-These bindings require a passing source-bound report before slice acceptance.
-`NB-WRITER`, `NB-FIXED`, `NB-UI` and `NB-PARALLEL` await their slice bindings.
+portable history, pinned exports, asset GC and private retention. NB03 adds 120
+variants for resumable writers, bounded barriers, drafts, history ownership and
+independent navigation. All 428 due variants have exact Python or Node bindings.
+Additional checks cover pin corruption, late callbacks, namespace loss, repeated
+saves, engine marks and callback ownership after resume. Real API cases also
+cover clean lease expiry at/after the deadline, a timed out renewal and explicit
+saved/draft choices after expiry or revocation. The later single-tab amendment
+blocks every secondary tab before session exchange or application mounting;
+contention, simultaneous claims, release and lock failure have exact Node checks.
+Manual T3 also verifies no secondary-tab API requests. Additional checks
+include guarded sole-tab resume after a lost unload notification, fresh
+tab resume markers, exact dirty IDs and rejection after losing tab ownership.
+The shared contract
+corpus has 425 cases, including 72 new writer-wire boundaries. These bindings
+require a passing source-bound report before slice acceptance. `NB-FIXED`,
+`NB-UI` and `NB-PARALLEL` await their slice bindings.
 
 The existing fast gate writes exact Python setup/call/teardown results through
 `tools/background_pytest.py` and validates NB parameter/file identities, current
@@ -27,10 +37,19 @@ including a failed run. A subsequent fix gets a new directory/run identity; retr
 results cannot erase failures. The default fast run also retains its local history
 under ignored `tmp/checks-background/`. Unchanged-source retries require
 `--nb-diagnosis <json>` binding the previous run, source hash and reproducible
-diagnostic artifacts; new source keeps the failed run in its history. Normal Node state tests still run, but global Node
-test names cannot satisfy any NB variant: NB00a binds Python nodes only. Future
-Node NB bindings require exact file/full-name execution evidence. No automated
-browser scenarios are added or executed; mounted behavior uses manual T3.
+diagnostic artifacts; new source keeps the failed run in its history. Node state
+results now retain exact file/full nested names and completed hooks through
+`tools/background_node_reporter.mjs`; global names cannot satisfy NB variants.
+Raw Node events also retain V8 branch details for background, assistant and rich
+modules. Review these transformed-module ranges alongside named safety cases;
+they are not a source-line coverage guarantee.
+The combined report requires all 32 traces: the original specification corpus
+and 16 real API/store/compiler traces of 200 transitions at capacity one. Named
+orders cover attach/commit, timeout/input/reply, edit/Undo/detach,
+delete/restart/callback and save/crash/duplicate. Disposable copies prove five
+critical guard regressions. No automated browser scenarios are added or executed;
+mounted mutation origins, drafts, reload and history use manual T3. Real OS IME
+evidence remains separate from scripted composition.
 
 D085 assistant work follows [its plan](agent-assistant-plan.md), AC01–AC18 and
 AG00–AG08. No assistant acceptance is claimed yet. Add the namespaced requirement

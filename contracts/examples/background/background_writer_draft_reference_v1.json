@@ -1,0 +1,12 @@
+{
+  "schemaVersion": 1,
+  "proof": {
+    "schemaVersion": 1,
+    "lineage": "lineage_2d845c6516af8f57fc565be5",
+    "epoch": 2,
+    "sessionId": "editor-session",
+    "incarnation": "connection-one",
+    "credential": "synthetic_writer_credential_0123456789"
+  },
+  "id": "recovery-input"
+}

@@ -12,6 +12,7 @@ from packages.resume_core.background_history import digest_bytes
 from packages.resume_core.extraction.parser import extract
 from packages.resume_core.gui_projects import GuiRenameProjectRequest
 from packages.resume_core.models.rich_workspace import RichWarning
+from packages.resume_core.models.background import WriterMutationV1, WriterProofV1, WriterViewV1
 from packages.resume_core.rich_api import ImageSessionRequest
 from packages.resume_core.rich_archive import export_rich_archive
 from packages.resume_core.rich_dependencies import placements
@@ -162,6 +163,16 @@ async def test_each_existing_canonical_http_entry_preserves_an_interleaved_chang
     async with boundary(fixture, tmp_path, provider) as (client, service, jobs):
         prefix = "/v1/rich/projects/" + fixture.project
         before = service.read(fixture.project)
+        writer_view, writer_proof = None, None
+        if variant == "NB-P08:v09":
+            credential = "synthetic_route_writer_credential_0123456789"
+            opened = await client.post(prefix + "/writer/open", json={"schemaVersion": 1,
+                "sessionId": "manual-route", "incarnation": "manual-route-connection", "credential": credential,
+                "canonicalRevision": before.project_revision, "canonicalSha256": digest_bytes(before), "actionCursor": 0})
+            assert opened.status_code == 200, opened.text
+            writer_view = WriterViewV1.model_validate(opened.json())
+            writer_proof = WriterProofV1(schemaVersion=1, lineage=writer_view.writer.lineage, epoch=writer_view.writer.epoch,
+                sessionId=writer_view.writer.session_id, incarnation=writer_view.writer.incarnation, credential=credential)
         selected = selection(before) if variant not in {"NB-P08:v14", "NB-P08:v15"} else None
         record = None
         if variant in {"NB-P08:v17", "NB-P08:v18", "NB-P08:v19"}:
@@ -234,6 +245,15 @@ async def test_each_existing_canonical_http_entry_preserves_an_interleaved_chang
             response = await client.request(method, prefix + path, files=files, headers=headers)
         else:
             response = await client.request(method, prefix + path, json=payload)
+        if variant == "NB-P08:v09":
+            assert response.status_code == 409 and response.json()["error"]["code"] == "WRITER_UNKNOWN"
+            assert fixture.current() == committed and (jobs.store.projects / fixture.project / "state.json").read_bytes() == raw
+            assert writer_proof is not None and writer_view is not None and request is not None
+            request.capture.session_id = writer_proof.session_id
+            command = WriterMutationV1(schemaVersion=1, proof=writer_proof,
+                canonicalRevision=writer_view.writer.acknowledged_revision, canonicalSha256=writer_view.writer.acknowledged_sha256,
+                actionCursor=1, touches=[{"cursor": 1, "mutation": request}], mutation=request)
+            response = await client.post(prefix + "/writer/save", json=command.model_dump(mode="json", by_alias=True))
         assert response.status_code in {200, 201}, (variant, response.status_code, response.text)
         if variant == "NB-P08:v05":
             assert response.json()["status"] == "deleted" and not (service.storage.projects / fixture.project).exists()

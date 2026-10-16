@@ -18,7 +18,8 @@ import uuid
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
-from tools.background_evidence import ExecutionReportV1, assert_report as assert_background_report, failure_history, source_hashes as background_source_hashes
+from tools.background_evidence import (ExecutionReportV1, assert_report as assert_background_report,
+    failure_history, merge_reports, read_report, source_hashes as background_source_hashes)
 
 WEB = ROOT / "apps/web"
 PYTHON = ROOT / ".venv/bin/python"
@@ -102,7 +103,7 @@ def background_context(root: Path, suite: str, sources: dict[str, str]) -> dict:
         "startedAt": datetime.now(timezone.utc).isoformat(), "reportPath": str(root.resolve() / "execution.json")}
 
 
-def pytest_group(name: str, evidence_dir: Path | None = None, diagnosis: Path | None = None) -> None:
+def pytest_group(name: str, evidence_dir: Path | None = None, diagnosis: Path | None = None, *, prepared: dict | None = None) -> None:
     require_python()
     targets = PYTHON_SUITES[name]
     with tempfile.TemporaryDirectory(prefix="foldcv-coverage-") as temp:
@@ -114,21 +115,28 @@ def pytest_group(name: str, evidence_dir: Path | None = None, diagnosis: Path | 
         history = []
         retained = []
         if spec is not None:
-            context = background_context(temp_root, name, background_source_hashes(spec["sources"]))
+            context = prepared["context"] if prepared else background_context(temp_root, name, background_source_hashes(spec["sources"]))
             history_root = ROOT / "tmp/checks-background"
-            history = failure_history(history_root, context["sourceHashes"], diagnosis)
-            if evidence_dir is not None and evidence_dir.parent != history_root:
+            history = prepared["history"] if prepared else failure_history(history_root, context["sourceHashes"], diagnosis)
+            if not prepared and evidence_dir is not None and evidence_dir.parent != history_root:
                 history.extend(failure_history(evidence_dir.parent, context["sourceHashes"], diagnosis))
             history = list({item["runId"]: item for item in history}.values())
             retained = [history_root / context["runId"]]
             context_file = temp_root / "context.json"
             context_file.write_text(json.dumps(context))
-            env["FOLDCV_BACKGROUND_CONTEXT"] = str(context_file)
+            python_context = {**context, "reportPath": str(temp_root / "execution-python.json")}
+            python_context_file = temp_root / "context-python.json"
+            python_context_file.write_text(json.dumps(python_context))
+            env["FOLDCV_BACKGROUND_CONTEXT"] = str(python_context_file)
             arguments = ["-p", "tools.background_pytest"]
         if evidence_dir is not None:
             retained.append(evidence_dir)
         for directory in retained:
-            directory.mkdir(parents=True, exist_ok=False)
+            if prepared:
+                if (directory / "validation.json").exists() or (directory / "context.json").read_bytes() != context_file.read_bytes():
+                    raise SystemExit("NB retained context already exists or changed")
+            else:
+                directory.mkdir(parents=True, exist_ok=False)
             if spec is not None:
                 (directory / "context.json").write_bytes(context_file.read_bytes())
         failure = None
@@ -139,9 +147,12 @@ def pytest_group(name: str, evidence_dir: Path | None = None, diagnosis: Path | 
         except BaseException as error:
             failure = error
         finally:
+            if spec is not None and (temp_root / "execution-python.json").is_file():
+                raw = [Path(prepared["nodeReport"])] if prepared else []
+                merge_reports([*raw, temp_root / "execution-python.json"], Path(context["reportPath"]))
             for directory in retained:
-                for filename in ("execution.json", "branches.json", "context.json"):
-                    path = temp_root / filename
+                for filename in ("execution.json", "execution-python.json", "branches.json", "context.json"):
+                    path = Path(context["reportPath"]) if filename == "execution.json" and spec is not None else temp_root / filename
                     if path.is_file():
                         (directory / filename).write_bytes(path.read_bytes())
                 (directory / "history.json").write_text(json.dumps(history, indent=2) + "\n")
@@ -192,7 +203,7 @@ def assert_partial_checks(entries: list[dict[str, object]], checks: object) -> N
             raise SystemExit(f"Incomplete remaining check: {requirement}")
 
 
-def validate_map() -> None:
+def validate_map(node_context: Path | None = None) -> None:
     require_python()
     data = json.loads((ROOT / "tests/requirements.json").read_text(encoding="utf-8"))
     entries = data["entries"]
@@ -213,13 +224,26 @@ def validate_map() -> None:
     assert_prototype_collection(data["foundation"].get("prototypeRegressions"), collected)
     # A function ID maps its parametrized cases without matching longer function names.
     mapped_ids = collected | {node.partition("[")[0] for node in collected}
-    state_result = subprocess.run(["npm", "run", "test:state"], cwd=WEB, env=safe_env(),
+    state_env = safe_env()
+    if node_context is not None:
+        state_env["FOLDCV_BACKGROUND_NODE_CONTEXT"] = str(node_context)
+    state_result = subprocess.run(["npm", "run", "test:state"], cwd=WEB, env=state_env,
                                   capture_output=True, text=True)
     if state_result.returncode != 0:
         raise SystemExit(state_result.stdout + state_result.stderr)
     state_names = set(re.findall(r"^# Subtest: (.+)$", state_result.stdout, re.MULTILINE))
     if not state_names or not re.search(r"^# fail 0$", state_result.stdout, re.MULTILINE):
         raise SystemExit("State suite did not report passing tests")
+    exact_state_nodes = set()
+    if node_context is not None:
+        scope = json.loads(node_context.read_text())
+        report = read_report(Path(scope["reportPath"]))
+        binding = next((node for node in report.collected if node.startswith("apps/web/unit/background-")), None)
+        if binding is None:
+            raise SystemExit("NB Node suite did not collect its exact test files")
+        assert_background_report(Path(scope["reportPath"]), run_id=scope["runId"], suite="fast", sources=scope["sourceHashes"],
+            started_at=scope["startedAt"], bindings={"node-state": [binding]}, required_traces={}, required_actions=set(), required_orders=set())
+        exact_state_nodes = set(report.collected)
     browser_listing = subprocess.run(["npm", "run", "test:browser", "--", "--list"], cwd=WEB,
                                      env=safe_env(), capture_output=True, text=True, check=True).stdout
     browser_names = set(re.findall(r"^\s+([\w.-]+\.spec\.ts):\d+:\d+ › (.+)$",
@@ -232,11 +256,11 @@ def validate_map() -> None:
         if (entry["status"] == "unimplemented") != (not entry["tests"]):
             raise SystemExit(f"Invalid test mapping for {entry['id']}")
         for node in entry["tests"]:
-            if entry["id"].startswith("NB-") and node.startswith("apps/web/"):
-                raise SystemExit("NB Node bindings require an exact execution reporter; browser evidence is manual T3")
+            if entry["id"].startswith("NB-") and node.startswith("apps/web/tests/"):
+                raise SystemExit("NB browser evidence is manual T3")
             if node.startswith("apps/web/unit/"):
                 file, _, name = node.partition("::")
-                found = (ROOT / file).is_file() and name in state_names
+                found = (ROOT / file).is_file() and (node in exact_state_nodes if entry["id"].startswith("NB-") else name in state_names)
             elif node.startswith("apps/web/tests/"):
                 file, _, name = node.partition("::")
                 found = (ROOT / file).is_file() and (Path(file).name, name) in browser_names
@@ -266,6 +290,41 @@ def browser() -> None:
     run(["npm", "run", "test:browser"], WEB)
 
 
+def fast(evidence_dir: Path | None, diagnosis: Path | None) -> None:
+    require_node()
+    spec = background_spec()
+    with tempfile.TemporaryDirectory(prefix="foldcv-fast-") as folder:
+        root = Path(folder).resolve()
+        context = background_context(root, "fast", background_source_hashes(spec["sources"]))
+        history_root = ROOT / "tmp/checks-background"
+        history = failure_history(history_root, context["sourceHashes"], diagnosis)
+        if evidence_dir is not None and evidence_dir.parent != history_root:
+            history.extend(failure_history(evidence_dir.parent, context["sourceHashes"], diagnosis))
+        retained = [history_root / context["runId"], *([evidence_dir] if evidence_dir else [])]
+        for directory in retained:
+            directory.mkdir(parents=True, exist_ok=False)
+            (directory / "context.json").write_text(json.dumps(context))
+        node_report = root / "execution-node.json"
+        node_context = root / "context-node.json"
+        node_context.write_text(json.dumps({**context, "reportPath": str(node_report)}))
+        try:
+            validate_map(node_context)
+            for command in (["npm", "run", "typecheck"], ["npm", "run", "lint"],
+                            ["npm", "run", "contracts:check"], ["npm", "run", "test:contracts"],
+                            ["npm", "run", "build"]):
+                run(command, WEB)
+            pytest_group("fast", evidence_dir, diagnosis,
+                prepared={"context": context, "nodeReport": str(node_report), "history": history})
+        finally:
+            for directory in retained:
+                for path in (node_context, node_report, node_report.with_suffix(".json.events.jsonl")):
+                    if path.is_file():
+                        (directory / path.name).write_bytes(path.read_bytes())
+                history_file = directory / "history.json"
+                if not history_file.exists():
+                    history_file.write_text(json.dumps(history, indent=2) + "\n")
+
+
 def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("group", choices=["fast", "integration-render", "browser"])
@@ -273,13 +332,7 @@ def main() -> None:
     parser.add_argument("--nb-diagnosis", type=Path)
     args = parser.parse_args()
     if args.group == "fast":
-        require_node()
-        validate_map()
-        for command in (["npm", "run", "typecheck"], ["npm", "run", "lint"],
-                        ["npm", "run", "contracts:check"], ["npm", "run", "test:contracts"],
-                        ["npm", "run", "build"]):
-            run(command, WEB)
-        pytest_group("fast", args.evidence_dir, args.nb_diagnosis)
+        fast(args.evidence_dir, args.nb_diagnosis)
     elif args.group == "integration-render":
         require_converter()
         pytest_group("integration-render", args.evidence_dir)

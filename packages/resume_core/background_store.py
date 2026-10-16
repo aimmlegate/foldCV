@@ -48,7 +48,7 @@ def job_in(state: BackgroundSidecarV1, job_id: str) -> JobSnapshotV1:
 
 
 def records(state: BackgroundSidecarV1) -> int:
-    return (sum(len(getattr(state, key)) for key in ("jobs", "requests", "proposals", "drafts", "generations", "intents", "inverses", "manual_intents", "asset_pins", "orphan_assets", "cleanup_refs"))
+    return (sum(len(getattr(state, key)) for key in ("jobs", "requests", "proposals", "drafts", "generations", "intents", "inverses", "manual_intents", "asset_pins", "orphan_assets", "cleanup_refs", "writer_touches", "history_commands"))
         + int(state.writer is not None) + int(state.barrier is not None)
         + (1 + len(state.history.definitions) if state.history is not None else 0))
 
@@ -112,13 +112,14 @@ class JobStore:
         jobs = {job.id: job for job in state.jobs}
         archived = {request.job_id: request.archived_result for request in state.requests if request.archived_result is not None}
         from .agent_store import digest
-        for kind, owners in (("job", {**jobs, **archived}), ("inverse", {item.proposal_id: item for item in state.inverses})):
+        for kind, owners in (("job", {**jobs, **archived}), ("inverse", {item.proposal_id: item for item in state.inverses}),
+                ("draft", {item.id: item for item in state.drafts})):
             pins = {pin.owner: pin for pin in state.asset_pins if pin.kind == kind}
             for identifier, owner in owners.items():
                 if owner.asset_pins_sha256 is not None and (identifier not in pins or digest([
                         ref.model_dump(mode="json", by_alias=True) for ref in pins[identifier].references]) != owner.asset_pins_sha256):
                     raise ValueError("missing or changed asset ownership")
-            if pins.keys() - owners.keys():
+            if kind != "draft" and pins.keys() - owners.keys():
                 raise ValueError("orphan asset owner")
         for request in state.requests:
             if request.archived_result is None and (request.job_id not in jobs or
@@ -168,6 +169,13 @@ class JobStore:
                         and intent.candidate_ref == inverse.inverse_ref and intent.phase == "receipt_stored"
                         for intent in state.intents)):
                 raise ValueError("inverse ownership needs its exact saved Job")
+            if inverse.command_ref is not None and not any(item.candidate_ref == inverse.command_ref
+                    and item.phase == "receipt_stored" for item in state.manual_intents):
+                raise ValueError("active compensation needs its durable manual candidate")
+        for command in state.history_commands:
+            job = jobs.get(command.job_id) or archived.get(command.job_id)
+            if job is None or job.receipt is None or job.proposal_id != command.proposal_id:
+                raise ValueError("history command needs its exact saved Job")
 
     def _all(self) -> dict[str, BackgroundSidecarV1]:
         result = {}
@@ -574,7 +582,7 @@ class JobStore:
                 else:
                     raise BackgroundFailure("JOB_STORE_UNAVAILABLE")
             for name in ("jobs", "requests", "proposals", "drafts", "generations", "intents", "inverses",
-                    "manual_intents", "asset_pins", "orphan_assets", "cleanup_refs"):
+                    "manual_intents", "asset_pins", "orphan_assets", "cleanup_refs", "writer_touches", "history_commands"):
                 setattr(state, name, [])
             state.writer, state.barrier, state.history = None, None, None
             self._write(directory, state, self._all())

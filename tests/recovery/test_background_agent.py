@@ -36,6 +36,18 @@ async def environment(root):
     return service, factory, workspace, payload, connection, old
 
 
+def hold_writer(service, workspace):
+    from packages.resume_core.background_history import digest_bytes
+    from packages.resume_core.models.background import WriterOpenV1, WriterProofV1
+    current = service.projects.storage.read_committed(workspace.project_id)[0]
+    view = service.writers.open(workspace.project_id, WriterOpenV1(schemaVersion=1, sessionId="held-editor",
+        incarnation="held-connection", credential="synthetic_held_writer_credential_0123456789",
+        canonicalRevision=current.project_revision, canonicalSha256=digest_bytes(current), actionCursor=0))
+    return WriterProofV1(schemaVersion=1, lineage=view.writer.lineage, epoch=view.writer.epoch,
+        sessionId=view.writer.session_id, incarnation=view.writer.incarnation,
+        credential="synthetic_held_writer_credential_0123456789")
+
+
 @pytest.mark.asyncio
 async def test_server_capture_retry_and_legacy_view_have_one_job_authority(tmp_path):
     service, factory, workspace, payload, connection, old = await environment(tmp_path)
@@ -240,6 +252,7 @@ async def test_runtime_adapter_uses_v2_instructions_and_closes_tools_before_perm
 @pytest.mark.parametrize("review", [False, True], ids=["NB-J04:v01", "NB-J04:v02"])
 async def test_actual_compiler_apply_v2_retains_single_payload_after_native_exit_and_restart(tmp_path, review):
     service, factory, workspace, payload, _connection, old = await environment(tmp_path)
+    hold_writer(service, workspace)
     canonical_before = digest(service.projects.read(workspace.project_id))
     old_before = old.store.load(workspace.project_id)
     replies = []
@@ -255,8 +268,9 @@ async def test_actual_compiler_apply_v2_retains_single_payload_after_native_exit
             if review:
                 from tests.recovery.test_background_inverse import mutation, put
                 current = service.projects.storage.read_committed(workspace.project_id)[0]
-                service.projects.mutate(workspace.project_id,
-                    mutation(current, [put(current, "narrative", text="Concurrent user input")], "manual-before-apply"))
+                service.publisher.manual(workspace.project_id,
+                    mutation(current, [put(current, "narrative", text="Concurrent user input")], "manual-before-apply"),
+                    originals=service.projects.originals, artifacts=service.projects.artifacts, images=service.projects.images)
                 expected_canonical[0] = digest(service.projects.read(workspace.project_id))
             applied = await session.call("apply_edit_batch", AgentApplyRequest(batchId=prepared["batchId"]))
             assert applied["disposition"] == ("needs_review" if review else "waiting_for_sync"), applied

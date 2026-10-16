@@ -1,4 +1,8 @@
 export type Assetpinssha256 = string | null;
+export type Commandinversebytes = number | null;
+export type Commandinversesha256 = string | null;
+export type Commandref = string | null;
+export type Direction = "undo" | "redo" | "closed";
 export type Expiresat = string;
 export type Fingerprint = string;
 export type Generation = number;
@@ -26,6 +30,10 @@ export type Writerepoch = number | null;
 
 export interface UndoOwnershipV1 {
   assetPinsSha256?: Assetpinssha256;
+  commandInverseBytes?: Commandinversebytes;
+  commandInverseSha256?: Commandinversesha256;
+  commandRef?: Commandref;
+  direction?: Direction;
   expiresAt: Expiresat;
   guards: ScopeGuardV1;
   incarnation: Incarnation;

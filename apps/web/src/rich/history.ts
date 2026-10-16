@@ -25,7 +25,8 @@ export class SessionHistory {
   private readonly assistantActions = new Set<string>();
 
   constructor(readonly session: string, initial: ReadonlyMap<string, CellValue>,
-    private readonly effect: (changes: readonly CellChange[], context: HistoryEffectContext) => void = () => {}) {
+    private readonly effect: (changes: readonly CellChange[], context: HistoryEffectContext) => void = () => {},
+    private readonly allowed: (context: HistoryEffectContext) => boolean = () => true) {
     for (const [key, value] of initial) this.cells.set(key, value);
   }
 
@@ -35,6 +36,7 @@ export class SessionHistory {
   get position(): number { return this.cursor; }
   get length(): number { return this.actions.length; }
   get currentActionId(): string | null { return this.actions[this.cursor - 1]?.id ?? null; }
+  actionFor(direction: "undo" | "redo"): string | null { return this.actions[direction === "undo" ? this.cursor - 1 : this.cursor]?.id ?? null; }
   retainedValues(): CellValue[] {
     return [...this.cells.values(), ...this.actions.flatMap(action => action.changes.flatMap(change => [change.before, change.after]))];
   }
@@ -55,7 +57,7 @@ export class SessionHistory {
 
   private apply(changes: readonly CellChange[], context: HistoryEffectContext = { mode: "ordinary", actionId: null, kind: "typing" },
     reservation: HistoryReservation | null = null): boolean {
-    if (this.reservation !== reservation || !this.valid(changes)) return false;
+    if (this.reservation !== reservation || !this.valid(changes) || !this.allowed(context)) return false;
     // The adapter validates and applies the whole transaction before publishing cells.
     this.effect(changes, context);
     for (const change of changes) {
@@ -167,6 +169,21 @@ export class SessionHistory {
 
   discard(reservation: HistoryReservation): void {
     if (this.reservation === reservation) this.reservation = null;
+  }
+
+  adoptExisting(reservation: HistoryReservation, changes: readonly CellChange[]): boolean {
+    const effective = changes.filter(change => change.before !== change.after);
+    if (!effective.length || !this.reserved(reservation) || new Set(effective.map(change => change.key)).size !== effective.length
+      || effective.some(change => this.read(change.key) !== change.after)) return false;
+    this.actions.splice(this.cursor);
+    this.actions.push({ id: reservation.actionId, token: 0, kind: "structure", group: null, changes: effective.map(change => ({ ...change })) });
+    this.assistantActions.add(reservation.actionId);
+    this.cursor++; this.reservation = null;
+    return true;
+  }
+
+  reconcile(changes: readonly CellChange[]): boolean {
+    return this.apply(changes, { mode: "prepared", actionId: null, kind: "structure" });
   }
 
   close(): void { this.closed = true; this.reservation = null; }

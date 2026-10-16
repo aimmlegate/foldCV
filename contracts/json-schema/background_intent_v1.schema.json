@@ -1,4 +1,48 @@
 {
+  "$defs": {
+    "JobFailure": {
+      "additionalProperties": false,
+      "properties": {
+        "code": {
+          "enum": [
+            "AUTH_REQUIRED",
+            "RATE_LIMITED",
+            "BUSY",
+            "MODEL_DENIED",
+            "CANCELLED",
+            "DEADLINE",
+            "STARTUP_TIMEOUT",
+            "PROCESS_FAILED",
+            "CLEANUP_FAILED",
+            "INTERRUPTED",
+            "PROTOCOL",
+            "JOB_QUEUE_FULL",
+            "JOB_STORAGE_FULL",
+            "JOB_IDEMPOTENCY_CONFLICT",
+            "REQUEST_EXPIRED",
+            "JOB_NOT_FOUND",
+            "JOB_STORE_CORRUPT",
+            "JOB_STORE_UNAVAILABLE",
+            "JOB_DISABLED",
+            "JOB_SCOPE_INVALID",
+            "ACCOUNT_CHANGED",
+            "DEPENDENCY_CHANGED",
+            "WRITER_UNKNOWN",
+            "SAVE_FAILED",
+            "OUTCOME_UNKNOWN",
+            "PROJECT_DELETED"
+          ],
+          "title": "Code",
+          "type": "string"
+        }
+      },
+      "required": [
+        "code"
+      ],
+      "title": "JobFailure",
+      "type": "object"
+    }
+  },
   "additionalProperties": false,
   "properties": {
     "afterGenerationsSha256": {
@@ -148,6 +192,17 @@
       "pattern": "^[A-Za-z0-9_-]+$",
       "title": "Proposalid",
       "type": "string"
+    },
+    "reconciledReason": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/JobFailure"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
     },
     "requestSha256": {
       "pattern": "^[a-f0-9]{64}$",

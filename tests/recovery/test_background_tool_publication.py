@@ -7,16 +7,51 @@ import pytest
 from packages.resume_core.background_store import BackgroundFailure
 from packages.resume_core.background_supervisor import ExecutionOutcome
 from packages.resume_core.models.agent import AgentApplyRequest, AgentQuery, AgentReadSnapshot
-from packages.resume_core.models.background import WriterSessionV1
+from packages.resume_core.models.background import WriterAdvanceV1
 from tests.recovery.test_agent_edits import command, replace
-from tests.recovery.test_background_agent import environment
+from tests.recovery.test_background_agent import environment, hold_writer
 from tests.recovery.test_background_inverse import mutation, put
+
+
+@pytest.mark.asyncio
+async def test_apply_v2_returns_one_exact_saved_receipt_when_no_writer_is_attached(tmp_path):
+    from packages.resume_core.models.background import SavedApplyV2
+    service, factory, workspace, payload, _connection, _old = await environment(tmp_path)
+    results = []
+    async def execute(control, _actor):
+        session = service.tools.session(control)
+        try:
+            read = await session.call("get_resume_context", AgentQuery(kind="document", ids=["narrative"]))
+            prepared = await session.call("prepare_edit_batch", command(replace(
+                AgentReadSnapshot.model_validate(read["snapshot"]), "narrative", 0, 6, "Saved now")))
+            request = AgentApplyRequest(batchId=prepared["batchId"])
+            saved = SavedApplyV2.model_validate(await session.call("apply_edit_batch", request))
+            assert saved.disposition == "saved" and saved.durable and saved.result.receipt.durable
+            assert SavedApplyV2.model_validate(await session.call("apply_edit_batch", request)) == saved
+            results.append(saved)
+            return ExecutionOutcome(finished_at=service.supervisor.clock.now())
+        finally:
+            await session.close()
+    factory.callbacks[payload.request.client_request_id] = execute
+    try:
+        job, _created = await service.submit(workspace.project_id, payload)
+        await factory.actor(job)
+        await asyncio.wait_for(service.supervisor.controls[job.id].task, 10)
+        persisted = service.projects.storage.read_committed(workspace.project_id)[0]
+        assert len(results) == len(persisted.mutation_replay) == 1
+        stored = service.store.read(workspace.project_id, job.id)
+        assert stored.receipt.request_sha256 == results[0].result.receipt.request_sha256
+        assert stored.publication == "saved" and factory.calls == [(job.id, "agent")]
+    finally:
+        await service.shutdown()
+        factory.verify(); service.supervisor.clock.verify()
 
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize("variant", ["NB-J06:v01", "NB-J06:v02", "NB-J06:v03", "NB-J05:v04"])
 async def test_one_turn_cannot_replace_or_duplicate_its_accepted_payload(tmp_path, variant):
     service, factory, workspace, payload, _connection, _old = await environment(tmp_path)
+    hold_writer(service, workspace)
     sessions, results = [], []
     async def execute(control, _actor):
         session = service.tools.session(control)
@@ -62,9 +97,10 @@ async def test_one_turn_cannot_replace_or_duplicate_its_accepted_payload(tmp_pat
 @pytest.mark.asyncio
 @pytest.mark.parametrize("restart", [False, True], ids=["after-runtime-exit", "startup-recovery"])
 async def test_compiled_proposal_saves_through_the_service_after_owned_runtime_cleanup(tmp_path, restart):
-    from packages.resume_core.background_store import expiration
+    from packages.resume_core.background_history import digest_bytes
     from packages.resume_core.models.agent import wire_bytes
     service, factory, workspace, payload, connection, _old = await environment(tmp_path)
+    proof = hold_writer(service, workspace)
     results = []
     async def execute(control, _actor):
         session = service.tools.session(control)
@@ -89,15 +125,12 @@ async def test_compiled_proposal_saves_through_the_service_after_owned_runtime_c
         pending = service.publication.publish(workspace.project_id, job.id, accepted.payload_sha256)
         assert pending.publication == "waiting_for_sync" and pending.publication_error.code == "WRITER_UNKNOWN"
         current = service.projects.storage.read_committed(workspace.project_id)[0]
-        service.projects.mutate(workspace.project_id,
-            mutation(current, [put(current, "quote", text="Independent user input")], "independent-before-publication"))
-        with service.store.guard(workspace.project_id) as directory:
-            state = service.store._read(workspace.project_id, directory)
-            state.writer = WriterSessionV1(schemaVersion=1, projectId=workspace.project_id, lineage=state.lineage,
-                epoch=1, sessionId="session", incarnation="instance", resumeCredentialSha256="a" * 64,
-                leaseExpiresAt=expiration(service.store.clock(), 15), status="clean_detached", acknowledgedRevision=2,
-                acknowledgedCursor=1, touchGeneration=1, barrierGeneration=0, draftId=None)
-            service.store._write(directory, state, service.store._all())
+        service.publisher.manual(workspace.project_id,
+            mutation(current, [put(current, "quote", text="Independent user input")], "independent-before-publication"),
+            originals=service.projects.originals, artifacts=service.projects.artifacts, images=service.projects.images)
+        current = service.projects.storage.read_committed(workspace.project_id)[0]
+        service.writers.detach(workspace.project_id, WriterAdvanceV1(schemaVersion=1, proof=proof,
+            canonicalRevision=current.project_revision, canonicalSha256=digest_bytes(current), actionCursor=0))
         owner = service
         if restart:
             from packages.resume_core.background_clock import ControlledDeadlines
@@ -152,6 +185,7 @@ async def test_compiled_proposal_saves_through_the_service_after_owned_runtime_c
 @pytest.mark.parametrize("variant", ["NB-J06:v04", "NB-J05:v03"])
 async def test_a_new_turn_reads_canonical_and_supersession_is_durable_before_dispatch(tmp_path, variant):
     service, factory, workspace, payload, _connection, _old = await environment(tmp_path)
+    hold_writer(service, workspace)
     accepted, checked = [], []
     async def first(control, _actor):
         session = service.tools.session(control)

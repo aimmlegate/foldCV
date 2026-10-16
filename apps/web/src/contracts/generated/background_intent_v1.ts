@@ -26,6 +26,33 @@ export type Phase =
 export type Previousref = string;
 export type Projectid = string;
 export type Proposalid = string;
+export type Code =
+  | "AUTH_REQUIRED"
+  | "RATE_LIMITED"
+  | "BUSY"
+  | "MODEL_DENIED"
+  | "CANCELLED"
+  | "DEADLINE"
+  | "STARTUP_TIMEOUT"
+  | "PROCESS_FAILED"
+  | "CLEANUP_FAILED"
+  | "INTERRUPTED"
+  | "PROTOCOL"
+  | "JOB_QUEUE_FULL"
+  | "JOB_STORAGE_FULL"
+  | "JOB_IDEMPOTENCY_CONFLICT"
+  | "REQUEST_EXPIRED"
+  | "JOB_NOT_FOUND"
+  | "JOB_STORE_CORRUPT"
+  | "JOB_STORE_UNAVAILABLE"
+  | "JOB_DISABLED"
+  | "JOB_SCOPE_INVALID"
+  | "ACCOUNT_CHANGED"
+  | "DEPENDENCY_CHANGED"
+  | "WRITER_UNKNOWN"
+  | "SAVE_FAILED"
+  | "OUTCOME_UNKNOWN"
+  | "PROJECT_DELETED";
 export type Requestsha256 = string;
 export type Resolvedat = string | null;
 export type Schemaversion = 1;
@@ -49,8 +76,12 @@ export interface PublicationIntentV1 {
   previousRef: Previousref;
   projectId: Projectid;
   proposalId: Proposalid;
+  reconciledReason?: JobFailure | null;
   requestSha256: Requestsha256;
   resolvedAt?: Resolvedat;
   schemaVersion: Schemaversion;
   writerEpoch: Writerepoch;
+}
+export interface JobFailure {
+  code: Code;
 }

@@ -1430,6 +1430,63 @@
       "title": "HeadingProps",
       "type": "object"
     },
+    "HistoryPendingV1": {
+      "additionalProperties": false,
+      "properties": {
+        "actionCursor": {
+          "maximum": 9007199254740991,
+          "minimum": 0,
+          "title": "Actioncursor",
+          "type": "integer"
+        },
+        "commandId": {
+          "maxLength": 128,
+          "minLength": 1,
+          "pattern": "^[A-Za-z0-9_-]+$",
+          "title": "Commandid",
+          "type": "string"
+        },
+        "direction": {
+          "enum": [
+            "undo",
+            "redo"
+          ],
+          "title": "Direction",
+          "type": "string"
+        },
+        "jobId": {
+          "maxLength": 128,
+          "minLength": 1,
+          "pattern": "^[A-Za-z0-9_-]+$",
+          "title": "Jobid",
+          "type": "string"
+        },
+        "proposalId": {
+          "maxLength": 128,
+          "minLength": 1,
+          "pattern": "^[A-Za-z0-9_-]+$",
+          "title": "Proposalid",
+          "type": "string"
+        },
+        "transferId": {
+          "maxLength": 128,
+          "minLength": 1,
+          "pattern": "^[A-Za-z0-9_-]+$",
+          "title": "Transferid",
+          "type": "string"
+        }
+      },
+      "required": [
+        "jobId",
+        "proposalId",
+        "transferId",
+        "commandId",
+        "direction",
+        "actionCursor"
+      ],
+      "title": "HistoryPendingV1",
+      "type": "object"
+    },
     "Hyperlink": {
       "additionalProperties": false,
       "properties": {
@@ -4669,6 +4726,32 @@
       ],
       "title": "WorkingPeriod",
       "type": "object"
+    },
+    "WriterTouchV1": {
+      "additionalProperties": false,
+      "properties": {
+        "cursor": {
+          "minimum": 1,
+          "title": "Cursor",
+          "type": "integer"
+        },
+        "mutation": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/RichMutation"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "cursor",
+        "mutation"
+      ],
+      "title": "WriterTouchV1",
+      "type": "object"
     }
   },
   "additionalProperties": false,
@@ -4690,6 +4773,14 @@
     "facts": {
       "$ref": "#/$defs/WorkingFacts"
     },
+    "historyOutbox": {
+      "items": {
+        "$ref": "#/$defs/HistoryPendingV1"
+      },
+      "maxItems": 100,
+      "title": "Historyoutbox",
+      "type": "array"
+    },
     "outbox": {
       "items": {
         "$ref": "#/$defs/RichMutation"
@@ -4702,6 +4793,14 @@
       "const": 1,
       "title": "Schemaversion",
       "type": "integer"
+    },
+    "touches": {
+      "items": {
+        "$ref": "#/$defs/WriterTouchV1"
+      },
+      "maxItems": 100,
+      "title": "Touches",
+      "type": "array"
     }
   },
   "required": [

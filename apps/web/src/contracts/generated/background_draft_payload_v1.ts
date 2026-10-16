@@ -492,6 +492,16 @@ export type Orderindex = number;
 export type Recordid5 = string;
 export type Revision34 = number;
 export type Tombstones = RecordTombstone[];
+export type Actioncursor = number;
+export type Commandid = string;
+export type Direction = "undo" | "redo";
+export type Jobid5 = string;
+export type Proposalid = string;
+export type Transferid = string;
+/**
+ * @maxItems 100
+ */
+export type Historyoutbox = HistoryPendingV1[];
 export type Actionid1 = string;
 export type Actionid2 = string;
 export type Actiontoken = number;
@@ -578,13 +588,20 @@ export type Recordid6 = string;
  */
 export type Outbox = RichMutation[];
 export type Schemaversion2 = 1;
+export type Cursor = number;
+/**
+ * @maxItems 100
+ */
+export type Touches = WriterTouchV1[];
 
 export interface DraftPayloadV1 {
   assetPins: Assetpins;
   document: RichDocumentV1;
   facts: WorkingFacts;
+  historyOutbox?: Historyoutbox;
   outbox: Outbox;
   schemaVersion: Schemaversion2;
+  touches?: Touches;
 }
 export interface RichDocumentV1 {
   regions: Regions;
@@ -1041,6 +1058,14 @@ export interface RecordTombstone {
   recordId: Recordid5;
   revision: Revision34;
 }
+export interface HistoryPendingV1 {
+  actionCursor: Actioncursor;
+  commandId: Commandid;
+  direction: Direction;
+  jobId: Jobid5;
+  proposalId: Proposalid;
+  transferId: Transferid;
+}
 export interface RichMutation {
   actionId: Actionid1;
   capture: ActionCapture;
@@ -1101,4 +1126,8 @@ export interface RemoveRecord {
   beforeRevision: Beforerevision5;
   kind: Kind23;
   recordId: Recordid6;
+}
+export interface WriterTouchV1 {
+  cursor: Cursor;
+  mutation: RichMutation | null;
 }

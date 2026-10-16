@@ -25,8 +25,8 @@ function canonical(value: unknown): string {
   }
   return JSON.stringify(value) ?? "null";
 }
-function logical(block: RichBlock): string {
-  block = normalizedBlock(block);
+function logical(block: RichBlock, exact: boolean): string {
+  if (!exact) block = normalizedBlock(block);
   const content = block.type === "table" ? { ...block.content, rows: block.content.rows.map(row => ({ ...row,
     cells: row.cells.map(({ revision: _revision, ...cell }) => cell) })) } : block.content;
   return canonical(semantic({ type: block.type, props: block.props, content, provenance: block.provenance }));
@@ -43,7 +43,7 @@ export function factSteps(before: WorkingFacts, after: WorkingFacts): RichMutati
   })];
 }
 
-export function documentSteps(before: RichDocumentV1, after: RichDocumentV1): RichMutation["steps"][number][] {
+export function documentSteps(before: RichDocumentV1, after: RichDocumentV1, exact = false): RichMutation["steps"][number][] {
   const old = placements(before), current = placements(after);
   const steps: RichMutation["steps"][number][] = [];
   const parents = new Map([...old].map(([id, item]) => [id, item.parentId]));
@@ -78,7 +78,7 @@ export function documentSteps(before: RichDocumentV1, after: RichDocumentV1): Ri
   for (const [id, item] of current) {
     const previous = old.get(id);
     if (!previous) continue;
-    if (logical(previous.block) !== logical(item.block)) {
+    if (logical(previous.block, exact) !== logical(item.block, exact)) {
       steps.push({ kind: "put_block", parentId: item.parentId, afterId: null,
         beforeRevision: previous.block.revision, block: { ...item.block, children: [] }, keepChildren: true });
     }
@@ -150,6 +150,10 @@ export class RichSaveQueue {
   }
   endPrepared(key: string): void { if (this.prepared === key && !this.fenced) this.prepared = null; }
   fencePrepared(): void { this.fenced = true; }
+  recoverPrepared(key: string): void {
+    if (this.closed || this.running) throw new Error("AGENT_OUTCOME_UNKNOWN");
+    this.fenced = false; this.prepared = key;
+  }
   private async drain(): Promise<void> {
     while (!this.closed) {
       const before = this.response.workspace.project?.document;

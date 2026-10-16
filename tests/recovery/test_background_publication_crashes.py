@@ -89,6 +89,7 @@ def test_owned_process_termination_recovers_exact_durable_proof(tmp_path, varian
     try:
         command = {"sourceRoot": str(Path(__file__).resolve().parents[2]), "dataRoot": str(fixture.root),
             "phase": phase, "project": fixture.project, "job": job.id, "proposalSha256": proposal.payload_sha256,
+            "wallNow": fixture.jobs.clock(),
             "barrierAck": barrier.model_dump(mode="json", by_alias=True) if barrier else None}
         child.process.stdin.write(json.dumps(command) + "\n")
         child.process.stdin.flush()

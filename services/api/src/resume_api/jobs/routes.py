@@ -9,6 +9,8 @@ from packages.resume_core.models.background import JobAgentRequestV1, JobReplayR
 
 
 def mount_jobs(app, service):
+    from .writers import mount_writers
+    mount_writers(app, service)
     prefix = "/v1/rich/projects/{project_id}/jobs"
 
     def response(value, status=200):
@@ -39,6 +41,23 @@ def mount_jobs(app, service):
     async def legacy(project_id: str, job_id: str, payload: AgentEmptyRequest):
         service.project(project_id)
         return response(service.artifacts.bound(project_id, job_id).legacy())
+
+    @app.post(prefix + "/{job_id}/proposal/read")
+    async def proposal(project_id: str, job_id: str, payload: AgentEmptyRequest):
+        service.project(project_id)
+        from packages.resume_core.background_publication import proposal_in
+        state = service.store.load(project_id)
+        job = service.store.read(project_id, job_id)
+        return response(proposal_in(state, job))
+
+    @app.post(prefix + "/{job_id}/conversation/read")
+    async def conversation(project_id: str, job_id: str, payload: AgentEmptyRequest):
+        from packages.resume_core.agent_store import conversation_in
+        service.project(project_id)
+        view = service.artifacts.bound(project_id, job_id)
+        state = view.load(project_id)
+        run = view.legacy().run
+        return response(conversation_in(state, run.conversation_id))
 
     @app.post(prefix + "/{job_id}/cancel")
     async def cancel(project_id: str, job_id: str, payload: AgentEmptyRequest):

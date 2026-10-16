@@ -481,6 +481,19 @@
           "title": "Actioncursor",
           "type": "integer"
         },
+        "assetPinsSha256": {
+          "anyOf": [
+            {
+              "pattern": "^[a-f0-9]{64}$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Assetpinssha256"
+        },
         "baseRevision": {
           "minimum": 1,
           "title": "Baserevision",
@@ -649,6 +662,78 @@
         "fingerprint"
       ],
       "title": "GenerationStamp",
+      "type": "object"
+    },
+    "HistoryCommandReceiptV1": {
+      "additionalProperties": false,
+      "properties": {
+        "candidateRef": {
+          "maxLength": 128,
+          "minLength": 1,
+          "pattern": "^[A-Za-z0-9_-]+$",
+          "title": "Candidateref",
+          "type": "string"
+        },
+        "clientMutationId": {
+          "minLength": 1,
+          "title": "Clientmutationid",
+          "type": "string"
+        },
+        "commandId": {
+          "maxLength": 128,
+          "minLength": 1,
+          "pattern": "^[A-Za-z0-9_-]+$",
+          "title": "Commandid",
+          "type": "string"
+        },
+        "commandSha256": {
+          "pattern": "^[a-f0-9]{64}$",
+          "title": "Commandsha256",
+          "type": "string"
+        },
+        "completedAt": {
+          "format": "date-time",
+          "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(?:\\.\\d+)?(?:Z|\\+00:00)$",
+          "title": "Completedat",
+          "type": "string"
+        },
+        "jobId": {
+          "maxLength": 128,
+          "minLength": 1,
+          "pattern": "^[A-Za-z0-9_-]+$",
+          "title": "Jobid",
+          "type": "string"
+        },
+        "proposalId": {
+          "maxLength": 128,
+          "minLength": 1,
+          "pattern": "^[A-Za-z0-9_-]+$",
+          "title": "Proposalid",
+          "type": "string"
+        },
+        "requestSha256": {
+          "pattern": "^[a-f0-9]{64}$",
+          "title": "Requestsha256",
+          "type": "string"
+        },
+        "resultingRevision": {
+          "minimum": 1,
+          "title": "Resultingrevision",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "jobId",
+        "proposalId",
+        "commandId",
+        "commandSha256",
+        "clientMutationId",
+        "requestSha256",
+        "resultingRevision",
+        "candidateRef",
+        "completedAt"
+      ],
+      "title": "HistoryCommandReceiptV1",
       "type": "object"
     },
     "HistoryDefinitionV1": {
@@ -1298,6 +1383,21 @@
           "title": "Clientmutationid",
           "type": "string"
         },
+        "historyJobId": {
+          "anyOf": [
+            {
+              "maxLength": 128,
+              "minLength": 1,
+              "pattern": "^[A-Za-z0-9_-]+$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Historyjobid"
+        },
         "id": {
           "maxLength": 128,
           "minLength": 1,
@@ -1353,6 +1453,17 @@
           "pattern": "^[A-Za-z0-9_-]+$",
           "title": "Projectid",
           "type": "string"
+        },
+        "reconciledReason": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/JobFailure"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
         },
         "requestSha256": {
           "pattern": "^[a-f0-9]{64}$",
@@ -1919,6 +2030,17 @@
           "title": "Proposalid",
           "type": "string"
         },
+        "reconciledReason": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/JobFailure"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
         "requestSha256": {
           "pattern": "^[a-f0-9]{64}$",
           "title": "Requestsha256",
@@ -2174,6 +2296,58 @@
           "default": null,
           "title": "Assetpinssha256"
         },
+        "commandInverseBytes": {
+          "anyOf": [
+            {
+              "maximum": 524288,
+              "minimum": 1,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Commandinversebytes"
+        },
+        "commandInverseSha256": {
+          "anyOf": [
+            {
+              "pattern": "^[a-f0-9]{64}$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Commandinversesha256"
+        },
+        "commandRef": {
+          "anyOf": [
+            {
+              "maxLength": 128,
+              "minLength": 1,
+              "pattern": "^[A-Za-z0-9_-]+$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Commandref"
+        },
+        "direction": {
+          "default": "undo",
+          "enum": [
+            "undo",
+            "redo",
+            "closed"
+          ],
+          "title": "Direction",
+          "type": "string"
+        },
         "expiresAt": {
           "format": "date-time",
           "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(?:\\.\\d+)?(?:Z|\\+00:00)$",
@@ -2299,6 +2473,20 @@
     "WriterSessionV1": {
       "additionalProperties": false,
       "properties": {
+        "abandonedEpoch": {
+          "anyOf": [
+            {
+              "maximum": 9007199254740991,
+              "minimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Abandonedepoch"
+        },
         "acknowledgedCursor": {
           "maximum": 9007199254740991,
           "minimum": 0,
@@ -2309,6 +2497,19 @@
           "minimum": 1,
           "title": "Acknowledgedrevision",
           "type": "integer"
+        },
+        "acknowledgedSha256": {
+          "anyOf": [
+            {
+              "pattern": "^[a-f0-9]{64}$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Acknowledgedsha256"
         },
         "barrierGeneration": {
           "maximum": 9007199254740991,
@@ -2329,6 +2530,13 @@
             }
           ],
           "title": "Draftid"
+        },
+        "draftSequenceFloor": {
+          "default": 0,
+          "maximum": 9007199254740991,
+          "minimum": 0,
+          "title": "Draftsequencefloor",
+          "type": "integer"
         },
         "epoch": {
           "minimum": 1,
@@ -2389,6 +2597,13 @@
           "title": "Status",
           "type": "string"
         },
+        "touchFloor": {
+          "default": 0,
+          "maximum": 9007199254740991,
+          "minimum": 0,
+          "title": "Touchfloor",
+          "type": "integer"
+        },
         "touchGeneration": {
           "maximum": 9007199254740991,
           "minimum": 0,
@@ -2413,6 +2628,27 @@
         "draftId"
       ],
       "title": "WriterSessionV1",
+      "type": "object"
+    },
+    "WriterTouchReceiptV1": {
+      "additionalProperties": false,
+      "properties": {
+        "cursor": {
+          "minimum": 1,
+          "title": "Cursor",
+          "type": "integer"
+        },
+        "sha256": {
+          "pattern": "^[a-f0-9]{64}$",
+          "title": "Sha256",
+          "type": "string"
+        }
+      },
+      "required": [
+        "cursor",
+        "sha256"
+      ],
+      "title": "WriterTouchReceiptV1",
       "type": "object"
     }
   },
@@ -2486,6 +2722,14 @@
         }
       ],
       "default": null
+    },
+    "historyCommands": {
+      "items": {
+        "$ref": "#/$defs/HistoryCommandReceiptV1"
+      },
+      "maxItems": 512,
+      "title": "Historycommands",
+      "type": "array"
     },
     "historyNamespace": {
       "anyOf": [
@@ -2596,6 +2840,21 @@
           "type": "null"
         }
       ]
+    },
+    "writerEpoch": {
+      "default": 0,
+      "maximum": 9007199254740991,
+      "minimum": 0,
+      "title": "Writerepoch",
+      "type": "integer"
+    },
+    "writerTouches": {
+      "items": {
+        "$ref": "#/$defs/WriterTouchReceiptV1"
+      },
+      "maxItems": 512,
+      "title": "Writertouches",
+      "type": "array"
     }
   },
   "required": [

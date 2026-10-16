@@ -36,6 +36,8 @@ class JobRetention:
                 current, checksum = RichProjectStore(self.jobs.root)._read_committed_unlocked(project, synchronize=True)
                 history._ready(state, directory, checksum)
                 for intent in list(state.manual_intents):
+                    if any(inverse.command_ref == intent.candidate_ref for inverse in state.inverses):
+                        continue
                     if intent.phase != "receipt_stored":
                         continue
                     path = directory / "canonical-candidates" / (intent.candidate_ref + ".json")
@@ -73,6 +75,8 @@ class JobRetention:
             now, removed_files = self.jobs.clock(), []
             before = state.model_dump(by_alias=True)
             active = {intent.job_id for intent in state.intents if intent.phase not in {"receipt_stored", "reconciled"}}
+            active.update(intent.history_job_id for intent in state.manual_intents if intent.history_job_id is not None
+                and intent.phase not in {"receipt_stored", "reconciled"})
             folder = directory / "proposal-intents"
             if folder.exists():
                 from .models.background import ProposalBindingV1
@@ -85,14 +89,19 @@ class JobRetention:
                         if job is not None and job.publication not in {"discarded", "cancelled"}:
                             active.add(job.id)
             for inverse in list(state.inverses):
+                closed = inverse.direction == "closed" and inverse.owner == "backend"
                 if (inverse.owner == "transferring" or inverse.job_id in active
-                        or elapsed(now, inverse.expires_at) < 0):
+                        or not closed and elapsed(now, inverse.expires_at) < 0):
                     continue
                 job = job_in(state, inverse.job_id)
-                job.undo_expired = True
+                if not closed:
+                    job.undo_expired = True
                 job.event_cursor += 1
                 state.asset_pins = [pin for pin in state.asset_pins if (pin.kind, pin.owner) != ("inverse", inverse.proposal_id)]
                 state.inverses.remove(inverse)
+            active_history = {item.job_id for item in state.inverses}
+            state.history_commands = [item for item in state.history_commands if item.job_id in active_history
+                or elapsed(now, item.completed_at) < LIMITS.inverse_seconds]
             retained_inverse = {item.job_id for item in state.inverses}
             current = None
             for intent in list(state.manual_intents):

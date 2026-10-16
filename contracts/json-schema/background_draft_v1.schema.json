@@ -50,6 +50,19 @@
       "title": "Actioncursor",
       "type": "integer"
     },
+    "assetPinsSha256": {
+      "anyOf": [
+        {
+          "pattern": "^[a-f0-9]{64}$",
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Assetpinssha256"
+    },
     "baseRevision": {
       "minimum": 1,
       "title": "Baserevision",

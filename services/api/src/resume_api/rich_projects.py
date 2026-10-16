@@ -400,6 +400,8 @@ class RichProjectService(RichSynchronization, RichAssets, GuiProjectService):
                 raise ProjectFailure("AGENT_TICKET_INVALID", 409)
             jobs = getattr(self, "background_jobs", None)
             if jobs is not None and jobs.enabled:
+                if getattr(jobs, "writers", None) is not None:
+                    raise ProjectFailure("WRITER_UNKNOWN", 409)
                 jobs.store.open(identifier)
                 try:
                     workspace, _replay = jobs.publisher.manual(identifier, request, originals=self.originals,

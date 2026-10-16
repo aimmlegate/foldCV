@@ -5,12 +5,13 @@ import { AgentApiFailure, AgentBrowserApi } from "./api";
 import { AssistantController, type AssistantView } from "./controller";
 import { drawerSize, errorText } from "./presentation";
 import { DrawerView } from "../workbench/assistant/DrawerView";
+import { projectJobs } from "../background/jobs";
 
 export type AssistantHandle = { stop: () => Promise<void>; history: () => void; fence: (saved: boolean) => void };
 const key = "foldcv.assistant.drawer";
 function storedSize() { try { const value: unknown = JSON.parse(localStorage.getItem(key) ?? "null"); return drawerSize(value); } catch { return drawerSize(null); } }
-export function AssistantDrawer({ projectId, editor, settingsOpen, settings, ref, title = "Резюме" }: { projectId: string; editor: RefObject<RichEditorHandle | null>;
-  settingsOpen: boolean; settings: () => void; ref: Ref<AssistantHandle>; title?: string }) {
+export function AssistantDrawer({ projectId, editor, settingsOpen, settings, ref, title = "Резюме", background = false }: { projectId: string; editor: RefObject<RichEditorHandle | null>;
+  settingsOpen: boolean; settings: () => void; ref: Ref<AssistantHandle>; title?: string; background?: boolean }) {
   const [view, setView] = useState<AssistantView | null>(null), [size, setSize] = useState(storedSize);
   const [captured, setCaptured] = useState<CapturedEditorSelection | null>(null), [fence, setFence] = useState<string | null>(null);
   const controller = useRef<AssistantController | null>(null), selectionKey = useRef(""), log = useRef<HTMLDivElement>(null);
@@ -21,7 +22,7 @@ export function AssistantDrawer({ projectId, editor, settingsOpen, settings, ref
     if (!mounted) return;
     const api = new AgentBrowserApi(projectId), connection = new ConnectionWorkflow(() => {});
     const current = new AssistantController(api, { sessionId: mounted.sessionId,
-      apply: (id, api) => { if (editor.current?.sessionId !== mounted.sessionId) return Promise.reject(new AgentApiFailure("AGENT_NO_OWNER")); return editor.current.applyAssistant(id, api); } }, setView);
+      apply: (id, api) => { if (editor.current?.sessionId !== mounted.sessionId) return Promise.reject(new AgentApiFailure("AGENT_NO_OWNER")); return editor.current.applyAssistant(id, api); } }, setView, 5000, background ? projectJobs(projectId) : null);
     controller.current = current; setView(current.view);
     void (async () => {
       await connection.peek();
@@ -30,7 +31,7 @@ export function AssistantDrawer({ projectId, editor, settingsOpen, settings, ref
     })().catch(() => setFailure("REQUEST_FAILED"));
     const close = () => current.close(); window.addEventListener("pagehide", close);
     return () => { window.removeEventListener("pagehide", close); connection.close(); current.close(); if (controller.current === current) controller.current = null; };
-  }, [projectId, editor]);
+  }, [projectId, editor, background]);
   useEffect(() => { if (!settingsOpen) report(controller.current?.refresh()); }, [settingsOpen]);
   useEffect(() => { try { localStorage.setItem(key, JSON.stringify(size)); } catch { /* Size is optional when browser storage is unavailable. */ } }, [size]);
   useEffect(() => {
@@ -48,8 +49,8 @@ export function AssistantDrawer({ projectId, editor, settingsOpen, settings, ref
   }, [view?.messages, view?.partial, view?.findings, view?.sources]);
   useEffect(() => { if (log.current) log.current.scrollTop = log.current.scrollHeight; }, [view?.conversationId, view?.run?.id]);
   useImperativeHandle(ref, () => ({ stop: async () => { if (controller.current?.active) await controller.current.stop(); },
-    history: () => { if (controller.current?.active) report(controller.current.stop()); },
-    fence: saved => { setFence(saved ? "Правки сохранены. Откройте резюме заново, чтобы продолжить редактирование." : errorText("AGENT_OUTCOME_UNKNOWN")); report(controller.current?.stop()); } }), []);
+    history: () => { if (!background && controller.current?.active) report(controller.current.stop()); },
+    fence: saved => { setFence(saved ? "Правки сохранены. Откройте резюме заново, чтобы продолжить редактирование." : errorText("AGENT_OUTCOME_UNKNOWN")); if (!background) report(controller.current?.stop()); } }), [background]);
   function send() {
     const current = controller.current, mounted = editor.current, scope = captured;
     if (!current || !mounted) return;

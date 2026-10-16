@@ -11,6 +11,10 @@ import type { AgentEvent } from "../contracts/generated/agent_event";
 import type { RichProjectResponse } from "../contracts/generated/rich_project_response";
 import { AgentApiFailure, type AgentBrowserApi, type AgentFlags, type AgentOwner } from "./api";
 import type { PreparedApi } from "./editor-bridge";
+import type { JobAgentRequestV1 } from "../contracts/generated/background_agent_request_v1";
+import type { BackgroundConversation } from "../background/api";
+import type { ProjectJobs } from "../background/jobs";
+import { RichApiFailure } from "../rich/api";
 
 export const terminal = (run: AgentRun | null): boolean => run !== null && ["completed", "failed", "cancelled", "interrupted"].includes(run.state);
 export type AssistantView = {
@@ -25,7 +29,7 @@ export type TurnBaseline = () => Promise<{ response: RichProjectResponse; scope:
 export type AssistantApi = Pick<AgentBrowserApi, "projectId" | "settings" | "saveSettings" | "capabilities" | "conversations" | "conversation" |
   "messages" | "resources" | "open" | "renew" | "close" | "submit" | "read" | "cancel" | "events" | "prepared">;
 const pause = (milliseconds: number) => new Promise<void>(resolve => { setTimeout(resolve, milliseconds); });
-function code(error: unknown): string { return error instanceof AgentApiFailure ? error.code : error instanceof Error && error.message.startsWith("AGENT_") ? error.message : "REQUEST_FAILED"; }
+function code(error: unknown): string { return error instanceof AgentApiFailure || error instanceof RichApiFailure ? error.code : error instanceof Error && error.message.startsWith("AGENT_") ? error.message : "REQUEST_FAILED"; }
 
 export class AssistantController {
   view: AssistantView = { settings: null, capabilities: null, flags: { allowEdits: true, allowWeb: true }, conversations: [],
@@ -41,8 +45,14 @@ export class AssistantController {
   private pending: AgentRunRequest | null = null;
   private readonly applying = new Set<string>();
   private readonly drafts = new Map<string, string>();
+  private pendingBackground: JobAgentRequestV1 | null = null;
+  private backgroundSequence = 0;
+  private unsubscribeBackground: (() => void) | null = null;
+  private readonly backgroundConversations = new Map<string, { cursor: number; generation: number; conversation: BackgroundConversation }>();
   constructor(readonly api: AssistantApi, private readonly editor: AssistantEditor,
-    private readonly changed: (view: AssistantView) => void, private readonly heartbeatMs = 5000) {}
+    private readonly changed: (view: AssistantView) => void, private readonly heartbeatMs = 5000, private readonly jobs: ProjectJobs | null = null) {
+    if (jobs) this.unsubscribeBackground = jobs.subscribe(() => { void this.reloadBackground().catch(error => this.publish({ error: code(error) })); });
+  }
 
   get active(): boolean { return this.view.submitting || this.view.pendingSend || this.applying.size > 0 || this.view.run !== null && !terminal(this.view.run); }
   private publish(update: Partial<AssistantView>): void {
@@ -72,7 +82,10 @@ export class AssistantController {
     try {
       const next = await this.api.saveSettings({ expectedRevision: settings.revision, enabled, selectedAgentModel: model });
       this.publish({ settings: next, error: null }); await this.refresh();
-      if (!enabled && this.view.run) { this.publish({ run: (await this.api.read(this.view.run.id)).run }); await this.reloadMessages(); }
+      if (!enabled && this.view.run) {
+        if (this.jobs) await this.reloadBackground();
+        else { this.publish({ run: (await this.api.read(this.view.run.id)).run }); await this.reloadMessages(); }
+      }
     } catch (error) { this.publish({ error: code(error) }); await this.refresh().catch(() => {}); }
   }
   private scheduleBeat(): void {
@@ -108,7 +121,7 @@ export class AssistantController {
   }
   async newConversation(): Promise<void> {
     if (this.view.submitting) throw new AgentApiFailure("AGENT_BUSY");
-    if (this.active) await this.stop();
+    if (this.active && !this.jobs) await this.stop();
     if (this.applying.size) throw new AgentApiFailure("AGENT_BUSY");
     this.drafts.set(this.view.conversationId ?? "", this.view.draft);
     const conversation = await this.api.conversation();
@@ -120,7 +133,7 @@ export class AssistantController {
   async select(id: string): Promise<void> {
     if (id === this.view.conversationId) return;
     if (this.view.submitting) throw new AgentApiFailure("AGENT_BUSY");
-    if (this.active) await this.stop();
+    if (this.active && !this.jobs) await this.stop();
     if (this.applying.size) throw new AgentApiFailure("AGENT_BUSY");
     this.drafts.set(this.view.conversationId ?? "", this.view.draft);
     const epoch = ++this.epoch; this.stream?.abort(); this.sequence = 0;
@@ -128,6 +141,7 @@ export class AssistantController {
     if (this.closed || epoch !== this.epoch) return;
     this.publish({ conversationId: id, messages: page.items, messageCursor: page.nextCursor, sources: [], findings: [], run: null,
       receipts: [], activity: [], partial: "", partialTruncated: false, draft: this.drafts.get(id) ?? "", error: null });
+    if (this.jobs) await this.reloadBackground();
   }
   async older(): Promise<void> {
     const id = this.view.conversationId, cursor = this.view.messageCursor, epoch = this.epoch;
@@ -146,6 +160,7 @@ export class AssistantController {
     this.publish({ conversations: items, conversationCursor: page.nextCursor });
   }
   async resource(kind: "sources" | "findings", id: string): Promise<void> {
+    if (this.jobs) { await this.reloadBackground(); if (this.view[kind].some(item => item.id === id)) return; }
     const conversation = this.view.conversationId, epoch = this.epoch;
     if (!conversation) return;
     const value = await this.api.resources(conversation, kind, [id]);
@@ -157,6 +172,7 @@ export class AssistantController {
     if (this.closed || this.view.submitting || this.view.run && !terminal(this.view.run) || this.applying.size) return;
     const message = this.view.draft, flags = { ...this.view.flags };
     if (!message.trim() || [...message].length > 8000) return;
+    if (this.jobs) { await this.sendBackground(baseline); return; }
     this.publish({ submitting: true, error: null });
     try {
       let request = this.pending;
@@ -188,10 +204,76 @@ export class AssistantController {
     } finally { this.publish({ submitting: false }); }
   }
   private async reloadMessages(): Promise<void> {
+    if (this.jobs) { await this.reloadBackground(); return; }
     const id = this.view.conversationId, epoch = this.epoch;
     if (!id) return;
     const page = await this.api.messages(id);
     if (!this.closed && epoch === this.epoch) this.publish({ messages: page.items, messageCursor: page.nextCursor });
+  }
+  private async sendBackground(baseline: TurnBaseline): Promise<void> {
+    const jobs = this.jobs; if (!jobs) return;
+    this.publish({ submitting: true, error: null });
+    try {
+      let pending = this.pendingBackground;
+      if (pending && pending.request.message !== this.view.draft) throw new AgentApiFailure("AGENT_IDEMPOTENCY_CONFLICT");
+      if (!pending) {
+        await this.refresh(); await jobs.refresh();
+        const project = jobs.view.project, settings = this.view.settings;
+        if (!project || !settings || !this.view.capabilities?.ready) throw new AgentApiFailure(this.view.capabilities?.unavailable?.code ?? "AGENT_CONNECTION_UNAVAILABLE");
+        const conversationId = await this.ensureConversation(), current = await baseline(), workspace = current.response.workspace;
+        if (!workspace.project || this.closed) throw new AgentApiFailure("AGENT_STALE_READ");
+        pending = { schemaVersion: 1, lineage: project.lineage, requestEpoch: project.requestEpoch,
+          request: { clientRequestId: crypto.randomUUID(), conversationId, message: this.view.draft, ...this.view.flags,
+            scope: current.scope, settingsRevision: settings.revision, projectRevision: workspace.projectRevision,
+            documentRevision: workspace.documentRevision, factsRevision: workspace.project.facts.revision } };
+        this.pendingBackground = pending;
+      }
+      await jobs.submit(pending); this.pendingBackground = null;
+      this.publish({ draft: "", pendingSend: false }); await this.reloadBackground();
+    } catch (error) {
+      if ((error instanceof AgentApiFailure || error instanceof RichApiFailure) && error.status >= 400 && error.status < 500) this.pendingBackground = null;
+      this.publish({ error: code(error), pendingSend: this.pendingBackground !== null });
+    } finally { this.publish({ submitting: false }); }
+  }
+  private async reloadBackground(): Promise<void> {
+    const jobs = this.jobs, project = jobs?.view.project;
+    if (!jobs || !project || this.closed) return;
+    const sequence = ++this.backgroundSequence, epoch = this.epoch;
+    const values = await Promise.all(project.jobs.filter(job => job.submission.kind === "agent").map(async job => {
+      const old = this.backgroundConversations.get(job.id);
+      if (old?.cursor === job.eventCursor && old.generation === job.executionGeneration) return { job, conversation: old.conversation };
+      const conversation = await jobs.api.conversation(job.id);
+      if (conversation.projectId !== this.api.projectId || !conversation.runs.some(run => run.id === job.id && run.ownerEpoch === job.executionGeneration)) throw new AgentApiFailure("INVALID_RESULT");
+      const current = this.backgroundConversations.get(job.id);
+      if (!current || current.generation < job.executionGeneration || current.generation === job.executionGeneration && current.cursor <= job.eventCursor)
+        this.backgroundConversations.set(job.id, { cursor: job.eventCursor, generation: job.executionGeneration, conversation });
+      return { job, conversation };
+    }));
+    if (this.closed || epoch !== this.epoch || sequence !== this.backgroundSequence) return;
+    const summaries = new Map(this.view.conversations.map(item => [item.id, item]));
+    const scoped = values.map(({ job, conversation }) => ({ conversation,
+      run: conversation.runs.find(run => run.id === job.id && run.ownerEpoch === job.executionGeneration) }));
+    for (const { conversation } of scoped) {
+      const active = scoped.find(item => item.conversation.id === conversation.id && item.run && !terminal(item.run))?.run;
+      summaries.set(conversation.id, { id: conversation.id, createdAt: conversation.createdAt, updatedAt: conversation.updatedAt,
+        title: summaries.get(conversation.id)?.title ?? conversation.messages.find(message => message.role === "user")?.text.slice(0, 80) ?? "Новая беседа",
+        activeRunId: active?.id ?? null });
+    }
+    const selected = scoped.filter(value => value.conversation.id === this.view.conversationId);
+    const messages = new Map(this.view.messages.map(message => [message.id, message]));
+    const sources = new Map(this.view.sources.map(source => [source.id, source])), findings = new Map(this.view.findings.map(finding => [finding.id, finding]));
+    const runs = new Map<string, AgentRun>();
+    for (const { conversation, run } of selected) {
+      if (!run) continue;
+      conversation.messages.filter(message => message.runId === run.id).forEach(message => messages.set(message.id, message));
+      conversation.sources.filter(source => source.runId === run.id).forEach(source => sources.set(source.id, source));
+      conversation.findings.filter(finding => finding.runId === run.id).forEach(finding => findings.set(finding.id, finding));
+      runs.set(run.id, run);
+    }
+    const latest = [...runs.values()].sort((a, b) => a.createdAt.localeCompare(b.createdAt)).at(-1);
+    this.publish({ conversations: [...summaries.values()].sort((a, b) => b.updatedAt.localeCompare(a.updatedAt)),
+      messages: [...messages.values()].sort((a, b) => a.timestamp.localeCompare(b.timestamp)), sources: [...sources.values()], findings: [...findings.values()],
+      run: latest ?? null, error: jobs.view.error });
   }
   private startStream(run: AgentRun, owner: AgentOwner): void {
     this.stream?.abort(); const stream = new AbortController(); this.stream = stream;
@@ -253,6 +335,10 @@ export class AssistantController {
     this.publish(update);
   }
   async stop(): Promise<void> {
+    if (this.jobs) {
+      if (this.view.run && !terminal(this.view.run)) await this.jobs.stop(this.view.run.id);
+      this.pendingBackground = null; this.publish({ pendingSend: false }); await this.reloadBackground(); return;
+    }
     this.stream?.abort();
     const run = this.view.run, owner = this.owner;
     if (run && !terminal(run) && owner) {
@@ -273,6 +359,7 @@ export class AssistantController {
   close(): void {
     this.closed = true; ++this.epoch; this.stream?.abort();
     if (this.beat) clearTimeout(this.beat);
+    this.unsubscribeBackground?.(); this.unsubscribeBackground = null;
     const owner = this.owner; this.owner = null;
     if (owner) void this.api.close(owner).catch(() => {});
   }

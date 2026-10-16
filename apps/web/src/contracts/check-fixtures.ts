@@ -1,7 +1,8 @@
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
+import { readFileSync, readdirSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { dirname, resolve } from "node:path";
+import { validateBackgroundWire } from "./background-validate.js";
 import { validateContract, validateExtractResult, validateFactRequest, validateFactSheet,
   validateRenderRequest, validateSemanticProposal, validateDraftRequest, validateDraftProposal, validateDraftResult } from "./validate.js";
 
@@ -74,19 +75,16 @@ for (const name of ["agent_settings", "agent_run_request", "agent_message", "age
   "agent_commit_result", "agent_event", "agent_prepare_request", "agent_prepare_result", "agent_edit_receipt", "agent_run", "agent_read_snapshot"]) {
   bases[name] = read(`agent/${name}.json`);
 }
-for (const name of ["background_submission_v1", "background_snapshot_v1", "background_proposal_v1", "background_scope_guard_v1",
-  "background_writer_v1", "background_barrier_v1", "background_draft_v1", "background_receipt_v1", "background_apply_v2", "background_event_v1", "background_saved_v2",
-  "background_intent_v1", "background_undo_v1", "background_sidecar_v1", "background_attempt_v1", "background_draft_payload_v1", "background_saved_snapshot_v1", "background_dispatch_v1", "background_agent_request_v1", "background_artifact_v1", "background_legacy_run_v2", "background_project_v1", "background_replay_request_v1", "background_replay_v1",
-  "background_history_sidecar_v1", "background_manual_sidecar_v1", "background_history_metadata_full_v1",
-  "background_asset_sidecar_v1", "background_compact_manual_v1"]) {
-  bases[name] = read(`background/${name}.json`);
+for (const file of readdirSync(resolve(examples, "background")).filter(file => file.endsWith(".json"))) {
+  bases[file.slice(0, -5)] = read(`background/${file}`);
 }
 for (const test of cases) {
   const source = bases[test.base];
   if (source === undefined) throw new Error(`unknown fixture base ${test.base}`);
   const data: unknown = structuredClone(source);
   for (const change of test.edits) edit(data, change);
-  const valid = test.contract === "render_request" ? await validateRenderRequest(data)
+  const valid = test.contract.startsWith("background_") ? validateContract(test.contract, data) && await validateBackgroundWire(test.contract, data)
+    : test.contract === "render_request" ? await validateRenderRequest(data)
     : test.contract === "extract_result" ? validateExtractResult(data)
       : test.contract === "fact_request" ? validateFactRequest(data)
         : test.contract === "fact_sheet" ? validateFactSheet(data)

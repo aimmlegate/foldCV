@@ -36,6 +36,8 @@ class PublicationAuthority:
         barrier, known = state.barrier, self.acks.get(state.project_id)
         if (barrier is None or barrier.state != "acked" or known is None or known[0] != barrier
                 or self.clock.now() >= known[1]
+                or now is not None and datetime.fromisoformat(now.replace("Z", "+00:00")) >=
+                    datetime.fromisoformat(barrier.expires_at.replace("Z", "+00:00"))
                 or (barrier.writer_epoch, barrier.incarnation, barrier.generation, barrier.acknowledged_revision,
                     barrier.action_cursor, barrier.touch_generation) !=
                 (writer.epoch, writer.incarnation, writer.barrier_generation, workspace.project_revision,

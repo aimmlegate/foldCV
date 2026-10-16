@@ -32,10 +32,11 @@ from resume_api.agent.context import query_fingerprint
 from packages.resume_core.agent_artifacts import JobArtifacts
 from packages.resume_core.background_history import ScopeHistory
 from packages.resume_core.background_publication import CanonicalCoordinator
+from packages.resume_core.background_clock import ControlledDeadlines
 from packages.resume_core.background_store import JobStore
 from packages.resume_core.rich_project_store import RichProjectStore
 
-jobs = JobStore(data)
+jobs = JobStore(data, clock=lambda: command["wallNow"])
 artifacts = JobArtifacts(jobs)
 history = ScopeHistory(jobs, query_fingerprint)
 
@@ -49,6 +50,7 @@ def observe(name, project):
 
 canonical = RichProjectStore(data)
 coordinator = CanonicalCoordinator(jobs, history, canonical, artifacts.payload_unlocked, observer=observe)
+coordinator.authority.clock = ControlledDeadlines()
 state = jobs.load(command["project"])
 if command.get("barrierAck") is not None:
     if state.barrier.model_dump(mode="json", by_alias=True) != command["barrierAck"] or state.writer.status != "attached":

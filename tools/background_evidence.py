@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import hashlib
 import json
+import re
+from datetime import datetime
 from pathlib import Path
 from typing import Literal
 
@@ -85,6 +87,25 @@ def read_report(path: Path) -> ExecutionReportV1:
         raise SystemExit(f"NB execution report is missing or malformed: {type(error).__name__}") from error
 
 
+def merge_reports(paths: list[Path], target: Path) -> None:
+    reports = [read_report(path) for path in paths]
+    if not reports:
+        raise SystemExit("NB report merge is empty")
+    first = reports[0]
+    if any((report.run_id, report.suite, report.source_hashes, report.started_at) !=
+            (first.run_id, first.suite, first.source_hashes, first.started_at) for report in reports):
+        raise SystemExit("NB raw reports have different run/source identity")
+    combined = first.model_copy(update={"finished_at": reports[-1].finished_at,
+        "complete": all(report.complete for report in reports),
+        "exit_status": next((report.exit_status for report in reports if report.exit_status), 0),
+        "collected": [node for report in reports for node in report.collected],
+        "records": [record for report in reports for record in report.records],
+        "traces": [trace for report in reports for trace in report.traces]})
+    if target.exists():
+        raise SystemExit("NB combined evidence already exists; never rewrite a validated report")
+    target.write_text(combined.model_dump_json(by_alias=True, indent=2) + "\n")
+
+
 def failure_history(root: Path, sources: dict[str, str], diagnosis: Path | None = None) -> list[dict]:
     history = []
     for path in sorted(root.glob("*/context.json")):
@@ -124,7 +145,9 @@ def assert_report(path: Path, *, run_id: str, suite: str, sources: dict[str, str
         required_orders: set[str]) -> dict:
     report = read_report(path)
     if (not report.complete or report.exit_status != 0 or report.run_id != run_id or report.suite != suite
-            or report.started_at != started_at or not report.finished_at):
+            or report.started_at != started_at or not report.finished_at
+            or datetime.fromisoformat(report.finished_at.replace("Z", "+00:00")) <
+                datetime.fromisoformat(report.started_at.replace("Z", "+00:00"))):
         raise SystemExit("NB report has an old/wrong run, suite or incomplete execution")
     if not sources or report.source_hashes != sources:
         raise SystemExit("NB report source hashes do not match the executed source")
@@ -134,8 +157,9 @@ def assert_report(path: Path, *, run_id: str, suite: str, sources: dict[str, str
     if not bindings or any(not nodes for nodes in bindings.values()) or not expected:
         raise SystemExit("NB bindings are empty")
     if any(not node.startswith(("tests/recovery/test_background_", "tests/foundation/test_runner_gates.py::"))
+            and re.fullmatch(r"apps/web/unit/background-[A-Za-z0-9_-]+\.test\.ts::.+", node) is None
             for node in expected):
-        raise SystemExit("NB binding is outside its required Python suite")
+        raise SystemExit("NB binding is outside its required Python/Node suite")
     results = {}
     for item in report.records:
         if item.node_id in results:

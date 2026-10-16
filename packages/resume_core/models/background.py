@@ -7,6 +7,7 @@ from typing import Annotated, Literal, Union
 from pydantic import ConfigDict, Field, RootModel, model_validator
 
 from ..background_limits import LIMITS
+from ..rich_api import RichProjectResponse
 from .agent import (AgentBatchJournal, AgentCommitResult, AgentFinding, AgentId, AgentJournalRequest,
     AgentMessage, AgentReadSnapshot, AgentRun, AgentScope, AgentSnapshotDependency, AgentUsage, AgentWebSource, AgentWire,
     ModelId, Timestamp, bounded)
@@ -254,12 +255,96 @@ class WriterSessionV1(BackgroundWire):
     touch_generation: Counter
     barrier_generation: Counter
     draft_id: AgentId | None
+    touch_floor: Counter = 0
+    draft_sequence_floor: Counter = 0
+    abandoned_epoch: Counter | None = None
+    acknowledged_sha256: Sha256 | None = None
 
     @model_validator(mode="after")
     def clean_is_explicit(self):
         if self.status == "clean_detached" and self.draft_id is not None:
             raise ValueError("unreconciled draft is not clean detach")
+        if self.touch_floor > self.acknowledged_cursor:
+            raise ValueError("touch replay floor cannot exceed its durable cursor")
         return self
+
+
+WriterSecret = Annotated[str, Field(min_length=32, max_length=128, pattern=r"^[A-Za-z0-9_-]+$")]
+
+
+class WriterProofV1(BackgroundWire):
+    schema_version: Literal[1]
+    lineage: AgentId
+    epoch: Revision
+    session_id: AgentId
+    incarnation: AgentId
+    credential: WriterSecret
+
+
+class WriterCommitBindingV1(BackgroundWire):
+    epoch: Revision
+    incarnation: AgentId
+    action_cursor: Counter
+    touch_generation: Counter
+    draft_id: AgentId | None = None
+    draft_sequence: Revision | None = None
+    draft_sha256: Sha256 | None = None
+
+    @model_validator(mode="after")
+    def whole_draft(self):
+        parts = (self.draft_id, self.draft_sequence, self.draft_sha256)
+        if any(item is None for item in parts) and not all(item is None for item in parts):
+            raise ValueError("draft resolution needs the whole checkpoint proof")
+        return self
+
+
+class WriterOpenV1(BackgroundWire):
+    schema_version: Literal[1]
+    session_id: AgentId
+    incarnation: AgentId
+    credential: WriterSecret
+    previous_epoch: Revision | None = None
+    previous_incarnation: AgentId | None = None
+    canonical_revision: Revision
+    canonical_sha256: Sha256
+    action_cursor: Counter
+    draft_sequence: Counter = 0
+
+
+class WriterTouchV1(BackgroundWire):
+    cursor: Revision
+    mutation: RichMutation | None
+
+
+class WriterTouchReceiptV1(BackgroundWire):
+    cursor: Revision
+    sha256: Sha256
+
+
+class WriterAdvanceV1(BackgroundWire):
+    schema_version: Literal[1]
+    proof: WriterProofV1
+    canonical_revision: Revision
+    canonical_sha256: Sha256
+    action_cursor: Counter
+    touches: list[WriterTouchV1] = Field(default_factory=list, max_length=100)
+
+
+class WriterBarrierAckV1(WriterAdvanceV1):
+    generation: Revision
+    token: WriterSecret
+    touch_generation: Counter
+
+
+class WriterMutationV1(WriterAdvanceV1):
+    mutation: RichMutation
+
+
+class WriterBarrierCommandV1(BackgroundWire):
+    schema_version: Literal[1]
+    proof: WriterProofV1
+    generation: Revision
+    token: WriterSecret
 
 
 class PublicationBarrierV1(BackgroundWire):
@@ -293,6 +378,16 @@ class DraftCheckpointV1(BackgroundWire):
     payload_ref: AgentId
     touches: list[GenerationStamp] = Field(max_length=100)
     checkpointed_at: Timestamp
+    asset_pins_sha256: Sha256 | None = None
+
+
+class HistoryPendingV1(BackgroundWire):
+    job_id: AgentId
+    proposal_id: AgentId
+    transfer_id: AgentId
+    command_id: AgentId
+    direction: Literal["undo", "redo"]
+    action_cursor: Counter
 
 
 class DraftPayloadV1(BackgroundWire):
@@ -302,11 +397,98 @@ class DraftPayloadV1(BackgroundWire):
     facts: WorkingFacts
     outbox: list[RichMutation] = Field(max_length=100)
     asset_pins: list[AgentId] = Field(max_length=100)
+    touches: list[WriterTouchV1] = Field(default_factory=list, max_length=100)
+    history_outbox: list[HistoryPendingV1] = Field(default_factory=list, max_length=100)
 
     @model_validator(mode="after")
     def payload_bound(self):
+        if len(self.outbox) + len(self.history_outbox) > 100:
+            raise ValueError("draft outbox capacity exhausted")
         bounded(self, LIMITS.draft_project_bytes)
         return self
+
+
+class WriterCheckpointV1(BackgroundWire):
+    schema_version: Literal[1]
+    proof: WriterProofV1
+    id: AgentId
+    sequence: Revision
+    action_cursor: Counter
+    base_revision: Revision
+    base_sha256: Sha256
+    payload: DraftPayloadV1
+
+
+class WriterAbandonV1(BackgroundWire):
+    schema_version: Literal[1]
+    session_id: AgentId
+    incarnation: AgentId
+    credential: WriterSecret
+    canonical_revision: Revision
+    canonical_sha256: Sha256
+    discard_drafts: list[AgentId] = Field(default_factory=list, max_length=100)
+
+
+class WriterDraftReferenceV1(BackgroundWire):
+    schema_version: Literal[1]
+    proof: WriterProofV1
+    id: AgentId
+
+
+class WriterDraftCommandV1(WriterDraftReferenceV1):
+    sequence: Revision
+    payload_sha256: Sha256
+    canonical_revision: Revision
+    canonical_sha256: Sha256
+
+
+class WriterDraftResolveV1(WriterDraftCommandV1):
+    mutation: RichMutation
+
+
+class WriterDraftReadV1(BackgroundWire):
+    schema_version: Literal[1]
+    checkpoint: DraftCheckpointV1
+    payload: DraftPayloadV1
+
+
+class WriterViewV1(BackgroundWire):
+    schema_version: Literal[1]
+    writer: WriterSessionV1
+    response: RichProjectResponse
+    workspace_sha256: Sha256
+    workspace_wire: str
+    canonical_ready: bool
+    drafts: list[DraftCheckpointV1]
+    inverses: list[UndoOwnershipV1] = Field(default_factory=list)
+    replayed: bool = False
+    mutation_wire: str | None = None
+
+    @model_validator(mode="after")
+    def exact_workspace(self):
+        import hashlib
+        workspace = self.response.workspace
+        if (hashlib.sha256(self.workspace_wire.encode()).hexdigest() != self.workspace_sha256
+                or WorkspaceV6.model_validate_json(self.workspace_wire) != workspace
+                or self.writer.project_id != workspace.project_id
+                or any(item.project_id != workspace.project_id or item.lineage != self.writer.lineage for item in self.drafts)
+                or not self.canonical_ready and self.response.durability == "durable"
+                or self.canonical_ready and (self.response.durability != "durable"
+                    or self.response.saved_project_revision != workspace.project_revision
+                    or self.response.saved_document_revision != workspace.document_revision)):
+            raise ValueError("writer view needs its exact canonical bytes")
+        if self.mutation_wire is not None:
+            mutation = RichMutation.model_validate_json(self.mutation_wire)
+            if (mutation.model_dump_json(by_alias=True) != self.mutation_wire or mutation.project_id != workspace.project_id
+                    or not self.canonical_ready or not any(item.client_mutation_id == mutation.client_mutation_id
+                        and item.request_sha256 == hashlib.sha256(self.mutation_wire.encode()).hexdigest()
+                        and item.resulting_revision <= workspace.project_revision for item in workspace.mutation_replay)):
+                raise ValueError("mutation acknowledgment needs exact replay proof")
+        return self
+
+    @property
+    def workspace(self):
+        return self.response.workspace
 
 
 class DeferredApplyV2(BackgroundWire):
@@ -495,6 +677,7 @@ class CanonicalIntentV1(BackgroundWire):
     candidate_sha256: Sha256 | None = None
     before_generations_sha256: Sha256 | None = None
     resolved_at: Timestamp | None = None
+    reconciled_reason: JobFailure | None = None
 
     @model_validator(mode="after")
     def complete_writer_binding(self):
@@ -514,6 +697,7 @@ class ManualIntentV1(CanonicalIntentV1):
     action_id: Id | None = None
     steps_sha256: Sha256 | None = None
     candidate_pruned: bool = False
+    history_job_id: AgentId | None = None
 
     @model_validator(mode="after")
     def compact_proof(self):
@@ -536,6 +720,10 @@ class UndoOwnershipV1(BackgroundWire):
     expires_at: Timestamp
     guards: ScopeGuardV1
     asset_pins_sha256: Sha256 | None = None
+    direction: Literal["undo", "redo", "closed"] = "undo"
+    command_ref: AgentId | None = None
+    command_inverse_sha256: Sha256 | None = None
+    command_inverse_bytes: int | None = Field(default=None, ge=1, le=LIMITS.inverse_bytes)
 
     @model_validator(mode="after")
     def single_owner(self):
@@ -545,6 +733,9 @@ class UndoOwnershipV1(BackgroundWire):
             raise ValueError("session inverse needs its acknowledged writer")
         if self.owner in {"backend", "expired"} and self.writer_epoch is not None:
             raise ValueError("headless inverse cannot also have a session owner")
+        if any(part is None for part in (self.command_ref, self.command_inverse_sha256, self.command_inverse_bytes)) and not all(
+                part is None for part in (self.command_ref, self.command_inverse_sha256, self.command_inverse_bytes)):
+            raise ValueError("a compensation reference needs its exact inverse hash")
         return self
 
 
@@ -585,6 +776,28 @@ class CanonicalSyncReferenceV1(BackgroundWire):
     steps_sha256: Sha256
 
 
+class HistoryCommitBindingV1(BackgroundWire):
+    job_id: AgentId
+    proposal_id: AgentId
+    transfer_id: AgentId
+    direction: Literal["undo", "redo"]
+    previous_ref: AgentId | None
+    command_id: AgentId
+    command_sha256: Sha256
+
+
+class HistoryCommandReceiptV1(BackgroundWire):
+    job_id: AgentId
+    proposal_id: AgentId
+    command_id: AgentId
+    command_sha256: Sha256
+    client_mutation_id: Id
+    request_sha256: Sha256
+    resulting_revision: Revision
+    candidate_ref: AgentId
+    completed_at: Timestamp
+
+
 class CanonicalCandidateV1(BackgroundWire):
     schema_version: Literal[1]
     id: AgentId
@@ -609,6 +822,8 @@ class CanonicalCandidateV1(BackgroundWire):
     persisted_at: Timestamp
     snapshot_write: bool = False
     sync_payloads: list[CanonicalSyncReferenceV1] = Field(default_factory=list, max_length=100)
+    writer_binding: WriterCommitBindingV1 | None = None
+    history_binding: HistoryCommitBindingV1 | None = None
 
     @model_validator(mode="after")
     def exact_candidate(self):
@@ -685,11 +900,14 @@ class BackgroundSidecarV1(BackgroundWire):
     asset_pins: list[AssetPinV1] = Field(default_factory=list, max_length=LIMITS.metadata_project_records)
     orphan_assets: list[OrphanAssetV1] = Field(default_factory=list, max_length=LIMITS.metadata_project_records)
     cleanup_refs: list[str] = Field(default_factory=list, max_length=LIMITS.metadata_project_records)
+    writer_touches: list[WriterTouchReceiptV1] = Field(default_factory=list, max_length=LIMITS.metadata_project_records)
+    writer_epoch: Counter = 0
+    history_commands: list[HistoryCommandReceiptV1] = Field(default_factory=list, max_length=LIMITS.metadata_project_records)
 
     @model_validator(mode="after")
     def bounded_authority(self):
         groups = (self.jobs, self.requests, self.proposals, self.drafts, self.generations, self.intents, self.inverses,
-            self.manual_intents, self.asset_pins, self.orphan_assets, self.cleanup_refs)
+            self.manual_intents, self.asset_pins, self.orphan_assets, self.cleanup_refs, self.writer_touches, self.history_commands)
         if self.history is not None and self.history_namespace is not None and self.history_namespace != self.history.namespace:
             raise ValueError("history namespace changed")
         if (len({(pin.kind, pin.owner) for pin in self.asset_pins}) != len(self.asset_pins)
@@ -697,9 +915,17 @@ class BackgroundSidecarV1(BackgroundWire):
             raise ValueError("duplicate asset owner or orphan")
         import re
         if len(set(self.cleanup_refs)) != len(self.cleanup_refs) or any(re.fullmatch(
-                r"(?:canonical-candidates|agent-artifacts|proposal-intents|events)/[A-Za-z0-9_-]{1,128}\.json", path) is None
+                r"(?:canonical-candidates|agent-artifacts|proposal-intents|events|drafts)/[A-Za-z0-9_-]{1,128}\.json", path) is None
                 for path in self.cleanup_refs):
             raise ValueError("cleanup must name unique owned private blobs")
+        if (len({item.cursor for item in self.writer_touches}) != len(self.writer_touches)
+                or self.writer_touches and (self.writer is None or any(item.cursor <= self.writer.touch_floor
+                    or item.cursor > self.writer.acknowledged_cursor for item in self.writer_touches))):
+            raise ValueError("touch receipts need one current writer watermark")
+        if self.writer is not None and self.writer_epoch and self.writer.epoch != self.writer_epoch:
+            raise ValueError("writer epoch differs from its retained floor")
+        if len({(item.job_id, item.command_id) for item in self.history_commands}) != len(self.history_commands):
+            raise ValueError("duplicate history command identity")
         if self.active_request_epoch <= self.expired_through_epoch:
             raise ValueError("active request epoch must be above the durable expired floor")
         if (sum(map(len, groups)) + int(self.writer is not None) + int(self.barrier is not None)
@@ -733,6 +959,79 @@ class DispatchStateV1(BackgroundWire):
     paused: Literal["RATE_LIMITED", "AUTH_REQUIRED"] | None
 
 
+class WriterPublishV1(WriterBarrierCommandV1):
+    job_id: AgentId
+    proposal_sha256: Sha256
+
+
+class WriterPublicationV1(BackgroundWire):
+    schema_version: Literal[1]
+    job: JobSnapshotV1
+    view: WriterViewV1
+
+
+class WriterHistoryRequestV1(WriterAdvanceV1):
+    job_id: AgentId
+    proposal_id: AgentId
+    transfer_id: AgentId
+
+
+class WriterHistoryCommandV1(WriterHistoryRequestV1):
+    command_id: AgentId
+    direction: Literal["undo", "redo"]
+
+
+class WriterHistoryResultV1(BackgroundWire):
+    schema_version: Literal[1]
+    view: WriterViewV1
+    receipt: HistoryCommandReceiptV1
+    replayed: bool
+
+
+class WriterHistoryOfferV1(BackgroundWire):
+    schema_version: Literal[1]
+    view: WriterViewV1
+    job: JobSnapshotV1
+    proposal: ProposalBindingV1
+    saved: RichProjectResponse
+    preview: RichProjectResponse
+    ownership: UndoOwnershipV1
+    batch_id: AgentId | None
+    saved_wire: str
+    mutation_wire: str
+
+    @model_validator(mode="after")
+    def exact_saved_proof(self):
+        import hashlib
+        from ..background_history import digest_bytes
+        receipt = self.job.receipt
+        workspace = self.saved.workspace
+        if (receipt is None or workspace.project is None or self.saved.durability != "durable" or not self.view.canonical_ready
+                or (receipt.project_id, receipt.lineage, receipt.job_id, receipt.proposal_id) !=
+                    (self.view.workspace.project_id, self.view.writer.lineage, self.job.id, self.proposal.id)
+                or self.proposal.job_id != self.job.id or self.ownership.job_id != self.job.id
+                or self.ownership.proposal_id != self.proposal.id or self.job.proposal_id != self.proposal.id
+                or self.proposal.payload_sha256 != receipt.proposal_sha256
+                or (self.saved.saved_project_revision, self.saved.saved_document_revision) !=
+                    (receipt.project_revision, receipt.document_revision)
+                or digest_bytes(workspace) != receipt.workspace_sha256
+                or hashlib.sha256(self.saved_wire.encode()).hexdigest() != receipt.workspace_sha256
+                or WorkspaceV6.model_validate_json(self.saved_wire) != workspace
+                or hashlib.sha256(self.mutation_wire.encode()).hexdigest() !=
+                    (self.ownership.command_inverse_sha256 or self.ownership.inverse_sha256)
+                or len(self.mutation_wire.encode()) != (self.ownership.command_inverse_bytes or self.ownership.inverse_bytes)
+                or RichMutation.model_validate_json(self.mutation_wire).project_id != workspace.project_id
+                or (workspace.project_revision, workspace.document_revision, workspace.project.facts.revision) !=
+                    (receipt.project_revision, receipt.document_revision, receipt.facts_revision)
+                or not any(item.client_mutation_id == receipt.client_mutation_id and item.request_sha256 == receipt.request_sha256
+                    and item.resulting_revision == receipt.project_revision for item in workspace.mutation_replay)
+                or self.preview.durability != "pending"
+                or self.preview.workspace.project_id != self.view.workspace.project_id
+                or self.batch_id != (self.proposal.payload.batch_id if self.proposal.payload.kind == "agent_journal" else None)):
+            raise ValueError("history offer needs exact original saved proof")
+        return self
+
+
 BACKGROUND_CONTRACTS = {"background_submission_v1": JobSubmissionV1, "background_snapshot_v1": JobSnapshotV1,
     "background_proposal_v1": ProposalBindingV1, "background_scope_guard_v1": ScopeGuardV1,
     "background_writer_v1": WriterSessionV1, "background_barrier_v1": PublicationBarrierV1,
@@ -744,3 +1043,17 @@ BACKGROUND_CONTRACTS = {"background_submission_v1": JobSubmissionV1, "background
     "background_agent_request_v1": JobAgentRequestV1, "background_artifact_v1": JobArtifactV1,
     "background_legacy_run_v2": JobLegacyRunV2, "background_project_v1": JobProjectV1,
     "background_replay_request_v1": JobReplayRequestV1, "background_replay_v1": JobReplayV1}
+
+BACKGROUND_CONTRACTS.update({"background_writer_proof_v1": WriterProofV1, "background_writer_open_v1": WriterOpenV1,
+    "background_writer_advance_v1": WriterAdvanceV1, "background_writer_barrier_ack_v1": WriterBarrierAckV1,
+    "background_writer_barrier_command_v1": WriterBarrierCommandV1, "background_writer_checkpoint_v1": WriterCheckpointV1,
+    "background_writer_abandon_v1": WriterAbandonV1, "background_writer_view_v1": WriterViewV1,
+    "background_writer_mutation_v1": WriterMutationV1,
+    "background_writer_publish_v1": WriterPublishV1, "background_writer_publication_v1": WriterPublicationV1,
+    "background_writer_history_request_v1": WriterHistoryRequestV1,
+    "background_writer_history_offer_v1": WriterHistoryOfferV1,
+    "background_writer_history_command_v1": WriterHistoryCommandV1,
+    "background_writer_history_result_v1": WriterHistoryResultV1,
+    "background_writer_draft_reference_v1": WriterDraftReferenceV1,
+    "background_writer_draft_command_v1": WriterDraftCommandV1, "background_writer_draft_read_v1": WriterDraftReadV1})
+BACKGROUND_CONTRACTS["background_writer_draft_resolve_v1"] = WriterDraftResolveV1

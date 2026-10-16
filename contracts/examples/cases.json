@@ -4685,5 +4685,977 @@
         "value": "other-history"
       }
     ]
-  }
+  },
+{
+  "name": "nb03_background_writer_abandon_v1_valid",
+  "contract": "background_writer_abandon_v1",
+  "base": "background_writer_abandon_v1",
+  "valid": true,
+  "edits": []
+},
+{
+  "name": "nb03_background_writer_abandon_v1_wrong_version",
+  "contract": "background_writer_abandon_v1",
+  "base": "background_writer_abandon_v1",
+  "valid": false,
+  "edits": [
+    {
+      "op": "set",
+      "path": [
+        "schemaVersion"
+      ],
+      "value": 2
+    }
+  ]
+},
+{
+  "name": "nb03_background_writer_abandon_v1_unknown_field",
+  "contract": "background_writer_abandon_v1",
+  "base": "background_writer_abandon_v1",
+  "valid": false,
+  "edits": [
+    {
+      "op": "set",
+      "path": [
+        "unexpected"
+      ],
+      "value": true
+    }
+  ]
+},
+{
+  "name": "nb03_background_writer_advance_v1_valid",
+  "contract": "background_writer_advance_v1",
+  "base": "background_writer_advance_v1",
+  "valid": true,
+  "edits": []
+},
+{
+  "name": "nb03_background_writer_advance_v1_wrong_version",
+  "contract": "background_writer_advance_v1",
+  "base": "background_writer_advance_v1",
+  "valid": false,
+  "edits": [
+    {
+      "op": "set",
+      "path": [
+        "schemaVersion"
+      ],
+      "value": 2
+    }
+  ]
+},
+{
+  "name": "nb03_background_writer_advance_v1_unknown_field",
+  "contract": "background_writer_advance_v1",
+  "base": "background_writer_advance_v1",
+  "valid": false,
+  "edits": [
+    {
+      "op": "set",
+      "path": [
+        "unexpected"
+      ],
+      "value": true
+    }
+  ]
+},
+{
+  "name": "nb03_background_writer_barrier_ack_v1_valid",
+  "contract": "background_writer_barrier_ack_v1",
+  "base": "background_writer_barrier_ack_v1",
+  "valid": true,
+  "edits": []
+},
+{
+  "name": "nb03_background_writer_barrier_ack_v1_wrong_version",
+  "contract": "background_writer_barrier_ack_v1",
+  "base": "background_writer_barrier_ack_v1",
+  "valid": false,
+  "edits": [
+    {
+      "op": "set",
+      "path": [
+        "schemaVersion"
+      ],
+      "value": 2
+    }
+  ]
+},
+{
+  "name": "nb03_background_writer_barrier_ack_v1_unknown_field",
+  "contract": "background_writer_barrier_ack_v1",
+  "base": "background_writer_barrier_ack_v1",
+  "valid": false,
+  "edits": [
+    {
+      "op": "set",
+      "path": [
+        "unexpected"
+      ],
+      "value": true
+    }
+  ]
+},
+{
+  "name": "nb03_background_writer_barrier_command_v1_valid",
+  "contract": "background_writer_barrier_command_v1",
+  "base": "background_writer_barrier_command_v1",
+  "valid": true,
+  "edits": []
+},
+{
+  "name": "nb03_background_writer_barrier_command_v1_wrong_version",
+  "contract": "background_writer_barrier_command_v1",
+  "base": "background_writer_barrier_command_v1",
+  "valid": false,
+  "edits": [
+    {
+      "op": "set",
+      "path": [
+        "schemaVersion"
+      ],
+      "value": 2
+    }
+  ]
+},
+{
+  "name": "nb03_background_writer_barrier_command_v1_unknown_field",
+  "contract": "background_writer_barrier_command_v1",
+  "base": "background_writer_barrier_command_v1",
+  "valid": false,
+  "edits": [
+    {
+      "op": "set",
+      "path": [
+        "unexpected"
+      ],
+      "value": true
+    }
+  ]
+},
+{
+  "name": "nb03_background_writer_checkpoint_v1_valid",
+  "contract": "background_writer_checkpoint_v1",
+  "base": "background_writer_checkpoint_v1",
+  "valid": true,
+  "edits": []
+},
+{
+  "name": "nb03_background_writer_checkpoint_v1_wrong_version",
+  "contract": "background_writer_checkpoint_v1",
+  "base": "background_writer_checkpoint_v1",
+  "valid": false,
+  "edits": [
+    {
+      "op": "set",
+      "path": [
+        "schemaVersion"
+      ],
+      "value": 2
+    }
+  ]
+},
+{
+  "name": "nb03_background_writer_checkpoint_v1_unknown_field",
+  "contract": "background_writer_checkpoint_v1",
+  "base": "background_writer_checkpoint_v1",
+  "valid": false,
+  "edits": [
+    {
+      "op": "set",
+      "path": [
+        "unexpected"
+      ],
+      "value": true
+    }
+  ]
+},
+{
+  "name": "nb03_background_writer_draft_command_v1_valid",
+  "contract": "background_writer_draft_command_v1",
+  "base": "background_writer_draft_command_v1",
+  "valid": true,
+  "edits": []
+},
+{
+  "name": "nb03_background_writer_draft_command_v1_wrong_version",
+  "contract": "background_writer_draft_command_v1",
+  "base": "background_writer_draft_command_v1",
+  "valid": false,
+  "edits": [
+    {
+      "op": "set",
+      "path": [
+        "schemaVersion"
+      ],
+      "value": 2
+    }
+  ]
+},
+{
+  "name": "nb03_background_writer_draft_command_v1_unknown_field",
+  "contract": "background_writer_draft_command_v1",
+  "base": "background_writer_draft_command_v1",
+  "valid": false,
+  "edits": [
+    {
+      "op": "set",
+      "path": [
+        "unexpected"
+      ],
+      "value": true
+    }
+  ]
+},
+{
+  "name": "nb03_background_writer_draft_read_v1_valid",
+  "contract": "background_writer_draft_read_v1",
+  "base": "background_writer_draft_read_v1",
+  "valid": true,
+  "edits": []
+},
+{
+  "name": "nb03_background_writer_draft_read_v1_wrong_version",
+  "contract": "background_writer_draft_read_v1",
+  "base": "background_writer_draft_read_v1",
+  "valid": false,
+  "edits": [
+    {
+      "op": "set",
+      "path": [
+        "schemaVersion"
+      ],
+      "value": 2
+    }
+  ]
+},
+{
+  "name": "nb03_background_writer_draft_read_v1_unknown_field",
+  "contract": "background_writer_draft_read_v1",
+  "base": "background_writer_draft_read_v1",
+  "valid": false,
+  "edits": [
+    {
+      "op": "set",
+      "path": [
+        "unexpected"
+      ],
+      "value": true
+    }
+  ]
+},
+{
+  "name": "nb03_background_writer_draft_reference_v1_valid",
+  "contract": "background_writer_draft_reference_v1",
+  "base": "background_writer_draft_reference_v1",
+  "valid": true,
+  "edits": []
+},
+{
+  "name": "nb03_background_writer_draft_reference_v1_wrong_version",
+  "contract": "background_writer_draft_reference_v1",
+  "base": "background_writer_draft_reference_v1",
+  "valid": false,
+  "edits": [
+    {
+      "op": "set",
+      "path": [
+        "schemaVersion"
+      ],
+      "value": 2
+    }
+  ]
+},
+{
+  "name": "nb03_background_writer_draft_reference_v1_unknown_field",
+  "contract": "background_writer_draft_reference_v1",
+  "base": "background_writer_draft_reference_v1",
+  "valid": false,
+  "edits": [
+    {
+      "op": "set",
+      "path": [
+        "unexpected"
+      ],
+      "value": true
+    }
+  ]
+},
+{
+  "name": "nb03_background_writer_draft_resolve_v1_valid",
+  "contract": "background_writer_draft_resolve_v1",
+  "base": "background_writer_draft_resolve_v1",
+  "valid": true,
+  "edits": []
+},
+{
+  "name": "nb03_background_writer_draft_resolve_v1_wrong_version",
+  "contract": "background_writer_draft_resolve_v1",
+  "base": "background_writer_draft_resolve_v1",
+  "valid": false,
+  "edits": [
+    {
+      "op": "set",
+      "path": [
+        "schemaVersion"
+      ],
+      "value": 2
+    }
+  ]
+},
+{
+  "name": "nb03_background_writer_draft_resolve_v1_unknown_field",
+  "contract": "background_writer_draft_resolve_v1",
+  "base": "background_writer_draft_resolve_v1",
+  "valid": false,
+  "edits": [
+    {
+      "op": "set",
+      "path": [
+        "unexpected"
+      ],
+      "value": true
+    }
+  ]
+},
+{
+  "name": "nb03_background_writer_history_command_v1_valid",
+  "contract": "background_writer_history_command_v1",
+  "base": "background_writer_history_command_v1",
+  "valid": true,
+  "edits": []
+},
+{
+  "name": "nb03_background_writer_history_command_v1_wrong_version",
+  "contract": "background_writer_history_command_v1",
+  "base": "background_writer_history_command_v1",
+  "valid": false,
+  "edits": [
+    {
+      "op": "set",
+      "path": [
+        "schemaVersion"
+      ],
+      "value": 2
+    }
+  ]
+},
+{
+  "name": "nb03_background_writer_history_command_v1_unknown_field",
+  "contract": "background_writer_history_command_v1",
+  "base": "background_writer_history_command_v1",
+  "valid": false,
+  "edits": [
+    {
+      "op": "set",
+      "path": [
+        "unexpected"
+      ],
+      "value": true
+    }
+  ]
+},
+{
+  "name": "nb03_background_writer_history_offer_v1_valid",
+  "contract": "background_writer_history_offer_v1",
+  "base": "background_writer_history_offer_v1",
+  "valid": true,
+  "edits": []
+},
+{
+  "name": "nb03_background_writer_history_offer_v1_wrong_version",
+  "contract": "background_writer_history_offer_v1",
+  "base": "background_writer_history_offer_v1",
+  "valid": false,
+  "edits": [
+    {
+      "op": "set",
+      "path": [
+        "schemaVersion"
+      ],
+      "value": 2
+    }
+  ]
+},
+{
+  "name": "nb03_background_writer_history_offer_v1_unknown_field",
+  "contract": "background_writer_history_offer_v1",
+  "base": "background_writer_history_offer_v1",
+  "valid": false,
+  "edits": [
+    {
+      "op": "set",
+      "path": [
+        "unexpected"
+      ],
+      "value": true
+    }
+  ]
+},
+{
+  "name": "nb03_background_writer_history_request_v1_valid",
+  "contract": "background_writer_history_request_v1",
+  "base": "background_writer_history_request_v1",
+  "valid": true,
+  "edits": []
+},
+{
+  "name": "nb03_background_writer_history_request_v1_wrong_version",
+  "contract": "background_writer_history_request_v1",
+  "base": "background_writer_history_request_v1",
+  "valid": false,
+  "edits": [
+    {
+      "op": "set",
+      "path": [
+        "schemaVersion"
+      ],
+      "value": 2
+    }
+  ]
+},
+{
+  "name": "nb03_background_writer_history_request_v1_unknown_field",
+  "contract": "background_writer_history_request_v1",
+  "base": "background_writer_history_request_v1",
+  "valid": false,
+  "edits": [
+    {
+      "op": "set",
+      "path": [
+        "unexpected"
+      ],
+      "value": true
+    }
+  ]
+},
+{
+  "name": "nb03_background_writer_history_result_v1_valid",
+  "contract": "background_writer_history_result_v1",
+  "base": "background_writer_history_result_v1",
+  "valid": true,
+  "edits": []
+},
+{
+  "name": "nb03_background_writer_history_result_v1_wrong_version",
+  "contract": "background_writer_history_result_v1",
+  "base": "background_writer_history_result_v1",
+  "valid": false,
+  "edits": [
+    {
+      "op": "set",
+      "path": [
+        "schemaVersion"
+      ],
+      "value": 2
+    }
+  ]
+},
+{
+  "name": "nb03_background_writer_history_result_v1_unknown_field",
+  "contract": "background_writer_history_result_v1",
+  "base": "background_writer_history_result_v1",
+  "valid": false,
+  "edits": [
+    {
+      "op": "set",
+      "path": [
+        "unexpected"
+      ],
+      "value": true
+    }
+  ]
+},
+{
+  "name": "nb03_background_writer_mutation_v1_valid",
+  "contract": "background_writer_mutation_v1",
+  "base": "background_writer_mutation_v1",
+  "valid": true,
+  "edits": []
+},
+{
+  "name": "nb03_background_writer_mutation_v1_wrong_version",
+  "contract": "background_writer_mutation_v1",
+  "base": "background_writer_mutation_v1",
+  "valid": false,
+  "edits": [
+    {
+      "op": "set",
+      "path": [
+        "schemaVersion"
+      ],
+      "value": 2
+    }
+  ]
+},
+{
+  "name": "nb03_background_writer_mutation_v1_unknown_field",
+  "contract": "background_writer_mutation_v1",
+  "base": "background_writer_mutation_v1",
+  "valid": false,
+  "edits": [
+    {
+      "op": "set",
+      "path": [
+        "unexpected"
+      ],
+      "value": true
+    }
+  ]
+},
+{
+  "name": "nb03_background_writer_open_v1_valid",
+  "contract": "background_writer_open_v1",
+  "base": "background_writer_open_v1",
+  "valid": true,
+  "edits": []
+},
+{
+  "name": "nb03_background_writer_open_v1_wrong_version",
+  "contract": "background_writer_open_v1",
+  "base": "background_writer_open_v1",
+  "valid": false,
+  "edits": [
+    {
+      "op": "set",
+      "path": [
+        "schemaVersion"
+      ],
+      "value": 2
+    }
+  ]
+},
+{
+  "name": "nb03_background_writer_open_v1_unknown_field",
+  "contract": "background_writer_open_v1",
+  "base": "background_writer_open_v1",
+  "valid": false,
+  "edits": [
+    {
+      "op": "set",
+      "path": [
+        "unexpected"
+      ],
+      "value": true
+    }
+  ]
+},
+{
+  "name": "nb03_background_writer_proof_v1_valid",
+  "contract": "background_writer_proof_v1",
+  "base": "background_writer_proof_v1",
+  "valid": true,
+  "edits": []
+},
+{
+  "name": "nb03_background_writer_proof_v1_wrong_version",
+  "contract": "background_writer_proof_v1",
+  "base": "background_writer_proof_v1",
+  "valid": false,
+  "edits": [
+    {
+      "op": "set",
+      "path": [
+        "schemaVersion"
+      ],
+      "value": 2
+    }
+  ]
+},
+{
+  "name": "nb03_background_writer_proof_v1_unknown_field",
+  "contract": "background_writer_proof_v1",
+  "base": "background_writer_proof_v1",
+  "valid": false,
+  "edits": [
+    {
+      "op": "set",
+      "path": [
+        "unexpected"
+      ],
+      "value": true
+    }
+  ]
+},
+{
+  "name": "nb03_background_writer_publication_v1_valid",
+  "contract": "background_writer_publication_v1",
+  "base": "background_writer_publication_v1",
+  "valid": true,
+  "edits": []
+},
+{
+  "name": "nb03_background_writer_publication_v1_wrong_version",
+  "contract": "background_writer_publication_v1",
+  "base": "background_writer_publication_v1",
+  "valid": false,
+  "edits": [
+    {
+      "op": "set",
+      "path": [
+        "schemaVersion"
+      ],
+      "value": 2
+    }
+  ]
+},
+{
+  "name": "nb03_background_writer_publication_v1_unknown_field",
+  "contract": "background_writer_publication_v1",
+  "base": "background_writer_publication_v1",
+  "valid": false,
+  "edits": [
+    {
+      "op": "set",
+      "path": [
+        "unexpected"
+      ],
+      "value": true
+    }
+  ]
+},
+{
+  "name": "nb03_background_writer_publish_v1_valid",
+  "contract": "background_writer_publish_v1",
+  "base": "background_writer_publish_v1",
+  "valid": true,
+  "edits": []
+},
+{
+  "name": "nb03_background_writer_publish_v1_wrong_version",
+  "contract": "background_writer_publish_v1",
+  "base": "background_writer_publish_v1",
+  "valid": false,
+  "edits": [
+    {
+      "op": "set",
+      "path": [
+        "schemaVersion"
+      ],
+      "value": 2
+    }
+  ]
+},
+{
+  "name": "nb03_background_writer_publish_v1_unknown_field",
+  "contract": "background_writer_publish_v1",
+  "base": "background_writer_publish_v1",
+  "valid": false,
+  "edits": [
+    {
+      "op": "set",
+      "path": [
+        "unexpected"
+      ],
+      "value": true
+    }
+  ]
+},
+{
+  "name": "nb03_background_writer_view_v1_valid",
+  "contract": "background_writer_view_v1",
+  "base": "background_writer_view_v1",
+  "valid": true,
+  "edits": []
+},
+{
+  "name": "nb03_background_writer_view_v1_wrong_version",
+  "contract": "background_writer_view_v1",
+  "base": "background_writer_view_v1",
+  "valid": false,
+  "edits": [
+    {
+      "op": "set",
+      "path": [
+        "schemaVersion"
+      ],
+      "value": 2
+    }
+  ]
+},
+{
+  "name": "nb03_background_writer_view_v1_unknown_field",
+  "contract": "background_writer_view_v1",
+  "base": "background_writer_view_v1",
+  "valid": false,
+  "edits": [
+    {
+      "op": "set",
+      "path": [
+        "unexpected"
+      ],
+      "value": true
+    }
+  ]
+},
+{
+  "name": "nb03_writer_short_credential",
+  "contract": "background_writer_proof_v1",
+  "base": "background_writer_proof_v1",
+  "valid": false,
+  "edits": [
+    {
+      "op": "set",
+      "path": [
+        "credential"
+      ],
+      "value": "short"
+    }
+  ]
+},
+{
+  "name": "nb03_writer_negative_sequence",
+  "contract": "background_writer_checkpoint_v1",
+  "base": "background_writer_checkpoint_v1",
+  "valid": false,
+  "edits": [
+    {
+      "op": "set",
+      "path": [
+        "sequence"
+      ],
+      "value": 0
+    }
+  ]
+},
+{
+  "name": "nb03_writer_negative_cursor",
+  "contract": "background_writer_advance_v1",
+  "base": "background_writer_advance_v1",
+  "valid": false,
+  "edits": [
+    {
+      "op": "set",
+      "path": [
+        "actionCursor"
+      ],
+      "value": -1
+    }
+  ]
+},
+{
+  "name": "nb03_writer_touch_replay_floor",
+  "contract": "background_writer_view_v1",
+  "base": "background_writer_view_v1",
+  "valid": false,
+  "edits": [
+    {
+      "op": "set",
+      "path": [
+        "writer",
+        "touchFloor"
+      ],
+      "value": 1
+    }
+  ]
+},
+{
+  "name": "nb03_writer_negative_draft_floor",
+  "contract": "background_writer_view_v1",
+  "base": "background_writer_view_v1",
+  "valid": false,
+  "edits": [
+    {
+      "op": "set",
+      "path": [
+        "writer",
+        "draftSequenceFloor"
+      ],
+      "value": -1
+    }
+  ]
+},
+{
+  "name": "nb03_writer_draft_floor_survives_resolution",
+  "contract": "background_writer_view_v1",
+  "base": "background_writer_view_v1",
+  "valid": true,
+  "edits": [
+    {
+      "op": "set",
+      "path": [
+        "writer",
+        "draftSequenceFloor"
+      ],
+      "value": 20
+    }
+  ]
+},
+{
+  "name": "nb03_writer_wrong_workspace_hash",
+  "contract": "background_writer_view_v1",
+  "base": "background_writer_view_v1",
+  "valid": false,
+  "edits": [
+    {
+      "op": "set",
+      "path": [
+        "workspaceSha256"
+      ],
+      "value": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"
+    }
+  ]
+},
+{
+  "name": "nb03_writer_changed_workspace_wire",
+  "contract": "background_writer_view_v1",
+  "base": "background_writer_view_v1",
+  "valid": false,
+  "edits": [
+    {
+      "op": "set",
+      "path": [
+        "workspaceWire"
+      ],
+      "value": "{}"
+    }
+  ]
+},
+{
+  "name": "nb03_writer_false_durable_view",
+  "contract": "background_writer_view_v1",
+  "base": "background_writer_view_v1",
+  "valid": false,
+  "edits": [
+    {
+      "op": "set",
+      "path": [
+        "canonicalReady"
+      ],
+      "value": false
+    }
+  ]
+},
+{
+  "name": "nb03_writer_foreign_draft",
+  "contract": "background_writer_view_v1",
+  "base": "background_writer_view_v1",
+  "valid": false,
+  "edits": [
+    {
+      "op": "set",
+      "path": [
+        "drafts"
+      ],
+      "value": [
+        {
+          "schemaVersion": 1,
+          "id": "recovery-input",
+          "projectId": "project-1",
+          "lineage": "lineage_2d845c6516af8f57fc565be5",
+          "writerEpoch": 2,
+          "incarnation": "connection-one",
+          "sequence": 1,
+          "actionCursor": 1,
+          "baseRevision": 1,
+          "baseSha256": "97b841f787fcaec5244055a3ed5ea88ede96cdfe008124f536a9a900cd39d718",
+          "payloadSha256": "ec1936fd7018923bfb5a168abb218f95946e4a0c70e96a0ce0378dcbb19bfe18",
+          "payloadBytes": 11792,
+          "payloadRef": "draft_4acc4024ca4dab319472941b67b583e69f09093b",
+          "touches": [],
+          "checkpointedAt": "2026-10-16T12:00:00+00:00",
+          "assetPinsSha256": null
+        }
+      ]
+    },
+    {
+      "op": "set",
+      "path": [
+        "drafts",
+        0,
+        "projectId"
+      ],
+      "value": "other-project"
+    }
+  ]
+},
+{
+  "name": "nb03_writer_history_wrong_batch",
+  "contract": "background_writer_history_offer_v1",
+  "base": "background_writer_history_offer_v1",
+  "valid": false,
+  "edits": [
+    {
+      "op": "set",
+      "path": [
+        "batchId"
+      ],
+      "value": "other-batch"
+    }
+  ]
+},
+{
+  "name": "nb03_writer_history_wrong_hash",
+  "contract": "background_writer_history_offer_v1",
+  "base": "background_writer_history_offer_v1",
+  "valid": false,
+  "edits": [
+    {
+      "op": "set",
+      "path": [
+        "job",
+        "receipt",
+        "workspaceSha256"
+      ],
+      "value": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"
+    }
+  ]
+},
+{
+  "name": "nb03_writer_history_wrong_wire",
+  "contract": "background_writer_history_offer_v1",
+  "base": "background_writer_history_offer_v1",
+  "valid": false,
+  "edits": [
+    {
+      "op": "set",
+      "path": [
+        "savedWire"
+      ],
+      "value": "{}"
+    }
+  ]
+},
+{
+  "name": "nb03_writer_history_unsafe_direction",
+  "contract": "background_writer_history_command_v1",
+  "base": "background_writer_history_command_v1",
+  "valid": false,
+  "edits": [
+    {
+      "op": "set",
+      "path": [
+        "direction"
+      ],
+      "value": "apply"
+    }
+  ]
+},
+{
+  "name": "nb03_writer_history_credential_in_outbox",
+  "contract": "background_writer_checkpoint_v1",
+  "base": "background_writer_checkpoint_v1",
+  "valid": false,
+  "edits": [
+    {
+      "op": "set",
+      "path": [
+        "payload",
+        "historyOutbox"
+      ],
+      "value": [
+        {
+          "jobId": "job",
+          "proposalId": "proposal",
+          "transferId": "transfer",
+          "commandId": "command",
+          "direction": "undo",
+          "actionCursor": 1,
+          "credential": "synthetic"
+        }
+      ]
+    }
+  ]
+}
 ]

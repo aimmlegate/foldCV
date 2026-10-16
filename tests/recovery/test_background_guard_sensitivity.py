@@ -86,3 +86,33 @@ def test_critical_guard_omission_breaks_the_actual_regression(tmp_path, variant,
         "actions": ["healthy", "mutant"], "orders": ["healthy_then_mutant"], "scope": "production_integration",
         "log": [{"action": "healthy", "result": results[0], "sourceSha256": original_sha},
             {"action": "mutant", "result": results[1], "sourceSha256": mutant_sha, "regressionFailure": failure}]})
+
+
+def test_zero_diff_touch_guard_omission_breaks_the_scoped_aba_regression(tmp_path, background_evidence):
+    from tests.recovery.test_background_writer_sessions import WriterFixture
+    module, source_sha, mutant_sha = copied_module(tmp_path, "background_writers", [
+        ("                touched.update(query_touches(state, workspace, workspace, item.mutation))",
+         "                pass")])
+    results = []
+    for label in ("healthy", "mutant"):
+        fixture = WriterFixture(tmp_path / label)
+        if label == "mutant":
+            original = fixture.writers
+            fixture.writers = module.WriterSessions(fixture.publication.coordinator)
+            fixture.writers.live = original.live
+        job, proposal, _batch = fixture.publication.accepted()
+        before = fixture.publication.current()
+        edit = mutation(before, [put(before, "narrative", text="Typed and undone")], "zero-diff-touch")
+        edit.capture.session_id = fixture.proof.session_id
+        fixture.writers.flush(fixture.project, fixture.flush_request(1, [{"cursor": 1, "mutation": edit}]))
+        assert fixture.publication.current() == before
+        fixture.writers.detach(fixture.project, fixture.flush_request(1))
+        results.append(fixture.publication.publish(job, proposal).publication)
+    assert results == ["needs_review", "saved"]
+    with pytest.raises(AssertionError, match="zero-diff regression"):
+        assert results[1] == "needs_review", "zero-diff regression"
+    background_evidence({"id": "NB-G03:v04:sensitivity", "seed": 0, "capacity": 1, "transitions": 2,
+        "actions": ["healthy", "mutant"], "orders": ["healthy_then_mutant"], "scope": "production_integration",
+        "log": [{"action": "healthy", "result": results[0], "sourceSha256": source_sha},
+            {"action": "mutant", "result": results[1], "sourceSha256": mutant_sha,
+                "regressionFailure": "zero-diff regression: saved after uncommitted edit and Undo"}]})

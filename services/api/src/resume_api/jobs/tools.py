@@ -1,5 +1,6 @@
 """Reuse agent reads and compilation with Job authority and deferred apply v2."""
 
+import asyncio
 import hashlib
 
 from packages.resume_core.agent_store import AgentFailure, digest, run_in
@@ -123,8 +124,18 @@ class JobToolSession(ToolSession):
                     acceptedAt=self.service.jobs.store.clock(), executionDeadline=job.attempts[-1].active_deadline,
                     authority="active", revocation=None)
                 current = self.service.projects.read(self.control.project_id)
-                result = await self.service.jobs.proposals_for(self.control.project_id).accept(self.control, candidate,
-                    needs_review=not current_dependencies(current, batch.dependencies))
+                known = self.service.jobs.store.read(self.control.project_id, job.id)
+                if known.receipt is not None:
+                    result = self.service.jobs.publication.native_result(self.control.project_id, job.id)
+                else:
+                    manager = self.service.jobs.proposals_for(self.control.project_id)
+                    result = await manager.accept(self.control, candidate,
+                        needs_review=not current_dependencies(current, batch.dependencies))
+                    published = await asyncio.to_thread(self.service.jobs.publication.publish,
+                        self.control.project_id, job.id, candidate.payload_sha256)
+                    await self.service.jobs.supervisor._emit(published)
+                    result = (self.service.jobs.publication.native_result(self.control.project_id, job.id)
+                        if published.receipt is not None else manager.result(published))
                 value = result.model_dump(mode="json", by_alias=True)
                 self.result_bytes += len(json_text(value).encode())
                 return value

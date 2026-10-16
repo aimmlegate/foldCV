@@ -127,17 +127,22 @@ def test_native_saved_envelope_uses_the_retained_real_candidate_after_replay_pru
 
 @pytest.mark.asyncio
 async def test_manual_service_route_replays_and_stale_cache_save_cannot_overwrite_it(tmp_path):
-    from tests.recovery.test_background_agent import environment
+    from tests.recovery.test_background_agent import environment, hold_writer
     from packages.resume_core.agent_store import digest
+    from resume_api.gui_projects import ProjectFailure
+    from tests.support.background import save_input
     service, factory, workspace, _payload, _connection, _old = await environment(tmp_path)
     request = mutation(workspace, [put(workspace, "narrative", text="Actual manual input")], "manual-route")
     try:
-        saved = service.projects.mutate(workspace.project_id, request)
+        with pytest.raises(ProjectFailure, match="WRITER_UNKNOWN"):
+            service.projects.mutate(workspace.project_id, request)
+        proof = hold_writer(service, workspace)
+        saved = save_input(service, request, proof)
         assert saved.durability == "durable" and saved.workspace.project_revision == 2
         service.projects.workspaces[workspace.project_id] = workspace.model_copy(deep=True)
         assert service.projects.persist(workspace.project_id) == "failed"
         assert service.projects.storage.read_committed(workspace.project_id)[0] == saved.workspace
-        replay = service.projects.mutate(workspace.project_id, request)
+        replay = save_input(service, request, proof)
         assert replay.workspace == saved.workspace and replay.durability == "durable"
         assert not factory.calls
         assert service.projects.saved_hashes[workspace.project_id] == digest(saved.workspace)
