@@ -113,7 +113,8 @@ async def main(args):
         dist.mkdir(exist_ok=True); (dist / "index.html").write_text('<div data-app="foldcv-uir00">UIR00 reference inventory</div>')
     assert dist.is_dir()
     data, operations = root / "data", root / "operations"
-    PreferencesStore(data).select_model("uir-processing")
+    preferences = PreferencesStore(data)
+    if not preferences.path.exists(): preferences.select_model("uir-processing")
     listener = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     listener.bind(("127.0.0.1", args.port)); listener.listen(128)
     origin = "http://127.0.0.1:" + str(listener.getsockname()[1]); secret = secrets.token_urlsafe(32)

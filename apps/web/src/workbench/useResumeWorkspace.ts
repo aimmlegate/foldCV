@@ -11,6 +11,8 @@ function label(error: unknown): string {
   if (error instanceof RichApiFailure && error.code === "ARCHIVE_VERSION_UNSUPPORTED") return "Версия файла проекта не поддерживается.";
   if (error instanceof RichApiFailure && error.code === "RICH_EXPORT_UNSUPPORTED") return "Этот блок пока не поддерживает экспорт. Изменения сохранены.";
   if (error instanceof RichApiFailure && error.code === "CONNECTION_REQUIRED") return "Настройте подключение модели и повторите обработку. Источник сохранён.";
+  if (error instanceof RichApiFailure) return "Не удалось выполнить действие. Повторите попытку.";
+  if (error instanceof TypeError) return "Нет связи с локальным сервисом. Проверьте его запуск и повторите попытку.";
   return error instanceof Error ? error.message : "Не удалось выполнить действие";
 }
 export const stageLabels = { assess_resume: "Проверяем, похоже ли содержимое на резюме", normalize_semantics: "Извлекаем факты", draft_prose: "Редактируем текст",
@@ -28,6 +30,7 @@ export function useResumeWorkspace() {
   const [textDraft, setTextDraft] = useState("");
   function setInput(next: ResumeInput) { storeInput(next); if (next.kind === "text") setTextDraft(next.text); }
   const [error, setError] = useState("");
+  const dismissError = useCallback(() => setError(""), []);
   const [status, setStatus] = useState("Сохранено");
   const [busy, setBusy] = useState(false);
   const [settings, setSettings] = useState(false);
@@ -121,7 +124,7 @@ export function useResumeWorkspace() {
     });
   }
   async function upload(file: File) {
-    await action(async () => {
+    return action(async () => {
       await assistant.current?.stop();
       if (editor.current) await editor.current.flush();
       const body = new FormData(); body.append("file", file);
@@ -129,16 +132,16 @@ export function useResumeWorkspace() {
       prepared.current = null; setInput({ kind: "text", text: "" }); setProjects(await listProjects());
     });
   }
-  async function exportFile(kind: "export" | "archive") {
-    await action(async () => {
+  async function exportFile(kind: "export" | "archive", filename?: string | ((current: RichProjectResponse) => string)) {
+    return action(async () => {
       const current = editor.current ? await editor.current.flush() : response;
-      if (!current) return;
+      if (!current) throw new Error("Откройте резюме перед сохранением файла.");
       const blob = await download(current.workspace.projectId, kind, current.workspace);
       const url = URL.createObjectURL(blob), anchor = document.createElement("a");
-      anchor.href = url; anchor.download = kind === "export" ? "resume.docx" : "project.foldcv";
+      anchor.href = url; anchor.download = typeof filename === "function" ? filename(current) : filename ?? (kind === "export" ? "resume.docx" : "project.foldcv");
       anchor.click(); setTimeout(() => URL.revokeObjectURL(url), 1000);
     });
   }
   return { response, projects, input, setInput, textDraft, error, status, setStatus, busy, settings, setSettings,
-    editor, assistant, acknowledge, action, fresh, open, remove, process, upload, exportFile };
+    editor, assistant, acknowledge, action, fresh, open, remove, process, upload, exportFile, dismissError };
 }

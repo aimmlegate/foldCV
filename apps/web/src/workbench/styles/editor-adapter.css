@@ -130,6 +130,8 @@
 .uir-timeline small { display: block; }
 .uir-timeline > details > button { background: none; border: 0; color: var(--accent); text-align: left; padding: 5px 0; font-size: 10px; }
 .uir-period-actions { display: flex; flex-wrap: wrap; gap: 12px; }
+.uir-assistant-options { margin-top: 32px; padding-top: 24px; border-top: 1px solid var(--line); }
+.demo-file-row > span { min-width: 0; overflow-wrap: anywhere; }
 @media (max-width: 1080px) { .uir-editor-body .uir-block-panel { top: 143px; } }
 @media (max-width: 800px) { .uir-editor-body .uir-block-panel { top: 135px; } }
 @media (max-width: 600px) { .uir-editor-body .uir-block-panel { top: 121px; } }

@@ -36,13 +36,22 @@ def main():
             assert reopened.project.sources == workspace.project.sources
             assert source_bytes == {key[1]: value for key, value in originals.items()}
             assert image_bytes == {key[1]: value for key, value in images.items()}
+            if expected.get("reopenedProjectId"):
+                returned = projects[expected["reopenedProjectId"]][0]
+                assert returned.project.document == workspace.project.document
+                assert returned.project.facts == workspace.project.facts
+                assert returned.project.sources == workspace.project.sources
+                assert {key[1]: value for key, value in projects[expected["reopenedProjectId"]][1].items()} == {key[1]: value for key, value in originals.items()}
+                assert {key[1]: value for key, value in projects[expected["reopenedProjectId"]][3].items()} == {key[1]: value for key, value in images.items()}
         else:
             assert name.endswith(".docx")
             assert data == artifacts[(identifier, workspace.project.renders[-1].id)]
             with ZipFile(BytesIO(data)) as archive:
                 xml = archive.read("word/document.xml").decode()
-                assert "UIR04 table" in xml and "Clearer:" in xml and "UIR04 synthetic image" in xml
-                assert "https://example.com/uir04" in archive.read("word/_rels/document.xml.rels").decode()
+                markers = expected.get("textMarkers", ["UIR04 table", "Clearer:", "UIR04 synthetic image"])
+                assert markers and all(marker in xml for marker in markers)
+                links = expected.get("links", ["https://example.com/uir04"] if "textMarkers" not in expected else [])
+                if links: assert all(link in archive.read("word/_rels/document.xml.rels").decode() for link in links)
                 media = [archive.read(path) for path in archive.namelist() if path.startswith("word/media/")]
                 assert all(blob in media for blob in images.values())
         target = handoff / f"{args.slice.lower()}-{name}"; target.write_bytes(data)

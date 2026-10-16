@@ -1,23 +1,10 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
-import { ConnectionWorkflow, type ConnectionState, type ConnectionView } from "../connection/workflow";
+import { ConnectionWorkflow, type ConnectionView } from "../connection/workflow";
+import { connectionMessages } from "../connection/messages";
 import type { Preferences } from "../contracts/generated/preferences";
 import { preferencesRequest } from "./api";
 import { RulesPanel } from "./RulesPanel";
 
-const messages: Record<ConnectionState, string> = {
-  unchecked: "Подключение ещё не проверено.", detached: "Модель отключена от FoldCV. Вход в CLI остаётся в силе.",
-  cli_missing: "Codex CLI не найден. Установите его и перезапустите приложение.",
-  launcher_unsupported: "Для запуска этого CLI нужен Node. Установите Node и перезапустите приложение.",
-  unsupported_version: "Эта версия CLI не поддерживается в выбранном режиме.",
-  login_required: "Нужен вход с подпиской ChatGPT в выделенном профиле CLI.",
-  api_key_mode: "Обнаружен вход по API-ключу. Для этого приложения нужна подписка ChatGPT.",
-  metadata_failed: "Не удалось получить сведения об аккаунте и моделях. Повторите проверку.",
-  quota_exhausted: "Лимит подписки исчерпан. Дождитесь его сброса.",
-  unknown_limits: "Модели доступны в списке, но сведения о лимите не получены.",
-  connected: "Вход с подпиской и список моделей доступны.", login_pending: "Завершите вход в окне, открытом CLI.",
-  login_failed: "Вход не завершён. Повторите, когда будете готовы.",
-  cleanup_blocked: "Не удалось подтвердить остановку процесса. Проверьте CLI и перезапустите приложение.",
-};
 
 type SettingsSection = "model" | "rules" | "analysis" | "appearance";
 export function SettingsPanel({ close, analysisChanged, appearance, assistant }: { close: () => void; analysisChanged: (enabled: boolean) => void; appearance?: ReactNode;
@@ -58,7 +45,7 @@ export function SettingsPanel({ close, analysisChanged, appearance, assistant }:
     <div className="next-settings-content">
     <section aria-label="Подключение модели" hidden={section !== "model"}>
       <h2>Модель и подключение</h2>
-      <p role="status">{view.detaching ? "Останавливаем операцию FoldCV…" : messages[snapshot.state]}</p>
+      <p role="status">{view.detaching ? "Останавливаем операцию FoldCV…" : connectionMessages[snapshot.state]}</p>
       {snapshot.version && <p>Версия CLI: {snapshot.version}</p>}
       {snapshot.plan && <p>Подписка: {snapshot.plan}</p>}
       <div className="next-settings-controls">

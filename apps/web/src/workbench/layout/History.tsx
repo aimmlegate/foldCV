@@ -1,15 +1,15 @@
-import { useRef, useState } from "react";
+import { useState } from "react";
 import type { GuiProjectListResponse } from "../../contracts/generated/gui_project_list_response";
 import { Button } from "../ui/Button";
 import { Dialog } from "../ui/Dialog";
 import { Icon } from "../ui/Icon";
 
-export function History({ projects, activeId, busy, collapse, fresh, open, remove, upload, settings, connection }: {
+export function History({ projects, activeId, busy, collapse, fresh, open, remove, openFile, settings, connection }: {
   projects: GuiProjectListResponse | null; activeId: string | null; busy: boolean; collapse: () => void;
   fresh: () => void; open: (id: string) => Promise<boolean>; remove: (id: string) => Promise<boolean>;
-  upload: (file: File) => void; settings: () => void; connection: string;
+  openFile: () => void; settings: () => void; connection: string;
 }) {
-  const input = useRef<HTMLInputElement>(null), [deleting, setDeleting] = useState<string | null>(null);
+  const [deleting, setDeleting] = useState<string | null>(null);
   const entries = projects?.entries.filter(item => !item.tombstoned) ?? [];
   return <aside className="history" aria-label="История резюме">
     <div className="brand-row"><button className="brand" disabled={busy} aria-label="FoldCV — новый исходник" onClick={fresh}><Icon name="fold" />FoldCV<span>.</span></button>
@@ -23,9 +23,7 @@ export function History({ projects, activeId, busy, collapse, fresh, open, remov
         </button><button className="project-delete" disabled={busy} aria-label={`Удалить проект: ${item.title}`} title="Удалить резюме" onClick={() => setDeleting(item.projectId)}><Icon name="trash" /></button>
       </div>)}
     </div>
-    <button className="history-open" disabled={busy} onClick={() => input.current?.click()}><Icon name="upload" />Открыть .foldcv</button>
-    <input ref={input} hidden type="file" aria-label="Открыть файл проекта" accept=".foldcv,.zip" disabled={busy}
-      onChange={event => { const file = event.currentTarget.files?.[0]; event.currentTarget.value = ""; if (file) upload(file); }} />
+    <button className="history-open" disabled={busy} onClick={openFile}><Icon name="upload" />Открыть .foldcv</button>
     <footer className="history-footer"><div className="connection-mini"><span className="dot" /><span>{connection}</span></div>
       <button disabled={busy} onClick={settings}><Icon name="settings" />Настройки<Icon name="chevron" /></button></footer>
     <Dialog open={deleting !== null} close={() => setDeleting(null)} title="Удалить резюме?">
