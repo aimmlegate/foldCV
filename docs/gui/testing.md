@@ -18,7 +18,9 @@ independent navigation. NB05 adds 31 variants for existing fixed services, queue
 reversed replies, overlap and processing stage cuts. NB06 adds eight lifecycle
 variants with real API/client bindings and 13 retained manual T3 cases. The IME
 case has an explicit user amendment after trusted Cyrillic input; other-language
-composition is not claimed. All 467 executable variants have exact Python/Node
+composition is not claimed. NB07a adds 19 controlled variants for serial resource
+ownership, held-model export/manual saves, BUSY login, safe feature retirement
+and the integrated corpus. All 486 executable variants have exact Python/Node
 bindings; the manual cases bind observations and retained artifact hashes.
 Additional checks cover pin corruption, late callbacks, namespace loss, repeated
 saves, engine marks and callback ownership after resume. Real API cases also
@@ -54,13 +56,28 @@ results now retain exact file/full nested names and completed hooks through
 Raw Node events also retain V8 branch details for background, assistant and rich
 modules. Review these transformed-module ranges alongside named safety cases;
 they are not a source-line coverage guarantee.
-The combined report requires all 32 traces: the original specification corpus
-and 16 real API/store/compiler traces of 200 transitions at capacity one. Named
+The combined report requires all 160 traces: the original specification corpus,
+16 real API/store/compiler traces of 200 transitions and the NB07a 128 × 300
+production integration corpus at capacity one. Named
 orders cover attach/commit, timeout/input/reply, edit/Undo/detach,
-delete/restart/callback and save/crash/duplicate. Disposable copies prove five
+delete/restart/callback and save/crash/duplicate. Disposable copies check six
 critical guard regressions. No automated browser scenarios are added or executed;
 mounted mutation origins, drafts, reload and history use manual T3. Real OS IME
 evidence remains separate from scripted composition.
+
+Production traces run over four disjoint pytest shards with fresh isolated stores.
+Each supervisor still has capacity one. The original base, Node and worker reports
+share one fast identity and exact source hashes; every phase and trace remains
+mandatory. Raw worker logs and malformed reports are retained before parsing or
+merging. Combined branch coverage includes the base suite and all workers.
+
+Native-only variants have separate release bindings. Passing fast cannot satisfy
+them. The release validator requires an authorized attempt in the sole ledger,
+the current exact source hashes, retained native runtime/cleanup witnesses and
+unchanged artifacts. Pending, scripted, stale, wrong-pool and unverified-cleanup
+fixtures must fail release validation. The later [native authorization](handoffs/BACKGROUND-WORK/native-final-authorization.json)
+grants NB07a two and NB07b six starts; NB00 retains its separate ten-start pool.
+Failed starts count. Current outcomes remain in the slice acceptance records.
 
 D085 assistant work follows [its plan](agent-assistant-plan.md), AC01–AC18 and
 AG00–AG08. No assistant acceptance is claimed yet. Add the namespaced requirement

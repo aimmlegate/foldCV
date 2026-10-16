@@ -20,6 +20,7 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 from tools.background_evidence import (ExecutionReportV1, assert_report as assert_background_report,
     failure_history, merge_reports, read_report, source_hashes as background_source_hashes)
+from tools.background_corpus import WORKERS as CORPUS_WORKERS, production_nodes, run_shards, retain_raw
 
 WEB = ROOT / "apps/web"
 PYTHON = ROOT / ".venv/bin/python"
@@ -81,8 +82,8 @@ def require_converter() -> None:
             raise SystemExit(f"Missing or changed app-local font: {font.name}")
 
 
-def background_spec() -> dict:
-    from tools.background_evidence import assert_manual_bindings
+def background_spec(*, require_native=False) -> dict:
+    from tools.background_evidence import assert_manual_bindings, assert_native_bindings
     data = json.loads((ROOT / "tests/requirements.json").read_text())
     spec = data["backgroundExecution"]
     report_schema = json.loads((ROOT / spec["reportSchema"]).read_text())
@@ -91,9 +92,12 @@ def background_spec() -> dict:
     matrix = json.loads((ROOT / "docs/gui/handoffs/BACKGROUND-WORK/test-matrix.json").read_text())
     due = {v["id"] for c in matrix["cases"] for v in c["requiredVariants"] if v["requiredBy"] in spec["coveredSlices"]}
     manual = {v["id"] for c in matrix["cases"] if c["layers"] == ["t3"] for v in c["requiredVariants"] if v["requiredBy"] in spec["coveredSlices"]}
-    if set(spec["bindings"]) != due - manual or not due:
+    native = {v["id"] for c in matrix["cases"] if c["layers"] == ["native"] for v in c["requiredVariants"] if v["requiredBy"] in spec["coveredSlices"]}
+    if set(spec["bindings"]) != due - manual - native or not due:
         raise SystemExit("NB matrix due variants do not match execution bindings")
     assert_manual_bindings(spec.get("manualBindings", {}), manual, ROOT)
+    spec["pendingNative"] = assert_native_bindings(spec.get("nativeBindings", {}), native, ROOT,
+        sources=background_source_hashes(spec["sources"]), require_pass=require_native)
     matrix_bindings = {b["variant"]: b["nodes"] for c in matrix["cases"] for b in c["testBindings"] if b["suite"] == "fast"}
     if any(matrix_bindings.get(variant) != nodes for variant, nodes in spec["bindings"].items()):
         raise SystemExit("NB matrix executable identities do not match the runner")
@@ -143,16 +147,29 @@ def pytest_group(name: str, evidence_dir: Path | None = None, diagnosis: Path | 
             if spec is not None:
                 (directory / "context.json").write_bytes(context_file.read_bytes())
         failure = None
+        corpus = production_nodes(spec) if spec is not None else []
+        coverage_arguments = ["--cov=packages", "--cov=spikes", "--cov=tools", "--cov=services/api/src/resume_api", "--cov-branch"]
         try:
-            run([str(PYTHON), "-m", "pytest", "-q", *targets, *arguments, "--cov=packages", "--cov=spikes",
-                 "--cov=tools", "--cov=services/api/src/resume_api", "--cov-branch",
-                 "--cov-report=term-missing:skip-covered", "--cov-report=json:" + str(temp_root / "branches.json")], env=env)
+            if corpus:
+                env["COVERAGE_FILE"] = str(temp_root / ".coverage-base")
+            run([str(PYTHON), "-m", "pytest", "-q", *targets, *arguments,
+                 *("--deselect=" + node for node in corpus), *coverage_arguments,
+                 "--cov-report=term-missing:skip-covered",
+                 "--cov-report=json:" + str(temp_root / ("branches-base.json" if corpus else "branches.json"))], env=env)
+            if corpus:
+                run_shards(PYTHON, corpus, context=context, root=temp_root, cwd=ROOT, env=env,
+                    coverage_arguments=coverage_arguments, retained=retained)
+                combined_env = {**env, "COVERAGE_FILE": str(temp_root / ".coverage")}
+                run([str(PYTHON), "-m", "coverage", "combine", "--keep", str(temp_root / ".coverage-base"),
+                    *(str(temp_root / f".coverage-corpus-{index}") for index in range(min(CORPUS_WORKERS, len(corpus))))], env=combined_env)
+                run([str(PYTHON), "-m", "coverage", "json", "-o", str(temp_root / "branches.json")], env=combined_env)
         except BaseException as error:
             failure = error
         finally:
+            retain_raw(temp_root, retained)
             if spec is not None and (temp_root / "execution-python.json").is_file():
                 raw = [Path(prepared["nodeReport"])] if prepared else []
-                merge_reports([*raw, temp_root / "execution-python.json"], Path(context["reportPath"]))
+                merge_reports([*raw, temp_root / "execution-python.json", *sorted(temp_root.glob("execution-corpus-*.json"))], Path(context["reportPath"]))
             for directory in retained:
                 for filename in ("execution.json", "execution-python.json", "branches.json", "context.json"):
                     path = Path(context["reportPath"]) if filename == "execution.json" and spec is not None else temp_root / filename
@@ -175,6 +192,8 @@ def pytest_group(name: str, evidence_dir: Path | None = None, diagnosis: Path | 
                     "sourceSha256": hashlib.sha256(json.dumps(current, sort_keys=True, separators=(",", ":")).encode()).hexdigest(),
                     "reportSha256": hashlib.sha256((directory / "execution.json").read_bytes()).hexdigest()}) + "\n")
             print(f"NB executed evidence: {len(spec['bindings'])} due variants, {len(spec['requiredTraces'])} reference traces", flush=True)
+            if spec["pendingNative"]:
+                print("Separate native release proof remains pending: " + ", ".join(spec["pendingNative"]), flush=True)
 
 
 def assert_prototype_collection(mapped: object, collected: set[str]) -> None:

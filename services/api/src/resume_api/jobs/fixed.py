@@ -64,6 +64,10 @@ class FixedJobs:
     def render(self, job):
         if job.submission.kind != "processing" or job.receipt is None or job.id in self.renders:
             return
+        completed = [key for key, task in self.renders.items() if task.done()]
+        for key in completed[:-8]:
+            del self.renders[key]
+            self.render_errors.pop(key, None)
         async def run():
             from packages.resume_core.rendering.template import RenderFailure
             project = job.submission.identity.project_id
@@ -110,7 +114,7 @@ class FixedJobs:
 
     async def submit(self, project, request):
         service, projects = self.service, self.service.projects
-        if not service.enabled or service.supervisor.closed or service.supervisor.dispatcher is None:
+        if not service.enabled or not service.accepting or service.supervisor.closed or service.supervisor.dispatcher is None:
             raise BackgroundFailure("JOB_DISABLED")
         identity = JobIdentity(projectId=project, lineage=request.lineage, requestEpoch=request.request_epoch,
             requestId=request.client_request_id)

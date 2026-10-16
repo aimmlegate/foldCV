@@ -14,6 +14,8 @@ from .background_scheduler import SerialOrder
 from .background_store import BackgroundFailure, JobStore, TERMINAL_EXECUTION, expiration, identity
 from .models.background import JobAttemptV1, JobFailure, JobSnapshotV1
 
+COMPLETED_CONTROLS = 8
+
 
 async def observe_nothing(_name, _job_id):
     pass
@@ -111,6 +113,7 @@ class JobSupervisor:
         self.paused = None
         self.changed = asyncio.Event()
         self.closed = False
+        self.dispatch_enabled = True
         self.dispatcher = None
         self.listeners = set()
 
@@ -127,7 +130,7 @@ class JobSupervisor:
         self.dispatcher = asyncio.create_task(self._dispatch())
 
     async def submit(self, submission):
-        if self.closed or self.dispatcher is None:
+        if self.closed or not self.dispatch_enabled or self.dispatcher is None:
             raise BackgroundFailure("JOB_DISABLED")
         job, created = self.store.submit(submission)
         try:
@@ -176,11 +179,18 @@ class JobSupervisor:
     def login_allowed(self):
         return self.active is None and not self.fenced
 
+    def reap(self):
+        completed = [key for key, control in self.controls.items() if control.task is not None
+            and control.task.done() and control.owned is None and control.permit is None]
+        for key in completed[:-COMPLETED_CONTROLS]:
+            del self.controls[key]
+
     async def _dispatch(self):
         while not self.closed:
             await self.changed.wait()
             self.changed.clear()
-            if self.active is not None or self.fenced or self.paused:
+            self.reap()
+            if not self.dispatch_enabled or self.active is not None or self.fenced or self.paused:
                 continue
             try:
                 job = self.order.choose(self.store.snapshots(), self.eligible)

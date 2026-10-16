@@ -109,5 +109,5 @@ if __name__ == "__main__":
     parser.add_argument("--port", type=int, default=0)
     parser.add_argument("--hold-model", action="store_true")
     parser.add_argument("--fixed-operations", action="store_true")
-    parser.add_argument("--proof-slice", choices=("nb03", "nb05", "nb06"))
+    parser.add_argument("--proof-slice", choices=("nb03", "nb05", "nb06", "nb07a"))
     asyncio.run(main(parser.parse_args()))

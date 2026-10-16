@@ -35,6 +35,7 @@ class JobService:
                  admission=INFERENCE, authorize_native=deny_native, observer=None, fetcher=None):
         self.projects, self.runtime, self.connection = projects, runtime, connection
         self.enabled, self.admission, self.authorize_native = enabled, admission, authorize_native
+        self.accepting = enabled
         self.runtime_available = runtime is not None or factory is not None
         self.store = JobStore(projects.storage.root)
         self.artifacts = JobArtifacts(self.store)
@@ -58,6 +59,8 @@ class JobService:
         self.tools = JobTools(self, fetcher=fetcher or PublicFetcher(projects.temp_root))
 
     async def start(self):
+        # An activated store keeps its writer authority when model delivery is off.
+        self.enabled = self.enabled or self.store.projects.exists()
         if self.enabled:
             self.projects.background_jobs = self
             for project, state in self.store.snapshots().items():
@@ -69,6 +72,7 @@ class JobService:
             from packages.resume_core.background_retention import JobRetention
             self.writers.recover_all()
             JobRetention(self.store).sweep_all()
+            self.supervisor.dispatch_enabled = self.accepting
             await self.supervisor.start()
 
     def capture_preparation(self, directory, state, record, batch):
@@ -127,6 +131,8 @@ class JobService:
 
     def proposals_for(self, project):
         if project not in self.proposals:
+            self.proposals = {key: value for key, value in self.proposals.items()
+                if any(not task.done() for _, task in value.tasks.values())}
             self.proposals[project] = JobProposals(self.supervisor,
                 lambda reference: self.artifacts.payload_for(project, reference) if reference.kind == "agent_journal"
                     else self.fixed.payload(project, reference))
@@ -168,7 +174,7 @@ class JobService:
             raise BackgroundFailure("CLEANUP_FAILED") from None
 
     async def submit(self, project, payload):
-        if not self.enabled or self.supervisor.closed or self.supervisor.dispatcher is None:
+        if not self.enabled or not self.accepting or self.supervisor.closed or self.supervisor.dispatcher is None:
             raise BackgroundFailure("JOB_DISABLED")
         logical = payload.request
         identity = JobIdentity(projectId=project, lineage=payload.lineage, requestEpoch=payload.request_epoch,
@@ -255,8 +261,19 @@ class JobService:
         for changed in tuple(self.supervisor.listeners):
             changed.set()
 
+    async def disable(self):
+        self.accepting = False
+        self.supervisor.dispatch_enabled = False
+        await self.shutdown()
+        for project in self.store.snapshots():
+            try:
+                await asyncio.to_thread(self.publisher.recover, project)
+            except BackgroundFailure as error:
+                self.store.fences.setdefault(project, error.code)
+            self.store.recover(project)
+
     def wake_publication(self, project):
-        if not self.enabled or self.supervisor.closed:
+        if not self.enabled or not self.accepting or self.supervisor.closed:
             return
         self.publication_wakes.add(project)
         if project in self.publication_tasks and not self.publication_tasks[project].done():

@@ -22,9 +22,10 @@ from tests.support.background import PipeExecutions
 
 
 class Bridge:
-    def __init__(self, root, *, dist=None, origin=None):
+    def __init__(self, root, *, dist=None, origin=None, background_enabled=True):
         self.root, self.loop = root, asyncio.get_running_loop()
         self.dist, self.origin = dist, origin
+        self.background_enabled = background_enabled
         self.clock = ControlledDeadlines()
         self.factory = PipeExecutions(root / "pipes", self.clock)
         self.holds, self.lock = {}, threading.Lock()
@@ -41,7 +42,8 @@ class Bridge:
             held = [(token, row) for token, row in self.holds.items() if row["name"] == name and row["family"] == "writer"]
         for token, row in held:
             if row.get("jobOnly"):
-                state = self.service.store.load(project)
+                # Commit observers may already own the non-reentrant lifecycle flock.
+                state = self.service.store._read(project, self.service.store.projects / project)
                 if not any(intent.phase not in {"receipt_stored", "reconciled"} for intent in state.intents):
                     continue
             self.loop.call_soon_threadsafe(self.send, {"event": "hook", "token": token, "name": name, "project": project})
@@ -80,7 +82,7 @@ class Bridge:
         self.adapter = MetadataAdapter()
         self.application = create_app(origin=self.origin, secret=secret, temp_root=self.root / "operations", dist=dist,
             data_root=canonical.root, connection_adapter=self.adapter, agent_runtime=ScriptedAgentRuntime(None),
-            agent_tools=Tools(), background_enabled=True, background_factory=self.factory)
+            agent_tools=Tools(), background_enabled=self.background_enabled, background_factory=self.factory)
         self.service = self.application.app.state.jobs
         self.service.supervisor.clock = self.clock
         self.service.publisher.authority.clock = self.clock

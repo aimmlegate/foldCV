@@ -127,7 +127,8 @@ def merge_reports(paths: list[Path], target: Path) -> None:
     if any((report.run_id, report.suite, report.source_hashes, report.started_at) !=
             (first.run_id, first.suite, first.source_hashes, first.started_at) for report in reports):
         raise SystemExit("NB raw reports have different run/source identity")
-    combined = first.model_copy(update={"finished_at": reports[-1].finished_at,
+    finished = max(reports, key=lambda report: datetime.fromisoformat(report.finished_at.replace("Z", "+00:00"))).finished_at
+    combined = first.model_copy(update={"finished_at": finished,
         "complete": all(report.complete for report in reports),
         "exit_status": next((report.exit_status for report in reports if report.exit_status), 0),
         "collected": [node for report in reports for node in report.collected],
@@ -170,6 +171,49 @@ def failure_history(root: Path, sources: dict[str, str], diagnosis: Path | None 
             record["diagnosisSha256"] = hashlib.sha256(diagnosis.read_bytes()).hexdigest()
         history.append(record)
     return history
+
+
+def assert_native_bindings(bindings: dict, expected: set[str], root: Path, *, sources: dict[str, str], require_pass=False):
+    if set(bindings) != expected:
+        raise SystemExit("NB native release bindings do not match the due native variants")
+    pending = []
+    for variant, binding in bindings.items():
+        try:
+            path = root / binding["evidence"]
+            if not path.resolve().is_relative_to(root.resolve()):
+                raise ValueError("foreign native proof")
+            report = json.loads(path.read_bytes())
+            case = report["variants"][variant]
+            if case["outcome"] == "awaiting_native_proof":
+                pending.append(variant)
+                continue
+            ledger = json.loads((root / "docs/gui/handoffs/BACKGROUND-WORK/native-attempts.json").read_bytes())
+            attempt = next(row for row in ledger["attempts"] if row["id"] == case["attemptId"])
+            pool = ledger["pools"][binding["pool"]]
+            if (case["outcome"] != "passed" or case["layer"] != "native" or report["sourceHashes"] != sources
+                    or attempt["pool"] != binding["pool"] or attempt["variant"] != variant or attempt["status"] != "passed"
+                    or not pool["authorized"] or type(pool["cap"]) is not int or not 0 < pool["spent"] <= pool["cap"]
+                    or not case["artifacts"]):
+                raise ValueError("unproved native execution")
+            for name, checksum in case["artifacts"].items():
+                artifact = root / name
+                if not artifact.resolve().is_relative_to(root.resolve()) or hashlib.sha256(artifact.read_bytes()).hexdigest() != checksum:
+                    raise ValueError("native evidence changed")
+            runtime_path = case["runtimeArtifact"]
+            if runtime_path not in case["artifacts"]:
+                raise ValueError("native runtime witness is not retained")
+            runtime = json.loads((root / runtime_path).read_bytes())
+            if (runtime["nativeStarted"] is not True or runtime["state"] != "completed" or runtime["error"] is not None
+                    or type(runtime["nativePid"]) is not int or runtime["nativePid"] <= 0
+                    or runtime["ownedPidsGone"] is not True or runtime["mcpListenerClosed"] is not True
+                    or runtime["operationRemoved"] is not True or runtime["profileExclusionLost"] is not False
+                    or runtime["toolCalls"] < 3):
+                raise ValueError("native runtime or cleanup was not proved")
+        except (OSError, KeyError, TypeError, ValueError, StopIteration) as error:
+            raise SystemExit("NB native release proof is missing, stale or not an authorized native execution") from error
+    if require_pass and pending:
+        raise SystemExit("NB native release proof is pending: " + ", ".join(sorted(pending)))
+    return pending
 
 
 def assert_report(path: Path, *, run_id: str, suite: str, sources: dict[str, str], started_at: str,

@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 import hashlib
 from copy import deepcopy
+from datetime import datetime, timedelta
 from pathlib import Path
 import subprocess
 import sys
@@ -14,11 +15,69 @@ import pytest
 from tools import checks
 from tools.checks import PROTOTYPE_TESTS, assert_mapped_python_suites, assert_partial_checks, assert_prototype_collection
 from tools.background_evidence import assert_report, digest, failure_history, merge_reports, read_report
-from tools.background_evidence import assert_manual_bindings
+from tools.background_evidence import assert_manual_bindings, assert_native_bindings
+from tools.background_corpus import run_shards, retain_raw
 from spikes.background.corpus import ACTIONS, ORDERS, reached_orders, trace
 
 
 ROOT = Path(__file__).resolve().parents[2]
+
+
+@pytest.mark.parametrize("fault", ["none", "failed-worker"])
+def test_background_corpus_shards_retain_every_exact_node_and_failed_worker(tmp_path, fault):
+    probe = tmp_path / "test_corpus_probe.py"
+    probe.write_text("import pytest\n@pytest.mark.parametrize('index', range(8))\ndef test_case(index):\n"
+        + ("    assert index != 3\n" if fault == "failed-worker" else "    assert index >= 0\n"))
+    nodes = [probe.name + f"::test_case[{index}]" for index in range(8)]
+    root, retained = tmp_path / "reports", tmp_path / "retained"
+    root.mkdir(); retained.mkdir()
+    context = checks.background_context(root, "fast", {probe.name: hashlib.sha256(probe.read_bytes()).hexdigest()})
+    env = {**checks.safe_env(), "PYTHONPATH": str(ROOT)}
+    def execute():
+        run_shards(Path(sys.executable), nodes, context=context, root=root, cwd=tmp_path, env=env,
+            coverage_arguments=["--cov=tools.background_pytest", "--cov-branch"], retained=[retained])
+    if fault == "failed-worker":
+        with pytest.raises(subprocess.CalledProcessError):
+            execute()
+    else:
+        execute()
+    retain_raw(root, [retained])
+    paths = sorted(retained.glob("execution-corpus-*.json"))
+    assert len(paths) == 4 and len(list(retained.glob("corpus-*.log"))) == 4
+    merge_reports(paths, retained / "combined.json")
+    report = read_report(retained / "combined.json")
+    assert len(report.collected) == len(set(report.collected)) == 8 and set(report.collected) == set(nodes)
+    assert len(report.records) == 8 and report.complete
+    assert report.exit_status == (1 if fault == "failed-worker" else 0)
+    failures = [record for record in report.records if record.phases["call"] == "failed"]
+    assert len(failures) == int(fault == "failed-worker")
+    assert all(record.phases["setup"] == record.phases["teardown"] == "passed" for record in report.records)
+
+
+@pytest.mark.parametrize("fault", ["missing", "pending", "scripted", "source", "pool", "ungranted", "changed", "cleanup"])
+def test_background_native_gate_rejects_unproved_or_wrong_authority_results(tmp_path, fault):
+    variant = "NB-X03:v01"
+    runtime = dict(nativeStarted=True, state="completed", error=None, nativePid=123,
+        ownedPidsGone=True, mcpListenerClosed=True, operationRemoved=True, profileExclusionLost=False, toolCalls=3)
+    if fault == "cleanup": runtime["ownedPidsGone"] = False
+    artifact = tmp_path / "runtime.json"; artifact.write_text(json.dumps(runtime))
+    sources = {"runtime.py": "a" * 64}
+    case = dict(outcome="passed", layer="native", attemptId="test-attempt", runtimeArtifact=artifact.name,
+        artifacts={artifact.name: hashlib.sha256(artifact.read_bytes()).hexdigest()})
+    if fault == "pending": case["outcome"] = "awaiting_native_proof"
+    if fault == "scripted": case["layer"] = "python"
+    proof = tmp_path / "proof.json"
+    proof.write_text(json.dumps(dict(sourceHashes={} if fault == "source" else sources, variants={variant: case})))
+    ledger = tmp_path / "docs/gui/handoffs/BACKGROUND-WORK/native-attempts.json"
+    ledger.parent.mkdir(parents=True)
+    ledger.write_text(json.dumps(dict(pools={"NB07a": dict(authorized=fault != "ungranted", cap=2, spent=1)},
+        attempts=[dict(id="test-attempt", pool="NB00" if fault == "pool" else "NB07a", variant=variant, status="passed")])))
+    if fault == "changed": artifact.write_text("changed")
+    bindings = {} if fault == "missing" else {variant: dict(evidence=proof.name, pool="NB07a")}
+    with pytest.raises(SystemExit):
+        assert_native_bindings(bindings, {variant}, tmp_path, sources=sources, require_pass=True)
+    if fault == "pending":
+        assert assert_native_bindings(bindings, {variant}, tmp_path, sources=sources) == [variant]
 
 
 @pytest.mark.parametrize("fault", ["none", "missing-binding", "missing-case", "skipped", "changed-evidence", "missing-authority"])
@@ -201,8 +260,9 @@ test("concurrent parent", { concurrency: 2 }, async t => {
 
 def test_background_raw_report_merge_preserves_files_and_refuses_rewrite_or_source_drift(tmp_path):
     first, report, _options = nb_report_fixture(tmp_path)
-    first.write_text(json.dumps(report))
     node = deepcopy(report)
+    report["finishedAt"] = (datetime.fromisoformat(report["finishedAt"]) + timedelta(seconds=30)).isoformat()
+    first.write_text(json.dumps(report))
     identity = "apps/web/unit/background-writer.test.ts::exact parameter [case=A]"
     node["collected"], node["records"][0]["nodeId"], node["traces"] = [identity], identity, []
     second = tmp_path / "node.json"; second.write_text(json.dumps(node))
@@ -210,6 +270,7 @@ def test_background_raw_report_merge_preserves_files_and_refuses_rewrite_or_sour
     original = first.read_bytes(), second.read_bytes()
     merge_reports([first, second], combined)
     assert len(read_report(combined).records) == 2
+    assert read_report(combined).finished_at == report["finishedAt"]
     assert original == (first.read_bytes(), second.read_bytes())
     with pytest.raises(SystemExit, match="never rewrite"):
         merge_reports([first, second], combined)
@@ -218,11 +279,12 @@ def test_background_raw_report_merge_preserves_files_and_refuses_rewrite_or_sour
         merge_reports([first, second], tmp_path / "wrong.json")
 
 
-def test_background_fast_uses_one_context_and_retains_raw_reports_before_combining(tmp_path, monkeypatch):
+@pytest.mark.parametrize("fault", ["none", "malformed-python"])
+def test_background_fast_uses_one_context_and_retains_raw_reports_before_combining(tmp_path, monkeypatch, fault):
     node = "apps/web/unit/background-proof.test.ts::exact [case=A]"
     python = "tests/recovery/test_background_probe.py::exact_python"
     spec = {"sources": ["probe.py"], "bindings": {"node": [node], "python": [python]}, "checks": {},
-        "requiredTraces": {}, "requiredActions": [], "requiredOrders": []}
+        "requiredTraces": {}, "requiredActions": [], "requiredOrders": [], "pendingNative": []}
     (tmp_path / "probe.py").write_text("retained source\n")
     source_sha = hashlib.sha256((tmp_path / "probe.py").read_bytes()).hexdigest()
     monkeypatch.setattr(checks, "ROOT", tmp_path)
@@ -243,11 +305,21 @@ def test_background_fast_uses_one_context_and_retains_raw_reports_before_combini
     def run(argv, cwd=checks.ROOT, env=None):
         calls.append(argv)
         if "pytest" in argv:
-            write_report(json.loads(Path(env["FOLDCV_BACKGROUND_CONTEXT"]).read_text()), python)
+            context = json.loads(Path(env["FOLDCV_BACKGROUND_CONTEXT"]).read_text())
+            write_report(context, python)
+            if fault == "malformed-python":
+                Path(context["reportPath"]).write_text('{"partial":')
         return ""
     monkeypatch.setattr(checks, "validate_map", validate)
     monkeypatch.setattr(checks, "run", run)
     evidence = tmp_path / "retained" / "proof"
+    if fault == "malformed-python":
+        with pytest.raises(SystemExit, match="missing or malformed"):
+            checks.fast(evidence, None)
+        assert (evidence / "execution-python.json").read_text() == '{"partial":'
+        assert read_report(evidence / "execution-node.json").complete
+        assert not (evidence / "validation.json").exists()
+        return
     checks.fast(evidence, None)
     combined = read_report(evidence / "execution.json")
     raw_node, raw_python = read_report(evidence / "execution-node.json"), read_report(evidence / "execution-python.json")

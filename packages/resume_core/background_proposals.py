@@ -38,6 +38,7 @@ class JobProposals:
             if (candidate.id, candidate.payload_sha256, candidate.payload) != (original.id, original.payload_sha256, original.payload):
                 raise BackgroundFailure("JOB_SCOPE_INVALID")
             return await asyncio.shield(task)
+        self.tasks = {key: value for key, value in self.tasks.items() if not value[1].done()}
         snapshot = candidate.model_copy(deep=True)
         task = asyncio.create_task(self._accept(control, snapshot, needs_review))
         self.tasks[control.job.id] = (snapshot, task)

@@ -1,0 +1,229 @@
+"""Final two-start serial proof in an owned synthetic store and native profile."""
+
+import argparse
+import asyncio
+from datetime import datetime, timezone
+import fcntl
+import hashlib
+import json
+import os
+from pathlib import Path
+import secrets
+import signal
+import socket
+
+import uvicorn
+
+from packages.resume_core.agent_settings import AgentSettingsStore
+from packages.resume_core.background_store import BackgroundFailure
+from packages.resume_core.models.agent import AgentSettingsRequest
+from packages.resume_core.models.background import JobAgentRequestV1, WriterOpenV1
+from packages.resume_core.models.rich_document import StyledText
+from packages.resume_core.storage import atomic_write
+from resume_api.app import create_app
+from resume_api.cli.experimental_profile import BINARY, ExperimentalCliProfile
+from spikes.agent.native_proof import Exclusion, ProofServer, alive
+from spikes.agent.profile import check_host
+from tools.background_evidence import source_hashes
+from tests.support.agent import isolated_project
+
+ROOT = Path(__file__).resolve().parents[2]
+HANDOFF = ROOT / "docs/gui/handoffs/BACKGROUND-WORK"
+LEDGER = HANDOFF / "native-attempts.json"
+PROFILE = Path.home() / "Library/Application Support/FoldCV/cli-experiment"
+MODEL = "gpt-6-luna"
+TEXT = "Built REST APIs in Python. Wrote unit tests with pytest."
+PROMPTS = (
+    "В синтетическом резюме прочитай блок narrative. Замени только первое слово Built на Developed, "
+    "сохрани остальной текст и факты. Подготовь и примени один пакет. Используй только FoldCV-инструменты. "
+    "При waiting_for_sync или needs_review заверши ход без повторов, ожидания, опросов или заявления о сохранении. "
+    "Только saved и durable:true означают сохранение. Ответь кратко по-русски.",
+    "В синтетическом резюме прочитай блок narrative. Замени только слово Wrote на Added, "
+    "сохрани остальной текст и факты. Подготовь и примени один пакет. Используй только FoldCV-инструменты. "
+    "При waiting_for_sync или needs_review заверши ход без повторов, ожидания, опросов или заявления о сохранении. "
+    "Только saved и durable:true означают сохранение. Ответь кратко по-русски.",
+)
+
+
+def now():
+    return datetime.now(timezone.utc).isoformat()
+
+
+def write(path, value):
+    atomic_write(path, json.dumps(value, ensure_ascii=False, indent=2).encode() + b"\n")
+
+
+def spend(path, *, variant, job, project, hashes):
+    with (path.parent / ".native-attempts.lock").open("a") as lock:
+        fcntl.flock(lock, fcntl.LOCK_EX)
+        ledger = json.loads(path.read_bytes())
+        pool = ledger["pools"]["NB07a"]
+        recorded = [row for row in ledger["attempts"] if row["pool"] == "NB07a"]
+        if (not pool["authorized"] or type(pool["cap"]) is not int or pool["spent"] >= pool["cap"]
+                or type(pool["spent"]) is not int or pool["spent"] != len(recorded)
+                or any(row.get("error") in {"AGENT_AUTH_REQUIRED", "AGENT_QUOTA", "AUTH_REQUIRED", "RATE_LIMITED"}
+                    for row in ledger["attempts"])):
+            raise BackgroundFailure("JOB_DISABLED")
+        if any(row["pool"] == "NB07a" and row["variant"] == variant for row in ledger["attempts"]):
+            raise BackgroundFailure("JOB_IDEMPOTENCY_CONFLICT")
+        pool["spent"] += 1
+        row = dict(id="NB07a-" + str(pool["spent"]), pool="NB07a", number=pool["spent"], variant=variant,
+            jobId=job, projectId=project, model=MODEL, effort="medium", startedAt=now(), status="started",
+            sourceHashes=hashes, failedStartsCount=True)
+        ledger["attempts"].append(row)
+        write(path, ledger)
+        return row["id"]
+
+
+class SerialProof:
+    def __init__(self, root, dist, controlled):
+        self.root, self.dist = root.resolve(), dist.resolve()
+        if self.root.parent != Path("/private/tmp") or not self.root.name.startswith("foldcv-nb07a-native-") or self.root.exists():
+            raise ValueError("A fresh owned NB07a native root is required")
+        spec = json.loads((ROOT / "tests/requirements.json").read_bytes())["backgroundExecution"]
+        self.hashes = source_hashes(spec["sources"])
+        context = json.loads((controlled / "context.json").read_bytes())
+        validation = json.loads((controlled / "validation.json").read_bytes())
+        if context["sourceHashes"] != self.hashes or validation["outcome"] != "passed" or validation["runId"] != context["runId"]:
+            raise ValueError("Current complete controlled fast evidence is required")
+        if hashlib.sha256((controlled / "execution.json").read_bytes()).hexdigest() != validation["reportSha256"]:
+            raise ValueError("Controlled execution evidence changed")
+        ExperimentalCliProfile(PROFILE).check_binary(); check_host()
+        if not (PROFILE / ".foldcv-cli-experiment-v1").is_file():
+            raise ValueError("The existing isolated authenticated profile is required; never copy credentials")
+        self.root.mkdir(mode=0o700)
+        self.exclusion = Exclusion(self.root)
+        self.sessions, self.attempts, self.tasks = {}, {}, set()
+        self.phase = 0
+        self.dist_hashes = {str(path.relative_to(self.dist)): hashlib.sha256(path.read_bytes()).hexdigest()
+            for path in self.dist.rglob("*") if path.is_file()}
+        if "index.html" not in self.dist_hashes:
+            raise ValueError("A complete final frontend build is required")
+
+    async def authorize(self, control):
+        self.exclusion.check()
+        _, artifact = self.service.artifacts.record(control.project_id, control.run_id)
+        index = PROMPTS.index(artifact.request.message)
+        job = control.job
+        if (not job.submission.allow_edits or job.submission.allow_web or len(job.submission.models) != 1
+                or job.submission.models[0].model != MODEL or self.hashes != source_hashes(self.hashes)):
+            raise BackgroundFailure("JOB_SCOPE_INVALID")
+        variant = f"NB-X03:v{index + 1:02d}"
+        self.attempts[job.id] = spend(LEDGER, variant=variant, job=job.id, project=control.project_id, hashes=self.hashes)
+        write(self.root / "attempts.json", self.attempts)
+
+    def audit(self, report):
+        control = self.service.supervisor.active
+        identifier = self.attempts.get(control.run_id)
+        session = self.sessions.get(control.run_id)
+        report.update(checkedAt=now(), jobId=control.run_id, attemptId=identifier,
+            profileExclusionLost=self.exclusion.lost, profileExclusionChecks=self.exclusion.checks,
+            ownedPidsGone=all(not alive(pid) for pid in [report["nativePid"], *report["hostPids"]] if pid is not None),
+            mcpListenerClosed=session is not None and session.listener.fileno() < 0 and not session.active and session.token == "")
+        write(self.root / (identifier + "-runtime.json" if identifier else "prestart-failure.json"), report)
+        if identifier:
+            with (LEDGER.parent / ".native-attempts.lock").open("a") as lock:
+                fcntl.flock(lock, fcntl.LOCK_EX)
+                ledger = json.loads(LEDGER.read_bytes())
+                row = next(row for row in ledger["attempts"] if row["id"] == identifier)
+                row.update(status="native_completed_unvalidated" if report["state"] == "completed" else "failed",
+                    error=report["error"], finishedAt=now(), runtimeEvidence=str(self.root / (identifier + "-runtime.json")))
+                write(LEDGER, ledger)
+
+    def session(self, control):
+        session = self.original_session(control)
+        self.sessions[control.run_id] = session
+        call = session.call
+        async def record(name, arguments):
+            result = await call(name, arguments)
+            path = self.root / (control.run_id + "-tools.jsonl")
+            row = dict(at=now(), jobId=control.run_id, name=name,
+                arguments=arguments.model_dump(mode="json", by_alias=True) if hasattr(arguments, "model_dump") else arguments,
+                result=result)
+            descriptor = os.open(path, os.O_APPEND | os.O_CREAT | os.O_WRONLY | os.O_NOFOLLOW, 0o600)
+            with os.fdopen(descriptor, "a") as output:
+                output.write(json.dumps(row, ensure_ascii=False) + "\n")
+            return result
+        session.call = record
+        return session
+
+    async def submit(self):
+        index = self.phase
+        if index >= 2 or self.service.supervisor.active is not None:
+            raise BackgroundFailure("BUSY")
+        project = self.project
+        if index == 1:
+            first = self.service.store.read(project, self.jobs[0])
+            if first.receipt is None or first.execution != "completed":
+                raise BackgroundFailure("JOB_SCOPE_INVALID")
+            current, checksum = self.service.projects.storage.read_committed(project)
+            await asyncio.to_thread(self.service.writers.open, project, WriterOpenV1(schemaVersion=1,
+                sessionId="synthetic-native-deferred", incarnation="held-native-proof",
+                credential=secrets.token_urlsafe(32), canonicalRevision=current.project_revision,
+                canonicalSha256=checksum, actionCursor=0))
+        state = self.service.project(project)
+        current = self.service.projects.storage.read_committed(project)[0]
+        request = JobAgentRequestV1(schemaVersion=1, lineage=state.lineage, requestEpoch=state.request_epoch,
+            request=dict(clientRequestId="native-serial-" + str(index + 1), conversationId=self.conversation,
+                message=PROMPTS[index], allowEdits=True, allowWeb=False, scope={"kind": "resume"},
+                settingsRevision=2, projectRevision=current.project_revision, documentRevision=current.document_revision,
+                factsRevision=current.project.facts.revision))
+        job, created = await self.service.submit(project, request)
+        assert created
+        self.jobs.append(job.id); self.phase += 1
+        write(self.root / "jobs.json", dict(project=project, jobs=self.jobs, phase=self.phase, at=now()))
+
+    async def serve(self):
+        data = self.root / "data"
+        _, storage, workspace, conversation = isolated_project(data)
+        block = next(block for block in workspace.project.document.blocks() if block.id == "narrative")
+        block.content = [StyledText(type="text", text=TEXT, styles={})]
+        storage.save(workspace, {}, {})
+        AgentSettingsStore(data).save(AgentSettingsRequest(expectedRevision=1, enabled=True, selectedAgentModel=MODEL), (MODEL,))
+        self.project, self.conversation, self.jobs = workspace.project_id, conversation.id, []
+        write(self.root / "baseline.json", workspace.model_dump(mode="json", by_alias=True))
+        write(self.root / "source-context.json", dict(sourceHashes=self.hashes, protocol="apply_v2", model=MODEL,
+            prompts=PROMPTS, root=str(self.root), nativePool="NB07a", dist=str(self.dist), distHashes=self.dist_hashes))
+        self.exclusion.start()
+        listener = socket.socket(); listener.bind(("127.0.0.1", 0)); listener.listen(128)
+        origin = "http://127.0.0.1:" + str(listener.getsockname()[1]); secret = secrets.token_urlsafe(32)
+        app = create_app(origin=origin, secret=secret, temp_root=self.root / "operations", dist=self.dist,
+            cli_executable=BINARY, experimental_profile=ExperimentalCliProfile(PROFILE), data_root=data,
+            background_enabled=True, background_native_authority=self.authorize)
+        self.service = app.app.state.jobs
+        self.service.runtime.audit = self.audit
+        self.original_session = self.service.tools.session
+        self.service.tools.session = self.session
+        self.exclusion.on_lost = lambda: [control.stop() for control in self.service.supervisor.controls.values()]
+        server = ProofServer(uvicorn.Config(app, host="127.0.0.1", port=listener.getsockname()[1], proxy_headers=False,
+            access_log=False, server_header=False, log_level="warning"))
+        loop = asyncio.get_running_loop()
+        loop.add_signal_handler(signal.SIGUSR1, setattr, server, "should_exit", True)
+        def launch():
+            async def dispatch():
+                try:
+                    await self.submit()
+                except Exception as error:
+                    write(self.root / "dispatch-error.json", dict(at=now(), type=type(error).__name__, reason=str(error)))
+            task = asyncio.create_task(dispatch()); self.tasks.add(task); task.add_done_callback(self.tasks.discard)
+        loop.add_signal_handler(signal.SIGUSR2, launch)
+        write(self.root / "launch.json", dict(origin=origin, url=origin + "/#secret=" + secret, pid=os.getpid(), project=self.project))
+        print(origin, flush=True)
+        try:
+            await server.serve(sockets=[listener])
+        finally:
+            await asyncio.gather(*self.tasks, return_exceptions=True)
+            self.exclusion.stop(); listener.close()
+            write(self.root / "shutdown.json", dict(at=now(), stopped=True, active=self.service.supervisor.active is not None,
+                admissionHeld=self.service.admission.locked(), operationDirectories=[p.name for p in (self.root / "operations").glob("op-*")]))
+
+
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--root", type=Path, required=True)
+    parser.add_argument("--dist", type=Path, required=True)
+    parser.add_argument("--controlled-evidence", type=Path, required=True)
+    options = parser.parse_args()
+    with open("/private/tmp/foldcv-nb-native-live.lock", "a") as lock:
+        fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        asyncio.run(SerialProof(options.root, options.dist, options.controlled_evidence).serve())

@@ -3,6 +3,7 @@
 import hashlib
 import importlib.util
 from pathlib import Path
+import asyncio
 
 import pytest
 
@@ -116,3 +117,44 @@ def test_zero_diff_touch_guard_omission_breaks_the_scoped_aba_regression(tmp_pat
         "log": [{"action": "healthy", "result": results[0], "sourceSha256": source_sha},
             {"action": "mutant", "result": results[1], "sourceSha256": mutant_sha,
                 "regressionFailure": "zero-diff regression: saved after uncommitted edit and Undo"}]})
+
+
+@pytest.mark.asyncio
+async def test_releasing_a_slot_before_cleanup_fails_the_actual_ownership_invariant(tmp_path, background_evidence):
+    from tests.recovery.test_background_supervisor import environment
+    from tests.recovery.test_background_store import capture
+    module, source_sha, mutant_sha = copied_module(tmp_path, "background_supervisor", [
+        ("        control.revoked = True\n        close = asyncio.create_task(control.owned.close())",
+         "        control.revoked = True\n        self.active = None\n        close = asyncio.create_task(control.owned.close())")])
+    rows = []
+    for label in ("healthy", "mutant"):
+        store, state, clock, factory, supervisor = await environment(tmp_path / label)
+        if label == "mutant":
+            supervisor.__class__ = module.JobSupervisor
+        factory.hold_cleanup.add("cleanup-owner")
+        try:
+            job, _ = await supervisor.submit(capture(state, "cleanup-owner"))
+            actor = await factory.actor(job)
+            await asyncio.wait_for(actor.cleanup_started.wait(), 10)
+            control = supervisor.controls[job.id]
+            assert actor.child.command("probe") == {"type": "alive"}
+            def assert_owner():
+                assert supervisor.active is control, "NB-I06: slot released before owned child cleanup"
+            if label == "healthy":
+                assert_owner()
+            else:
+                with pytest.raises(AssertionError, match="NB-I06: slot released before owned child cleanup"):
+                    assert_owner()
+            rows.append(dict(action=label, result="owned" if supervisor.active is control else "premature_release",
+                sourceSha256=source_sha if label == "healthy" else mutant_sha,
+                regressionFailure="none" if label == "healthy" else "NB-I06: slot released before owned child cleanup"))
+            actor.cleanup_permission.set()
+            await asyncio.wait_for(control.task, 10)
+            assert store.read(state.project_id, job.id).attempts[-1].cleanup_verified
+        finally:
+            for actor in factory.actors.values():
+                actor.cleanup_permission.set()
+            await supervisor.shutdown()
+            factory.verify(); clock.verify()
+    background_evidence(dict(id="NB-G03:v06:sensitivity", seed=0, capacity=1, transitions=2,
+        actions=["healthy", "mutant"], orders=["healthy_then_mutant"], scope="production_integration", log=rows))

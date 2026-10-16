@@ -47,8 +47,9 @@ class ProjectOracle:
 
 
 class IntegrationTrace:
-    def __init__(self, root, seed):
+    def __init__(self, root, seed, *, transitions=FIXED_TRANSITIONS, identity="NB03:production"):
         self.root, self.seed, self.rng = root, seed, random.Random(seed)
+        self.transitions, self.identity = transitions, identity
         self.bridge, self.earlier_starts = None, 0
         self.projects, self.proofs, self.views, self.models = {}, {}, {}, {}
         self.jobs, self.requests, self.barriers, self.last_manual = {}, {}, {}, {}
@@ -144,6 +145,10 @@ class IntegrationTrace:
             stats = await asyncio.to_thread(self.bridge.stats, self.projects[name]["project"])
             workspace, state = stats["workspace"], stats["state"]
             assert stats["activeSlots"] == self.slots and self.slots <= 1
+            assert len(state["jobs"]) <= 3 and len(state["proposals"]) <= 2
+            assert not self.bridge.service.supervisor.listeners
+            assert all(control.owned is None and control.permit is None for control in
+                self.bridge.service.supervisor.controls.values() if control.task is not None and control.task.done())
             assert workspace["projectRevision"] == model.revision, (action, name, model.revision, workspace["projectRevision"])
             assert state["writer"]["status"] == model.status
             assert state["writer"]["epoch"] == model.epoch and state["writer"]["acknowledgedCursor"] == model.cursor
@@ -291,7 +296,7 @@ class IntegrationTrace:
             await self.http("B", "/jobs/" + self.jobs["two"]["id"] + "/cancel", {}, contract="background_snapshot_v1")
             self.expected_jobs["two"] = "B", "completed", "cancelled"
             await self.remember("stop", "B", "two", "cancelled")
-            while len(self.log) < FIXED_TRANSITIONS - 1:
+            while len(self.log) < self.transitions - 1:
                 label = self.rng.choice(("A", "B")); model = self.models[label]
                 if model.draft is not None:
                     await self.resolve(label); continue
@@ -319,8 +324,8 @@ class IntegrationTrace:
             await self.remember("delete", "B", "two", "tombstoned")
             actions = sorted({row["action"] for row in self.log if row["result"] != "rejected"})
             assert set(ACTIONS) <= set(actions)
-            assert len(self.log) == FIXED_TRANSITIONS
-            return dict(id=f"NB03:production:1:{self.seed}", seed=self.seed, capacity=1, transitions=len(self.log),
+            assert len(self.log) == self.transitions
+            return dict(id=f"{self.identity}:1:{self.seed}", seed=self.seed, capacity=1, transitions=len(self.log),
                 actions=actions, orders=reached_orders(self.log), log=self.log, scope="production_integration")
         except BaseException as error:
             (self.root / "failure-trace.json").write_text(json.dumps(dict(seed=self.seed, log=self.log,

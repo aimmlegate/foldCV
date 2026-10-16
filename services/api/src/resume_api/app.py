@@ -1021,8 +1021,6 @@ def create_app(*, origin: str, secret: str, temp_root: Path, dist: Path, runner:
     async def connection_job(kind: str, work):
         nonlocal active, connection_epoch, connection_state, login_task
         async with gate:
-            if kind == "login" and connection_state.state != "login_required":
-                return problem("LOGIN_NOT_AVAILABLE", 409, "host")
             if unsafe_cleanup:
                 connection_state = ConnectionPayload(state="cleanup_blocked")
                 return connection_response()
@@ -1031,6 +1029,8 @@ def create_app(*, origin: str, secret: str, temp_root: Path, dist: Path, runner:
                 return connection_response()
             if INFERENCE.locked() or background_enabled and not jobs.supervisor.login_allowed():
                 return connection_response() if kind != "login" else problem("BUSY", 429, "host", True)
+            if kind == "login" and connection_state.state != "login_required":
+                return problem("LOGIN_NOT_AVAILABLE", 409, "host")
             if cancellation_pending or active >= MAX_CONCURRENT or connection_work:
                 return problem("BUSY", 429, "host", True)
             active += 1
