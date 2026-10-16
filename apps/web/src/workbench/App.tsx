@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { ConnectionWorkflow, type ConnectionView } from "../connection/workflow";
 import { RichEditor } from "../rich/Editor";
+import { AssistantDrawer } from "../assistant/Drawer";
 import { projectRequest, readTimeline } from "../rich/api";
 import type { TimelineReport } from "../contracts/generated/timeline_report";
 import { useResumeWorkspace, warningLabel } from "./useResumeWorkspace";
@@ -18,7 +19,7 @@ import { projectFilename } from "./files/filename";
 export function App({ portalHost }: { portalHost: HTMLElement }) {
   const workspace = useResumeWorkspace();
   const { response, projects, input, setInput, textDraft, error, status, setStatus, busy, settings, setSettings,
-    editor, acknowledge, action, fresh, open, remove, process, upload, exportFile } = workspace;
+    editor, assistant, acknowledge, action, fresh, open, remove, process, upload, exportFile } = workspace;
   const [collapsed, setCollapsed] = useState(() => innerWidth <= 600);
   const [warningsOpen, setWarningsOpen] = useState(false);
   const [reviewed, setReviewed] = useState<string | null>(null), [sourceOpen, setSourceOpen] = useState(false);
@@ -70,6 +71,9 @@ export function App({ portalHost }: { portalHost: HTMLElement }) {
         {view === "editor" && response?.workspace.project && <>
           {status !== "Сохранено" && status !== "Изменения сохраняются…" && <button className="text-button" disabled={busy} onClick={() => void action(async () => { await editor.current?.flush(); setStatus("Сохранено"); })}>Повторить сохранение</button>}
           <RichEditor key={response.workspace.projectId} initial={response} acknowledge={acknowledge} onStatus={setStatus} ref={editor} appearance="prototype" portalHost={portalHost}
+            onHistoryNavigation={() => assistant.current?.history()} onAssistantFence={saved => assistant.current?.fence(saved)}
+            assistant={<AssistantDrawer key={response.workspace.projectId} projectId={response.workspace.projectId} editor={editor} settingsOpen={settings} ref={assistant}
+              appearance="prototype" title={projectTitle} settings={openSettings} />}
             contextActions={response.workspace.warnings.length > 0 && <button onClick={() => setWarningsOpen(true)}>Замечания к исходнику</button>} />
         </>}
         {view === "source" && <SourceForm input={input} change={setInput} textDraft={textDraft} busy={busy || creating} sourceName={source?.originalName ?? null}

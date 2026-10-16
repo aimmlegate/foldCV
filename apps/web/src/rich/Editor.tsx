@@ -125,9 +125,9 @@ export type RichEditorHandle = { flush: () => Promise<RichProjectResponse>; undo
   assistantBaseline: (captured: CapturedEditorSelection | null) => Promise<{ response: RichProjectResponse; selection: RichSelection | null }>;
   focusFinding: (anchor: AgentFinding["anchors"][number]) => boolean;
   applyAssistant: (batchId: string, api: PreparedApi) => Promise<void> };
-export function RichEditor({ initial, acknowledge, onStatus, ref, onHistoryNavigation, onAssistantFence, appearance = "reference", portalHost, contextActions }: { initial: RichProjectResponse;
+export function RichEditor({ initial, acknowledge, onStatus, ref, onHistoryNavigation, onAssistantFence, appearance = "reference", portalHost, contextActions, assistant }: { initial: RichProjectResponse;
   acknowledge: (response: RichProjectResponse) => void; onStatus: (status: string) => void; ref: Ref<RichEditorHandle>;
-  onHistoryNavigation?: () => void; onAssistantFence?: (saved: boolean) => void; appearance?: "reference" | "prototype"; portalHost?: HTMLElement; contextActions?: ReactNode }) {
+  onHistoryNavigation?: () => void; onAssistantFence?: (saved: boolean) => void; appearance?: "reference" | "prototype"; portalHost?: HTMLElement; contextActions?: ReactNode; assistant?: ReactNode }) {
   const project = initial.workspace.project;
   if (!project) throw new Error("Document is missing");
   const initialFacts = project.facts;
@@ -867,7 +867,8 @@ export function RichEditor({ initial, acknowledge, onStatus, ref, onHistoryNavig
       </Popover.Content></Popover.Portal>
     </Popover.Root>}
     {applying && <p role="status">Сохраняю правки помощника…</p>}
-    <fieldset className={appearance === "prototype" ? "contents uir-editor-session" : "contents"} disabled={applying || recovery}>
+    <div className={appearance === "prototype" ? "contents uir-editor-session" : "contents"}>
+    <fieldset className="contents uir-editor-controls" disabled={applying || recovery}>
     {appearance === "prototype" ? <><Toolbar command={toolbarCommand} factsVisible={factsVisible} blockVisible={blockTarget !== null}
       canUndo={!factIntents.pending.length && (bridge.history?.position ?? 0) > 0} canRedo={!factIntents.pending.length && (bridge.history?.position ?? 0) < (bridge.history?.length ?? 0)} selecting={selecting}
       active={{ bold: editor.getActiveStyles().bold === true, italic: editor.getActiveStyles().italic === true, underline: editor.getActiveStyles().underline === true }}
@@ -887,13 +888,17 @@ export function RichEditor({ initial, acknowledge, onStatus, ref, onHistoryNavig
       <label className="cv-insert-image">Добавить изображение<input ref={imageInput} type="file" accept="image/png,image/jpeg,image/webp"
         onChange={event => { const file = event.currentTarget.files?.[0]; event.currentTarget.value = ""; if (file) void assets.upload(file).catch(error => setEditorWarning(error instanceof Error ? error.message : "Не удалось добавить изображение")); }} /></label>
     </div>}
+    </fieldset>
     <div className={appearance === "prototype" ? "editor-body uir-editor-body" : "rich-workspace"}>
+    <fieldset className="contents uir-editor-controls" disabled={applying || recovery}>
     {appearance === "prototype" ? <PrototypeFactsPanel facts={facts} submit={command => bridge.panel(command)} hidden={!factsVisible} close={() => setFactsVisible(false)}
       pending={factIntents.pending.flatMap(intent => intent.kind === "panel" ? [intent.command] : [])} paused={factIntents.paused}
       timeline={ready ? <Timeline facts={facts} anchors={anchors} controls={timelineControls} prototype /> : null} />
       : <FactsPanel facts={facts} submit={command => bridge.panel(command)} hidden={!factsVisible} close={() => setFactsVisible(false)}
         timeline={ready ? <Timeline facts={facts} anchors={anchors} controls={timelineControls} /> : null} />}
+    </fieldset>
     <div className={appearance === "prototype" ? "document-workspace" : "rich-editor-document"}>
+    <fieldset className="contents uir-editor-controls" disabled={applying || recovery}>
     {appearance === "prototype" && <div className="document-context"><div className="context-left"><span>Исходный текст</span><span>Шаблон FoldCV</span></div>{contextActions}</div>}
     <div className={appearance === "prototype" ? "paper-scroll" : undefined}>
     <div className={appearance === "prototype" ? "cv-document resume-paper uir-prototype" : "cv-document"} style={appearance === "prototype" ? undefined : { ...referenceVariables, color: "#000000" }} data-project-id={initial.workspace.projectId}
@@ -919,15 +924,19 @@ export function RichEditor({ initial, acknowledge, onStatus, ref, onHistoryNavig
       {appearance !== "prototype" && <div className="cv-template-footer">mail@example.com</div>}</div>
       {appearance === "prototype" && <footer className="paper-footer"><span>mail@example.com</span><span>FoldCV</span></footer>}
     </div></div>
-    {appearance === "prototype" && <><footer className="editor-footer"><span>Исходный текст</span><button onClick={() => setSourceOpen(true)}><Icon name="file" />Исходник</button></footer><div className="uir-chat-reservation" aria-hidden="true" /></>}
+    {appearance === "prototype" && <footer className="editor-footer"><span>Исходный текст</span><button onClick={() => setSourceOpen(true)}><Icon name="file" />Исходник</button></footer>}
+    </fieldset>
+    {appearance === "prototype" && (assistant ?? <div className="uir-chat-reservation" aria-hidden="true" />)}
     </div>
+    <fieldset className="contents uir-editor-controls" disabled={applying || recovery}>
     {blockTarget && (appearance === "prototype" ? <PrototypeBlockPanel id={blockTarget} available={!!editor.getBlock(blockTarget)} text={(() => {
       const key = bridge.current.get(`block:${blockTarget}`), block = key ? bridge.values.get(key)?.block : null;
       return typeof block?.content === "string" ? block.content : Array.isArray(block?.content) ? block.content.map(span => span.type === "link" ? span.content.map(part => part.text).join("") : span.text).join("") : "";
     })()} close={() => { setBlockTarget(null); editor.focus(); }} command={(command, target) => assets.command(blockTarget, command, target)} destinations={targets} />
       : <BlockPanel id={blockTarget} available={!!editor.getBlock(blockTarget)} close={() => setBlockTarget(null)}
         command={(command, target) => assets.command(blockTarget, command, target)} destinations={targets} />)}
-    </div>
     </fieldset>
+    </div>
+    </div>
   </ImageActions.Provider></EditorAppearance.Provider>;
 }

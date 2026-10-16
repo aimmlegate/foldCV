@@ -2,6 +2,7 @@ import { useState } from "react";
 import { SettingsPanel } from "../next/SettingsPanel";
 import { RichEditor } from "./Editor";
 import { AssistantDrawer } from "../assistant/Drawer";
+import "../assistant/assistant.css";
 import { AssistantSettings } from "../assistant/Settings";
 import { Projects } from "./Projects";
 import { NewResume } from "./NewResume";

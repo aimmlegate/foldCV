@@ -1,4 +1,5 @@
 .uir-editor-session { display: contents; border: 0; margin: 0; padding: 0; min-width: 0; }
+.uir-editor-controls { display: contents; border: 0; margin: 0; padding: 0; min-width: 0; }
 .uir-chat-reservation { flex: 0 0 39px; }
 .uir-prototype { color: var(--ink); }
 .uir-engine-sheet { position: relative; }
@@ -124,7 +125,7 @@
 [data-uir-engine-ui] .rich-block-handle svg { width: 14px; height: 14px; stroke-width: 1.5; }
 [data-uir-engine-ui] .uir-selection-action:hover { background: var(--accent-hover); }
 .editor-toolbar .tool[aria-pressed="true"] { background: var(--wash); color: var(--accent); }
-.uir-editor-body > .facts-panel { order: 1; }
+.uir-editor-body .facts-panel { order: 1; }
 .technology-chip[aria-busy="true"] { opacity: .65; outline: 1px dashed var(--accent); outline-offset: -1px; }
 .uir-facts-pending, .uir-timeline { display: block; margin-top: 10px; font-size: 10px; line-height: 1.6; color: var(--muted); }
 .uir-timeline small { display: block; }
@@ -135,3 +136,9 @@
 @media (max-width: 1080px) { .uir-editor-body .uir-block-panel { top: 143px; } }
 @media (max-width: 800px) { .uir-editor-body .uir-block-panel { top: 135px; } }
 @media (max-width: 600px) { .uir-editor-body .uir-block-panel { top: 121px; } }
+.uir-chat-active-bar { display: flex; align-items: center; padding-right: 12px; }
+.uir-chat-active-bar .chat-launcher { min-width: 0; }
+.uir-chat-active-bar > .chat-icon { flex-shrink: 0; }
+.uir-chat-source > small { display: block; margin: 6px 0; }
+.chat-findings > div { min-width: 0; }
+.chat-findings button { width: 100%; overflow-wrap: anywhere; }

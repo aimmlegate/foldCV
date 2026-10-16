@@ -28,6 +28,7 @@ from resume_api.agent.runtime import ScriptedAgentRuntime
 from resume_api.app import create_app
 from spikes.uir.fixtures import FIXTURES, HANDOFF, NOW, ALIASES, sample, structured, demo_from_workspace, write_json
 from spikes.uir.providers import ScriptedConnection, ScriptedContent, StoredWeb, scripted_agent
+from spikes.uir.agent import UIRAgent
 
 
 def digest(path): return hashlib.sha256(path.read_bytes()).hexdigest()
@@ -119,7 +120,8 @@ async def main(args):
     listener.bind(("127.0.0.1", args.port)); listener.listen(128)
     origin = "http://127.0.0.1:" + str(listener.getsockname()[1]); secret = secrets.token_urlsafe(32)
     connection, content, web = ScriptedConnection(), ScriptedContent(), StoredWeb()
-    runtime = ScriptedAgentRuntime(scripted_agent)
+    agent = UIRAgent() if int(args.slice[3:]) >= 7 else None
+    runtime = ScriptedAgentRuntime(agent or scripted_agent)
     # These constructors must remain unreachable even during application creation.
     with patch("resume_api.app.ConnectionAdapter", side_effect=AssertionError("native connection")), \
          patch("resume_api.app.CodexCliProvider", side_effect=AssertionError("native content")), \
@@ -137,19 +139,21 @@ async def main(args):
             "agent": "ScriptedAgentRuntime", "web": "StoredWeb"}, "experimentalProfile": None,
         "nativeConstructorGuard": "all three native factory branches guarded; zero calls",
         "serviceState": "running", "sourceSha256": {str(p.relative_to(ROOT)): digest(p) for p in
-            [Path(__file__), ROOT / "spikes/uir/providers.py", ROOT / "spikes/uir/fixtures.py", ROOT / "services/api/src/resume_api/app.py"]}}
+            [Path(__file__), ROOT / "spikes/uir/providers.py", ROOT / "spikes/uir/agent.py", ROOT / "spikes/uir/fixtures.py", ROOT / "services/api/src/resume_api/app.py"]}}
     def diagnostics():
         return {**info, "callCounts": {"connection": len(connection.calls), "content": len(content.calls),
             "agent": len(runtime.calls), "web": len(web.calls), "nativeStarts": 0},
             "contentTypes": [call.get("task", call.get("kind", "structured")) for call in content.calls],
-            "scriptedAttempts": content.attempts, "scriptedGateEntered": content.entered.is_set()}
+            "scriptedAttempts": content.attempts, "scriptedGateEntered": content.entered.is_set(),
+            "assistantTurns": agent.turns if agent else [], "assistantTools": agent.tools if agent else [],
+            "assistantGateEntered": agent.entered.is_set() if agent else False}
     @app.app.get("/v1/uir/diagnostics")
     async def read_diagnostics(): return diagnostics()
     app.app.router.routes.insert(0, app.app.router.routes.pop())
     @app.app.post("/v1/uir/control")
     async def control(request: Request):
         value = await request.json()
-        if not isinstance(value, dict) or set(value) - {"pauseType", "failKind", "assessment", "release"}:
+        if not isinstance(value, dict) or set(value) - {"pauseType", "failKind", "assessment", "release", "agentRelease"}:
             raise HTTPException(422)
         for key in ("pauseType", "failKind"):
             if value.get(key) not in {None, "ResumeAssessment", "GuiSemanticProposal"}:
@@ -161,6 +165,10 @@ async def main(args):
         content.entered.clear()
         if value.get("release", True): content.release.set()
         else: content.release.clear()
+        if "agentRelease" in value:
+            if not agent or not isinstance(value["agentRelease"], bool): raise HTTPException(422)
+            if value["agentRelease"]: agent.release.set()
+            else: agent.release.clear()
         return diagnostics()
     app.app.router.routes.insert(0, app.app.router.routes.pop())
     @app.app.post("/v1/uir/artifacts/{name}")

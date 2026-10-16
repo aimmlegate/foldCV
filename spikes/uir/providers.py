@@ -57,7 +57,7 @@ class StoredWeb:
     async def fetch(self, url, _cancel):
         self.calls.append(url)
         text = "Synthetic UIR stored page. No external retrieval."
-        return AgentWebSource(id="uir-stored-page", runId="unbound", requestedUrl=url, finalUrl=url,
+        return AgentWebSource(id="uir-stored-page-" + str(len(self.calls)), runId="unbound", requestedUrl=url, finalUrl=url,
             title="Synthetic UIR page", retrievedAt=NOW, contentSha256=hashlib.sha256(text.encode()).hexdigest(),
             text=text, truncated=False, originalBytes=len(text.encode()))
 
