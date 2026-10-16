@@ -151,9 +151,10 @@ async def test_queued_and_executing_revocation_never_reaches_publication(tmp_pat
             if cause == "delete":
                 with service.store.guard(workspace.project_id, deleted=True) as directory:
                     state = service.store._read(workspace.project_id, directory)
-                    assert state.tombstoned
-                    known = state.jobs[0]
+                    assert state.tombstoned and not state.jobs and not state.proposals and not state.intents
+                    known = service.supervisor.controls[job.id].job
                 assert service.supervisor.fenced is None
+                assert not (service.projects.storage.projects / workspace.project_id).exists()
             else:
                 known = service.store.read(workspace.project_id, job.id)
             assert known.receipt is None and known.publication == "cancelled"

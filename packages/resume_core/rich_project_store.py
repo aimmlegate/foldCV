@@ -40,9 +40,17 @@ class PreparedRichSave:
 
 
 class RichProjectStore(ProjectStore):
+    def _observe(self, phase, identifier):
+        observer = getattr(self, "background_observer", None)
+        if observer is not None:
+            observer(phase, identifier)
+
     def reclaim_images(self, workspace):
         try:
             with locked_root(self.root, ".projects.lock"):
+                marker = self.root / "background" / "projects" / workspace.project_id / "history-activation.json"
+                if marker.exists() or marker.is_symlink():
+                    return
                 directory = self._directory(workspace.project_id)
                 target = directory / "workspace.json"
                 owned_file(target)
@@ -69,6 +77,19 @@ class RichProjectStore(ProjectStore):
         prepared = self.prepare_save(workspace, originals, artifacts, images)
         try:
             with locked_root(self.root, ".projects.lock"):
+                marker = self.root / "background" / "projects" / workspace.project_id / "history-activation.json"
+                if marker.exists() or marker.is_symlink():
+                    raise ProjectStoreFailure("PROJECT_COORDINATOR_REQUIRED")
+                sidecar = marker.with_name("state.json")
+                if sidecar.exists() or sidecar.is_symlink():
+                    try:
+                        from .background_limits import LIMITS
+                        owned_file(sidecar, LIMITS.sidecar_project_bytes)
+                        state = strict_json(sidecar.read_bytes())
+                        if not isinstance(state, dict) or state.get("historyNamespace") is not None or state.get("history") is not None or state.get("generations"):
+                            raise ValueError("coordinated history exists")
+                    except (OSError, StorageFailure, ValueError):
+                        raise ProjectStoreFailure("PROJECT_COORDINATOR_REQUIRED") from None
                 self._commit_prepared_unlocked(prepared, before_workspace=before_workspace, after_workspace=after_workspace)
         except ProjectStoreFailure:
             raise
@@ -141,6 +162,7 @@ class RichProjectStore(ProjectStore):
                     existing.project_revision > workspace.project_revision or existing.document_revision > workspace.document_revision
                 ):
                     raise ProjectStoreFailure("PROJECT_REVISION_CHANGED")
+            self._observe("before_assets_staged", workspace.project_id)
             for kind, identifier, blob, checksum in prepared.blobs:
                 path = self._blob(directory, kind, identifier)
                 if path.exists():
@@ -158,6 +180,7 @@ class RichProjectStore(ProjectStore):
                         verify_image_bytes(asset, path.read_bytes())
                     else:
                         atomic_write(path, blob)
+            self._observe("assets_staged", workspace.project_id)
             if before_workspace is not None:
                 before_workspace()
             atomic_write(target, raw, **({"after_replace": workspace_replaced} if workspace_replaced else {}))
@@ -268,12 +291,15 @@ class RichProjectStore(ProjectStore):
             entry = next((item for item in registry.entries if item.project_id == id), None)
             if entry is None or not entry.tombstoned:
                 raise ProjectStoreFailure("PROJECT_NOT_DELETED")
+            if entry.cleanup_status == "complete" and not (self.projects / id).exists():
+                return entry.model_copy(deep=True)
             directory = self._directory(id)
             target = directory / "workspace.json"
             owned_file(target)
             # Unsupported files are never eligible for rich cleanup, even after a list action.
             decode_rich_snapshot(target.read_bytes())
             try:
+                self._observe("before_tombstone_cleanup", id)
                 files, folders = [], []
                 for path in directory.iterdir():
                     if path.name in {"workspace.json", ".project-identity.json"}:
@@ -299,4 +325,5 @@ class RichProjectStore(ProjectStore):
             except (OSError, StorageFailure):
                 entry.cleanup_status = "failed"
             self._write_registry(registry)
+            self._observe("tombstone_cleanup", id)
             return entry.model_copy(deep=True)

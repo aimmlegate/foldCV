@@ -1,3 +1,7 @@
+export type Assetpinssha256 = string | null;
+/**
+ * @maxItems 2
+ */
 export type Attempts = [] | [JobAttemptV1] | [JobAttemptV1, JobAttemptV1];
 export type Activedeadline = string;
 export type Childstartedat = string | null;
@@ -816,9 +820,11 @@ export type Tools =
         | "apply_edit_batch"
       )
     ];
+export type Undoexpired = boolean;
 export type Updatedat = string;
 
 export interface JobSnapshotV1 {
+  assetPinsSha256?: Assetpinssha256;
   attempts: Attempts;
   createdAt: Createdat;
   error: JobFailure | null;
@@ -832,6 +838,7 @@ export interface JobSnapshotV1 {
   receipt: CanonicalReceiptV1 | null;
   schemaVersion: Schemaversion2;
   submission: JobSubmissionV1;
+  undoExpired?: Undoexpired;
   updatedAt: Updatedat;
 }
 export interface JobAttemptV1 {

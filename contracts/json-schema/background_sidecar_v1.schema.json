@@ -183,6 +183,87 @@
       "title": "AgentQueryDependency",
       "type": "object"
     },
+    "AssetPinV1": {
+      "additionalProperties": false,
+      "properties": {
+        "kind": {
+          "enum": [
+            "job",
+            "proposal",
+            "export",
+            "inverse",
+            "draft",
+            "session"
+          ],
+          "title": "Kind",
+          "type": "string"
+        },
+        "owner": {
+          "maxLength": 128,
+          "minLength": 1,
+          "pattern": "^[A-Za-z0-9_-]+$",
+          "title": "Owner",
+          "type": "string"
+        },
+        "references": {
+          "items": {
+            "$ref": "#/$defs/AssetReferenceV1"
+          },
+          "maxItems": 100,
+          "title": "References",
+          "type": "array"
+        }
+      },
+      "required": [
+        "owner",
+        "kind",
+        "references"
+      ],
+      "title": "AssetPinV1",
+      "type": "object"
+    },
+    "AssetReferenceV1": {
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "minLength": 1,
+          "title": "Id",
+          "type": "string"
+        },
+        "kind": {
+          "enum": [
+            "image",
+            "source"
+          ],
+          "title": "Kind",
+          "type": "string"
+        },
+        "path": {
+          "title": "Path",
+          "type": "string"
+        },
+        "sha256": {
+          "pattern": "^[a-f0-9]{64}$",
+          "title": "Sha256",
+          "type": "string"
+        },
+        "size": {
+          "maximum": 33554432,
+          "minimum": 0,
+          "title": "Size",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "kind",
+        "id",
+        "path",
+        "sha256",
+        "size"
+      ],
+      "title": "AssetReferenceV1",
+      "type": "object"
+    },
     "BackgroundHistoryV1": {
       "additionalProperties": false,
       "properties": {
@@ -834,6 +915,19 @@
     "JobSnapshotV1": {
       "additionalProperties": false,
       "properties": {
+        "assetPinsSha256": {
+          "anyOf": [
+            {
+              "pattern": "^[a-f0-9]{64}$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Assetpinssha256"
+        },
         "attempts": {
           "items": {
             "$ref": "#/$defs/JobAttemptV1"
@@ -949,6 +1043,11 @@
         },
         "submission": {
           "$ref": "#/$defs/JobSubmissionV1"
+        },
+        "undoExpired": {
+          "default": false,
+          "title": "Undoexpired",
+          "type": "boolean"
         },
         "updatedAt": {
           "format": "date-time",
@@ -1105,6 +1204,19 @@
     "ManualIntentV1": {
       "additionalProperties": false,
       "properties": {
+        "actionId": {
+          "anyOf": [
+            {
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Actionid"
+        },
         "afterGenerationsSha256": {
           "pattern": "^[a-f0-9]{64}$",
           "title": "Aftergenerationssha256",
@@ -1156,6 +1268,11 @@
           "title": "Beforeworkspacesha256",
           "type": "string"
         },
+        "candidatePruned": {
+          "default": false,
+          "title": "Candidatepruned",
+          "type": "boolean"
+        },
         "candidateRef": {
           "maxLength": 128,
           "minLength": 1,
@@ -1177,9 +1294,7 @@
           "title": "Candidatesha256"
         },
         "clientMutationId": {
-          "maxLength": 128,
           "minLength": 1,
-          "pattern": "^[A-Za-z0-9_-]+$",
           "title": "Clientmutationid",
           "type": "string"
         },
@@ -1244,10 +1359,37 @@
           "title": "Requestsha256",
           "type": "string"
         },
+        "resolvedAt": {
+          "anyOf": [
+            {
+              "format": "date-time",
+              "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(?:\\.\\d+)?(?:Z|\\+00:00)$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Resolvedat"
+        },
         "schemaVersion": {
           "const": 1,
           "title": "Schemaversion",
           "type": "integer"
+        },
+        "stepsSha256": {
+          "anyOf": [
+            {
+              "pattern": "^[a-f0-9]{64}$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Stepssha256"
         },
         "writerEpoch": {
           "anyOf": [
@@ -1314,6 +1456,28 @@
         "configSha256"
       ],
       "title": "ModelCapture",
+      "type": "object"
+    },
+    "OrphanAssetV1": {
+      "additionalProperties": false,
+      "properties": {
+        "orphanedAt": {
+          "format": "date-time",
+          "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(?:\\.\\d+)?(?:Z|\\+00:00)$",
+          "title": "Orphanedat",
+          "type": "string"
+        },
+        "path": {
+          "maxLength": 160,
+          "title": "Path",
+          "type": "string"
+        }
+      },
+      "required": [
+        "path",
+        "orphanedAt"
+      ],
+      "title": "OrphanAssetV1",
       "type": "object"
     },
     "ProcessingPayloadReference": {
@@ -1760,6 +1924,20 @@
           "title": "Requestsha256",
           "type": "string"
         },
+        "resolvedAt": {
+          "anyOf": [
+            {
+              "format": "date-time",
+              "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(?:\\.\\d+)?(?:Z|\\+00:00)$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Resolvedat"
+        },
         "schemaVersion": {
           "const": 1,
           "title": "Schemaversion",
@@ -1983,6 +2161,19 @@
     "UndoOwnershipV1": {
       "additionalProperties": false,
       "properties": {
+        "assetPinsSha256": {
+          "anyOf": [
+            {
+              "pattern": "^[a-f0-9]{64}$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Assetpinssha256"
+        },
         "expiresAt": {
           "format": "date-time",
           "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(?:\\.\\d+)?(?:Z|\\+00:00)$",
@@ -2237,6 +2428,14 @@
       "title": "Activerequestepoch",
       "type": "integer"
     },
+    "assetPins": {
+      "items": {
+        "$ref": "#/$defs/AssetPinV1"
+      },
+      "maxItems": 512,
+      "title": "Assetpins",
+      "type": "array"
+    },
     "barrier": {
       "anyOf": [
         {
@@ -2246,6 +2445,14 @@
           "type": "null"
         }
       ]
+    },
+    "cleanupRefs": {
+      "items": {
+        "type": "string"
+      },
+      "maxItems": 512,
+      "title": "Cleanuprefs",
+      "type": "array"
     },
     "drafts": {
       "items": {
@@ -2279,6 +2486,21 @@
         }
       ],
       "default": null
+    },
+    "historyNamespace": {
+      "anyOf": [
+        {
+          "maxLength": 128,
+          "minLength": 1,
+          "pattern": "^[A-Za-z0-9_-]+$",
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Historynamespace"
     },
     "intents": {
       "items": {
@@ -2317,6 +2539,14 @@
       },
       "maxItems": 512,
       "title": "Manualintents",
+      "type": "array"
+    },
+    "orphanAssets": {
+      "items": {
+        "$ref": "#/$defs/OrphanAssetV1"
+      },
+      "maxItems": 512,
+      "title": "Orphanassets",
       "type": "array"
     },
     "projectId": {

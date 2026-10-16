@@ -51,6 +51,8 @@ class ScopeHistory:
         try:
             if state.history is None or state.history.phase != "ready" or state.history.workspace_sha256 != checksum:
                 raise ValueError("history is unavailable for these canonical bytes")
+            if state.history_namespace is not None and state.history_namespace != state.history.namespace:
+                raise ValueError("history namespace changed")
             path = directory / "history-activation.json"
             owned_file(path, 8192)
             if strict_json(path.read_bytes()) != self._activation(state):
@@ -76,11 +78,14 @@ class ScopeHistory:
             _workspace, checksum = self.canonical._read_committed_unlocked(project)
             path = directory / "history-activation.json"
             if state.history is None:
-                if path.exists() or path.is_symlink() or state.generations:
+                if (state.history_namespace is not None or path.exists() or path.is_symlink() or state.generations or state.intents or state.manual_intents or state.inverses
+                        or any(job.receipt is not None or job.submission.guards.reads or job.submission.guards.writes for job in state.jobs)
+                        or any(proposal.guards.reads or proposal.guards.writes for proposal in state.proposals)):
                     self._fence(project)
                 namespace = identity("history")
                 state.history = BackgroundHistoryV1(schemaVersion=1, namespace=namespace, phase="initializing",
                     workspaceSha256=checksum, definitions=[])
+                state.history_namespace = namespace
                 state.generations = [GenerationStamp(kind="rules", key=key, generation=1,
                     fingerprint=digest(namespace)) for key in (NAMESPACE, CLOCK)]
                 # Interim proposals have no history authority; retain their immutable payloads.
@@ -107,6 +112,9 @@ class ScopeHistory:
                 state.history.workspace_sha256, state.history.phase = checksum, "ready"
                 self.jobs._write(directory, state, self.jobs._all())
                 self.observer("history_ready", project)
+            if state.history_namespace is None:
+                state.history_namespace = state.history.namespace
+                self.jobs._write(directory, state, self.jobs._all())
             self._ready(state, directory, checksum)
             return state.history.model_copy(deep=True)
 
@@ -123,7 +131,7 @@ class ScopeHistory:
                 raise BackgroundFailure("DEPENDENCY_CHANGED") from None
         return digest({"missing": selector_key(selector)})
 
-    def observe(self, project, reader):
+    def observe(self, project, reader, *, job_id=None):
         """reader returns a materialized value and dependencies without I/O or waits."""
         self.open(project)
         with self.jobs.guard(project) as directory:
@@ -133,6 +141,15 @@ class ScopeHistory:
             if any(intent.phase not in {"receipt_stored", "reconciled"} for intent in [*state.intents, *state.manual_intents]):
                 raise BackgroundFailure("OUTCOME_UNKNOWN")
             value, selectors = reader(workspace)
+            if job_id is not None:
+                from .background_assets import pin_snapshot
+                from .background_store import job_in
+                job = job_in(state, job_id)
+                previous = job.asset_pins_sha256
+                pin_snapshot(state, self.canonical, workspace, "job", job_id, extend=True)
+                if job.asset_pins_sha256 != previous:
+                    job.event_cursor += 1
+                    job.updated_at = self.jobs.clock()
             guards = self.register(state, workspace, selectors)
             self.jobs._write(directory, state, self.jobs._all())
             self.observer("history_capture_durable", project)

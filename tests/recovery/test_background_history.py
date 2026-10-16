@@ -10,7 +10,8 @@ from packages.resume_core.models.agent import AgentEntityDependency, AgentQuery,
 from packages.resume_core.models.background import ScopeGuardV1
 from packages.resume_core.project_store import encoded
 from packages.resume_core.rich_dependencies import dependency
-from packages.resume_core.storage import atomic_write, locked_root
+from packages.resume_core.rich_project_store import rich_snapshot_bytes
+from packages.resume_core.storage import atomic_write
 from spikes.background.fixtures import TIME
 from tests.recovery.test_background_store import capture
 from tests.support.agent import isolated_project
@@ -31,13 +32,13 @@ def read_block(workspace):
 
 
 def component_write(jobs, canonical, history, before, candidate, *, touches=frozenset()):
-    def persist_history(_checksum):
-        with locked_root(jobs.background, ".jobs.lock"):
-            directory = jobs.projects / before.project_id
-            state = jobs._read(before.project_id, directory)
+    prepared = canonical.prepare_save(candidate, {}, {})
+    with jobs.guard(before.project_id) as directory:
+        state = jobs._read(before.project_id, directory)
+        def persist_history(_checksum):
             history.advance(state, before, candidate, touches=touches)
             jobs._write(directory, state, jobs._all())
-    canonical.save(candidate, {}, {}, after_workspace=persist_history)
+        canonical._commit_prepared_unlocked(prepared, after_workspace=persist_history)
 
 
 def edit(before, text):
@@ -113,7 +114,7 @@ def test_missing_activated_history_and_uncoordinated_writes_fence_without_reset(
         value["history"], value["generations"] = None, []
         atomic_write(directory / "state.json", encoded(value))
     else:
-        canonical.save(edit(workspace, "Uncoordinated change"), {}, {})
+        atomic_write(canonical.projects / workspace.project_id / "workspace.json", rich_snapshot_bytes(edit(workspace, "Uncoordinated change")))
     before = (directory / "state.json").read_bytes()
     fresh = ScopeHistory(JobStore(tmp_path), history.query_fingerprint)
     with pytest.raises(BackgroundFailure, match="OUTCOME_UNKNOWN"):

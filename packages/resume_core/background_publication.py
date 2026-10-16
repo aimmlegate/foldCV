@@ -50,6 +50,7 @@ class CanonicalCoordinator:
         self.jobs, self.history, self.canonical, self.payload_loader = jobs, history, canonical, payload_loader
         self.authority, self.observer, self.validate = authority or PublicationAuthority(), observer, validate
         self.mutexes = {}
+        self.canonical.background_observer = lambda phase, project: self.observer(phase, project)
 
     def _mutex(self, project):
         return self.mutexes.setdefault(project, threading.Lock())
@@ -100,10 +101,35 @@ class CanonicalCoordinator:
             raise BackgroundFailure("CANCELLED")
 
     def _payload(self, state, directory, proposal):
-        raw = self.payload_loader(state, directory, proposal.payload)
+        from .agent_store import AgentFailure
+        from .storage import StorageFailure
+        try:
+            return self._read_payload(state, directory, proposal)
+        except BackgroundFailure as error:
+            if error.code == "OUTCOME_UNKNOWN":
+                self.jobs.fences.setdefault(state.project_id, "OUTCOME_UNKNOWN")
+            raise
+        except (AgentFailure, StorageFailure, OSError, ValueError):
+            self.jobs.fences.setdefault(state.project_id, "OUTCOME_UNKNOWN")
+            raise BackgroundFailure("OUTCOME_UNKNOWN") from None
+
+    def _read_payload(self, state, directory, proposal):
+        record = None
+        if proposal.payload.kind == "rich_sync":
+            from .background_fixed import fixed_payload
+            workspace, _checksum = self.canonical._read_committed_unlocked(state.project_id)
+            record = next((item for item in workspace.sync_records if item.id == proposal.payload.sync_id), None)
+            if record is None:
+                raise BackgroundFailure("OUTCOME_UNKNOWN")
+            raw = fixed_payload(record)
+        else:
+            raw = self.payload_loader(state, directory, proposal.payload)
         if (not isinstance(raw, bytes) or len(raw) != proposal.payload_bytes
                 or hashlib.sha256(raw).hexdigest() != proposal.payload_sha256):
             raise BackgroundFailure("OUTCOME_UNKNOWN")
+        if record is not None:
+            from .background_fixed import fixed_mutation
+            return fixed_mutation(state.project_id, record)
         if proposal.payload.kind != "agent_journal":
             raise BackgroundFailure("JOB_SCOPE_INVALID")
         batch = AgentEditBatch.model_validate(strict_json(raw))
@@ -134,6 +160,8 @@ class CanonicalCoordinator:
         return candidate
 
     def _candidate(self, state, directory, before, after, mutation, job, proposal, *, snapshot_id=None):
+        from .background_assets import guard_removal
+        guard_removal(state, before, after)
         inverse = inverse_mutation(before, after, mutation_id="inverse_" + mutation.client_mutation_id,
             session_id=mutation.capture.session_id) if job else None
         if inverse is not None:
@@ -177,10 +205,17 @@ class CanonicalCoordinator:
             requestSha256=mutation_sha256(mutation) if mutation else snapshot_request(snapshot_id, digest_bytes(before), digest_bytes(after)),
             beforeWorkspaceSha256=digest_bytes(before), afterWorkspaceSha256=digest_bytes(after),
             beforeHistory=previous, afterHistory=checkpoint(following), workspace=after, inverse=inverse,
-            inverseGuards=inverse_guards, persistedAt=self.jobs.clock(), snapshotWrite=mutation is None)
+            inverseGuards=inverse_guards, persistedAt=self.jobs.clock(), snapshotWrite=mutation is None,
+            syncPayloads=[{"syncId": record.id, "stepsSha256": digest([step.model_dump(mode="json", by_alias=True) for step in record.proposed_steps])}
+                for record in after.sync_records if record.proposed_steps and any(item.payload.kind == "rich_sync"
+                    and item.payload.sync_id == record.id for item in state.proposals)])
 
     def _store_intent(self, state, directory, candidate, claim):
-        raw = encoded(candidate.model_dump(mode="json", by_alias=True))
+        value = candidate.model_dump(mode="json", by_alias=True)
+        for record in value["workspace"]["syncRecords"]:
+            if any(item.sync_id == record["id"] for item in candidate.sync_payloads):
+                record["proposedSteps"] = []
+        raw = encoded(value)
         folder = private_directory(directory / "canonical-candidates")
         path = folder / (candidate.id + ".json")
         fields = dict(schemaVersion=1, id="intent_" + candidate.id, projectId=state.project_id, lineage=state.lineage,
@@ -190,26 +225,34 @@ class CanonicalCoordinator:
             afterGenerationsSha256=checkpoint_sha(candidate.after_history), candidateRef=candidate.id,
             previousRef=candidate.id, writerEpoch=claim.epoch if claim else None,
             incarnation=claim.incarnation if claim else None, barrierGeneration=claim.generation if claim else None,
-            phase="intent_stored", assetPins=[asset.id for asset in candidate.workspace.project.assets],
+            phase="intent_stored", assetPins=[asset.id for asset in candidate.workspace.project.assets] if candidate.workspace.project else [],
             candidateSha256=hashlib.sha256(raw).hexdigest())
         if candidate.job_id:
             intent = PublicationIntentV1(**fields, jobId=candidate.job_id, proposalId=candidate.proposal_id)
         else:
-            intent = ManualIntentV1(**fields)
+            intent = ManualIntentV1(**fields, actionId=candidate.action_id,
+                stepsSha256=digest([step.model_dump(mode="json", by_alias=True) for step in candidate.manual_mutation.steps])
+                    if candidate.manual_mutation else None)
         future = state.model_copy(deep=True)
         future.history, future.generations = candidate.after_history.history, candidate.after_history.generations
-        (future.intents if candidate.job_id else future.manual_intents).append(intent.model_copy(deep=True))
+        completed_at = "9999-12-30T23:59:59.999999+00:00"
+        completed = intent.model_copy(update={"phase": "receipt_stored", "resolved_at": completed_at}, deep=True)
+        (future.intents if candidate.job_id else future.manual_intents).append(completed)
         states = self.jobs._all()
-        self.jobs._capacity(future, states, replacing=(path, len(raw)))
+        from .background_fixed import stored_fixed_bytes
+        fixed_bytes = stored_fixed_bytes(state, candidate.workspace)
+        self.jobs._capacity(future, states, replacing=(path, len(raw)), canonical_fixed_bytes=fixed_bytes)
         if candidate.job_id:
             future_job = job_in(future, candidate.job_id)
-            future_job.receipt, future_job.publication = self._receipt_value(candidate), "saved"
+            future_job.receipt, future_job.publication = self._receipt_value(candidate, completed_at), "saved"
             if candidate.inverse is not None:
-                future.inverses.append(self._inverse_value(candidate))
+                future.inverses.append(self._inverse_value(candidate, completed_at))
+                from .background_assets import pin_snapshot
+                pin_snapshot(future, self.canonical, candidate.workspace, "inverse", candidate.proposal_id)
         if records(future) > LIMITS.metadata_project_records or len(future.inverses) > LIMITS.inverse_project_records:
             raise BackgroundFailure("JOB_STORAGE_FULL")
-        self.jobs._capacity(future, states, replacing=(path, len(raw)))
-        self.jobs._capacity(state, states, replacing=(path, len(raw)))
+        self.jobs._capacity(future, states, replacing=(path, len(raw)), canonical_fixed_bytes=fixed_bytes)
+        self.jobs._capacity(state, states, replacing=(path, len(raw)), canonical_fixed_bytes=fixed_bytes)
         atomic_write(path, raw)
         self.jobs._sync_namespace(path)
         self.observer("before_intent_stored", state.project_id)
@@ -226,6 +269,15 @@ class CanonicalCoordinator:
         owned_file(path, LIMITS.sidecar_project_bytes)
         raw = path.read_bytes()
         value = CanonicalCandidateV1.model_validate(strict_json(raw))
+        if value.sync_payloads:
+            workspace, _checksum = self.canonical._read_committed_unlocked(state.project_id)
+            for ref in value.sync_payloads:
+                source = next((record for record in workspace.sync_records if record.id == ref.sync_id), None)
+                target = next((record for record in value.workspace.sync_records if record.id == ref.sync_id), None)
+                if (source is None or target is None or target.proposed_steps
+                        or digest([step.model_dump(mode="json", by_alias=True) for step in source.proposed_steps]) != ref.steps_sha256):
+                    raise BackgroundFailure("OUTCOME_UNKNOWN")
+                target.proposed_steps = [step.model_copy(deep=True) for step in source.proposed_steps]
         if (hashlib.sha256(raw).hexdigest() != intent.candidate_sha256 or value.id != intent.candidate_ref
                 or (value.project_id, value.lineage, value.client_mutation_id, value.request_sha256,
                     value.before_workspace_sha256, value.after_workspace_sha256) !=
@@ -259,10 +311,13 @@ class CanonicalCoordinator:
     def publish(self, project, job_id, proposal_sha256, *, originals=None, artifacts=None, images=None):
         with self._writer(project):
             known_job = self.jobs.read(project, job_id)
-            if known_job.receipt is not None:
-                if known_job.receipt.proposal_sha256 != proposal_sha256:
+            if known_job.receipt is not None or known_job.publication == "no_change":
+                state = self.jobs.load(project)
+                if proposal_in(state, known_job).payload_sha256 != proposal_sha256:
                     raise BackgroundFailure("JOB_IDEMPOTENCY_CONFLICT")
                 return known_job
+            from .background_retention import JobRetention
+            JobRetention(self.jobs).compact_manual(project, self.history)
             self.history.open(project)
             with self.jobs.guard(project) as directory:
                 state = self.jobs._read(project, directory)
@@ -289,16 +344,29 @@ class CanonicalCoordinator:
                     self._publication(job, "needs_review", "DEPENDENCY_CHANGED")
                     self._persist(directory, state)
                     return job
+                original = self._payload(state, directory, proposal)
+                if original is None:
+                    self._publication(job, "no_change")
+                    from .background_assets import release_resolved_jobs
+                    release_resolved_jobs(state)
+                    self._persist(directory, state)
+                    return job
                 try:
-                    claim = self.authority.require(state, current)
+                    claim = self.authority.require(state, current, now=self.jobs.clock())
                 except BackgroundFailure as error:
                     if error.code != "WRITER_UNKNOWN":
                         raise
                     self._publication(job, "waiting_for_sync", "WRITER_UNKNOWN")
                     self._persist(directory, state)
                     return job
-                actual = self._actual(self._payload(state, directory, proposal), state, job)
+                actual = self._actual(original, state, job)
                 after = self._apply(current, actual, validate=True)
+                if proposal.payload.kind == "rich_sync":
+                    record = next(item for item in after.sync_records if item.id == proposal.payload.sync_id)
+                    record.ready = False
+                    if record.status != "conflict":
+                        record.status = "applied"
+            self.observer("before_canonical_prepared", project)
             prepared = self.canonical.prepare_save(after, originals or {}, artifacts or {}, images)
             with self.jobs.guard(project) as directory:
                 state = self.jobs._read(project, directory)
@@ -309,7 +377,7 @@ class CanonicalCoordinator:
                 if checksum != digest_bytes(current):
                     raise BackgroundFailure("BUSY")
                 self.history.validate(state, directory, latest, proposal.guards)
-                if self.authority.require(state, latest) != claim:
+                if self.authority.require(state, latest, now=self.jobs.clock()) != claim:
                     raise BackgroundFailure("WRITER_UNKNOWN")
                 candidate = self._candidate(state, directory, current, after, actual, job, proposal)
                 intent = self._store_intent(state, directory, candidate, claim)
@@ -317,6 +385,8 @@ class CanonicalCoordinator:
 
     def manual(self, project, request, *, originals=None, artifacts=None, images=None):
         with self._writer(project):
+            from .background_retention import JobRetention
+            JobRetention(self.jobs).compact_manual(project, self.history)
             self.history.open(project)
             with self.jobs.guard(project) as directory:
                 state = self.jobs._read(project, directory)
@@ -332,6 +402,16 @@ class CanonicalCoordinator:
                     raise BackgroundFailure("JOB_SCOPE_INVALID")
                 self._writable(state)
                 self.history._ready(state, directory, digest_bytes(before))
+                proof = next((item for item in before.mutation_replay if item.client_mutation_id == request.client_mutation_id), None)
+                if proof is not None:
+                    if proof.request_sha256 != mutation_sha256(request):
+                        raise BackgroundFailure("JOB_IDEMPOTENCY_CONFLICT")
+                    self.canonical._read_committed_unlocked(project, synchronize=True)
+                    return before, True
+                if (any(record.action_id == request.action_id and record.error_code in {"CANCELLED", "SYNC_SUPERSEDED"}
+                        for record in before.sync_records) and not any(record.action_id == request.action_id and record.ready
+                            and record.proposed_steps == request.steps for record in before.sync_records)):
+                    raise BackgroundFailure("JOB_SCOPE_INVALID")
                 after = self._apply(before, request, validate=False)
             prepared = self.canonical.prepare_save(after, originals or {}, artifacts or {}, images)
             with self.jobs.guard(project) as directory:
@@ -353,6 +433,8 @@ class CanonicalCoordinator:
 
     def _stage(self, state, directory, intent, phase):
         intent.phase = phase
+        if phase in RESOLVED and intent.resolved_at is None:
+            intent.resolved_at = self.jobs.clock()
         self._persist(directory, state)
         self.observer(phase, state.project_id)
 
@@ -367,13 +449,43 @@ class CanonicalCoordinator:
             self.canonical.expected[project] = checksum
             return current, checksum
 
-    def snapshot(self, project, before_sha256, after, command_id, *, originals=None, artifacts=None, images=None):
+    def legacy_sync_saved(self, project, record):
+        with self._writer(project), self.jobs.guard(project) as directory:
+            state = self.jobs._read(project, directory)
+            self._writable(state)
+            current, checksum = self.canonical._read_committed_unlocked(project)
+            self.history._ready(state, directory, checksum)
+            for intent in state.manual_intents:
+                if intent.phase != "receipt_stored":
+                    continue
+                if intent.action_id is not None and intent.steps_sha256 is not None:
+                    if intent.action_id == record.action_id and intent.steps_sha256 == digest([
+                            step.model_dump(mode="json", by_alias=True) for step in record.proposed_steps]):
+                        return any(item.client_mutation_id == intent.client_mutation_id and item.request_sha256 == intent.request_sha256
+                            for item in current.mutation_replay)
+                    continue
+                candidate = self._load_candidate(state, directory, intent)
+                mutation = candidate.manual_mutation
+                if mutation is not None and mutation.action_id == record.action_id and mutation.steps == record.proposed_steps:
+                    return any(item.client_mutation_id == mutation.client_mutation_id
+                        and item.request_sha256 == intent.request_sha256 for item in current.mutation_replay)
+            return False
+
+    def snapshot(self, project, before_sha256, after, command_id, *, originals=None, artifacts=None, images=None, base=None):
         """A whole-snapshot writer must prove its exact base; it cannot overwrite a newer save."""
         with self._writer(project):
+            from .background_retention import JobRetention
+            JobRetention(self.jobs).compact_manual(project, self.history)
             self.history.open(project)
             with self.jobs.guard(project) as directory:
                 state = self.jobs._read(project, directory)
                 before, checksum = self.canonical._read_committed_unlocked(project)
+                if base is not None:
+                    from .rich_snapshot_merge import merge_snapshot
+                    if digest_bytes(base) != before_sha256:
+                        raise BackgroundFailure("JOB_SCOPE_INVALID")
+                    after = merge_snapshot(base, after, before)
+                    before_sha256 = checksum
                 request_sha = snapshot_request(command_id, before_sha256, digest_bytes(after))
                 known = next((item for item in state.manual_intents if item.client_mutation_id == command_id), None)
                 if known is not None:
@@ -386,6 +498,13 @@ class CanonicalCoordinator:
                 if checksum != before_sha256:
                     raise BackgroundFailure("DEPENDENCY_CHANGED")
                 self.history._ready(state, directory, checksum)
+                from .background_fixed import guard_fixed_records
+                guard_fixed_records(state, before, after)
+                if digest_bytes(after) == checksum:
+                    current, _checksum = self.canonical._read_committed_unlocked(project, synchronize=True)
+                    self.canonical.expected[project] = checksum
+                    return current, False
+            self.observer("before_snapshot_prepared", project)
             prepared = self.canonical.prepare_save(after, originals or {}, artifacts or {}, images)
             with self.jobs.guard(project) as directory:
                 state = self.jobs._read(project, directory)
@@ -397,6 +516,10 @@ class CanonicalCoordinator:
                 candidate = self._candidate(state, directory, before, after, None, None, None, snapshot_id=command_id)
                 intent = self._store_intent(state, directory, candidate, None)
             self._commit(project, intent.id, candidate, prepared)
+            with self.jobs.guard(project) as directory:
+                state = self.jobs._read(project, directory)
+                if next(item for item in state.manual_intents if item.id == intent.id).phase != "receipt_stored":
+                    raise BackgroundFailure("OUTCOME_UNKNOWN")
             return after, False
 
     def _commit(self, project, intent_id, candidate, prepared):
@@ -413,11 +536,13 @@ class CanonicalCoordinator:
                 self._load_candidate(state, directory, intent)
                 self.canonical.expected[project] = checksum
                 def claim_commit():
+                    from .background_assets import guard_removal
+                    guard_removal(state, before, candidate.workspace)
                     if candidate.job_id:
                         job, proposal = job_in(state, candidate.job_id), proposal_in(state, job_in(state, candidate.job_id))
                         self._gate(state, job, proposal)
                         self.history.validate(state, directory, before, proposal.guards)
-                        claim = self.authority.require(state, before)
+                        claim = self.authority.require(state, before, now=self.jobs.clock())
                         if (claim.epoch, claim.incarnation, claim.generation) != (intent.writer_epoch, intent.incarnation, intent.barrier_generation):
                             raise BackgroundFailure("WRITER_UNKNOWN")
                         self._publication(job, "committing")
@@ -458,6 +583,7 @@ class CanonicalCoordinator:
                                 self._publication(job, "needs_review" if error.code == "DEPENDENCY_CHANGED" else "waiting_for_sync",
                                     error.code)
                     intent.phase = "reconciled"
+                    intent.resolved_at = self.jobs.clock()
                     self._persist(directory, state)
                     return job.model_copy(deep=True) if candidate.job_id else None
                 if intent.phase != "receipt_stored":
@@ -474,11 +600,15 @@ class CanonicalCoordinator:
     def _receipt(self, state, directory, intent, candidate):
         self.observer("before_receipt_stored", state.project_id)
         if candidate.job_id:
+            from .background_assets import pin_snapshot, release_resolved_jobs
+            completed_at = self.jobs.clock()
             job = job_in(state, candidate.job_id)
-            job.receipt = self._receipt_value(candidate)
+            job.receipt = self._receipt_value(candidate, completed_at)
             self._publication(job, "saved")
             if candidate.inverse is not None and not any(item.proposal_id == candidate.proposal_id for item in state.inverses):
-                state.inverses.append(self._inverse_value(candidate))
+                state.inverses.append(self._inverse_value(candidate, completed_at))
+                pin_snapshot(state, self.canonical, candidate.workspace, "inverse", candidate.proposal_id)
+            release_resolved_jobs(state)
         if state.barrier is not None and state.barrier.state == "commit_claimed":
             state.barrier.state = "resolved"
         if state.writer is not None and state.writer.status == "clean_detached":
@@ -486,22 +616,22 @@ class CanonicalCoordinator:
         self._stage(state, directory, intent, "receipt_stored")
 
     @staticmethod
-    def _receipt_value(candidate):
+    def _receipt_value(candidate, completed_at=None):
         workspace = candidate.workspace
         return CanonicalReceiptV1(schemaVersion=1, projectId=candidate.project_id, lineage=candidate.lineage,
             jobId=candidate.job_id, proposalId=candidate.proposal_id, clientMutationId=candidate.client_mutation_id,
             requestSha256=candidate.request_sha256, proposalSha256=candidate.proposal_sha256,
             workspaceSha256=candidate.after_workspace_sha256, generationsSha256=checkpoint_sha(candidate.after_history),
             projectRevision=workspace.project_revision, documentRevision=workspace.document_revision,
-            factsRevision=workspace.project.facts.revision, durable=True, persistedAt=candidate.persisted_at)
+            factsRevision=workspace.project.facts.revision, durable=True, persistedAt=completed_at or candidate.persisted_at)
 
     @staticmethod
-    def _inverse_value(candidate):
+    def _inverse_value(candidate, completed_at=None):
         raw = encoded(candidate.inverse.model_dump(mode="json", by_alias=True))
         return UndoOwnershipV1(schemaVersion=1, jobId=candidate.job_id, proposalId=candidate.proposal_id,
             owner="backend", writerEpoch=None, incarnation=None, transferId="transfer_" + candidate.id,
             inverseRef=candidate.id, inverseSha256=hashlib.sha256(raw).hexdigest(), inverseBytes=len(raw),
-            expiresAt=expiration(candidate.persisted_at, LIMITS.inverse_seconds), guards=candidate.inverse_guards)
+            expiresAt=expiration(completed_at or candidate.persisted_at, LIMITS.inverse_seconds), guards=candidate.inverse_guards)
 
     def recover(self, project):
         with self._writer(project), self.jobs.guard(project) as directory:
@@ -520,6 +650,7 @@ class CanonicalCoordinator:
                             if job.publication not in {"cancelled", "discarded"}:
                                 self._publication(job, "save_failed", "SAVE_FAILED")
                         intent.phase = "reconciled"
+                        intent.resolved_at = self.jobs.clock()
                         if state.barrier is not None and state.barrier.state == "commit_claimed":
                             state.barrier.state = "revoked"
                         self._persist(directory, state)

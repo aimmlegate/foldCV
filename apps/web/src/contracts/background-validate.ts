@@ -70,6 +70,7 @@ function semantics(value: unknown): boolean {
       typeof value.acceptedAt !== "string" || typeof value.executionDeadline !== "string" || !earlier(value.acceptedAt, value.executionDeadline))) return false;
   if (value.status === "clean_detached" && value.draftId !== null) return false;
   if ("execution" in value && "publication" in value) {
+    if (value.undoExpired === true && value.receipt === null) return false;
     if (["saved", "no_change", "none"].includes(String(value.publication)) && value.publicationError !== null && value.publicationError !== undefined) return false;
     if ((value.publication === "saved") !== (value.receipt !== null) || !record(value.submission) || !record(value.submission.identity)) return false;
     const attempts = list(value.attempts), models = list(value.submission.models);
@@ -120,6 +121,17 @@ function semantics(value: unknown): boolean {
   if ("candidateRef" in value) {
     const count = [value.writerEpoch, value.incarnation, value.barrierGeneration].filter((item) => item !== null).length;
     if (count !== 0 && count !== 3) return false;
+    if (value.candidatePruned === true && (value.phase !== "receipt_stored" ||
+        value.actionId === null || value.actionId === undefined || value.stepsSha256 === null || value.stepsSha256 === undefined)) return false;
+  }
+  if ("references" in value && "owner" in value) {
+    const references = list(value.references);
+    if (new Set(references.map((item) => record(item) ? JSON.stringify([item.kind, item.path]) : null)).size !== references.length) return false;
+  }
+  if ("path" in value && "sha256" in value && ["image", "source"].includes(String(value.kind))) {
+    const path = String(value.path);
+    const pattern = value.kind === "image" ? /^images\/[0-9a-f]{64}\.(?:png|jpg)$/u : /^sources\/[0-9a-f]{64}\.bin$/u;
+    if (pattern.exec(path)?.[0] !== path || value.kind === "image" && path.slice(7, 71) !== value.sha256) return false;
   }
   if ("inverseRef" in value) {
     if ((value.writerEpoch === null) !== (value.incarnation === null) ||
@@ -132,9 +144,15 @@ function semantics(value: unknown): boolean {
   }
   if ("activeRequestEpoch" in value) {
     if (typeof value.activeRequestEpoch !== "number" || typeof value.expiredThroughEpoch !== "number" || value.activeRequestEpoch <= value.expiredThroughEpoch) return false;
-    const groups = ["jobs", "requests", "proposals", "drafts", "generations", "intents", "inverses", "manualIntents"];
+    const groups = ["jobs", "requests", "proposals", "drafts", "generations", "intents", "inverses", "manualIntents", "assetPins", "orphanAssets", "cleanupRefs"];
     const historyRecords = record(value.history) ? 1 + list(value.history.definitions).length : 0;
     if (groups.reduce((count, key) => count + list(value[key]).length, 0) + Number(value.writer !== null) + Number(value.barrier !== null) + historyRecords > background_sidecar_v1["x-maxMetadataRecords"]) return false;
+    if (record(value.history) && value.historyNamespace !== undefined && value.historyNamespace !== null && value.historyNamespace !== value.history.namespace) return false;
+    const pins = list(value.assetPins), orphans = list(value.orphanAssets), cleanup = list(value.cleanupRefs);
+    if (new Set(pins.map((pin) => record(pin) ? JSON.stringify([pin.kind, pin.owner]) : null)).size !== pins.length ||
+        new Set(orphans.map((orphan) => record(orphan) ? orphan.path : null)).size !== orphans.length || new Set(cleanup).size !== cleanup.length) return false;
+    if (cleanup.some((reference) => typeof reference !== "string" ||
+        /^(?:canonical-candidates|agent-artifacts|proposal-intents|events)\/[A-Za-z0-9_-]{1,128}\.json$/u.exec(reference)?.[0] !== reference)) return false;
     const scoped: unknown[] = [value.writer, value.barrier, ...["jobs", "requests", "proposals", "drafts", "intents", "manualIntents"].flatMap((key) => list(value[key]))].filter((item) => item !== null);
     for (const item of scoped) {
       if (!record(item)) return false;

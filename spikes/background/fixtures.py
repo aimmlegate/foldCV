@@ -31,7 +31,8 @@ def submission():
 def snapshot():
     return {"schemaVersion": 1, "id": "job-one", "submission": submission(), "execution": "completed",
         "publication": "waiting_for_sync", "executionGeneration": 1, "attempts": [], "eventCursor": 1,
-        "proposalId": "proposal-one", "receipt": None, "error": None, "publicationError": None, "createdAt": TIME, "updatedAt": TIME}
+        "proposalId": "proposal-one", "receipt": None, "error": None, "publicationError": None,
+        "undoExpired": False, "assetPinsSha256": None, "createdAt": TIME, "updatedAt": TIME}
 
 
 def examples():
@@ -70,15 +71,16 @@ def examples():
             "beforeWorkspaceSha256": HASH, "afterWorkspaceSha256": HASH, "afterGenerationsSha256": HASH,
             "candidateRef": "candidate-one", "previousRef": "previous-one", "writerEpoch": 1,
             "incarnation": "connection-one", "barrierGeneration": 1, "phase": "intent_stored", "assetPins": [],
-            "candidateSha256": None, "beforeGenerationsSha256": None},
+            "candidateSha256": None, "beforeGenerationsSha256": None, "resolvedAt": None},
         "background_undo_v1": {"schemaVersion": 1, "jobId": "job-one", "proposalId": "proposal-one", "owner": "backend",
             "writerEpoch": None, "incarnation": None, "transferId": "transfer-one", "inverseRef": "inverse-one",
-            "inverseSha256": HASH, "inverseBytes": 128, "expiresAt": "2026-10-17T12:00:00Z", "guards": guard()},
+            "inverseSha256": HASH, "inverseBytes": 128, "expiresAt": "2026-10-17T12:00:00Z", "guards": guard(),
+            "assetPinsSha256": None},
         "background_sidecar_v1": {"schemaVersion": 1, "projectId": "project-one", "lineage": "lineage-one",
             "accountGeneration": 1, "activeRequestEpoch": 1, "expiredThroughEpoch": 0,
             "requestEpochExpiresAt": "2026-11-15T12:00:00Z", "tombstoned": False, "jobs": [], "requests": [],
             "proposals": [], "writer": None, "barrier": None, "drafts": [], "generations": [], "intents": [], "inverses": [],
-            "history": None, "manualIntents": []},
+            "history": None, "historyNamespace": None, "manualIntents": [], "assetPins": [], "orphanAssets": [], "cleanupRefs": []},
         "background_attempt_v1": {"schemaVersion": 1, "id": "attempt-one", "stage": "agent", "executionGeneration": 1,
             "state": "completed", "dispatchedAt": TIME, "startupDeadline": "2026-10-16T12:00:15Z",
             "activeDeadline": "2026-10-16T12:03:00Z", "nativeStarted": True, "childStartedAt": TIME,

@@ -77,7 +77,8 @@ for (const name of ["agent_settings", "agent_run_request", "agent_message", "age
 for (const name of ["background_submission_v1", "background_snapshot_v1", "background_proposal_v1", "background_scope_guard_v1",
   "background_writer_v1", "background_barrier_v1", "background_draft_v1", "background_receipt_v1", "background_apply_v2", "background_event_v1", "background_saved_v2",
   "background_intent_v1", "background_undo_v1", "background_sidecar_v1", "background_attempt_v1", "background_draft_payload_v1", "background_saved_snapshot_v1", "background_dispatch_v1", "background_agent_request_v1", "background_artifact_v1", "background_legacy_run_v2", "background_project_v1", "background_replay_request_v1", "background_replay_v1",
-  "background_history_sidecar_v1", "background_manual_sidecar_v1", "background_history_metadata_full_v1"]) {
+  "background_history_sidecar_v1", "background_manual_sidecar_v1", "background_history_metadata_full_v1",
+  "background_asset_sidecar_v1", "background_compact_manual_v1"]) {
   bases[name] = read(`background/${name}.json`);
 }
 for (const test of cases) {

@@ -1,3 +1,4 @@
+export type Assetpinssha256 = string | null;
 export type Expiresat = string;
 export type Fingerprint = string;
 export type Generation = number;
@@ -24,6 +25,7 @@ export type Transferid = string;
 export type Writerepoch = number | null;
 
 export interface UndoOwnershipV1 {
+  assetPinsSha256?: Assetpinssha256;
   expiresAt: Expiresat;
   guards: ScopeGuardV1;
   incarnation: Incarnation;

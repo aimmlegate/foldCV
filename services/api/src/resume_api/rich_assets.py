@@ -4,6 +4,7 @@ import asyncio
 from dataclasses import dataclass, field
 
 from packages.resume_core.gui_archive_zip import ArchiveFailure
+from packages.resume_core.background_store import BackgroundFailure
 from packages.resume_core.models.rich_document import ImageBlock
 from packages.resume_core.rich_api import ImageSessionRequest, ImageUploadCapture
 from packages.resume_core.rich_archive import archive_payload
@@ -11,6 +12,7 @@ from packages.resume_core.rich_asset_lifecycle import ImageOwner, ImageRetention
 from packages.resume_core.rich_images import ImageFailure, normalize_image
 from packages.resume_core.rich_limits import ImageReferences
 from packages.resume_core.rich_project_store import rich_snapshot_bytes
+from packages.resume_core.rich_snapshot_merge import reconcile
 from packages.resume_core.project_store import ProjectStoreFailure
 from .gui_projects import ProjectFailure
 
@@ -42,6 +44,7 @@ class RichAssets:
 
     def update_image_session(self, identifier, request):
         with self.state_lock:
+            self.require_agent_writable(identifier)
             workspace = self.read(identifier)
             if workspace.project is None:
                 raise ProjectFailure("DOCUMENT_NOT_CREATED")
@@ -62,6 +65,17 @@ class RichAssets:
             if not set((*request.live, *request.history)) <= assets:
                 raise ProjectFailure("IMAGE_REFERENCE_MISSING", 422)
             session = ImageSession(request.revision, tuple(request.live), tuple(request.history), closed=request.closed)
+            jobs = getattr(self, "background_jobs", None)
+            if jobs is not None and jobs.enabled:
+                from packages.resume_core.agent_store import digest
+                from packages.resume_core.background_assets import JobAssets
+                from packages.resume_core.background_store import BackgroundFailure
+                try:
+                    JobAssets(jobs.store).session(identifier, "session_" + digest(request.session_id)[:40],
+                        set((*request.live, *request.history)), closed=request.closed,
+                        previous="session_" + digest(request.previous_session_id)[:40] if request.previous_session_id else None)
+                except BackgroundFailure as error:
+                    raise ProjectFailure(error.code, 409) from None
             self.image_sessions[key] = session
             self.reclaim_images(identifier)
 
@@ -71,8 +85,22 @@ class RichAssets:
             return
         refs = self.image_references(identifier)
         keep = set((*refs.live, *refs.durable, *refs.history, *refs.in_flight))
+        jobs = getattr(self, "background_jobs", None)
+        assets = None
+        if jobs is not None and jobs.enabled:
+            from packages.resume_core.background_assets import JobAssets
+            from packages.resume_core.background_store import BackgroundFailure
+            assets = JobAssets(jobs.store)
+            jobs.store.open(identifier)
+            try:
+                removable = assets.collectable(identifier, keep)
+            except BackgroundFailure:
+                return
+            keep.update(asset.id for asset in workspace.project.assets if asset.id not in removable)
         removed = [asset for asset in workspace.project.assets if asset.id not in keep]
         if not removed:
+            if assets is not None:
+                assets.reclaim_blobs(identifier)
             return
         old = workspace.project.assets
         workspace.project.assets = [asset for asset in old if asset.id in keep]
@@ -81,12 +109,16 @@ class RichAssets:
             return
         for asset in removed:
             self.images.pop((identifier, asset.id), None)
-        self.storage.reclaim_images(workspace)
+        if assets is not None:
+            assets.reclaim_blobs(identifier)
+        else:
+            self.storage.reclaim_images(workspace)
 
     async def ingest_image(self, identifier, raw, capture):
         key = (identifier, capture.reservation_id)
         owner = ImageOwner(identifier, capture.session_id, capture.revision)
         with self.state_lock:
+            self.require_agent_writable(identifier)
             workspace = self.read(identifier)
             document_revision = workspace.document_revision
             session = self.image_sessions.get((identifier, capture.session_id))
@@ -152,10 +184,16 @@ class RichAssets:
                 rich_snapshot_bytes(workspace)
                 archive_payload(proof, {sid: blob for (pid, sid), blob in self.originals.items() if pid == identifier}, images)
                 self.images[(identifier, asset.id)] = data
-                self.workspaces[identifier] = workspace
+                self.workspaces[identifier] = reconcile(self.workspaces[identifier], workspace)
                 current.pending.add(asset.id)
                 if self.persist(identifier) != "durable":
                     raise ProjectFailure("PROJECT_SAVE_FAILED", 503)
+                jobs = getattr(self, "background_jobs", None)
+                if jobs is not None and jobs.enabled:
+                    from packages.resume_core.agent_store import digest
+                    from packages.resume_core.background_assets import JobAssets
+                    JobAssets(jobs.store).session(identifier, "session_" + digest(capture.session_id)[:40],
+                        set((*current.live, *current.history, *current.pending)))
                 return asset.id
         except ImageFailure as error:
             raise ProjectFailure(error.code, 422) from None
@@ -163,6 +201,8 @@ class RichAssets:
             raise ProjectFailure(error.code, 422) from None
         except ProjectStoreFailure as error:
             raise ProjectFailure(error.code, 422) from None
+        except BackgroundFailure as error:
+            raise ProjectFailure(error.code, 409) from None
         finally:
             self.image_tasks.discard(task)
             with self.state_lock:

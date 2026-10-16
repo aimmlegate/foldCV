@@ -465,6 +465,19 @@
     "JobSnapshotV1": {
       "additionalProperties": false,
       "properties": {
+        "assetPinsSha256": {
+          "anyOf": [
+            {
+              "pattern": "^[a-f0-9]{64}$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Assetpinssha256"
+        },
         "attempts": {
           "items": {
             "$ref": "#/$defs/JobAttemptV1"
@@ -580,6 +593,11 @@
         },
         "submission": {
           "$ref": "#/$defs/JobSubmissionV1"
+        },
+        "undoExpired": {
+          "default": false,
+          "title": "Undoexpired",
+          "type": "boolean"
         },
         "updatedAt": {
           "format": "date-time",

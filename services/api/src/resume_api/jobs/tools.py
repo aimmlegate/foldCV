@@ -33,7 +33,7 @@ class JobReadBook(ReadBook):
         def read(workspace):
             capture = canonical_capture(workspace, query)
             return capture, capture.dependencies
-        capture, guards = jobs.history.observe(self.control.project_id, read)
+        capture, guards = jobs.history.observe(self.control.project_id, read, job_id=self.control.run_id)
         jobs.artifacts.observe(self.control.project_id, self.control.run_id, guards)
         return capture
 
@@ -88,7 +88,10 @@ class JobToolSession(ToolSession):
         if name != "apply_edit_batch":
             if name not in self.control.job.submission.tools:
                 return {"error": {"code": "AGENT_TOOL_DENIED"}}
-            return await super().call(name, arguments)
+            try:
+                return await super().call(name, arguments)
+            except BackgroundFailure as error:
+                return {"error": {"code": error.code}}
         try:
             async with self.gate:
                 self.guard()

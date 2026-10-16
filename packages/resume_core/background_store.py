@@ -7,6 +7,7 @@ from datetime import datetime, timedelta, timezone
 import os
 from pathlib import Path
 import secrets
+import re
 
 from . import agent_limits
 from .background_limits import LIMITS
@@ -47,7 +48,7 @@ def job_in(state: BackgroundSidecarV1, job_id: str) -> JobSnapshotV1:
 
 
 def records(state: BackgroundSidecarV1) -> int:
-    return (sum(len(getattr(state, key)) for key in ("jobs", "requests", "proposals", "drafts", "generations", "intents", "inverses", "manual_intents"))
+    return (sum(len(getattr(state, key)) for key in ("jobs", "requests", "proposals", "drafts", "generations", "intents", "inverses", "manual_intents", "asset_pins", "orphan_assets", "cleanup_refs"))
         + int(state.writer is not None) + int(state.barrier is not None)
         + (1 + len(state.history.definitions) if state.history is not None else 0))
 
@@ -65,6 +66,8 @@ class JobStore:
         self.canonical = ProjectStore(root)
         self.clock = clock
         self.fences: dict[str, str] = {}
+        self.fixed_sizes = {}
+        self.fixed_unknown = set()
 
     @contextmanager
     def guard(self, project_id: str, *, deleted=False):
@@ -108,6 +111,15 @@ class JobStore:
     def _validate_bindings(state):
         jobs = {job.id: job for job in state.jobs}
         archived = {request.job_id: request.archived_result for request in state.requests if request.archived_result is not None}
+        from .agent_store import digest
+        for kind, owners in (("job", {**jobs, **archived}), ("inverse", {item.proposal_id: item for item in state.inverses})):
+            pins = {pin.owner: pin for pin in state.asset_pins if pin.kind == kind}
+            for identifier, owner in owners.items():
+                if owner.asset_pins_sha256 is not None and (identifier not in pins or digest([
+                        ref.model_dump(mode="json", by_alias=True) for ref in pins[identifier].references]) != owner.asset_pins_sha256):
+                    raise ValueError("missing or changed asset ownership")
+            if pins.keys() - owners.keys():
+                raise ValueError("orphan asset owner")
         for request in state.requests:
             if request.archived_result is None and (request.job_id not in jobs or
                     request.identity != jobs[request.job_id].submission.identity):
@@ -189,21 +201,63 @@ class JobStore:
                 total += path.stat().st_size
         return total
 
-    def _capacity(self, state: BackgroundSidecarV1, states: dict[str, BackgroundSidecarV1], *, replacing=None):
+    def _capacity(self, state: BackgroundSidecarV1, states: dict[str, BackgroundSidecarV1], *, replacing=None, canonical_fixed_bytes=None):
         states = {**states, state.project_id: state}
         sizes = {}
         for project, value in states.items():
             replacement = replacing if replacing is not None and replacing[0].is_relative_to(self.projects / project) else None
             sizes[project] = (len(encoded(value.model_dump(mode="json", by_alias=True))) + self._reserved_bytes(value)
                 + self._extra_bytes(project, excluding=replacement[0] if replacement else None)
+                + (canonical_fixed_bytes if project == state.project_id and canonical_fixed_bytes is not None else self._fixed_bytes(value))
                 + (replacement[1] if replacement else 0))
+            if project in self.fixed_unknown:
+                sizes[project] = max(sizes[project], LIMITS.sidecar_project_bytes)
         unknown = set(self.fences) - states.keys()
-        if (sizes[state.project_id] > LIMITS.sidecar_project_bytes or
+        draft_sizes = {project: sum(item.payload_bytes for item in value.drafts) for project, value in states.items()}
+        resolved = {project: sum(job.execution in TERMINAL_EXECUTION and job.publication in RESOLVED_PUBLICATION
+            for job in value.jobs) for project, value in states.items()}
+        if (records(state) > LIMITS.metadata_project_records or
+                resolved[state.project_id] > LIMITS.resolved_project_records or
+                sum(resolved.values()) > LIMITS.resolved_global_records or
+                draft_sizes[state.project_id] > LIMITS.draft_project_bytes or
+                sum(draft_sizes.values()) + len(unknown) * LIMITS.draft_project_bytes > LIMITS.draft_global_bytes or
+                sizes[state.project_id] > LIMITS.sidecar_project_bytes or
                 sum(sizes.values()) + len(unknown) * LIMITS.sidecar_project_bytes > LIMITS.sidecar_global_bytes or
                 sum(records(value) for value in states.values()) + len(unknown) * LIMITS.metadata_project_records > LIMITS.metadata_global_records):
             raise BackgroundFailure("JOB_STORAGE_FULL")
 
+    def _fixed_bytes(self, state):
+        jobs = [*state.jobs, *[request.archived_result for request in state.requests if request.archived_result is not None]]
+        ids = {job.submission.input.id for job in jobs if job.submission.input.kind == "rich_sync"}
+        if state.tombstoned:
+            return sum(proposal.payload_bytes for proposal in state.proposals if proposal.payload.kind == "rich_sync")
+        from .background_fixed import stored_fixed_bytes
+        from .rich_limits import WORKSPACE_BYTES
+        from .rich_project_store import RichProjectStore
+        try:
+            path = self.canonical.projects / state.project_id / "workspace.json"
+            owned_file(path, WORKSPACE_BYTES)
+            stamp = path.stat()
+            key = (stamp.st_dev, stamp.st_ino, stamp.st_size, stamp.st_mtime_ns, stamp.st_ctime_ns, tuple(sorted(ids)))
+            cached = self.fixed_sizes.get(state.project_id)
+            if cached is not None and cached[0] == key:
+                self.fixed_unknown.discard(state.project_id)
+                return cached[1]
+            workspace, _checksum = RichProjectStore(self.root)._read_committed_unlocked(state.project_id)
+            value = stored_fixed_bytes(state, workspace)
+            self.fixed_sizes[state.project_id] = (key, value)
+            self.fixed_unknown.discard(state.project_id)
+            return value
+        except (ProjectStoreFailure, StorageFailure, OSError, ValueError):
+            entry = next((entry for entry in self.canonical._registry().entries if entry.project_id == state.project_id), None)
+            if entry is not None and entry.tombstoned:
+                return sum(proposal.payload_bytes for proposal in state.proposals if proposal.payload.kind == "rich_sync")
+            self.fixed_unknown.add(state.project_id)
+            self.fences.setdefault(state.project_id, "OUTCOME_UNKNOWN")
+            return 0
+
     def _write(self, directory: Path, state: BackgroundSidecarV1, states: dict[str, BackgroundSidecarV1]):
+        self._capacity(state, states)
         value = BackgroundSidecarV1.model_validate(state.model_dump(by_alias=True))
         self._validate_bindings(value)
         self._capacity(value, states)
@@ -406,6 +460,11 @@ class JobStore:
                 publication="none", executionGeneration=1, attempts=[], eventCursor=1, proposalId=None,
                 receipt=None, error=None, createdAt=now, updatedAt=now)
             state.jobs.append(job)
+            from .background_assets import pin_snapshot
+            from .rich_project_store import RichProjectStore
+            canonical = RichProjectStore(self.root)
+            workspace, _checksum = canonical._read_committed_unlocked(project_id)
+            pin_snapshot(state, canonical, workspace, "job", job.id)
             state.requests.append(RequestReplayV1(identity=request, payloadSha256=submission.payload_sha256,
                 jobId=job.id, expiresAt=expiration(now, LIMITS.request_replay_seconds), archivedResult=None))
             self._write(directory, state, states)
@@ -439,6 +498,8 @@ class JobStore:
                 return job
             job.event_cursor += 1
             job.updated_at = self.clock()
+            from .background_assets import release_resolved_jobs
+            release_resolved_jobs(state)
             self._write(directory, state, self._all())
             return job
 
@@ -487,6 +548,46 @@ class JobStore:
                     proposal.authority, proposal.revocation = "revoked", "deleted"
             self._write(directory, state, self._all())
             return state
+
+    def cleanup_deleted(self, project_id):
+        with self.guard(project_id, deleted=True) as directory:
+            if not directory.exists():
+                return
+            state = self._read(project_id, directory)
+            if (not state.tombstoned or any(job.execution not in TERMINAL_EXECUTION
+                    or any(not attempt.cleanup_verified for attempt in job.attempts) for job in state.jobs)):
+                raise BackgroundFailure("CLEANUP_FAILED")
+            allowed = {"agent-artifacts", "canonical-candidates", "proposal-intents", "events", "drafts"}
+            files, folders = [], []
+            for path in directory.iterdir():
+                if path.name in {"state.json", ".canonical.lock", "history-activation.json"}:
+                    owned_file(path, LIMITS.sidecar_project_bytes)
+                    if path.name == "history-activation.json":
+                        files.append(path)
+                elif path.name in allowed and path.is_dir() and not path.is_symlink():
+                    for blob in path.iterdir():
+                        if re.fullmatch(r"[A-Za-z0-9_-]{1,128}\.json", blob.name) is None:
+                            raise BackgroundFailure("JOB_STORE_UNAVAILABLE")
+                        owned_file(blob, LIMITS.sidecar_project_bytes)
+                        files.append(blob)
+                    folders.append(path)
+                else:
+                    raise BackgroundFailure("JOB_STORE_UNAVAILABLE")
+            for name in ("jobs", "requests", "proposals", "drafts", "generations", "intents", "inverses",
+                    "manual_intents", "asset_pins", "orphan_assets", "cleanup_refs"):
+                setattr(state, name, [])
+            state.writer, state.barrier, state.history = None, None, None
+            self._write(directory, state, self._all())
+            try:
+                for path in files:
+                    path.unlink()
+                    self._sync_namespace(path)
+                for path in folders:
+                    path.rmdir()
+                    self._sync_namespace(path)
+            except (OSError, StorageFailure):
+                raise BackgroundFailure("JOB_STORE_UNAVAILABLE") from None
+            self.fences.pop(project_id, None)
 
     def rotate_request_epoch(self, project_id: str) -> BackgroundSidecarV1:
         with self.guard(project_id) as directory:

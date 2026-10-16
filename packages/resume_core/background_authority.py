@@ -1,6 +1,7 @@
 """A durable writer record alone cannot revive a short-lived publication barrier."""
 
 from dataclasses import dataclass
+from datetime import datetime
 from .background_clock import Deadlines
 from .background_limits import LIMITS
 from .background_store import BackgroundFailure
@@ -24,12 +25,14 @@ class PublicationAuthority:
             return
         self.acks[writer.project_id] = (barrier.model_copy(deep=True), self.clock.now() + LIMITS.local_barrier_ms / 1000)
 
-    def require(self, state, workspace):
+    def require(self, state, workspace, *, now=None):
         writer = state.writer
         if writer is None or writer.status not in {"attached", "clean_detached"} or writer.draft_id is not None:
             raise BackgroundFailure("WRITER_UNKNOWN")
         if writer.status == "clean_detached":
             return WriterClaim(None, None, None)
+        if now is not None and datetime.fromisoformat(now.replace("Z", "+00:00")) >= datetime.fromisoformat(writer.lease_expires_at.replace("Z", "+00:00")):
+            raise BackgroundFailure("WRITER_UNKNOWN")
         barrier, known = state.barrier, self.acks.get(state.project_id)
         if (barrier is None or barrier.state != "acked" or known is None or known[0] != barrier
                 or self.clock.now() >= known[1]

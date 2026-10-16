@@ -1,5 +1,20 @@
 export type Accountgeneration = number;
 export type Activerequestepoch = number;
+export type Kind = "job" | "proposal" | "export" | "inverse" | "draft" | "session";
+export type Owner = string;
+export type Id = string;
+export type Kind1 = "image" | "source";
+export type Path = string;
+export type Sha256 = string;
+export type Size = number;
+/**
+ * @maxItems 100
+ */
+export type References = AssetReferenceV1[];
+/**
+ * @maxItems 512
+ */
+export type Assetpins = AssetPinV1[];
 export type Acknowledgedrevision = number;
 export type Actioncursor = number;
 export type Expiresat = string;
@@ -12,11 +27,15 @@ export type State = "acked" | "revoked" | "commit_claimed" | "resolved";
 export type Token = string;
 export type Touchgeneration = number;
 export type Writerepoch = number;
+/**
+ * @maxItems 512
+ */
+export type Cleanuprefs = string[];
 export type Actioncursor1 = number;
 export type Baserevision = number;
 export type Basesha256 = string;
 export type Checkpointedat = string;
-export type Id = string;
+export type Id1 = string;
 export type Incarnation1 = string;
 export type Lineage1 = string;
 export type Payloadbytes = number;
@@ -28,7 +47,7 @@ export type Sequence = number;
 export type Fingerprint = string;
 export type Generation1 = number;
 export type Key = string;
-export type Kind = "entity" | "structure" | "query" | "source" | "rules";
+export type Kind2 = "entity" | "structure" | "query" | "source" | "rules";
 /**
  * @maxItems 100
  */
@@ -45,20 +64,20 @@ export type Expiredthroughepoch = number;
 export type Generations = GenerationStamp[];
 export type Key1 = string;
 export type Selector = AgentEntityDependency | AgentQueryDependency;
-export type Kind1 = "entity";
+export type Kind3 = "entity";
 export type Fingerprint1 = string | null;
-export type Id1 = string;
-export type Kind2 =
+export type Id2 = string;
+export type Kind4 =
   "block" | "record" | "field" | "period" | "ownership" | "source" | "rules" | "asset" | "timeline_order";
 export type Revision = number;
 export type Fingerprint2 = string;
-export type Kind3 = "query";
+export type Kind5 = "query";
 export type Cursor = string | null;
 /**
  * @maxItems 100
  */
 export type Ids = string[];
-export type Kind4 = "context" | "document" | "find" | "facts" | "source" | "history";
+export type Kind6 = "context" | "document" | "find" | "facts" | "source" | "history";
 export type Parentid = string | null;
 export type Text = string;
 /**
@@ -69,19 +88,20 @@ export type Namespace = string;
 export type Phase = "initializing" | "ready" | "fenced";
 export type Schemaversion2 = 1;
 export type Workspacesha256 = string;
+export type Historynamespace = string | null;
 export type Aftergenerationssha256 = string;
 export type Afterworkspacesha256 = string;
 /**
  * @maxItems 100
  */
-export type Assetpins = string[];
+export type Assetpins1 = string[];
 export type Barriergeneration = number | null;
 export type Beforegenerationssha256 = string | null;
 export type Beforeworkspacesha256 = string;
 export type Candidateref = string;
 export type Candidatesha256 = string | null;
 export type Clientmutationid = string;
-export type Id2 = string;
+export type Id3 = string;
 export type Incarnation2 = string | null;
 export type Jobid = string;
 export type Lineage2 = string;
@@ -98,6 +118,7 @@ export type Previousref = string;
 export type Projectid2 = string;
 export type Proposalid = string;
 export type Requestsha256 = string;
+export type Resolvedat = string | null;
 export type Schemaversion3 = 1;
 export type Writerepoch2 = number | null;
 /**
@@ -332,6 +353,7 @@ export type Inverses =
       UndoOwnershipV1,
       UndoOwnershipV1
     ];
+export type Assetpinssha256 = string | null;
 export type Expiresat1 = string;
 /**
  * @maxItems 100
@@ -347,11 +369,12 @@ export type Inversebytes = number;
 export type Inverseref = string;
 export type Inversesha256 = string;
 export type Jobid1 = string;
-export type Owner = "session" | "backend" | "transferring" | "expired";
+export type Owner1 = "session" | "backend" | "transferring" | "expired";
 export type Proposalid1 = string;
 export type Schemaversion5 = 1;
 export type Transferid = string;
 export type Writerepoch3 = number | null;
+export type Assetpinssha2561 = string | null;
 /**
  * @maxItems 2
  */
@@ -388,7 +411,7 @@ export type Code =
   | "OUTCOME_UNKNOWN"
   | "PROJECT_DELETED";
 export type Executiongeneration = number;
-export type Id3 = string;
+export type Id4 = string;
 export type Nativestarted = boolean;
 export type Schemaversion6 = 1;
 export type Stage = "agent" | "assessment" | "extraction" | "rewrite" | "reconciliation";
@@ -400,7 +423,7 @@ export type Eventcursor = number;
 export type Execution =
   "queued" | "starting" | "running" | "cancelling" | "completed" | "failed" | "cancelled" | "interrupted";
 export type Executiongeneration1 = number;
-export type Id4 = string;
+export type Id5 = string;
 export type Proposalid2 = string | null;
 export type Publication =
   | "none"
@@ -437,10 +460,10 @@ export type Lineage4 = string;
 export type Projectid4 = string;
 export type Requestepoch = number;
 export type Requestid = string;
-export type Id5 = string;
-export type Kind5 = "agent_journal" | "rich_sync" | "processing";
-export type Sha256 = string;
-export type Kind6 = "agent" | "processing" | "rewrite" | "reconciliation";
+export type Id6 = string;
+export type Kind7 = "agent_journal" | "rich_sync" | "processing";
+export type Sha2561 = string;
+export type Kind8 = "agent" | "processing" | "rewrite" | "reconciliation";
 /**
  * @minItems 1
  * @maxItems 2
@@ -453,8 +476,8 @@ export type Payloadsha2561 = string;
 export type Schedulingclass = "background" | "interactive" | "reconciliation";
 export type Schemaversion9 = 1;
 export type Scope = WholeResumeScope | SelectionScope;
-export type Kind7 = "resume";
-export type Kind8 = "selection";
+export type Kind9 = "resume";
+export type Kind10 = "selection";
 export type Blockid = string;
 export type Cellid = string | null;
 /**
@@ -469,7 +492,7 @@ export type Actionid = string;
 export type Actiontoken = number;
 export type Dependencies = DependencyStamp[];
 export type Sessionid = string;
-export type Kind9 = "text" | "blocks" | "table_cells";
+export type Kind11 = "text" | "blocks" | "table_cells";
 export type Textsha256 = string;
 export type Submittedat = string;
 /**
@@ -1155,25 +1178,28 @@ export type Tools =
         | "apply_edit_batch"
       )
     ];
+export type Undoexpired = boolean;
 export type Updatedat = string;
 /**
  * @maxItems 512
  */
 export type Jobs = JobSnapshotV1[];
 export type Lineage5 = string;
+export type Actionid1 = string | null;
 export type Aftergenerationssha2561 = string;
 export type Afterworkspacesha2561 = string;
 /**
  * @maxItems 100
  */
-export type Assetpins1 = string[];
+export type Assetpins2 = string[];
 export type Barriergeneration1 = number | null;
 export type Beforegenerationssha2561 = string | null;
 export type Beforeworkspacesha2561 = string;
+export type Candidatepruned = boolean;
 export type Candidateref1 = string;
 export type Candidatesha2561 = string | null;
 export type Clientmutationid2 = string;
-export type Id6 = string;
+export type Id7 = string;
 export type Incarnation4 = string | null;
 export type Lineage6 = string;
 export type Phase2 =
@@ -1188,30 +1214,38 @@ export type Phase2 =
 export type Previousref1 = string;
 export type Projectid5 = string;
 export type Requestsha2562 = string;
+export type Resolvedat1 = string | null;
 export type Schemaversion10 = 1;
+export type Stepssha256 = string | null;
 export type Writerepoch4 = number | null;
 /**
  * @maxItems 512
  */
 export type Manualintents = ManualIntentV1[];
+export type Orphanedat = string;
+export type Path1 = string;
+/**
+ * @maxItems 512
+ */
+export type Orphanassets = OrphanAssetV1[];
 export type Projectid6 = string;
 export type Acceptedat = string;
 export type Accountgeneration2 = number;
 export type Authority = "active" | "revoked";
 export type Executiondeadline = string;
 export type Executiongeneration2 = number;
-export type Id7 = string;
+export type Id8 = string;
 export type Jobid3 = string;
 export type Lineage7 = string;
 export type Payload = AgentPayloadReference | FixedPayloadReference | ProcessingPayloadReference;
 export type Batchid = string;
 export type Conversationid = string;
-export type Kind10 = "agent_journal";
+export type Kind12 = "agent_journal";
 export type Runid = string;
-export type Kind11 = "rich_sync";
+export type Kind13 = "rich_sync";
 export type Syncid = string;
 export type Candidateid = string;
-export type Kind12 = "processing";
+export type Kind14 = "processing";
 export type Payloadbytes1 = number;
 export type Payloadsha2562 = string;
 export type Projectid7 = string;
@@ -1251,16 +1285,20 @@ export type Touchgeneration1 = number;
 export interface BackgroundSidecarV1 {
   accountGeneration: Accountgeneration;
   activeRequestEpoch: Activerequestepoch;
+  assetPins?: Assetpins;
   barrier: PublicationBarrierV1 | null;
+  cleanupRefs?: Cleanuprefs;
   drafts: Drafts;
   expiredThroughEpoch: Expiredthroughepoch;
   generations: Generations;
   history?: BackgroundHistoryV1 | null;
+  historyNamespace?: Historynamespace;
   intents: Intents;
   inverses: Inverses;
   jobs: Jobs;
   lineage: Lineage5;
   manualIntents?: Manualintents;
+  orphanAssets?: Orphanassets;
   projectId: Projectid6;
   proposals: Proposals;
   requestEpochExpiresAt: Requestepochexpiresat;
@@ -1268,6 +1306,18 @@ export interface BackgroundSidecarV1 {
   schemaVersion: Schemaversion12;
   tombstoned: Tombstoned;
   writer: WriterSessionV1 | null;
+}
+export interface AssetPinV1 {
+  kind: Kind;
+  owner: Owner;
+  references: References;
+}
+export interface AssetReferenceV1 {
+  id: Id;
+  kind: Kind1;
+  path: Path;
+  sha256: Sha256;
+  size: Size;
 }
 export interface PublicationBarrierV1 {
   acknowledgedRevision: Acknowledgedrevision;
@@ -1288,7 +1338,7 @@ export interface DraftCheckpointV1 {
   baseRevision: Baserevision;
   baseSha256: Basesha256;
   checkpointedAt: Checkpointedat;
-  id: Id;
+  id: Id1;
   incarnation: Incarnation1;
   lineage: Lineage1;
   payloadBytes: Payloadbytes;
@@ -1304,7 +1354,7 @@ export interface GenerationStamp {
   fingerprint: Fingerprint;
   generation: Generation1;
   key: Key;
-  kind: Kind;
+  kind: Kind2;
 }
 export interface BackgroundHistoryV1 {
   definitions: Definitions;
@@ -1318,38 +1368,38 @@ export interface HistoryDefinitionV1 {
   selector: Selector;
 }
 export interface AgentEntityDependency {
-  kind: Kind1;
+  kind: Kind3;
   stamp: DependencyStamp;
 }
 export interface DependencyStamp {
   fingerprint: Fingerprint1;
-  id: Id1;
-  kind: Kind2;
+  id: Id2;
+  kind: Kind4;
   revision: Revision;
 }
 export interface AgentQueryDependency {
   fingerprint: Fingerprint2;
-  kind: Kind3;
+  kind: Kind5;
   query: AgentQuery;
 }
 export interface AgentQuery {
   cursor?: Cursor;
   ids?: Ids;
-  kind: Kind4;
+  kind: Kind6;
   parentId?: Parentid;
   text?: Text;
 }
 export interface PublicationIntentV1 {
   afterGenerationsSha256: Aftergenerationssha256;
   afterWorkspaceSha256: Afterworkspacesha256;
-  assetPins: Assetpins;
+  assetPins: Assetpins1;
   barrierGeneration: Barriergeneration;
   beforeGenerationsSha256?: Beforegenerationssha256;
   beforeWorkspaceSha256: Beforeworkspacesha256;
   candidateRef: Candidateref;
   candidateSha256?: Candidatesha256;
   clientMutationId: Clientmutationid;
-  id: Id2;
+  id: Id3;
   incarnation: Incarnation2;
   jobId: Jobid;
   lineage: Lineage2;
@@ -1358,10 +1408,12 @@ export interface PublicationIntentV1 {
   projectId: Projectid2;
   proposalId: Proposalid;
   requestSha256: Requestsha256;
+  resolvedAt?: Resolvedat;
   schemaVersion: Schemaversion3;
   writerEpoch: Writerepoch2;
 }
 export interface UndoOwnershipV1 {
+  assetPinsSha256?: Assetpinssha256;
   expiresAt: Expiresat1;
   guards: ScopeGuardV1;
   incarnation: Incarnation3;
@@ -1369,7 +1421,7 @@ export interface UndoOwnershipV1 {
   inverseRef: Inverseref;
   inverseSha256: Inversesha256;
   jobId: Jobid1;
-  owner: Owner;
+  owner: Owner1;
   proposalId: Proposalid1;
   schemaVersion: Schemaversion5;
   transferId: Transferid;
@@ -1381,19 +1433,21 @@ export interface ScopeGuardV1 {
   writes: Writes;
 }
 export interface JobSnapshotV1 {
+  assetPinsSha256?: Assetpinssha2561;
   attempts: Attempts;
   createdAt: Createdat;
   error: JobFailure | null;
   eventCursor: Eventcursor;
   execution: Execution;
   executionGeneration: Executiongeneration1;
-  id: Id4;
+  id: Id5;
   proposalId: Proposalid2;
   publication: Publication;
   publicationError?: JobFailure | null;
   receipt: CanonicalReceiptV1 | null;
   schemaVersion: Schemaversion8;
   submission: JobSubmissionV1;
+  undoExpired?: Undoexpired;
   updatedAt: Updatedat;
 }
 export interface JobAttemptV1 {
@@ -1403,7 +1457,7 @@ export interface JobAttemptV1 {
   dispatchedAt: Dispatchedat;
   error: JobFailure | null;
   executionGeneration: Executiongeneration;
-  id: Id3;
+  id: Id4;
   nativeStarted: Nativestarted;
   schemaVersion: Schemaversion6;
   stage: Stage;
@@ -1437,7 +1491,7 @@ export interface JobSubmissionV1 {
   guards: ScopeGuardV1;
   identity: JobIdentity;
   input: InputReference;
-  kind: Kind6;
+  kind: Kind8;
   models: Models;
   payloadSha256: Payloadsha2561;
   schedulingClass: Schedulingclass;
@@ -1453,9 +1507,9 @@ export interface JobIdentity {
   requestId: Requestid;
 }
 export interface InputReference {
-  id: Id5;
-  kind: Kind5;
-  sha256: Sha256;
+  id: Id6;
+  kind: Kind7;
+  sha256: Sha2561;
 }
 export interface ModelCapture {
   configSha256: Configsha256;
@@ -1463,10 +1517,10 @@ export interface ModelCapture {
   stage: Stage1;
 }
 export interface WholeResumeScope {
-  kind: Kind7;
+  kind: Kind9;
 }
 export interface SelectionScope {
-  kind: Kind8;
+  kind: Kind10;
   selection: RichSelection;
 }
 export interface RichSelection {
@@ -1474,7 +1528,7 @@ export interface RichSelection {
   blockIds: Blockids;
   capture: ActionCapture;
   head: RichPosition;
-  kind: Kind9;
+  kind: Kind11;
   textSha256: Textsha256;
 }
 export interface RichPosition {
@@ -1489,24 +1543,32 @@ export interface ActionCapture {
   sessionId: Sessionid;
 }
 export interface ManualIntentV1 {
+  actionId?: Actionid1;
   afterGenerationsSha256: Aftergenerationssha2561;
   afterWorkspaceSha256: Afterworkspacesha2561;
-  assetPins: Assetpins1;
+  assetPins: Assetpins2;
   barrierGeneration: Barriergeneration1;
   beforeGenerationsSha256?: Beforegenerationssha2561;
   beforeWorkspaceSha256: Beforeworkspacesha2561;
+  candidatePruned?: Candidatepruned;
   candidateRef: Candidateref1;
   candidateSha256?: Candidatesha2561;
   clientMutationId: Clientmutationid2;
-  id: Id6;
+  id: Id7;
   incarnation: Incarnation4;
   lineage: Lineage6;
   phase: Phase2;
   previousRef: Previousref1;
   projectId: Projectid5;
   requestSha256: Requestsha2562;
+  resolvedAt?: Resolvedat1;
   schemaVersion: Schemaversion10;
+  stepsSha256?: Stepssha256;
   writerEpoch: Writerepoch4;
+}
+export interface OrphanAssetV1 {
+  orphanedAt: Orphanedat;
+  path: Path1;
 }
 export interface ProposalBindingV1 {
   acceptedAt: Acceptedat;
@@ -1515,7 +1577,7 @@ export interface ProposalBindingV1 {
   executionDeadline: Executiondeadline;
   executionGeneration: Executiongeneration2;
   guards: ScopeGuardV1;
-  id: Id7;
+  id: Id8;
   jobId: Jobid3;
   lineage: Lineage7;
   payload: Payload;
@@ -1530,16 +1592,16 @@ export interface ProposalBindingV1 {
 export interface AgentPayloadReference {
   batchId: Batchid;
   conversationId: Conversationid;
-  kind: Kind10;
+  kind: Kind12;
   runId: Runid;
 }
 export interface FixedPayloadReference {
-  kind: Kind11;
+  kind: Kind13;
   syncId: Syncid;
 }
 export interface ProcessingPayloadReference {
   candidateId: Candidateid;
-  kind: Kind12;
+  kind: Kind14;
 }
 export interface RequestReplayV1 {
   archivedResult: JobSnapshotV1 | null;

@@ -6,12 +6,17 @@ maps NB00a's offline schemas, limit policy, controlled protocol, pipe-process
 isolation, reference corpus and executed-report negatives. This is not production
 background acceptance. `NB-JOBS` maps NB01's capacity-one Job store/supervisor,
 single-copy agent artifacts, deferred apply v2, async admission and opt-in API.
-Its 73 due variants use real temporary stores and owned pipe children. Canonical
-publication and normal rollout stay off. `NB-PUBLICATION` maps NB02a's conditional
+Its 73 due variants use real temporary stores and owned pipe children. Normal
+rollout stays off. `NB-PUBLICATION` maps NB02a's conditional
 publisher, monotonic scoped history, manual-save boundary, exact receipts and
 typed inverses. Its 103 due variants include real persistence cuts, six owned
-synthetic process terminations and three disposable guard mutants. This is partial:
-NB02b still owns full writer/export/asset/retention coverage before headless saving.
+synthetic process terminations and three disposable guard mutants. NB02b adds 105
+variants for every writer route/internal callback, fixed payload ownership,
+portable history, pinned exports, asset GC and private retention. All 308 due
+variants have exact Python bindings. Additional checks cover pin corruption,
+late callbacks, namespace loss and 200 repeated saves without snapshot growth.
+The shared contract corpus has 353 cases, including 16 private-wire boundaries.
+These bindings require a passing source-bound report before slice acceptance.
 `NB-WRITER`, `NB-FIXED`, `NB-UI` and `NB-PARALLEL` await their slice bindings.
 
 The existing fast gate writes exact Python setup/call/teardown results through

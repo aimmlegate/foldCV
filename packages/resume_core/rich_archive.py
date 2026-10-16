@@ -15,8 +15,17 @@ def referenced_assets(project):
     return [asset for asset in project.assets if asset.id in refs]
 
 
+def inert_sync_history(workspace):
+    for sync in workspace.sync_records:
+        sync.proposed_steps, sync.ready, sync.dependencies, sync.selection = [], False, [], None
+        if sync.status == "pending":
+            sync.status = "stale"
+            sync.error_code = sync.error_code or "OPERATION_INTERRUPTED"
+
+
 def archive_payload(workspace, originals, images, current_render=None):
     workspace = WorkspaceV6.model_validate(workspace.model_dump(by_alias=True))
+    inert_sync_history(workspace)
     owner = workspace.project or workspace.pre_draft
     payload, roles = {}, {}
 
@@ -138,9 +147,7 @@ def open_rich_archive(data, project_id):
         for operation in owner.operations:
             if operation.status in {"queued", "running"}:
                 operation.status, operation.error_code = "interrupted", "OPERATION_INTERRUPTED"
-        for sync in workspace.sync_records:
-            if sync.status == "pending":
-                sync.error_code = "OPERATION_INTERRUPTED"
+        inert_sync_history(workspace)
         return WorkspaceV6.model_validate(workspace.model_dump(by_alias=True)), originals, {}, images
     except ArchiveFailure:
         raise

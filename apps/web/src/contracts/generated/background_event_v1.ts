@@ -4,6 +4,7 @@ export type Jobid = string;
 export type Lineage = string;
 export type Projectid = string;
 export type Schemaversion = 1;
+export type Assetpinssha256 = string | null;
 /**
  * @maxItems 2
  */
@@ -825,6 +826,7 @@ export type Tools =
         | "apply_edit_batch"
       )
     ];
+export type Undoexpired = boolean;
 export type Updatedat = string;
 export type Type = "job.snapshot" | "cursor.gap";
 
@@ -839,6 +841,7 @@ export interface JobEventV1 {
   type: Type;
 }
 export interface JobSnapshotV1 {
+  assetPinsSha256?: Assetpinssha256;
   attempts: Attempts;
   createdAt: Createdat;
   error: JobFailure | null;
@@ -852,6 +855,7 @@ export interface JobSnapshotV1 {
   receipt: CanonicalReceiptV1 | null;
   schemaVersion: Schemaversion3;
   submission: JobSubmissionV1;
+  undoExpired?: Undoexpired;
   updatedAt: Updatedat;
 }
 export interface JobAttemptV1 {

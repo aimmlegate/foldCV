@@ -27,6 +27,7 @@ export type Previousref = string;
 export type Projectid = string;
 export type Proposalid = string;
 export type Requestsha256 = string;
+export type Resolvedat = string | null;
 export type Schemaversion = 1;
 export type Writerepoch = number | null;
 
@@ -49,6 +50,7 @@ export interface PublicationIntentV1 {
   projectId: Projectid;
   proposalId: Proposalid;
   requestSha256: Requestsha256;
+  resolvedAt?: Resolvedat;
   schemaVersion: Schemaversion;
   writerEpoch: Writerepoch;
 }

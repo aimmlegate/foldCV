@@ -178,6 +178,9 @@ class AgentPublication:
                 if known.batch.request_sha256 != request.request_sha256:
                     raise AgentFailure("AGENT_IDEMPOTENCY_CONFLICT")
                 return AgentCommitResult(receipt=known.receipt, project=projects.response(project_id))
+            jobs = getattr(projects, "background_jobs", None)
+            if jobs is not None and jobs.enabled:
+                raise AgentFailure("AGENT_TICKET_INVALID")
             self._ticket(project_id, run_id, batch_id, request)
             run, item, _ = self._gate(project_id, run_id, batch_id, owner=request.owner)
             batch = item.batch

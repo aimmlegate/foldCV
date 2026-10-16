@@ -1,6 +1,5 @@
 """Adapt durable Job proof without changing the original prepared payload."""
 
-from packages.resume_core.agent_store import digest
 from packages.resume_core.background_store import BackgroundFailure
 from packages.resume_core.models.agent import AgentCommitResult, AgentEditBatch, AgentEditReceipt
 from packages.resume_core.models.background import SavedApplyV2
@@ -14,13 +13,10 @@ class JobPublication:
     def __init__(self, service):
         self.service = service
 
-    def adopt(self, project, workspace, checksum):
-        projects = self.service.projects
-        projects.workspaces[project] = workspace
-        projects.storage.expected[project] = checksum
-        projects.saved_hashes[project] = digest(workspace)
-        projects.saved_revisions[project] = (workspace.project_revision, workspace.document_revision)
-        projects.save_errors.pop(project, None)
+    def adopt(self, project, workspace, checksum, *, preserve=True):
+        self.service.publisher.observer("before_registry_cache_update", project)
+        self.service.projects.adopt_committed(project, workspace, checksum, preserve=preserve)
+        self.service.publisher.observer("registry_cache_update", project)
 
     def publish(self, project, job_id, proposal_sha256):
         service, projects = self.service, self.service.projects

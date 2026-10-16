@@ -57,6 +57,8 @@ class JobService:
                         self.publisher.recover(project)
                     except BackgroundFailure:
                         self.store.fences.setdefault(project, "OUTCOME_UNKNOWN")
+            from packages.resume_core.background_retention import JobRetention
+            JobRetention(self.store).sweep_all()
             await self.supervisor.start()
 
     def capture_preparation(self, directory, state, record, batch):
@@ -95,6 +97,10 @@ class JobService:
         connection = self.connection()
         if not connection.ready:
             return "RATE_LIMITED" if connection.reason == "AGENT_QUOTA" else "AUTH_REQUIRED"
+        try:
+            self.history.open(job.submission.identity.project_id)
+        except BackgroundFailure as error:
+            return error.code
         _job, artifact = self.artifacts.record(job.submission.identity.project_id, job.id)
         if connection.epoch != artifact.connection_epoch:
             return "ACCOUNT_CHANGED"
@@ -207,4 +213,12 @@ class JobService:
             self.store.mark_deleted(project)
         if controls:
             await asyncio.gather(*(control.task for control in controls), return_exceptions=True)
+        if project in self.proposals:
+            await self.proposals[project].shutdown()
+        if (self.store.projects / project).exists():
+            with self.store.guard(project, deleted=True) as directory:
+                state = self.store._read(project, directory)
+                if any(job.execution not in TERMINAL_EXECUTION or any(not attempt.cleanup_verified for attempt in job.attempts)
+                        for job in state.jobs):
+                    raise BackgroundFailure("CLEANUP_FAILED")
         self.supervisor.changed.set()

@@ -4427,5 +4427,263 @@
         }
       }
     ]
+  },
+  {
+    "name": "background_owned_asset_pins",
+    "contract": "background_sidecar_v1",
+    "base": "background_asset_sidecar_v1",
+    "valid": true,
+    "edits": []
+  },
+  {
+    "name": "background_asset_path_escape",
+    "contract": "background_sidecar_v1",
+    "base": "background_asset_sidecar_v1",
+    "valid": false,
+    "edits": [
+      {
+        "op": "set",
+        "path": [
+          "assetPins",
+          0,
+          "references",
+          0,
+          "path"
+        ],
+        "value": "../other-project/image.png"
+      }
+    ]
+  },
+  {
+    "name": "background_asset_path_newline",
+    "contract": "background_sidecar_v1",
+    "base": "background_asset_sidecar_v1",
+    "valid": false,
+    "edits": [
+      {
+        "op": "set",
+        "path": [
+          "assetPins",
+          0,
+          "references",
+          0,
+          "path"
+        ],
+        "value": "images/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.png\n"
+      }
+    ]
+  },
+  {
+    "name": "background_asset_hash_path_mismatch",
+    "contract": "background_sidecar_v1",
+    "base": "background_asset_sidecar_v1",
+    "valid": false,
+    "edits": [
+      {
+        "op": "set",
+        "path": [
+          "assetPins",
+          0,
+          "references",
+          0,
+          "sha256"
+        ],
+        "value": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+      }
+    ]
+  },
+  {
+    "name": "background_duplicate_pin_owner",
+    "contract": "background_sidecar_v1",
+    "base": "background_asset_sidecar_v1",
+    "valid": false,
+    "edits": [
+      {
+        "op": "clone",
+        "path": [
+          "assetPins"
+        ],
+        "from": [
+          "assetPins",
+          0
+        ]
+      }
+    ]
+  },
+  {
+    "name": "background_duplicate_pinned_blob",
+    "contract": "background_sidecar_v1",
+    "base": "background_asset_sidecar_v1",
+    "valid": false,
+    "edits": [
+      {
+        "op": "clone",
+        "path": [
+          "assetPins",
+          0,
+          "references"
+        ],
+        "from": [
+          "assetPins",
+          0,
+          "references",
+          0
+        ]
+      }
+    ]
+  },
+  {
+    "name": "background_duplicate_orphan",
+    "contract": "background_sidecar_v1",
+    "base": "background_asset_sidecar_v1",
+    "valid": false,
+    "edits": [
+      {
+        "op": "clone",
+        "path": [
+          "orphanAssets"
+        ],
+        "from": [
+          "orphanAssets",
+          0
+        ]
+      }
+    ]
+  },
+  {
+    "name": "background_cleanup_path_escape",
+    "contract": "background_sidecar_v1",
+    "base": "background_asset_sidecar_v1",
+    "valid": false,
+    "edits": [
+      {
+        "op": "set",
+        "path": [
+          "cleanupRefs"
+        ],
+        "value": [
+          "../workspace.json"
+        ]
+      }
+    ]
+  },
+  {
+    "name": "background_duplicate_cleanup_reference",
+    "contract": "background_sidecar_v1",
+    "base": "background_asset_sidecar_v1",
+    "valid": false,
+    "edits": [
+      {
+        "op": "set",
+        "path": [
+          "cleanupRefs"
+        ],
+        "value": [
+          "events/old.json",
+          "events/old.json"
+        ]
+      }
+    ]
+  },
+  {
+    "name": "background_compact_manual_receipt",
+    "contract": "background_sidecar_v1",
+    "base": "background_compact_manual_v1",
+    "valid": true,
+    "edits": []
+  },
+  {
+    "name": "background_compact_manual_without_witness",
+    "contract": "background_sidecar_v1",
+    "base": "background_compact_manual_v1",
+    "valid": false,
+    "edits": [
+      {
+        "op": "set",
+        "path": [
+          "manualIntents",
+          0,
+          "stepsSha256"
+        ],
+        "value": null
+      }
+    ]
+  },
+  {
+    "name": "background_compact_manual_before_receipt",
+    "contract": "background_sidecar_v1",
+    "base": "background_compact_manual_v1",
+    "valid": false,
+    "edits": [
+      {
+        "op": "set",
+        "path": [
+          "manualIntents",
+          0,
+          "phase"
+        ],
+        "value": "commit_claimed"
+      }
+    ]
+  },
+  {
+    "name": "background_undo_expiry_without_saved",
+    "contract": "background_snapshot_v1",
+    "base": "background_snapshot_v1",
+    "valid": false,
+    "edits": [
+      {
+        "op": "set",
+        "path": [
+          "undoExpired"
+        ],
+        "value": true
+      }
+    ]
+  },
+  {
+    "name": "background_saved_undo_expiry_notice",
+    "contract": "background_snapshot_v1",
+    "base": "background_saved_snapshot_v1",
+    "valid": true,
+    "edits": [
+      {
+        "op": "set",
+        "path": [
+          "undoExpired"
+        ],
+        "value": true
+      }
+    ]
+  },
+  {
+    "name": "background_history_namespace_retained",
+    "contract": "background_sidecar_v1",
+    "base": "background_history_sidecar_v1",
+    "valid": true,
+    "edits": [
+      {
+        "op": "set",
+        "path": [
+          "historyNamespace"
+        ],
+        "value": "history-example"
+      }
+    ]
+  },
+  {
+    "name": "background_history_namespace_mismatch",
+    "contract": "background_sidecar_v1",
+    "base": "background_history_sidecar_v1",
+    "valid": false,
+    "edits": [
+      {
+        "op": "set",
+        "path": [
+          "historyNamespace"
+        ],
+        "value": "other-history"
+      }
+    ]
   }
 ]

@@ -10,7 +10,7 @@ from ..background_limits import LIMITS
 from .agent import (AgentBatchJournal, AgentCommitResult, AgentFinding, AgentId, AgentJournalRequest,
     AgentMessage, AgentReadSnapshot, AgentRun, AgentScope, AgentSnapshotDependency, AgentUsage, AgentWebSource, AgentWire,
     ModelId, Timestamp, bounded)
-from .contracts import Revision, Sha256
+from .contracts import Id, Revision, Sha256
 from .rich_document import RichDocumentV1
 from .rich_facts import WorkingFacts
 from .rich_mutations import RichMutation
@@ -386,9 +386,13 @@ class JobSnapshotV1(BackgroundWire):
     created_at: Timestamp
     updated_at: Timestamp
     publication_error: JobFailure | None = None
+    undo_expired: bool = False
+    asset_pins_sha256: Sha256 | None = None
 
     @model_validator(mode="after")
     def exact_saved(self):
+        if self.undo_expired and self.receipt is None:
+            raise ValueError("only a saved job can report inverse expiry")
         if self.publication in {"saved", "no_change", "none"} and self.publication_error is not None:
             raise ValueError("publication error cannot claim a successful or absent publication")
         if len({a.id for a in self.attempts}) != len(self.attempts) or len(self.attempts) > len(self.submission.models):
@@ -475,7 +479,7 @@ class CanonicalIntentV1(BackgroundWire):
     id: AgentId
     project_id: AgentId
     lineage: AgentId
-    client_mutation_id: AgentId
+    client_mutation_id: Id
     request_sha256: Sha256
     before_workspace_sha256: Sha256
     after_workspace_sha256: Sha256
@@ -490,6 +494,7 @@ class CanonicalIntentV1(BackgroundWire):
     asset_pins: list[AgentId] = Field(max_length=100)
     candidate_sha256: Sha256 | None = None
     before_generations_sha256: Sha256 | None = None
+    resolved_at: Timestamp | None = None
 
     @model_validator(mode="after")
     def complete_writer_binding(self):
@@ -500,12 +505,21 @@ class CanonicalIntentV1(BackgroundWire):
 
 
 class PublicationIntentV1(CanonicalIntentV1):
+    client_mutation_id: AgentId
     job_id: AgentId
     proposal_id: AgentId
 
 
 class ManualIntentV1(CanonicalIntentV1):
-    pass
+    action_id: Id | None = None
+    steps_sha256: Sha256 | None = None
+    candidate_pruned: bool = False
+
+    @model_validator(mode="after")
+    def compact_proof(self):
+        if self.candidate_pruned and (self.phase != "receipt_stored" or self.action_id is None or self.steps_sha256 is None):
+            raise ValueError("a compacted manual receipt needs its durable action and step witness")
+        return self
 
 
 class UndoOwnershipV1(BackgroundWire):
@@ -521,6 +535,7 @@ class UndoOwnershipV1(BackgroundWire):
     inverse_bytes: int = Field(ge=1, le=LIMITS.inverse_bytes)
     expires_at: Timestamp
     guards: ScopeGuardV1
+    asset_pins_sha256: Sha256 | None = None
 
     @model_validator(mode="after")
     def single_owner(self):
@@ -565,6 +580,11 @@ class HistoryCheckpointV1(BackgroundWire):
     generations: list[GenerationStamp] = Field(max_length=LIMITS.metadata_project_records)
 
 
+class CanonicalSyncReferenceV1(BackgroundWire):
+    sync_id: AgentId
+    steps_sha256: Sha256
+
+
 class CanonicalCandidateV1(BackgroundWire):
     schema_version: Literal[1]
     id: AgentId
@@ -575,9 +595,9 @@ class CanonicalCandidateV1(BackgroundWire):
     proposal_sha256: Sha256 | None
     payload: PayloadReference | None
     manual_mutation: RichMutation | None
-    client_mutation_id: AgentId
-    action_id: AgentId
-    session_id: AgentId
+    client_mutation_id: Id
+    action_id: Id
+    session_id: Id
     request_sha256: Sha256
     before_workspace_sha256: Sha256
     after_workspace_sha256: Sha256
@@ -588,6 +608,7 @@ class CanonicalCandidateV1(BackgroundWire):
     inverse_guards: ScopeGuardV1
     persisted_at: Timestamp
     snapshot_write: bool = False
+    sync_payloads: list[CanonicalSyncReferenceV1] = Field(default_factory=list, max_length=100)
 
     @model_validator(mode="after")
     def exact_candidate(self):
@@ -601,6 +622,41 @@ class CanonicalCandidateV1(BackgroundWire):
         if self.workspace.project_id != self.project_id:
             raise ValueError("candidate workspace belongs to another project")
         return self
+
+
+class AssetReferenceV1(BackgroundWire):
+    kind: Literal["image", "source"]
+    id: Id
+    path: str
+    sha256: Sha256
+    size: int = Field(ge=0, le=32 * 1024 * 1024)
+
+    @model_validator(mode="after")
+    def owned_path(self):
+        import re
+        pattern = r"images/[0-9a-f]{64}\.(?:png|jpg)" if self.kind == "image" else r"sources/[0-9a-f]{64}\.bin"
+        if re.fullmatch(pattern, self.path) is None:
+            raise ValueError("asset reference must name an owned blob")
+        if self.kind == "image" and self.path[7:71] != self.sha256:
+            raise ValueError("image reference must match its byte hash")
+        return self
+
+
+class AssetPinV1(BackgroundWire):
+    owner: AgentId
+    kind: Literal["job", "proposal", "export", "inverse", "draft", "session"]
+    references: list[AssetReferenceV1] = Field(max_length=100)
+
+    @model_validator(mode="after")
+    def unique_references(self):
+        if len({(ref.kind, ref.path) for ref in self.references}) != len(self.references):
+            raise ValueError("duplicate pinned blob")
+        return self
+
+
+class OrphanAssetV1(BackgroundWire):
+    path: str = Field(max_length=160)
+    orphaned_at: Timestamp
 
 
 class BackgroundSidecarV1(BackgroundWire):
@@ -624,12 +680,26 @@ class BackgroundSidecarV1(BackgroundWire):
     intents: list[PublicationIntentV1] = Field(max_length=LIMITS.metadata_project_records)
     inverses: list[UndoOwnershipV1] = Field(max_length=LIMITS.inverse_project_records)
     history: BackgroundHistoryV1 | None = None
+    history_namespace: AgentId | None = None
     manual_intents: list[ManualIntentV1] = Field(default_factory=list, max_length=LIMITS.metadata_project_records)
+    asset_pins: list[AssetPinV1] = Field(default_factory=list, max_length=LIMITS.metadata_project_records)
+    orphan_assets: list[OrphanAssetV1] = Field(default_factory=list, max_length=LIMITS.metadata_project_records)
+    cleanup_refs: list[str] = Field(default_factory=list, max_length=LIMITS.metadata_project_records)
 
     @model_validator(mode="after")
     def bounded_authority(self):
         groups = (self.jobs, self.requests, self.proposals, self.drafts, self.generations, self.intents, self.inverses,
-            self.manual_intents)
+            self.manual_intents, self.asset_pins, self.orphan_assets, self.cleanup_refs)
+        if self.history is not None and self.history_namespace is not None and self.history_namespace != self.history.namespace:
+            raise ValueError("history namespace changed")
+        if (len({(pin.kind, pin.owner) for pin in self.asset_pins}) != len(self.asset_pins)
+                or len({item.path for item in self.orphan_assets}) != len(self.orphan_assets)):
+            raise ValueError("duplicate asset owner or orphan")
+        import re
+        if len(set(self.cleanup_refs)) != len(self.cleanup_refs) or any(re.fullmatch(
+                r"(?:canonical-candidates|agent-artifacts|proposal-intents|events)/[A-Za-z0-9_-]{1,128}\.json", path) is None
+                for path in self.cleanup_refs):
+            raise ValueError("cleanup must name unique owned private blobs")
         if self.active_request_epoch <= self.expired_through_epoch:
             raise ValueError("active request epoch must be above the durable expired floor")
         if (sum(map(len, groups)) + int(self.writer is not None) + int(self.barrier is not None)
