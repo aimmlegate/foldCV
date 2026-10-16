@@ -19,6 +19,7 @@ export function normalizeInline(content: Content): Content {
     const last = result.at(-1);
     if (span.type === "text" && last?.type === "text" && stableJson(last.styles) === stableJson(span.styles)) last.text += span.text;
     else if (span.type === "link" && last?.type === "link" && span.href === last.href) last.content = textRuns([...last.content, ...span.content]);
+    else if (span.type === "fact_field") result.push({ ...structuredClone(span), bindingRootId: span.bindingRootId ?? span.bindingId });
     else result.push(span.type === "link" ? { ...span, content: textRuns(span.content) } : structuredClone(span));
   }
   return result;

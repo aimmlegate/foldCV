@@ -1,0 +1,11 @@
+{
+  "operation": "clear_technologies",
+  "recordKind": "technology",
+  "jobId": null,
+  "recordId": null,
+  "periodId": null,
+  "values": {},
+  "factsRevision": 1,
+  "documentRevision": 1,
+  "capture": {"sessionId": "panel-session", "actionId": "panel-action", "actionToken": 0, "dependencies": []}
+}

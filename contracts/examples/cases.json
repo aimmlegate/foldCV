@@ -2986,5 +2986,12 @@
         "value": "failed"
       }
     ]
-  }
+  },
+  {"name": "clear global technologies", "contract": "rich_panel_request", "base": "rich_panel_request", "valid": true, "edits": []},
+  {"name": "clear job technologies", "contract": "rich_panel_request", "base": "rich_panel_request", "valid": true, "edits": [{"op": "set", "path": ["jobId"], "value": "job-1"}]},
+  {"name": "reject other clear kind", "contract": "rich_panel_request", "base": "rich_panel_request", "valid": false, "edits": [{"op": "set", "path": ["recordKind"], "value": "employment"}]},
+  {"name": "reject clear record", "contract": "rich_panel_request", "base": "rich_panel_request", "valid": false, "edits": [{"op": "set", "path": ["recordId"], "value": "technology-1"}]},
+  {"name": "reject clear period", "contract": "rich_panel_request", "base": "rich_panel_request", "valid": false, "edits": [{"op": "set", "path": ["periodId"], "value": "period-1"}]},
+  {"name": "reject clear values", "contract": "rich_panel_request", "base": "rich_panel_request", "valid": false, "edits": [{"op": "set", "path": ["values"], "value": {"display": "Rust"}}]},
+  {"name": "reject unknown panel operation", "contract": "rich_panel_request", "base": "rich_panel_request", "valid": false, "edits": [{"op": "set", "path": ["operation"], "value": "clear_all"}]}
 ]

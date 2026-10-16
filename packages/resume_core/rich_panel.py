@@ -2,10 +2,10 @@
 
 from typing import Literal
 
-from pydantic import Field, TypeAdapter
+from pydantic import Field, TypeAdapter, ConfigDict, model_validator
 
 from .models.contracts import Id, Revision, Wire
-from .models.rich_document import RichBlock, FactFieldSpan
+from .models.rich_document import RichBlock, FactFieldSpan, StyledText
 from .models.rich_facts import RichFact, WorkingPeriod
 from .models.rich_mutations import ActionCapture, RichMutation, PutRecord, RemoveRecord, PutBlock, RemoveBlock
 from .rich_assembly import field, identity
@@ -20,7 +20,12 @@ FIELDS = {"candidate": ("name", "title", "location"), "employment": ("employer",
 
 
 class RichPanelRequest(Wire):
-    operation: Literal["add", "edit", "remove", "add_period", "remove_period"]
+    model_config = ConfigDict(json_schema_extra={
+        "if": {"properties": {"operation": {"const": "clear_technologies"}}, "required": ["operation"]},
+        "then": {"properties": {"recordKind": {"const": "technology"}, "recordId": {"type": "null"},
+            "periodId": {"type": "null"}, "values": {"maxProperties": 0}}, "required": ["recordKind"]},
+    })
+    operation: Literal["add", "edit", "remove", "add_period", "remove_period", "clear_technologies"]
     record_id: Id | None = None
     record_kind: PanelKind | None = None
     job_id: Id | None = None
@@ -29,6 +34,13 @@ class RichPanelRequest(Wire):
     facts_revision: Revision
     document_revision: Revision
     capture: ActionCapture
+
+    @model_validator(mode="after")
+    def clear_scope(self):
+        if self.operation == "clear_technologies" and (self.record_kind != "technology" or self.record_id is not None
+                or self.period_id is not None or self.values):
+            raise ValueError("PANEL_CLEAR_INVALID")
+        return self
 
 
 class RichPanelSyncRequest(Wire):
@@ -91,6 +103,18 @@ def panel_mutation(workspace, request):
     if project is None or (project.facts.revision, project.document.revision) != (request.facts_revision, request.document_revision):
         raise ValueError("STALE_PANEL_EDIT")
     records = {record.id: record for record in project.facts.records}
+    if request.operation == "clear_technologies":
+        if request.job_id is not None and (request.job_id not in records or records[request.job_id].kind != "employment"):
+            raise ValueError("PANEL_OWNER_INVALID")
+        removed = {record.id for record in records.values() if record.kind == "technology" and record.job_id == request.job_id}
+        if not removed:
+            return None
+        candidate = project.model_copy(deep=True)
+        for identifier in sorted(removed):
+            bind_exact_technology(candidate.document, records[identifier], removed)
+        steps = removal_steps(candidate, records, removed)
+        return RichMutation(schemaVersion=1, projectId=workspace.project_id, clientMutationId=identity("panel"),
+            actionId=request.capture.action_id, capture=request.capture, kind="panel", steps=steps)
     if request.operation == "add":
         if request.record_kind not in FIELDS:
             raise ValueError("PANEL_KIND_INVALID")
@@ -116,30 +140,7 @@ def panel_mutation(workspace, request):
         removed = {record.id}
         if record.kind == "employment":
             removed.update(r.id for r in records.values() if getattr(r, "job_id", None) == record.id)
-        steps += [RemoveRecord(kind="remove_record", recordId=id, beforeRevision=records[id].revision) for id in sorted(removed)]
-        removed_blocks = set()
-        def prune(block):
-            if getattr(block.props, "record_id", None) in removed:
-                removed_blocks.update(b.id for b in descend(block))
-                return
-            for child in block.children:
-                prune(child)
-        for region in project.document.regions:
-            for block in region.blocks:
-                prune(block)
-        steps += [RemoveBlock(kind="remove_block", blockId=b.id, beforeRevision=b.revision) for b in blocks
-            if b.id in removed_blocks and positions[b.id][0] not in removed_blocks]
-        for block in blocks:
-            if block.id in removed_blocks:
-                continue
-            copy, changed = block.model_copy(deep=True), False
-            for _, content in inline_groups(copy):
-                kept = [span for span in content if not isinstance(span, FactFieldSpan) or span.record_id not in removed]
-                if len(kept) != len(content):
-                    content[:] = kept; changed = True
-            if changed:
-                copy.provenance = [link for link in copy.provenance if link.kind != "field_binding" or link.record_id not in removed]
-                steps.append(put_block(copy, positions))
+        steps += removal_steps(project, records, removed)
     else:
         if request.operation in {"add_period", "remove_period"}:
             if record.kind != "employment":
@@ -192,11 +193,60 @@ def panel_mutation(workspace, request):
         actionId=request.capture.action_id, capture=request.capture, kind="panel", steps=steps)
 
 
-def bind_exact_technology(document, original):
+def removal_steps(project, records, removed):
+    blocks = list(project.document.blocks())
+    positions = placements(project.document)
+    steps = [RemoveRecord(kind="remove_record", recordId=id, beforeRevision=records[id].revision) for id in sorted(removed)]
+    removed_blocks = set()
+    def prune(block):
+        if getattr(block.props, "record_id", None) in removed:
+            removed_blocks.update(b.id for b in descend(block))
+            return
+        for child in block.children:
+            prune(child)
+    for region in project.document.regions:
+        for block in region.blocks:
+            prune(block)
+    steps += [RemoveBlock(kind="remove_block", blockId=b.id, beforeRevision=b.revision) for b in blocks
+        if b.id in removed_blocks and positions[b.id][0] not in removed_blocks]
+    for block in blocks:
+        if block.id in removed_blocks:
+            continue
+        copy, changed = block.model_copy(deep=True), False
+        for _, content in inline_groups(copy):
+            kept = [span for span in content if not isinstance(span, FactFieldSpan) or span.record_id not in removed]
+            if len(kept) != len(content):
+                content[:] = technology_delimiters(content, kept, records); changed = True
+        if changed:
+            copy.provenance = [link for link in copy.provenance if link.kind != "field_binding" or link.record_id not in removed]
+            steps.append(put_block(copy, positions))
+    return steps
+
+
+def technology_delimiters(before, kept, records):
+    def delimiter(span):
+        return isinstance(span, StyledText) and not span.text.strip(" \t\r\n·,;|/")
+    if not any(isinstance(span, FactFieldSpan) for span in before) or not all(delimiter(span) or
+            isinstance(span, FactFieldSpan) and span.field_key == "display" and span.record_id in records
+            and records[span.record_id].kind == "technology" for span in before):
+        return kept
+    # Only technology-only list separators can collapse; authored prose stays literal.
+    result = []
+    for span in kept:
+        if delimiter(span) and (not result or delimiter(result[-1])):
+            continue
+        result.append(span)
+    if result and delimiter(result[-1]): result.pop()
+    return result
+
+
+def bind_exact_technology(document, original, removal_scope=None):
     from .models.rich_document import StyledText
     changed = set()
     for block in document.blocks():
         if not any(link.kind == "citation" and link.record_id == original.id for link in block.provenance):
+            continue
+        if removal_scope is not None and any(link.kind == "citation" and link.record_id not in removal_scope for link in block.provenance):
             continue
         for _, content in inline_groups(block):
             if not content or not all(isinstance(span, StyledText) for span in content) or "".join(span.text for span in content) != original.display.raw_text:

@@ -69,6 +69,7 @@ for (const name of ["project_v4", "workspace_v5", "archive_manifest_v5", "render
   bases[name] = read(`recovery/${name}.json`);
 }
 const cases = array(read("cases.json")) as Case[];
+bases.rich_panel_request = read("recovery/rich_panel_request.json");
 for (const name of ["agent_settings", "agent_run_request", "agent_message", "agent_web_source", "agent_finding", "agent_conversation",
   "agent_commit_result", "agent_event", "agent_prepare_request", "agent_prepare_result", "agent_edit_receipt", "agent_run", "agent_read_snapshot"]) {
   bases[name] = read(`agent/${name}.json`);

@@ -26,7 +26,7 @@ class RichSynchronization:
             mutation = panel_mutation(self.read(identifier), request)
         except ValueError as error:
             raise ProjectFailure(str(error), 409) from None
-        return self.preview(identifier, mutation)
+        return self.response(identifier) if mutation is None else self.preview(identifier, mutation)
 
     async def panel_rich(self, identifier, request):
         from packages.resume_core.rich_panel import RichPanelProposal, narrative_steps, has_exact_fields

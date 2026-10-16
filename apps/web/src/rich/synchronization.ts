@@ -8,6 +8,8 @@ import type { DateCascadeProposal } from "../contracts/generated/date_cascade_pr
 import { projectRequest, previewCascade, RichApiFailure } from "./api";
 import type { CellChange, CellValue, DependencyCapture, SessionHistory } from "./history";
 import type { RichBlock, RichSaveQueue } from "./save-queue";
+import { AppliedIntentFailure } from "./intent-queue";
+import { currentPanelIntent } from "./panel-intents";
 
 type Sync = RichProjectResponse["workspace"]["syncRecords"][number];
 type Capture = DependencyCapture & { epochs: ReadonlyMap<string, number> };
@@ -141,23 +143,31 @@ export class RichSynchronization {
   async panel(command: PanelCommand): Promise<void> {
     const adapter = this.adapter, history = adapter.history;
     await adapter.queue.flush();
-    if (this.closed) return;
+    if (this.closed) throw new Error("Редактор закрыт.");
     const before = adapter.cells(adapter.queue.baseline), project = adapter.queue.baseline.workspace.project;
-    if (!project) return;
+    if (!project) throw new Error("Документ закрыт.");
+    const intent = currentPanelIntent(command, project.facts);
+    if (!intent) return;
     const marker = `request:${crypto.randomUUID()}`, action = history.commit("panel", [{ key: marker, before: null, after: "panel" }]);
     const initial = action ? history.capture(action, []) : null;
     const epochs = new Map([...adapter.current().keys()].map(key => [key, history.revision(key)]));
     if (!initial) return;
-    const response = await projectRequest(`/${this.projectId}/panel/preview`, "POST", { ...command,
+    try {
+    const response = await projectRequest(`/${this.projectId}/panel/preview`, "POST", { ...intent,
       factsRevision: project.facts.revision, documentRevision: project.document.revision, capture: this.wireCapture(initial) } satisfies RichPanelRequest);
     const after = adapter.cells(response);
     const changes = [...new Set([...before.keys(), ...after.keys()])].map(key => ({ key, before: before.get(key) ?? null, after: after.get(key) ?? null }))
       .filter(change => change.before !== change.after);
+    if (!changes.length) return;
     const dependencies = new Map(changes.map(change => [change.key, epochs.get(change.key) ?? 0]));
-    if (this.closed || history.attach({ ...initial, dependencies }, changes) !== "applied") throw new Error("Изменения уже обновились. Повторите правку.");
-    adapter.changed(); await adapter.queue.flush();
-    adapter.applied?.(initial.actionId, changes);
-    this.synchronizePanelAction(initial.actionId, changes);
+    const disposition = this.closed ? "stale" : history.attach({ ...initial, dependencies }, changes);
+    if (disposition !== "applied") throw new Error("Изменения уже обновились. Повторите правку.");
+    adapter.changed();
+    const saved = () => { if (!this.closed) { adapter.applied?.(initial.actionId, changes); this.synchronizePanelAction(initial.actionId, changes); } };
+    try { await adapter.queue.flush(); }
+    catch (error) { throw new AppliedIntentFailure(async () => { await adapter.queue.flush(); saved(); }, error); }
+    saved();
+    } finally { history.discardPending(initial.actionId); }
   }
   private synchronizePanelAction(actionId: string, changes: CellChange[]): void {
     const adapter = this.adapter;
@@ -200,6 +210,7 @@ export class RichSynchronization {
     const capture = action ? history.capture(action, []) : null;
     if (!capture) return;
     const epochs = new Map([...adapter.current().keys()].map(key => [key, history.revision(key)]));
+    try {
     const response = await projectRequest(`/${this.projectId}/cascade/preview`, "POST", { proposal, capture: this.wireCapture(capture) });
     if (!history.current(origin) || this.closed) throw new Error("Предпросмотр устарел. Обновите его.");
     const after = adapter.cells(response);
@@ -207,8 +218,12 @@ export class RichSynchronization {
       .filter(change => change.before !== change.after);
     const dependencies = new Map(changes.map(change => [change.key, epochs.get(change.key) ?? 0]));
     if (history.attach({ ...capture, dependencies }, changes) !== "applied") throw new Error("Предпросмотр устарел. Обновите его.");
-    adapter.changed(); await adapter.queue.flush(); this.cascades.delete(proposal.id);
-    this.synchronizePanelAction(capture.actionId, changes);
+    adapter.changed();
+    const saved = () => { this.cascades.delete(proposal.id); if (!this.closed) this.synchronizePanelAction(capture.actionId, changes); };
+    try { await adapter.queue.flush(); }
+    catch (error) { throw new AppliedIntentFailure(async () => { await adapter.queue.flush(); saved(); }, error); }
+    saved();
+    } finally { history.discardPending(capture.actionId); }
   }
   async retry(id: string, blockIds: string[]): Promise<void> {
     const history = this.adapter.history, marker = `request:${crypto.randomUUID()}`;

@@ -124,6 +124,12 @@
 [data-uir-engine-ui] .rich-block-handle svg { width: 14px; height: 14px; stroke-width: 1.5; }
 [data-uir-engine-ui] .uir-selection-action:hover { background: var(--accent-hover); }
 .editor-toolbar .tool[aria-pressed="true"] { background: var(--wash); color: var(--accent); }
+.uir-editor-body > .facts-panel { order: 1; }
+.technology-chip[aria-busy="true"] { opacity: .65; outline: 1px dashed var(--accent); outline-offset: -1px; }
+.uir-facts-pending, .uir-timeline { display: block; margin-top: 10px; font-size: 10px; line-height: 1.6; color: var(--muted); }
+.uir-timeline small { display: block; }
+.uir-timeline > details > button { background: none; border: 0; color: var(--accent); text-align: left; padding: 5px 0; font-size: 10px; }
+.uir-period-actions { display: flex; flex-wrap: wrap; gap: 12px; }
 @media (max-width: 1080px) { .uir-editor-body .uir-block-panel { top: 143px; } }
 @media (max-width: 800px) { .uir-editor-body .uir-block-panel { top: 135px; } }
 @media (max-width: 600px) { .uir-editor-body .uir-block-panel { top: 121px; } }

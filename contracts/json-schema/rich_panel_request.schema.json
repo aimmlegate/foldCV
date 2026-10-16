@@ -87,6 +87,16 @@
     }
   },
   "additionalProperties": false,
+  "if": {
+    "properties": {
+      "operation": {
+        "const": "clear_technologies"
+      }
+    },
+    "required": [
+      "operation"
+    ]
+  },
   "properties": {
     "capture": {
       "$ref": "#/$defs/ActionCapture"
@@ -120,7 +130,8 @@
         "edit",
         "remove",
         "add_period",
-        "remove_period"
+        "remove_period",
+        "clear_technologies"
       ],
       "title": "Operation",
       "type": "string"
@@ -185,6 +196,25 @@
     "documentRevision",
     "capture"
   ],
+  "then": {
+    "properties": {
+      "periodId": {
+        "type": "null"
+      },
+      "recordId": {
+        "type": "null"
+      },
+      "recordKind": {
+        "const": "technology"
+      },
+      "values": {
+        "maxProperties": 0
+      }
+    },
+    "required": [
+      "recordKind"
+    ]
+  },
   "title": "RichPanelRequest",
   "type": "object"
 }

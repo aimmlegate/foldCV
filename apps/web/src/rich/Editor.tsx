@@ -53,6 +53,10 @@ import { BlockPanel as PrototypeBlockPanel } from "../workbench/editor/BlockPane
 import { SourceDialog } from "../workbench/editor/SourceDialog";
 import { TableDialog } from "../workbench/editor/TableDialog";
 import { capturedSelectionCurrent } from "../workbench/editor/capture";
+import { AppliedIntentFailure, IntentQueue, type IntentState } from "./intent-queue";
+import { FactsPanel as PrototypeFactsPanel } from "../workbench/facts/FactsPanel";
+
+type FactIntent = { kind: "panel"; command: PanelCommand } | { kind: "cascade"; proposal: DateCascadeProposal };
 
 const EditorAppearance = createContext<{ appearance: "reference" | "prototype"; addText: (id: string) => void }>({ appearance: "reference", addText: () => {} });
 const region = createReactBlockSpec({ type: "region", content: "none", propSchema: {
@@ -128,6 +132,7 @@ export function RichEditor({ initial, acknowledge, onStatus, ref, onHistoryNavig
   if (!project) throw new Error("Document is missing");
   const initialFacts = project.facts;
   const [facts, setFacts] = useState(initialFacts);
+  const [factIntents, setFactIntents] = useState<IntentState<FactIntent>>({ pending: [], paused: false });
   const prototypeFacts = useRef(initialFacts);
   prototypeFacts.current = facts;
   const [ready, setReady] = useState(false);
@@ -163,7 +168,7 @@ export function RichEditor({ initial, acknowledge, onStatus, ref, onHistoryNavig
   const imageInput = useRef<HTMLInputElement>(null);
   const bridge = useMemo(() => ({ session: crypto.randomUUID(), group: 0, composing: false, observing: false, replaying: false,
     kind: "typing" as RichMutation["kind"],
-    lastTypingAt: 0, history: null as SessionHistory | null, queue: null as RichSaveQueue | null,
+    lastTypingAt: 0, history: null as SessionHistory | null, queue: null as RichSaveQueue | null, intents: null as IntentQueue<FactIntent> | null,
     prepared: null as PreparedEditorBridge | null, applying: false, fenced: false,
     latestSelection: null as ReturnType<typeof selectedRange>,
     assistantFlush: async (): Promise<RichProjectResponse> => { throw new Error("Редактор ещё открывается"); },
@@ -401,7 +406,7 @@ export function RichEditor({ initial, acknowledge, onStatus, ref, onHistoryNavig
     const queue = new RichSaveQueue(initial, bridge.session, saveMutation, acknowledge);
     bridge.queue = queue;
     function schedule() {
-      if (bridge.applying || bridge.fenced) return;
+      if (bridge.applying || bridge.fenced || bridge.intents?.awaitingSave) return;
       onStatus("Изменения сохраняются…");
       if (bridge.timer) clearTimeout(bridge.timer);
       if (bridge.composing) return;
@@ -479,8 +484,22 @@ export function RichEditor({ initial, acknowledge, onStatus, ref, onHistoryNavig
       if (bridge.composing) throw new Error("Завершите ввод текста");
       if (bridge.projectionError) throw new Error(bridge.projectionError);
     }
+    const intents = new IntentQueue<FactIntent>(async intent => {
+      available(); finishEdit(); bridge.group++; bridge.kind = intent.kind;
+      try {
+        if (intent.kind === "panel") await sync.panel(intent.command);
+        else await sync.cascadeApply(intent.proposal);
+      } catch (error) {
+        if (error instanceof AppliedIntentFailure) {
+          if (bridge.timer) clearTimeout(bridge.timer);
+          onStatus(error.message);
+        }
+        throw error;
+      } finally { bridge.kind = "typing"; }
+    }, setFactIntents);
+    bridge.intents = intents;
     bridge.assistantFlush = async () => {
-      available(); finishEdit(); await queue.flush();
+      available(); await intents.drain(); finishEdit(); await queue.flush();
       queue.refreshMetadata(await projectRequest(`/${initial.workspace.projectId}`));
       return queue.baseline;
     };
@@ -508,10 +527,9 @@ export function RichEditor({ initial, acknowledge, onStatus, ref, onHistoryNavig
     };
     bridge.resolve = id => { available(); return sync.resolve(id); };
     bridge.timeline = async () => { await queue.flush(); return readTimeline(initial.workspace.projectId); };
-    bridge.cascadePreview = anchor => { available(); return sync.cascadePreview(anchor.jobId, anchor.periodId, anchor.actionId); };
-    bridge.cascadeApply = async proposal => { available(); bridge.group++; bridge.kind = "cascade";
-      try { await sync.cascadeApply(proposal); } finally { bridge.kind = "typing"; } };
-    bridge.panel = async command => { available(); finishEdit(); bridge.group++; bridge.kind = "panel"; await sync.panel(command); bridge.kind = "typing"; };
+    bridge.cascadePreview = async anchor => { available(); await intents.drain(); return sync.cascadePreview(anchor.jobId, anchor.periodId, anchor.actionId); };
+    bridge.cascadeApply = proposal => { available(); return intents.enqueue({ kind: "cascade", proposal }); };
+    bridge.panel = command => { available(); return intents.enqueue({ kind: "panel", command }); };
     bridge.retry = async id => {
       available();
       const response = await projectRequest(`/${initial.workspace.projectId}`), record = response.workspace.syncRecords.find(item => item.id === id);
@@ -636,9 +654,9 @@ export function RichEditor({ initial, acknowledge, onStatus, ref, onHistoryNavig
     const closeOnUnload = () => { navigator.sendBeacon(`/v1/rich/projects/${initial.workspace.projectId}/images/session`,
       new Blob([JSON.stringify({ sessionId: bridge.session, revision: imageRevision + 1, live: [], history: [], closed: true })], { type: "application/json" })); };
     window.addEventListener("pagehide", closeOnUnload);
-    bridge.undo = () => { if (bridge.composing || bridge.projectionError || bridge.applying || bridge.fenced) return;
+    bridge.undo = () => { if (intents.busy || bridge.composing || bridge.projectionError || bridge.applying || bridge.fenced) return;
       assistantCallbacks.current.onHistoryNavigation?.(); bridge.kind = "undo"; try { history.undo(); } finally { bridge.kind = "typing"; } };
-    bridge.redo = () => { if (bridge.composing || bridge.projectionError || bridge.applying || bridge.fenced) return;
+    bridge.redo = () => { if (intents.busy || bridge.composing || bridge.projectionError || bridge.applying || bridge.fenced) return;
       assistantCallbacks.current.onHistoryNavigation?.(); bridge.kind = "redo"; try { history.redo(); } finally { bridge.kind = "typing"; } };
     function observe() {
       if (bridge.replaying || bridge.applying || bridge.fenced) return;
@@ -714,7 +732,7 @@ export function RichEditor({ initial, acknowledge, onStatus, ref, onHistoryNavig
     // Only initial normalization is queued; acknowledgments never replace the editor.
     queue.update(document(), `${bridge.session}:initial`);
     setReady(true);
-    return () => { stop(); sync.close(); bridge.prepared?.close(); open = false; imageRevision++; for (const upload of uploads.values()) upload.abort();
+    return () => { stop(); sync.close(); intents.close(); bridge.prepared?.close(); open = false; imageRevision++; for (const upload of uploads.values()) upload.abort();
       window.removeEventListener("pagehide", closeOnUnload); void publishImageReferences().catch(() => {}); history.close(); queue.close(); if (bridge.timer) clearTimeout(bridge.timer); };
   }, [editor, bridge]);
   useImperativeHandle(ref, () => ({ flush: async () => {
@@ -722,7 +740,7 @@ export function RichEditor({ initial, acknowledge, onStatus, ref, onHistoryNavig
     if (bridge.composing) throw new Error("Завершите ввод текста");
     if (!bridge.queue) throw new Error("Редактор ещё открывается");
     if (bridge.projectionError) throw new Error(bridge.projectionError);
-    await bridge.queue.flush(); return bridge.queue.baseline;
+    await bridge.intents?.drain(); await bridge.queue.flush(); return bridge.queue.baseline;
   }, undo: () => bridge.undo(), redo: () => bridge.redo(), sessionId: bridge.session,
   focusFinding: anchor => {
     if (bridge.applying || !bridge.queue || !anchorCurrent(anchor, bridge.queue.baseline, bridge.current)) return false;
@@ -851,7 +869,7 @@ export function RichEditor({ initial, acknowledge, onStatus, ref, onHistoryNavig
     {applying && <p role="status">Сохраняю правки помощника…</p>}
     <fieldset className={appearance === "prototype" ? "contents uir-editor-session" : "contents"} disabled={applying || recovery}>
     {appearance === "prototype" ? <><Toolbar command={toolbarCommand} factsVisible={factsVisible} blockVisible={blockTarget !== null}
-      canUndo={(bridge.history?.position ?? 0) > 0} canRedo={(bridge.history?.position ?? 0) < (bridge.history?.length ?? 0)} selecting={selecting}
+      canUndo={!factIntents.pending.length && (bridge.history?.position ?? 0) > 0} canRedo={!factIntents.pending.length && (bridge.history?.position ?? 0) < (bridge.history?.length ?? 0)} selecting={selecting}
       active={{ bold: editor.getActiveStyles().bold === true, italic: editor.getActiveStyles().italic === true, underline: editor.getActiveStyles().underline === true }}
       style={(() => { const block = editor.getTextCursorPosition().block; return block.type === "heading" && block.props.level === 2 ? "h2" : block.type === "heading" && block.props.level === 3 ? "h3" : block.type === "quote" ? "blockquote" : "p"; })()}
       textStyle={style => {
@@ -869,8 +887,12 @@ export function RichEditor({ initial, acknowledge, onStatus, ref, onHistoryNavig
       <label className="cv-insert-image">Добавить изображение<input ref={imageInput} type="file" accept="image/png,image/jpeg,image/webp"
         onChange={event => { const file = event.currentTarget.files?.[0]; event.currentTarget.value = ""; if (file) void assets.upload(file).catch(error => setEditorWarning(error instanceof Error ? error.message : "Не удалось добавить изображение")); }} /></label>
     </div>}
-    <div className={appearance === "prototype" ? "editor-body uir-editor-body" : "rich-workspace"}><FactsPanel facts={facts} submit={command => bridge.panel(command)} hidden={!factsVisible} close={() => setFactsVisible(false)}
-      timeline={ready ? <Timeline facts={facts} anchors={anchors} controls={timelineControls} /> : null} />
+    <div className={appearance === "prototype" ? "editor-body uir-editor-body" : "rich-workspace"}>
+    {appearance === "prototype" ? <PrototypeFactsPanel facts={facts} submit={command => bridge.panel(command)} hidden={!factsVisible} close={() => setFactsVisible(false)}
+      pending={factIntents.pending.flatMap(intent => intent.kind === "panel" ? [intent.command] : [])} paused={factIntents.paused}
+      timeline={ready ? <Timeline facts={facts} anchors={anchors} controls={timelineControls} prototype /> : null} />
+      : <FactsPanel facts={facts} submit={command => bridge.panel(command)} hidden={!factsVisible} close={() => setFactsVisible(false)}
+        timeline={ready ? <Timeline facts={facts} anchors={anchors} controls={timelineControls} /> : null} />}
     <div className={appearance === "prototype" ? "document-workspace" : "rich-editor-document"}>
     {appearance === "prototype" && <div className="document-context"><div className="context-left"><span>Исходный текст</span><span>Шаблон FoldCV</span></div>{contextActions}</div>}
     <div className={appearance === "prototype" ? "paper-scroll" : undefined}>

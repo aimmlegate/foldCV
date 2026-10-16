@@ -28,7 +28,7 @@ test("empty unbound runs do not create an initial save while empty fact bindings
   assert.deepEqual(documentSteps(before, after), []);
   const emptyField = { type: "fact_field" as const, bindingId: "empty-binding", recordId: "candidate",
     fieldKey: "name", syncedFactRevision: 1, text: "", styles: {} };
-  assert.deepEqual(normalizeInline([emptyField]), [emptyField]);
+  assert.deepEqual(normalizeInline([emptyField]), [{ ...emptyField, bindingRootId: "empty-binding" }]);
 });
 
 test("table save acknowledgments advance cell revisions without queuing the same content again", async () => {
