@@ -28,12 +28,12 @@ def main():
     for name, expected in {"surface": "#fafaf5", "muted": "#767c6f", "accent": "#58684c"}.items():
         assert re.findall(rf"--{name}\s*:\s*([^;}}]+)", css) == [expected]
     assert ':root[data-theme' not in css and "cv-sheet" not in css
-    light_entries = ["apps/web/index.html", "apps/web/next.html"]
+    light_entries = ["apps/web/index.html", "apps/web/uir-proof.html"]
     for name in light_entries:
         entry = (ROOT / name).read_text()
         assert 'color-scheme: light' in entry and 'data-theme="light"' in entry
         assert "foldcv-theme" not in entry and "matchMedia" not in entry
-    assert "useTheme" not in (ROOT / "apps/web/src/rich/App.tsx").read_text()
+    assert not (ROOT / "apps/web/src/rich/App.tsx").exists()
     frozen = ["design/future-editor/visual", "docs/gui/handoffs/AGENT-ASSISTANT",
         "docs/gui/handoffs/PROTOTYPE-ADOPTION/fixtures", "docs/gui/handoffs/PROTOTYPE-ADOPTION/visual-extraction.json",
         "docs/gui/handoffs/PROTOTYPE-ADOPTION/source-manifest.json",

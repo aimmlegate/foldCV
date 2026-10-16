@@ -1,6 +1,6 @@
 import { createRoot } from "react-dom/client";
 import { referenceTemplate, referenceVariables } from "./template";
-import "../shell/theme.css";
+import "../internal/proof-theme.css";
 import "./reference-fonts.css";
 
 const root = document.getElementById("root");

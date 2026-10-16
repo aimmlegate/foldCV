@@ -72,6 +72,7 @@ def test_requirement_map_does_not_accept_a_test_name_prefix(monkeypatch, scope) 
                    if node.startswith("apps/web/unit/")}
     browser_names = {node.split("::", 1)[0].rsplit("/", 1)[1] + ":1:1 › " + node.split("::", 1)[1]
                      for entry in data["entries"] for node in entry["tests"] if node.startswith("apps/web/tests/")}
+    browser_names.add("default-entry.spec.ts:1:1 › retained collection fixture")
 
     def run(argv, **kwargs):
         if "--collect-only" in argv:

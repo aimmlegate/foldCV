@@ -14,9 +14,18 @@ def retain(task, paths, scope):
     relative = f"docs/gui/handoffs/PROTOTYPE-ADOPTION/{task.lower()}-source-manifest.json"
     target = ROOT / relative
     assert not target.exists(), "Milestone manifests are immutable"
-    files = {path: {"sha256": hashlib.sha256((ROOT / path).read_bytes()).hexdigest(), "bytes": (ROOT / path).stat().st_size}
-        for path in sorted(set(paths))}
     base = subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=ROOT, text=True).strip()
+    files = {}
+    for path in sorted(set(paths)):
+        source = ROOT / path
+        if source.is_file():
+            files[path] = {"sha256": hashlib.sha256(source.read_bytes()).hexdigest(), "bytes": source.stat().st_size}
+        else:
+            before = subprocess.check_output(["git", "show", f"{base}:{path}"], cwd=ROOT)
+            marker = b"UIR deleted file\0" + path.encode() + b"\0" + before
+            files[path] = {"state": "deleted", "sha256": hashlib.sha256(marker).hexdigest(), "bytes": 0,
+                "hashKind": "SHA256 of UIR deleted file + NUL + UTF-8 path + NUL + base bytes",
+                "baseSha256": hashlib.sha256(before).hexdigest(), "baseBytes": len(before)}
     locator = f"git log -1 --format=%H -- {relative}"
     manifest = {"task": task, "baseRevision": base, "scope": scope, "files": files,
         "retainedRevisionLocator": locator, "excludes": ["state.json", "review ledger bookkeeping", "this manifest"]}

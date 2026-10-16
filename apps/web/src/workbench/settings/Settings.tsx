@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { ConnectionWorkflow, type ConnectionView } from "../../connection/workflow";
 import { AgentBrowserApi } from "../../assistant/api";
-import { preferencesRequest, rulesRequest, saveRulesRequest } from "../../next/api";
+import { preferencesRequest, rulesRequest, saveRulesRequest } from "../../api/client";
 import { SettingsDrafts, type SettingsPart, type SettingsState } from "./drafts";
 import { Connection } from "./Connection";
 import { Button } from "../ui/Button";

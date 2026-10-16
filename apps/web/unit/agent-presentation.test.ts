@@ -10,7 +10,7 @@ import { documentCells } from "../src/rich/document-cells";
 import { factCells } from "../src/rich/fact-cells";
 import type { RichBlock } from "../src/rich/save-queue";
 import { anchorCurrent, drawerSize, sourceUrl, submitKey } from "../src/assistant/presentation";
-import { Messages } from "../src/assistant/Messages";
+import { MessageText } from "../src/assistant/MessageText";
 
 test("assistant findings reject changed revisions and unsaved target cells without matching text", () => {
   const workspace: unknown = structuredClone(fixture); assert.ok(validateRichWorkspaceShape(workspace)); assert.ok(workspace.project);
@@ -28,9 +28,7 @@ test("assistant findings reject changed revisions and unsaved target cells witho
 });
 
 test("assistant message markup stays plain text and stored source URLs reject active schemes", () => {
-  const html = renderToStaticMarkup(createElement(Messages, { items: [{ id: "m1", role: "assistant", runId: "r1", timestamp: "2026-10-15T12:00:00Z",
-    text: '<img src="https://unretrieved.example/pixel"> [link](https://unretrieved.example) https://unretrieved.example', sources: [], findings: [], truncated: false, error: null }],
-    partial: "", truncated: false, resource: () => {} }));
+  const html = renderToStaticMarkup(createElement(MessageText, { text: '<img src="https://unretrieved.example/pixel"> [link](https://unretrieved.example) https://unretrieved.example', truncated: false, error: null }));
   assert.equal(/<img|<a\s/.test(html), false); assert.ok(html.includes("&lt;img"));
   for (const value of ["javascript:alert(1)", "data:text/html,test", "https://user:secret@example.com", "invalid"]) assert.equal(sourceUrl(value), null);
   assert.equal(sourceUrl("https://example.com/vacancy"), "https://example.com/vacancy");

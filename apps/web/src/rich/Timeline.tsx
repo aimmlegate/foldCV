@@ -19,7 +19,7 @@ const reasons: Record<string, string> = {
   DATE_RANGE_EXCEEDED: "Сдвиг выходит за допустимый диапазон дат.",
   NO_FORWARD_OVERLAP: "Последующие периоды не требуют сдвига.",
 };
-export function Timeline({ facts, anchors, controls, prototype = false }: { facts: WorkingFacts; anchors: DateAnchor[]; controls: TimelineControls; prototype?: boolean }) {
+export function Timeline({ facts, anchors, controls }: { facts: WorkingFacts; anchors: DateAnchor[]; controls: TimelineControls }) {
   const [report, setReport] = useState<TimelineReport | null>(null), [proposal, setProposal] = useState<DateCascadeProposal | null>(null);
   const [error, setError] = useState(""), [busy, setBusy] = useState(false);
   const previewTrigger = useRef<HTMLButtonElement | null>(null);
@@ -47,7 +47,7 @@ export function Timeline({ facts, anchors, controls, prototype = false }: { fact
   }
   const overlaps = report?.warnings.filter(warning => warning.kind === "overlap") ?? [];
   const estimate = report?.estimates.find(estimate => estimate.scopeId === "employment");
-  return <div className={prototype ? "uir-timeline" : "rich-timeline"} aria-label="Проверка периодов">
+  return <div className={"uir-timeline"} aria-label="Проверка периодов">
     {estimate?.monthsMin !== null && estimate?.monthsMin !== undefined ? <small>Месяцев опыта без двойного счёта: {estimate.monthsMin}{estimate.monthsMax !== estimate.monthsMin ? `–${estimate.monthsMax ?? "?"}` : ""}</small>
       : <small>Оценка опыта недоступна. Проверьте даты и дату наблюдения источника.</small>}
     {overlaps.length > 0 && <details open><summary>Пересечения: {overlaps.length}</summary><small>Параллельная работа допустима. Сохранение и экспорт доступны.</small>
@@ -59,17 +59,8 @@ export function Timeline({ facts, anchors, controls, prototype = false }: { fact
     {report?.warnings.filter(warning => warning.kind !== "overlap").map(warning => <small key={warning.id}>
       {warning.kind === "future" ? "Дата может быть в будущем" : warning.code === "OPEN_PERIOD" ? "Открытый период" : "Проверьте дату"}: {warning.periodIds.map(period).join(" / ")}</small>)}
     {error && <p role="status">{error}</p>}
-    {proposal && prototype ? <DatePreview proposal={proposal} job={job} reason={reasons[proposal.reason ?? ""] ?? "Сдвиг недоступен. Проверьте периоды вручную."}
+    {proposal && <DatePreview proposal={proposal} job={job} reason={reasons[proposal.reason ?? ""] ?? "Сдвиг недоступен. Проверьте периоды вручную."}
       busy={busy} error={error} returnFocus={previewTrigger.current} close={() => setProposal(null)} apply={() => { setBusy(true); setError(""); void controls.apply(proposal).then(() => setProposal(null))
-        .catch(error => setError(error instanceof Error ? error.message : "Предпросмотр устарел")).finally(() => setBusy(false)); }} /> : proposal && <div className="rich-cascade" role="region" aria-label="Предпросмотр сдвига">
-      {proposal.status === "available" ? <><p>Предлагаемые изменения</p><ul>{proposal.shifts.map(shift => <li key={shift.periodId}>
-        {job(shift.jobId)}: {shift.before.start.rawText} — {shift.before.end.rawText} → {shift.after.start.rawText} — {shift.after.end.rawText}
-        <small>{shift.inclusiveSpan} {shift.unit === "month" ? "мес." : "дн."}, длительность сохранена</small></li>)}</ul>
-        <small>После сдвига предупреждений: {proposal.warnings.length}</small>
-        <button disabled={busy} onClick={() => { setBusy(true); setError(""); void controls.apply(proposal).then(() => setProposal(null))
-          .catch(error => setError(error instanceof Error ? error.message : "Предпросмотр устарел")).finally(() => setBusy(false)); }}>Применить сдвиг</button></>
-        : <p>{reasons[proposal.reason ?? ""] ?? "Сдвиг недоступен. Проверьте периоды вручную."}</p>}
-      <button disabled={busy} onClick={() => setProposal(null)}>Закрыть предпросмотр</button>
-    </div>}
+        .catch(error => setError(error instanceof Error ? error.message : "Предпросмотр устарел")).finally(() => setBusy(false)); }} />}
   </div>;
 }

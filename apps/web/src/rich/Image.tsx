@@ -1,8 +1,8 @@
 import { createContext, useContext, useRef, useState } from "react";
 import { createReactBlockSpec } from "@blocknote/react";
 
-export const ImageActions = createContext<{ source: (asset: string) => string; upload: (file: File, block: string) => Promise<void>; cancel: (block: string) => void; prototype: boolean }>({
-  source: () => "", upload: async () => {}, cancel: () => {}, prototype: false,
+export const ImageActions = createContext<{ source: (asset: string) => string; upload: (file: File, block: string) => Promise<void>; cancel: (block: string) => void }>({
+  source: () => "", upload: async () => {}, cancel: () => {},
 });
 export const image = createReactBlockSpec({ type: "image", content: "inline", propSchema: {
   assetId: { default: "" }, alt: { default: "" }, width: { default: 160 }, height: { default: 80 },
@@ -18,10 +18,10 @@ export const image = createReactBlockSpec({ type: "image", content: "inline", pr
       {block.props.assetId && <img src={actions.source(block.props.assetId)} alt={block.props.alt}
         style={{ width: `${block.props.width}pt`, maxWidth: "100%", height: "auto" }} />}
       <div className="cv-image-controls" data-uir-engine-ui="true">
-        {actions.prototype && <button type="button" className="text-button" disabled={busy} onClick={() => fileInput.current?.click()}>{label}</button>}
-        <label>{!actions.prototype && label}<input ref={fileInput} hidden={actions.prototype} aria-label={label} type="file" accept="image/png,image/jpeg,image/webp" disabled={busy}
+        <button type="button" className="text-button" disabled={busy} onClick={() => fileInput.current?.click()}>{label}</button>
+        <input ref={fileInput} hidden aria-label={label} type="file" accept="image/png,image/jpeg,image/webp" disabled={busy}
           onChange={event => { const file = event.currentTarget.files?.[0]; event.currentTarget.value = "";
-            if (file) { setBusy(true); setError(""); void actions.upload(file, block.id).catch(error => setError(error instanceof Error ? error.message : "IMAGE_INVALID")).finally(() => setBusy(false)); } }} /></label>
+            if (file) { setBusy(true); setError(""); void actions.upload(file, block.id).catch(error => setError(error instanceof Error ? error.message : "IMAGE_INVALID")).finally(() => setBusy(false)); } }} />
         {busy && <button onClick={() => actions.cancel(block.id)}>Остановить загрузку</button>}
         {block.props.assetId && <><label>Описание<input aria-label="Описание изображения" value={block.props.alt}
           onChange={event => editor.updateBlock(block.id, { props: { alt: event.currentTarget.value } })} /></label>

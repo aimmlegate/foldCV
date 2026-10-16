@@ -7,7 +7,7 @@ import { useEffect, useMemo, useState } from "react";
 import { SessionHistory, type CellChange, type CellValue, type DependencyCapture, type HistoryKind } from "./history";
 import { readTableIdentities, restoreTableIdentities, tableIdentityAttributes, tableIdentityPlugin, type TableRowIdentity } from "./table-identity";
 import "@blocknote/shadcn/style.css";
-import "../shell/theme.css";
+import "../internal/proof-theme.css";
 import "./spike.css";
 
 const region = createReactBlockSpec({ type: "region", content: "none",

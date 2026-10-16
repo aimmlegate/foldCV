@@ -200,7 +200,8 @@ async def main(args):
     app.session = None; app.secret = secret
     projects_path = root / "fixture-projects.json"
     projects = json.loads(projects_path.read_text()) if projects_path.exists() else json.loads((FIXTURES / "manifest.json").read_text())["projects"]
-    proof_url = origin + "/uir-proof.html?project=" + projects["structured"] if args.slice != "UIR00" else origin + "/reference/"
+    proof_entry = "/?project=" if args.slice == "UIR09" else "/uir-proof.html?project="
+    proof_url = origin + proof_entry + projects["structured"] if args.slice != "UIR00" else origin + "/reference/"
     info["proofUrl"] = proof_url
     launch = root / "launch.json"
     write_json(launch, {"origin": origin, "url": proof_url + "#secret=" + secret, "pid": os.getpid()}); launch.chmod(0o600)

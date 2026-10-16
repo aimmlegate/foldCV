@@ -1,8 +1,9 @@
 import { useState } from "react";
 import type { AgentFinding } from "../../contracts/generated/agent_finding";
 import type { AssistantView } from "../../assistant/controller";
-import { errorText, sourceUrl } from "../../assistant/presentation";
+import { sourceUrl } from "../../assistant/presentation";
 import { activityText } from "./status";
+import { MessageText } from "../../assistant/MessageText";
 import { Icon } from "../ui/Icon";
 
 const tools: Record<string, string> = { web_search: "Поиск в интернете", get_resume_context: "Чтение резюме", find_resume_content: "Поиск в резюме",
@@ -19,8 +20,7 @@ export function Transcript({ view, active, resource, focus, draft }: { view: Ass
     {view.messages.map(message => <article key={message.id} className={`chat-message${message.role === "user" ? " from-user" : ""}`}>
       <div className="chat-message-heading"><span>{message.role !== "user" && <Icon name="spark" />}{message.role === "user" ? "Вы" : "Помощник"}</span>
         <small><time dateTime={message.timestamp}>{new Date(message.timestamp).toLocaleTimeString("ru", { hour: "2-digit", minute: "2-digit" })}</time></small></div>
-      <div className="chat-message-text"><p>{message.text}</p></div>{message.truncated && <small>Ответ сокращён.</small>}
-      {message.error && <p className="chat-error">{errorText(message.error.code)}</p>}
+      <MessageText text={message.text} truncated={message.truncated} error={message.error?.code ?? null} />
       {message.sources.map(ref => <button className="chat-source" key={ref.id} onClick={() => resource("sources", ref.id)}><Icon name="file" />{ref.label || "Открыть источник"}<Icon name="arrow" /></button>)}
       {message.findings.map(ref => <button className="chat-source" key={ref.id} onClick={() => resource("findings", ref.id)}><Icon name="info" />{ref.label || "Открыть замечание"}<Icon name="arrow" /></button>)}
       {message.role !== "user" && <div className="chat-message-actions"><button className="chat-icon" aria-label="Скопировать ответ" title="Скопировать ответ"

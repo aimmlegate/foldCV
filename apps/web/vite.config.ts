@@ -5,8 +5,8 @@ import { fileURLToPath } from "node:url";
 
 function proofBoundary(mode: string): Plugin {
   return { name: "foldcv-uir-boundary", generateBundle() {
-    if (mode !== "uir-proof") return;
-    const entry = fileURLToPath(new URL("./uir-proof.html", import.meta.url));
+    const entryName = mode === "uir-proof" ? "uir-proof.html" : "index.html";
+    const entry = fileURLToPath(new URL(`./${entryName}`, import.meta.url));
     const root = fileURLToPath(new URL("../../", import.meta.url));
     const visited = new Set<string>();
     const visit = (id: string) => {
@@ -17,9 +17,9 @@ function proofBoundary(mode: string): Plugin {
     };
     visit(entry);
     const modules = [...visited].map(id => id.startsWith(root) ? id.slice(root.length) : id).sort();
-    const forbidden = modules.filter(id => /src\/(shell\/theme\.css|next\/next\.css|rich\/(editor|shell)\.css)|future-editor\/(prototype\.js|agent-chat\.js|visual\/index\.js)|tailwindcss\/preflight/.test(id));
+    const forbidden = modules.filter(id => /src\/(shell\/|next\/|internal\/|assistant\/assistant\.css|rich\/(editor|shell)\.css)|future-editor\/(prototype\.js|agent-chat\.js|visual\/index\.js)|tailwindcss\/preflight/.test(id));
     if (forbidden.length) this.error(`UIR stylesheet/runtime boundary: ${forbidden.join(", ")}`);
-    this.emitFile({ type: "asset", fileName: "uir-proof-imports.json", source: JSON.stringify({ entry: "uir-proof.html", forbidden, modules }, null, 2) });
+    this.emitFile({ type: "asset", fileName: mode === "uir-proof" ? "uir-proof-imports.json" : "frontend-imports.json", source: JSON.stringify({ entry: entryName, forbidden, modules }, null, 2) });
   } };
 }
 
@@ -34,8 +34,6 @@ export default defineConfig(({ mode }) => ({
   ] } },
   build: { target: "es2022", cssCodeSplit: true, manifest: mode === "uir-proof", rollupOptions: { input: {
     main: fileURLToPath(new URL("./index.html", import.meta.url)),
-    legacy: fileURLToPath(new URL("./legacy.html", import.meta.url)),
-    next: fileURLToPath(new URL("./next.html", import.meta.url)),
     ...(mode === "uir-proof" ? { uirProof: fileURLToPath(new URL("./uir-proof.html", import.meta.url)) } : {}),
   } } },
 }));

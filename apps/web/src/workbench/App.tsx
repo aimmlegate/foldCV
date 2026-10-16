@@ -55,7 +55,7 @@ export function App({ portalHost }: { portalHost: HTMLElement }) {
   const projectTitle = response?.identity?.title ?? response?.workspace.title ?? "resume";
   const filename = projectFilename(projectTitle, fileMode === "export" ? "docx" : "foldcv");
   const navigate = (id: string) => open(id).then(done => { if (done) { setSourceOpen(false); if (innerWidth <= 600) setCollapsed(true); } return done; });
-  return <main className={`app-shell${collapsed ? " history-collapsed" : ""}`} data-app="foldcv-uir-proof">
+  return <main className={`app-shell${collapsed ? " history-collapsed" : ""}`} data-app="foldcv">
     <History projects={projects} activeId={response?.workspace.projectId ?? null} busy={busy || creating} collapse={() => setCollapsed(true)}
       fresh={() => { void fresh(); setSourceOpen(false); if (innerWidth <= 600) setCollapsed(true); }} open={navigate} remove={remove} openFile={() => openFile("open")} settings={openSettings}
       connection={connection?.snapshot.state === "connected" ? "Codex · подписка" : connection?.snapshot.state === "unchecked" ? "Подключение не проверено" : "Модель отключена"} />
@@ -70,10 +70,10 @@ export function App({ portalHost }: { portalHost: HTMLElement }) {
         {view === "assessment" && response && <Assessment response={response} open={() => setReviewed(reviewId(response))} back={() => setSourceOpen(true)} />}
         {view === "editor" && response?.workspace.project && <>
           {status !== "Сохранено" && status !== "Изменения сохраняются…" && <button className="text-button" disabled={busy} onClick={() => void action(async () => { await editor.current?.flush(); setStatus("Сохранено"); })}>Повторить сохранение</button>}
-          <RichEditor key={response.workspace.projectId} initial={response} acknowledge={acknowledge} onStatus={setStatus} ref={editor} appearance="prototype" portalHost={portalHost}
+          <RichEditor key={response.workspace.projectId} initial={response} acknowledge={acknowledge} onStatus={setStatus} ref={editor} portalHost={portalHost}
             onHistoryNavigation={() => assistant.current?.history()} onAssistantFence={saved => assistant.current?.fence(saved)}
             assistant={<AssistantDrawer key={response.workspace.projectId} projectId={response.workspace.projectId} editor={editor} settingsOpen={settings} ref={assistant}
-              appearance="prototype" title={projectTitle} settings={openSettings} />}
+              title={projectTitle} settings={openSettings} />}
             contextActions={response.workspace.warnings.length > 0 && <button onClick={() => setWarningsOpen(true)}>Замечания к исходнику</button>} />
         </>}
         {view === "source" && <SourceForm input={input} change={setInput} textDraft={textDraft} busy={busy || creating} sourceName={source?.originalName ?? null}
