@@ -55,6 +55,7 @@ import { BackgroundWriter, type WriterMode } from "../background/writer";
 import type { AttachedWriter } from "../background/connection";
 import { projectJobs } from "../background/jobs";
 import { allowRichCodeStyles } from "./styles";
+import { captureCaret, restoreCaret } from "./caret";
 
 type FactIntent = { kind: "panel"; command: PanelCommand } | { kind: "cascade"; proposal: DateCascadeProposal };
 
@@ -371,9 +372,11 @@ export function RichEditor({ initial, acknowledge, onStatus, ref, onHistoryNavig
       const remember = (block: RichBlock) => { bridge.original.set(block.id, block); block.children.forEach(remember); };
       document.regions.forEach(region => region.blocks.forEach(remember));
       editor.transact(tr => {
+        const caret = captureCaret(tr);
         document.regions.forEach(region => editor.updateBlock(region.id, { children: region.blocks.map(toBlock) }));
         restoreEmptyRegions(tr, new Set(document.regions.filter(region => !region.blocks.length).map(region => region.id)));
         restoreTableIdentities(tr, tableIds(document));
+        restoreCaret(tr, caret);
       });
     }
     assets.command = (id, command, target) => {
@@ -432,6 +435,7 @@ export function RichEditor({ initial, acknowledge, onStatus, ref, onHistoryNavig
         bridge.replaying = true;
         try {
           editor.transact(tr => {
+            const caret = captureCaret(tr);
             const empty = new Set<string>();
             originalDocument.regions.forEach(region => {
             const value = next.get(`region:${region.id}`);
@@ -448,6 +452,7 @@ export function RichEditor({ initial, acknowledge, onStatus, ref, onHistoryNavig
               if (stored?.block.type === "table") tables.set(stored.block.id, stored.block.content.rows.map(row => ({ id: row.id, cells: row.cells.map(cell => cell.id) })));
             }
             restoreTableIdentities(tr, tables);
+            restoreCaret(tr, caret);
           });
         } finally { bridge.replaying = false; }
       }

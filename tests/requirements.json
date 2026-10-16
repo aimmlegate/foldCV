@@ -97,6 +97,30 @@
         "tests/contracts/test_contracts.py::test_shared_case[nb03_writer_short_credential]",
         "tests/contracts/test_contracts.py::test_shared_case[nb03_writer_touch_replay_floor]",
         "tests/contracts/test_contracts.py::test_shared_case[nb03_writer_wrong_workspace_hash]",
+        "tests/contracts/test_contracts.py::test_shared_case[nb06_background_index_v1_unknown_field]",
+        "tests/contracts/test_contracts.py::test_shared_case[nb06_background_index_v1_valid]",
+        "tests/contracts/test_contracts.py::test_shared_case[nb06_background_index_v1_wrong_version]",
+        "tests/contracts/test_contracts.py::test_shared_case[nb06_background_summary_v1_unknown_field]",
+        "tests/contracts/test_contracts.py::test_shared_case[nb06_background_summary_v1_valid]",
+        "tests/contracts/test_contracts.py::test_shared_case[nb06_background_summary_v1_wrong_version]",
+        "tests/contracts/test_contracts.py::test_shared_case[nb06_index_bad_nested_summary]",
+        "tests/contracts/test_contracts.py::test_shared_case[nb06_index_duplicate]",
+        "tests/contracts/test_contracts.py::test_shared_case[nb06_index_empty]",
+        "tests/contracts/test_contracts.py::test_shared_case[nb06_index_mixed_lineage]",
+        "tests/contracts/test_contracts.py::test_shared_case[nb06_index_two_projects]",
+        "tests/contracts/test_contracts.py::test_shared_case[nb06_summary_bad_date]",
+        "tests/contracts/test_contracts.py::test_shared_case[nb06_summary_bad_stage]",
+        "tests/contracts/test_contracts.py::test_shared_case[nb06_summary_business_payload]",
+        "tests/contracts/test_contracts.py::test_shared_case[nb06_summary_check_only]",
+        "tests/contracts/test_contracts.py::test_shared_case[nb06_summary_check_only_cannot_publish]",
+        "tests/contracts/test_contracts.py::test_shared_case[nb06_summary_empty_title]",
+        "tests/contracts/test_contracts.py::test_shared_case[nb06_summary_fake_saved]",
+        "tests/contracts/test_contracts.py::test_shared_case[nb06_summary_long_title]",
+        "tests/contracts/test_contracts.py::test_shared_case[nb06_summary_missing_identity]",
+        "tests/contracts/test_contracts.py::test_shared_case[nb06_summary_saved_then_cancelled]",
+        "tests/contracts/test_contracts.py::test_shared_case[nb06_summary_saved_without_flag]",
+        "tests/contracts/test_contracts.py::test_shared_case[nb06_summary_strict_edit_flag]",
+        "tests/contracts/test_contracts.py::test_shared_case[nb06_summary_strict_saved_flag]",
         "tests/docx/test_export_mapping.py::test_all_authored_sections_order_hidden_rows_and_legacy_text_keep_actual_word_breaks",
         "tests/docx/test_export_mapping.py::test_each_empty_required_string_uses_only_localized_render_labels",
         "tests/docx/test_export_mapping.py::test_multiple_partial_present_periods_and_incomplete_exposure_export_verbatim",
@@ -2715,8 +2739,37 @@
     },
     {
       "id": "NB-UI",
-      "status": "unimplemented",
-      "tests": []
+      "status": "implemented",
+      "tests": [
+        "apps/web/unit/background-caret.test.ts::selection remains valid when an endpoint is deleted and select-all survives replacement",
+        "apps/web/unit/background-caret.test.ts::table cell reorder with equal text preserves the selected cell identity and offset",
+        "apps/web/unit/background-caret.test.ts::unrelated inserted content preserves a backward text selection by stable endpoints",
+        "apps/web/unit/background-caret.test.ts::whole-document adoption preserves a caret in its original block instead of the last table cell",
+        "apps/web/unit/background-global.test.ts::NB-W13:v01 real replay resync survives a missing sequence without inference",
+        "apps/web/unit/background-global.test.ts::NB-W13:v02 old generation and cursor cannot regress global or project state",
+        "apps/web/unit/background-global.test.ts::NB-W13:v03 real replay resync survives a pruned cursor without inference",
+        "apps/web/unit/background-global.test.ts::NB-W13:v04 real replay resync survives terminal before an older event without inference",
+        "apps/web/unit/background-global.test.ts::NB-W13:v05 execution completes before Saved; later publication emits one notice and no new inference",
+        "apps/web/unit/background-global.test.ts::NB-W13:v06 New keeps real background work and exact result identity",
+        "apps/web/unit/background-global.test.ts::NB-W13:v07 Settings keeps real background work and exact result identity",
+        "apps/web/unit/background-global.test.ts::NB-W13:v08 another conversation keeps real background work and exact result identity",
+        "apps/web/unit/background-global.test.ts::Stop deduplicates an exact job and fences a stale index reply",
+        "apps/web/unit/background-global.test.ts::a late command result cannot resurrect a deleted global row",
+        "apps/web/unit/background-global.test.ts::a real Saved receipt remains visible after exact Stop cancels the remaining execution",
+        "apps/web/unit/background-global.test.ts::disabled global polling stops; transient errors preserve the last known jobs",
+        "apps/web/unit/background-global.test.ts::discarding a real conflicted result clears its review notice and preserves resume content",
+        "apps/web/unit/background-global.test.ts::global notices are bounded, deduplicated and quiet for historical or automatic results",
+        "tests/foundation/test_runner_gates.py::test_background_manual_gate_keeps_unavailable_or_stale_cases_out[changed-evidence]",
+        "tests/foundation/test_runner_gates.py::test_background_manual_gate_keeps_unavailable_or_stale_cases_out[missing-authority]",
+        "tests/foundation/test_runner_gates.py::test_background_manual_gate_keeps_unavailable_or_stale_cases_out[missing-binding]",
+        "tests/foundation/test_runner_gates.py::test_background_manual_gate_keeps_unavailable_or_stale_cases_out[missing-case]",
+        "tests/foundation/test_runner_gates.py::test_background_manual_gate_keeps_unavailable_or_stale_cases_out[none]",
+        "tests/foundation/test_runner_gates.py::test_background_manual_gate_keeps_unavailable_or_stale_cases_out[skipped]",
+        "tests/recovery/test_background_ui.py::test_discard_rejects_unresolved_commit_and_cross_project_job",
+        "tests/recovery/test_background_ui.py::test_global_exact_stop_leaves_another_project_job_to_save",
+        "tests/recovery/test_background_ui.py::test_global_index_is_authenticated_disabled_and_read_only",
+        "tests/recovery/test_background_ui.py::test_reloaded_fixed_metadata_preserves_dependency_kinds_and_durability"
+      ]
     },
     {
       "id": "NB-PARALLEL",
@@ -2751,7 +2804,7 @@
     "G01": {
       "unproved": "Application dispatch/count/zero-call paths pass; actual CLI internal requests, payload disclosure and tokens are unmeasured.",
       "owner": "Manual CLI usage after MVP under D038",
-      "check": "Record logical operations and supported CLI metadata on examples E1\u2013E8; keep unavailable internal request counts unknown."
+      "check": "Record logical operations and supported CLI metadata on examples E1–E8; keep unavailable internal request counts unknown."
     },
     "G02": {
       "unproved": "Controlled event/error/retry guards pass; the installed experimental native CLI version is unverified.",
@@ -2780,7 +2833,7 @@
     },
     "B01": {
       "unproved": "Connected controlled raw-to-edit/rewrite/restore/local-portable-reopen/DOCX and default-entry UI pass; live semantic wording/quality remains pending.",
-      "owner": "Manual examples E1\u2013E8 after MVP under D038",
+      "owner": "Manual examples E1–E8 after MVP under D038",
       "check": "Use the manual guide through the real CLI path, inspect quality and supported facts, record keyboard/failure behavior and measured usage. No mandatory automated pilot."
     },
     "N01": {
@@ -2846,7 +2899,7 @@
     "historicalMapping": "docs/gui/handoffs/PROTOTYPE-ADOPTION/evidence/uir09-browser-retirement.json",
     "connectedAcceptance": "docs/gui/handoffs/PROTOTYPE-ADOPTION/uir08-acceptance.json",
     "manualWord": "pending_unchanged",
-    "currentUiChecks": "Manual T3 acceptance in UIR01\u2013UIR09; Python/state mappings remain active."
+    "currentUiChecks": "Manual T3 acceptance in UIR01–UIR09; Python/state mappings remain active."
   },
   "backgroundExecution": {
     "schemaVersion": 1,
@@ -2856,7 +2909,8 @@
       "NB02a",
       "NB02b",
       "NB03",
-      "NB05"
+      "NB05",
+      "NB06"
     ],
     "bindings": {
       "NB-R03:v01": [
@@ -4308,6 +4362,30 @@
       ],
       "NB-F03:v08": [
         "tests/recovery/test_background_fixed_jobs.py::test_processing_stage_boundaries_keep_captured_input_and_stop_authority[NB-F03:v08]"
+      ],
+      "NB-W13:v02": [
+        "apps/web/unit/background-global.test.ts::NB-W13:v02 old generation and cursor cannot regress global or project state"
+      ],
+      "NB-W13:v01": [
+        "apps/web/unit/background-global.test.ts::NB-W13:v01 real replay resync survives a missing sequence without inference"
+      ],
+      "NB-W13:v03": [
+        "apps/web/unit/background-global.test.ts::NB-W13:v03 real replay resync survives a pruned cursor without inference"
+      ],
+      "NB-W13:v04": [
+        "apps/web/unit/background-global.test.ts::NB-W13:v04 real replay resync survives terminal before an older event without inference"
+      ],
+      "NB-W13:v05": [
+        "apps/web/unit/background-global.test.ts::NB-W13:v05 execution completes before Saved; later publication emits one notice and no new inference"
+      ],
+      "NB-W13:v06": [
+        "apps/web/unit/background-global.test.ts::NB-W13:v06 New keeps real background work and exact result identity"
+      ],
+      "NB-W13:v07": [
+        "apps/web/unit/background-global.test.ts::NB-W13:v07 Settings keeps real background work and exact result identity"
+      ],
+      "NB-W13:v08": [
+        "apps/web/unit/background-global.test.ts::NB-W13:v08 another conversation keeps real background work and exact result identity"
       ]
     },
     "checks": {
@@ -5187,6 +5265,42 @@
         "apps/web/unit/background-fixed.test.ts::fixed submission validates its capture before metadata",
         "apps/web/unit/background-fixed.test.ts::fixed submission validates its capture before server acceptance",
         "apps/web/unit/background-fixed.test.ts::fixed submission validates its capture valid metadata delay"
+      ],
+      "NB06:lifecycle-and-controls": [
+        "apps/web/unit/background-global.test.ts::NB-W13:v01 real replay resync survives a missing sequence without inference",
+        "apps/web/unit/background-global.test.ts::NB-W13:v02 old generation and cursor cannot regress global or project state",
+        "apps/web/unit/background-global.test.ts::NB-W13:v03 real replay resync survives a pruned cursor without inference",
+        "apps/web/unit/background-global.test.ts::NB-W13:v04 real replay resync survives terminal before an older event without inference",
+        "apps/web/unit/background-global.test.ts::NB-W13:v05 execution completes before Saved; later publication emits one notice and no new inference",
+        "apps/web/unit/background-global.test.ts::NB-W13:v06 New keeps real background work and exact result identity",
+        "apps/web/unit/background-global.test.ts::NB-W13:v07 Settings keeps real background work and exact result identity",
+        "apps/web/unit/background-global.test.ts::NB-W13:v08 another conversation keeps real background work and exact result identity",
+        "apps/web/unit/background-global.test.ts::Stop deduplicates an exact job and fences a stale index reply",
+        "apps/web/unit/background-global.test.ts::a late command result cannot resurrect a deleted global row",
+        "apps/web/unit/background-global.test.ts::a real Saved receipt remains visible after exact Stop cancels the remaining execution",
+        "apps/web/unit/background-global.test.ts::disabled global polling stops; transient errors preserve the last known jobs",
+        "apps/web/unit/background-global.test.ts::discarding a real conflicted result clears its review notice and preserves resume content",
+        "apps/web/unit/background-global.test.ts::global notices are bounded, deduplicated and quiet for historical or automatic results"
+      ],
+      "NB06:caret-restoration": [
+        "apps/web/unit/background-caret.test.ts::whole-document adoption preserves a caret in its original block instead of the last table cell",
+        "apps/web/unit/background-caret.test.ts::unrelated inserted content preserves a backward text selection by stable endpoints",
+        "apps/web/unit/background-caret.test.ts::table cell reorder with equal text preserves the selected cell identity and offset",
+        "apps/web/unit/background-caret.test.ts::selection remains valid when an endpoint is deleted and select-all survives replacement"
+      ],
+      "NB06:global-http-boundary": [
+        "tests/recovery/test_background_ui.py::test_discard_rejects_unresolved_commit_and_cross_project_job",
+        "tests/recovery/test_background_ui.py::test_global_exact_stop_leaves_another_project_job_to_save",
+        "tests/recovery/test_background_ui.py::test_global_index_is_authenticated_disabled_and_read_only",
+        "tests/recovery/test_background_ui.py::test_reloaded_fixed_metadata_preserves_dependency_kinds_and_durability"
+      ],
+      "NB06:manual-evidence-gate": [
+        "tests/foundation/test_runner_gates.py::test_background_manual_gate_keeps_unavailable_or_stale_cases_out[none]",
+        "tests/foundation/test_runner_gates.py::test_background_manual_gate_keeps_unavailable_or_stale_cases_out[missing-binding]",
+        "tests/foundation/test_runner_gates.py::test_background_manual_gate_keeps_unavailable_or_stale_cases_out[missing-case]",
+        "tests/foundation/test_runner_gates.py::test_background_manual_gate_keeps_unavailable_or_stale_cases_out[skipped]",
+        "tests/foundation/test_runner_gates.py::test_background_manual_gate_keeps_unavailable_or_stale_cases_out[changed-evidence]",
+        "tests/foundation/test_runner_gates.py::test_background_manual_gate_keeps_unavailable_or_stale_cases_out[missing-authority]"
       ]
     },
     "sources": [
@@ -5197,8 +5311,11 @@
       "apps/web/src/background/connection.ts",
       "apps/web/src/background/drafts.ts",
       "apps/web/src/background/fixed.ts",
+      "apps/web/src/background/global.ts",
       "apps/web/src/background/jobs.ts",
+      "apps/web/src/background/status.ts",
       "apps/web/src/background/tab.ts",
+      "apps/web/src/background/useGlobalJobs.ts",
       "apps/web/src/background/wire.ts",
       "apps/web/src/background/writer.ts",
       "apps/web/src/contracts/background-validate.ts",
@@ -5215,6 +5332,7 @@
       "apps/web/src/contracts/generated/background_fixed_input_v1.ts",
       "apps/web/src/contracts/generated/background_fixed_reply_v1.ts",
       "apps/web/src/contracts/generated/background_fixed_request_v1.ts",
+      "apps/web/src/contracts/generated/background_index_v1.ts",
       "apps/web/src/contracts/generated/background_intent_v1.ts",
       "apps/web/src/contracts/generated/background_legacy_run_v2.ts",
       "apps/web/src/contracts/generated/background_processing_candidate_v1.ts",
@@ -5227,6 +5345,7 @@
       "apps/web/src/contracts/generated/background_sidecar_v1.ts",
       "apps/web/src/contracts/generated/background_snapshot_v1.ts",
       "apps/web/src/contracts/generated/background_submission_v1.ts",
+      "apps/web/src/contracts/generated/background_summary_v1.ts",
       "apps/web/src/contracts/generated/background_undo_v1.ts",
       "apps/web/src/contracts/generated/background_writer_abandon_v1.ts",
       "apps/web/src/contracts/generated/background_writer_advance_v1.ts",
@@ -5251,18 +5370,26 @@
       "apps/web/src/contracts/validate.ts",
       "apps/web/src/main.tsx",
       "apps/web/src/rich/Editor.tsx",
+      "apps/web/src/rich/caret.ts",
       "apps/web/src/rich/history.ts",
       "apps/web/src/rich/save-queue.ts",
       "apps/web/src/rich/styles.ts",
       "apps/web/src/rich/synchronization.ts",
       "apps/web/src/workbench/App.tsx",
       "apps/web/src/workbench/BlockedTab.tsx",
+      "apps/web/src/workbench/background/BackgroundJobs.tsx",
+      "apps/web/src/workbench/layout/Header.tsx",
+      "apps/web/src/workbench/layout/History.tsx",
       "apps/web/src/workbench/main.tsx",
       "apps/web/src/workbench/proof.tsx",
+      "apps/web/src/workbench/styles/background.css",
+      "apps/web/src/workbench/styles/index.css",
       "apps/web/src/workbench/useResumeWorkspace.ts",
+      "apps/web/unit/background-caret.test.ts",
       "apps/web/unit/background-drafts.test.ts",
       "apps/web/unit/background-editor-schema.test.ts",
       "apps/web/unit/background-fixed.test.ts",
+      "apps/web/unit/background-global.test.ts",
       "apps/web/unit/background-guard.test.ts",
       "apps/web/unit/background-jobs.test.ts",
       "apps/web/unit/background-orders.test.ts",
@@ -5289,6 +5416,7 @@
       "contracts/examples/background/background_fixed_request_v1.json",
       "contracts/examples/background/background_history_metadata_full_v1.json",
       "contracts/examples/background/background_history_sidecar_v1.json",
+      "contracts/examples/background/background_index_v1.json",
       "contracts/examples/background/background_intent_v1.json",
       "contracts/examples/background/background_legacy_run_v2.json",
       "contracts/examples/background/background_manual_sidecar_v1.json",
@@ -5304,6 +5432,7 @@
       "contracts/examples/background/background_sidecar_v1.json",
       "contracts/examples/background/background_snapshot_v1.json",
       "contracts/examples/background/background_submission_v1.json",
+      "contracts/examples/background/background_summary_v1.json",
       "contracts/examples/background/background_undo_v1.json",
       "contracts/examples/background/background_writer_abandon_v1.json",
       "contracts/examples/background/background_writer_advance_v1.json",
@@ -5339,6 +5468,7 @@
       "contracts/json-schema/background_fixed_input_v1.schema.json",
       "contracts/json-schema/background_fixed_reply_v1.schema.json",
       "contracts/json-schema/background_fixed_request_v1.schema.json",
+      "contracts/json-schema/background_index_v1.schema.json",
       "contracts/json-schema/background_intent_v1.schema.json",
       "contracts/json-schema/background_legacy_run_v2.schema.json",
       "contracts/json-schema/background_processing_candidate_v1.schema.json",
@@ -5351,6 +5481,7 @@
       "contracts/json-schema/background_sidecar_v1.schema.json",
       "contracts/json-schema/background_snapshot_v1.schema.json",
       "contracts/json-schema/background_submission_v1.schema.json",
+      "contracts/json-schema/background_summary_v1.schema.json",
       "contracts/json-schema/background_undo_v1.schema.json",
       "contracts/json-schema/background_writer_abandon_v1.schema.json",
       "contracts/json-schema/background_writer_advance_v1.schema.json",
@@ -5380,6 +5511,8 @@
       "docs/gui/handoffs/BACKGROUND-WORK/nb00a-state-mappings.md",
       "docs/gui/handoffs/BACKGROUND-WORK/nb02a-contract.md",
       "docs/gui/handoffs/BACKGROUND-WORK/nb02b-contract.md",
+      "docs/gui/handoffs/BACKGROUND-WORK/nb06-ime-amendment.json",
+      "docs/gui/handoffs/BACKGROUND-WORK/nb06-t3.json",
       "docs/gui/handoffs/BACKGROUND-WORK/test-matrix.json",
       "docs/gui/testing.md",
       "packages/resume_core/__init__.py",
@@ -5604,6 +5737,7 @@
       "tests/recovery/test_background_store.py",
       "tests/recovery/test_background_supervisor.py",
       "tests/recovery/test_background_tool_publication.py",
+      "tests/recovery/test_background_ui.py",
       "tests/recovery/test_background_writer_api.py",
       "tests/recovery/test_background_writer_cuts.py",
       "tests/recovery/test_background_writer_drafts.py",
@@ -5895,7 +6029,22 @@
       "claim_before_timeout",
       "runtime_exit_before_publication"
     ],
-    "scope": "Exact implemented variants through NB05; capacity one with real fixed/agent services, writer/compiler/store traces and separate specification traces. Final serial/parallel native and platform gates retain their own deadlines.",
-    "reportSchema": "docs/gui/handoffs/BACKGROUND-WORK/nb00a-execution-report.schema.json"
+    "scope": "Exact implemented variants through NB06. Executable reports cover Python/Node; sole-layer T3 cases bind retained observations and artifact hashes, including explicit user amendments. Normal rollout, parallel/native and Word gates remain separate.",
+    "reportSchema": "docs/gui/handoffs/BACKGROUND-WORK/nb00a-execution-report.schema.json",
+    "manualBindings": {
+      "NB-X02:v01": "docs/gui/handoffs/BACKGROUND-WORK/nb06-t3.json",
+      "NB-X02:v02": "docs/gui/handoffs/BACKGROUND-WORK/nb06-t3.json",
+      "NB-X02:v03": "docs/gui/handoffs/BACKGROUND-WORK/nb06-t3.json",
+      "NB-X02:v04": "docs/gui/handoffs/BACKGROUND-WORK/nb06-t3.json",
+      "NB-X02:v05": "docs/gui/handoffs/BACKGROUND-WORK/nb06-t3.json",
+      "NB-X02:v06": "docs/gui/handoffs/BACKGROUND-WORK/nb06-t3.json",
+      "NB-X02:v07": "docs/gui/handoffs/BACKGROUND-WORK/nb06-t3.json",
+      "NB-X02:v08": "docs/gui/handoffs/BACKGROUND-WORK/nb06-t3.json",
+      "NB-X02:v09": "docs/gui/handoffs/BACKGROUND-WORK/nb06-t3.json",
+      "NB-X02:v10": "docs/gui/handoffs/BACKGROUND-WORK/nb06-t3.json",
+      "NB-X02:v11": "docs/gui/handoffs/BACKGROUND-WORK/nb06-t3.json",
+      "NB-X02:v12": "docs/gui/handoffs/BACKGROUND-WORK/nb06-t3.json",
+      "NB-X02:v13": "docs/gui/handoffs/BACKGROUND-WORK/nb06-t3.json"
+    }
   }
 }

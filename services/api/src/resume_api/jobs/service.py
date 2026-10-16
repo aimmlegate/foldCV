@@ -13,7 +13,7 @@ from packages.resume_core.background_writers import WriterSessions
 from packages.resume_core.background_scopes import mutation_selectors
 from packages.resume_core.background_store import BackgroundFailure, JobStore, RESOLVED_PUBLICATION, TERMINAL_EXECUTION, job_in
 from packages.resume_core.background_supervisor import JobSupervisor
-from packages.resume_core.models.background import JobIdentity, JobProjectV1, JobSubmissionV1, ScopeGuardV1
+from packages.resume_core.models.background import JobIdentity, JobProjectV1, JobSubmissionV1, ScopeGuardV1, JobSummaryV1, JobIndexV1
 from packages.resume_core.models.agent import wire_bytes
 
 from ..agent.service import CONFIG_SHA256
@@ -96,6 +96,34 @@ class JobService:
         state = self.store.open(project)
         return JobProjectV1(schemaVersion=1, projectId=project, lineage=state.lineage,
             requestEpoch=state.active_request_epoch, jobs=state.jobs)
+
+    def index(self):
+        if not self.enabled:
+            raise BackgroundFailure("JOB_DISABLED")
+        titles = {entry["projectId"]: entry["title"] for entry in self.projects.listing()["entries"]}
+        rows = []
+        for project, state in self.store.snapshots().items():
+            title = (titles.get(project) or "Резюме")[:512]
+            for job in state.jobs:
+                rows.append(JobSummaryV1(schemaVersion=1, projectId=project, lineage=state.lineage,
+                    jobId=job.id, projectTitle=title, kind=job.submission.kind,
+                    stage=job.attempts[-1].stage if job.attempts else None, execution=job.execution,
+                    publication=job.publication, executionGeneration=job.execution_generation,
+                    eventCursor=job.event_cursor, allowEdits=job.submission.allow_edits,
+                    saved=job.receipt is not None, error=job.error, publicationError=job.publication_error,
+                    updatedAt=job.updated_at))
+        return JobIndexV1(schemaVersion=1, jobs=rows)
+
+    async def discard(self, project, identifier):
+        self.project(project)
+        job = self.store.read(project, identifier)
+        if job.publication == "outcome_unknown":
+            raise BackgroundFailure("OUTCOME_UNKNOWN")
+        await self.supervisor.cancel(project, identifier)
+        job = self.store.discard(project, identifier)
+        await self.supervisor._emit(job)
+        self.supervisor.changed.set()
+        return job
 
     def proposals_for(self, project):
         if project not in self.proposals:

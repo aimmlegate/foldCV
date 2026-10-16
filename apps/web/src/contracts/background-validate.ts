@@ -5,6 +5,8 @@ import { sameValue, sha256 } from "../background/wire.js";
 import rich_mutation from "../../../../contracts/json-schema/rich_mutation.schema.json" with { type: "json" };
 import background_submission_v1 from "../../../../contracts/json-schema/background_submission_v1.schema.json" with { type: "json" };
 import background_snapshot_v1 from "../../../../contracts/json-schema/background_snapshot_v1.schema.json" with { type: "json" };
+import background_summary_v1 from "../../../../contracts/json-schema/background_summary_v1.schema.json" with { type: "json" };
+import background_index_v1 from "../../../../contracts/json-schema/background_index_v1.schema.json" with { type: "json" };
 import background_proposal_v1 from "../../../../contracts/json-schema/background_proposal_v1.schema.json" with { type: "json" };
 import background_scope_guard_v1 from "../../../../contracts/json-schema/background_scope_guard_v1.schema.json" with { type: "json" };
 import background_writer_v1 from "../../../../contracts/json-schema/background_writer_v1.schema.json" with { type: "json" };
@@ -60,6 +62,8 @@ const schemas = new Map<string, object>(Object.entries({ background_submission_v
   background_proposal_v1, background_scope_guard_v1, background_writer_v1, background_barrier_v1,
   background_draft_v1, background_receipt_v1, background_apply_v2, background_event_v1, background_intent_v1,
   background_undo_v1, background_sidecar_v1, background_attempt_v1, background_draft_payload_v1, background_dispatch_v1, background_agent_request_v1, background_artifact_v1, background_legacy_run_v2, background_project_v1, background_replay_request_v1, background_replay_v1, background_writer_proof_v1, background_writer_open_v1, background_writer_advance_v1, background_writer_barrier_ack_v1, background_writer_barrier_command_v1, background_writer_checkpoint_v1, background_writer_abandon_v1, background_writer_view_v1, background_writer_mutation_v1, background_writer_publish_v1, background_writer_publication_v1, background_writer_history_request_v1, background_writer_history_offer_v1, background_writer_history_command_v1, background_writer_history_result_v1, background_writer_draft_reference_v1, background_writer_draft_command_v1, background_writer_draft_read_v1, background_writer_draft_resolve_v1, background_fixed_request_v1, background_fixed_reply_v1, background_fixed_input_v1, background_processing_candidate_v1 }));
+schemas.set("background_summary_v1", background_summary_v1);
+schemas.set("background_index_v1", background_index_v1);
 const validators = new Map<string, ValidateFunction<unknown>>();
 const mutationShape = ajv.compile<unknown>(rich_mutation);
 export function prepareWriterContracts(): void {
@@ -84,6 +88,18 @@ function earlier(left: string, right: string): boolean {
 function semantics(value: unknown): boolean {
   if (Array.isArray(value)) return value.every(semantics);
   if (!record(value)) return true;
+  if ("projectTitle" in value && "saved" in value && "jobId" in value) {
+    if (value.saved !== (value.publication === "saved") || value.allowEdits === false && value.publication !== "none") return false;
+  }
+  if (value.schemaVersion === 1 && "jobs" in value && Object.keys(value).every(key => ["schemaVersion", "jobs"].includes(key))) {
+    const jobs = list(value.jobs), lineages = new Map<unknown, unknown>();
+    const keys = jobs.map(job => record(job) ? JSON.stringify([job.projectId, job.lineage, job.jobId]) : null);
+    if (new Set(keys).size !== jobs.length) return false;
+    for (const job of jobs) {
+      if (!record(job) || lineages.has(job.projectId) && lineages.get(job.projectId) !== job.lineage) return false;
+      lineages.set(job.projectId, job.lineage);
+    }
+  }
   if ("syncId" in value && "actionId" in value && record(value.job)) {
     const job = value.job;
     if (!record(job.submission) || !record(job.submission.identity) || !record(job.submission.input)
@@ -159,7 +175,7 @@ function semantics(value: unknown): boolean {
       || !list(workspace.mutationReplay).some(item => record(item) && item.clientMutationId === receipt.clientMutationId
         && item.requestSha256 === receipt.requestSha256 && item.resultingRevision === receipt.projectRevision)) return false;
   }
-  if ("execution" in value && "publication" in value) {
+  if ("execution" in value && "publication" in value && "submission" in value) {
     if (value.undoExpired === true && value.receipt === null) return false;
     if (["saved", "no_change", "none"].includes(String(value.publication)) && value.publicationError !== null && value.publicationError !== undefined) return false;
     if ((value.publication === "saved") !== (value.receipt !== null) || !record(value.submission) || !record(value.submission.identity)) return false;

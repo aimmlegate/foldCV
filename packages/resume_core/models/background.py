@@ -666,6 +666,46 @@ class JobProjectV1(BackgroundWire):
         return self
 
 
+class JobSummaryV1(BackgroundWire):
+    schema_version: Literal[1]
+    project_id: AgentId
+    lineage: AgentId
+    job_id: AgentId
+    project_title: str = Field(min_length=1, max_length=512)
+    kind: JobKind
+    stage: Literal["agent", "assessment", "extraction", "rewrite", "reconciliation"] | None
+    execution: Execution
+    publication: Publication
+    execution_generation: Revision
+    event_cursor: Counter
+    allow_edits: bool = Field(strict=True)
+    saved: bool = Field(strict=True)
+    error: JobFailure | None
+    publication_error: JobFailure | None
+    updated_at: Timestamp
+
+    @model_validator(mode="after")
+    def saved_authority(self):
+        if self.saved != (self.publication == "saved") or not self.allow_edits and self.publication != "none":
+            raise ValueError("summary must preserve saved and check-only authority")
+        return self
+
+
+class JobIndexV1(BackgroundWire):
+    model_config = ConfigDict(json_schema_extra={"x-maxSerializedBytes": LIMITS.sidecar_global_bytes})
+    schema_version: Literal[1]
+    jobs: list[JobSummaryV1] = Field(max_length=LIMITS.metadata_global_records)
+
+    @model_validator(mode="after")
+    def unique_jobs(self):
+        keys = [(job.project_id, job.lineage, job.job_id) for job in self.jobs]
+        lineages = {job.project_id: job.lineage for job in self.jobs}
+        if len(keys) != len(set(keys)) or any(lineages[job.project_id] != job.lineage for job in self.jobs):
+            raise ValueError("global index cannot duplicate a job")
+        bounded(self, LIMITS.sidecar_global_bytes)
+        return self
+
+
 class CanonicalIntentV1(BackgroundWire):
     schema_version: Literal[1]
     id: AgentId
@@ -1189,3 +1229,4 @@ BACKGROUND_CONTRACTS["background_writer_draft_resolve_v1"] = WriterDraftResolveV
 BACKGROUND_CONTRACTS.update({"background_fixed_request_v1": JobFixedRequestV1,
     "background_fixed_reply_v1": JobFixedReplyV1, "background_fixed_input_v1": FixedInputV1,
     "background_processing_candidate_v1": ProcessingCandidateV1})
+BACKGROUND_CONTRACTS.update({"background_summary_v1": JobSummaryV1, "background_index_v1": JobIndexV1})

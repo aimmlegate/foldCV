@@ -1,6 +1,8 @@
 import { validateContract } from "../contracts/validate";
 import { validateBackgroundWire } from "../contracts/background-validate";
-import { request, RichApiFailure } from "../rich/api";
+import { request, rootRequest, RichApiFailure } from "../rich/api";
+import type { JobSummaryV1 } from "../contracts/generated/background_summary_v1";
+import type { JobIndexV1 } from "../contracts/generated/background_index_v1";
 import type { WriterViewV1 } from "../contracts/generated/background_writer_view_v1";
 import type { WriterOpenV1 } from "../contracts/generated/background_writer_open_v1";
 import type { WriterProofV1 } from "../contracts/generated/background_writer_proof_v1";
@@ -39,9 +41,14 @@ type Replies = { background_writer_view_v1: WriterViewV1; background_barrier_v1:
   background_undo_v1: UndoOwnershipV1; background_writer_history_result_v1: WriterHistoryResultV1;
   background_project_v1: JobProjectV1; background_snapshot_v1: JobSnapshotV1; background_replay_v1: JobReplayV1;
   background_proposal_v1: ProposalBindingV1; background_legacy_run_v2: JobLegacyRunV2;
-  background_fixed_reply_v1: JobFixedReplyV1 };
+  background_fixed_reply_v1: JobFixedReplyV1; background_summary_v1: JobSummaryV1; background_index_v1: JobIndexV1 };
 export type BackgroundConversation = Omit<AgentConversation, "messages"> & { messages: AgentMessage[] };
 export type BackgroundRequest = (path: string, method?: string, body?: unknown) => Promise<unknown>;
+
+export class GlobalJobsApi {
+  constructor(private readonly transport: () => Promise<unknown> = () => rootRequest("/v1/background/jobs")) {}
+  async index(): Promise<JobIndexV1> { return backgroundReply("background_index_v1", await this.transport()); }
+}
 
 export async function backgroundReply<K extends keyof Replies>(kind: K, value: unknown): Promise<Replies[K]> {
   if (!validateContract(kind, value) || !await validateBackgroundWire(kind, value)) throw new RichApiFailure("INVALID_RESULT");
@@ -89,6 +96,7 @@ export class JobsApi {
   fixed(body: JobFixedRequestV1): Promise<JobFixedReplyV1> { return this.call("background_fixed_reply_v1", "/fixed", body); }
   read(id: string): Promise<JobSnapshotV1> { return this.call("background_snapshot_v1", `/${encodeURIComponent(id)}/read`, {}); }
   cancel(id: string): Promise<JobSnapshotV1> { return this.call("background_snapshot_v1", `/${encodeURIComponent(id)}/cancel`, {}); }
+  discard(id: string): Promise<JobSnapshotV1> { return this.call("background_snapshot_v1", `/${encodeURIComponent(id)}/discard`, {}); }
   proposal(id: string): Promise<ProposalBindingV1> { return this.call("background_proposal_v1", `/${encodeURIComponent(id)}/proposal/read`, {}); }
   legacy(id: string): Promise<JobLegacyRunV2> { return this.call("background_legacy_run_v2", `/${encodeURIComponent(id)}/legacy-v2`, {}); }
   async conversation(id: string): Promise<BackgroundConversation> {

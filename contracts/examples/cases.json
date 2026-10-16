@@ -5961,5 +5961,409 @@
         "value": "history-session:7"
       }
     ]
+  },
+  {
+    "name": "nb06_background_summary_v1_valid",
+    "contract": "background_summary_v1",
+    "base": "background_summary_v1",
+    "valid": true,
+    "edits": []
+  },
+  {
+    "name": "nb06_background_summary_v1_wrong_version",
+    "contract": "background_summary_v1",
+    "base": "background_summary_v1",
+    "valid": false,
+    "edits": [
+      {
+        "op": "set",
+        "path": [
+          "schemaVersion"
+        ],
+        "value": 2
+      }
+    ]
+  },
+  {
+    "name": "nb06_background_summary_v1_unknown_field",
+    "contract": "background_summary_v1",
+    "base": "background_summary_v1",
+    "valid": false,
+    "edits": [
+      {
+        "op": "set",
+        "path": [
+          "extra"
+        ],
+        "value": true
+      }
+    ]
+  },
+  {
+    "name": "nb06_background_index_v1_valid",
+    "contract": "background_index_v1",
+    "base": "background_index_v1",
+    "valid": true,
+    "edits": []
+  },
+  {
+    "name": "nb06_background_index_v1_wrong_version",
+    "contract": "background_index_v1",
+    "base": "background_index_v1",
+    "valid": false,
+    "edits": [
+      {
+        "op": "set",
+        "path": [
+          "schemaVersion"
+        ],
+        "value": 2
+      }
+    ]
+  },
+  {
+    "name": "nb06_background_index_v1_unknown_field",
+    "contract": "background_index_v1",
+    "base": "background_index_v1",
+    "valid": false,
+    "edits": [
+      {
+        "op": "set",
+        "path": [
+          "extra"
+        ],
+        "value": true
+      }
+    ]
+  },
+  {
+    "name": "nb06_summary_fake_saved",
+    "contract": "background_summary_v1",
+    "base": "background_summary_v1",
+    "valid": false,
+    "edits": [
+      {
+        "op": "set",
+        "path": [
+          "saved"
+        ],
+        "value": true
+      }
+    ]
+  },
+  {
+    "name": "nb06_summary_saved_without_flag",
+    "contract": "background_summary_v1",
+    "base": "background_summary_v1",
+    "valid": false,
+    "edits": [
+      {
+        "op": "set",
+        "path": [
+          "publication"
+        ],
+        "value": "saved"
+      }
+    ]
+  },
+  {
+    "name": "nb06_summary_saved_then_cancelled",
+    "contract": "background_summary_v1",
+    "base": "background_summary_v1",
+    "valid": true,
+    "edits": [
+      {
+        "op": "set",
+        "path": [
+          "saved"
+        ],
+        "value": true
+      },
+      {
+        "op": "set",
+        "path": [
+          "publication"
+        ],
+        "value": "saved"
+      },
+      {
+        "op": "set",
+        "path": [
+          "execution"
+        ],
+        "value": "cancelled"
+      }
+    ]
+  },
+  {
+    "name": "nb06_summary_check_only",
+    "contract": "background_summary_v1",
+    "base": "background_summary_v1",
+    "valid": true,
+    "edits": [
+      {
+        "op": "set",
+        "path": [
+          "allowEdits"
+        ],
+        "value": false
+      },
+      {
+        "op": "set",
+        "path": [
+          "publication"
+        ],
+        "value": "none"
+      }
+    ]
+  },
+  {
+    "name": "nb06_summary_check_only_cannot_publish",
+    "contract": "background_summary_v1",
+    "base": "background_summary_v1",
+    "valid": false,
+    "edits": [
+      {
+        "op": "set",
+        "path": [
+          "allowEdits"
+        ],
+        "value": false
+      }
+    ]
+  },
+  {
+    "name": "nb06_summary_strict_saved_flag",
+    "contract": "background_summary_v1",
+    "base": "background_summary_v1",
+    "valid": false,
+    "edits": [
+      {
+        "op": "set",
+        "path": [
+          "saved"
+        ],
+        "value": 0
+      }
+    ]
+  },
+  {
+    "name": "nb06_summary_strict_edit_flag",
+    "contract": "background_summary_v1",
+    "base": "background_summary_v1",
+    "valid": false,
+    "edits": [
+      {
+        "op": "set",
+        "path": [
+          "allowEdits"
+        ],
+        "value": "true"
+      }
+    ]
+  },
+  {
+    "name": "nb06_summary_empty_title",
+    "contract": "background_summary_v1",
+    "base": "background_summary_v1",
+    "valid": false,
+    "edits": [
+      {
+        "op": "set",
+        "path": [
+          "projectTitle"
+        ],
+        "value": ""
+      }
+    ]
+  },
+  {
+    "name": "nb06_summary_long_title",
+    "contract": "background_summary_v1",
+    "base": "background_summary_v1",
+    "valid": false,
+    "edits": [
+      {
+        "op": "repeat_text",
+        "path": [
+          "projectTitle"
+        ],
+        "text": "x",
+        "count": 513
+      }
+    ]
+  },
+  {
+    "name": "nb06_summary_bad_stage",
+    "contract": "background_summary_v1",
+    "base": "background_summary_v1",
+    "valid": false,
+    "edits": [
+      {
+        "op": "set",
+        "path": [
+          "stage"
+        ],
+        "value": "unknown"
+      }
+    ]
+  },
+  {
+    "name": "nb06_summary_bad_date",
+    "contract": "background_summary_v1",
+    "base": "background_summary_v1",
+    "valid": false,
+    "edits": [
+      {
+        "op": "set",
+        "path": [
+          "updatedAt"
+        ],
+        "value": "yesterday"
+      }
+    ]
+  },
+  {
+    "name": "nb06_summary_business_payload",
+    "contract": "background_summary_v1",
+    "base": "background_summary_v1",
+    "valid": false,
+    "edits": [
+      {
+        "op": "set",
+        "path": [
+          "document"
+        ],
+        "value": {}
+      }
+    ]
+  },
+  {
+    "name": "nb06_summary_missing_identity",
+    "contract": "background_summary_v1",
+    "base": "background_summary_v1",
+    "valid": false,
+    "edits": [
+      {
+        "op": "remove",
+        "path": [
+          "lineage"
+        ]
+      }
+    ]
+  },
+  {
+    "name": "nb06_index_empty",
+    "contract": "background_index_v1",
+    "base": "background_index_v1",
+    "valid": true,
+    "edits": [
+      {
+        "op": "set",
+        "path": [
+          "jobs"
+        ],
+        "value": []
+      }
+    ]
+  },
+  {
+    "name": "nb06_index_duplicate",
+    "contract": "background_index_v1",
+    "base": "background_index_v1",
+    "valid": false,
+    "edits": [
+      {
+        "op": "clone",
+        "path": [
+          "jobs"
+        ],
+        "from": [
+          "jobs",
+          0
+        ]
+      }
+    ]
+  },
+  {
+    "name": "nb06_index_mixed_lineage",
+    "contract": "background_index_v1",
+    "base": "background_index_v1",
+    "valid": false,
+    "edits": [
+      {
+        "op": "append",
+        "path": [
+          "jobs"
+        ],
+        "value": {
+          "schemaVersion": 1,
+          "projectId": "project-one",
+          "lineage": "other-lineage",
+          "jobId": "other-job",
+          "projectTitle": "Synthetic resume",
+          "kind": "agent",
+          "stage": null,
+          "execution": "completed",
+          "publication": "waiting_for_sync",
+          "executionGeneration": 1,
+          "eventCursor": 1,
+          "allowEdits": true,
+          "saved": false,
+          "error": null,
+          "publicationError": null,
+          "updatedAt": "2026-10-16T12:00:00Z"
+        }
+      }
+    ]
+  },
+  {
+    "name": "nb06_index_two_projects",
+    "contract": "background_index_v1",
+    "base": "background_index_v1",
+    "valid": true,
+    "edits": [
+      {
+        "op": "append",
+        "path": [
+          "jobs"
+        ],
+        "value": {
+          "schemaVersion": 1,
+          "projectId": "other-project",
+          "lineage": "other-lineage",
+          "jobId": "other-job",
+          "projectTitle": "Synthetic resume",
+          "kind": "agent",
+          "stage": null,
+          "execution": "completed",
+          "publication": "waiting_for_sync",
+          "executionGeneration": 1,
+          "eventCursor": 1,
+          "allowEdits": true,
+          "saved": false,
+          "error": null,
+          "publicationError": null,
+          "updatedAt": "2026-10-16T12:00:00Z"
+        }
+      }
+    ]
+  },
+  {
+    "name": "nb06_index_bad_nested_summary",
+    "contract": "background_index_v1",
+    "base": "background_index_v1",
+    "valid": false,
+    "edits": [
+      {
+        "op": "set",
+        "path": [
+          "jobs",
+          0,
+          "saved"
+        ],
+        "value": true
+      }
+    ]
   }
 ]

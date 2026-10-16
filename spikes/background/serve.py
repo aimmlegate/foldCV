@@ -17,7 +17,7 @@ from spikes.background.writer_bridge import Bridge
 
 async def main(args):
     root = args.root.resolve()
-    prefix = "foldcv-nb05-" if args.fixed_operations else "foldcv-nb03-"
+    prefix = "foldcv-" + (args.proof_slice or ("nb05" if args.fixed_operations else "nb03")) + "-"
     if root.parent != Path("/private/tmp") or not root.name.startswith(prefix) or root.exists():
         raise ValueError("Use a new owned /private/tmp proof root")
     root.mkdir(mode=0o700)
@@ -46,14 +46,16 @@ async def serve(args, root, listener, origin, bridge):
         from spikes.background.fixed_fixtures import FixedProofProvider
         bridge.fixed_provider = FixedProofProvider()
         bridge.service.projects.provider_factory = lambda: (bridge.fixed_provider, "processing-model")
-    token = "t3-controlled-model"
+    names = ["scripted_model_ready"] + (["fixed_model_ready"] if args.fixed_operations else [])
+    tokens = ["t3-controlled-" + name for name in names]
     if args.hold_model:
         def reached(value):
-            if value.get("event") == "hook" and value.get("token") == token:
+            if value.get("event") == "hook" and value.get("token") in tokens:
                 (root / "model-gate.json").write_text(json.dumps({"name": value["name"],
                     "job": value["job"], "status": "reached"}, indent=2) + "\n")
         bridge.send = reached
-        await bridge.handle({"kind": "hold", "name": "fixed_model_ready" if args.fixed_operations else "scripted_model_ready", "family": "job", "token": token})
+        for name, token in zip(names, tokens):
+            await bridge.handle({"kind": "hold", "name": name, "family": "job", "token": token})
     other = await bridge.handle({"kind": "clone"})
     secret = secrets.token_urlsafe(32)
     bridge.application.session, bridge.application.secret = None, secret
@@ -62,7 +64,8 @@ async def serve(args, root, listener, origin, bridge):
     path = root / "launch.json"; path.write_text(json.dumps(launch)); path.chmod(0o600)
     info = {"root": str(root), "origin": origin, "pid": os.getpid(), "project": bridge.project,
         "otherProject": other["project"], "backgroundEnabled": True, "parallelEnabled": False,
-        "capacity": 1, "nativeStarts": 0, "providers": ["MetadataAdapter", "ScriptedAgentRuntime", "PipeExecutions"],
+        "capacity": 1, "nativeStarts": 0, "providers": ["MetadataAdapter", "ScriptedAgentRuntime", "PipeExecutions"]
+            + (["FixedProofProvider"] if args.fixed_operations else []),
         "dist": str(args.dist.resolve()), "status": "running", "holdModel": args.hold_model,
         "stopSignal": "SIGUSR1", "releaseModelSignal": "SIGUSR2" if args.hold_model else None,
         "fixedOperations": args.fixed_operations}
@@ -73,7 +76,11 @@ async def serve(args, root, listener, origin, bridge):
     loop.add_signal_handler(signal.SIGUSR1, setattr, server, "should_exit", True)
     if args.hold_model:
         async def release():
-            await bridge.handle({"kind": "release", "token": token})
+            for token in tokens:
+                with bridge.lock:
+                    held = token in bridge.holds
+                if held:
+                    await bridge.handle({"kind": "release", "token": token})
             path = root / "model-gate.json"
             value = json.loads(path.read_text()) if path.exists() else {"name": "scripted_model_ready"}
             path.write_text(json.dumps({**value, "status": "released"}, indent=2) + "\n")
@@ -102,4 +109,5 @@ if __name__ == "__main__":
     parser.add_argument("--port", type=int, default=0)
     parser.add_argument("--hold-model", action="store_true")
     parser.add_argument("--fixed-operations", action="store_true")
+    parser.add_argument("--proof-slice", choices=("nb03", "nb05", "nb06"))
     asyncio.run(main(parser.parse_args()))

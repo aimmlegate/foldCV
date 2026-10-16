@@ -82,6 +82,7 @@ def require_converter() -> None:
 
 
 def background_spec() -> dict:
+    from tools.background_evidence import assert_manual_bindings
     data = json.loads((ROOT / "tests/requirements.json").read_text())
     spec = data["backgroundExecution"]
     report_schema = json.loads((ROOT / spec["reportSchema"]).read_text())
@@ -89,8 +90,10 @@ def background_spec() -> dict:
         raise SystemExit("NB execution report schema drift")
     matrix = json.loads((ROOT / "docs/gui/handoffs/BACKGROUND-WORK/test-matrix.json").read_text())
     due = {v["id"] for c in matrix["cases"] for v in c["requiredVariants"] if v["requiredBy"] in spec["coveredSlices"]}
-    if set(spec["bindings"]) != due or not due:
+    manual = {v["id"] for c in matrix["cases"] if c["layers"] == ["t3"] for v in c["requiredVariants"] if v["requiredBy"] in spec["coveredSlices"]}
+    if set(spec["bindings"]) != due - manual or not due:
         raise SystemExit("NB matrix due variants do not match execution bindings")
+    assert_manual_bindings(spec.get("manualBindings", {}), manual, ROOT)
     matrix_bindings = {b["variant"]: b["nodes"] for c in matrix["cases"] for b in c["testBindings"] if b["suite"] == "fast"}
     if any(matrix_bindings.get(variant) != nodes for variant, nodes in spec["bindings"].items()):
         raise SystemExit("NB matrix executable identities do not match the runner")

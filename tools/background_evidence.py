@@ -67,6 +67,38 @@ def source_hashes(paths: list[str], root: Path = ROOT) -> dict[str, str]:
     return result
 
 
+def assert_manual_bindings(bindings: dict[str, str], required: set[str], root: Path = ROOT) -> None:
+    if set(bindings) != required:
+        raise SystemExit("NB manual variants do not match their evidence bindings")
+    checked = {}
+    def retained(name):
+        path = root / name
+        if not path.is_file() or path.is_symlink() or not path.resolve().is_relative_to(root.resolve()):
+            raise SystemExit("NB manual evidence is missing or outside the repository")
+        if name not in checked:
+            checked[name] = hashlib.sha256(path.read_bytes()).hexdigest()
+        return path
+    for variant, name in bindings.items():
+        record = json.loads(retained(name).read_text())
+        case = record.get("cases", {}).get(variant)
+        if not isinstance(case, dict) or case.get("status") not in {"passed", "accepted_user_amendment"}:
+            raise SystemExit("NB manual case has no accepted observation")
+        evidence = case.get("evidence")
+        if not isinstance(evidence, dict) or not evidence:
+            raise SystemExit("NB manual observation has no retained evidence")
+        for artifact, checksum in evidence.items():
+            retained(artifact)
+            if checked[artifact] != checksum:
+                raise SystemExit("NB manual evidence hash changed")
+        if case["status"] == "accepted_user_amendment":
+            authority = case.get("authority")
+            if authority not in evidence:
+                raise SystemExit("NB manual amendment has no retained authority")
+            value = json.loads(retained(authority).read_text())
+            if value.get("variant") != variant or not value.get("userText"):
+                raise SystemExit("NB manual amendment has no exact user instruction")
+
+
 def strict_pairs(pairs):
     result = {}
     for key, value in pairs:

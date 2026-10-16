@@ -15,9 +15,13 @@ import { importView, reviewId } from "./import/view";
 import { Settings } from "./settings/Settings";
 import { FileDialog, type FileMode } from "./files/FileDialog";
 import { projectFilename } from "./files/filename";
+import { useGlobalJobs } from "../background/useGlobalJobs";
+import { projectActivity } from "../background/status";
+import { BackgroundJobs } from "./background/BackgroundJobs";
 
 export function App({ portalHost }: { portalHost: HTMLElement }) {
   const workspace = useResumeWorkspace();
+  const jobs = useGlobalJobs();
   const { response, writer, background, projects, input, setInput, textDraft, error, status, setStatus, busy, settings, setSettings,
     editor, assistant, acknowledge, action, fresh, open, remove, process, upload, exportFile } = workspace;
   const [collapsed, setCollapsed] = useState(() => innerWidth <= 600);
@@ -56,13 +60,14 @@ export function App({ portalHost }: { portalHost: HTMLElement }) {
   const filename = projectFilename(projectTitle, fileMode === "export" ? "docx" : "foldcv");
   const navigate = (id: string) => open(id).then(done => { if (done) { setSourceOpen(false); if (innerWidth <= 600) setCollapsed(true); } return done; });
   return <main className={`app-shell${collapsed ? " history-collapsed" : ""}`} data-app="foldcv">
-    <History projects={projects} activeId={response?.workspace.projectId ?? null} busy={busy || creating && !background} collapse={() => setCollapsed(true)}
+    <History projects={projects} activeId={response?.workspace.projectId ?? null} activity={projectActivity(jobs.view.jobs)} busy={busy || creating && !background} collapse={() => setCollapsed(true)}
       fresh={() => { void fresh(); setSourceOpen(false); if (innerWidth <= 600) setCollapsed(true); }} open={navigate} remove={remove} openFile={() => openFile("open")} settings={openSettings}
       connection={connection?.snapshot.state === "connected" ? "Codex · подписка" : connection?.snapshot.state === "unchecked" ? "Подключение не проверено" : "Модель отключена"} />
     <section className="main-area">
       <Header title={settings ? "Настройки" : response?.identity?.title ?? response?.workspace.title ?? "Новое резюме"}
         subtitle={settings ? "FoldCV" : response?.identity?.subtitle || "Рабочий документ"} collapsed={collapsed} expand={() => setCollapsed(false)} status={status}
-        ready={!settings && view === "editor"} busy={busy} save={() => openFile("save")} exportFile={() => openFile("export")} />
+        ready={!settings && view === "editor"} busy={busy} save={() => openFile("save")} exportFile={() => openFile("export")}
+        activity={jobs.view.enabled ? <BackgroundJobs registry={jobs.registry} view={jobs.view} openProject={navigate} /> : null} />
       <div className="screen uir-proof-screen" hidden={settings}>
         {error && <p role="alert" className="notice error">{error}</p>}
         {view === "progress" && response && generation && <Progress generation={generation} sourceName={source?.originalName ?? (input.kind === "file" ? input.file.name : "Вставленный текст")} busy={busy}

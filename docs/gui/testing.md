@@ -15,8 +15,11 @@ variants for every writer route/internal callback, fixed payload ownership,
 portable history, pinned exports, asset GC and private retention. NB03 adds 120
 variants for resumable writers, bounded barriers, drafts, history ownership and
 independent navigation. NB05 adds 31 variants for existing fixed services, queue fairness, stale captures,
-reversed replies, overlap and processing stage cuts. All 459 due variants have
-exact Python or Node bindings.
+reversed replies, overlap and processing stage cuts. NB06 adds eight lifecycle
+variants with real API/client bindings and 13 retained manual T3 cases. The IME
+case has an explicit user amendment after trusted Cyrillic input; other-language
+composition is not claimed. All 467 executable variants have exact Python/Node
+bindings; the manual cases bind observations and retained artifact hashes.
 Additional checks cover pin corruption, late callbacks, namespace loss, repeated
 saves, engine marks and callback ownership after resume. Real API cases also
 cover clean lease expiry at/after the deadline, a timed out renewal and explicit
@@ -27,10 +30,15 @@ Manual T3 also verifies no secondary-tab API requests. Additional checks
 include guarded sole-tab resume after a lost unload notification, fresh
 tab resume markers, exact dirty IDs and rejection after losing tab ownership.
 The shared contract
-corpus has 446 cases, including 72 new writer-wire boundaries. These bindings
+corpus has 470 cases, including 72 writer-wire boundaries and 24 NB06 summary/index cases. These bindings
 require a passing source-bound report before slice acceptance. `NB-FIXED` maps real two-stage processing and scoped rewrite/reconciliation jobs,
 exact TypeScript-to-Python reply identity and admission/account cutpoints.
-`NB-UI` and `NB-PARALLEL` await their slice bindings.
+`NB-UI` maps NB06 replay, global notices, exact actions, authenticated index,
+stable caret restoration and retained manual T3 evidence. The fast gate validates
+manual binding/status/artifact integrity, without executing browser scenarios or
+turning an unavailable case into a pass. Current source applicability is reviewed
+at acceptance; retained visual observations do not certify later mounted changes.
+`NB-PARALLEL` awaits its slice bindings.
 
 The existing fast gate writes exact Python setup/call/teardown results through
 `tools/background_pytest.py` and validates NB parameter/file identities, current

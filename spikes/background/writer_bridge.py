@@ -40,6 +40,10 @@ class Bridge:
         with self.lock:
             held = [(token, row) for token, row in self.holds.items() if row["name"] == name and row["family"] == "writer"]
         for token, row in held:
+            if row.get("jobOnly"):
+                state = self.service.store.load(project)
+                if not any(intent.phase not in {"receipt_stored", "reconciled"} for intent in state.intents):
+                    continue
             self.loop.call_soon_threadsafe(self.send, {"event": "hook", "token": token, "name": name, "project": project})
             if not row["thread"].wait(30):
                 raise TimeoutError("Writer bridge watchdog: " + name)
@@ -112,6 +116,7 @@ class Bridge:
                     assert prepared["disposition"] == "prepared", prepared
                     await self.observe_job("scripted_proposal_prepared", control.job.id)
                     self.results[request_id] = await session.call("apply_edit_batch", AgentApplyRequest(batchId=prepared["batchId"]))
+                    await self.observe_job("scripted_after_apply", control.job.id)
                 return ExecutionOutcome(finished_at=self.clock.now())
             finally:
                 await session.close()
@@ -133,7 +138,7 @@ class Bridge:
             with self.lock:
                 assert frame["token"] not in self.holds
                 self.holds[frame["token"]] = {"name": frame["name"], "family": frame.get("family", "writer"),
-                    "thread": threading.Event(), "async": asyncio.Event()}
+                    "thread": threading.Event(), "async": asyncio.Event(), "jobOnly": frame.get("jobOnly", False)}
             return {"held": frame["token"]}
         if kind == "release":
             with self.lock:
@@ -154,6 +159,28 @@ class Bridge:
         if kind == "fixed_fixture":
             from spikes.background.fixed_fixtures import prepare_fixed
             return await asyncio.to_thread(prepare_fixed, self, frame.get("project", self.project))
+        if kind == "prune_events":
+            project = frame.get("project", self.project)
+            job = self.service.store.read(project, frame["job"])
+            with self.service.store.guard(project) as directory:
+                (directory / "events" / (job.id + ".json")).unlink(missing_ok=True)
+            return {"pruned": job.id}
+        if kind == "wait_execution":
+            job = await self.wait_execution(frame.get("project", self.project), frame["job"])
+            return {"job": job.model_dump(mode="json", by_alias=True)}
+        if kind == "wait_publication":
+            project = frame.get("project", self.project)
+            changed = asyncio.Event()
+            self.service.supervisor.listeners.add(changed)
+            try:
+                while True:
+                    changed.clear()
+                    job = self.service.store.read(project, frame["job"])
+                    if job.publication == frame["publication"]:
+                        return {"job": job.model_dump(mode="json", by_alias=True)}
+                    await asyncio.wait_for(changed.wait(), 20)
+            finally:
+                self.service.supervisor.listeners.discard(changed)
         if kind == "wait_fixed":
             project, identifier = frame.get("project", self.project), frame["job"]
             changed = asyncio.Event()
@@ -189,6 +216,23 @@ class Bridge:
             self.closed = True
             return {"closing": True}
         raise ValueError("Unknown writer bridge command")
+
+    async def wait_execution(self, project, identifier):
+        changed = asyncio.Event()
+        self.service.supervisor.listeners.add(changed)
+        try:
+            while True:
+                changed.clear()
+                job = self.service.store.read(project, identifier)
+                if job.execution in {"completed", "failed", "cancelled", "interrupted"}:
+                    break
+                await asyncio.wait_for(changed.wait(), 20)
+            control = self.service.supervisor.controls.get(identifier)
+            if control and control.task:
+                await asyncio.wait_for(asyncio.shield(control.task), 20)
+            return self.service.store.read(project, identifier)
+        finally:
+            self.service.supervisor.listeners.discard(changed)
 
     def stats(self, project):
         workspace, checksum = self.service.projects.storage.read_committed(project)

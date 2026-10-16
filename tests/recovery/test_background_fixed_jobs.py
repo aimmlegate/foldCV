@@ -121,6 +121,8 @@ async def settled(service, project, identifier, *, publication=None):
             if job.execution in {"completed", "failed", "cancelled", "interrupted"} and (publication is None or job.publication == publication):
                 if identifier in service.supervisor.controls:
                     await asyncio.wait_for(service.supervisor.controls[identifier].task, 10)
+                if publication == "saved" and project in service.publication_tasks:
+                    await asyncio.wait_for(asyncio.shield(service.publication_tasks[project]), 10)
                 return service.store.read(project, identifier)
             await asyncio.wait_for(changed.wait(), 10)
     finally:

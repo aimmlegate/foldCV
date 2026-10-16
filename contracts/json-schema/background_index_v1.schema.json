@@ -1,0 +1,244 @@
+{
+  "$defs": {
+    "JobFailure": {
+      "additionalProperties": false,
+      "properties": {
+        "code": {
+          "enum": [
+            "AUTH_REQUIRED",
+            "RATE_LIMITED",
+            "BUSY",
+            "MODEL_DENIED",
+            "CANCELLED",
+            "DEADLINE",
+            "STARTUP_TIMEOUT",
+            "PROCESS_FAILED",
+            "CLEANUP_FAILED",
+            "INTERRUPTED",
+            "PROTOCOL",
+            "JOB_QUEUE_FULL",
+            "JOB_STORAGE_FULL",
+            "JOB_IDEMPOTENCY_CONFLICT",
+            "REQUEST_EXPIRED",
+            "JOB_NOT_FOUND",
+            "JOB_STORE_CORRUPT",
+            "JOB_STORE_UNAVAILABLE",
+            "JOB_DISABLED",
+            "JOB_SCOPE_INVALID",
+            "ACCOUNT_CHANGED",
+            "DEPENDENCY_CHANGED",
+            "WRITER_UNKNOWN",
+            "SAVE_FAILED",
+            "OUTCOME_UNKNOWN",
+            "PROJECT_DELETED",
+            "INVALID_RESULT",
+            "TEMP_FAILED",
+            "CLI_MISSING",
+            "CLI_UNSUPPORTED",
+            "CLI_PROFILE_UNSAFE",
+            "AUTH_MODE_MISMATCH",
+            "INPUT_TOO_LARGE",
+            "OUTPUT_TOO_LARGE",
+            "BUDGET_EXCEEDED",
+            "INVALID_INPUT",
+            "INVALID_SCHEMA",
+            "CLI_FAILED",
+            "UNSAFE_TEMP_ROOT",
+            "INCOMPLETE_STREAM"
+          ],
+          "title": "Code",
+          "type": "string"
+        }
+      },
+      "required": [
+        "code"
+      ],
+      "title": "JobFailure",
+      "type": "object"
+    },
+    "JobSummaryV1": {
+      "additionalProperties": false,
+      "properties": {
+        "allowEdits": {
+          "title": "Allowedits",
+          "type": "boolean"
+        },
+        "error": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/JobFailure"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "eventCursor": {
+          "maximum": 9007199254740991,
+          "minimum": 0,
+          "title": "Eventcursor",
+          "type": "integer"
+        },
+        "execution": {
+          "enum": [
+            "queued",
+            "starting",
+            "running",
+            "cancelling",
+            "completed",
+            "failed",
+            "cancelled",
+            "interrupted"
+          ],
+          "title": "Execution",
+          "type": "string"
+        },
+        "executionGeneration": {
+          "minimum": 1,
+          "title": "Executiongeneration",
+          "type": "integer"
+        },
+        "jobId": {
+          "maxLength": 128,
+          "minLength": 1,
+          "pattern": "^[A-Za-z0-9_-]+$",
+          "title": "Jobid",
+          "type": "string"
+        },
+        "kind": {
+          "enum": [
+            "agent",
+            "processing",
+            "rewrite",
+            "reconciliation"
+          ],
+          "title": "Kind",
+          "type": "string"
+        },
+        "lineage": {
+          "maxLength": 128,
+          "minLength": 1,
+          "pattern": "^[A-Za-z0-9_-]+$",
+          "title": "Lineage",
+          "type": "string"
+        },
+        "projectId": {
+          "maxLength": 128,
+          "minLength": 1,
+          "pattern": "^[A-Za-z0-9_-]+$",
+          "title": "Projectid",
+          "type": "string"
+        },
+        "projectTitle": {
+          "maxLength": 512,
+          "minLength": 1,
+          "title": "Projecttitle",
+          "type": "string"
+        },
+        "publication": {
+          "enum": [
+            "none",
+            "ready",
+            "waiting_for_sync",
+            "needs_review",
+            "committing",
+            "saved",
+            "no_change",
+            "save_failed",
+            "outcome_unknown",
+            "discarded",
+            "cancelled"
+          ],
+          "title": "Publication",
+          "type": "string"
+        },
+        "publicationError": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/JobFailure"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "saved": {
+          "title": "Saved",
+          "type": "boolean"
+        },
+        "schemaVersion": {
+          "const": 1,
+          "title": "Schemaversion",
+          "type": "integer"
+        },
+        "stage": {
+          "anyOf": [
+            {
+              "enum": [
+                "agent",
+                "assessment",
+                "extraction",
+                "rewrite",
+                "reconciliation"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Stage"
+        },
+        "updatedAt": {
+          "format": "date-time",
+          "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(?:\\.\\d+)?(?:Z|\\+00:00)$",
+          "title": "Updatedat",
+          "type": "string"
+        }
+      },
+      "required": [
+        "schemaVersion",
+        "projectId",
+        "lineage",
+        "jobId",
+        "projectTitle",
+        "kind",
+        "stage",
+        "execution",
+        "publication",
+        "executionGeneration",
+        "eventCursor",
+        "allowEdits",
+        "saved",
+        "error",
+        "publicationError",
+        "updatedAt"
+      ],
+      "title": "JobSummaryV1",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "jobs": {
+      "items": {
+        "$ref": "#/$defs/JobSummaryV1"
+      },
+      "maxItems": 8192,
+      "title": "Jobs",
+      "type": "array"
+    },
+    "schemaVersion": {
+      "const": 1,
+      "title": "Schemaversion",
+      "type": "integer"
+    }
+  },
+  "required": [
+    "schemaVersion",
+    "jobs"
+  ],
+  "title": "JobIndexV1",
+  "type": "object",
+  "x-maxSerializedBytes": 67108864
+}

@@ -3,4 +3,5 @@
 @import "../../../../../design/future-editor/visual/index.css";
 @import "./aliases.css";
 @import "./frame.css";
+@import "./background.css";
 @import "./editor-adapter.css";

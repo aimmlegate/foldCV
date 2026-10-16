@@ -14,10 +14,30 @@ import pytest
 from tools import checks
 from tools.checks import PROTOTYPE_TESTS, assert_mapped_python_suites, assert_partial_checks, assert_prototype_collection
 from tools.background_evidence import assert_report, digest, failure_history, merge_reports, read_report
+from tools.background_evidence import assert_manual_bindings
 from spikes.background.corpus import ACTIONS, ORDERS, reached_orders, trace
 
 
 ROOT = Path(__file__).resolve().parents[2]
+
+
+@pytest.mark.parametrize("fault", ["none", "missing-binding", "missing-case", "skipped", "changed-evidence", "missing-authority"])
+def test_background_manual_gate_keeps_unavailable_or_stale_cases_out(tmp_path, fault):
+    variant = "NB-X02:v01"
+    artifact = tmp_path / "observation.json"
+    artifact.write_text('{"observed":true}')
+    case = {"status": "passed", "evidence": {artifact.name: hashlib.sha256(artifact.read_bytes()).hexdigest()}}
+    if fault == "skipped": case["status"] = "skipped"
+    if fault == "missing-authority": case["status"] = "accepted_user_amendment"
+    record = tmp_path / "manual.json"
+    record.write_text(json.dumps({"cases": {} if fault == "missing-case" else {variant: case}}))
+    if fault == "changed-evidence": artifact.write_text('{"observed":false}')
+    bindings = {} if fault == "missing-binding" else {variant: record.name}
+    if fault == "none":
+        assert_manual_bindings(bindings, {variant}, tmp_path)
+    else:
+        with pytest.raises(SystemExit, match="NB manual"):
+            assert_manual_bindings(bindings, {variant}, tmp_path)
 
 
 def test_missing_prototype_regression_fails_collection_gate() -> None:

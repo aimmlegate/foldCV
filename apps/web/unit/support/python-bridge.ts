@@ -64,10 +64,10 @@ export class PythonBridge {
     const id = ++this.sequence, pending = deferred<unknown>(); this.pending.set(id, pending);
     this.child.stdin.write(JSON.stringify({ ...body, id }) + "\n"); return pending.promise;
   }
-  async hold(name: string, family: "writer" | "job" | "http" = "writer") {
+  async hold(name: string, family: "writer" | "job" | "http" = "writer", options: { jobOnly?: boolean } = {}) {
     const token = crypto.randomUUID(), reached = deferred<Record<string, unknown>>(); this.hooks.set(token, reached);
     void reached.promise.catch(() => {});
-    await this.call({ kind: "hold", name, family, token });
+    await this.call({ kind: "hold", name, family, token, ...options });
     let released = false;
     return { reached: reached.promise, release: async () => {
       if (released) return; released = true;

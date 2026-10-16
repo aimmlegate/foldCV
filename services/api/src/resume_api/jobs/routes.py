@@ -17,6 +17,10 @@ def mount_jobs(app, service):
         return JSONResponse(value.model_dump(mode="json", by_alias=True), status_code=status,
             headers={"Cache-Control": "no-store"})
 
+    @app.get("/v1/background/jobs")
+    async def index():
+        return response(service.index())
+
     @app.exception_handler(BackgroundFailure)
     async def failure(_request: Request, error: BackgroundFailure):
         status = (404 if error.code == "JOB_NOT_FOUND" else 410 if error.code == "PROJECT_DELETED" else
@@ -73,6 +77,10 @@ def mount_jobs(app, service):
     async def cancel(project_id: str, job_id: str, payload: AgentEmptyRequest):
         service.project(project_id)
         return response(await service.supervisor.cancel(project_id, job_id))
+
+    @app.post(prefix + "/{job_id}/discard")
+    async def discard(project_id: str, job_id: str, payload: AgentEmptyRequest):
+        return response(await service.discard(project_id, job_id))
 
     @app.post(prefix + "/{job_id}/replay")
     async def replay(project_id: str, job_id: str, payload: JobReplayRequestV1):

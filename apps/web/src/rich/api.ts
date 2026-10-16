@@ -23,11 +23,11 @@ const prefix = "/v1/rich/projects";
 export class RichApiFailure extends Error {
   constructor(readonly code: string, readonly status = 0) { super(code); }
 }
-export async function request(path: string, method = "GET", body?: unknown): Promise<unknown> {
+export async function rootRequest(path: string, method = "GET", body?: unknown): Promise<unknown> {
   const init: RequestInit = { method, credentials: "same-origin", cache: "no-store" };
   if (body instanceof FormData) init.body = body;
   else if (body !== undefined) { init.body = JSON.stringify(body); init.headers = { "Content-Type": "application/json" }; }
-  const response = await fetch(prefix + path, init);
+  const response = await fetch(path, init);
   const value: unknown = await response.json();
   if (!response.ok) {
     const code = typeof value === "object" && value !== null && "error" in value && typeof value.error === "object"
@@ -36,6 +36,7 @@ export async function request(path: string, method = "GET", body?: unknown): Pro
   }
   return value;
 }
+export function request(path: string, method = "GET", body?: unknown): Promise<unknown> { return rootRequest(prefix + path, method, body); }
 export async function projectRequest(path: string, method = "GET", body?: unknown): Promise<RichProjectResponse> {
   const response = await request(path, method, body);
   if (!responseShape(response)) throw new RichApiFailure("INVALID_RESULT");

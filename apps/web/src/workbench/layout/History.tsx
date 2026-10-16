@@ -4,10 +4,11 @@ import { Button } from "../ui/Button";
 import { Dialog } from "../ui/Dialog";
 import { Icon } from "../ui/Icon";
 
-export function History({ projects, activeId, busy, collapse, fresh, open, remove, openFile, settings, connection }: {
+export function History({ projects, activeId, busy, collapse, fresh, open, remove, openFile, settings, connection, activity }: {
   projects: GuiProjectListResponse | null; activeId: string | null; busy: boolean; collapse: () => void;
   fresh: () => void; open: (id: string) => Promise<boolean>; remove: (id: string) => Promise<boolean>;
   openFile: () => void; settings: () => void; connection: string;
+  activity?: ReadonlyMap<string, string>;
 }) {
   const [deleting, setDeleting] = useState<string | null>(null);
   const entries = projects?.entries.filter(item => !item.tombstoned) ?? [];
@@ -19,7 +20,7 @@ export function History({ projects, activeId, busy, collapse, fresh, open, remov
     <div className="project-list">{!entries.length && <p className="empty-state">Здесь появятся ваши резюме.</p>}
       {entries.map(item => <div className={`project-row${item.projectId === activeId ? " active" : ""}`} key={item.projectId}>
         <button className="project-select" disabled={busy} aria-current={item.projectId === activeId ? "page" : undefined} onClick={() => void open(item.projectId)}>
-          <strong>{item.title}</strong><small>{item.subtitle}</small><em>{projects?.errors.some(error => error.projectId === item.projectId) ? "Не удалось прочитать" : "Рабочая версия"}</em>
+          <strong>{item.title}</strong><small>{item.subtitle}</small><em>{projects?.errors.some(error => error.projectId === item.projectId) ? "Не удалось прочитать" : activity?.get(item.projectId) ?? "Рабочая версия"}</em>
         </button><button className="project-delete" disabled={busy} aria-label={`Удалить проект: ${item.title}`} title="Удалить резюме" onClick={() => setDeleting(item.projectId)}><Icon name="trash" /></button>
       </div>)}
     </div>

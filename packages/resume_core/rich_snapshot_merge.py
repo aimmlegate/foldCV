@@ -103,7 +103,7 @@ def reconcile(target, source):
         return target
     if isinstance(target, list) and isinstance(source, list):
         def key(value):
-            return (type(value), getattr(value, "id", None), getattr(value, "revision", None)
+            return (type(value), getattr(value, "kind", None), getattr(value, "id", None), getattr(value, "revision", None)
                 if type(value).__name__ == "Source" else None)
         owned = {key(value): value for value in target if isinstance(value, BaseModel) and hasattr(value, "id")}
         target[:] = [reconcile(owned[key(value)], value) if key(value) in owned else deepcopy(value) for value in source]
