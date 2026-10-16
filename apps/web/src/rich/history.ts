@@ -39,6 +39,15 @@ export class SessionHistory {
     return [...this.cells.values(), ...this.actions.flatMap(action => action.changes.flatMap(change => [change.before, change.after]))];
   }
 
+  discardPending(actionId: string): boolean {
+    const index = this.actions.findIndex(action => action.id === actionId), action = this.actions[index];
+    if (!action || action.changes.some(change => !change.key.startsWith("request:") || change.before !== null)) return false;
+    const changes = action.changes.map(change => ({ key: change.key, before: this.read(change.key), after: null }));
+    if (!this.apply(changes)) return false;
+    this.actions.splice(index, 1); if (index < this.cursor) this.cursor--;
+    return true;
+  }
+
   private valid(changes: readonly CellChange[]): boolean {
     return !this.closed && new Set(changes.map(change => change.key)).size === changes.length
       && changes.every(change => this.read(change.key) === change.before);

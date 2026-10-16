@@ -104,6 +104,7 @@ export class RichSynchronization {
     const marker = `request:${crypto.randomUUID()}`, history = this.adapter.history;
     const action = history.commit("rewrite", [{ key: marker, before: null, after: "pending" }]);
     if (!action) return;
+    try {
     const capture = this.capture(action, selection.blockIds);
     if (!capture) return;
     await this.adapter.queue.flush();
@@ -117,8 +118,14 @@ export class RichSynchronization {
     selection.capture = { ...this.wireCapture(capture), dependencies: selection.blockIds.map(id => ({ kind: "block", id, revision: blocks.get(id) ?? 1, fingerprint: null })) };
     const response = await this.admitted(`/${this.projectId}/rewrite`, { selection, instruction }, capture);
     const sync = response.workspace.syncRecords.at(-1);
-    if (sync) await this.apply(sync, capture);
+    if (!sync) throw new Error("Не удалось получить результат правки.");
+    if (sync.status === "failed" || sync.status === "stale") {
+      this.adapter.report(response); throw new RichApiFailure(sync.errorCode ?? "REWRITE_FAILED");
+    }
+    const disposition = await this.apply(sync, capture);
+    if (disposition && disposition !== "applied") throw new Error("Правка устарела. Запросите её заново.");
     if (!this.closed) this.adapter.report(await projectRequest(`/${this.projectId}`));
+    } finally { history.discardPending(action); }
   }
   async resolve(id: string): Promise<void> {
     const history = this.adapter.history, marker = `request:${crypto.randomUUID()}`;
@@ -214,10 +221,10 @@ export class RichSynchronization {
     if (sync) await this.apply(sync, capture);
     if (!this.closed) this.adapter.report(await projectRequest(`/${this.projectId}`));
   }
-  private async apply(sync: Sync, original: Capture): Promise<void> {
+  private async apply(sync: Sync, original: Capture): Promise<"applied" | "stale" | "conflict" | null> {
     const adapter = this.adapter;
     const [first, ...rest] = sync.proposedSteps ?? [];
-    if (!sync.ready || !first) return;
+    if (!sync.ready || !first) return null;
     const mutation: RichMutation = { schemaVersion: 1, projectId: this.projectId, clientMutationId: crypto.randomUUID(),
       actionId: original.actionId, kind: sync.kind === "rewrite" ? "rewrite" : "reconciliation",
       capture: { ...this.wireCapture(original), dependencies: sync.dependencies }, steps: [first, ...rest] };
@@ -242,5 +249,6 @@ export class RichSynchronization {
       const response = await projectRequest(`/${this.projectId}/sync/${sync.id}`, "POST", { status: disposition, errorCode });
       adapter.report(response);
     }
+    return disposition;
   }
 }

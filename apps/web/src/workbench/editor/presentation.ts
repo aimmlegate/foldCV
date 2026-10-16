@@ -3,7 +3,7 @@ import { Decoration, DecorationSet } from "@tiptap/pm/view";
 import type { WorkingFacts } from "../../contracts/generated/working_facts";
 import { prototypeClass } from "./classes";
 
-export function prototypePresentation(facts: () => WorkingFacts): Plugin {
+export function prototypePresentation(facts: () => WorkingFacts, selected: () => string | null = () => null): Plugin {
   return new Plugin({ props: { decorations: state => {
     const decorations: Decoration[] = [];
     const firstBlocks = new Set<string>();
@@ -40,7 +40,7 @@ export function prototypePresentation(facts: () => WorkingFacts): Plugin {
       firstBlocks.add(region);
       decorations.push(Decoration.node(position, position + node.nodeSize, { class: "uir-block-container",
         "data-uir-section": content.type.name === "section" ? "true" : "false", "data-uir-class": className }));
-      decorations.push(Decoration.node(position + 1, position + 1 + content.nodeSize, { class: className,
+      decorations.push(Decoration.node(position + 1, position + 1 + content.nodeSize, { class: `${className}${node.attrs["id"] === selected() ? " is-selected" : ""}`,
         "data-uir-first": first ? "true" : "false",
         "data-uir-monogram": className.includes("cv-focus") ? content.textContent.slice(0, 2).toUpperCase() : "" }));
     });
