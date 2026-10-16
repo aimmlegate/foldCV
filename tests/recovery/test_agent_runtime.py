@@ -208,3 +208,16 @@ def test_shared_permit_cancels_a_waiter_without_releasing_its_current_owner():
     permit.release()
     assert permit.acquire(blocking=False)
     permit.release()
+
+
+@pytest.mark.asyncio
+async def test_scripted_native_turn_completes_after_pinned_moderation_metadata_without_exposing_it(tmp_path):
+    value = input_value()
+    events = []
+    steps = script(value, turn_events=[notification("turn/moderationMetadata", turnId="turn_1",
+        metadata={"opaque": "MODERATION_CANARY"}), *complete_events()])
+    result = await runtime(tmp_path, value, steps).run(value, threading.Event(), lambda *event: events.append(event))
+    assert result.state == "completed" and result.error is None and result.native_started
+    assert result.tool_calls == 1 and result.text == "Python evidence checked." and result.usage.total_tokens == 130
+    assert "MODERATION_CANARY" not in json.dumps(events)
+    assert not any((tmp_path / "operations").iterdir())

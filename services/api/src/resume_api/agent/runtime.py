@@ -353,6 +353,11 @@ class NativeSession:
             elif self.result.state == "cancelled":
                 self.result.error = "AGENT_CANCELLED"
             return b""
+        elif method == "turn/moderationMetadata":
+            # Pinned CLI metadata is opaque and grants no tool or publication authority.
+            if (self.thread is None or self.turn is None or params.get("threadId") != self.thread
+                    or params.get("turnId") != self.turn or "metadata" not in params):
+                raise AgentFailure("AGENT_PROTOCOL")
         elif method == "thread/tokenUsage/updated":
             if params.get("turnId") not in {None, self.turn}:
                 raise AgentFailure("AGENT_PROTOCOL")

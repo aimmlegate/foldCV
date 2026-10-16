@@ -5664,6 +5664,32 @@
         "tests/foundation/test_runner_gates.py::test_background_corpus_shards_retain_every_exact_node_and_failed_worker[failed-worker]",
         "tests/foundation/test_runner_gates.py::test_background_fast_uses_one_context_and_retains_raw_reports_before_combining[none]",
         "tests/foundation/test_runner_gates.py::test_background_fast_uses_one_context_and_retains_raw_reports_before_combining[malformed-python]"
+      ],
+      "NB07a:native-protocol-diagnostics": [
+        "tests/recovery/test_background_native_budget.py::test_native_protocol_observer_preserves_parser_decisions_and_redacts_bounded_failure[healthy]",
+        "tests/recovery/test_background_native_budget.py::test_native_protocol_observer_preserves_parser_decisions_and_redacts_bounded_failure[notification]",
+        "tests/recovery/test_background_native_budget.py::test_native_protocol_observer_preserves_parser_decisions_and_redacts_bounded_failure[provider]",
+        "tests/recovery/test_background_native_budget.py::test_native_protocol_observer_preserves_parser_decisions_and_redacts_bounded_failure[malformed]",
+        "tests/recovery/test_background_native_budget.py::test_native_protocol_observer_retains_process_failure_without_raw_stdout_or_credentials[error]",
+        "tests/recovery/test_background_native_budget.py::test_native_protocol_observer_retains_process_failure_without_raw_stdout_or_credentials[eof]",
+        "tests/recovery/test_background_native_budget.py::test_native_protocol_observer_preserves_parser_decisions_and_redacts_bounded_failure[shape]"
+      ],
+      "NB07a:native-retry-authority": [
+        "tests/recovery/test_background_native_budget.py::test_native_failed_variant_retry_requires_the_exact_new_grant_and_keeps_deferred_capacity[none]",
+        "tests/recovery/test_background_native_budget.py::test_native_failed_variant_retry_requires_the_exact_new_grant_and_keeps_deferred_capacity[authority-changed]",
+        "tests/recovery/test_background_native_budget.py::test_native_failed_variant_retry_requires_the_exact_new_grant_and_keeps_deferred_capacity[already-passed]",
+        "tests/recovery/test_background_native_budget.py::test_native_failed_variant_retry_requires_the_exact_new_grant_and_keeps_deferred_capacity[reserve-deferred]"
+      ],
+      "NB07a:moderation-metadata": [
+        "tests/recovery/test_background_native_budget.py::test_moderation_metadata_is_inert_and_cannot_cross_the_active_turn_or_grant_requests[valid]",
+        "tests/recovery/test_background_native_budget.py::test_moderation_metadata_is_inert_and_cannot_cross_the_active_turn_or_grant_requests[null-metadata]",
+        "tests/recovery/test_background_native_budget.py::test_moderation_metadata_is_inert_and_cannot_cross_the_active_turn_or_grant_requests[foreign-thread]",
+        "tests/recovery/test_background_native_budget.py::test_moderation_metadata_is_inert_and_cannot_cross_the_active_turn_or_grant_requests[foreign-turn]",
+        "tests/recovery/test_background_native_budget.py::test_moderation_metadata_is_inert_and_cannot_cross_the_active_turn_or_grant_requests[missing-thread]",
+        "tests/recovery/test_background_native_budget.py::test_moderation_metadata_is_inert_and_cannot_cross_the_active_turn_or_grant_requests[missing-turn]",
+        "tests/recovery/test_background_native_budget.py::test_moderation_metadata_is_inert_and_cannot_cross_the_active_turn_or_grant_requests[missing-metadata]",
+        "tests/recovery/test_background_native_budget.py::test_moderation_metadata_is_inert_and_cannot_cross_the_active_turn_or_grant_requests[unknown]",
+        "tests/recovery/test_background_native_budget.py::test_moderation_metadata_is_inert_and_cannot_cross_the_active_turn_or_grant_requests[request]"
       ]
     },
     "sources": [
@@ -5869,6 +5895,7 @@
       "docs/gui/background-work-contracts.md",
       "docs/gui/background-work-plan.md",
       "docs/gui/background-work-tests.md",
+      "docs/gui/handoffs/BACKGROUND-WORK/native-retry-authorization.json",
       "docs/gui/handoffs/BACKGROUND-WORK/nb00a-contract.md",
       "docs/gui/handoffs/BACKGROUND-WORK/nb00a-execution-report.schema.json",
       "docs/gui/handoffs/BACKGROUND-WORK/nb00a-state-mappings.md",
@@ -6070,6 +6097,7 @@
       "tests/foundation/test_runner_gates.py",
       "tests/recovery/conftest.py",
       "tests/recovery/test_agent_lifecycle.py",
+      "tests/recovery/test_agent_runtime.py",
       "tests/recovery/test_background_admission.py",
       "tests/recovery/test_background_agent.py",
       "tests/recovery/test_background_assets.py",

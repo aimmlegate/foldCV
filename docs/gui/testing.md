@@ -558,3 +558,29 @@ NB05 also checks retained request identity, Undo before metadata and server
 acceptance, history action IDs, epoch expiry and the denied legacy fixed routes.
 The 31 due fixed-operation variants and 89 cumulative extra groups require exact
 executed evidence; declarations alone do not accept them.
+
+## NB07a authorized native retry
+
+The direct native-retry-authorization.json amendment raises NB07a to four total
+starts and preserves its first failed start. New copied-ledger tests require the
+exact grant hash, reject successful-variant replay and reserve deferred capacity.
+Five real NativeSession frame tests prove that bounded redacted diagnostics leave
+healthy/error parser decisions intact and restore the observer after use. These
+are offline checks; neither they nor the separate transport authority spend a
+native turn. Both final native protocol cases still gate acceptance.
+
+The observer also preserves a real missing-key exception detail and distinguishes
+clean EOF from a process failure. Both process exits retain bounded redacted
+stderr without raw stdout. The r4 full-run prefix is retained as intentionally
+interrupted for this concrete diagnostic gap; it is not acceptance evidence.
+
+The diagnostic second start identified `turn/moderationMetadata` as the rejected
+notification. The pinned CLI's generated schema declares opaque metadata plus
+thread/turn IDs. Accept only the current thread/turn with a metadata field, without
+publishing or interpreting it. Nine guard cases and a scripted pipe execution
+cover inert delivery, nullable metadata, missing/foreign IDs, unknown methods and
+denied requests. The first focused run lacked required sandbox process/IPC access;
+retain its cleanup failures and rerun with owned-process permission.
+The strict NB offline guard also rejected constructing a runtime in an NB test.
+Keep that failure and the guard unchanged: run the scripted pipe case in the
+existing agent-driver suite; keep the nine pure frame guards in the NB suite.

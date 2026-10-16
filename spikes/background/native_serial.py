@@ -2,12 +2,14 @@
 
 import argparse
 import asyncio
+from contextlib import contextmanager
 from datetime import datetime, timezone
 import fcntl
 import hashlib
 import json
 import os
 from pathlib import Path
+import re
 import secrets
 import signal
 import socket
@@ -21,6 +23,9 @@ from packages.resume_core.models.background import JobAgentRequestV1, WriterOpen
 from packages.resume_core.models.rich_document import StyledText
 from packages.resume_core.storage import atomic_write
 from resume_api.app import create_app
+from resume_api.agent.runtime import NativeSession
+from resume_api.cli.process_runner import ProcessExit, ProcessRunner
+from resume_api.lifecycle import SpikeError
 from resume_api.cli.experimental_profile import BINARY, ExperimentalCliProfile
 from spikes.agent.native_proof import Exclusion, ProofServer, alive
 from spikes.agent.profile import check_host
@@ -53,6 +58,112 @@ def write(path, value):
     atomic_write(path, json.dumps(value, ensure_ascii=False, indent=2).encode() + b"\n")
 
 
+def redact(value, secret, depth=0):
+    if depth > 4:
+        return "[bounded]"
+    if isinstance(value, dict):
+        return {str(key)[:128]: "[redacted]" if re.search(r"token|credential|authorization|secret", str(key), re.I)
+            else redact(item, secret, depth + 1) for key, item in list(value.items())[:12]}
+    if isinstance(value, list):
+        return [redact(item, secret, depth + 1) for item in value[:8]]
+    if isinstance(value, str):
+        text = value.replace(secret, "[redacted]") if secret else value
+        text = re.sub(r"(?i)Bearer\s+\S+", "Bearer [redacted]", text)
+        text = re.sub(r"sk-[A-Za-z0-9_-]+", "[redacted]", text)
+        text = re.sub(r'''(?i)((?:access_token|refresh_token|id_token|credential|authorization|secret)["'\s:=]+)[^\s",}]+''', r"\1[redacted]", text)
+        return text[:2048]
+    return value if value is None or isinstance(value, (bool, int, float)) else "[unknown]"
+
+
+@contextmanager
+def protocol_diagnostics(root):
+    original = NativeSession.accept
+    original_run = ProcessRunner.run
+    captured = set()
+    tokens = set()
+    def label(value):
+        return str(value)[:128] if value is None or isinstance(value, (str, int, bool)) else "[invalid]"
+    def capture(session, raw):
+        tokens.add(session.value.token)
+        try:
+            parsed = json.loads(raw)
+            summary = dict(at=now(), method=label(parsed.get("method")), keys=[key[:128] for key in list(parsed)[:12]],
+                thread=label(session.thread), turn=label(session.turn)) if isinstance(parsed, dict) else dict(shape="non_object")
+            write(root / "protocol-last-frame.json", redact(summary, session.value.token))
+        except (OSError, TypeError, ValueError):
+            pass
+        def retain(error):
+            identity = hashlib.sha256(str(session.thread).encode()).hexdigest()[:16]
+            if identity in captured:
+                return
+            try:
+                try:
+                    frame = json.loads(raw)
+                except (TypeError, ValueError):
+                    frame = {}
+                frame = frame if isinstance(frame, dict) else {}
+                params = frame.get("params", {})
+                params = params if isinstance(params, dict) else {}
+                row = dict(at=now(), exception=type(error).__name__ if error else None,
+                    detail=str(error) if error else session.result.error,
+                    code=getattr(error, "code", session.result.error), method=label(frame.get("method")),
+                    requestId=label(frame.get("id")), parameterKeys=[key[:128] for key in list(params)[:12]],
+                    error=frame.get("error", params.get("error", params.get("turn", {}).get("error")
+                        if isinstance(params.get("turn"), dict) else None)), willRetry=params.get("willRetry"),
+                    itemType=label(params.get("item", {}).get("type")) if isinstance(params.get("item"), dict) else None,
+                    turn=label(params.get("turn", {}).get("status")) if isinstance(params.get("turn"), dict) else None)
+                safe = redact(row, session.value.token)
+                safe["error"] = json.dumps(safe["error"], ensure_ascii=False)[:4096]
+                write(root / ("protocol-failure-" + identity + ".json"), safe)
+                captured.add(identity)
+            except (OSError, TypeError, ValueError):
+                pass
+        before = session.result.error
+        try:
+            result = original(session, raw)
+        except Exception as error:
+            retain(error)
+            raise
+        if session.result.error is not None and session.result.error != before:
+            retain(None)
+        return result
+    def run(runner, *args, **kwargs):
+        try:
+            result = original_run(runner, *args, **kwargs)
+            if kwargs.get("interactive") is True and isinstance(result, tuple) and len(result) == 2:
+                output, errors = result
+                if isinstance(output, bytes) and isinstance(errors, bytes):
+                    detail = errors.decode("utf-8", "replace")
+                    for token in tokens:
+                        if token:
+                            detail = detail.replace(token, "[redacted]")
+                    try:
+                        write(root / "protocol-process-exit.json", dict(at=now(), exit="clean_eof",
+                            stdoutBytes=len(output), stderr=redact(detail, "")))
+                    except OSError:
+                        pass
+            return result
+        except (ProcessExit, SpikeError) as error:
+            if kwargs.get("interactive") is True:
+                detail = getattr(error, "stderr", b"").decode("utf-8", "replace")
+                for token in tokens:
+                    if token:
+                        detail = detail.replace(token, "[redacted]")
+                try:
+                    write(root / "protocol-process-failure.json", dict(at=now(), exception=type(error).__name__,
+                        code=error.code, stderr=redact(detail, "")))
+                except OSError:
+                    pass
+            raise
+    NativeSession.accept = capture
+    ProcessRunner.run = run
+    try:
+        yield
+    finally:
+        NativeSession.accept = original
+        ProcessRunner.run = original_run
+
+
 def spend(path, *, variant, job, project, hashes):
     with (path.parent / ".native-attempts.lock").open("a") as lock:
         fcntl.flock(lock, fcntl.LOCK_EX)
@@ -64,8 +175,20 @@ def spend(path, *, variant, job, project, hashes):
                 or any(row.get("error") in {"AGENT_AUTH_REQUIRED", "AGENT_QUOTA", "AUTH_REQUIRED", "RATE_LIMITED"}
                     for row in ledger["attempts"])):
             raise BackgroundFailure("JOB_DISABLED")
-        if any(row["pool"] == "NB07a" and row["variant"] == variant for row in ledger["attempts"]):
-            raise BackgroundFailure("JOB_IDEMPOTENCY_CONFLICT")
+        previous = [row for row in recorded if row["variant"] == variant]
+        if previous:
+            authority = path.parent / "native-retry-authorization.json"
+            try:
+                grant = json.loads(authority.read_bytes())
+                allowed = (pool.get("retryAuthority") == authority.name and grant["authorized"] is True
+                    and pool.get("retryAuthoritySha256") == hashlib.sha256(authority.read_bytes()).hexdigest()
+                    and grant["capTotal"] == pool["cap"] == 4 and grant["failedStartsCount"] is True
+                    and variant == "NB-X03:v01" and len(previous) < grant["retryVariants"][variant] == 3
+                    and all(row["status"] == "failed" for row in previous) and pool["cap"] - pool["spent"] >= 2)
+            except (OSError, KeyError, TypeError, ValueError):
+                allowed = False
+            if not allowed:
+                raise BackgroundFailure("JOB_IDEMPOTENCY_CONFLICT")
         pool["spent"] += 1
         row = dict(id="NB07a-" + str(pool["spent"]), pool="NB07a", number=pool["spent"], variant=variant,
             jobId=job, projectId=project, model=MODEL, effort="medium", startedAt=now(), status="started",
@@ -224,6 +347,6 @@ if __name__ == "__main__":
     parser.add_argument("--dist", type=Path, required=True)
     parser.add_argument("--controlled-evidence", type=Path, required=True)
     options = parser.parse_args()
-    with open("/private/tmp/foldcv-nb-native-live.lock", "a") as lock:
+    with open("/private/tmp/foldcv-nb-native-live.lock", "a") as lock, protocol_diagnostics(options.root):
         fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
         asyncio.run(SerialProof(options.root, options.dist, options.controlled_evidence).serve())
