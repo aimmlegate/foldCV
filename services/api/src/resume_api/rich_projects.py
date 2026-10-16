@@ -6,6 +6,7 @@ import threading
 from pydantic import ValidationError
 
 from packages.resume_core.dates import partial_date
+from packages.resume_core.background_store import BackgroundFailure
 from packages.resume_core.gui_archive_zip import ArchiveFailure
 from packages.resume_core.gui_normalization import GuiNormalizeRequest, canonical_source
 from packages.resume_core.models.contracts import Source
@@ -95,12 +96,19 @@ class RichProjectService(RichSynchronization, RichAssets, GuiProjectService):
                 self.save_errors[identifier] = "PROJECT_DELETED"; return "failed"
             try:
                 snapshot = self.read_memory(identifier)
+                jobs = getattr(self, "background_jobs", None)
+                if jobs is not None and jobs.enabled and (jobs.store.projects / identifier).exists():
+                    state = jobs.store.load(identifier)
+                    if state.history is not None or (jobs.store.projects / identifier / "history-activation.json").exists():
+                        _current, checksum = jobs.publisher.confirm_snapshot(identifier, snapshot)
+                        jobs.publication.adopt(identifier, snapshot, checksum)
+                        return "durable"
                 self.storage.save(snapshot, self.originals, self.artifacts, self.images)
                 self.saved_hashes[identifier] = digest(snapshot.model_dump(mode="json", by_alias=True))
                 self.saved_revisions[identifier] = (snapshot.project_revision, snapshot.document_revision)
                 self.save_errors.pop(identifier, None)
                 return "durable"
-            except ProjectStoreFailure as error:
+            except (ProjectStoreFailure, BackgroundFailure) as error:
                 self.save_errors[identifier] = error.code
                 return "failed"
 
@@ -305,6 +313,20 @@ class RichProjectService(RichSynchronization, RichAssets, GuiProjectService):
             agent = getattr(self, "agent", None)
             if agent is not None and not agent.publication.manual_allowed(identifier, request):
                 raise ProjectFailure("AGENT_TICKET_INVALID", 409)
+            jobs = getattr(self, "background_jobs", None)
+            if jobs is not None and jobs.enabled:
+                jobs.store.open(identifier)
+                try:
+                    workspace, _replay = jobs.publisher.manual(identifier, request, originals=self.originals,
+                        artifacts=self.artifacts, images=self.images)
+                except (BackgroundFailure, RichMutationFailure, ProjectStoreFailure) as error:
+                    self.save_errors[identifier] = error.code
+                    raise ProjectFailure(error.code, 409) from None
+                current, checksum = self.storage.read_committed(identifier)
+                jobs.publication.adopt(identifier, current, checksum)
+                if agent is not None:
+                    agent.publication.record_history(identifier, request)
+                return self.response(identifier)
             try:
                 workspace, replay = apply_rich_mutation(self.workspaces[identifier], request)
                 archive_payload(workspace, {sid: blob for (pid, sid), blob in self.originals.items() if pid == identifier},
@@ -424,6 +446,11 @@ class RichProjectService(RichSynchronization, RichAssets, GuiProjectService):
                 agent_error = error.code
             except ProjectStoreFailure as error:
                 raise ProjectFailure(error.code, 409) from None
+        jobs = getattr(self, "background_jobs", None)
+        if jobs is not None and jobs.enabled:
+            self.storage.tombstone(identifier)
+            self.deleted_ids.add(identifier)
+            await jobs.stop_project(identifier)
         for (pid, _), session in self.image_sessions.items():
             if pid == identifier:
                 session.closed = True

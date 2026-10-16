@@ -34,6 +34,19 @@
       ],
       "title": "Barriergeneration"
     },
+    "beforeGenerationsSha256": {
+      "anyOf": [
+        {
+          "pattern": "^[a-f0-9]{64}$",
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Beforegenerationssha256"
+    },
     "beforeWorkspaceSha256": {
       "pattern": "^[a-f0-9]{64}$",
       "title": "Beforeworkspacesha256",
@@ -45,6 +58,19 @@
       "pattern": "^[A-Za-z0-9_-]+$",
       "title": "Candidateref",
       "type": "string"
+    },
+    "candidateSha256": {
+      "anyOf": [
+        {
+          "pattern": "^[a-f0-9]{64}$",
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Candidatesha256"
     },
     "clientMutationId": {
       "maxLength": 128,
@@ -149,8 +175,6 @@
   "required": [
     "schemaVersion",
     "id",
-    "jobId",
-    "proposalId",
     "projectId",
     "lineage",
     "clientMutationId",
@@ -164,7 +188,9 @@
     "incarnation",
     "barrierGeneration",
     "phase",
-    "assetPins"
+    "assetPins",
+    "jobId",
+    "proposalId"
   ],
   "title": "PublicationIntentV1",
   "type": "object"

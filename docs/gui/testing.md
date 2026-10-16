@@ -7,8 +7,12 @@ isolation, reference corpus and executed-report negatives. This is not productio
 background acceptance. `NB-JOBS` maps NB01's capacity-one Job store/supervisor,
 single-copy agent artifacts, deferred apply v2, async admission and opt-in API.
 Its 73 due variants use real temporary stores and owned pipe children. Canonical
-publication and normal rollout stay off. `NB-PUBLICATION`, `NB-WRITER`, `NB-FIXED`,
-`NB-UI` and `NB-PARALLEL` remain unimplemented until their slices add real bindings.
+publication and normal rollout stay off. `NB-PUBLICATION` maps NB02a's conditional
+publisher, monotonic scoped history, manual-save boundary, exact receipts and
+typed inverses. Its 103 due variants include real persistence cuts, six owned
+synthetic process terminations and three disposable guard mutants. This is partial:
+NB02b still owns full writer/export/asset/retention coverage before headless saving.
+`NB-WRITER`, `NB-FIXED`, `NB-UI` and `NB-PARALLEL` await their slice bindings.
 
 The existing fast gate writes exact Python setup/call/teardown results through
 `tools/background_pytest.py` and validates NB parameter/file identities, current

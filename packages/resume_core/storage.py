@@ -52,7 +52,7 @@ def locked_root(root: Path, name: str):
         os.close(fd)
 
 
-def atomic_write(path: Path, content: bytes) -> None:
+def atomic_write(path: Path, content: bytes, *, after_replace=None) -> None:
     private_directory(path.parent)
     if path.is_symlink():
         raise StorageFailure("UNSAFE_STORAGE")
@@ -65,6 +65,8 @@ def atomic_write(path: Path, content: bytes) -> None:
             output.flush()
             os.fsync(output.fileno())
         os.replace(temp, path)
+        if after_replace is not None:
+            after_replace()
         directory = os.open(path.parent, os.O_RDONLY | getattr(os, "O_DIRECTORY", 0))
         try:
             os.fsync(directory)

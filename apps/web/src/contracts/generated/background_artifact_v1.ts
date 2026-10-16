@@ -1059,6 +1059,19 @@ export type Projectid1 = string;
 export type Requestepoch = number;
 export type Requestid = string;
 export type Jobid5 = string | null;
+export type Fingerprint2 = string;
+export type Generation = number;
+export type Key1 = string;
+export type Kind31 = "entity" | "structure" | "query" | "source" | "rules";
+/**
+ * @maxItems 100
+ */
+export type Reads = GenerationStamp[];
+export type Schemaversion1 = 1;
+/**
+ * @maxItems 100
+ */
+export type Writes = GenerationStamp[];
 export type AgentMessage = {
   [k: string]: unknown;
 };
@@ -1074,7 +1087,7 @@ export type Scope2 = WholeResumeScope | SelectionScope;
 export type Settingsrevision = number;
 export type Requestsha2563 = string;
 export type Rulessha256 = string;
-export type Schemaversion1 = 1;
+export type Schemaversion2 = 1;
 export type Contentsha256 = string;
 /**
  * @maxItems 2000
@@ -1331,11 +1344,13 @@ export interface JobArtifactV1 {
   id: Id34;
   identity: JobIdentity;
   jobId: Jobid5;
+  observedGuards?: ScopeGuardV1 | null;
+  preparedGuards?: ScopeGuardV1 | null;
   reply: AgentMessage | null;
   request: AgentJournalRequest;
   requestSha256: Requestsha2563;
   rulesSha256: Rulessha256;
-  schemaVersion: Schemaversion1;
+  schemaVersion: Schemaversion2;
   snapshots: Snapshots;
   sources: Sources;
   usage: AgentUsage | null;
@@ -1953,6 +1968,17 @@ export interface JobIdentity {
   projectId: Projectid1;
   requestEpoch: Requestepoch;
   requestId: Requestid;
+}
+export interface ScopeGuardV1 {
+  reads: Reads;
+  schemaVersion: Schemaversion1;
+  writes: Writes;
+}
+export interface GenerationStamp {
+  fingerprint: Fingerprint2;
+  generation: Generation;
+  key: Key1;
+  kind: Kind31;
 }
 export interface AgentJournalRequest {
   allowEdits: Allowedits;

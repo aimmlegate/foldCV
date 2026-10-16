@@ -28,7 +28,8 @@ def offline_background_boundaries(request, monkeypatch, tmp_path):
     for cls in (CodexAgentRuntime, ConnectionAdapter, CodexCliProvider):
         monkeypatch.setattr(cls, "__init__", forbidden)
     original = subprocess.Popen
-    child_hash = hashlib.sha256((root / "spikes/background/fake_child.py").read_bytes()).hexdigest()
+    child_hashes = {hashlib.sha256((root / "spikes/background" / name).read_bytes()).hexdigest()
+        for name in ("fake_child.py", "fake_publication_child.py")}
 
     def guarded(arguments, *args, **kwargs):
         allowed = SYNTHETIC_SPAWN.get()
@@ -37,7 +38,7 @@ def offline_background_boundaries(request, monkeypatch, tmp_path):
             raise AssertionError("unregistered child spawn is forbidden in offline NB tests")
         script = Path(arguments[-1])
         if (script.is_symlink() or not script.resolve().is_relative_to(tmp_path.resolve())
-                or hashlib.sha256(script.read_bytes()).hexdigest() != child_hash
+                or hashlib.sha256(script.read_bytes()).hexdigest() not in child_hashes
                 or kwargs.get("env") != {"HOME": str(script.parent), "LANG": "C.UTF-8"}
                 or kwargs.get("cwd") != script.parent):
             raise AssertionError("synthetic child identity, environment or ownership is invalid")

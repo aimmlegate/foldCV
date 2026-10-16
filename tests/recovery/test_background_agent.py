@@ -112,7 +112,9 @@ async def test_captured_models_rules_and_bound_capabilities_cannot_be_replaced(t
                 with pytest.raises(AgentFailure, match="AGENT_CONNECTION_CHANGED"):
                     session.guard()
             elif variant == "NB-J03:v05":
-                service.projects.workspaces[workspace.project_id].rules_used = service.projects.rules.load()
+                current, checksum = service.projects.storage.read_committed(workspace.project_id)
+                current.rules_used = service.projects.rules.load()
+                service.publisher.snapshot(workspace.project_id, checksum, current, "rules-update")
                 with pytest.raises(AgentFailure, match="AGENT_STALE_READ"):
                     session.guard()
                 assert service.artifacts.record(workspace.project_id, control.run_id)[1].rules_sha256 == digest(None)
@@ -251,9 +253,10 @@ async def test_actual_compiler_apply_v2_retains_single_payload_after_native_exit
             prepared = await session.call("prepare_edit_batch", command(replace(snapshot, "narrative", 0, 6, "Clear")))
             assert prepared["disposition"] == "prepared", prepared
             if review:
-                current = service.projects.workspaces[workspace.project_id]
-                next(block for block in current.project.document.blocks() if block.id == "narrative").revision += 1
-                service.projects.persist(workspace.project_id)
+                from tests.recovery.test_background_inverse import mutation, put
+                current = service.projects.storage.read_committed(workspace.project_id)[0]
+                service.projects.mutate(workspace.project_id,
+                    mutation(current, [put(current, "narrative", text="Concurrent user input")], "manual-before-apply"))
                 expected_canonical[0] = digest(service.projects.read(workspace.project_id))
             applied = await session.call("apply_edit_batch", AgentApplyRequest(batchId=prepared["batchId"]))
             assert applied["disposition"] == ("needs_review" if review else "waiting_for_sync"), applied

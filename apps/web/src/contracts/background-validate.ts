@@ -87,7 +87,9 @@ function semantics(value: unknown): boolean {
     if (!record(value.identity) || !record(value.request) || value.identity.requestId !== value.request.clientRequestId) return false;
     const resources: unknown[] = [...list(value.snapshots), ...list(value.sources), ...list(value.findings), ...(value.reply === null ? [] : [value.reply])];
     if (resources.some((item) => !record(item) || item.runId !== value.jobId)) return false;
-    if (value.jobId === null && (resources.length > 0 || list(value.batches).length > 0 || value.usage !== null)) return false;
+    if (value.jobId === null && (resources.length > 0 || list(value.batches).length > 0 || value.usage !== null ||
+        value.observedGuards !== undefined && value.observedGuards !== null ||
+        value.preparedGuards !== undefined && value.preparedGuards !== null)) return false;
     if (record(value.reply) && value.reply.role !== "assistant") return false;
     for (const item of list(value.batches)) {
       if (!record(item) || item.receipt !== null || item.publication !== undefined && item.publication !== null || list(item.historyActions).length > 0 ||
@@ -124,11 +126,16 @@ function semantics(value: unknown): boolean {
         (value.owner === "session" && value.writerEpoch === null) ||
         (["backend", "expired"].includes(String(value.owner)) && value.writerEpoch !== null)) return false;
   }
+  if ("namespace" in value && "definitions" in value) {
+    const definitions = list(value.definitions);
+    if (new Set(definitions.map((item) => record(item) ? item.key : null)).size !== definitions.length) return false;
+  }
   if ("activeRequestEpoch" in value) {
     if (typeof value.activeRequestEpoch !== "number" || typeof value.expiredThroughEpoch !== "number" || value.activeRequestEpoch <= value.expiredThroughEpoch) return false;
-    const groups = ["jobs", "requests", "proposals", "drafts", "generations", "intents", "inverses"];
-    if (groups.reduce((count, key) => count + list(value[key]).length, 0) + Number(value.writer !== null) + Number(value.barrier !== null) > background_sidecar_v1["x-maxMetadataRecords"]) return false;
-    const scoped: unknown[] = [value.writer, value.barrier, ...["jobs", "requests", "proposals", "drafts", "intents"].flatMap((key) => list(value[key]))].filter((item) => item !== null);
+    const groups = ["jobs", "requests", "proposals", "drafts", "generations", "intents", "inverses", "manualIntents"];
+    const historyRecords = record(value.history) ? 1 + list(value.history.definitions).length : 0;
+    if (groups.reduce((count, key) => count + list(value[key]).length, 0) + Number(value.writer !== null) + Number(value.barrier !== null) + historyRecords > background_sidecar_v1["x-maxMetadataRecords"]) return false;
+    const scoped: unknown[] = [value.writer, value.barrier, ...["jobs", "requests", "proposals", "drafts", "intents", "manualIntents"].flatMap((key) => list(value[key]))].filter((item) => item !== null);
     for (const item of scoped) {
       if (!record(item)) return false;
       const identity: unknown = record(item.submission) ? item.submission.identity : record(item.identity) ? item.identity : item;

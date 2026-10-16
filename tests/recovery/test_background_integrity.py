@@ -119,3 +119,24 @@ async def test_account_failure_observed_during_deadline_cleanup_still_pauses_dis
     finally:
         await supervisor.shutdown()
         factory.verify(); clock.verify()
+
+
+@pytest.mark.asyncio
+async def test_secondary_outcome_observation_cannot_interrupt_verified_cleanup(tmp_path):
+    class SyntheticFatal(BaseException):
+        pass
+    store, state, clock, factory, supervisor = await environment(tmp_path)
+    async def execute(_control, _actor):
+        raise SyntheticFatal("synthetic nonstandard runtime exit")
+    factory.callbacks["fatal-result"] = execute
+    try:
+        first, _ = await supervisor.submit(capture(state, "fatal-result"))
+        actor = await factory.actor(first)
+        with pytest.raises(SyntheticFatal):
+            await asyncio.wait_for(supervisor.controls[first.id].task, 10)
+        assert actor.verified_dead() and supervisor.active is None
+        assert store.read(state.project_id, first.id).execution == "failed"
+        assert store.read(state.project_id, first.id).attempts[0].cleanup_verified
+    finally:
+        await supervisor.shutdown()
+        factory.verify(); clock.verify()

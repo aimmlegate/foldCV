@@ -1,0 +1,59 @@
+{
+  "schemaVersion": 1,
+  "projectId": "project-one",
+  "lineage": "lineage-one",
+  "accountGeneration": 1,
+  "activeRequestEpoch": 1,
+  "expiredThroughEpoch": 0,
+  "requestEpochExpiresAt": "2026-11-15T12:00:00Z",
+  "tombstoned": false,
+  "jobs": [],
+  "requests": [],
+  "proposals": [],
+  "writer": null,
+  "barrier": null,
+  "drafts": [],
+  "generations": [
+    {
+      "kind": "rules",
+      "key": "history.namespace",
+      "generation": 1,
+      "fingerprint": "68f9599d689c70e1a02914dd47117b31462e46b75738f39f3e6f805ebb784be5"
+    },
+    {
+      "kind": "rules",
+      "key": "history.clock",
+      "generation": 2,
+      "fingerprint": "68f9599d689c70e1a02914dd47117b31462e46b75738f39f3e6f805ebb784be5"
+    },
+    {
+      "kind": "entity",
+      "key": "entity:c73d99e11db0c2f919d8d40fe49331a0d52b0a374b912397c4c637548505ce81",
+      "generation": 2,
+      "fingerprint": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+    }
+  ],
+  "intents": [],
+  "inverses": [],
+  "history": {
+    "schemaVersion": 1,
+    "namespace": "history-example",
+    "phase": "ready",
+    "workspaceSha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+    "definitions": [
+      {
+        "key": "entity:c73d99e11db0c2f919d8d40fe49331a0d52b0a374b912397c4c637548505ce81",
+        "selector": {
+          "kind": "entity",
+          "stamp": {
+            "kind": "block",
+            "id": "block-one",
+            "revision": 1,
+            "fingerprint": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+          }
+        }
+      }
+    ]
+  },
+  "manualIntents": []
+}

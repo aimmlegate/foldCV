@@ -8,12 +8,13 @@ from pydantic import ConfigDict, Field, RootModel, model_validator
 
 from ..background_limits import LIMITS
 from .agent import (AgentBatchJournal, AgentCommitResult, AgentFinding, AgentId, AgentJournalRequest,
-    AgentMessage, AgentReadSnapshot, AgentRun, AgentScope, AgentUsage, AgentWebSource, AgentWire,
+    AgentMessage, AgentReadSnapshot, AgentRun, AgentScope, AgentSnapshotDependency, AgentUsage, AgentWebSource, AgentWire,
     ModelId, Timestamp, bounded)
 from .contracts import Revision, Sha256
 from .rich_document import RichDocumentV1
 from .rich_facts import WorkingFacts
 from .rich_mutations import RichMutation
+from .rich_workspace import WorkspaceV6
 
 Execution = Literal["queued", "starting", "running", "cancelling", "completed", "failed", "cancelled", "interrupted"]
 Publication = Literal["none", "ready", "waiting_for_sync", "needs_review", "committing", "saved", "no_change",
@@ -31,7 +32,7 @@ class BackgroundWire(AgentWire):
     @classmethod
     def literal_booleans(cls, value):
         if isinstance(value, dict):
-            for key in ("durable", "proposalStored"):
+            for key in ("durable", "proposalStored", "snapshotWrite"):
                 if key in value and type(value[key]) is not bool:
                     raise ValueError("background boolean must be explicit")
         return value
@@ -93,6 +94,8 @@ class JobArtifactV1(BackgroundWire):
     findings: list[AgentFinding] = Field(max_length=100)
     reply: AgentMessage | None
     usage: AgentUsage | None
+    observed_guards: ScopeGuardV1 | None = None
+    prepared_guards: ScopeGuardV1 | None = None
 
     @model_validator(mode="after")
     def owns_artifacts_only(self):
@@ -101,7 +104,8 @@ class JobArtifactV1(BackgroundWire):
         resources = [*self.snapshots, *self.sources, *self.findings, *([self.reply] if self.reply else [])]
         if any(item.run_id != self.job_id for item in resources):
             raise ValueError("foreign job artifact")
-        if self.job_id is None and (resources or self.batches or self.usage is not None):
+        if self.job_id is None and (resources or self.batches or self.usage is not None
+                or self.observed_guards is not None or self.prepared_guards is not None):
             raise ValueError("unbound input cannot have execution artifacts")
         if self.reply is not None and self.reply.role != "assistant":
             raise ValueError("the original user message belongs to the immutable request")
@@ -466,11 +470,9 @@ class JobProjectV1(BackgroundWire):
         return self
 
 
-class PublicationIntentV1(BackgroundWire):
+class CanonicalIntentV1(BackgroundWire):
     schema_version: Literal[1]
     id: AgentId
-    job_id: AgentId
-    proposal_id: AgentId
     project_id: AgentId
     lineage: AgentId
     client_mutation_id: AgentId
@@ -486,6 +488,8 @@ class PublicationIntentV1(BackgroundWire):
     phase: Literal["intent_stored", "commit_claimed", "workspace_replaced", "workspace_durable",
         "generation_history_durable", "receipt_stored", "fenced", "reconciled"]
     asset_pins: list[AgentId] = Field(max_length=100)
+    candidate_sha256: Sha256 | None = None
+    before_generations_sha256: Sha256 | None = None
 
     @model_validator(mode="after")
     def complete_writer_binding(self):
@@ -493,6 +497,15 @@ class PublicationIntentV1(BackgroundWire):
         if any(p is None for p in parts) and not all(p is None for p in parts):
             raise ValueError("intent needs the whole writer binding or a proved clean detach")
         return self
+
+
+class PublicationIntentV1(CanonicalIntentV1):
+    job_id: AgentId
+    proposal_id: AgentId
+
+
+class ManualIntentV1(CanonicalIntentV1):
+    pass
 
 
 class UndoOwnershipV1(BackgroundWire):
@@ -528,6 +541,68 @@ class RequestReplayV1(BackgroundWire):
     archived_result: JobSnapshotV1 | None
 
 
+class HistoryDefinitionV1(BackgroundWire):
+    key: ScopeKey
+    selector: AgentSnapshotDependency
+
+
+class BackgroundHistoryV1(BackgroundWire):
+    schema_version: Literal[1]
+    namespace: AgentId
+    phase: Literal["initializing", "ready", "fenced"]
+    workspace_sha256: Sha256
+    definitions: list[HistoryDefinitionV1] = Field(max_length=LIMITS.metadata_project_records)
+
+    @model_validator(mode="after")
+    def unique_definitions(self):
+        if len({definition.key for definition in self.definitions}) != len(self.definitions):
+            raise ValueError("duplicate history definition")
+        return self
+
+
+class HistoryCheckpointV1(BackgroundWire):
+    history: BackgroundHistoryV1
+    generations: list[GenerationStamp] = Field(max_length=LIMITS.metadata_project_records)
+
+
+class CanonicalCandidateV1(BackgroundWire):
+    schema_version: Literal[1]
+    id: AgentId
+    project_id: AgentId
+    lineage: AgentId
+    job_id: AgentId | None
+    proposal_id: AgentId | None
+    proposal_sha256: Sha256 | None
+    payload: PayloadReference | None
+    manual_mutation: RichMutation | None
+    client_mutation_id: AgentId
+    action_id: AgentId
+    session_id: AgentId
+    request_sha256: Sha256
+    before_workspace_sha256: Sha256
+    after_workspace_sha256: Sha256
+    before_history: HistoryCheckpointV1
+    after_history: HistoryCheckpointV1
+    workspace: WorkspaceV6
+    inverse: RichMutation | None
+    inverse_guards: ScopeGuardV1
+    persisted_at: Timestamp
+    snapshot_write: bool = False
+
+    @model_validator(mode="after")
+    def exact_candidate(self):
+        job_fields = (self.job_id, self.proposal_id, self.proposal_sha256, self.payload)
+        if any(part is None for part in job_fields) and not all(part is None for part in job_fields):
+            raise ValueError("candidate needs complete proposal identity")
+        if (self.job_id is None) != (self.manual_mutation is not None or self.snapshot_write):
+            raise ValueError("a job candidate references its original payload exactly once")
+        if self.snapshot_write and self.manual_mutation is not None:
+            raise ValueError("a snapshot write cannot also execute a mutation")
+        if self.workspace.project_id != self.project_id:
+            raise ValueError("candidate workspace belongs to another project")
+        return self
+
+
 class BackgroundSidecarV1(BackgroundWire):
     model_config = ConfigDict(json_schema_extra={"x-maxSerializedBytes": LIMITS.sidecar_project_bytes,
         "x-maxMetadataRecords": LIMITS.metadata_project_records})
@@ -548,15 +623,19 @@ class BackgroundSidecarV1(BackgroundWire):
     generations: list[GenerationStamp] = Field(max_length=LIMITS.metadata_project_records)
     intents: list[PublicationIntentV1] = Field(max_length=LIMITS.metadata_project_records)
     inverses: list[UndoOwnershipV1] = Field(max_length=LIMITS.inverse_project_records)
+    history: BackgroundHistoryV1 | None = None
+    manual_intents: list[ManualIntentV1] = Field(default_factory=list, max_length=LIMITS.metadata_project_records)
 
     @model_validator(mode="after")
     def bounded_authority(self):
-        groups = (self.jobs, self.requests, self.proposals, self.drafts, self.generations, self.intents, self.inverses)
+        groups = (self.jobs, self.requests, self.proposals, self.drafts, self.generations, self.intents, self.inverses,
+            self.manual_intents)
         if self.active_request_epoch <= self.expired_through_epoch:
             raise ValueError("active request epoch must be above the durable expired floor")
-        if sum(map(len, groups)) + int(self.writer is not None) + int(self.barrier is not None) > LIMITS.metadata_project_records:
+        if (sum(map(len, groups)) + int(self.writer is not None) + int(self.barrier is not None)
+                + (1 + len(self.history.definitions) if self.history is not None else 0) > LIMITS.metadata_project_records):
             raise ValueError("background metadata capacity exhausted")
-        for item in [*self.jobs, *self.requests, *self.proposals, *self.drafts, *self.intents,
+        for item in [*self.jobs, *self.requests, *self.proposals, *self.drafts, *self.intents, *self.manual_intents,
                 *([self.writer] if self.writer else []), *([self.barrier] if self.barrier else [])]:
             identity = item.submission.identity if isinstance(item, JobSnapshotV1) else item.identity if isinstance(item, RequestReplayV1) else item
             if identity.project_id != self.project_id or identity.lineage != self.lineage:

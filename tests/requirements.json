@@ -1990,8 +1990,150 @@
     },
     {
       "id": "NB-PUBLICATION",
-      "status": "unimplemented",
-      "tests": []
+      "status": "partial",
+      "tests": [
+        "tests/recovery/test_background_conflicts.py::test_capture_and_writer_orders_are_coherent[NB-P06:v01]",
+        "tests/recovery/test_background_conflicts.py::test_capture_and_writer_orders_are_coherent[NB-P06:v02]",
+        "tests/recovery/test_background_conflicts.py::test_cross_read_write_skew_has_a_valid_serial_winner[NB-P02:v01]",
+        "tests/recovery/test_background_conflicts.py::test_cross_read_write_skew_has_a_valid_serial_winner[NB-P02:v02]",
+        "tests/recovery/test_background_conflicts.py::test_cross_read_write_skew_has_a_valid_serial_winner[NB-P02:v03]",
+        "tests/recovery/test_background_conflicts.py::test_entity_aba_and_tombstones_cannot_revalidate_an_old_capture[NB-P04:v01]",
+        "tests/recovery/test_background_conflicts.py::test_entity_aba_and_tombstones_cannot_revalidate_an_old_capture[NB-P04:v02]",
+        "tests/recovery/test_background_conflicts.py::test_entity_aba_and_tombstones_cannot_revalidate_an_old_capture[NB-P04:v03]",
+        "tests/recovery/test_background_conflicts.py::test_entity_aba_and_tombstones_cannot_revalidate_an_old_capture[NB-P04:v04]",
+        "tests/recovery/test_background_conflicts.py::test_every_observed_dependency_can_make_a_proposal_stale[NB-P03:v01]",
+        "tests/recovery/test_background_conflicts.py::test_every_observed_dependency_can_make_a_proposal_stale[NB-P03:v02]",
+        "tests/recovery/test_background_conflicts.py::test_every_observed_dependency_can_make_a_proposal_stale[NB-P03:v03]",
+        "tests/recovery/test_background_conflicts.py::test_every_observed_dependency_can_make_a_proposal_stale[NB-P03:v04]",
+        "tests/recovery/test_background_conflicts.py::test_every_observed_dependency_can_make_a_proposal_stale[NB-P03:v05]",
+        "tests/recovery/test_background_conflicts.py::test_every_observed_dependency_can_make_a_proposal_stale[NB-P03:v06]",
+        "tests/recovery/test_background_conflicts.py::test_every_observed_dependency_can_make_a_proposal_stale[NB-P03:v07]",
+        "tests/recovery/test_background_conflicts.py::test_every_observed_dependency_can_make_a_proposal_stale[NB-P03:v08]",
+        "tests/recovery/test_background_conflicts.py::test_every_observed_dependency_can_make_a_proposal_stale[NB-P03:v09]",
+        "tests/recovery/test_background_conflicts.py::test_exact_commit_identity_survives_concurrent_delivery_and_restart[NB-P09:v01]",
+        "tests/recovery/test_background_conflicts.py::test_exact_commit_identity_survives_concurrent_delivery_and_restart[NB-P09:v02]",
+        "tests/recovery/test_background_conflicts.py::test_exact_commit_identity_survives_concurrent_delivery_and_restart[NB-P09:v03]",
+        "tests/recovery/test_background_conflicts.py::test_exact_commit_identity_survives_concurrent_delivery_and_restart[NB-P09:v04]",
+        "tests/recovery/test_background_conflicts.py::test_invalid_whole_batches_never_publish_a_valid_prefix[NB-P07:v01]",
+        "tests/recovery/test_background_conflicts.py::test_invalid_whole_batches_never_publish_a_valid_prefix[NB-P07:v02]",
+        "tests/recovery/test_background_conflicts.py::test_invalid_whole_batches_never_publish_a_valid_prefix[NB-P07:v03]",
+        "tests/recovery/test_background_conflicts.py::test_invalid_whole_batches_never_publish_a_valid_prefix[NB-P07:v04]",
+        "tests/recovery/test_background_conflicts.py::test_positive_disjoint_writes_and_actual_broad_reads[NB-P01:v01]",
+        "tests/recovery/test_background_conflicts.py::test_positive_disjoint_writes_and_actual_broad_reads[NB-P01:v02]",
+        "tests/recovery/test_background_conflicts.py::test_positive_disjoint_writes_and_actual_broad_reads[NB-P01:v03]",
+        "tests/recovery/test_background_conflicts.py::test_positive_disjoint_writes_and_actual_broad_reads[NB-P01:v04]",
+        "tests/recovery/test_background_conflicts.py::test_positive_disjoint_writes_and_actual_broad_reads[NB-P01:v05]",
+        "tests/recovery/test_background_conflicts.py::test_positive_disjoint_writes_and_actual_broad_reads[NB-P01:v06]",
+        "tests/recovery/test_background_conflicts.py::test_structural_and_collection_history_keeps_each_member_change[NB-P05:v01]",
+        "tests/recovery/test_background_conflicts.py::test_structural_and_collection_history_keeps_each_member_change[NB-P05:v02]",
+        "tests/recovery/test_background_conflicts.py::test_structural_and_collection_history_keeps_each_member_change[NB-P05:v03]",
+        "tests/recovery/test_background_conflicts.py::test_structural_and_collection_history_keeps_each_member_change[NB-P05:v04]",
+        "tests/recovery/test_background_conflicts.py::test_structural_and_collection_history_keeps_each_member_change[NB-P05:v05]",
+        "tests/recovery/test_background_conflicts.py::test_structural_and_collection_history_keeps_each_member_change[NB-P05:v06]",
+        "tests/recovery/test_background_guard_sensitivity.py::test_critical_guard_omission_breaks_the_actual_regression[NB-G03:v01]",
+        "tests/recovery/test_background_guard_sensitivity.py::test_critical_guard_omission_breaks_the_actual_regression[NB-G03:v02]",
+        "tests/recovery/test_background_guard_sensitivity.py::test_critical_guard_omission_breaks_the_actual_regression[NB-G03:v05]",
+        "tests/recovery/test_background_handoff_cuts.py::test_page_membership_and_partial_rereads_preserve_all_old_dependencies[NB-P06:v03]",
+        "tests/recovery/test_background_handoff_cuts.py::test_page_membership_and_partial_rereads_preserve_all_old_dependencies[NB-P06:v04]",
+        "tests/recovery/test_background_handoff_cuts.py::test_proposal_handoff_cut_does_not_create_canonical_authority[NB-D01:v01]",
+        "tests/recovery/test_background_handoff_cuts.py::test_proposal_handoff_cut_does_not_create_canonical_authority[NB-D01:v02]",
+        "tests/recovery/test_background_handoff_cuts.py::test_proposal_handoff_cut_does_not_create_canonical_authority[NB-D01:v03]",
+        "tests/recovery/test_background_handoff_cuts.py::test_proposal_handoff_cut_does_not_create_canonical_authority[NB-D01:v04]",
+        "tests/recovery/test_background_handoff_cuts.py::test_proposal_handoff_cut_does_not_create_canonical_authority[NB-D01:v05]",
+        "tests/recovery/test_background_handoff_cuts.py::test_proposal_handoff_cut_does_not_create_canonical_authority[NB-D01:v06]",
+        "tests/recovery/test_background_handoff_cuts.py::test_proposal_handoff_cut_does_not_create_canonical_authority[NB-D01:v07]",
+        "tests/recovery/test_background_handoff_cuts.py::test_proposal_handoff_cut_does_not_create_canonical_authority[NB-D01:v08]",
+        "tests/recovery/test_background_handoff_cuts.py::test_queued_and_executing_revocation_never_reaches_publication[NB-P10:v01]",
+        "tests/recovery/test_background_handoff_cuts.py::test_queued_and_executing_revocation_never_reaches_publication[NB-P10:v02]",
+        "tests/recovery/test_background_history.py::test_additive_private_fields_do_not_rewrite_an_old_exact_retry",
+        "tests/recovery/test_background_history.py::test_empty_query_aba_cannot_restore_an_old_guard",
+        "tests/recovery/test_background_history.py::test_history_capture_and_aba_preserve_monotonic_scoped_generations",
+        "tests/recovery/test_background_history.py::test_missing_activated_history_and_uncoordinated_writes_fence_without_reset[activation-missing]",
+        "tests/recovery/test_background_history.py::test_missing_activated_history_and_uncoordinated_writes_fence_without_reset[metadata-missing]",
+        "tests/recovery/test_background_history.py::test_missing_activated_history_and_uncoordinated_writes_fence_without_reset[outside-writer]",
+        "tests/recovery/test_background_history.py::test_partial_history_activation_recovers_the_same_namespace[history_activation_durable]",
+        "tests/recovery/test_background_history.py::test_partial_history_activation_recovers_the_same_namespace[history_initializing]",
+        "tests/recovery/test_background_history.py::test_zero_diff_touch_invalidates_only_its_registered_scope",
+        "tests/recovery/test_background_inverse.py::test_inverse_does_not_replace_an_independent_later_block",
+        "tests/recovery/test_background_inverse.py::test_typed_inverse_restores_each_kind_of_edit[fact]",
+        "tests/recovery/test_background_inverse.py::test_typed_inverse_restores_each_kind_of_edit[insert]",
+        "tests/recovery/test_background_inverse.py::test_typed_inverse_restores_each_kind_of_edit[move-and-text]",
+        "tests/recovery/test_background_inverse.py::test_typed_inverse_restores_each_kind_of_edit[move]",
+        "tests/recovery/test_background_inverse.py::test_typed_inverse_restores_each_kind_of_edit[remove-fact]",
+        "tests/recovery/test_background_inverse.py::test_typed_inverse_restores_each_kind_of_edit[remove]",
+        "tests/recovery/test_background_inverse.py::test_typed_inverse_restores_each_kind_of_edit[replace-tree]",
+        "tests/recovery/test_background_inverse.py::test_typed_inverse_restores_each_kind_of_edit[text]",
+        "tests/recovery/test_background_publication.py::test_changed_payload_hash_cannot_change_a_known_receipt",
+        "tests/recovery/test_background_publication.py::test_conditional_save_keeps_original_payload_and_proves_the_actual_mutation",
+        "tests/recovery/test_background_publication.py::test_exact_candidate_recovers_without_reapplication_at_each_real_cut[commit_claimed]",
+        "tests/recovery/test_background_publication.py::test_exact_candidate_recovers_without_reapplication_at_each_real_cut[generation_history_durable]",
+        "tests/recovery/test_background_publication.py::test_exact_candidate_recovers_without_reapplication_at_each_real_cut[intent_stored]",
+        "tests/recovery/test_background_publication.py::test_exact_candidate_recovers_without_reapplication_at_each_real_cut[receipt_stored]",
+        "tests/recovery/test_background_publication.py::test_exact_candidate_recovers_without_reapplication_at_each_real_cut[workspace_durable]",
+        "tests/recovery/test_background_publication.py::test_exact_candidate_recovers_without_reapplication_at_each_real_cut[workspace_replaced]",
+        "tests/recovery/test_background_publication.py::test_independent_manual_input_survives_and_targeted_input_requires_review[False]",
+        "tests/recovery/test_background_publication.py::test_independent_manual_input_survives_and_targeted_input_requires_review[True]",
+        "tests/recovery/test_background_publication_crashes.py::test_owned_process_termination_recovers_exact_durable_proof[NB-D01:v49]",
+        "tests/recovery/test_background_publication_crashes.py::test_owned_process_termination_recovers_exact_durable_proof[NB-D01:v50]",
+        "tests/recovery/test_background_publication_crashes.py::test_owned_process_termination_recovers_exact_durable_proof[NB-D01:v51]",
+        "tests/recovery/test_background_publication_crashes.py::test_owned_process_termination_recovers_exact_durable_proof[NB-D01:v52]",
+        "tests/recovery/test_background_publication_crashes.py::test_owned_process_termination_recovers_exact_durable_proof[NB-D01:v53]",
+        "tests/recovery/test_background_publication_crashes.py::test_owned_process_termination_recovers_exact_durable_proof[NB-D01:v54]",
+        "tests/recovery/test_background_publication_crashes.py::test_publication_exception_cut_has_only_the_exact_old_saved_or_fenced_outcome[NB-D01:v09]",
+        "tests/recovery/test_background_publication_crashes.py::test_publication_exception_cut_has_only_the_exact_old_saved_or_fenced_outcome[NB-D01:v10]",
+        "tests/recovery/test_background_publication_crashes.py::test_publication_exception_cut_has_only_the_exact_old_saved_or_fenced_outcome[NB-D01:v11]",
+        "tests/recovery/test_background_publication_crashes.py::test_publication_exception_cut_has_only_the_exact_old_saved_or_fenced_outcome[NB-D01:v12]",
+        "tests/recovery/test_background_publication_crashes.py::test_publication_exception_cut_has_only_the_exact_old_saved_or_fenced_outcome[NB-D01:v17]",
+        "tests/recovery/test_background_publication_crashes.py::test_publication_exception_cut_has_only_the_exact_old_saved_or_fenced_outcome[NB-D01:v18]",
+        "tests/recovery/test_background_publication_crashes.py::test_publication_exception_cut_has_only_the_exact_old_saved_or_fenced_outcome[NB-D01:v19]",
+        "tests/recovery/test_background_publication_crashes.py::test_publication_exception_cut_has_only_the_exact_old_saved_or_fenced_outcome[NB-D01:v20]",
+        "tests/recovery/test_background_publication_crashes.py::test_publication_exception_cut_has_only_the_exact_old_saved_or_fenced_outcome[NB-D01:v21]",
+        "tests/recovery/test_background_publication_crashes.py::test_publication_exception_cut_has_only_the_exact_old_saved_or_fenced_outcome[NB-D01:v22]",
+        "tests/recovery/test_background_publication_crashes.py::test_publication_exception_cut_has_only_the_exact_old_saved_or_fenced_outcome[NB-D01:v23]",
+        "tests/recovery/test_background_publication_crashes.py::test_publication_exception_cut_has_only_the_exact_old_saved_or_fenced_outcome[NB-D01:v24]",
+        "tests/recovery/test_background_publication_crashes.py::test_publication_exception_cut_has_only_the_exact_old_saved_or_fenced_outcome[NB-D01:v25]",
+        "tests/recovery/test_background_publication_crashes.py::test_publication_exception_cut_has_only_the_exact_old_saved_or_fenced_outcome[NB-D01:v26]",
+        "tests/recovery/test_background_publication_crashes.py::test_publication_exception_cut_has_only_the_exact_old_saved_or_fenced_outcome[NB-D01:v27]",
+        "tests/recovery/test_background_publication_crashes.py::test_publication_exception_cut_has_only_the_exact_old_saved_or_fenced_outcome[NB-D01:v28]",
+        "tests/recovery/test_background_publication_crashes.py::test_publication_exception_cut_has_only_the_exact_old_saved_or_fenced_outcome[NB-D01:v29]",
+        "tests/recovery/test_background_publication_crashes.py::test_publication_exception_cut_has_only_the_exact_old_saved_or_fenced_outcome[NB-D01:v30]",
+        "tests/recovery/test_background_publication_crashes.py::test_publication_exception_cut_has_only_the_exact_old_saved_or_fenced_outcome[NB-D01:v31]",
+        "tests/recovery/test_background_publication_crashes.py::test_publication_exception_cut_has_only_the_exact_old_saved_or_fenced_outcome[NB-D01:v32]",
+        "tests/recovery/test_background_publication_crashes.py::test_publication_exception_cut_has_only_the_exact_old_saved_or_fenced_outcome[NB-D01:v33]",
+        "tests/recovery/test_background_publication_crashes.py::test_publication_exception_cut_has_only_the_exact_old_saved_or_fenced_outcome[NB-D01:v34]",
+        "tests/recovery/test_background_publication_crashes.py::test_publication_exception_cut_has_only_the_exact_old_saved_or_fenced_outcome[NB-D01:v35]",
+        "tests/recovery/test_background_publication_crashes.py::test_publication_exception_cut_has_only_the_exact_old_saved_or_fenced_outcome[NB-D01:v36]",
+        "tests/recovery/test_background_publication_crashes.py::test_recovery_can_itself_crash_and_never_reapply_or_reset_history[NB-D03:v01]",
+        "tests/recovery/test_background_publication_crashes.py::test_recovery_can_itself_crash_and_never_reapply_or_reset_history[NB-D03:v02]",
+        "tests/recovery/test_background_publication_crashes.py::test_recovery_can_itself_crash_and_never_reapply_or_reset_history[NB-D03:v03]",
+        "tests/recovery/test_background_publication_crashes.py::test_recovery_can_itself_crash_and_never_reapply_or_reset_history[NB-D03:v04]",
+        "tests/recovery/test_background_publication_crashes.py::test_recovery_can_itself_crash_and_never_reapply_or_reset_history[NB-D03:v05]",
+        "tests/recovery/test_background_publication_races.py::test_discard_and_old_event_delivery_cannot_reverse_the_winner[NB-J05:v01]",
+        "tests/recovery/test_background_publication_races.py::test_discard_and_old_event_delivery_cannot_reverse_the_winner[NB-J05:v02]",
+        "tests/recovery/test_background_publication_races.py::test_discard_and_old_event_delivery_cannot_reverse_the_winner[NB-J05:v05]",
+        "tests/recovery/test_background_publication_races.py::test_stop_account_and_delete_orders_keep_saved_truth_or_the_tombstone[NB-P10:v03]",
+        "tests/recovery/test_background_publication_races.py::test_stop_account_and_delete_orders_keep_saved_truth_or_the_tombstone[NB-P10:v04]",
+        "tests/recovery/test_background_publication_races.py::test_stop_account_and_delete_orders_keep_saved_truth_or_the_tombstone[NB-P10:v05]",
+        "tests/recovery/test_background_publication_races.py::test_stop_account_and_delete_orders_keep_saved_truth_or_the_tombstone[NB-P10:v06]",
+        "tests/recovery/test_background_publication_races.py::test_stop_account_and_delete_orders_keep_saved_truth_or_the_tombstone[NB-P10:v07]",
+        "tests/recovery/test_background_publication_races.py::test_stop_account_and_delete_orders_keep_saved_truth_or_the_tombstone[NB-P10:v08]",
+        "tests/recovery/test_background_publication_review.py::test_duplicate_barrier_ack_does_not_extend_its_continuous_deadline",
+        "tests/recovery/test_background_publication_review.py::test_inverse_capacity_is_reserved_before_canonical_claim",
+        "tests/recovery/test_background_publication_review.py::test_inverse_reads_fence_a_new_user_reference_to_a_changed_fact",
+        "tests/recovery/test_background_publication_review.py::test_lost_history_fences_only_its_project_and_another_project_still_runs",
+        "tests/recovery/test_background_publication_review.py::test_manual_service_route_replays_and_stale_cache_save_cannot_overwrite_it",
+        "tests/recovery/test_background_publication_review.py::test_native_saved_envelope_uses_the_retained_real_candidate_after_replay_pruning",
+        "tests/recovery/test_background_publication_review.py::test_receipt_metadata_capacity_is_reserved_before_canonical_claim",
+        "tests/recovery/test_background_publication_review.py::test_recovery_does_not_recreate_a_missing_history_activation_marker",
+        "tests/recovery/test_background_tool_publication.py::test_a_new_turn_reads_canonical_and_supersession_is_durable_before_dispatch[NB-J05:v03]",
+        "tests/recovery/test_background_tool_publication.py::test_a_new_turn_reads_canonical_and_supersession_is_durable_before_dispatch[NB-J06:v04]",
+        "tests/recovery/test_background_tool_publication.py::test_compiled_proposal_saves_through_the_service_after_owned_runtime_cleanup[after-runtime-exit]",
+        "tests/recovery/test_background_tool_publication.py::test_compiled_proposal_saves_through_the_service_after_owned_runtime_cleanup[startup-recovery]",
+        "tests/recovery/test_background_tool_publication.py::test_one_turn_cannot_replace_or_duplicate_its_accepted_payload[NB-J05:v04]",
+        "tests/recovery/test_background_tool_publication.py::test_one_turn_cannot_replace_or_duplicate_its_accepted_payload[NB-J06:v01]",
+        "tests/recovery/test_background_tool_publication.py::test_one_turn_cannot_replace_or_duplicate_its_accepted_payload[NB-J06:v02]",
+        "tests/recovery/test_background_tool_publication.py::test_one_turn_cannot_replace_or_duplicate_its_accepted_payload[NB-J06:v03]"
+      ]
     },
     {
       "id": "NB-WRITER",
@@ -2041,7 +2183,7 @@
     "G01": {
       "unproved": "Application dispatch/count/zero-call paths pass; actual CLI internal requests, payload disclosure and tokens are unmeasured.",
       "owner": "Manual CLI usage after MVP under D038",
-      "check": "Record logical operations and supported CLI metadata on examples E1\u2013E8; keep unavailable internal request counts unknown."
+      "check": "Record logical operations and supported CLI metadata on examples E1–E8; keep unavailable internal request counts unknown."
     },
     "G02": {
       "unproved": "Controlled event/error/retry guards pass; the installed experimental native CLI version is unverified.",
@@ -2070,7 +2212,7 @@
     },
     "B01": {
       "unproved": "Connected controlled raw-to-edit/rewrite/restore/local-portable-reopen/DOCX and default-entry UI pass; live semantic wording/quality remains pending.",
-      "owner": "Manual examples E1\u2013E8 after MVP under D038",
+      "owner": "Manual examples E1–E8 after MVP under D038",
       "check": "Use the manual guide through the real CLI path, inspect quality and supported facts, record keyboard/failure behavior and measured usage. No mandatory automated pilot."
     },
     "N01": {
@@ -2107,6 +2249,11 @@
       "unproved": "All rich OOXML and 17 all-page converter/T3 inspections pass; actual Word fonts/layout/edit/save/reopen remain manual.",
       "owner": "Manual Word",
       "check": "Follow manual-macos-checklist.md on the five exact hashed files."
+    },
+    "NB-PUBLICATION": {
+      "unproved": "Complete writer, export, asset and retention inventory; headless publication remains off.",
+      "owner": "NB02b",
+      "check": "Pass every NB02b variant and the route-to-coordinator inventory before exposing headless publication."
     }
   },
   "recovery": {
@@ -2136,13 +2283,14 @@
     "historicalMapping": "docs/gui/handoffs/PROTOTYPE-ADOPTION/evidence/uir09-browser-retirement.json",
     "connectedAcceptance": "docs/gui/handoffs/PROTOTYPE-ADOPTION/uir08-acceptance.json",
     "manualWord": "pending_unchanged",
-    "currentUiChecks": "Manual T3 acceptance in UIR01\u2013UIR09; Python/state mappings remain active."
+    "currentUiChecks": "Manual T3 acceptance in UIR01–UIR09; Python/state mappings remain active."
   },
   "backgroundExecution": {
     "schemaVersion": 1,
     "coveredSlices": [
       "NB00a",
-      "NB01"
+      "NB01",
+      "NB02a"
     ],
     "bindings": {
       "NB-R03:v01": [
@@ -2444,6 +2592,315 @@
       ],
       "NB-A04:v21": [
         "tests/recovery/test_background_events.py::test_event_window_bounds_return_an_explicit_gap_and_latest_snapshot[NB-A04:v21]"
+      ],
+      "NB-P01:v01": [
+        "tests/recovery/test_background_conflicts.py::test_positive_disjoint_writes_and_actual_broad_reads[NB-P01:v01]"
+      ],
+      "NB-P01:v02": [
+        "tests/recovery/test_background_conflicts.py::test_positive_disjoint_writes_and_actual_broad_reads[NB-P01:v02]"
+      ],
+      "NB-P01:v03": [
+        "tests/recovery/test_background_conflicts.py::test_positive_disjoint_writes_and_actual_broad_reads[NB-P01:v03]"
+      ],
+      "NB-P01:v04": [
+        "tests/recovery/test_background_conflicts.py::test_positive_disjoint_writes_and_actual_broad_reads[NB-P01:v04]"
+      ],
+      "NB-P01:v05": [
+        "tests/recovery/test_background_conflicts.py::test_positive_disjoint_writes_and_actual_broad_reads[NB-P01:v05]"
+      ],
+      "NB-P01:v06": [
+        "tests/recovery/test_background_conflicts.py::test_positive_disjoint_writes_and_actual_broad_reads[NB-P01:v06]"
+      ],
+      "NB-P02:v01": [
+        "tests/recovery/test_background_conflicts.py::test_cross_read_write_skew_has_a_valid_serial_winner[NB-P02:v01]"
+      ],
+      "NB-P02:v02": [
+        "tests/recovery/test_background_conflicts.py::test_cross_read_write_skew_has_a_valid_serial_winner[NB-P02:v02]"
+      ],
+      "NB-P02:v03": [
+        "tests/recovery/test_background_conflicts.py::test_cross_read_write_skew_has_a_valid_serial_winner[NB-P02:v03]"
+      ],
+      "NB-P03:v01": [
+        "tests/recovery/test_background_conflicts.py::test_every_observed_dependency_can_make_a_proposal_stale[NB-P03:v01]"
+      ],
+      "NB-P03:v02": [
+        "tests/recovery/test_background_conflicts.py::test_every_observed_dependency_can_make_a_proposal_stale[NB-P03:v02]"
+      ],
+      "NB-P03:v03": [
+        "tests/recovery/test_background_conflicts.py::test_every_observed_dependency_can_make_a_proposal_stale[NB-P03:v03]"
+      ],
+      "NB-P03:v04": [
+        "tests/recovery/test_background_conflicts.py::test_every_observed_dependency_can_make_a_proposal_stale[NB-P03:v04]"
+      ],
+      "NB-P03:v05": [
+        "tests/recovery/test_background_conflicts.py::test_every_observed_dependency_can_make_a_proposal_stale[NB-P03:v05]"
+      ],
+      "NB-P03:v06": [
+        "tests/recovery/test_background_conflicts.py::test_every_observed_dependency_can_make_a_proposal_stale[NB-P03:v06]"
+      ],
+      "NB-P03:v07": [
+        "tests/recovery/test_background_conflicts.py::test_every_observed_dependency_can_make_a_proposal_stale[NB-P03:v07]"
+      ],
+      "NB-P03:v08": [
+        "tests/recovery/test_background_conflicts.py::test_every_observed_dependency_can_make_a_proposal_stale[NB-P03:v08]"
+      ],
+      "NB-P03:v09": [
+        "tests/recovery/test_background_conflicts.py::test_every_observed_dependency_can_make_a_proposal_stale[NB-P03:v09]"
+      ],
+      "NB-P04:v01": [
+        "tests/recovery/test_background_conflicts.py::test_entity_aba_and_tombstones_cannot_revalidate_an_old_capture[NB-P04:v01]"
+      ],
+      "NB-P04:v02": [
+        "tests/recovery/test_background_conflicts.py::test_entity_aba_and_tombstones_cannot_revalidate_an_old_capture[NB-P04:v02]"
+      ],
+      "NB-P04:v03": [
+        "tests/recovery/test_background_conflicts.py::test_entity_aba_and_tombstones_cannot_revalidate_an_old_capture[NB-P04:v03]"
+      ],
+      "NB-P04:v04": [
+        "tests/recovery/test_background_conflicts.py::test_entity_aba_and_tombstones_cannot_revalidate_an_old_capture[NB-P04:v04]"
+      ],
+      "NB-P05:v01": [
+        "tests/recovery/test_background_conflicts.py::test_structural_and_collection_history_keeps_each_member_change[NB-P05:v01]"
+      ],
+      "NB-P05:v02": [
+        "tests/recovery/test_background_conflicts.py::test_structural_and_collection_history_keeps_each_member_change[NB-P05:v02]"
+      ],
+      "NB-P05:v03": [
+        "tests/recovery/test_background_conflicts.py::test_structural_and_collection_history_keeps_each_member_change[NB-P05:v03]"
+      ],
+      "NB-P05:v04": [
+        "tests/recovery/test_background_conflicts.py::test_structural_and_collection_history_keeps_each_member_change[NB-P05:v04]"
+      ],
+      "NB-P05:v05": [
+        "tests/recovery/test_background_conflicts.py::test_structural_and_collection_history_keeps_each_member_change[NB-P05:v05]"
+      ],
+      "NB-P05:v06": [
+        "tests/recovery/test_background_conflicts.py::test_structural_and_collection_history_keeps_each_member_change[NB-P05:v06]"
+      ],
+      "NB-P06:v01": [
+        "tests/recovery/test_background_conflicts.py::test_capture_and_writer_orders_are_coherent[NB-P06:v01]"
+      ],
+      "NB-P06:v02": [
+        "tests/recovery/test_background_conflicts.py::test_capture_and_writer_orders_are_coherent[NB-P06:v02]"
+      ],
+      "NB-P07:v01": [
+        "tests/recovery/test_background_conflicts.py::test_invalid_whole_batches_never_publish_a_valid_prefix[NB-P07:v01]"
+      ],
+      "NB-P07:v02": [
+        "tests/recovery/test_background_conflicts.py::test_invalid_whole_batches_never_publish_a_valid_prefix[NB-P07:v02]"
+      ],
+      "NB-P07:v03": [
+        "tests/recovery/test_background_conflicts.py::test_invalid_whole_batches_never_publish_a_valid_prefix[NB-P07:v03]"
+      ],
+      "NB-P07:v04": [
+        "tests/recovery/test_background_conflicts.py::test_invalid_whole_batches_never_publish_a_valid_prefix[NB-P07:v04]"
+      ],
+      "NB-P09:v01": [
+        "tests/recovery/test_background_conflicts.py::test_exact_commit_identity_survives_concurrent_delivery_and_restart[NB-P09:v01]"
+      ],
+      "NB-P09:v02": [
+        "tests/recovery/test_background_conflicts.py::test_exact_commit_identity_survives_concurrent_delivery_and_restart[NB-P09:v02]"
+      ],
+      "NB-P09:v03": [
+        "tests/recovery/test_background_conflicts.py::test_exact_commit_identity_survives_concurrent_delivery_and_restart[NB-P09:v03]"
+      ],
+      "NB-P09:v04": [
+        "tests/recovery/test_background_conflicts.py::test_exact_commit_identity_survives_concurrent_delivery_and_restart[NB-P09:v04]"
+      ],
+      "NB-J05:v01": [
+        "tests/recovery/test_background_publication_races.py::test_discard_and_old_event_delivery_cannot_reverse_the_winner[NB-J05:v01]"
+      ],
+      "NB-J05:v02": [
+        "tests/recovery/test_background_publication_races.py::test_discard_and_old_event_delivery_cannot_reverse_the_winner[NB-J05:v02]"
+      ],
+      "NB-J05:v05": [
+        "tests/recovery/test_background_publication_races.py::test_discard_and_old_event_delivery_cannot_reverse_the_winner[NB-J05:v05]"
+      ],
+      "NB-P10:v03": [
+        "tests/recovery/test_background_publication_races.py::test_stop_account_and_delete_orders_keep_saved_truth_or_the_tombstone[NB-P10:v03]"
+      ],
+      "NB-P10:v04": [
+        "tests/recovery/test_background_publication_races.py::test_stop_account_and_delete_orders_keep_saved_truth_or_the_tombstone[NB-P10:v04]"
+      ],
+      "NB-P10:v05": [
+        "tests/recovery/test_background_publication_races.py::test_stop_account_and_delete_orders_keep_saved_truth_or_the_tombstone[NB-P10:v05]"
+      ],
+      "NB-P10:v06": [
+        "tests/recovery/test_background_publication_races.py::test_stop_account_and_delete_orders_keep_saved_truth_or_the_tombstone[NB-P10:v06]"
+      ],
+      "NB-P10:v07": [
+        "tests/recovery/test_background_publication_races.py::test_stop_account_and_delete_orders_keep_saved_truth_or_the_tombstone[NB-P10:v07]"
+      ],
+      "NB-P10:v08": [
+        "tests/recovery/test_background_publication_races.py::test_stop_account_and_delete_orders_keep_saved_truth_or_the_tombstone[NB-P10:v08]"
+      ],
+      "NB-J06:v01": [
+        "tests/recovery/test_background_tool_publication.py::test_one_turn_cannot_replace_or_duplicate_its_accepted_payload[NB-J06:v01]"
+      ],
+      "NB-J06:v02": [
+        "tests/recovery/test_background_tool_publication.py::test_one_turn_cannot_replace_or_duplicate_its_accepted_payload[NB-J06:v02]"
+      ],
+      "NB-J06:v03": [
+        "tests/recovery/test_background_tool_publication.py::test_one_turn_cannot_replace_or_duplicate_its_accepted_payload[NB-J06:v03]"
+      ],
+      "NB-J05:v04": [
+        "tests/recovery/test_background_tool_publication.py::test_one_turn_cannot_replace_or_duplicate_its_accepted_payload[NB-J05:v04]"
+      ],
+      "NB-J06:v04": [
+        "tests/recovery/test_background_tool_publication.py::test_a_new_turn_reads_canonical_and_supersession_is_durable_before_dispatch[NB-J06:v04]"
+      ],
+      "NB-J05:v03": [
+        "tests/recovery/test_background_tool_publication.py::test_a_new_turn_reads_canonical_and_supersession_is_durable_before_dispatch[NB-J05:v03]"
+      ],
+      "NB-D01:v09": [
+        "tests/recovery/test_background_publication_crashes.py::test_publication_exception_cut_has_only_the_exact_old_saved_or_fenced_outcome[NB-D01:v09]"
+      ],
+      "NB-D01:v10": [
+        "tests/recovery/test_background_publication_crashes.py::test_publication_exception_cut_has_only_the_exact_old_saved_or_fenced_outcome[NB-D01:v10]"
+      ],
+      "NB-D01:v11": [
+        "tests/recovery/test_background_publication_crashes.py::test_publication_exception_cut_has_only_the_exact_old_saved_or_fenced_outcome[NB-D01:v11]"
+      ],
+      "NB-D01:v12": [
+        "tests/recovery/test_background_publication_crashes.py::test_publication_exception_cut_has_only_the_exact_old_saved_or_fenced_outcome[NB-D01:v12]"
+      ],
+      "NB-D01:v17": [
+        "tests/recovery/test_background_publication_crashes.py::test_publication_exception_cut_has_only_the_exact_old_saved_or_fenced_outcome[NB-D01:v17]"
+      ],
+      "NB-D01:v18": [
+        "tests/recovery/test_background_publication_crashes.py::test_publication_exception_cut_has_only_the_exact_old_saved_or_fenced_outcome[NB-D01:v18]"
+      ],
+      "NB-D01:v19": [
+        "tests/recovery/test_background_publication_crashes.py::test_publication_exception_cut_has_only_the_exact_old_saved_or_fenced_outcome[NB-D01:v19]"
+      ],
+      "NB-D01:v20": [
+        "tests/recovery/test_background_publication_crashes.py::test_publication_exception_cut_has_only_the_exact_old_saved_or_fenced_outcome[NB-D01:v20]"
+      ],
+      "NB-D01:v21": [
+        "tests/recovery/test_background_publication_crashes.py::test_publication_exception_cut_has_only_the_exact_old_saved_or_fenced_outcome[NB-D01:v21]"
+      ],
+      "NB-D01:v22": [
+        "tests/recovery/test_background_publication_crashes.py::test_publication_exception_cut_has_only_the_exact_old_saved_or_fenced_outcome[NB-D01:v22]"
+      ],
+      "NB-D01:v23": [
+        "tests/recovery/test_background_publication_crashes.py::test_publication_exception_cut_has_only_the_exact_old_saved_or_fenced_outcome[NB-D01:v23]"
+      ],
+      "NB-D01:v24": [
+        "tests/recovery/test_background_publication_crashes.py::test_publication_exception_cut_has_only_the_exact_old_saved_or_fenced_outcome[NB-D01:v24]"
+      ],
+      "NB-D01:v25": [
+        "tests/recovery/test_background_publication_crashes.py::test_publication_exception_cut_has_only_the_exact_old_saved_or_fenced_outcome[NB-D01:v25]"
+      ],
+      "NB-D01:v26": [
+        "tests/recovery/test_background_publication_crashes.py::test_publication_exception_cut_has_only_the_exact_old_saved_or_fenced_outcome[NB-D01:v26]"
+      ],
+      "NB-D01:v27": [
+        "tests/recovery/test_background_publication_crashes.py::test_publication_exception_cut_has_only_the_exact_old_saved_or_fenced_outcome[NB-D01:v27]"
+      ],
+      "NB-D01:v28": [
+        "tests/recovery/test_background_publication_crashes.py::test_publication_exception_cut_has_only_the_exact_old_saved_or_fenced_outcome[NB-D01:v28]"
+      ],
+      "NB-D01:v29": [
+        "tests/recovery/test_background_publication_crashes.py::test_publication_exception_cut_has_only_the_exact_old_saved_or_fenced_outcome[NB-D01:v29]"
+      ],
+      "NB-D01:v30": [
+        "tests/recovery/test_background_publication_crashes.py::test_publication_exception_cut_has_only_the_exact_old_saved_or_fenced_outcome[NB-D01:v30]"
+      ],
+      "NB-D01:v31": [
+        "tests/recovery/test_background_publication_crashes.py::test_publication_exception_cut_has_only_the_exact_old_saved_or_fenced_outcome[NB-D01:v31]"
+      ],
+      "NB-D01:v32": [
+        "tests/recovery/test_background_publication_crashes.py::test_publication_exception_cut_has_only_the_exact_old_saved_or_fenced_outcome[NB-D01:v32]"
+      ],
+      "NB-D01:v33": [
+        "tests/recovery/test_background_publication_crashes.py::test_publication_exception_cut_has_only_the_exact_old_saved_or_fenced_outcome[NB-D01:v33]"
+      ],
+      "NB-D01:v34": [
+        "tests/recovery/test_background_publication_crashes.py::test_publication_exception_cut_has_only_the_exact_old_saved_or_fenced_outcome[NB-D01:v34]"
+      ],
+      "NB-D01:v35": [
+        "tests/recovery/test_background_publication_crashes.py::test_publication_exception_cut_has_only_the_exact_old_saved_or_fenced_outcome[NB-D01:v35]"
+      ],
+      "NB-D01:v36": [
+        "tests/recovery/test_background_publication_crashes.py::test_publication_exception_cut_has_only_the_exact_old_saved_or_fenced_outcome[NB-D01:v36]"
+      ],
+      "NB-D01:v49": [
+        "tests/recovery/test_background_publication_crashes.py::test_owned_process_termination_recovers_exact_durable_proof[NB-D01:v49]"
+      ],
+      "NB-D01:v50": [
+        "tests/recovery/test_background_publication_crashes.py::test_owned_process_termination_recovers_exact_durable_proof[NB-D01:v50]"
+      ],
+      "NB-D01:v51": [
+        "tests/recovery/test_background_publication_crashes.py::test_owned_process_termination_recovers_exact_durable_proof[NB-D01:v51]"
+      ],
+      "NB-D01:v52": [
+        "tests/recovery/test_background_publication_crashes.py::test_owned_process_termination_recovers_exact_durable_proof[NB-D01:v52]"
+      ],
+      "NB-D01:v53": [
+        "tests/recovery/test_background_publication_crashes.py::test_owned_process_termination_recovers_exact_durable_proof[NB-D01:v53]"
+      ],
+      "NB-D01:v54": [
+        "tests/recovery/test_background_publication_crashes.py::test_owned_process_termination_recovers_exact_durable_proof[NB-D01:v54]"
+      ],
+      "NB-D03:v01": [
+        "tests/recovery/test_background_publication_crashes.py::test_recovery_can_itself_crash_and_never_reapply_or_reset_history[NB-D03:v01]"
+      ],
+      "NB-D03:v02": [
+        "tests/recovery/test_background_publication_crashes.py::test_recovery_can_itself_crash_and_never_reapply_or_reset_history[NB-D03:v02]"
+      ],
+      "NB-D03:v03": [
+        "tests/recovery/test_background_publication_crashes.py::test_recovery_can_itself_crash_and_never_reapply_or_reset_history[NB-D03:v03]"
+      ],
+      "NB-D03:v04": [
+        "tests/recovery/test_background_publication_crashes.py::test_recovery_can_itself_crash_and_never_reapply_or_reset_history[NB-D03:v04]"
+      ],
+      "NB-D03:v05": [
+        "tests/recovery/test_background_publication_crashes.py::test_recovery_can_itself_crash_and_never_reapply_or_reset_history[NB-D03:v05]"
+      ],
+      "NB-D01:v01": [
+        "tests/recovery/test_background_handoff_cuts.py::test_proposal_handoff_cut_does_not_create_canonical_authority[NB-D01:v01]"
+      ],
+      "NB-D01:v02": [
+        "tests/recovery/test_background_handoff_cuts.py::test_proposal_handoff_cut_does_not_create_canonical_authority[NB-D01:v02]"
+      ],
+      "NB-D01:v03": [
+        "tests/recovery/test_background_handoff_cuts.py::test_proposal_handoff_cut_does_not_create_canonical_authority[NB-D01:v03]"
+      ],
+      "NB-D01:v04": [
+        "tests/recovery/test_background_handoff_cuts.py::test_proposal_handoff_cut_does_not_create_canonical_authority[NB-D01:v04]"
+      ],
+      "NB-D01:v05": [
+        "tests/recovery/test_background_handoff_cuts.py::test_proposal_handoff_cut_does_not_create_canonical_authority[NB-D01:v05]"
+      ],
+      "NB-D01:v06": [
+        "tests/recovery/test_background_handoff_cuts.py::test_proposal_handoff_cut_does_not_create_canonical_authority[NB-D01:v06]"
+      ],
+      "NB-D01:v07": [
+        "tests/recovery/test_background_handoff_cuts.py::test_proposal_handoff_cut_does_not_create_canonical_authority[NB-D01:v07]"
+      ],
+      "NB-D01:v08": [
+        "tests/recovery/test_background_handoff_cuts.py::test_proposal_handoff_cut_does_not_create_canonical_authority[NB-D01:v08]"
+      ],
+      "NB-P06:v03": [
+        "tests/recovery/test_background_handoff_cuts.py::test_page_membership_and_partial_rereads_preserve_all_old_dependencies[NB-P06:v03]"
+      ],
+      "NB-P06:v04": [
+        "tests/recovery/test_background_handoff_cuts.py::test_page_membership_and_partial_rereads_preserve_all_old_dependencies[NB-P06:v04]"
+      ],
+      "NB-P10:v01": [
+        "tests/recovery/test_background_handoff_cuts.py::test_queued_and_executing_revocation_never_reaches_publication[NB-P10:v01]"
+      ],
+      "NB-P10:v02": [
+        "tests/recovery/test_background_handoff_cuts.py::test_queued_and_executing_revocation_never_reaches_publication[NB-P10:v02]"
+      ],
+      "NB-G03:v01": [
+        "tests/recovery/test_background_guard_sensitivity.py::test_critical_guard_omission_breaks_the_actual_regression[NB-G03:v01]"
+      ],
+      "NB-G03:v02": [
+        "tests/recovery/test_background_guard_sensitivity.py::test_critical_guard_omission_breaks_the_actual_regression[NB-G03:v02]"
+      ],
+      "NB-G03:v05": [
+        "tests/recovery/test_background_guard_sensitivity.py::test_critical_guard_omission_breaks_the_actual_regression[NB-G03:v05]"
       ]
     },
     "checks": {
@@ -2695,6 +3152,149 @@
         "tests/recovery/test_background_supervisor.py::test_typed_runtime_failure_pauses_only_when_account_dispatch_requires_it[MODEL_DENIED]",
         "tests/recovery/test_background_supervisor.py::test_typed_runtime_failure_pauses_only_when_account_dispatch_requires_it[RATE_LIMITED]",
         "tests/recovery/test_background_supervisor.py::test_unverified_cleanup_keeps_the_slot_and_blocks_the_next_job"
+      ],
+      "NB02a:all-publication-regressions": [
+        "tests/recovery/test_background_conflicts.py::test_capture_and_writer_orders_are_coherent[NB-P06:v01]",
+        "tests/recovery/test_background_conflicts.py::test_capture_and_writer_orders_are_coherent[NB-P06:v02]",
+        "tests/recovery/test_background_conflicts.py::test_cross_read_write_skew_has_a_valid_serial_winner[NB-P02:v01]",
+        "tests/recovery/test_background_conflicts.py::test_cross_read_write_skew_has_a_valid_serial_winner[NB-P02:v02]",
+        "tests/recovery/test_background_conflicts.py::test_cross_read_write_skew_has_a_valid_serial_winner[NB-P02:v03]",
+        "tests/recovery/test_background_conflicts.py::test_entity_aba_and_tombstones_cannot_revalidate_an_old_capture[NB-P04:v01]",
+        "tests/recovery/test_background_conflicts.py::test_entity_aba_and_tombstones_cannot_revalidate_an_old_capture[NB-P04:v02]",
+        "tests/recovery/test_background_conflicts.py::test_entity_aba_and_tombstones_cannot_revalidate_an_old_capture[NB-P04:v03]",
+        "tests/recovery/test_background_conflicts.py::test_entity_aba_and_tombstones_cannot_revalidate_an_old_capture[NB-P04:v04]",
+        "tests/recovery/test_background_conflicts.py::test_every_observed_dependency_can_make_a_proposal_stale[NB-P03:v01]",
+        "tests/recovery/test_background_conflicts.py::test_every_observed_dependency_can_make_a_proposal_stale[NB-P03:v02]",
+        "tests/recovery/test_background_conflicts.py::test_every_observed_dependency_can_make_a_proposal_stale[NB-P03:v03]",
+        "tests/recovery/test_background_conflicts.py::test_every_observed_dependency_can_make_a_proposal_stale[NB-P03:v04]",
+        "tests/recovery/test_background_conflicts.py::test_every_observed_dependency_can_make_a_proposal_stale[NB-P03:v05]",
+        "tests/recovery/test_background_conflicts.py::test_every_observed_dependency_can_make_a_proposal_stale[NB-P03:v06]",
+        "tests/recovery/test_background_conflicts.py::test_every_observed_dependency_can_make_a_proposal_stale[NB-P03:v07]",
+        "tests/recovery/test_background_conflicts.py::test_every_observed_dependency_can_make_a_proposal_stale[NB-P03:v08]",
+        "tests/recovery/test_background_conflicts.py::test_every_observed_dependency_can_make_a_proposal_stale[NB-P03:v09]",
+        "tests/recovery/test_background_conflicts.py::test_exact_commit_identity_survives_concurrent_delivery_and_restart[NB-P09:v01]",
+        "tests/recovery/test_background_conflicts.py::test_exact_commit_identity_survives_concurrent_delivery_and_restart[NB-P09:v02]",
+        "tests/recovery/test_background_conflicts.py::test_exact_commit_identity_survives_concurrent_delivery_and_restart[NB-P09:v03]",
+        "tests/recovery/test_background_conflicts.py::test_exact_commit_identity_survives_concurrent_delivery_and_restart[NB-P09:v04]",
+        "tests/recovery/test_background_conflicts.py::test_invalid_whole_batches_never_publish_a_valid_prefix[NB-P07:v01]",
+        "tests/recovery/test_background_conflicts.py::test_invalid_whole_batches_never_publish_a_valid_prefix[NB-P07:v02]",
+        "tests/recovery/test_background_conflicts.py::test_invalid_whole_batches_never_publish_a_valid_prefix[NB-P07:v03]",
+        "tests/recovery/test_background_conflicts.py::test_invalid_whole_batches_never_publish_a_valid_prefix[NB-P07:v04]",
+        "tests/recovery/test_background_conflicts.py::test_positive_disjoint_writes_and_actual_broad_reads[NB-P01:v01]",
+        "tests/recovery/test_background_conflicts.py::test_positive_disjoint_writes_and_actual_broad_reads[NB-P01:v02]",
+        "tests/recovery/test_background_conflicts.py::test_positive_disjoint_writes_and_actual_broad_reads[NB-P01:v03]",
+        "tests/recovery/test_background_conflicts.py::test_positive_disjoint_writes_and_actual_broad_reads[NB-P01:v04]",
+        "tests/recovery/test_background_conflicts.py::test_positive_disjoint_writes_and_actual_broad_reads[NB-P01:v05]",
+        "tests/recovery/test_background_conflicts.py::test_positive_disjoint_writes_and_actual_broad_reads[NB-P01:v06]",
+        "tests/recovery/test_background_conflicts.py::test_structural_and_collection_history_keeps_each_member_change[NB-P05:v01]",
+        "tests/recovery/test_background_conflicts.py::test_structural_and_collection_history_keeps_each_member_change[NB-P05:v02]",
+        "tests/recovery/test_background_conflicts.py::test_structural_and_collection_history_keeps_each_member_change[NB-P05:v03]",
+        "tests/recovery/test_background_conflicts.py::test_structural_and_collection_history_keeps_each_member_change[NB-P05:v04]",
+        "tests/recovery/test_background_conflicts.py::test_structural_and_collection_history_keeps_each_member_change[NB-P05:v05]",
+        "tests/recovery/test_background_conflicts.py::test_structural_and_collection_history_keeps_each_member_change[NB-P05:v06]",
+        "tests/recovery/test_background_guard_sensitivity.py::test_critical_guard_omission_breaks_the_actual_regression[NB-G03:v01]",
+        "tests/recovery/test_background_guard_sensitivity.py::test_critical_guard_omission_breaks_the_actual_regression[NB-G03:v02]",
+        "tests/recovery/test_background_guard_sensitivity.py::test_critical_guard_omission_breaks_the_actual_regression[NB-G03:v05]",
+        "tests/recovery/test_background_handoff_cuts.py::test_page_membership_and_partial_rereads_preserve_all_old_dependencies[NB-P06:v03]",
+        "tests/recovery/test_background_handoff_cuts.py::test_page_membership_and_partial_rereads_preserve_all_old_dependencies[NB-P06:v04]",
+        "tests/recovery/test_background_handoff_cuts.py::test_proposal_handoff_cut_does_not_create_canonical_authority[NB-D01:v01]",
+        "tests/recovery/test_background_handoff_cuts.py::test_proposal_handoff_cut_does_not_create_canonical_authority[NB-D01:v02]",
+        "tests/recovery/test_background_handoff_cuts.py::test_proposal_handoff_cut_does_not_create_canonical_authority[NB-D01:v03]",
+        "tests/recovery/test_background_handoff_cuts.py::test_proposal_handoff_cut_does_not_create_canonical_authority[NB-D01:v04]",
+        "tests/recovery/test_background_handoff_cuts.py::test_proposal_handoff_cut_does_not_create_canonical_authority[NB-D01:v05]",
+        "tests/recovery/test_background_handoff_cuts.py::test_proposal_handoff_cut_does_not_create_canonical_authority[NB-D01:v06]",
+        "tests/recovery/test_background_handoff_cuts.py::test_proposal_handoff_cut_does_not_create_canonical_authority[NB-D01:v07]",
+        "tests/recovery/test_background_handoff_cuts.py::test_proposal_handoff_cut_does_not_create_canonical_authority[NB-D01:v08]",
+        "tests/recovery/test_background_handoff_cuts.py::test_queued_and_executing_revocation_never_reaches_publication[NB-P10:v01]",
+        "tests/recovery/test_background_handoff_cuts.py::test_queued_and_executing_revocation_never_reaches_publication[NB-P10:v02]",
+        "tests/recovery/test_background_history.py::test_additive_private_fields_do_not_rewrite_an_old_exact_retry",
+        "tests/recovery/test_background_history.py::test_empty_query_aba_cannot_restore_an_old_guard",
+        "tests/recovery/test_background_history.py::test_history_capture_and_aba_preserve_monotonic_scoped_generations",
+        "tests/recovery/test_background_history.py::test_missing_activated_history_and_uncoordinated_writes_fence_without_reset[activation-missing]",
+        "tests/recovery/test_background_history.py::test_missing_activated_history_and_uncoordinated_writes_fence_without_reset[metadata-missing]",
+        "tests/recovery/test_background_history.py::test_missing_activated_history_and_uncoordinated_writes_fence_without_reset[outside-writer]",
+        "tests/recovery/test_background_history.py::test_partial_history_activation_recovers_the_same_namespace[history_activation_durable]",
+        "tests/recovery/test_background_history.py::test_partial_history_activation_recovers_the_same_namespace[history_initializing]",
+        "tests/recovery/test_background_history.py::test_zero_diff_touch_invalidates_only_its_registered_scope",
+        "tests/recovery/test_background_inverse.py::test_inverse_does_not_replace_an_independent_later_block",
+        "tests/recovery/test_background_inverse.py::test_typed_inverse_restores_each_kind_of_edit[fact]",
+        "tests/recovery/test_background_inverse.py::test_typed_inverse_restores_each_kind_of_edit[insert]",
+        "tests/recovery/test_background_inverse.py::test_typed_inverse_restores_each_kind_of_edit[move-and-text]",
+        "tests/recovery/test_background_inverse.py::test_typed_inverse_restores_each_kind_of_edit[move]",
+        "tests/recovery/test_background_inverse.py::test_typed_inverse_restores_each_kind_of_edit[remove-fact]",
+        "tests/recovery/test_background_inverse.py::test_typed_inverse_restores_each_kind_of_edit[remove]",
+        "tests/recovery/test_background_inverse.py::test_typed_inverse_restores_each_kind_of_edit[replace-tree]",
+        "tests/recovery/test_background_inverse.py::test_typed_inverse_restores_each_kind_of_edit[text]",
+        "tests/recovery/test_background_publication.py::test_changed_payload_hash_cannot_change_a_known_receipt",
+        "tests/recovery/test_background_publication.py::test_conditional_save_keeps_original_payload_and_proves_the_actual_mutation",
+        "tests/recovery/test_background_publication.py::test_exact_candidate_recovers_without_reapplication_at_each_real_cut[commit_claimed]",
+        "tests/recovery/test_background_publication.py::test_exact_candidate_recovers_without_reapplication_at_each_real_cut[generation_history_durable]",
+        "tests/recovery/test_background_publication.py::test_exact_candidate_recovers_without_reapplication_at_each_real_cut[intent_stored]",
+        "tests/recovery/test_background_publication.py::test_exact_candidate_recovers_without_reapplication_at_each_real_cut[receipt_stored]",
+        "tests/recovery/test_background_publication.py::test_exact_candidate_recovers_without_reapplication_at_each_real_cut[workspace_durable]",
+        "tests/recovery/test_background_publication.py::test_exact_candidate_recovers_without_reapplication_at_each_real_cut[workspace_replaced]",
+        "tests/recovery/test_background_publication.py::test_independent_manual_input_survives_and_targeted_input_requires_review[False]",
+        "tests/recovery/test_background_publication.py::test_independent_manual_input_survives_and_targeted_input_requires_review[True]",
+        "tests/recovery/test_background_publication_crashes.py::test_owned_process_termination_recovers_exact_durable_proof[NB-D01:v49]",
+        "tests/recovery/test_background_publication_crashes.py::test_owned_process_termination_recovers_exact_durable_proof[NB-D01:v50]",
+        "tests/recovery/test_background_publication_crashes.py::test_owned_process_termination_recovers_exact_durable_proof[NB-D01:v51]",
+        "tests/recovery/test_background_publication_crashes.py::test_owned_process_termination_recovers_exact_durable_proof[NB-D01:v52]",
+        "tests/recovery/test_background_publication_crashes.py::test_owned_process_termination_recovers_exact_durable_proof[NB-D01:v53]",
+        "tests/recovery/test_background_publication_crashes.py::test_owned_process_termination_recovers_exact_durable_proof[NB-D01:v54]",
+        "tests/recovery/test_background_publication_crashes.py::test_publication_exception_cut_has_only_the_exact_old_saved_or_fenced_outcome[NB-D01:v09]",
+        "tests/recovery/test_background_publication_crashes.py::test_publication_exception_cut_has_only_the_exact_old_saved_or_fenced_outcome[NB-D01:v10]",
+        "tests/recovery/test_background_publication_crashes.py::test_publication_exception_cut_has_only_the_exact_old_saved_or_fenced_outcome[NB-D01:v11]",
+        "tests/recovery/test_background_publication_crashes.py::test_publication_exception_cut_has_only_the_exact_old_saved_or_fenced_outcome[NB-D01:v12]",
+        "tests/recovery/test_background_publication_crashes.py::test_publication_exception_cut_has_only_the_exact_old_saved_or_fenced_outcome[NB-D01:v17]",
+        "tests/recovery/test_background_publication_crashes.py::test_publication_exception_cut_has_only_the_exact_old_saved_or_fenced_outcome[NB-D01:v18]",
+        "tests/recovery/test_background_publication_crashes.py::test_publication_exception_cut_has_only_the_exact_old_saved_or_fenced_outcome[NB-D01:v19]",
+        "tests/recovery/test_background_publication_crashes.py::test_publication_exception_cut_has_only_the_exact_old_saved_or_fenced_outcome[NB-D01:v20]",
+        "tests/recovery/test_background_publication_crashes.py::test_publication_exception_cut_has_only_the_exact_old_saved_or_fenced_outcome[NB-D01:v21]",
+        "tests/recovery/test_background_publication_crashes.py::test_publication_exception_cut_has_only_the_exact_old_saved_or_fenced_outcome[NB-D01:v22]",
+        "tests/recovery/test_background_publication_crashes.py::test_publication_exception_cut_has_only_the_exact_old_saved_or_fenced_outcome[NB-D01:v23]",
+        "tests/recovery/test_background_publication_crashes.py::test_publication_exception_cut_has_only_the_exact_old_saved_or_fenced_outcome[NB-D01:v24]",
+        "tests/recovery/test_background_publication_crashes.py::test_publication_exception_cut_has_only_the_exact_old_saved_or_fenced_outcome[NB-D01:v25]",
+        "tests/recovery/test_background_publication_crashes.py::test_publication_exception_cut_has_only_the_exact_old_saved_or_fenced_outcome[NB-D01:v26]",
+        "tests/recovery/test_background_publication_crashes.py::test_publication_exception_cut_has_only_the_exact_old_saved_or_fenced_outcome[NB-D01:v27]",
+        "tests/recovery/test_background_publication_crashes.py::test_publication_exception_cut_has_only_the_exact_old_saved_or_fenced_outcome[NB-D01:v28]",
+        "tests/recovery/test_background_publication_crashes.py::test_publication_exception_cut_has_only_the_exact_old_saved_or_fenced_outcome[NB-D01:v29]",
+        "tests/recovery/test_background_publication_crashes.py::test_publication_exception_cut_has_only_the_exact_old_saved_or_fenced_outcome[NB-D01:v30]",
+        "tests/recovery/test_background_publication_crashes.py::test_publication_exception_cut_has_only_the_exact_old_saved_or_fenced_outcome[NB-D01:v31]",
+        "tests/recovery/test_background_publication_crashes.py::test_publication_exception_cut_has_only_the_exact_old_saved_or_fenced_outcome[NB-D01:v32]",
+        "tests/recovery/test_background_publication_crashes.py::test_publication_exception_cut_has_only_the_exact_old_saved_or_fenced_outcome[NB-D01:v33]",
+        "tests/recovery/test_background_publication_crashes.py::test_publication_exception_cut_has_only_the_exact_old_saved_or_fenced_outcome[NB-D01:v34]",
+        "tests/recovery/test_background_publication_crashes.py::test_publication_exception_cut_has_only_the_exact_old_saved_or_fenced_outcome[NB-D01:v35]",
+        "tests/recovery/test_background_publication_crashes.py::test_publication_exception_cut_has_only_the_exact_old_saved_or_fenced_outcome[NB-D01:v36]",
+        "tests/recovery/test_background_publication_crashes.py::test_recovery_can_itself_crash_and_never_reapply_or_reset_history[NB-D03:v01]",
+        "tests/recovery/test_background_publication_crashes.py::test_recovery_can_itself_crash_and_never_reapply_or_reset_history[NB-D03:v02]",
+        "tests/recovery/test_background_publication_crashes.py::test_recovery_can_itself_crash_and_never_reapply_or_reset_history[NB-D03:v03]",
+        "tests/recovery/test_background_publication_crashes.py::test_recovery_can_itself_crash_and_never_reapply_or_reset_history[NB-D03:v04]",
+        "tests/recovery/test_background_publication_crashes.py::test_recovery_can_itself_crash_and_never_reapply_or_reset_history[NB-D03:v05]",
+        "tests/recovery/test_background_publication_races.py::test_discard_and_old_event_delivery_cannot_reverse_the_winner[NB-J05:v01]",
+        "tests/recovery/test_background_publication_races.py::test_discard_and_old_event_delivery_cannot_reverse_the_winner[NB-J05:v02]",
+        "tests/recovery/test_background_publication_races.py::test_discard_and_old_event_delivery_cannot_reverse_the_winner[NB-J05:v05]",
+        "tests/recovery/test_background_publication_races.py::test_stop_account_and_delete_orders_keep_saved_truth_or_the_tombstone[NB-P10:v03]",
+        "tests/recovery/test_background_publication_races.py::test_stop_account_and_delete_orders_keep_saved_truth_or_the_tombstone[NB-P10:v04]",
+        "tests/recovery/test_background_publication_races.py::test_stop_account_and_delete_orders_keep_saved_truth_or_the_tombstone[NB-P10:v05]",
+        "tests/recovery/test_background_publication_races.py::test_stop_account_and_delete_orders_keep_saved_truth_or_the_tombstone[NB-P10:v06]",
+        "tests/recovery/test_background_publication_races.py::test_stop_account_and_delete_orders_keep_saved_truth_or_the_tombstone[NB-P10:v07]",
+        "tests/recovery/test_background_publication_races.py::test_stop_account_and_delete_orders_keep_saved_truth_or_the_tombstone[NB-P10:v08]",
+        "tests/recovery/test_background_publication_review.py::test_duplicate_barrier_ack_does_not_extend_its_continuous_deadline",
+        "tests/recovery/test_background_publication_review.py::test_inverse_capacity_is_reserved_before_canonical_claim",
+        "tests/recovery/test_background_publication_review.py::test_inverse_reads_fence_a_new_user_reference_to_a_changed_fact",
+        "tests/recovery/test_background_publication_review.py::test_lost_history_fences_only_its_project_and_another_project_still_runs",
+        "tests/recovery/test_background_publication_review.py::test_manual_service_route_replays_and_stale_cache_save_cannot_overwrite_it",
+        "tests/recovery/test_background_publication_review.py::test_native_saved_envelope_uses_the_retained_real_candidate_after_replay_pruning",
+        "tests/recovery/test_background_publication_review.py::test_receipt_metadata_capacity_is_reserved_before_canonical_claim",
+        "tests/recovery/test_background_publication_review.py::test_recovery_does_not_recreate_a_missing_history_activation_marker",
+        "tests/recovery/test_background_tool_publication.py::test_a_new_turn_reads_canonical_and_supersession_is_durable_before_dispatch[NB-J05:v03]",
+        "tests/recovery/test_background_tool_publication.py::test_a_new_turn_reads_canonical_and_supersession_is_durable_before_dispatch[NB-J06:v04]",
+        "tests/recovery/test_background_tool_publication.py::test_compiled_proposal_saves_through_the_service_after_owned_runtime_cleanup[after-runtime-exit]",
+        "tests/recovery/test_background_tool_publication.py::test_compiled_proposal_saves_through_the_service_after_owned_runtime_cleanup[startup-recovery]",
+        "tests/recovery/test_background_tool_publication.py::test_one_turn_cannot_replace_or_duplicate_its_accepted_payload[NB-J05:v04]",
+        "tests/recovery/test_background_tool_publication.py::test_one_turn_cannot_replace_or_duplicate_its_accepted_payload[NB-J06:v01]",
+        "tests/recovery/test_background_tool_publication.py::test_one_turn_cannot_replace_or_duplicate_its_accepted_payload[NB-J06:v02]",
+        "tests/recovery/test_background_tool_publication.py::test_one_turn_cannot_replace_or_duplicate_its_accepted_payload[NB-J06:v03]"
       ]
     },
     "sources": [
@@ -2733,8 +3333,11 @@
       "contracts/examples/background/background_draft_payload_v1.json",
       "contracts/examples/background/background_draft_v1.json",
       "contracts/examples/background/background_event_v1.json",
+      "contracts/examples/background/background_history_metadata_full_v1.json",
+      "contracts/examples/background/background_history_sidecar_v1.json",
       "contracts/examples/background/background_intent_v1.json",
       "contracts/examples/background/background_legacy_run_v2.json",
+      "contracts/examples/background/background_manual_sidecar_v1.json",
       "contracts/examples/background/background_project_v1.json",
       "contracts/examples/background/background_proposal_v1.json",
       "contracts/examples/background/background_receipt_v1.json",
@@ -2775,31 +3378,50 @@
       "docs/gui/handoffs/BACKGROUND-WORK/nb00a-contract.md",
       "docs/gui/handoffs/BACKGROUND-WORK/nb00a-execution-report.schema.json",
       "docs/gui/handoffs/BACKGROUND-WORK/nb00a-state-mappings.md",
+      "docs/gui/handoffs/BACKGROUND-WORK/nb02a-contract.md",
       "docs/gui/handoffs/BACKGROUND-WORK/test-matrix.json",
       "packages/resume_core/agent_artifacts.py",
+      "packages/resume_core/agent_edits.py",
       "packages/resume_core/agent_limits.py",
+      "packages/resume_core/background_authority.py",
       "packages/resume_core/background_clock.py",
       "packages/resume_core/background_events.py",
+      "packages/resume_core/background_history.py",
+      "packages/resume_core/background_inverse.py",
       "packages/resume_core/background_limits.py",
       "packages/resume_core/background_proposals.py",
+      "packages/resume_core/background_publication.py",
       "packages/resume_core/background_scheduler.py",
+      "packages/resume_core/background_scopes.py",
       "packages/resume_core/background_store.py",
       "packages/resume_core/background_supervisor.py",
       "packages/resume_core/models/agent.py",
       "packages/resume_core/models/background.py",
       "packages/resume_core/models/contracts.py",
+      "packages/resume_core/models/rich_document.py",
+      "packages/resume_core/models/rich_mutations.py",
+      "packages/resume_core/models/rich_workspace.py",
+      "packages/resume_core/rich_dependencies.py",
+      "packages/resume_core/rich_fact_mutations.py",
+      "packages/resume_core/rich_fields.py",
+      "packages/resume_core/rich_mutations.py",
+      "packages/resume_core/rich_project_store.py",
       "packages/resume_core/storage.py",
+      "services/api/src/resume_api/agent/context.py",
       "services/api/src/resume_api/agent/edits.py",
+      "services/api/src/resume_api/agent/publication.py",
       "services/api/src/resume_api/agent/runtime.py",
       "services/api/src/resume_api/agent/tools.py",
       "services/api/src/resume_api/app.py",
       "services/api/src/resume_api/cli/process_runner.py",
       "services/api/src/resume_api/inference_admission.py",
       "services/api/src/resume_api/jobs/__init__.py",
+      "services/api/src/resume_api/jobs/publication.py",
       "services/api/src/resume_api/jobs/routes.py",
       "services/api/src/resume_api/jobs/runtime.py",
       "services/api/src/resume_api/jobs/service.py",
       "services/api/src/resume_api/jobs/tools.py",
+      "services/api/src/resume_api/rich_projects.py",
       "spikes/background/__init__.py",
       "spikes/background/corpus.py",
       "spikes/background/fake_child.py",
@@ -2813,18 +3435,29 @@
       "tests/recovery/test_agent_lifecycle.py",
       "tests/recovery/test_background_admission.py",
       "tests/recovery/test_background_agent.py",
+      "tests/recovery/test_background_conflicts.py",
       "tests/recovery/test_background_events.py",
+      "tests/recovery/test_background_guard_sensitivity.py",
+      "tests/recovery/test_background_handoff_cuts.py",
+      "tests/recovery/test_background_history.py",
       "tests/recovery/test_background_integrity.py",
+      "tests/recovery/test_background_inverse.py",
       "tests/recovery/test_background_offline.py",
       "tests/recovery/test_background_proposals.py",
+      "tests/recovery/test_background_publication.py",
+      "tests/recovery/test_background_publication_crashes.py",
+      "tests/recovery/test_background_publication_races.py",
+      "tests/recovery/test_background_publication_review.py",
       "tests/recovery/test_background_queue.py",
       "tests/recovery/test_background_routes.py",
       "tests/recovery/test_background_store.py",
       "tests/recovery/test_background_supervisor.py",
+      "tests/recovery/test_background_tool_publication.py",
       "tests/recovery/test_recovery_contracts.py",
       "tests/requirements.json",
       "tests/support/agent.py",
       "tests/support/background.py",
+      "tests/support/background_publication.py",
       "tools/background_evidence.py",
       "tools/background_pytest.py",
       "tools/check_contract_drift.py",
@@ -2969,7 +3602,7 @@
       "claim_before_timeout",
       "runtime_exit_before_publication"
     ],
-    "scope": "NB00a is offline protocol/reference proof. Product lifecycle, publisher and UI remain unimplemented.",
+    "scope": "NB00a specification oracle; NB01 capacity-one Job ownership; NB02a conditional publisher and manual-save integration. Complete writer coverage and headless exposure remain NB02b; product trace corpus remains NB03.",
     "reportSchema": "docs/gui/handoffs/BACKGROUND-WORK/nb00a-execution-report.schema.json"
   }
 }

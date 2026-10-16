@@ -50,6 +50,7 @@ class JobProposals:
         if (not isinstance(payload, bytes) or not payload or len(payload) > LIMITS.proposal_bytes
                 or len(payload) != candidate.payload_bytes or hashlib.sha256(payload).hexdigest() != candidate.payload_sha256):
             raise BackgroundFailure("PROTOCOL")
+        await self.supervisor.observer("before_payload_stored", control.job.id)
         with self.store.guard(project) as directory:
             state = self.store._read(project, directory)
             job = job_in(state, control.job.id)
@@ -88,6 +89,7 @@ class JobProposals:
         accepted = candidate.model_dump(by_alias=True)
         accepted["acceptedAt"] = accepted_at
         accepted = ProposalBindingV1.model_validate(accepted)
+        await self.supervisor.observer("before_binding_stored", control.job.id)
 
         def bind(state, job):
             current_account = self.store._read_dispatch(self.store.background / "dispatch.json").account_generation

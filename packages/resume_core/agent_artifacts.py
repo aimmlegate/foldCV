@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import hashlib
+
 from .agent_store import AgentFailure, AgentStore, digest, run_in, verify_journals
 from .background_limits import LIMITS
 from .background_store import BackgroundFailure, TERMINAL_EXECUTION, expiration, job_in
@@ -24,6 +26,7 @@ class JobArtifacts(AgentStore):
     def __init__(self, jobs):
         super().__init__(jobs.root, clock=jobs.clock)
         self.jobs = jobs
+        self.prepare_capture = None
 
     def _path(self, directory, identifier):
         from .project_store import SAFE_ID
@@ -126,8 +129,35 @@ class JobArtifacts(AgentStore):
     def bound(self, project, job_id):
         return JobArtifactView(self, project, job_id)
 
+    def observe(self, project, job_id, guards):
+        from .models.background import ScopeGuardV1
+        with self.jobs.guard(project) as directory:
+            state = self.jobs._read(project, directory)
+            job = job_in(state, job_id)
+            if job.proposal_id is not None:
+                return
+            record = self._artifact(self._path(directory, job.submission.input.id))
+            if record.job_id != job.id:
+                raise AgentFailure("AGENT_STORE_CORRUPT")
+            original = record.observed_guards
+            reads = {(stamp.kind, stamp.key): stamp for stamp in original.reads} if original else {}
+            for stamp in guards.reads:
+                # A later read cannot erase a dependency already observed by this turn.
+                reads.setdefault((stamp.kind, stamp.key), stamp)
+            if len(reads) > 100:
+                raise BackgroundFailure("JOB_STORAGE_FULL")
+            record.observed_guards = ScopeGuardV1(schemaVersion=1, reads=list(reads.values()),
+                writes=original.writes if original else [])
+            self._save(directory, state, record)
+
     def payload_for(self, project, reference):
-        job, record = self.record(project, reference.run_id)
+        with self.jobs.guard(project) as directory:
+            state = self.jobs._read(project, directory)
+            return self.payload_unlocked(state, directory, reference)
+
+    def payload_unlocked(self, state, directory, reference):
+        job = job_in(state, reference.run_id)
+        record = self._artifact(self._path(directory, job.submission.input.id))
         if reference.kind != "agent_journal" or record.request.conversation_id != reference.conversation_id:
             raise AgentFailure("AGENT_EDIT_INVALID")
         item = next((item for item in record.batches if item.result.batch_id == reference.batch_id), None)
@@ -163,6 +193,9 @@ class JobArtifacts(AgentStore):
                 error = AgentError(code="AGENT_INTERRUPTED")
         else:
             error = None
+        saved_batch = next((item.batch.id for item in record.batches if item.batch is not None
+            and job.receipt is not None and hashlib.sha256(encoded(item.batch.model_dump(mode="json", by_alias=True))).hexdigest()
+                == job.receipt.proposal_sha256), None)
         run = AgentRun(id=job.id, projectId=record.identity.project_id, conversationId=request.conversation_id,
             clientRequestId=request.client_request_id, ownerEpoch=job.execution_generation,
             state="queued" if job.execution == "starting" else job.execution,
@@ -171,7 +204,7 @@ class JobArtifacts(AgentStore):
             settingsRevision=request.settings_revision, createdAt=job.created_at,
             deadline=job.attempts[-1].active_deadline if job.attempts else expiration(job.created_at, 195),
             finishedAt=job.updated_at if terminal else None, usage=record.usage, error=error,
-            savedBatchId=job.receipt.client_mutation_id if job.receipt else None,
+            savedBatchId=saved_batch,
             outcomeUnknown=job.publication == "outcome_unknown")
         messages = [AgentMessage(id="user_" + record.id, role="user", text=record.request.message,
             runId=job.id, timestamp=record.created_at, sources=[], findings=[], truncated=False, error=None)]
@@ -265,6 +298,10 @@ class JobArtifactView(AgentStore):
                 raise AgentFailure("AGENT_TOOL_DENIED")
             record.reply = replies[0] if replies else None
             verify_journals(AgentProjectState.model_validate(view.model_dump(by_alias=True)))
+            old_keys = {item["key"] for item in before_journal["batches"]}
+            prepared = [item.batch for item in journal.batches if item.key not in old_keys and item.batch is not None]
+            if prepared and self.artifacts.prepare_capture is not None:
+                self.artifacts.prepare_capture(directory, sidecar, record, prepared[0])
             self.artifacts._save(directory, sidecar, record)
             return result
 

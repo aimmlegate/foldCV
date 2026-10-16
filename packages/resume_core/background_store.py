@@ -47,7 +47,14 @@ def job_in(state: BackgroundSidecarV1, job_id: str) -> JobSnapshotV1:
 
 
 def records(state: BackgroundSidecarV1) -> int:
-    return sum(len(getattr(state, key)) for key in ("jobs", "requests", "proposals", "drafts", "generations", "intents", "inverses")) + int(state.writer is not None) + int(state.barrier is not None)
+    return (sum(len(getattr(state, key)) for key in ("jobs", "requests", "proposals", "drafts", "generations", "intents", "inverses", "manual_intents"))
+        + int(state.writer is not None) + int(state.barrier is not None)
+        + (1 + len(state.history.definitions) if state.history is not None else 0))
+
+
+def claimed(state, job_id):
+    return any(intent.job_id == job_id and intent.phase not in {"intent_stored", "reconciled", "receipt_stored"}
+        for intent in state.intents)
 
 
 class JobStore:
@@ -60,7 +67,7 @@ class JobStore:
         self.fences: dict[str, str] = {}
 
     @contextmanager
-    def guard(self, project_id: str):
+    def guard(self, project_id: str, *, deleted=False):
         if SAFE_ID.fullmatch(project_id) is None:
             raise BackgroundFailure("JOB_NOT_FOUND")
         try:
@@ -68,9 +75,12 @@ class JobStore:
                 entry = next((item for item in self.canonical._registry().entries if item.project_id == project_id), None)
                 if entry is None:
                     raise BackgroundFailure("JOB_NOT_FOUND")
-                if entry.tombstoned:
+                if entry.tombstoned and not deleted:
                     raise BackgroundFailure("PROJECT_DELETED")
-                self.canonical._directory(project_id)
+                if deleted and not entry.tombstoned:
+                    raise BackgroundFailure("JOB_SCOPE_INVALID")
+                if not deleted:
+                    self.canonical._directory(project_id)
                 with locked_root(self.background, ".jobs.lock"):
                     private_directory(self.projects)
                     directory = self.projects / project_id
@@ -112,13 +122,40 @@ class JobStore:
                     or proposal.execution_generation != job.execution_generation
                     or proposal.payload.kind != job.submission.input.kind or job.publication == "none"
                     or job.publication in {"cancelled", "discarded"} and proposal.authority != "revoked"
-                    or job.publication not in RESOLVED_PUBLICATION and proposal.authority != "active"
+                    or job.publication not in RESOLVED_PUBLICATION and proposal.authority != "active" and not claimed(state, job.id)
                     or proposal.payload.kind == "agent_journal" and proposal.payload.run_id != job.id
                     or job.receipt is not None and job.receipt.proposal_sha256 != proposal.payload_sha256):
                 raise ValueError("proposal authority does not match its Job")
         for job in state.jobs:
             if job.publication not in RESOLVED_PUBLICATION and job.proposal_id not in proposals:
                 raise ValueError("unresolved publication has no proposal authority")
+        intents = [*state.intents, *state.manual_intents]
+        if (len({intent.id for intent in intents}) != len(intents)
+                or len({intent.client_mutation_id for intent in state.manual_intents}) != len(state.manual_intents)):
+            raise ValueError("duplicate canonical intent authority")
+        active = [intent.job_id for intent in state.intents if intent.phase != "reconciled"]
+        if len(set(active)) != len(active):
+            raise ValueError("one job cannot own two canonical candidates")
+        for intent in state.intents:
+            job = jobs.get(intent.job_id) or archived.get(intent.job_id)
+            proposal = proposals.get(intent.proposal_id)
+            if (job is None or proposal is None or job.proposal_id != proposal.id or proposal.job_id != job.id
+                    or intent.phase == "receipt_stored" and job.receipt is None
+                    or job.receipt is not None and intent.phase == "receipt_stored" and (
+                        job.receipt.client_mutation_id != intent.client_mutation_id or
+                        job.receipt.request_sha256 != intent.request_sha256 or
+                        job.receipt.workspace_sha256 != intent.after_workspace_sha256 or
+                        job.receipt.generations_sha256 != intent.after_generations_sha256)):
+                raise ValueError("canonical intent does not match its Job")
+        if len({item.proposal_id for item in state.inverses}) != len(state.inverses):
+            raise ValueError("duplicate inverse ownership")
+        for inverse in state.inverses:
+            job = jobs.get(inverse.job_id) or archived.get(inverse.job_id)
+            if (job is None or job.receipt is None or job.proposal_id != inverse.proposal_id
+                    or not any(intent.job_id == job.id and intent.proposal_id == inverse.proposal_id
+                        and intent.candidate_ref == inverse.inverse_ref and intent.phase == "receipt_stored"
+                        for intent in state.intents)):
+                raise ValueError("inverse ownership needs its exact saved Job")
 
     def _all(self) -> dict[str, BackgroundSidecarV1]:
         result = {}
@@ -180,6 +217,21 @@ class JobStore:
 
     def _confirm(self, directory: Path, raw: bytes):
         self._confirm_file(directory / "state.json", raw)
+
+    def _confirm_state(self, directory, state):
+        path = directory / "state.json"
+        try:
+            owned_file(path, LIMITS.sidecar_project_bytes)
+            raw = path.read_bytes()
+            stored = BackgroundSidecarV1.model_validate(strict_json(raw))
+            self._validate_bindings(stored)
+            if stored != state:
+                raise ValueError("different state")
+        except (StorageFailure, OSError, ValueError):
+            self.fences[state.project_id] = "JOB_STORE_UNAVAILABLE"
+            raise BackgroundFailure("JOB_STORE_UNAVAILABLE") from None
+        # Additive private fields need not rewrite an older exact retry's bytes.
+        self._confirm_file(path, raw)
 
     def _confirm_file(self, path: Path, raw: bytes):
         try:
@@ -306,7 +358,8 @@ class JobStore:
                 if job.execution not in TERMINAL_EXECUTION:
                     job.execution = "cancelled" if job.execution == "queued" else "cancelling"
                     changed = True
-                if job.submission.allow_edits and job.publication not in {"saved", "no_change", "discarded", "cancelled"}:
+                if (job.submission.allow_edits and job.publication not in {"saved", "no_change", "discarded", "cancelled"}
+                        and not claimed(state, job.id)):
                     job.publication = "cancelled"
                     changed = True
                 if changed:
@@ -330,7 +383,7 @@ class JobStore:
             if existing is not None:
                 if existing.payload_sha256 != submission.payload_sha256:
                     raise BackgroundFailure("JOB_IDEMPOTENCY_CONFLICT")
-                self._confirm(directory, encoded(state.model_dump(mode="json", by_alias=True)))
+                self._confirm_state(directory, state)
                 return job_in(state, existing.job_id), False
             now = self.clock()
             if (request.request_epoch != state.active_request_epoch or request.request_epoch <= state.expired_through_epoch
@@ -361,8 +414,8 @@ class JobStore:
     def read(self, project_id: str, job_id: str) -> JobSnapshotV1:
         return job_in(self.load(project_id), job_id)
 
-    def update(self, project_id: str, job_id: str, change) -> JobSnapshotV1:
-        with self.guard(project_id) as directory:
+    def update(self, project_id: str, job_id: str, change, *, deleted=False) -> JobSnapshotV1:
+        with self.guard(project_id, deleted=deleted) as directory:
             state = self._read(project_id, directory)
             job = next((item for item in state.jobs if item.id == job_id), None)
             if job is None:
@@ -382,7 +435,7 @@ class JobStore:
                     [item for item in before_state["proposals"] if item["jobId"] != job_id]):
                 raise BackgroundFailure("JOB_SCOPE_INVALID")
             if after_state == before_state:
-                self._confirm(directory, encoded(state.model_dump(mode="json", by_alias=True)))
+                self._confirm_state(directory, state)
                 return job
             job.event_cursor += 1
             job.updated_at = self.clock()
@@ -394,12 +447,46 @@ class JobStore:
             if job.execution not in TERMINAL_EXECUTION:
                 job.execution = "cancelled" if job.execution == "queued" else "cancelling"
                 job.error = JobFailure(code="CANCELLED")
-            if job.submission.allow_edits and job.publication not in {"saved", "no_change", "discarded", "cancelled"}:
+            if (job.submission.allow_edits and job.publication not in {"saved", "no_change", "discarded", "cancelled"}
+                    and not claimed(_state, job.id)):
                 job.publication = "cancelled"
             for proposal in _state.proposals:
                 if proposal.job_id == job_id and proposal.authority == "active":
                     proposal.authority, proposal.revocation = "revoked", "stop"
         return self.update(project_id, job_id, cancel)
+
+    def discard(self, project_id, job_id, *, superseded=False):
+        def discard(state, job):
+            if job.publication in {"saved", "no_change"}:
+                return
+            if job.execution not in TERMINAL_EXECUTION:
+                job.execution = "cancelled" if job.execution == "queued" else "cancelling"
+                job.error = JobFailure(code="CANCELLED")
+            if not claimed(state, job.id):
+                job.publication = "discarded" if job.proposal_id is not None else "cancelled"
+            for proposal in state.proposals:
+                if proposal.job_id == job.id and proposal.authority == "active":
+                    proposal.authority, proposal.revocation = "revoked", "superseded" if superseded else "discard"
+        return self.update(project_id, job_id, discard)
+
+    def mark_deleted(self, project_id):
+        with self.guard(project_id, deleted=True) as directory:
+            state = self._read(project_id, directory)
+            state.tombstoned = True
+            for job in state.jobs:
+                if job.execution not in TERMINAL_EXECUTION:
+                    job.execution = "cancelled" if job.execution == "queued" else "cancelling"
+                    job.error = JobFailure(code="PROJECT_DELETED")
+                if (job.submission.allow_edits and job.publication not in {"saved", "no_change", "discarded", "cancelled"}
+                        and not claimed(state, job.id)):
+                    job.publication = "cancelled"
+                job.event_cursor += 1
+                job.updated_at = self.clock()
+            for proposal in state.proposals:
+                if proposal.authority == "active":
+                    proposal.authority, proposal.revocation = "revoked", "deleted"
+            self._write(directory, state, self._all())
+            return state
 
     def rotate_request_epoch(self, project_id: str) -> BackgroundSidecarV1:
         with self.guard(project_id) as directory:

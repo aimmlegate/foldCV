@@ -4316,6 +4316,116 @@
         }
       }
     ]
-  }
+  },
 
+  {
+    "name": "background_sidecar_v1 accepts scoped history",
+    "contract": "background_sidecar_v1",
+    "base": "background_history_sidecar_v1",
+    "valid": true,
+    "edits": []
+  },
+  {
+    "name": "background_sidecar_v1 accepts a manual intent",
+    "contract": "background_sidecar_v1",
+    "base": "background_manual_sidecar_v1",
+    "valid": true,
+    "edits": []
+  },
+  {
+    "name": "background_sidecar_v1 rejects duplicate history definitions",
+    "contract": "background_sidecar_v1",
+    "base": "background_history_sidecar_v1",
+    "valid": false,
+    "edits": [
+      {
+        "op": "clone",
+        "path": [
+          "history",
+          "definitions"
+        ],
+        "from": [
+          "history",
+          "definitions",
+          0
+        ]
+      }
+    ]
+  },
+  {
+    "name": "background_sidecar_v1 counts history metadata",
+    "contract": "background_sidecar_v1",
+    "base": "background_history_metadata_full_v1",
+    "valid": false,
+    "edits": []
+  },
+  {
+    "name": "background_sidecar_v1 rejects foreign manual intent",
+    "contract": "background_sidecar_v1",
+    "base": "background_manual_sidecar_v1",
+    "valid": false,
+    "edits": [
+      {
+        "op": "set",
+        "path": [
+          "manualIntents",
+          0,
+          "projectId"
+        ],
+        "value": "other-project"
+      }
+    ]
+  },
+  {
+    "name": "background_artifact_v1 rejects unbound observed guards",
+    "contract": "background_artifact_v1",
+    "base": "background_artifact_v1",
+    "valid": false,
+    "edits": [
+      {
+        "op": "set",
+        "path": [
+          "jobId"
+        ],
+        "value": null
+      },
+      {
+        "op": "set",
+        "path": [
+          "observedGuards"
+        ],
+        "value": {
+          "schemaVersion": 1,
+          "reads": [],
+          "writes": []
+        }
+      }
+    ]
+  },
+  {
+    "name": "background_artifact_v1 rejects unbound prepared guards",
+    "contract": "background_artifact_v1",
+    "base": "background_artifact_v1",
+    "valid": false,
+    "edits": [
+      {
+        "op": "set",
+        "path": [
+          "jobId"
+        ],
+        "value": null
+      },
+      {
+        "op": "set",
+        "path": [
+          "preparedGuards"
+        ],
+        "value": {
+          "schemaVersion": 1,
+          "reads": [],
+          "writes": []
+        }
+      }
+    ]
+  }
 ]

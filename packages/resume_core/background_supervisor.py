@@ -121,7 +121,7 @@ class JobSupervisor:
             return
         for project in self.store.snapshots():
             self.store.recover(project)
-        if self.store.fences:
+        if any(reason != "OUTCOME_UNKNOWN" for reason in self.store.fences.values()):
             self.fenced = "CLEANUP_FAILED"
         self.paused = self.store.dispatch_state().paused
         self.dispatcher = asyncio.create_task(self._dispatch())
@@ -367,12 +367,17 @@ class JobSupervisor:
             control.revoked = True
             if control.run_task is not None and control.run_task.done() and not control.run_task.cancelled():
                 try:
-                    # Account failures observed while a deadline wins still pause new work.
-                    self._outcome(control.run_task.result())
-                except BackgroundFailure:
-                    self.fenced = "JOB_STORE_UNAVAILABLE"
-                except Exception:
-                    pass
+                    observed = control.run_task.result()
+                except BaseException:
+                    observed = None
+                if observed is not None:
+                    try:
+                        # Account failures observed while a deadline wins still pause new work.
+                        self._outcome(observed)
+                    except BackgroundFailure:
+                        self.fenced = "JOB_STORE_UNAVAILABLE"
+                    except Exception:
+                        pass
             if not verified:
                 self.fenced = "CLEANUP_FAILED"
                 outcome = ExecutionOutcome("failed", "CLEANUP_FAILED")
@@ -394,8 +399,14 @@ class JobSupervisor:
                             attempt.cleanup_verified = verified
                 control.job = self.store.update(project, control.job.id, finish)
                 await self._emit(control.job)
-            except BackgroundFailure:
-                self.fenced = "JOB_STORE_UNAVAILABLE"
+            except BackgroundFailure as error:
+                if error.code == "PROJECT_DELETED" and verified:
+                    try:
+                        control.job = self.store.update(project, control.job.id, finish, deleted=True)
+                    except BackgroundFailure:
+                        self.fenced = "JOB_STORE_UNAVAILABLE"
+                else:
+                    self.fenced = "JOB_STORE_UNAVAILABLE"
             if verified:
                 if control.permit is not None:
                     control.permit.release()

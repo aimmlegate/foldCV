@@ -128,10 +128,29 @@ class ReadCapture:
     complete: bool = False
 
 
+def canonical_capture(workspace, query):
+    payload = query_value(workspace, query)
+    deps = [AgentQueryDependency(kind="query", query=query, fingerprint=query_fingerprint(workspace, query))]
+    if query.kind == "document":
+        deps += [AgentEntityDependency(kind="entity", stamp=dependency(workspace, "block", block.id)) for block in payload["blocks"]]
+        deps += [AgentEntityDependency(kind="entity", stamp=dependency(workspace, "field", json_text(["cell", part["blockId"], part["cell"].id])))
+            for part in payload["cells"]]
+        linked = {getattr(span, "record_id", None) for block in payload["blocks"] for node in subtree(block)
+            for _, content in inline_groups(node) for span in content}
+        linked.update(getattr(link, "record_id", None) for block in payload["blocks"] for node in subtree(block) for link in node.provenance)
+        linked.update(getattr(span, "record_id", None) for part in payload["cells"] for span in part["cell"].content)
+        linked.update(getattr(link, "record_id", None) for part in payload["cells"] for link in part["provenance"])
+        deps += [AgentEntityDependency(kind="entity", stamp=dependency(workspace, "record", identifier)) for identifier in linked if identifier is not None]
+    return ReadCapture(query, workspace, payload, deps)
+
+
 class ReadBook:
     def __init__(self, service, control):
         self.service, self.control = service, control
         self.captures, self.by_snapshot, self.cursors = {}, {}, {}
+
+    def canonical_capture(self, workspace, query):
+        return canonical_capture(workspace, query)
 
     def read(self, query):
         with self.service.projects.state_lock:
@@ -157,18 +176,8 @@ class ReadBook:
                             "findings": [{"id": finding.id, "message": finding.message} for finding in conversation.findings]}
                     deps = []
                 else:
-                    payload = query_value(workspace, query)
-                    deps = [AgentQueryDependency(kind="query", query=query, fingerprint=query_fingerprint(workspace, query))]
-                    if query.kind == "document":
-                        deps += [AgentEntityDependency(kind="entity", stamp=dependency(workspace, "block", block.id)) for block in payload["blocks"]]
-                        deps += [AgentEntityDependency(kind="entity", stamp=dependency(workspace, "field", json_text(["cell", part["blockId"], part["cell"].id])))
-                            for part in payload["cells"]]
-                        linked = {getattr(span, "record_id", None) for block in payload["blocks"] for node in subtree(block)
-                            for _, content in inline_groups(node) for span in content}
-                        linked.update(getattr(link, "record_id", None) for block in payload["blocks"] for node in subtree(block) for link in node.provenance)
-                        linked.update(getattr(span, "record_id", None) for part in payload["cells"] for span in part["cell"].content)
-                        linked.update(getattr(link, "record_id", None) for part in payload["cells"] for link in part["provenance"])
-                        deps += [AgentEntityDependency(kind="entity", stamp=dependency(workspace, "record", identifier)) for identifier in linked if identifier is not None]
+                    captured = self.canonical_capture(workspace, query)
+                    workspace, payload, deps = captured.workspace, captured.payload, captured.dependencies
                 capture = ReadCapture(query, workspace, payload, deps)
                 key, offset = digest(query), 0
                 old = self.captures.get(key)

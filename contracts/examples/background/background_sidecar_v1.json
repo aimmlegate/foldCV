@@ -15,5 +15,7 @@
   "drafts": [],
   "generations": [],
   "intents": [],
-  "inverses": []
+  "inverses": [],
+  "history": null,
+  "manualIntents": []
 }

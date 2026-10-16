@@ -16,5 +16,7 @@
   "incarnation": "connection-one",
   "barrierGeneration": 1,
   "phase": "intent_stored",
-  "assetPins": []
+  "assetPins": [],
+  "candidateSha256": null,
+  "beforeGenerationsSha256": null
 }

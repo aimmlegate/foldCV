@@ -145,9 +145,12 @@ class PipeChild:
 
 
 class OfflineGuard:
-    def __init__(self, root: Path):
+    def __init__(self, root: Path, *, role="pipe"):
         self.root = private_directory(root).resolve()
-        self.source = Path(__file__).with_name("fake_child.py")
+        source_name = {"pipe": "fake_child.py", "publication": "fake_publication_child.py"}.get(role)
+        if source_name is None:
+            raise OfflineDenied("unregistered synthetic role")
+        self.source = Path(__file__).with_name(source_name)
         self.child = self.root / "nb-synthetic-child.py"
         shutil.copyfile(self.source, self.child)
         self.child.chmod(0o400)

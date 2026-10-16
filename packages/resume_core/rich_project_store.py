@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import hashlib
+from dataclasses import dataclass
 import os
 import re
 
@@ -28,6 +29,14 @@ def decode_rich_snapshot(raw: bytes) -> WorkspaceV6:
     if data["schemaVersion"] != 6:
         raise ProjectStoreFailure("PROJECT_VERSION_UNSUPPORTED")
     return WorkspaceV6.model_validate(data)
+
+
+@dataclass(frozen=True)
+class PreparedRichSave:
+    workspace: WorkspaceV6
+    raw: bytes
+    blobs: tuple
+    images: tuple
 
 
 class RichProjectStore(ProjectStore):
@@ -57,9 +66,22 @@ class RichProjectStore(ProjectStore):
             return
 
     def save(self, workspace, originals, artifacts, images=None, *, before_workspace=None, after_workspace=None):
+        prepared = self.prepare_save(workspace, originals, artifacts, images)
+        try:
+            with locked_root(self.root, ".projects.lock"):
+                self._commit_prepared_unlocked(prepared, before_workspace=before_workspace, after_workspace=after_workspace)
+        except ProjectStoreFailure:
+            raise
+        except StorageFailure:
+            raise ProjectStoreFailure("PROJECT_UNSAFE_STORAGE") from None
+        except (OSError, ValueError):
+            raise ProjectStoreFailure("PROJECT_SAVE_FAILED") from None
+
+    def prepare_save(self, workspace, originals, artifacts, images=None):
         images = images or {}
         try:
-            raw = rich_snapshot_bytes(WorkspaceV6.model_validate(workspace.model_dump(by_alias=True)))
+            workspace = WorkspaceV6.model_validate(workspace.model_dump(by_alias=True))
+            raw = rich_snapshot_bytes(workspace)
             owner = workspace.project or workspace.pre_draft
             from .rich_archive import archive_payload
             from .gui_archive_zip import ArchiveFailure
@@ -90,44 +112,59 @@ class RichProjectStore(ProjectStore):
                         if len(blob) > DOCX_BYTES or len(blob) != render.docx_size or hashlib.sha256(blob).hexdigest() != render.docx_sha256:
                             raise ProjectStoreFailure("ARTIFACT_BYTES_MISMATCH")
                         prepared.append(("renders", render.id, blob, render.docx_sha256))
-            with locked_root(self.root, ".projects.lock"):
-                registry = self._registry()
-                self._upsert(registry, workspace)
-                directory = self._directory(workspace.project_id, create=True)
-                target = directory / "workspace.json"
-                if target.exists():
-                    owned_file(target)
-                    old_raw = target.read_bytes()
-                    existing = decode_rich_snapshot(old_raw)
-                    if hashlib.sha256(old_raw).hexdigest() != self.expected.get(workspace.project_id) or (
-                        existing.project_revision > workspace.project_revision or existing.document_revision > workspace.document_revision
-                    ):
-                        raise ProjectStoreFailure("PROJECT_REVISION_CHANGED")
-                for kind, identifier, blob, checksum in prepared:
-                    path = self._blob(directory, kind, identifier)
+            retained = tuple((asset, images[(workspace.project_id, asset.id)]) for asset in workspace.project.assets) if workspace.project else ()
+            return PreparedRichSave(workspace, raw, tuple(prepared), retained)
+        except ProjectStoreFailure:
+            raise
+        except ImageFailure as error:
+            raise ProjectStoreFailure(error.code) from None
+        except StorageFailure:
+            raise ProjectStoreFailure("PROJECT_UNSAFE_STORAGE") from None
+        except (OSError, UnicodeError, ValueError, RecursionError):
+            raise ProjectStoreFailure("PROJECT_SAVE_FAILED") from None
+
+    def _commit_prepared_unlocked(self, prepared, *, before_workspace=None, after_workspace=None, workspace_replaced=None):
+        """Commit validated bytes under an existing canonical lifecycle guard."""
+        workspace, raw = prepared.workspace, prepared.raw
+        try:
+            if rich_snapshot_bytes(workspace) != raw:
+                raise ProjectStoreFailure("PROJECT_SAVE_FAILED")
+            registry = self._registry()
+            self._upsert(registry, workspace)
+            directory = self._directory(workspace.project_id, create=True)
+            target = directory / "workspace.json"
+            if target.exists():
+                owned_file(target)
+                old_raw = target.read_bytes()
+                existing = decode_rich_snapshot(old_raw)
+                if hashlib.sha256(old_raw).hexdigest() != self.expected.get(workspace.project_id) or (
+                    existing.project_revision > workspace.project_revision or existing.document_revision > workspace.document_revision
+                ):
+                    raise ProjectStoreFailure("PROJECT_REVISION_CHANGED")
+            for kind, identifier, blob, checksum in prepared.blobs:
+                path = self._blob(directory, kind, identifier)
+                if path.exists():
+                    owned_file(path, DOCX_BYTES if kind == "renders" else 32 * 1024 * 1024)
+                    if hashlib.sha256(path.read_bytes()).hexdigest() != checksum:
+                        raise ProjectStoreFailure("ARTIFACT_BYTES_MISMATCH" if kind == "renders" else "SOURCE_BYTES_MISMATCH")
+                else:
+                    atomic_write(path, blob)
+            if workspace.project:
+                private_directory(directory / "images")
+                for asset, blob in prepared.images:
+                    path = directory / asset.path
                     if path.exists():
-                        owned_file(path, DOCX_BYTES if kind == "renders" else 32 * 1024 * 1024)
-                        if hashlib.sha256(path.read_bytes()).hexdigest() != checksum:
-                            raise ProjectStoreFailure("ARTIFACT_BYTES_MISMATCH" if kind == "renders" else "SOURCE_BYTES_MISMATCH")
+                        owned_file(path, 20 * 1024 * 1024)
+                        verify_image_bytes(asset, path.read_bytes())
                     else:
                         atomic_write(path, blob)
-                if workspace.project:
-                    private_directory(directory / "images")
-                    for asset in workspace.project.assets:
-                        path = directory / asset.path
-                        blob = images[(workspace.project_id, asset.id)]
-                        if path.exists():
-                            owned_file(path, 20 * 1024 * 1024)
-                            verify_image_bytes(asset, path.read_bytes())
-                        else:
-                            atomic_write(path, blob)
-                if before_workspace is not None:
-                    before_workspace()
-                atomic_write(target, raw)
-                self.expected[workspace.project_id] = hashlib.sha256(raw).hexdigest()
-                if after_workspace is not None:
-                    after_workspace(self.expected[workspace.project_id])
-                self._write_registry(registry)
+            if before_workspace is not None:
+                before_workspace()
+            atomic_write(target, raw, **({"after_replace": workspace_replaced} if workspace_replaced else {}))
+            self.expected[workspace.project_id] = hashlib.sha256(raw).hexdigest()
+            if after_workspace is not None:
+                after_workspace(self.expected[workspace.project_id])
+            self._write_registry(registry)
         except ProjectStoreFailure:
             raise
         except ImageFailure as error:
@@ -140,34 +177,43 @@ class RichProjectStore(ProjectStore):
     def read_committed(self, identifier, *, synchronize=False):
         try:
             with locked_root(self.root, ".projects.lock"):
-                entry = next((entry for entry in self._registry().entries if entry.project_id == identifier), None)
-                if entry is None or entry.tombstoned:
-                    raise ProjectStoreFailure("PROJECT_DELETED")
-                directory = self._directory(identifier)
-                path = directory / "workspace.json"
-                owned_file(path, WORKSPACE_BYTES)
-                descriptor = os.open(path, os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0))
-                with os.fdopen(descriptor, "rb") as stream:
-                    before = os.fstat(stream.fileno())
-                    if before.st_nlink != 1 or before.st_uid != os.getuid() or before.st_mode & 0o077:
-                        raise StorageFailure("UNSAFE_STORAGE")
-                    raw = stream.read(WORKSPACE_BYTES + 1)
-                    after = os.fstat(stream.fileno())
-                    if len(raw) > WORKSPACE_BYTES or (before.st_ino, before.st_size, before.st_mtime_ns, before.st_nlink) != (
-                            after.st_ino, after.st_size, after.st_mtime_ns, after.st_nlink):
-                        raise StorageFailure("UNSAFE_STORAGE")
-                    workspace = decode_rich_snapshot(raw)
-                    if workspace.project_id != identifier:
-                        raise StorageFailure("UNSAFE_STORAGE")
-                    if synchronize:
-                        # Confirm existing bytes; never reapply or replace an uncertain command.
-                        os.fsync(stream.fileno())
-                        folder = os.open(directory, os.O_RDONLY | getattr(os, "O_DIRECTORY", 0))
-                        try:
-                            os.fsync(folder)
-                        finally:
-                            os.close(folder)
-                return workspace, hashlib.sha256(raw).hexdigest()
+                return self._read_committed_unlocked(identifier, synchronize=synchronize)
+        except ProjectStoreFailure:
+            raise
+        except (StorageFailure, OSError, ValueError):
+            raise ProjectStoreFailure("PROJECT_LOAD_FAILED") from None
+
+    def _read_committed_unlocked(self, identifier, *, synchronize=False):
+        """Read under an existing canonical lifecycle guard without reentering it."""
+        try:
+            entry = next((entry for entry in self._registry().entries if entry.project_id == identifier), None)
+            if entry is None or entry.tombstoned:
+                raise ProjectStoreFailure("PROJECT_DELETED")
+            directory = self._directory(identifier)
+            path = directory / "workspace.json"
+            owned_file(path, WORKSPACE_BYTES)
+            descriptor = os.open(path, os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0))
+            with os.fdopen(descriptor, "rb") as stream:
+                before = os.fstat(stream.fileno())
+                if before.st_nlink != 1 or before.st_uid != os.getuid() or before.st_mode & 0o077:
+                    raise StorageFailure("UNSAFE_STORAGE")
+                raw = stream.read(WORKSPACE_BYTES + 1)
+                after = os.fstat(stream.fileno())
+                if len(raw) > WORKSPACE_BYTES or (before.st_ino, before.st_size, before.st_mtime_ns, before.st_nlink) != (
+                        after.st_ino, after.st_size, after.st_mtime_ns, after.st_nlink):
+                    raise StorageFailure("UNSAFE_STORAGE")
+                workspace = decode_rich_snapshot(raw)
+                if workspace.project_id != identifier:
+                    raise StorageFailure("UNSAFE_STORAGE")
+                if synchronize:
+                    # Confirm existing bytes; never reapply or replace an uncertain command.
+                    os.fsync(stream.fileno())
+                    folder = os.open(directory, os.O_RDONLY | getattr(os, "O_DIRECTORY", 0))
+                    try:
+                        os.fsync(folder)
+                    finally:
+                        os.close(folder)
+            return workspace, hashlib.sha256(raw).hexdigest()
         except ProjectStoreFailure:
             raise
         except (StorageFailure, OSError, ValueError):

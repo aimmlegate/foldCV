@@ -35,6 +35,25 @@
       "title": "ActionCapture",
       "type": "object"
     },
+    "AgentEntityDependency": {
+      "additionalProperties": false,
+      "properties": {
+        "kind": {
+          "const": "entity",
+          "title": "Kind",
+          "type": "string"
+        },
+        "stamp": {
+          "$ref": "#/$defs/DependencyStamp"
+        }
+      },
+      "required": [
+        "kind",
+        "stamp"
+      ],
+      "title": "AgentEntityDependency",
+      "type": "object"
+    },
     "AgentPayloadReference": {
       "additionalProperties": false,
       "properties": {
@@ -72,6 +91,144 @@
         "batchId"
       ],
       "title": "AgentPayloadReference",
+      "type": "object"
+    },
+    "AgentQuery": {
+      "additionalProperties": false,
+      "properties": {
+        "cursor": {
+          "anyOf": [
+            {
+              "maxLength": 512,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Cursor"
+        },
+        "ids": {
+          "items": {
+            "maxLength": 256,
+            "minLength": 1,
+            "type": "string"
+          },
+          "maxItems": 100,
+          "title": "Ids",
+          "type": "array"
+        },
+        "kind": {
+          "enum": [
+            "context",
+            "document",
+            "find",
+            "facts",
+            "source",
+            "history"
+          ],
+          "title": "Kind",
+          "type": "string"
+        },
+        "parentId": {
+          "anyOf": [
+            {
+              "maxLength": 256,
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Parentid"
+        },
+        "text": {
+          "default": "",
+          "maxLength": 1000,
+          "title": "Text",
+          "type": "string"
+        }
+      },
+      "required": [
+        "kind"
+      ],
+      "title": "AgentQuery",
+      "type": "object"
+    },
+    "AgentQueryDependency": {
+      "additionalProperties": false,
+      "properties": {
+        "fingerprint": {
+          "pattern": "^[a-f0-9]{64}$",
+          "title": "Fingerprint",
+          "type": "string"
+        },
+        "kind": {
+          "const": "query",
+          "title": "Kind",
+          "type": "string"
+        },
+        "query": {
+          "$ref": "#/$defs/AgentQuery"
+        }
+      },
+      "required": [
+        "kind",
+        "query",
+        "fingerprint"
+      ],
+      "title": "AgentQueryDependency",
+      "type": "object"
+    },
+    "BackgroundHistoryV1": {
+      "additionalProperties": false,
+      "properties": {
+        "definitions": {
+          "items": {
+            "$ref": "#/$defs/HistoryDefinitionV1"
+          },
+          "maxItems": 512,
+          "title": "Definitions",
+          "type": "array"
+        },
+        "namespace": {
+          "maxLength": 128,
+          "minLength": 1,
+          "pattern": "^[A-Za-z0-9_-]+$",
+          "title": "Namespace",
+          "type": "string"
+        },
+        "phase": {
+          "enum": [
+            "initializing",
+            "ready",
+            "fenced"
+          ],
+          "title": "Phase",
+          "type": "string"
+        },
+        "schemaVersion": {
+          "const": 1,
+          "title": "Schemaversion",
+          "type": "integer"
+        },
+        "workspaceSha256": {
+          "pattern": "^[a-f0-9]{64}$",
+          "title": "Workspacesha256",
+          "type": "string"
+        }
+      },
+      "required": [
+        "schemaVersion",
+        "namespace",
+        "phase",
+        "workspaceSha256",
+        "definitions"
+      ],
+      "title": "BackgroundHistoryV1",
       "type": "object"
     },
     "CanonicalReceiptV1": {
@@ -411,6 +568,41 @@
         "fingerprint"
       ],
       "title": "GenerationStamp",
+      "type": "object"
+    },
+    "HistoryDefinitionV1": {
+      "additionalProperties": false,
+      "properties": {
+        "key": {
+          "maxLength": 512,
+          "minLength": 1,
+          "title": "Key",
+          "type": "string"
+        },
+        "selector": {
+          "discriminator": {
+            "mapping": {
+              "entity": "#/$defs/AgentEntityDependency",
+              "query": "#/$defs/AgentQueryDependency"
+            },
+            "propertyName": "kind"
+          },
+          "oneOf": [
+            {
+              "$ref": "#/$defs/AgentEntityDependency"
+            },
+            {
+              "$ref": "#/$defs/AgentQueryDependency"
+            }
+          ],
+          "title": "Selector"
+        }
+      },
+      "required": [
+        "key",
+        "selector"
+      ],
+      "title": "HistoryDefinitionV1",
       "type": "object"
     },
     "InputReference": {
@@ -910,6 +1102,187 @@
       "title": "JobSubmissionV1",
       "type": "object"
     },
+    "ManualIntentV1": {
+      "additionalProperties": false,
+      "properties": {
+        "afterGenerationsSha256": {
+          "pattern": "^[a-f0-9]{64}$",
+          "title": "Aftergenerationssha256",
+          "type": "string"
+        },
+        "afterWorkspaceSha256": {
+          "pattern": "^[a-f0-9]{64}$",
+          "title": "Afterworkspacesha256",
+          "type": "string"
+        },
+        "assetPins": {
+          "items": {
+            "maxLength": 128,
+            "minLength": 1,
+            "pattern": "^[A-Za-z0-9_-]+$",
+            "type": "string"
+          },
+          "maxItems": 100,
+          "title": "Assetpins",
+          "type": "array"
+        },
+        "barrierGeneration": {
+          "anyOf": [
+            {
+              "minimum": 1,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Barriergeneration"
+        },
+        "beforeGenerationsSha256": {
+          "anyOf": [
+            {
+              "pattern": "^[a-f0-9]{64}$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Beforegenerationssha256"
+        },
+        "beforeWorkspaceSha256": {
+          "pattern": "^[a-f0-9]{64}$",
+          "title": "Beforeworkspacesha256",
+          "type": "string"
+        },
+        "candidateRef": {
+          "maxLength": 128,
+          "minLength": 1,
+          "pattern": "^[A-Za-z0-9_-]+$",
+          "title": "Candidateref",
+          "type": "string"
+        },
+        "candidateSha256": {
+          "anyOf": [
+            {
+              "pattern": "^[a-f0-9]{64}$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Candidatesha256"
+        },
+        "clientMutationId": {
+          "maxLength": 128,
+          "minLength": 1,
+          "pattern": "^[A-Za-z0-9_-]+$",
+          "title": "Clientmutationid",
+          "type": "string"
+        },
+        "id": {
+          "maxLength": 128,
+          "minLength": 1,
+          "pattern": "^[A-Za-z0-9_-]+$",
+          "title": "Id",
+          "type": "string"
+        },
+        "incarnation": {
+          "anyOf": [
+            {
+              "maxLength": 128,
+              "minLength": 1,
+              "pattern": "^[A-Za-z0-9_-]+$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Incarnation"
+        },
+        "lineage": {
+          "maxLength": 128,
+          "minLength": 1,
+          "pattern": "^[A-Za-z0-9_-]+$",
+          "title": "Lineage",
+          "type": "string"
+        },
+        "phase": {
+          "enum": [
+            "intent_stored",
+            "commit_claimed",
+            "workspace_replaced",
+            "workspace_durable",
+            "generation_history_durable",
+            "receipt_stored",
+            "fenced",
+            "reconciled"
+          ],
+          "title": "Phase",
+          "type": "string"
+        },
+        "previousRef": {
+          "maxLength": 128,
+          "minLength": 1,
+          "pattern": "^[A-Za-z0-9_-]+$",
+          "title": "Previousref",
+          "type": "string"
+        },
+        "projectId": {
+          "maxLength": 128,
+          "minLength": 1,
+          "pattern": "^[A-Za-z0-9_-]+$",
+          "title": "Projectid",
+          "type": "string"
+        },
+        "requestSha256": {
+          "pattern": "^[a-f0-9]{64}$",
+          "title": "Requestsha256",
+          "type": "string"
+        },
+        "schemaVersion": {
+          "const": 1,
+          "title": "Schemaversion",
+          "type": "integer"
+        },
+        "writerEpoch": {
+          "anyOf": [
+            {
+              "minimum": 1,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Writerepoch"
+        }
+      },
+      "required": [
+        "schemaVersion",
+        "id",
+        "projectId",
+        "lineage",
+        "clientMutationId",
+        "requestSha256",
+        "beforeWorkspaceSha256",
+        "afterWorkspaceSha256",
+        "afterGenerationsSha256",
+        "candidateRef",
+        "previousRef",
+        "writerEpoch",
+        "incarnation",
+        "barrierGeneration",
+        "phase",
+        "assetPins"
+      ],
+      "title": "ManualIntentV1",
+      "type": "object"
+    },
     "ModelCapture": {
       "additionalProperties": false,
       "properties": {
@@ -1267,6 +1640,19 @@
           ],
           "title": "Barriergeneration"
         },
+        "beforeGenerationsSha256": {
+          "anyOf": [
+            {
+              "pattern": "^[a-f0-9]{64}$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Beforegenerationssha256"
+        },
         "beforeWorkspaceSha256": {
           "pattern": "^[a-f0-9]{64}$",
           "title": "Beforeworkspacesha256",
@@ -1278,6 +1664,19 @@
           "pattern": "^[A-Za-z0-9_-]+$",
           "title": "Candidateref",
           "type": "string"
+        },
+        "candidateSha256": {
+          "anyOf": [
+            {
+              "pattern": "^[a-f0-9]{64}$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Candidatesha256"
         },
         "clientMutationId": {
           "maxLength": 128,
@@ -1382,8 +1781,6 @@
       "required": [
         "schemaVersion",
         "id",
-        "jobId",
-        "proposalId",
         "projectId",
         "lineage",
         "clientMutationId",
@@ -1397,7 +1794,9 @@
         "incarnation",
         "barrierGeneration",
         "phase",
-        "assetPins"
+        "assetPins",
+        "jobId",
+        "proposalId"
       ],
       "title": "PublicationIntentV1",
       "type": "object"
@@ -1870,6 +2269,17 @@
       "title": "Generations",
       "type": "array"
     },
+    "history": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/BackgroundHistoryV1"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
+    },
     "intents": {
       "items": {
         "$ref": "#/$defs/PublicationIntentV1"
@@ -1900,6 +2310,14 @@
       "pattern": "^[A-Za-z0-9_-]+$",
       "title": "Lineage",
       "type": "string"
+    },
+    "manualIntents": {
+      "items": {
+        "$ref": "#/$defs/ManualIntentV1"
+      },
+      "maxItems": 512,
+      "title": "Manualintents",
+      "type": "array"
     },
     "projectId": {
       "maxLength": 128,

@@ -31,5 +31,7 @@
   "sources": [],
   "findings": [],
   "reply": null,
-  "usage": null
+  "usage": null,
+  "observedGuards": null,
+  "preparedGuards": null
 }

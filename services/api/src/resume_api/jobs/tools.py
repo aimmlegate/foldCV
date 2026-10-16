@@ -6,7 +6,7 @@ from packages.resume_core.agent_store import AgentFailure, digest, run_in
 from packages.resume_core.background_store import BackgroundFailure
 from packages.resume_core.models.background import ProposalBindingV1
 
-from ..agent.context import current_dependencies, json_text
+from ..agent.context import ReadBook, canonical_capture, current_dependencies, json_text
 from ..agent.tools import TOOL_NAMES, ToolSession
 
 APPLY_DESCRIPTION = (
@@ -27,8 +27,34 @@ DEVELOPER_INSTRUCTIONS_V2 = (
 PROTOCOL_V2_SHA256 = hashlib.sha256((APPLY_DESCRIPTION + DEVELOPER_INSTRUCTIONS_V2).encode()).hexdigest()
 
 
+class JobReadBook(ReadBook):
+    def canonical_capture(self, _workspace, query):
+        jobs = self.service.jobs
+        def read(workspace):
+            capture = canonical_capture(workspace, query)
+            return capture, capture.dependencies
+        capture, guards = jobs.history.observe(self.control.project_id, read)
+        jobs.artifacts.observe(self.control.project_id, self.control.run_id, guards)
+        return capture
+
+
+class CanonicalProjects:
+    def __init__(self, projects):
+        self.projects = projects
+
+    def read(self, project):
+        return self.projects.storage.read_committed(project)[0]
+
+    def __getattr__(self, name):
+        return getattr(self.projects, name)
+
+
 class JobToolSession(ToolSession):
     apply_description = APPLY_DESCRIPTION
+
+    def __init__(self, service, control, run, fetcher):
+        super().__init__(service, control, run, fetcher)
+        self.book = JobReadBook(service, control)
 
     def register(self):
         super().register()
@@ -78,6 +104,9 @@ class JobToolSession(ToolSession):
                 if item is None or item.batch is None:
                     raise AgentFailure("AGENT_EDIT_INVALID")
                 batch = item.batch
+                artifact = self.service.jobs.artifacts.record(self.control.project_id, job.id)[1]
+                if artifact.prepared_guards is None:
+                    raise AgentFailure("AGENT_STALE_READ")
                 reference = {"kind": "agent_journal", "conversationId": self.run.conversation_id,
                     "runId": job.id, "batchId": batch.id}
                 from packages.resume_core.models.background import AgentPayloadReference
@@ -87,7 +116,7 @@ class JobToolSession(ToolSession):
                     jobId=job.id, projectId=self.control.project_id, lineage=job.submission.identity.lineage,
                     accountGeneration=job.submission.account_generation, executionGeneration=job.execution_generation,
                     turnId=job.id, payload=reference, payloadSha256=hashlib.sha256(payload).hexdigest(),
-                    payloadBytes=len(payload), guards=job.submission.guards, scope=job.submission.scope,
+                    payloadBytes=len(payload), guards=artifact.prepared_guards, scope=job.submission.scope,
                     acceptedAt=self.service.jobs.store.clock(), executionDeadline=job.attempts[-1].active_deadline,
                     authority="active", revocation=None)
                 current = self.service.projects.read(self.control.project_id)
@@ -114,7 +143,7 @@ class JobTools:
 
     def session(self, control):
         from types import SimpleNamespace
-        service = SimpleNamespace(projects=self.jobs.projects, jobs=self.jobs,
+        service = SimpleNamespace(projects=CanonicalProjects(self.jobs.projects), jobs=self.jobs,
             store=self.jobs.artifacts.bound(control.project_id, control.run_id),
             event=lambda *_args, **_kwargs: None,
             revoke=lambda bound, _reason=None: bound.stop(), cleanup_error=lambda _code: None)
