@@ -40,7 +40,8 @@ class ProcessRunner:
             max_line: int = MAX_LINE, max_stdout: int | None = None,
             max_stderr: int | None = None,
             poll_input: Callable[[], bytes | None] | None = None,
-            before_cleanup: Callable[[], None] | None = None) -> tuple[bytes, bytes]:
+            before_cleanup: Callable[[], None] | None = None,
+            on_spawn: Callable[[], None] | None = None) -> tuple[bytes, bytes]:
         if (not math.isfinite(deadline) or any(type(value) is not int or value <= 0
                 for value in (max_output, max_line, max_stdout, max_stderr) if value is not None)):
             raise SpikeError("INVALID_LIMIT")
@@ -56,6 +57,8 @@ class ProcessRunner:
                                              if self.launch is not None and files.path is not None
                                              else (self.executable, arguments, None))
             process = files.spawn(executable, args, environment=environment)
+            if on_spawn is not None:
+                on_spawn()
             assert process.stdin is not None and process.stdout is not None and process.stderr is not None
             with selectors.DefaultSelector() as selector:
                 for stream, kind in ((process.stdin, "stdin"), (process.stdout, "stdout"), (process.stderr, "stderr")):

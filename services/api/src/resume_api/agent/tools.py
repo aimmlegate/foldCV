@@ -44,6 +44,7 @@ class AgentTools:
 
 class ToolSession(PrivateMcp):
     names = TOOL_NAMES
+    apply_description = "Offer a prepared batch to the mounted editor and wait for a durable receipt. Check-only mode forbids writes."
 
     def __init__(self, service, control, run, fetcher):
         self.service, self.control, self.run, self.fetcher = service, control, run, fetcher
@@ -100,6 +101,9 @@ class ToolSession(PrivateMcp):
             if datetime.now(timezone.utc) >= datetime.fromisoformat(run.deadline):
                 raise AgentFailure("AGENT_DEADLINE")
 
+    def writer_session_id(self):
+        return self.service.leases.require(self.control.project_id, epoch=self.control.owner_epoch).session_id
+
     def register(self):
         def reader(name, kind):
             async def read(query: AgentQuery | None = None) -> CallToolResult:
@@ -129,10 +133,10 @@ class ToolSession(PrivateMcp):
             """Compile edits without saving. Example arguments: {"request":{"key":"edit_1","snapshotIds":["read_id"],"operations":[{"kind":"replace_text","target":{"snapshotId":"read_id","blockId":"block_id","cellId":null,"field":"content","start":0,"end":1},"content":[{"text":"Existing claim rephrased"}]}]}}. Read real IDs/ranges first. cellId is required: use null outside tables. Content uses text/marks, not document styles. One saved batch per turn."""
             return self.wire(await self.call("prepare_edit_batch", request))
 
-        @self.sdk.tool(structured_output=False)
         async def apply_edit_batch(request: AgentApplyRequest) -> CallToolResult:
-            """Offer a prepared batch to the mounted editor and wait for a durable receipt. Check-only mode forbids writes."""
             return self.wire(await self.call("apply_edit_batch", request))
+        apply_edit_batch.__doc__ = self.apply_description
+        self.sdk.tool(structured_output=False)(apply_edit_batch)
 
     def wire(self, value):
         text = json_text(value)

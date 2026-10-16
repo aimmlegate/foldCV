@@ -7,7 +7,9 @@ from typing import Annotated, Literal, Union
 from pydantic import ConfigDict, Field, RootModel, model_validator
 
 from ..background_limits import LIMITS
-from .agent import AgentCommitResult, AgentId, AgentScope, AgentWire, ModelId, Timestamp, bounded
+from .agent import (AgentBatchJournal, AgentCommitResult, AgentFinding, AgentId, AgentJournalRequest,
+    AgentMessage, AgentReadSnapshot, AgentRun, AgentScope, AgentUsage, AgentWebSource, AgentWire,
+    ModelId, Timestamp, bounded)
 from .contracts import Revision, Sha256
 from .rich_document import RichDocumentV1
 from .rich_facts import WorkingFacts
@@ -66,6 +68,60 @@ class InputReference(BackgroundWire):
     kind: Literal["agent_journal", "rich_sync", "processing"]
     id: AgentId
     sha256: Sha256
+
+
+class JobAgentRequestV1(BackgroundWire):
+    schema_version: Literal[1]
+    lineage: AgentId
+    request_epoch: Revision
+    request: AgentJournalRequest
+
+
+class JobArtifactV1(BackgroundWire):
+    schema_version: Literal[1]
+    id: AgentId
+    identity: JobIdentity
+    request: AgentJournalRequest
+    request_sha256: Sha256
+    connection_epoch: AgentId
+    rules_sha256: Sha256
+    job_id: AgentId | None
+    created_at: Timestamp
+    snapshots: list[AgentReadSnapshot] = Field(max_length=24)
+    batches: list[AgentBatchJournal] = Field(max_length=100)
+    sources: list[AgentWebSource] = Field(max_length=20)
+    findings: list[AgentFinding] = Field(max_length=100)
+    reply: AgentMessage | None
+    usage: AgentUsage | None
+
+    @model_validator(mode="after")
+    def owns_artifacts_only(self):
+        if self.identity.request_id != self.request.client_request_id:
+            raise ValueError("artifact input identity mismatch")
+        resources = [*self.snapshots, *self.sources, *self.findings, *([self.reply] if self.reply else [])]
+        if any(item.run_id != self.job_id for item in resources):
+            raise ValueError("foreign job artifact")
+        if self.job_id is None and (resources or self.batches or self.usage is not None):
+            raise ValueError("unbound input cannot have execution artifacts")
+        if self.reply is not None and self.reply.role != "assistant":
+            raise ValueError("the original user message belongs to the immutable request")
+        if any(item.receipt is not None or item.publication is not None or item.history_actions
+                or item.batch is not None and (item.batch.run_id != self.job_id or item.batch.state != "prepared") for item in self.batches):
+            raise ValueError("Job alone owns publication and lifecycle")
+        return self
+
+
+class JobLegacyRunV2(BackgroundWire):
+    schema_version: Literal[2]
+    job_id: AgentId
+    publication: Publication
+    run: AgentRun
+
+    @model_validator(mode="after")
+    def same_job(self):
+        if self.job_id != self.run.id:
+            raise ValueError("legacy view must identify its Job")
+        return self
 
 
 class ModelCapture(BackgroundWire):
@@ -284,6 +340,7 @@ class JobFailure(BackgroundWire):
     code: Literal["AUTH_REQUIRED", "RATE_LIMITED", "BUSY", "MODEL_DENIED", "CANCELLED", "DEADLINE",
         "STARTUP_TIMEOUT", "PROCESS_FAILED", "CLEANUP_FAILED", "INTERRUPTED", "PROTOCOL",
         "JOB_QUEUE_FULL", "JOB_STORAGE_FULL", "JOB_IDEMPOTENCY_CONFLICT", "REQUEST_EXPIRED",
+        "JOB_NOT_FOUND", "JOB_STORE_CORRUPT", "JOB_STORE_UNAVAILABLE", "JOB_DISABLED", "JOB_SCOPE_INVALID", "ACCOUNT_CHANGED",
         "DEPENDENCY_CHANGED", "WRITER_UNKNOWN", "SAVE_FAILED", "OUTCOME_UNKNOWN", "PROJECT_DELETED"]
 
 
@@ -324,9 +381,12 @@ class JobSnapshotV1(BackgroundWire):
     error: JobFailure | None
     created_at: Timestamp
     updated_at: Timestamp
+    publication_error: JobFailure | None = None
 
     @model_validator(mode="after")
     def exact_saved(self):
+        if self.publication in {"saved", "no_change", "none"} and self.publication_error is not None:
+            raise ValueError("publication error cannot claim a successful or absent publication")
         if len({a.id for a in self.attempts}) != len(self.attempts) or len(self.attempts) > len(self.submission.models):
             raise ValueError("an attempt cannot start twice or hide a retry")
         for index, attempt in enumerate(self.attempts):
@@ -363,6 +423,46 @@ class JobEventV1(BackgroundWire):
                 or self.snapshot.execution_generation != self.generation):
             raise ValueError("event identity must match its snapshot")
         bounded(self, LIMITS.replay_bytes)
+        return self
+
+
+class JobReplayRequestV1(BackgroundWire):
+    schema_version: Literal[1]
+    generation: Revision
+    after: Counter
+
+
+class JobReplayV1(BackgroundWire):
+    schema_version: Literal[1]
+    events: list[JobEventV1] = Field(max_length=LIMITS.replay_events)
+
+    @model_validator(mode="after")
+    def ordered_one_job(self):
+        cursors = [event.cursor for event in self.events]
+        if cursors != sorted(set(cursors)):
+            raise ValueError("replay must be ordered without duplicates")
+        if self.events:
+            first = self.events[0]
+            if any((event.project_id, event.lineage, event.job_id, event.generation) !=
+                    (first.project_id, first.lineage, first.job_id, first.generation) for event in self.events):
+                raise ValueError("replay cannot mix jobs")
+            if len(self.events) > 1 and any(event.type == "cursor.gap" for event in self.events):
+                raise ValueError("a gap is one current snapshot")
+        return self
+
+
+class JobProjectV1(BackgroundWire):
+    schema_version: Literal[1]
+    project_id: AgentId
+    lineage: AgentId
+    request_epoch: Revision
+    jobs: list[JobSnapshotV1] = Field(max_length=LIMITS.metadata_project_records)
+
+    @model_validator(mode="after")
+    def same_project(self):
+        if len({job.id for job in self.jobs}) != len(self.jobs) or any(
+                job.submission.identity.project_id != self.project_id or job.submission.identity.lineage != self.lineage for job in self.jobs):
+            raise ValueError("project view cannot mix or duplicate jobs")
         return self
 
 
@@ -478,6 +578,12 @@ class BackgroundSidecarV1(BackgroundWire):
         return self
 
 
+class DispatchStateV1(BackgroundWire):
+    schema_version: Literal[1]
+    account_generation: Revision
+    paused: Literal["RATE_LIMITED", "AUTH_REQUIRED"] | None
+
+
 BACKGROUND_CONTRACTS = {"background_submission_v1": JobSubmissionV1, "background_snapshot_v1": JobSnapshotV1,
     "background_proposal_v1": ProposalBindingV1, "background_scope_guard_v1": ScopeGuardV1,
     "background_writer_v1": WriterSessionV1, "background_barrier_v1": PublicationBarrierV1,
@@ -485,4 +591,7 @@ BACKGROUND_CONTRACTS = {"background_submission_v1": JobSubmissionV1, "background
     "background_apply_v2": ApplyResultV2, "background_event_v1": JobEventV1,
     "background_intent_v1": PublicationIntentV1, "background_undo_v1": UndoOwnershipV1,
     "background_sidecar_v1": BackgroundSidecarV1, "background_attempt_v1": JobAttemptV1,
-    "background_draft_payload_v1": DraftPayloadV1}
+    "background_draft_payload_v1": DraftPayloadV1, "background_dispatch_v1": DispatchStateV1,
+    "background_agent_request_v1": JobAgentRequestV1, "background_artifact_v1": JobArtifactV1,
+    "background_legacy_run_v2": JobLegacyRunV2, "background_project_v1": JobProjectV1,
+    "background_replay_request_v1": JobReplayRequestV1, "background_replay_v1": JobReplayV1}

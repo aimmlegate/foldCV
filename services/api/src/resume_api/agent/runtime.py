@@ -6,6 +6,7 @@ import asyncio
 from dataclasses import dataclass, field
 from contextlib import contextmanager
 import json
+import inspect
 from pathlib import Path
 import subprocess
 import threading
@@ -93,6 +94,9 @@ class RuntimeInput:
     revoke: Callable[[], None] = lambda: None
     queued_at: float | None = None
     close_tools: Callable[[float], None] = lambda _seconds: None
+    developer_instructions: str = DEVELOPER_INSTRUCTIONS
+    elapsed_clock: Callable[[], float] = time.monotonic
+    child_started: Callable[[], None] = lambda: None
 
 
 @dataclass
@@ -103,6 +107,7 @@ class RuntimeResult:
     truncated: bool = False
     usage: AgentUsage | None = None
     native_started: bool = False
+    cleanup_verified: bool = False
     tool_calls: int = 0
     web_actions: int = 0
     timings: dict[str, float] = field(default_factory=dict)
@@ -121,14 +126,14 @@ def terminal_cleanup(value, admission, cleanup_started):
             admission.block()
         raise
     finally:
-        began = cleanup_started() or time.monotonic()
+        began = cleanup_started() or value.elapsed_clock()
         value.revoke()
         try:
-            remaining = limits.CLEANUP_SECONDS - (time.monotonic() - began)
+            remaining = limits.CLEANUP_SECONDS - (value.elapsed_clock() - began)
             if remaining <= 0:
                 raise TimeoutError()
             value.close_tools(remaining)
-            if time.monotonic() - began > limits.CLEANUP_SECONDS:
+            if value.elapsed_clock() - began > limits.CLEANUP_SECONDS:
                 raise TimeoutError()
         except Exception:
             admission.block()
@@ -233,7 +238,7 @@ class NativeSession:
         return self.request("thread/start", {"model": self.value.model, "cwd": str(self.operation),
             "ephemeral": True, "allowProviderModelFallback": False, "approvalPolicy": "never",
             "approvalsReviewer": "user", "sandbox": "read-only", "baseInstructions": BASE_INSTRUCTIONS,
-            "developerInstructions": DEVELOPER_INSTRUCTIONS, "environments": [], "runtimeWorkspaceRoots": []})
+            "developerInstructions": self.value.developer_instructions, "environments": [], "runtimeWorkspaceRoots": []})
 
     def accept(self, raw):
         message = strict_json(raw, max_bytes=2 * 1024 * 1024)
@@ -460,15 +465,18 @@ class CodexAgentRuntime:
         session = None
         cleanup_started = None
         native_pid, host_pids, operation_path, raw_bytes = None, (), None, 0
+        elapsed = value.elapsed_clock
+        began_elapsed = elapsed()
         try:
-            if len((value.prompt + BASE_INSTRUCTIONS + DEVELOPER_INSTRUCTIONS).encode()) > limits.CONTEXT_BYTES:
+            if len((value.prompt + BASE_INSTRUCTIONS + value.developer_instructions).encode()) > limits.CONTEXT_BYTES:
                 raise AgentFailure("AGENT_CONTEXT_LIMIT")
             with self.admission.hold(cancel, deadline=queued + limits.ADMISSION_SECONDS), native_profile(
                     self.profile, cancel, deadline=queued + limits.ADMISSION_SECONDS,
                     operations_root=self.temp_root), terminal_cleanup(
                     value, self.admission, lambda: cleanup_started):
                 result.timings["admission"] = time.monotonic() - queued
-                session = NativeSession(value, cancel, emit, startup=self.startup_seconds, active=self.active_seconds)
+                session = NativeSession(value, cancel, emit, startup=self.startup_seconds,
+                    active=self.active_seconds, clock=elapsed)
                 session.result.timings = result.timings
                 result = session.result
                 with OperationFiles(self.temp_root).open() as files:
@@ -482,7 +490,7 @@ class CodexAgentRuntime:
                             launcher, command, environment = self.profile.launch(executable, args, operation)
                             environment[TOKEN_ENV] = value.token
                             return launcher, command, environment
-                        runner = ProcessRunner(self.connection.executable, launch=launch)
+                        runner = ProcessRunner(self.connection.executable, launch=launch, clock=elapsed)
                         arguments = self.profile.arguments(files.path, url=value.url, tools=value.tools, allow_web=value.allow_web)
                         def ready():
                             nonlocal native_pid, host_pids
@@ -498,13 +506,13 @@ class CodexAgentRuntime:
                     def before_cleanup():
                         nonlocal cleanup_started
                         if cleanup_started is None:
-                            cleanup_started = session.cleanup_at or time.monotonic()
+                            cleanup_started = session.cleanup_at or elapsed()
                         value.revoke()
                     try:
                         try:
-                            runner.run(files, arguments, data=session.begin(), deadline=time.monotonic() + self.startup_seconds + self.active_seconds,
+                            runner.run(files, arguments, data=session.begin(), deadline=elapsed() + self.startup_seconds + self.active_seconds,
                                 cancel=threading.Event(), on_line=accept, poll_input=session.poll,
-                                before_cleanup=before_cleanup, interactive=True,
+                                before_cleanup=before_cleanup, on_spawn=value.child_started, interactive=True,
                                 max_line=2 * 1024 * 1024, max_stdout=8 * 1024 * 1024, max_stderr=256 * 1024,
                                 max_output=8 * 1024 * 1024 + 256 * 1024)
                         except SessionFinished:
@@ -514,7 +522,7 @@ class CodexAgentRuntime:
                     finally:
                         before_cleanup()
                         files.stop_worker()
-                result.timings["cleanup"] = time.monotonic() - cleanup_started
+                result.timings["cleanup"] = elapsed() - cleanup_started
                 if result.timings.get("cleanup", 0) > limits.CLEANUP_SECONDS:
                     raise AgentFailure("AGENT_CLEANUP_FAILED")
         except AdmissionCancelled:
@@ -541,15 +549,16 @@ class CodexAgentRuntime:
             result.state, result.error = "failed", "AGENT_PROCESS_FAILED"
         finally:
             value.revoke()
-            result.timings["total"] = time.monotonic() - queued
+            result.timings["total"] = elapsed() - began_elapsed
             if cleanup_started is not None:
-                result.timings["cleanup"] = time.monotonic() - cleanup_started
+                result.timings["cleanup"] = elapsed() - cleanup_started
                 if result.timings["cleanup"] > limits.CLEANUP_SECONDS:
                     result.state, result.error = "failed", "AGENT_CLEANUP_FAILED"
             if session is not None:
-                result.timings["startup"] = (session.active_started or cleanup_started or time.monotonic()) - session.started
+                result.timings["startup"] = (session.active_started or cleanup_started or elapsed()) - session.started
                 if session.active_started is not None:
-                    result.timings["active"] = (cleanup_started or time.monotonic()) - session.active_started
+                    result.timings["active"] = (cleanup_started or elapsed()) - session.active_started
+            result.cleanup_verified = result.error != "AGENT_CLEANUP_FAILED"
             if self.audit is not None:
                 self.audit({"threadId": session.thread if session else None, "turnId": session.turn if session else None,
                     "nativePid": native_pid, "hostPids": list(host_pids), "operation": str(operation_path) if operation_path else None,
@@ -584,18 +593,39 @@ class ScriptedAgentRuntime:
 
     async def run(self, value, cancel, emit):
         from .admission import turn_slot
-        async with turn_slot(cancel, admission=self.admission,
-                deadline=(value.queued_at or time.monotonic()) + limits.ADMISSION_SECONDS):
+        result = None
+        admitted = False
+        async def close_tools():
+            value.revoke()
             try:
-                if cancel.is_set():
-                    raise AgentFailure("AGENT_CANCELLED")
-                value.before_start()
-                self.calls.append(value.model)
-                return await self.script(value, cancel, emit)
-            finally:
-                value.revoke()
+                await asyncio.to_thread(value.close_tools, limits.CLEANUP_SECONDS)
+                if isinstance(result, RuntimeResult):
+                    result.cleanup_verified = True
+            except Exception:
+                self.admission.block()
+                raise AgentFailure("AGENT_CLEANUP_FAILED") from None
+        try:
+            async with turn_slot(cancel, admission=self.admission,
+                    deadline=(value.queued_at or time.monotonic()) + limits.ADMISSION_SECONDS):
+                admitted = True
                 try:
-                    await asyncio.to_thread(value.close_tools, limits.CLEANUP_SECONDS)
-                except Exception:
-                    self.admission.block()
-                    raise AgentFailure("AGENT_CLEANUP_FAILED") from None
+                    if cancel.is_set():
+                        raise AgentFailure("AGENT_CANCELLED")
+                    ready = value.before_start()
+                    if inspect.isawaitable(ready):
+                        await ready
+                    self.calls.append(value.model)
+                    result = await self.script(value, cancel, emit)
+                    return result
+                except AgentFailure as error:
+                    result = RuntimeResult(state="cancelled" if error.code == "AGENT_CANCELLED" else "failed", error=error.code)
+                    return result
+                finally:
+                    await close_tools()
+        except (AdmissionCancelled, AdmissionTimeout) as error:
+            code = "AGENT_CANCELLED" if isinstance(error, AdmissionCancelled) else "AGENT_BUSY"
+            result = RuntimeResult(state="cancelled" if code == "AGENT_CANCELLED" else "failed", error=code)
+            return result
+        finally:
+            if not admitted:
+                await close_tools()

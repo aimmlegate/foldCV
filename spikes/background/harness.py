@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+from contextvars import ContextVar
 from dataclasses import dataclass, field
 import hashlib
 import json
@@ -21,6 +22,7 @@ PUBLICATION_HOOKS = ("payload_stored", "binding_stored", "intent_stored", "befor
 WRITER_HOOKS = ("composition_end", "local_barrier_acquired", "final_flush_started", "touch_watermark_durable",
     "barrier_acked", "adoption_started", "draft_checkpointed", "clean_detach_acked", "writer_resumed")
 HOOKS = DISPATCH_HOOKS + PUBLICATION_HOOKS + WRITER_HOOKS
+SYNTHETIC_SPAWN: ContextVar[tuple[str, ...] | None] = ContextVar("nb_synthetic_spawn", default=None)
 
 
 class OfflineDenied(RuntimeError):
@@ -179,8 +181,13 @@ class OfflineGuard:
         if env is not None and env:
             raise OfflineDenied("inherited environment is forbidden")
         child_env = {"HOME": str(self.root), "LANG": "C.UTF-8"}
-        process = subprocess.Popen([sys.executable, "-I", "-S", "-u", str(executable)], cwd=self.root,
-            env=child_env, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, bufsize=1)
+        arguments = [sys.executable, "-I", "-S", "-u", str(executable)]
+        token = SYNTHETIC_SPAWN.set(tuple(arguments))
+        try:
+            process = subprocess.Popen(arguments, cwd=self.root, env=child_env,
+                stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, bufsize=1)
+        finally:
+            SYNTHETIC_SPAWN.reset(token)
         self.spawns += 1
         try:
             child = PipeChild(process, lambda: setattr(self, "cleanup_fenced", True))

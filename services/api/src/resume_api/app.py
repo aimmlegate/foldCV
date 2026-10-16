@@ -255,7 +255,8 @@ def create_app(*, origin: str, secret: str, temp_root: Path, dist: Path, runner:
                semantic_runner: SemanticRunner | None = None, draft_runner: ProseDraftRunner | None = None,
                rewrite_runner: ProseRewriteRunner | None = None, fixture_generation_ready: bool = False,
                experimental_profile: ExperimentalCliProfile | None = None, data_root: Path | None = None,
-               gui_provider=None, gui_clock=None, gui_renderer=None, agent_runtime=None, agent_tools=None):
+               gui_provider=None, gui_clock=None, gui_renderer=None, agent_runtime=None, agent_tools=None,
+               background_enabled=False, background_factory=None, background_native_authority=None):
     if not origin.startswith("http://127.0.0.1:") or not origin.rsplit(":", 1)[-1].isdigit():
         raise ValueError("A concrete IPv4 loopback origin is required")
     if len(secret) < 32:
@@ -275,7 +276,9 @@ def create_app(*, origin: str, secret: str, temp_root: Path, dist: Path, runner:
     @asynccontextmanager
     async def lifespan(_app: FastAPI):
         agent.recover()
+        await jobs.start()
         yield
+        await jobs.shutdown()
         gui_projects.request_shutdown()
         rich_projects.request_shutdown()
         agent.request_stop(reason="AGENT_INTERRUPTED")
@@ -410,6 +413,12 @@ def create_app(*, origin: str, secret: str, temp_root: Path, dist: Path, runner:
     app.state.agent = agent
     from .agent.routes import mount_agent
     mount_agent(app, agent)
+    from .jobs.service import JobService
+    from .jobs.routes import mount_jobs
+    jobs = JobService(rich_projects, resolved_agent_runtime, agent_connection, enabled=background_enabled,
+        factory=background_factory, **({"authorize_native": background_native_authority} if background_native_authority else {}))
+    app.state.jobs = jobs
+    mount_jobs(app, jobs)
 
     def execute_content(files, runner, payload, cancel, runner_epoch):
         worker_error = None
@@ -1015,7 +1024,7 @@ def create_app(*, origin: str, secret: str, temp_root: Path, dist: Path, runner:
             if INFERENCE.blocked:
                 connection_state = ConnectionPayload(state="cleanup_blocked")
                 return connection_response()
-            if INFERENCE.locked():
+            if INFERENCE.locked() or background_enabled and not jobs.supervisor.login_allowed():
                 return connection_response() if kind != "login" else problem("BUSY", 429, "host", True)
             if cancellation_pending or active >= MAX_CONCURRENT or connection_work:
                 return problem("BUSY", 429, "host", True)
@@ -1140,6 +1149,8 @@ def create_app(*, origin: str, secret: str, temp_root: Path, dist: Path, runner:
         async with gate:
             connection_epoch += 1
             connection_state = ConnectionPayload(state="detached")
+            if background_enabled:
+                jobs.supervisor.confirmed_account_change(jobs.store.dispatch_state().account_generation + 1)
             current = list(connection_work.items())
             generating = list(semantic_work.items())
             gui_projects.request_shutdown()

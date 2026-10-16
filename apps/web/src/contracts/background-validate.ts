@@ -17,6 +17,14 @@ import background_sidecar_v1 from "../../../../contracts/json-schema/background_
 import background_attempt_v1 from "../../../../contracts/json-schema/background_attempt_v1.schema.json" with { type: "json" };
 import background_draft_payload_v1 from "../../../../contracts/json-schema/background_draft_payload_v1.schema.json" with { type: "json" };
 
+import background_dispatch_v1 from "../../../../contracts/json-schema/background_dispatch_v1.schema.json" with { type: "json" };
+import background_agent_request_v1 from "../../../../contracts/json-schema/background_agent_request_v1.schema.json" with { type: "json" };
+import background_artifact_v1 from "../../../../contracts/json-schema/background_artifact_v1.schema.json" with { type: "json" };
+import background_legacy_run_v2 from "../../../../contracts/json-schema/background_legacy_run_v2.schema.json" with { type: "json" };
+import background_project_v1 from "../../../../contracts/json-schema/background_project_v1.schema.json" with { type: "json" };
+import background_replay_request_v1 from "../../../../contracts/json-schema/background_replay_request_v1.schema.json" with { type: "json" };
+import background_replay_v1 from "../../../../contracts/json-schema/background_replay_v1.schema.json" with { type: "json" };
+
 const ajv = new Ajv2020({ allErrors: true, strict: false });
 addFormats(ajv);
 ajv.addKeyword({ keyword: "x-maxSerializedBytes", schemaType: "number",
@@ -24,7 +32,7 @@ ajv.addKeyword({ keyword: "x-maxSerializedBytes", schemaType: "number",
 const schemas = new Map<string, object>(Object.entries({ background_submission_v1, background_snapshot_v1,
   background_proposal_v1, background_scope_guard_v1, background_writer_v1, background_barrier_v1,
   background_draft_v1, background_receipt_v1, background_apply_v2, background_event_v1, background_intent_v1,
-  background_undo_v1, background_sidecar_v1, background_attempt_v1, background_draft_payload_v1 }));
+  background_undo_v1, background_sidecar_v1, background_attempt_v1, background_draft_payload_v1, background_dispatch_v1, background_agent_request_v1, background_artifact_v1, background_legacy_run_v2, background_project_v1, background_replay_request_v1, background_replay_v1 }));
 const validators = new Map<string, ValidateFunction<unknown>>();
 function record(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
@@ -62,6 +70,7 @@ function semantics(value: unknown): boolean {
       typeof value.acceptedAt !== "string" || typeof value.executionDeadline !== "string" || !earlier(value.acceptedAt, value.executionDeadline))) return false;
   if (value.status === "clean_detached" && value.draftId !== null) return false;
   if ("execution" in value && "publication" in value) {
+    if (["saved", "no_change", "none"].includes(String(value.publication)) && value.publicationError !== null && value.publicationError !== undefined) return false;
     if ((value.publication === "saved") !== (value.receipt !== null) || !record(value.submission) || !record(value.submission.identity)) return false;
     const attempts = list(value.attempts), models = list(value.submission.models);
     if (new Set(attempts.map((attempt) => record(attempt) ? attempt.id : null)).size !== attempts.length || attempts.length > models.length) return false;
@@ -73,6 +82,29 @@ function semantics(value: unknown): boolean {
         value.receipt.lineage !== value.submission.identity.lineage || value.receipt.proposalId !== value.proposalId)) return false;
     if (!["none", "no_change", "cancelled"].includes(String(value.publication)) && value.proposalId === null) return false;
     if (value.submission.allowEdits === false && value.publication !== "none") return false;
+  }
+  if ("requestSha256" in value && "snapshots" in value && "identity" in value) {
+    if (!record(value.identity) || !record(value.request) || value.identity.requestId !== value.request.clientRequestId) return false;
+    const resources: unknown[] = [...list(value.snapshots), ...list(value.sources), ...list(value.findings), ...(value.reply === null ? [] : [value.reply])];
+    if (resources.some((item) => !record(item) || item.runId !== value.jobId)) return false;
+    if (value.jobId === null && (resources.length > 0 || list(value.batches).length > 0 || value.usage !== null)) return false;
+    if (record(value.reply) && value.reply.role !== "assistant") return false;
+    for (const item of list(value.batches)) {
+      if (!record(item) || item.receipt !== null || item.publication !== undefined && item.publication !== null || list(item.historyActions).length > 0 ||
+          record(item.batch) && (item.batch.runId !== value.jobId || item.batch.state !== "prepared")) return false;
+    }
+  }
+  if ("publication" in value && record(value.run) && (value.jobId !== value.run.id || !validateAgentShape("agent_run", value.run))) return false;
+  if ("jobs" in value && "requestEpoch" in value) {
+    const jobs = list(value.jobs);
+    if (new Set(jobs.map((job) => record(job) ? job.id : null)).size !== jobs.length || jobs.some((job) => !record(job) ||
+        !record(job.submission) || !record(job.submission.identity) || job.submission.identity.projectId !== value.projectId || job.submission.identity.lineage !== value.lineage)) return false;
+  }
+  if ("events" in value && !("request" in value)) {
+    const events = list(value.events), first = events[0];
+    const cursors = events.map((event) => record(event) ? event.cursor : null);
+    if (new Set(cursors).size !== cursors.length || cursors.some((cursor, index) => index > 0 && typeof cursor === "number" && typeof cursors[index - 1] === "number" && cursor <= Number(cursors[index - 1]))) return false;
+    if (record(first) && events.some((event) => !record(event) || ["projectId", "lineage", "jobId", "generation"].some((key) => event[key] !== first[key]) || events.length > 1 && event.type === "cursor.gap")) return false;
   }
   if ("nativeStarted" in value && ((value.nativeStarted === true) !== (value.childStartedAt !== null) ||
       (value.cleanupVerified === true && ["reserved", "starting", "running", "cleanup_failed"].includes(String(value.state))))) return false;

@@ -23,11 +23,11 @@ def prepare(session, request):
         workspace = service.projects.read(control.project_id)
         if not session.book.validate(workspace):
             raise AgentFailure("AGENT_STALE_READ")
-        lease = service.leases.require(control.project_id, epoch=control.owner_epoch)
+        writer_session_id = session.writer_session_id()
         def compile_command(state, run, journal):
             if state.owner_epoch != control.owner_epoch:
                 raise AgentFailure("AGENT_OWNER_MISMATCH")
-            result, batch = compile_batch(workspace, run, journal, request, session.book, lease.session_id)
+            result, batch = compile_batch(workspace, run, journal, request, session.book, writer_session_id)
             if batch is not None:
                 ids = [identifier for identifier in batch.fact_record_ids if any(record.id == identifier for record in workspace.project.facts.records)]
                 if ids:

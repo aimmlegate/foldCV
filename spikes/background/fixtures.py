@@ -1,6 +1,8 @@
 """Small synthetic captures shared by contract and protocol tests."""
 
 from copy import deepcopy
+import hashlib
+import json
 from pathlib import Path
 
 from packages.resume_core.models.rich_workspace import WorkspaceV6
@@ -29,7 +31,7 @@ def submission():
 def snapshot():
     return {"schemaVersion": 1, "id": "job-one", "submission": submission(), "execution": "completed",
         "publication": "waiting_for_sync", "executionGeneration": 1, "attempts": [], "eventCursor": 1,
-        "proposalId": "proposal-one", "receipt": None, "error": None, "createdAt": TIME, "updatedAt": TIME}
+        "proposalId": "proposal-one", "receipt": None, "error": None, "publicationError": None, "createdAt": TIME, "updatedAt": TIME}
 
 
 def examples():
@@ -81,5 +83,28 @@ def examples():
             "cleanupVerified": True, "error": None},
         "background_draft_payload_v1": {"schemaVersion": 1, "document": project["document"], "facts": project["facts"],
             "outbox": [], "assetPins": []},
+        "background_dispatch_v1": {"schemaVersion": 1, "accountGeneration": 1, "paused": None},
     }
+    request = {"clientRequestId": "request-one", "conversationId": "conversation-one", "message": "Check synthetic evidence.",
+        "allowEdits": True, "allowWeb": False, "scope": {"kind": "resume"}, "settingsRevision": 1,
+        "projectRevision": 1, "documentRevision": 1, "factsRevision": 1}
+    digest = lambda value: hashlib.sha256(json.dumps(value, sort_keys=True, ensure_ascii=False,
+        separators=(",", ":")).encode()).hexdigest()
+    result["background_agent_request_v1"] = {"schemaVersion": 1, "lineage": "lineage-one", "requestEpoch": 1, "request": request}
+    result["background_artifact_v1"] = {"schemaVersion": 1,
+        "id": "input_" + digest(submission()["identity"])[:24], "identity": submission()["identity"],
+        "request": request, "requestSha256": digest(request), "connectionEpoch": "connection-one",
+        "rulesSha256": digest(None), "jobId": "job-one", "createdAt": TIME,
+        "snapshots": [], "batches": [], "sources": [], "findings": [], "reply": None, "usage": None}
+    result["background_legacy_run_v2"] = {"schemaVersion": 2, "jobId": "job-one", "publication": "waiting_for_sync",
+        "run": {"id": "job-one", "conversationId": "conversation-one", "projectId": "project-one",
+            "clientRequestId": "request_" + digest(submission()["identity"])[:24], "ownerEpoch": 1,
+            "state": "completed", "allowEdits": True, "allowWeb": False, "scope": {"kind": "resume"},
+            "model": "synthetic-model", "connectionEpoch": "connection-one", "settingsRevision": 1,
+            "createdAt": TIME, "deadline": "2026-10-16T12:03:00Z", "finishedAt": TIME,
+            "usage": None, "error": None, "savedBatchId": None, "outcomeUnknown": False}}
+    result["background_project_v1"] = {"schemaVersion": 1, "projectId": "project-one", "lineage": "lineage-one",
+        "requestEpoch": 1, "jobs": [snapshot()]}
+    result["background_replay_request_v1"] = {"schemaVersion": 1, "generation": 1, "after": 0}
+    result["background_replay_v1"] = {"schemaVersion": 1, "events": [result["background_event_v1"]]}
     return deepcopy(result)

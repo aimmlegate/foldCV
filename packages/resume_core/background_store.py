@@ -1,0 +1,438 @@
+"""Private job authority, separate from canonical resumes and artifact payloads."""
+
+from __future__ import annotations
+
+from contextlib import contextmanager
+from datetime import datetime, timedelta, timezone
+import os
+from pathlib import Path
+import secrets
+
+from . import agent_limits
+from .background_limits import LIMITS
+from .models.background import BackgroundSidecarV1, DispatchStateV1, JobFailure, JobSnapshotV1, JobSubmissionV1, RequestReplayV1
+from .project_store import ProjectStore, ProjectStoreFailure, SAFE_ID, encoded, owned_file, strict_json
+from .storage import StorageFailure, atomic_write, locked_root, private_directory
+
+TERMINAL_EXECUTION = frozenset({"completed", "failed", "cancelled", "interrupted"})
+RESOLVED_PUBLICATION = frozenset({"none", "saved", "no_change", "discarded", "cancelled"})
+
+
+class BackgroundFailure(Exception):
+    def __init__(self, code: str):
+        self.code = code
+        super().__init__(code)
+
+
+def utc_now() -> str:
+    return datetime.now(timezone.utc).isoformat()
+
+
+def identity(prefix: str) -> str:
+    return prefix + "_" + secrets.token_hex(12)
+
+
+def expiration(now: str, seconds: int) -> str:
+    return (datetime.fromisoformat(now.replace("Z", "+00:00")) + timedelta(seconds=seconds)).isoformat()
+
+
+def job_in(state: BackgroundSidecarV1, job_id: str) -> JobSnapshotV1:
+    result = next((job for job in state.jobs if job.id == job_id), None)
+    if result is None:
+        result = next((request.archived_result for request in state.requests if request.job_id == job_id
+            and request.archived_result is not None), None)
+    if result is None:
+        raise BackgroundFailure("JOB_NOT_FOUND")
+    return result
+
+
+def records(state: BackgroundSidecarV1) -> int:
+    return sum(len(getattr(state, key)) for key in ("jobs", "requests", "proposals", "drafts", "generations", "intents", "inverses")) + int(state.writer is not None) + int(state.barrier is not None)
+
+
+class JobStore:
+    def __init__(self, root: Path, *, clock=utc_now):
+        self.root = root
+        self.background = root / "background"
+        self.projects = self.background / "projects"
+        self.canonical = ProjectStore(root)
+        self.clock = clock
+        self.fences: dict[str, str] = {}
+
+    @contextmanager
+    def guard(self, project_id: str):
+        if SAFE_ID.fullmatch(project_id) is None:
+            raise BackgroundFailure("JOB_NOT_FOUND")
+        try:
+            with locked_root(self.root, ".projects.lock"):
+                entry = next((item for item in self.canonical._registry().entries if item.project_id == project_id), None)
+                if entry is None:
+                    raise BackgroundFailure("JOB_NOT_FOUND")
+                if entry.tombstoned:
+                    raise BackgroundFailure("PROJECT_DELETED")
+                self.canonical._directory(project_id)
+                with locked_root(self.background, ".jobs.lock"):
+                    private_directory(self.projects)
+                    directory = self.projects / project_id
+                    if directory.is_symlink():
+                        raise StorageFailure("UNSAFE_STORAGE")
+                    yield directory
+        except BackgroundFailure:
+            raise
+        except (StorageFailure, ProjectStoreFailure, OSError, ValueError):
+            raise BackgroundFailure("JOB_STORE_UNAVAILABLE") from None
+
+    def _read(self, project_id: str, directory: Path) -> BackgroundSidecarV1:
+        try:
+            owned_file(directory / "state.json", LIMITS.sidecar_project_bytes)
+            state = BackgroundSidecarV1.model_validate(strict_json((directory / "state.json").read_bytes()))
+            if state.project_id != project_id:
+                raise ValueError("foreign job namespace")
+            self._validate_bindings(state)
+            return state
+        except (OSError, StorageFailure, ValueError, RecursionError):
+            self.fences[project_id] = "JOB_STORE_CORRUPT"
+            raise BackgroundFailure("JOB_STORE_CORRUPT") from None
+
+    @staticmethod
+    def _validate_bindings(state):
+        jobs = {job.id: job for job in state.jobs}
+        archived = {request.job_id: request.archived_result for request in state.requests if request.archived_result is not None}
+        for request in state.requests:
+            if request.archived_result is None and (request.job_id not in jobs or
+                    request.identity != jobs[request.job_id].submission.identity):
+                raise ValueError("orphan request authority")
+        proposals = {proposal.id: proposal for proposal in state.proposals}
+        if len(proposals) != len(state.proposals) or len({proposal.job_id for proposal in state.proposals}) != len(state.proposals):
+            raise ValueError("duplicate proposal authority")
+        for proposal in state.proposals:
+            job = jobs.get(proposal.job_id) or archived.get(proposal.job_id)
+            if (job is None or job.proposal_id != proposal.id or proposal.scope != job.submission.scope
+                    or proposal.account_generation != job.submission.account_generation
+                    or proposal.execution_generation != job.execution_generation
+                    or proposal.payload.kind != job.submission.input.kind or job.publication == "none"
+                    or job.publication in {"cancelled", "discarded"} and proposal.authority != "revoked"
+                    or job.publication not in RESOLVED_PUBLICATION and proposal.authority != "active"
+                    or proposal.payload.kind == "agent_journal" and proposal.payload.run_id != job.id
+                    or job.receipt is not None and job.receipt.proposal_sha256 != proposal.payload_sha256):
+                raise ValueError("proposal authority does not match its Job")
+        for job in state.jobs:
+            if job.publication not in RESOLVED_PUBLICATION and job.proposal_id not in proposals:
+                raise ValueError("unresolved publication has no proposal authority")
+
+    def _all(self) -> dict[str, BackgroundSidecarV1]:
+        result = {}
+        for directory in sorted(self.projects.iterdir()):
+            if directory.is_symlink() or not directory.is_dir() or SAFE_ID.fullmatch(directory.name) is None:
+                raise BackgroundFailure("JOB_STORE_CORRUPT")
+            try:
+                result[directory.name] = self._read(directory.name, directory)
+            except BackgroundFailure:
+                self.fences[directory.name] = "JOB_STORE_CORRUPT"
+        return result
+
+    @staticmethod
+    def _reserved_bytes(state: BackgroundSidecarV1) -> int:
+        return sum(agent_limits.TERMINAL_BYTES for job in state.jobs
+            if job.execution not in TERMINAL_EXECUTION or job.publication not in RESOLVED_PUBLICATION)
+
+    def _extra_bytes(self, project_id: str, *, excluding: Path | None = None) -> int:
+        directory = self.projects / project_id
+        if not directory.exists():
+            return 0
+        total = 0
+        for folder, directories, names in os.walk(directory):
+            if any((Path(folder) / name).is_symlink() for name in directories):
+                raise BackgroundFailure("JOB_STORE_CORRUPT")
+            for name in names:
+                path = Path(folder) / name
+                if path == directory / "state.json" or path == excluding:
+                    continue
+                owned_file(path, LIMITS.sidecar_project_bytes)
+                total += path.stat().st_size
+        return total
+
+    def _capacity(self, state: BackgroundSidecarV1, states: dict[str, BackgroundSidecarV1], *, replacing=None):
+        states = {**states, state.project_id: state}
+        sizes = {}
+        for project, value in states.items():
+            replacement = replacing if replacing is not None and replacing[0].is_relative_to(self.projects / project) else None
+            sizes[project] = (len(encoded(value.model_dump(mode="json", by_alias=True))) + self._reserved_bytes(value)
+                + self._extra_bytes(project, excluding=replacement[0] if replacement else None)
+                + (replacement[1] if replacement else 0))
+        unknown = set(self.fences) - states.keys()
+        if (sizes[state.project_id] > LIMITS.sidecar_project_bytes or
+                sum(sizes.values()) + len(unknown) * LIMITS.sidecar_project_bytes > LIMITS.sidecar_global_bytes or
+                sum(records(value) for value in states.values()) + len(unknown) * LIMITS.metadata_project_records > LIMITS.metadata_global_records):
+            raise BackgroundFailure("JOB_STORAGE_FULL")
+
+    def _write(self, directory: Path, state: BackgroundSidecarV1, states: dict[str, BackgroundSidecarV1]):
+        value = BackgroundSidecarV1.model_validate(state.model_dump(by_alias=True))
+        self._validate_bindings(value)
+        self._capacity(value, states)
+        raw = encoded(value.model_dump(mode="json", by_alias=True))
+        try:
+            atomic_write(directory / "state.json", raw)
+            self._sync_namespace(directory / "state.json")
+        except (StorageFailure, OSError):
+            # Confirm a lost atomic-write reply without applying the transition again.
+            self._confirm(directory, raw)
+
+    def _confirm(self, directory: Path, raw: bytes):
+        self._confirm_file(directory / "state.json", raw)
+
+    def _confirm_file(self, path: Path, raw: bytes):
+        try:
+            owned_file(path, LIMITS.sidecar_project_bytes)
+            if path.read_bytes() != raw:
+                raise OSError("different state")
+            with path.open("rb") as stream:
+                os.fsync(stream.fileno())
+            self._sync_namespace(path)
+        except (StorageFailure, OSError):
+            self.fences[path.relative_to(self.projects).parts[0]] = "JOB_STORE_UNAVAILABLE"
+            raise BackgroundFailure("JOB_STORE_UNAVAILABLE") from None
+
+    def _sync_namespace(self, path):
+        if not path.is_relative_to(self.root):
+            raise StorageFailure("UNSAFE_STORAGE")
+        for directory in path.parents:
+            fd = os.open(directory, os.O_RDONLY | getattr(os, "O_DIRECTORY", 0) | getattr(os, "O_NOFOLLOW", 0))
+            try:
+                os.fsync(fd)
+            finally:
+                os.close(fd)
+            if directory == self.root:
+                break
+
+    def open(self, project_id: str, *, account_generation: int | None = None) -> BackgroundSidecarV1:
+        with self.guard(project_id) as directory:
+            if directory.exists():
+                return self._read(project_id, directory)
+            current_account = self._read_dispatch(self.background / "dispatch.json").account_generation
+            if not (self.background / "dispatch.json").exists():
+                atomic_write(self.background / "dispatch.json", encoded(DispatchStateV1(
+                    schemaVersion=1, accountGeneration=current_account, paused=None).model_dump(by_alias=True)))
+            if account_generation is not None and account_generation != current_account:
+                raise BackgroundFailure("ACCOUNT_CHANGED")
+            now = self.clock()
+            state = BackgroundSidecarV1(schemaVersion=1, projectId=project_id, lineage=identity("lineage"),
+                accountGeneration=current_account, activeRequestEpoch=1, expiredThroughEpoch=0,
+                requestEpochExpiresAt=expiration(now, LIMITS.request_replay_seconds), tombstoned=False,
+                jobs=[], requests=[], proposals=[], writer=None, barrier=None, drafts=[], generations=[], intents=[], inverses=[])
+            self._write(directory, state, self._all())
+            return state
+
+    def load(self, project_id: str) -> BackgroundSidecarV1:
+        with self.guard(project_id) as directory:
+            return self._read(project_id, directory)
+
+    def snapshots(self) -> dict[str, BackgroundSidecarV1]:
+        try:
+            with locked_root(self.root, ".projects.lock"):
+                allowed = {entry.project_id for entry in self.canonical._registry().entries if not entry.tombstoned}
+                with locked_root(self.background, ".jobs.lock"):
+                    private_directory(self.projects)
+                    return {project: state for project, state in self._all().items() if project in allowed and not state.tombstoned}
+        except (StorageFailure, OSError, ValueError):
+            raise BackgroundFailure("JOB_STORE_UNAVAILABLE") from None
+
+    @contextmanager
+    def _dispatch_guard(self):
+        try:
+            with locked_root(self.root, ".projects.lock"):
+                with locked_root(self.background, ".jobs.lock"):
+                    yield self.background / "dispatch.json"
+        except BackgroundFailure:
+            raise
+        except (StorageFailure, OSError, ValueError):
+            raise BackgroundFailure("JOB_STORE_UNAVAILABLE") from None
+
+    @staticmethod
+    def _read_dispatch(path) -> DispatchStateV1:
+        if not path.exists() and not path.is_symlink():
+            projects = path.parent / "projects"
+            if projects.exists() and any(projects.iterdir()):
+                raise BackgroundFailure("JOB_STORE_CORRUPT")
+            return DispatchStateV1(schemaVersion=1, accountGeneration=1, paused=None)
+        owned_file(path, agent_limits.TERMINAL_BYTES)
+        return DispatchStateV1.model_validate(strict_json(path.read_bytes()))
+
+    def dispatch_state(self) -> DispatchStateV1:
+        with self._dispatch_guard() as path:
+            return self._read_dispatch(path)
+
+    def pause_dispatch(self, reason):
+        with self._dispatch_guard() as path:
+            state = self._read_dispatch(path)
+            state.paused = reason
+            validated = DispatchStateV1.model_validate(state.model_dump(by_alias=True))
+            atomic_write(path, encoded(validated.model_dump(mode="json", by_alias=True)))
+            self._sync_namespace(path)
+
+    def resume_dispatch(self, account_generation: int):
+        if type(account_generation) is not int or account_generation < 1:
+            raise BackgroundFailure("JOB_SCOPE_INVALID")
+        with self._dispatch_guard() as path:
+            state = self._read_dispatch(path)
+            if account_generation != state.account_generation:
+                raise BackgroundFailure("ACCOUNT_CHANGED")
+            state.paused = None
+            atomic_write(path, encoded(state.model_dump(mode="json", by_alias=True)))
+            self._sync_namespace(path)
+
+    def replace_account(self, account_generation: int):
+        if type(account_generation) is not int or account_generation < 1:
+            raise BackgroundFailure("JOB_SCOPE_INVALID")
+        with self._dispatch_guard() as path:
+            dispatch = self._read_dispatch(path)
+            if account_generation < dispatch.account_generation:
+                raise BackgroundFailure("ACCOUNT_CHANGED")
+            if account_generation != dispatch.account_generation:
+                dispatch.account_generation, dispatch.paused = account_generation, "AUTH_REQUIRED"
+            # This revokes old authority even if a later per-project write is interrupted.
+            atomic_write(path, encoded(dispatch.model_dump(mode="json", by_alias=True)))
+            self._sync_namespace(path)
+            states = self._all()
+            for project, state in states.items():
+                self._revoke_account(state, account_generation)
+                self._write(self.projects / project, state, states)
+
+    def _revoke_account(self, state, account_generation):
+        state.account_generation = account_generation
+        for job in state.jobs:
+            changed = False
+            if job.submission.account_generation != account_generation:
+                if job.execution not in TERMINAL_EXECUTION:
+                    job.execution = "cancelled" if job.execution == "queued" else "cancelling"
+                    changed = True
+                if job.submission.allow_edits and job.publication not in {"saved", "no_change", "discarded", "cancelled"}:
+                    job.publication = "cancelled"
+                    changed = True
+                if changed:
+                    job.error = JobFailure(code="ACCOUNT_CHANGED")
+                    job.event_cursor += 1
+                    job.updated_at = self.clock()
+        for proposal in state.proposals:
+            if proposal.account_generation != account_generation and proposal.authority == "active":
+                proposal.authority, proposal.revocation = "revoked", "account_changed"
+
+    def submit(self, submission: JobSubmissionV1) -> tuple[JobSnapshotV1, bool]:
+        project_id = submission.identity.project_id
+        with self.guard(project_id) as directory:
+            state = self._read(project_id, directory)
+            if state.tombstoned:
+                raise BackgroundFailure("PROJECT_DELETED")
+            request = submission.identity
+            if request.lineage != state.lineage:
+                raise BackgroundFailure("JOB_IDEMPOTENCY_CONFLICT")
+            existing = next((item for item in state.requests if item.identity == request), None)
+            if existing is not None:
+                if existing.payload_sha256 != submission.payload_sha256:
+                    raise BackgroundFailure("JOB_IDEMPOTENCY_CONFLICT")
+                self._confirm(directory, encoded(state.model_dump(mode="json", by_alias=True)))
+                return job_in(state, existing.job_id), False
+            now = self.clock()
+            if (request.request_epoch != state.active_request_epoch or request.request_epoch <= state.expired_through_epoch
+                    or datetime.fromisoformat(now.replace("Z", "+00:00")) >= datetime.fromisoformat(state.request_epoch_expires_at)):
+                raise BackgroundFailure("REQUEST_EXPIRED")
+            if (submission.account_generation != state.account_generation or submission.account_generation !=
+                    self._read_dispatch(self.background / "dispatch.json").account_generation):
+                raise BackgroundFailure("ACCOUNT_CHANGED")
+            states = self._all()
+            pending = [job for value in states.values() for job in value.jobs if job.execution == "queued"]
+            local = [job for job in pending if job.submission.identity.project_id == project_id]
+            unknown = len(set(self.fences) - states.keys())
+            noninteractive = submission.scheduling_class != "interactive"
+            if (len(pending) + unknown * LIMITS.pending_project >= LIMITS.pending_global or len(local) >= LIMITS.pending_project
+                    or noninteractive and (sum(job.submission.scheduling_class != "interactive" for job in pending)
+                        + unknown * LIMITS.pending_noninteractive_project >= LIMITS.pending_noninteractive_global
+                        or sum(job.submission.scheduling_class != "interactive" for job in local) >= LIMITS.pending_noninteractive_project)):
+                raise BackgroundFailure("JOB_QUEUE_FULL")
+            job = JobSnapshotV1(schemaVersion=1, id=identity("job"), submission=submission, execution="queued",
+                publication="none", executionGeneration=1, attempts=[], eventCursor=1, proposalId=None,
+                receipt=None, error=None, createdAt=now, updatedAt=now)
+            state.jobs.append(job)
+            state.requests.append(RequestReplayV1(identity=request, payloadSha256=submission.payload_sha256,
+                jobId=job.id, expiresAt=expiration(now, LIMITS.request_replay_seconds), archivedResult=None))
+            self._write(directory, state, states)
+            return job, True
+
+    def read(self, project_id: str, job_id: str) -> JobSnapshotV1:
+        return job_in(self.load(project_id), job_id)
+
+    def update(self, project_id: str, job_id: str, change) -> JobSnapshotV1:
+        with self.guard(project_id) as directory:
+            state = self._read(project_id, directory)
+            job = next((item for item in state.jobs if item.id == job_id), None)
+            if job is None:
+                raise BackgroundFailure("JOB_NOT_FOUND")
+            before = job.model_dump(by_alias=True)
+            before_state = state.model_dump(by_alias=True)
+            change(state, job)
+            if job.id != before["id"] or job.submission.model_dump(by_alias=True) != before["submission"]:
+                raise BackgroundFailure("JOB_SCOPE_INVALID")
+            after_state = state.model_dump(by_alias=True)
+            if (next((item for item in state.jobs if item.id == job_id), None) is not job or
+                    {key: value for key, value in after_state.items() if key not in {"jobs", "proposals"}} !=
+                    {key: value for key, value in before_state.items() if key not in {"jobs", "proposals"}} or
+                    [item for item in after_state["jobs"] if item["id"] != job_id] !=
+                    [item for item in before_state["jobs"] if item["id"] != job_id] or
+                    [item for item in after_state["proposals"] if item["jobId"] != job_id] !=
+                    [item for item in before_state["proposals"] if item["jobId"] != job_id]):
+                raise BackgroundFailure("JOB_SCOPE_INVALID")
+            if after_state == before_state:
+                self._confirm(directory, encoded(state.model_dump(mode="json", by_alias=True)))
+                return job
+            job.event_cursor += 1
+            job.updated_at = self.clock()
+            self._write(directory, state, self._all())
+            return job
+
+    def cancel(self, project_id: str, job_id: str) -> JobSnapshotV1:
+        def cancel(_state, job):
+            if job.execution not in TERMINAL_EXECUTION:
+                job.execution = "cancelled" if job.execution == "queued" else "cancelling"
+                job.error = JobFailure(code="CANCELLED")
+            if job.submission.allow_edits and job.publication not in {"saved", "no_change", "discarded", "cancelled"}:
+                job.publication = "cancelled"
+            for proposal in _state.proposals:
+                if proposal.job_id == job_id and proposal.authority == "active":
+                    proposal.authority, proposal.revocation = "revoked", "stop"
+        return self.update(project_id, job_id, cancel)
+
+    def rotate_request_epoch(self, project_id: str) -> BackgroundSidecarV1:
+        with self.guard(project_id) as directory:
+            state = self._read(project_id, directory)
+            now = self.clock()
+            if datetime.fromisoformat(now.replace("Z", "+00:00")) < datetime.fromisoformat(state.request_epoch_expires_at):
+                raise BackgroundFailure("JOB_SCOPE_INVALID")
+            state.expired_through_epoch = state.active_request_epoch
+            state.active_request_epoch += 1
+            state.request_epoch_expires_at = expiration(now, LIMITS.request_replay_seconds)
+            self._write(directory, state, self._all())
+            return state
+
+    def recover(self, project_id: str) -> BackgroundSidecarV1:
+        with self.guard(project_id) as directory:
+            state = self._read(project_id, directory)
+            changed = False
+            account = self._read_dispatch(self.background / "dispatch.json").account_generation
+            if state.account_generation != account:
+                self._revoke_account(state, account)
+                changed = True
+            for job in state.jobs:
+                if job.execution not in TERMINAL_EXECUTION:
+                    job.execution = "interrupted"
+                    if job.error is None or job.error.code != "ACCOUNT_CHANGED":
+                        job.error = JobFailure(code="INTERRUPTED")
+                    job.event_cursor += 1
+                    job.updated_at = self.clock()
+                    for attempt in job.attempts:
+                        if not attempt.cleanup_verified:
+                            attempt.state = "interrupted"
+                            self.fences[project_id] = "CLEANUP_FAILED"
+                    changed = True
+            if changed:
+                self._write(directory, state, self._all())
+            return state

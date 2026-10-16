@@ -28,6 +28,12 @@ export type Code =
   | "JOB_STORAGE_FULL"
   | "JOB_IDEMPOTENCY_CONFLICT"
   | "REQUEST_EXPIRED"
+  | "JOB_NOT_FOUND"
+  | "JOB_STORE_CORRUPT"
+  | "JOB_STORE_UNAVAILABLE"
+  | "JOB_DISABLED"
+  | "JOB_SCOPE_INVALID"
+  | "ACCOUNT_CHANGED"
   | "DEPENDENCY_CHANGED"
   | "WRITER_UNKNOWN"
   | "SAVE_FAILED"
@@ -842,6 +848,7 @@ export interface JobSnapshotV1 {
   id: Id1;
   proposalId: Proposalid;
   publication: Publication;
+  publicationError?: JobFailure | null;
   receipt: CanonicalReceiptV1 | null;
   schemaVersion: Schemaversion3;
   submission: JobSubmissionV1;

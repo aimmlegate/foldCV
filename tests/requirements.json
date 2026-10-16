@@ -1874,8 +1874,119 @@
     },
     {
       "id": "NB-JOBS",
-      "status": "unimplemented",
-      "tests": []
+      "status": "implemented",
+      "tests": [
+        "tests/recovery/test_background_admission.py::test_borrowed_native_admission_requires_the_exact_live_reservation",
+        "tests/recovery/test_background_admission.py::test_cancel_during_a_granted_reservation_handoff_releases_only_its_owner",
+        "tests/recovery/test_background_agent.py::test_actual_compiler_apply_v2_retains_single_payload_after_native_exit_and_restart[NB-J04:v01]",
+        "tests/recovery/test_background_agent.py::test_actual_compiler_apply_v2_retains_single_payload_after_native_exit_and_restart[NB-J04:v02]",
+        "tests/recovery/test_background_agent.py::test_captured_models_rules_and_bound_capabilities_cannot_be_replaced[NB-J03:v01]",
+        "tests/recovery/test_background_agent.py::test_captured_models_rules_and_bound_capabilities_cannot_be_replaced[NB-J03:v02]",
+        "tests/recovery/test_background_agent.py::test_captured_models_rules_and_bound_capabilities_cannot_be_replaced[NB-J03:v03]",
+        "tests/recovery/test_background_agent.py::test_captured_models_rules_and_bound_capabilities_cannot_be_replaced[NB-J03:v04]",
+        "tests/recovery/test_background_agent.py::test_captured_models_rules_and_bound_capabilities_cannot_be_replaced[NB-J03:v05]",
+        "tests/recovery/test_background_agent.py::test_captured_models_rules_and_bound_capabilities_cannot_be_replaced[NB-J03:v06]",
+        "tests/recovery/test_background_agent.py::test_runtime_adapter_uses_v2_instructions_and_closes_tools_before_permit_release",
+        "tests/recovery/test_background_agent.py::test_server_capture_retry_and_legacy_view_have_one_job_authority",
+        "tests/recovery/test_background_agent.py::test_shared_admission_wait_consumes_no_startup_or_active_budget[NB-Q10:v10]",
+        "tests/recovery/test_background_agent.py::test_shared_admission_wait_consumes_no_startup_or_active_budget[cancel-shared-waiter]",
+        "tests/recovery/test_background_events.py::test_event_window_bounds_return_an_explicit_gap_and_latest_snapshot[NB-A04:v19]",
+        "tests/recovery/test_background_events.py::test_event_window_bounds_return_an_explicit_gap_and_latest_snapshot[NB-A04:v20]",
+        "tests/recovery/test_background_events.py::test_event_window_bounds_return_an_explicit_gap_and_latest_snapshot[NB-A04:v21]",
+        "tests/recovery/test_background_events.py::test_forged_saved_event_cannot_override_the_authoritative_pending_job",
+        "tests/recovery/test_background_events.py::test_offline_fixture_blocks_native_factories_and_unregistered_processes",
+        "tests/recovery/test_background_events.py::test_replay_duplicate_append_and_lost_event_reply_do_not_change_job_authority",
+        "tests/recovery/test_background_integrity.py::test_account_failure_observed_during_deadline_cleanup_still_pauses_dispatch[AUTH_REQUIRED]",
+        "tests/recovery/test_background_integrity.py::test_account_failure_observed_during_deadline_cleanup_still_pauses_dispatch[RATE_LIMITED]",
+        "tests/recovery/test_background_integrity.py::test_cancel_after_runtime_entry_before_turn_readiness_releases_the_real_permit",
+        "tests/recovery/test_background_integrity.py::test_valid_json_with_broken_proposal_links_is_fenced_without_reset[account]",
+        "tests/recovery/test_background_integrity.py::test_valid_json_with_broken_proposal_links_is_fenced_without_reset[duplicate]",
+        "tests/recovery/test_background_integrity.py::test_valid_json_with_broken_proposal_links_is_fenced_without_reset[execution-generation]",
+        "tests/recovery/test_background_integrity.py::test_valid_json_with_broken_proposal_links_is_fenced_without_reset[foreign-job]",
+        "tests/recovery/test_background_integrity.py::test_valid_json_with_broken_proposal_links_is_fenced_without_reset[missing]",
+        "tests/recovery/test_background_integrity.py::test_valid_json_with_broken_proposal_links_is_fenced_without_reset[revoked]",
+        "tests/recovery/test_background_offline.py::test_versioned_background_contract_round_trip[background_agent_request_v1]",
+        "tests/recovery/test_background_offline.py::test_versioned_background_contract_round_trip[background_artifact_v1]",
+        "tests/recovery/test_background_offline.py::test_versioned_background_contract_round_trip[background_dispatch_v1]",
+        "tests/recovery/test_background_offline.py::test_versioned_background_contract_round_trip[background_legacy_run_v2]",
+        "tests/recovery/test_background_offline.py::test_versioned_background_contract_round_trip[background_project_v1]",
+        "tests/recovery/test_background_offline.py::test_versioned_background_contract_round_trip[background_replay_request_v1]",
+        "tests/recovery/test_background_offline.py::test_versioned_background_contract_round_trip[background_replay_v1]",
+        "tests/recovery/test_background_proposals.py::test_durable_acceptance_can_finish_binding_after_deadline_and_native_cleanup",
+        "tests/recovery/test_background_proposals.py::test_fault_after_proposal_durability_keeps_pending_authority_and_releases_native",
+        "tests/recovery/test_background_proposals.py::test_late_new_proposal_is_rejected_before_loading_any_payload",
+        "tests/recovery/test_background_proposals.py::test_payload_fsync_must_be_observed_before_the_acceptance_deadline[NB-Q10:v07]",
+        "tests/recovery/test_background_proposals.py::test_payload_fsync_must_be_observed_before_the_acceptance_deadline[NB-Q10:v08]",
+        "tests/recovery/test_background_proposals.py::test_payload_fsync_must_be_observed_before_the_acceptance_deadline[NB-Q10:v09]",
+        "tests/recovery/test_background_proposals.py::test_pending_payload_binding_keeps_backend_authority_after_runtime_exit[pending]",
+        "tests/recovery/test_background_proposals.py::test_pending_payload_binding_keeps_backend_authority_after_runtime_exit[review]",
+        "tests/recovery/test_background_proposals.py::test_stop_between_payload_and_binding_revokes_the_backend_request",
+        "tests/recovery/test_background_queue.py::test_capacity_one_serializes_all_kinds_and_both_processing_stages[NB-Q03:v04]",
+        "tests/recovery/test_background_queue.py::test_capacity_one_serializes_all_kinds_and_both_processing_stages[NB-Q05:v04]",
+        "tests/recovery/test_background_queue.py::test_fifo_round_robin_and_an_ineligible_head_use_the_real_dispatcher[NB-Q03:v01]",
+        "tests/recovery/test_background_queue.py::test_fifo_round_robin_and_an_ineligible_head_use_the_real_dispatcher[NB-Q03:v02]",
+        "tests/recovery/test_background_queue.py::test_fifo_round_robin_and_an_ineligible_head_use_the_real_dispatcher[NB-Q03:v03]",
+        "tests/recovery/test_background_queue.py::test_pending_limits_preserve_interactive_places_and_exact_replay[NB-Q01:v01]",
+        "tests/recovery/test_background_queue.py::test_pending_limits_preserve_interactive_places_and_exact_replay[NB-Q01:v02]",
+        "tests/recovery/test_background_queue.py::test_pending_limits_preserve_interactive_places_and_exact_replay[NB-Q01:v03]",
+        "tests/recovery/test_background_queue.py::test_pending_limits_preserve_interactive_places_and_exact_replay[NB-Q01:v04]",
+        "tests/recovery/test_background_queue.py::test_pending_limits_preserve_interactive_places_and_exact_replay[NB-Q01:v05]",
+        "tests/recovery/test_background_queue.py::test_pending_limits_preserve_interactive_places_and_exact_replay[NB-Q01:v06]",
+        "tests/recovery/test_background_queue.py::test_pending_limits_preserve_interactive_places_and_exact_replay[NB-Q01:v07]",
+        "tests/recovery/test_background_queue.py::test_pending_limits_preserve_interactive_places_and_exact_replay[NB-Q01:v08]",
+        "tests/recovery/test_background_queue.py::test_pending_limits_preserve_interactive_places_and_exact_replay[NB-Q01:v09]",
+        "tests/recovery/test_background_queue.py::test_pending_limits_preserve_interactive_places_and_exact_replay[NB-Q01:v10]",
+        "tests/recovery/test_background_queue.py::test_pending_limits_preserve_interactive_places_and_exact_replay[NB-Q01:v11]",
+        "tests/recovery/test_background_queue.py::test_pending_limits_preserve_interactive_places_and_exact_replay[NB-Q01:v12]",
+        "tests/recovery/test_background_queue.py::test_pending_limits_preserve_interactive_places_and_exact_replay[NB-Q01:v13]",
+        "tests/recovery/test_background_queue.py::test_pending_limits_preserve_interactive_places_and_exact_replay[NB-Q01:v14]",
+        "tests/recovery/test_background_routes.py::test_job_routes_capture_on_the_server_and_disconnect_keeps_the_execution[disabled]",
+        "tests/recovery/test_background_routes.py::test_job_routes_capture_on_the_server_and_disconnect_keeps_the_execution[opt-in]",
+        "tests/recovery/test_background_store.py::test_concurrent_submit_replays_exact_identity_or_conflicts[NB-J01:v01]",
+        "tests/recovery/test_background_store.py::test_concurrent_submit_replays_exact_identity_or_conflicts[NB-J01:v02]",
+        "tests/recovery/test_background_store.py::test_concurrent_submit_replays_exact_identity_or_conflicts[NB-J01:v03]",
+        "tests/recovery/test_background_store.py::test_expired_epoch_rejects_unknown_ids_but_replays_retained_requests",
+        "tests/recovery/test_background_store.py::test_job_update_cannot_rewrite_captured_authority[account_generation-2]",
+        "tests/recovery/test_background_store.py::test_job_update_cannot_rewrite_captured_authority[allow_edits-False]",
+        "tests/recovery/test_background_store.py::test_job_update_cannot_rewrite_captured_authority[scheduling_class-interactive]",
+        "tests/recovery/test_background_store.py::test_lost_submit_reply_replays_original_capture_after_restart",
+        "tests/recovery/test_background_store.py::test_missing_account_header_cannot_reset_a_project_to_an_older_account",
+        "tests/recovery/test_background_store.py::test_missing_or_corrupt_private_state_is_not_reset",
+        "tests/recovery/test_background_store.py::test_project_tombstone_rejects_new_jobs_and_reads",
+        "tests/recovery/test_background_store.py::test_queued_cancel_is_idempotent_and_reuses_admission_place[False]",
+        "tests/recovery/test_background_store.py::test_queued_cancel_is_idempotent_and_reuses_admission_place[True]",
+        "tests/recovery/test_background_store.py::test_restart_interrupts_queued_work_and_retains_request_without_dispatch",
+        "tests/recovery/test_background_store.py::test_submit_persistence_cutpoints_have_one_recoverable_identity[NB-J02:v01]",
+        "tests/recovery/test_background_store.py::test_submit_persistence_cutpoints_have_one_recoverable_identity[NB-J02:v02]",
+        "tests/recovery/test_background_store.py::test_submit_persistence_cutpoints_have_one_recoverable_identity[NB-J02:v03]",
+        "tests/recovery/test_background_store.py::test_unproved_write_reply_replays_only_after_exact_durability_is_confirmed",
+        "tests/recovery/test_background_supervisor.py::test_attempt_deadlines_use_elapsed_time_at_the_exact_boundary[NB-Q10:v01]",
+        "tests/recovery/test_background_supervisor.py::test_attempt_deadlines_use_elapsed_time_at_the_exact_boundary[NB-Q10:v02]",
+        "tests/recovery/test_background_supervisor.py::test_attempt_deadlines_use_elapsed_time_at_the_exact_boundary[NB-Q10:v03]",
+        "tests/recovery/test_background_supervisor.py::test_attempt_deadlines_use_elapsed_time_at_the_exact_boundary[NB-Q10:v04]",
+        "tests/recovery/test_background_supervisor.py::test_attempt_deadlines_use_elapsed_time_at_the_exact_boundary[NB-Q10:v05]",
+        "tests/recovery/test_background_supervisor.py::test_attempt_deadlines_use_elapsed_time_at_the_exact_boundary[NB-Q10:v06]",
+        "tests/recovery/test_background_supervisor.py::test_cancellation_after_slot_grant_prevents_the_owned_child_start",
+        "tests/recovery/test_background_supervisor.py::test_confirmed_account_change_revokes_old_jobs_before_new_dispatch",
+        "tests/recovery/test_background_supervisor.py::test_dispatch_faults_reach_the_boundary_without_releasing_live_ownership[before_spawn]",
+        "tests/recovery/test_background_supervisor.py::test_dispatch_faults_reach_the_boundary_without_releasing_live_ownership[child_started]",
+        "tests/recovery/test_background_supervisor.py::test_dispatch_faults_reach_the_boundary_without_releasing_live_ownership[children_verified_dead]",
+        "tests/recovery/test_background_supervisor.py::test_dispatch_faults_reach_the_boundary_without_releasing_live_ownership[cleanup_started]",
+        "tests/recovery/test_background_supervisor.py::test_dispatch_faults_reach_the_boundary_without_releasing_live_ownership[queue_eligible]",
+        "tests/recovery/test_background_supervisor.py::test_dispatch_faults_reach_the_boundary_without_releasing_live_ownership[slot_granted]",
+        "tests/recovery/test_background_supervisor.py::test_dispatch_faults_reach_the_boundary_without_releasing_live_ownership[slot_released]",
+        "tests/recovery/test_background_supervisor.py::test_native_slot_is_held_until_owned_cleanup_and_the_next_job_then_runs",
+        "tests/recovery/test_background_supervisor.py::test_queued_cancel_does_not_start_a_process_or_cancel_its_neighbour",
+        "tests/recovery/test_background_supervisor.py::test_sleep_and_wall_clock_rollback_cannot_extend_the_active_deadline[NB-Q10:v11]",
+        "tests/recovery/test_background_supervisor.py::test_sleep_and_wall_clock_rollback_cannot_extend_the_active_deadline[NB-Q10:v12]",
+        "tests/recovery/test_background_supervisor.py::test_stop_after_child_start_or_during_cleanup_keeps_the_owned_slot[NB-Q02:v03]",
+        "tests/recovery/test_background_supervisor.py::test_stop_after_child_start_or_during_cleanup_keeps_the_owned_slot[NB-Q02:v04]",
+        "tests/recovery/test_background_supervisor.py::test_stop_after_child_start_or_during_cleanup_keeps_the_owned_slot[NB-Q02:v05]",
+        "tests/recovery/test_background_supervisor.py::test_typed_runtime_failure_pauses_only_when_account_dispatch_requires_it[AUTH_REQUIRED]",
+        "tests/recovery/test_background_supervisor.py::test_typed_runtime_failure_pauses_only_when_account_dispatch_requires_it[MODEL_DENIED]",
+        "tests/recovery/test_background_supervisor.py::test_typed_runtime_failure_pauses_only_when_account_dispatch_requires_it[RATE_LIMITED]",
+        "tests/recovery/test_background_supervisor.py::test_unverified_cleanup_keeps_the_slot_and_blocks_the_next_job"
+      ]
     },
     {
       "id": "NB-PUBLICATION",
@@ -1930,7 +2041,7 @@
     "G01": {
       "unproved": "Application dispatch/count/zero-call paths pass; actual CLI internal requests, payload disclosure and tokens are unmeasured.",
       "owner": "Manual CLI usage after MVP under D038",
-      "check": "Record logical operations and supported CLI metadata on examples E1–E8; keep unavailable internal request counts unknown."
+      "check": "Record logical operations and supported CLI metadata on examples E1\u2013E8; keep unavailable internal request counts unknown."
     },
     "G02": {
       "unproved": "Controlled event/error/retry guards pass; the installed experimental native CLI version is unverified.",
@@ -1959,7 +2070,7 @@
     },
     "B01": {
       "unproved": "Connected controlled raw-to-edit/rewrite/restore/local-portable-reopen/DOCX and default-entry UI pass; live semantic wording/quality remains pending.",
-      "owner": "Manual examples E1–E8 after MVP under D038",
+      "owner": "Manual examples E1\u2013E8 after MVP under D038",
       "check": "Use the manual guide through the real CLI path, inspect quality and supported facts, record keyboard/failure behavior and measured usage. No mandatory automated pilot."
     },
     "N01": {
@@ -2025,12 +2136,13 @@
     "historicalMapping": "docs/gui/handoffs/PROTOTYPE-ADOPTION/evidence/uir09-browser-retirement.json",
     "connectedAcceptance": "docs/gui/handoffs/PROTOTYPE-ADOPTION/uir08-acceptance.json",
     "manualWord": "pending_unchanged",
-    "currentUiChecks": "Manual T3 acceptance in UIR01–UIR09; Python/state mappings remain active."
+    "currentUiChecks": "Manual T3 acceptance in UIR01\u2013UIR09; Python/state mappings remain active."
   },
   "backgroundExecution": {
     "schemaVersion": 1,
     "coveredSlices": [
-      "NB00a"
+      "NB00a",
+      "NB01"
     ],
     "bindings": {
       "NB-R03:v01": [
@@ -2113,6 +2225,225 @@
       ],
       "NB-G02:v16": [
         "tests/foundation/test_runner_gates.py::test_background_report_rejects_false_coverage[NB-G02:v16]"
+      ],
+      "NB-J01:v01": [
+        "tests/recovery/test_background_store.py::test_concurrent_submit_replays_exact_identity_or_conflicts[NB-J01:v01]"
+      ],
+      "NB-J01:v02": [
+        "tests/recovery/test_background_store.py::test_concurrent_submit_replays_exact_identity_or_conflicts[NB-J01:v02]"
+      ],
+      "NB-J01:v03": [
+        "tests/recovery/test_background_store.py::test_concurrent_submit_replays_exact_identity_or_conflicts[NB-J01:v03]"
+      ],
+      "NB-J02:v01": [
+        "tests/recovery/test_background_store.py::test_submit_persistence_cutpoints_have_one_recoverable_identity[NB-J02:v01]"
+      ],
+      "NB-J02:v02": [
+        "tests/recovery/test_background_store.py::test_submit_persistence_cutpoints_have_one_recoverable_identity[NB-J02:v02]"
+      ],
+      "NB-J02:v03": [
+        "tests/recovery/test_background_store.py::test_submit_persistence_cutpoints_have_one_recoverable_identity[NB-J02:v03]"
+      ],
+      "NB-J03:v01": [
+        "tests/recovery/test_background_agent.py::test_captured_models_rules_and_bound_capabilities_cannot_be_replaced[NB-J03:v01]"
+      ],
+      "NB-J03:v02": [
+        "tests/recovery/test_background_agent.py::test_captured_models_rules_and_bound_capabilities_cannot_be_replaced[NB-J03:v02]"
+      ],
+      "NB-J03:v03": [
+        "tests/recovery/test_background_agent.py::test_captured_models_rules_and_bound_capabilities_cannot_be_replaced[NB-J03:v03]"
+      ],
+      "NB-J03:v04": [
+        "tests/recovery/test_background_agent.py::test_captured_models_rules_and_bound_capabilities_cannot_be_replaced[NB-J03:v04]"
+      ],
+      "NB-J03:v05": [
+        "tests/recovery/test_background_agent.py::test_captured_models_rules_and_bound_capabilities_cannot_be_replaced[NB-J03:v05]"
+      ],
+      "NB-J03:v06": [
+        "tests/recovery/test_background_agent.py::test_captured_models_rules_and_bound_capabilities_cannot_be_replaced[NB-J03:v06]"
+      ],
+      "NB-Q01:v01": [
+        "tests/recovery/test_background_queue.py::test_pending_limits_preserve_interactive_places_and_exact_replay[NB-Q01:v01]"
+      ],
+      "NB-Q01:v02": [
+        "tests/recovery/test_background_queue.py::test_pending_limits_preserve_interactive_places_and_exact_replay[NB-Q01:v02]"
+      ],
+      "NB-Q01:v03": [
+        "tests/recovery/test_background_queue.py::test_pending_limits_preserve_interactive_places_and_exact_replay[NB-Q01:v03]"
+      ],
+      "NB-Q01:v04": [
+        "tests/recovery/test_background_queue.py::test_pending_limits_preserve_interactive_places_and_exact_replay[NB-Q01:v04]"
+      ],
+      "NB-Q01:v05": [
+        "tests/recovery/test_background_queue.py::test_pending_limits_preserve_interactive_places_and_exact_replay[NB-Q01:v05]"
+      ],
+      "NB-Q01:v06": [
+        "tests/recovery/test_background_queue.py::test_pending_limits_preserve_interactive_places_and_exact_replay[NB-Q01:v06]"
+      ],
+      "NB-Q01:v07": [
+        "tests/recovery/test_background_queue.py::test_pending_limits_preserve_interactive_places_and_exact_replay[NB-Q01:v07]"
+      ],
+      "NB-Q01:v08": [
+        "tests/recovery/test_background_queue.py::test_pending_limits_preserve_interactive_places_and_exact_replay[NB-Q01:v08]"
+      ],
+      "NB-Q01:v09": [
+        "tests/recovery/test_background_queue.py::test_pending_limits_preserve_interactive_places_and_exact_replay[NB-Q01:v09]"
+      ],
+      "NB-Q01:v10": [
+        "tests/recovery/test_background_queue.py::test_pending_limits_preserve_interactive_places_and_exact_replay[NB-Q01:v10]"
+      ],
+      "NB-Q01:v11": [
+        "tests/recovery/test_background_queue.py::test_pending_limits_preserve_interactive_places_and_exact_replay[NB-Q01:v11]"
+      ],
+      "NB-Q01:v12": [
+        "tests/recovery/test_background_queue.py::test_pending_limits_preserve_interactive_places_and_exact_replay[NB-Q01:v12]"
+      ],
+      "NB-Q01:v13": [
+        "tests/recovery/test_background_queue.py::test_pending_limits_preserve_interactive_places_and_exact_replay[NB-Q01:v13]"
+      ],
+      "NB-Q01:v14": [
+        "tests/recovery/test_background_queue.py::test_pending_limits_preserve_interactive_places_and_exact_replay[NB-Q01:v14]"
+      ],
+      "NB-J04:v01": [
+        "tests/recovery/test_background_agent.py::test_actual_compiler_apply_v2_retains_single_payload_after_native_exit_and_restart[NB-J04:v01]"
+      ],
+      "NB-J04:v02": [
+        "tests/recovery/test_background_agent.py::test_actual_compiler_apply_v2_retains_single_payload_after_native_exit_and_restart[NB-J04:v02]"
+      ],
+      "NB-J04:v03": [
+        "tests/recovery/test_background_proposals.py::test_durable_acceptance_can_finish_binding_after_deadline_and_native_cleanup"
+      ],
+      "NB-J04:v04": [
+        "tests/recovery/test_background_proposals.py::test_late_new_proposal_is_rejected_before_loading_any_payload"
+      ],
+      "NB-Q02:v01": [
+        "tests/recovery/test_background_supervisor.py::test_queued_cancel_does_not_start_a_process_or_cancel_its_neighbour"
+      ],
+      "NB-Q02:v02": [
+        "tests/recovery/test_background_supervisor.py::test_cancellation_after_slot_grant_prevents_the_owned_child_start"
+      ],
+      "NB-Q02:v03": [
+        "tests/recovery/test_background_supervisor.py::test_stop_after_child_start_or_during_cleanup_keeps_the_owned_slot[NB-Q02:v03]"
+      ],
+      "NB-Q02:v04": [
+        "tests/recovery/test_background_supervisor.py::test_stop_after_child_start_or_during_cleanup_keeps_the_owned_slot[NB-Q02:v04]"
+      ],
+      "NB-Q02:v05": [
+        "tests/recovery/test_background_supervisor.py::test_stop_after_child_start_or_during_cleanup_keeps_the_owned_slot[NB-Q02:v05]"
+      ],
+      "NB-Q03:v01": [
+        "tests/recovery/test_background_queue.py::test_fifo_round_robin_and_an_ineligible_head_use_the_real_dispatcher[NB-Q03:v01]"
+      ],
+      "NB-Q03:v02": [
+        "tests/recovery/test_background_queue.py::test_fifo_round_robin_and_an_ineligible_head_use_the_real_dispatcher[NB-Q03:v02]"
+      ],
+      "NB-Q03:v03": [
+        "tests/recovery/test_background_queue.py::test_fifo_round_robin_and_an_ineligible_head_use_the_real_dispatcher[NB-Q03:v03]"
+      ],
+      "NB-Q03:v04": [
+        "tests/recovery/test_background_queue.py::test_capacity_one_serializes_all_kinds_and_both_processing_stages[NB-Q03:v04]"
+      ],
+      "NB-Q05:v04": [
+        "tests/recovery/test_background_queue.py::test_capacity_one_serializes_all_kinds_and_both_processing_stages[NB-Q05:v04]"
+      ],
+      "NB-Q06:v01": [
+        "tests/recovery/test_background_agent.py::test_actual_compiler_apply_v2_retains_single_payload_after_native_exit_and_restart[NB-J04:v01]"
+      ],
+      "NB-Q06:v02": [
+        "tests/recovery/test_background_agent.py::test_actual_compiler_apply_v2_retains_single_payload_after_native_exit_and_restart[NB-J04:v02]"
+      ],
+      "NB-Q06:v03": [
+        "tests/recovery/test_background_supervisor.py::test_unverified_cleanup_keeps_the_slot_and_blocks_the_next_job"
+      ],
+      "NB-Q06:v04": [
+        "tests/recovery/test_background_supervisor.py::test_native_slot_is_held_until_owned_cleanup_and_the_next_job_then_runs"
+      ],
+      "NB-Q06:v05": [
+        "tests/recovery/test_background_supervisor.py::test_dispatch_faults_reach_the_boundary_without_releasing_live_ownership[slot_released]"
+      ],
+      "NB-Q08:v01": [
+        "tests/recovery/test_background_supervisor.py::test_typed_runtime_failure_pauses_only_when_account_dispatch_requires_it[RATE_LIMITED]"
+      ],
+      "NB-Q08:v02": [
+        "tests/recovery/test_background_supervisor.py::test_typed_runtime_failure_pauses_only_when_account_dispatch_requires_it[AUTH_REQUIRED]"
+      ],
+      "NB-Q08:v04": [
+        "tests/recovery/test_background_supervisor.py::test_typed_runtime_failure_pauses_only_when_account_dispatch_requires_it[MODEL_DENIED]"
+      ],
+      "NB-Q08:v05": [
+        "tests/recovery/test_background_supervisor.py::test_confirmed_account_change_revokes_old_jobs_before_new_dispatch"
+      ],
+      "NB-Q10:v01": [
+        "tests/recovery/test_background_supervisor.py::test_attempt_deadlines_use_elapsed_time_at_the_exact_boundary[NB-Q10:v01]"
+      ],
+      "NB-Q10:v02": [
+        "tests/recovery/test_background_supervisor.py::test_attempt_deadlines_use_elapsed_time_at_the_exact_boundary[NB-Q10:v02]"
+      ],
+      "NB-Q10:v03": [
+        "tests/recovery/test_background_supervisor.py::test_attempt_deadlines_use_elapsed_time_at_the_exact_boundary[NB-Q10:v03]"
+      ],
+      "NB-Q10:v04": [
+        "tests/recovery/test_background_supervisor.py::test_attempt_deadlines_use_elapsed_time_at_the_exact_boundary[NB-Q10:v04]"
+      ],
+      "NB-Q10:v05": [
+        "tests/recovery/test_background_supervisor.py::test_attempt_deadlines_use_elapsed_time_at_the_exact_boundary[NB-Q10:v05]"
+      ],
+      "NB-Q10:v06": [
+        "tests/recovery/test_background_supervisor.py::test_attempt_deadlines_use_elapsed_time_at_the_exact_boundary[NB-Q10:v06]"
+      ],
+      "NB-Q10:v07": [
+        "tests/recovery/test_background_proposals.py::test_payload_fsync_must_be_observed_before_the_acceptance_deadline[NB-Q10:v07]"
+      ],
+      "NB-Q10:v08": [
+        "tests/recovery/test_background_proposals.py::test_payload_fsync_must_be_observed_before_the_acceptance_deadline[NB-Q10:v08]"
+      ],
+      "NB-Q10:v09": [
+        "tests/recovery/test_background_proposals.py::test_payload_fsync_must_be_observed_before_the_acceptance_deadline[NB-Q10:v09]"
+      ],
+      "NB-Q10:v10": [
+        "tests/recovery/test_background_agent.py::test_shared_admission_wait_consumes_no_startup_or_active_budget[NB-Q10:v10]"
+      ],
+      "NB-Q10:v11": [
+        "tests/recovery/test_background_supervisor.py::test_sleep_and_wall_clock_rollback_cannot_extend_the_active_deadline[NB-Q10:v11]"
+      ],
+      "NB-Q10:v12": [
+        "tests/recovery/test_background_supervisor.py::test_sleep_and_wall_clock_rollback_cannot_extend_the_active_deadline[NB-Q10:v12]"
+      ],
+      "NB-Q10:v13": [
+        "tests/recovery/test_background_proposals.py::test_durable_acceptance_can_finish_binding_after_deadline_and_native_cleanup"
+      ],
+      "NB-Q11:v01": [
+        "tests/recovery/test_background_supervisor.py::test_dispatch_faults_reach_the_boundary_without_releasing_live_ownership[queue_eligible]"
+      ],
+      "NB-Q11:v02": [
+        "tests/recovery/test_background_supervisor.py::test_dispatch_faults_reach_the_boundary_without_releasing_live_ownership[slot_granted]"
+      ],
+      "NB-Q11:v03": [
+        "tests/recovery/test_background_supervisor.py::test_dispatch_faults_reach_the_boundary_without_releasing_live_ownership[before_spawn]"
+      ],
+      "NB-Q11:v04": [
+        "tests/recovery/test_background_supervisor.py::test_dispatch_faults_reach_the_boundary_without_releasing_live_ownership[child_started]"
+      ],
+      "NB-Q11:v06": [
+        "tests/recovery/test_background_supervisor.py::test_dispatch_faults_reach_the_boundary_without_releasing_live_ownership[cleanup_started]"
+      ],
+      "NB-Q11:v07": [
+        "tests/recovery/test_background_supervisor.py::test_dispatch_faults_reach_the_boundary_without_releasing_live_ownership[children_verified_dead]"
+      ],
+      "NB-Q11:v08": [
+        "tests/recovery/test_background_supervisor.py::test_dispatch_faults_reach_the_boundary_without_releasing_live_ownership[slot_released]"
+      ],
+      "NB-Q11:v05": [
+        "tests/recovery/test_background_proposals.py::test_fault_after_proposal_durability_keeps_pending_authority_and_releases_native"
+      ],
+      "NB-A04:v19": [
+        "tests/recovery/test_background_events.py::test_event_window_bounds_return_an_explicit_gap_and_latest_snapshot[NB-A04:v19]"
+      ],
+      "NB-A04:v20": [
+        "tests/recovery/test_background_events.py::test_event_window_bounds_return_an_explicit_gap_and_latest_snapshot[NB-A04:v20]"
+      ],
+      "NB-A04:v21": [
+        "tests/recovery/test_background_events.py::test_event_window_bounds_return_an_explicit_gap_and_latest_snapshot[NB-A04:v21]"
       ]
     },
     "checks": {
@@ -2252,21 +2583,140 @@
         "tests/recovery/test_background_offline.py::test_reference_oracle_uses_scoped_read_and_write_generations[independent]",
         "tests/recovery/test_background_offline.py::test_reference_oracle_uses_scoped_read_and_write_generations[read-cycle]",
         "tests/recovery/test_background_offline.py::test_reference_oracle_uses_scoped_read_and_write_generations[edit-undo]"
+      ],
+      "NB01:all-offline-regressions": [
+        "tests/recovery/test_background_admission.py::test_borrowed_native_admission_requires_the_exact_live_reservation",
+        "tests/recovery/test_background_admission.py::test_cancel_during_a_granted_reservation_handoff_releases_only_its_owner",
+        "tests/recovery/test_background_agent.py::test_actual_compiler_apply_v2_retains_single_payload_after_native_exit_and_restart[NB-J04:v01]",
+        "tests/recovery/test_background_agent.py::test_actual_compiler_apply_v2_retains_single_payload_after_native_exit_and_restart[NB-J04:v02]",
+        "tests/recovery/test_background_agent.py::test_captured_models_rules_and_bound_capabilities_cannot_be_replaced[NB-J03:v01]",
+        "tests/recovery/test_background_agent.py::test_captured_models_rules_and_bound_capabilities_cannot_be_replaced[NB-J03:v02]",
+        "tests/recovery/test_background_agent.py::test_captured_models_rules_and_bound_capabilities_cannot_be_replaced[NB-J03:v03]",
+        "tests/recovery/test_background_agent.py::test_captured_models_rules_and_bound_capabilities_cannot_be_replaced[NB-J03:v04]",
+        "tests/recovery/test_background_agent.py::test_captured_models_rules_and_bound_capabilities_cannot_be_replaced[NB-J03:v05]",
+        "tests/recovery/test_background_agent.py::test_captured_models_rules_and_bound_capabilities_cannot_be_replaced[NB-J03:v06]",
+        "tests/recovery/test_background_agent.py::test_runtime_adapter_uses_v2_instructions_and_closes_tools_before_permit_release",
+        "tests/recovery/test_background_agent.py::test_server_capture_retry_and_legacy_view_have_one_job_authority",
+        "tests/recovery/test_background_agent.py::test_shared_admission_wait_consumes_no_startup_or_active_budget[NB-Q10:v10]",
+        "tests/recovery/test_background_agent.py::test_shared_admission_wait_consumes_no_startup_or_active_budget[cancel-shared-waiter]",
+        "tests/recovery/test_background_events.py::test_event_window_bounds_return_an_explicit_gap_and_latest_snapshot[NB-A04:v19]",
+        "tests/recovery/test_background_events.py::test_event_window_bounds_return_an_explicit_gap_and_latest_snapshot[NB-A04:v20]",
+        "tests/recovery/test_background_events.py::test_event_window_bounds_return_an_explicit_gap_and_latest_snapshot[NB-A04:v21]",
+        "tests/recovery/test_background_events.py::test_forged_saved_event_cannot_override_the_authoritative_pending_job",
+        "tests/recovery/test_background_events.py::test_offline_fixture_blocks_native_factories_and_unregistered_processes",
+        "tests/recovery/test_background_events.py::test_replay_duplicate_append_and_lost_event_reply_do_not_change_job_authority",
+        "tests/recovery/test_background_integrity.py::test_account_failure_observed_during_deadline_cleanup_still_pauses_dispatch[AUTH_REQUIRED]",
+        "tests/recovery/test_background_integrity.py::test_account_failure_observed_during_deadline_cleanup_still_pauses_dispatch[RATE_LIMITED]",
+        "tests/recovery/test_background_integrity.py::test_cancel_after_runtime_entry_before_turn_readiness_releases_the_real_permit",
+        "tests/recovery/test_background_integrity.py::test_valid_json_with_broken_proposal_links_is_fenced_without_reset[account]",
+        "tests/recovery/test_background_integrity.py::test_valid_json_with_broken_proposal_links_is_fenced_without_reset[duplicate]",
+        "tests/recovery/test_background_integrity.py::test_valid_json_with_broken_proposal_links_is_fenced_without_reset[execution-generation]",
+        "tests/recovery/test_background_integrity.py::test_valid_json_with_broken_proposal_links_is_fenced_without_reset[foreign-job]",
+        "tests/recovery/test_background_integrity.py::test_valid_json_with_broken_proposal_links_is_fenced_without_reset[missing]",
+        "tests/recovery/test_background_integrity.py::test_valid_json_with_broken_proposal_links_is_fenced_without_reset[revoked]",
+        "tests/recovery/test_background_offline.py::test_versioned_background_contract_round_trip[background_agent_request_v1]",
+        "tests/recovery/test_background_offline.py::test_versioned_background_contract_round_trip[background_artifact_v1]",
+        "tests/recovery/test_background_offline.py::test_versioned_background_contract_round_trip[background_dispatch_v1]",
+        "tests/recovery/test_background_offline.py::test_versioned_background_contract_round_trip[background_legacy_run_v2]",
+        "tests/recovery/test_background_offline.py::test_versioned_background_contract_round_trip[background_project_v1]",
+        "tests/recovery/test_background_offline.py::test_versioned_background_contract_round_trip[background_replay_request_v1]",
+        "tests/recovery/test_background_offline.py::test_versioned_background_contract_round_trip[background_replay_v1]",
+        "tests/recovery/test_background_proposals.py::test_durable_acceptance_can_finish_binding_after_deadline_and_native_cleanup",
+        "tests/recovery/test_background_proposals.py::test_fault_after_proposal_durability_keeps_pending_authority_and_releases_native",
+        "tests/recovery/test_background_proposals.py::test_late_new_proposal_is_rejected_before_loading_any_payload",
+        "tests/recovery/test_background_proposals.py::test_payload_fsync_must_be_observed_before_the_acceptance_deadline[NB-Q10:v07]",
+        "tests/recovery/test_background_proposals.py::test_payload_fsync_must_be_observed_before_the_acceptance_deadline[NB-Q10:v08]",
+        "tests/recovery/test_background_proposals.py::test_payload_fsync_must_be_observed_before_the_acceptance_deadline[NB-Q10:v09]",
+        "tests/recovery/test_background_proposals.py::test_pending_payload_binding_keeps_backend_authority_after_runtime_exit[pending]",
+        "tests/recovery/test_background_proposals.py::test_pending_payload_binding_keeps_backend_authority_after_runtime_exit[review]",
+        "tests/recovery/test_background_proposals.py::test_stop_between_payload_and_binding_revokes_the_backend_request",
+        "tests/recovery/test_background_queue.py::test_capacity_one_serializes_all_kinds_and_both_processing_stages[NB-Q03:v04]",
+        "tests/recovery/test_background_queue.py::test_capacity_one_serializes_all_kinds_and_both_processing_stages[NB-Q05:v04]",
+        "tests/recovery/test_background_queue.py::test_fifo_round_robin_and_an_ineligible_head_use_the_real_dispatcher[NB-Q03:v01]",
+        "tests/recovery/test_background_queue.py::test_fifo_round_robin_and_an_ineligible_head_use_the_real_dispatcher[NB-Q03:v02]",
+        "tests/recovery/test_background_queue.py::test_fifo_round_robin_and_an_ineligible_head_use_the_real_dispatcher[NB-Q03:v03]",
+        "tests/recovery/test_background_queue.py::test_pending_limits_preserve_interactive_places_and_exact_replay[NB-Q01:v01]",
+        "tests/recovery/test_background_queue.py::test_pending_limits_preserve_interactive_places_and_exact_replay[NB-Q01:v02]",
+        "tests/recovery/test_background_queue.py::test_pending_limits_preserve_interactive_places_and_exact_replay[NB-Q01:v03]",
+        "tests/recovery/test_background_queue.py::test_pending_limits_preserve_interactive_places_and_exact_replay[NB-Q01:v04]",
+        "tests/recovery/test_background_queue.py::test_pending_limits_preserve_interactive_places_and_exact_replay[NB-Q01:v05]",
+        "tests/recovery/test_background_queue.py::test_pending_limits_preserve_interactive_places_and_exact_replay[NB-Q01:v06]",
+        "tests/recovery/test_background_queue.py::test_pending_limits_preserve_interactive_places_and_exact_replay[NB-Q01:v07]",
+        "tests/recovery/test_background_queue.py::test_pending_limits_preserve_interactive_places_and_exact_replay[NB-Q01:v08]",
+        "tests/recovery/test_background_queue.py::test_pending_limits_preserve_interactive_places_and_exact_replay[NB-Q01:v09]",
+        "tests/recovery/test_background_queue.py::test_pending_limits_preserve_interactive_places_and_exact_replay[NB-Q01:v10]",
+        "tests/recovery/test_background_queue.py::test_pending_limits_preserve_interactive_places_and_exact_replay[NB-Q01:v11]",
+        "tests/recovery/test_background_queue.py::test_pending_limits_preserve_interactive_places_and_exact_replay[NB-Q01:v12]",
+        "tests/recovery/test_background_queue.py::test_pending_limits_preserve_interactive_places_and_exact_replay[NB-Q01:v13]",
+        "tests/recovery/test_background_queue.py::test_pending_limits_preserve_interactive_places_and_exact_replay[NB-Q01:v14]",
+        "tests/recovery/test_background_routes.py::test_job_routes_capture_on_the_server_and_disconnect_keeps_the_execution[disabled]",
+        "tests/recovery/test_background_routes.py::test_job_routes_capture_on_the_server_and_disconnect_keeps_the_execution[opt-in]",
+        "tests/recovery/test_background_store.py::test_concurrent_submit_replays_exact_identity_or_conflicts[NB-J01:v01]",
+        "tests/recovery/test_background_store.py::test_concurrent_submit_replays_exact_identity_or_conflicts[NB-J01:v02]",
+        "tests/recovery/test_background_store.py::test_concurrent_submit_replays_exact_identity_or_conflicts[NB-J01:v03]",
+        "tests/recovery/test_background_store.py::test_expired_epoch_rejects_unknown_ids_but_replays_retained_requests",
+        "tests/recovery/test_background_store.py::test_job_update_cannot_rewrite_captured_authority[account_generation-2]",
+        "tests/recovery/test_background_store.py::test_job_update_cannot_rewrite_captured_authority[allow_edits-False]",
+        "tests/recovery/test_background_store.py::test_job_update_cannot_rewrite_captured_authority[scheduling_class-interactive]",
+        "tests/recovery/test_background_store.py::test_lost_submit_reply_replays_original_capture_after_restart",
+        "tests/recovery/test_background_store.py::test_missing_account_header_cannot_reset_a_project_to_an_older_account",
+        "tests/recovery/test_background_store.py::test_missing_or_corrupt_private_state_is_not_reset",
+        "tests/recovery/test_background_store.py::test_project_tombstone_rejects_new_jobs_and_reads",
+        "tests/recovery/test_background_store.py::test_queued_cancel_is_idempotent_and_reuses_admission_place[False]",
+        "tests/recovery/test_background_store.py::test_queued_cancel_is_idempotent_and_reuses_admission_place[True]",
+        "tests/recovery/test_background_store.py::test_restart_interrupts_queued_work_and_retains_request_without_dispatch",
+        "tests/recovery/test_background_store.py::test_submit_persistence_cutpoints_have_one_recoverable_identity[NB-J02:v01]",
+        "tests/recovery/test_background_store.py::test_submit_persistence_cutpoints_have_one_recoverable_identity[NB-J02:v02]",
+        "tests/recovery/test_background_store.py::test_submit_persistence_cutpoints_have_one_recoverable_identity[NB-J02:v03]",
+        "tests/recovery/test_background_store.py::test_unproved_write_reply_replays_only_after_exact_durability_is_confirmed",
+        "tests/recovery/test_background_supervisor.py::test_attempt_deadlines_use_elapsed_time_at_the_exact_boundary[NB-Q10:v01]",
+        "tests/recovery/test_background_supervisor.py::test_attempt_deadlines_use_elapsed_time_at_the_exact_boundary[NB-Q10:v02]",
+        "tests/recovery/test_background_supervisor.py::test_attempt_deadlines_use_elapsed_time_at_the_exact_boundary[NB-Q10:v03]",
+        "tests/recovery/test_background_supervisor.py::test_attempt_deadlines_use_elapsed_time_at_the_exact_boundary[NB-Q10:v04]",
+        "tests/recovery/test_background_supervisor.py::test_attempt_deadlines_use_elapsed_time_at_the_exact_boundary[NB-Q10:v05]",
+        "tests/recovery/test_background_supervisor.py::test_attempt_deadlines_use_elapsed_time_at_the_exact_boundary[NB-Q10:v06]",
+        "tests/recovery/test_background_supervisor.py::test_cancellation_after_slot_grant_prevents_the_owned_child_start",
+        "tests/recovery/test_background_supervisor.py::test_confirmed_account_change_revokes_old_jobs_before_new_dispatch",
+        "tests/recovery/test_background_supervisor.py::test_dispatch_faults_reach_the_boundary_without_releasing_live_ownership[before_spawn]",
+        "tests/recovery/test_background_supervisor.py::test_dispatch_faults_reach_the_boundary_without_releasing_live_ownership[child_started]",
+        "tests/recovery/test_background_supervisor.py::test_dispatch_faults_reach_the_boundary_without_releasing_live_ownership[children_verified_dead]",
+        "tests/recovery/test_background_supervisor.py::test_dispatch_faults_reach_the_boundary_without_releasing_live_ownership[cleanup_started]",
+        "tests/recovery/test_background_supervisor.py::test_dispatch_faults_reach_the_boundary_without_releasing_live_ownership[queue_eligible]",
+        "tests/recovery/test_background_supervisor.py::test_dispatch_faults_reach_the_boundary_without_releasing_live_ownership[slot_granted]",
+        "tests/recovery/test_background_supervisor.py::test_dispatch_faults_reach_the_boundary_without_releasing_live_ownership[slot_released]",
+        "tests/recovery/test_background_supervisor.py::test_native_slot_is_held_until_owned_cleanup_and_the_next_job_then_runs",
+        "tests/recovery/test_background_supervisor.py::test_queued_cancel_does_not_start_a_process_or_cancel_its_neighbour",
+        "tests/recovery/test_background_supervisor.py::test_sleep_and_wall_clock_rollback_cannot_extend_the_active_deadline[NB-Q10:v11]",
+        "tests/recovery/test_background_supervisor.py::test_sleep_and_wall_clock_rollback_cannot_extend_the_active_deadline[NB-Q10:v12]",
+        "tests/recovery/test_background_supervisor.py::test_stop_after_child_start_or_during_cleanup_keeps_the_owned_slot[NB-Q02:v03]",
+        "tests/recovery/test_background_supervisor.py::test_stop_after_child_start_or_during_cleanup_keeps_the_owned_slot[NB-Q02:v04]",
+        "tests/recovery/test_background_supervisor.py::test_stop_after_child_start_or_during_cleanup_keeps_the_owned_slot[NB-Q02:v05]",
+        "tests/recovery/test_background_supervisor.py::test_typed_runtime_failure_pauses_only_when_account_dispatch_requires_it[AUTH_REQUIRED]",
+        "tests/recovery/test_background_supervisor.py::test_typed_runtime_failure_pauses_only_when_account_dispatch_requires_it[MODEL_DENIED]",
+        "tests/recovery/test_background_supervisor.py::test_typed_runtime_failure_pauses_only_when_account_dispatch_requires_it[RATE_LIMITED]",
+        "tests/recovery/test_background_supervisor.py::test_unverified_cleanup_keeps_the_slot_and_blocks_the_next_job"
       ]
     },
     "sources": [
       "apps/web/package.json",
       "apps/web/src/contracts/background-validate.ts",
       "apps/web/src/contracts/check-fixtures.ts",
+      "apps/web/src/contracts/generated/background_agent_request_v1.ts",
       "apps/web/src/contracts/generated/background_apply_v2.ts",
+      "apps/web/src/contracts/generated/background_artifact_v1.ts",
       "apps/web/src/contracts/generated/background_attempt_v1.ts",
       "apps/web/src/contracts/generated/background_barrier_v1.ts",
+      "apps/web/src/contracts/generated/background_dispatch_v1.ts",
       "apps/web/src/contracts/generated/background_draft_payload_v1.ts",
       "apps/web/src/contracts/generated/background_draft_v1.ts",
       "apps/web/src/contracts/generated/background_event_v1.ts",
       "apps/web/src/contracts/generated/background_intent_v1.ts",
+      "apps/web/src/contracts/generated/background_legacy_run_v2.ts",
+      "apps/web/src/contracts/generated/background_project_v1.ts",
       "apps/web/src/contracts/generated/background_proposal_v1.ts",
       "apps/web/src/contracts/generated/background_receipt_v1.ts",
+      "apps/web/src/contracts/generated/background_replay_request_v1.ts",
+      "apps/web/src/contracts/generated/background_replay_v1.ts",
       "apps/web/src/contracts/generated/background_scope_guard_v1.ts",
       "apps/web/src/contracts/generated/background_sidecar_v1.ts",
       "apps/web/src/contracts/generated/background_snapshot_v1.ts",
@@ -2274,15 +2724,22 @@
       "apps/web/src/contracts/generated/background_undo_v1.ts",
       "apps/web/src/contracts/generated/background_writer_v1.ts",
       "apps/web/src/contracts/validate.ts",
+      "contracts/examples/background/background_agent_request_v1.json",
       "contracts/examples/background/background_apply_v2.json",
+      "contracts/examples/background/background_artifact_v1.json",
       "contracts/examples/background/background_attempt_v1.json",
       "contracts/examples/background/background_barrier_v1.json",
+      "contracts/examples/background/background_dispatch_v1.json",
       "contracts/examples/background/background_draft_payload_v1.json",
       "contracts/examples/background/background_draft_v1.json",
       "contracts/examples/background/background_event_v1.json",
       "contracts/examples/background/background_intent_v1.json",
+      "contracts/examples/background/background_legacy_run_v2.json",
+      "contracts/examples/background/background_project_v1.json",
       "contracts/examples/background/background_proposal_v1.json",
       "contracts/examples/background/background_receipt_v1.json",
+      "contracts/examples/background/background_replay_request_v1.json",
+      "contracts/examples/background/background_replay_v1.json",
       "contracts/examples/background/background_saved_snapshot_v1.json",
       "contracts/examples/background/background_saved_v2.json",
       "contracts/examples/background/background_scope_guard_v1.json",
@@ -2292,15 +2749,22 @@
       "contracts/examples/background/background_undo_v1.json",
       "contracts/examples/background/background_writer_v1.json",
       "contracts/examples/cases.json",
+      "contracts/json-schema/background_agent_request_v1.schema.json",
       "contracts/json-schema/background_apply_v2.schema.json",
+      "contracts/json-schema/background_artifact_v1.schema.json",
       "contracts/json-schema/background_attempt_v1.schema.json",
       "contracts/json-schema/background_barrier_v1.schema.json",
+      "contracts/json-schema/background_dispatch_v1.schema.json",
       "contracts/json-schema/background_draft_payload_v1.schema.json",
       "contracts/json-schema/background_draft_v1.schema.json",
       "contracts/json-schema/background_event_v1.schema.json",
       "contracts/json-schema/background_intent_v1.schema.json",
+      "contracts/json-schema/background_legacy_run_v2.schema.json",
+      "contracts/json-schema/background_project_v1.schema.json",
       "contracts/json-schema/background_proposal_v1.schema.json",
       "contracts/json-schema/background_receipt_v1.schema.json",
+      "contracts/json-schema/background_replay_request_v1.schema.json",
+      "contracts/json-schema/background_replay_v1.schema.json",
       "contracts/json-schema/background_scope_guard_v1.schema.json",
       "contracts/json-schema/background_sidecar_v1.schema.json",
       "contracts/json-schema/background_snapshot_v1.schema.json",
@@ -2312,13 +2776,30 @@
       "docs/gui/handoffs/BACKGROUND-WORK/nb00a-execution-report.schema.json",
       "docs/gui/handoffs/BACKGROUND-WORK/nb00a-state-mappings.md",
       "docs/gui/handoffs/BACKGROUND-WORK/test-matrix.json",
+      "packages/resume_core/agent_artifacts.py",
       "packages/resume_core/agent_limits.py",
+      "packages/resume_core/background_clock.py",
+      "packages/resume_core/background_events.py",
       "packages/resume_core/background_limits.py",
+      "packages/resume_core/background_proposals.py",
+      "packages/resume_core/background_scheduler.py",
+      "packages/resume_core/background_store.py",
+      "packages/resume_core/background_supervisor.py",
       "packages/resume_core/models/agent.py",
       "packages/resume_core/models/background.py",
       "packages/resume_core/models/contracts.py",
       "packages/resume_core/storage.py",
+      "services/api/src/resume_api/agent/edits.py",
+      "services/api/src/resume_api/agent/runtime.py",
       "services/api/src/resume_api/agent/tools.py",
+      "services/api/src/resume_api/app.py",
+      "services/api/src/resume_api/cli/process_runner.py",
+      "services/api/src/resume_api/inference_admission.py",
+      "services/api/src/resume_api/jobs/__init__.py",
+      "services/api/src/resume_api/jobs/routes.py",
+      "services/api/src/resume_api/jobs/runtime.py",
+      "services/api/src/resume_api/jobs/service.py",
+      "services/api/src/resume_api/jobs/tools.py",
       "spikes/background/__init__.py",
       "spikes/background/corpus.py",
       "spikes/background/fake_child.py",
@@ -2328,9 +2809,22 @@
       "tests/contracts/test_contracts.py",
       "tests/fixtures/rich_workspace.json",
       "tests/foundation/test_runner_gates.py",
+      "tests/recovery/conftest.py",
+      "tests/recovery/test_agent_lifecycle.py",
+      "tests/recovery/test_background_admission.py",
+      "tests/recovery/test_background_agent.py",
+      "tests/recovery/test_background_events.py",
+      "tests/recovery/test_background_integrity.py",
       "tests/recovery/test_background_offline.py",
+      "tests/recovery/test_background_proposals.py",
+      "tests/recovery/test_background_queue.py",
+      "tests/recovery/test_background_routes.py",
+      "tests/recovery/test_background_store.py",
+      "tests/recovery/test_background_supervisor.py",
       "tests/recovery/test_recovery_contracts.py",
       "tests/requirements.json",
+      "tests/support/agent.py",
+      "tests/support/background.py",
       "tools/background_evidence.py",
       "tools/background_pytest.py",
       "tools/check_contract_drift.py",

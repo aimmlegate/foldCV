@@ -4,8 +4,11 @@ NB uses [the mandatory contract](background-work-tests.md) and
 [per-variant matrix](handoffs/BACKGROUND-WORK/test-matrix.json). `NB-CONTRACTS`
 maps NB00a's offline schemas, limit policy, controlled protocol, pipe-process
 isolation, reference corpus and executed-report negatives. This is not production
-background acceptance. `NB-JOBS`, `NB-PUBLICATION`, `NB-WRITER`, `NB-FIXED`, `NB-UI`
-and `NB-PARALLEL` remain unimplemented until their slices add real bindings.
+background acceptance. `NB-JOBS` maps NB01's capacity-one Job store/supervisor,
+single-copy agent artifacts, deferred apply v2, async admission and opt-in API.
+Its 73 due variants use real temporary stores and owned pipe children. Canonical
+publication and normal rollout stay off. `NB-PUBLICATION`, `NB-WRITER`, `NB-FIXED`,
+`NB-UI` and `NB-PARALLEL` remain unimplemented until their slices add real bindings.
 
 The existing fast gate writes exact Python setup/call/teardown results through
 `tools/background_pytest.py` and validates NB parameter/file identities, current

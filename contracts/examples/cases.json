@@ -4033,5 +4033,289 @@
         "value": 1
       }
     ]
+  },
+
+  {
+    "name": "background_dispatch_v1 valid",
+    "contract": "background_dispatch_v1",
+    "base": "background_dispatch_v1",
+    "valid": true,
+    "edits": []
+  },
+  {
+    "name": "background_dispatch_v1 rejects extras",
+    "contract": "background_dispatch_v1",
+    "base": "background_dispatch_v1",
+    "valid": false,
+    "edits": [
+      {
+        "op": "set",
+        "path": [
+          "clientCapability"
+        ],
+        "value": "forged"
+      }
+    ]
+  },
+  {
+    "name": "background_agent_request_v1 valid",
+    "contract": "background_agent_request_v1",
+    "base": "background_agent_request_v1",
+    "valid": true,
+    "edits": []
+  },
+  {
+    "name": "background_agent_request_v1 rejects extras",
+    "contract": "background_agent_request_v1",
+    "base": "background_agent_request_v1",
+    "valid": false,
+    "edits": [
+      {
+        "op": "set",
+        "path": [
+          "clientCapability"
+        ],
+        "value": "forged"
+      }
+    ]
+  },
+  {
+    "name": "background_artifact_v1 valid",
+    "contract": "background_artifact_v1",
+    "base": "background_artifact_v1",
+    "valid": true,
+    "edits": []
+  },
+  {
+    "name": "background_artifact_v1 rejects extras",
+    "contract": "background_artifact_v1",
+    "base": "background_artifact_v1",
+    "valid": false,
+    "edits": [
+      {
+        "op": "set",
+        "path": [
+          "clientCapability"
+        ],
+        "value": "forged"
+      }
+    ]
+  },
+  {
+    "name": "background_legacy_run_v2 valid",
+    "contract": "background_legacy_run_v2",
+    "base": "background_legacy_run_v2",
+    "valid": true,
+    "edits": []
+  },
+  {
+    "name": "background_legacy_run_v2 rejects extras",
+    "contract": "background_legacy_run_v2",
+    "base": "background_legacy_run_v2",
+    "valid": false,
+    "edits": [
+      {
+        "op": "set",
+        "path": [
+          "clientCapability"
+        ],
+        "value": "forged"
+      }
+    ]
+  },
+  {
+    "name": "background_project_v1 valid",
+    "contract": "background_project_v1",
+    "base": "background_project_v1",
+    "valid": true,
+    "edits": []
+  },
+  {
+    "name": "background_project_v1 rejects extras",
+    "contract": "background_project_v1",
+    "base": "background_project_v1",
+    "valid": false,
+    "edits": [
+      {
+        "op": "set",
+        "path": [
+          "clientCapability"
+        ],
+        "value": "forged"
+      }
+    ]
+  },
+  {
+    "name": "background_replay_request_v1 valid",
+    "contract": "background_replay_request_v1",
+    "base": "background_replay_request_v1",
+    "valid": true,
+    "edits": []
+  },
+  {
+    "name": "background_replay_request_v1 rejects extras",
+    "contract": "background_replay_request_v1",
+    "base": "background_replay_request_v1",
+    "valid": false,
+    "edits": [
+      {
+        "op": "set",
+        "path": [
+          "clientCapability"
+        ],
+        "value": "forged"
+      }
+    ]
+  },
+  {
+    "name": "background_replay_v1 valid",
+    "contract": "background_replay_v1",
+    "base": "background_replay_v1",
+    "valid": true,
+    "edits": []
+  },
+  {
+    "name": "background_replay_v1 rejects extras",
+    "contract": "background_replay_v1",
+    "base": "background_replay_v1",
+    "valid": false,
+    "edits": [
+      {
+        "op": "set",
+        "path": [
+          "clientCapability"
+        ],
+        "value": "forged"
+      }
+    ]
+  },
+  {
+    "name": "background_artifact_v1 rejects changed input identity",
+    "contract": "background_artifact_v1",
+    "base": "background_artifact_v1",
+    "valid": false,
+    "edits": [
+      {
+        "op": "set",
+        "path": [
+          "identity",
+          "requestId"
+        ],
+        "value": "foreign"
+      }
+    ]
+  },
+  {
+    "name": "background_artifact_v1 accepts inert unbound input",
+    "contract": "background_artifact_v1",
+    "base": "background_artifact_v1",
+    "valid": true,
+    "edits": [
+      {
+        "op": "set",
+        "path": [
+          "jobId"
+        ],
+        "value": null
+      }
+    ]
+  },
+  {
+    "name": "background_legacy_run_v2 rejects a foreign run",
+    "contract": "background_legacy_run_v2",
+    "base": "background_legacy_run_v2",
+    "valid": false,
+    "edits": [
+      {
+        "op": "set",
+        "path": [
+          "jobId"
+        ],
+        "value": "foreign"
+      }
+    ]
+  },
+  {
+    "name": "background_project_v1 rejects a foreign project",
+    "contract": "background_project_v1",
+    "base": "background_project_v1",
+    "valid": false,
+    "edits": [
+      {
+        "op": "set",
+        "path": [
+          "projectId"
+        ],
+        "value": "foreign"
+      }
+    ]
+  },
+  {
+    "name": "background_project_v1 rejects duplicate jobs",
+    "contract": "background_project_v1",
+    "base": "background_project_v1",
+    "valid": false,
+    "edits": [
+      {
+        "op": "clone",
+        "path": [
+          "jobs"
+        ],
+        "from": [
+          "jobs",
+          0
+        ]
+      }
+    ]
+  },
+  {
+    "name": "background_replay_v1 rejects duplicate events",
+    "contract": "background_replay_v1",
+    "base": "background_replay_v1",
+    "valid": false,
+    "edits": [
+      {
+        "op": "clone",
+        "path": [
+          "events"
+        ],
+        "from": [
+          "events",
+          0
+        ]
+      }
+    ]
+  },
+  {
+    "name": "background_snapshot_v1 rejects publication error without proposal",
+    "contract": "background_snapshot_v1",
+    "base": "background_snapshot_v1",
+    "valid": false,
+    "edits": [
+      {
+        "op": "set",
+        "path": [
+          "publication"
+        ],
+        "value": "none"
+      },
+      {
+        "op": "set",
+        "path": [
+          "proposalId"
+        ],
+        "value": null
+      },
+      {
+        "op": "set",
+        "path": [
+          "publicationError"
+        ],
+        "value": {
+          "code": "DEPENDENCY_CHANGED"
+        }
+      }
+    ]
   }
+
 ]
