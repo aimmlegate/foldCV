@@ -37,7 +37,7 @@ export function Settings({ close, connectionChanged }: { close: () => void; conn
     </nav><div className="settings-content">
       {section === "model" && <><Connection view={view} workflow={workflow} model={current.draft.model} change={value => controller.change("model", value)} disabled={current.saving} selectionDisabled={!current.preferences} />
         <div className="uir-assistant-options"><h3>Помощник</h3><div className="switch-line"><label htmlFor="assistant-enabled">Включить помощника<small>Использует это же подключение. Открытие панели не включает помощника.</small></label>
-          <input className="switch" id="assistant-enabled" role="switch" type="checkbox" checked={current.draft.agentEnabled} disabled={!current.assistant}
+          <input className="switch" id="assistant-enabled" aria-label="Включить помощника" role="switch" type="checkbox" checked={current.draft.agentEnabled} disabled={!current.assistant}
             onChange={event => controller.change("agentEnabled", event.currentTarget.checked)} /></div>
           <label htmlFor="assistant-model-select">Модель помощника</label><select className="model-select" id="assistant-model-select" aria-label="Модель помощника"
             value={current.draft.agentModel ?? ""} disabled={!current.assistant || !view.snapshot.metadataReady} onChange={event => controller.change("agentModel", event.currentTarget.value || null)}>
@@ -55,7 +55,7 @@ export function Settings({ close, connectionChanged }: { close: () => void; conn
       </>}
       {section === "analysis" && <><h3>Проверка изменений</h3><p>Проверять факты и даты после редактирования.</p>
         <div className="switch-line"><label htmlFor="analysis-toggle">Автоматически проверять изменения<small>Другие упоминания меняются только с вашего согласия.</small></label>
-          <input className="switch" id="analysis-toggle" type="checkbox" role="switch" disabled={!current.preferences} checked={current.draft.automatic}
+          <input className="switch" id="analysis-toggle" aria-label="Автоматически проверять изменения" type="checkbox" role="switch" disabled={!current.preferences} checked={current.draft.automatic}
             onChange={event => controller.change("automatic", event.currentTarget.checked)} /></div>
         <p className="settings-disclosure">Параллельные периоды работы допустимы. Подсказки не блокируют редактирование, сохранение или экспорт.</p>
       </>}

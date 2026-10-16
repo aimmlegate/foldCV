@@ -53,7 +53,7 @@ export function TechnologySelect({ facts, jobId, label, pending, paused, submit 
           autoComplete="off" maxLength={80} placeholder={records.length ? "Найти…" : "Выбрать технологии"} value={query}
           onFocus={() => setOpen(true)} onChange={event => { setQuery(event.target.value); setActive(0); setOpen(true); }}
           onKeyDown={event => {
-            if (event.key === "Escape") { event.preventDefault(); event.stopPropagation(); setOpen(false); }
+            if (event.key === "Escape" && open) { event.preventDefault(); event.stopPropagation(); setOpen(false); }
             else if (event.key === "ArrowDown" || event.key === "ArrowUp") { event.preventDefault(); setOpen(true);
               setActive((activeIndex + (event.key === "ArrowDown" ? 1 : -1) + choices.length) % Math.max(1, choices.length)); }
             else if (event.key === "Enter" && open) { event.preventDefault(); const choice = choices[activeIndex]; if (choice) choose(choice.name); }

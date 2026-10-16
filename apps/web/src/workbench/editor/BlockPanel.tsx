@@ -1,10 +1,14 @@
+import { useEffect, useRef } from "react";
 import { Icon } from "../ui/Icon";
 
 export function BlockPanel({ id, text, available, close, command, destinations }: {
   id: string; text: string; available: boolean; close: () => void;
   command: (command: string, target?: string) => void; destinations: { id: string; label: string }[];
 }) {
-  return <aside className="block-panel uir-block-panel" id="uir-block-panel" aria-label="Действия блока" data-block-id={id}>
+  const panel = useRef<HTMLElement>(null);
+  useEffect(() => { panel.current?.querySelector("button")?.focus(); }, []);
+  return <aside ref={panel} className="block-panel uir-block-panel" id="uir-block-panel" aria-label="Действия блока" data-block-id={id}
+    onKeyDown={event => { if (event.key === "Escape") { event.preventDefault(); event.stopPropagation(); close(); } }}>
     <div className="panel-heading"><h2>Блок</h2><button className="icon" aria-label="Скрыть действия блока" onClick={close}><Icon name="close" /></button></div>
     <p className="block-scope">{available ? text.slice(0, 90) || "Пустой блок" : "Блок удалён. Выберите другой блок."}</p>
     <div className="block-actions">

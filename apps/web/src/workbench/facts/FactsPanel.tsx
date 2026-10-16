@@ -27,7 +27,8 @@ export function FactsPanel({ facts, submit, pending, paused, timeline, hidden, c
     try { await submit(command); }
     catch (error) { setError({ message: factError(error), save: error instanceof AppliedIntentFailure }); throw error; }
   }
-  return <><aside className="facts-panel" aria-label="Факты резюме" id="rich-facts-panel" hidden={hidden}>
+  return <><aside className="facts-panel" aria-label="Факты резюме" id="rich-facts-panel" hidden={hidden}
+    onKeyDown={event => { if (event.key === "Escape") { event.preventDefault(); event.stopPropagation(); close(); } }}>
     <div className="panel-heading"><h2>Факты</h2><button className="icon" aria-label="Скрыть факты" onClick={close}><Icon name="close" /></button></div>
     {error && <p className="notice warning" role="alert">{error.message}</p>}
     {pending.length > 0 && <small className="uir-facts-pending" role="status">{paused ? "Ожидает повторного сохранения" : `Сохраняем изменения: ${pending.length}`}</small>}

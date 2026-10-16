@@ -891,7 +891,7 @@ export function RichEditor({ initial, acknowledge, onStatus, ref, onHistoryNavig
     </fieldset>
     <div className={appearance === "prototype" ? "editor-body uir-editor-body" : "rich-workspace"}>
     <fieldset className="contents uir-editor-controls" disabled={applying || recovery}>
-    {appearance === "prototype" ? <PrototypeFactsPanel facts={facts} submit={command => bridge.panel(command)} hidden={!factsVisible} close={() => setFactsVisible(false)}
+    {appearance === "prototype" ? <PrototypeFactsPanel facts={facts} submit={command => bridge.panel(command)} hidden={!factsVisible} close={() => { setFactsVisible(false); editor.focus(); }}
       pending={factIntents.pending.flatMap(intent => intent.kind === "panel" ? [intent.command] : [])} paused={factIntents.paused}
       timeline={ready ? <Timeline facts={facts} anchors={anchors} controls={timelineControls} prototype /> : null} />
       : <FactsPanel facts={facts} submit={command => bridge.panel(command)} hidden={!factsVisible} close={() => setFactsVisible(false)}
@@ -903,12 +903,12 @@ export function RichEditor({ initial, acknowledge, onStatus, ref, onHistoryNavig
     <div className={appearance === "prototype" ? "paper-scroll" : undefined}>
     <div className={appearance === "prototype" ? "cv-document resume-paper uir-prototype" : "cv-document"} style={appearance === "prototype" ? undefined : { ...referenceVariables, color: "#000000" }} data-project-id={initial.workspace.projectId}
       data-history-position={bridge.history?.position ?? 0} data-history-length={bridge.history?.length ?? 0} data-composing={bridge.composing}>
-      {editorWarning && <p role="alert" className="cv-editor-warning">{editorWarning}<button onClick={() => setEditorWarning("")}>Закрыть</button></p>}
+      {editorWarning && <p role="alert" className="cv-editor-warning">{editorWarning}<button className="text-button" onClick={() => setEditorWarning("")}>Закрыть</button></p>}
       {syncRecords.filter(record => ["failed", "conflict", "pending", "stale"].includes(record.status)).map(record => <p key={record.id} className="cv-editor-warning" role="status">
         {record.status === "failed" ? `Синхронизация не завершена: ${record.errorCode ?? "ошибка"}` : record.status === "conflict" ? "Есть другие упоминания. Проверьте связанные факты." : record.status === "stale" ? "Предложение устарело. Ваши изменения сохранены." : record.errorCode === "OPERATION_INTERRUPTED" ? "Синхронизация была прервана." : "Синхронизация…"}
-        {record.status === "conflict" && <button onClick={() => void bridge.resolve(record.id).catch(error => setEditorWarning(error instanceof Error ? error.message : "Не удалось обновить"))}>Обновить связанные поля</button>}
-        <button onClick={() => void bridge.retry(record.id).catch(error => setEditorWarning(error instanceof Error ? error.message : "Не удалось повторить"))}>Повторить</button>
-        <button onClick={() => void projectRequest(`/${initial.workspace.projectId}/sync/${record.id}`, "POST", { status: "stale" }).then(response => setSyncRecords(response.workspace.syncRecords))}>Закрыть</button>
+        {record.status === "conflict" && <button className="text-button" onClick={() => void bridge.resolve(record.id).catch(error => setEditorWarning(error instanceof Error ? error.message : "Не удалось обновить"))}>Обновить связанные поля</button>}
+        <button className="text-button" onClick={() => void bridge.retry(record.id).catch(error => setEditorWarning(error instanceof Error ? error.message : "Не удалось повторить"))}>Повторить</button>
+        <button className="text-button" onClick={() => void projectRequest(`/${initial.workspace.projectId}/sync/${record.id}`, "POST", { status: "stale" }).then(response => setSyncRecords(response.workspace.syncRecords))}>Закрыть</button>
       </p>)}
       {appearance === "prototype" && <div className="paper-kicker"><span>РЕЗЮМЕ СПЕЦИАЛИСТА</span><span>F / РЕЗЮМЕ</span></div>}
       <div className={appearance === "prototype" ? "uir-engine-sheet" : "cv-sheet"}>{appearance === "prototype" ? <span className="template-wordmark" aria-label="generic">generic</span> : <img className="cv-template-brand" src={brand} alt="Generic" />}

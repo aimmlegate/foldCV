@@ -2,10 +2,10 @@ import type { DateCascadeProposal } from "../../contracts/generated/date_cascade
 import { Dialog } from "../ui/Dialog";
 import { Button } from "../ui/Button";
 
-export function DatePreview({ proposal, job, reason, busy, error, close, apply }: {
-  proposal: DateCascadeProposal; job: (id: string) => string; reason: string; busy: boolean; error: string; close: () => void; apply: () => void;
+export function DatePreview({ proposal, job, reason, busy, error, close, apply, returnFocus }: {
+  proposal: DateCascadeProposal; job: (id: string) => string; reason: string; busy: boolean; error: string; close: () => void; apply: () => void; returnFocus: HTMLElement | null;
 }) {
-  return <Dialog open title="Проверить даты" close={() => { if (!busy) close(); }}>
+  return <Dialog open title="Проверить даты" returnFocus={returnFocus} close={() => { if (!busy) close(); }}>
     {proposal.status === "available" ? <><p className="dialog-copy">Параллельная работа допустима. Если это ошибка, проверьте предлагаемый сдвиг.</p>
       {proposal.shifts.map(shift => <div key={shift.periodId}>
         <div className="timeline-pair"><div><small>Сейчас</small><strong>{job(shift.jobId)}</strong><p>{shift.before.start.rawText} — {shift.before.end.rawText}</p></div>

@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { TimelineReport } from "../contracts/generated/timeline_report";
 import type { DateCascadeProposal } from "../contracts/generated/date_cascade_proposal";
 import type { WorkingFacts } from "../contracts/generated/working_facts";
@@ -22,6 +22,7 @@ const reasons: Record<string, string> = {
 export function Timeline({ facts, anchors, controls, prototype = false }: { facts: WorkingFacts; anchors: DateAnchor[]; controls: TimelineControls; prototype?: boolean }) {
   const [report, setReport] = useState<TimelineReport | null>(null), [proposal, setProposal] = useState<DateCascadeProposal | null>(null);
   const [error, setError] = useState(""), [busy, setBusy] = useState(false);
+  const previewTrigger = useRef<HTMLButtonElement | null>(null);
   const factsKey = JSON.stringify(facts);
   useEffect(() => {
     let active = true;
@@ -52,14 +53,14 @@ export function Timeline({ facts, anchors, controls, prototype = false }: { fact
     {overlaps.length > 0 && <details open><summary>Пересечения: {overlaps.length}</summary><small>Параллельная работа допустима. Сохранение и экспорт доступны.</small>
       <ul>{overlaps.map(warning => <li key={warning.id}>{warning.certainty === "certain" ? "Пересечение" : "Возможное пересечение"}: {warning.periodIds.map(period).join(" / ")}</li>)}</ul>
       {anchors.filter(anchor => overlaps.some(warning => warning.periodIds.includes(anchor.periodId))).map(anchor => <button key={anchor.periodId} disabled={busy}
-        onClick={() => void preview(anchor)}>Предпросмотр сдвига: {period(anchor.periodId)}</button>)}
+        onClick={event => { previewTrigger.current = event.currentTarget; void preview(anchor); }}>Предпросмотр сдвига: {period(anchor.periodId)}</button>)}
       <button disabled={busy} onClick={() => { setProposal(null); setError(""); }}>Оставить параллельные периоды</button>
     </details>}
     {report?.warnings.filter(warning => warning.kind !== "overlap").map(warning => <small key={warning.id}>
       {warning.kind === "future" ? "Дата может быть в будущем" : warning.code === "OPEN_PERIOD" ? "Открытый период" : "Проверьте дату"}: {warning.periodIds.map(period).join(" / ")}</small>)}
     {error && <p role="status">{error}</p>}
     {proposal && prototype ? <DatePreview proposal={proposal} job={job} reason={reasons[proposal.reason ?? ""] ?? "Сдвиг недоступен. Проверьте периоды вручную."}
-      busy={busy} error={error} close={() => setProposal(null)} apply={() => { setBusy(true); setError(""); void controls.apply(proposal).then(() => setProposal(null))
+      busy={busy} error={error} returnFocus={previewTrigger.current} close={() => setProposal(null)} apply={() => { setBusy(true); setError(""); void controls.apply(proposal).then(() => setProposal(null))
         .catch(error => setError(error instanceof Error ? error.message : "Предпросмотр устарел")).finally(() => setBusy(false)); }} /> : proposal && <div className="rich-cascade" role="region" aria-label="Предпросмотр сдвига">
       {proposal.status === "available" ? <><p>Предлагаемые изменения</p><ul>{proposal.shifts.map(shift => <li key={shift.periodId}>
         {job(shift.jobId)}: {shift.before.start.rawText} — {shift.before.end.rawText} → {shift.after.start.rawText} — {shift.after.end.rawText}

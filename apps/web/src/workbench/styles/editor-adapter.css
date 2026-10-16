@@ -126,6 +126,8 @@
 [data-uir-engine-ui] .uir-selection-action:hover { background: var(--accent-hover); }
 .editor-toolbar .tool[aria-pressed="true"] { background: var(--wash); color: var(--accent); }
 .uir-editor-body .facts-panel { order: 1; }
+.uir-editor-body .fact-edit { overflow-wrap: anywhere; }
+.modal { font: 13px var(--sans); overflow-wrap: anywhere; }
 .technology-chip[aria-busy="true"] { opacity: .65; outline: 1px dashed var(--accent); outline-offset: -1px; }
 .uir-facts-pending, .uir-timeline { display: block; margin-top: 10px; font-size: 10px; line-height: 1.6; color: var(--muted); }
 .uir-timeline small { display: block; }
