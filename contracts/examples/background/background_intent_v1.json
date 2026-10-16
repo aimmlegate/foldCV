@@ -1,0 +1,20 @@
+{
+  "schemaVersion": 1,
+  "id": "intent-one",
+  "jobId": "job-one",
+  "proposalId": "proposal-one",
+  "projectId": "project-one",
+  "lineage": "lineage-one",
+  "clientMutationId": "mutation-one",
+  "requestSha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "beforeWorkspaceSha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "afterWorkspaceSha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "afterGenerationsSha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "candidateRef": "candidate-one",
+  "previousRef": "previous-one",
+  "writerEpoch": 1,
+  "incarnation": "connection-one",
+  "barrierGeneration": 1,
+  "phase": "intent_stored",
+  "assetPins": []
+}

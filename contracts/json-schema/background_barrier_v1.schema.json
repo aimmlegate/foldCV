@@ -1,0 +1,97 @@
+{
+  "additionalProperties": false,
+  "properties": {
+    "acknowledgedRevision": {
+      "minimum": 1,
+      "title": "Acknowledgedrevision",
+      "type": "integer"
+    },
+    "actionCursor": {
+      "maximum": 9007199254740991,
+      "minimum": 0,
+      "title": "Actioncursor",
+      "type": "integer"
+    },
+    "expiresAt": {
+      "format": "date-time",
+      "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(?:\\.\\d+)?(?:Z|\\+00:00)$",
+      "title": "Expiresat",
+      "type": "string"
+    },
+    "generation": {
+      "minimum": 1,
+      "title": "Generation",
+      "type": "integer"
+    },
+    "incarnation": {
+      "maxLength": 128,
+      "minLength": 1,
+      "pattern": "^[A-Za-z0-9_-]+$",
+      "title": "Incarnation",
+      "type": "string"
+    },
+    "lineage": {
+      "maxLength": 128,
+      "minLength": 1,
+      "pattern": "^[A-Za-z0-9_-]+$",
+      "title": "Lineage",
+      "type": "string"
+    },
+    "projectId": {
+      "maxLength": 128,
+      "minLength": 1,
+      "pattern": "^[A-Za-z0-9_-]+$",
+      "title": "Projectid",
+      "type": "string"
+    },
+    "schemaVersion": {
+      "const": 1,
+      "title": "Schemaversion",
+      "type": "integer"
+    },
+    "state": {
+      "enum": [
+        "acked",
+        "revoked",
+        "commit_claimed",
+        "resolved"
+      ],
+      "title": "State",
+      "type": "string"
+    },
+    "token": {
+      "maxLength": 128,
+      "minLength": 32,
+      "pattern": "^[A-Za-z0-9_-]+$",
+      "title": "Token",
+      "type": "string"
+    },
+    "touchGeneration": {
+      "maximum": 9007199254740991,
+      "minimum": 0,
+      "title": "Touchgeneration",
+      "type": "integer"
+    },
+    "writerEpoch": {
+      "minimum": 1,
+      "title": "Writerepoch",
+      "type": "integer"
+    }
+  },
+  "required": [
+    "schemaVersion",
+    "projectId",
+    "lineage",
+    "writerEpoch",
+    "incarnation",
+    "generation",
+    "token",
+    "acknowledgedRevision",
+    "actionCursor",
+    "touchGeneration",
+    "expiresAt",
+    "state"
+  ],
+  "title": "PublicationBarrierV1",
+  "type": "object"
+}

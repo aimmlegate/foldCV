@@ -3,7 +3,9 @@
 from __future__ import annotations
 
 import argparse
+from datetime import datetime, timezone
 import importlib.util
+import hashlib
 import json
 import os
 from pathlib import Path
@@ -12,9 +14,12 @@ import re
 import subprocess
 import sys
 import tempfile
-
+import uuid
 
 ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(ROOT))
+from tools.background_evidence import ExecutionReportV1, assert_report as assert_background_report, failure_history, source_hashes as background_source_hashes
+
 WEB = ROOT / "apps/web"
 PYTHON = ROOT / ".venv/bin/python"
 SOFFICE = ROOT / ".tools/LibreOffice.app/Contents/MacOS/soffice"
@@ -75,15 +80,87 @@ def require_converter() -> None:
             raise SystemExit(f"Missing or changed app-local font: {font.name}")
 
 
-def pytest_group(name: str) -> None:
+def background_spec() -> dict:
+    data = json.loads((ROOT / "tests/requirements.json").read_text())
+    spec = data["backgroundExecution"]
+    report_schema = json.loads((ROOT / spec["reportSchema"]).read_text())
+    if report_schema != ExecutionReportV1.model_json_schema():
+        raise SystemExit("NB execution report schema drift")
+    matrix = json.loads((ROOT / "docs/gui/handoffs/BACKGROUND-WORK/test-matrix.json").read_text())
+    due = {v["id"] for c in matrix["cases"] for v in c["requiredVariants"] if v["requiredBy"] in spec["coveredSlices"]}
+    if set(spec["bindings"]) != due or not due:
+        raise SystemExit("NB matrix due variants do not match execution bindings")
+    matrix_bindings = {b["variant"]: b["nodes"] for c in matrix["cases"] for b in c["testBindings"] if b["suite"] == "fast"}
+    if any(matrix_bindings.get(variant) != nodes for variant, nodes in spec["bindings"].items()):
+        raise SystemExit("NB matrix executable identities do not match the runner")
+    assert_mapped_python_suites([{"tests": [node for nodes in spec["bindings"].values() for node in nodes]}])
+    return spec
+
+
+def background_context(root: Path, suite: str, sources: dict[str, str]) -> dict:
+    return {"runId": uuid.uuid4().hex, "suite": suite, "sourceHashes": sources,
+        "startedAt": datetime.now(timezone.utc).isoformat(), "reportPath": str(root.resolve() / "execution.json")}
+
+
+def pytest_group(name: str, evidence_dir: Path | None = None, diagnosis: Path | None = None) -> None:
     require_python()
     targets = PYTHON_SUITES[name]
     with tempfile.TemporaryDirectory(prefix="foldcv-coverage-") as temp:
+        temp_root = Path(temp).resolve()
         env = safe_env()
-        env["COVERAGE_FILE"] = str(Path(temp) / ".coverage")
-        run([str(PYTHON), "-m", "pytest", "-q", *targets, "--cov=packages", "--cov=spikes",
-             "--cov=tools", "--cov=services/api/src/resume_api", "--cov-branch",
-             "--cov-report=term-missing:skip-covered"], env=env)
+        env["COVERAGE_FILE"] = str(temp_root / ".coverage")
+        arguments = []
+        spec = background_spec() if name == "fast" else None
+        history = []
+        retained = []
+        if spec is not None:
+            context = background_context(temp_root, name, background_source_hashes(spec["sources"]))
+            history_root = ROOT / "tmp/checks-background"
+            history = failure_history(history_root, context["sourceHashes"], diagnosis)
+            if evidence_dir is not None and evidence_dir.parent != history_root:
+                history.extend(failure_history(evidence_dir.parent, context["sourceHashes"], diagnosis))
+            history = list({item["runId"]: item for item in history}.values())
+            retained = [history_root / context["runId"]]
+            context_file = temp_root / "context.json"
+            context_file.write_text(json.dumps(context))
+            env["FOLDCV_BACKGROUND_CONTEXT"] = str(context_file)
+            arguments = ["-p", "tools.background_pytest"]
+        if evidence_dir is not None:
+            retained.append(evidence_dir)
+        for directory in retained:
+            directory.mkdir(parents=True, exist_ok=False)
+            if spec is not None:
+                (directory / "context.json").write_bytes(context_file.read_bytes())
+        failure = None
+        try:
+            run([str(PYTHON), "-m", "pytest", "-q", *targets, *arguments, "--cov=packages", "--cov=spikes",
+                 "--cov=tools", "--cov=services/api/src/resume_api", "--cov-branch",
+                 "--cov-report=term-missing:skip-covered", "--cov-report=json:" + str(temp_root / "branches.json")], env=env)
+        except BaseException as error:
+            failure = error
+        finally:
+            for directory in retained:
+                for filename in ("execution.json", "branches.json", "context.json"):
+                    path = temp_root / filename
+                    if path.is_file():
+                        (directory / filename).write_bytes(path.read_bytes())
+                (directory / "history.json").write_text(json.dumps(history, indent=2) + "\n")
+        if failure is not None:
+            raise failure
+        if spec is not None:
+            current = background_source_hashes(spec["sources"])
+            if current != context["sourceHashes"]:
+                raise SystemExit("NB source changed during execution")
+            coverage = assert_background_report(Path(context["reportPath"]), run_id=context["runId"], suite=name,
+                sources=current, started_at=context["startedAt"], bindings={**spec["bindings"], **spec["checks"]},
+                required_traces=spec["requiredTraces"], required_actions=set(spec["requiredActions"]),
+                required_orders=set(spec["requiredOrders"]))
+            for directory in retained:
+                (directory / "variant-results.json").write_text(json.dumps(coverage, indent=2) + "\n")
+                (directory / "validation.json").write_text(json.dumps({"runId": context["runId"], "outcome": "passed",
+                    "sourceSha256": hashlib.sha256(json.dumps(current, sort_keys=True, separators=(",", ":")).encode()).hexdigest(),
+                    "reportSha256": hashlib.sha256((directory / "execution.json").read_bytes()).hexdigest()}) + "\n")
+            print(f"NB executed evidence: {len(spec['bindings'])} due variants, {len(spec['requiredTraces'])} reference traces", flush=True)
 
 
 def assert_prototype_collection(mapped: object, collected: set[str]) -> None:
@@ -123,7 +200,8 @@ def validate_map() -> None:
     expected = {"C01", "X01", "X02", "F01", "P01", "P02", "G01", "G02", "G03", "S01",
                 "U01", "U02", "D01", "D02", "A01", "A02", "E01", "E02", "R01", "B01", "N01", "L01",
                 "NE-RICH", "NE-HISTORY", "NE-ASSETS", "NE-SYNC", "NE-FACTS", "NE-DATES", "NE-TEMPLATE",
-                "AG-RUNTIME", "AG-MODELS", "AG-WEB", "AG-EDITS", "AG-HISTORY", "AG-STORAGE", "AG-UI"}
+                "AG-RUNTIME", "AG-MODELS", "AG-WEB", "AG-EDITS", "AG-HISTORY", "AG-STORAGE", "AG-UI",
+                "NB-CONTRACTS", "NB-JOBS", "NB-PUBLICATION", "NB-WRITER", "NB-FIXED", "NB-UI", "NB-PARALLEL"}
     if ids != expected or len(entries) != len(expected):
         raise SystemExit("Requirement map IDs do not match docs/gui/testing.md")
     assert_partial_checks(entries, data.get("partialChecks"))
@@ -154,6 +232,8 @@ def validate_map() -> None:
         if (entry["status"] == "unimplemented") != (not entry["tests"]):
             raise SystemExit(f"Invalid test mapping for {entry['id']}")
         for node in entry["tests"]:
+            if entry["id"].startswith("NB-") and node.startswith("apps/web/"):
+                raise SystemExit("NB Node bindings require an exact execution reporter; browser evidence is manual T3")
             if node.startswith("apps/web/unit/"):
                 file, _, name = node.partition("::")
                 found = (ROOT / file).is_file() and name in state_names
@@ -161,7 +241,7 @@ def validate_map() -> None:
                 file, _, name = node.partition("::")
                 found = (ROOT / file).is_file() and (Path(file).name, name) in browser_names
             else:
-                found = node in mapped_ids
+                found = node in (collected if entry["id"].startswith("NB-") else mapped_ids)
             if not found:
                 raise SystemExit(f"Missing mapped test: {node}")
     for name, node in data["foundation"].items():
@@ -189,6 +269,8 @@ def browser() -> None:
 def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("group", choices=["fast", "integration-render", "browser"])
+    parser.add_argument("--evidence-dir", type=Path)
+    parser.add_argument("--nb-diagnosis", type=Path)
     args = parser.parse_args()
     if args.group == "fast":
         require_node()
@@ -197,10 +279,10 @@ def main() -> None:
                         ["npm", "run", "contracts:check"], ["npm", "run", "test:contracts"],
                         ["npm", "run", "build"]):
             run(command, WEB)
-        pytest_group("fast")
+        pytest_group("fast", args.evidence_dir, args.nb_diagnosis)
     elif args.group == "integration-render":
         require_converter()
-        pytest_group("integration-render")
+        pytest_group("integration-render", args.evidence_dir)
     else:
         browser()
 

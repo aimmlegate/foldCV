@@ -2993,5 +2993,1045 @@
   {"name": "reject clear record", "contract": "rich_panel_request", "base": "rich_panel_request", "valid": false, "edits": [{"op": "set", "path": ["recordId"], "value": "technology-1"}]},
   {"name": "reject clear period", "contract": "rich_panel_request", "base": "rich_panel_request", "valid": false, "edits": [{"op": "set", "path": ["periodId"], "value": "period-1"}]},
   {"name": "reject clear values", "contract": "rich_panel_request", "base": "rich_panel_request", "valid": false, "edits": [{"op": "set", "path": ["values"], "value": {"display": "Rust"}}]},
-  {"name": "reject unknown panel operation", "contract": "rich_panel_request", "base": "rich_panel_request", "valid": false, "edits": [{"op": "set", "path": ["operation"], "value": "clear_all"}]}
+  {"name": "reject unknown panel operation", "contract": "rich_panel_request", "base": "rich_panel_request", "valid": false, "edits": [{"op": "set", "path": ["operation"], "value": "clear_all"}]},
+  {
+    "name": "background_apply_v2_valid",
+    "contract": "background_apply_v2",
+    "base": "background_apply_v2",
+    "valid": true,
+    "edits": []
+  },
+  {
+    "name": "background_barrier_v1_valid",
+    "contract": "background_barrier_v1",
+    "base": "background_barrier_v1",
+    "valid": true,
+    "edits": []
+  },
+  {
+    "name": "background_draft_v1_valid",
+    "contract": "background_draft_v1",
+    "base": "background_draft_v1",
+    "valid": true,
+    "edits": []
+  },
+  {
+    "name": "background_event_v1_valid",
+    "contract": "background_event_v1",
+    "base": "background_event_v1",
+    "valid": true,
+    "edits": []
+  },
+  {
+    "name": "background_proposal_v1_valid",
+    "contract": "background_proposal_v1",
+    "base": "background_proposal_v1",
+    "valid": true,
+    "edits": []
+  },
+  {
+    "name": "background_receipt_v1_valid",
+    "contract": "background_receipt_v1",
+    "base": "background_receipt_v1",
+    "valid": true,
+    "edits": []
+  },
+  {
+    "name": "background_saved_v2_valid",
+    "contract": "background_apply_v2",
+    "base": "background_saved_v2",
+    "valid": true,
+    "edits": []
+  },
+  {
+    "name": "background_scope_guard_v1_valid",
+    "contract": "background_scope_guard_v1",
+    "base": "background_scope_guard_v1",
+    "valid": true,
+    "edits": []
+  },
+  {
+    "name": "background_snapshot_v1_valid",
+    "contract": "background_snapshot_v1",
+    "base": "background_snapshot_v1",
+    "valid": true,
+    "edits": []
+  },
+  {
+    "name": "background_submission_v1_valid",
+    "contract": "background_submission_v1",
+    "base": "background_submission_v1",
+    "valid": true,
+    "edits": []
+  },
+  {
+    "name": "background_writer_v1_valid",
+    "contract": "background_writer_v1",
+    "base": "background_writer_v1",
+    "valid": true,
+    "edits": []
+  },
+  {
+    "name": "background_deferred_not_saved",
+    "contract": "background_apply_v2",
+    "base": "background_apply_v2",
+    "valid": false,
+    "edits": [
+      {
+        "op": "set",
+        "path": [
+          "durable"
+        ],
+        "value": true
+      }
+    ]
+  },
+  {
+    "name": "background_proposal_not_durable_one",
+    "contract": "background_apply_v2",
+    "base": "background_apply_v2",
+    "valid": false,
+    "edits": [
+      {
+        "op": "set",
+        "path": [
+          "durable"
+        ],
+        "value": 1
+      }
+    ]
+  },
+  {
+    "name": "background_stored_not_numeric",
+    "contract": "background_apply_v2",
+    "base": "background_apply_v2",
+    "valid": false,
+    "edits": [
+      {
+        "op": "set",
+        "path": [
+          "proposalStored"
+        ],
+        "value": 1
+      }
+    ]
+  },
+  {
+    "name": "background_version_not_boolean",
+    "contract": "background_snapshot_v1",
+    "base": "background_snapshot_v1",
+    "valid": false,
+    "edits": [
+      {
+        "op": "set",
+        "path": [
+          "schemaVersion"
+        ],
+        "value": true
+      }
+    ]
+  },
+  {
+    "name": "background_pending_not_old_enum",
+    "contract": "background_apply_v2",
+    "base": "background_apply_v2",
+    "valid": false,
+    "edits": [
+      {
+        "op": "set",
+        "path": [
+          "schemaVersion"
+        ],
+        "value": 1
+      }
+    ]
+  },
+  {
+    "name": "background_wrong_class",
+    "contract": "background_submission_v1",
+    "base": "background_submission_v1",
+    "valid": false,
+    "edits": [
+      {
+        "op": "set",
+        "path": [
+          "schedulingClass"
+        ],
+        "value": "interactive"
+      }
+    ]
+  },
+  {
+    "name": "background_duplicate_tools",
+    "contract": "background_submission_v1",
+    "base": "background_submission_v1",
+    "valid": false,
+    "edits": [
+      {
+        "op": "set",
+        "path": [
+          "tools"
+        ],
+        "value": [
+          "get_resume_context",
+          "get_resume_context"
+        ]
+      }
+    ]
+  },
+  {
+    "name": "background_check_only_write",
+    "contract": "background_submission_v1",
+    "base": "background_submission_v1",
+    "valid": false,
+    "edits": [
+      {
+        "op": "set",
+        "path": [
+          "allowEdits"
+        ],
+        "value": false
+      }
+    ]
+  },
+  {
+    "name": "background_wrong_stage",
+    "contract": "background_submission_v1",
+    "base": "background_submission_v1",
+    "valid": false,
+    "edits": [
+      {
+        "op": "set",
+        "path": [
+          "models",
+          0,
+          "stage"
+        ],
+        "value": "rewrite"
+      }
+    ]
+  },
+  {
+    "name": "background_wrong_input",
+    "contract": "background_submission_v1",
+    "base": "background_submission_v1",
+    "valid": false,
+    "edits": [
+      {
+        "op": "set",
+        "path": [
+          "input",
+          "kind"
+        ],
+        "value": "rich_sync"
+      }
+    ]
+  },
+  {
+    "name": "background_forged_saved",
+    "contract": "background_snapshot_v1",
+    "base": "background_snapshot_v1",
+    "valid": false,
+    "edits": [
+      {
+        "op": "set",
+        "path": [
+          "publication"
+        ],
+        "value": "saved"
+      }
+    ]
+  },
+  {
+    "name": "background_missing_proposal",
+    "contract": "background_snapshot_v1",
+    "base": "background_snapshot_v1",
+    "valid": false,
+    "edits": [
+      {
+        "op": "set",
+        "path": [
+          "proposalId"
+        ],
+        "value": null
+      }
+    ]
+  },
+  {
+    "name": "background_late_accept",
+    "contract": "background_proposal_v1",
+    "base": "background_proposal_v1",
+    "valid": false,
+    "edits": [
+      {
+        "op": "set",
+        "path": [
+          "acceptedAt"
+        ],
+        "value": "2026-10-16T12:03:00Z"
+      }
+    ]
+  },
+  {
+    "name": "background_revocation_cause",
+    "contract": "background_proposal_v1",
+    "base": "background_proposal_v1",
+    "valid": false,
+    "edits": [
+      {
+        "op": "set",
+        "path": [
+          "authority"
+        ],
+        "value": "revoked"
+      }
+    ]
+  },
+  {
+    "name": "background_single_payload_ref",
+    "contract": "background_proposal_v1",
+    "base": "background_proposal_v1",
+    "valid": false,
+    "edits": [
+      {
+        "op": "set",
+        "path": [
+          "payload",
+          "proposedSteps"
+        ],
+        "value": []
+      }
+    ]
+  },
+  {
+    "name": "background_oversized_proposal",
+    "contract": "background_proposal_v1",
+    "base": "background_proposal_v1",
+    "valid": false,
+    "edits": [
+      {
+        "op": "set",
+        "path": [
+          "payloadBytes"
+        ],
+        "value": 524289
+      }
+    ]
+  },
+  {
+    "name": "background_wrong_event",
+    "contract": "background_event_v1",
+    "base": "background_event_v1",
+    "valid": false,
+    "edits": [
+      {
+        "op": "set",
+        "path": [
+          "jobId"
+        ],
+        "value": "another-job"
+      }
+    ]
+  },
+  {
+    "name": "background_wrong_generation",
+    "contract": "background_event_v1",
+    "base": "background_event_v1",
+    "valid": false,
+    "edits": [
+      {
+        "op": "set",
+        "path": [
+          "generation"
+        ],
+        "value": 2
+      }
+    ]
+  },
+  {
+    "name": "background_oversized_draft",
+    "contract": "background_draft_v1",
+    "base": "background_draft_v1",
+    "valid": false,
+    "edits": [
+      {
+        "op": "set",
+        "path": [
+          "payloadBytes"
+        ],
+        "value": 2097153
+      }
+    ]
+  },
+  {
+    "name": "background_zero_barrier_generation",
+    "contract": "background_barrier_v1",
+    "base": "background_barrier_v1",
+    "valid": false,
+    "edits": [
+      {
+        "op": "set",
+        "path": [
+          "generation"
+        ],
+        "value": 0
+      }
+    ]
+  },
+  {
+    "name": "background_negative_touch",
+    "contract": "background_scope_guard_v1",
+    "base": "background_scope_guard_v1",
+    "valid": false,
+    "edits": [
+      {
+        "op": "set",
+        "path": [
+          "reads",
+          0,
+          "generation"
+        ],
+        "value": -1
+      }
+    ]
+  },
+  {
+    "name": "background_unsafe_cursor",
+    "contract": "background_draft_v1",
+    "base": "background_draft_v1",
+    "valid": false,
+    "edits": [
+      {
+        "op": "set",
+        "path": [
+          "actionCursor"
+        ],
+        "value": 9007199254740992
+      }
+    ]
+  },
+  {
+    "name": "background_forged_agent_saved",
+    "contract": "background_apply_v2",
+    "base": "background_saved_v2",
+    "valid": false,
+    "edits": [
+      {
+        "op": "set",
+        "path": [
+          "result",
+          "receipt",
+          "disposition"
+        ],
+        "value": "waiting_for_sync"
+      }
+    ]
+  },
+  {
+    "name": "background_no_exact_agent_proof",
+    "contract": "background_apply_v2",
+    "base": "background_saved_v2",
+    "valid": false,
+    "edits": [
+      {
+        "op": "set",
+        "path": [
+          "result",
+          "project",
+          "workspace",
+          "mutationReplay"
+        ],
+        "value": []
+      }
+    ]
+  },
+  {
+    "name": "background_dirty_detach",
+    "contract": "background_writer_v1",
+    "base": "background_writer_v1",
+    "valid": false,
+    "edits": [
+      {
+        "op": "set",
+        "path": [
+          "status"
+        ],
+        "value": "clean_detached"
+      },
+      {
+        "op": "set",
+        "path": [
+          "draftId"
+        ],
+        "value": "draft-one"
+      }
+    ]
+  },
+  {
+    "name": "background_duplicate_scope",
+    "contract": "background_scope_guard_v1",
+    "base": "background_scope_guard_v1",
+    "valid": false,
+    "edits": [
+      {
+        "op": "clone",
+        "path": [
+          "reads"
+        ],
+        "from": [
+          "reads",
+          0
+        ]
+      }
+    ]
+  },
+  {
+    "name": "background_intent_v1_valid",
+    "contract": "background_intent_v1",
+    "base": "background_intent_v1",
+    "valid": true,
+    "edits": []
+  },
+  {
+    "name": "background_undo_v1_valid",
+    "contract": "background_undo_v1",
+    "base": "background_undo_v1",
+    "valid": true,
+    "edits": []
+  },
+  {
+    "name": "background_sidecar_v1_valid",
+    "contract": "background_sidecar_v1",
+    "base": "background_sidecar_v1",
+    "valid": true,
+    "edits": []
+  },
+  {
+    "name": "background_partial_intent",
+    "contract": "background_intent_v1",
+    "base": "background_intent_v1",
+    "valid": false,
+    "edits": [
+      {
+        "op": "set",
+        "path": [
+          "incarnation"
+        ],
+        "value": null
+      }
+    ]
+  },
+  {
+    "name": "background_double_undo_owner",
+    "contract": "background_undo_v1",
+    "base": "background_undo_v1",
+    "valid": false,
+    "edits": [
+      {
+        "op": "set",
+        "path": [
+          "writerEpoch"
+        ],
+        "value": 1
+      },
+      {
+        "op": "set",
+        "path": [
+          "incarnation"
+        ],
+        "value": "connection-one"
+      }
+    ]
+  },
+  {
+    "name": "background_empty_session_owner",
+    "contract": "background_undo_v1",
+    "base": "background_undo_v1",
+    "valid": false,
+    "edits": [
+      {
+        "op": "set",
+        "path": [
+          "owner"
+        ],
+        "value": "session"
+      }
+    ]
+  },
+  {
+    "name": "background_expired_epoch",
+    "contract": "background_sidecar_v1",
+    "base": "background_sidecar_v1",
+    "valid": false,
+    "edits": [
+      {
+        "op": "set",
+        "path": [
+          "expiredThroughEpoch"
+        ],
+        "value": 1
+      }
+    ]
+  },
+  {
+    "name": "background_microsecond_accept",
+    "contract": "background_proposal_v1",
+    "base": "background_proposal_v1",
+    "valid": true,
+    "edits": [
+      {
+        "op": "set",
+        "path": [
+          "acceptedAt"
+        ],
+        "value": "2026-10-16T12:00:00.000001Z"
+      },
+      {
+        "op": "set",
+        "path": [
+          "executionDeadline"
+        ],
+        "value": "2026-10-16T12:00:00.000002Z"
+      }
+    ]
+  },
+  {
+    "name": "background_equal_precision_deadline",
+    "contract": "background_proposal_v1",
+    "base": "background_proposal_v1",
+    "valid": false,
+    "edits": [
+      {
+        "op": "set",
+        "path": [
+          "acceptedAt"
+        ],
+        "value": "2026-10-16T12:00:00.100Z"
+      },
+      {
+        "op": "set",
+        "path": [
+          "executionDeadline"
+        ],
+        "value": "2026-10-16T12:00:00.1Z"
+      }
+    ]
+  },
+  {
+    "name": "background_attempt_v1_valid",
+    "contract": "background_attempt_v1",
+    "base": "background_attempt_v1",
+    "valid": true,
+    "edits": []
+  },
+  {
+    "name": "background_draft_payload_v1_valid",
+    "contract": "background_draft_payload_v1",
+    "base": "background_draft_payload_v1",
+    "valid": true,
+    "edits": []
+  },
+  {
+    "name": "background_web_disabled",
+    "contract": "background_submission_v1",
+    "base": "background_submission_v1",
+    "valid": false,
+    "edits": [
+      {
+        "op": "set",
+        "path": [
+          "tools"
+        ],
+        "value": [
+          "read_public_page"
+        ]
+      }
+    ]
+  },
+  {
+    "name": "background_start_needs_marker",
+    "contract": "background_attempt_v1",
+    "base": "background_attempt_v1",
+    "valid": false,
+    "edits": [
+      {
+        "op": "set",
+        "path": [
+          "childStartedAt"
+        ],
+        "value": null
+      }
+    ]
+  },
+  {
+    "name": "background_cleanup_needs_exit",
+    "contract": "background_attempt_v1",
+    "base": "background_attempt_v1",
+    "valid": false,
+    "edits": [
+      {
+        "op": "set",
+        "path": [
+          "state"
+        ],
+        "value": "running"
+      }
+    ]
+  },
+  {
+    "name": "background_duplicate_attempt",
+    "contract": "background_snapshot_v1",
+    "base": "background_snapshot_v1",
+    "valid": false,
+    "edits": [
+      {
+        "op": "set",
+        "path": [
+          "attempts"
+        ],
+        "value": [
+          {
+            "schemaVersion": 1,
+            "id": "attempt-one",
+            "stage": "agent",
+            "executionGeneration": 1,
+            "state": "completed",
+            "dispatchedAt": "2026-10-16T12:00:00Z",
+            "startupDeadline": "2026-10-16T12:00:15Z",
+            "activeDeadline": "2026-10-16T12:03:00Z",
+            "nativeStarted": true,
+            "childStartedAt": "2026-10-16T12:00:00Z",
+            "cleanupVerified": true,
+            "error": null
+          },
+          {
+            "schemaVersion": 1,
+            "id": "attempt-one",
+            "stage": "agent",
+            "executionGeneration": 1,
+            "state": "completed",
+            "dispatchedAt": "2026-10-16T12:00:00Z",
+            "startupDeadline": "2026-10-16T12:00:15Z",
+            "activeDeadline": "2026-10-16T12:03:00Z",
+            "nativeStarted": true,
+            "childStartedAt": "2026-10-16T12:00:00Z",
+            "cleanupVerified": true,
+            "error": null
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "name": "background_wrong_attempt_stage",
+    "contract": "background_snapshot_v1",
+    "base": "background_snapshot_v1",
+    "valid": false,
+    "edits": [
+      {
+        "op": "set",
+        "path": [
+          "attempts"
+        ],
+        "value": [
+          {
+            "schemaVersion": 1,
+            "id": "attempt-one",
+            "stage": "rewrite",
+            "executionGeneration": 1,
+            "state": "completed",
+            "dispatchedAt": "2026-10-16T12:00:00Z",
+            "startupDeadline": "2026-10-16T12:00:15Z",
+            "activeDeadline": "2026-10-16T12:03:00Z",
+            "nativeStarted": true,
+            "childStartedAt": "2026-10-16T12:00:00Z",
+            "cleanupVerified": true,
+            "error": null
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "name": "background_wrong_attempt_generation",
+    "contract": "background_snapshot_v1",
+    "base": "background_snapshot_v1",
+    "valid": false,
+    "edits": [
+      {
+        "op": "set",
+        "path": [
+          "attempts"
+        ],
+        "value": [
+          {
+            "schemaVersion": 1,
+            "id": "attempt-one",
+            "stage": "agent",
+            "executionGeneration": 2,
+            "state": "completed",
+            "dispatchedAt": "2026-10-16T12:00:00Z",
+            "startupDeadline": "2026-10-16T12:00:15Z",
+            "activeDeadline": "2026-10-16T12:03:00Z",
+            "nativeStarted": true,
+            "childStartedAt": "2026-10-16T12:00:00Z",
+            "cleanupVerified": true,
+            "error": null
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "name": "background_attempt_snapshot",
+    "contract": "background_snapshot_v1",
+    "base": "background_snapshot_v1",
+    "valid": true,
+    "edits": [
+      {
+        "op": "set",
+        "path": [
+          "attempts"
+        ],
+        "value": [
+          {
+            "schemaVersion": 1,
+            "id": "attempt-one",
+            "stage": "agent",
+            "executionGeneration": 1,
+            "state": "completed",
+            "dispatchedAt": "2026-10-16T12:00:00Z",
+            "startupDeadline": "2026-10-16T12:00:15Z",
+            "activeDeadline": "2026-10-16T12:03:00Z",
+            "nativeStarted": true,
+            "childStartedAt": "2026-10-16T12:00:00Z",
+            "cleanupVerified": true,
+            "error": null
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "name": "background_draft_invalid_document",
+    "contract": "background_draft_payload_v1",
+    "base": "background_draft_payload_v1",
+    "valid": false,
+    "edits": [
+      {
+        "op": "set",
+        "path": [
+          "document",
+          "regions"
+        ],
+        "value": []
+      }
+    ]
+  },
+  {
+    "name": "background_submicrosecond_deadline",
+    "contract": "background_proposal_v1",
+    "base": "background_proposal_v1",
+    "valid": false,
+    "edits": [
+      {
+        "op": "set",
+        "path": [
+          "acceptedAt"
+        ],
+        "value": "2026-10-16T12:00:00.0000001Z"
+      },
+      {
+        "op": "set",
+        "path": [
+          "executionDeadline"
+        ],
+        "value": "2026-10-16T12:00:00.0000002Z"
+      }
+    ]
+  },
+  {
+    "name": "background_saved_snapshot_valid",
+    "contract": "background_snapshot_v1",
+    "base": "background_saved_snapshot_v1",
+    "valid": true,
+    "edits": []
+  },
+  {
+    "name": "background_foreign_saved_receipt",
+    "contract": "background_snapshot_v1",
+    "base": "background_saved_snapshot_v1",
+    "valid": false,
+    "edits": [
+      {
+        "op": "set",
+        "path": [
+          "receipt",
+          "jobId"
+        ],
+        "value": "another-job"
+      }
+    ]
+  },
+  {
+    "name": "background_check_only_publication",
+    "contract": "background_snapshot_v1",
+    "base": "background_snapshot_v1",
+    "valid": false,
+    "edits": [
+      {
+        "op": "set",
+        "path": [
+          "submission",
+          "allowEdits"
+        ],
+        "value": false
+      },
+      {
+        "op": "set",
+        "path": [
+          "submission",
+          "tools"
+        ],
+        "value": [
+          "get_resume_context"
+        ]
+      },
+      {
+        "op": "set",
+        "path": [
+          "submission",
+          "guards",
+          "writes"
+        ],
+        "value": []
+      }
+    ]
+  },
+  {
+    "name": "background_saved_tool_requires_canonical_durability",
+    "contract": "background_apply_v2",
+    "base": "background_saved_v2",
+    "valid": false,
+    "edits": [
+      {
+        "op": "set",
+        "path": [
+          "result",
+          "receipt",
+          "durable"
+        ],
+        "value": false
+      },
+      {
+        "op": "set",
+        "path": [
+          "result",
+          "receipt",
+          "disposition"
+        ],
+        "value": "offered"
+      }
+    ]
+  },
+  {
+    "name": "background_fixed_capture_valid",
+    "contract": "background_submission_v1",
+    "base": "background_submission_v1",
+    "valid": true,
+    "edits": [
+      {
+        "op": "set",
+        "path": [
+          "kind"
+        ],
+        "value": "rewrite"
+      },
+      {
+        "op": "set",
+        "path": [
+          "schedulingClass"
+        ],
+        "value": "interactive"
+      },
+      {
+        "op": "set",
+        "path": [
+          "input",
+          "kind"
+        ],
+        "value": "rich_sync"
+      },
+      {
+        "op": "set",
+        "path": [
+          "models",
+          0,
+          "stage"
+        ],
+        "value": "rewrite"
+      },
+      {
+        "op": "set",
+        "path": [
+          "tools"
+        ],
+        "value": []
+      }
+    ]
+  },
+  {
+    "name": "background_fixed_capture_denies_agent_tools",
+    "contract": "background_submission_v1",
+    "base": "background_submission_v1",
+    "valid": false,
+    "edits": [
+      {
+        "op": "set",
+        "path": [
+          "kind"
+        ],
+        "value": "rewrite"
+      },
+      {
+        "op": "set",
+        "path": [
+          "schedulingClass"
+        ],
+        "value": "interactive"
+      },
+      {
+        "op": "set",
+        "path": [
+          "input",
+          "kind"
+        ],
+        "value": "rich_sync"
+      },
+      {
+        "op": "set",
+        "path": [
+          "models",
+          0,
+          "stage"
+        ],
+        "value": "rewrite"
+      }
+    ]
+  },
+  {
+    "name": "background_partial_inverse_owner",
+    "contract": "background_undo_v1",
+    "base": "background_undo_v1",
+    "valid": false,
+    "edits": [
+      {
+        "op": "set",
+        "path": [
+          "writerEpoch"
+        ],
+        "value": 1
+      }
+    ]
+  }
 ]

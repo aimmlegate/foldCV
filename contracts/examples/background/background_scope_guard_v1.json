@@ -1,0 +1,19 @@
+{
+  "schemaVersion": 1,
+  "reads": [
+    {
+      "kind": "entity",
+      "key": "block-one",
+      "generation": 1,
+      "fingerprint": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+    }
+  ],
+  "writes": [
+    {
+      "kind": "entity",
+      "key": "block-one",
+      "generation": 1,
+      "fingerprint": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+    }
+  ]
+}

@@ -38,6 +38,7 @@ def case_data(case: dict) -> object:
              "draft_request": DRAFT_REQUEST, "draft_proposal": DRAFT_PROPOSAL, "draft_result": DRAFT_RESULT}
     bases.update({path.stem: json.loads(path.read_text()) for path in (EXAMPLES / "recovery").glob("*.json")})
     bases.update({path.stem: json.loads(path.read_text()) for path in (EXAMPLES / "agent").glob("*.json")})
+    bases.update({path.stem: json.loads(path.read_text()) for path in (EXAMPLES / "background").glob("*.json")})
     data = copy.deepcopy(bases[case["base"]])
     for edit in case["edits"]:
         target = data

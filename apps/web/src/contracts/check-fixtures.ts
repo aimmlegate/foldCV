@@ -74,6 +74,11 @@ for (const name of ["agent_settings", "agent_run_request", "agent_message", "age
   "agent_commit_result", "agent_event", "agent_prepare_request", "agent_prepare_result", "agent_edit_receipt", "agent_run", "agent_read_snapshot"]) {
   bases[name] = read(`agent/${name}.json`);
 }
+for (const name of ["background_submission_v1", "background_snapshot_v1", "background_proposal_v1", "background_scope_guard_v1",
+  "background_writer_v1", "background_barrier_v1", "background_draft_v1", "background_receipt_v1", "background_apply_v2", "background_event_v1", "background_saved_v2",
+  "background_intent_v1", "background_undo_v1", "background_sidecar_v1", "background_attempt_v1", "background_draft_payload_v1", "background_saved_snapshot_v1"]) {
+  bases[name] = read(`background/${name}.json`);
+}
 for (const test of cases) {
   const source = bases[test.base];
   if (source === undefined) throw new Error(`unknown fixture base ${test.base}`);

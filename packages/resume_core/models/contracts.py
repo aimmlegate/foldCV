@@ -605,12 +605,14 @@ def validate_contract(kind: str, data: object) -> Wire:
     from ..gui_drafting import GUI_DRAFT_CONTRACTS
     from ..gui_projects import GUI_PROJECT_CONTRACTS
     from .agent import AGENT_CONTRACTS
+    from .background import BACKGROUND_CONTRACTS
     from ..rich_panel import RichPanelRequest
     models.update(RECOVERY_CONTRACTS)
     models.update(GUI_NORMALIZATION_CONTRACTS)
     models.update(GUI_DRAFT_CONTRACTS)
     models.update(GUI_PROJECT_CONTRACTS)
     models.update(AGENT_CONTRACTS)
+    models.update(BACKGROUND_CONTRACTS)
     models["rich_panel_request"] = RichPanelRequest
     if kind not in models:
         raise ValueError("unknown contract")

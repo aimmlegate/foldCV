@@ -1,0 +1,509 @@
+{
+  "$defs": {
+    "ActionCapture": {
+      "additionalProperties": false,
+      "properties": {
+        "actionId": {
+          "minLength": 1,
+          "title": "Actionid",
+          "type": "string"
+        },
+        "actionToken": {
+          "minimum": 0,
+          "title": "Actiontoken",
+          "type": "integer"
+        },
+        "dependencies": {
+          "items": {
+            "$ref": "#/$defs/DependencyStamp"
+          },
+          "title": "Dependencies",
+          "type": "array"
+        },
+        "sessionId": {
+          "minLength": 1,
+          "title": "Sessionid",
+          "type": "string"
+        }
+      },
+      "required": [
+        "sessionId",
+        "actionId",
+        "actionToken",
+        "dependencies"
+      ],
+      "title": "ActionCapture",
+      "type": "object"
+    },
+    "DependencyStamp": {
+      "additionalProperties": false,
+      "properties": {
+        "fingerprint": {
+          "anyOf": [
+            {
+              "pattern": "^[a-f0-9]{64}$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Fingerprint"
+        },
+        "id": {
+          "minLength": 1,
+          "title": "Id",
+          "type": "string"
+        },
+        "kind": {
+          "enum": [
+            "block",
+            "record",
+            "field",
+            "period",
+            "ownership",
+            "source",
+            "rules",
+            "asset",
+            "timeline_order"
+          ],
+          "title": "Kind",
+          "type": "string"
+        },
+        "revision": {
+          "minimum": 1,
+          "title": "Revision",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "kind",
+        "id",
+        "revision",
+        "fingerprint"
+      ],
+      "title": "DependencyStamp",
+      "type": "object"
+    },
+    "GenerationStamp": {
+      "additionalProperties": false,
+      "properties": {
+        "fingerprint": {
+          "pattern": "^[a-f0-9]{64}$",
+          "title": "Fingerprint",
+          "type": "string"
+        },
+        "generation": {
+          "maximum": 9007199254740991,
+          "minimum": 0,
+          "title": "Generation",
+          "type": "integer"
+        },
+        "key": {
+          "maxLength": 512,
+          "minLength": 1,
+          "title": "Key",
+          "type": "string"
+        },
+        "kind": {
+          "enum": [
+            "entity",
+            "structure",
+            "query",
+            "source",
+            "rules"
+          ],
+          "title": "Kind",
+          "type": "string"
+        }
+      },
+      "required": [
+        "kind",
+        "key",
+        "generation",
+        "fingerprint"
+      ],
+      "title": "GenerationStamp",
+      "type": "object"
+    },
+    "InputReference": {
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "maxLength": 128,
+          "minLength": 1,
+          "pattern": "^[A-Za-z0-9_-]+$",
+          "title": "Id",
+          "type": "string"
+        },
+        "kind": {
+          "enum": [
+            "agent_journal",
+            "rich_sync",
+            "processing"
+          ],
+          "title": "Kind",
+          "type": "string"
+        },
+        "sha256": {
+          "pattern": "^[a-f0-9]{64}$",
+          "title": "Sha256",
+          "type": "string"
+        }
+      },
+      "required": [
+        "kind",
+        "id",
+        "sha256"
+      ],
+      "title": "InputReference",
+      "type": "object"
+    },
+    "JobIdentity": {
+      "additionalProperties": false,
+      "properties": {
+        "lineage": {
+          "maxLength": 128,
+          "minLength": 1,
+          "pattern": "^[A-Za-z0-9_-]+$",
+          "title": "Lineage",
+          "type": "string"
+        },
+        "projectId": {
+          "maxLength": 128,
+          "minLength": 1,
+          "pattern": "^[A-Za-z0-9_-]+$",
+          "title": "Projectid",
+          "type": "string"
+        },
+        "requestEpoch": {
+          "minimum": 1,
+          "title": "Requestepoch",
+          "type": "integer"
+        },
+        "requestId": {
+          "maxLength": 128,
+          "minLength": 1,
+          "pattern": "^[A-Za-z0-9_-]+$",
+          "title": "Requestid",
+          "type": "string"
+        }
+      },
+      "required": [
+        "projectId",
+        "lineage",
+        "requestEpoch",
+        "requestId"
+      ],
+      "title": "JobIdentity",
+      "type": "object"
+    },
+    "ModelCapture": {
+      "additionalProperties": false,
+      "properties": {
+        "configSha256": {
+          "pattern": "^[a-f0-9]{64}$",
+          "title": "Configsha256",
+          "type": "string"
+        },
+        "model": {
+          "pattern": "^[a-zA-Z0-9][a-zA-Z0-9._-]{0,79}$",
+          "title": "Model",
+          "type": "string"
+        },
+        "stage": {
+          "enum": [
+            "agent",
+            "assessment",
+            "extraction",
+            "rewrite",
+            "reconciliation"
+          ],
+          "title": "Stage",
+          "type": "string"
+        }
+      },
+      "required": [
+        "stage",
+        "model",
+        "configSha256"
+      ],
+      "title": "ModelCapture",
+      "type": "object"
+    },
+    "RichPosition": {
+      "additionalProperties": false,
+      "properties": {
+        "blockId": {
+          "minLength": 1,
+          "title": "Blockid",
+          "type": "string"
+        },
+        "cellId": {
+          "anyOf": [
+            {
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Cellid"
+        },
+        "offset": {
+          "description": "UTF-16 code units within the block or cell.",
+          "minimum": 0,
+          "title": "Offset",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "blockId",
+        "cellId",
+        "offset"
+      ],
+      "title": "RichPosition",
+      "type": "object"
+    },
+    "RichSelection": {
+      "additionalProperties": false,
+      "properties": {
+        "anchor": {
+          "$ref": "#/$defs/RichPosition"
+        },
+        "blockIds": {
+          "items": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "minItems": 1,
+          "title": "Blockids",
+          "type": "array"
+        },
+        "capture": {
+          "$ref": "#/$defs/ActionCapture"
+        },
+        "head": {
+          "$ref": "#/$defs/RichPosition"
+        },
+        "kind": {
+          "enum": [
+            "text",
+            "blocks",
+            "table_cells"
+          ],
+          "title": "Kind",
+          "type": "string"
+        },
+        "textSha256": {
+          "pattern": "^[a-f0-9]{64}$",
+          "title": "Textsha256",
+          "type": "string"
+        }
+      },
+      "required": [
+        "kind",
+        "anchor",
+        "head",
+        "blockIds",
+        "capture",
+        "textSha256"
+      ],
+      "title": "RichSelection",
+      "type": "object"
+    },
+    "ScopeGuardV1": {
+      "additionalProperties": false,
+      "properties": {
+        "reads": {
+          "items": {
+            "$ref": "#/$defs/GenerationStamp"
+          },
+          "maxItems": 100,
+          "title": "Reads",
+          "type": "array"
+        },
+        "schemaVersion": {
+          "const": 1,
+          "title": "Schemaversion",
+          "type": "integer"
+        },
+        "writes": {
+          "items": {
+            "$ref": "#/$defs/GenerationStamp"
+          },
+          "maxItems": 100,
+          "title": "Writes",
+          "type": "array"
+        }
+      },
+      "required": [
+        "schemaVersion",
+        "reads",
+        "writes"
+      ],
+      "title": "ScopeGuardV1",
+      "type": "object"
+    },
+    "SelectionScope": {
+      "additionalProperties": false,
+      "properties": {
+        "kind": {
+          "const": "selection",
+          "title": "Kind",
+          "type": "string"
+        },
+        "selection": {
+          "$ref": "#/$defs/RichSelection"
+        }
+      },
+      "required": [
+        "kind",
+        "selection"
+      ],
+      "title": "SelectionScope",
+      "type": "object"
+    },
+    "WholeResumeScope": {
+      "additionalProperties": false,
+      "properties": {
+        "kind": {
+          "const": "resume",
+          "title": "Kind",
+          "type": "string"
+        }
+      },
+      "required": [
+        "kind"
+      ],
+      "title": "WholeResumeScope",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "accountGeneration": {
+      "minimum": 1,
+      "title": "Accountgeneration",
+      "type": "integer"
+    },
+    "allowEdits": {
+      "title": "Allowedits",
+      "type": "boolean"
+    },
+    "allowWeb": {
+      "title": "Allowweb",
+      "type": "boolean"
+    },
+    "guards": {
+      "$ref": "#/$defs/ScopeGuardV1"
+    },
+    "identity": {
+      "$ref": "#/$defs/JobIdentity"
+    },
+    "input": {
+      "$ref": "#/$defs/InputReference"
+    },
+    "kind": {
+      "enum": [
+        "agent",
+        "processing",
+        "rewrite",
+        "reconciliation"
+      ],
+      "title": "Kind",
+      "type": "string"
+    },
+    "models": {
+      "items": {
+        "$ref": "#/$defs/ModelCapture"
+      },
+      "maxItems": 2,
+      "minItems": 1,
+      "title": "Models",
+      "type": "array"
+    },
+    "payloadSha256": {
+      "pattern": "^[a-f0-9]{64}$",
+      "title": "Payloadsha256",
+      "type": "string"
+    },
+    "schedulingClass": {
+      "enum": [
+        "background",
+        "interactive",
+        "reconciliation"
+      ],
+      "title": "Schedulingclass",
+      "type": "string"
+    },
+    "schemaVersion": {
+      "const": 1,
+      "title": "Schemaversion",
+      "type": "integer"
+    },
+    "scope": {
+      "discriminator": {
+        "mapping": {
+          "resume": "#/$defs/WholeResumeScope",
+          "selection": "#/$defs/SelectionScope"
+        },
+        "propertyName": "kind"
+      },
+      "oneOf": [
+        {
+          "$ref": "#/$defs/WholeResumeScope"
+        },
+        {
+          "$ref": "#/$defs/SelectionScope"
+        }
+      ],
+      "title": "Scope"
+    },
+    "submittedAt": {
+      "format": "date-time",
+      "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(?:\\.\\d+)?(?:Z|\\+00:00)$",
+      "title": "Submittedat",
+      "type": "string"
+    },
+    "tools": {
+      "items": {
+        "enum": [
+          "get_resume_context",
+          "find_resume_content",
+          "get_working_facts",
+          "get_original_source",
+          "get_conversation_context",
+          "check_resume",
+          "read_public_page",
+          "publish_findings",
+          "prepare_edit_batch",
+          "apply_edit_batch"
+        ],
+        "type": "string"
+      },
+      "maxItems": 10,
+      "title": "Tools",
+      "type": "array"
+    }
+  },
+  "required": [
+    "schemaVersion",
+    "identity",
+    "payloadSha256",
+    "kind",
+    "schedulingClass",
+    "input",
+    "models",
+    "accountGeneration",
+    "tools",
+    "allowEdits",
+    "allowWeb",
+    "scope",
+    "guards",
+    "submittedAt"
+  ],
+  "title": "JobSubmissionV1",
+  "type": "object"
+}

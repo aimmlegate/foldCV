@@ -1765,6 +1765,142 @@
         "apps/web/unit/agent-presentation.test.ts::assistant drawer persistence contains only bounded dimensions and collapse state",
         "apps/web/unit/agent-presentation.test.ts::assistant Enter sends only outside composition and Shift retains a newline"
       ]
+    },
+    {
+      "id": "NB-CONTRACTS",
+      "status": "implemented",
+      "tests": [
+        "tests/foundation/test_runner_gates.py::test_background_report_rejects_broken_files_and_erased_failures[cancelled]",
+        "tests/foundation/test_runner_gates.py::test_background_report_rejects_broken_files_and_erased_failures[duplicate-key]",
+        "tests/foundation/test_runner_gates.py::test_background_report_rejects_broken_files_and_erased_failures[duplicate-trace]",
+        "tests/foundation/test_runner_gates.py::test_background_report_rejects_broken_files_and_erased_failures[empty-bindings]",
+        "tests/foundation/test_runner_gates.py::test_background_report_rejects_broken_files_and_erased_failures[empty]",
+        "tests/foundation/test_runner_gates.py::test_background_report_rejects_broken_files_and_erased_failures[incomplete]",
+        "tests/foundation/test_runner_gates.py::test_background_report_rejects_broken_files_and_erased_failures[initial-failure]",
+        "tests/foundation/test_runner_gates.py::test_background_report_rejects_broken_files_and_erased_failures[missing-parameter]",
+        "tests/foundation/test_runner_gates.py::test_background_report_rejects_broken_files_and_erased_failures[missing]",
+        "tests/foundation/test_runner_gates.py::test_background_report_rejects_broken_files_and_erased_failures[off-suite]",
+        "tests/foundation/test_runner_gates.py::test_background_report_rejects_broken_files_and_erased_failures[timeout]",
+        "tests/foundation/test_runner_gates.py::test_background_report_rejects_broken_files_and_erased_failures[truncated]",
+        "tests/foundation/test_runner_gates.py::test_background_report_rejects_broken_files_and_erased_failures[uncollected-result]",
+        "tests/foundation/test_runner_gates.py::test_background_report_rejects_broken_files_and_erased_failures[wrong-trace-hash]",
+        "tests/foundation/test_runner_gates.py::test_background_report_rejects_broken_files_and_erased_failures[wrong-trace-length]",
+        "tests/foundation/test_runner_gates.py::test_background_report_rejects_broken_files_and_erased_failures[wrong-trace-owner]",
+        "tests/foundation/test_runner_gates.py::test_background_report_rejects_broken_files_and_erased_failures[wrong-trace-seed]",
+        "tests/foundation/test_runner_gates.py::test_background_report_rejects_false_coverage[NB-G02:v01]",
+        "tests/foundation/test_runner_gates.py::test_background_report_rejects_false_coverage[NB-G02:v02]",
+        "tests/foundation/test_runner_gates.py::test_background_report_rejects_false_coverage[NB-G02:v03]",
+        "tests/foundation/test_runner_gates.py::test_background_report_rejects_false_coverage[NB-G02:v04]",
+        "tests/foundation/test_runner_gates.py::test_background_report_rejects_false_coverage[NB-G02:v05]",
+        "tests/foundation/test_runner_gates.py::test_background_report_rejects_false_coverage[NB-G02:v06]",
+        "tests/foundation/test_runner_gates.py::test_background_report_rejects_false_coverage[NB-G02:v07]",
+        "tests/foundation/test_runner_gates.py::test_background_report_rejects_false_coverage[NB-G02:v08]",
+        "tests/foundation/test_runner_gates.py::test_background_report_rejects_false_coverage[NB-G02:v09]",
+        "tests/foundation/test_runner_gates.py::test_background_report_rejects_false_coverage[NB-G02:v10]",
+        "tests/foundation/test_runner_gates.py::test_background_report_rejects_false_coverage[NB-G02:v11]",
+        "tests/foundation/test_runner_gates.py::test_background_report_rejects_false_coverage[NB-G02:v12]",
+        "tests/foundation/test_runner_gates.py::test_background_report_rejects_false_coverage[NB-G02:v13]",
+        "tests/foundation/test_runner_gates.py::test_background_report_rejects_false_coverage[NB-G02:v14]",
+        "tests/foundation/test_runner_gates.py::test_background_report_rejects_false_coverage[NB-G02:v15]",
+        "tests/foundation/test_runner_gates.py::test_background_report_rejects_false_coverage[NB-G02:v16]",
+        "tests/foundation/test_runner_gates.py::test_background_reporter_retains_real_skips_and_failed_phases",
+        "tests/foundation/test_runner_gates.py::test_background_retry_cannot_forget_a_prior_failed_run",
+        "tests/recovery/test_background_offline.py::test_attempt_spending_survives_failures_and_restart[NB-R03:v01]",
+        "tests/recovery/test_background_offline.py::test_attempt_spending_survives_failures_and_restart[NB-R03:v02]",
+        "tests/recovery/test_background_offline.py::test_attempt_spending_survives_failures_and_restart[NB-R03:v03]",
+        "tests/recovery/test_background_offline.py::test_attempt_spending_survives_failures_and_restart[NB-R03:v04]",
+        "tests/recovery/test_background_offline.py::test_attempt_spending_survives_failures_and_restart[NB-R03:v05]",
+        "tests/recovery/test_background_offline.py::test_attempt_spending_survives_failures_and_restart[NB-R03:v06]",
+        "tests/recovery/test_background_offline.py::test_barrier_timeout_keeps_canonical_result_and_post_timeout_input[claim_before_timeout]",
+        "tests/recovery/test_background_offline.py::test_barrier_timeout_keeps_canonical_result_and_post_timeout_input[timeout_before_claim]",
+        "tests/recovery/test_background_offline.py::test_check_only_capture_cannot_acquire_write_tools_or_use_interactive_admission",
+        "tests/recovery/test_background_offline.py::test_failed_fake_cleanup_retains_ownership_and_does_not_kill_a_neighbour",
+        "tests/recovery/test_background_offline.py::test_fake_process_identity_and_neighbour_cleanup",
+        "tests/recovery/test_background_offline.py::test_frozen_reference_corpus_is_reproducible_and_reaches_each_action[seed-00]",
+        "tests/recovery/test_background_offline.py::test_frozen_reference_corpus_is_reproducible_and_reaches_each_action[seed-01]",
+        "tests/recovery/test_background_offline.py::test_frozen_reference_corpus_is_reproducible_and_reaches_each_action[seed-02]",
+        "tests/recovery/test_background_offline.py::test_frozen_reference_corpus_is_reproducible_and_reaches_each_action[seed-03]",
+        "tests/recovery/test_background_offline.py::test_frozen_reference_corpus_is_reproducible_and_reaches_each_action[seed-04]",
+        "tests/recovery/test_background_offline.py::test_frozen_reference_corpus_is_reproducible_and_reaches_each_action[seed-05]",
+        "tests/recovery/test_background_offline.py::test_frozen_reference_corpus_is_reproducible_and_reaches_each_action[seed-06]",
+        "tests/recovery/test_background_offline.py::test_frozen_reference_corpus_is_reproducible_and_reaches_each_action[seed-07]",
+        "tests/recovery/test_background_offline.py::test_frozen_reference_corpus_is_reproducible_and_reaches_each_action[seed-08]",
+        "tests/recovery/test_background_offline.py::test_frozen_reference_corpus_is_reproducible_and_reaches_each_action[seed-09]",
+        "tests/recovery/test_background_offline.py::test_frozen_reference_corpus_is_reproducible_and_reaches_each_action[seed-10]",
+        "tests/recovery/test_background_offline.py::test_frozen_reference_corpus_is_reproducible_and_reaches_each_action[seed-11]",
+        "tests/recovery/test_background_offline.py::test_frozen_reference_corpus_is_reproducible_and_reaches_each_action[seed-12]",
+        "tests/recovery/test_background_offline.py::test_frozen_reference_corpus_is_reproducible_and_reaches_each_action[seed-13]",
+        "tests/recovery/test_background_offline.py::test_frozen_reference_corpus_is_reproducible_and_reaches_each_action[seed-14]",
+        "tests/recovery/test_background_offline.py::test_frozen_reference_corpus_is_reproducible_and_reaches_each_action[seed-15]",
+        "tests/recovery/test_background_offline.py::test_job_tool_capture_uses_the_actual_bound_mcp_names",
+        "tests/recovery/test_background_offline.py::test_offline_guard_rejects_production_boundaries[NB-G01:v01]",
+        "tests/recovery/test_background_offline.py::test_offline_guard_rejects_production_boundaries[NB-G01:v02]",
+        "tests/recovery/test_background_offline.py::test_offline_guard_rejects_production_boundaries[NB-G01:v03]",
+        "tests/recovery/test_background_offline.py::test_offline_guard_rejects_production_boundaries[NB-G01:v04]",
+        "tests/recovery/test_background_offline.py::test_offline_guard_rejects_production_boundaries[NB-G01:v05]",
+        "tests/recovery/test_background_offline.py::test_pending_proposal_is_single_copy_and_runtime_cleanup_does_not_revoke_it",
+        "tests/recovery/test_background_offline.py::test_policy_reserves_interactive_admission_and_bounds_retained_authority",
+        "tests/recovery/test_background_offline.py::test_reference_oracle_uses_scoped_read_and_write_generations[edit-undo]",
+        "tests/recovery/test_background_offline.py::test_reference_oracle_uses_scoped_read_and_write_generations[independent]",
+        "tests/recovery/test_background_offline.py::test_reference_oracle_uses_scoped_read_and_write_generations[read-cycle]",
+        "tests/recovery/test_background_offline.py::test_revoked_or_missing_protocol_authority_cannot_publish",
+        "tests/recovery/test_background_offline.py::test_scripted_tools_are_isolated_and_cancelled_after_a_held_reply",
+        "tests/recovery/test_background_offline.py::test_sidecar_keeps_request_identity_retention_and_foreign_authority_separate[archived-identity]",
+        "tests/recovery/test_background_offline.py::test_sidecar_keeps_request_identity_retention_and_foreign_authority_separate[archived-pending]",
+        "tests/recovery/test_background_offline.py::test_sidecar_keeps_request_identity_retention_and_foreign_authority_separate[archived-resolved]",
+        "tests/recovery/test_background_offline.py::test_sidecar_keeps_request_identity_retention_and_foreign_authority_separate[changed-hash]",
+        "tests/recovery/test_background_offline.py::test_sidecar_keeps_request_identity_retention_and_foreign_authority_separate[duplicate-request]",
+        "tests/recovery/test_background_offline.py::test_sidecar_keeps_request_identity_retention_and_foreign_authority_separate[foreign-project]",
+        "tests/recovery/test_background_offline.py::test_sidecar_keeps_request_identity_retention_and_foreign_authority_separate[metadata-full]",
+        "tests/recovery/test_background_offline.py::test_sidecar_keeps_request_identity_retention_and_foreign_authority_separate[missing-request]",
+        "tests/recovery/test_background_offline.py::test_sidecar_keeps_request_identity_retention_and_foreign_authority_separate[none]",
+        "tests/recovery/test_background_offline.py::test_unreached_controlled_hook_cannot_pass_teardown",
+        "tests/recovery/test_background_offline.py::test_versioned_background_contract_round_trip[background_apply_v2]",
+        "tests/recovery/test_background_offline.py::test_versioned_background_contract_round_trip[background_attempt_v1]",
+        "tests/recovery/test_background_offline.py::test_versioned_background_contract_round_trip[background_barrier_v1]",
+        "tests/recovery/test_background_offline.py::test_versioned_background_contract_round_trip[background_draft_payload_v1]",
+        "tests/recovery/test_background_offline.py::test_versioned_background_contract_round_trip[background_draft_v1]",
+        "tests/recovery/test_background_offline.py::test_versioned_background_contract_round_trip[background_event_v1]",
+        "tests/recovery/test_background_offline.py::test_versioned_background_contract_round_trip[background_intent_v1]",
+        "tests/recovery/test_background_offline.py::test_versioned_background_contract_round_trip[background_proposal_v1]",
+        "tests/recovery/test_background_offline.py::test_versioned_background_contract_round_trip[background_receipt_v1]",
+        "tests/recovery/test_background_offline.py::test_versioned_background_contract_round_trip[background_scope_guard_v1]",
+        "tests/recovery/test_background_offline.py::test_versioned_background_contract_round_trip[background_sidecar_v1]",
+        "tests/recovery/test_background_offline.py::test_versioned_background_contract_round_trip[background_snapshot_v1]",
+        "tests/recovery/test_background_offline.py::test_versioned_background_contract_round_trip[background_submission_v1]",
+        "tests/recovery/test_background_offline.py::test_versioned_background_contract_round_trip[background_undo_v1]",
+        "tests/recovery/test_background_offline.py::test_versioned_background_contract_round_trip[background_writer_v1]"
+      ]
+    },
+    {
+      "id": "NB-JOBS",
+      "status": "unimplemented",
+      "tests": []
+    },
+    {
+      "id": "NB-PUBLICATION",
+      "status": "unimplemented",
+      "tests": []
+    },
+    {
+      "id": "NB-WRITER",
+      "status": "unimplemented",
+      "tests": []
+    },
+    {
+      "id": "NB-FIXED",
+      "status": "unimplemented",
+      "tests": []
+    },
+    {
+      "id": "NB-UI",
+      "status": "unimplemented",
+      "tests": []
+    },
+    {
+      "id": "NB-PARALLEL",
+      "status": "unimplemented",
+      "tests": []
     }
   ],
   "foundation": {
@@ -1890,5 +2026,456 @@
     "connectedAcceptance": "docs/gui/handoffs/PROTOTYPE-ADOPTION/uir08-acceptance.json",
     "manualWord": "pending_unchanged",
     "currentUiChecks": "Manual T3 acceptance in UIR01–UIR09; Python/state mappings remain active."
+  },
+  "backgroundExecution": {
+    "schemaVersion": 1,
+    "coveredSlices": [
+      "NB00a"
+    ],
+    "bindings": {
+      "NB-R03:v01": [
+        "tests/recovery/test_background_offline.py::test_attempt_spending_survives_failures_and_restart[NB-R03:v01]"
+      ],
+      "NB-R03:v02": [
+        "tests/recovery/test_background_offline.py::test_attempt_spending_survives_failures_and_restart[NB-R03:v02]"
+      ],
+      "NB-R03:v03": [
+        "tests/recovery/test_background_offline.py::test_attempt_spending_survives_failures_and_restart[NB-R03:v03]"
+      ],
+      "NB-R03:v04": [
+        "tests/recovery/test_background_offline.py::test_attempt_spending_survives_failures_and_restart[NB-R03:v04]"
+      ],
+      "NB-R03:v05": [
+        "tests/recovery/test_background_offline.py::test_attempt_spending_survives_failures_and_restart[NB-R03:v05]"
+      ],
+      "NB-R03:v06": [
+        "tests/recovery/test_background_offline.py::test_attempt_spending_survives_failures_and_restart[NB-R03:v06]"
+      ],
+      "NB-G01:v01": [
+        "tests/recovery/test_background_offline.py::test_offline_guard_rejects_production_boundaries[NB-G01:v01]"
+      ],
+      "NB-G01:v02": [
+        "tests/recovery/test_background_offline.py::test_offline_guard_rejects_production_boundaries[NB-G01:v02]"
+      ],
+      "NB-G01:v03": [
+        "tests/recovery/test_background_offline.py::test_offline_guard_rejects_production_boundaries[NB-G01:v03]"
+      ],
+      "NB-G01:v04": [
+        "tests/recovery/test_background_offline.py::test_offline_guard_rejects_production_boundaries[NB-G01:v04]"
+      ],
+      "NB-G01:v05": [
+        "tests/recovery/test_background_offline.py::test_offline_guard_rejects_production_boundaries[NB-G01:v05]"
+      ],
+      "NB-G02:v01": [
+        "tests/foundation/test_runner_gates.py::test_background_report_rejects_false_coverage[NB-G02:v01]"
+      ],
+      "NB-G02:v02": [
+        "tests/foundation/test_runner_gates.py::test_background_report_rejects_false_coverage[NB-G02:v02]"
+      ],
+      "NB-G02:v03": [
+        "tests/foundation/test_runner_gates.py::test_background_report_rejects_false_coverage[NB-G02:v03]"
+      ],
+      "NB-G02:v04": [
+        "tests/foundation/test_runner_gates.py::test_background_report_rejects_false_coverage[NB-G02:v04]"
+      ],
+      "NB-G02:v05": [
+        "tests/foundation/test_runner_gates.py::test_background_report_rejects_false_coverage[NB-G02:v05]"
+      ],
+      "NB-G02:v06": [
+        "tests/foundation/test_runner_gates.py::test_background_report_rejects_false_coverage[NB-G02:v06]"
+      ],
+      "NB-G02:v07": [
+        "tests/foundation/test_runner_gates.py::test_background_report_rejects_false_coverage[NB-G02:v07]"
+      ],
+      "NB-G02:v08": [
+        "tests/foundation/test_runner_gates.py::test_background_report_rejects_false_coverage[NB-G02:v08]"
+      ],
+      "NB-G02:v09": [
+        "tests/foundation/test_runner_gates.py::test_background_report_rejects_false_coverage[NB-G02:v09]"
+      ],
+      "NB-G02:v10": [
+        "tests/foundation/test_runner_gates.py::test_background_report_rejects_false_coverage[NB-G02:v10]"
+      ],
+      "NB-G02:v11": [
+        "tests/foundation/test_runner_gates.py::test_background_report_rejects_false_coverage[NB-G02:v11]"
+      ],
+      "NB-G02:v12": [
+        "tests/foundation/test_runner_gates.py::test_background_report_rejects_false_coverage[NB-G02:v12]"
+      ],
+      "NB-G02:v13": [
+        "tests/foundation/test_runner_gates.py::test_background_report_rejects_false_coverage[NB-G02:v13]"
+      ],
+      "NB-G02:v14": [
+        "tests/foundation/test_runner_gates.py::test_background_report_rejects_false_coverage[NB-G02:v14]"
+      ],
+      "NB-G02:v15": [
+        "tests/foundation/test_runner_gates.py::test_background_report_rejects_false_coverage[NB-G02:v15]"
+      ],
+      "NB-G02:v16": [
+        "tests/foundation/test_runner_gates.py::test_background_report_rejects_false_coverage[NB-G02:v16]"
+      ]
+    },
+    "checks": {
+      "NB00a:test_fake_process_identity_and_neighbour_cleanup": [
+        "tests/recovery/test_background_offline.py::test_fake_process_identity_and_neighbour_cleanup"
+      ],
+      "NB00a:test_scripted_tools_are_isolated_and_cancelled_after_a_held_reply": [
+        "tests/recovery/test_background_offline.py::test_scripted_tools_are_isolated_and_cancelled_after_a_held_reply"
+      ],
+      "NB00a:test_pending_proposal_is_single_copy_and_runtime_cleanup_does_not_revoke_it": [
+        "tests/recovery/test_background_offline.py::test_pending_proposal_is_single_copy_and_runtime_cleanup_does_not_revoke_it"
+      ],
+      "NB00a:test_check_only_capture_cannot_acquire_write_tools_or_use_interactive_admission": [
+        "tests/recovery/test_background_offline.py::test_check_only_capture_cannot_acquire_write_tools_or_use_interactive_admission"
+      ],
+      "NB00a:test_policy_reserves_interactive_admission_and_bounds_retained_authority": [
+        "tests/recovery/test_background_offline.py::test_policy_reserves_interactive_admission_and_bounds_retained_authority"
+      ],
+      "NB00a:test_unreached_controlled_hook_cannot_pass_teardown": [
+        "tests/recovery/test_background_offline.py::test_unreached_controlled_hook_cannot_pass_teardown"
+      ],
+      "NB00a:barrier-orders": [
+        "tests/recovery/test_background_offline.py::test_barrier_timeout_keeps_canonical_result_and_post_timeout_input[timeout_before_claim]",
+        "tests/recovery/test_background_offline.py::test_barrier_timeout_keeps_canonical_result_and_post_timeout_input[claim_before_timeout]"
+      ],
+      "NB00a:contracts": [
+        "tests/recovery/test_background_offline.py::test_versioned_background_contract_round_trip[background_submission_v1]",
+        "tests/recovery/test_background_offline.py::test_versioned_background_contract_round_trip[background_snapshot_v1]",
+        "tests/recovery/test_background_offline.py::test_versioned_background_contract_round_trip[background_proposal_v1]",
+        "tests/recovery/test_background_offline.py::test_versioned_background_contract_round_trip[background_scope_guard_v1]",
+        "tests/recovery/test_background_offline.py::test_versioned_background_contract_round_trip[background_writer_v1]",
+        "tests/recovery/test_background_offline.py::test_versioned_background_contract_round_trip[background_barrier_v1]",
+        "tests/recovery/test_background_offline.py::test_versioned_background_contract_round_trip[background_draft_v1]",
+        "tests/recovery/test_background_offline.py::test_versioned_background_contract_round_trip[background_receipt_v1]",
+        "tests/recovery/test_background_offline.py::test_versioned_background_contract_round_trip[background_apply_v2]",
+        "tests/recovery/test_background_offline.py::test_versioned_background_contract_round_trip[background_event_v1]",
+        "tests/recovery/test_background_offline.py::test_versioned_background_contract_round_trip[background_intent_v1]",
+        "tests/recovery/test_background_offline.py::test_versioned_background_contract_round_trip[background_undo_v1]",
+        "tests/recovery/test_background_offline.py::test_versioned_background_contract_round_trip[background_sidecar_v1]",
+        "tests/recovery/test_background_offline.py::test_versioned_background_contract_round_trip[background_attempt_v1]",
+        "tests/recovery/test_background_offline.py::test_versioned_background_contract_round_trip[background_draft_payload_v1]"
+      ],
+      "NB00a:seed-00": [
+        "tests/recovery/test_background_offline.py::test_frozen_reference_corpus_is_reproducible_and_reaches_each_action[seed-00]"
+      ],
+      "NB00a:seed-01": [
+        "tests/recovery/test_background_offline.py::test_frozen_reference_corpus_is_reproducible_and_reaches_each_action[seed-01]"
+      ],
+      "NB00a:seed-02": [
+        "tests/recovery/test_background_offline.py::test_frozen_reference_corpus_is_reproducible_and_reaches_each_action[seed-02]"
+      ],
+      "NB00a:seed-03": [
+        "tests/recovery/test_background_offline.py::test_frozen_reference_corpus_is_reproducible_and_reaches_each_action[seed-03]"
+      ],
+      "NB00a:seed-04": [
+        "tests/recovery/test_background_offline.py::test_frozen_reference_corpus_is_reproducible_and_reaches_each_action[seed-04]"
+      ],
+      "NB00a:seed-05": [
+        "tests/recovery/test_background_offline.py::test_frozen_reference_corpus_is_reproducible_and_reaches_each_action[seed-05]"
+      ],
+      "NB00a:seed-06": [
+        "tests/recovery/test_background_offline.py::test_frozen_reference_corpus_is_reproducible_and_reaches_each_action[seed-06]"
+      ],
+      "NB00a:seed-07": [
+        "tests/recovery/test_background_offline.py::test_frozen_reference_corpus_is_reproducible_and_reaches_each_action[seed-07]"
+      ],
+      "NB00a:seed-08": [
+        "tests/recovery/test_background_offline.py::test_frozen_reference_corpus_is_reproducible_and_reaches_each_action[seed-08]"
+      ],
+      "NB00a:seed-09": [
+        "tests/recovery/test_background_offline.py::test_frozen_reference_corpus_is_reproducible_and_reaches_each_action[seed-09]"
+      ],
+      "NB00a:seed-10": [
+        "tests/recovery/test_background_offline.py::test_frozen_reference_corpus_is_reproducible_and_reaches_each_action[seed-10]"
+      ],
+      "NB00a:seed-11": [
+        "tests/recovery/test_background_offline.py::test_frozen_reference_corpus_is_reproducible_and_reaches_each_action[seed-11]"
+      ],
+      "NB00a:seed-12": [
+        "tests/recovery/test_background_offline.py::test_frozen_reference_corpus_is_reproducible_and_reaches_each_action[seed-12]"
+      ],
+      "NB00a:seed-13": [
+        "tests/recovery/test_background_offline.py::test_frozen_reference_corpus_is_reproducible_and_reaches_each_action[seed-13]"
+      ],
+      "NB00a:seed-14": [
+        "tests/recovery/test_background_offline.py::test_frozen_reference_corpus_is_reproducible_and_reaches_each_action[seed-14]"
+      ],
+      "NB00a:seed-15": [
+        "tests/recovery/test_background_offline.py::test_frozen_reference_corpus_is_reproducible_and_reaches_each_action[seed-15]"
+      ],
+      "NB00a:broken-reports": [
+        "tests/foundation/test_runner_gates.py::test_background_report_rejects_broken_files_and_erased_failures[missing]",
+        "tests/foundation/test_runner_gates.py::test_background_report_rejects_broken_files_and_erased_failures[empty]",
+        "tests/foundation/test_runner_gates.py::test_background_report_rejects_broken_files_and_erased_failures[truncated]",
+        "tests/foundation/test_runner_gates.py::test_background_report_rejects_broken_files_and_erased_failures[duplicate-key]",
+        "tests/foundation/test_runner_gates.py::test_background_report_rejects_broken_files_and_erased_failures[missing-parameter]",
+        "tests/foundation/test_runner_gates.py::test_background_report_rejects_broken_files_and_erased_failures[off-suite]",
+        "tests/foundation/test_runner_gates.py::test_background_report_rejects_broken_files_and_erased_failures[cancelled]",
+        "tests/foundation/test_runner_gates.py::test_background_report_rejects_broken_files_and_erased_failures[timeout]",
+        "tests/foundation/test_runner_gates.py::test_background_report_rejects_broken_files_and_erased_failures[initial-failure]",
+        "tests/foundation/test_runner_gates.py::test_background_report_rejects_broken_files_and_erased_failures[incomplete]",
+        "tests/foundation/test_runner_gates.py::test_background_report_rejects_broken_files_and_erased_failures[empty-bindings]",
+        "tests/foundation/test_runner_gates.py::test_background_report_rejects_broken_files_and_erased_failures[uncollected-result]",
+        "tests/foundation/test_runner_gates.py::test_background_report_rejects_broken_files_and_erased_failures[duplicate-trace]",
+        "tests/foundation/test_runner_gates.py::test_background_report_rejects_broken_files_and_erased_failures[wrong-trace-hash]",
+        "tests/foundation/test_runner_gates.py::test_background_report_rejects_broken_files_and_erased_failures[wrong-trace-owner]",
+        "tests/foundation/test_runner_gates.py::test_background_report_rejects_broken_files_and_erased_failures[wrong-trace-seed]",
+        "tests/foundation/test_runner_gates.py::test_background_report_rejects_broken_files_and_erased_failures[wrong-trace-length]"
+      ],
+      "NB00a:real-reporter": [
+        "tests/foundation/test_runner_gates.py::test_background_reporter_retains_real_skips_and_failed_phases"
+      ],
+      "NB00a:retry-history": [
+        "tests/foundation/test_runner_gates.py::test_background_retry_cannot_forget_a_prior_failed_run"
+      ],
+      "NB00a:actual-tool-names": [
+        "tests/recovery/test_background_offline.py::test_job_tool_capture_uses_the_actual_bound_mcp_names"
+      ],
+      "NB00a:cleanup-failure": [
+        "tests/recovery/test_background_offline.py::test_failed_fake_cleanup_retains_ownership_and_does_not_kill_a_neighbour"
+      ],
+      "NB00a:sidecar-replay": [
+        "tests/recovery/test_background_offline.py::test_sidecar_keeps_request_identity_retention_and_foreign_authority_separate[none]",
+        "tests/recovery/test_background_offline.py::test_sidecar_keeps_request_identity_retention_and_foreign_authority_separate[foreign-project]",
+        "tests/recovery/test_background_offline.py::test_sidecar_keeps_request_identity_retention_and_foreign_authority_separate[duplicate-request]",
+        "tests/recovery/test_background_offline.py::test_sidecar_keeps_request_identity_retention_and_foreign_authority_separate[missing-request]",
+        "tests/recovery/test_background_offline.py::test_sidecar_keeps_request_identity_retention_and_foreign_authority_separate[changed-hash]",
+        "tests/recovery/test_background_offline.py::test_sidecar_keeps_request_identity_retention_and_foreign_authority_separate[metadata-full]",
+        "tests/recovery/test_background_offline.py::test_sidecar_keeps_request_identity_retention_and_foreign_authority_separate[archived-resolved]",
+        "tests/recovery/test_background_offline.py::test_sidecar_keeps_request_identity_retention_and_foreign_authority_separate[archived-pending]",
+        "tests/recovery/test_background_offline.py::test_sidecar_keeps_request_identity_retention_and_foreign_authority_separate[archived-identity]"
+      ],
+      "NB00a:revoked-protocol-authority": [
+        "tests/recovery/test_background_offline.py::test_revoked_or_missing_protocol_authority_cannot_publish"
+      ],
+      "NB00a:scoped-oracle": [
+        "tests/recovery/test_background_offline.py::test_reference_oracle_uses_scoped_read_and_write_generations[independent]",
+        "tests/recovery/test_background_offline.py::test_reference_oracle_uses_scoped_read_and_write_generations[read-cycle]",
+        "tests/recovery/test_background_offline.py::test_reference_oracle_uses_scoped_read_and_write_generations[edit-undo]"
+      ]
+    },
+    "sources": [
+      "apps/web/package.json",
+      "apps/web/src/contracts/background-validate.ts",
+      "apps/web/src/contracts/check-fixtures.ts",
+      "apps/web/src/contracts/generated/background_apply_v2.ts",
+      "apps/web/src/contracts/generated/background_attempt_v1.ts",
+      "apps/web/src/contracts/generated/background_barrier_v1.ts",
+      "apps/web/src/contracts/generated/background_draft_payload_v1.ts",
+      "apps/web/src/contracts/generated/background_draft_v1.ts",
+      "apps/web/src/contracts/generated/background_event_v1.ts",
+      "apps/web/src/contracts/generated/background_intent_v1.ts",
+      "apps/web/src/contracts/generated/background_proposal_v1.ts",
+      "apps/web/src/contracts/generated/background_receipt_v1.ts",
+      "apps/web/src/contracts/generated/background_scope_guard_v1.ts",
+      "apps/web/src/contracts/generated/background_sidecar_v1.ts",
+      "apps/web/src/contracts/generated/background_snapshot_v1.ts",
+      "apps/web/src/contracts/generated/background_submission_v1.ts",
+      "apps/web/src/contracts/generated/background_undo_v1.ts",
+      "apps/web/src/contracts/generated/background_writer_v1.ts",
+      "apps/web/src/contracts/validate.ts",
+      "contracts/examples/background/background_apply_v2.json",
+      "contracts/examples/background/background_attempt_v1.json",
+      "contracts/examples/background/background_barrier_v1.json",
+      "contracts/examples/background/background_draft_payload_v1.json",
+      "contracts/examples/background/background_draft_v1.json",
+      "contracts/examples/background/background_event_v1.json",
+      "contracts/examples/background/background_intent_v1.json",
+      "contracts/examples/background/background_proposal_v1.json",
+      "contracts/examples/background/background_receipt_v1.json",
+      "contracts/examples/background/background_saved_snapshot_v1.json",
+      "contracts/examples/background/background_saved_v2.json",
+      "contracts/examples/background/background_scope_guard_v1.json",
+      "contracts/examples/background/background_sidecar_v1.json",
+      "contracts/examples/background/background_snapshot_v1.json",
+      "contracts/examples/background/background_submission_v1.json",
+      "contracts/examples/background/background_undo_v1.json",
+      "contracts/examples/background/background_writer_v1.json",
+      "contracts/examples/cases.json",
+      "contracts/json-schema/background_apply_v2.schema.json",
+      "contracts/json-schema/background_attempt_v1.schema.json",
+      "contracts/json-schema/background_barrier_v1.schema.json",
+      "contracts/json-schema/background_draft_payload_v1.schema.json",
+      "contracts/json-schema/background_draft_v1.schema.json",
+      "contracts/json-schema/background_event_v1.schema.json",
+      "contracts/json-schema/background_intent_v1.schema.json",
+      "contracts/json-schema/background_proposal_v1.schema.json",
+      "contracts/json-schema/background_receipt_v1.schema.json",
+      "contracts/json-schema/background_scope_guard_v1.schema.json",
+      "contracts/json-schema/background_sidecar_v1.schema.json",
+      "contracts/json-schema/background_snapshot_v1.schema.json",
+      "contracts/json-schema/background_submission_v1.schema.json",
+      "contracts/json-schema/background_undo_v1.schema.json",
+      "contracts/json-schema/background_writer_v1.schema.json",
+      "docs/gui/background-work-tests.md",
+      "docs/gui/handoffs/BACKGROUND-WORK/nb00a-contract.md",
+      "docs/gui/handoffs/BACKGROUND-WORK/nb00a-execution-report.schema.json",
+      "docs/gui/handoffs/BACKGROUND-WORK/nb00a-state-mappings.md",
+      "docs/gui/handoffs/BACKGROUND-WORK/test-matrix.json",
+      "packages/resume_core/agent_limits.py",
+      "packages/resume_core/background_limits.py",
+      "packages/resume_core/models/agent.py",
+      "packages/resume_core/models/background.py",
+      "packages/resume_core/models/contracts.py",
+      "packages/resume_core/storage.py",
+      "services/api/src/resume_api/agent/tools.py",
+      "spikes/background/__init__.py",
+      "spikes/background/corpus.py",
+      "spikes/background/fake_child.py",
+      "spikes/background/fixtures.py",
+      "spikes/background/harness.py",
+      "spikes/background/protocol.py",
+      "tests/contracts/test_contracts.py",
+      "tests/fixtures/rich_workspace.json",
+      "tests/foundation/test_runner_gates.py",
+      "tests/recovery/test_background_offline.py",
+      "tests/recovery/test_recovery_contracts.py",
+      "tests/requirements.json",
+      "tools/background_evidence.py",
+      "tools/background_pytest.py",
+      "tools/check_contract_drift.py",
+      "tools/checks.py",
+      "tools/generate_contracts.py"
+    ],
+    "requiredTraces": {
+      "fixed:1:0": {
+        "nodeId": "tests/recovery/test_background_offline.py::test_frozen_reference_corpus_is_reproducible_and_reaches_each_action[seed-00]",
+        "seed": 0,
+        "capacity": 1,
+        "transitions": 200,
+        "scope": "specification_oracle_only"
+      },
+      "fixed:1:1": {
+        "nodeId": "tests/recovery/test_background_offline.py::test_frozen_reference_corpus_is_reproducible_and_reaches_each_action[seed-01]",
+        "seed": 1,
+        "capacity": 1,
+        "transitions": 200,
+        "scope": "specification_oracle_only"
+      },
+      "fixed:1:2": {
+        "nodeId": "tests/recovery/test_background_offline.py::test_frozen_reference_corpus_is_reproducible_and_reaches_each_action[seed-02]",
+        "seed": 2,
+        "capacity": 1,
+        "transitions": 200,
+        "scope": "specification_oracle_only"
+      },
+      "fixed:1:3": {
+        "nodeId": "tests/recovery/test_background_offline.py::test_frozen_reference_corpus_is_reproducible_and_reaches_each_action[seed-03]",
+        "seed": 3,
+        "capacity": 1,
+        "transitions": 200,
+        "scope": "specification_oracle_only"
+      },
+      "fixed:1:4": {
+        "nodeId": "tests/recovery/test_background_offline.py::test_frozen_reference_corpus_is_reproducible_and_reaches_each_action[seed-04]",
+        "seed": 4,
+        "capacity": 1,
+        "transitions": 200,
+        "scope": "specification_oracle_only"
+      },
+      "fixed:1:5": {
+        "nodeId": "tests/recovery/test_background_offline.py::test_frozen_reference_corpus_is_reproducible_and_reaches_each_action[seed-05]",
+        "seed": 5,
+        "capacity": 1,
+        "transitions": 200,
+        "scope": "specification_oracle_only"
+      },
+      "fixed:1:6": {
+        "nodeId": "tests/recovery/test_background_offline.py::test_frozen_reference_corpus_is_reproducible_and_reaches_each_action[seed-06]",
+        "seed": 6,
+        "capacity": 1,
+        "transitions": 200,
+        "scope": "specification_oracle_only"
+      },
+      "fixed:1:7": {
+        "nodeId": "tests/recovery/test_background_offline.py::test_frozen_reference_corpus_is_reproducible_and_reaches_each_action[seed-07]",
+        "seed": 7,
+        "capacity": 1,
+        "transitions": 200,
+        "scope": "specification_oracle_only"
+      },
+      "fixed:1:8": {
+        "nodeId": "tests/recovery/test_background_offline.py::test_frozen_reference_corpus_is_reproducible_and_reaches_each_action[seed-08]",
+        "seed": 8,
+        "capacity": 1,
+        "transitions": 200,
+        "scope": "specification_oracle_only"
+      },
+      "fixed:1:9": {
+        "nodeId": "tests/recovery/test_background_offline.py::test_frozen_reference_corpus_is_reproducible_and_reaches_each_action[seed-09]",
+        "seed": 9,
+        "capacity": 1,
+        "transitions": 200,
+        "scope": "specification_oracle_only"
+      },
+      "fixed:1:10": {
+        "nodeId": "tests/recovery/test_background_offline.py::test_frozen_reference_corpus_is_reproducible_and_reaches_each_action[seed-10]",
+        "seed": 10,
+        "capacity": 1,
+        "transitions": 200,
+        "scope": "specification_oracle_only"
+      },
+      "fixed:1:11": {
+        "nodeId": "tests/recovery/test_background_offline.py::test_frozen_reference_corpus_is_reproducible_and_reaches_each_action[seed-11]",
+        "seed": 11,
+        "capacity": 1,
+        "transitions": 200,
+        "scope": "specification_oracle_only"
+      },
+      "fixed:1:12": {
+        "nodeId": "tests/recovery/test_background_offline.py::test_frozen_reference_corpus_is_reproducible_and_reaches_each_action[seed-12]",
+        "seed": 12,
+        "capacity": 1,
+        "transitions": 200,
+        "scope": "specification_oracle_only"
+      },
+      "fixed:1:13": {
+        "nodeId": "tests/recovery/test_background_offline.py::test_frozen_reference_corpus_is_reproducible_and_reaches_each_action[seed-13]",
+        "seed": 13,
+        "capacity": 1,
+        "transitions": 200,
+        "scope": "specification_oracle_only"
+      },
+      "fixed:1:14": {
+        "nodeId": "tests/recovery/test_background_offline.py::test_frozen_reference_corpus_is_reproducible_and_reaches_each_action[seed-14]",
+        "seed": 14,
+        "capacity": 1,
+        "transitions": 200,
+        "scope": "specification_oracle_only"
+      },
+      "fixed:1:15": {
+        "nodeId": "tests/recovery/test_background_offline.py::test_frozen_reference_corpus_is_reproducible_and_reaches_each_action[seed-15]",
+        "seed": 15,
+        "capacity": 1,
+        "transitions": 200,
+        "scope": "specification_oracle_only"
+      }
+    },
+    "requiredActions": [
+      "submit",
+      "duplicate",
+      "start",
+      "propose",
+      "runtime_exit",
+      "touch",
+      "undo",
+      "claim",
+      "timeout",
+      "input",
+      "deliver",
+      "detach",
+      "attach",
+      "restart",
+      "stop",
+      "delete",
+      "tick"
+    ],
+    "requiredOrders": [
+      "timeout_before_claim",
+      "claim_before_timeout",
+      "runtime_exit_before_publication"
+    ],
+    "scope": "NB00a is offline protocol/reference proof. Product lifecycle, publisher and UI remain unimplemented.",
+    "reportSchema": "docs/gui/handoffs/BACKGROUND-WORK/nb00a-execution-report.schema.json"
   }
 }

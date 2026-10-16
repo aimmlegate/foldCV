@@ -1,0 +1,1959 @@
+{
+  "$defs": {
+    "ActionCapture": {
+      "additionalProperties": false,
+      "properties": {
+        "actionId": {
+          "minLength": 1,
+          "title": "Actionid",
+          "type": "string"
+        },
+        "actionToken": {
+          "minimum": 0,
+          "title": "Actiontoken",
+          "type": "integer"
+        },
+        "dependencies": {
+          "items": {
+            "$ref": "#/$defs/DependencyStamp"
+          },
+          "title": "Dependencies",
+          "type": "array"
+        },
+        "sessionId": {
+          "minLength": 1,
+          "title": "Sessionid",
+          "type": "string"
+        }
+      },
+      "required": [
+        "sessionId",
+        "actionId",
+        "actionToken",
+        "dependencies"
+      ],
+      "title": "ActionCapture",
+      "type": "object"
+    },
+    "AgentPayloadReference": {
+      "additionalProperties": false,
+      "properties": {
+        "batchId": {
+          "maxLength": 128,
+          "minLength": 1,
+          "pattern": "^[A-Za-z0-9_-]+$",
+          "title": "Batchid",
+          "type": "string"
+        },
+        "conversationId": {
+          "maxLength": 128,
+          "minLength": 1,
+          "pattern": "^[A-Za-z0-9_-]+$",
+          "title": "Conversationid",
+          "type": "string"
+        },
+        "kind": {
+          "const": "agent_journal",
+          "title": "Kind",
+          "type": "string"
+        },
+        "runId": {
+          "maxLength": 128,
+          "minLength": 1,
+          "pattern": "^[A-Za-z0-9_-]+$",
+          "title": "Runid",
+          "type": "string"
+        }
+      },
+      "required": [
+        "kind",
+        "conversationId",
+        "runId",
+        "batchId"
+      ],
+      "title": "AgentPayloadReference",
+      "type": "object"
+    },
+    "CanonicalReceiptV1": {
+      "additionalProperties": false,
+      "properties": {
+        "clientMutationId": {
+          "maxLength": 128,
+          "minLength": 1,
+          "pattern": "^[A-Za-z0-9_-]+$",
+          "title": "Clientmutationid",
+          "type": "string"
+        },
+        "documentRevision": {
+          "minimum": 1,
+          "title": "Documentrevision",
+          "type": "integer"
+        },
+        "durable": {
+          "const": true,
+          "title": "Durable",
+          "type": "boolean"
+        },
+        "factsRevision": {
+          "minimum": 1,
+          "title": "Factsrevision",
+          "type": "integer"
+        },
+        "generationsSha256": {
+          "pattern": "^[a-f0-9]{64}$",
+          "title": "Generationssha256",
+          "type": "string"
+        },
+        "jobId": {
+          "maxLength": 128,
+          "minLength": 1,
+          "pattern": "^[A-Za-z0-9_-]+$",
+          "title": "Jobid",
+          "type": "string"
+        },
+        "lineage": {
+          "maxLength": 128,
+          "minLength": 1,
+          "pattern": "^[A-Za-z0-9_-]+$",
+          "title": "Lineage",
+          "type": "string"
+        },
+        "persistedAt": {
+          "format": "date-time",
+          "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(?:\\.\\d+)?(?:Z|\\+00:00)$",
+          "title": "Persistedat",
+          "type": "string"
+        },
+        "projectId": {
+          "maxLength": 128,
+          "minLength": 1,
+          "pattern": "^[A-Za-z0-9_-]+$",
+          "title": "Projectid",
+          "type": "string"
+        },
+        "projectRevision": {
+          "minimum": 1,
+          "title": "Projectrevision",
+          "type": "integer"
+        },
+        "proposalId": {
+          "maxLength": 128,
+          "minLength": 1,
+          "pattern": "^[A-Za-z0-9_-]+$",
+          "title": "Proposalid",
+          "type": "string"
+        },
+        "proposalSha256": {
+          "pattern": "^[a-f0-9]{64}$",
+          "title": "Proposalsha256",
+          "type": "string"
+        },
+        "requestSha256": {
+          "pattern": "^[a-f0-9]{64}$",
+          "title": "Requestsha256",
+          "type": "string"
+        },
+        "schemaVersion": {
+          "const": 1,
+          "title": "Schemaversion",
+          "type": "integer"
+        },
+        "workspaceSha256": {
+          "pattern": "^[a-f0-9]{64}$",
+          "title": "Workspacesha256",
+          "type": "string"
+        }
+      },
+      "required": [
+        "schemaVersion",
+        "projectId",
+        "lineage",
+        "jobId",
+        "proposalId",
+        "clientMutationId",
+        "requestSha256",
+        "proposalSha256",
+        "workspaceSha256",
+        "generationsSha256",
+        "projectRevision",
+        "documentRevision",
+        "factsRevision",
+        "durable",
+        "persistedAt"
+      ],
+      "title": "CanonicalReceiptV1",
+      "type": "object"
+    },
+    "DependencyStamp": {
+      "additionalProperties": false,
+      "properties": {
+        "fingerprint": {
+          "anyOf": [
+            {
+              "pattern": "^[a-f0-9]{64}$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Fingerprint"
+        },
+        "id": {
+          "minLength": 1,
+          "title": "Id",
+          "type": "string"
+        },
+        "kind": {
+          "enum": [
+            "block",
+            "record",
+            "field",
+            "period",
+            "ownership",
+            "source",
+            "rules",
+            "asset",
+            "timeline_order"
+          ],
+          "title": "Kind",
+          "type": "string"
+        },
+        "revision": {
+          "minimum": 1,
+          "title": "Revision",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "kind",
+        "id",
+        "revision",
+        "fingerprint"
+      ],
+      "title": "DependencyStamp",
+      "type": "object"
+    },
+    "DraftCheckpointV1": {
+      "additionalProperties": false,
+      "properties": {
+        "actionCursor": {
+          "maximum": 9007199254740991,
+          "minimum": 0,
+          "title": "Actioncursor",
+          "type": "integer"
+        },
+        "baseRevision": {
+          "minimum": 1,
+          "title": "Baserevision",
+          "type": "integer"
+        },
+        "baseSha256": {
+          "pattern": "^[a-f0-9]{64}$",
+          "title": "Basesha256",
+          "type": "string"
+        },
+        "checkpointedAt": {
+          "format": "date-time",
+          "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(?:\\.\\d+)?(?:Z|\\+00:00)$",
+          "title": "Checkpointedat",
+          "type": "string"
+        },
+        "id": {
+          "maxLength": 128,
+          "minLength": 1,
+          "pattern": "^[A-Za-z0-9_-]+$",
+          "title": "Id",
+          "type": "string"
+        },
+        "incarnation": {
+          "maxLength": 128,
+          "minLength": 1,
+          "pattern": "^[A-Za-z0-9_-]+$",
+          "title": "Incarnation",
+          "type": "string"
+        },
+        "lineage": {
+          "maxLength": 128,
+          "minLength": 1,
+          "pattern": "^[A-Za-z0-9_-]+$",
+          "title": "Lineage",
+          "type": "string"
+        },
+        "payloadBytes": {
+          "maximum": 2097152,
+          "minimum": 1,
+          "title": "Payloadbytes",
+          "type": "integer"
+        },
+        "payloadRef": {
+          "maxLength": 128,
+          "minLength": 1,
+          "pattern": "^[A-Za-z0-9_-]+$",
+          "title": "Payloadref",
+          "type": "string"
+        },
+        "payloadSha256": {
+          "pattern": "^[a-f0-9]{64}$",
+          "title": "Payloadsha256",
+          "type": "string"
+        },
+        "projectId": {
+          "maxLength": 128,
+          "minLength": 1,
+          "pattern": "^[A-Za-z0-9_-]+$",
+          "title": "Projectid",
+          "type": "string"
+        },
+        "schemaVersion": {
+          "const": 1,
+          "title": "Schemaversion",
+          "type": "integer"
+        },
+        "sequence": {
+          "minimum": 1,
+          "title": "Sequence",
+          "type": "integer"
+        },
+        "touches": {
+          "items": {
+            "$ref": "#/$defs/GenerationStamp"
+          },
+          "maxItems": 100,
+          "title": "Touches",
+          "type": "array"
+        },
+        "writerEpoch": {
+          "minimum": 1,
+          "title": "Writerepoch",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "schemaVersion",
+        "id",
+        "projectId",
+        "lineage",
+        "writerEpoch",
+        "incarnation",
+        "sequence",
+        "actionCursor",
+        "baseRevision",
+        "baseSha256",
+        "payloadSha256",
+        "payloadBytes",
+        "payloadRef",
+        "touches",
+        "checkpointedAt"
+      ],
+      "title": "DraftCheckpointV1",
+      "type": "object"
+    },
+    "FixedPayloadReference": {
+      "additionalProperties": false,
+      "properties": {
+        "kind": {
+          "const": "rich_sync",
+          "title": "Kind",
+          "type": "string"
+        },
+        "syncId": {
+          "maxLength": 128,
+          "minLength": 1,
+          "pattern": "^[A-Za-z0-9_-]+$",
+          "title": "Syncid",
+          "type": "string"
+        }
+      },
+      "required": [
+        "kind",
+        "syncId"
+      ],
+      "title": "FixedPayloadReference",
+      "type": "object"
+    },
+    "GenerationStamp": {
+      "additionalProperties": false,
+      "properties": {
+        "fingerprint": {
+          "pattern": "^[a-f0-9]{64}$",
+          "title": "Fingerprint",
+          "type": "string"
+        },
+        "generation": {
+          "maximum": 9007199254740991,
+          "minimum": 0,
+          "title": "Generation",
+          "type": "integer"
+        },
+        "key": {
+          "maxLength": 512,
+          "minLength": 1,
+          "title": "Key",
+          "type": "string"
+        },
+        "kind": {
+          "enum": [
+            "entity",
+            "structure",
+            "query",
+            "source",
+            "rules"
+          ],
+          "title": "Kind",
+          "type": "string"
+        }
+      },
+      "required": [
+        "kind",
+        "key",
+        "generation",
+        "fingerprint"
+      ],
+      "title": "GenerationStamp",
+      "type": "object"
+    },
+    "InputReference": {
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "maxLength": 128,
+          "minLength": 1,
+          "pattern": "^[A-Za-z0-9_-]+$",
+          "title": "Id",
+          "type": "string"
+        },
+        "kind": {
+          "enum": [
+            "agent_journal",
+            "rich_sync",
+            "processing"
+          ],
+          "title": "Kind",
+          "type": "string"
+        },
+        "sha256": {
+          "pattern": "^[a-f0-9]{64}$",
+          "title": "Sha256",
+          "type": "string"
+        }
+      },
+      "required": [
+        "kind",
+        "id",
+        "sha256"
+      ],
+      "title": "InputReference",
+      "type": "object"
+    },
+    "JobAttemptV1": {
+      "additionalProperties": false,
+      "properties": {
+        "activeDeadline": {
+          "format": "date-time",
+          "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(?:\\.\\d+)?(?:Z|\\+00:00)$",
+          "title": "Activedeadline",
+          "type": "string"
+        },
+        "childStartedAt": {
+          "anyOf": [
+            {
+              "format": "date-time",
+              "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(?:\\.\\d+)?(?:Z|\\+00:00)$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Childstartedat"
+        },
+        "cleanupVerified": {
+          "title": "Cleanupverified",
+          "type": "boolean"
+        },
+        "dispatchedAt": {
+          "format": "date-time",
+          "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(?:\\.\\d+)?(?:Z|\\+00:00)$",
+          "title": "Dispatchedat",
+          "type": "string"
+        },
+        "error": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/JobFailure"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "executionGeneration": {
+          "minimum": 1,
+          "title": "Executiongeneration",
+          "type": "integer"
+        },
+        "id": {
+          "maxLength": 128,
+          "minLength": 1,
+          "pattern": "^[A-Za-z0-9_-]+$",
+          "title": "Id",
+          "type": "string"
+        },
+        "nativeStarted": {
+          "title": "Nativestarted",
+          "type": "boolean"
+        },
+        "schemaVersion": {
+          "const": 1,
+          "title": "Schemaversion",
+          "type": "integer"
+        },
+        "stage": {
+          "enum": [
+            "agent",
+            "assessment",
+            "extraction",
+            "rewrite",
+            "reconciliation"
+          ],
+          "title": "Stage",
+          "type": "string"
+        },
+        "startupDeadline": {
+          "format": "date-time",
+          "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(?:\\.\\d+)?(?:Z|\\+00:00)$",
+          "title": "Startupdeadline",
+          "type": "string"
+        },
+        "state": {
+          "enum": [
+            "reserved",
+            "starting",
+            "running",
+            "completed",
+            "failed",
+            "cancelled",
+            "interrupted",
+            "cleanup_failed"
+          ],
+          "title": "State",
+          "type": "string"
+        }
+      },
+      "required": [
+        "schemaVersion",
+        "id",
+        "stage",
+        "executionGeneration",
+        "state",
+        "dispatchedAt",
+        "startupDeadline",
+        "activeDeadline",
+        "nativeStarted",
+        "childStartedAt",
+        "cleanupVerified",
+        "error"
+      ],
+      "title": "JobAttemptV1",
+      "type": "object"
+    },
+    "JobFailure": {
+      "additionalProperties": false,
+      "properties": {
+        "code": {
+          "enum": [
+            "AUTH_REQUIRED",
+            "RATE_LIMITED",
+            "BUSY",
+            "MODEL_DENIED",
+            "CANCELLED",
+            "DEADLINE",
+            "STARTUP_TIMEOUT",
+            "PROCESS_FAILED",
+            "CLEANUP_FAILED",
+            "INTERRUPTED",
+            "PROTOCOL",
+            "JOB_QUEUE_FULL",
+            "JOB_STORAGE_FULL",
+            "JOB_IDEMPOTENCY_CONFLICT",
+            "REQUEST_EXPIRED",
+            "DEPENDENCY_CHANGED",
+            "WRITER_UNKNOWN",
+            "SAVE_FAILED",
+            "OUTCOME_UNKNOWN",
+            "PROJECT_DELETED"
+          ],
+          "title": "Code",
+          "type": "string"
+        }
+      },
+      "required": [
+        "code"
+      ],
+      "title": "JobFailure",
+      "type": "object"
+    },
+    "JobIdentity": {
+      "additionalProperties": false,
+      "properties": {
+        "lineage": {
+          "maxLength": 128,
+          "minLength": 1,
+          "pattern": "^[A-Za-z0-9_-]+$",
+          "title": "Lineage",
+          "type": "string"
+        },
+        "projectId": {
+          "maxLength": 128,
+          "minLength": 1,
+          "pattern": "^[A-Za-z0-9_-]+$",
+          "title": "Projectid",
+          "type": "string"
+        },
+        "requestEpoch": {
+          "minimum": 1,
+          "title": "Requestepoch",
+          "type": "integer"
+        },
+        "requestId": {
+          "maxLength": 128,
+          "minLength": 1,
+          "pattern": "^[A-Za-z0-9_-]+$",
+          "title": "Requestid",
+          "type": "string"
+        }
+      },
+      "required": [
+        "projectId",
+        "lineage",
+        "requestEpoch",
+        "requestId"
+      ],
+      "title": "JobIdentity",
+      "type": "object"
+    },
+    "JobSnapshotV1": {
+      "additionalProperties": false,
+      "properties": {
+        "attempts": {
+          "items": {
+            "$ref": "#/$defs/JobAttemptV1"
+          },
+          "maxItems": 2,
+          "title": "Attempts",
+          "type": "array"
+        },
+        "createdAt": {
+          "format": "date-time",
+          "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(?:\\.\\d+)?(?:Z|\\+00:00)$",
+          "title": "Createdat",
+          "type": "string"
+        },
+        "error": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/JobFailure"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "eventCursor": {
+          "maximum": 9007199254740991,
+          "minimum": 0,
+          "title": "Eventcursor",
+          "type": "integer"
+        },
+        "execution": {
+          "enum": [
+            "queued",
+            "starting",
+            "running",
+            "cancelling",
+            "completed",
+            "failed",
+            "cancelled",
+            "interrupted"
+          ],
+          "title": "Execution",
+          "type": "string"
+        },
+        "executionGeneration": {
+          "minimum": 1,
+          "title": "Executiongeneration",
+          "type": "integer"
+        },
+        "id": {
+          "maxLength": 128,
+          "minLength": 1,
+          "pattern": "^[A-Za-z0-9_-]+$",
+          "title": "Id",
+          "type": "string"
+        },
+        "proposalId": {
+          "anyOf": [
+            {
+              "maxLength": 128,
+              "minLength": 1,
+              "pattern": "^[A-Za-z0-9_-]+$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Proposalid"
+        },
+        "publication": {
+          "enum": [
+            "none",
+            "ready",
+            "waiting_for_sync",
+            "needs_review",
+            "committing",
+            "saved",
+            "no_change",
+            "save_failed",
+            "outcome_unknown",
+            "discarded",
+            "cancelled"
+          ],
+          "title": "Publication",
+          "type": "string"
+        },
+        "receipt": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/CanonicalReceiptV1"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "schemaVersion": {
+          "const": 1,
+          "title": "Schemaversion",
+          "type": "integer"
+        },
+        "submission": {
+          "$ref": "#/$defs/JobSubmissionV1"
+        },
+        "updatedAt": {
+          "format": "date-time",
+          "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(?:\\.\\d+)?(?:Z|\\+00:00)$",
+          "title": "Updatedat",
+          "type": "string"
+        }
+      },
+      "required": [
+        "schemaVersion",
+        "id",
+        "submission",
+        "execution",
+        "publication",
+        "executionGeneration",
+        "attempts",
+        "eventCursor",
+        "proposalId",
+        "receipt",
+        "error",
+        "createdAt",
+        "updatedAt"
+      ],
+      "title": "JobSnapshotV1",
+      "type": "object"
+    },
+    "JobSubmissionV1": {
+      "additionalProperties": false,
+      "properties": {
+        "accountGeneration": {
+          "minimum": 1,
+          "title": "Accountgeneration",
+          "type": "integer"
+        },
+        "allowEdits": {
+          "title": "Allowedits",
+          "type": "boolean"
+        },
+        "allowWeb": {
+          "title": "Allowweb",
+          "type": "boolean"
+        },
+        "guards": {
+          "$ref": "#/$defs/ScopeGuardV1"
+        },
+        "identity": {
+          "$ref": "#/$defs/JobIdentity"
+        },
+        "input": {
+          "$ref": "#/$defs/InputReference"
+        },
+        "kind": {
+          "enum": [
+            "agent",
+            "processing",
+            "rewrite",
+            "reconciliation"
+          ],
+          "title": "Kind",
+          "type": "string"
+        },
+        "models": {
+          "items": {
+            "$ref": "#/$defs/ModelCapture"
+          },
+          "maxItems": 2,
+          "minItems": 1,
+          "title": "Models",
+          "type": "array"
+        },
+        "payloadSha256": {
+          "pattern": "^[a-f0-9]{64}$",
+          "title": "Payloadsha256",
+          "type": "string"
+        },
+        "schedulingClass": {
+          "enum": [
+            "background",
+            "interactive",
+            "reconciliation"
+          ],
+          "title": "Schedulingclass",
+          "type": "string"
+        },
+        "schemaVersion": {
+          "const": 1,
+          "title": "Schemaversion",
+          "type": "integer"
+        },
+        "scope": {
+          "discriminator": {
+            "mapping": {
+              "resume": "#/$defs/WholeResumeScope",
+              "selection": "#/$defs/SelectionScope"
+            },
+            "propertyName": "kind"
+          },
+          "oneOf": [
+            {
+              "$ref": "#/$defs/WholeResumeScope"
+            },
+            {
+              "$ref": "#/$defs/SelectionScope"
+            }
+          ],
+          "title": "Scope"
+        },
+        "submittedAt": {
+          "format": "date-time",
+          "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(?:\\.\\d+)?(?:Z|\\+00:00)$",
+          "title": "Submittedat",
+          "type": "string"
+        },
+        "tools": {
+          "items": {
+            "enum": [
+              "get_resume_context",
+              "find_resume_content",
+              "get_working_facts",
+              "get_original_source",
+              "get_conversation_context",
+              "check_resume",
+              "read_public_page",
+              "publish_findings",
+              "prepare_edit_batch",
+              "apply_edit_batch"
+            ],
+            "type": "string"
+          },
+          "maxItems": 10,
+          "title": "Tools",
+          "type": "array"
+        }
+      },
+      "required": [
+        "schemaVersion",
+        "identity",
+        "payloadSha256",
+        "kind",
+        "schedulingClass",
+        "input",
+        "models",
+        "accountGeneration",
+        "tools",
+        "allowEdits",
+        "allowWeb",
+        "scope",
+        "guards",
+        "submittedAt"
+      ],
+      "title": "JobSubmissionV1",
+      "type": "object"
+    },
+    "ModelCapture": {
+      "additionalProperties": false,
+      "properties": {
+        "configSha256": {
+          "pattern": "^[a-f0-9]{64}$",
+          "title": "Configsha256",
+          "type": "string"
+        },
+        "model": {
+          "pattern": "^[a-zA-Z0-9][a-zA-Z0-9._-]{0,79}$",
+          "title": "Model",
+          "type": "string"
+        },
+        "stage": {
+          "enum": [
+            "agent",
+            "assessment",
+            "extraction",
+            "rewrite",
+            "reconciliation"
+          ],
+          "title": "Stage",
+          "type": "string"
+        }
+      },
+      "required": [
+        "stage",
+        "model",
+        "configSha256"
+      ],
+      "title": "ModelCapture",
+      "type": "object"
+    },
+    "ProcessingPayloadReference": {
+      "additionalProperties": false,
+      "properties": {
+        "candidateId": {
+          "maxLength": 128,
+          "minLength": 1,
+          "pattern": "^[A-Za-z0-9_-]+$",
+          "title": "Candidateid",
+          "type": "string"
+        },
+        "kind": {
+          "const": "processing",
+          "title": "Kind",
+          "type": "string"
+        }
+      },
+      "required": [
+        "kind",
+        "candidateId"
+      ],
+      "title": "ProcessingPayloadReference",
+      "type": "object"
+    },
+    "ProposalBindingV1": {
+      "additionalProperties": false,
+      "properties": {
+        "acceptedAt": {
+          "format": "date-time",
+          "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(?:\\.\\d+)?(?:Z|\\+00:00)$",
+          "title": "Acceptedat",
+          "type": "string"
+        },
+        "accountGeneration": {
+          "minimum": 1,
+          "title": "Accountgeneration",
+          "type": "integer"
+        },
+        "authority": {
+          "enum": [
+            "active",
+            "revoked"
+          ],
+          "title": "Authority",
+          "type": "string"
+        },
+        "executionDeadline": {
+          "format": "date-time",
+          "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(?:\\.\\d+)?(?:Z|\\+00:00)$",
+          "title": "Executiondeadline",
+          "type": "string"
+        },
+        "executionGeneration": {
+          "minimum": 1,
+          "title": "Executiongeneration",
+          "type": "integer"
+        },
+        "guards": {
+          "$ref": "#/$defs/ScopeGuardV1"
+        },
+        "id": {
+          "maxLength": 128,
+          "minLength": 1,
+          "pattern": "^[A-Za-z0-9_-]+$",
+          "title": "Id",
+          "type": "string"
+        },
+        "jobId": {
+          "maxLength": 128,
+          "minLength": 1,
+          "pattern": "^[A-Za-z0-9_-]+$",
+          "title": "Jobid",
+          "type": "string"
+        },
+        "lineage": {
+          "maxLength": 128,
+          "minLength": 1,
+          "pattern": "^[A-Za-z0-9_-]+$",
+          "title": "Lineage",
+          "type": "string"
+        },
+        "payload": {
+          "discriminator": {
+            "mapping": {
+              "agent_journal": "#/$defs/AgentPayloadReference",
+              "processing": "#/$defs/ProcessingPayloadReference",
+              "rich_sync": "#/$defs/FixedPayloadReference"
+            },
+            "propertyName": "kind"
+          },
+          "oneOf": [
+            {
+              "$ref": "#/$defs/AgentPayloadReference"
+            },
+            {
+              "$ref": "#/$defs/FixedPayloadReference"
+            },
+            {
+              "$ref": "#/$defs/ProcessingPayloadReference"
+            }
+          ],
+          "title": "Payload"
+        },
+        "payloadBytes": {
+          "maximum": 524288,
+          "minimum": 1,
+          "title": "Payloadbytes",
+          "type": "integer"
+        },
+        "payloadSha256": {
+          "pattern": "^[a-f0-9]{64}$",
+          "title": "Payloadsha256",
+          "type": "string"
+        },
+        "projectId": {
+          "maxLength": 128,
+          "minLength": 1,
+          "pattern": "^[A-Za-z0-9_-]+$",
+          "title": "Projectid",
+          "type": "string"
+        },
+        "revocation": {
+          "anyOf": [
+            {
+              "enum": [
+                "stop",
+                "discard",
+                "superseded",
+                "deleted",
+                "account_changed"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Revocation"
+        },
+        "schemaVersion": {
+          "const": 1,
+          "title": "Schemaversion",
+          "type": "integer"
+        },
+        "scope": {
+          "discriminator": {
+            "mapping": {
+              "resume": "#/$defs/WholeResumeScope",
+              "selection": "#/$defs/SelectionScope"
+            },
+            "propertyName": "kind"
+          },
+          "oneOf": [
+            {
+              "$ref": "#/$defs/WholeResumeScope"
+            },
+            {
+              "$ref": "#/$defs/SelectionScope"
+            }
+          ],
+          "title": "Scope"
+        },
+        "turnId": {
+          "maxLength": 128,
+          "minLength": 1,
+          "pattern": "^[A-Za-z0-9_-]+$",
+          "title": "Turnid",
+          "type": "string"
+        }
+      },
+      "required": [
+        "schemaVersion",
+        "id",
+        "jobId",
+        "projectId",
+        "lineage",
+        "accountGeneration",
+        "executionGeneration",
+        "turnId",
+        "payload",
+        "payloadSha256",
+        "payloadBytes",
+        "guards",
+        "scope",
+        "acceptedAt",
+        "executionDeadline",
+        "authority",
+        "revocation"
+      ],
+      "title": "ProposalBindingV1",
+      "type": "object"
+    },
+    "PublicationBarrierV1": {
+      "additionalProperties": false,
+      "properties": {
+        "acknowledgedRevision": {
+          "minimum": 1,
+          "title": "Acknowledgedrevision",
+          "type": "integer"
+        },
+        "actionCursor": {
+          "maximum": 9007199254740991,
+          "minimum": 0,
+          "title": "Actioncursor",
+          "type": "integer"
+        },
+        "expiresAt": {
+          "format": "date-time",
+          "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(?:\\.\\d+)?(?:Z|\\+00:00)$",
+          "title": "Expiresat",
+          "type": "string"
+        },
+        "generation": {
+          "minimum": 1,
+          "title": "Generation",
+          "type": "integer"
+        },
+        "incarnation": {
+          "maxLength": 128,
+          "minLength": 1,
+          "pattern": "^[A-Za-z0-9_-]+$",
+          "title": "Incarnation",
+          "type": "string"
+        },
+        "lineage": {
+          "maxLength": 128,
+          "minLength": 1,
+          "pattern": "^[A-Za-z0-9_-]+$",
+          "title": "Lineage",
+          "type": "string"
+        },
+        "projectId": {
+          "maxLength": 128,
+          "minLength": 1,
+          "pattern": "^[A-Za-z0-9_-]+$",
+          "title": "Projectid",
+          "type": "string"
+        },
+        "schemaVersion": {
+          "const": 1,
+          "title": "Schemaversion",
+          "type": "integer"
+        },
+        "state": {
+          "enum": [
+            "acked",
+            "revoked",
+            "commit_claimed",
+            "resolved"
+          ],
+          "title": "State",
+          "type": "string"
+        },
+        "token": {
+          "maxLength": 128,
+          "minLength": 32,
+          "pattern": "^[A-Za-z0-9_-]+$",
+          "title": "Token",
+          "type": "string"
+        },
+        "touchGeneration": {
+          "maximum": 9007199254740991,
+          "minimum": 0,
+          "title": "Touchgeneration",
+          "type": "integer"
+        },
+        "writerEpoch": {
+          "minimum": 1,
+          "title": "Writerepoch",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "schemaVersion",
+        "projectId",
+        "lineage",
+        "writerEpoch",
+        "incarnation",
+        "generation",
+        "token",
+        "acknowledgedRevision",
+        "actionCursor",
+        "touchGeneration",
+        "expiresAt",
+        "state"
+      ],
+      "title": "PublicationBarrierV1",
+      "type": "object"
+    },
+    "PublicationIntentV1": {
+      "additionalProperties": false,
+      "properties": {
+        "afterGenerationsSha256": {
+          "pattern": "^[a-f0-9]{64}$",
+          "title": "Aftergenerationssha256",
+          "type": "string"
+        },
+        "afterWorkspaceSha256": {
+          "pattern": "^[a-f0-9]{64}$",
+          "title": "Afterworkspacesha256",
+          "type": "string"
+        },
+        "assetPins": {
+          "items": {
+            "maxLength": 128,
+            "minLength": 1,
+            "pattern": "^[A-Za-z0-9_-]+$",
+            "type": "string"
+          },
+          "maxItems": 100,
+          "title": "Assetpins",
+          "type": "array"
+        },
+        "barrierGeneration": {
+          "anyOf": [
+            {
+              "minimum": 1,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Barriergeneration"
+        },
+        "beforeWorkspaceSha256": {
+          "pattern": "^[a-f0-9]{64}$",
+          "title": "Beforeworkspacesha256",
+          "type": "string"
+        },
+        "candidateRef": {
+          "maxLength": 128,
+          "minLength": 1,
+          "pattern": "^[A-Za-z0-9_-]+$",
+          "title": "Candidateref",
+          "type": "string"
+        },
+        "clientMutationId": {
+          "maxLength": 128,
+          "minLength": 1,
+          "pattern": "^[A-Za-z0-9_-]+$",
+          "title": "Clientmutationid",
+          "type": "string"
+        },
+        "id": {
+          "maxLength": 128,
+          "minLength": 1,
+          "pattern": "^[A-Za-z0-9_-]+$",
+          "title": "Id",
+          "type": "string"
+        },
+        "incarnation": {
+          "anyOf": [
+            {
+              "maxLength": 128,
+              "minLength": 1,
+              "pattern": "^[A-Za-z0-9_-]+$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Incarnation"
+        },
+        "jobId": {
+          "maxLength": 128,
+          "minLength": 1,
+          "pattern": "^[A-Za-z0-9_-]+$",
+          "title": "Jobid",
+          "type": "string"
+        },
+        "lineage": {
+          "maxLength": 128,
+          "minLength": 1,
+          "pattern": "^[A-Za-z0-9_-]+$",
+          "title": "Lineage",
+          "type": "string"
+        },
+        "phase": {
+          "enum": [
+            "intent_stored",
+            "commit_claimed",
+            "workspace_replaced",
+            "workspace_durable",
+            "generation_history_durable",
+            "receipt_stored",
+            "fenced",
+            "reconciled"
+          ],
+          "title": "Phase",
+          "type": "string"
+        },
+        "previousRef": {
+          "maxLength": 128,
+          "minLength": 1,
+          "pattern": "^[A-Za-z0-9_-]+$",
+          "title": "Previousref",
+          "type": "string"
+        },
+        "projectId": {
+          "maxLength": 128,
+          "minLength": 1,
+          "pattern": "^[A-Za-z0-9_-]+$",
+          "title": "Projectid",
+          "type": "string"
+        },
+        "proposalId": {
+          "maxLength": 128,
+          "minLength": 1,
+          "pattern": "^[A-Za-z0-9_-]+$",
+          "title": "Proposalid",
+          "type": "string"
+        },
+        "requestSha256": {
+          "pattern": "^[a-f0-9]{64}$",
+          "title": "Requestsha256",
+          "type": "string"
+        },
+        "schemaVersion": {
+          "const": 1,
+          "title": "Schemaversion",
+          "type": "integer"
+        },
+        "writerEpoch": {
+          "anyOf": [
+            {
+              "minimum": 1,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Writerepoch"
+        }
+      },
+      "required": [
+        "schemaVersion",
+        "id",
+        "jobId",
+        "proposalId",
+        "projectId",
+        "lineage",
+        "clientMutationId",
+        "requestSha256",
+        "beforeWorkspaceSha256",
+        "afterWorkspaceSha256",
+        "afterGenerationsSha256",
+        "candidateRef",
+        "previousRef",
+        "writerEpoch",
+        "incarnation",
+        "barrierGeneration",
+        "phase",
+        "assetPins"
+      ],
+      "title": "PublicationIntentV1",
+      "type": "object"
+    },
+    "RequestReplayV1": {
+      "additionalProperties": false,
+      "properties": {
+        "archivedResult": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/JobSnapshotV1"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "expiresAt": {
+          "format": "date-time",
+          "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(?:\\.\\d+)?(?:Z|\\+00:00)$",
+          "title": "Expiresat",
+          "type": "string"
+        },
+        "identity": {
+          "$ref": "#/$defs/JobIdentity"
+        },
+        "jobId": {
+          "maxLength": 128,
+          "minLength": 1,
+          "pattern": "^[A-Za-z0-9_-]+$",
+          "title": "Jobid",
+          "type": "string"
+        },
+        "payloadSha256": {
+          "pattern": "^[a-f0-9]{64}$",
+          "title": "Payloadsha256",
+          "type": "string"
+        }
+      },
+      "required": [
+        "identity",
+        "payloadSha256",
+        "jobId",
+        "expiresAt",
+        "archivedResult"
+      ],
+      "title": "RequestReplayV1",
+      "type": "object"
+    },
+    "RichPosition": {
+      "additionalProperties": false,
+      "properties": {
+        "blockId": {
+          "minLength": 1,
+          "title": "Blockid",
+          "type": "string"
+        },
+        "cellId": {
+          "anyOf": [
+            {
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Cellid"
+        },
+        "offset": {
+          "description": "UTF-16 code units within the block or cell.",
+          "minimum": 0,
+          "title": "Offset",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "blockId",
+        "cellId",
+        "offset"
+      ],
+      "title": "RichPosition",
+      "type": "object"
+    },
+    "RichSelection": {
+      "additionalProperties": false,
+      "properties": {
+        "anchor": {
+          "$ref": "#/$defs/RichPosition"
+        },
+        "blockIds": {
+          "items": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "minItems": 1,
+          "title": "Blockids",
+          "type": "array"
+        },
+        "capture": {
+          "$ref": "#/$defs/ActionCapture"
+        },
+        "head": {
+          "$ref": "#/$defs/RichPosition"
+        },
+        "kind": {
+          "enum": [
+            "text",
+            "blocks",
+            "table_cells"
+          ],
+          "title": "Kind",
+          "type": "string"
+        },
+        "textSha256": {
+          "pattern": "^[a-f0-9]{64}$",
+          "title": "Textsha256",
+          "type": "string"
+        }
+      },
+      "required": [
+        "kind",
+        "anchor",
+        "head",
+        "blockIds",
+        "capture",
+        "textSha256"
+      ],
+      "title": "RichSelection",
+      "type": "object"
+    },
+    "ScopeGuardV1": {
+      "additionalProperties": false,
+      "properties": {
+        "reads": {
+          "items": {
+            "$ref": "#/$defs/GenerationStamp"
+          },
+          "maxItems": 100,
+          "title": "Reads",
+          "type": "array"
+        },
+        "schemaVersion": {
+          "const": 1,
+          "title": "Schemaversion",
+          "type": "integer"
+        },
+        "writes": {
+          "items": {
+            "$ref": "#/$defs/GenerationStamp"
+          },
+          "maxItems": 100,
+          "title": "Writes",
+          "type": "array"
+        }
+      },
+      "required": [
+        "schemaVersion",
+        "reads",
+        "writes"
+      ],
+      "title": "ScopeGuardV1",
+      "type": "object"
+    },
+    "SelectionScope": {
+      "additionalProperties": false,
+      "properties": {
+        "kind": {
+          "const": "selection",
+          "title": "Kind",
+          "type": "string"
+        },
+        "selection": {
+          "$ref": "#/$defs/RichSelection"
+        }
+      },
+      "required": [
+        "kind",
+        "selection"
+      ],
+      "title": "SelectionScope",
+      "type": "object"
+    },
+    "UndoOwnershipV1": {
+      "additionalProperties": false,
+      "properties": {
+        "expiresAt": {
+          "format": "date-time",
+          "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(?:\\.\\d+)?(?:Z|\\+00:00)$",
+          "title": "Expiresat",
+          "type": "string"
+        },
+        "guards": {
+          "$ref": "#/$defs/ScopeGuardV1"
+        },
+        "incarnation": {
+          "anyOf": [
+            {
+              "maxLength": 128,
+              "minLength": 1,
+              "pattern": "^[A-Za-z0-9_-]+$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Incarnation"
+        },
+        "inverseBytes": {
+          "maximum": 524288,
+          "minimum": 1,
+          "title": "Inversebytes",
+          "type": "integer"
+        },
+        "inverseRef": {
+          "maxLength": 128,
+          "minLength": 1,
+          "pattern": "^[A-Za-z0-9_-]+$",
+          "title": "Inverseref",
+          "type": "string"
+        },
+        "inverseSha256": {
+          "pattern": "^[a-f0-9]{64}$",
+          "title": "Inversesha256",
+          "type": "string"
+        },
+        "jobId": {
+          "maxLength": 128,
+          "minLength": 1,
+          "pattern": "^[A-Za-z0-9_-]+$",
+          "title": "Jobid",
+          "type": "string"
+        },
+        "owner": {
+          "enum": [
+            "session",
+            "backend",
+            "transferring",
+            "expired"
+          ],
+          "title": "Owner",
+          "type": "string"
+        },
+        "proposalId": {
+          "maxLength": 128,
+          "minLength": 1,
+          "pattern": "^[A-Za-z0-9_-]+$",
+          "title": "Proposalid",
+          "type": "string"
+        },
+        "schemaVersion": {
+          "const": 1,
+          "title": "Schemaversion",
+          "type": "integer"
+        },
+        "transferId": {
+          "maxLength": 128,
+          "minLength": 1,
+          "pattern": "^[A-Za-z0-9_-]+$",
+          "title": "Transferid",
+          "type": "string"
+        },
+        "writerEpoch": {
+          "anyOf": [
+            {
+              "minimum": 1,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Writerepoch"
+        }
+      },
+      "required": [
+        "schemaVersion",
+        "jobId",
+        "proposalId",
+        "owner",
+        "writerEpoch",
+        "incarnation",
+        "transferId",
+        "inverseRef",
+        "inverseSha256",
+        "inverseBytes",
+        "expiresAt",
+        "guards"
+      ],
+      "title": "UndoOwnershipV1",
+      "type": "object"
+    },
+    "WholeResumeScope": {
+      "additionalProperties": false,
+      "properties": {
+        "kind": {
+          "const": "resume",
+          "title": "Kind",
+          "type": "string"
+        }
+      },
+      "required": [
+        "kind"
+      ],
+      "title": "WholeResumeScope",
+      "type": "object"
+    },
+    "WriterSessionV1": {
+      "additionalProperties": false,
+      "properties": {
+        "acknowledgedCursor": {
+          "maximum": 9007199254740991,
+          "minimum": 0,
+          "title": "Acknowledgedcursor",
+          "type": "integer"
+        },
+        "acknowledgedRevision": {
+          "minimum": 1,
+          "title": "Acknowledgedrevision",
+          "type": "integer"
+        },
+        "barrierGeneration": {
+          "maximum": 9007199254740991,
+          "minimum": 0,
+          "title": "Barriergeneration",
+          "type": "integer"
+        },
+        "draftId": {
+          "anyOf": [
+            {
+              "maxLength": 128,
+              "minLength": 1,
+              "pattern": "^[A-Za-z0-9_-]+$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Draftid"
+        },
+        "epoch": {
+          "minimum": 1,
+          "title": "Epoch",
+          "type": "integer"
+        },
+        "incarnation": {
+          "maxLength": 128,
+          "minLength": 1,
+          "pattern": "^[A-Za-z0-9_-]+$",
+          "title": "Incarnation",
+          "type": "string"
+        },
+        "leaseExpiresAt": {
+          "format": "date-time",
+          "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(?:\\.\\d+)?(?:Z|\\+00:00)$",
+          "title": "Leaseexpiresat",
+          "type": "string"
+        },
+        "lineage": {
+          "maxLength": 128,
+          "minLength": 1,
+          "pattern": "^[A-Za-z0-9_-]+$",
+          "title": "Lineage",
+          "type": "string"
+        },
+        "projectId": {
+          "maxLength": 128,
+          "minLength": 1,
+          "pattern": "^[A-Za-z0-9_-]+$",
+          "title": "Projectid",
+          "type": "string"
+        },
+        "resumeCredentialSha256": {
+          "pattern": "^[a-f0-9]{64}$",
+          "title": "Resumecredentialsha256",
+          "type": "string"
+        },
+        "schemaVersion": {
+          "const": 1,
+          "title": "Schemaversion",
+          "type": "integer"
+        },
+        "sessionId": {
+          "maxLength": 128,
+          "minLength": 1,
+          "pattern": "^[A-Za-z0-9_-]+$",
+          "title": "Sessionid",
+          "type": "string"
+        },
+        "status": {
+          "enum": [
+            "attached",
+            "recovering",
+            "clean_detached",
+            "fenced"
+          ],
+          "title": "Status",
+          "type": "string"
+        },
+        "touchGeneration": {
+          "maximum": 9007199254740991,
+          "minimum": 0,
+          "title": "Touchgeneration",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "schemaVersion",
+        "projectId",
+        "lineage",
+        "epoch",
+        "sessionId",
+        "incarnation",
+        "resumeCredentialSha256",
+        "leaseExpiresAt",
+        "status",
+        "acknowledgedRevision",
+        "acknowledgedCursor",
+        "touchGeneration",
+        "barrierGeneration",
+        "draftId"
+      ],
+      "title": "WriterSessionV1",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "accountGeneration": {
+      "minimum": 1,
+      "title": "Accountgeneration",
+      "type": "integer"
+    },
+    "activeRequestEpoch": {
+      "minimum": 1,
+      "title": "Activerequestepoch",
+      "type": "integer"
+    },
+    "barrier": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/PublicationBarrierV1"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "drafts": {
+      "items": {
+        "$ref": "#/$defs/DraftCheckpointV1"
+      },
+      "maxItems": 512,
+      "title": "Drafts",
+      "type": "array"
+    },
+    "expiredThroughEpoch": {
+      "maximum": 9007199254740991,
+      "minimum": 0,
+      "title": "Expiredthroughepoch",
+      "type": "integer"
+    },
+    "generations": {
+      "items": {
+        "$ref": "#/$defs/GenerationStamp"
+      },
+      "maxItems": 512,
+      "title": "Generations",
+      "type": "array"
+    },
+    "intents": {
+      "items": {
+        "$ref": "#/$defs/PublicationIntentV1"
+      },
+      "maxItems": 512,
+      "title": "Intents",
+      "type": "array"
+    },
+    "inverses": {
+      "items": {
+        "$ref": "#/$defs/UndoOwnershipV1"
+      },
+      "maxItems": 20,
+      "title": "Inverses",
+      "type": "array"
+    },
+    "jobs": {
+      "items": {
+        "$ref": "#/$defs/JobSnapshotV1"
+      },
+      "maxItems": 512,
+      "title": "Jobs",
+      "type": "array"
+    },
+    "lineage": {
+      "maxLength": 128,
+      "minLength": 1,
+      "pattern": "^[A-Za-z0-9_-]+$",
+      "title": "Lineage",
+      "type": "string"
+    },
+    "projectId": {
+      "maxLength": 128,
+      "minLength": 1,
+      "pattern": "^[A-Za-z0-9_-]+$",
+      "title": "Projectid",
+      "type": "string"
+    },
+    "proposals": {
+      "items": {
+        "$ref": "#/$defs/ProposalBindingV1"
+      },
+      "maxItems": 512,
+      "title": "Proposals",
+      "type": "array"
+    },
+    "requestEpochExpiresAt": {
+      "format": "date-time",
+      "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(?:\\.\\d+)?(?:Z|\\+00:00)$",
+      "title": "Requestepochexpiresat",
+      "type": "string"
+    },
+    "requests": {
+      "items": {
+        "$ref": "#/$defs/RequestReplayV1"
+      },
+      "maxItems": 512,
+      "title": "Requests",
+      "type": "array"
+    },
+    "schemaVersion": {
+      "const": 1,
+      "title": "Schemaversion",
+      "type": "integer"
+    },
+    "tombstoned": {
+      "title": "Tombstoned",
+      "type": "boolean"
+    },
+    "writer": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/WriterSessionV1"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    }
+  },
+  "required": [
+    "schemaVersion",
+    "projectId",
+    "lineage",
+    "accountGeneration",
+    "activeRequestEpoch",
+    "expiredThroughEpoch",
+    "requestEpochExpiresAt",
+    "tombstoned",
+    "jobs",
+    "requests",
+    "proposals",
+    "writer",
+    "barrier",
+    "drafts",
+    "generations",
+    "intents",
+    "inverses"
+  ],
+  "title": "BackgroundSidecarV1",
+  "type": "object",
+  "x-maxMetadataRecords": 512,
+  "x-maxSerializedBytes": 10485760
+}

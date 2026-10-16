@@ -1,5 +1,25 @@
 # Test strategy
 
+NB uses [the mandatory contract](background-work-tests.md) and
+[per-variant matrix](handoffs/BACKGROUND-WORK/test-matrix.json). `NB-CONTRACTS`
+maps NB00a's offline schemas, limit policy, controlled protocol, pipe-process
+isolation, reference corpus and executed-report negatives. This is not production
+background acceptance. `NB-JOBS`, `NB-PUBLICATION`, `NB-WRITER`, `NB-FIXED`, `NB-UI`
+and `NB-PARALLEL` remain unimplemented until their slices add real bindings.
+
+The existing fast gate writes exact Python setup/call/teardown results through
+`tools/background_pytest.py` and validates NB parameter/file identities, current
+source hashes, run identity, full collection and required seed/action/order
+coverage. `--evidence-dir <new-directory>` retains phase, branch and variant reports,
+including a failed run. A subsequent fix gets a new directory/run identity; retry
+results cannot erase failures. The default fast run also retains its local history
+under ignored `tmp/checks-background/`. Unchanged-source retries require
+`--nb-diagnosis <json>` binding the previous run, source hash and reproducible
+diagnostic artifacts; new source keeps the failed run in its history. Normal Node state tests still run, but global Node
+test names cannot satisfy any NB variant: NB00a binds Python nodes only. Future
+Node NB bindings require exact file/full-name execution evidence. No automated
+browser scenarios are added or executed; mounted behavior uses manual T3.
+
 D085 assistant work follows [its plan](agent-assistant-plan.md), AC01–AC18 and
 AG00–AG08. No assistant acceptance is claimed yet. Add the namespaced requirement
 mapping during AG01 with the seven grouped AG IDs and existing recovery suite

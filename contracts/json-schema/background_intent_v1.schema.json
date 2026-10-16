@@ -1,0 +1,171 @@
+{
+  "additionalProperties": false,
+  "properties": {
+    "afterGenerationsSha256": {
+      "pattern": "^[a-f0-9]{64}$",
+      "title": "Aftergenerationssha256",
+      "type": "string"
+    },
+    "afterWorkspaceSha256": {
+      "pattern": "^[a-f0-9]{64}$",
+      "title": "Afterworkspacesha256",
+      "type": "string"
+    },
+    "assetPins": {
+      "items": {
+        "maxLength": 128,
+        "minLength": 1,
+        "pattern": "^[A-Za-z0-9_-]+$",
+        "type": "string"
+      },
+      "maxItems": 100,
+      "title": "Assetpins",
+      "type": "array"
+    },
+    "barrierGeneration": {
+      "anyOf": [
+        {
+          "minimum": 1,
+          "type": "integer"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "title": "Barriergeneration"
+    },
+    "beforeWorkspaceSha256": {
+      "pattern": "^[a-f0-9]{64}$",
+      "title": "Beforeworkspacesha256",
+      "type": "string"
+    },
+    "candidateRef": {
+      "maxLength": 128,
+      "minLength": 1,
+      "pattern": "^[A-Za-z0-9_-]+$",
+      "title": "Candidateref",
+      "type": "string"
+    },
+    "clientMutationId": {
+      "maxLength": 128,
+      "minLength": 1,
+      "pattern": "^[A-Za-z0-9_-]+$",
+      "title": "Clientmutationid",
+      "type": "string"
+    },
+    "id": {
+      "maxLength": 128,
+      "minLength": 1,
+      "pattern": "^[A-Za-z0-9_-]+$",
+      "title": "Id",
+      "type": "string"
+    },
+    "incarnation": {
+      "anyOf": [
+        {
+          "maxLength": 128,
+          "minLength": 1,
+          "pattern": "^[A-Za-z0-9_-]+$",
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "title": "Incarnation"
+    },
+    "jobId": {
+      "maxLength": 128,
+      "minLength": 1,
+      "pattern": "^[A-Za-z0-9_-]+$",
+      "title": "Jobid",
+      "type": "string"
+    },
+    "lineage": {
+      "maxLength": 128,
+      "minLength": 1,
+      "pattern": "^[A-Za-z0-9_-]+$",
+      "title": "Lineage",
+      "type": "string"
+    },
+    "phase": {
+      "enum": [
+        "intent_stored",
+        "commit_claimed",
+        "workspace_replaced",
+        "workspace_durable",
+        "generation_history_durable",
+        "receipt_stored",
+        "fenced",
+        "reconciled"
+      ],
+      "title": "Phase",
+      "type": "string"
+    },
+    "previousRef": {
+      "maxLength": 128,
+      "minLength": 1,
+      "pattern": "^[A-Za-z0-9_-]+$",
+      "title": "Previousref",
+      "type": "string"
+    },
+    "projectId": {
+      "maxLength": 128,
+      "minLength": 1,
+      "pattern": "^[A-Za-z0-9_-]+$",
+      "title": "Projectid",
+      "type": "string"
+    },
+    "proposalId": {
+      "maxLength": 128,
+      "minLength": 1,
+      "pattern": "^[A-Za-z0-9_-]+$",
+      "title": "Proposalid",
+      "type": "string"
+    },
+    "requestSha256": {
+      "pattern": "^[a-f0-9]{64}$",
+      "title": "Requestsha256",
+      "type": "string"
+    },
+    "schemaVersion": {
+      "const": 1,
+      "title": "Schemaversion",
+      "type": "integer"
+    },
+    "writerEpoch": {
+      "anyOf": [
+        {
+          "minimum": 1,
+          "type": "integer"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "title": "Writerepoch"
+    }
+  },
+  "required": [
+    "schemaVersion",
+    "id",
+    "jobId",
+    "proposalId",
+    "projectId",
+    "lineage",
+    "clientMutationId",
+    "requestSha256",
+    "beforeWorkspaceSha256",
+    "afterWorkspaceSha256",
+    "afterGenerationsSha256",
+    "candidateRef",
+    "previousRef",
+    "writerEpoch",
+    "incarnation",
+    "barrierGeneration",
+    "phase",
+    "assetPins"
+  ],
+  "title": "PublicationIntentV1",
+  "type": "object"
+}

@@ -1,0 +1,16 @@
+{
+  "schemaVersion": 1,
+  "projectId": "project-one",
+  "lineage": "lineage-one",
+  "epoch": 1,
+  "sessionId": "session-one",
+  "incarnation": "connection-one",
+  "resumeCredentialSha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "leaseExpiresAt": "2026-10-16T12:00:15Z",
+  "status": "attached",
+  "acknowledgedRevision": 1,
+  "acknowledgedCursor": 0,
+  "touchGeneration": 0,
+  "barrierGeneration": 0,
+  "draftId": null
+}

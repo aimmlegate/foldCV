@@ -1,0 +1,44 @@
+{
+  "schemaVersion": 1,
+  "id": "proposal-one",
+  "jobId": "job-one",
+  "projectId": "project-one",
+  "lineage": "lineage-one",
+  "accountGeneration": 1,
+  "executionGeneration": 1,
+  "turnId": "turn-one",
+  "payload": {
+    "kind": "agent_journal",
+    "conversationId": "conversation-one",
+    "runId": "run-one",
+    "batchId": "batch-one"
+  },
+  "payloadSha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "payloadBytes": 128,
+  "guards": {
+    "schemaVersion": 1,
+    "reads": [
+      {
+        "kind": "entity",
+        "key": "block-one",
+        "generation": 1,
+        "fingerprint": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+      }
+    ],
+    "writes": [
+      {
+        "kind": "entity",
+        "key": "block-one",
+        "generation": 1,
+        "fingerprint": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+      }
+    ]
+  },
+  "scope": {
+    "kind": "resume"
+  },
+  "acceptedAt": "2026-10-16T12:00:00Z",
+  "executionDeadline": "2026-10-16T12:03:00Z",
+  "authority": "active",
+  "revocation": null
+}

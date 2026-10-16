@@ -1,0 +1,19 @@
+{
+  "schemaVersion": 1,
+  "projectId": "project-one",
+  "lineage": "lineage-one",
+  "accountGeneration": 1,
+  "activeRequestEpoch": 1,
+  "expiredThroughEpoch": 0,
+  "requestEpochExpiresAt": "2026-11-15T12:00:00Z",
+  "tombstoned": false,
+  "jobs": [],
+  "requests": [],
+  "proposals": [],
+  "writer": null,
+  "barrier": null,
+  "drafts": [],
+  "generations": [],
+  "intents": [],
+  "inverses": []
+}

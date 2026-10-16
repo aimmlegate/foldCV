@@ -1,0 +1,119 @@
+{
+  "additionalProperties": false,
+  "properties": {
+    "acknowledgedCursor": {
+      "maximum": 9007199254740991,
+      "minimum": 0,
+      "title": "Acknowledgedcursor",
+      "type": "integer"
+    },
+    "acknowledgedRevision": {
+      "minimum": 1,
+      "title": "Acknowledgedrevision",
+      "type": "integer"
+    },
+    "barrierGeneration": {
+      "maximum": 9007199254740991,
+      "minimum": 0,
+      "title": "Barriergeneration",
+      "type": "integer"
+    },
+    "draftId": {
+      "anyOf": [
+        {
+          "maxLength": 128,
+          "minLength": 1,
+          "pattern": "^[A-Za-z0-9_-]+$",
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "title": "Draftid"
+    },
+    "epoch": {
+      "minimum": 1,
+      "title": "Epoch",
+      "type": "integer"
+    },
+    "incarnation": {
+      "maxLength": 128,
+      "minLength": 1,
+      "pattern": "^[A-Za-z0-9_-]+$",
+      "title": "Incarnation",
+      "type": "string"
+    },
+    "leaseExpiresAt": {
+      "format": "date-time",
+      "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(?:\\.\\d+)?(?:Z|\\+00:00)$",
+      "title": "Leaseexpiresat",
+      "type": "string"
+    },
+    "lineage": {
+      "maxLength": 128,
+      "minLength": 1,
+      "pattern": "^[A-Za-z0-9_-]+$",
+      "title": "Lineage",
+      "type": "string"
+    },
+    "projectId": {
+      "maxLength": 128,
+      "minLength": 1,
+      "pattern": "^[A-Za-z0-9_-]+$",
+      "title": "Projectid",
+      "type": "string"
+    },
+    "resumeCredentialSha256": {
+      "pattern": "^[a-f0-9]{64}$",
+      "title": "Resumecredentialsha256",
+      "type": "string"
+    },
+    "schemaVersion": {
+      "const": 1,
+      "title": "Schemaversion",
+      "type": "integer"
+    },
+    "sessionId": {
+      "maxLength": 128,
+      "minLength": 1,
+      "pattern": "^[A-Za-z0-9_-]+$",
+      "title": "Sessionid",
+      "type": "string"
+    },
+    "status": {
+      "enum": [
+        "attached",
+        "recovering",
+        "clean_detached",
+        "fenced"
+      ],
+      "title": "Status",
+      "type": "string"
+    },
+    "touchGeneration": {
+      "maximum": 9007199254740991,
+      "minimum": 0,
+      "title": "Touchgeneration",
+      "type": "integer"
+    }
+  },
+  "required": [
+    "schemaVersion",
+    "projectId",
+    "lineage",
+    "epoch",
+    "sessionId",
+    "incarnation",
+    "resumeCredentialSha256",
+    "leaseExpiresAt",
+    "status",
+    "acknowledgedRevision",
+    "acknowledgedCursor",
+    "touchGeneration",
+    "barrierGeneration",
+    "draftId"
+  ],
+  "title": "WriterSessionV1",
+  "type": "object"
+}

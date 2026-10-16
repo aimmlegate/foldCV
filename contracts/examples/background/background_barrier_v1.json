@@ -1,0 +1,14 @@
+{
+  "schemaVersion": 1,
+  "projectId": "project-one",
+  "lineage": "lineage-one",
+  "writerEpoch": 1,
+  "incarnation": "connection-one",
+  "generation": 1,
+  "token": "synthetic_synthetic_synthetic_synthetic_",
+  "acknowledgedRevision": 1,
+  "actionCursor": 0,
+  "touchGeneration": 0,
+  "expiresAt": "2026-10-16T12:00:00.750Z",
+  "state": "acked"
+}

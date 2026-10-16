@@ -1,0 +1,32 @@
+{
+  "schemaVersion": 1,
+  "jobId": "job-one",
+  "proposalId": "proposal-one",
+  "owner": "backend",
+  "writerEpoch": null,
+  "incarnation": null,
+  "transferId": "transfer-one",
+  "inverseRef": "inverse-one",
+  "inverseSha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "inverseBytes": 128,
+  "expiresAt": "2026-10-17T12:00:00Z",
+  "guards": {
+    "schemaVersion": 1,
+    "reads": [
+      {
+        "kind": "entity",
+        "key": "block-one",
+        "generation": 1,
+        "fingerprint": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+      }
+    ],
+    "writes": [
+      {
+        "kind": "entity",
+        "key": "block-one",
+        "generation": 1,
+        "fingerprint": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+      }
+    ]
+  }
+}
