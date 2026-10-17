@@ -82,7 +82,7 @@ def require_converter() -> None:
             raise SystemExit(f"Missing or changed app-local font: {font.name}")
 
 
-def background_spec(*, require_native=False) -> dict:
+def background_spec(*, require_native=False, retained_native=False) -> dict:
     from tools.background_evidence import assert_manual_bindings, assert_native_bindings
     data = json.loads((ROOT / "tests/requirements.json").read_text())
     spec = data["backgroundExecution"]
@@ -96,8 +96,13 @@ def background_spec(*, require_native=False) -> dict:
     if set(spec["bindings"]) != due - manual - native or not due:
         raise SystemExit("NB matrix due variants do not match execution bindings")
     assert_manual_bindings(spec.get("manualBindings", {}), manual, ROOT)
+    if retained_native:
+        from tools.manual_qa_evidence import historical_sources
+        native_sources = historical_sources(spec["sources"])
+    else:
+        native_sources = background_source_hashes(spec["sources"])
     spec["pendingNative"] = assert_native_bindings(spec.get("nativeBindings", {}), native, ROOT,
-        sources=background_source_hashes(spec["sources"]), require_pass=require_native)
+        sources=native_sources, require_pass=require_native)
     matrix_bindings = {b["variant"]: b["nodes"] for c in matrix["cases"] for b in c["testBindings"] if b["suite"] == "fast"}
     if any(matrix_bindings.get(variant) != nodes for variant, nodes in spec["bindings"].items()):
         raise SystemExit("NB matrix executable identities do not match the runner")
@@ -118,7 +123,7 @@ def pytest_group(name: str, evidence_dir: Path | None = None, diagnosis: Path | 
         env = safe_env()
         env["COVERAGE_FILE"] = str(temp_root / ".coverage")
         arguments = []
-        spec = background_spec() if name == "fast" else None
+        spec = (prepared["spec"] if prepared and "spec" in prepared else background_spec()) if name == "fast" else None
         history = []
         retained = []
         if spec is not None:
@@ -225,7 +230,7 @@ def assert_partial_checks(entries: list[dict[str, object]], checks: object) -> N
             raise SystemExit(f"Incomplete remaining check: {requirement}")
 
 
-def validate_map(node_context: Path | None = None) -> None:
+def validate_map(node_context: Path | None = None, *, manual_qa: bool = False) -> None:
     require_python()
     data = json.loads((ROOT / "tests/requirements.json").read_text(encoding="utf-8"))
     entries = data["entries"]
@@ -300,6 +305,9 @@ def validate_map(node_context: Path | None = None) -> None:
             raise SystemExit(f"Missing foundation test: {node}")
     gaps = [entry["id"] for entry in entries if entry["status"] != "implemented"]
     print("Unimplemented or partial requirements: " + ", ".join(gaps), flush=True)
+    if manual_qa:
+        from tools.manual_qa_evidence import HANDOFF, validate_bindings
+        validate_bindings(json.loads((HANDOFF / "case-bindings.json").read_text()), collected | exact_state_nodes)
 
 
 def browser() -> None:
@@ -312,9 +320,12 @@ def browser() -> None:
     run(["npm", "run", "test:browser"], WEB)
 
 
-def fast(evidence_dir: Path | None, diagnosis: Path | None) -> None:
+def fast(evidence_dir: Path | None, diagnosis: Path | None, *, manual_qa: bool = False) -> None:
     require_node()
-    spec = background_spec()
+    spec = background_spec(retained_native=True) if manual_qa else background_spec()
+    if manual_qa:
+        from tools.manual_qa_evidence import current_sources
+        spec["sources"] = list(current_sources())
     with tempfile.TemporaryDirectory(prefix="foldcv-fast-") as folder:
         root = Path(folder).resolve()
         context = background_context(root, "fast", background_source_hashes(spec["sources"]))
@@ -330,13 +341,27 @@ def fast(evidence_dir: Path | None, diagnosis: Path | None) -> None:
         node_context = root / "context-node.json"
         node_context.write_text(json.dumps({**context, "reportPath": str(node_report)}))
         try:
-            validate_map(node_context)
+            if manual_qa:
+                validate_map(node_context, manual_qa=True)
+            else:
+                validate_map(node_context)
             for command in (["npm", "run", "typecheck"], ["npm", "run", "lint"],
                             ["npm", "run", "contracts:check"], ["npm", "run", "test:contracts"],
                             ["npm", "run", "build"]):
                 run(command, WEB)
             pytest_group("fast", evidence_dir, diagnosis,
-                prepared={"context": context, "nodeReport": str(node_report), "history": history})
+                prepared={"context": context, "nodeReport": str(node_report), "history": history, "spec": spec})
+            if manual_qa:
+                from tools.manual_qa_evidence import HANDOFF, validate_bindings, validate_execution
+                report = read_report(Path(context["reportPath"]))
+                qa = json.loads((HANDOFF / "case-bindings.json").read_text())
+                bindings = validate_bindings(qa, set(report.collected))
+                results = validate_execution(Path(context["reportPath"]), context, bindings)
+                for directory in retained:
+                    (directory / "qa-results.json").write_text(json.dumps({"controlled": results,
+                        "historicalNativeRevision": "dad17565c05b600b3965c3fad9329ff7b3958390",
+                        "observations": {key: value.get("observations", []) for key, value in qa["cases"].items()}}, indent=2) + "\n")
+                print("QA controlled regression passed; current native/T3/manual observations require separate acceptance.", flush=True)
         finally:
             for directory in retained:
                 for path in (node_context, node_report, node_report.with_suffix(".json.events.jsonl")):
@@ -349,12 +374,12 @@ def fast(evidence_dir: Path | None, diagnosis: Path | None) -> None:
 
 def main() -> None:
     parser = argparse.ArgumentParser()
-    parser.add_argument("group", choices=["fast", "integration-render", "browser"])
+    parser.add_argument("group", choices=["fast", "manual-qa", "integration-render", "browser"])
     parser.add_argument("--evidence-dir", type=Path)
     parser.add_argument("--nb-diagnosis", type=Path)
     args = parser.parse_args()
-    if args.group == "fast":
-        fast(args.evidence_dir, args.nb_diagnosis)
+    if args.group in {"fast", "manual-qa"}:
+        fast(args.evidence_dir, args.nb_diagnosis, manual_qa=args.group == "manual-qa")
     elif args.group == "integration-render":
         require_converter()
         pytest_group("integration-render", args.evidence_dir)
