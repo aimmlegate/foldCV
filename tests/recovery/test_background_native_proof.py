@@ -158,6 +158,70 @@ def test_structured_native_evidence_requires_its_own_durable_fixed_publication(t
             assert_native_bindings(bindings, {variant}, tmp_path, sources=sources, require_pass=True)
 
 
+@pytest.mark.parametrize("fault", ["none", "agent", "missing-features", "enabled-host", "enabled-prewarm",
+    "tools", "foreign-thread", "duplicate-ack", "request-generation", "ack-generation", "runtime-generation",
+    "owner-generation", "owner-pid", "host-cleanup", "group-cleanup", "missing-owner", "late-ack"])
+def test_hostless_structured_proof_requires_disabled_thread_and_verified_generation(tmp_path, fault):
+    from spikes.background.appserver_offline import structured_features
+    sources, bindings, report, ledger, runtimes, shutdown, wire, save = proof_fixture(tmp_path)
+    old, variant = "NB-R05:v01", "NB-R05:v02"
+    case = report["variants"].pop(old)
+    report["variants"][variant] = case
+    bindings[variant] = bindings.pop(old)
+    bindings[variant]["roles"][1] = "structured-rewrite-B"
+    case["turns"][1]["role"] = "structured-rewrite-B"
+    for attempt in ledger["attempts"]:
+        attempt["variant"] = variant
+    ledger["attempts"][1]["role"] = "structured-rewrite-B"
+    runtime = list(runtimes.values())[1]
+    runtime.update(role="structured-rewrite-B", toolCalls=0, toolNames=[], mcpListenerClosed=None,
+        hostPids=[], generation=2, schemaValidated=True, logicalAttempts=1, repairTurns=0,
+        fixedPublication=dict(exactRequestedChange=True, jobArtifact="fixed-job.json"))
+    wire[:] = [row for row in wire if row["frame"].get("params", {}).get("threadId") != runtime["threadId"]
+        or row["frame"].get("method") != "item/tool/call"]
+    wire[:] = [row for row in wire if row["frame"].get("id") not in {110, 111, 112}]
+    for row in wire:
+        row["generation"] = 2
+        if row["frame"].get("method") == "turn/start" and row["frame"]["params"]["threadId"] == runtime["threadId"]:
+            row["frame"]["params"]["outputSchema"] = {"type": "object"}
+    request = dict(direction="client", generation=2, at=.5, frame=dict(id=900, method="thread/start",
+        params=dict(dynamicTools=[], ephemeral=True, sandbox="read-only",
+            config=dict(web_search="disabled", features=structured_features()))))
+    response = dict(direction="server", generation=2, at=.6,
+        frame=dict(id=900, result=dict(thread=dict(id=runtime["threadId"])) ))
+    wire[:0] = [request, response]
+    owner = dict(generation=2, processPid=123, hostPids=[124], ownedGroupCleanupVerified=True,
+        ownedHostPidsGone=True, operationRemoved=True)
+    shutdown["serverGenerations"] = [owner]
+    if fault == "agent": list(runtimes.values())[0]["hostPids"] = []
+    elif fault == "missing-features": request["frame"]["params"]["config"].pop("features")
+    elif fault == "enabled-host": request["frame"]["params"]["config"]["features"]["code_mode_host"] = True
+    elif fault == "enabled-prewarm": request["frame"]["params"]["config"]["features"]["code_mode_prewarm"] = True
+    elif fault == "tools": request["frame"]["params"]["dynamicTools"] = [{"name": "foreign"}]
+    elif fault == "foreign-thread": response["frame"]["result"]["thread"]["id"] = "foreign"
+    elif fault == "duplicate-ack": wire.append(response.copy())
+    elif fault == "request-generation": request["generation"] = 1
+    elif fault == "ack-generation": response["generation"] = 1
+    elif fault == "runtime-generation": runtime["generation"] = 1
+    elif fault == "owner-generation": owner["generation"] = 1
+    elif fault == "owner-pid": owner["processPid"] = 999
+    elif fault == "host-cleanup": owner["ownedHostPidsGone"] = False
+    elif fault == "group-cleanup": owner["ownedGroupCleanupVerified"] = False
+    elif fault == "missing-owner": shutdown.pop("serverGenerations")
+    elif fault == "late-ack": response["at"] = 10
+    job = dict(id=runtime["jobId"], execution="completed", publication="saved",
+        receipt=dict(durable=True, jobId=runtime["jobId"]))
+    path = tmp_path / "fixed-job.json"
+    path.write_text(json.dumps(job))
+    case["artifacts"][path.name] = hashlib.sha256(path.read_bytes()).hexdigest()
+    save()
+    if fault == "none":
+        assert_native_bindings(bindings, {variant}, tmp_path, sources=sources, require_pass=True)
+    else:
+        with pytest.raises(SystemExit, match="native release proof"):
+            assert_native_bindings(bindings, {variant}, tmp_path, sources=sources, require_pass=True)
+
+
 @pytest.mark.asyncio
 async def test_native_matrix_retains_startup_failure_without_charging_a_turn(tmp_path):
     from spikes.background.native_parallel import Feasibility

@@ -29,6 +29,41 @@ def artifact(root, case, path, *, lines=False):
     return json.loads(raw)
 
 
+def hostless_structured(runtime, shutdown, owner, wire):
+    from spikes.background.appserver_offline import structured_features
+    if not runtime["role"].startswith("structured-") or runtime["hostPids"] != []:
+        return False
+    generation = runtime.get("generation")
+    require(type(generation) is int and generation > 0, "Missing structured server generation")
+    generations = [row for row in owner.get("serverGenerations", []) if row.get("generation") == generation]
+    require(len(generations) == 1, "Missing structured generation ownership")
+    owned = generations[0]
+    require(owned["processPid"] == runtime["serverPid"] == shutdown["serverPid"]
+        and owned["hostPids"] == shutdown["hostPids"] and owned["ownedGroupCleanupVerified"] is True
+        and owned["ownedHostPidsGone"] is True and owned["operationRemoved"] is True,
+        "Unproved structured generation shutdown")
+    responses = [row for row in wire if row["direction"] == "server"
+        and isinstance(row["frame"].get("result"), dict)
+        and isinstance(row["frame"]["result"].get("thread"), dict)
+        and row["frame"]["result"]["thread"].get("id") == runtime["threadId"]]
+    require(len(responses) == 1, "Missing or ambiguous structured thread acknowledgment")
+    response = responses[0]
+    requests = [row for row in wire if row["direction"] == "client" and row["frame"].get("method") == "thread/start"
+        and row["frame"].get("id") == response["frame"].get("id")]
+    require(len(requests) == 1, "Missing structured thread request")
+    request = requests[0]
+    params = request["frame"]["params"]
+    require(request.get("generation") == response.get("generation") == generation
+        and request["at"] <= response["at"] <= runtime["startedAt"]
+        and params["dynamicTools"] == [] and params["ephemeral"] is True and params["sandbox"] == "read-only"
+        and params["config"]["web_search"] == "disabled" and params["config"]["features"] == structured_features(),
+        "Structured host was not disabled in its exact captured thread")
+    require(all(row.get("generation") == generation for row in wire
+        if row["frame"].get("params", {}).get("threadId") == runtime["threadId"]),
+        "Structured wire crossed server generations")
+    return True
+
+
 def assert_shared_case(binding, variant, report, ledger, root, sources):
     case = report["variants"][variant]
     require(binding["transport"] == report["transport"] == PROTOCOL, "Wrong transport")
@@ -85,7 +120,8 @@ def assert_shared_case(binding, variant, report, ledger, root, sources):
             and runtime["state"] == expected_state and runtime["error"] == ("CANCELLED" if expected_state == "cancelled" else None),
             "Wrong runtime outcome")
         require(type(runtime["serverPid"]) is int and runtime["serverPid"] > 0
-            and runtime["serverPid"] == shutdown["serverPid"] and runtime["hostPids"]
+            and runtime["serverPid"] == shutdown["serverPid"]
+            and (runtime["hostPids"] or hostless_structured(runtime, shutdown, owner, wire))
             and set(runtime["hostPids"]) <= set(shutdown["hostPids"])
             and runtime["sharedProcessDead"] is False and runtime["profileExclusionLost"] is False,
             "False per-job process claim")

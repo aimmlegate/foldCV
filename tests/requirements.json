@@ -3160,7 +3160,24 @@
         "tests/recovery/test_background_native_proof.py::test_structured_native_evidence_requires_its_own_durable_fixed_publication[none]",
         "tests/recovery/test_background_native_proof.py::test_structured_native_evidence_requires_its_own_durable_fixed_publication[not-durable]",
         "tests/recovery/test_background_native_proof.py::test_structured_native_evidence_requires_its_own_durable_fixed_publication[not-saved]",
-        "tests/recovery/test_background_native_proof.py::test_structured_native_evidence_requires_its_own_durable_fixed_publication[wrong-change]"
+        "tests/recovery/test_background_native_proof.py::test_structured_native_evidence_requires_its_own_durable_fixed_publication[wrong-change]",
+        "tests/recovery/test_background_native_proof.py::test_hostless_structured_proof_requires_disabled_thread_and_verified_generation[none]",
+        "tests/recovery/test_background_native_proof.py::test_hostless_structured_proof_requires_disabled_thread_and_verified_generation[agent]",
+        "tests/recovery/test_background_native_proof.py::test_hostless_structured_proof_requires_disabled_thread_and_verified_generation[missing-features]",
+        "tests/recovery/test_background_native_proof.py::test_hostless_structured_proof_requires_disabled_thread_and_verified_generation[enabled-host]",
+        "tests/recovery/test_background_native_proof.py::test_hostless_structured_proof_requires_disabled_thread_and_verified_generation[enabled-prewarm]",
+        "tests/recovery/test_background_native_proof.py::test_hostless_structured_proof_requires_disabled_thread_and_verified_generation[tools]",
+        "tests/recovery/test_background_native_proof.py::test_hostless_structured_proof_requires_disabled_thread_and_verified_generation[foreign-thread]",
+        "tests/recovery/test_background_native_proof.py::test_hostless_structured_proof_requires_disabled_thread_and_verified_generation[duplicate-ack]",
+        "tests/recovery/test_background_native_proof.py::test_hostless_structured_proof_requires_disabled_thread_and_verified_generation[request-generation]",
+        "tests/recovery/test_background_native_proof.py::test_hostless_structured_proof_requires_disabled_thread_and_verified_generation[ack-generation]",
+        "tests/recovery/test_background_native_proof.py::test_hostless_structured_proof_requires_disabled_thread_and_verified_generation[runtime-generation]",
+        "tests/recovery/test_background_native_proof.py::test_hostless_structured_proof_requires_disabled_thread_and_verified_generation[owner-generation]",
+        "tests/recovery/test_background_native_proof.py::test_hostless_structured_proof_requires_disabled_thread_and_verified_generation[owner-pid]",
+        "tests/recovery/test_background_native_proof.py::test_hostless_structured_proof_requires_disabled_thread_and_verified_generation[host-cleanup]",
+        "tests/recovery/test_background_native_proof.py::test_hostless_structured_proof_requires_disabled_thread_and_verified_generation[group-cleanup]",
+        "tests/recovery/test_background_native_proof.py::test_hostless_structured_proof_requires_disabled_thread_and_verified_generation[missing-owner]",
+        "tests/recovery/test_background_native_proof.py::test_hostless_structured_proof_requires_disabled_thread_and_verified_generation[late-ack]"
       ]
     }
   ],
@@ -3191,7 +3208,7 @@
     "G01": {
       "unproved": "Application dispatch/count/zero-call paths pass; actual CLI internal requests, payload disclosure and tokens are unmeasured.",
       "owner": "Manual CLI usage after MVP under D038",
-      "check": "Record logical operations and supported CLI metadata on examples E1\u2013E8; keep unavailable internal request counts unknown."
+      "check": "Record logical operations and supported CLI metadata on examples E1–E8; keep unavailable internal request counts unknown."
     },
     "G02": {
       "unproved": "Controlled event/error/retry guards pass; the installed experimental native CLI version is unverified.",
@@ -3220,7 +3237,7 @@
     },
     "B01": {
       "unproved": "Connected controlled raw-to-edit/rewrite/restore/local-portable-reopen/DOCX and default-entry UI pass; live semantic wording/quality remains pending.",
-      "owner": "Manual examples E1\u2013E8 after MVP under D038",
+      "owner": "Manual examples E1–E8 after MVP under D038",
       "check": "Use the manual guide through the real CLI path, inspect quality and supported facts, record keyboard/failure behavior and measured usage. No mandatory automated pilot."
     },
     "N01": {
@@ -3291,7 +3308,7 @@
     "historicalMapping": "docs/gui/handoffs/PROTOTYPE-ADOPTION/evidence/uir09-browser-retirement.json",
     "connectedAcceptance": "docs/gui/handoffs/PROTOTYPE-ADOPTION/uir08-acceptance.json",
     "manualWord": "pending_unchanged",
-    "currentUiChecks": "Manual T3 acceptance in UIR01\u2013UIR09; Python/state mappings remain active."
+    "currentUiChecks": "Manual T3 acceptance in UIR01–UIR09; Python/state mappings remain active."
   },
   "backgroundExecution": {
     "schemaVersion": 1,
@@ -6216,7 +6233,24 @@
         "tests/recovery/test_background_native_proof.py::test_structured_native_evidence_requires_its_own_durable_fixed_publication[none]",
         "tests/recovery/test_background_native_proof.py::test_structured_native_evidence_requires_its_own_durable_fixed_publication[not-durable]",
         "tests/recovery/test_background_native_proof.py::test_structured_native_evidence_requires_its_own_durable_fixed_publication[not-saved]",
-        "tests/recovery/test_background_native_proof.py::test_structured_native_evidence_requires_its_own_durable_fixed_publication[wrong-change]"
+        "tests/recovery/test_background_native_proof.py::test_structured_native_evidence_requires_its_own_durable_fixed_publication[wrong-change]",
+        "tests/recovery/test_background_native_proof.py::test_hostless_structured_proof_requires_disabled_thread_and_verified_generation[none]",
+        "tests/recovery/test_background_native_proof.py::test_hostless_structured_proof_requires_disabled_thread_and_verified_generation[agent]",
+        "tests/recovery/test_background_native_proof.py::test_hostless_structured_proof_requires_disabled_thread_and_verified_generation[missing-features]",
+        "tests/recovery/test_background_native_proof.py::test_hostless_structured_proof_requires_disabled_thread_and_verified_generation[enabled-host]",
+        "tests/recovery/test_background_native_proof.py::test_hostless_structured_proof_requires_disabled_thread_and_verified_generation[enabled-prewarm]",
+        "tests/recovery/test_background_native_proof.py::test_hostless_structured_proof_requires_disabled_thread_and_verified_generation[tools]",
+        "tests/recovery/test_background_native_proof.py::test_hostless_structured_proof_requires_disabled_thread_and_verified_generation[foreign-thread]",
+        "tests/recovery/test_background_native_proof.py::test_hostless_structured_proof_requires_disabled_thread_and_verified_generation[duplicate-ack]",
+        "tests/recovery/test_background_native_proof.py::test_hostless_structured_proof_requires_disabled_thread_and_verified_generation[request-generation]",
+        "tests/recovery/test_background_native_proof.py::test_hostless_structured_proof_requires_disabled_thread_and_verified_generation[ack-generation]",
+        "tests/recovery/test_background_native_proof.py::test_hostless_structured_proof_requires_disabled_thread_and_verified_generation[runtime-generation]",
+        "tests/recovery/test_background_native_proof.py::test_hostless_structured_proof_requires_disabled_thread_and_verified_generation[owner-generation]",
+        "tests/recovery/test_background_native_proof.py::test_hostless_structured_proof_requires_disabled_thread_and_verified_generation[owner-pid]",
+        "tests/recovery/test_background_native_proof.py::test_hostless_structured_proof_requires_disabled_thread_and_verified_generation[host-cleanup]",
+        "tests/recovery/test_background_native_proof.py::test_hostless_structured_proof_requires_disabled_thread_and_verified_generation[group-cleanup]",
+        "tests/recovery/test_background_native_proof.py::test_hostless_structured_proof_requires_disabled_thread_and_verified_generation[missing-owner]",
+        "tests/recovery/test_background_native_proof.py::test_hostless_structured_proof_requires_disabled_thread_and_verified_generation[late-ack]"
       ],
       "NB-APP:pin-schema": [
         "tests/recovery/test_background_appserver.py::test_pinned_schema_requires_routed_tools_structured_turns_and_targeted_interrupt[none]",

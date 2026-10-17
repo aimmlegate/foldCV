@@ -18,6 +18,12 @@ a shielded receipt timeout prove that execution cleanup alone is not publication
 Native evidence requires an exact fixed change and its own durable job receipt.
 Copied-ledger negatives retain all charged history and reject pending retry grants.
 
+A structured thread can disable code mode, its host and prewarm. An empty host
+inventory requires its exact captured thread request/acknowledgment, disabled
+feature set, matching server generation and verified generation shutdown. Agents
+still require their host inventory. Native source hashes remain the executed
+snapshot; later evidence-validator corrections are recorded separately.
+
 NB uses [the mandatory contract](background-work-tests.md) and
 [per-variant matrix](handoffs/BACKGROUND-WORK/test-matrix.json). `NB-CONTRACTS`
 maps NB00a's offline schemas, limit policy, controlled protocol, pipe-process
