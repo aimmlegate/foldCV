@@ -12,7 +12,7 @@ export function History({ projects, activeId, busy, collapse, fresh, open, remov
 }) {
   const [deleting, setDeleting] = useState<string | null>(null);
   const entries = projects?.entries.filter(item => !item.tombstoned) ?? [];
-  return <aside className="history" aria-label="История резюме">
+  return <aside className="history" aria-label="История резюме" aria-busy={busy}>
     <div className="brand-row"><button className="brand" disabled={busy} aria-label="FoldCV — новый исходник" onClick={fresh}><Icon name="fold" />FoldCV<span>.</span></button>
       <button className="icon" aria-label="Свернуть историю" onClick={collapse}><Icon name="panel" /></button></div>
     <Button className="new-button" disabled={busy} onClick={fresh}><Icon name="plus" />Новое резюме</Button>
@@ -20,7 +20,7 @@ export function History({ projects, activeId, busy, collapse, fresh, open, remov
     <div className="project-list">{!entries.length && <p className="empty-state">Здесь появятся ваши резюме.</p>}
       {entries.map(item => <div className={`project-row${item.projectId === activeId ? " active" : ""}`} key={item.projectId}>
         <button className="project-select" disabled={busy} aria-current={item.projectId === activeId ? "page" : undefined} onClick={() => void open(item.projectId)}>
-          <strong>{item.title}</strong><small>{item.subtitle}</small><em>{projects?.errors.some(error => error.projectId === item.projectId) ? "Не удалось прочитать" : activity?.get(item.projectId) ?? "Рабочая версия"}</em>
+          <strong>{item.title}</strong>{item.subtitle && <small>{item.subtitle}</small>}<em>{projects?.errors.some(error => error.projectId === item.projectId) ? "Не удалось прочитать" : activity?.get(item.projectId) ?? "Рабочая версия"}</em>
         </button><button className="project-delete" disabled={busy} aria-label={`Удалить проект: ${item.title}`} title="Удалить резюме" onClick={() => setDeleting(item.projectId)}><Icon name="trash" /></button>
       </div>)}
     </div>

@@ -6,6 +6,7 @@ import { Button } from "../ui/Button";
 import { Icon } from "../ui/Icon";
 import { factError } from "./error";
 import { AppliedIntentFailure } from "../../rich/intent-queue";
+import { DateInput } from "./DateInput";
 
 export type FactTarget = { kind: Exclude<Kind, "technology">; record: RecordValue | null; remove?: boolean };
 export function FactDialog({ target, close, submit }: { target: FactTarget; close: () => void; submit: (command: PanelCommand) => Promise<void> }) {
@@ -39,7 +40,9 @@ export function FactDialog({ target, close, submit }: { target: FactTarget; clos
     }}>
       {target.remove ? <p className="dialog-copy">Связанные поля будут удалены из документа. Остальной текст сохранится.</p> : <>
         <p className="dialog-subtitle">Изменения появятся в документе после сохранения.</p>
-        <div className="fact-form-grid">{[...inputs, ...addingPeriod].map((field, index) => <div key={field.key} className={index === 0 ? "full" : ""}>
+        <div className="fact-form-grid">{[...inputs, ...addingPeriod].map((field, index) => "date" in field || field.key === "start" || field.key === "end" || field.key === "completion"
+          ? <DateInput key={field.key} name={field.key} label={field.label} field={"date" in field ? field.date : undefined} disabled={busy} />
+          : <div key={field.key} className={index === 0 || field.key === "role" ? "full" : ""}>
           <label htmlFor={`fact-${field.key}`}>{field.label}</label><input id={`fact-${field.key}`} name={field.key} aria-label={field.label}
             type={field.checked === undefined ? "text" : "checkbox"} defaultValue={field.checked === undefined ? field.text : "present"}
             defaultChecked={field.checked} autoFocus={index === 0} disabled={busy} maxLength={16000} />

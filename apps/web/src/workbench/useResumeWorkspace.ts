@@ -38,6 +38,7 @@ export function useResumeWorkspace() {
   const dismissError = useCallback(() => setError(""), []);
   const [status, setStatus] = useState("Сохранено");
   const [busy, setBusy] = useState(false);
+  const [loading, setLoading] = useState(() => new URLSearchParams(location.search).has("project"));
   const [settings, setSettings] = useState(false);
   const editor = useRef<RichEditorHandle>(null);
   const assistant = useRef<AssistantHandle>(null);
@@ -112,7 +113,7 @@ export function useResumeWorkspace() {
   useEffect(() => {
     const ticket = ++epoch.current;
     const id = new URLSearchParams(location.search).get("project");
-    if (id) void load(id).then(({ next, connection, available }) => { if (ticket === epoch.current) { setWriter(connection); select(next, available); } }).catch(error => { if (ticket === epoch.current) setError(label(error)); });
+    if (id) void load(id).then(({ next, connection, available }) => { if (ticket === epoch.current) { setWriter(connection); select(next, available); } }).catch(error => { if (ticket === epoch.current) setError(label(error)); }).finally(() => { if (ticket === epoch.current) setLoading(false); });
     void listProjects().then(setProjects).catch(error => setError(label(error)));
     return () => { ++epoch.current; };
   }, [acknowledge]);
@@ -179,6 +180,6 @@ export function useResumeWorkspace() {
       anchor.click(); setTimeout(() => URL.revokeObjectURL(url), 1000);
     });
   }
-  return { response, writer, background, projects, input, setInput, textDraft, error, status, setStatus, busy, settings, setSettings,
+  return { response, writer, background, projects, input, setInput, textDraft, error, status, setStatus, busy, loading, settings, setSettings,
     editor, assistant, acknowledge, action, fresh, open, remove, process, upload, exportFile, dismissError };
 }

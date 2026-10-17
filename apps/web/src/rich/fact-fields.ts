@@ -1,8 +1,8 @@
-import type { WorkingFacts } from "../contracts/generated/working_facts";
+import type { WorkingFacts, WorkingFieldPartialDate } from "../contracts/generated/working_facts";
 
 export type RecordValue = WorkingFacts["records"][number];
 export type Kind = "candidate" | "employment" | "technology" | "education" | "language";
-type Field = { key: string; label: string; text: string; checked?: boolean };
+type Field = { key: string; label: string; text: string; checked?: boolean; date?: WorkingFieldPartialDate };
 export const labels = { candidate: "Кандидат", employment: "Опыт", technology: "Технологии", education: "Образование", language: "Языки" };
 export const names: Record<Kind, readonly (readonly [string, string])[]> = {
   candidate: [["name", "Имя"], ["title", "Должность"], ["location", "Город"]],
@@ -13,13 +13,14 @@ export const names: Record<Kind, readonly (readonly [string, string])[]> = {
 export function fields(record: RecordValue): Field[] {
   if (!(record.kind in names)) return [];
   const values = Object.entries(record);
-  const result = names[record.kind as Kind].map(([key, label]) => {
+  const result: Field[] = names[record.kind as Kind].map(([key, label]) => {
     const value: unknown = values.find(([name]) => name === key)?.[1];
-    return { key, label, text: typeof value === "object" && value !== null && "rawText" in value && typeof value.rawText === "string" ? value.rawText : "" };
+    return { key, label, text: typeof value === "object" && value !== null && "rawText" in value && typeof value.rawText === "string" ? value.rawText : "",
+      ...(record.kind === "education" && key === "completion" ? { date: record.completion } : {}) };
   });
   if (record.kind === "employment") record.periods.forEach((period, index) => {
-    result.push({ key: `period:${period.id}:start`, label: `Начало ${index + 1}`, text: period.start.rawText },
-      { key: `period:${period.id}:end`, label: `Окончание ${index + 1}`, text: period.end.rawText });
+    result.push({ key: `period:${period.id}:start`, label: `Начало ${index + 1}`, text: period.start.rawText, date: period.start },
+      { key: `period:${period.id}:end`, label: `Окончание ${index + 1}`, text: period.end.rawText, date: period.end });
   });
   return [...result, ...(record.kind === "employment" ? record.periods.map((period, index) => ({ key: `period:${period.id}:present`,
     label: `Работаю сейчас ${index + 1}`, text: period.present.rawText, checked: period.present.value === true })) : [])];

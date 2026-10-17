@@ -1,5 +1,5 @@
 import { BlockNoteSchema, createExtension, defaultBlockSpecs, defaultInlineContentSpecs, parseDefaultProps, type Block, type PartialBlock } from "@blocknote/core";
-import { createReactBlockSpec, createReactInlineContentSpec, useCreateBlockNote, SuggestionMenuController, getDefaultReactSlashMenuItems, FormattingToolbarController, SideMenuController } from "@blocknote/react";
+import { createReactBlockSpec, createReactInlineContentSpec, useCreateBlockNote, FormattingToolbarController } from "@blocknote/react";
 import { BlockNoteView } from "@blocknote/shadcn";
 import { AllSelection, TextSelection, Plugin, PluginKey } from "@tiptap/pm/state";
 import type { SelectionBookmark } from "@tiptap/pm/state";
@@ -37,7 +37,7 @@ import { image, ImageActions } from "./Image";
 import { structureIdentityAttributes, structureIdentityPlugin, readBlockSources } from "./structure-identity";
 import { copyBlock, moveBlock, mergeBlocks } from "./structure";
 import { deleteAcrossRegions, pastedRegionsPlugin, flattenPastedRegions } from "./regions";
-import { BlockSideMenu, SelectionToolbar } from "./ContextMenus";
+import { SelectionToolbar } from "./ContextMenus";
 import { commandBlock } from "./block-target";
 import { prototypePresentation } from "../workbench/editor/presentation";
 import { Toolbar, type ToolbarCommand } from "../workbench/editor/Toolbar";
@@ -47,7 +47,8 @@ import { Icon } from "../workbench/ui/Icon";
 import { restoreEmptyRegions } from "../workbench/editor/regions";
 import { BlockPanel } from "../workbench/editor/BlockPanel";
 import { SourceDialog } from "../workbench/editor/SourceDialog";
-import { TableDialog } from "../workbench/editor/TableDialog";
+import { EditorNotices } from "../workbench/editor/EditorNotices";
+import { allowsBasicEdit, basicPastedSlice } from "./basic-editing";
 import { capturedSelectionCurrent } from "../workbench/editor/capture";
 import { AppliedIntentFailure, IntentQueue, type IntentState } from "./intent-queue";
 import { FactsPanel } from "../workbench/facts/FactsPanel";
@@ -153,11 +154,14 @@ export function RichEditor({ initial, acknowledge, onStatus, ref, onHistoryNavig
   const [linkOpen, setLinkOpen] = useState(false);
   const [linkText, setLinkText] = useState("");
   const [sourceOpen, setSourceOpen] = useState(false);
-  const [tableTarget, setTableTarget] = useState<string | null>(null);
   const linkCapture = useRef<{ doc: ProseMirrorNode; bookmark: SelectionBookmark } | null>(null);
   const imageTarget = useRef<string | undefined>(undefined);
   const [rewriteSource, setRewriteSource] = useState("");
   const [blockTarget, setBlockTarget] = useState<string | null>(null);
+  useEffect(() => {
+    const narrow = matchMedia("(max-width: 600px)"), collapse = () => { if (narrow.matches) { setFactsVisible(false); setBlockTarget(null); } };
+    narrow.addEventListener("change", collapse); return () => narrow.removeEventListener("change", collapse);
+  }, []);
   const selectedBlock = useRef<string | null>(null);
   selectedBlock.current = blockTarget;
   const [syncRecords, setSyncRecords] = useState(initial.workspace.syncRecords);
@@ -198,13 +202,14 @@ export function RichEditor({ initial, acknowledge, onStatus, ref, onHistoryNavig
     key: new PluginKey("foldcv-rich-session"), filterTransaction: transaction => {
       if (!transaction.docChanged) return true;
       if ((bridge.applying || bridge.fenced || bridge.writer && !bridge.writer.writable) && !bridge.replaying) return false;
+      if (!bridge.replaying && !bridge.applying && !allowsBasicEdit(transaction.before, transaction.doc)) return false;
       const root = transaction.doc.firstChild;
       if (!root || root.childCount !== 3) return false;
       return ["header", "sidebar", "main"].every((id, index) => {
         const item = root.child(index); const value: unknown = item.attrs["id"];
         return value === id && item.firstChild?.type.name === "region";
       });
-    }, props: { handleDrop: (_view, event) => assets.paste(event), handlePaste: (view, event, slice) => {
+    }, props: { transformPasted: basicPastedSlice, handleDrop: (_view, event) => assets.paste(event), handlePaste: (view, event, slice) => {
       if (assets.paste(event)) return true;
       const flattened = flattenPastedRegions(slice);
       if (flattened) { bridge.group++; view.dispatch(view.state.tr.replaceSelection(flattened).scrollIntoView()); return true; }
@@ -233,7 +238,7 @@ export function RichEditor({ initial, acknowledge, onStatus, ref, onHistoryNavig
       },
     } },
   })] }), [bridge, assets, presentation]);
-  const editor = useCreateBlockNote({ schema, disableExtensions: ["history"], extensions: [extension],
+  const editor = useCreateBlockNote({ schema, disableExtensions: ["history", "code-block-keyboard-shortcuts", "check-list-item-shortcuts", "toggle-list-item-shortcuts"], extensions: [extension],
     pasteHandler: ({ event, defaultPasteHandler }) => assets.paste(event) || defaultPasteHandler(),
     tables: { splitCells: true, cellBackgroundColor: true, cellTextColor: true, headers: true }, links: {
     onClick: event => {
@@ -291,7 +296,6 @@ export function RichEditor({ initial, acknowledge, onStatus, ref, onHistoryNavig
     rewriteSelection.current = structuredClone(selected); setRewriteError(""); setRewriteOpen(true);
   }, [editor, bridge, captureSelected]);
   const selectionToolbar = useCallback(() => selecting ? <SelectionToolbar rewrite={openRewrite} disabled={rewriting} /> : null, [openRewrite, selecting, rewriting]);
-  const blockSideMenu = useCallback(() => <BlockSideMenu open={setBlockTarget} />, []);
   const selectionFloating = useMemo(() => ({ useFloatingOptions: { placement: "top-start" as const,
     middleware: [{ name: "uir-selection-position", fn: ({ x, y }: { x: number; y: number }) => {
       const selection = window.getSelection(), range = selection?.rangeCount ? selection.getRangeAt(0).getBoundingClientRect() : null;
@@ -903,12 +907,9 @@ export function RichEditor({ initial, acknowledge, onStatus, ref, onHistoryNavig
       linkCapture.current = { doc: editor.prosemirrorState.doc, bookmark: editor.prosemirrorState.selection.getBookmark() };
       setLinkText(editor.getSelectedText()); setLinkOpen(true);
     }
-    else if (command === "table") {
+    else if (command === "list" || command === "numbered") {
       const block = commandBlock(editor.getTextCursorPosition().block.id, id => editor.getBlock(id));
-      setTableTarget(block.id);
-    } else if (command === "list") {
-      const block = commandBlock(editor.getTextCursorPosition().block.id, id => editor.getBlock(id));
-      if (block.type !== "table" && block.type !== "image") editor.updateBlock(block, { type: "bulletListItem" });
+      if (block.type !== "table" && block.type !== "image") editor.updateBlock(block, { type: command === "numbered" ? "numberedListItem" : "bulletListItem" });
       bridge.complete(); editor.focus();
     } else { editor.toggleStyles({ [command]: true }); bridge.complete(); editor.focus(); }
     } catch (error) { setEditorWarning(error instanceof Error ? error.message : "Не удалось выполнить действие"); }
@@ -930,36 +931,19 @@ export function RichEditor({ initial, acknowledge, onStatus, ref, onHistoryNavig
         editor.createLink(href, text === linkText ? undefined : text); bridge.complete();
       }} />}
       {sourceOpen && <SourceDialog sources={project.sources} close={() => setSourceOpen(false)} />}
-      {tableTarget && <TableDialog close={() => { setTableTarget(null); editor.focus(); }} apply={(rows, columns) => {
-        try {
-          const target = commandBlock(tableTarget, id => editor.getBlock(id));
-          const inserted = editor.insertBlocks([{ type: "table", content: { type: "tableContent", rows: Array.from({ length: rows }, () => ({ cells: Array.from({ length: columns }, () => "") })) } }], target, "after");
-          const table = inserted[0]; if (table) editor.setTextCursorPosition(table.id, "start");
-          bridge.complete(); setTableTarget(null); editor.focus();
-        } catch (error) { setTableTarget(null); setEditorWarning(error instanceof Error ? error.message : "Не удалось вставить таблицу"); }
-      }} />}</>
-    {applying && <p role="status">Сохраняю правки помощника…</p>}
-    {(writerMode === "recovering" || writerMode === "read_only") && <div role="alert" className="notice error">
-      <p>{writerMode === "read_only" ? "Не удалось восстановить редактор. Редактирование приостановлено. Выберите состояние для продолжения."
-        : "Ввод сохранён в отдельном черновике. Сначала выберите, какое состояние продолжить."}</p>
-      {(writerMode === "recovering" || writerConnection?.local) && <button type="button" onClick={() => void bridge.writer?.resolveDraft("draft").then(() => location.reload())
-        .catch(error => setEditorWarning(error instanceof Error ? error.message : "DRAFT_RECOVERY_FAILED"))}>Использовать мой черновик</button>}
-      <button type="button" onClick={() => void bridge.writer?.resolveDraft("saved").then(() => location.reload())
-        .catch(error => setEditorWarning(error instanceof Error ? error.message : "DRAFT_RECOVERY_FAILED"))}>Продолжить с сохранённого состояния</button>
-      <p>Продолжение с сохранённого состояния удалит доступный черновик. Невосстановленные правки могут быть потеряны.</p>
-    </div>}
+    </>
     <div className="contents uir-editor-session">
     <fieldset className="contents uir-editor-controls" disabled={applying || recovery || writerMode === "read_only" || writerMode === "detached"}>
     <><Toolbar command={toolbarCommand} factsVisible={factsVisible} blockVisible={blockTarget !== null}
       canUndo={!factIntents.pending.length && (bridge.history?.position ?? 0) > 0} canRedo={!factIntents.pending.length && (bridge.history?.position ?? 0) < (bridge.history?.length ?? 0)} selecting={selecting}
       active={{ bold: editor.getActiveStyles().bold === true, italic: editor.getActiveStyles().italic === true, underline: editor.getActiveStyles().underline === true }}
-      style={(() => { const block = editor.getTextCursorPosition().block; return block.type === "heading" && block.props.level === 2 ? "h2" : block.type === "heading" && block.props.level === 3 ? "h3" : block.type === "quote" ? "blockquote" : "p"; })()}
+      style={(() => { const block = editor.getTextCursorPosition().block; return block.type === "heading" && block.props.level === 2 ? "h2" : block.type === "heading" && block.props.level === 3 ? "h3" : "p"; })()}
       textStyle={style => {
         try {
         const block = commandBlock(editor.getTextCursorPosition().block.id, id => editor.getBlock(id));
         if (block.type === "table" || block.type === "image") return;
         if (style === "h2" || style === "h3") editor.updateBlock(block, { type: "heading", props: { level: style === "h2" ? 2 : 3 } });
-        else editor.updateBlock(block, { type: style === "blockquote" ? "quote" : "paragraph" });
+        else editor.updateBlock(block, { type: "paragraph" });
         bridge.complete(); editor.focus();
         } catch (error) { setEditorWarning(error instanceof Error ? error.message : "Не удалось изменить стиль"); }
       }} />
@@ -968,33 +952,28 @@ export function RichEditor({ initial, acknowledge, onStatus, ref, onHistoryNavig
     </fieldset>
     <div className="editor-body uir-editor-body">
     <fieldset className="contents uir-editor-controls" disabled={applying || recovery || writerMode === "read_only" || writerMode === "detached"}>
-    <FactsPanel facts={facts} submit={command => bridge.panel(command)} hidden={!factsVisible} close={() => { setFactsVisible(false); editor.focus(); }}
+    <FactsPanel facts={facts} document={project.document} submit={command => bridge.panel(command)} hidden={!factsVisible} close={() => { setFactsVisible(false); editor.focus(); }}
       pending={factIntents.pending.flatMap(intent => intent.kind === "panel" ? [intent.command] : [])} paused={factIntents.paused}
       timeline={ready ? <Timeline facts={facts} anchors={anchors} controls={timelineControls} /> : null} />
     </fieldset>
     <div className="document-workspace">
+    <div className="document-context"><div className="context-left"><span>Исходный текст</span><span>Шаблон FoldCV</span></div><div className="context-notices">
+      {applying && <span className="editor-applying" role="status">Сохраняем правки…</span>}
+      <EditorNotices mode={writerMode} localDraft={!!writerConnection?.local} warning={editorWarning} clearWarning={() => setEditorWarning("")}
+        resolveDraft={async choice => { await bridge.writer?.resolveDraft(choice); location.reload(); }} syncRecords={syncRecords}
+        resolve={id => bridge.resolve(id)} retry={id => bridge.retry(id)} report={setEditorWarning}
+        dismiss={async id => { const response = await projectRequest(`/${initial.workspace.projectId}/sync/${id}`, "POST", { status: "stale" }); setSyncRecords(response.workspace.syncRecords); }} />
+      {contextActions}</div></div>
     <fieldset className="contents uir-editor-controls" disabled={applying || recovery}>
-    <div className="document-context"><div className="context-left"><span>Исходный текст</span><span>Шаблон FoldCV</span></div>{contextActions}</div>
     <div className="paper-scroll">
     <div className="cv-document resume-paper uir-prototype" data-project-id={initial.workspace.projectId}
       data-history-position={bridge.history?.position ?? 0} data-history-length={bridge.history?.length ?? 0} data-composing={bridge.composing}>
-      {editorWarning && <p role="alert" className="cv-editor-warning">{editorWarning}<button className="text-button" onClick={() => setEditorWarning("")}>Закрыть</button></p>}
-      {syncRecords.filter(record => ["failed", "conflict", "pending", "stale"].includes(record.status)).map(record => <p key={record.id} className="cv-editor-warning" role="status">
-        {record.status === "failed" ? "Не удалось проверить изменения. Повторите проверку." : record.status === "conflict" ? "Есть другие упоминания. Проверьте связанные факты." : record.status === "stale" ? "Предложение устарело. Ваши изменения сохранены." : record.errorCode === "OPERATION_INTERRUPTED" ? "Синхронизация была прервана." : "Синхронизация…"}
-        {record.status === "conflict" && <button className="text-button" onClick={() => void bridge.resolve(record.id).catch(error => setEditorWarning(error instanceof Error ? error.message : "Не удалось обновить"))}>Обновить связанные поля</button>}
-        <button className="text-button" onClick={() => void bridge.retry(record.id).catch(error => setEditorWarning(error instanceof Error ? error.message : "Не удалось повторить"))}>Повторить</button>
-        <button className="text-button" onClick={() => void projectRequest(`/${initial.workspace.projectId}/sync/${record.id}`, "POST", { status: "stale" }).then(response => setSyncRecords(response.workspace.syncRecords))}>Закрыть</button>
-      </p>)}
       <div className="paper-kicker"><span>РЕЗЮМЕ СПЕЦИАЛИСТА</span><span>F / РЕЗЮМЕ</span></div>
       <div className="uir-engine-sheet"><span className="template-wordmark" aria-label="generic">generic</span>
-      <BlockNoteView editor={editor} theme="light" linkToolbar={!selecting} filePanel={false} slashMenu={false} formattingToolbar={false} sideMenu={false}
+      <BlockNoteView editor={editor} theme="light" linkToolbar={!selecting} filePanel={false} slashMenu={false} formattingToolbar={false} sideMenu={false} tableHandles={false}
         {...(portalHost ? { portalElements: { default: portalHost } } : {})}>
         <FormattingToolbarController formattingToolbar={selectionToolbar} portalElement={portalHost ?? window.document.body}
           floatingUIOptions={selectionFloating} />
-        <SideMenuController sideMenu={blockSideMenu} portalElement={portalHost ?? window.document.body} />
-        <SuggestionMenuController triggerCharacter="/" getItems={async query => [...getDefaultReactSlashMenuItems(editor),
-          { title: "Изображение", subtext: "Локальный PNG, JPEG или WebP", aliases: ["image", "photo"], group: "Media", onItemClick: () => imageInput.current?.click() }]
-          .filter(item => `${item.title} ${item.aliases?.join(" ") ?? ""}`.toLowerCase().includes(query.toLowerCase()))} />
       </BlockNoteView>
       </div>
       <footer className="paper-footer"><span>mail@example.com</span><span>FoldCV</span></footer>

@@ -4,7 +4,6 @@ import type { DateCascadeProposal } from "../contracts/generated/date_cascade_pr
 import type { WorkingFacts } from "../contracts/generated/working_facts";
 import type { DateAnchor } from "./date-edit";
 import { DatePreview } from "../workbench/facts/DatePreview";
-import { RichApiFailure } from "./api";
 
 export type TimelineControls = {
   read: () => Promise<TimelineReport>;
@@ -27,7 +26,9 @@ export function Timeline({ facts, anchors, controls }: { facts: WorkingFacts; an
   useEffect(() => {
     let active = true;
     void controls.read().then(value => { if (active) { setReport(value); setError(""); } }).catch(error => {
-      if (active) setError(error instanceof RichApiFailure || error instanceof TypeError ? "Не удалось проверить даты. Повторите после сохранения." : error instanceof Error ? error.message : "Не удалось проверить даты");
+      if (active) setError(error instanceof Error && /OUTCOME_UNKNOWN|WRITER_|DRAFT_/u.test(error.message)
+        ? "Проверим даты после восстановления черновика."
+        : "Не удалось проверить даты. Повторите после сохранения.");
     });
     return () => { active = false; };
   }, [controls, factsKey]);

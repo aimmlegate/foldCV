@@ -1,11 +1,13 @@
-import { useEffect, useId, useRef, useState } from "react";
+import { useEffect, useId, useMemo, useRef, useState } from "react";
 import type { WorkingFacts } from "../../contracts/generated/working_facts";
+import type { RichDocumentV1 } from "../../contracts/generated/rich_document_v1";
 import type { PanelCommand } from "../../rich/synchronization";
 import { technologyKey, technologyName } from "../../rich/panel-intents";
 import { Icon } from "../ui/Icon";
+import { technologySuggestions } from "./technology-catalog";
 
-export function TechnologySelect({ facts, jobId, label, pending, paused, submit }: {
-  facts: WorkingFacts; jobId: string | null; label: string; pending: readonly PanelCommand[]; paused: boolean;
+export function TechnologySelect({ facts, document: resumeDocument, jobId, label, pending, paused, submit }: {
+  facts: WorkingFacts; document: RichDocumentV1; jobId: string | null; label: string; pending: readonly PanelCommand[]; paused: boolean;
   submit: (command: PanelCommand) => Promise<void>;
 }) {
   const id = useId(), root = useRef<HTMLDivElement>(null), input = useRef<HTMLInputElement>(null);
@@ -16,9 +18,9 @@ export function TechnologySelect({ facts, jobId, label, pending, paused, submit 
       : records.some(record => record.id === command.recordId));
   const adding = scoped.filter(command => command.operation === "add").map(command => technologyName(command.values?.["display"] ?? ""));
   const selected = new Set([...records.map(record => technologyKey(record.display.rawText)), ...adding.map(technologyKey)]);
-  const catalog = [...new Map(facts.records.filter(record => record.kind === "technology").map(record =>
-    [technologyKey(record.display.rawText), record.display.rawText])).values()];
-  const choices = catalog.filter(name => !selected.has(technologyKey(name)) && technologyKey(name).includes(technologyKey(query)))
+  const catalog = useMemo(() => technologySuggestions(facts, jobId, query, resumeDocument), [facts, jobId, query, resumeDocument]);
+  const available = catalog.filter(name => !selected.has(technologyKey(name)));
+  const choices = available.slice(0, 60)
     .map(name => ({ name, custom: false }));
   const custom = technologyName(query);
   if (custom && !selected.has(technologyKey(custom)) && !catalog.some(name => technologyKey(name) === technologyKey(custom))) choices.push({ name: custom, custom: true });
@@ -34,7 +36,7 @@ export function TechnologySelect({ facts, jobId, label, pending, paused, submit 
   function choose(name: string) {
     if (paused) return;
     apply({ operation: "add", recordKind: "technology", jobId, values: { display: name } });
-    setOpen(true); input.current?.focus();
+    setQuery(""); setActive(0); setOpen(true); input.current?.focus();
   }
   return <div className="technology-select" data-technology-scope={jobId ?? ""} ref={root}>
     {jobId && <span className="technology-label">Технологии</span>}
@@ -71,6 +73,7 @@ export function TechnologySelect({ facts, jobId, label, pending, paused, submit 
         id={`${id}-option-${index}`} className={`technology-option${index === activeIndex ? " active" : ""}`} disabled={paused}
         onMouseDown={event => event.preventDefault()} onClick={() => choose(choice.name)}>{choice.custom ? `Добавить «${choice.name}»` : choice.name}</button>)
         : <span className="technology-no-results">Нет доступных вариантов</span>}
+      {available.length > 60 && <span className="technology-no-results">Уточните название, чтобы увидеть остальные варианты.</span>}
     </div>
   </div>;
 }
