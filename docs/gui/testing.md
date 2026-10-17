@@ -1,5 +1,16 @@
 # Test strategy
 
+The approved NB00b alternative uses one pinned App Server. `NB-PARALLEL`
+maps the bounded shared protocol, real synthetic pipes, exact routed capabilities,
+strict fixed validators, targeted cancellation, individual limits, idle rotation,
+orphan fencing and durable rollback. Routine sockets remain blocked; product MCP
+checks use the same capability-protected ASGI app. A registered synthetic fork
+proves coordinator death with a live same-group child. The pinned empty-profile
+probe has no network or model turns. Its metadata alone does not prove native go.
+Grouped native proof must retain actual wire intervals, each charged turn and a
+separate shared-server shutdown. Serial NB07a remains archived at its accepted
+commit; affected final native bindings are pending NB07b. Native pools never mix.
+
 NB uses [the mandatory contract](background-work-tests.md) and
 [per-variant matrix](handoffs/BACKGROUND-WORK/test-matrix.json). `NB-CONTRACTS`
 maps NB00a's offline schemas, limit policy, controlled protocol, pipe-process
@@ -40,7 +51,7 @@ stable caret restoration and retained manual T3 evidence. The fast gate validate
 manual binding/status/artifact integrity, without executing browser scenarios or
 turning an unavailable case into a pass. Current source applicability is reviewed
 at acceptance; retained visual observations do not certify later mounted changes.
-`NB-PARALLEL` awaits its slice bindings.
+`NB-PARALLEL` now maps controlled transport preflight; its scheduler and native acceptance remain partial.
 
 The existing fast gate writes exact Python setup/call/teardown results through
 `tools/background_pytest.py` and validates NB parameter/file identities, current

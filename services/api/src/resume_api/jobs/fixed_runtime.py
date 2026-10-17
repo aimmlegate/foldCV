@@ -56,7 +56,12 @@ class FixedRuntime:
                 raise BackgroundFailure("AUTH_REQUIRED")
             provider = copy.copy(selected[0])
             loop = asyncio.get_running_loop()
-            if hasattr(provider, "model_started"):
+            if getattr(provider, "multiplexed", False):
+                provider.loop, provider.job_id, provider.cancelled = loop, control.run_id, control.cancelled
+                provider.before_turn = lambda native=provider.native: self.service.authorize_native(control) if native else None
+                provider.model_started = control.child_started if provider.native else lambda: self.service.supervisor.observer(
+                    "scripted_fixed_model_ready", control.run_id)
+            elif hasattr(provider, "model_started"):
                 provider.model_started = lambda: asyncio.run_coroutine_threadsafe(control.child_started(), loop).result(timeout=15)
             provider = OwnedContent(provider, control.permit)
             await control.execution_ready()
@@ -89,7 +94,7 @@ class FixedRuntime:
             await self.service.supervisor.observer("fixed_model_ready", self.control.job.id)
         if self.control.cancel.is_set():
             raise BackgroundFailure("CANCELLED")
-        if not self.authorized and self.native:
+        if not self.authorized and self.native and not getattr(self.provider.provider, "multiplexed", False):
             await self.service.authorize_native(self.control)
         self.authorized = True
 
@@ -114,5 +119,7 @@ class FixedRuntime:
             self.closed = True
 
     def verified_dead(self):
+        provider = getattr(getattr(self, "provider", None), "provider", None)
         return (self.closed and (self.driver is None or self.driver.done())
-            and self.files.process is None and self.files.path is None and not self.files.cleanup_failed)
+            and self.files.process is None and self.files.path is None and not self.files.cleanup_failed
+            and (not getattr(provider, "multiplexed", False) or provider.cleanup_verified))

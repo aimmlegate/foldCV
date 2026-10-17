@@ -1,4 +1,4 @@
-"""Own the existing pinned runtime until its worker and private tools are closed."""
+"""Hold job ownership until its worker or shared turn and private tools close."""
 
 import asyncio
 import copy
@@ -39,7 +39,8 @@ class JobRuntime:
             if control.cancel.is_set():
                 raise BackgroundFailure("CANCELLED")
             runtime = copy.copy(self.service.runtime)
-            if getattr(runtime, "native", False):
+            multiplexed = getattr(runtime, "multiplexed", False)
+            if getattr(runtime, "native", False) and not multiplexed:
                 await self.service.authorize_native(control)
             runtime.admission = control.permit
             def call(coroutine):
@@ -49,15 +50,30 @@ class JobRuntime:
                 self.session.revoke()
             def close_tools(seconds):
                 asyncio.run_coroutine_threadsafe(self.session.close(), loop).result(timeout=max(0.001, seconds))
+            async def ready_shared():
+                await control.execution_ready()
+                if getattr(runtime, "native", False):
+                    await self.service.authorize_native(control)
+            async def close_shared(_seconds):
+                await self.session.close()
+                return (not self.session.token and self.session.listener.fileno() == -1
+                    and (self.session.task is None or self.session.task.done()))
+            async def started_shared():
+                if getattr(runtime, "native", False):
+                    await control.child_started()
+                else:
+                    await self.service.supervisor.observer("scripted_model_ready", control.run_id)
             def emit(kind, payload):
                 if kind == "run.state" and payload.get("error", {}).get("code") in {"AGENT_QUOTA", "AGENT_AUTH_REQUIRED"}:
                     loop.call_soon_threadsafe(self.service.supervisor.pause, ERRORS[payload["error"]["code"]])
             value = RuntimeInput(model=self.model.model, prompt=self.session.prompt, url=self.session.url,
                 token=self.session.token, tools=tuple(control.job.submission.tools), allow_web=control.job.submission.allow_web,
-                queued_at=time.monotonic(), before_start=(lambda: call(control.execution_ready()))
-                    if getattr(runtime, "native", False) else control.execution_ready,
-                child_started=lambda: call(control.child_started()), revoke=revoke, close_tools=close_tools,
-                developer_instructions=DEVELOPER_INSTRUCTIONS_V2, elapsed_clock=self.service.supervisor.clock.now)
+                queued_at=time.monotonic(), before_start=ready_shared if multiplexed else
+                    (lambda: call(control.execution_ready())) if getattr(runtime, "native", False) else control.execution_ready,
+                child_started=started_shared if multiplexed else lambda: call(control.child_started()),
+                revoke=revoke, close_tools=close_shared if multiplexed else close_tools,
+                developer_instructions=DEVELOPER_INSTRUCTIONS_V2, elapsed_clock=self.service.supervisor.clock.now,
+                job_id=control.run_id, cancelled=control.cancelled)
             self.runtime_entered = True
             self.result = await runtime.run(value, control.cancel, emit)
             error = ERRORS.get(self.result.error, "PROTOCOL" if self.result.error else None)

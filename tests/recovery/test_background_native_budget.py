@@ -11,11 +11,12 @@ from spikes.background.native_serial import SerialProof
 from spikes.background.native_serial import protocol_diagnostics
 
 
-@pytest.mark.parametrize("fault", ["unauthorized", "exhausted", "count-mismatch", "auth", "quota", "duplicate"])
+@pytest.mark.parametrize("fault", ["unauthorized", "exhausted", "count-mismatch", "auth", "quota", "duplicate", "closed"])
 def test_final_native_dispatch_refuses_an_invalid_or_spent_allowance_before_launch(tmp_path, fault):
     attempt = dict(id="NB07a-1", pool="NB07a", variant="NB-X03:v01", status="failed", error=None)
     ledger = dict(pools={"NB07a": dict(authorized=True, cap=2, spent=0)}, attempts=[])
     if fault == "unauthorized": ledger["pools"]["NB07a"]["authorized"] = False
+    elif fault == "closed": ledger["pools"]["NB07a"]["dispatchClosed"] = True
     elif fault == "exhausted": ledger["pools"]["NB07a"]["cap"] = 0
     elif fault == "count-mismatch": ledger["pools"]["NB07a"]["spent"] = 1
     else:

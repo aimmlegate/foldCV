@@ -188,6 +188,10 @@ def assert_native_bindings(bindings: dict, expected: set[str], root: Path, *, so
                 pending.append(variant)
                 continue
             ledger = json.loads((root / "docs/gui/handoffs/BACKGROUND-WORK/native-attempts.json").read_bytes())
+            if binding.get("transport") == "shared_appserver_v1":
+                from tools.background_shared_native import assert_shared_case
+                assert_shared_case(binding, variant, report, ledger, root, sources)
+                continue
             attempt = next(row for row in ledger["attempts"] if row["id"] == case["attemptId"])
             pool = ledger["pools"][binding["pool"]]
             if (case["outcome"] != "passed" or case["layer"] != "native" or report["sourceHashes"] != sources

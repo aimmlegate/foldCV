@@ -207,7 +207,8 @@ def spend(path, *, variant, job, project, hashes):
         pool = ledger["pools"]["NB07a"]
         recorded = [row for row in ledger["attempts"] if row["pool"] == "NB07a"]
         if (variant not in {"NB-X03:v01", "NB-X03:v02"}
-                or not pool["authorized"] or type(pool["cap"]) is not int or pool["spent"] >= pool["cap"]
+                or pool.get("dispatchClosed") is True or not pool["authorized"]
+                or type(pool["cap"]) is not int or pool["spent"] >= pool["cap"]
                 or type(pool["spent"]) is not int or pool["spent"] != len(recorded)
                 or any(row.get("error") in {"AGENT_AUTH_REQUIRED", "AGENT_QUOTA", "AUTH_REQUIRED", "RATE_LIMITED"}
                     for row in ledger["attempts"])):
