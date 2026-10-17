@@ -113,6 +113,51 @@ def test_native_feasibility_refuses_a_stale_controlled_gate_before_profile_or_at
     assert not root.exists()
 
 
+@pytest.mark.parametrize("fault", ["none", "no-receipt", "not-saved", "not-durable", "foreign-job",
+    "foreign-receipt", "wrong-change", "missing-job", "missing-output-schema"])
+def test_structured_native_evidence_requires_its_own_durable_fixed_publication(tmp_path, fault):
+    sources, bindings, report, ledger, runtimes, _shutdown, wire, save = proof_fixture(tmp_path)
+    old, variant = "NB-R05:v01", "NB-R05:v02"
+    case = report["variants"].pop(old)
+    report["variants"][variant] = case
+    binding = bindings.pop(old)
+    bindings[variant] = binding
+    binding["roles"][1] = "structured-rewrite-B"
+    case["turns"][1]["role"] = "structured-rewrite-B"
+    for attempt in ledger["attempts"]:
+        attempt["variant"] = variant
+    ledger["attempts"][1]["role"] = "structured-rewrite-B"
+    runtime = list(runtimes.values())[1]
+    runtime.update(role="structured-rewrite-B", toolCalls=0, toolNames=[], mcpListenerClosed=None,
+        schemaValidated=True, logicalAttempts=1, repairTurns=0,
+        fixedPublication=dict(exactRequestedChange=True, jobArtifact="fixed-job.json"))
+    wire[:] = [row for row in wire if row["frame"].get("params", {}).get("threadId") != runtime["threadId"]
+        or row["frame"].get("method") != "item/tool/call"]
+    wire[:] = [row for row in wire if row["frame"].get("id") not in {110, 111, 112}]
+    start = next(row["frame"] for row in wire if row["direction"] == "client"
+        and row["frame"].get("params", {}).get("threadId") == runtime["threadId"])
+    if fault != "missing-output-schema":
+        start["params"]["outputSchema"] = {"type": "object"}
+    job = dict(id=runtime["jobId"], execution="completed", publication="saved",
+        receipt=dict(durable=True, jobId=runtime["jobId"]))
+    if fault == "no-receipt": job["receipt"] = None
+    elif fault == "not-saved": job["publication"] = "waiting_for_sync"
+    elif fault == "not-durable": job["receipt"]["durable"] = False
+    elif fault == "foreign-job": job["id"] = "foreign-job"
+    elif fault == "foreign-receipt": job["receipt"]["jobId"] = "foreign-job"
+    elif fault == "wrong-change": runtime["fixedPublication"]["exactRequestedChange"] = False
+    path = tmp_path / "fixed-job.json"
+    path.write_text(json.dumps(job))
+    case["artifacts"][path.name] = hashlib.sha256(path.read_bytes()).hexdigest()
+    save()
+    if fault == "missing-job": path.unlink()
+    if fault == "none":
+        assert_native_bindings(bindings, {variant}, tmp_path, sources=sources, require_pass=True)
+    else:
+        with pytest.raises(SystemExit, match="native release proof"):
+            assert_native_bindings(bindings, {variant}, tmp_path, sources=sources, require_pass=True)
+
+
 @pytest.mark.asyncio
 async def test_native_matrix_retains_startup_failure_without_charging_a_turn(tmp_path):
     from spikes.background.native_parallel import Feasibility
@@ -152,6 +197,37 @@ def test_native_retry_proof_requires_the_same_approved_extension_and_failed_hist
     if fault == "changed-history": historical[0]["status"] = "passed"
     ledger["attempts"] = historical + ledger["attempts"]
     ledger["pools"]["NB00"].update(cap=12, spent=4)
+    save()
+    if fault == "none":
+        assert_native_bindings(bindings, set(bindings), tmp_path, sources=sources, require_pass=True)
+    else:
+        with pytest.raises(SystemExit, match="native release proof"):
+            assert_native_bindings(bindings, set(bindings), tmp_path, sources=sources, require_pass=True)
+
+
+@pytest.mark.parametrize("fault", ["none", "pending", "wrong-authority", "changed-history", "changed-prior-grant"])
+def test_publication_retry_proof_requires_the_new_grant_and_unchanged_prior_approval(tmp_path, fault):
+    from pathlib import Path
+    sources, bindings, _report, ledger, _runtimes, _shutdown, _wire, save = proof_fixture(tmp_path)
+    handoff = Path("docs/gui/handoffs/BACKGROUND-WORK")
+    target = tmp_path / handoff
+    (target / "nb00b-evidence").mkdir(parents=True)
+    grant = json.loads((handoff / "native-feasibility-repair-authorization.json").read_text())
+    grant.update(authorized=fault != "pending", status="approved_by_user",
+        userInstruction="Synthetic copied-proof approval only", approvedAt="2026-10-17T00:00:00+00:00")
+    authority = target / "native-feasibility-repair-authorization.json"
+    authority.write_text(json.dumps(grant))
+    (target / "native-feasibility-retry-authorization.json").write_bytes((handoff / "native-feasibility-retry-authorization.json").read_bytes())
+    (target / "nb00b-evidence/publication-retry-proposal.md").write_bytes((handoff / "nb00b-evidence/publication-retry-proposal.md").read_bytes())
+    for attempt in ledger["attempts"]:
+        attempt.update(historicalStarts=6, retryAuthoritySha256=hashlib.sha256(authority.read_bytes()).hexdigest())
+    if fault == "wrong-authority": ledger["attempts"][0]["retryAuthoritySha256"] = "0" * 64
+    historical = json.loads((handoff / "nb00b-evidence/first-six-native-starts.json").read_text())
+    if fault == "changed-history": historical[-1]["status"] = "passed"
+    if fault == "changed-prior-grant":
+        (target / "native-feasibility-retry-authorization.json").write_text("Changed original approval")
+    ledger["attempts"] = historical + ledger["attempts"]
+    ledger["pools"]["NB00"].update(cap=16, spent=8)
     save()
     if fault == "none":
         assert_native_bindings(bindings, set(bindings), tmp_path, sources=sources, require_pass=True)
@@ -230,6 +306,10 @@ async def test_native_matrix_captures_all_ten_requests_without_launching_a_model
                         candidate = next(record for record in fixed.workspace.project.facts.records if record.id == "candidate-1")
                         assert candidate.title.value != "Python API Engineer"
                     else:
+                        from packages.resume_core.rich_sync import selection_parts
+                        parts = selection_parts(fixed.workspace, fixed.request.command.request.selection)
+                        selected = "".join(span["text"] for span in parts[0][-1]["content"])
+                        assert selected == text and participant.marker in selected and "Python. Wrote" in selected
                         assert "Python. Wrote" in text
                         assert "Replace exactly 'Python. Wrote' with 'Python; Wrote'" in fixed.request.command.request.instruction
                 captured.append((variant, role))
@@ -237,3 +317,182 @@ async def test_native_matrix_captures_all_ten_requests_without_launching_a_model
     finally:
         for participant in proof.all_participants:
             await participant.service.shutdown()
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("order", ["execution-first", "publication-first"])
+async def test_native_harness_waits_for_both_real_execution_and_fixed_publication(tmp_path, order):
+    import threading
+    from types import SimpleNamespace
+    from spikes.background.native_parallel import Feasibility
+    from tests.recovery.generation_fixtures import CreationProvider
+    from tests.recovery.test_background_agent import environment
+    from tests.recovery.test_background_fixed_jobs import fixed_request, rewrite_command
+    service, factory, workspace, _payload, _connection, _old = await environment(tmp_path)
+    service.projects.provider_factory = lambda: (CreationProvider(), "processing-model")
+    loop = asyncio.get_running_loop()
+    publisher_entered, published, execution_finished = asyncio.Event(), asyncio.Event(), asyncio.Event()
+    release_publisher, release_execution = threading.Event(), asyncio.Event()
+    original = service.publish_waiting
+    def publish(project):
+        loop.call_soon_threadsafe(publisher_entered.set)
+        if order == "execution-first" and not release_publisher.wait(10):
+            raise AssertionError("The synthetic publisher was not released")
+        result = original(project)
+        loop.call_soon_threadsafe(published.set)
+        return result
+    service.publish_waiting = publish
+    async def observe(name, _job):
+        if name == "slot_released":
+            execution_finished.set()
+            if order == "publication-first":
+                await release_execution.wait()
+    service.supervisor.observer = observe
+    waiter = None
+    try:
+        reply, _ = await service.fixed.submit(workspace.project_id, fixed_request(service, workspace.project_id,
+            "publication-order", rewrite_command(workspace)))
+        await asyncio.wait_for(publisher_entered.wait(), 5)
+        await asyncio.wait_for(execution_finished.wait(), 5)
+        control = service.supervisor.controls[reply.job.id]
+        if order == "execution-first":
+            await asyncio.wait_for(asyncio.shield(control.task), 5)
+            snapshot = service.store.read(workspace.project_id, reply.job.id)
+            assert snapshot.execution == "completed" and snapshot.publication == "waiting_for_sync" and snapshot.receipt is None
+            assert snapshot.attempts[-1].cleanup_verified and not service.admission.locked()
+        else:
+            await asyncio.wait_for(published.wait(), 5)
+            assert service.store.read(workspace.project_id, reply.job.id).receipt.durable
+        participant = SimpleNamespace(service=service, job=reply.job, workspace=workspace, role="structured-rewrite-B")
+        waiter = asyncio.create_task(Feasibility.__new__(Feasibility).completed(participant))
+        checkpoint = loop.create_future()
+        loop.call_soon(checkpoint.set_result, None)
+        await checkpoint
+        assert not waiter.done()
+        release_publisher.set()
+        release_execution.set()
+        result = await asyncio.wait_for(waiter, 5)
+        assert result.execution == "completed" and result.publication == "saved" and result.receipt.durable
+        assert result == service.store.read(workspace.project_id, reply.job.id)
+        assert not result.attempts[-1].native_started and not service.supervisor.listeners
+    finally:
+        release_publisher.set()
+        release_execution.set()
+        if waiter is not None:
+            await asyncio.gather(waiter, return_exceptions=True)
+        await service.shutdown()
+        factory.verify(); service.supervisor.clock.verify()
+
+
+@pytest.mark.asyncio
+async def test_native_harness_receipt_timeout_leaves_the_real_publisher_owned_until_shutdown(tmp_path, monkeypatch):
+    import threading
+    from dataclasses import replace
+    from types import SimpleNamespace
+    from spikes.background import native_parallel
+    from tests.recovery.generation_fixtures import CreationProvider
+    from tests.recovery.test_background_agent import environment
+    from tests.recovery.test_background_fixed_jobs import fixed_request, rewrite_command
+    service, factory, workspace, _payload, _connection, _old = await environment(tmp_path)
+    service.projects.provider_factory = lambda: (CreationProvider(), "processing-model")
+    loop, entered, release = asyncio.get_running_loop(), asyncio.Event(), threading.Event()
+    original = service.publish_waiting
+    def publish(project):
+        loop.call_soon_threadsafe(entered.set)
+        if not release.wait(10):
+            raise AssertionError("The synthetic publisher was not released")
+        return original(project)
+    service.publish_waiting = publish
+    try:
+        reply, _ = await service.fixed.submit(workspace.project_id, fixed_request(service, workspace.project_id,
+            "publication-timeout", rewrite_command(workspace)))
+        await asyncio.wait_for(entered.wait(), 5)
+        await asyncio.wait_for(asyncio.shield(service.supervisor.controls[reply.job.id].task), 5)
+        publication = service.publication_tasks[workspace.project_id]
+        monkeypatch.setattr(native_parallel, "LIMITS", replace(native_parallel.LIMITS, receipt_seconds=0))
+        participant = SimpleNamespace(service=service, job=reply.job, workspace=workspace, role="structured-rewrite-B")
+        with pytest.raises(TimeoutError):
+            await native_parallel.Feasibility.__new__(native_parallel.Feasibility).completed(participant)
+        assert not publication.done() and not publication.cancelled() and not service.supervisor.listeners
+        assert service.store.read(workspace.project_id, reply.job.id).receipt is None
+        release.set()
+        await asyncio.wait_for(asyncio.shield(publication), 5)
+        result = service.store.read(workspace.project_id, reply.job.id)
+        assert result.publication == "saved" and result.receipt.durable and not result.attempts[-1].native_started
+    finally:
+        release.set()
+        await service.shutdown()
+        factory.verify(); service.supervisor.clock.verify()
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("variant,role", [
+    ("NB-R05:v02", "structured-rewrite-B"), ("NB-R05:v03", "structured-rewrite-C"),
+    ("NB-R05:v04", "structured-rewrite-B"), ("NB-R05:v04", "structured-sync-C")])
+async def test_every_native_fixed_fixture_publishes_its_exact_captured_change_without_a_model(tmp_path, variant, role):
+    from pathlib import Path
+    from spikes.background.native_parallel import Feasibility
+    from resume_api.jobs.appserver import SharedContentProvider
+    from packages.resume_core.rich_sync import RichRewriteProposal, RichReconcileProposal
+    from tests.recovery.test_background_appserver import shared_peer, complete_shared
+    ledger = Path("docs/gui/handoffs/BACKGROUND-WORK/native-attempts.json")
+    before = ledger.read_bytes()
+    server = shared_peer(tmp_path / "transport")
+    proof = Feasibility.__new__(Feasibility)
+    proof.root, proof.server, proof.variant, proof.all_participants = tmp_path / "proof", server, variant, []
+    ready = asyncio.Event()
+    participant = await proof.participant(role)
+    service, project = participant.service, participant.workspace.project_id
+    provider = SharedContentProvider(server, native=False, audit=lambda value: setattr(participant, "runtime", value))
+    service.projects.provider_factory = lambda: (provider, "gpt-6-luna")
+    async def observe(name, _job):
+        if name == "scripted_fixed_model_ready":
+            ready.set()
+    service.supervisor.observer = observe
+    try:
+        await proof.submit(participant)
+        await asyncio.wait_for(ready.wait(), 5)
+        live = server.live[participant.job.id]
+        payload = json.loads(live.value.prompt)["input"]
+        assert live.value.output_schema and not live.value.tools
+        if role == "structured-sync-C":
+            assert "Current job title: Python API Engineer." in live.value.prompt
+            output = RichReconcileProposal(updates=[dict(recordId="candidate-1", fieldKey="title", text="Python API Engineer")])
+        else:
+            block = payload["selection"][0]
+            text = "".join(span["text"] for span in block["content"])
+            original = next(block for block in participant.workspace.project.document.blocks() if block.id == "narrative").content[0].text
+            assert text == original and participant.marker in text and "Python. Wrote" in text
+            block["content"][0]["text"] = text.replace("Python. Wrote", "Python; Wrote", 1)
+            output = RichRewriteProposal(replacements=[dict(blockId=block["id"], blocks=[block])])
+        complete_shared(server, participant.job.id, output.model_dump_json(by_alias=True))
+        result = await asyncio.wait_for(proof.completed(participant), 10)
+        assert result.execution == "completed" and result.publication == "saved" and result.receipt.durable
+        current = service.projects.storage.read_committed(project)[0]
+        if role == "structured-sync-C":
+            from packages.resume_core.rich_fields import set_text
+            expected_facts = participant.workspace.project.facts.model_copy(deep=True)
+            candidate = next(record for record in expected_facts.records if record.id == "candidate-1")
+            actual = next(record for record in current.project.facts.records if record.id == "candidate-1")
+            set_text(candidate, "title", "Python API Engineer")
+            candidate.revision, candidate.title.revision = actual.revision, actual.title.revision
+            expected_facts.revision = current.project.facts.revision
+            assert current.project.facts == expected_facts
+        else:
+            expected = participant.workspace.project.document.model_copy(deep=True)
+            block = next(block for block in expected.blocks() if block.id == "narrative")
+            block.content[0].text = original.replace("Python. Wrote", "Python; Wrote", 1)
+            expected.revision = current.project.document.revision
+            for before_region, after_region in zip(expected.regions, current.project.document.regions):
+                before_region.revision = after_region.revision
+            actual_blocks = {block.id: block for block in current.project.document.blocks()}
+            for before_block in expected.blocks():
+                before_block.revision = actual_blocks[before_block.id].revision
+            assert current.project.document == expected and current.project.facts == participant.workspace.project.facts
+        assert result.attempts[-1].cleanup_verified and not result.attempts[-1].native_started
+        assert participant.runtime["schemaValidated"] and participant.runtime["logicalAttempts"] == 1
+        assert participant.runtime["repairTurns"] == 0 and not participant.runtime["nativeStarted"]
+        assert not service.admission.locked() and ledger.read_bytes() == before
+    finally:
+        await service.shutdown()
+        await server.close()

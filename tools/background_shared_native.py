@@ -38,7 +38,9 @@ def assert_shared_case(binding, variant, report, ledger, root, sources):
     from spikes.background.native_turn_budget import matrix_budget
     cap, _rows, _historical, _retry = matrix_budget(ledger, pool_name,
         retry_authority=root / "docs/gui/handoffs/BACKGROUND-WORK/native-feasibility-retry-authorization.json",
-        retry_proposal=root / "docs/gui/handoffs/BACKGROUND-WORK/nb00b-evidence/native-retry-proposal.md")
+        retry_proposal=root / "docs/gui/handoffs/BACKGROUND-WORK/nb00b-evidence/native-retry-proposal.md",
+        repair_authority=root / "docs/gui/handoffs/BACKGROUND-WORK/native-feasibility-repair-authorization.json",
+        repair_proposal=root / "docs/gui/handoffs/BACKGROUND-WORK/nb00b-evidence/publication-retry-proposal.md")
     require(pool_name in {"NB00", "NB07b"} and pool["authorized"] is True
         and pool["cap"] == cap
         and type(pool["spent"]) is int and 0 < pool["spent"] <= pool["cap"]
@@ -106,6 +108,12 @@ def assert_shared_case(binding, variant, report, ledger, root, sources):
             and began[0]["at"] == runtime["startedAt"] and ended[0]["at"] == runtime["endedAt"], "No actual turn interval")
         if not agent:
             require(starts[0]["frame"]["params"].get("outputSchema"), "Missing pinned output grammar")
+            publication = runtime["fixedPublication"]
+            job = artifact(root, case, publication["jobArtifact"])
+            require(publication["exactRequestedChange"] is True and job["id"] == runtime["jobId"]
+                and job["execution"] == "completed" and job["publication"] == "saved"
+                and job["receipt"]["durable"] is True and job["receipt"]["jobId"] == job["id"],
+                "Unproved fixed publication")
         calls = events("item/tool/call", "server")
         unique = {}
         for item in calls:

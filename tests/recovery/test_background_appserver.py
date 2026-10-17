@@ -617,6 +617,71 @@ async def test_pipe_queue_overflow_stops_reading_until_owned_shutdown(tmp_path):
     assert peer.cleanup_verified
 
 
+@pytest.mark.parametrize("fault", ["none", "pending", "pending-status", "missing", "wrong-cap", "changed-history",
+    "reclassified", "refunded", "proposal", "prior-authority", "no-instruction", "wrong-pool", "failed-retry"])
+def test_publication_retry_requires_a_new_grant_and_preserves_all_six_charged_starts(tmp_path, fault):
+    import hashlib
+    from pathlib import Path
+    from spikes.background.native_turn_budget import spend_turn, NativeTurnDenied, GROUPS
+    handoff = Path("docs/gui/handoffs/BACKGROUND-WORK")
+    historical = json.loads((handoff / "nb00b-evidence/first-six-native-starts.json").read_text())
+    ledger = dict(pools={"NB00": dict(authorized=True, cap=16, spent=6),
+        "NB07a": dict(authorized=True, cap=14, spent=10, dispatchClosed=True),
+        "NB07b": dict(authorized=True, cap=6, spent=0)}, attempts=json.loads(json.dumps(historical)))
+    options = {}
+    for key, name in dict(authority="parallel-transport-authorization.json",
+            proposal="nb07a-evidence/parallel-transport-proposal.md",
+            retry_authority="native-feasibility-retry-authorization.json",
+            repair_authority="native-feasibility-repair-authorization.json",
+            repair_proposal="nb00b-evidence/publication-retry-proposal.md").items():
+        path = tmp_path / (key + ".json")
+        path.write_bytes((handoff / name).read_bytes())
+        options[key] = path
+    grant = json.loads(options["repair_authority"].read_bytes())
+    grant.update(authorized=True, status="approved_by_user", userInstruction="Synthetic copied-ledger approval only",
+        approvedAt="2026-10-17T00:00:00+00:00")
+    if fault == "pending": grant["authorized"] = False
+    elif fault == "pending-status": grant["status"] = "pending_user_approval"
+    elif fault == "wrong-cap": ledger["pools"]["NB00"]["cap"] = 17
+    elif fault == "changed-history": ledger["attempts"][3]["jobId"] = "changed-history"
+    elif fault == "reclassified": ledger["attempts"][5]["status"] = "passed"
+    elif fault == "refunded": ledger["pools"]["NB00"]["spent"] = 5
+    elif fault == "proposal": options["repair_proposal"].write_text("Changed proposal")
+    elif fault == "prior-authority": options["retry_authority"].write_text("Changed prior grant")
+    elif fault == "no-instruction": grant["userInstruction"] = ""
+    elif fault == "wrong-pool": grant["pool"] = "NB07b"
+    options["repair_authority"].write_text(json.dumps(grant))
+    if fault == "missing": options["repair_authority"].unlink()
+    path = tmp_path / "attempts.json"
+    path.write_text(json.dumps(ledger))
+    before = path.read_bytes()
+    sequence = [variant for variant, count in GROUPS["NB00"] for _ in range(count)]
+    def spend(index):
+        return spend_turn(path, pool="NB00", variant=sequence[index], job="synthetic-publication-retry-" + str(index),
+            source_hashes={"source.py": "a" * 64}, **options)
+    if fault not in {"none", "failed-retry"}:
+        with pytest.raises(NativeTurnDenied):
+            spend(0)
+        assert path.read_bytes() == before
+        return
+    for index in range(10):
+        row = spend(index)
+        assert row["id"] == "NB00-" + str(index + 7) and row["historicalStarts"] == 6
+        assert row["retryAuthority"] == str(options["repair_authority"])
+        assert row["retryAuthoritySha256"] == hashlib.sha256(options["repair_authority"].read_bytes()).hexdigest()
+        current = json.loads(path.read_bytes())
+        assert current["attempts"][:6] == historical and current["pools"]["NB00"]["spent"] == index + 7
+        assert all(current["pools"][key] == ledger["pools"][key] for key in ("NB07a", "NB07b"))
+        current["attempts"][-1]["status"] = "failed" if fault == "failed-retry" else "passed"
+        path.write_text(json.dumps(current))
+        if fault == "failed-retry":
+            before = path.read_bytes()
+            with pytest.raises(NativeTurnDenied):
+                spend(index + 1)
+            assert path.read_bytes() == before
+            break
+
+
 def shared_peer(tmp_path, *, clock=None, interrupt_completes=True, limits=ProtocolLimits(), startup_frame=None):
     from contextlib import contextmanager
     from pathlib import Path

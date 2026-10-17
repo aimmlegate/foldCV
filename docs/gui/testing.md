@@ -11,6 +11,13 @@ Grouped native proof must retain actual wire intervals, each charged turn and a
 separate shared-server shutdown. Serial NB07a remains archived at its accepted
 commit; affected final native bindings are pending NB07b. Native pools never mix.
 
+The feasibility harness captures the complete rewrite narrative, including its
+requested punctuation. Model-free checks exercise all four fixed inputs through
+the real structured adapter, compiler and publisher. Both completion orders and
+a shielded receipt timeout prove that execution cleanup alone is not publication.
+Native evidence requires an exact fixed change and its own durable job receipt.
+Copied-ledger negatives retain all charged history and reject pending retry grants.
+
 NB uses [the mandatory contract](background-work-tests.md) and
 [per-variant matrix](handoffs/BACKGROUND-WORK/test-matrix.json). `NB-CONTRACTS`
 maps NB00a's offline schemas, limit policy, controlled protocol, pipe-process

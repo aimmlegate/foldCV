@@ -27,13 +27,39 @@ RETRY_AUTHORITY = HANDOFF / "native-feasibility-retry-authorization.json"
 RETRY_PROPOSAL = HANDOFF / "nb00b-evidence/native-retry-proposal.md"
 RETRY_PROPOSAL_SHA256 = "c01b055c1bfc2612a4f8c7be4e9552b4b5246d51c166eeb31b9522bd3e54fb6a"
 FAILED_PAIR_SHA256 = "aed250fd5514208fa175709cf119e629674380736b3a6d4a697f2c6440d3a72c"
+REPAIR_AUTHORITY = HANDOFF / "native-feasibility-repair-authorization.json"
+REPAIR_PROPOSAL = HANDOFF / "nb00b-evidence/publication-retry-proposal.md"
+REPAIR_PROPOSAL_SHA256 = "5d31ef3019c838ad5aefa00c18459673a9242ac53c4c686eac5de34cc24ff374"
+FIRST_SIX_SHA256 = "cc31591db365e8488f44fa1a6ce6ee4e0d07e95925e2fa6abc2e16d0f3d8ab6e"
+PRIOR_RETRY_AUTHORITY_SHA256 = "de7176ddb64e54399f9d0932807e490611b2d07e8c5d943771de2e1ec1eda8fd"
 
 
 class NativeTurnDenied(ValueError):
     pass
 
 
-def matrix_budget(ledger, pool, *, retry_authority=RETRY_AUTHORITY, retry_proposal=RETRY_PROPOSAL):
+def repair_budget(rows, retry_authority, repair_authority, repair_proposal):
+    raw = repair_authority.read_bytes()
+    grant = json.loads(raw)
+    fingerprint = hashlib.sha256(json.dumps(rows[:6], sort_keys=True, separators=(",", ":")).encode()).hexdigest()
+    if (grant["schemaVersion"] != 1 or grant["status"] != "approved_by_user" or grant["authorized"] is not True
+            or grant["pool"] != "NB00" or grant["priorCap"] != 12 or grant["cap"] != 16
+            or grant["historicalStarts"] != 6 or grant["freshMatrixTurns"] != 10
+            or grant["everyModelTurnCounts"] is not True or grant["noOtherPoolsChanged"] is not True
+            or grant["preservedAttemptIds"] != ["NB00-" + str(number) for number in range(1, 7)]
+            or grant["preservedAttemptsSha256"] != fingerprint or fingerprint != FIRST_SIX_SHA256
+            or grant["priorRetryAuthoritySha256"] != PRIOR_RETRY_AUTHORITY_SHA256
+            or hashlib.sha256(retry_authority.read_bytes()).hexdigest() != PRIOR_RETRY_AUTHORITY_SHA256
+            or grant["proposalSha256"] != REPAIR_PROPOSAL_SHA256
+            or hashlib.sha256(repair_proposal.read_bytes()).hexdigest() != REPAIR_PROPOSAL_SHA256
+            or not isinstance(grant["userInstruction"], str) or not grant["userInstruction"].strip()
+            or not isinstance(grant["approvedAt"], str) or not grant["approvedAt"].strip()):
+        raise NativeTurnDenied("A new approved matrix and unchanged six-start history are required")
+    return 16, rows[6:], 6, hashlib.sha256(raw).hexdigest()
+
+
+def matrix_budget(ledger, pool, *, retry_authority=RETRY_AUTHORITY, retry_proposal=RETRY_PROPOSAL,
+                  repair_authority=REPAIR_AUTHORITY, repair_proposal=REPAIR_PROPOSAL):
     try:
         selected = ledger["pools"][pool]
         rows = [row for row in ledger["attempts"] if row["pool"] == pool]
@@ -43,6 +69,8 @@ def matrix_budget(ledger, pool, *, retry_authority=RETRY_AUTHORITY, retry_propos
             raise NativeTurnDenied("Invalid native cap")
         if selected["cap"] == CAPS[pool]:
             return selected["cap"], rows, 0, None
+        if pool == "NB00" and selected["cap"] == 16:
+            return repair_budget(rows, retry_authority, repair_authority, repair_proposal)
         if pool != "NB00" or selected["cap"] != 12:
             raise NativeTurnDenied("Unapproved native cap")
         raw = retry_authority.read_bytes()
@@ -67,7 +95,8 @@ def matrix_budget(ledger, pool, *, retry_authority=RETRY_AUTHORITY, retry_propos
 
 
 def spend_turn(path, *, pool, variant, job, source_hashes, authority=AUTHORITY, proposal=PROPOSAL,
-               retry_authority=RETRY_AUTHORITY, retry_proposal=RETRY_PROPOSAL):
+               retry_authority=RETRY_AUTHORITY, retry_proposal=RETRY_PROPOSAL,
+               repair_authority=REPAIR_AUTHORITY, repair_proposal=REPAIR_PROPOSAL):
     if pool not in GROUPS or not isinstance(job, str) or not job:
         raise NativeTurnDenied("Unknown pool or turn identity")
     if (not source_hashes or not isinstance(source_hashes, dict)
@@ -91,7 +120,8 @@ def spend_turn(path, *, pool, variant, job, source_hashes, authority=AUTHORITY, 
         selected = ledger["pools"][pool]
         all_rows = [row for row in ledger["attempts"] if row["pool"] == pool]
         cap, rows, historical, retry_sha = matrix_budget(ledger, pool,
-            retry_authority=retry_authority, retry_proposal=retry_proposal)
+            retry_authority=retry_authority, retry_proposal=retry_proposal,
+            repair_authority=repair_authority, repair_proposal=repair_proposal)
         order = [name for name, count in GROUPS[pool] for _ in range(count)]
         if (selected["authorized"] is not True or type(selected["cap"]) is not int
                 or selected["cap"] != cap or type(selected["spent"]) is not int
@@ -114,7 +144,8 @@ def spend_turn(path, *, pool, variant, job, source_hashes, authority=AUTHORITY, 
             transport="one pinned multiplexed App Server", failedStartsCount=True,
             authority=str(authority), authoritySha256=hashlib.sha256(raw_authority).hexdigest())
         if historical:
-            row.update(retryAuthority=str(retry_authority), retryAuthoritySha256=retry_sha, historicalStarts=historical)
+            row.update(retryAuthority=str(repair_authority if historical == 6 else retry_authority),
+                retryAuthoritySha256=retry_sha, historicalStarts=historical)
         ledger["attempts"].append(row)
         atomic_write(path, json.dumps(ledger, indent=2, ensure_ascii=False).encode() + b"\n")
         return row

@@ -16,6 +16,7 @@ from types import SimpleNamespace
 
 from packages.resume_core.agent_settings import AgentSettingsStore
 from packages.resume_core.agent_store import digest
+from packages.resume_core.background_limits import LIMITS
 from packages.resume_core.background_store import BackgroundFailure
 from packages.resume_core.models.agent import AgentSettingsRequest
 from packages.resume_core.models.background import JobAgentRequestV1
@@ -34,6 +35,7 @@ from .appserver_offline import alive
 from .native_turn_budget import spend_turn, ROLES, matrix_budget
 from tests.support.agent import isolated_project
 from tests.recovery.test_background_fixed_jobs import fixed_request, rewrite_command, completion_command
+from tests.recovery.test_rich_synchronization import selection
 from tools.background_evidence import source_hashes, assert_native_bindings, assert_report, digest as source_digest
 from tools.checks import background_spec
 
@@ -212,11 +214,14 @@ class Feasibility:
             command = (completion_command(action="native-auto-sync", block="narrative", interpret=True)
                 if participant.role == "structured-sync-C" else rewrite_command(workspace))
             if participant.role != "structured-sync-C":
+                block = next(block for block in workspace.project.document.blocks() if block.id == "narrative")
+                command["request"]["selection"] = selection(workspace,
+                    end=len(block.content[0].text.encode("utf-16-le")) // 2).model_dump(by_alias=True)
                 command["request"]["instruction"] = "Replace exactly 'Python. Wrote' with 'Python; Wrote'. Preserve the exact marker, all other text, facts and formatting."
             participant.job = (await service.fixed.submit(project, fixed_request(service, project,
                 request_id, command)))[0].job
 
-    async def finished(self, participant):
+    async def completed(self, participant):
         service, job, project = participant.service, participant.job, participant.workspace.project_id
         changed = asyncio.Event()
         service.supervisor.listeners.add(changed)
@@ -225,9 +230,18 @@ class Feasibility:
                 changed.clear()
                 if job.id not in service.supervisor.controls: await asyncio.wait_for(changed.wait(), 200)
             await asyncio.wait_for(asyncio.shield(service.supervisor.controls[job.id].task), 210)
+            if not participant.role.startswith("agent-"):
+                # Execution cleanup can finish before the separate publisher stores its receipt.
+                async with asyncio.timeout(LIMITS.receipt_seconds):
+                    while project in service.publication_tasks:
+                        await asyncio.shield(service.publication_tasks[project])
         finally:
             service.supervisor.listeners.discard(changed)
-        job = service.store.read(project, job.id)
+        return service.store.read(project, job.id)
+
+    async def finished(self, participant):
+        service, project = participant.service, participant.workspace.project_id
+        job = await self.completed(participant)
         artifact = participant.attempt["id"] if participant.attempt is not None else participant.role + "-uncharged"
         write(self.root / (artifact + "-job.json"), job.model_dump(mode="json", by_alias=True))
         if participant.runtime is not None:
@@ -259,11 +273,29 @@ class Feasibility:
             if participant.marker not in content or any(other.marker in content for other in self.participants if other is not participant):
                 raise ValueError("The fixed native result crossed or lost its private context")
             if participant.role == "structured-sync-C":
-                title = next(record.title.value for record in current.project.facts.records if record.id == "candidate-1")
-                if title != "Python API Engineer":
-                    raise ValueError("The eligible native sync did not save its explicit captured title")
-            elif "Python; Wrote" not in content or "Python. Wrote" in content:
-                raise ValueError("The native selected rewrite did not save the exact requested punctuation")
+                from packages.resume_core.rich_fields import set_text
+                expected_facts = participant.workspace.project.facts.model_copy(deep=True)
+                candidate = next(record for record in expected_facts.records if record.id == "candidate-1")
+                actual = next(record for record in current.project.facts.records if record.id == "candidate-1")
+                set_text(candidate, "title", "Python API Engineer")
+                candidate.revision, candidate.title.revision = actual.revision, actual.title.revision
+                expected_facts.revision = current.project.facts.revision
+                if current.project.facts != expected_facts:
+                    raise ValueError("The eligible native sync changed more than its explicit captured title")
+            else:
+                expected = participant.workspace.project.document.model_copy(deep=True)
+                block = next(block for block in expected.blocks() if block.id == "narrative")
+                block.content[0].text = block.content[0].text.replace("Python. Wrote", "Python; Wrote", 1)
+                expected.revision = current.project.document.revision
+                for before_region, after_region in zip(expected.regions, current.project.document.regions):
+                    before_region.revision = after_region.revision
+                actual_blocks = {block.id: block for block in current.project.document.blocks()}
+                for before_block in expected.blocks():
+                    before_block.revision = actual_blocks[before_block.id].revision
+                if current.project.document != expected or current.project.facts != participant.workspace.project.facts:
+                    raise ValueError("The native selected rewrite changed more than the exact requested punctuation")
+            runtime["fixedPublication"] = dict(exactRequestedChange=True,
+                jobArtifact=str(HANDOFF / "nb00b-evidence" / self.root.name / (participant.attempt["id"] + "-job.json")))
         if participant.role.startswith("agent-") and not cancelled:
             reply = service.artifacts.record(project, job.id)[1].reply.text
             if participant.marker not in reply or any(other.marker in reply for other in self.participants if other is not participant):
