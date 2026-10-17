@@ -30,3 +30,13 @@ async def test_integrated_serial_corpus_preserves_each_transition_and_order(tmp_
         identity="NB07a:production").run()
     assert set(trace["orders"]) == set(ORDERS)
     background_evidence(trace)
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("seed", INTEGRATED_SEEDS, ids=lambda seed: f"seed-{seed:03d}")
+async def test_integrated_parallel_corpus_preserves_each_transition_and_order(tmp_path, seed, background_evidence):
+    trace = await IntegrationTrace(tmp_path / "bridge", seed, capacity=3,
+        transitions=INTEGRATED_TRANSITIONS, identity="NB07b:production").run()
+    assert trace["capacity"] == 3 and trace["transitions"] == 300
+    assert set(trace["orders"]) == set(ORDERS)
+    background_evidence(trace)

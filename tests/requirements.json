@@ -2935,7 +2935,7 @@
     },
     {
       "id": "NB-PARALLEL",
-      "status": "partial",
+      "status": "implemented",
       "tests": [
         "tests/recovery/test_background_appserver.py::test_callback_from_released_turn_cannot_complete_a_new_job_identity",
         "tests/recovery/test_background_appserver.py::test_cleanup_failure_and_flag_rollback_preserve_durable_state",
@@ -3104,6 +3104,31 @@
         "tests/recovery/test_background_feasibility.py::test_native_parallel_configuration_fails_before_profile_access[disabled-background]",
         "tests/recovery/test_background_feasibility.py::test_native_parallel_configuration_fails_before_profile_access[injected-server]",
         "tests/recovery/test_background_feasibility.py::test_native_parallel_configuration_fails_before_profile_access[missing-authority]",
+        "tests/recovery/test_background_final_parallel.py::test_exact_final_document_accepts_equal_text_fragments_and_rejects_other_changes[equal-fragments]",
+        "tests/recovery/test_background_final_parallel.py::test_exact_final_document_accepts_equal_text_fragments_and_rejects_other_changes[fact]",
+        "tests/recovery/test_background_final_parallel.py::test_exact_final_document_accepts_equal_text_fragments_and_rejects_other_changes[other-block]",
+        "tests/recovery/test_background_final_parallel.py::test_exact_final_document_accepts_equal_text_fragments_and_rejects_other_changes[outside-text]",
+        "tests/recovery/test_background_final_parallel.py::test_exact_final_document_accepts_equal_text_fragments_and_rejects_other_changes[style]",
+        "tests/recovery/test_background_final_parallel.py::test_final_conflict_measurement_keeps_narrow_independence_and_actual_rejection_reasons[first-second-broad-read]",
+        "tests/recovery/test_background_final_parallel.py::test_final_conflict_measurement_keeps_narrow_independence_and_actual_rejection_reasons[first-second-narrow-independent]",
+        "tests/recovery/test_background_final_parallel.py::test_final_conflict_measurement_keeps_narrow_independence_and_actual_rejection_reasons[first-second-same-write-scope]",
+        "tests/recovery/test_background_final_parallel.py::test_final_conflict_measurement_keeps_narrow_independence_and_actual_rejection_reasons[second-first-broad-read]",
+        "tests/recovery/test_background_final_parallel.py::test_final_conflict_measurement_keeps_narrow_independence_and_actual_rejection_reasons[second-first-narrow-independent]",
+        "tests/recovery/test_background_final_parallel.py::test_final_conflict_measurement_keeps_narrow_independence_and_actual_rejection_reasons[second-first-same-write-scope]",
+        "tests/recovery/test_background_final_parallel.py::test_final_native_proof_rejects_incomplete_current_fast_before_profile_access[changed-report]",
+        "tests/recovery/test_background_final_parallel.py::test_final_native_proof_rejects_incomplete_current_fast_before_profile_access[failed-gate]",
+        "tests/recovery/test_background_final_parallel.py::test_final_native_proof_rejects_incomplete_current_fast_before_profile_access[stale-sources]",
+        "tests/recovery/test_background_final_parallel.py::test_final_native_proof_rejects_incomplete_current_fast_before_profile_access[wrong-run]",
+        "tests/recovery/test_background_final_parallel.py::test_final_publication_alias_requires_the_same_actual_deferred_turn[canonical-changed]",
+        "tests/recovery/test_background_final_parallel.py::test_final_publication_alias_requires_the_same_actual_deferred_turn[different-parent-turn]",
+        "tests/recovery/test_background_final_parallel.py::test_final_publication_alias_requires_the_same_actual_deferred_turn[early-save]",
+        "tests/recovery/test_background_final_parallel.py::test_final_publication_alias_requires_the_same_actual_deferred_turn[multiple-prepare]",
+        "tests/recovery/test_background_final_parallel.py::test_final_publication_alias_requires_the_same_actual_deferred_turn[new-turn]",
+        "tests/recovery/test_background_final_parallel.py::test_final_publication_alias_requires_the_same_actual_deferred_turn[none]",
+        "tests/recovery/test_background_final_parallel.py::test_final_publication_alias_requires_the_same_actual_deferred_turn[not-durable]",
+        "tests/recovery/test_background_final_parallel.py::test_final_publication_alias_requires_the_same_actual_deferred_turn[unvalidated-parent]",
+        "tests/recovery/test_background_final_parallel.py::test_integrated_native_harness_closes_resources_and_keeps_real_counters_unchanged[both-triples]",
+        "tests/recovery/test_background_final_parallel.py::test_integrated_native_harness_closes_resources_and_keeps_real_counters_unchanged[invalid-structured-result]",
         "tests/recovery/test_background_integration_corpus.py::test_capacity_three_production_corpus_preserves_parallel_ownership_and_the_oracle[seed-00]",
         "tests/recovery/test_background_integration_corpus.py::test_capacity_three_production_corpus_preserves_parallel_ownership_and_the_oracle[seed-01]",
         "tests/recovery/test_background_integration_corpus.py::test_capacity_three_production_corpus_preserves_parallel_ownership_and_the_oracle[seed-02]",
@@ -3120,6 +3145,134 @@
         "tests/recovery/test_background_integration_corpus.py::test_capacity_three_production_corpus_preserves_parallel_ownership_and_the_oracle[seed-13]",
         "tests/recovery/test_background_integration_corpus.py::test_capacity_three_production_corpus_preserves_parallel_ownership_and_the_oracle[seed-14]",
         "tests/recovery/test_background_integration_corpus.py::test_capacity_three_production_corpus_preserves_parallel_ownership_and_the_oracle[seed-15]",
+        "tests/recovery/test_background_integration_corpus.py::test_integrated_parallel_corpus_preserves_each_transition_and_order[seed-000]",
+        "tests/recovery/test_background_integration_corpus.py::test_integrated_parallel_corpus_preserves_each_transition_and_order[seed-001]",
+        "tests/recovery/test_background_integration_corpus.py::test_integrated_parallel_corpus_preserves_each_transition_and_order[seed-002]",
+        "tests/recovery/test_background_integration_corpus.py::test_integrated_parallel_corpus_preserves_each_transition_and_order[seed-003]",
+        "tests/recovery/test_background_integration_corpus.py::test_integrated_parallel_corpus_preserves_each_transition_and_order[seed-004]",
+        "tests/recovery/test_background_integration_corpus.py::test_integrated_parallel_corpus_preserves_each_transition_and_order[seed-005]",
+        "tests/recovery/test_background_integration_corpus.py::test_integrated_parallel_corpus_preserves_each_transition_and_order[seed-006]",
+        "tests/recovery/test_background_integration_corpus.py::test_integrated_parallel_corpus_preserves_each_transition_and_order[seed-007]",
+        "tests/recovery/test_background_integration_corpus.py::test_integrated_parallel_corpus_preserves_each_transition_and_order[seed-008]",
+        "tests/recovery/test_background_integration_corpus.py::test_integrated_parallel_corpus_preserves_each_transition_and_order[seed-009]",
+        "tests/recovery/test_background_integration_corpus.py::test_integrated_parallel_corpus_preserves_each_transition_and_order[seed-010]",
+        "tests/recovery/test_background_integration_corpus.py::test_integrated_parallel_corpus_preserves_each_transition_and_order[seed-011]",
+        "tests/recovery/test_background_integration_corpus.py::test_integrated_parallel_corpus_preserves_each_transition_and_order[seed-012]",
+        "tests/recovery/test_background_integration_corpus.py::test_integrated_parallel_corpus_preserves_each_transition_and_order[seed-013]",
+        "tests/recovery/test_background_integration_corpus.py::test_integrated_parallel_corpus_preserves_each_transition_and_order[seed-014]",
+        "tests/recovery/test_background_integration_corpus.py::test_integrated_parallel_corpus_preserves_each_transition_and_order[seed-015]",
+        "tests/recovery/test_background_integration_corpus.py::test_integrated_parallel_corpus_preserves_each_transition_and_order[seed-016]",
+        "tests/recovery/test_background_integration_corpus.py::test_integrated_parallel_corpus_preserves_each_transition_and_order[seed-017]",
+        "tests/recovery/test_background_integration_corpus.py::test_integrated_parallel_corpus_preserves_each_transition_and_order[seed-018]",
+        "tests/recovery/test_background_integration_corpus.py::test_integrated_parallel_corpus_preserves_each_transition_and_order[seed-019]",
+        "tests/recovery/test_background_integration_corpus.py::test_integrated_parallel_corpus_preserves_each_transition_and_order[seed-020]",
+        "tests/recovery/test_background_integration_corpus.py::test_integrated_parallel_corpus_preserves_each_transition_and_order[seed-021]",
+        "tests/recovery/test_background_integration_corpus.py::test_integrated_parallel_corpus_preserves_each_transition_and_order[seed-022]",
+        "tests/recovery/test_background_integration_corpus.py::test_integrated_parallel_corpus_preserves_each_transition_and_order[seed-023]",
+        "tests/recovery/test_background_integration_corpus.py::test_integrated_parallel_corpus_preserves_each_transition_and_order[seed-024]",
+        "tests/recovery/test_background_integration_corpus.py::test_integrated_parallel_corpus_preserves_each_transition_and_order[seed-025]",
+        "tests/recovery/test_background_integration_corpus.py::test_integrated_parallel_corpus_preserves_each_transition_and_order[seed-026]",
+        "tests/recovery/test_background_integration_corpus.py::test_integrated_parallel_corpus_preserves_each_transition_and_order[seed-027]",
+        "tests/recovery/test_background_integration_corpus.py::test_integrated_parallel_corpus_preserves_each_transition_and_order[seed-028]",
+        "tests/recovery/test_background_integration_corpus.py::test_integrated_parallel_corpus_preserves_each_transition_and_order[seed-029]",
+        "tests/recovery/test_background_integration_corpus.py::test_integrated_parallel_corpus_preserves_each_transition_and_order[seed-030]",
+        "tests/recovery/test_background_integration_corpus.py::test_integrated_parallel_corpus_preserves_each_transition_and_order[seed-031]",
+        "tests/recovery/test_background_integration_corpus.py::test_integrated_parallel_corpus_preserves_each_transition_and_order[seed-032]",
+        "tests/recovery/test_background_integration_corpus.py::test_integrated_parallel_corpus_preserves_each_transition_and_order[seed-033]",
+        "tests/recovery/test_background_integration_corpus.py::test_integrated_parallel_corpus_preserves_each_transition_and_order[seed-034]",
+        "tests/recovery/test_background_integration_corpus.py::test_integrated_parallel_corpus_preserves_each_transition_and_order[seed-035]",
+        "tests/recovery/test_background_integration_corpus.py::test_integrated_parallel_corpus_preserves_each_transition_and_order[seed-036]",
+        "tests/recovery/test_background_integration_corpus.py::test_integrated_parallel_corpus_preserves_each_transition_and_order[seed-037]",
+        "tests/recovery/test_background_integration_corpus.py::test_integrated_parallel_corpus_preserves_each_transition_and_order[seed-038]",
+        "tests/recovery/test_background_integration_corpus.py::test_integrated_parallel_corpus_preserves_each_transition_and_order[seed-039]",
+        "tests/recovery/test_background_integration_corpus.py::test_integrated_parallel_corpus_preserves_each_transition_and_order[seed-040]",
+        "tests/recovery/test_background_integration_corpus.py::test_integrated_parallel_corpus_preserves_each_transition_and_order[seed-041]",
+        "tests/recovery/test_background_integration_corpus.py::test_integrated_parallel_corpus_preserves_each_transition_and_order[seed-042]",
+        "tests/recovery/test_background_integration_corpus.py::test_integrated_parallel_corpus_preserves_each_transition_and_order[seed-043]",
+        "tests/recovery/test_background_integration_corpus.py::test_integrated_parallel_corpus_preserves_each_transition_and_order[seed-044]",
+        "tests/recovery/test_background_integration_corpus.py::test_integrated_parallel_corpus_preserves_each_transition_and_order[seed-045]",
+        "tests/recovery/test_background_integration_corpus.py::test_integrated_parallel_corpus_preserves_each_transition_and_order[seed-046]",
+        "tests/recovery/test_background_integration_corpus.py::test_integrated_parallel_corpus_preserves_each_transition_and_order[seed-047]",
+        "tests/recovery/test_background_integration_corpus.py::test_integrated_parallel_corpus_preserves_each_transition_and_order[seed-048]",
+        "tests/recovery/test_background_integration_corpus.py::test_integrated_parallel_corpus_preserves_each_transition_and_order[seed-049]",
+        "tests/recovery/test_background_integration_corpus.py::test_integrated_parallel_corpus_preserves_each_transition_and_order[seed-050]",
+        "tests/recovery/test_background_integration_corpus.py::test_integrated_parallel_corpus_preserves_each_transition_and_order[seed-051]",
+        "tests/recovery/test_background_integration_corpus.py::test_integrated_parallel_corpus_preserves_each_transition_and_order[seed-052]",
+        "tests/recovery/test_background_integration_corpus.py::test_integrated_parallel_corpus_preserves_each_transition_and_order[seed-053]",
+        "tests/recovery/test_background_integration_corpus.py::test_integrated_parallel_corpus_preserves_each_transition_and_order[seed-054]",
+        "tests/recovery/test_background_integration_corpus.py::test_integrated_parallel_corpus_preserves_each_transition_and_order[seed-055]",
+        "tests/recovery/test_background_integration_corpus.py::test_integrated_parallel_corpus_preserves_each_transition_and_order[seed-056]",
+        "tests/recovery/test_background_integration_corpus.py::test_integrated_parallel_corpus_preserves_each_transition_and_order[seed-057]",
+        "tests/recovery/test_background_integration_corpus.py::test_integrated_parallel_corpus_preserves_each_transition_and_order[seed-058]",
+        "tests/recovery/test_background_integration_corpus.py::test_integrated_parallel_corpus_preserves_each_transition_and_order[seed-059]",
+        "tests/recovery/test_background_integration_corpus.py::test_integrated_parallel_corpus_preserves_each_transition_and_order[seed-060]",
+        "tests/recovery/test_background_integration_corpus.py::test_integrated_parallel_corpus_preserves_each_transition_and_order[seed-061]",
+        "tests/recovery/test_background_integration_corpus.py::test_integrated_parallel_corpus_preserves_each_transition_and_order[seed-062]",
+        "tests/recovery/test_background_integration_corpus.py::test_integrated_parallel_corpus_preserves_each_transition_and_order[seed-063]",
+        "tests/recovery/test_background_integration_corpus.py::test_integrated_parallel_corpus_preserves_each_transition_and_order[seed-064]",
+        "tests/recovery/test_background_integration_corpus.py::test_integrated_parallel_corpus_preserves_each_transition_and_order[seed-065]",
+        "tests/recovery/test_background_integration_corpus.py::test_integrated_parallel_corpus_preserves_each_transition_and_order[seed-066]",
+        "tests/recovery/test_background_integration_corpus.py::test_integrated_parallel_corpus_preserves_each_transition_and_order[seed-067]",
+        "tests/recovery/test_background_integration_corpus.py::test_integrated_parallel_corpus_preserves_each_transition_and_order[seed-068]",
+        "tests/recovery/test_background_integration_corpus.py::test_integrated_parallel_corpus_preserves_each_transition_and_order[seed-069]",
+        "tests/recovery/test_background_integration_corpus.py::test_integrated_parallel_corpus_preserves_each_transition_and_order[seed-070]",
+        "tests/recovery/test_background_integration_corpus.py::test_integrated_parallel_corpus_preserves_each_transition_and_order[seed-071]",
+        "tests/recovery/test_background_integration_corpus.py::test_integrated_parallel_corpus_preserves_each_transition_and_order[seed-072]",
+        "tests/recovery/test_background_integration_corpus.py::test_integrated_parallel_corpus_preserves_each_transition_and_order[seed-073]",
+        "tests/recovery/test_background_integration_corpus.py::test_integrated_parallel_corpus_preserves_each_transition_and_order[seed-074]",
+        "tests/recovery/test_background_integration_corpus.py::test_integrated_parallel_corpus_preserves_each_transition_and_order[seed-075]",
+        "tests/recovery/test_background_integration_corpus.py::test_integrated_parallel_corpus_preserves_each_transition_and_order[seed-076]",
+        "tests/recovery/test_background_integration_corpus.py::test_integrated_parallel_corpus_preserves_each_transition_and_order[seed-077]",
+        "tests/recovery/test_background_integration_corpus.py::test_integrated_parallel_corpus_preserves_each_transition_and_order[seed-078]",
+        "tests/recovery/test_background_integration_corpus.py::test_integrated_parallel_corpus_preserves_each_transition_and_order[seed-079]",
+        "tests/recovery/test_background_integration_corpus.py::test_integrated_parallel_corpus_preserves_each_transition_and_order[seed-080]",
+        "tests/recovery/test_background_integration_corpus.py::test_integrated_parallel_corpus_preserves_each_transition_and_order[seed-081]",
+        "tests/recovery/test_background_integration_corpus.py::test_integrated_parallel_corpus_preserves_each_transition_and_order[seed-082]",
+        "tests/recovery/test_background_integration_corpus.py::test_integrated_parallel_corpus_preserves_each_transition_and_order[seed-083]",
+        "tests/recovery/test_background_integration_corpus.py::test_integrated_parallel_corpus_preserves_each_transition_and_order[seed-084]",
+        "tests/recovery/test_background_integration_corpus.py::test_integrated_parallel_corpus_preserves_each_transition_and_order[seed-085]",
+        "tests/recovery/test_background_integration_corpus.py::test_integrated_parallel_corpus_preserves_each_transition_and_order[seed-086]",
+        "tests/recovery/test_background_integration_corpus.py::test_integrated_parallel_corpus_preserves_each_transition_and_order[seed-087]",
+        "tests/recovery/test_background_integration_corpus.py::test_integrated_parallel_corpus_preserves_each_transition_and_order[seed-088]",
+        "tests/recovery/test_background_integration_corpus.py::test_integrated_parallel_corpus_preserves_each_transition_and_order[seed-089]",
+        "tests/recovery/test_background_integration_corpus.py::test_integrated_parallel_corpus_preserves_each_transition_and_order[seed-090]",
+        "tests/recovery/test_background_integration_corpus.py::test_integrated_parallel_corpus_preserves_each_transition_and_order[seed-091]",
+        "tests/recovery/test_background_integration_corpus.py::test_integrated_parallel_corpus_preserves_each_transition_and_order[seed-092]",
+        "tests/recovery/test_background_integration_corpus.py::test_integrated_parallel_corpus_preserves_each_transition_and_order[seed-093]",
+        "tests/recovery/test_background_integration_corpus.py::test_integrated_parallel_corpus_preserves_each_transition_and_order[seed-094]",
+        "tests/recovery/test_background_integration_corpus.py::test_integrated_parallel_corpus_preserves_each_transition_and_order[seed-095]",
+        "tests/recovery/test_background_integration_corpus.py::test_integrated_parallel_corpus_preserves_each_transition_and_order[seed-096]",
+        "tests/recovery/test_background_integration_corpus.py::test_integrated_parallel_corpus_preserves_each_transition_and_order[seed-097]",
+        "tests/recovery/test_background_integration_corpus.py::test_integrated_parallel_corpus_preserves_each_transition_and_order[seed-098]",
+        "tests/recovery/test_background_integration_corpus.py::test_integrated_parallel_corpus_preserves_each_transition_and_order[seed-099]",
+        "tests/recovery/test_background_integration_corpus.py::test_integrated_parallel_corpus_preserves_each_transition_and_order[seed-100]",
+        "tests/recovery/test_background_integration_corpus.py::test_integrated_parallel_corpus_preserves_each_transition_and_order[seed-101]",
+        "tests/recovery/test_background_integration_corpus.py::test_integrated_parallel_corpus_preserves_each_transition_and_order[seed-102]",
+        "tests/recovery/test_background_integration_corpus.py::test_integrated_parallel_corpus_preserves_each_transition_and_order[seed-103]",
+        "tests/recovery/test_background_integration_corpus.py::test_integrated_parallel_corpus_preserves_each_transition_and_order[seed-104]",
+        "tests/recovery/test_background_integration_corpus.py::test_integrated_parallel_corpus_preserves_each_transition_and_order[seed-105]",
+        "tests/recovery/test_background_integration_corpus.py::test_integrated_parallel_corpus_preserves_each_transition_and_order[seed-106]",
+        "tests/recovery/test_background_integration_corpus.py::test_integrated_parallel_corpus_preserves_each_transition_and_order[seed-107]",
+        "tests/recovery/test_background_integration_corpus.py::test_integrated_parallel_corpus_preserves_each_transition_and_order[seed-108]",
+        "tests/recovery/test_background_integration_corpus.py::test_integrated_parallel_corpus_preserves_each_transition_and_order[seed-109]",
+        "tests/recovery/test_background_integration_corpus.py::test_integrated_parallel_corpus_preserves_each_transition_and_order[seed-110]",
+        "tests/recovery/test_background_integration_corpus.py::test_integrated_parallel_corpus_preserves_each_transition_and_order[seed-111]",
+        "tests/recovery/test_background_integration_corpus.py::test_integrated_parallel_corpus_preserves_each_transition_and_order[seed-112]",
+        "tests/recovery/test_background_integration_corpus.py::test_integrated_parallel_corpus_preserves_each_transition_and_order[seed-113]",
+        "tests/recovery/test_background_integration_corpus.py::test_integrated_parallel_corpus_preserves_each_transition_and_order[seed-114]",
+        "tests/recovery/test_background_integration_corpus.py::test_integrated_parallel_corpus_preserves_each_transition_and_order[seed-115]",
+        "tests/recovery/test_background_integration_corpus.py::test_integrated_parallel_corpus_preserves_each_transition_and_order[seed-116]",
+        "tests/recovery/test_background_integration_corpus.py::test_integrated_parallel_corpus_preserves_each_transition_and_order[seed-117]",
+        "tests/recovery/test_background_integration_corpus.py::test_integrated_parallel_corpus_preserves_each_transition_and_order[seed-118]",
+        "tests/recovery/test_background_integration_corpus.py::test_integrated_parallel_corpus_preserves_each_transition_and_order[seed-119]",
+        "tests/recovery/test_background_integration_corpus.py::test_integrated_parallel_corpus_preserves_each_transition_and_order[seed-120]",
+        "tests/recovery/test_background_integration_corpus.py::test_integrated_parallel_corpus_preserves_each_transition_and_order[seed-121]",
+        "tests/recovery/test_background_integration_corpus.py::test_integrated_parallel_corpus_preserves_each_transition_and_order[seed-122]",
+        "tests/recovery/test_background_integration_corpus.py::test_integrated_parallel_corpus_preserves_each_transition_and_order[seed-123]",
+        "tests/recovery/test_background_integration_corpus.py::test_integrated_parallel_corpus_preserves_each_transition_and_order[seed-124]",
+        "tests/recovery/test_background_integration_corpus.py::test_integrated_parallel_corpus_preserves_each_transition_and_order[seed-125]",
+        "tests/recovery/test_background_integration_corpus.py::test_integrated_parallel_corpus_preserves_each_transition_and_order[seed-126]",
+        "tests/recovery/test_background_integration_corpus.py::test_integrated_parallel_corpus_preserves_each_transition_and_order[seed-127]",
         "tests/recovery/test_background_native_budget.py::test_final_native_dispatch_counts_failed_starts_without_borrowing_another_pool",
         "tests/recovery/test_background_native_budget.py::test_final_native_dispatch_refuses_an_invalid_or_spent_allowance_before_launch[auth]",
         "tests/recovery/test_background_native_budget.py::test_final_native_dispatch_refuses_an_invalid_or_spent_allowance_before_launch[closed]",
@@ -3273,7 +3426,13 @@
         "tests/recovery/test_background_process_ownership.py::test_unverified_startup_never_falls_back_to_legacy_signals_or_directory_removal[group-mismatch]",
         "tests/recovery/test_background_process_ownership.py::test_unverified_startup_never_falls_back_to_legacy_signals_or_directory_removal[inspector-error]",
         "tests/recovery/test_background_process_ownership.py::test_unverified_startup_never_falls_back_to_legacy_signals_or_directory_removal[missing-identity]",
-        "tests/recovery/test_background_process_ownership.py::test_unverified_startup_never_falls_back_to_legacy_signals_or_directory_removal[spawn-marker-failure]"
+        "tests/recovery/test_background_process_ownership.py::test_unverified_startup_never_falls_back_to_legacy_signals_or_directory_removal[spawn-marker-failure]",
+        "tests/recovery/test_gui_archive_service.py::test_portable_save_packages_only_current_docx_sources_and_workspace_then_import_regenerates_cache",
+        "tests/recovery/test_gui_exports.py::test_capacity_error_retains_safe_field_identity_and_retry_uses_current_text",
+        "tests/recovery/test_gui_exports.py::test_edited_rewritten_and_excluded_content_reaches_real_docx_without_source_refill",
+        "tests/recovery/test_gui_exports.py::test_export_while_editing_rejects_late_worker_result_without_losing_text_or_pointer[cancel]",
+        "tests/recovery/test_gui_exports.py::test_export_while_editing_rejects_late_worker_result_without_losing_text_or_pointer[rename]",
+        "tests/recovery/test_gui_exports.py::test_export_while_editing_rejects_late_worker_result_without_losing_text_or_pointer[text]"
       ]
     }
   ],
@@ -3370,11 +3529,6 @@
       "unproved": "All rich OOXML and 17 all-page converter/T3 inspections pass; actual Word fonts/layout/edit/save/reopen remain manual.",
       "owner": "Manual Word",
       "check": "Follow manual-macos-checklist.md on the five exact hashed files."
-    },
-    "NB-PARALLEL": {
-      "unproved": "Final integrated native triples and NB07b release remain pending. NB00b feasibility is accepted at9938f54; NB04 bindings require current executed evidence.",
-      "owner": "NB04/NB07b",
-      "check": "Pass the exact authorized ten-turn feasibility matrix, all due scheduler variants and six current final integrated turns with retained cleanup/source evidence."
     }
   },
   "recovery": {
@@ -3418,7 +3572,8 @@
       "NB06",
       "NB07a",
       "NB00b",
-      "NB04"
+      "NB04",
+      "NB07b"
     ],
     "bindings": {
       "NB-R03:v01": [
@@ -5142,6 +5297,136 @@
       ],
       "NB-R01:v08": [
         "tests/recovery/test_background_parallel.py::test_one_job_service_runs_two_agents_and_rewrite_on_one_owned_server[old-tool]"
+      ],
+      "NB-M02:v02": [
+        "tests/recovery/test_background_integration_corpus.py::test_integrated_parallel_corpus_preserves_each_transition_and_order[seed-000]",
+        "tests/recovery/test_background_integration_corpus.py::test_integrated_parallel_corpus_preserves_each_transition_and_order[seed-001]",
+        "tests/recovery/test_background_integration_corpus.py::test_integrated_parallel_corpus_preserves_each_transition_and_order[seed-002]",
+        "tests/recovery/test_background_integration_corpus.py::test_integrated_parallel_corpus_preserves_each_transition_and_order[seed-003]",
+        "tests/recovery/test_background_integration_corpus.py::test_integrated_parallel_corpus_preserves_each_transition_and_order[seed-004]",
+        "tests/recovery/test_background_integration_corpus.py::test_integrated_parallel_corpus_preserves_each_transition_and_order[seed-005]",
+        "tests/recovery/test_background_integration_corpus.py::test_integrated_parallel_corpus_preserves_each_transition_and_order[seed-006]",
+        "tests/recovery/test_background_integration_corpus.py::test_integrated_parallel_corpus_preserves_each_transition_and_order[seed-007]",
+        "tests/recovery/test_background_integration_corpus.py::test_integrated_parallel_corpus_preserves_each_transition_and_order[seed-008]",
+        "tests/recovery/test_background_integration_corpus.py::test_integrated_parallel_corpus_preserves_each_transition_and_order[seed-009]",
+        "tests/recovery/test_background_integration_corpus.py::test_integrated_parallel_corpus_preserves_each_transition_and_order[seed-010]",
+        "tests/recovery/test_background_integration_corpus.py::test_integrated_parallel_corpus_preserves_each_transition_and_order[seed-011]",
+        "tests/recovery/test_background_integration_corpus.py::test_integrated_parallel_corpus_preserves_each_transition_and_order[seed-012]",
+        "tests/recovery/test_background_integration_corpus.py::test_integrated_parallel_corpus_preserves_each_transition_and_order[seed-013]",
+        "tests/recovery/test_background_integration_corpus.py::test_integrated_parallel_corpus_preserves_each_transition_and_order[seed-014]",
+        "tests/recovery/test_background_integration_corpus.py::test_integrated_parallel_corpus_preserves_each_transition_and_order[seed-015]",
+        "tests/recovery/test_background_integration_corpus.py::test_integrated_parallel_corpus_preserves_each_transition_and_order[seed-016]",
+        "tests/recovery/test_background_integration_corpus.py::test_integrated_parallel_corpus_preserves_each_transition_and_order[seed-017]",
+        "tests/recovery/test_background_integration_corpus.py::test_integrated_parallel_corpus_preserves_each_transition_and_order[seed-018]",
+        "tests/recovery/test_background_integration_corpus.py::test_integrated_parallel_corpus_preserves_each_transition_and_order[seed-019]",
+        "tests/recovery/test_background_integration_corpus.py::test_integrated_parallel_corpus_preserves_each_transition_and_order[seed-020]",
+        "tests/recovery/test_background_integration_corpus.py::test_integrated_parallel_corpus_preserves_each_transition_and_order[seed-021]",
+        "tests/recovery/test_background_integration_corpus.py::test_integrated_parallel_corpus_preserves_each_transition_and_order[seed-022]",
+        "tests/recovery/test_background_integration_corpus.py::test_integrated_parallel_corpus_preserves_each_transition_and_order[seed-023]",
+        "tests/recovery/test_background_integration_corpus.py::test_integrated_parallel_corpus_preserves_each_transition_and_order[seed-024]",
+        "tests/recovery/test_background_integration_corpus.py::test_integrated_parallel_corpus_preserves_each_transition_and_order[seed-025]",
+        "tests/recovery/test_background_integration_corpus.py::test_integrated_parallel_corpus_preserves_each_transition_and_order[seed-026]",
+        "tests/recovery/test_background_integration_corpus.py::test_integrated_parallel_corpus_preserves_each_transition_and_order[seed-027]",
+        "tests/recovery/test_background_integration_corpus.py::test_integrated_parallel_corpus_preserves_each_transition_and_order[seed-028]",
+        "tests/recovery/test_background_integration_corpus.py::test_integrated_parallel_corpus_preserves_each_transition_and_order[seed-029]",
+        "tests/recovery/test_background_integration_corpus.py::test_integrated_parallel_corpus_preserves_each_transition_and_order[seed-030]",
+        "tests/recovery/test_background_integration_corpus.py::test_integrated_parallel_corpus_preserves_each_transition_and_order[seed-031]",
+        "tests/recovery/test_background_integration_corpus.py::test_integrated_parallel_corpus_preserves_each_transition_and_order[seed-032]",
+        "tests/recovery/test_background_integration_corpus.py::test_integrated_parallel_corpus_preserves_each_transition_and_order[seed-033]",
+        "tests/recovery/test_background_integration_corpus.py::test_integrated_parallel_corpus_preserves_each_transition_and_order[seed-034]",
+        "tests/recovery/test_background_integration_corpus.py::test_integrated_parallel_corpus_preserves_each_transition_and_order[seed-035]",
+        "tests/recovery/test_background_integration_corpus.py::test_integrated_parallel_corpus_preserves_each_transition_and_order[seed-036]",
+        "tests/recovery/test_background_integration_corpus.py::test_integrated_parallel_corpus_preserves_each_transition_and_order[seed-037]",
+        "tests/recovery/test_background_integration_corpus.py::test_integrated_parallel_corpus_preserves_each_transition_and_order[seed-038]",
+        "tests/recovery/test_background_integration_corpus.py::test_integrated_parallel_corpus_preserves_each_transition_and_order[seed-039]",
+        "tests/recovery/test_background_integration_corpus.py::test_integrated_parallel_corpus_preserves_each_transition_and_order[seed-040]",
+        "tests/recovery/test_background_integration_corpus.py::test_integrated_parallel_corpus_preserves_each_transition_and_order[seed-041]",
+        "tests/recovery/test_background_integration_corpus.py::test_integrated_parallel_corpus_preserves_each_transition_and_order[seed-042]",
+        "tests/recovery/test_background_integration_corpus.py::test_integrated_parallel_corpus_preserves_each_transition_and_order[seed-043]",
+        "tests/recovery/test_background_integration_corpus.py::test_integrated_parallel_corpus_preserves_each_transition_and_order[seed-044]",
+        "tests/recovery/test_background_integration_corpus.py::test_integrated_parallel_corpus_preserves_each_transition_and_order[seed-045]",
+        "tests/recovery/test_background_integration_corpus.py::test_integrated_parallel_corpus_preserves_each_transition_and_order[seed-046]",
+        "tests/recovery/test_background_integration_corpus.py::test_integrated_parallel_corpus_preserves_each_transition_and_order[seed-047]",
+        "tests/recovery/test_background_integration_corpus.py::test_integrated_parallel_corpus_preserves_each_transition_and_order[seed-048]",
+        "tests/recovery/test_background_integration_corpus.py::test_integrated_parallel_corpus_preserves_each_transition_and_order[seed-049]",
+        "tests/recovery/test_background_integration_corpus.py::test_integrated_parallel_corpus_preserves_each_transition_and_order[seed-050]",
+        "tests/recovery/test_background_integration_corpus.py::test_integrated_parallel_corpus_preserves_each_transition_and_order[seed-051]",
+        "tests/recovery/test_background_integration_corpus.py::test_integrated_parallel_corpus_preserves_each_transition_and_order[seed-052]",
+        "tests/recovery/test_background_integration_corpus.py::test_integrated_parallel_corpus_preserves_each_transition_and_order[seed-053]",
+        "tests/recovery/test_background_integration_corpus.py::test_integrated_parallel_corpus_preserves_each_transition_and_order[seed-054]",
+        "tests/recovery/test_background_integration_corpus.py::test_integrated_parallel_corpus_preserves_each_transition_and_order[seed-055]",
+        "tests/recovery/test_background_integration_corpus.py::test_integrated_parallel_corpus_preserves_each_transition_and_order[seed-056]",
+        "tests/recovery/test_background_integration_corpus.py::test_integrated_parallel_corpus_preserves_each_transition_and_order[seed-057]",
+        "tests/recovery/test_background_integration_corpus.py::test_integrated_parallel_corpus_preserves_each_transition_and_order[seed-058]",
+        "tests/recovery/test_background_integration_corpus.py::test_integrated_parallel_corpus_preserves_each_transition_and_order[seed-059]",
+        "tests/recovery/test_background_integration_corpus.py::test_integrated_parallel_corpus_preserves_each_transition_and_order[seed-060]",
+        "tests/recovery/test_background_integration_corpus.py::test_integrated_parallel_corpus_preserves_each_transition_and_order[seed-061]",
+        "tests/recovery/test_background_integration_corpus.py::test_integrated_parallel_corpus_preserves_each_transition_and_order[seed-062]",
+        "tests/recovery/test_background_integration_corpus.py::test_integrated_parallel_corpus_preserves_each_transition_and_order[seed-063]",
+        "tests/recovery/test_background_integration_corpus.py::test_integrated_parallel_corpus_preserves_each_transition_and_order[seed-064]",
+        "tests/recovery/test_background_integration_corpus.py::test_integrated_parallel_corpus_preserves_each_transition_and_order[seed-065]",
+        "tests/recovery/test_background_integration_corpus.py::test_integrated_parallel_corpus_preserves_each_transition_and_order[seed-066]",
+        "tests/recovery/test_background_integration_corpus.py::test_integrated_parallel_corpus_preserves_each_transition_and_order[seed-067]",
+        "tests/recovery/test_background_integration_corpus.py::test_integrated_parallel_corpus_preserves_each_transition_and_order[seed-068]",
+        "tests/recovery/test_background_integration_corpus.py::test_integrated_parallel_corpus_preserves_each_transition_and_order[seed-069]",
+        "tests/recovery/test_background_integration_corpus.py::test_integrated_parallel_corpus_preserves_each_transition_and_order[seed-070]",
+        "tests/recovery/test_background_integration_corpus.py::test_integrated_parallel_corpus_preserves_each_transition_and_order[seed-071]",
+        "tests/recovery/test_background_integration_corpus.py::test_integrated_parallel_corpus_preserves_each_transition_and_order[seed-072]",
+        "tests/recovery/test_background_integration_corpus.py::test_integrated_parallel_corpus_preserves_each_transition_and_order[seed-073]",
+        "tests/recovery/test_background_integration_corpus.py::test_integrated_parallel_corpus_preserves_each_transition_and_order[seed-074]",
+        "tests/recovery/test_background_integration_corpus.py::test_integrated_parallel_corpus_preserves_each_transition_and_order[seed-075]",
+        "tests/recovery/test_background_integration_corpus.py::test_integrated_parallel_corpus_preserves_each_transition_and_order[seed-076]",
+        "tests/recovery/test_background_integration_corpus.py::test_integrated_parallel_corpus_preserves_each_transition_and_order[seed-077]",
+        "tests/recovery/test_background_integration_corpus.py::test_integrated_parallel_corpus_preserves_each_transition_and_order[seed-078]",
+        "tests/recovery/test_background_integration_corpus.py::test_integrated_parallel_corpus_preserves_each_transition_and_order[seed-079]",
+        "tests/recovery/test_background_integration_corpus.py::test_integrated_parallel_corpus_preserves_each_transition_and_order[seed-080]",
+        "tests/recovery/test_background_integration_corpus.py::test_integrated_parallel_corpus_preserves_each_transition_and_order[seed-081]",
+        "tests/recovery/test_background_integration_corpus.py::test_integrated_parallel_corpus_preserves_each_transition_and_order[seed-082]",
+        "tests/recovery/test_background_integration_corpus.py::test_integrated_parallel_corpus_preserves_each_transition_and_order[seed-083]",
+        "tests/recovery/test_background_integration_corpus.py::test_integrated_parallel_corpus_preserves_each_transition_and_order[seed-084]",
+        "tests/recovery/test_background_integration_corpus.py::test_integrated_parallel_corpus_preserves_each_transition_and_order[seed-085]",
+        "tests/recovery/test_background_integration_corpus.py::test_integrated_parallel_corpus_preserves_each_transition_and_order[seed-086]",
+        "tests/recovery/test_background_integration_corpus.py::test_integrated_parallel_corpus_preserves_each_transition_and_order[seed-087]",
+        "tests/recovery/test_background_integration_corpus.py::test_integrated_parallel_corpus_preserves_each_transition_and_order[seed-088]",
+        "tests/recovery/test_background_integration_corpus.py::test_integrated_parallel_corpus_preserves_each_transition_and_order[seed-089]",
+        "tests/recovery/test_background_integration_corpus.py::test_integrated_parallel_corpus_preserves_each_transition_and_order[seed-090]",
+        "tests/recovery/test_background_integration_corpus.py::test_integrated_parallel_corpus_preserves_each_transition_and_order[seed-091]",
+        "tests/recovery/test_background_integration_corpus.py::test_integrated_parallel_corpus_preserves_each_transition_and_order[seed-092]",
+        "tests/recovery/test_background_integration_corpus.py::test_integrated_parallel_corpus_preserves_each_transition_and_order[seed-093]",
+        "tests/recovery/test_background_integration_corpus.py::test_integrated_parallel_corpus_preserves_each_transition_and_order[seed-094]",
+        "tests/recovery/test_background_integration_corpus.py::test_integrated_parallel_corpus_preserves_each_transition_and_order[seed-095]",
+        "tests/recovery/test_background_integration_corpus.py::test_integrated_parallel_corpus_preserves_each_transition_and_order[seed-096]",
+        "tests/recovery/test_background_integration_corpus.py::test_integrated_parallel_corpus_preserves_each_transition_and_order[seed-097]",
+        "tests/recovery/test_background_integration_corpus.py::test_integrated_parallel_corpus_preserves_each_transition_and_order[seed-098]",
+        "tests/recovery/test_background_integration_corpus.py::test_integrated_parallel_corpus_preserves_each_transition_and_order[seed-099]",
+        "tests/recovery/test_background_integration_corpus.py::test_integrated_parallel_corpus_preserves_each_transition_and_order[seed-100]",
+        "tests/recovery/test_background_integration_corpus.py::test_integrated_parallel_corpus_preserves_each_transition_and_order[seed-101]",
+        "tests/recovery/test_background_integration_corpus.py::test_integrated_parallel_corpus_preserves_each_transition_and_order[seed-102]",
+        "tests/recovery/test_background_integration_corpus.py::test_integrated_parallel_corpus_preserves_each_transition_and_order[seed-103]",
+        "tests/recovery/test_background_integration_corpus.py::test_integrated_parallel_corpus_preserves_each_transition_and_order[seed-104]",
+        "tests/recovery/test_background_integration_corpus.py::test_integrated_parallel_corpus_preserves_each_transition_and_order[seed-105]",
+        "tests/recovery/test_background_integration_corpus.py::test_integrated_parallel_corpus_preserves_each_transition_and_order[seed-106]",
+        "tests/recovery/test_background_integration_corpus.py::test_integrated_parallel_corpus_preserves_each_transition_and_order[seed-107]",
+        "tests/recovery/test_background_integration_corpus.py::test_integrated_parallel_corpus_preserves_each_transition_and_order[seed-108]",
+        "tests/recovery/test_background_integration_corpus.py::test_integrated_parallel_corpus_preserves_each_transition_and_order[seed-109]",
+        "tests/recovery/test_background_integration_corpus.py::test_integrated_parallel_corpus_preserves_each_transition_and_order[seed-110]",
+        "tests/recovery/test_background_integration_corpus.py::test_integrated_parallel_corpus_preserves_each_transition_and_order[seed-111]",
+        "tests/recovery/test_background_integration_corpus.py::test_integrated_parallel_corpus_preserves_each_transition_and_order[seed-112]",
+        "tests/recovery/test_background_integration_corpus.py::test_integrated_parallel_corpus_preserves_each_transition_and_order[seed-113]",
+        "tests/recovery/test_background_integration_corpus.py::test_integrated_parallel_corpus_preserves_each_transition_and_order[seed-114]",
+        "tests/recovery/test_background_integration_corpus.py::test_integrated_parallel_corpus_preserves_each_transition_and_order[seed-115]",
+        "tests/recovery/test_background_integration_corpus.py::test_integrated_parallel_corpus_preserves_each_transition_and_order[seed-116]",
+        "tests/recovery/test_background_integration_corpus.py::test_integrated_parallel_corpus_preserves_each_transition_and_order[seed-117]",
+        "tests/recovery/test_background_integration_corpus.py::test_integrated_parallel_corpus_preserves_each_transition_and_order[seed-118]",
+        "tests/recovery/test_background_integration_corpus.py::test_integrated_parallel_corpus_preserves_each_transition_and_order[seed-119]",
+        "tests/recovery/test_background_integration_corpus.py::test_integrated_parallel_corpus_preserves_each_transition_and_order[seed-120]",
+        "tests/recovery/test_background_integration_corpus.py::test_integrated_parallel_corpus_preserves_each_transition_and_order[seed-121]",
+        "tests/recovery/test_background_integration_corpus.py::test_integrated_parallel_corpus_preserves_each_transition_and_order[seed-122]",
+        "tests/recovery/test_background_integration_corpus.py::test_integrated_parallel_corpus_preserves_each_transition_and_order[seed-123]",
+        "tests/recovery/test_background_integration_corpus.py::test_integrated_parallel_corpus_preserves_each_transition_and_order[seed-124]",
+        "tests/recovery/test_background_integration_corpus.py::test_integrated_parallel_corpus_preserves_each_transition_and_order[seed-125]",
+        "tests/recovery/test_background_integration_corpus.py::test_integrated_parallel_corpus_preserves_each_transition_and_order[seed-126]",
+        "tests/recovery/test_background_integration_corpus.py::test_integrated_parallel_corpus_preserves_each_transition_and_order[seed-127]"
       ]
     },
     "checks": {
@@ -6594,6 +6879,33 @@
         "tests/recovery/test_background_process_ownership.py::test_unverified_startup_never_falls_back_to_legacy_signals_or_directory_removal[inspector-error]",
         "tests/recovery/test_background_process_ownership.py::test_unverified_startup_never_falls_back_to_legacy_signals_or_directory_removal[missing-identity]",
         "tests/recovery/test_background_process_ownership.py::test_unverified_startup_never_falls_back_to_legacy_signals_or_directory_removal[spawn-marker-failure]"
+      ],
+      "NB07b:final-regressions": [
+        "tests/recovery/test_background_final_parallel.py::test_final_native_proof_rejects_incomplete_current_fast_before_profile_access[failed-gate]",
+        "tests/recovery/test_background_final_parallel.py::test_final_native_proof_rejects_incomplete_current_fast_before_profile_access[wrong-run]",
+        "tests/recovery/test_background_final_parallel.py::test_final_native_proof_rejects_incomplete_current_fast_before_profile_access[changed-report]",
+        "tests/recovery/test_background_final_parallel.py::test_final_native_proof_rejects_incomplete_current_fast_before_profile_access[stale-sources]",
+        "tests/recovery/test_background_final_parallel.py::test_exact_final_document_accepts_equal_text_fragments_and_rejects_other_changes[equal-fragments]",
+        "tests/recovery/test_background_final_parallel.py::test_exact_final_document_accepts_equal_text_fragments_and_rejects_other_changes[outside-text]",
+        "tests/recovery/test_background_final_parallel.py::test_exact_final_document_accepts_equal_text_fragments_and_rejects_other_changes[style]",
+        "tests/recovery/test_background_final_parallel.py::test_exact_final_document_accepts_equal_text_fragments_and_rejects_other_changes[other-block]",
+        "tests/recovery/test_background_final_parallel.py::test_exact_final_document_accepts_equal_text_fragments_and_rejects_other_changes[fact]",
+        "tests/recovery/test_background_final_parallel.py::test_final_conflict_measurement_keeps_narrow_independence_and_actual_rejection_reasons[first-second-narrow-independent]",
+        "tests/recovery/test_background_final_parallel.py::test_final_conflict_measurement_keeps_narrow_independence_and_actual_rejection_reasons[first-second-broad-read]",
+        "tests/recovery/test_background_final_parallel.py::test_final_conflict_measurement_keeps_narrow_independence_and_actual_rejection_reasons[first-second-same-write-scope]",
+        "tests/recovery/test_background_final_parallel.py::test_final_conflict_measurement_keeps_narrow_independence_and_actual_rejection_reasons[second-first-narrow-independent]",
+        "tests/recovery/test_background_final_parallel.py::test_final_conflict_measurement_keeps_narrow_independence_and_actual_rejection_reasons[second-first-broad-read]",
+        "tests/recovery/test_background_final_parallel.py::test_final_conflict_measurement_keeps_narrow_independence_and_actual_rejection_reasons[second-first-same-write-scope]",
+        "tests/recovery/test_background_final_parallel.py::test_integrated_native_harness_closes_resources_and_keeps_real_counters_unchanged[both-triples]",
+        "tests/recovery/test_background_final_parallel.py::test_integrated_native_harness_closes_resources_and_keeps_real_counters_unchanged[invalid-structured-result]",
+        "tests/recovery/test_background_final_parallel.py::test_final_publication_alias_requires_the_same_actual_deferred_turn[none]",
+        "tests/recovery/test_background_final_parallel.py::test_final_publication_alias_requires_the_same_actual_deferred_turn[different-parent-turn]",
+        "tests/recovery/test_background_final_parallel.py::test_final_publication_alias_requires_the_same_actual_deferred_turn[unvalidated-parent]",
+        "tests/recovery/test_background_final_parallel.py::test_final_publication_alias_requires_the_same_actual_deferred_turn[multiple-prepare]",
+        "tests/recovery/test_background_final_parallel.py::test_final_publication_alias_requires_the_same_actual_deferred_turn[not-durable]",
+        "tests/recovery/test_background_final_parallel.py::test_final_publication_alias_requires_the_same_actual_deferred_turn[new-turn]",
+        "tests/recovery/test_background_final_parallel.py::test_final_publication_alias_requires_the_same_actual_deferred_turn[early-save]",
+        "tests/recovery/test_background_final_parallel.py::test_final_publication_alias_requires_the_same_actual_deferred_turn[canonical-changed]"
       ]
     },
     "sources": [
@@ -6840,9 +7152,12 @@
       "docs/gui/handoffs/BACKGROUND-WORK/nb00b-transport-limits.json",
       "docs/gui/handoffs/BACKGROUND-WORK/nb02a-contract.md",
       "docs/gui/handoffs/BACKGROUND-WORK/nb02b-contract.md",
+      "docs/gui/handoffs/BACKGROUND-WORK/nb04-acceptance.json",
       "docs/gui/handoffs/BACKGROUND-WORK/nb04-contract.md",
+      "docs/gui/handoffs/BACKGROUND-WORK/nb04-source-manifest.json",
       "docs/gui/handoffs/BACKGROUND-WORK/nb06-ime-amendment.json",
       "docs/gui/handoffs/BACKGROUND-WORK/nb06-t3.json",
+      "docs/gui/handoffs/BACKGROUND-WORK/nb07b-contract.md",
       "docs/gui/handoffs/BACKGROUND-WORK/test-matrix.json",
       "docs/gui/handoffs/UX-POLISH/acceptance.json",
       "docs/gui/handoffs/UX-POLISH/source-manifest.json",
@@ -7041,9 +7356,11 @@
       "spikes/background/fixtures.py",
       "spikes/background/harness.py",
       "spikes/background/integration.py",
+      "spikes/background/native_integrated.py",
       "spikes/background/native_parallel.py",
       "spikes/background/native_serial.py",
       "spikes/background/native_turn_budget.py",
+      "spikes/background/parallel_metrics.py",
       "spikes/background/protocol.py",
       "spikes/background/serve.py",
       "spikes/background/writer_bridge.py",
@@ -7065,6 +7382,7 @@
       "tests/recovery/test_background_events.py",
       "tests/recovery/test_background_exports.py",
       "tests/recovery/test_background_feasibility.py",
+      "tests/recovery/test_background_final_parallel.py",
       "tests/recovery/test_background_fixed_jobs.py",
       "tests/recovery/test_background_fixed_storage.py",
       "tests/recovery/test_background_guard_sensitivity.py",
@@ -8373,6 +8691,902 @@
         "capacity": 3,
         "transitions": 200,
         "scope": "production_integration"
+      },
+      "NB07b:production:3:0": {
+        "nodeId": "tests/recovery/test_background_integration_corpus.py::test_integrated_parallel_corpus_preserves_each_transition_and_order[seed-000]",
+        "seed": 0,
+        "capacity": 3,
+        "transitions": 300,
+        "scope": "production_integration"
+      },
+      "NB07b:production:3:1": {
+        "nodeId": "tests/recovery/test_background_integration_corpus.py::test_integrated_parallel_corpus_preserves_each_transition_and_order[seed-001]",
+        "seed": 1,
+        "capacity": 3,
+        "transitions": 300,
+        "scope": "production_integration"
+      },
+      "NB07b:production:3:2": {
+        "nodeId": "tests/recovery/test_background_integration_corpus.py::test_integrated_parallel_corpus_preserves_each_transition_and_order[seed-002]",
+        "seed": 2,
+        "capacity": 3,
+        "transitions": 300,
+        "scope": "production_integration"
+      },
+      "NB07b:production:3:3": {
+        "nodeId": "tests/recovery/test_background_integration_corpus.py::test_integrated_parallel_corpus_preserves_each_transition_and_order[seed-003]",
+        "seed": 3,
+        "capacity": 3,
+        "transitions": 300,
+        "scope": "production_integration"
+      },
+      "NB07b:production:3:4": {
+        "nodeId": "tests/recovery/test_background_integration_corpus.py::test_integrated_parallel_corpus_preserves_each_transition_and_order[seed-004]",
+        "seed": 4,
+        "capacity": 3,
+        "transitions": 300,
+        "scope": "production_integration"
+      },
+      "NB07b:production:3:5": {
+        "nodeId": "tests/recovery/test_background_integration_corpus.py::test_integrated_parallel_corpus_preserves_each_transition_and_order[seed-005]",
+        "seed": 5,
+        "capacity": 3,
+        "transitions": 300,
+        "scope": "production_integration"
+      },
+      "NB07b:production:3:6": {
+        "nodeId": "tests/recovery/test_background_integration_corpus.py::test_integrated_parallel_corpus_preserves_each_transition_and_order[seed-006]",
+        "seed": 6,
+        "capacity": 3,
+        "transitions": 300,
+        "scope": "production_integration"
+      },
+      "NB07b:production:3:7": {
+        "nodeId": "tests/recovery/test_background_integration_corpus.py::test_integrated_parallel_corpus_preserves_each_transition_and_order[seed-007]",
+        "seed": 7,
+        "capacity": 3,
+        "transitions": 300,
+        "scope": "production_integration"
+      },
+      "NB07b:production:3:8": {
+        "nodeId": "tests/recovery/test_background_integration_corpus.py::test_integrated_parallel_corpus_preserves_each_transition_and_order[seed-008]",
+        "seed": 8,
+        "capacity": 3,
+        "transitions": 300,
+        "scope": "production_integration"
+      },
+      "NB07b:production:3:9": {
+        "nodeId": "tests/recovery/test_background_integration_corpus.py::test_integrated_parallel_corpus_preserves_each_transition_and_order[seed-009]",
+        "seed": 9,
+        "capacity": 3,
+        "transitions": 300,
+        "scope": "production_integration"
+      },
+      "NB07b:production:3:10": {
+        "nodeId": "tests/recovery/test_background_integration_corpus.py::test_integrated_parallel_corpus_preserves_each_transition_and_order[seed-010]",
+        "seed": 10,
+        "capacity": 3,
+        "transitions": 300,
+        "scope": "production_integration"
+      },
+      "NB07b:production:3:11": {
+        "nodeId": "tests/recovery/test_background_integration_corpus.py::test_integrated_parallel_corpus_preserves_each_transition_and_order[seed-011]",
+        "seed": 11,
+        "capacity": 3,
+        "transitions": 300,
+        "scope": "production_integration"
+      },
+      "NB07b:production:3:12": {
+        "nodeId": "tests/recovery/test_background_integration_corpus.py::test_integrated_parallel_corpus_preserves_each_transition_and_order[seed-012]",
+        "seed": 12,
+        "capacity": 3,
+        "transitions": 300,
+        "scope": "production_integration"
+      },
+      "NB07b:production:3:13": {
+        "nodeId": "tests/recovery/test_background_integration_corpus.py::test_integrated_parallel_corpus_preserves_each_transition_and_order[seed-013]",
+        "seed": 13,
+        "capacity": 3,
+        "transitions": 300,
+        "scope": "production_integration"
+      },
+      "NB07b:production:3:14": {
+        "nodeId": "tests/recovery/test_background_integration_corpus.py::test_integrated_parallel_corpus_preserves_each_transition_and_order[seed-014]",
+        "seed": 14,
+        "capacity": 3,
+        "transitions": 300,
+        "scope": "production_integration"
+      },
+      "NB07b:production:3:15": {
+        "nodeId": "tests/recovery/test_background_integration_corpus.py::test_integrated_parallel_corpus_preserves_each_transition_and_order[seed-015]",
+        "seed": 15,
+        "capacity": 3,
+        "transitions": 300,
+        "scope": "production_integration"
+      },
+      "NB07b:production:3:16": {
+        "nodeId": "tests/recovery/test_background_integration_corpus.py::test_integrated_parallel_corpus_preserves_each_transition_and_order[seed-016]",
+        "seed": 16,
+        "capacity": 3,
+        "transitions": 300,
+        "scope": "production_integration"
+      },
+      "NB07b:production:3:17": {
+        "nodeId": "tests/recovery/test_background_integration_corpus.py::test_integrated_parallel_corpus_preserves_each_transition_and_order[seed-017]",
+        "seed": 17,
+        "capacity": 3,
+        "transitions": 300,
+        "scope": "production_integration"
+      },
+      "NB07b:production:3:18": {
+        "nodeId": "tests/recovery/test_background_integration_corpus.py::test_integrated_parallel_corpus_preserves_each_transition_and_order[seed-018]",
+        "seed": 18,
+        "capacity": 3,
+        "transitions": 300,
+        "scope": "production_integration"
+      },
+      "NB07b:production:3:19": {
+        "nodeId": "tests/recovery/test_background_integration_corpus.py::test_integrated_parallel_corpus_preserves_each_transition_and_order[seed-019]",
+        "seed": 19,
+        "capacity": 3,
+        "transitions": 300,
+        "scope": "production_integration"
+      },
+      "NB07b:production:3:20": {
+        "nodeId": "tests/recovery/test_background_integration_corpus.py::test_integrated_parallel_corpus_preserves_each_transition_and_order[seed-020]",
+        "seed": 20,
+        "capacity": 3,
+        "transitions": 300,
+        "scope": "production_integration"
+      },
+      "NB07b:production:3:21": {
+        "nodeId": "tests/recovery/test_background_integration_corpus.py::test_integrated_parallel_corpus_preserves_each_transition_and_order[seed-021]",
+        "seed": 21,
+        "capacity": 3,
+        "transitions": 300,
+        "scope": "production_integration"
+      },
+      "NB07b:production:3:22": {
+        "nodeId": "tests/recovery/test_background_integration_corpus.py::test_integrated_parallel_corpus_preserves_each_transition_and_order[seed-022]",
+        "seed": 22,
+        "capacity": 3,
+        "transitions": 300,
+        "scope": "production_integration"
+      },
+      "NB07b:production:3:23": {
+        "nodeId": "tests/recovery/test_background_integration_corpus.py::test_integrated_parallel_corpus_preserves_each_transition_and_order[seed-023]",
+        "seed": 23,
+        "capacity": 3,
+        "transitions": 300,
+        "scope": "production_integration"
+      },
+      "NB07b:production:3:24": {
+        "nodeId": "tests/recovery/test_background_integration_corpus.py::test_integrated_parallel_corpus_preserves_each_transition_and_order[seed-024]",
+        "seed": 24,
+        "capacity": 3,
+        "transitions": 300,
+        "scope": "production_integration"
+      },
+      "NB07b:production:3:25": {
+        "nodeId": "tests/recovery/test_background_integration_corpus.py::test_integrated_parallel_corpus_preserves_each_transition_and_order[seed-025]",
+        "seed": 25,
+        "capacity": 3,
+        "transitions": 300,
+        "scope": "production_integration"
+      },
+      "NB07b:production:3:26": {
+        "nodeId": "tests/recovery/test_background_integration_corpus.py::test_integrated_parallel_corpus_preserves_each_transition_and_order[seed-026]",
+        "seed": 26,
+        "capacity": 3,
+        "transitions": 300,
+        "scope": "production_integration"
+      },
+      "NB07b:production:3:27": {
+        "nodeId": "tests/recovery/test_background_integration_corpus.py::test_integrated_parallel_corpus_preserves_each_transition_and_order[seed-027]",
+        "seed": 27,
+        "capacity": 3,
+        "transitions": 300,
+        "scope": "production_integration"
+      },
+      "NB07b:production:3:28": {
+        "nodeId": "tests/recovery/test_background_integration_corpus.py::test_integrated_parallel_corpus_preserves_each_transition_and_order[seed-028]",
+        "seed": 28,
+        "capacity": 3,
+        "transitions": 300,
+        "scope": "production_integration"
+      },
+      "NB07b:production:3:29": {
+        "nodeId": "tests/recovery/test_background_integration_corpus.py::test_integrated_parallel_corpus_preserves_each_transition_and_order[seed-029]",
+        "seed": 29,
+        "capacity": 3,
+        "transitions": 300,
+        "scope": "production_integration"
+      },
+      "NB07b:production:3:30": {
+        "nodeId": "tests/recovery/test_background_integration_corpus.py::test_integrated_parallel_corpus_preserves_each_transition_and_order[seed-030]",
+        "seed": 30,
+        "capacity": 3,
+        "transitions": 300,
+        "scope": "production_integration"
+      },
+      "NB07b:production:3:31": {
+        "nodeId": "tests/recovery/test_background_integration_corpus.py::test_integrated_parallel_corpus_preserves_each_transition_and_order[seed-031]",
+        "seed": 31,
+        "capacity": 3,
+        "transitions": 300,
+        "scope": "production_integration"
+      },
+      "NB07b:production:3:32": {
+        "nodeId": "tests/recovery/test_background_integration_corpus.py::test_integrated_parallel_corpus_preserves_each_transition_and_order[seed-032]",
+        "seed": 32,
+        "capacity": 3,
+        "transitions": 300,
+        "scope": "production_integration"
+      },
+      "NB07b:production:3:33": {
+        "nodeId": "tests/recovery/test_background_integration_corpus.py::test_integrated_parallel_corpus_preserves_each_transition_and_order[seed-033]",
+        "seed": 33,
+        "capacity": 3,
+        "transitions": 300,
+        "scope": "production_integration"
+      },
+      "NB07b:production:3:34": {
+        "nodeId": "tests/recovery/test_background_integration_corpus.py::test_integrated_parallel_corpus_preserves_each_transition_and_order[seed-034]",
+        "seed": 34,
+        "capacity": 3,
+        "transitions": 300,
+        "scope": "production_integration"
+      },
+      "NB07b:production:3:35": {
+        "nodeId": "tests/recovery/test_background_integration_corpus.py::test_integrated_parallel_corpus_preserves_each_transition_and_order[seed-035]",
+        "seed": 35,
+        "capacity": 3,
+        "transitions": 300,
+        "scope": "production_integration"
+      },
+      "NB07b:production:3:36": {
+        "nodeId": "tests/recovery/test_background_integration_corpus.py::test_integrated_parallel_corpus_preserves_each_transition_and_order[seed-036]",
+        "seed": 36,
+        "capacity": 3,
+        "transitions": 300,
+        "scope": "production_integration"
+      },
+      "NB07b:production:3:37": {
+        "nodeId": "tests/recovery/test_background_integration_corpus.py::test_integrated_parallel_corpus_preserves_each_transition_and_order[seed-037]",
+        "seed": 37,
+        "capacity": 3,
+        "transitions": 300,
+        "scope": "production_integration"
+      },
+      "NB07b:production:3:38": {
+        "nodeId": "tests/recovery/test_background_integration_corpus.py::test_integrated_parallel_corpus_preserves_each_transition_and_order[seed-038]",
+        "seed": 38,
+        "capacity": 3,
+        "transitions": 300,
+        "scope": "production_integration"
+      },
+      "NB07b:production:3:39": {
+        "nodeId": "tests/recovery/test_background_integration_corpus.py::test_integrated_parallel_corpus_preserves_each_transition_and_order[seed-039]",
+        "seed": 39,
+        "capacity": 3,
+        "transitions": 300,
+        "scope": "production_integration"
+      },
+      "NB07b:production:3:40": {
+        "nodeId": "tests/recovery/test_background_integration_corpus.py::test_integrated_parallel_corpus_preserves_each_transition_and_order[seed-040]",
+        "seed": 40,
+        "capacity": 3,
+        "transitions": 300,
+        "scope": "production_integration"
+      },
+      "NB07b:production:3:41": {
+        "nodeId": "tests/recovery/test_background_integration_corpus.py::test_integrated_parallel_corpus_preserves_each_transition_and_order[seed-041]",
+        "seed": 41,
+        "capacity": 3,
+        "transitions": 300,
+        "scope": "production_integration"
+      },
+      "NB07b:production:3:42": {
+        "nodeId": "tests/recovery/test_background_integration_corpus.py::test_integrated_parallel_corpus_preserves_each_transition_and_order[seed-042]",
+        "seed": 42,
+        "capacity": 3,
+        "transitions": 300,
+        "scope": "production_integration"
+      },
+      "NB07b:production:3:43": {
+        "nodeId": "tests/recovery/test_background_integration_corpus.py::test_integrated_parallel_corpus_preserves_each_transition_and_order[seed-043]",
+        "seed": 43,
+        "capacity": 3,
+        "transitions": 300,
+        "scope": "production_integration"
+      },
+      "NB07b:production:3:44": {
+        "nodeId": "tests/recovery/test_background_integration_corpus.py::test_integrated_parallel_corpus_preserves_each_transition_and_order[seed-044]",
+        "seed": 44,
+        "capacity": 3,
+        "transitions": 300,
+        "scope": "production_integration"
+      },
+      "NB07b:production:3:45": {
+        "nodeId": "tests/recovery/test_background_integration_corpus.py::test_integrated_parallel_corpus_preserves_each_transition_and_order[seed-045]",
+        "seed": 45,
+        "capacity": 3,
+        "transitions": 300,
+        "scope": "production_integration"
+      },
+      "NB07b:production:3:46": {
+        "nodeId": "tests/recovery/test_background_integration_corpus.py::test_integrated_parallel_corpus_preserves_each_transition_and_order[seed-046]",
+        "seed": 46,
+        "capacity": 3,
+        "transitions": 300,
+        "scope": "production_integration"
+      },
+      "NB07b:production:3:47": {
+        "nodeId": "tests/recovery/test_background_integration_corpus.py::test_integrated_parallel_corpus_preserves_each_transition_and_order[seed-047]",
+        "seed": 47,
+        "capacity": 3,
+        "transitions": 300,
+        "scope": "production_integration"
+      },
+      "NB07b:production:3:48": {
+        "nodeId": "tests/recovery/test_background_integration_corpus.py::test_integrated_parallel_corpus_preserves_each_transition_and_order[seed-048]",
+        "seed": 48,
+        "capacity": 3,
+        "transitions": 300,
+        "scope": "production_integration"
+      },
+      "NB07b:production:3:49": {
+        "nodeId": "tests/recovery/test_background_integration_corpus.py::test_integrated_parallel_corpus_preserves_each_transition_and_order[seed-049]",
+        "seed": 49,
+        "capacity": 3,
+        "transitions": 300,
+        "scope": "production_integration"
+      },
+      "NB07b:production:3:50": {
+        "nodeId": "tests/recovery/test_background_integration_corpus.py::test_integrated_parallel_corpus_preserves_each_transition_and_order[seed-050]",
+        "seed": 50,
+        "capacity": 3,
+        "transitions": 300,
+        "scope": "production_integration"
+      },
+      "NB07b:production:3:51": {
+        "nodeId": "tests/recovery/test_background_integration_corpus.py::test_integrated_parallel_corpus_preserves_each_transition_and_order[seed-051]",
+        "seed": 51,
+        "capacity": 3,
+        "transitions": 300,
+        "scope": "production_integration"
+      },
+      "NB07b:production:3:52": {
+        "nodeId": "tests/recovery/test_background_integration_corpus.py::test_integrated_parallel_corpus_preserves_each_transition_and_order[seed-052]",
+        "seed": 52,
+        "capacity": 3,
+        "transitions": 300,
+        "scope": "production_integration"
+      },
+      "NB07b:production:3:53": {
+        "nodeId": "tests/recovery/test_background_integration_corpus.py::test_integrated_parallel_corpus_preserves_each_transition_and_order[seed-053]",
+        "seed": 53,
+        "capacity": 3,
+        "transitions": 300,
+        "scope": "production_integration"
+      },
+      "NB07b:production:3:54": {
+        "nodeId": "tests/recovery/test_background_integration_corpus.py::test_integrated_parallel_corpus_preserves_each_transition_and_order[seed-054]",
+        "seed": 54,
+        "capacity": 3,
+        "transitions": 300,
+        "scope": "production_integration"
+      },
+      "NB07b:production:3:55": {
+        "nodeId": "tests/recovery/test_background_integration_corpus.py::test_integrated_parallel_corpus_preserves_each_transition_and_order[seed-055]",
+        "seed": 55,
+        "capacity": 3,
+        "transitions": 300,
+        "scope": "production_integration"
+      },
+      "NB07b:production:3:56": {
+        "nodeId": "tests/recovery/test_background_integration_corpus.py::test_integrated_parallel_corpus_preserves_each_transition_and_order[seed-056]",
+        "seed": 56,
+        "capacity": 3,
+        "transitions": 300,
+        "scope": "production_integration"
+      },
+      "NB07b:production:3:57": {
+        "nodeId": "tests/recovery/test_background_integration_corpus.py::test_integrated_parallel_corpus_preserves_each_transition_and_order[seed-057]",
+        "seed": 57,
+        "capacity": 3,
+        "transitions": 300,
+        "scope": "production_integration"
+      },
+      "NB07b:production:3:58": {
+        "nodeId": "tests/recovery/test_background_integration_corpus.py::test_integrated_parallel_corpus_preserves_each_transition_and_order[seed-058]",
+        "seed": 58,
+        "capacity": 3,
+        "transitions": 300,
+        "scope": "production_integration"
+      },
+      "NB07b:production:3:59": {
+        "nodeId": "tests/recovery/test_background_integration_corpus.py::test_integrated_parallel_corpus_preserves_each_transition_and_order[seed-059]",
+        "seed": 59,
+        "capacity": 3,
+        "transitions": 300,
+        "scope": "production_integration"
+      },
+      "NB07b:production:3:60": {
+        "nodeId": "tests/recovery/test_background_integration_corpus.py::test_integrated_parallel_corpus_preserves_each_transition_and_order[seed-060]",
+        "seed": 60,
+        "capacity": 3,
+        "transitions": 300,
+        "scope": "production_integration"
+      },
+      "NB07b:production:3:61": {
+        "nodeId": "tests/recovery/test_background_integration_corpus.py::test_integrated_parallel_corpus_preserves_each_transition_and_order[seed-061]",
+        "seed": 61,
+        "capacity": 3,
+        "transitions": 300,
+        "scope": "production_integration"
+      },
+      "NB07b:production:3:62": {
+        "nodeId": "tests/recovery/test_background_integration_corpus.py::test_integrated_parallel_corpus_preserves_each_transition_and_order[seed-062]",
+        "seed": 62,
+        "capacity": 3,
+        "transitions": 300,
+        "scope": "production_integration"
+      },
+      "NB07b:production:3:63": {
+        "nodeId": "tests/recovery/test_background_integration_corpus.py::test_integrated_parallel_corpus_preserves_each_transition_and_order[seed-063]",
+        "seed": 63,
+        "capacity": 3,
+        "transitions": 300,
+        "scope": "production_integration"
+      },
+      "NB07b:production:3:64": {
+        "nodeId": "tests/recovery/test_background_integration_corpus.py::test_integrated_parallel_corpus_preserves_each_transition_and_order[seed-064]",
+        "seed": 64,
+        "capacity": 3,
+        "transitions": 300,
+        "scope": "production_integration"
+      },
+      "NB07b:production:3:65": {
+        "nodeId": "tests/recovery/test_background_integration_corpus.py::test_integrated_parallel_corpus_preserves_each_transition_and_order[seed-065]",
+        "seed": 65,
+        "capacity": 3,
+        "transitions": 300,
+        "scope": "production_integration"
+      },
+      "NB07b:production:3:66": {
+        "nodeId": "tests/recovery/test_background_integration_corpus.py::test_integrated_parallel_corpus_preserves_each_transition_and_order[seed-066]",
+        "seed": 66,
+        "capacity": 3,
+        "transitions": 300,
+        "scope": "production_integration"
+      },
+      "NB07b:production:3:67": {
+        "nodeId": "tests/recovery/test_background_integration_corpus.py::test_integrated_parallel_corpus_preserves_each_transition_and_order[seed-067]",
+        "seed": 67,
+        "capacity": 3,
+        "transitions": 300,
+        "scope": "production_integration"
+      },
+      "NB07b:production:3:68": {
+        "nodeId": "tests/recovery/test_background_integration_corpus.py::test_integrated_parallel_corpus_preserves_each_transition_and_order[seed-068]",
+        "seed": 68,
+        "capacity": 3,
+        "transitions": 300,
+        "scope": "production_integration"
+      },
+      "NB07b:production:3:69": {
+        "nodeId": "tests/recovery/test_background_integration_corpus.py::test_integrated_parallel_corpus_preserves_each_transition_and_order[seed-069]",
+        "seed": 69,
+        "capacity": 3,
+        "transitions": 300,
+        "scope": "production_integration"
+      },
+      "NB07b:production:3:70": {
+        "nodeId": "tests/recovery/test_background_integration_corpus.py::test_integrated_parallel_corpus_preserves_each_transition_and_order[seed-070]",
+        "seed": 70,
+        "capacity": 3,
+        "transitions": 300,
+        "scope": "production_integration"
+      },
+      "NB07b:production:3:71": {
+        "nodeId": "tests/recovery/test_background_integration_corpus.py::test_integrated_parallel_corpus_preserves_each_transition_and_order[seed-071]",
+        "seed": 71,
+        "capacity": 3,
+        "transitions": 300,
+        "scope": "production_integration"
+      },
+      "NB07b:production:3:72": {
+        "nodeId": "tests/recovery/test_background_integration_corpus.py::test_integrated_parallel_corpus_preserves_each_transition_and_order[seed-072]",
+        "seed": 72,
+        "capacity": 3,
+        "transitions": 300,
+        "scope": "production_integration"
+      },
+      "NB07b:production:3:73": {
+        "nodeId": "tests/recovery/test_background_integration_corpus.py::test_integrated_parallel_corpus_preserves_each_transition_and_order[seed-073]",
+        "seed": 73,
+        "capacity": 3,
+        "transitions": 300,
+        "scope": "production_integration"
+      },
+      "NB07b:production:3:74": {
+        "nodeId": "tests/recovery/test_background_integration_corpus.py::test_integrated_parallel_corpus_preserves_each_transition_and_order[seed-074]",
+        "seed": 74,
+        "capacity": 3,
+        "transitions": 300,
+        "scope": "production_integration"
+      },
+      "NB07b:production:3:75": {
+        "nodeId": "tests/recovery/test_background_integration_corpus.py::test_integrated_parallel_corpus_preserves_each_transition_and_order[seed-075]",
+        "seed": 75,
+        "capacity": 3,
+        "transitions": 300,
+        "scope": "production_integration"
+      },
+      "NB07b:production:3:76": {
+        "nodeId": "tests/recovery/test_background_integration_corpus.py::test_integrated_parallel_corpus_preserves_each_transition_and_order[seed-076]",
+        "seed": 76,
+        "capacity": 3,
+        "transitions": 300,
+        "scope": "production_integration"
+      },
+      "NB07b:production:3:77": {
+        "nodeId": "tests/recovery/test_background_integration_corpus.py::test_integrated_parallel_corpus_preserves_each_transition_and_order[seed-077]",
+        "seed": 77,
+        "capacity": 3,
+        "transitions": 300,
+        "scope": "production_integration"
+      },
+      "NB07b:production:3:78": {
+        "nodeId": "tests/recovery/test_background_integration_corpus.py::test_integrated_parallel_corpus_preserves_each_transition_and_order[seed-078]",
+        "seed": 78,
+        "capacity": 3,
+        "transitions": 300,
+        "scope": "production_integration"
+      },
+      "NB07b:production:3:79": {
+        "nodeId": "tests/recovery/test_background_integration_corpus.py::test_integrated_parallel_corpus_preserves_each_transition_and_order[seed-079]",
+        "seed": 79,
+        "capacity": 3,
+        "transitions": 300,
+        "scope": "production_integration"
+      },
+      "NB07b:production:3:80": {
+        "nodeId": "tests/recovery/test_background_integration_corpus.py::test_integrated_parallel_corpus_preserves_each_transition_and_order[seed-080]",
+        "seed": 80,
+        "capacity": 3,
+        "transitions": 300,
+        "scope": "production_integration"
+      },
+      "NB07b:production:3:81": {
+        "nodeId": "tests/recovery/test_background_integration_corpus.py::test_integrated_parallel_corpus_preserves_each_transition_and_order[seed-081]",
+        "seed": 81,
+        "capacity": 3,
+        "transitions": 300,
+        "scope": "production_integration"
+      },
+      "NB07b:production:3:82": {
+        "nodeId": "tests/recovery/test_background_integration_corpus.py::test_integrated_parallel_corpus_preserves_each_transition_and_order[seed-082]",
+        "seed": 82,
+        "capacity": 3,
+        "transitions": 300,
+        "scope": "production_integration"
+      },
+      "NB07b:production:3:83": {
+        "nodeId": "tests/recovery/test_background_integration_corpus.py::test_integrated_parallel_corpus_preserves_each_transition_and_order[seed-083]",
+        "seed": 83,
+        "capacity": 3,
+        "transitions": 300,
+        "scope": "production_integration"
+      },
+      "NB07b:production:3:84": {
+        "nodeId": "tests/recovery/test_background_integration_corpus.py::test_integrated_parallel_corpus_preserves_each_transition_and_order[seed-084]",
+        "seed": 84,
+        "capacity": 3,
+        "transitions": 300,
+        "scope": "production_integration"
+      },
+      "NB07b:production:3:85": {
+        "nodeId": "tests/recovery/test_background_integration_corpus.py::test_integrated_parallel_corpus_preserves_each_transition_and_order[seed-085]",
+        "seed": 85,
+        "capacity": 3,
+        "transitions": 300,
+        "scope": "production_integration"
+      },
+      "NB07b:production:3:86": {
+        "nodeId": "tests/recovery/test_background_integration_corpus.py::test_integrated_parallel_corpus_preserves_each_transition_and_order[seed-086]",
+        "seed": 86,
+        "capacity": 3,
+        "transitions": 300,
+        "scope": "production_integration"
+      },
+      "NB07b:production:3:87": {
+        "nodeId": "tests/recovery/test_background_integration_corpus.py::test_integrated_parallel_corpus_preserves_each_transition_and_order[seed-087]",
+        "seed": 87,
+        "capacity": 3,
+        "transitions": 300,
+        "scope": "production_integration"
+      },
+      "NB07b:production:3:88": {
+        "nodeId": "tests/recovery/test_background_integration_corpus.py::test_integrated_parallel_corpus_preserves_each_transition_and_order[seed-088]",
+        "seed": 88,
+        "capacity": 3,
+        "transitions": 300,
+        "scope": "production_integration"
+      },
+      "NB07b:production:3:89": {
+        "nodeId": "tests/recovery/test_background_integration_corpus.py::test_integrated_parallel_corpus_preserves_each_transition_and_order[seed-089]",
+        "seed": 89,
+        "capacity": 3,
+        "transitions": 300,
+        "scope": "production_integration"
+      },
+      "NB07b:production:3:90": {
+        "nodeId": "tests/recovery/test_background_integration_corpus.py::test_integrated_parallel_corpus_preserves_each_transition_and_order[seed-090]",
+        "seed": 90,
+        "capacity": 3,
+        "transitions": 300,
+        "scope": "production_integration"
+      },
+      "NB07b:production:3:91": {
+        "nodeId": "tests/recovery/test_background_integration_corpus.py::test_integrated_parallel_corpus_preserves_each_transition_and_order[seed-091]",
+        "seed": 91,
+        "capacity": 3,
+        "transitions": 300,
+        "scope": "production_integration"
+      },
+      "NB07b:production:3:92": {
+        "nodeId": "tests/recovery/test_background_integration_corpus.py::test_integrated_parallel_corpus_preserves_each_transition_and_order[seed-092]",
+        "seed": 92,
+        "capacity": 3,
+        "transitions": 300,
+        "scope": "production_integration"
+      },
+      "NB07b:production:3:93": {
+        "nodeId": "tests/recovery/test_background_integration_corpus.py::test_integrated_parallel_corpus_preserves_each_transition_and_order[seed-093]",
+        "seed": 93,
+        "capacity": 3,
+        "transitions": 300,
+        "scope": "production_integration"
+      },
+      "NB07b:production:3:94": {
+        "nodeId": "tests/recovery/test_background_integration_corpus.py::test_integrated_parallel_corpus_preserves_each_transition_and_order[seed-094]",
+        "seed": 94,
+        "capacity": 3,
+        "transitions": 300,
+        "scope": "production_integration"
+      },
+      "NB07b:production:3:95": {
+        "nodeId": "tests/recovery/test_background_integration_corpus.py::test_integrated_parallel_corpus_preserves_each_transition_and_order[seed-095]",
+        "seed": 95,
+        "capacity": 3,
+        "transitions": 300,
+        "scope": "production_integration"
+      },
+      "NB07b:production:3:96": {
+        "nodeId": "tests/recovery/test_background_integration_corpus.py::test_integrated_parallel_corpus_preserves_each_transition_and_order[seed-096]",
+        "seed": 96,
+        "capacity": 3,
+        "transitions": 300,
+        "scope": "production_integration"
+      },
+      "NB07b:production:3:97": {
+        "nodeId": "tests/recovery/test_background_integration_corpus.py::test_integrated_parallel_corpus_preserves_each_transition_and_order[seed-097]",
+        "seed": 97,
+        "capacity": 3,
+        "transitions": 300,
+        "scope": "production_integration"
+      },
+      "NB07b:production:3:98": {
+        "nodeId": "tests/recovery/test_background_integration_corpus.py::test_integrated_parallel_corpus_preserves_each_transition_and_order[seed-098]",
+        "seed": 98,
+        "capacity": 3,
+        "transitions": 300,
+        "scope": "production_integration"
+      },
+      "NB07b:production:3:99": {
+        "nodeId": "tests/recovery/test_background_integration_corpus.py::test_integrated_parallel_corpus_preserves_each_transition_and_order[seed-099]",
+        "seed": 99,
+        "capacity": 3,
+        "transitions": 300,
+        "scope": "production_integration"
+      },
+      "NB07b:production:3:100": {
+        "nodeId": "tests/recovery/test_background_integration_corpus.py::test_integrated_parallel_corpus_preserves_each_transition_and_order[seed-100]",
+        "seed": 100,
+        "capacity": 3,
+        "transitions": 300,
+        "scope": "production_integration"
+      },
+      "NB07b:production:3:101": {
+        "nodeId": "tests/recovery/test_background_integration_corpus.py::test_integrated_parallel_corpus_preserves_each_transition_and_order[seed-101]",
+        "seed": 101,
+        "capacity": 3,
+        "transitions": 300,
+        "scope": "production_integration"
+      },
+      "NB07b:production:3:102": {
+        "nodeId": "tests/recovery/test_background_integration_corpus.py::test_integrated_parallel_corpus_preserves_each_transition_and_order[seed-102]",
+        "seed": 102,
+        "capacity": 3,
+        "transitions": 300,
+        "scope": "production_integration"
+      },
+      "NB07b:production:3:103": {
+        "nodeId": "tests/recovery/test_background_integration_corpus.py::test_integrated_parallel_corpus_preserves_each_transition_and_order[seed-103]",
+        "seed": 103,
+        "capacity": 3,
+        "transitions": 300,
+        "scope": "production_integration"
+      },
+      "NB07b:production:3:104": {
+        "nodeId": "tests/recovery/test_background_integration_corpus.py::test_integrated_parallel_corpus_preserves_each_transition_and_order[seed-104]",
+        "seed": 104,
+        "capacity": 3,
+        "transitions": 300,
+        "scope": "production_integration"
+      },
+      "NB07b:production:3:105": {
+        "nodeId": "tests/recovery/test_background_integration_corpus.py::test_integrated_parallel_corpus_preserves_each_transition_and_order[seed-105]",
+        "seed": 105,
+        "capacity": 3,
+        "transitions": 300,
+        "scope": "production_integration"
+      },
+      "NB07b:production:3:106": {
+        "nodeId": "tests/recovery/test_background_integration_corpus.py::test_integrated_parallel_corpus_preserves_each_transition_and_order[seed-106]",
+        "seed": 106,
+        "capacity": 3,
+        "transitions": 300,
+        "scope": "production_integration"
+      },
+      "NB07b:production:3:107": {
+        "nodeId": "tests/recovery/test_background_integration_corpus.py::test_integrated_parallel_corpus_preserves_each_transition_and_order[seed-107]",
+        "seed": 107,
+        "capacity": 3,
+        "transitions": 300,
+        "scope": "production_integration"
+      },
+      "NB07b:production:3:108": {
+        "nodeId": "tests/recovery/test_background_integration_corpus.py::test_integrated_parallel_corpus_preserves_each_transition_and_order[seed-108]",
+        "seed": 108,
+        "capacity": 3,
+        "transitions": 300,
+        "scope": "production_integration"
+      },
+      "NB07b:production:3:109": {
+        "nodeId": "tests/recovery/test_background_integration_corpus.py::test_integrated_parallel_corpus_preserves_each_transition_and_order[seed-109]",
+        "seed": 109,
+        "capacity": 3,
+        "transitions": 300,
+        "scope": "production_integration"
+      },
+      "NB07b:production:3:110": {
+        "nodeId": "tests/recovery/test_background_integration_corpus.py::test_integrated_parallel_corpus_preserves_each_transition_and_order[seed-110]",
+        "seed": 110,
+        "capacity": 3,
+        "transitions": 300,
+        "scope": "production_integration"
+      },
+      "NB07b:production:3:111": {
+        "nodeId": "tests/recovery/test_background_integration_corpus.py::test_integrated_parallel_corpus_preserves_each_transition_and_order[seed-111]",
+        "seed": 111,
+        "capacity": 3,
+        "transitions": 300,
+        "scope": "production_integration"
+      },
+      "NB07b:production:3:112": {
+        "nodeId": "tests/recovery/test_background_integration_corpus.py::test_integrated_parallel_corpus_preserves_each_transition_and_order[seed-112]",
+        "seed": 112,
+        "capacity": 3,
+        "transitions": 300,
+        "scope": "production_integration"
+      },
+      "NB07b:production:3:113": {
+        "nodeId": "tests/recovery/test_background_integration_corpus.py::test_integrated_parallel_corpus_preserves_each_transition_and_order[seed-113]",
+        "seed": 113,
+        "capacity": 3,
+        "transitions": 300,
+        "scope": "production_integration"
+      },
+      "NB07b:production:3:114": {
+        "nodeId": "tests/recovery/test_background_integration_corpus.py::test_integrated_parallel_corpus_preserves_each_transition_and_order[seed-114]",
+        "seed": 114,
+        "capacity": 3,
+        "transitions": 300,
+        "scope": "production_integration"
+      },
+      "NB07b:production:3:115": {
+        "nodeId": "tests/recovery/test_background_integration_corpus.py::test_integrated_parallel_corpus_preserves_each_transition_and_order[seed-115]",
+        "seed": 115,
+        "capacity": 3,
+        "transitions": 300,
+        "scope": "production_integration"
+      },
+      "NB07b:production:3:116": {
+        "nodeId": "tests/recovery/test_background_integration_corpus.py::test_integrated_parallel_corpus_preserves_each_transition_and_order[seed-116]",
+        "seed": 116,
+        "capacity": 3,
+        "transitions": 300,
+        "scope": "production_integration"
+      },
+      "NB07b:production:3:117": {
+        "nodeId": "tests/recovery/test_background_integration_corpus.py::test_integrated_parallel_corpus_preserves_each_transition_and_order[seed-117]",
+        "seed": 117,
+        "capacity": 3,
+        "transitions": 300,
+        "scope": "production_integration"
+      },
+      "NB07b:production:3:118": {
+        "nodeId": "tests/recovery/test_background_integration_corpus.py::test_integrated_parallel_corpus_preserves_each_transition_and_order[seed-118]",
+        "seed": 118,
+        "capacity": 3,
+        "transitions": 300,
+        "scope": "production_integration"
+      },
+      "NB07b:production:3:119": {
+        "nodeId": "tests/recovery/test_background_integration_corpus.py::test_integrated_parallel_corpus_preserves_each_transition_and_order[seed-119]",
+        "seed": 119,
+        "capacity": 3,
+        "transitions": 300,
+        "scope": "production_integration"
+      },
+      "NB07b:production:3:120": {
+        "nodeId": "tests/recovery/test_background_integration_corpus.py::test_integrated_parallel_corpus_preserves_each_transition_and_order[seed-120]",
+        "seed": 120,
+        "capacity": 3,
+        "transitions": 300,
+        "scope": "production_integration"
+      },
+      "NB07b:production:3:121": {
+        "nodeId": "tests/recovery/test_background_integration_corpus.py::test_integrated_parallel_corpus_preserves_each_transition_and_order[seed-121]",
+        "seed": 121,
+        "capacity": 3,
+        "transitions": 300,
+        "scope": "production_integration"
+      },
+      "NB07b:production:3:122": {
+        "nodeId": "tests/recovery/test_background_integration_corpus.py::test_integrated_parallel_corpus_preserves_each_transition_and_order[seed-122]",
+        "seed": 122,
+        "capacity": 3,
+        "transitions": 300,
+        "scope": "production_integration"
+      },
+      "NB07b:production:3:123": {
+        "nodeId": "tests/recovery/test_background_integration_corpus.py::test_integrated_parallel_corpus_preserves_each_transition_and_order[seed-123]",
+        "seed": 123,
+        "capacity": 3,
+        "transitions": 300,
+        "scope": "production_integration"
+      },
+      "NB07b:production:3:124": {
+        "nodeId": "tests/recovery/test_background_integration_corpus.py::test_integrated_parallel_corpus_preserves_each_transition_and_order[seed-124]",
+        "seed": 124,
+        "capacity": 3,
+        "transitions": 300,
+        "scope": "production_integration"
+      },
+      "NB07b:production:3:125": {
+        "nodeId": "tests/recovery/test_background_integration_corpus.py::test_integrated_parallel_corpus_preserves_each_transition_and_order[seed-125]",
+        "seed": 125,
+        "capacity": 3,
+        "transitions": 300,
+        "scope": "production_integration"
+      },
+      "NB07b:production:3:126": {
+        "nodeId": "tests/recovery/test_background_integration_corpus.py::test_integrated_parallel_corpus_preserves_each_transition_and_order[seed-126]",
+        "seed": 126,
+        "capacity": 3,
+        "transitions": 300,
+        "scope": "production_integration"
+      },
+      "NB07b:production:3:127": {
+        "nodeId": "tests/recovery/test_background_integration_corpus.py::test_integrated_parallel_corpus_preserves_each_transition_and_order[seed-127]",
+        "seed": 127,
+        "capacity": 3,
+        "transitions": 300,
+        "scope": "production_integration"
       }
     },
     "requiredActions": [
@@ -8488,6 +9702,26 @@
         ],
         "acceptedRevision": "9938f54c67f8e593f914b18a5f8d156cba737b62",
         "acceptedFeasibility": true
+      },
+      "NB-X03:v03": {
+        "evidence": "docs/gui/handoffs/BACKGROUND-WORK/nb07b-native.json",
+        "pool": "NB07b",
+        "transport": "shared_appserver_v1",
+        "roles": [
+          "agent-A",
+          "agent-B",
+          "structured-rewrite-C"
+        ]
+      },
+      "NB-X03:v04": {
+        "evidence": "docs/gui/handoffs/BACKGROUND-WORK/nb07b-native.json",
+        "pool": "NB07b",
+        "transport": "shared_appserver_v1",
+        "roles": [
+          "agent-A",
+          "structured-rewrite-B",
+          "structured-sync-C"
+        ]
       }
     }
   }

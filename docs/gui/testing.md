@@ -33,6 +33,14 @@ cleanup orders for16 seeds×200 transitions. Native feasibility remains archived
 at9938f54 with19 unchanged critical dependencies and four byte-pinned artifacts;
 this cannot satisfy final integrated NB07b. Current normal flags remain off.
 
+NB07b binds the final integrated capacity-three corpus to128 seeds x300
+transitions, beside the same serial corpus. Its six separately authorized model
+turns use one parallel JobService and one owned App Server per group. Immediate
+and deferred publication reuse the actual first group's agent turns. Synthetic
+harness regressions and exact-content checks run before the full current fast
+gate and native dispatch. Controlled conflict measurements retain both orders
+for narrow independent reads, broad reads and overlapping writes.
+
 NB uses [the mandatory contract](background-work-tests.md) and
 [per-variant matrix](handoffs/BACKGROUND-WORK/test-matrix.json). `NB-CONTRACTS`
 maps NB00a's offline schemas, limit policy, controlled protocol, pipe-process

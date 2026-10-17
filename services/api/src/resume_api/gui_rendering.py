@@ -15,6 +15,8 @@ from .rendering import WORKER, ALLOWED_ERRORS
 
 
 class GuiDocxRenderer:
+    executor = None
+
     def __init__(self, *, executor=None):
         self.executor = executor
 
