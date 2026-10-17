@@ -24,7 +24,7 @@ async def main(args):
     listener = socket.socket()
     listener.bind(("127.0.0.1", args.port)); listener.listen(128)
     origin = "http://127.0.0.1:" + str(listener.getsockname()[1])
-    bridge = Bridge(root, dist=args.dist.resolve(), origin=origin)
+    bridge = Bridge(root, dist=args.dist.resolve(), origin=origin, parallel=args.parallel)
     bridge.send = lambda value: None
     with patch("resume_api.app.ConnectionAdapter", side_effect=AssertionError("Native connection reached")), \
          patch("resume_api.app.CodexCliProvider", side_effect=AssertionError("Native content reached")), \
@@ -63,8 +63,8 @@ async def serve(args, root, listener, origin, bridge):
         "project": bridge.project, "otherProject": other["project"], "pid": os.getpid()}
     path = root / "launch.json"; path.write_text(json.dumps(launch)); path.chmod(0o600)
     info = {"root": str(root), "origin": origin, "pid": os.getpid(), "project": bridge.project,
-        "otherProject": other["project"], "backgroundEnabled": True, "parallelEnabled": False,
-        "capacity": 1, "nativeStarts": 0, "providers": ["MetadataAdapter", "ScriptedAgentRuntime", "PipeExecutions"]
+        "otherProject": other["project"], "backgroundEnabled": True, "parallelEnabled": args.parallel,
+        "capacity": 3 if args.parallel else 1, "nativeStarts": 0, "providers": ["MetadataAdapter", "ScriptedAgentRuntime", "PipeExecutions"]
             + (["FixedProofProvider"] if args.fixed_operations else []),
         "dist": str(args.dist.resolve()), "status": "running", "holdModel": args.hold_model,
         "stopSignal": "SIGUSR1", "releaseModelSignal": "SIGUSR2" if args.hold_model else None,
@@ -109,5 +109,6 @@ if __name__ == "__main__":
     parser.add_argument("--port", type=int, default=0)
     parser.add_argument("--hold-model", action="store_true")
     parser.add_argument("--fixed-operations", action="store_true")
-    parser.add_argument("--proof-slice", choices=("nb03", "nb05", "nb06", "nb07a"))
+    parser.add_argument("--parallel", action="store_true")
+    parser.add_argument("--proof-slice", choices=("nb03", "nb04", "nb05", "nb06", "nb07a"))
     asyncio.run(main(parser.parse_args()))

@@ -37,7 +37,7 @@ def run_shards(python, nodes, *, context, root: Path, cwd: Path, env, coverage_a
             plan.append(dict(worker=index, pid=process.pid, nodes=targets, report=str(report), log=str(log_path)))
         for directory in retained:
             (directory / "corpus-plan.json").write_text(json.dumps(dict(workers=plan,
-                scope="Independent offline stores; every product supervisor remains at capacity one."), indent=2) + "\n")
+                scope="Independent offline stores; each trace retains its exact capacity-one or capacity-three identity."), indent=2) + "\n")
         print(f"NB production corpus: {len(nodes)} exact tests across {len(groups)} isolated workers", flush=True)
         for index, (process, _output) in enumerate(running):
             code = process.wait()

@@ -68,7 +68,7 @@ class JobToolSession(ToolSession):
 
     def guard(self):
         control, supervisor = self.control, self.service.jobs.supervisor
-        if (not self.active or supervisor.active is not control or supervisor.controls.get(control.job.id) is not control
+        if (not self.active or not supervisor.owns(control)
                 or control.revoked or control.cancel.is_set() or not control.ready.is_set()):
             raise AgentFailure("AGENT_CANCELLED")
         job = supervisor.store.read(control.project_id, control.run_id)

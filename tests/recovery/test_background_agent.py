@@ -19,14 +19,15 @@ from tests.recovery.test_agent_lifecycle import setup
 from tests.support.background import PipeExecutions
 
 
-async def environment(root):
+async def environment(root, *, parallel=False, server_factory=None):
     from resume_api.jobs.service import JobService
     from resume_api.inference_admission import InferenceAdmission
     old, _, projects, workspace, conversation, request, connection = setup(root, None)
     clock = ControlledDeadlines()
     factory = PipeExecutions(root / "pipes", clock)
     service = JobService(projects, None, lambda: connection["value"], enabled=True,
-        factory=factory, clock=clock, admission=InferenceAdmission())
+        factory=None if server_factory else factory, clock=clock, admission=InferenceAdmission(),
+        parallel=parallel, server_factory=server_factory)
     base = datetime.fromisoformat(TIME.replace("Z", "+00:00"))
     service.store.clock = service.artifacts.clock = lambda: (base + timedelta(seconds=clock.now())).isoformat()
     await service.start()

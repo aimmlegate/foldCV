@@ -20,7 +20,7 @@ class JobProposals:
         self.tasks = {}
 
     def _live(self, control):
-        if (self.supervisor.controls.get(control.job.id) is not control or self.supervisor.active is not control
+        if (not self.supervisor.owns(control)
                 or control.revoked or control.cancel.is_set() or not control.ready.is_set()):
             raise BackgroundFailure("CANCELLED")
         if not control.job.submission.allow_edits:

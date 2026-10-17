@@ -125,7 +125,7 @@ async def test_releasing_a_slot_before_cleanup_fails_the_actual_ownership_invari
     from tests.recovery.test_background_store import capture
     module, source_sha, mutant_sha = copied_module(tmp_path, "background_supervisor", [
         ("        control.revoked = True\n        close = asyncio.create_task(control.owned.close())",
-         "        control.revoked = True\n        self.active = None\n        close = asyncio.create_task(control.owned.close())")])
+         "        control.revoked = True\n        self._release_control(control)\n        close = asyncio.create_task(control.owned.close())")])
     rows = []
     for label in ("healthy", "mutant"):
         store, state, clock, factory, supervisor = await environment(tmp_path / label)
@@ -139,13 +139,13 @@ async def test_releasing_a_slot_before_cleanup_fails_the_actual_ownership_invari
             control = supervisor.controls[job.id]
             assert actor.child.command("probe") == {"type": "alive"}
             def assert_owner():
-                assert supervisor.active is control, "NB-I06: slot released before owned child cleanup"
+                assert supervisor.owns(control), "NB-I06: slot released before owned child cleanup"
             if label == "healthy":
                 assert_owner()
             else:
                 with pytest.raises(AssertionError, match="NB-I06: slot released before owned child cleanup"):
                     assert_owner()
-            rows.append(dict(action=label, result="owned" if supervisor.active is control else "premature_release",
+            rows.append(dict(action=label, result="owned" if supervisor.owns(control) else "premature_release",
                 sourceSha256=source_sha if label == "healthy" else mutant_sha,
                 regressionFailure="none" if label == "healthy" else "NB-I06: slot released before owned child cleanup"))
             actor.cleanup_permission.set()

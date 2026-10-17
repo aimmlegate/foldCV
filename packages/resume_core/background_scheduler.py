@@ -1,4 +1,4 @@
-"""Capacity-one scheduling order; runtime ownership belongs to the supervisor."""
+"""Eligible project/class order; runtime ownership belongs to the supervisor."""
 
 from collections import defaultdict
 
@@ -13,12 +13,12 @@ class SerialOrder:
         self.last_class = {}
         self.interactive_streak = defaultdict(int)
 
-    def choose(self, states, eligible=lambda _job: True):
+    def choose(self, states, eligible=lambda _job: True, *, reserved=()):
         queues = {}
         for project, state in states.items():
             groups = {name: [] for name in CLASSES}
             for job in state.jobs:
-                if job.execution == "queued":
+                if job.execution == "queued" and job.id not in reserved:
                     groups[job.submission.scheduling_class].append(job)
             groups = {name: items if items and eligible(items[0]) else [] for name, items in groups.items()}
             if any(groups.values()):

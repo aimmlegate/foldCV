@@ -24,6 +24,15 @@ feature set, matching server generation and verified generation shutdown. Agents
 still require their host inventory. Native source hashes remain the executed
 snapshot; later evidence-validator corrections are recorded separately.
 
+NB04 adds the opt-in three-position scheduler, two noninteractive positions,
+one mutating agent per project, shared account/server ownership, idle drain,
+bounded thread-context rotation, dedicated inference/render workers and exact
+per-job authority. Its15 due variants bind actual scheduler/resource/fault cases.
+The capacity-three production corpus overlaps two projects and explores both
+cleanup orders for16 seeds×200 transitions. Native feasibility remains archived
+at9938f54 with19 unchanged critical dependencies and four byte-pinned artifacts;
+this cannot satisfy final integrated NB07b. Current normal flags remain off.
+
 NB uses [the mandatory contract](background-work-tests.md) and
 [per-variant matrix](handoffs/BACKGROUND-WORK/test-matrix.json). `NB-CONTRACTS`
 maps NB00a's offline schemas, limit policy, controlled protocol, pipe-process

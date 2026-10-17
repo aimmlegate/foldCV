@@ -22,10 +22,11 @@ from tests.support.background import PipeExecutions
 
 
 class Bridge:
-    def __init__(self, root, *, dist=None, origin=None, background_enabled=True):
+    def __init__(self, root, *, dist=None, origin=None, background_enabled=True, parallel=False):
         self.root, self.loop = root, asyncio.get_running_loop()
         self.dist, self.origin = dist, origin
         self.background_enabled = background_enabled
+        self.parallel = parallel
         self.clock = ControlledDeadlines()
         self.factory = PipeExecutions(root / "pipes", self.clock)
         self.holds, self.lock = {}, threading.Lock()
@@ -55,7 +56,8 @@ class Bridge:
 
     async def observe_async(self, name, family, **identity):
         with self.lock:
-            held = [(token, row) for token, row in self.holds.items() if row["name"] == name and row["family"] == family]
+            held = [(token, row) for token, row in self.holds.items() if row["name"] == name and row["family"] == family
+                and (row.get("job") is None or row["job"] == identity.get("job"))]
         for token, row in held:
             self.send({"event": "hook", "token": token, "name": name, **identity})
             await row["async"].wait()
@@ -82,7 +84,8 @@ class Bridge:
         self.adapter = MetadataAdapter()
         self.application = create_app(origin=self.origin, secret=secret, temp_root=self.root / "operations", dist=dist,
             data_root=canonical.root, connection_adapter=self.adapter, agent_runtime=ScriptedAgentRuntime(None),
-            agent_tools=Tools(), background_enabled=self.background_enabled, background_factory=self.factory)
+            agent_tools=Tools(), background_enabled=self.background_enabled, background_factory=self.factory,
+            background_parallel=self.parallel)
         self.service = self.application.app.state.jobs
         self.service.supervisor.clock = self.clock
         self.service.publisher.authority.clock = self.clock
@@ -104,7 +107,7 @@ class Bridge:
                 selectedAgentModel="assistant-model"), ("assistant-model", "processing-model"))
         self.project = workspace.project_id
         self.send({"event": "ready", "project": self.project, "conversation": self.conversation.id,
-            "root": str(self.root), "synthetic": True, "capacity": 1})
+            "root": str(self.root), "synthetic": True, "capacity": 3 if self.parallel else 1})
 
     def script(self, request_id, text):
         async def execute(control, _actor):
@@ -140,7 +143,8 @@ class Bridge:
             with self.lock:
                 assert frame["token"] not in self.holds
                 self.holds[frame["token"]] = {"name": frame["name"], "family": frame.get("family", "writer"),
-                    "thread": threading.Event(), "async": asyncio.Event(), "jobOnly": frame.get("jobOnly", False)}
+                    "thread": threading.Event(), "async": asyncio.Event(), "jobOnly": frame.get("jobOnly", False),
+                    "job": frame.get("job")}
             return {"held": frame["token"]}
         if kind == "release":
             with self.lock:

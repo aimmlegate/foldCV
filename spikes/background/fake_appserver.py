@@ -43,6 +43,19 @@ for line in sys.stdin:
             emit({"id": message["id"], "result": {"acquired": acquired, "pid": os.getpid()}})
         finally:
             os.close(descriptor)
+    elif method == "fixture/fork-child":
+        child = os.fork()
+        if child == 0:
+            for stream in (sys.stdin, sys.stdout, sys.stderr):
+                stream.close()
+            for descriptor in (0, 1, 2):
+                try:
+                    os.close(descriptor)
+                except OSError:
+                    pass
+            while True:
+                signal.pause()
+        emit({"id": message["id"], "result": {"childPid": child}})
     elif method == "fixture/owner-and-orphan":
         descriptor = os.open(params["lockPath"], os.O_RDWR | os.O_CREAT | os.O_NOFOLLOW, 0o600)
         fcntl.flock(descriptor, fcntl.LOCK_EX)

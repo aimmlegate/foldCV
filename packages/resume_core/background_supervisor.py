@@ -1,4 +1,4 @@
-"""Durable capacity-one execution; publication authority has a separate lifetime."""
+"""Bounded durable execution; publication authority has a separate lifetime."""
 
 from __future__ import annotations
 
@@ -99,16 +99,19 @@ class JobControl:
 
 class JobSupervisor:
     def __init__(self, store: JobStore, factory, *, clock=None, observer=observe_nothing,
-                 preflight=lambda _job: None, admit=None, eligible=lambda _job: True):
+                 preflight=lambda _job: None, admit=None, eligible=lambda _job: True, parallel=False, idle=None):
         self.store, self.factory = store, factory
         self.clock = clock or Deadlines()
         self.observer, self.preflight = observer, preflight
         self.admit = admit
         self.eligible = eligible
+        self.parallel, self.idle = parallel, idle
         self.events = JobEvents(store)
         self.order = SerialOrder()
         self.controls = {}
         self.active = None
+        self.active_controls = {}
+        self.maintenance_ready = lambda: True
         self.fenced = None
         self.paused = None
         self.changed = asyncio.Event()
@@ -159,7 +162,7 @@ class JobSupervisor:
         self.changed.set()
 
     def resume(self, account_generation):
-        if self.active is not None or self.fenced:
+        if self.active_controls or self.fenced or not self.maintenance_ready():
             raise BackgroundFailure("BUSY")
         self.store.resume_dispatch(account_generation)
         self.paused = None
@@ -177,7 +180,29 @@ class JobSupervisor:
         self.changed.set()
 
     def login_allowed(self):
-        return self.active is None and not self.fenced
+        return not self.active_controls and not self.fenced and self.maintenance_ready()
+
+    def owns(self, control):
+        return (self.active_controls.get(control.run_id) is control
+            and self.controls.get(control.run_id) is control)
+
+    def _eligible(self, job):
+        if job.id in self.active_controls or not self.eligible(job):
+            return False
+        if not self.parallel:
+            return True
+        active = [control.job for control in self.active_controls.values()]
+        if (job.submission.scheduling_class != "interactive" and
+                sum(item.submission.scheduling_class != "interactive" for item in active) >= LIMITS.noninteractive_executions):
+            return False
+        return not (job.submission.kind == "agent" and job.submission.allow_edits and any(
+            item.submission.kind == "agent" and item.submission.allow_edits
+            and item.submission.identity.project_id == job.submission.identity.project_id for item in active))
+
+    def _release_control(self, control):
+        if self.active_controls.get(control.run_id) is control:
+            del self.active_controls[control.run_id]
+        self.active = next(iter(self.active_controls.values()), None)
 
     def reap(self):
         completed = [key for key, control in self.controls.items() if control.task is not None
@@ -190,19 +215,26 @@ class JobSupervisor:
             await self.changed.wait()
             self.changed.clear()
             self.reap()
-            if not self.dispatch_enabled or self.active is not None or self.fenced or self.paused:
-                continue
-            try:
-                job = self.order.choose(self.store.snapshots(), self.eligible)
-            except BackgroundFailure as error:
-                self.fenced = error.code
-                continue
-            if job is None:
-                continue
-            control = JobControl(self, job)
-            self.controls[job.id] = control
-            self.active = control
-            control.task = asyncio.create_task(self._drive(control))
+            limit = LIMITS.executions if self.parallel else LIMITS.serial_executions
+            while not self.closed and self.dispatch_enabled and not self.fenced and not self.paused and len(self.active_controls) < limit:
+                try:
+                    job = self.order.choose(self.store.snapshots(), self._eligible, reserved=self.active_controls)
+                except BackgroundFailure as error:
+                    self.fenced = error.code
+                    break
+                if job is None:
+                    break
+                control = JobControl(self, job)
+                self.controls[job.id] = self.active_controls[job.id] = control
+                self.active = next(iter(self.active_controls.values()))
+                if self.parallel:
+                    self.order.dispatched(job)
+                control.task = asyncio.create_task(self._drive(control))
+            if not self.active_controls and self.idle is not None:
+                try:
+                    await self.idle()
+                except Exception:
+                    self.fenced = "CLEANUP_FAILED"
 
     async def _emit(self, job):
         try:
@@ -316,7 +348,8 @@ class JobSupervisor:
                         return
                     raise BackgroundFailure(reason)
             control.slot_granted = True
-            self.order.dispatched(control.job)
+            if not self.parallel:
+                self.order.dispatched(control.job)
             await self.observer("slot_granted", control.job.id)
             for stage, model in enumerate(control.job.submission.models):
                 if control.cancel.is_set():
@@ -429,7 +462,7 @@ class JobSupervisor:
                 if control.permit is not None:
                     control.permit.release()
                     control.permit = None
-                self.active = None
+                self._release_control(control)
                 try:
                     if control.slot_granted:
                         await self.observer("slot_released", control.job.id)
@@ -455,13 +488,14 @@ class JobSupervisor:
                     attempt.cleanup_verified = True
                     attempt.state = "failed"
         control.job = self.store.update(control.job.submission.identity.project_id, job_id, verified)
-        if self.active is control:
-            self.active = None
+        self._release_control(control)
         control.owned = None
         if control.permit is not None:
             control.permit.release()
             control.permit = None
-        if self.fenced == "CLEANUP_FAILED" and not self.store.fences:
+        if (self.fenced == "CLEANUP_FAILED" and not self.store.fences and not any(
+                item.owned is not None and item.task is not None and item.task.done()
+                for item in self.active_controls.values())):
             self.fenced = None
         self.changed.set()
 
@@ -476,5 +510,7 @@ class JobSupervisor:
         tasks = [control.task for control in self.controls.values() if control.task is not None]
         if tasks:
             await asyncio.gather(*tasks, return_exceptions=True)
-        if self.active is not None:
+        if self.active_controls:
             raise BackgroundFailure("CLEANUP_FAILED")
+        if self.idle is not None:
+            await self.idle()

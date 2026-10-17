@@ -67,7 +67,12 @@ def hostless_structured(runtime, shutdown, owner, wire):
 def assert_shared_case(binding, variant, report, ledger, root, sources):
     case = report["variants"][variant]
     require(binding["transport"] == report["transport"] == PROTOCOL, "Wrong transport")
-    require(case["outcome"] == "passed" and case["layer"] == "native" and report["sourceHashes"] == sources,
+    proved_sources = report["sourceHashes"]
+    current = proved_sources == sources
+    if not current and variant.startswith("NB-R05:"):
+        from resume_api.jobs.feasibility import applicable
+        current = applicable(binding, report, sources, root)
+    require(case["outcome"] == "passed" and case["layer"] == "native" and current,
         "Unproved current source")
     pool_name, pool = binding["pool"], ledger["pools"][binding["pool"]]
     from spikes.background.native_turn_budget import matrix_budget
@@ -107,7 +112,7 @@ def assert_shared_case(binding, variant, report, ledger, root, sources):
         attempt = next(row for row in ledger["attempts"] if row["id"] == turn["attemptId"])
         actual_variant = binding.get("attemptVariant", variant)
         require(attempt["pool"] == pool_name and attempt["variant"] == actual_variant
-            and attempt["role"] == turn["role"] and attempt["status"] == "passed" and attempt["sourceHashes"] == sources
+            and attempt["role"] == turn["role"] and attempt["status"] == "passed" and attempt["sourceHashes"] == proved_sources
             and attempt["model"] == "gpt-6-luna" and attempt["effort"] == "medium"
             and attempt["transport"] == "one pinned multiplexed App Server", "Wrong charged model turn")
         if _historical:

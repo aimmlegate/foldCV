@@ -46,12 +46,12 @@ class FixedRuntime:
         def run():
             with self.files.open():
                 return function(self.files)
-        return await asyncio.to_thread(run)
+        return await asyncio.get_running_loop().run_in_executor(self.service.content_pool, run)
 
     async def execute(self, control):
         try:
             captured = self.service.fixed.input(self.job)
-            selected = self.service.projects.provider_factory()
+            selected = self.service.content_provider()
             if selected is None:
                 raise BackgroundFailure("AUTH_REQUIRED")
             provider = copy.copy(selected[0])

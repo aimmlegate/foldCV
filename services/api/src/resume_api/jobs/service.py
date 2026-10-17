@@ -1,6 +1,7 @@
 """Server-captured agent submission and event-driven capacity-one dispatch."""
 
 import asyncio
+from concurrent.futures import ThreadPoolExecutor
 
 from packages.resume_core.agent_artifacts import JobArtifacts
 from packages.resume_core.agent_edits import Scope
@@ -32,11 +33,18 @@ async def deny_native(_control):
 
 class JobService:
     def __init__(self, projects, runtime, connection, *, enabled=False, factory=None, clock=None,
-                 admission=INFERENCE, authorize_native=deny_native, observer=None, fetcher=None):
+                 admission=INFERENCE, authorize_native=deny_native, observer=None, fetcher=None,
+                 parallel=False, server_factory=None, shared_native=False):
+        if parallel and (not enabled or factory is None and server_factory is None):
+            raise ValueError("Parallel jobs require an enabled isolated transport")
         self.projects, self.runtime, self.connection = projects, runtime, connection
         self.enabled, self.admission, self.authorize_native = enabled, admission, authorize_native
         self.accepting = enabled
-        self.runtime_available = runtime is not None or factory is not None
+        self.runtime_available = runtime is not None or factory is not None or parallel
+        self.content_provider = lambda: self.projects.provider_factory()
+        from packages.resume_core.background_limits import LIMITS
+        self.content_pool = ThreadPoolExecutor(max_workers=LIMITS.executions if parallel else LIMITS.serial_executions,
+            thread_name_prefix="foldcv-inference")
         self.store = JobStore(projects.storage.root)
         self.artifacts = JobArtifacts(self.store)
         self.history = ScopeHistory(self.store, query_fingerprint)
@@ -54,8 +62,14 @@ class JobService:
         agent_factory = factory or (lambda job, model: JobRuntime(self, job, model))
         self.supervisor = JobSupervisor(self.store,
             lambda job, model: agent_factory(job, model) if job.submission.kind == "agent" else FixedRuntime(self, job, model),
-            clock=clock, preflight=self.preflight, admit=self.admit, eligible=self.eligible,
+            clock=clock, preflight=self.preflight, admit=self.admit, eligible=self.eligible, parallel=parallel,
             **({"observer": observer} if observer else {}))
+        self.parallel_owner = None
+        if parallel:
+            from .parallel import ParallelOwner
+            self.parallel_owner = ParallelOwner(self, server_factory, native=shared_native)
+            self.supervisor.idle = self.parallel_owner.idle
+            self.supervisor.maintenance_ready = self.parallel_owner.login_allowed
         self.tools = JobTools(self, fetcher=fetcher or PublicFetcher(projects.temp_root))
 
     async def start(self):
@@ -167,7 +181,8 @@ class JobService:
 
     async def admit(self, control):
         try:
-            return await self.admission.reserve(control.cancelled)
+            return await (self.parallel_owner.reserve(control) if self.parallel_owner is not None
+                else self.admission.reserve(control.cancelled))
         except AdmissionCancelled:
             raise BackgroundFailure("CANCELLED") from None
         except AdmissionBlocked:
@@ -258,6 +273,7 @@ class JobService:
         if self.publication_tasks:
             await asyncio.gather(*tuple(self.publication_tasks.values()), return_exceptions=True)
         await self.fixed.shutdown()
+        self.content_pool.shutdown(wait=True, cancel_futures=True)
         for changed in tuple(self.supervisor.listeners):
             changed.set()
 

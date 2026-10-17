@@ -47,9 +47,13 @@ class ProjectOracle:
 
 
 class IntegrationTrace:
-    def __init__(self, root, seed, *, transitions=FIXED_TRANSITIONS, identity="NB03:production"):
+    def __init__(self, root, seed, *, transitions=FIXED_TRANSITIONS, identity="NB03:production", capacity=1):
+        if capacity not in {1, 3}:
+            raise ValueError("Use the frozen capacity one or three policy")
         self.root, self.seed, self.rng = root, seed, random.Random(seed)
         self.transitions, self.identity = transitions, identity
+        self.capacity = capacity
+        self.observed = asyncio.Event()
         self.bridge, self.earlier_starts = None, 0
         self.projects, self.proofs, self.views, self.models = {}, {}, {}, {}
         self.jobs, self.requests, self.barriers, self.last_manual = {}, {}, {}, {}
@@ -68,9 +72,10 @@ class IntegrationTrace:
                 {target: text_of(block(workspace, target)["content"]) for target in ("narrative", "quote")})
 
     async def connect(self):
-        self.bridge = Bridge(self.root)
+        self.bridge = Bridge(self.root, parallel=self.capacity == 3)
         def event(value):
             self.events.append(value)
+            self.observed.set()
             if value.get("event") == "hook":
                 self.hooks[value["token"]].set()
         self.bridge.send = event
@@ -107,14 +112,22 @@ class IntegrationTrace:
         return dict(schemaVersion=1, proof=self.proofs[label], canonicalRevision=view["response"]["workspace"]["projectRevision"],
             canonicalSha256=view["workspaceSha256"], actionCursor=self.models[label].cursor, touches=[])
 
-    async def hold(self, name):
+    async def hold(self, name, *, job=None):
         token = "hold-" + str(len(self.hooks))
         self.hooks[token] = asyncio.Event()
-        await self.bridge.handle(dict(kind="hold", token=token, family="job", name=name))
+        await self.bridge.handle(dict(kind="hold", token=token, family="job", name=name, job=job))
         return token
 
     async def reached(self, token):
         await asyncio.wait_for(self.hooks[token].wait(), 10)
+
+    async def reached_jobs(self, token, jobs):
+        while True:
+            self.observed.clear()
+            reached = {row.get("job") for row in self.events if row.get("token") == token}
+            if set(jobs) <= reached:
+                return
+            await asyncio.wait_for(self.observed.wait(), 10)
 
     async def release(self, token):
         await self.bridge.handle(dict(kind="release", token=token))
@@ -144,7 +157,7 @@ class IntegrationTrace:
                 continue
             stats = await asyncio.to_thread(self.bridge.stats, self.projects[name]["project"])
             workspace, state = stats["workspace"], stats["state"]
-            assert stats["activeSlots"] == self.slots and self.slots <= 1
+            assert stats["activeSlots"] == self.slots and self.slots <= self.capacity
             assert len(state["jobs"]) <= 3 and len(state["proposals"]) <= 2
             assert not self.bridge.service.supervisor.listeners
             assert all(control.owned is None and control.permit is None for control in
@@ -192,6 +205,44 @@ class IntegrationTrace:
         await self.bridge.handle(dict(kind="wait_job", project=self.projects[label]["project"], job=self.jobs[key]["id"]))
         self.expected_jobs[key] = label, "completed", "waiting_for_sync"; self.slots = 0
         await self.remember("runtime_exit", label, key, "released")
+
+    async def execute_pair(self):
+        spawn, model = await self.hold("before_spawn"), await self.hold("scripted_model_ready")
+        await self.submit("A", "one")
+        await self.submit("B", "two")
+        jobs = [self.jobs[key]["id"] for key in ("one", "two")]
+        cleanup = {key: await self.hold("cleanup_started", job=self.jobs[key]["id"]) for key in ("one", "two")}
+        await self.reached_jobs(spawn, jobs)
+        self.slots = 2
+        for label, key in (("A", "one"), ("B", "two")):
+            self.expected_jobs[key] = label, "starting", "none"
+        for label, key in (("A", "one"), ("B", "two")):
+            await self.remember("submit", label, key, "accepted")
+            replay = await self.http(label, "/jobs/agent", self.requests[key], contract="background_snapshot_v1")
+            assert replay["id"] == self.jobs[key]["id"]
+            await self.remember("duplicate", label, key, "replay")
+        await self.release(spawn)
+        await self.reached_jobs(model, jobs)
+        self.starts += 2
+        for label, key in (("A", "one"), ("B", "two")):
+            self.expected_jobs[key] = label, "running", "none"
+        for label, key in (("A", "one"), ("B", "two")):
+            await self.remember("start", label, key, "started")
+        await self.release(model)
+        for token in cleanup.values():
+            await self.reached(token)
+        for label, key in (("A", "one"), ("B", "two")):
+            self.expected_jobs[key] = label, "running", "waiting_for_sync"
+        for label, key in (("A", "one"), ("B", "two")):
+            await self.remember("propose", label, key, "stored")
+        order = [("A", "one"), ("B", "two")]
+        self.rng.shuffle(order)
+        for label, key in order:
+            await self.release(cleanup[key])
+            await self.bridge.handle(dict(kind="wait_job", project=self.projects[label]["project"], job=self.jobs[key]["id"]))
+            self.expected_jobs[key] = label, "completed", "waiting_for_sync"
+            self.slots -= 1
+            await self.remember("runtime_exit", label, key, "released")
 
     async def barrier(self, label):
         header = await self.header(label)
@@ -261,7 +312,11 @@ class IntegrationTrace:
     async def run(self):
         try:
             await self.start()
-            await self.execute_job("A", "one"); await self.barrier("A"); await self.publish("A", "one")
+            if self.capacity == 3:
+                await self.execute_pair()
+            else:
+                await self.execute_job("A", "one")
+            await self.barrier("A"); await self.publish("A", "one")
             await self.http("A", "/writer/revoke", self.barriers["A"])
             await self.bridge.handle(dict(kind="advance", seconds=0.75)); self.elapsed_ms += 750
             await self.remember("timeout", "A", "one", "recovering")
@@ -274,7 +329,9 @@ class IntegrationTrace:
             self.models["A"].status = "clean_detached"; await self.remember("detach", "A", "one", "writer_changed")
             await self.open("A", "two"); self.models["A"].epoch += 1; self.models["A"].cursor = self.models["A"].sequence = 0
             self.models["A"].status = "attached"; await self.remember("attach", "A", "one", "writer_changed")
-            await self.execute_job("B", "two"); await self.barrier("B")
+            if self.capacity == 1:
+                await self.execute_job("B", "two")
+            await self.barrier("B")
             await self.http("B", "/writer/revoke", self.barriers["B"])
             await self.remember("timeout", "B", "two", "revoked"); await self.publish("B", "two", rejected=True)
             hold = await self.hold("before_spawn")
@@ -325,7 +382,7 @@ class IntegrationTrace:
             actions = sorted({row["action"] for row in self.log if row["result"] != "rejected"})
             assert set(ACTIONS) <= set(actions)
             assert len(self.log) == self.transitions
-            return dict(id=f"{self.identity}:1:{self.seed}", seed=self.seed, capacity=1, transitions=len(self.log),
+            return dict(id=f"{self.identity}:{self.capacity}:{self.seed}", seed=self.seed, capacity=self.capacity, transitions=len(self.log),
                 actions=actions, orders=reached_orders(self.log), log=self.log, scope="production_integration")
         except BaseException as error:
             (self.root / "failure-trace.json").write_text(json.dumps(dict(seed=self.seed, log=self.log,

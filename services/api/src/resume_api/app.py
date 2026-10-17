@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+from concurrent.futures import ThreadPoolExecutor
 from packages.resume_core.gui_reconciliation import SaveAnalysisPreference
 from io import BytesIO
 from contextlib import asynccontextmanager
@@ -261,18 +262,33 @@ def create_app(*, origin: str, secret: str, temp_root: Path, dist: Path, runner:
                rewrite_runner: ProseRewriteRunner | None = None, fixture_generation_ready: bool = False,
                experimental_profile: ExperimentalCliProfile | None = None, data_root: Path | None = None,
                gui_provider=None, gui_clock=None, gui_renderer=None, agent_runtime=None, agent_tools=None,
-               background_enabled=False, background_factory=None, background_native_authority=None):
+               background_enabled=False, background_factory=None, background_native_authority=None,
+               background_parallel=False, background_server_factory=None):
     if not origin.startswith("http://127.0.0.1:") or not origin.rsplit(":", 1)[-1].isdigit():
         raise ValueError("A concrete IPv4 loopback origin is required")
     if len(secret) < 32:
         raise ValueError("Startup secret is too short")
+    if background_parallel and not background_enabled:
+        raise ValueError("Parallel execution requires background delivery")
+    if background_parallel and experimental_profile is not None and (background_factory or background_server_factory):
+        raise ValueError("Native parallel execution cannot use an injected server or runtime")
+    parallel_transport_sources = None
+    if background_parallel and experimental_profile is not None:
+        if background_native_authority is None:
+            raise ValueError("Native parallel execution requires an explicit turn authority")
+        from .jobs.feasibility import require_native_transport
+        parallel_transport_sources = require_native_transport(Path(__file__).resolve().parents[4])
     if fixture_generation_ready and (semantic_runner is None or draft_runner is None):
         raise ValueError("Fixture generation requires both injected runners")
     if experimental_profile is not None and (fixture_generation_ready or any(
             runner is not None for runner in (semantic_runner, draft_runner, rewrite_runner, gui_provider, agent_runtime))):
         raise ValueError("Experimental CLI cannot use injected generation runners")
+    background_operations = temp_root / "background-transport"
     reap_owned(temp_root)
-    blocked_on_start = has_blocked_owned(temp_root) or recover_profile(experimental_profile, temp_root)
+    if background_parallel:
+        reap_owned(background_operations)
+    blocked_on_start = (has_blocked_owned(temp_root) or background_parallel and has_blocked_owned(background_operations)
+        or recover_profile(experimental_profile, background_operations if background_parallel else temp_root))
     operations: dict[asyncio.Task, OperationFiles] = {}
     cancellation_pending: set[asyncio.Task] = set()
     connection_work: dict[asyncio.Task, tuple[OperationFiles, threading.Event]] = {}
@@ -289,6 +305,7 @@ def create_app(*, origin: str, secret: str, temp_root: Path, dist: Path, runner:
         agent.request_stop(reason="AGENT_INTERRUPTED")
         await gui_projects.shutdown()
         await rich_projects.shutdown()
+        render_executor.shutdown(wait=True, cancel_futures=True)
         for task, (files, cancel) in list(connection_work.items()):
             await stop_connection(task, files, cancel)
         for task, (files, cancel) in list(semantic_work.items()):
@@ -298,6 +315,7 @@ def create_app(*, origin: str, secret: str, temp_root: Path, dist: Path, runner:
                 await cancel_operation(task, files)
 
     app = FastAPI(docs_url=None, redoc_url=None, openapi_url=None, lifespan=lifespan)
+    app.state.parallel_transport_sources = parallel_transport_sources
     boundary = LocalBoundary(app, origin, secret)
     if data_root is None and any(value is not None for value in (runner, connection_adapter, semantic_runner, draft_runner, rewrite_runner, gui_provider)):
         data_root = temp_root.parent / "FoldCV"
@@ -307,9 +325,15 @@ def create_app(*, origin: str, secret: str, temp_root: Path, dist: Path, runner:
     count = 0
     unsafe_cleanup = blocked_on_start
     gate = asyncio.Lock()
-    document_renderer = DocumentRenderer()
+    from packages.resume_core.background_limits import LIMITS as BACKGROUND_LIMITS
+    from .gui_rendering import GuiDocxRenderer, RichDocxRenderer
+    render_executor = ThreadPoolExecutor(max_workers=BACKGROUND_LIMITS.render_workers, thread_name_prefix="foldcv-render")
+    document_renderer = DocumentRenderer(executor=render_executor)
     connection = connection_adapter or ConnectionAdapter(BINARY if experimental_profile else cli_executable,
                                                           experimental_profile=experimental_profile)
+    if background_parallel and experimental_profile is not None:
+        from spikes.background.appserver_driver import SharedAppServer
+        background_server_factory = lambda: SharedAppServer.native(background_operations, connection)
     provider = (CodexCliProvider(BINARY, experimental_profile=experimental_profile)
                 if experimental_profile else None)
     connection_state = ConnectionPayload(state="unchecked")
@@ -382,14 +406,16 @@ def create_app(*, origin: str, secret: str, temp_root: Path, dist: Path, runner:
     gui_options = {"clock": gui_clock} if gui_clock is not None else {}
     preferences_store = PreferencesStore(rules_store.root)
     gui_projects = GuiProjectService(temp_root, rules_store, gui_selected_provider,
-        worker_slot=gui_worker_slot, cleanup_error=lifecycle_code, renderer=gui_renderer,
+        worker_slot=gui_worker_slot, cleanup_error=lifecycle_code,
+        renderer=gui_renderer or GuiDocxRenderer(executor=render_executor),
         storage=ProjectStore(rules_store.root), preferences=preferences_store, **gui_options)
     app.state.gui_projects = gui_projects
     mount_projects(app, gui_projects, problem)
     from .rich_projects import RichProjectService
     from .rich_routes import mount_rich_projects
     rich_projects = RichProjectService(temp_root, rules_store, gui_selected_provider,
-        worker_slot=gui_worker_slot, cleanup_error=lifecycle_code, preferences=preferences_store, **gui_options)
+        worker_slot=gui_worker_slot, cleanup_error=lifecycle_code, preferences=preferences_store,
+        renderer=RichDocxRenderer(executor=render_executor), **gui_options)
     app.state.rich_projects = rich_projects
     mount_rich_projects(app, rich_projects, problem)
 
@@ -421,7 +447,9 @@ def create_app(*, origin: str, secret: str, temp_root: Path, dist: Path, runner:
     from .jobs.service import JobService
     from .jobs.routes import mount_jobs
     jobs = JobService(rich_projects, resolved_agent_runtime, agent_connection, enabled=background_enabled,
-        factory=background_factory, **({"authorize_native": background_native_authority} if background_native_authority else {}))
+        factory=background_factory, parallel=background_parallel, server_factory=background_server_factory,
+        shared_native=experimental_profile is not None,
+        **({"authorize_native": background_native_authority} if background_native_authority else {}))
     app.state.jobs = jobs
     mount_jobs(app, jobs)
 

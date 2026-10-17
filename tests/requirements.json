@@ -1549,7 +1549,11 @@
         "tests/recovery/test_resume_assessment.py::test_failed_connection_can_process_the_same_saved_source_after_setup",
         "tests/recovery/test_rich_identity.py::test_resume_identity_uses_candidate_name_and_profession_with_safe_missing_values",
         "tests/recovery/test_rich_identity.py::test_listing_and_response_ignore_manual_titles_without_rewriting_saved_workspace",
-        "tests/recovery/test_rich_identity.py::test_candidate_fact_updates_and_restoration_change_identity_without_cached_titles"
+        "tests/recovery/test_rich_identity.py::test_candidate_fact_updates_and_restoration_change_identity_without_cached_titles",
+        "apps/web/unit/ux-polish.test.ts::legacy rich blocks remain editable and movable while new restricted blocks are denied",
+        "apps/web/unit/ux-polish.test.ts::pasted quotes and code become ordinary styled text and retain all authored content",
+        "apps/web/unit/ux-polish.test.ts::pasted tables retain every cell's text as paragraphs without enabling table creation",
+        "apps/web/unit/ux-polish.test.ts::editor notices keep useful messages and replace internal recovery or transport codes"
       ]
     },
     {
@@ -1672,7 +1676,11 @@
         "tests/recovery/test_rich_panel.py::test_closing_open_period_and_reopening_it_updates_the_existing_endpoint_span",
         "apps/web/unit/rich-panel.test.ts::panel edit keeps unrelated typing while a preview is pending",
         "tests/recovery/test_rich_panel.py::test_deleted_job_leaves_other_cited_narrative_as_an_explicit_conflict_without_inference",
-        "apps/web/unit/rich-api.test.ts::project deletion validates its own result instead of a workspace and retains cleanup failures"
+        "apps/web/unit/rich-api.test.ts::project deletion validates its own result instead of a workspace and retains cleanup failures",
+        "apps/web/unit/ux-polish.test.ts::the embedded catalog spans major technical roles and contains no case duplicates",
+        "apps/web/unit/ux-polish.test.ts::project and role mentions outrank unrelated technologies without leaking another job's context",
+        "apps/web/unit/ux-polish.test.ts::technology searches support aliases and keep custom imported names",
+        "apps/web/unit/ux-polish.test.ts::technology ranking reads the owned project description without using a peer project's text"
       ]
     },
     {
@@ -1694,7 +1702,10 @@
         "tests/recovery/test_rich_timeline.py::test_nested_subproject_periods_do_not_enter_employment_warnings_or_cascades",
         "tests/recovery/test_rich_timeline.py::test_cascade_dates_and_estimate_survive_owned_store_restart_without_inference",
         "tests/recovery/test_rich_timeline.py::test_timeline_and_cascade_require_a_document_instead_of_crashing_on_predraft",
-        "tests/recovery/test_rich_import.py::test_original_date_endpoints_keep_period_ownership_without_binding_other_jobs"
+        "tests/recovery/test_rich_import.py::test_original_date_endpoints_keep_period_ownership_without_binding_other_jobs",
+        "apps/web/unit/ux-polish.test.ts::date controls display exact known precision without exposing serialized source objects",
+        "apps/web/unit/ux-polish.test.ts::refining date precision requires a choice and never invents a month or day",
+        "apps/web/unit/ux-polish.test.ts::picker values use the real facts path, preserve precision and share Undo/Redo"
       ]
     },
     {
@@ -3059,6 +3070,56 @@
         "tests/recovery/test_background_appserver.py::test_unknown_stale_and_foreign_tool_requests_cannot_gain_authority[thread]",
         "tests/recovery/test_background_appserver.py::test_unknown_stale_and_foreign_tool_requests_cannot_gain_authority[tool]",
         "tests/recovery/test_background_appserver.py::test_unknown_stale_and_foreign_tool_requests_cannot_gain_authority[turn]",
+        "tests/recovery/test_background_feasibility.py::test_any_changed_transport_dependency_invalidates_native_feasibility[packages/resume_core/agent_limits.py]",
+        "tests/recovery/test_background_feasibility.py::test_any_changed_transport_dependency_invalidates_native_feasibility[packages/resume_core/background_limits.py]",
+        "tests/recovery/test_background_feasibility.py::test_any_changed_transport_dependency_invalidates_native_feasibility[packages/resume_core/models/agent.py]",
+        "tests/recovery/test_background_feasibility.py::test_any_changed_transport_dependency_invalidates_native_feasibility[packages/resume_core/models/background.py]",
+        "tests/recovery/test_background_feasibility.py::test_any_changed_transport_dependency_invalidates_native_feasibility[services/api/src/resume_api/agent/runtime.py]",
+        "tests/recovery/test_background_feasibility.py::test_any_changed_transport_dependency_invalidates_native_feasibility[services/api/src/resume_api/cli/experimental_profile.py]",
+        "tests/recovery/test_background_feasibility.py::test_any_changed_transport_dependency_invalidates_native_feasibility[services/api/src/resume_api/jobs/appserver.py]",
+        "tests/recovery/test_background_feasibility.py::test_any_changed_transport_dependency_invalidates_native_feasibility[services/api/src/resume_api/lifecycle.py]",
+        "tests/recovery/test_background_feasibility.py::test_any_changed_transport_dependency_invalidates_native_feasibility[services/api/src/resume_api/profile_ownership.py]",
+        "tests/recovery/test_background_feasibility.py::test_any_changed_transport_dependency_invalidates_native_feasibility[services/api/src/resume_api/providers/codex_cli.py]",
+        "tests/recovery/test_background_feasibility.py::test_any_changed_transport_dependency_invalidates_native_feasibility[services/api/src/resume_api/providers/structured_schema.py]",
+        "tests/recovery/test_background_feasibility.py::test_any_changed_transport_dependency_invalidates_native_feasibility[spikes/agent/profile.py]",
+        "tests/recovery/test_background_feasibility.py::test_any_changed_transport_dependency_invalidates_native_feasibility[spikes/background/appserver_driver.py]",
+        "tests/recovery/test_background_feasibility.py::test_any_changed_transport_dependency_invalidates_native_feasibility[spikes/background/appserver_offline.py]",
+        "tests/recovery/test_background_feasibility.py::test_any_changed_transport_dependency_invalidates_native_feasibility[spikes/background/appserver_protocol.py]",
+        "tests/recovery/test_background_feasibility.py::test_any_changed_transport_dependency_invalidates_native_feasibility[spikes/background/appserver_schema.py]",
+        "tests/recovery/test_background_feasibility.py::test_any_changed_transport_dependency_invalidates_native_feasibility[spikes/background/appserver_wire.py]",
+        "tests/recovery/test_background_feasibility.py::test_any_changed_transport_dependency_invalidates_native_feasibility[spikes/cli/profile.py]",
+        "tests/recovery/test_background_feasibility.py::test_any_changed_transport_dependency_invalidates_native_feasibility[spikes/cli/runner.py]",
+        "tests/recovery/test_background_feasibility.py::test_applicability_rejects_changed_or_unaccepted_provenance[changed-acceptance]",
+        "tests/recovery/test_background_feasibility.py::test_applicability_rejects_changed_or_unaccepted_provenance[changed-manifest]",
+        "tests/recovery/test_background_feasibility.py::test_applicability_rejects_changed_or_unaccepted_provenance[changed-proof]",
+        "tests/recovery/test_background_feasibility.py::test_applicability_rejects_changed_or_unaccepted_provenance[changed-validation]",
+        "tests/recovery/test_background_feasibility.py::test_applicability_rejects_changed_or_unaccepted_provenance[current-hash]",
+        "tests/recovery/test_background_feasibility.py::test_applicability_rejects_changed_or_unaccepted_provenance[evidence]",
+        "tests/recovery/test_background_feasibility.py::test_applicability_rejects_changed_or_unaccepted_provenance[missing-opt-in]",
+        "tests/recovery/test_background_feasibility.py::test_applicability_rejects_changed_or_unaccepted_provenance[no-go]",
+        "tests/recovery/test_background_feasibility.py::test_applicability_rejects_changed_or_unaccepted_provenance[pool]",
+        "tests/recovery/test_background_feasibility.py::test_applicability_rejects_changed_or_unaccepted_provenance[restamp]",
+        "tests/recovery/test_background_feasibility.py::test_applicability_rejects_changed_or_unaccepted_provenance[revision]",
+        "tests/recovery/test_background_feasibility.py::test_native_feasibility_can_apply_to_later_integration_without_restamping",
+        "tests/recovery/test_background_feasibility.py::test_native_parallel_configuration_fails_before_profile_access[disabled-background]",
+        "tests/recovery/test_background_feasibility.py::test_native_parallel_configuration_fails_before_profile_access[injected-server]",
+        "tests/recovery/test_background_feasibility.py::test_native_parallel_configuration_fails_before_profile_access[missing-authority]",
+        "tests/recovery/test_background_integration_corpus.py::test_capacity_three_production_corpus_preserves_parallel_ownership_and_the_oracle[seed-00]",
+        "tests/recovery/test_background_integration_corpus.py::test_capacity_three_production_corpus_preserves_parallel_ownership_and_the_oracle[seed-01]",
+        "tests/recovery/test_background_integration_corpus.py::test_capacity_three_production_corpus_preserves_parallel_ownership_and_the_oracle[seed-02]",
+        "tests/recovery/test_background_integration_corpus.py::test_capacity_three_production_corpus_preserves_parallel_ownership_and_the_oracle[seed-03]",
+        "tests/recovery/test_background_integration_corpus.py::test_capacity_three_production_corpus_preserves_parallel_ownership_and_the_oracle[seed-04]",
+        "tests/recovery/test_background_integration_corpus.py::test_capacity_three_production_corpus_preserves_parallel_ownership_and_the_oracle[seed-05]",
+        "tests/recovery/test_background_integration_corpus.py::test_capacity_three_production_corpus_preserves_parallel_ownership_and_the_oracle[seed-06]",
+        "tests/recovery/test_background_integration_corpus.py::test_capacity_three_production_corpus_preserves_parallel_ownership_and_the_oracle[seed-07]",
+        "tests/recovery/test_background_integration_corpus.py::test_capacity_three_production_corpus_preserves_parallel_ownership_and_the_oracle[seed-08]",
+        "tests/recovery/test_background_integration_corpus.py::test_capacity_three_production_corpus_preserves_parallel_ownership_and_the_oracle[seed-09]",
+        "tests/recovery/test_background_integration_corpus.py::test_capacity_three_production_corpus_preserves_parallel_ownership_and_the_oracle[seed-10]",
+        "tests/recovery/test_background_integration_corpus.py::test_capacity_three_production_corpus_preserves_parallel_ownership_and_the_oracle[seed-11]",
+        "tests/recovery/test_background_integration_corpus.py::test_capacity_three_production_corpus_preserves_parallel_ownership_and_the_oracle[seed-12]",
+        "tests/recovery/test_background_integration_corpus.py::test_capacity_three_production_corpus_preserves_parallel_ownership_and_the_oracle[seed-13]",
+        "tests/recovery/test_background_integration_corpus.py::test_capacity_three_production_corpus_preserves_parallel_ownership_and_the_oracle[seed-14]",
+        "tests/recovery/test_background_integration_corpus.py::test_capacity_three_production_corpus_preserves_parallel_ownership_and_the_oracle[seed-15]",
         "tests/recovery/test_background_native_budget.py::test_final_native_dispatch_counts_failed_starts_without_borrowing_another_pool",
         "tests/recovery/test_background_native_budget.py::test_final_native_dispatch_refuses_an_invalid_or_spent_allowance_before_launch[auth]",
         "tests/recovery/test_background_native_budget.py::test_final_native_dispatch_refuses_an_invalid_or_spent_allowance_before_launch[closed]",
@@ -3113,6 +3174,23 @@
         "tests/recovery/test_background_native_proof.py::test_every_native_fixed_fixture_publishes_its_exact_captured_change_without_a_model[NB-R05:v03-structured-rewrite-C]",
         "tests/recovery/test_background_native_proof.py::test_every_native_fixed_fixture_publishes_its_exact_captured_change_without_a_model[NB-R05:v04-structured-rewrite-B]",
         "tests/recovery/test_background_native_proof.py::test_every_native_fixed_fixture_publishes_its_exact_captured_change_without_a_model[NB-R05:v04-structured-sync-C]",
+        "tests/recovery/test_background_native_proof.py::test_hostless_structured_proof_requires_disabled_thread_and_verified_generation[ack-generation]",
+        "tests/recovery/test_background_native_proof.py::test_hostless_structured_proof_requires_disabled_thread_and_verified_generation[agent]",
+        "tests/recovery/test_background_native_proof.py::test_hostless_structured_proof_requires_disabled_thread_and_verified_generation[duplicate-ack]",
+        "tests/recovery/test_background_native_proof.py::test_hostless_structured_proof_requires_disabled_thread_and_verified_generation[enabled-host]",
+        "tests/recovery/test_background_native_proof.py::test_hostless_structured_proof_requires_disabled_thread_and_verified_generation[enabled-prewarm]",
+        "tests/recovery/test_background_native_proof.py::test_hostless_structured_proof_requires_disabled_thread_and_verified_generation[foreign-thread]",
+        "tests/recovery/test_background_native_proof.py::test_hostless_structured_proof_requires_disabled_thread_and_verified_generation[group-cleanup]",
+        "tests/recovery/test_background_native_proof.py::test_hostless_structured_proof_requires_disabled_thread_and_verified_generation[host-cleanup]",
+        "tests/recovery/test_background_native_proof.py::test_hostless_structured_proof_requires_disabled_thread_and_verified_generation[late-ack]",
+        "tests/recovery/test_background_native_proof.py::test_hostless_structured_proof_requires_disabled_thread_and_verified_generation[missing-features]",
+        "tests/recovery/test_background_native_proof.py::test_hostless_structured_proof_requires_disabled_thread_and_verified_generation[missing-owner]",
+        "tests/recovery/test_background_native_proof.py::test_hostless_structured_proof_requires_disabled_thread_and_verified_generation[none]",
+        "tests/recovery/test_background_native_proof.py::test_hostless_structured_proof_requires_disabled_thread_and_verified_generation[owner-generation]",
+        "tests/recovery/test_background_native_proof.py::test_hostless_structured_proof_requires_disabled_thread_and_verified_generation[owner-pid]",
+        "tests/recovery/test_background_native_proof.py::test_hostless_structured_proof_requires_disabled_thread_and_verified_generation[request-generation]",
+        "tests/recovery/test_background_native_proof.py::test_hostless_structured_proof_requires_disabled_thread_and_verified_generation[runtime-generation]",
+        "tests/recovery/test_background_native_proof.py::test_hostless_structured_proof_requires_disabled_thread_and_verified_generation[tools]",
         "tests/recovery/test_background_native_proof.py::test_native_feasibility_refuses_a_stale_controlled_gate_before_profile_or_attempt",
         "tests/recovery/test_background_native_proof.py::test_native_harness_receipt_timeout_leaves_the_real_publisher_owned_until_shutdown",
         "tests/recovery/test_background_native_proof.py::test_native_harness_waits_for_both_real_execution_and_fixed_publication[execution-first]",
@@ -3161,23 +3239,41 @@
         "tests/recovery/test_background_native_proof.py::test_structured_native_evidence_requires_its_own_durable_fixed_publication[not-durable]",
         "tests/recovery/test_background_native_proof.py::test_structured_native_evidence_requires_its_own_durable_fixed_publication[not-saved]",
         "tests/recovery/test_background_native_proof.py::test_structured_native_evidence_requires_its_own_durable_fixed_publication[wrong-change]",
-        "tests/recovery/test_background_native_proof.py::test_hostless_structured_proof_requires_disabled_thread_and_verified_generation[none]",
-        "tests/recovery/test_background_native_proof.py::test_hostless_structured_proof_requires_disabled_thread_and_verified_generation[agent]",
-        "tests/recovery/test_background_native_proof.py::test_hostless_structured_proof_requires_disabled_thread_and_verified_generation[missing-features]",
-        "tests/recovery/test_background_native_proof.py::test_hostless_structured_proof_requires_disabled_thread_and_verified_generation[enabled-host]",
-        "tests/recovery/test_background_native_proof.py::test_hostless_structured_proof_requires_disabled_thread_and_verified_generation[enabled-prewarm]",
-        "tests/recovery/test_background_native_proof.py::test_hostless_structured_proof_requires_disabled_thread_and_verified_generation[tools]",
-        "tests/recovery/test_background_native_proof.py::test_hostless_structured_proof_requires_disabled_thread_and_verified_generation[foreign-thread]",
-        "tests/recovery/test_background_native_proof.py::test_hostless_structured_proof_requires_disabled_thread_and_verified_generation[duplicate-ack]",
-        "tests/recovery/test_background_native_proof.py::test_hostless_structured_proof_requires_disabled_thread_and_verified_generation[request-generation]",
-        "tests/recovery/test_background_native_proof.py::test_hostless_structured_proof_requires_disabled_thread_and_verified_generation[ack-generation]",
-        "tests/recovery/test_background_native_proof.py::test_hostless_structured_proof_requires_disabled_thread_and_verified_generation[runtime-generation]",
-        "tests/recovery/test_background_native_proof.py::test_hostless_structured_proof_requires_disabled_thread_and_verified_generation[owner-generation]",
-        "tests/recovery/test_background_native_proof.py::test_hostless_structured_proof_requires_disabled_thread_and_verified_generation[owner-pid]",
-        "tests/recovery/test_background_native_proof.py::test_hostless_structured_proof_requires_disabled_thread_and_verified_generation[host-cleanup]",
-        "tests/recovery/test_background_native_proof.py::test_hostless_structured_proof_requires_disabled_thread_and_verified_generation[group-cleanup]",
-        "tests/recovery/test_background_native_proof.py::test_hostless_structured_proof_requires_disabled_thread_and_verified_generation[missing-owner]",
-        "tests/recovery/test_background_native_proof.py::test_hostless_structured_proof_requires_disabled_thread_and_verified_generation[late-ack]"
+        "tests/recovery/test_background_parallel.py::test_one_job_service_runs_two_agents_and_rewrite_on_one_owned_server[complete]",
+        "tests/recovery/test_background_parallel.py::test_one_job_service_runs_two_agents_and_rewrite_on_one_owned_server[hung-tool]",
+        "tests/recovery/test_background_parallel.py::test_one_job_service_runs_two_agents_and_rewrite_on_one_owned_server[old-parser]",
+        "tests/recovery/test_background_parallel.py::test_one_job_service_runs_two_agents_and_rewrite_on_one_owned_server[old-tool]",
+        "tests/recovery/test_background_parallel.py::test_one_job_service_runs_two_agents_and_rewrite_on_one_owned_server[output-limit]",
+        "tests/recovery/test_background_parallel.py::test_one_job_service_runs_two_agents_and_rewrite_on_one_owned_server[owner-failure]",
+        "tests/recovery/test_background_parallel.py::test_one_job_service_runs_two_agents_and_rewrite_on_one_owned_server[stop]",
+        "tests/recovery/test_background_parallel.py::test_parallel_positions_preserve_interactive_reserve_and_scoped_stop[NB-Q05:v01]",
+        "tests/recovery/test_background_parallel.py::test_parallel_positions_preserve_interactive_reserve_and_scoped_stop[NB-Q05:v02]",
+        "tests/recovery/test_background_parallel.py::test_parallel_positions_preserve_interactive_reserve_and_scoped_stop[NB-Q05:v03]",
+        "tests/recovery/test_background_parallel.py::test_parallel_positions_preserve_interactive_reserve_and_scoped_stop[NB-Q05:v05]",
+        "tests/recovery/test_background_parallel.py::test_shutdown_never_dispatches_the_pending_queue_after_a_position_closes",
+        "tests/recovery/test_background_parallel.py::test_waiting_parallel_admission_is_cancellable_without_a_foreign_permit[False]",
+        "tests/recovery/test_background_parallel.py::test_waiting_parallel_admission_is_cancellable_without_a_foreign_permit[True]",
+        "tests/recovery/test_background_parallel_resources.py::test_capacity_three_keeps_fifo_and_progress_behind_an_ineligible_project_head",
+        "tests/recovery/test_background_parallel_resources.py::test_context_bound_drains_owned_turns_before_rotation_without_releasing_the_profile[cancel-waiter]",
+        "tests/recovery/test_background_parallel_resources.py::test_context_bound_drains_owned_turns_before_rotation_without_releasing_the_profile[next-turn]",
+        "tests/recovery/test_background_parallel_resources.py::test_context_bound_drains_owned_turns_before_rotation_without_releasing_the_profile[two-stage]",
+        "tests/recovery/test_background_parallel_resources.py::test_two_render_positions_and_a_queued_export_do_not_block_models_or_save[NB-Q09:v02]",
+        "tests/recovery/test_background_parallel_resources.py::test_two_render_positions_and_a_queued_export_do_not_block_models_or_save[NB-Q09:v03]",
+        "tests/recovery/test_background_process_ownership.py::test_denied_group_signal_rechecks_birth_before_fallback_and_keeps_the_neighbor[identity-changed]",
+        "tests/recovery/test_background_process_ownership.py::test_denied_group_signal_rechecks_birth_before_fallback_and_keeps_the_neighbor[leader-exited]",
+        "tests/recovery/test_background_process_ownership.py::test_denied_group_signal_rechecks_birth_before_fallback_and_keeps_the_neighbor[live-group]",
+        "tests/recovery/test_background_process_ownership.py::test_known_child_outliving_the_leader_is_cleaned_without_signaling_the_neighbor",
+        "tests/recovery/test_background_process_ownership.py::test_owned_cleanup_keeps_the_host_grace_when_the_leader_exits_early[leader-already-exited]",
+        "tests/recovery/test_background_process_ownership.py::test_owned_cleanup_keeps_the_host_grace_when_the_leader_exits_early[leader-exits-during-grace]",
+        "tests/recovery/test_background_process_ownership.py::test_owned_cleanup_keeps_the_host_grace_when_the_leader_exits_early[leader-still-running]",
+        "tests/recovery/test_background_process_ownership.py::test_unverified_pid_marker_or_group_never_signals_or_deletes_a_neighbor[NB-R01:v02]",
+        "tests/recovery/test_background_process_ownership.py::test_unverified_pid_marker_or_group_never_signals_or_deletes_a_neighbor[NB-R01:v03]",
+        "tests/recovery/test_background_process_ownership.py::test_unverified_pid_marker_or_group_never_signals_or_deletes_a_neighbor[NB-R01:v07]",
+        "tests/recovery/test_background_process_ownership.py::test_unverified_startup_never_falls_back_to_legacy_signals_or_directory_removal[foreign-parent]",
+        "tests/recovery/test_background_process_ownership.py::test_unverified_startup_never_falls_back_to_legacy_signals_or_directory_removal[group-mismatch]",
+        "tests/recovery/test_background_process_ownership.py::test_unverified_startup_never_falls_back_to_legacy_signals_or_directory_removal[inspector-error]",
+        "tests/recovery/test_background_process_ownership.py::test_unverified_startup_never_falls_back_to_legacy_signals_or_directory_removal[missing-identity]",
+        "tests/recovery/test_background_process_ownership.py::test_unverified_startup_never_falls_back_to_legacy_signals_or_directory_removal[spawn-marker-failure]"
       ]
     }
   ],
@@ -3208,7 +3304,7 @@
     "G01": {
       "unproved": "Application dispatch/count/zero-call paths pass; actual CLI internal requests, payload disclosure and tokens are unmeasured.",
       "owner": "Manual CLI usage after MVP under D038",
-      "check": "Record logical operations and supported CLI metadata on examples E1–E8; keep unavailable internal request counts unknown."
+      "check": "Record logical operations and supported CLI metadata on examples E1\u2013E8; keep unavailable internal request counts unknown."
     },
     "G02": {
       "unproved": "Controlled event/error/retry guards pass; the installed experimental native CLI version is unverified.",
@@ -3237,7 +3333,7 @@
     },
     "B01": {
       "unproved": "Connected controlled raw-to-edit/rewrite/restore/local-portable-reopen/DOCX and default-entry UI pass; live semantic wording/quality remains pending.",
-      "owner": "Manual examples E1–E8 after MVP under D038",
+      "owner": "Manual examples E1\u2013E8 after MVP under D038",
       "check": "Use the manual guide through the real CLI path, inspect quality and supported facts, record keyboard/failure behavior and measured usage. No mandatory automated pilot."
     },
     "N01": {
@@ -3276,8 +3372,8 @@
       "check": "Follow manual-macos-checklist.md on the five exact hashed files."
     },
     "NB-PARALLEL": {
-      "unproved": "Native feasibility, integrated parallel scheduler and final native triples remain unaccepted; controlled transport tests alone do not close the requirement.",
-      "owner": "NB00b/NB04/NB07b",
+      "unproved": "Final integrated native triples and NB07b release remain pending. NB00b feasibility is accepted at9938f54; NB04 bindings require current executed evidence.",
+      "owner": "NB04/NB07b",
       "check": "Pass the exact authorized ten-turn feasibility matrix, all due scheduler variants and six current final integrated turns with retained cleanup/source evidence."
     }
   },
@@ -3308,7 +3404,7 @@
     "historicalMapping": "docs/gui/handoffs/PROTOTYPE-ADOPTION/evidence/uir09-browser-retirement.json",
     "connectedAcceptance": "docs/gui/handoffs/PROTOTYPE-ADOPTION/uir08-acceptance.json",
     "manualWord": "pending_unchanged",
-    "currentUiChecks": "Manual T3 acceptance in UIR01–UIR09; Python/state mappings remain active."
+    "currentUiChecks": "Manual T3 acceptance in UIR01\u2013UIR09; Python/state mappings remain active."
   },
   "backgroundExecution": {
     "schemaVersion": 1,
@@ -3321,7 +3417,8 @@
       "NB05",
       "NB06",
       "NB07a",
-      "NB00b"
+      "NB00b",
+      "NB04"
     ],
     "bindings": {
       "NB-R03:v01": [
@@ -4997,6 +5094,54 @@
       ],
       "NB-R02:v05": [
         "tests/recovery/test_background_appserver.py::test_second_api_maintenance_and_login_cannot_take_a_live_server_profile"
+      ],
+      "NB-Q03:v05": [
+        "tests/recovery/test_background_parallel_resources.py::test_capacity_three_keeps_fifo_and_progress_behind_an_ineligible_project_head"
+      ],
+      "NB-Q05:v01": [
+        "tests/recovery/test_background_parallel.py::test_parallel_positions_preserve_interactive_reserve_and_scoped_stop[NB-Q05:v01]"
+      ],
+      "NB-Q05:v02": [
+        "tests/recovery/test_background_parallel.py::test_parallel_positions_preserve_interactive_reserve_and_scoped_stop[NB-Q05:v02]"
+      ],
+      "NB-Q05:v03": [
+        "tests/recovery/test_background_parallel.py::test_parallel_positions_preserve_interactive_reserve_and_scoped_stop[NB-Q05:v03]"
+      ],
+      "NB-Q05:v05": [
+        "tests/recovery/test_background_parallel.py::test_parallel_positions_preserve_interactive_reserve_and_scoped_stop[NB-Q05:v05]"
+      ],
+      "NB-Q09:v02": [
+        "tests/recovery/test_background_parallel_resources.py::test_two_render_positions_and_a_queued_export_do_not_block_models_or_save[NB-Q09:v02]"
+      ],
+      "NB-Q09:v03": [
+        "tests/recovery/test_background_parallel_resources.py::test_two_render_positions_and_a_queued_export_do_not_block_models_or_save[NB-Q09:v03]"
+      ],
+      "NB-R01:v01": [
+        "tests/recovery/test_background_process_ownership.py::test_known_child_outliving_the_leader_is_cleaned_without_signaling_the_neighbor"
+      ],
+      "NB-R01:v02": [
+        "tests/recovery/test_background_process_ownership.py::test_unverified_pid_marker_or_group_never_signals_or_deletes_a_neighbor[NB-R01:v02]",
+        "tests/recovery/test_background_parallel.py::test_one_job_service_runs_two_agents_and_rewrite_on_one_owned_server[owner-failure]"
+      ],
+      "NB-R01:v03": [
+        "tests/recovery/test_background_process_ownership.py::test_unverified_pid_marker_or_group_never_signals_or_deletes_a_neighbor[NB-R01:v03]",
+        "tests/recovery/test_background_parallel.py::test_one_job_service_runs_two_agents_and_rewrite_on_one_owned_server[owner-failure]"
+      ],
+      "NB-R01:v07": [
+        "tests/recovery/test_background_process_ownership.py::test_unverified_pid_marker_or_group_never_signals_or_deletes_a_neighbor[NB-R01:v07]",
+        "tests/recovery/test_background_parallel.py::test_one_job_service_runs_two_agents_and_rewrite_on_one_owned_server[owner-failure]"
+      ],
+      "NB-R01:v04": [
+        "tests/recovery/test_background_parallel.py::test_one_job_service_runs_two_agents_and_rewrite_on_one_owned_server[hung-tool]"
+      ],
+      "NB-R01:v05": [
+        "tests/recovery/test_background_parallel.py::test_one_job_service_runs_two_agents_and_rewrite_on_one_owned_server[output-limit]"
+      ],
+      "NB-R01:v06": [
+        "tests/recovery/test_background_parallel.py::test_one_job_service_runs_two_agents_and_rewrite_on_one_owned_server[old-parser]"
+      ],
+      "NB-R01:v08": [
+        "tests/recovery/test_background_parallel.py::test_one_job_service_runs_two_agents_and_rewrite_on_one_owned_server[old-tool]"
       ]
     },
     "checks": {
@@ -6362,6 +6507,93 @@
         "tests/recovery/test_background_native_proof.py::test_native_retry_proof_requires_the_same_approved_extension_and_failed_history[none]",
         "tests/recovery/test_background_native_proof.py::test_native_retry_proof_requires_the_same_approved_extension_and_failed_history[pending]",
         "tests/recovery/test_background_native_proof.py::test_native_retry_proof_requires_the_same_approved_extension_and_failed_history[wrong-authority]"
+      ],
+      "NB04:parallel-regressions": [
+        "tests/recovery/test_background_feasibility.py::test_any_changed_transport_dependency_invalidates_native_feasibility[packages/resume_core/agent_limits.py]",
+        "tests/recovery/test_background_feasibility.py::test_any_changed_transport_dependency_invalidates_native_feasibility[packages/resume_core/background_limits.py]",
+        "tests/recovery/test_background_feasibility.py::test_any_changed_transport_dependency_invalidates_native_feasibility[packages/resume_core/models/agent.py]",
+        "tests/recovery/test_background_feasibility.py::test_any_changed_transport_dependency_invalidates_native_feasibility[packages/resume_core/models/background.py]",
+        "tests/recovery/test_background_feasibility.py::test_any_changed_transport_dependency_invalidates_native_feasibility[services/api/src/resume_api/agent/runtime.py]",
+        "tests/recovery/test_background_feasibility.py::test_any_changed_transport_dependency_invalidates_native_feasibility[services/api/src/resume_api/cli/experimental_profile.py]",
+        "tests/recovery/test_background_feasibility.py::test_any_changed_transport_dependency_invalidates_native_feasibility[services/api/src/resume_api/jobs/appserver.py]",
+        "tests/recovery/test_background_feasibility.py::test_any_changed_transport_dependency_invalidates_native_feasibility[services/api/src/resume_api/lifecycle.py]",
+        "tests/recovery/test_background_feasibility.py::test_any_changed_transport_dependency_invalidates_native_feasibility[services/api/src/resume_api/profile_ownership.py]",
+        "tests/recovery/test_background_feasibility.py::test_any_changed_transport_dependency_invalidates_native_feasibility[services/api/src/resume_api/providers/codex_cli.py]",
+        "tests/recovery/test_background_feasibility.py::test_any_changed_transport_dependency_invalidates_native_feasibility[services/api/src/resume_api/providers/structured_schema.py]",
+        "tests/recovery/test_background_feasibility.py::test_any_changed_transport_dependency_invalidates_native_feasibility[spikes/agent/profile.py]",
+        "tests/recovery/test_background_feasibility.py::test_any_changed_transport_dependency_invalidates_native_feasibility[spikes/background/appserver_driver.py]",
+        "tests/recovery/test_background_feasibility.py::test_any_changed_transport_dependency_invalidates_native_feasibility[spikes/background/appserver_offline.py]",
+        "tests/recovery/test_background_feasibility.py::test_any_changed_transport_dependency_invalidates_native_feasibility[spikes/background/appserver_protocol.py]",
+        "tests/recovery/test_background_feasibility.py::test_any_changed_transport_dependency_invalidates_native_feasibility[spikes/background/appserver_schema.py]",
+        "tests/recovery/test_background_feasibility.py::test_any_changed_transport_dependency_invalidates_native_feasibility[spikes/background/appserver_wire.py]",
+        "tests/recovery/test_background_feasibility.py::test_any_changed_transport_dependency_invalidates_native_feasibility[spikes/cli/profile.py]",
+        "tests/recovery/test_background_feasibility.py::test_any_changed_transport_dependency_invalidates_native_feasibility[spikes/cli/runner.py]",
+        "tests/recovery/test_background_feasibility.py::test_applicability_rejects_changed_or_unaccepted_provenance[changed-acceptance]",
+        "tests/recovery/test_background_feasibility.py::test_applicability_rejects_changed_or_unaccepted_provenance[changed-manifest]",
+        "tests/recovery/test_background_feasibility.py::test_applicability_rejects_changed_or_unaccepted_provenance[changed-proof]",
+        "tests/recovery/test_background_feasibility.py::test_applicability_rejects_changed_or_unaccepted_provenance[changed-validation]",
+        "tests/recovery/test_background_feasibility.py::test_applicability_rejects_changed_or_unaccepted_provenance[current-hash]",
+        "tests/recovery/test_background_feasibility.py::test_applicability_rejects_changed_or_unaccepted_provenance[evidence]",
+        "tests/recovery/test_background_feasibility.py::test_applicability_rejects_changed_or_unaccepted_provenance[missing-opt-in]",
+        "tests/recovery/test_background_feasibility.py::test_applicability_rejects_changed_or_unaccepted_provenance[no-go]",
+        "tests/recovery/test_background_feasibility.py::test_applicability_rejects_changed_or_unaccepted_provenance[pool]",
+        "tests/recovery/test_background_feasibility.py::test_applicability_rejects_changed_or_unaccepted_provenance[restamp]",
+        "tests/recovery/test_background_feasibility.py::test_applicability_rejects_changed_or_unaccepted_provenance[revision]",
+        "tests/recovery/test_background_feasibility.py::test_native_feasibility_can_apply_to_later_integration_without_restamping",
+        "tests/recovery/test_background_feasibility.py::test_native_parallel_configuration_fails_before_profile_access[disabled-background]",
+        "tests/recovery/test_background_feasibility.py::test_native_parallel_configuration_fails_before_profile_access[injected-server]",
+        "tests/recovery/test_background_feasibility.py::test_native_parallel_configuration_fails_before_profile_access[missing-authority]",
+        "tests/recovery/test_background_integration_corpus.py::test_capacity_three_production_corpus_preserves_parallel_ownership_and_the_oracle[seed-00]",
+        "tests/recovery/test_background_integration_corpus.py::test_capacity_three_production_corpus_preserves_parallel_ownership_and_the_oracle[seed-01]",
+        "tests/recovery/test_background_integration_corpus.py::test_capacity_three_production_corpus_preserves_parallel_ownership_and_the_oracle[seed-02]",
+        "tests/recovery/test_background_integration_corpus.py::test_capacity_three_production_corpus_preserves_parallel_ownership_and_the_oracle[seed-03]",
+        "tests/recovery/test_background_integration_corpus.py::test_capacity_three_production_corpus_preserves_parallel_ownership_and_the_oracle[seed-04]",
+        "tests/recovery/test_background_integration_corpus.py::test_capacity_three_production_corpus_preserves_parallel_ownership_and_the_oracle[seed-05]",
+        "tests/recovery/test_background_integration_corpus.py::test_capacity_three_production_corpus_preserves_parallel_ownership_and_the_oracle[seed-06]",
+        "tests/recovery/test_background_integration_corpus.py::test_capacity_three_production_corpus_preserves_parallel_ownership_and_the_oracle[seed-07]",
+        "tests/recovery/test_background_integration_corpus.py::test_capacity_three_production_corpus_preserves_parallel_ownership_and_the_oracle[seed-08]",
+        "tests/recovery/test_background_integration_corpus.py::test_capacity_three_production_corpus_preserves_parallel_ownership_and_the_oracle[seed-09]",
+        "tests/recovery/test_background_integration_corpus.py::test_capacity_three_production_corpus_preserves_parallel_ownership_and_the_oracle[seed-10]",
+        "tests/recovery/test_background_integration_corpus.py::test_capacity_three_production_corpus_preserves_parallel_ownership_and_the_oracle[seed-11]",
+        "tests/recovery/test_background_integration_corpus.py::test_capacity_three_production_corpus_preserves_parallel_ownership_and_the_oracle[seed-12]",
+        "tests/recovery/test_background_integration_corpus.py::test_capacity_three_production_corpus_preserves_parallel_ownership_and_the_oracle[seed-13]",
+        "tests/recovery/test_background_integration_corpus.py::test_capacity_three_production_corpus_preserves_parallel_ownership_and_the_oracle[seed-14]",
+        "tests/recovery/test_background_integration_corpus.py::test_capacity_three_production_corpus_preserves_parallel_ownership_and_the_oracle[seed-15]",
+        "tests/recovery/test_background_parallel.py::test_one_job_service_runs_two_agents_and_rewrite_on_one_owned_server[complete]",
+        "tests/recovery/test_background_parallel.py::test_one_job_service_runs_two_agents_and_rewrite_on_one_owned_server[hung-tool]",
+        "tests/recovery/test_background_parallel.py::test_one_job_service_runs_two_agents_and_rewrite_on_one_owned_server[old-parser]",
+        "tests/recovery/test_background_parallel.py::test_one_job_service_runs_two_agents_and_rewrite_on_one_owned_server[old-tool]",
+        "tests/recovery/test_background_parallel.py::test_one_job_service_runs_two_agents_and_rewrite_on_one_owned_server[output-limit]",
+        "tests/recovery/test_background_parallel.py::test_one_job_service_runs_two_agents_and_rewrite_on_one_owned_server[owner-failure]",
+        "tests/recovery/test_background_parallel.py::test_one_job_service_runs_two_agents_and_rewrite_on_one_owned_server[stop]",
+        "tests/recovery/test_background_parallel.py::test_parallel_positions_preserve_interactive_reserve_and_scoped_stop[NB-Q05:v01]",
+        "tests/recovery/test_background_parallel.py::test_parallel_positions_preserve_interactive_reserve_and_scoped_stop[NB-Q05:v02]",
+        "tests/recovery/test_background_parallel.py::test_parallel_positions_preserve_interactive_reserve_and_scoped_stop[NB-Q05:v03]",
+        "tests/recovery/test_background_parallel.py::test_parallel_positions_preserve_interactive_reserve_and_scoped_stop[NB-Q05:v05]",
+        "tests/recovery/test_background_parallel.py::test_shutdown_never_dispatches_the_pending_queue_after_a_position_closes",
+        "tests/recovery/test_background_parallel.py::test_waiting_parallel_admission_is_cancellable_without_a_foreign_permit[False]",
+        "tests/recovery/test_background_parallel.py::test_waiting_parallel_admission_is_cancellable_without_a_foreign_permit[True]",
+        "tests/recovery/test_background_parallel_resources.py::test_capacity_three_keeps_fifo_and_progress_behind_an_ineligible_project_head",
+        "tests/recovery/test_background_parallel_resources.py::test_context_bound_drains_owned_turns_before_rotation_without_releasing_the_profile[cancel-waiter]",
+        "tests/recovery/test_background_parallel_resources.py::test_context_bound_drains_owned_turns_before_rotation_without_releasing_the_profile[next-turn]",
+        "tests/recovery/test_background_parallel_resources.py::test_context_bound_drains_owned_turns_before_rotation_without_releasing_the_profile[two-stage]",
+        "tests/recovery/test_background_parallel_resources.py::test_two_render_positions_and_a_queued_export_do_not_block_models_or_save[NB-Q09:v02]",
+        "tests/recovery/test_background_parallel_resources.py::test_two_render_positions_and_a_queued_export_do_not_block_models_or_save[NB-Q09:v03]",
+        "tests/recovery/test_background_process_ownership.py::test_denied_group_signal_rechecks_birth_before_fallback_and_keeps_the_neighbor[identity-changed]",
+        "tests/recovery/test_background_process_ownership.py::test_denied_group_signal_rechecks_birth_before_fallback_and_keeps_the_neighbor[leader-exited]",
+        "tests/recovery/test_background_process_ownership.py::test_denied_group_signal_rechecks_birth_before_fallback_and_keeps_the_neighbor[live-group]",
+        "tests/recovery/test_background_process_ownership.py::test_known_child_outliving_the_leader_is_cleaned_without_signaling_the_neighbor",
+        "tests/recovery/test_background_process_ownership.py::test_owned_cleanup_keeps_the_host_grace_when_the_leader_exits_early[leader-already-exited]",
+        "tests/recovery/test_background_process_ownership.py::test_owned_cleanup_keeps_the_host_grace_when_the_leader_exits_early[leader-exits-during-grace]",
+        "tests/recovery/test_background_process_ownership.py::test_owned_cleanup_keeps_the_host_grace_when_the_leader_exits_early[leader-still-running]",
+        "tests/recovery/test_background_process_ownership.py::test_unverified_pid_marker_or_group_never_signals_or_deletes_a_neighbor[NB-R01:v02]",
+        "tests/recovery/test_background_process_ownership.py::test_unverified_pid_marker_or_group_never_signals_or_deletes_a_neighbor[NB-R01:v03]",
+        "tests/recovery/test_background_process_ownership.py::test_unverified_pid_marker_or_group_never_signals_or_deletes_a_neighbor[NB-R01:v07]",
+        "tests/recovery/test_background_process_ownership.py::test_unverified_startup_never_falls_back_to_legacy_signals_or_directory_removal[foreign-parent]",
+        "tests/recovery/test_background_process_ownership.py::test_unverified_startup_never_falls_back_to_legacy_signals_or_directory_removal[group-mismatch]",
+        "tests/recovery/test_background_process_ownership.py::test_unverified_startup_never_falls_back_to_legacy_signals_or_directory_removal[inspector-error]",
+        "tests/recovery/test_background_process_ownership.py::test_unverified_startup_never_falls_back_to_legacy_signals_or_directory_removal[missing-identity]",
+        "tests/recovery/test_background_process_ownership.py::test_unverified_startup_never_falls_back_to_legacy_signals_or_directory_removal[spawn-marker-failure]"
       ]
     },
     "sources": [
@@ -6431,7 +6663,10 @@
       "apps/web/src/contracts/validate.ts",
       "apps/web/src/main.tsx",
       "apps/web/src/rich/Editor.tsx",
+      "apps/web/src/rich/Timeline.tsx",
+      "apps/web/src/rich/basic-editing.ts",
       "apps/web/src/rich/caret.ts",
+      "apps/web/src/rich/fact-fields.ts",
       "apps/web/src/rich/history.ts",
       "apps/web/src/rich/save-queue.ts",
       "apps/web/src/rich/styles.ts",
@@ -6439,12 +6674,25 @@
       "apps/web/src/workbench/App.tsx",
       "apps/web/src/workbench/BlockedTab.tsx",
       "apps/web/src/workbench/background/BackgroundJobs.tsx",
+      "apps/web/src/workbench/editor/EditorNotices.tsx",
+      "apps/web/src/workbench/editor/Toolbar.tsx",
+      "apps/web/src/workbench/facts/DateInput.tsx",
+      "apps/web/src/workbench/facts/FactDialog.tsx",
+      "apps/web/src/workbench/facts/FactsPanel.tsx",
+      "apps/web/src/workbench/facts/TechnologySelect.tsx",
+      "apps/web/src/workbench/facts/dates.ts",
+      "apps/web/src/workbench/facts/technology-catalog.ts",
       "apps/web/src/workbench/layout/Header.tsx",
       "apps/web/src/workbench/layout/History.tsx",
       "apps/web/src/workbench/main.tsx",
       "apps/web/src/workbench/proof.tsx",
       "apps/web/src/workbench/styles/background.css",
+      "apps/web/src/workbench/styles/frame.css",
       "apps/web/src/workbench/styles/index.css",
+      "apps/web/src/workbench/styles/polish.css",
+      "apps/web/src/workbench/ui/Icon.tsx",
+      "apps/web/src/workbench/ui/NoticePanel.tsx",
+      "apps/web/src/workbench/ui/notice-text.ts",
       "apps/web/src/workbench/useResumeWorkspace.ts",
       "apps/web/unit/background-caret.test.ts",
       "apps/web/unit/background-drafts.test.ts",
@@ -6461,6 +6709,7 @@
       "apps/web/unit/support/background-jobs.ts",
       "apps/web/unit/support/background-writer.ts",
       "apps/web/unit/support/python-bridge.ts",
+      "apps/web/unit/ux-polish.test.ts",
       "contracts/examples/background/background_agent_request_v1.json",
       "contracts/examples/background/background_apply_v2.json",
       "contracts/examples/background/background_artifact_v1.json",
@@ -6571,6 +6820,7 @@
       "docs/gui/handoffs/BACKGROUND-WORK/nb00a-contract.md",
       "docs/gui/handoffs/BACKGROUND-WORK/nb00a-execution-report.schema.json",
       "docs/gui/handoffs/BACKGROUND-WORK/nb00a-state-mappings.md",
+      "docs/gui/handoffs/BACKGROUND-WORK/nb00b-acceptance.json",
       "docs/gui/handoffs/BACKGROUND-WORK/nb00b-evidence/failed-native-pair.json",
       "docs/gui/handoffs/BACKGROUND-WORK/nb00b-evidence/first-six-native-starts.json",
       "docs/gui/handoffs/BACKGROUND-WORK/nb00b-evidence/native-retry-proposal.md",
@@ -6584,12 +6834,18 @@
       "docs/gui/handoffs/BACKGROUND-WORK/nb00b-evidence/pinned-schema/v2/TurnInterruptParams.json",
       "docs/gui/handoffs/BACKGROUND-WORK/nb00b-evidence/pinned-schema/v2/TurnStartParams.json",
       "docs/gui/handoffs/BACKGROUND-WORK/nb00b-evidence/publication-retry-proposal.md",
+      "docs/gui/handoffs/BACKGROUND-WORK/nb00b-feasibility-native.json",
+      "docs/gui/handoffs/BACKGROUND-WORK/nb00b-native-validation.json",
+      "docs/gui/handoffs/BACKGROUND-WORK/nb00b-source-manifest.json",
       "docs/gui/handoffs/BACKGROUND-WORK/nb00b-transport-limits.json",
       "docs/gui/handoffs/BACKGROUND-WORK/nb02a-contract.md",
       "docs/gui/handoffs/BACKGROUND-WORK/nb02b-contract.md",
+      "docs/gui/handoffs/BACKGROUND-WORK/nb04-contract.md",
       "docs/gui/handoffs/BACKGROUND-WORK/nb06-ime-amendment.json",
       "docs/gui/handoffs/BACKGROUND-WORK/nb06-t3.json",
       "docs/gui/handoffs/BACKGROUND-WORK/test-matrix.json",
+      "docs/gui/handoffs/UX-POLISH/acceptance.json",
+      "docs/gui/handoffs/UX-POLISH/source-manifest.json",
       "docs/gui/testing.md",
       "packages/resume_core/__init__.py",
       "packages/resume_core/agent_artifacts.py",
@@ -6742,9 +6998,12 @@
       "services/api/src/resume_api/inference_admission.py",
       "services/api/src/resume_api/jobs/__init__.py",
       "services/api/src/resume_api/jobs/appserver.py",
+      "services/api/src/resume_api/jobs/feasibility.py",
       "services/api/src/resume_api/jobs/fixed.py",
       "services/api/src/resume_api/jobs/fixed_projection.py",
       "services/api/src/resume_api/jobs/fixed_runtime.py",
+      "services/api/src/resume_api/jobs/parallel.py",
+      "services/api/src/resume_api/jobs/process_ownership.py",
       "services/api/src/resume_api/jobs/publication.py",
       "services/api/src/resume_api/jobs/routes.py",
       "services/api/src/resume_api/jobs/runtime.py",
@@ -6766,6 +7025,7 @@
       "services/api/src/resume_api/rich_projects.py",
       "services/api/src/resume_api/rich_routes.py",
       "services/api/src/resume_api/rich_synchronization.py",
+      "spikes/agent/profile.py",
       "spikes/background/__init__.py",
       "spikes/background/appserver_driver.py",
       "spikes/background/appserver_offline.py",
@@ -6788,6 +7048,8 @@
       "spikes/background/serve.py",
       "spikes/background/writer_bridge.py",
       "spikes/background/writer_fixture.py",
+      "spikes/cli/profile.py",
+      "spikes/cli/runner.py",
       "tests/contracts/test_contracts.py",
       "tests/fixtures/rich_workspace.json",
       "tests/foundation/test_runner_gates.py",
@@ -6802,6 +7064,7 @@
       "tests/recovery/test_background_conflicts.py",
       "tests/recovery/test_background_events.py",
       "tests/recovery/test_background_exports.py",
+      "tests/recovery/test_background_feasibility.py",
       "tests/recovery/test_background_fixed_jobs.py",
       "tests/recovery/test_background_fixed_storage.py",
       "tests/recovery/test_background_guard_sensitivity.py",
@@ -6816,7 +7079,10 @@
       "tests/recovery/test_background_native_budget.py",
       "tests/recovery/test_background_native_proof.py",
       "tests/recovery/test_background_offline.py",
+      "tests/recovery/test_background_parallel.py",
+      "tests/recovery/test_background_parallel_resources.py",
       "tests/recovery/test_background_portable.py",
+      "tests/recovery/test_background_process_ownership.py",
       "tests/recovery/test_background_proposals.py",
       "tests/recovery/test_background_publication.py",
       "tests/recovery/test_background_publication_crashes.py",
@@ -7995,6 +8261,118 @@
         "capacity": 1,
         "transitions": 300,
         "scope": "production_integration"
+      },
+      "NB04:production:3:0": {
+        "nodeId": "tests/recovery/test_background_integration_corpus.py::test_capacity_three_production_corpus_preserves_parallel_ownership_and_the_oracle[seed-00]",
+        "seed": 0,
+        "capacity": 3,
+        "transitions": 200,
+        "scope": "production_integration"
+      },
+      "NB04:production:3:1": {
+        "nodeId": "tests/recovery/test_background_integration_corpus.py::test_capacity_three_production_corpus_preserves_parallel_ownership_and_the_oracle[seed-01]",
+        "seed": 1,
+        "capacity": 3,
+        "transitions": 200,
+        "scope": "production_integration"
+      },
+      "NB04:production:3:2": {
+        "nodeId": "tests/recovery/test_background_integration_corpus.py::test_capacity_three_production_corpus_preserves_parallel_ownership_and_the_oracle[seed-02]",
+        "seed": 2,
+        "capacity": 3,
+        "transitions": 200,
+        "scope": "production_integration"
+      },
+      "NB04:production:3:3": {
+        "nodeId": "tests/recovery/test_background_integration_corpus.py::test_capacity_three_production_corpus_preserves_parallel_ownership_and_the_oracle[seed-03]",
+        "seed": 3,
+        "capacity": 3,
+        "transitions": 200,
+        "scope": "production_integration"
+      },
+      "NB04:production:3:4": {
+        "nodeId": "tests/recovery/test_background_integration_corpus.py::test_capacity_three_production_corpus_preserves_parallel_ownership_and_the_oracle[seed-04]",
+        "seed": 4,
+        "capacity": 3,
+        "transitions": 200,
+        "scope": "production_integration"
+      },
+      "NB04:production:3:5": {
+        "nodeId": "tests/recovery/test_background_integration_corpus.py::test_capacity_three_production_corpus_preserves_parallel_ownership_and_the_oracle[seed-05]",
+        "seed": 5,
+        "capacity": 3,
+        "transitions": 200,
+        "scope": "production_integration"
+      },
+      "NB04:production:3:6": {
+        "nodeId": "tests/recovery/test_background_integration_corpus.py::test_capacity_three_production_corpus_preserves_parallel_ownership_and_the_oracle[seed-06]",
+        "seed": 6,
+        "capacity": 3,
+        "transitions": 200,
+        "scope": "production_integration"
+      },
+      "NB04:production:3:7": {
+        "nodeId": "tests/recovery/test_background_integration_corpus.py::test_capacity_three_production_corpus_preserves_parallel_ownership_and_the_oracle[seed-07]",
+        "seed": 7,
+        "capacity": 3,
+        "transitions": 200,
+        "scope": "production_integration"
+      },
+      "NB04:production:3:8": {
+        "nodeId": "tests/recovery/test_background_integration_corpus.py::test_capacity_three_production_corpus_preserves_parallel_ownership_and_the_oracle[seed-08]",
+        "seed": 8,
+        "capacity": 3,
+        "transitions": 200,
+        "scope": "production_integration"
+      },
+      "NB04:production:3:9": {
+        "nodeId": "tests/recovery/test_background_integration_corpus.py::test_capacity_three_production_corpus_preserves_parallel_ownership_and_the_oracle[seed-09]",
+        "seed": 9,
+        "capacity": 3,
+        "transitions": 200,
+        "scope": "production_integration"
+      },
+      "NB04:production:3:10": {
+        "nodeId": "tests/recovery/test_background_integration_corpus.py::test_capacity_three_production_corpus_preserves_parallel_ownership_and_the_oracle[seed-10]",
+        "seed": 10,
+        "capacity": 3,
+        "transitions": 200,
+        "scope": "production_integration"
+      },
+      "NB04:production:3:11": {
+        "nodeId": "tests/recovery/test_background_integration_corpus.py::test_capacity_three_production_corpus_preserves_parallel_ownership_and_the_oracle[seed-11]",
+        "seed": 11,
+        "capacity": 3,
+        "transitions": 200,
+        "scope": "production_integration"
+      },
+      "NB04:production:3:12": {
+        "nodeId": "tests/recovery/test_background_integration_corpus.py::test_capacity_three_production_corpus_preserves_parallel_ownership_and_the_oracle[seed-12]",
+        "seed": 12,
+        "capacity": 3,
+        "transitions": 200,
+        "scope": "production_integration"
+      },
+      "NB04:production:3:13": {
+        "nodeId": "tests/recovery/test_background_integration_corpus.py::test_capacity_three_production_corpus_preserves_parallel_ownership_and_the_oracle[seed-13]",
+        "seed": 13,
+        "capacity": 3,
+        "transitions": 200,
+        "scope": "production_integration"
+      },
+      "NB04:production:3:14": {
+        "nodeId": "tests/recovery/test_background_integration_corpus.py::test_capacity_three_production_corpus_preserves_parallel_ownership_and_the_oracle[seed-14]",
+        "seed": 14,
+        "capacity": 3,
+        "transitions": 200,
+        "scope": "production_integration"
+      },
+      "NB04:production:3:15": {
+        "nodeId": "tests/recovery/test_background_integration_corpus.py::test_capacity_three_production_corpus_preserves_parallel_ownership_and_the_oracle[seed-15]",
+        "seed": 15,
+        "capacity": 3,
+        "transitions": 200,
+        "scope": "production_integration"
       }
     },
     "requiredActions": [
@@ -8062,7 +8440,7 @@
         ]
       },
       "NB-R05:v01": {
-        "evidence": "docs/gui/handoffs/BACKGROUND-WORK/nb00b-native.json",
+        "evidence": "docs/gui/handoffs/BACKGROUND-WORK/nb00b-feasibility-native.json",
         "pool": "NB00",
         "transport": "shared_appserver_v1",
         "roles": [
@@ -8072,36 +8450,44 @@
         "states": {
           "agent-A": "cancelled",
           "agent-B": "completed"
-        }
+        },
+        "acceptedRevision": "9938f54c67f8e593f914b18a5f8d156cba737b62",
+        "acceptedFeasibility": true
       },
       "NB-R05:v02": {
-        "evidence": "docs/gui/handoffs/BACKGROUND-WORK/nb00b-native.json",
+        "evidence": "docs/gui/handoffs/BACKGROUND-WORK/nb00b-feasibility-native.json",
         "pool": "NB00",
         "transport": "shared_appserver_v1",
         "roles": [
           "agent-A",
           "structured-rewrite-B"
-        ]
+        ],
+        "acceptedRevision": "9938f54c67f8e593f914b18a5f8d156cba737b62",
+        "acceptedFeasibility": true
       },
       "NB-R05:v03": {
-        "evidence": "docs/gui/handoffs/BACKGROUND-WORK/nb00b-native.json",
+        "evidence": "docs/gui/handoffs/BACKGROUND-WORK/nb00b-feasibility-native.json",
         "pool": "NB00",
         "transport": "shared_appserver_v1",
         "roles": [
           "agent-A",
           "agent-B",
           "structured-rewrite-C"
-        ]
+        ],
+        "acceptedRevision": "9938f54c67f8e593f914b18a5f8d156cba737b62",
+        "acceptedFeasibility": true
       },
       "NB-R05:v04": {
-        "evidence": "docs/gui/handoffs/BACKGROUND-WORK/nb00b-native.json",
+        "evidence": "docs/gui/handoffs/BACKGROUND-WORK/nb00b-feasibility-native.json",
         "pool": "NB00",
         "transport": "shared_appserver_v1",
         "roles": [
           "agent-A",
           "structured-rewrite-B",
           "structured-sync-C"
-        ]
+        ],
+        "acceptedRevision": "9938f54c67f8e593f914b18a5f8d156cba737b62",
+        "acceptedFeasibility": true
       }
     }
   }

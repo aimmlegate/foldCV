@@ -25,6 +25,9 @@ ALLOWED_ERRORS = frozenset({
 
 
 class DocumentRenderer:
+    def __init__(self, *, executor=None):
+        self.executor = executor
+
     async def render(self, request: RenderRequest, files: OperationFiles) -> bytes:
         if files.path is None:
             raise RenderFailure("RENDER_FAILED")
@@ -32,7 +35,7 @@ class DocumentRenderer:
         (workspace / "render-input.json").write_bytes(request.model_dump_json(by_alias=True).encode("utf-8"))
         process = files.spawn(Path(sys.executable), (str(WORKER),), capture=False)
         try:
-            code = await asyncio.to_thread(process.wait)
+            code = await asyncio.get_running_loop().run_in_executor(self.executor, process.wait)
         finally:
             # A failed worker may leave its converter alive in the same group.
             files.stop_worker()
