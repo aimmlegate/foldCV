@@ -5690,6 +5690,38 @@
         "tests/recovery/test_background_native_budget.py::test_moderation_metadata_is_inert_and_cannot_cross_the_active_turn_or_grant_requests[missing-metadata]",
         "tests/recovery/test_background_native_budget.py::test_moderation_metadata_is_inert_and_cannot_cross_the_active_turn_or_grant_requests[unknown]",
         "tests/recovery/test_background_native_budget.py::test_moderation_metadata_is_inert_and_cannot_cross_the_active_turn_or_grant_requests[request]"
+      ],
+      "NB07a:read-tool-schema": [
+        "tests/recovery/test_background_tool_schemas.py::test_read_tool_schemas_match_their_authority_and_load_known_blocks_without_search"
+      ],
+      "NB07a:native-repair-authority": [
+        "tests/recovery/test_background_native_budget.py::test_ten_additional_native_starts_preserve_history_and_require_current_proof[none]",
+        "tests/recovery/test_background_native_budget.py::test_ten_additional_native_starts_preserve_history_and_require_current_proof[deferred]",
+        "tests/recovery/test_background_native_budget.py::test_ten_additional_native_starts_preserve_history_and_require_current_proof[authority-changed]",
+        "tests/recovery/test_background_native_budget.py::test_ten_additional_native_starts_preserve_history_and_require_current_proof[history-changed]",
+        "tests/recovery/test_background_native_budget.py::test_ten_additional_native_starts_preserve_history_and_require_current_proof[current-passed]",
+        "tests/recovery/test_background_native_budget.py::test_ten_additional_native_starts_preserve_history_and_require_current_proof[unvalidated]",
+        "tests/recovery/test_background_native_budget.py::test_ten_additional_native_starts_preserve_history_and_require_current_proof[reserve-deferred]",
+        "tests/recovery/test_background_native_budget.py::test_ten_additional_native_starts_preserve_history_and_require_current_proof[exhausted]",
+        "tests/recovery/test_background_native_budget.py::test_ten_additional_native_starts_preserve_history_and_require_current_proof[auth]",
+        "tests/recovery/test_background_native_budget.py::test_ten_additional_native_starts_preserve_history_and_require_current_proof[quota]",
+        "tests/recovery/test_background_native_budget.py::test_ten_additional_native_starts_preserve_history_and_require_current_proof[unknown-variant]"
+      ],
+      "NB07a:four-current-successes": [
+        "tests/recovery/test_background_native_budget.py::test_four_current_successes_allow_two_pairs_and_stop_further_native_repeats[first]",
+        "tests/recovery/test_background_native_budget.py::test_four_current_successes_allow_two_pairs_and_stop_further_native_repeats[deferred]",
+        "tests/recovery/test_background_native_budget.py::test_four_current_successes_allow_two_pairs_and_stop_further_native_repeats[second-immediate]",
+        "tests/recovery/test_background_native_budget.py::test_four_current_successes_allow_two_pairs_and_stop_further_native_repeats[last-deferred]",
+        "tests/recovery/test_background_native_budget.py::test_four_current_successes_allow_two_pairs_and_stop_further_native_repeats[wrong-order]",
+        "tests/recovery/test_background_native_budget.py::test_four_current_successes_allow_two_pairs_and_stop_further_native_repeats[four-passed]",
+        "tests/recovery/test_background_native_budget.py::test_four_current_successes_allow_two_pairs_and_stop_further_native_repeats[unvalidated]",
+        "tests/recovery/test_background_native_budget.py::test_four_current_successes_allow_two_pairs_and_stop_further_native_repeats[remaining-capacity]",
+        "tests/recovery/test_background_native_budget.py::test_four_current_successes_allow_two_pairs_and_stop_further_native_repeats[authority-changed]",
+        "tests/recovery/test_background_native_budget.py::test_four_current_successes_allow_two_pairs_and_stop_further_native_repeats[history-changed]"
+      ],
+      "NB07a:literal-search-ranges": [
+        "tests/recovery/test_background_tool_schemas.py::test_literal_search_ranges_compile_the_exact_substring_across_styled_runs[native-split-runs]",
+        "tests/recovery/test_background_tool_schemas.py::test_literal_search_ranges_compile_the_exact_substring_across_styled_runs[unicode]"
       ]
     },
     "sources": [
@@ -6098,6 +6130,7 @@
       "tests/recovery/conftest.py",
       "tests/recovery/test_agent_lifecycle.py",
       "tests/recovery/test_agent_runtime.py",
+      "tests/recovery/test_agent_tools.py",
       "tests/recovery/test_background_admission.py",
       "tests/recovery/test_background_agent.py",
       "tests/recovery/test_background_assets.py",
@@ -6131,6 +6164,7 @@
       "tests/recovery/test_background_store.py",
       "tests/recovery/test_background_supervisor.py",
       "tests/recovery/test_background_tool_publication.py",
+      "tests/recovery/test_background_tool_schemas.py",
       "tests/recovery/test_background_ui.py",
       "tests/recovery/test_background_writer_api.py",
       "tests/recovery/test_background_writer_cuts.py",

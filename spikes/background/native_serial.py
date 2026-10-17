@@ -1,4 +1,4 @@
-"""Final two-start serial proof in an owned synthetic store and native profile."""
+"""Final serial proof in an owned synthetic store and native profile."""
 
 import argparse
 import asyncio
@@ -164,19 +164,59 @@ def protocol_diagnostics(root):
         ProcessRunner.run = original_run
 
 
+def repair_retry_allowed(path, pool, recorded, variant, hashes):
+    authority = path.parent / pool["retryAuthority"]
+    try:
+        grant = json.loads(authority.read_bytes())
+        preserved = hashlib.sha256(json.dumps(recorded[:4], sort_keys=True,
+            separators=(",", ":"), ensure_ascii=False).encode()).hexdigest()
+        previous = [row for row in recorded if row["variant"] == variant]
+        deferred_passed = any(row["variant"] == "NB-X03:v02" and row["status"] == "passed"
+            and row["sourceHashes"] == hashes for row in recorded)
+        valid = (pool.get("retryAuthoritySha256") == hashlib.sha256(authority.read_bytes()).hexdigest()
+            and grant["authorized"] is True and grant["schemaVersion"] in {2, 3}
+            and grant["baseCap"] == grant["baseSpent"] == 4 and grant["additionalStarts"] == 10
+            and grant["capTotal"] == pool["cap"] == 14 and len(recorded) >= 4
+            and grant["preservedAttemptsSha256"] == preserved and grant["failedStartsCount"] is True
+            and grant["variants"] == ["NB-X03:v01", "NB-X03:v02"] and variant in grant["variants"]
+            and grant["allowStalePassedVariant"] is True and grant["reserveDeferredStarts"] == 1)
+        if not valid:
+            return False
+        if grant["schemaVersion"] == 2:
+            return (authority.name == "native-repair-authorization.json"
+                and all(row["status"] == "failed" or row["status"] == "passed" and row["sourceHashes"] != hashes
+                    for row in previous)
+                and (variant != "NB-X03:v01" or deferred_passed or pool["cap"] - pool["spent"] >= 2))
+        current = [row for row in recorded if row["sourceHashes"] == hashes]
+        passed = [row["variant"] for row in current if row["status"] == "passed"]
+        order = ["NB-X03:v01", "NB-X03:v02", "NB-X03:v01", "NB-X03:v02"]
+        return (authority.name == "native-four-successes-authorization.json"
+            and grant["requiredCurrentSuccesses"] == 4 and grant["successesPerVariant"] == 2
+            and grant["successOrder"] == order and grant["stopAfterSuccesses"] is True
+            and all(row["status"] in {"failed", "passed"} for row in current)
+            and len(passed) < 4 and passed == order[:len(passed)] and variant == order[len(passed)]
+            and pool["cap"] - pool["spent"] >= 4 - len(passed))
+    except (OSError, KeyError, TypeError, ValueError):
+        return False
+
+
 def spend(path, *, variant, job, project, hashes):
     with (path.parent / ".native-attempts.lock").open("a") as lock:
         fcntl.flock(lock, fcntl.LOCK_EX)
         ledger = json.loads(path.read_bytes())
         pool = ledger["pools"]["NB07a"]
         recorded = [row for row in ledger["attempts"] if row["pool"] == "NB07a"]
-        if (not pool["authorized"] or type(pool["cap"]) is not int or pool["spent"] >= pool["cap"]
+        if (variant not in {"NB-X03:v01", "NB-X03:v02"}
+                or not pool["authorized"] or type(pool["cap"]) is not int or pool["spent"] >= pool["cap"]
                 or type(pool["spent"]) is not int or pool["spent"] != len(recorded)
                 or any(row.get("error") in {"AGENT_AUTH_REQUIRED", "AGENT_QUOTA", "AUTH_REQUIRED", "RATE_LIMITED"}
                     for row in ledger["attempts"])):
             raise BackgroundFailure("JOB_DISABLED")
         previous = [row for row in recorded if row["variant"] == variant]
-        if previous:
+        if pool.get("retryAuthority") in {"native-repair-authorization.json", "native-four-successes-authorization.json"}:
+            if not repair_retry_allowed(path, pool, recorded, variant, hashes):
+                raise BackgroundFailure("JOB_IDEMPOTENCY_CONFLICT")
+        elif previous:
             authority = path.parent / "native-retry-authorization.json"
             try:
                 grant = json.loads(authority.read_bytes())

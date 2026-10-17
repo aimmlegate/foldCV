@@ -584,3 +584,44 @@ retain its cleanup failures and rerun with owned-process permission.
 The strict NB offline guard also rejected constructing a runtime in an NB test.
 Keep that failure and the guard unchanged: run the scripted pipe case in the
 existing agent-driver suite; keep the nine pure frame guards in the NB suite.
+
+## NB07a read-tool repair and renewed allowance
+
+The direct `native-repair-authorization.json` grants ten additional NB07a starts:
+cap14, four spent before this amendment. The first four records remain immutable;
+NB00 cap10 and NB07b cap6 are unchanged. Failed starts count. Exact grant hashes,
+current-proof duplicate rejection and the last deferred slot are checked offline.
+
+Each read tool now advertises only its allowed query kinds. Full document reads
+use get_resume_context; find_resume_content requires nonempty search text and
+advertises kind:find. A real SDK tools/list and tools/call regression validates
+all five schemas, rejects cross-tool kinds and empty searches, and proves known
+block reads without changing canonical content. Authorization guards remain.
+The correction requires both native variants on one current checked source; the
+old immediate success is retained as historical evidence. The full fast gate
+freezes the read regression source alongside the existing source list.
+
+Tool metadata guidance was checked against the official
+[plugin guidelines](https://developers.openai.com/plugins/plugin-guidelines).
+The concrete schema defect and fix are established by local SDK evidence.
+
+The later user clarification requires four successful current native validations:
+two immediate/deferred pairs, then stop native repetition and continue after
+acceptance. Keep the cap14 and all four original attempts. Copied-ledger checks
+require the exact new authority, enforce the pair order, reject an unvalidated
+turn, reserve enough remaining slots and refuse a fifth current success. Failures
+spend allowance without advancing the success count. A source change requires a
+new current-source sequence; it never rewrites old results.
+
+Native attempt6 completed deferred publication but failed its exact text proof:
+the caller selected UTF-16 range30–35 (` Wrot`) instead of31–36 (`Wrote`). The
+canonical output matched the supplied operation; publication did not shift it.
+Keep that failed turn, its truthful pending answer and the earlier source's
+successful immediate turn as history. Neither is current acceptance evidence.
+
+Tool descriptions and the apply-v2 instructions now require exact literal-search
+offsets followed by a full target read; a search snapshot never grants editing
+authority. SDK-to-compiler cases cover styled split runs, Cyrillic, a surrogate
+pair and a combining character. They preserve adjacent text, marks, facts and
+the unpublished source. Current native proofs must retain the search match,
+the full-read identity and the matching prepared range on the corrected source.

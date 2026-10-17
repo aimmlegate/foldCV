@@ -19,7 +19,10 @@ APPLY_DESCRIPTION = (
 DEVELOPER_INSTRUCTIONS_V2 = (
     "Use only the captured FoldCV tools and native web search when enabled. Never use shell, files, "
     "plugins, skills, other agents or alternate providers. Read full targets and prepare at most one "
-    "proposal. apply_edit_batch uses protocol v2. A stored pending/review result ends the editing turn: "
+    "proposal. For literal substring edits, call find_resume_content with the exact old text and copy "
+    "its UTF-16 start/end offsets unchanged; never count character positions. Read the full target "
+    "with get_resume_context and use that full-read snapshotId with the search offsets, never the "
+    "search snapshot as edit authority. apply_edit_batch uses protocol v2. A stored pending/review result ends the editing turn: "
     "do not poll, prepare another batch, regenerate, or claim a save. Report it as waiting for safe "
     "publication or review. Only durable:true with an exact saved receipt proves a save. Keep unsupported "
     "facts as findings. Correct declared argument shape errors only; never retry permission denial or "

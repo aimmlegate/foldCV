@@ -6,8 +6,9 @@ import asyncio
 from datetime import datetime, timezone
 import json
 import threading
+from typing import Literal
 
-from pydantic import ValidationError
+from pydantic import Field, ValidationError
 from mcp.types import CallToolResult, TextContent
 
 from packages.resume_core import agent_limits as limits
@@ -26,6 +27,31 @@ from .web import PublicFetcher
 READ_TOOLS = {"get_resume_context": "context", "find_resume_content": "find", "get_working_facts": "facts",
     "get_original_source": "source", "get_conversation_context": "history"}
 TOOL_NAMES = (*READ_TOOLS, "check_resume", "read_public_page", "publish_findings", "prepare_edit_batch", "apply_edit_batch")
+
+
+class ContextQuery(AgentQuery):
+    kind: Literal["context", "document"] = "context"
+
+
+class FindQuery(AgentQuery):
+    kind: Literal["find"] = "find"
+    text: str = Field(min_length=1, max_length=1000)
+
+
+class FactsQuery(AgentQuery):
+    kind: Literal["facts"] = "facts"
+
+
+class SourceQuery(AgentQuery):
+    kind: Literal["source"] = "source"
+
+
+class HistoryQuery(AgentQuery):
+    kind: Literal["history"] = "history"
+
+
+READ_QUERIES = {"get_resume_context": ContextQuery, "find_resume_content": FindQuery,
+    "get_working_facts": FactsQuery, "get_original_source": SourceQuery, "get_conversation_context": HistoryQuery}
 
 
 class AgentTools:
@@ -105,13 +131,30 @@ class ToolSession(PrivateMcp):
         return self.service.leases.require(self.control.project_id, epoch=self.control.owner_epoch).session_id
 
     def register(self):
-        def reader(name, kind):
-            async def read(query: AgentQuery | None = None) -> CallToolResult:
-                """Read a bounded page. Document IDs load blocks/cells. History IDs load full stored sources/findings/messages without network. Use nextCursor with the same query for later pages."""
-                return self.wire(await self.call(name, query or AgentQuery(kind=kind)))
-            self.sdk.tool(name=name, structured_output=False)(read)
-        for name, kind in READ_TOOLS.items():
-            reader(name, kind)
+        @self.sdk.tool(structured_output=False)
+        async def get_resume_context(query: ContextQuery | None = None) -> CallToolResult:
+            """Read the resume outline, or full blocks/cells by IDs with query:{kind:"document",ids:["block_id"]}. For a literal substring edit, get exact UTF-16 start/end from find_resume_content, then read the full target here. Prepare with this full-read snapshotId and the unchanged search offsets; never count characters. Use nextCursor with the same query for later pages."""
+            return self.wire(await self.call("get_resume_context", query or ContextQuery()))
+
+        @self.sdk.tool(structured_output=False)
+        async def find_resume_content(query: FindQuery) -> CallToolResult:
+            """Search for nonempty literal text with kind:find. Matches provide exact UTF-16 start/end offsets; copy these unchanged for substring edits instead of counting characters. A match is not a full edit target. Read its block/cell with get_resume_context and use that full-read snapshotId with the search offsets. Use nextCursor with the same query for later pages."""
+            return self.wire(await self.call("find_resume_content", query))
+
+        @self.sdk.tool(structured_output=False)
+        async def get_working_facts(query: FactsQuery | None = None) -> CallToolResult:
+            """Read working facts, optionally filtered by record IDs. Use nextCursor with the same query for later pages."""
+            return self.wire(await self.call("get_working_facts", query or FactsQuery()))
+
+        @self.sdk.tool(structured_output=False)
+        async def get_original_source(query: SourceQuery | None = None) -> CallToolResult:
+            """Read stored original text, optionally filtered by source or unit IDs, without network. Use nextCursor with the same query for later pages."""
+            return self.wire(await self.call("get_original_source", query or SourceQuery()))
+
+        @self.sdk.tool(structured_output=False)
+        async def get_conversation_context(query: HistoryQuery | None = None) -> CallToolResult:
+            """Read conversation history. IDs load full stored sources, findings or messages without network. Use nextCursor with the same query for later pages."""
+            return self.wire(await self.call("get_conversation_context", query or HistoryQuery()))
 
         @self.sdk.tool(structured_output=False)
         async def check_resume() -> CallToolResult:
@@ -163,8 +206,8 @@ class ToolSession(PrivateMcp):
             if name in READ_TOOLS:
                 if arguments.keys() - {"query"}:
                     raise ValueError("invalid read envelope")
-                if arguments.get("query") is not None:
-                    AgentQuery.model_validate(arguments["query"])
+                query = arguments.get("query")
+                READ_QUERIES[name].model_validate({} if query is None else query)
             elif name == "check_resume":
                 if arguments:
                     raise ValueError("invalid check envelope")

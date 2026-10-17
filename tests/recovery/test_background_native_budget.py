@@ -190,3 +190,82 @@ def test_moderation_metadata_is_inert_and_cannot_cross_the_active_turn_or_grant_
             session.accept(json.dumps(frame).encode())
         assert vars(session.result) == before and not events
 
+
+@pytest.mark.parametrize("fault", ["none", "deferred", "authority-changed", "history-changed", "current-passed", "unvalidated", "reserve-deferred", "exhausted", "auth", "quota", "unknown-variant"])
+def test_ten_additional_native_starts_preserve_history_and_require_current_proof(tmp_path, fault):
+    import copy
+    import hashlib
+    old, current = {"source": "a" * 64}, {"source": "b" * 64}
+    attempts = [dict(id="NB07a-" + str(n), pool="NB07a", variant="NB-X03:v02" if n == 4 else "NB-X03:v01",
+        status="passed" if n == 3 else "failed", error=None, sourceHashes=old) for n in range(1, 5)]
+    preserved = hashlib.sha256(json.dumps(attempts, sort_keys=True, separators=(",", ":"), ensure_ascii=False).encode()).hexdigest()
+    grant = dict(schemaVersion=2, authorized=True, baseCap=4, baseSpent=4, additionalStarts=10, capTotal=14,
+        failedStartsCount=True, variants=["NB-X03:v01", "NB-X03:v02"], preservedAttemptsSha256=preserved,
+        allowStalePassedVariant=True, reserveDeferredStarts=1)
+    authority = tmp_path / "native-repair-authorization.json"; authority.write_text(json.dumps(grant))
+    pool = dict(authorized=True, cap=14, spent=4, retryAuthority=authority.name,
+        retryAuthoritySha256=hashlib.sha256(authority.read_bytes()).hexdigest())
+    if fault == "authority-changed": authority.write_text(json.dumps({**grant, "authorized": False}))
+    if fault == "history-changed": attempts[2]["sourceHashes"] = current
+    if fault in {"current-passed", "unvalidated", "reserve-deferred", "exhausted"}:
+        count = 13 if fault == "reserve-deferred" else 14 if fault == "exhausted" else 5
+        for n in range(5, count + 1):
+            attempts.append(dict(id="NB07a-" + str(n), pool="NB07a", variant="NB-X03:v01", status="failed", error=None, sourceHashes=current))
+        pool["spent"] = count
+        if fault in {"current-passed", "unvalidated"}:
+            attempts[-1]["status"] = "passed" if fault == "current-passed" else "native_completed_unvalidated"
+    if fault in {"auth", "quota"}:
+        attempts.append(dict(id="NB07a-5", pool="NB07a", variant="NB-X03:v01", status="failed",
+            error="AGENT_AUTH_REQUIRED" if fault == "auth" else "AGENT_QUOTA", sourceHashes=current)); pool["spent"] = 5
+    ledger = dict(pools={"NB07a": pool, "NB00": dict(authorized=True, cap=10, spent=0),
+        "NB07b": dict(authorized=True, cap=6, spent=0)}, attempts=attempts)
+    path = tmp_path / "ledger.json"; path.write_text(json.dumps(ledger)); before = path.read_bytes()
+    variant = "NB-X03:v02" if fault == "deferred" else "invalid" if fault == "unknown-variant" else "NB-X03:v01"
+    if fault in {"none", "deferred"}:
+        history = copy.deepcopy(attempts)
+        assert spend(path, variant=variant, job="new-job", project="synthetic-project", hashes=current) == "NB07a-5"
+        after = json.loads(path.read_bytes())
+        assert after["attempts"][:-1] == history and after["pools"]["NB07a"]["spent"] == 5
+        assert all(after["pools"][key] == ledger["pools"][key] for key in ("NB00", "NB07b"))
+    else:
+        with pytest.raises(BackgroundFailure):
+            spend(path, variant=variant, job="new-job", project="synthetic-project", hashes=current)
+        assert path.read_bytes() == before
+
+
+@pytest.mark.parametrize("case", ["first", "deferred", "second-immediate", "last-deferred", "wrong-order", "four-passed", "unvalidated", "remaining-capacity", "authority-changed", "history-changed"])
+def test_four_current_successes_allow_two_pairs_and_stop_further_native_repeats(tmp_path, case):
+    import hashlib
+    old, current = {"source": "a" * 64}, {"source": "b" * 64}
+    attempts = [dict(id="NB07a-" + str(n), pool="NB07a", variant="NB-X03:v02" if n == 4 else "NB-X03:v01",
+        status="passed" if n == 3 else "failed", error=None, sourceHashes=old) for n in range(1, 5)]
+    preserved = hashlib.sha256(json.dumps(attempts, sort_keys=True, separators=(",", ":"), ensure_ascii=False).encode()).hexdigest()
+    order = ["NB-X03:v01", "NB-X03:v02", "NB-X03:v01", "NB-X03:v02"]
+    grant = dict(schemaVersion=3, authorized=True, baseCap=4, baseSpent=4, additionalStarts=10, capTotal=14,
+        failedStartsCount=True, variants=order[:2], preservedAttemptsSha256=preserved, allowStalePassedVariant=True,
+        reserveDeferredStarts=1, requiredCurrentSuccesses=4, successesPerVariant=2, successOrder=order, stopAfterSuccesses=True)
+    authority = tmp_path / "native-four-successes-authorization.json"; authority.write_text(json.dumps(grant))
+    passed = {"deferred": 1, "wrong-order": 1, "second-immediate": 2, "last-deferred": 3, "four-passed": 4}.get(case, 0)
+    for index, variant in enumerate(order[:passed], 5):
+        attempts.append(dict(id="NB07a-" + str(index), pool="NB07a", variant=variant, status="passed", error=None, sourceHashes=current))
+    if case == "unvalidated":
+        attempts.append(dict(id="NB07a-5", pool="NB07a", variant=order[0], status="native_completed_unvalidated", error=None, sourceHashes=current))
+    if case == "remaining-capacity":
+        for index in range(5, 13):
+            attempts.append(dict(id="NB07a-" + str(index), pool="NB07a", variant=order[0], status="failed", error=None, sourceHashes=current))
+    pool = dict(authorized=True, cap=14, spent=len(attempts), retryAuthority=authority.name,
+        retryAuthoritySha256=hashlib.sha256(authority.read_bytes()).hexdigest())
+    if case == "authority-changed": authority.write_text(json.dumps({**grant, "requiredCurrentSuccesses": 5}))
+    if case == "history-changed": attempts[0]["error"] = "changed-history"
+    path = tmp_path / "ledger.json"; path.write_text(json.dumps(dict(pools={"NB07a": pool}, attempts=attempts)))
+    before = path.read_bytes()
+    variant = "NB-X03:v01" if case == "wrong-order" or passed == 4 else order[passed]
+    if case in {"first", "deferred", "second-immediate", "last-deferred"}:
+        identifier = spend(path, variant=variant, job="four-success-job", project="synthetic-project", hashes=current)
+        after = json.loads(path.read_bytes())
+        assert identifier == "NB07a-" + str(5 + passed)
+        assert after["attempts"][:-1] == attempts and after["pools"]["NB07a"]["spent"] == 5 + passed
+    else:
+        with pytest.raises(BackgroundFailure):
+            spend(path, variant=variant, job="four-success-job", project="synthetic-project", hashes=current)
+        assert path.read_bytes() == before
