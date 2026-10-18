@@ -48,7 +48,7 @@ def test_ordinary_export_has_real_headings_lists_restarts_shading_code_and_expan
         assert paragraphs["Quoted"].xpath("w:pPr/w:jc[@w:val='right']", namespaces=NS)
         assert paragraphs["Quoted"].xpath("w:pPr/w:shd[@w:fill='ddebf1']", namespaces=NS)
         assert root.xpath("//w:rFonts[@w:ascii='Courier New']", namespaces=NS)
-        assert len(root.xpath("//w:br", namespaces=NS)) == 2 and len(root.xpath("//w:tab", namespaces=NS)) == 1
+        assert len(root.xpath("//w:br", namespaces=NS)) == 2 and len(root.xpath("//w:r/w:tab", namespaces=NS)) == 1
         assert root.xpath("//w:pBdr/w:bottom", namespaces=NS)
 
 

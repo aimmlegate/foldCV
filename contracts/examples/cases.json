@@ -6504,5 +6504,71 @@
       "value": "other"
     }
   ]
-}
+},
+  {
+    "name": "import_model_selected",
+    "contract": "save_import_model_preference",
+    "base": "save_import_model_preference",
+    "valid": true,
+    "edits": []
+  },
+  {
+    "name": "import_model_follow_default",
+    "contract": "save_import_model_preference",
+    "base": "save_import_model_preference",
+    "valid": true,
+    "edits": [
+      {
+        "op": "set",
+        "path": [
+          "model"
+        ],
+        "value": null
+      }
+    ]
+  },
+  {
+    "name": "import_model_missing",
+    "contract": "save_import_model_preference",
+    "base": "save_import_model_preference",
+    "valid": false,
+    "edits": [
+      {
+        "op": "remove",
+        "path": [
+          "model"
+        ]
+      }
+    ]
+  },
+  {
+    "name": "import_model_invalid_id",
+    "contract": "save_import_model_preference",
+    "base": "save_import_model_preference",
+    "valid": false,
+    "edits": [
+      {
+        "op": "set",
+        "path": [
+          "model"
+        ],
+        "value": "invalid/model"
+      }
+    ]
+  },
+  {
+    "name": "preferences_import_override",
+    "contract": "preferences",
+    "base": "preferences",
+    "valid": true,
+    "edits": [
+      {
+        "op": "set",
+        "path": [
+          "selectedImportModel"
+        ],
+        "value": "model-b"
+      }
+    ]
+  }
 ]

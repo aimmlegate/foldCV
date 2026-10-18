@@ -782,6 +782,11 @@ class Preferences(Wire):
     automatic_analysis: bool
     theme: Literal["light", "dark", "system"]
     selected_model: str | None
+    selected_import_model: str | None = None
+
+
+class SaveImportModelPreference(Wire):
+    model: str | None = Field(max_length=80, pattern=r"^[a-zA-Z0-9][a-zA-Z0-9._-]{0,79}$")
 
 
 class ArchiveManifestV5(Wire):
@@ -838,6 +843,7 @@ RECOVERY_CONTRACTS = {
     "project_v4": ProjectV4, "workspace_v5": WorkspaceV5, "archive_manifest_v5": ArchiveManifestV5,
     "document": Document, "docx_error": DocxError, "editorial_plan": EditorialPlan,
     "mutation": Mutation, "mutation_result": MutationResult, "preferences": Preferences,
+    "save_import_model_preference": SaveImportModelPreference,
     "registry": Registry, "render_snapshot_v4": RenderSnapshotV4, "rules": Rules,
     "selection": Selection, "source_context": SourceContext, "source_context_request": SourceContextRequest,
     "save_rules_request": SaveRulesRequest, "rules_settings_error": RulesSettingsError,

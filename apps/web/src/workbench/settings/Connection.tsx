@@ -2,20 +2,18 @@ import type { ConnectionView, ConnectionWorkflow } from "../../connection/workfl
 import { connectionMessages } from "../../connection/messages";
 import { Button } from "../ui/Button";
 import { Icon } from "../ui/Icon";
+import { ModelSelect } from "./ModelSelect";
 
 export function Connection({ view, workflow, model, change, disabled, selectionDisabled }: { view: ConnectionView; workflow: ConnectionWorkflow;
   model: string | null; change: (value: string) => void; disabled: boolean; selectionDisabled: boolean }) {
   const snapshot = view.snapshot;
-  const choices = model && !snapshot.models.includes(model) ? [model, ...snapshot.models] : snapshot.models;
   return <><h3>Модель и подключение</h3><p>Подключение через Codex по подписке ChatGPT.</p>
     <div className="connection-status"><span className="connection-check"><Icon name={snapshot.state === "connected" ? "check" : "info"} /></span>
       <div><strong>{view.detaching ? "Останавливаем операцию…" : connectionMessages[snapshot.state]}</strong>
         <small>{[snapshot.plan, snapshot.version].filter(Boolean).join(" · ") || "Сведения о подписке ещё не получены"}</small></div></div>
-    <label htmlFor="model-select">Модель обработки</label>
-    <select className="model-select" id="model-select" aria-label="Модель обработки" value={model ?? ""} disabled={disabled || selectionDisabled || view.pending || !snapshot.metadataReady}
-      onChange={event => change(event.currentTarget.value)}><option value="" disabled>Выберите модель</option>
-      {choices.map(value => <option key={value} value={value} disabled={!snapshot.models.includes(value)}>{value}{!snapshot.models.includes(value) ? " · недоступна" : ""}</option>)}
-    </select>
+    <ModelSelect id="model-select" label="Модель обработки" value={model} models={snapshot.models}
+      disabled={disabled || selectionDisabled || view.pending || !snapshot.metadataReady}
+      change={value => { if (value) change(value); }} />
     <p className="small muted">Список получен от подключения. Наличие модели в списке не подтверждает доступ.</p>
     <div className="quota-line">{snapshot.quota.usedPercent !== null && <span className="quota-bar"><span style={{ width: `${snapshot.quota.usedPercent}%` }} /></span>}
       {snapshot.quota.usedPercent !== null ? `Использовано ${snapshot.quota.usedPercent}%` : "Использование неизвестно"}

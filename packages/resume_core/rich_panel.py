@@ -13,10 +13,10 @@ from .rich_dependencies import placements
 from .rich_fields import inline_groups, set_text
 from .rich_sync import linked_field_steps
 
-PanelKind = Literal["candidate", "employment", "technology", "education", "language"]
+PanelKind = Literal["candidate", "employment", "technology", "education", "language", "claim"]
 FIELDS = {"candidate": ("name", "title", "location"), "employment": ("employer", "role"),
-    "technology": ("display",), "education": ("institution", "qualification", "specialty", "completion"),
-    "language": ("language", "level")}
+    "technology": ("display", "experience"), "education": ("institution", "qualification", "specialty", "completion"),
+    "language": ("language", "level"), "claim": ("value",)}
 
 
 class RichPanelRequest(Wire):
@@ -70,6 +70,8 @@ def new_record(kind, job_id=None):
         values["periods"] = [period().model_dump(by_alias=True)]
     elif kind == "technology":
         values.update(jobId=job_id, subprojectId=None, canonicalId=field(None))
+    elif kind == "claim":
+        values.update(jobId=None, subprojectId=None)
     return TypeAdapter(RichFact).validate_python({"id": identity(kind), "kind": kind, "revision": 1,
         "origin": "user", "evidence": [], "userCorrected": True, **values})
 
@@ -85,7 +87,11 @@ def field_block(record, key, kind="paragraph", level=1):
 
 
 def record_blocks(record):
+    if record.kind == "claim":
+        return []
     keys = list(FIELDS[record.kind])
+    if record.kind == "technology" and not record.experience.raw_text:
+        keys.remove("experience")
     children = [field_block(record, key, "heading" if record.kind == "candidate" and key in {"name", "title"} else "paragraph",
         1 if key == "name" else 2) for key in keys]
     if record.kind == "employment":
@@ -133,6 +139,16 @@ def panel_mutation(workspace, request):
     positions = placements(project.document)
     steps = []
     if request.operation == "remove":
+        if record.kind == "claim" and project.facts.mode in {"digest", "imported"}:
+            steps.append(RemoveRecord(kind="remove_record", recordId=record.id, beforeRevision=record.revision))
+            for block in blocks:
+                kept = [link for link in block.provenance if not (link.kind == "citation" and link.record_id == record.id)]
+                if kept != block.provenance:
+                    changed = block.model_copy(deep=True)
+                    changed.provenance = kept
+                    steps.append(put_block(changed, positions))
+            return RichMutation(schemaVersion=1, projectId=workspace.project_id, clientMutationId=identity("panel"),
+                actionId=request.capture.action_id, capture=request.capture, kind="panel", steps=steps)
         if record.kind == "technology":
             project = project.model_copy(deep=True)
             bind_exact_technology(project.document, record)

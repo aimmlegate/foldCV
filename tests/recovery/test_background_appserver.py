@@ -1149,8 +1149,9 @@ async def test_shared_turn_limits_stop_only_the_target_and_preserve_neighbor(tmp
     clock = ControlledDeadlines()
     server = shared_peer(tmp_path, clock=clock)
     ra, rb = asyncio.Event(), asyncio.Event()
+    fault_active = False
     def emit(_kind, _value):
-        if fault == "normalized":
+        if fault == "normalized" and fault_active:
             raise TransportFailure("NORMALIZED_OUTPUT_LIMIT")
     a = asyncio.create_task(server.run(shared_input("A", started=ra.set, text_limit=8, emit=emit)))
     b = None
@@ -1159,6 +1160,8 @@ async def test_shared_turn_limits_stop_only_the_target_and_preserve_neighbor(tmp
         clock.advance(50)
         b = asyncio.create_task(server.run(shared_input("B", started=rb.set)))
         await asyncio.wait_for(rb.wait(), 5)
+        # Inject the failure after both turns start, not during startup events.
+        fault_active = True
         if fault == "deadline":
             clock.advance(130)
         else:

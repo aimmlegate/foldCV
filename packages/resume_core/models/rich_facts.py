@@ -104,6 +104,9 @@ class TechnologyRecord(WorkingRecord):
     subproject_id: Id | None
     display: TextField
     canonical_id: TextField
+    technical: bool | None = Field(default=None, exclude_if=lambda value: value is None)
+    experience: TextField = Field(default_factory=lambda: TextField(value=None, rawText="", status="unknown",
+        revision=1, pendingRawText=None), exclude_if=lambda value: not value.raw_text and not value.user_corrected)
 
 
 class EducationRecord(WorkingRecord):
@@ -176,7 +179,7 @@ class ExtractionIssue(Wire):
 
 class ExtractionReport(Wire):
     status: Literal["complete", "partial"]
-    fact_count: int = Field(ge=1)
+    fact_count: int = Field(ge=0)
     counts: dict[str, int]
     request_bytes: int = Field(ge=0)
     recovered_rows: int = Field(ge=0)
@@ -188,6 +191,7 @@ class WorkingFacts(Wire):
     records: list[RichFact]
     tombstones: list[RecordTombstone]
     extraction: ExtractionReport | None = None
+    mode: Literal["structured", "digest", "imported"] = Field(default="structured", exclude_if=lambda value: value == "structured")
 
     @model_validator(mode="after")
     def identity(self) -> WorkingFacts:

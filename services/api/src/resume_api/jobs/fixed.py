@@ -23,6 +23,7 @@ from ..gui_normalization_content import GuiNormalizationContentService
 from ..gui_projects import ProjectFailure
 from ..resume_assessment_content import ResumeAssessmentContentService
 from .fixed_projection import FixedProjection
+from packages.resume_core.models.importing import IMPORT_TOOLS
 
 PROTOCOL = "fixed-jobs-v1:existing-services:one-attempt:assessment-extraction-original"
 
@@ -106,12 +107,13 @@ class FixedJobs:
         if not jobs:
             return None
         job = jobs[-1]
-        stage = "assess_resume" if not job.attempts or job.attempts[-1].stage == "assessment" else "normalize_semantics"
+        stage = "normalize_semantics" if "save_import" in job.submission.tools else (
+            "assess_resume" if not job.attempts or job.attempts[-1].stage == "assessment" else "normalize_semantics")
         error = job.error or job.publication_error
         status = ("completed" if job.receipt is not None else "failed" if job.publication == "needs_review"
             else job.execution if job.execution in {"queued", "failed", "cancelled", "interrupted"} else "running")
         return RichGenerationState(id=job.id, status=status, stage="render" if job.receipt else stage,
-            errorCode=error.code if error else None)
+            errorCode=error.code if error else None, startedAt=job.created_at)
 
     async def submit(self, project, request):
         service, projects = self.service, self.service.projects
@@ -134,7 +136,9 @@ class FixedJobs:
                     or datetime.fromisoformat(service.store.clock().replace("Z", "+00:00")) >=
                         datetime.fromisoformat(state.request_epoch_expires_at.replace("Z", "+00:00"))):
                 raise BackgroundFailure("REQUEST_EXPIRED")
-            selected, connection = projects.provider_factory(), service.connection()
+            processing = request.command.kind == "processing"
+            selected = projects.import_provider_factory() if processing else projects.provider_factory()
+            connection = service.connection()
             if selected is None or not connection.ready:
                 raise BackgroundFailure("RATE_LIMITED" if connection.reason == "AGENT_QUOTA" else "AUTH_REQUIRED")
             if selected[1] not in connection.models:
@@ -144,7 +148,6 @@ class FixedJobs:
             origin = action_capture(command)
             if origin is not None and any(action_key(item) == action_key(origin) for item in state.fixed_invalidations):
                 raise ProjectFailure("STALE_SELECTION", 409)
-            processing = command.kind == "processing"
             rules = projects.rules.load() if processing else workspace.rules_used
             if processing and rules is None:
                 raise BackgroundFailure("JOB_SCOPE_INVALID")
@@ -184,12 +187,13 @@ class FixedJobs:
                 checksum = self.inputs.prepare(directory, state, value)
                 service.store._write(directory, state, service.store._all())
             kind = "processing" if processing else "rewrite" if record.kind == "rewrite" else "reconciliation"
-            models = ["assessment", "extraction"] if processing else ["rewrite" if kind == "rewrite" else "reconciliation"]
+            models = ["extraction"] if processing else ["rewrite" if kind == "rewrite" else "reconciliation"]
+            from ..importer.session import SKILL_SHA256
             submission = JobSubmissionV1(schemaVersion=1, identity=identity, payloadSha256=logical,
                 kind=kind, schedulingClass="background" if processing else "interactive" if kind == "rewrite" else "reconciliation",
                 input={"kind": "processing" if processing else "rich_sync", "id": identifier, "sha256": checksum},
-                models=[{"stage": stage, "model": selected[1], "configSha256": digest([PROTOCOL, stage, rules])} for stage in models],
-                accountGeneration=state.account_generation, tools=[], allowEdits=True, allowWeb=False,
+                models=[{"stage": stage, "model": selected[1], "configSha256": digest([SKILL_SHA256 if processing else PROTOCOL, stage, rules])} for stage in models],
+                accountGeneration=state.account_generation, tools=list(IMPORT_TOOLS) if processing else [], allowEdits=True, allowWeb=False,
                 scope={"kind": "selection", "selection": record.selection} if record and record.selection else {"kind": "resume"},
                 guards=guards, submittedAt=service.store.clock())
             # Retire only queued automatic work; explicit requests and active attempts keep their visible outcome.
@@ -242,6 +246,11 @@ class FixedJobs:
                 return "ACCOUNT_CHANGED"
             current, _checksum = service.projects.storage.read_committed(captured.identity.project_id)
             if job.submission.kind == "processing":
+                from ..importer.session import SKILL_SHA256
+                if "save_import" in job.submission.tools and any(
+                        model.config_sha256 != digest([SKILL_SHA256, model.stage, captured.rules])
+                        for model in job.submission.models):
+                    return "DEPENDENCY_CHANGED"
                 if processing_source(current, service.projects.rules.load()) != captured.source_sha256:
                     return "DEPENDENCY_CHANGED"
             else:
@@ -286,7 +295,7 @@ class FixedJobs:
 
     def validate_processing(self, state, directory, job, candidate, workspace):
         captured = self.inputs.read(directory, job)
-        if (candidate.input_id != captured.id or candidate.workspace is None or candidate.normalized is None
+        if (candidate.input_id != captured.id or candidate.workspace is None or (candidate.normalized is None and candidate.import_draft is None)
                 or workspace.project is not None
                 or processing_source(workspace, self.service.projects.rules.load()) != captured.source_sha256):
             raise BackgroundFailure("DEPENDENCY_CHANGED")

@@ -1,0 +1,57 @@
+{
+  "name": "FoldCV desktop assets v1",
+  "status": "proposed; not connected to the application",
+  "source_mark": {
+    "path": "design/future-editor/visual/icons.svg",
+    "symbol": "i-fold",
+    "geometry": "M5 3h14v18H5zM5 3l14 9H5m0 0 14 9"
+  },
+  "source_palette": "design/future-editor/visual/tokens.css",
+  "palette": {
+    "accent": "#58684c",
+    "paper": "#fffefa",
+    "desk": "#f2f0ea",
+    "ink": "#30372e",
+    "line": "#dfe2d6",
+    "wash": "#e8eddf"
+  },
+  "font": "System sans-serif; SVG exports use Helvetica Neue with Arial fallback",
+  "source_sha256": {
+    "design/future-editor/visual/icons.svg": "1f416443f17401adf3e3b870598d5ca7caf774978c31000f1315792f03c8c2d1",
+    "design/future-editor/visual/tokens.css": "699bf0166743124d098b05bc81e90f234bf62413a22e01c171059ff26ea59b97"
+  },
+  "files": {
+    "macos/FoldCV.icns": "16504b414e9bd6fabfa87d4961ca4aa86c03fe8da5e24453eb75c0a5de4d5927",
+    "macos/FoldCV.iconset/icon_128x128.png": "bad2b8bbb403884cbd33a1c69e0054dac64e40e36e56287aff72dbb948e4922a",
+    "macos/FoldCV.iconset/icon_128x128@2x.png": "57e0e5a05b70f888551caf88a726f41fcd2b0e53342d73b2a748b1c2835e7e64",
+    "macos/FoldCV.iconset/icon_16x16.png": "2805d567f12faa4b29b8bce7459d0bb20f6655d4eef3467f97f91ceca73ac1e8",
+    "macos/FoldCV.iconset/icon_16x16@2x.png": "1934149690a0dc451722b385a86cc2ad5ec3bd0ebc092bb13081e579b12927e5",
+    "macos/FoldCV.iconset/icon_256x256.png": "57e0e5a05b70f888551caf88a726f41fcd2b0e53342d73b2a748b1c2835e7e64",
+    "macos/FoldCV.iconset/icon_256x256@2x.png": "bae6e72c3d2354a82756c6a33ce6a24df276e80402fbdeb864af10b981fa42e9",
+    "macos/FoldCV.iconset/icon_32x32.png": "1934149690a0dc451722b385a86cc2ad5ec3bd0ebc092bb13081e579b12927e5",
+    "macos/FoldCV.iconset/icon_32x32@2x.png": "22e4fd5b2fe12ad093a900c1bd8bf3fae591c6f5878adb039774a3249bdb0367",
+    "macos/FoldCV.iconset/icon_512x512.png": "bae6e72c3d2354a82756c6a33ce6a24df276e80402fbdeb864af10b981fa42e9",
+    "macos/FoldCV.iconset/icon_512x512@2x.png": "79d07672ec80e4e7c0a21301847852658883653a6cfce4661e010449630fef94",
+    "macos/dmg-background@2x.png": "64921a12e0f32dd7d7116bb819e09e88b5e6d80d8694d321e850a51b598d1362",
+    "png/app-icon.png": "79d07672ec80e4e7c0a21301847852658883653a6cfce4661e010449630fef94",
+    "png/dmg-background.png": "30c1252fbea57d8ccd247c6d6cafc55cbed03e4974c71138ec273623a42e966c",
+    "png/empty-state.png": "960f8f12d2424a8f58e583e76346bb7836b5047f3d3224bcac154fed285247df",
+    "png/mark-inverse.png": "2181cec68e7d14ef7a627388634b136ca6f56352d88525f2932236d5133d6ad2",
+    "png/mark.png": "ca2255aa7717cb5ea8d2b2abb3a367b5c5c53b1fbb500e0e2c7474b325aaa1ea",
+    "png/wordmark-inverse.png": "b6eaee0c866f7a50bf99b9491983cae2015c1d1bbc684899e3f3166a62574fe3",
+    "png/wordmark.png": "185dd3536f100efa30409c1a6b681950d306ad002550dad1371bd84e57d13f9d",
+    "preview.png": "f88bbea64f2ae1ce7b41b41e7ff59769d3f25561cac01803a04626847c00e091",
+    "source/app-icon.svg": "2485df29a02c4176b914f18d6fb2c8075636b3e199de04bba8aec34b4f6d30a5",
+    "source/dmg-background.svg": "1582394e41942385ce976ef530c9bd53e9dd040309bf2318d338765a5681d68e",
+    "source/empty-state.svg": "e2b38f4b17d7535a537f11fc9a1ffbdd9e4284798bb20ea77ebb96a77b14a03b",
+    "source/mark-inverse.svg": "9e45f36e2da155ad607a11f05b697fd5d1726b1f9c5c5c32268616039d44ef6c",
+    "source/mark.svg": "d74a52e1fd89dd1c41889257bb95280743c783314e2c99e9220f5cf3de256cfb",
+    "source/wordmark-inverse.svg": "f84500011d271fca6dd4c2bd33cdcb00a90cc2701566af813364c54c4d321849",
+    "source/wordmark.svg": "b47626b352395264bce567022783d34ae165b5ba7b6b037734ef47247156c5e8",
+    "web/favicon-16.png": "e759b2e2cf7e26c8b65e207538ed7d25f28a5a082c2f8a18243a7b533ee44678",
+    "web/favicon-32.png": "e5bbe90a438b6599105366e72fa86585dc23cbd9d9b34d010f91fb1f4d648b22",
+    "web/favicon-48.png": "3f526345e92a8864296f6ef1529c82edf281120831de6fbccf54eb43206f9417",
+    "web/favicon.ico": "2f091a74c8efeab09a1ba6811debad0bf6f2b147903767cf1b9aa21735cedd6a",
+    "web/favicon.svg": "ea01f1a27b9b32ca1688e14488631d5ba94dcd08f6395a25f90bd006a33425ea"
+  }
+}

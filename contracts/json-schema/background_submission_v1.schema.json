@@ -487,7 +487,10 @@
           "publish_findings",
           "prepare_edit_batch",
           "apply_edit_batch",
-          "project_action"
+          "project_action",
+          "read_import",
+          "save_import",
+          "finish_import"
         ],
         "type": "string"
       },

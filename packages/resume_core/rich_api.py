@@ -14,6 +14,7 @@ class RichGenerationState(Wire):
     status: Literal["queued", "running", "completed", "failed", "cancelled", "interrupted"]
     stage: Literal["assess_resume", "normalize_semantics", "draft_prose", "assemble", "render"]
     error_code: Id | None
+    started_at: str | None = Field(default=None, exclude_if=lambda value: value is None)
 
 
 class RichProjectResponse(Wire):

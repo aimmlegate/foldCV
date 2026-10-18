@@ -18,11 +18,20 @@ ERRORS = {"AGENT_QUOTA": "RATE_LIMITED", "AGENT_AUTH_REQUIRED": "AUTH_REQUIRED",
 
 
 class JobRuntime:
+    instructions = DEVELOPER_INSTRUCTIONS_V2
+    revoke_owner = True
+
     def __init__(self, service, job, model):
         self.service, self.job, self.model = service, job, model
         self.driver = self.session = self.result = self.control = None
         self.closed = False
         self.runtime_entered = False
+
+    def open_session(self, control):
+        return self.service.tools.session(control)
+
+    async def finish_result(self, control):
+        self.service.artifacts.finish(control.project_id, control.run_id, self.result)
 
     async def run(self, control):
         if self.closed or self.driver is not None:
@@ -34,11 +43,13 @@ class JobRuntime:
     async def _execute(self, control):
         loop = asyncio.get_running_loop()
         try:
-            self.session = self.service.tools.session(control)
+            self.session = self.open_session(control)
             await self.session.start()
             if control.cancel.is_set():
                 raise BackgroundFailure("CANCELLED")
             runtime = copy.copy(self.service.runtime)
+            if runtime is None:
+                raise AgentFailure("AGENT_RUNTIME_UNSUPPORTED")
             multiplexed = getattr(runtime, "multiplexed", False)
             if getattr(runtime, "native", False) and not multiplexed:
                 await self.service.authorize_native(control)
@@ -46,7 +57,8 @@ class JobRuntime:
             def call(coroutine):
                 return asyncio.run_coroutine_threadsafe(coroutine, loop).result(timeout=15)
             def revoke():
-                control.revoked = True
+                if self.revoke_owner:
+                    control.revoked = True
                 self.session.revoke()
             def close_tools(seconds):
                 asyncio.run_coroutine_threadsafe(self.session.close(), loop).result(timeout=max(0.001, seconds))
@@ -72,7 +84,7 @@ class JobRuntime:
                     (lambda: call(control.execution_ready())) if getattr(runtime, "native", False) else control.execution_ready,
                 child_started=started_shared if multiplexed else lambda: call(control.child_started()),
                 revoke=revoke, close_tools=close_shared if multiplexed else close_tools,
-                developer_instructions=DEVELOPER_INSTRUCTIONS_V2, elapsed_clock=self.service.supervisor.clock.now,
+                developer_instructions=self.instructions, elapsed_clock=self.service.supervisor.clock.now,
                 job_id=control.run_id, cancelled=control.cancelled)
             self.runtime_entered = True
             self.result = await runtime.run(value, control.cancel, emit)
@@ -80,7 +92,7 @@ class JobRuntime:
             # An observed account failure still pauses dispatch when a deadline wins the race.
             if error in {"RATE_LIMITED", "AUTH_REQUIRED"}:
                 self.service.supervisor.pause(error)
-            self.service.artifacts.finish(control.project_id, control.run_id, self.result)
+            await self.finish_result(control)
             return ExecutionOutcome(self.result.state, error, self.service.supervisor.clock.now())
         except AgentFailure as error:
             return ExecutionOutcome("failed", ERRORS.get(error.code, "PROTOCOL"))

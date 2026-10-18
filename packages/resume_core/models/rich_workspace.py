@@ -12,6 +12,7 @@ from .recovery import EvidenceSpan, Rules
 from .rich_document import ImageBlock, RichDocumentV1, SectionBlock
 from .rich_facts import WorkingFacts
 from .rich_mutations import DependencyStamp, RichStep, RichSelection
+from .importing import ImportDraft
 
 
 class LocalImageAsset(Wire):
@@ -134,6 +135,7 @@ class RichPreDraft(Wire):
     facts: WorkingFacts
     operations: list[RichOperation]
     warnings: list[Id]
+    import_draft: ImportDraft | None = Field(default=None, exclude_if=lambda value: value is None)
 
 
 class RichSyncRecord(Wire):

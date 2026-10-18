@@ -1,4 +1,5 @@
 import Ajv2020 from "ajv/dist/2020.js";
+import { taggedSchema } from "../contracts/tagged-schema";
 import schema from "../../../../contracts/json-schema/rich_project_response.schema.json" with { type: "json" };
 import type { RichProjectResponse } from "../contracts/generated/rich_project_response";
 import type { RichMutation } from "../contracts/generated/rich_mutation";
@@ -14,10 +15,10 @@ import type { CascadeRequest } from "../contracts/generated/cascade_request";
 import timelineSchema from "../../../../contracts/json-schema/timeline_report.schema.json" with { type: "json" };
 import cascadeSchema from "../../../../contracts/json-schema/date_cascade_proposal.schema.json" with { type: "json" };
 
-const ajv = new Ajv2020({ strict: false, allErrors: true });
-const responseShape = ajv.compile<RichProjectResponse>(schema);
-const timelineShape = ajv.compile<TimelineReport>(timelineSchema);
-const cascadeShape = ajv.compile<DateCascadeProposal>(cascadeSchema);
+const ajv = new Ajv2020({ strict: false, allErrors: true, discriminator: true });
+const responseShape = ajv.compile<RichProjectResponse>(taggedSchema(schema));
+const timelineShape = ajv.compile<TimelineReport>(taggedSchema(timelineSchema));
+const cascadeShape = ajv.compile<DateCascadeProposal>(taggedSchema(cascadeSchema));
 export const validateImageSession = ajv.compile<ImageSessionRequest>(imageSessionSchema);
 const prefix = "/v1/rich/projects";
 export class RichApiFailure extends Error {

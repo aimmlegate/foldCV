@@ -6,3 +6,6 @@
 @import "./background.css";
 @import "./editor-adapter.css";
 @import "./polish.css";
+@import "./import-progress.css";
+@import "../../rich/reference-fonts.css";
+@import "./reference-document.css";

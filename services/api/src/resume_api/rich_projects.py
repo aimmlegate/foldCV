@@ -10,18 +10,15 @@ from packages.resume_core.background_store import BackgroundFailure
 from packages.resume_core.background_history import digest_bytes
 from packages.resume_core.background_store import identity as command_identity
 from packages.resume_core.gui_archive_zip import ArchiveFailure
-from packages.resume_core.gui_normalization import GuiNormalizeRequest, canonical_source
-from packages.resume_core.import_diagnostics import source_warnings
+from packages.resume_core.gui_normalization import canonical_source
 from packages.resume_core.models.contracts import Source
-from packages.resume_core.models.rich_workspace import RichOperation, RichRenderSnapshot, RichWarning, WorkspaceV6
+from packages.resume_core.models.rich_workspace import RichOperation, RichRenderSnapshot, WorkspaceV6
 from packages.resume_core.project_store import ProjectStoreFailure
 from packages.resume_core.project_catalog import ProjectCatalog
 from packages.resume_core.rich_api import RichGenerationState, RichProjectResponse
 from packages.resume_core.rich_archive import archive_payload, export_rich_archive, open_rich_archive
 from packages.resume_core.rich_assembly import identity
-from packages.resume_core.rich_import import assemble_import
 from packages.resume_core.rich_identity import resume_identity
-from packages.resume_core.gui_annotations import unresolved_source_units
 from packages.resume_core.rich_mutations import RichMutationFailure, apply_rich_mutation
 from packages.resume_core.rich_project_store import RichProjectStore
 from packages.resume_core.rich_snapshot_merge import merge_snapshot, reconcile
@@ -30,19 +27,16 @@ from packages.resume_core.rendering.rich_template import PACKAGE_SHA256
 from packages.resume_core.rendering.template import RenderFailure
 from packages.resume_core.rules import RulesFailure
 from .extracting import UploadFailure, run_extract
-from .gui_admission import AdmissionCancelled, QueuedProvider
-from .gui_normalization_content import GuiNormalizationContentService
+from .gui_admission import AdmissionCancelled
 from .gui_projects import GuiProjectService, ProjectFailure, digest
 from .gui_rendering import RichDocxRenderer
 from .lifecycle import OperationFiles, SpikeError
-from .providers.content import ContentFailure
 from .rich_assets import RichAssets
 from .rich_synchronization import RichSynchronization
-from .resume_assessment_content import ResumeAssessmentContentService
 
 
 class RichProjectService(RichSynchronization, RichAssets, GuiProjectService):
-    def __init__(self, temp_root, rules, provider_factory, **options):
+    def __init__(self, temp_root, rules, provider_factory, *, import_runtime=None, import_provider_factory=None, **options):
         options.setdefault("storage", RichProjectStore(rules.root))
         options.setdefault("renderer", RichDocxRenderer())
         super().__init__(temp_root, rules, provider_factory, **options)
@@ -52,6 +46,8 @@ class RichProjectService(RichSynchronization, RichAssets, GuiProjectService):
         self.generations = {}
         self.saved_baselines = {}
         self.agent_recovery_fences = set()
+        self.import_runtime = import_runtime
+        self.import_provider_factory = import_provider_factory or (lambda: self.provider_factory())
         self.initialize_images()
 
     def require_agent_writable(self, identifier):
@@ -347,18 +343,20 @@ class RichProjectService(RichSynchronization, RichAssets, GuiProjectService):
         sources = [source for source in workspace.pre_draft.sources if source.id == workspace.pre_draft.selected_source_id]
         if not sources or not any(unit.text.strip() for unit in sources[0].units):
             raise ProjectFailure("NO_USABLE_TEXT", 422)
-        selected = self.provider_factory()
+        selected = self.import_provider_factory()
         if selected is None:
             raise ProjectFailure("CONNECTION_REQUIRED")
         try:
             rules = self.rules.load()
         except RulesFailure as error:
             raise ProjectFailure(error.code, 503) from None
-        generation = RichGenerationState(id=identity("generation"), status="queued", stage="assess_resume", errorCode=None)
+        generation = RichGenerationState(id=identity("generation"), status="queued", stage="normalize_semantics",
+            errorCode=None, startedAt=self.clock().isoformat())
         self.generations[identifier] = generation
         key = (identifier, generation.id)
         self.cancels[key] = threading.Event()
-        self.tasks[key] = asyncio.create_task(self._run_rich(identifier, generation, sources, rules, selected))
+        from .importer.direct import run_import
+        self.tasks[key] = asyncio.create_task(run_import(self, identifier, generation, rules, selected))
         return generation.id
 
     def new_operation(self, identifier, kind):
@@ -374,99 +372,6 @@ class RichProjectService(RichSynchronization, RichAssets, GuiProjectService):
         with self.state_lock:
             operation = next(op for op in self.owner(self.workspaces[identifier]).operations if op.id == operation_id)
             operation.status, operation.error_code = status, error_code
-
-    async def content(self, identifier, generation, request, rules, selected):
-        key = (identifier, generation.id)
-        cancel = self.cancels[key]
-        operation = self.new_operation(identifier, generation.stage)
-        def admitted():
-            with self.state_lock:
-                operation.status = "running"
-                if self.persist(identifier) == "failed":
-                    raise ProjectFailure("PROJECT_SAVE_FAILED", 503)
-        service_type = ResumeAssessmentContentService if generation.stage == "assess_resume" else GuiNormalizationContentService
-        service = service_type(QueuedProvider(selected[0], admitted), selected[1])
-        files = OperationFiles(self.temp_root)
-        self.files[key] = files
-        def run():
-            with files.open():
-                return service.run(request, rules, files, cancel)[0]
-        try:
-            async with self.worker_slot(cancel):
-                result = await asyncio.to_thread(run)
-            if cancel.is_set():
-                raise AdmissionCancelled()
-            with self.state_lock:
-                operation.status = "completed"
-                self.persist(identifier)
-            return result
-        except Exception as error:
-            with self.state_lock:
-                operation.status = "cancelled" if cancel.is_set() else "failed"
-                operation.error_code = getattr(error, "code", "INVALID_RESULT")
-                self.persist(identifier)
-            if isinstance(error, SpikeError):
-                self.cleanup_error(error)
-            raise
-        finally:
-            self.files.pop(key, None)
-
-    async def _run_rich(self, identifier, generation, sources, rules, selected):
-        generation.status = "running"
-        workspace = self.workspaces[identifier]
-        source_capture = [source.model_dump(mode="json", by_alias=True) for source in sources]
-        formatting_capture = workspace.formatting_as_of.model_copy(deep=True)
-        try:
-            request = GuiNormalizeRequest(sources=sources, formattingAsOf=workspace.formatting_as_of, revision=workspace.project_revision)
-            assessment = await self.content(identifier, generation, request, rules, selected)
-            codes = {"unlikely": "source_not_resume", "uncertain": "source_resume_uncertain"}
-            if assessment.verdict in codes:
-                code = codes[assessment.verdict]
-                if not any(warning.code == code for warning in workspace.warnings):
-                    workspace.warnings.append(RichWarning(id=identity("warning"), code=code, blockIds=[], recordIds=[], evidence=[]))
-                if self.persist(identifier) == "failed":
-                    raise ProjectFailure("PROJECT_SAVE_FAILED", 503)
-            generation.stage = "normalize_semantics"
-            normalized = await self.content(identifier, generation, request, rules, selected)
-            if self.cancels[(identifier, generation.id)].is_set():
-                raise AdmissionCancelled()
-            with self.state_lock:
-                generation.stage = "assemble"
-                if self.persist(identifier) == "failed":
-                    raise ProjectFailure("PROJECT_SAVE_FAILED", 503)
-                if (workspace.project is not None or workspace.formatting_as_of != formatting_capture
-                        or [source.model_dump(mode="json", by_alias=True) for source in workspace.pre_draft.sources
-                            if source.id == workspace.pre_draft.selected_source_id] != source_capture):
-                    raise ProjectFailure("STALE_GENERATION", 409)
-                project = assemble_import(workspace, normalized)
-                workspace.project, workspace.pre_draft = project, None
-                workspace.project_revision, workspace.document_revision = project.revision, project.document.revision
-                workspace.rules_used, workspace.source_observed_at = rules, normalized.source_observed_at
-                if not workspace.title_manually_set:
-                    workspace.title = normalized.candidate.name.text or workspace.title
-                unresolved = ["source_details_unresolved"] if normalized._native_recovery_count or unresolved_source_units(normalized) else []
-                workspace.warnings = [warning for warning in workspace.warnings if warning.code not in {
-                    *[code for source in normalized.sources for code in source.warnings], "source_details_unresolved"}]
-                workspace.warnings.extend(source_warnings(normalized.sources))
-                for code in unresolved:
-                    workspace.warnings.append(RichWarning(id=identity("warning"), code=code, blockIds=[], recordIds=[], evidence=[]))
-                if self.persist(identifier) == "failed":
-                    raise ProjectFailure("PROJECT_SAVE_FAILED", 503)
-            generation.stage = "render"
-            try:
-                await self.export(identifier, generation.id)
-            except RenderFailure as error:
-                if error.code != "RICH_EXPORT_UNSUPPORTED":
-                    raise
-                workspace.warnings.append(RichWarning(id=identity("warning"), code=error.code, blockIds=[], recordIds=[], evidence=[]))
-            generation.status = "completed"
-        except (ContentFailure, ProjectFailure, RenderFailure, SpikeError, AdmissionCancelled, asyncio.TimeoutError) as error:
-            generation.status = "cancelled" if self.cancels[(identifier, generation.id)].is_set() else "failed"
-            generation.error_code = getattr(error, "code", "CANCELLED" if isinstance(error, AdmissionCancelled) else "OPERATION_TIMEOUT")
-        except Exception:
-            generation.status, generation.error_code = "failed", "INVALID_RESULT"
-        finally:
-            self.persist(identifier)
 
     def mutate(self, identifier, request):
         with self.state_lock:

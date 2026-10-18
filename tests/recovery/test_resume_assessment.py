@@ -17,7 +17,10 @@ from packages.resume_core.rules import RulesStore
 from resume_api.providers.content import ContentFailure, ContentResult, ReportedUsage
 from resume_api.resume_assessment_content import ResumeAssessmentContentService
 from resume_api.rich_projects import RichProjectService
+from resume_api.agent.runtime import RuntimeResult
+from packages.resume_core.models.importing import ImportFinish
 from tests.recovery.generation_fixtures import CreationProvider, frozen_now
+from tests.support.importing import importer, complete
 
 
 def input_source(text):
@@ -44,35 +47,43 @@ def test_assessment_bounds_unicode_and_escaped_text_and_discloses_head_tail_samp
     assert len(prompt.encode()) < 65_536
 
 
-@pytest.mark.parametrize("verdict,warning", [("likely", None), ("unlikely", "source_not_resume"), ("uncertain", "source_resume_uncertain")])
+@pytest.mark.parametrize("note", [None, "The source may be unrelated to a resume.", "The source needs review."])
 @pytest.mark.asyncio
-async def test_assessment_precedes_facts_and_negative_result_keeps_original_durable(tmp_path, verdict, warning):
-    provider = CreationProvider(assessment=verdict, fail_kind="GuiDraftProposal")
-    service = RichProjectService(tmp_path / "operations", RulesStore(tmp_path / "store"), lambda: (provider, "fixture"), clock=frozen_now)
+async def test_import_keeps_questionable_source_with_readable_review_notes(tmp_path, monkeypatch, note):
+    async def turn(session, _value, _cancel):
+        saved = await complete(session, finish=False)
+        await session.dispatcher.call("finish_import", ImportFinish(sequence=saved["sequence"], issues=[note] if note else []))
+        return RuntimeResult(state="completed")
+    runtime, _ = importer(monkeypatch, turn)
+    provider = CreationProvider(fail_kind="GuiDraftProposal")
+    service = RichProjectService(tmp_path / "operations", RulesStore(tmp_path / "store"),
+        lambda: (provider, "fixture"), clock=frozen_now, import_runtime=runtime)
     data = Path("tests/fixtures/recovery/E1.txt").read_bytes()
     selected = await service.select(data, "pasted.txt", True)
     identifier = selected.project_id
     generation = service.start(identifier)
-    assert service.generations[identifier].stage == "assess_resume"
+    assert service.generations[identifier].stage == "normalize_semantics"
     await service.tasks[(identifier, generation)]
     assert service.generations[identifier].status == "completed"
     workspace = service.read(identifier)
-    assert provider.calls[0] == {"task": "assess_resume"} and len(provider.calls) == 2
-    assert provider.calls[1]["task"] == "normalize_semantics"
-    assert [op.kind for op in workspace.project.operations] == ["assess_resume", "normalize_semantics", "render"]
+    assert len(runtime.calls) == 1 and not provider.calls
+    assert [op.kind for op in workspace.project.operations] == ["normalize_semantics", "render"]
     from packages.resume_core.rich_presentation import authored_text
     visible = " ".join(authored_text(block) for block in workspace.project.document.blocks())
     assert not (Counter(re.findall(r"\w+", data.decode())) - Counter(re.findall(r"\w+", visible)))
     source = workspace.project.sources[0]
     assert {item.unit_id for item in workspace.project.import_coverage} == {unit.id for unit in source.units}
     assert service.originals[(identifier, workspace.project.sources[0].id)] == data
-    assert {w.code for w in workspace.warnings} == ({warning} if warning else set())
+    assert {w.code for w in workspace.warnings} == ({"source_details_unresolved"} if note else set())
+    assert workspace.project.facts.mode == "digest"
+    assert [item.section for item in workspace.project.facts.extraction.unresolved] == ([note] if note else [])
     reopened = RichProjectService(tmp_path / "reopened", RulesStore(tmp_path / "store"), lambda: None)
     assert reopened.read(identifier) == workspace
     from packages.resume_core.rich_archive import open_rich_archive
     transferred, *_ = open_rich_archive(service.portable(identifier), "assessment-copy")
     assert transferred.project.document == workspace.project.document and transferred.warnings == workspace.warnings
-    assert len(provider.calls) == 2
+    assert len(runtime.calls) == 1 and not provider.calls
+    await service.shutdown()
 
 
 @pytest.mark.parametrize("value,error", [({"verdict": "other"}, None), ({}, None), (None, "INVALID_RESULT")])
@@ -115,9 +126,11 @@ def test_cancelled_assessment_cannot_continue_after_a_late_reply():
 
 
 @pytest.mark.asyncio
-async def test_failed_connection_can_process_the_same_saved_source_after_setup(tmp_path):
+async def test_failed_connection_can_process_the_same_saved_source_after_setup(tmp_path, monkeypatch):
     selected_provider = [None]
-    service = RichProjectService(tmp_path / "operations", RulesStore(tmp_path / "store"), lambda: selected_provider[0], clock=frozen_now)
+    runtime, _ = importer(monkeypatch)
+    service = RichProjectService(tmp_path / "operations", RulesStore(tmp_path / "store"),
+        lambda: selected_provider[0], clock=frozen_now, import_runtime=runtime)
     data = Path("tests/fixtures/recovery/E1.txt").read_bytes()
     source = await service.select(data, "pasted.txt", True)
     from resume_api.gui_projects import ProjectFailure
@@ -128,5 +141,7 @@ async def test_failed_connection_can_process_the_same_saved_source_after_setup(t
     selected_provider[0] = (provider, "fixture")
     generation = service.start(source.project_id)
     await service.tasks[(source.project_id, generation)]
-    assert service.generations[source.project_id].status == "completed" and len(provider.calls) == 2
-    assert len(service.workspaces) == 1 and service.read(source.project_id).project.sources == provider.normalized.sources
+    assert service.generations[source.project_id].status == "completed" and len(runtime.calls) == 1
+    assert not provider.calls
+    assert len(service.workspaces) == 1 and service.read(source.project_id).project.sources == source.pre_draft.sources
+    await service.shutdown()

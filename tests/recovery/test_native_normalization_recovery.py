@@ -99,6 +99,73 @@ def test_native_schema_accepts_supported_skills_without_inventing_employment(abs
         for fact in normalized.facts)
 
 
+FACT_VALUES = {
+    "text": {"text": "Python"},
+    "technology": {"canonicalId": "python", "display": "Python", "scope": "global"},
+    "date": {"precision": "year", "year": 2020, "month": None, "day": None},
+    "metric": {"number": 12, "upperNumber": None, "comparator": "exact", "unit": "services", "period": None,
+        "baseline": None, "result": None, "scope": None, "attribution": "team", "qualifiers": []},
+    "leadership": {"action": "Led a team", "teamSize": None, "attribution": "personal"},
+}
+
+
+@pytest.mark.parametrize("kind", FACT_VALUES)
+@pytest.mark.parametrize("value_kind,value", FACT_VALUES.items())
+def test_native_schema_binds_each_fact_kind_to_its_actual_value_shape(kind, value_kind, value):
+    from jsonschema import Draft202012Validator
+    captured = source()
+    raw = employment_proposal(captured).model_dump(mode="json", by_alias=True)
+    raw["facts"][0].update(kind=kind, value=value)
+    original = GuiSemanticProposal.model_json_schema()
+    before = deepcopy(original)
+    schema = NativeNormalizationTransport(captured, RULES).output_schema(original)
+    assert bool(list(Draft202012Validator(schema).iter_errors(raw))) is (kind != value_kind)
+    assert bool(list(Draft202012Validator(StructuredSchema(schema).wire).iter_errors(raw))) is (kind != value_kind)
+    assert original == before
+
+
+@pytest.mark.parametrize("text,required", [
+    ("Candidate\nWork experience\nJanuary 2020 — Present\nExample employer\nEngineer\n", True),
+    ("Кандидат\nОпыт работы — 5 лет\nМай 2020 — июнь 2024\nКомпания\nИнженер\n", True),
+    ("Student\nWork experience\nEducation\n2018 — 2022 Example University\nPython\n", False),
+    ("Student\nEmployment: none\nEducation\n2018 — 2022 Example University\nPython\n", False),
+    ("Candidate\nEmployment history\n01.2020 - 06.2024\nExample employer\nEngineer\n", True),
+    ("Candidate\nWork experience\n2020\n—\n2024\nExample employer\nEngineer\n", True),
+    ("Student\nWork experience\nPersonal projects\n2018 — 2022 Hobby project\nPython\n", False),
+    ("Student\nEducation\n2018 — 2022 Example University\nWork experience\nPython\n", False),
+    ("Student\nEmployment: none\n2018 — 2022\nPython\n", False),
+    ("Student\nNo work experience\n2018 — 2022\nPython\n", False),
+])
+def test_native_schema_requires_jobs_only_for_a_dated_employment_section(text, required):
+    captured = request(text)
+    schema = NativeNormalizationTransport(captured, RULES).output_schema(GuiSemanticProposal.model_json_schema())
+    assert (schema["properties"]["jobs"].get("minItems", 0) > 0) is required
+
+
+def test_native_job_requirement_does_not_join_sections_across_sources():
+    captured = request("Student\nWork experience\nPython\n")
+    captured.sources.extend(request("2018 — 2022 Example University\n").sources)
+    schema = NativeNormalizationTransport(captured, RULES).output_schema(GuiSemanticProposal.model_json_schema())
+    assert schema["properties"]["jobs"].get("minItems", 0) == 0
+
+
+def test_native_typed_schema_round_trip_preserves_jobs_facts_and_source_evidence():
+    captured = source()
+    expected = employment_proposal(captured)
+    raw = expected.model_dump(mode="json", by_alias=True)
+    for fact in raw["facts"]:
+        fact["importance"] = None
+    transport = NativeNormalizationTransport(captured, RULES)
+    schema = StructuredSchema(transport.output_schema(GuiSemanticProposal.model_json_schema()))
+    events = Events()
+    events.complete, events.text = True, json.dumps(raw)
+    proposal = transport.restore(events.result(GuiSemanticProposal, schema, transport.decode))
+    actual = normalize_employment(captured, proposal, normalize_candidate(captured, proposal, RULES))
+    before = normalize_employment(captured, expected, normalize_candidate(captured, expected, RULES))
+    assert actual.employment == before.employment and actual.facts == before.facts
+    assert actual.sources == before.sources and transport.unresolved == 0
+
+
 @pytest.mark.parametrize("change", ["citation", "ownership", "malformed", "unknown_kind"])
 def test_one_bad_native_fact_does_not_block_other_jobs_or_verified_facts(change):
     captured = source()

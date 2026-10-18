@@ -1752,7 +1752,7 @@
           "type": "object"
         },
         "factCount": {
-          "minimum": 1,
+          "minimum": 0,
           "title": "Factcount",
           "type": "integer"
         },
@@ -3373,6 +3373,106 @@
       "title": "ImmutableFactEvidence",
       "type": "object"
     },
+    "ImportBlock": {
+      "additionalProperties": false,
+      "properties": {
+        "category": {
+          "anyOf": [
+            {
+              "enum": [
+                "identity",
+                "contacts",
+                "summary",
+                "experience",
+                "education",
+                "skills",
+                "languages",
+                "other"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Category"
+        },
+        "duplicateOf": {
+          "items": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "maxItems": 1000,
+          "title": "Duplicateof",
+          "type": "array"
+        },
+        "id": {
+          "minLength": 1,
+          "title": "Id",
+          "type": "string"
+        },
+        "kind": {
+          "default": "paragraph",
+          "enum": [
+            "paragraph",
+            "heading",
+            "section",
+            "bullet_list",
+            "duplicate"
+          ],
+          "title": "Kind",
+          "type": "string"
+        },
+        "listItem": {
+          "default": false,
+          "title": "Listitem",
+          "type": "boolean"
+        },
+        "modelBlock": {
+          "default": false,
+          "title": "Modelblock",
+          "type": "boolean"
+        },
+        "region": {
+          "default": "main",
+          "enum": [
+            "header",
+            "sidebar",
+            "main"
+          ],
+          "title": "Region",
+          "type": "string"
+        },
+        "sourceKeys": {
+          "items": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "maxItems": 1000,
+          "title": "Sourcekeys",
+          "type": "array"
+        },
+        "title": {
+          "anyOf": [
+            {
+              "maxLength": 200,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Title"
+        }
+      },
+      "required": [
+        "id"
+      ],
+      "title": "ImportBlock",
+      "type": "object"
+    },
     "ImportCoverage": {
       "additionalProperties": false,
       "properties": {
@@ -3422,6 +3522,430 @@
         "reason"
       ],
       "title": "ImportCoverage",
+      "type": "object"
+    },
+    "ImportDraft": {
+      "additionalProperties": false,
+      "properties": {
+        "blocks": {
+          "items": {
+            "$ref": "#/$defs/ImportBlock"
+          },
+          "maxItems": 5000,
+          "title": "Blocks",
+          "type": "array"
+        },
+        "facts": {
+          "items": {
+            "$ref": "#/$defs/ImportFact"
+          },
+          "maxItems": 1000,
+          "title": "Facts",
+          "type": "array"
+        },
+        "finished": {
+          "default": false,
+          "title": "Finished",
+          "type": "boolean"
+        },
+        "issues": {
+          "items": {
+            "maxLength": 4000,
+            "minLength": 1,
+            "type": "string"
+          },
+          "maxItems": 100,
+          "title": "Issues",
+          "type": "array"
+        },
+        "profile": {
+          "$ref": "#/$defs/ImportProfile"
+        },
+        "receipts": {
+          "items": {
+            "$ref": "#/$defs/ImportReceipt"
+          },
+          "maxItems": 128,
+          "title": "Receipts",
+          "type": "array"
+        },
+        "runId": {
+          "minLength": 1,
+          "title": "Runid",
+          "type": "string"
+        },
+        "sequence": {
+          "default": 0,
+          "maximum": 128,
+          "minimum": 0,
+          "title": "Sequence",
+          "type": "integer"
+        },
+        "skillSha256": {
+          "pattern": "^[a-f0-9]{64}$",
+          "title": "Skillsha256",
+          "type": "string"
+        },
+        "sourceSha256": {
+          "pattern": "^[a-f0-9]{64}$",
+          "title": "Sourcesha256",
+          "type": "string"
+        },
+        "version": {
+          "const": 1,
+          "default": 1,
+          "title": "Version",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "sourceSha256",
+        "skillSha256",
+        "runId"
+      ],
+      "title": "ImportDraft",
+      "type": "object"
+    },
+    "ImportEducation": {
+      "additionalProperties": false,
+      "properties": {
+        "completion": {
+          "default": "",
+          "maxLength": 4000,
+          "title": "Completion",
+          "type": "string"
+        },
+        "institution": {
+          "default": "",
+          "maxLength": 4000,
+          "title": "Institution",
+          "type": "string"
+        },
+        "kind": {
+          "const": "education",
+          "title": "Kind",
+          "type": "string"
+        },
+        "qualification": {
+          "default": "",
+          "maxLength": 4000,
+          "title": "Qualification",
+          "type": "string"
+        },
+        "specialty": {
+          "default": "",
+          "maxLength": 4000,
+          "title": "Specialty",
+          "type": "string"
+        }
+      },
+      "required": [
+        "kind"
+      ],
+      "title": "ImportEducation",
+      "type": "object"
+    },
+    "ImportEmployment": {
+      "additionalProperties": false,
+      "properties": {
+        "employer": {
+          "default": "",
+          "maxLength": 4000,
+          "title": "Employer",
+          "type": "string"
+        },
+        "kind": {
+          "const": "employment",
+          "title": "Kind",
+          "type": "string"
+        },
+        "periods": {
+          "items": {
+            "$ref": "#/$defs/ImportPeriod"
+          },
+          "maxItems": 40,
+          "title": "Periods",
+          "type": "array"
+        },
+        "role": {
+          "default": "",
+          "maxLength": 4000,
+          "title": "Role",
+          "type": "string"
+        },
+        "technologies": {
+          "items": {
+            "anyOf": [
+              {
+                "maxLength": 4000,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "$ref": "#/$defs/ImportSkill"
+              }
+            ]
+          },
+          "maxItems": 100,
+          "title": "Technologies",
+          "type": "array"
+        }
+      },
+      "required": [
+        "kind"
+      ],
+      "title": "ImportEmployment",
+      "type": "object"
+    },
+    "ImportFact": {
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "minLength": 1,
+          "title": "Id",
+          "type": "string"
+        },
+        "record": {
+          "anyOf": [
+            {
+              "discriminator": {
+                "mapping": {
+                  "education": "#/$defs/ImportEducation",
+                  "employment": "#/$defs/ImportEmployment",
+                  "language": "#/$defs/ImportLanguage",
+                  "technology": "#/$defs/ImportTechnology"
+                },
+                "propertyName": "kind"
+              },
+              "oneOf": [
+                {
+                  "$ref": "#/$defs/ImportEmployment"
+                },
+                {
+                  "$ref": "#/$defs/ImportEducation"
+                },
+                {
+                  "$ref": "#/$defs/ImportTechnology"
+                },
+                {
+                  "$ref": "#/$defs/ImportLanguage"
+                }
+              ]
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Record"
+        },
+        "sourceKeys": {
+          "items": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "maxItems": 1000,
+          "title": "Sourcekeys",
+          "type": "array"
+        },
+        "text": {
+          "default": "",
+          "maxLength": 4000,
+          "title": "Text",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id"
+      ],
+      "title": "ImportFact",
+      "type": "object"
+    },
+    "ImportLanguage": {
+      "additionalProperties": false,
+      "properties": {
+        "kind": {
+          "const": "language",
+          "title": "Kind",
+          "type": "string"
+        },
+        "language": {
+          "default": "",
+          "maxLength": 4000,
+          "title": "Language",
+          "type": "string"
+        },
+        "level": {
+          "default": "",
+          "maxLength": 4000,
+          "title": "Level",
+          "type": "string"
+        }
+      },
+      "required": [
+        "kind"
+      ],
+      "title": "ImportLanguage",
+      "type": "object"
+    },
+    "ImportPeriod": {
+      "additionalProperties": false,
+      "properties": {
+        "end": {
+          "default": "",
+          "maxLength": 4000,
+          "title": "End",
+          "type": "string"
+        },
+        "present": {
+          "default": false,
+          "title": "Present",
+          "type": "boolean"
+        },
+        "start": {
+          "default": "",
+          "maxLength": 4000,
+          "title": "Start",
+          "type": "string"
+        }
+      },
+      "title": "ImportPeriod",
+      "type": "object"
+    },
+    "ImportProfile": {
+      "additionalProperties": false,
+      "properties": {
+        "location": {
+          "default": "",
+          "maxLength": 4000,
+          "title": "Location",
+          "type": "string"
+        },
+        "name": {
+          "default": "",
+          "maxLength": 4000,
+          "title": "Name",
+          "type": "string"
+        },
+        "sourceKeys": {
+          "items": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "maxItems": 1000,
+          "title": "Sourcekeys",
+          "type": "array"
+        },
+        "title": {
+          "default": "",
+          "maxLength": 4000,
+          "title": "Title",
+          "type": "string"
+        }
+      },
+      "title": "ImportProfile",
+      "type": "object"
+    },
+    "ImportReceipt": {
+      "additionalProperties": false,
+      "properties": {
+        "batchId": {
+          "minLength": 1,
+          "title": "Batchid",
+          "type": "string"
+        },
+        "requestSha256": {
+          "pattern": "^[a-f0-9]{64}$",
+          "title": "Requestsha256",
+          "type": "string"
+        },
+        "sequence": {
+          "maximum": 128,
+          "minimum": 1,
+          "title": "Sequence",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "batchId",
+        "requestSha256",
+        "sequence"
+      ],
+      "title": "ImportReceipt",
+      "type": "object"
+    },
+    "ImportSkill": {
+      "additionalProperties": false,
+      "properties": {
+        "display": {
+          "maxLength": 4000,
+          "minLength": 1,
+          "title": "Display",
+          "type": "string"
+        },
+        "experience": {
+          "default": "",
+          "maxLength": 4000,
+          "title": "Experience",
+          "type": "string"
+        },
+        "technical": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Technical"
+        }
+      },
+      "required": [
+        "display"
+      ],
+      "title": "ImportSkill",
+      "type": "object"
+    },
+    "ImportTechnology": {
+      "additionalProperties": false,
+      "properties": {
+        "display": {
+          "maxLength": 4000,
+          "minLength": 1,
+          "title": "Display",
+          "type": "string"
+        },
+        "experience": {
+          "default": "",
+          "maxLength": 4000,
+          "title": "Experience",
+          "type": "string"
+        },
+        "kind": {
+          "const": "technology",
+          "title": "Kind",
+          "type": "string"
+        },
+        "technical": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Technical"
+        }
+      },
+      "required": [
+        "display",
+        "kind"
+      ],
+      "title": "ImportTechnology",
       "type": "object"
     },
     "InlineStyles": {
@@ -5838,6 +6362,17 @@
         "facts": {
           "$ref": "#/$defs/WorkingFacts"
         },
+        "importDraft": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ImportDraft"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
         "operations": {
           "items": {
             "$ref": "#/$defs/RichOperation"
@@ -6714,6 +7249,209 @@
       "title": "SourceOverlay",
       "type": "object"
     },
+    "SourceStructure": {
+      "additionalProperties": false,
+      "description": "Observed layout cues, never semantic resume fields.",
+      "properties": {
+        "blankBefore": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Blankbefore"
+        },
+        "bold": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Bold"
+        },
+        "bounds": {
+          "anyOf": [
+            {
+              "items": {
+                "type": "number"
+              },
+              "maxItems": 4,
+              "minItems": 4,
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Bounds"
+        },
+        "column": {
+          "anyOf": [
+            {
+              "minimum": 1,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Column"
+        },
+        "columnSpan": {
+          "anyOf": [
+            {
+              "maximum": 1000,
+              "minimum": 1,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Columnspan"
+        },
+        "fontSize": {
+          "anyOf": [
+            {
+              "exclusiveMinimum": 0,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Fontsize"
+        },
+        "gapBefore": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Gapbefore"
+        },
+        "group": {
+          "anyOf": [
+            {
+              "minimum": 1,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Group"
+        },
+        "headingLevel": {
+          "anyOf": [
+            {
+              "maximum": 9,
+              "minimum": 1,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Headinglevel"
+        },
+        "indent": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Indent"
+        },
+        "layoutUncertain": {
+          "default": false,
+          "title": "Layoutuncertain",
+          "type": "boolean"
+        },
+        "listLevel": {
+          "anyOf": [
+            {
+              "maximum": 8,
+              "minimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Listlevel"
+        },
+        "part": {
+          "anyOf": [
+            {
+              "maxLength": 120,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Part"
+        },
+        "rowMerge": {
+          "anyOf": [
+            {
+              "enum": [
+                "start",
+                "continue"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Rowmerge"
+        },
+        "style": {
+          "anyOf": [
+            {
+              "maxLength": 120,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Style"
+        }
+      },
+      "title": "SourceStructure",
+      "type": "object"
+    },
     "SourceUnit": {
       "additionalProperties": false,
       "properties": {
@@ -6754,6 +7492,17 @@
           "minimum": 1,
           "title": "Revision",
           "type": "integer"
+        },
+        "structure": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/SourceStructure"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
         },
         "text": {
           "title": "Text",
@@ -7359,6 +8108,9 @@
           "title": "Evidence",
           "type": "array"
         },
+        "experience": {
+          "$ref": "#/$defs/WorkingField_str_"
+        },
         "id": {
           "minLength": 1,
           "title": "Id",
@@ -7405,6 +8157,18 @@
             }
           ],
           "title": "Subprojectid"
+        },
+        "technical": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Technical"
         },
         "userCorrected": {
           "default": false,
@@ -7905,6 +8669,16 @@
             }
           ],
           "default": null
+        },
+        "mode": {
+          "default": "structured",
+          "enum": [
+            "structured",
+            "digest",
+            "imported"
+          ],
+          "title": "Mode",
+          "type": "string"
         },
         "records": {
           "items": {
@@ -8487,7 +9261,14 @@
   "additionalProperties": false,
   "properties": {
     "assessment": {
-      "$ref": "#/$defs/ResumeAssessment"
+      "anyOf": [
+        {
+          "$ref": "#/$defs/ResumeAssessment"
+        },
+        {
+          "type": "null"
+        }
+      ]
     },
     "id": {
       "maxLength": 128,
@@ -8495,6 +9276,17 @@
       "pattern": "^[A-Za-z0-9_-]+$",
       "title": "Id",
       "type": "string"
+    },
+    "importDraft": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/ImportDraft"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
     },
     "inputId": {
       "maxLength": 128,

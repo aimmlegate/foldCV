@@ -5,7 +5,7 @@ from __future__ import annotations
 from datetime import date
 from typing import Annotated, Literal, Union
 
-from pydantic import BaseModel, ConfigDict, Field, model_validator
+from pydantic import BaseModel, ConfigDict, Field, model_validator, model_serializer
 from pydantic.alias_generators import to_camel
 
 
@@ -84,6 +84,31 @@ class SourceLocation(Wire):
         return self
 
 
+class SourceStructure(Wire):
+    """Observed layout cues, never semantic resume fields."""
+
+    model_config = ConfigDict(populate_by_name=True)
+    bounds: list[float] | None = Field(default=None, min_length=4, max_length=4)
+    column: int | None = Field(default=None, ge=1)
+    group: int | None = Field(default=None, ge=1)
+    gap_before: float | None = None
+    font_size: float | None = Field(default=None, gt=0)
+    bold: bool | None = None
+    layout_uncertain: bool = False
+    part: str | None = Field(default=None, max_length=120)
+    style: str | None = Field(default=None, max_length=120)
+    heading_level: int | None = Field(default=None, ge=1, le=9)
+    list_level: int | None = Field(default=None, ge=0, le=8)
+    column_span: int | None = Field(default=None, ge=1, le=1000)
+    row_merge: Literal["start", "continue"] | None = None
+    indent: int | None = Field(default=None, ge=0)
+    blank_before: int | None = Field(default=None, ge=0)
+
+    @model_serializer(mode="wrap")
+    def omit_unknown(self, serialize):
+        return {key: value for key, value in serialize(self).items() if value is not None}
+
+
 class SourceUnit(Wire):
     id: Id
     revision: Revision
@@ -92,6 +117,8 @@ class SourceUnit(Wire):
     location: SourceLocation
     disposition: Literal["shown", "condensed", "archived", "duplicate", "unresolved", "administrative"]
     represented_fact_ids: list[Id]
+    # Absent cues must not change old workspace hashes or saved job identities.
+    structure: SourceStructure | None = Field(default=None, exclude_if=lambda value: value is None)
 
 
 class SourceOverlay(Wire):

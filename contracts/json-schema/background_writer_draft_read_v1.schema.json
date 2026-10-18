@@ -1401,7 +1401,7 @@
           "type": "object"
         },
         "factCount": {
-          "minimum": 1,
+          "minimum": 0,
           "title": "Factcount",
           "type": "integer"
         },
@@ -4323,6 +4323,9 @@
           "title": "Evidence",
           "type": "array"
         },
+        "experience": {
+          "$ref": "#/$defs/WorkingField_str_"
+        },
         "id": {
           "minLength": 1,
           "title": "Id",
@@ -4369,6 +4372,18 @@
             }
           ],
           "title": "Subprojectid"
+        },
+        "technical": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Technical"
         },
         "userCorrected": {
           "default": false,
@@ -4624,6 +4639,16 @@
             }
           ],
           "default": null
+        },
+        "mode": {
+          "default": "structured",
+          "enum": [
+            "structured",
+            "digest",
+            "imported"
+          ],
+          "title": "Mode",
+          "type": "string"
         },
         "records": {
           "items": {

@@ -24,6 +24,8 @@ from packages.resume_core.rendering.rich_docx import render_rich_docx
 from packages.resume_core.rules import RulesStore
 from resume_api.rich_projects import RichProjectService
 from tests.recovery.generation_fixtures import CreationProvider, frozen_now
+from tests.support.importing import importer, complete
+from resume_api.agent.runtime import RuntimeResult
 
 
 def fixture():
@@ -63,12 +65,13 @@ def patch(workspace, text="Changed", identifier="change-1"):
 
 
 @pytest.mark.asyncio
-async def test_extraction_diagnostics_survive_typing_undo_and_durable_reopen(tmp_path):
+async def test_extraction_diagnostics_survive_typing_undo_and_durable_reopen(tmp_path, monkeypatch):
+    runtime, _sessions = importer(monkeypatch)
     from packages.resume_core.background_inverse import inverse_mutation
     from packages.resume_core.rich_mutations import locate
     provider = CreationProvider()
     store_root = tmp_path / "store"
-    service = RichProjectService(tmp_path / "operations", RulesStore(store_root), lambda: (provider, "fixture"))
+    service = RichProjectService(tmp_path / "operations", RulesStore(store_root), lambda: (provider, "fixture"), import_runtime=runtime)
     try:
         data = Path("tests/fixtures/recovery/E1.txt").read_bytes()
         selected = await service.select(data, "E1.txt", True)
@@ -95,7 +98,7 @@ async def test_extraction_diagnostics_survive_typing_undo_and_durable_reopen(tmp
         transferred, *_ = open_rich_archive(service.portable(pid), "report-copy")
         assert transferred.project.facts.extraction == report
         assert service.originals[(pid, before.project.sources[0].id)] == data
-        assert len(provider.calls) == 2
+        assert len(runtime.calls) == 1 and not provider.calls
     finally:
         await service.shutdown()
     reopened = RichProjectService(tmp_path / "reopened", RulesStore(store_root), lambda: None)
@@ -233,9 +236,10 @@ def test_image_animation_format_and_normalized_dimensions_are_checked_before_pub
 
 
 @pytest.mark.asyncio
-async def test_fresh_rich_creation_initial_docx_restart_and_portable_without_inference(tmp_path):
+async def test_fresh_rich_creation_initial_docx_restart_and_portable_without_inference(tmp_path, monkeypatch):
+    runtime, _sessions = importer(monkeypatch)
     provider = CreationProvider(fail_kind="GuiDraftProposal")
-    service = RichProjectService(tmp_path / "operations", RulesStore(tmp_path / "store"), lambda: (provider, "fixture"), clock=frozen_now)
+    service = RichProjectService(tmp_path / "operations", RulesStore(tmp_path / "store"), lambda: (provider, "fixture"), clock=frozen_now, import_runtime=runtime)
     data = Path("tests/fixtures/recovery/E1.txt").read_bytes()
     selected = await service.select(data, "pasted.txt", True)
     identifier = selected.project_id
@@ -243,7 +247,7 @@ async def test_fresh_rich_creation_initial_docx_restart_and_portable_without_inf
     await service.tasks[(identifier, generation)]
     assert service.generations[identifier].status == "completed"
     workspace = service.read(identifier)
-    assert workspace.schema_version == 6 and workspace.project.schema_version == 5 and len(provider.calls) == 2
+    assert workspace.schema_version == 6 and workspace.project.schema_version == 5 and len(runtime.calls) == 1 and not provider.calls
     assert service.durability(identifier) == "durable" and workspace.project.renders
     from packages.resume_core.rich_presentation import authored_text
     units = workspace.project.sources[0].units
@@ -253,8 +257,8 @@ async def test_fresh_rich_creation_initial_docx_restart_and_portable_without_inf
     assert not (Counter(re.findall(r"\w+", data.decode())) - Counter(re.findall(r"\w+", text)))
     assert all(region.blocks for region in workspace.project.document.regions)
     assert len(workspace.project.import_coverage) == len(units)
-    assert any(record.kind == "employment" for record in workspace.project.facts.records)
-    assert {operation.kind for operation in workspace.project.operations} == {"assess_resume", "normalize_semantics", "render"}
+    assert workspace.project.facts.mode == "digest" and any(record.kind == "claim" for record in workspace.project.facts.records)
+    assert {operation.kind for operation in workspace.project.operations} == {"normalize_semantics", "render"}
     assert service.originals[(identifier, workspace.project.sources[0].id)] == data
     snapshot, docx = await service.export(identifier)
     with ZipFile(BytesIO(docx)) as archive:
@@ -262,26 +266,27 @@ async def test_fresh_rich_creation_initial_docx_restart_and_portable_without_inf
         assert "Ирина Примерова" in xml and "w:rFonts" in xml
         assert len([name for name in archive.namelist() if name.endswith(".odttf")]) == 5
         assert "saveSubsetFonts" in archive.read("word/settings.xml").decode()
-    reopened = RichProjectService(tmp_path / "operations-2", RulesStore(tmp_path / "store"), lambda: (provider, "fixture"), clock=frozen_now)
-    assert reopened.read(identifier) == workspace and len(provider.calls) == 2
+    reopened = RichProjectService(tmp_path / "operations-2", RulesStore(tmp_path / "store"), lambda: (provider, "fixture"), clock=frozen_now, import_runtime=runtime)
+    assert reopened.read(identifier) == workspace and len(runtime.calls) == 1 and not provider.calls
     assert (await reopened.export(identifier))[1] == docx
     portable = reopened.portable(identifier)
-    other = RichProjectService(tmp_path / "operations-3", RulesStore(tmp_path / "other"), lambda: (provider, "fixture"), clock=frozen_now)
+    other = RichProjectService(tmp_path / "operations-3", RulesStore(tmp_path / "other"), lambda: (provider, "fixture"), clock=frozen_now, import_runtime=runtime)
     imported = other.import_portable(portable)
     assert other.read(imported).project.document == workspace.project.document
     assert other.read(imported).project.renders == []
-    assert len(provider.calls) == 2
+    assert len(runtime.calls) == 1 and not provider.calls
 
 
 @pytest.mark.asyncio
-async def test_technical_render_failure_keeps_imported_rich_content_but_cannot_claim_completed_export(tmp_path):
+async def test_technical_render_failure_keeps_imported_rich_content_but_cannot_claim_completed_export(tmp_path, monkeypatch):
+    runtime, _sessions = importer(monkeypatch)
     from packages.resume_core.rendering.template import RenderFailure
     class FailedRenderer:
         async def render(self, *_args):
             raise RenderFailure("RENDER_OUTPUT_LIMIT")
     provider = CreationProvider()
     service = RichProjectService(tmp_path / "operations", RulesStore(tmp_path / "store"), lambda: (provider, "fixture"),
-        clock=frozen_now, renderer=FailedRenderer())
+        clock=frozen_now, renderer=FailedRenderer(), import_runtime=runtime)
     selected = await service.select(Path("tests/fixtures/recovery/E1.txt").read_bytes(), "pasted.txt", True)
     identifier = selected.project_id
     generation = service.start(identifier); await service.tasks[(identifier, generation)]
@@ -290,45 +295,32 @@ async def test_technical_render_failure_keeps_imported_rich_content_but_cannot_c
     workspace = service.read(identifier)
     assert workspace.project is not None and workspace.project.renders == []
     assert workspace.project.document.regions[2].blocks and service.durability(identifier) == "durable"
-    assert len(provider.calls) == 2
+    assert len(runtime.calls) == 1 and not provider.calls
 
 
 @pytest.mark.asyncio
-async def test_valid_empty_native_result_fails_with_recoverable_source_and_durable_error(tmp_path):
-    from packages.resume_core.gui_normalization import GuiSemanticProposal
-    from resume_api.providers.content import ContentResult, ReportedUsage
-    from tests.recovery.employment_fixtures import employment_proposal
-    from tests.recovery.candidate_fixtures import request as captured_source
-
-    class EmptyProvider:
-        def generate(self, request, _files, _cancel):
-            from packages.resume_core.resume_assessment import ResumeAssessment
-            if request.result_type is ResumeAssessment:
-                return ContentResult(ResumeAssessment(verdict="likely"), ReportedUsage(), "fixture", request.policy.model, .01, 1)
-            if request.result_type is GuiSemanticProposal:
-                raw = employment_proposal(captured_source(data.decode())).model_dump(by_alias=True)
-                for key in ("jobs", "facts", "units", "education", "certifications", "languages", "privateDetails"):
-                    raw[key] = []
-                raw["candidate"] = {key: {"text": "", "evidence": []} for key in ("name", "title", "location")}
-                raw["nameAssessment"] = {"revision": 1, "missingSurname": None, "evidence": []}
-                raw["observationAssessment"] = {"revision": 1, "sourceObservedAt": None, "evidence": None}
-                result = GuiSemanticProposal.model_validate(raw)
-            else:
-                raise AssertionError("Import must not request generated prose")
-            return ContentResult(result, ReportedUsage(), "fixture", request.policy.model, .01, 1)
-
+async def test_empty_digest_keeps_source_as_an_editable_partial_result(tmp_path, monkeypatch):
+    async def script(session, value, cancel):
+        await complete(session, facts=False)
+        return RuntimeResult(state="completed")
+    runtime, _sessions = importer(monkeypatch, script)
     data = Path("tests/fixtures/recovery/E1.txt").read_bytes()
-    service = RichProjectService(tmp_path / "operations", RulesStore(tmp_path / "store"), lambda: (EmptyProvider(), "fixture"), clock=frozen_now)
+    service = RichProjectService(tmp_path / "operations", RulesStore(tmp_path / "store"),
+        lambda: (object(), "fixture"), clock=frozen_now, import_runtime=runtime)
     selected = await service.select(data, "pasted.txt", True)
-    generation = service.start(selected.project_id); await service.tasks[(selected.project_id, generation)]
-    assert service.generations[selected.project_id].status == "failed"
-    assert service.generations[selected.project_id].error_code == "FACT_EXTRACTION_EMPTY"
+    generation = service.start(selected.project_id)
+    await service.tasks[(selected.project_id, generation)]
+    assert service.generations[selected.project_id].status == "completed"
     workspace = service.read(selected.project_id)
-    assert workspace.project is None and workspace.pre_draft is not None
-    assert any(operation.error_code == "FACT_EXTRACTION_EMPTY" for operation in workspace.pre_draft.operations)
-    assert "".join(unit.text for unit in workspace.pre_draft.sources[0].units) == data.decode()
-    assert service.originals[(selected.project_id, workspace.pre_draft.selected_source_id)] == data
+    assert workspace.project is not None and workspace.pre_draft is None
+    report = workspace.project.facts.extraction
+    assert report.fact_count == 0 and report.status == "partial"
+    assert any("пуста" in issue.section for issue in report.unresolved)
+    assert any(warning.code == "source_details_unresolved" for warning in workspace.warnings)
+    assert "".join(unit.text for unit in workspace.project.sources[0].units) == data.decode()
+    assert service.originals[(selected.project_id, workspace.project.sources[0].id)] == data
     reopened = RichProjectService(tmp_path / "operations-2", RulesStore(tmp_path / "store"), lambda: None, clock=frozen_now)
     assert reopened.read(selected.project_id) == workspace
     imported, *_ = open_rich_archive(reopened.portable(selected.project_id), "empty-import")
-    assert imported.pre_draft == workspace.pre_draft and imported.warnings == workspace.warnings
+    assert imported.project.facts == workspace.project.facts and imported.warnings == workspace.warnings
+    assert runtime.calls == ["fixture"]

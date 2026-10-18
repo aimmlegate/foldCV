@@ -5,6 +5,7 @@ import type { PanelCommand } from "../../rich/synchronization";
 import { technologyKey, technologyName } from "../../rich/panel-intents";
 import { Icon } from "../ui/Icon";
 import { technologySuggestions } from "./technology-catalog";
+import { FactDialog } from "./FactDialog";
 
 export function TechnologySelect({ facts, document: resumeDocument, jobId, label, pending, paused, submit }: {
   facts: WorkingFacts; document: RichDocumentV1; jobId: string | null; label: string; pending: readonly PanelCommand[]; paused: boolean;
@@ -12,7 +13,10 @@ export function TechnologySelect({ facts, document: resumeDocument, jobId, label
 }) {
   const id = useId(), root = useRef<HTMLDivElement>(null), input = useRef<HTMLInputElement>(null);
   const [open, setOpen] = useState(false), [query, setQuery] = useState(""), [active, setActive] = useState(0);
+  const [editing, setEditing] = useState<string | null>(null);
+  const [expanded, setExpanded] = useState(false);
   const records = facts.records.filter((record): record is Extract<WorkingFacts["records"][number], { kind: "technology" }> => record.kind === "technology" && record.jobId === jobId);
+  const editedRecord = records.find(record => record.id === editing);
   const scoped = pending.filter(command => command.operation === "clear_technologies" ? (command.jobId ?? null) === jobId
     : command.operation === "add" ? command.recordKind === "technology" && (command.jobId ?? null) === jobId
       : records.some(record => record.id === command.recordId));
@@ -36,20 +40,27 @@ export function TechnologySelect({ facts, document: resumeDocument, jobId, label
   function choose(name: string) {
     if (paused) return;
     apply({ operation: "add", recordKind: "technology", jobId, values: { display: name } });
-    setQuery(""); setActive(0); setOpen(true); input.current?.focus();
+    setQuery(""); setActive(0); setExpanded(true); setOpen(true); input.current?.focus();
   }
   return <div className="technology-select" data-technology-scope={jobId ?? ""} ref={root}>
     {jobId && <span className="technology-label">Технологии</span>}
-    <div className="technology-field" onClick={() => input.current?.focus()}>
-      <div className="technology-values">
-        {records.map(record => <span key={record.id} className="technology-chip" data-fact-id={record.id}
+    <ul className="technology-values" id={`${id}-values`} aria-label={`Выбранные технологии: ${label}`}>
+        {(expanded ? records : records.slice(0, 8)).map(record => <li key={record.id} className="technology-chip" data-fact-id={record.id}
           aria-busy={scoped.some(command => command.operation === "clear_technologies" || command.recordId === record.id ||
             command.operation === "add" && technologyKey(command.values?.["display"] ?? "") === technologyKey(record.display.rawText))}>
-          <span>{record.display.rawText}</span><button type="button" aria-label={`Убрать ${record.display.rawText}`} disabled={paused}
+          <button type="button" className="technology-edit" aria-label={`Изменить ${record.display.rawText} и срок опыта`} disabled={paused}
+            onClick={event => { event.stopPropagation(); setOpen(false); setEditing(record.id); }}>
+            <span>{record.display.rawText}</span>{record.experience?.rawText && <small>{record.experience.rawText}</small>}
+          </button>
+          <button type="button" aria-label={`Убрать ${record.display.rawText}`} disabled={paused}
             onClick={event => { event.stopPropagation(); apply({ operation: "remove", recordId: record.id }); }}><Icon name="close" /></button>
-        </span>)}
+        </li>)}
         {[...new Set(adding)].filter(name => !records.some(record => technologyKey(record.display.rawText) === technologyKey(name))).map(name =>
-          <span key={technologyKey(name)} className="technology-chip" aria-busy="true"><span>{name}</span><small>…</small></span>)}
+          <li key={technologyKey(name)} className="technology-chip" aria-busy="true"><span>{name}</span><small>…</small></li>)}
+    </ul>
+    {records.length > 8 && <button type="button" className="technology-expand" aria-expanded={expanded} aria-controls={`${id}-values`}
+      onClick={() => { setExpanded(value => !value); }}>{expanded ? "Свернуть список" : `Ещё ${records.length - 8}`}</button>}
+    <div className="technology-field" onClick={() => input.current?.focus()}>
         <input ref={input} id={id} className="technology-search" role="combobox" aria-label={`Технологии: ${label}`} aria-autocomplete="list"
           aria-expanded={open} aria-controls={`${id}-options`} aria-activedescendant={open && choices.length ? `${id}-option-${activeIndex}` : undefined}
           autoComplete="off" maxLength={80} placeholder={records.length ? "Найти…" : "Выбрать технологии"} value={query}
@@ -60,7 +71,6 @@ export function TechnologySelect({ facts, document: resumeDocument, jobId, label
               setActive((activeIndex + (event.key === "ArrowDown" ? 1 : -1) + choices.length) % Math.max(1, choices.length)); }
             else if (event.key === "Enter" && open) { event.preventDefault(); const choice = choices[activeIndex]; if (choice) choose(choice.name); }
           }} />
-      </div>
       <div className="technology-field-actions">
         {(records.length > 0 || adding.length > 0) && <button type="button" aria-label={`Убрать все технологии: ${label}`} title="Убрать все" disabled={paused}
           onClick={event => { event.stopPropagation(); apply({ operation: "clear_technologies", recordKind: "technology", jobId, recordId: null, periodId: null, values: {} }); }}><Icon name="close" /></button>}
@@ -75,5 +85,6 @@ export function TechnologySelect({ facts, document: resumeDocument, jobId, label
         : <span className="technology-no-results">Нет доступных вариантов</span>}
       {available.length > 60 && <span className="technology-no-results">Уточните название, чтобы увидеть остальные варианты.</span>}
     </div>
+    {editedRecord && <FactDialog target={{ kind: "technology", record: editedRecord }} close={() => { setEditing(null); }} submit={submit} />}
   </div>;
 }

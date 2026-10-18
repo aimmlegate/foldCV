@@ -451,6 +451,7 @@ export type Kind15 = "technology";
 export type Origin4 = "source" | "user";
 export type Revision22 = number;
 export type Subprojectid = string | null;
+export type Technical = boolean | null;
 export type Usercorrected7 = boolean;
 export type Evidence8 = EvidenceSpan[];
 export type Id27 = string;
@@ -612,6 +613,7 @@ export type Unitid1 = string | null;
  * @maxItems 5000
  */
 export type Unresolved = ExtractionIssue[];
+export type Mode = "structured" | "digest" | "imported";
 export type Records = (
   | CandidateRecord
   | DetailRecord
@@ -632,11 +634,95 @@ export type Orderindex = number;
 export type Recordid7 = string;
 export type Revision34 = number;
 export type Tombstones = RecordTombstone[];
+export type Category1 =
+  ("identity" | "contacts" | "summary" | "experience" | "education" | "skills" | "languages" | "other") | null;
+/**
+ * @maxItems 1000
+ */
+export type Duplicateof = string[];
+export type Id34 = string;
+export type Kind30 = "paragraph" | "heading" | "section" | "bullet_list" | "duplicate";
+export type Listitem = boolean;
+export type Modelblock = boolean;
+export type Region = "header" | "sidebar" | "main";
+/**
+ * @maxItems 1000
+ */
+export type Sourcekeys = string[];
+export type Title = string | null;
+/**
+ * @maxItems 5000
+ */
+export type Blocks = ImportBlock[];
+export type Id35 = string;
+export type Record1 = (ImportEmployment | ImportEducation | ImportTechnology | ImportLanguage) | null;
+export type Employer = string;
+export type Kind31 = "employment";
+export type End1 = string;
+export type Present = boolean;
+export type Start2 = string;
+/**
+ * @maxItems 40
+ */
+export type Periods2 = ImportPeriod[];
+export type Role = string;
+export type Display = string;
+export type Experience = string;
+export type Technical1 = boolean | null;
+/**
+ * @maxItems 100
+ */
+export type Technologies = (string | ImportSkill)[];
+export type Completion = string;
+export type Institution = string;
+export type Kind32 = "education";
+export type Qualification = string;
+export type Specialty = string;
+export type Display1 = string;
+export type Experience1 = string;
+export type Kind33 = "technology";
+export type Technical2 = boolean | null;
+export type Kind34 = "language";
+export type Language1 = string;
+export type Level1 = string;
+/**
+ * @maxItems 1000
+ */
+export type Sourcekeys1 = string[];
+export type Text3 = string;
+/**
+ * @maxItems 1000
+ */
+export type Facts = ImportFact[];
+export type Finished = boolean;
+/**
+ * @maxItems 100
+ */
+export type Issues = string[];
+export type Location = string;
+export type Name = string;
+/**
+ * @maxItems 1000
+ */
+export type Sourcekeys2 = string[];
+export type Title1 = string;
+export type Batchid = string;
+export type Requestsha2561 = string;
+export type Sequence = number;
+/**
+ * @maxItems 128
+ */
+export type Receipts = ImportReceipt[];
+export type Runid = string;
+export type Sequence1 = number;
+export type Skillsha256 = string;
+export type Sourcesha2561 = string;
+export type Version = 1;
 export type Actionid4 = string | null;
 export type Dependencies2 = DependencyStamp[];
 export type Errorcode1 = string | null;
-export type Id34 = string;
-export type Kind30 =
+export type Id36 = string;
+export type Kind35 =
   | "extract"
   | "assess_resume"
   | "normalize_semantics"
@@ -651,28 +737,43 @@ export type Selectedinput = "text" | "file";
 export type Selectedsourceid = string | null;
 export type Byteref = string;
 export type Bytesha256 = string;
-export type Id35 = string;
+export type Id37 = string;
 export type Mimetype = string;
 export type Originalname = string;
-export type Id36 = string;
+export type Id38 = string;
 export type Origin12 = "user";
 export type Revision35 = number;
-export type Text3 = string;
+export type Text4 = string;
 export type Unitid2 = string;
 export type Overlays = SourceOverlay[];
 export type Parser = string;
 export type Parserversion = string;
 export type Revision36 = number;
 export type Disposition = "shown" | "condensed" | "archived" | "duplicate" | "unresolved" | "administrative";
-export type Id37 = string;
+export type Id39 = string;
 export type Column = number | null;
 export type Index = number;
-export type Kind31 = "page" | "paragraph" | "table_cell" | "pasted";
+export type Kind36 = "page" | "paragraph" | "table_cell" | "pasted";
 export type Row = number | null;
 export type Order = number;
 export type Representedfactids = string[];
 export type Revision37 = number;
-export type Text4 = string;
+export type Blankbefore = number | null;
+export type Bold1 = boolean | null;
+export type Bounds = [number, number, number, number] | null;
+export type Column1 = number | null;
+export type Columnspan = number | null;
+export type Fontsize = number | null;
+export type Gapbefore = number | null;
+export type Group = number | null;
+export type Headinglevel = number | null;
+export type Indent = number | null;
+export type Layoutuncertain = boolean;
+export type Listlevel = number | null;
+export type Part = string | null;
+export type Rowmerge = ("start" | "continue") | null;
+export type Style = string | null;
+export type Text5 = string;
 export type Units = SourceUnit[];
 export type Code2 = string;
 export type Page1 = number | null;
@@ -681,7 +782,7 @@ export type Warnings = string[];
 export type Sources = Source[];
 export type Warnings1 = string[];
 export type Height1 = number;
-export type Id38 = string;
+export type Id40 = string;
 export type Mimetype1 = "image/png" | "image/jpeg";
 export type Path = string;
 export type Sha2561 = string;
@@ -694,7 +795,7 @@ export type Createdat1 = string;
  * @maxItems 3
  */
 export type Regions = [RichRegion, RichRegion, RichRegion];
-export type Blocks = (
+export type Blocks1 = (
   | ParagraphBlock
   | HeadingBlock
   | BulletBlock
@@ -708,13 +809,13 @@ export type Blocks = (
   | ImageBlock
   | SectionBlock
 )[];
-export type Id39 = string;
+export type Id41 = string;
 export type Revision38 = number;
-export type Role = "header" | "sidebar" | "main";
+export type Role1 = "header" | "sidebar" | "main";
 export type Revision39 = number;
 export type Schemaversion2 = 1;
 export type Evidence15 = EvidenceSpan[];
-export type Id40 = string;
+export type Id42 = string;
 export type Rawtext5 = string;
 export type Evidencerecords = ImmutableFactEvidence[];
 export type Blockids3 = string[];
@@ -730,7 +831,7 @@ export type Docxpath = string;
 export type Docxsha256 = string;
 export type Docxsize = number;
 export type Factsrevision = number;
-export type Id41 = string;
+export type Id43 = string;
 export type Renderersha256 = string;
 export type Rendererversion = string;
 export type Templatesha256 = string;
@@ -743,14 +844,14 @@ export type Sha2562 = string;
 export type Size1 = number;
 export type Assets1 = AssetRef[];
 export type Contentpolicyversion = string;
-export type Id42 = string;
+export type Id44 = string;
 export type Packagesha256 = string;
-export type Version = string;
+export type Version1 = string;
 export type Projectid2 = string;
 export type Projectrevision = number;
 export type Schemaversion4 = 6;
 export type Syncrecords = RichSyncRecord[];
-export type Title = string;
+export type Title2 = string;
 export type Titlemanuallyset = boolean;
 export type Updatedat = string;
 export type Blockids4 = string[];
@@ -761,7 +862,7 @@ export type Sourcerevision1 = number;
 export type Unitid4 = string;
 export type Unitrevision1 = number;
 export type Evidence16 = Evidence17[];
-export type Id43 = string;
+export type Id45 = string;
 export type Page2 = number | null;
 export type Sourceid4 = string;
 export type Locations = WarningLocation[];
@@ -1160,12 +1261,14 @@ export interface TechnologyRecord {
   canonicalId: WorkingFieldStr;
   display: WorkingFieldStr;
   evidence: Evidence7;
+  experience?: WorkingFieldStr;
   id: Id26;
   jobId: Jobid1;
   kind: Kind15;
   origin: Origin4;
   revision: Revision22;
   subprojectId: Subprojectid;
+  technical?: Technical;
   userCorrected?: Usercorrected7;
 }
 export interface EducationRecord {
@@ -1367,7 +1470,7 @@ export interface WorkspaceV6 {
   schemaVersion: Schemaversion4;
   sourceObservedAt: PartialDate | null;
   syncRecords: Syncrecords;
-  title: Title;
+  title: Title2;
   titleManuallySet: Titlemanuallyset;
   updatedAt: Updatedat;
   warnings: Warnings2;
@@ -1379,6 +1482,7 @@ export interface RichMutationReplay {
 }
 export interface RichPreDraft {
   facts: WorkingFacts;
+  importDraft?: ImportDraft | null;
   operations: Operations;
   selectedInput: Selectedinput;
   selectedSourceId: Selectedsourceid;
@@ -1387,6 +1491,7 @@ export interface RichPreDraft {
 }
 export interface WorkingFacts {
   extraction?: ExtractionReport | null;
+  mode?: Mode;
   records: Records;
   revision: Revision33;
   tombstones: Tombstones;
@@ -1415,18 +1520,94 @@ export interface RecordTombstone {
   recordId: Recordid7;
   revision: Revision34;
 }
+export interface ImportDraft {
+  blocks?: Blocks;
+  facts?: Facts;
+  finished?: Finished;
+  issues?: Issues;
+  profile?: ImportProfile;
+  receipts?: Receipts;
+  runId: Runid;
+  sequence?: Sequence1;
+  skillSha256: Skillsha256;
+  sourceSha256: Sourcesha2561;
+  version?: Version;
+}
+export interface ImportBlock {
+  category?: Category1;
+  duplicateOf?: Duplicateof;
+  id: Id34;
+  kind?: Kind30;
+  listItem?: Listitem;
+  modelBlock?: Modelblock;
+  region?: Region;
+  sourceKeys?: Sourcekeys;
+  title?: Title;
+}
+export interface ImportFact {
+  id: Id35;
+  record?: Record1;
+  sourceKeys?: Sourcekeys1;
+  text?: Text3;
+}
+export interface ImportEmployment {
+  employer?: Employer;
+  kind: Kind31;
+  periods?: Periods2;
+  role?: Role;
+  technologies?: Technologies;
+}
+export interface ImportPeriod {
+  end?: End1;
+  present?: Present;
+  start?: Start2;
+}
+export interface ImportSkill {
+  display: Display;
+  experience?: Experience;
+  technical?: Technical1;
+}
+export interface ImportEducation {
+  completion?: Completion;
+  institution?: Institution;
+  kind: Kind32;
+  qualification?: Qualification;
+  specialty?: Specialty;
+}
+export interface ImportTechnology {
+  display: Display1;
+  experience?: Experience1;
+  kind: Kind33;
+  technical?: Technical2;
+}
+export interface ImportLanguage {
+  kind: Kind34;
+  language?: Language1;
+  level?: Level1;
+}
+export interface ImportProfile {
+  location?: Location;
+  name?: Name;
+  sourceKeys?: Sourcekeys2;
+  title?: Title1;
+}
+export interface ImportReceipt {
+  batchId: Batchid;
+  requestSha256: Requestsha2561;
+  sequence: Sequence;
+}
 export interface RichOperation {
   actionId: Actionid4;
   dependencies: Dependencies2;
   errorCode: Errorcode1;
-  id: Id34;
-  kind: Kind30;
+  id: Id36;
+  kind: Kind35;
   status: Status8;
 }
 export interface Source {
   byteRef: Byteref;
   byteSha256: Bytesha256;
-  id: Id35;
+  id: Id37;
   mimeType: Mimetype;
   originalName: Originalname;
   overlays: Overlays;
@@ -1438,26 +1619,47 @@ export interface Source {
   warnings: Warnings;
 }
 export interface SourceOverlay {
-  id: Id36;
+  id: Id38;
   origin: Origin12;
   revision: Revision35;
-  text: Text3;
+  text: Text4;
   unitId: Unitid2;
 }
 export interface SourceUnit {
   disposition: Disposition;
-  id: Id37;
+  id: Id39;
   location: SourceLocation;
   order: Order;
   representedFactIds: Representedfactids;
   revision: Revision37;
-  text: Text4;
+  structure?: SourceStructure | null;
+  text: Text5;
 }
 export interface SourceLocation {
   column: Column;
   index: Index;
-  kind: Kind31;
+  kind: Kind36;
   row: Row;
+}
+/**
+ * Observed layout cues, never semantic resume fields.
+ */
+export interface SourceStructure {
+  blankBefore?: Blankbefore;
+  bold?: Bold1;
+  bounds?: Bounds;
+  column?: Column1;
+  columnSpan?: Columnspan;
+  fontSize?: Fontsize;
+  gapBefore?: Gapbefore;
+  group?: Group;
+  headingLevel?: Headinglevel;
+  indent?: Indent;
+  layoutUncertain?: Layoutuncertain;
+  listLevel?: Listlevel;
+  part?: Part;
+  rowMerge?: Rowmerge;
+  style?: Style;
 }
 export interface SourceWarning {
   code: Code2;
@@ -1480,7 +1682,7 @@ export interface ProjectV5 {
 }
 export interface LocalImageAsset {
   height: Height1;
-  id: Id38;
+  id: Id40;
   mimeType: Mimetype1;
   path: Path;
   sha256: Sha2561;
@@ -1493,14 +1695,14 @@ export interface RichDocumentV1 {
   schemaVersion: Schemaversion2;
 }
 export interface RichRegion {
-  blocks: Blocks;
-  id: Id39;
+  blocks: Blocks1;
+  id: Id41;
   revision: Revision38;
-  role: Role;
+  role: Role1;
 }
 export interface ImmutableFactEvidence {
   evidence: Evidence15;
-  id: Id40;
+  id: Id42;
   rawText: Rawtext5;
 }
 export interface ImportCoverage {
@@ -1516,7 +1718,7 @@ export interface RichRenderSnapshot {
   docxSha256: Docxsha256;
   docxSize: Docxsize;
   factsRevision: Factsrevision;
-  id: Id41;
+  id: Id43;
   rendererSha256: Renderersha256;
   rendererVersion: Rendererversion;
   templateSha256: Templatesha256;
@@ -1524,9 +1726,9 @@ export interface RichRenderSnapshot {
 export interface TemplateManifest {
   assets: Assets1;
   contentPolicyVersion: Contentpolicyversion;
-  id: Id42;
+  id: Id44;
   packageSha256: Packagesha256;
-  version: Version;
+  version: Version1;
 }
 export interface AssetRef {
   path: Path1;
@@ -1538,7 +1740,7 @@ export interface RichWarning {
   code: Code3;
   count?: Count;
   evidence: Evidence16;
-  id: Id43;
+  id: Id45;
   locations?: Locations;
   recordIds: Recordids1;
 }

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import hashlib
+import re
 from io import BytesIO
 from pathlib import Path
 from copy import deepcopy
@@ -19,7 +20,7 @@ from docx.opc.constants import RELATIONSHIP_TYPE
 from docx.shared import Pt, RGBColor
 from lxml import etree
 
-from ..models.rich_document import Hyperlink, RichDocumentV1
+from ..models.rich_document import FactFieldSpan, Hyperlink, RichDocumentV1
 from ..rich_limits import DOCX_BYTES
 from ..rich_presentation import presentation, authored_text
 from .rich_template import PACKAGE_SHA256, ROOT, require_rich_template
@@ -30,7 +31,8 @@ INITIAL_BLOCKS = {"paragraph", "heading", "section", "bullet_list", "numbered_li
 
 
 def renderer_sha256():
-    sources = [Path(__file__), Path(__file__).with_name("worker.py"), ROOT / "packages/resume_core/rich_presentation.py", ROOT / "packages/resume_core/technologies.py"]
+    sources = [Path(__file__), Path(__file__).with_name("worker.py"), ROOT / "packages/resume_core/rich_presentation.py", ROOT / "packages/resume_core/technologies.py", ROOT / "packages/resume_core/technology_experience.py"]
+    sources += sorted((ROOT / "assets/technology-library").glob("*.png"))
     return hashlib.sha256(b"".join(path.name.encode() + b"\0" + path.read_bytes() for path in sources)).hexdigest()
 
 
@@ -138,12 +140,13 @@ class Writer:
                 item.append(element("w:lvlText", val="•" if bullet else f"%{level + 1}."))
                 item.append(element("w:lvlJc", val="left"))
                 props = element("w:pPr")
-                props.append(element("w:ind", left=720 + level * 360, hanging=360))
+                props.append(element("w:ind", left=260 + level * 260, hanging=260))
+                tabs = element("w:tabs"); tabs.append(element("w:tab", val="num", pos=260 + level * 260)); props.append(tabs)
                 item.append(props)
                 run = element("w:rPr")
                 run.append(element("w:rFonts", ascii="Helvetica" if bullet else "Source Sans Pro",
                     hAnsi="Helvetica" if bullet else "Source Sans Pro"))
-                run.append(element("w:sz", val=28 if bullet else 20))
+                run.append(element("w:sz", val=20))
                 item.append(run); abstract.append(item)
             self.numbering.append(abstract)
         self.bullet_numbering = self.new_numbering(5000)
@@ -229,7 +232,15 @@ class Writer:
         fill(run._r.get_or_add_rPr(), styles.background_color)
         return run
 
-    def inline(self, paragraph, content, face, size, text_color="default"):
+    def inline(self, paragraph, content, face, size, text_color="default", *, paragraph_boundary=False):
+        if paragraph_boundary:
+            content = deepcopy(content)
+            # A paragraph already supplies its final line boundary in Word.
+            for span in reversed(content):
+                final = span.content[-1] if isinstance(span, Hyperlink) and span.content else span
+                if final.text:
+                    final.text = re.sub(r"\r?\n$", "", final.text, count=1)
+                    break
         def effective(styles):
             return styles.model_copy(update={"text_color": text_color}) if styles.text_color == "default" else styles
         for span in content:
@@ -252,23 +263,79 @@ class Writer:
         node.append(override); self.numbering.append(node)
         return identifier
 
-    def blocks(self, container, blocks, width, region, depth=0, focus=False):
-        sequence = {"numbering": None, "index": 0, "previous": None}
-        for block in blocks:
-            self.block(container, block, width, region, depth, focus, sequence)
+    def job_prefix_count(self, blocks, reserved=0):
+        if blocks and blocks[0].type == "heading":
+            count, length, dated = 0, reserved, False
+            for block in blocks[:8]:
+                text = authored_text(block)
+                if block.type not in {"heading", "paragraph", "bullet_list"} or block.children or length + len(text) > 1000:
+                    break
+                count += 1; length += len(text)
+                dated = dated or any(isinstance(span, FactFieldSpan) and span.field_key.startswith("period:") for span in block.content)
+                view = self.roles.get(block.id)
+                if block.type == "bullet_list" or dated and count > 1 and len(text.strip()) >= 80 and (not view or view.role != "support"):
+                    break
+            return count
+        return 0
 
-    def block(self, container, block, width, region, depth=0, focus=False, sequence=None):
+    def blocks(self, container, blocks, width, region, depth=0, focus=False, profile=False, job=False):
+        if job and region != "header":
+            count = self.job_prefix_count(blocks)
+            if count >= 2:
+                self.job_header(container, blocks[:count], width, region, depth, profile)
+                self.blocks(container, blocks[count:], width, region, depth, focus, profile)
+                return
+        sequence = {"numbering": None, "index": 0, "previous": None, "job_prefix": 3 if job else 0}
+        for block in blocks:
+            self.block(container, block, width, region, depth, focus, sequence, profile)
+
+    def job_header(self, container, blocks, width, region, depth, profile, leading=None, caption="Job header"):
+        table_width = width + self.spec["sectionBand"]["widthBeyondMain"] if region == "main" else width
+        table = container.add_table(rows=1, cols=1); table.autofit = False
+        table.columns[0].width = Pt(table_width)
+        preferred = table._tbl.tblPr.find(qn("w:tblW")); preferred.set(qn("w:w"), str(round(table_width * 20))); preferred.set(qn("w:type"), "dxa")
+        table._tbl.tblPr.append(element("w:tblCaption", val=caption))
+        table.rows[0]._tr.get_or_add_trPr().append(element("w:cantSplit"))
+        cell = table.cell(0, 0); cell.width = Pt(table_width); self.clear_cell(cell)
+        if leading is not None:
+            self.section_band(cell, leading)
+        self.blocks(cell, blocks, width, region, depth, profile=profile)
+        # Row cohesion works inside the outer resume table; paragraph chains do not.
+        for paragraph in cell.paragraphs:
+            paragraph.paragraph_format.keep_with_next = False
+        self.compact(container.paragraphs[-1], .05)
+
+    def section_content(self, container, block, width, region, depth):
+        first = block.children[0] if block.children else None
+        reserved = len(authored_text(block))
+        if first and reserved <= 200 and first.type == "section" and first.props.record_id and not authored_text(first).strip():
+            count = self.job_prefix_count(first.children, reserved)
+            if count >= 2:
+                self.job_header(container, first.children[:count], width, region, depth, False, leading=block)
+                self.blocks(container, first.children[count:], width, region, depth)
+                self.section_spacing(container, first, region)
+                self.blocks(container, block.children[1:], width, region, depth)
+                return
+        if (first and reserved <= 200 and first.type in {"paragraph", "bullet_list"} and not first.children
+            and reserved + len(authored_text(first)) <= 1000):
+            self.job_header(container, [first], width, region, depth, False, leading=block, caption="Section header")
+            self.blocks(container, block.children[1:], width, region, depth)
+            return
+        self.section_band(container, block)
+        self.blocks(container, block.children, width, region, depth)
+
+    def block(self, container, block, width, region, depth=0, focus=False, sequence=None, profile=False):
         view = self.roles.get(block.id)
         role = view.role if view else "body"
+        profile = profile or role == "profile_heading"
         if block.type == "section" and not authored_text(block).strip():
-            self.blocks(container, block.children, width, region, depth, block.props.presentation == "focus")
+            self.blocks(container, block.children, width, region, depth, block.props.presentation == "focus", job=bool(block.props.record_id))
             self.section_spacing(container, block, region)
             return
         if isinstance(block.content, list) and not authored_text(block) and any(link.kind == "field_binding" for link in block.provenance) and not block.children:
             return
         if block.type == "section" and region == "main" and role == "section_heading":
-            self.section_band(container, block)
-            self.blocks(container, block.children, width, region, depth)
+            self.section_content(container, block, width, region, depth)
             self.section_spacing(container, block, region)
             return
         if block.type == "table":
@@ -278,12 +345,18 @@ class Writer:
             return
         paragraph = container.add_paragraph()
         self.compact(paragraph, self.spec["typography"]["body"]["lineHeight"])
-        base_left = -self.spec["sectionBand"]["leftFromMain"] if region == "main" else 0
+        base_left = (-self.spec["sectionBand"]["leftFromMain"] + (-5 if profile else 0)) if region == "main" else 0
         paragraph.paragraph_format.left_indent = Pt(base_left)
         if region == "main":
-            paragraph.paragraph_format.right_indent = Pt(self.spec["sectionBand"]["widthBeyondMain"] + self.spec["sectionBand"]["leftFromMain"])
+            paragraph.paragraph_format.right_indent = Pt(self.spec["sectionBand"]["widthBeyondMain"] + self.spec["sectionBand"]["leftFromMain"] - (10 if profile else 0))
         paragraph.paragraph_format.keep_together = False
         paragraph.paragraph_format.keep_with_next = False
+        if sequence and sequence["job_prefix"]:
+            if block.type == "heading" or role == "support":
+                paragraph.paragraph_format.keep_with_next = True
+                sequence["job_prefix"] -= 1
+            else:
+                sequence["job_prefix"] = 0
         # Word's character wrapping preserves long tokens rather than inserting characters.
         paragraph._p.get_or_add_pPr().append(element("w:wordWrap", val="0"))
         paragraph.alignment = {"left": WD_ALIGN_PARAGRAPH.LEFT, "center": WD_ALIGN_PARAGRAPH.CENTER,
@@ -303,14 +376,19 @@ class Writer:
         else:
             state["numbering"] = None
         state["previous"] = block.type
-        if block.type in {"bullet_list", "numbered_list"} and depth <= 8:
+        authored_marker = bool(re.match(r"\s*(?:[•\-—]|\d+[.)])\s", authored_text(block)))
+        if block.type in {"bullet_list", "numbered_list"} and authored_marker:
+            paragraph.paragraph_format.left_indent = Pt(base_left + 13 + min(depth, 8) * 13)
+            paragraph.paragraph_format.first_line_indent = Pt(-13)
+        elif block.type in {"bullet_list", "numbered_list"} and depth <= 8:
             numbering = element("w:numPr")
             numbering.append(element("w:ilvl", val=depth))
             numbering.append(element("w:numId", val=state["numbering"] if numbered else self.bullet_numbering))
             paragraph._p.get_or_add_pPr().append(numbering)
-            indent = min(36 + depth * 18, max(18, width - 24))
+            indent = min(13 + depth * 13, max(13, width - 24))
             paragraph.paragraph_format.left_indent = Pt(base_left + indent)
-            paragraph.paragraph_format.first_line_indent = Pt(-18)
+            paragraph.paragraph_format.first_line_indent = Pt(-13)
+            paragraph.paragraph_format.tab_stops.add_tab_stop(Pt(base_left + indent))
         elif block.type in {"bullet_list", "numbered_list", "check_list", "toggle_list"}:
             from ..models.rich_document import InlineStyles
             marker = f"{state['index']}. " if numbered else "☑ " if block.type == "check_list" and block.props.checked else "☐ " if block.type == "check_list" else "▾ " if block.type == "toggle_list" else "• "
@@ -318,10 +396,12 @@ class Writer:
             paragraph.paragraph_format.left_indent = Pt(base_left + min(36 + min(depth, 12) * 18, max(18, width - 24)))
             paragraph.paragraph_format.first_line_indent = Pt(-18)
         face, size = "light", 10
+        if block.type in {"bullet_list", "numbered_list"}:
+            paragraph.paragraph_format.space_after = Pt(3)
         if block.type == "heading":
             paragraph.style = self.document.styles[f"Heading {block.props.level}"]
-            paragraph.paragraph_format.keep_with_next = False
-            paragraph.paragraph_format.keep_together = False
+            paragraph.paragraph_format.keep_with_next = region != "header"
+            paragraph.paragraph_format.keep_together = True
         if region == "header" and block.type == "heading" and block.props.level in {1, 2}:
             face, size = ("black", 18) if block.type == "heading" and block.props.level == 1 else ("semibold", 16)
             paragraph.paragraph_format.space_before = Pt(0)
@@ -332,8 +412,10 @@ class Writer:
             paragraph.paragraph_format.space_before = Pt(0)
             paragraph.paragraph_format.line_spacing = Pt(19 if block.props.level == 1 else 15.08 if block.props.level == 2 else 12.57)
         elif block.type == "section":
-            face, size = "bold", 14
+            face, size = "black", 14
             paragraph.paragraph_format.line_spacing = Pt(19)
+            paragraph.paragraph_format.keep_with_next = bool(block.children)
+            paragraph.paragraph_format.keep_together = True
         elif role == "support":
             face = "regular"
         elif focus:
@@ -374,9 +456,13 @@ class Writer:
             from ..models.rich_document import InlineStyles
             self.run(paragraph, block.content, InlineStyles(code=True), "regular", 10)
         else:
-            self.inline(paragraph, block.content, face, size, getattr(block.props, "text_color", "default"))
+            self.inline(paragraph, block.content, face, size, getattr(block.props, "text_color", "default"), paragraph_boundary=True)
+            if role == "focus_entry" and view.experience:
+                from ..models.rich_document import InlineStyles
+                paragraph.add_run().add_break()
+                self.run(paragraph, view.experience, InlineStyles(), "light", 10)
         self.blocks(container, block.children, width, region, depth if block.type == "section" else depth + 1,
-            block.type == "section" and block.props.presentation == "focus")
+            block.type == "section" and block.props.presentation == "focus", profile)
         if block.type == "section":
             self.section_spacing(container, block, region)
 
@@ -386,31 +472,31 @@ class Writer:
                 paragraph = container.paragraphs[-1]
                 paragraph.paragraph_format.space_after = (paragraph.paragraph_format.space_after or Pt(0)) + Pt(self.spec["spacing"]["sidebarItemAfter"])
                 return
-            spacing = self.spec["spacing"]["sidebarSectionAfter"] if region == "sidebar" else self.spec["spacing"]["profileAfter"] if block.id == "profile" else self.spec["spacing"]["jobAfter"] if block.props.record_id else None
+            profile = block.id == "profile" or block.id.startswith("import_profile_")
+            spacing = self.spec["spacing"]["sidebarSectionAfter"] if region == "sidebar" else self.spec["spacing"]["profileAfter"] if profile else self.spec["spacing"]["jobAfter"] if block.props.record_id else None
             if spacing is not None:
                 paragraph = container.paragraphs[-1]
                 current = paragraph.paragraph_format.space_after or Pt(0)
                 paragraph.paragraph_format.space_after = max(current, Pt(spacing))
 
     def section_band(self, container, block):
-        from docx.enum.table import WD_ROW_HEIGHT_RULE
         band = self.spec["sectionBand"]
-        width = self.spec["regions"]["main"]["width"] + band["widthBeyondMain"]
-        table = container.add_table(rows=1, cols=1); table.autofit = False
-        table.columns[0].width = Pt(width)
-        preferred = table._tbl.tblPr.find(qn("w:tblW")); preferred.set(qn("w:w"), str(round(width * 20))); preferred.set(qn("w:type"), "dxa")
-        table.rows[0].height, table.rows[0].height_rule = Pt(band["height"]), WD_ROW_HEIGHT_RULE.AT_LEAST
-        cell = table.cell(0, 0); cell.width = Pt(width); self.clear_cell(cell)
-        margins = cell._tc.get_or_add_tcPr().find(qn("w:tcMar"))
-        for side in ("start", "end"):
-            margins.find(qn("w:" + side)).set(qn("w:w"), "100")
-        fill(cell._tc.get_or_add_tcPr(), block.props.background_color if block.props.background_color != "default" else band["background"])
-        paragraph = cell.add_paragraph(); paragraph.style = self.document.styles["Heading 1"]; self.compact(paragraph, 19)
+        # A nested heading table can pull the whole containing row onto a new page.
+        paragraph = container.add_paragraph(); paragraph.style = self.document.styles["Heading 1"]
+        self.compact(paragraph, band["height"])
+        paragraph.paragraph_format.left_indent = Pt(0)
+        paragraph.paragraph_format.right_indent = Pt(0)
+        paragraph.paragraph_format.first_line_indent = Pt(5)
+        fill(paragraph._p.get_or_add_pPr(), block.props.background_color if block.props.background_color != "default" else band["background"])
+        paragraph.paragraph_format.keep_with_next = bool(block.children)
+        paragraph.paragraph_format.keep_together = True
         paragraph.alignment = {"left": WD_ALIGN_PARAGRAPH.LEFT, "center": WD_ALIGN_PARAGRAPH.CENTER,
             "right": WD_ALIGN_PARAGRAPH.RIGHT, "justify": WD_ALIGN_PARAGRAPH.JUSTIFY}[block.props.alignment]
-        self.inline(paragraph, block.content, "bold", 14, block.props.text_color)
+        self.inline(paragraph, block.content, "black", 14, block.props.text_color, paragraph_boundary=True)
         separator = container.add_paragraph(); self.compact(separator)
-        gap = self.spec["spacing"]["barToFirstJob"] if block.id == "experience" else self.spec["spacing"]["earlyCareerBarAfter"] if block.id == "early-career" else self.spec["spacing"]["skillBarAfter"]
+        separator.paragraph_format.keep_with_next = bool(block.children)
+        experience = block.id == "experience" or block.id.startswith("import_experience_")
+        gap = self.spec["spacing"]["barToFirstJob"] if experience else self.spec["spacing"]["earlyCareerBarAfter"] if block.id == "early-career" else self.spec["spacing"]["skillBarAfter"]
         separator.paragraph_format.space_after = Pt(gap - 1)
 
     def table(self, container, block, width, region=None, indent=0):
@@ -514,6 +600,8 @@ class Writer:
         table.rows[0]._tr.get_or_add_trPr().append(element("w:tblHeader"))
         for region, index in zip(document.regions[1:], (0, 2)):
             cell = table.cell(1, index)
+            # Keep a heading's page flags from being treated as flags for the entire row.
+            self.compact(cell.add_paragraph(), .05)
             self.blocks(cell, region.blocks, spec["regions"]["sidebar"]["width"] if index == 0 else spec["regions"]["main"]["width"], region.role)
             if not cell.paragraphs:
                 self.compact(cell.add_paragraph())

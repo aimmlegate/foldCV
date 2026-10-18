@@ -56,3 +56,76 @@ def test_rich_table_and_code_export_without_a_stale_plain_cache():
     files = read_zip(export_rich_archive(workspace, {}, {}, {}))
     assert not any(path.startswith("renders/") for path in files)
     assert b'"type":"table"' in files["workspace.json"] and b'"type":"code"' in files["workspace.json"]
+
+
+def test_section_bands_and_employer_headings_keep_the_next_body_but_long_text_can_split():
+    document = initial_document("Long body " * 500)
+    body = document.regions[2].blocks[0].model_dump(by_alias=True)
+    heading = {"id": "employer", "type": "heading", "revision": 1, "props": {"level": 2},
+        "children": [], "provenance": [], "content": [{"type": "text", "text": "Orion", "styles": {}}]}
+    role = {"id": "role", "type": "paragraph", "revision": 1, "props": {}, "children": [], "provenance": [],
+        "content": [{"type": "fact_field", "text": "Engineer", "styles": {}, "recordId": "job", "fieldKey": "role",
+            "bindingId": "role-binding", "syncedFactRevision": 1}]}
+    job = {"id": "job", "type": "section", "revision": 1, "props": {"recordId": "job"},
+        "children": [heading, role, body], "content": [], "provenance": []}
+    section = {"id": "experience", "type": "section", "revision": 1, "props": {"recordId": None},
+        "children": [job], "provenance": [], "content": [{"type": "text", "text": "WORK", "styles": {}}]}
+    value = document.model_dump(by_alias=True)
+    value["regions"][2]["blocks"] = [section]
+    with ZipFile(BytesIO(render_rich_docx(RichDocumentV1.model_validate(value)))) as archive:
+        xml = etree.fromstring(archive.read("word/document.xml"))
+    ns = {"w": "http://schemas.openxmlformats.org/wordprocessingml/2006/main"}
+    def paragraph(text):
+        return next(p for p in xml.xpath("//w:p", namespaces=ns)
+            if "".join(p.xpath(".//w:t/text()", namespaces=ns)).startswith(text))
+    assert paragraph("WORK").xpath("ancestor::w:tr[1]/w:trPr/w:cantSplit", namespaces=ns)
+    assert paragraph("Orion").xpath("ancestor::w:tr[1]/w:trPr/w:cantSplit", namespaces=ns)
+    separator = paragraph("WORK").getnext()
+    assert separator.xpath("ancestor::w:tr[1]/w:trPr/w:cantSplit", namespaces=ns)
+    assert paragraph("Engineer").xpath("ancestor::w:tr[1]/w:trPr/w:cantSplit", namespaces=ns)
+    assert paragraph("Long body").xpath("w:pPr/w:keepNext[@w:val='0']", namespaces=ns)
+    assert len(xml.xpath("//w:cantSplit", namespaces=ns)) == 1
+    assert not paragraph("Long body").xpath("ancestor::w:tr[1]/w:trPr/w:cantSplit", namespaces=ns)
+    first = xml.xpath("/w:document/w:body/w:tbl[2]/w:tr[2]/w:tc[3]/w:p[1]", namespaces=ns)[0]
+    assert not first.xpath(".//w:t", namespaces=ns)
+    assert first.xpath("w:pPr/w:spacing/@w:line", namespaces=ns) == ["1"]
+    assert first.xpath("w:pPr/w:keepNext[@w:val='0']", namespaces=ns)
+
+
+def test_job_header_does_not_restart_the_following_numbered_sequence():
+    value = initial_document("unused").model_dump(by_alias=True)
+    def block(identifier, kind, text, props):
+        return {"id": identifier, "revision": 1, "type": kind, "props": props, "children": [],
+            "provenance": [], "content": [{"type": "text", "text": text, "styles": {}}]}
+    value["regions"][2]["blocks"] = [{"id": "job", "revision": 1, "type": "section", "props": {"recordId": "job"},
+        "content": [], "provenance": [], "children": [block("company", "heading", "Orion", {"level": 2}),
+            block("role", "paragraph", "Engineer", {}),
+            block("first", "numbered_list", "First numbered task", {"start": 7}),
+            block("second", "numbered_list", "Second numbered task", {})]}]
+    with ZipFile(BytesIO(render_rich_docx(RichDocumentV1.model_validate(value)))) as archive:
+        xml = etree.fromstring(archive.read("word/document.xml"))
+        numbering = etree.fromstring(archive.read("word/numbering.xml"))
+    ns = {"w": "http://schemas.openxmlformats.org/wordprocessingml/2006/main"}
+    tasks = xml.xpath("//w:p[w:pPr/w:numPr]", namespaces=ns)
+    assert len(tasks) == 2
+    identifiers = [p.xpath("w:pPr/w:numPr/w:numId/@w:val", namespaces=ns)[0] for p in tasks]
+    assert identifiers[0] == identifiers[1]
+    assert numbering.xpath("w:num[@w:numId=$id]/w:lvlOverride/w:startOverride/@w:val", namespaces=ns, id=identifiers[0]) == ["7"]
+    assert all(not p.xpath("ancestor::w:tbl[w:tblPr/w:tblCaption[@w:val='Job header']]", namespaces=ns) for p in tasks)
+
+
+def test_section_band_and_first_list_item_share_a_bounded_row_without_capturing_long_following_text():
+    value = initial_document('Long trailing text ' * 400).model_dump(by_alias=True)
+    body = value['regions'][2]['blocks'][0]
+    item = {'id':'first-item','type':'bullet_list','revision':1,'props':{},'children':[],'provenance':[],
+        'content':[{'type':'text','text':'First skill item.','styles':{}}]}
+    value['regions'][2]['blocks']=[{'id':'skills','type':'section','revision':1,'props':{'recordId':None},
+        'content':[{'type':'text','text':'SKILLS','styles':{}}],'provenance':[],'children':[item,body]}]
+    with ZipFile(BytesIO(render_rich_docx(RichDocumentV1.model_validate(value)))) as archive:
+        xml=etree.fromstring(archive.read('word/document.xml'))
+    ns={'w':'http://schemas.openxmlformats.org/wordprocessingml/2006/main'}
+    row=xml.xpath('//w:tbl[w:tblPr/w:tblCaption[@w:val="Section header"]]/w:tr',namespaces=ns)[0]
+    assert row.xpath('w:trPr/w:cantSplit',namespaces=ns)
+    assert ''.join(row.xpath('.//w:t/text()',namespaces=ns))=='SKILLSFirst skill item.'
+    assert 'Long trailing text' not in ''.join(row.xpath('.//w:t/text()',namespaces=ns))
+    assert xml.xpath('//w:p[.//w:t[contains(.,"Long trailing text")]]/w:pPr/w:keepNext[@w:val="0"]',namespaces=ns)

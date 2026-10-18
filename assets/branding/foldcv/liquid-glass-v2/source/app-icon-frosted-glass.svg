@@ -1,0 +1,27 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024"><defs>
+      <linearGradient id="body" x1="0" y1="0" x2="0.8" y2="1">
+        <stop stop-color="#f7f9f2"/><stop offset=".55" stop-color="#e0e7d7"/>
+        <stop offset="1" stop-color="#c6d1ba"/></linearGradient>
+      <radialGradient id="light" cx=".18" cy="0" r="1.05">
+        <stop stop-color="#fffefa" stop-opacity=".4"/>
+        <stop offset=".65" stop-color="#fffefa" stop-opacity="0"/></radialGradient>
+      <radialGradient id="lowerLight" cx=".9" cy="1" r=".85">
+        <stop stop-color="#dcebc6" stop-opacity=".3"/>
+        <stop offset="1" stop-color="#dcebc6" stop-opacity="0"/></radialGradient>
+      <linearGradient id="rim" x1="0" y1="0" x2=".8" y2="1">
+        <stop stop-color="#ffffff" stop-opacity=".95"/>
+        <stop offset=".4" stop-color="#fffefa" stop-opacity=".15"/>
+        <stop offset=".76" stop-color="#fffefa" stop-opacity=".12"/>
+        <stop offset="1" stop-color="#fffefa" stop-opacity=".65"/></linearGradient>
+      <linearGradient id="glyph" x1="0" y1="0" x2=".7" y2="1">
+        <stop stop-color="#70845f"/><stop offset=".52" stop-color="#4b603d"/>
+        <stop offset="1" stop-color="#3c5031"/></linearGradient>
+      <linearGradient id="sheen" x1="0" y1="0" x2="0" y2="1">
+        <stop stop-color="#ffffff" stop-opacity=".18"/>
+        <stop offset="1" stop-color="#ffffff" stop-opacity="0"/></linearGradient>
+      <filter id="shadow" x="-.3" y="-.3" width="1.6" height="1.8" color-interpolation-filters="sRGB">
+        <feGaussianBlur stdDeviation="12"/></filter>
+      <filter id="glyphShadow" x="-.3" y="-.3" width="1.6" height="1.8" color-interpolation-filters="sRGB">
+        <feGaussianBlur stdDeviation="6"/></filter>
+      <clipPath id="tile"><rect x="100" y="100" width="824" height="824" rx="184"/></clipPath>
+    </defs><rect x="112" y="120" width="800" height="800" rx="177" fill="#27311d" opacity=".2" filter="url(#shadow)"/><g opacity=".9"><rect x="100" y="100" width="824" height="824" rx="184" fill="url(#body)"/><rect x="100" y="100" width="824" height="824" rx="184" fill="url(#light)"/><rect x="100" y="100" width="824" height="824" rx="184" fill="url(#lowerLight)"/></g><g clip-path="url(#tile)"><path d="M90 90H934V350C690 480 345 475 90 625Z" fill="url(#sheen)"/></g><rect x="104" y="104" width="816" height="816" rx="180" fill="none" stroke="url(#rim)" stroke-width="7"/><rect x="114" y="114" width="796" height="796" rx="172" fill="none" stroke="#fffefa" stroke-opacity=".09" stroke-width="2"/><g opacity=".24" filter="url(#glyphShadow)"><g transform="translate(176 187) scale(28)"><path d="M5 3h14v18H5zM5 3l14 9H5m0 0 14 9" fill="none" stroke="#293520" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></g></g><g transform="translate(176 176) scale(28)"><path d="M5 3h14v18H5zM5 3l14 9H5m0 0 14 9" fill="none" stroke="url(#glyph)" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></g></svg>

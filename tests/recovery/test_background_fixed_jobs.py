@@ -20,6 +20,8 @@ from tests.recovery.test_background_agent import environment, hold_writer
 from tests.recovery.test_rich_synchronization import selection, completion, capture
 from tests.recovery.test_background_inverse import mutation, put
 from tests.support.background import save_input
+from tests.support.importing import importer, complete
+from resume_api.agent.runtime import RuntimeResult
 
 
 class HeldProvider(CreationProvider):
@@ -188,10 +190,12 @@ async def test_fixed_rewrite_uses_the_existing_service_and_one_owned_permit(tmp_
 
 
 @pytest.mark.asyncio
-async def test_fixed_processing_reuses_two_stages_and_original_assembly(tmp_path, monkeypatch):
+async def test_fixed_processing_uses_one_import_turn_and_preserves_original_source(tmp_path, monkeypatch):
     service, factory, _workspace, _request, _connection, _old = await environment(tmp_path)
     provider = CreationProvider()
     service.projects.provider_factory = lambda: (provider, "processing-model")
+    runtime, _sessions = importer(monkeypatch, admission=service.admission)
+    service.runtime = runtime
     from packages.resume_core.extraction.parser import extract
     from tests.recovery.test_background_exports import HeldRenderer
     service.projects.renderer = HeldRenderer()
@@ -205,8 +209,8 @@ async def test_fixed_processing_reuses_two_stages_and_original_assembly(tmp_path
         reply, _created = await service.fixed.submit(source.project_id, request)
         done = await settled(service, source.project_id, reply.job.id, publication="saved")
         await asyncio.wait_for(service.fixed.renders[done.id], 10)
-        assert [a.stage for a in done.attempts] == ["assessment", "extraction"]
-        assert all(a.cleanup_verified for a in done.attempts) and len(provider.calls) == 2
+        assert [a.stage for a in done.attempts] == ["extraction"]
+        assert all(a.cleanup_verified for a in done.attempts) and runtime.calls == ["processing-model"] and not provider.calls
         saved, _checksum = service.projects.storage.read_committed(source.project_id)
         assert saved.pre_draft is None and saved.project is not None
         assert saved.project.renders and not service.fixed.render_errors
@@ -226,33 +230,36 @@ async def test_fixed_processing_reuses_two_stages_and_original_assembly(tmp_path
 @pytest.mark.parametrize("variant", [f"NB-F03:v{i:02d}" for i in range(1, 9)])
 async def test_processing_stage_boundaries_keep_captured_input_and_stop_authority(tmp_path, monkeypatch, variant):
     service, factory, _workspace, _request, _connection, _old = await environment(tmp_path)
-    provider = HeldProvider() if variant == "NB-F03:v08" else CreationProvider(fail_kind="ResumeAssessment" if variant == "NB-F03:v05" else None)
-    # The advisory service intentionally recovers INVALID_RESULT; infrastructure failures remain typed.
-    if variant == "NB-F03:v05":
-        def fail(_request, _files, _cancel):
-            raise ContentFailure("AUTH_REQUIRED")
-        provider.generate = fail
+    provider = CreationProvider()
     service.projects.provider_factory = lambda: (provider, "processing-model")
     entered, release, deletion_started = asyncio.Event(), asyncio.Event(), asyncio.Event()
     late = variant == "NB-F03:v06"
-    async def observe(name, job_id):
-        control = service.supervisor.controls.get(job_id)
-        if name == ("before_payload_stored" if late else "children_verified_dead") and control and (late or control.stage == 0):
+    async def script(session, value, cancel):
+        if variant == "NB-F03:v05":
+            return RuntimeResult(state="failed", error="AGENT_AUTH_REQUIRED")
+        await complete(session)
+        if not late:
             entered.set()
             await release.wait()
-    if variant not in {"NB-F03:v05", "NB-F03:v08"}:
-        service.supervisor.observer = observe
+        return RuntimeResult(state="cancelled" if cancel.is_set() else "completed")
+    runtime, _sessions = importer(monkeypatch, script, admission=service.admission)
+    service.runtime = runtime
+    async def observe(name, job_id):
+        if name == "before_payload_stored" and late:
+            entered.set()
+            await release.wait()
+    service.supervisor.observer = observe
     deleted = None
     try:
         source = await source_project(service, monkeypatch)
         request = fixed_request(service, source.project_id, "processing-boundary", {"kind": "processing"})
         reply, _created = await service.fixed.submit(source.project_id, request)
         if variant == "NB-F03:v08":
-            _content, model_release = await asyncio.wait_for(provider.entered.get(), 10)
+            await asyncio.wait_for(entered.wait(), 10)
             control = service.supervisor.controls[reply.job.id]
             service.supervisor.clock.advance(180)
             await asyncio.wait_for(control.cancelled.wait(), 10)
-            model_release.set()
+            release.set()
         elif variant != "NB-F03:v05":
             await asyncio.wait_for(entered.wait(), 10)
             if variant in {"NB-F03:v01", "NB-F03:v06"}:
@@ -277,7 +284,7 @@ async def test_processing_stage_boundaries_keep_captured_input_and_stop_authorit
             release.set()
         if deleted is not None:
             result = await asyncio.wait_for(deleted, 10)
-            assert result.status == "deleted" and len(provider.calls) == 1
+            assert result.status == "deleted" and len(runtime.calls) == 1 and not provider.calls
             owned = service.supervisor.controls[reply.job.id].owned
             assert owned is None or owned.verified_dead()
             assert service.supervisor.active is None and service.supervisor.fenced is None
@@ -285,7 +292,7 @@ async def test_processing_stage_boundaries_keep_captured_input_and_stop_authorit
             done = await settled(service, source.project_id, reply.job.id)
             if variant == "NB-F03:v04":
                 done = await settled(service, source.project_id, reply.job.id, publication="saved")
-                assert len(done.attempts) == 2 and len(provider.calls) == 2
+                assert len(done.attempts) == 1 and len(runtime.calls) == 1 and not provider.calls
             elif late:
                 changed = asyncio.Event()
                 service.supervisor.listeners.add(changed)
@@ -297,7 +304,7 @@ async def test_processing_stage_boundaries_keep_captured_input_and_stop_authorit
                         await asyncio.wait_for(changed.wait(), 10)
                 finally:
                     service.supervisor.listeners.discard(changed)
-                assert len(provider.calls) == 2 and done.receipt is None
+                assert len(runtime.calls) == 1 and not provider.calls and done.receipt is None
             else:
                 assert len(done.attempts) == 1 and done.receipt is None
                 expected = "CANCELLED" if variant == "NB-F03:v02" else "AUTH_REQUIRED" if variant == "NB-F03:v05" else "DEADLINE" if variant == "NB-F03:v08" else "DEPENDENCY_CHANGED"
@@ -309,8 +316,6 @@ async def test_processing_stage_boundaries_keep_captured_input_and_stop_authorit
             assert not service.admission.locked()
     finally:
         release.set()
-        if isinstance(provider, HeldProvider):
-            provider.release_all()
         if deleted is not None and not deleted.done():
             await asyncio.gather(deleted, return_exceptions=True)
         await service.shutdown()
@@ -508,7 +513,7 @@ async def test_fixed_queue_invalidates_stale_work_without_hidden_model_retries(t
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize("boundary", ["before-dispatch", "between-stages"])
+@pytest.mark.parametrize("boundary", ["before-dispatch", "during-import"])
 @pytest.mark.parametrize("reason", ["AUTH_REQUIRED", "RATE_LIMITED"])
 async def test_account_preflight_pauses_dispatch_without_repeated_attempts(tmp_path, monkeypatch, boundary, reason):
     service, factory, workspace, payload, connection, _old = await environment(tmp_path)
@@ -522,16 +527,17 @@ async def test_account_preflight_pauses_dispatch_without_repeated_attempts(tmp_p
             project = workspace.project_id
             command = rewrite_command(workspace)
         else:
-            async def observe(name, identifier):
-                control = service.supervisor.controls.get(identifier)
-                if name == "children_verified_dead" and control and control.stage == 0:
-                    reached.set()
-                    await release.wait()
-            service.supervisor.observer = observe
+            async def script(session, value, cancel):
+                await complete(session)
+                reached.set()
+                await release.wait()
+                return RuntimeResult(state="failed", error="AGENT_QUOTA" if reason == "RATE_LIMITED" else "AGENT_AUTH_REQUIRED")
+            runtime, _sessions = importer(monkeypatch, script, admission=service.admission)
+            service.runtime = runtime
             source = await source_project(service, monkeypatch)
             project, command = source.project_id, {"kind": "processing"}
         reply, _ = await service.fixed.submit(project, fixed_request(service, project, "account-boundary", command))
-        if boundary == "between-stages":
+        if boundary == "during-import":
             await asyncio.wait_for(reached.wait(), 10)
         connection["value"] = replace(connection["value"], ready=False,
             reason="AGENT_QUOTA" if reason == "RATE_LIMITED" else "AGENT_AUTH_REQUIRED")
@@ -552,9 +558,11 @@ async def test_account_preflight_pauses_dispatch_without_repeated_attempts(tmp_p
         done = service.store.read(project, reply.job.id)
         assert service.supervisor.paused == reason and service.store.dispatch_state().paused == reason
         assert done.error.code == reason and done.receipt is None
-        assert len(done.attempts) == (1 if boundary == "between-stages" else 0)
-        assert len(provider.calls) == (1 if boundary == "between-stages" else 0)
-        assert done.execution == ("failed" if boundary == "between-stages" else "queued")
+        assert len(done.attempts) == (1 if boundary == "during-import" else 0)
+        assert not provider.calls
+        if boundary == "during-import":
+            assert runtime.calls == ["processing-model"]
+        assert done.execution == ("failed" if boundary == "during-import" else "queued")
     finally:
         release.set()
         if actor is not None:

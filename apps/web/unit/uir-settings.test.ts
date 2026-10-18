@@ -17,6 +17,8 @@ function setup() {
   const api: SettingsApi = {
     preferences: async () => structuredClone(server.preferences), rules: async () => structuredClone(server.rules), assistant: async () => structuredClone(server.assistant),
     select: async model => { calls.push({ part: "model", value: model }); if (!model || fail.has("model")) throw new Error("unavailable"); server.preferences.selectedModel = model; return model; },
+    selectImport: async model => { calls.push({ part: "import", value: model }); if (fail.has("import")) throw new Error("unavailable");
+      server.preferences.selectedImportModel = model; return structuredClone(server.preferences); },
     analysis: async automatic => { calls.push({ part: "analysis", value: automatic }); if (fail.has("analysis")) throw new Error("disk full");
       server.preferences.automaticAnalysis = automatic; return structuredClone(server.preferences); },
     saveAssistant: async request => { calls.push({ part: "assistant", value: request });
@@ -77,6 +79,47 @@ test("retrying an incomplete load does not silently advance an already loaded ru
 test("Cancel restores a null model and never sends a rollback request", async () => {
   const h = setup(); h.server.preferences.selectedModel = null; await h.controller.load(); h.controller.change("model", "model-b");
   h.controller.cancel(); assert.equal(h.controller.state.draft.model, null); assert.deepEqual(h.calls, []);
+});
+
+test("import selection persists independently and can return to the processing model", async () => {
+  const h = setup(); await h.controller.load();
+  assert.equal(h.controller.state.draft.importModel, null);
+  h.controller.change("importModel", "model-b"); await h.controller.save();
+  assert.equal(h.server.preferences.selectedImportModel, "model-b");
+  assert.equal(h.server.preferences.selectedModel, "model-a");
+  assert.equal(h.server.assistant.selectedAgentModel, null);
+  const reopened = new SettingsDrafts(h.api, () => {}); await reopened.load();
+  assert.equal(reopened.state.draft.importModel, "model-b");
+  reopened.change("importModel", null); reopened.cancel();
+  assert.equal(reopened.state.draft.importModel, "model-b");
+  reopened.change("importModel", null); await reopened.save();
+  assert.equal(h.server.preferences.selectedImportModel, null);
+  assert.deepEqual(h.calls.map(call => call.part), ["import", "import"]);
+});
+
+test("failed import saves keep the choice while other settings save successfully", async () => {
+  const h = setup(); await h.controller.load(); h.fail.add("import");
+  h.controller.change("importModel", "model-b"); h.controller.change("model", "model-c");
+  h.controller.change("automatic", false); await h.controller.save();
+  assert.deepEqual(h.controller.state.saved, ["model", "analysis"]);
+  assert.deepEqual(h.controller.dirty, ["import"]);
+  assert.equal(h.controller.state.draft.importModel, "model-b");
+  assert.equal(h.server.preferences.selectedImportModel, undefined);
+  h.fail.clear(); await h.controller.save();
+  assert.equal(h.server.preferences.selectedImportModel, "model-b");
+  assert.equal(h.server.preferences.selectedModel, "model-c");
+  assert.equal(h.server.preferences.automaticAnalysis, false);
+});
+
+test("an import save acknowledgment retains a newer model draft", async () => {
+  const h = setup(), entered = gate(), release = gate(); await h.controller.load();
+  const save = h.api.selectImport;
+  h.api.selectImport = async model => { entered.release(); await release.wait; return save(model); };
+  h.controller.change("importModel", "model-b"); const pending = h.controller.save(); await entered.wait;
+  h.controller.change("importModel", "model-c"); release.release(); await pending;
+  assert.equal(h.controller.state.preferences?.selectedImportModel, "model-b");
+  assert.equal(h.controller.state.draft.importModel, "model-c");
+  assert.deepEqual(h.controller.dirty, ["import"]);
 });
 
 test("closing during Save invalidates late UI callbacks and unsent section writes", async () => {

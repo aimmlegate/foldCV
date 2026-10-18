@@ -115,3 +115,57 @@
 .uir-chat-source > small { display: block; margin: 6px 0; }
 .chat-findings > div { min-width: 0; }
 .chat-findings button { width: 100%; overflow-wrap: anywhere; }
+.technology-chip button.technology-edit {
+  width: auto;
+  height: auto;
+  min-width: 0;
+  flex-shrink: 1;
+  justify-content: flex-start;
+  overflow-wrap: anywhere;
+  text-align: left;
+  color: inherit;
+  font: inherit;
+}
+.technology-select .technology-values {
+  display: grid;
+  gap: 0;
+  margin: 0 0 6px;
+  padding: 0;
+  list-style: none;
+}
+.technology-select .technology-chip {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+  padding: 5px 0;
+  border-radius: 0;
+  border-bottom: 1px solid var(--line);
+  background: transparent;
+  color: var(--ink);
+  font-size: 11px;
+}
+.technology-select .technology-chip button.technology-edit {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  min-height: 24px;
+  padding: 0;
+  line-height: 1.5;
+}
+.technology-select .technology-chip button.technology-edit small { color: var(--muted); font-size: 10px; }
+.technology-select .technology-chip > button:not(.technology-edit) { width: 24px; height: 24px; }
+.technology-select .technology-field { min-height: 32px; padding: 3px 6px; gap: 4px; }
+.technology-select .technology-search { width: 0; flex: 1; min-width: 0; }
+.technology-expand {
+  display: block;
+  margin: 3px 0 8px;
+  padding: 2px 0;
+  border: 0;
+  background: transparent;
+  color: var(--accent);
+  font: 11px var(--sans);
+  cursor: pointer;
+}

@@ -29,6 +29,21 @@ export type Sourceid = string;
 export type Sourcekind = "pdf" | "docx" | "txt" | "markdown" | "paste";
 export type Id = string;
 export type Order = number;
+export type Blankbefore = number | null;
+export type Bold = boolean | null;
+export type Bounds = [number, number, number, number] | null;
+export type Column1 = number | null;
+export type Columnspan = number | null;
+export type Fontsize = number | null;
+export type Gapbefore = number | null;
+export type Group = number | null;
+export type Headinglevel = number | null;
+export type Indent = number | null;
+export type Layoutuncertain = boolean;
+export type Listlevel = number | null;
+export type Part2 = string | null;
+export type Rowmerge = ("start" | "continue") | null;
+export type Style = string | null;
 export type Text = string;
 /**
  * @maxItems 5000
@@ -72,5 +87,26 @@ export interface ExtractUnit {
   id: Id;
   location: ExtractLocation;
   order: Order;
+  structure?: SourceStructure | null;
   text: Text;
+}
+/**
+ * Observed layout cues, never semantic resume fields.
+ */
+export interface SourceStructure {
+  blankBefore?: Blankbefore;
+  bold?: Bold;
+  bounds?: Bounds;
+  column?: Column1;
+  columnSpan?: Columnspan;
+  fontSize?: Fontsize;
+  gapBefore?: Gapbefore;
+  group?: Group;
+  headingLevel?: Headinglevel;
+  indent?: Indent;
+  layoutUncertain?: Layoutuncertain;
+  listLevel?: Listlevel;
+  part?: Part2;
+  rowMerge?: Rowmerge;
+  style?: Style;
 }

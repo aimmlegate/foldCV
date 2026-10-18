@@ -13,7 +13,7 @@ export type Jobid = string | null;
 export type Operation = "add" | "edit" | "remove" | "add_period" | "remove_period" | "clear_technologies";
 export type Periodid = string | null;
 export type Recordid = string | null;
-export type Recordkind = ("candidate" | "employment" | "technology" | "education" | "language") | null;
+export type Recordkind = ("candidate" | "employment" | "technology" | "education" | "language" | "claim") | null;
 
 export interface RichPanelRequest {
   capture: ActionCapture;

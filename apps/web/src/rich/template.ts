@@ -1,7 +1,8 @@
 import specification from "../../../../templates/foldcv-reference/spec.json";
+import type { CSSProperties } from "react";
 
 export const referenceTemplate = specification;
-export const referenceVariables = {
+export const referenceVariables: CSSProperties & Record<`--cv-${string}`, string> = {
   "--cv-page-width": `${specification.page.width}pt`,
   "--cv-sidebar-width": `${specification.regions.sidebar.width}pt`,
   "--cv-main-width": `${specification.regions.main.width}pt`,
@@ -10,4 +11,29 @@ export const referenceVariables = {
   "--cv-body-size": `${specification.typography.body.size}pt`,
   "--cv-line-height": `${specification.typography.body.lineHeight}pt`,
   "--cv-band-color": specification.sectionBand.background,
+  "--cv-page-height": `${specification.page.height}pt`,
+  "--cv-body-right": `${specification.page.width - specification.regions.main.x - specification.regions.main.width}pt`,
+  "--cv-header-top": `${specification.header.name.top}pt`,
+  "--cv-header-left": `${specification.header.name.x - specification.regions.sidebar.x}pt`,
+  "--cv-header-height": `${specification.header.divider.y - specification.header.name.top}pt`,
+  "--cv-header-gap": `${specification.page.bodyTopFirst - specification.header.divider.y}pt`,
+  "--cv-divider-left": `${specification.header.divider.x1 - specification.header.name.x}pt`,
+  "--cv-divider-width": `${specification.header.divider.x2 - specification.header.divider.x1}pt`,
+  "--cv-name-size": `${specification.header.name.size}pt`,
+  "--cv-name-line": `${specification.header.name.lineHeight}pt`,
+  "--cv-title-size": `${specification.header.title.size}pt`,
+  "--cv-title-line": `${specification.header.title.lineHeight}pt`,
+  "--cv-job-size": `${specification.typography.jobHeading.size}pt`,
+  "--cv-job-line": `${specification.typography.jobHeading.lineHeight}pt`,
+  "--cv-section-size": `${specification.typography.sectionHeading.size}pt`,
+  "--cv-section-line": `${specification.typography.sectionHeading.lineHeight}pt`,
+  "--cv-band-height": `${specification.sectionBand.height}pt`,
+  "--cv-band-left": `${specification.sectionBand.leftFromMain}pt`,
+  "--cv-band-extra": `${specification.sectionBand.widthBeyondMain}pt`,
+  "--cv-brand-left": `${specification.header.brand.x - specification.regions.sidebar.x}pt`,
+  "--cv-brand-top": `${specification.header.brand.top - specification.header.name.top}pt`,
+  "--cv-brand-width": `${specification.header.brand.boxWidth}pt`,
+  "--cv-brand-height": `${specification.header.brand.boxHeight}pt`,
+  "--cv-focus-height": `${specification.focus.minimumEntryHeight}pt`,
+  "--cv-focus-text": `${specification.focus.textFromSidebar}pt`,
 };

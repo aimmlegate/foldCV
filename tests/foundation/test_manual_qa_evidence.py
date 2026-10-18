@@ -9,6 +9,7 @@ import pytest
 from tools.manual_qa_evidence import CASE_IDS, ROOT, validate_bindings, validate_execution, validate_observation, validate_retained_native
 from tools.background_evidence import assert_report
 from tests.foundation.test_runner_gates import nb_report_fixture
+from tools.manual_qa_evidence import observe_provider_generation
 
 
 def test_retained_native_guard_uses_its_whole_revision_and_rejects_rebound_cases():
@@ -39,6 +40,46 @@ def test_function_bindings_expand_only_their_actual_parameter_cases():
     assert all(nodes == sorted(collected) for nodes in validate_bindings(value, collected).values())
     with pytest.raises(SystemExit, match="not collected"):
         validate_bindings(value, {node + "_different[one]"})
+
+
+@pytest.mark.parametrize("path", ["direct", "queued", "owned"])
+def test_native_observer_counts_before_every_real_provider_entry_once(tmp_path, path):
+    from contextlib import contextmanager
+    from types import SimpleNamespace
+    import threading
+    from resume_api.gui_admission import QueuedProvider
+    from resume_api.providers.codex_cli import CodexCliProvider
+    events = []
+    class Provider(CodexCliProvider):
+        def __init__(self):
+            pass
+        @contextmanager
+        def _profile_owner(self, *_args):
+            yield
+        def _generate(self, *_args):
+            events.append("native_start")
+            return "result"
+    def wrap(original):
+        def observed(*args):
+            events.append("counted")
+            return original(*args)
+        return observed
+    provider = Provider()
+    assert observe_provider_generation(provider, wrap) is provider
+    observe_provider_generation(provider, wrap)
+    files, cancel = SimpleNamespace(root=tmp_path), threading.Event()
+    if path == "queued":
+        result = QueuedProvider(provider, lambda: events.append("admitted")).generate(None, files, cancel)
+        assert events.pop(0) == "admitted"
+    elif path == "owned":
+        class Permit:
+            @contextmanager
+            def hold(self, *_args):
+                yield
+        result = provider.generate_owned(None, files, cancel, Permit())
+    else:
+        result = provider.generate(None, files, cancel)
+    assert result == "result" and events == ["counted", "native_start"]
 
 
 @pytest.mark.parametrize("fault", ["none", "unmapped_failure", "source", "retry"])

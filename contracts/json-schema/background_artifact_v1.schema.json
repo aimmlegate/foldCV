@@ -5238,6 +5238,9 @@
           "title": "Evidence",
           "type": "array"
         },
+        "experience": {
+          "$ref": "#/$defs/WorkingField_str_"
+        },
         "id": {
           "minLength": 1,
           "title": "Id",
@@ -5284,6 +5287,18 @@
             }
           ],
           "title": "Subprojectid"
+        },
+        "technical": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Technical"
         },
         "userCorrected": {
           "default": false,

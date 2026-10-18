@@ -1,0 +1,148 @@
+/* The paper follows the export template; shell tokens style the surrounding UI. */
+.cv-document.uir-prototype {
+  width: var(--cv-page-width);
+  min-width: var(--cv-page-width);
+  max-width: none;
+  min-height: var(--cv-page-height);
+  padding: var(--cv-header-top) var(--cv-body-right) 42pt var(--cv-body-left);
+  background: #fff;
+  color: #000;
+  font: 300 var(--cv-body-size)/var(--cv-line-height) "FoldCV Source Sans Pro", sans-serif;
+}
+.uir-prototype .uir-regions {
+  grid-template-columns: var(--cv-sidebar-width) var(--cv-main-width);
+  column-gap: var(--cv-column-gap);
+}
+.uir-prototype .paper-heading {
+  padding: 0;
+  min-height: var(--cv-header-height);
+  margin: 0 0 var(--cv-header-gap) var(--cv-header-left);
+  border: 0;
+}
+.uir-prototype .paper-heading::after {
+  content: "";
+  position: absolute;
+  left: var(--cv-divider-left);
+  bottom: 0;
+  width: var(--cv-divider-width);
+  border-bottom: .6pt solid #888;
+}
+.uir-prototype .uir-header > .bn-block > .bn-block-group { max-width: 450pt; }
+.uir-prototype .paper-sidebar,
+.uir-prototype .paper-main { color: inherit; font: inherit; }
+.uir-prototype .bn-inline-content { min-height: var(--cv-line-height); }
+.uir-prototype .cv-block { margin: 0; border-radius: 0; font: inherit; color: inherit; }
+.uir-prototype .paper-heading .candidate-name,
+.uir-prototype [data-cv-role="header_name"] > .bn-block > .cv-block {
+  margin: 0 0 5.3pt;
+  min-height: 0;
+  color: #000;
+  font: 900 var(--cv-name-size)/var(--cv-name-line) "FoldCV Source Sans Pro", sans-serif;
+  letter-spacing: 0;
+}
+.uir-prototype .candidate-title,
+.uir-prototype [data-cv-role="header_title"] > .bn-block > .cv-block {
+  color: #000;
+  font: 600 var(--cv-title-size)/var(--cv-title-line) "FoldCV Source Sans Pro", sans-serif;
+}
+.cv-template-brand {
+  position: absolute;
+  left: var(--cv-brand-left);
+  top: var(--cv-brand-top);
+  width: var(--cv-brand-width);
+  height: var(--cv-brand-height);
+  object-fit: contain;
+}
+.uir-prototype .paper-main .cv-section {
+  width: calc(100% + var(--cv-band-extra));
+  min-height: var(--cv-band-height);
+  margin: 0 0 5pt var(--cv-band-left);
+  padding: 0 5pt;
+  background: var(--cv-band-color);
+  color: inherit;
+  font: 900 var(--cv-section-size)/var(--cv-section-line) "FoldCV Source Sans Pro", sans-serif;
+  letter-spacing: 0;
+}
+.uir-prototype .paper-sidebar .cv-section,
+.uir-prototype [data-cv-role="profile_heading"] > .bn-block > .cv-section {
+  width: auto;
+  min-height: 0;
+  padding: 0;
+  margin: 0;
+  background: transparent;
+  color: inherit;
+  font: 900 var(--cv-section-size)/var(--cv-section-line) "FoldCV Source Sans Pro", sans-serif;
+  letter-spacing: 0;
+  text-transform: none;
+}
+.uir-prototype [data-uir-section="true"] > .bn-block > .bn-block-group { margin-bottom: 10pt; }
+.uir-prototype .bn-block-outer[data-cv-role="profile_heading"] { margin-left: -5pt; width: calc(100% + 15pt); }
+.uir-prototype .bn-block-outer[data-id^="import_experience_"] > .bn-block > .cv-section { margin-bottom: 14pt; }
+.uir-prototype .paper-main .cv-job,
+.uir-prototype [data-cv-role="job_heading"] > .bn-block > .cv-block {
+  margin: 0;
+  color: inherit;
+  font: 600 var(--cv-job-size)/var(--cv-job-line) "FoldCV Source Sans Pro", sans-serif;
+}
+.uir-prototype .cv-caption,
+.uir-prototype .cv-tech,
+.uir-prototype [data-cv-role="support"] > .bn-block > .cv-block {
+  margin: 0;
+  color: inherit;
+  font: 400 var(--cv-body-size)/var(--cv-line-height) "FoldCV Source Sans Pro", sans-serif;
+}
+.uir-prototype [data-cv-role="focus_entry"] > .bn-block > .cv-block {
+  position: relative;
+  display: block;
+  padding-left: var(--cv-focus-text);
+  min-height: var(--cv-focus-height);
+  font-weight: 600;
+}
+.uir-prototype .cv-focus::before { content: none; }
+.uir-prototype .cv-focus-experience {
+  display: block;
+  font-weight: 300;
+  white-space: normal;
+  user-select: none;
+}
+.uir-prototype [data-cv-logo="true"] > .bn-block > .cv-block::before {
+  content: "";
+  position: absolute;
+  left: 4.5pt;
+  top: 0;
+  width: 28pt;
+  height: 32pt;
+  background: var(--cv-focus-logo) center/contain no-repeat;
+  border: 0;
+  border-radius: 0;
+}
+.uir-prototype .bn-block-outer[data-cv-marker="true"] > .bn-block > .bn-block-content[data-content-type]::before {
+  content: none;
+  display: none;
+}
+.uir-prototype [data-content-type="bulletListItem"],
+.uir-prototype [data-content-type="numberedListItem"] { padding-left: 18pt; }
+/* Override the engine's wider marker column on the reference paper. */
+.cv-document.uir-prototype .bn-block-content.cv-block:is([data-content-type="bulletListItem"], [data-content-type="numberedListItem"]) {
+  align-items: baseline;
+  gap: 4pt;
+  margin-bottom: 3pt;
+  padding-left: 0;
+}
+.cv-document.uir-prototype .bn-block-content.cv-block:is([data-content-type="bulletListItem"], [data-content-type="numberedListItem"])::before {
+  position: static;
+  flex: 0 0 9pt;
+  width: 9pt;
+  min-width: 9pt;
+  margin: 0;
+  padding: 0;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+}
+.cv-document.uir-prototype .bn-block-content.cv-block:is([data-content-type="bulletListItem"], [data-content-type="numberedListItem"]) > .bn-inline-content { flex: 1; min-width: 0; }
+.cv-document.uir-prototype [data-cv-marker="true"] > .bn-block > .bn-block-content.cv-block:is([data-content-type="bulletListItem"], [data-content-type="numberedListItem"]) {
+  display: block;
+  padding-left: 13pt;
+  text-indent: -13pt;
+}

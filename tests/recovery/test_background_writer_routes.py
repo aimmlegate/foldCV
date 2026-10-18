@@ -27,6 +27,8 @@ from tests.recovery.test_rich_synchronization import capture, selection
 from tests.recovery.test_rich_timeline import timeline
 from tests.support.background_publication import PublicationFixture
 from tests.recovery.test_background_fixed_jobs import fixed_request, settled
+from tests.support.importing import importer, complete
+from resume_api.agent.runtime import RuntimeResult
 
 
 class HeldProvider(CreationProvider):
@@ -86,6 +88,13 @@ async def test_source_import_and_fixed_generation_routes_keep_independent_public
     fixture = PublicationFixture(tmp_path / "store")
     provider = HeldProvider()
     parsed, release_parse = asyncio.Event(), asyncio.Event()
+    entered, release = asyncio.Event(), asyncio.Event()
+    async def import_turn(session, _value, cancel):
+        await complete(session)
+        entered.set()
+        await release.wait()
+        return RuntimeResult(state="cancelled" if cancel.is_set() else "completed")
+    runtime, _ = importer(monkeypatch, import_turn)
     async def scripted_extract(data, name, pasted, _files):
         parsed.set()
         if variant == "NB-P08:v02":
@@ -93,6 +102,7 @@ async def test_source_import_and_fixed_generation_routes_keep_independent_public
         return extract(data, name, pasted)
     monkeypatch.setattr(rich_projects, "run_extract", scripted_extract)
     async with boundary(fixture, tmp_path, provider) as (client, service, jobs):
+        jobs.runtime = runtime
         prefix = "/v1/rich/projects"
         data = Path("tests/fixtures/recovery/E1.txt").read_bytes()
         if variant == "NB-P08:v03":
@@ -127,7 +137,7 @@ async def test_source_import_and_fixed_generation_routes_keep_independent_public
             assert response.status_code == 409 and response.json()["error"]["code"] == "JOB_SCOPE_INVALID"
         if variant != "NB-P08:v02":
             reply, _created = await jobs.fixed.submit(identifier, fixed_request(jobs, identifier, "route-process", {"kind": "processing"}))
-            assert await asyncio.to_thread(provider.entered.wait, 10)
+            await asyncio.wait_for(entered.wait(), 10)
         before, checksum = service.storage.read_committed(identifier)
         changed = before.model_copy(deep=True)
         changed.title, changed.title_manually_set = "Keep the interleaved title", True
@@ -144,16 +154,16 @@ async def test_source_import_and_fixed_generation_routes_keep_independent_public
             if variant == "NB-P08:v08":
                 cancel_task = asyncio.create_task(client.post(prefix + f"/{identifier}/cancel", json={}))
                 await asyncio.wait_for(jobs.supervisor.controls[reply.job.id].cancelled.wait(), 10)
-            provider.release.set()
+            release.set()
             if variant == "NB-P08:v08":
                 cancelled = await cancel_task
                 assert cancelled.status_code == 200 and cancelled.json()["generation"]["status"] == "cancelled"
                 done = await settled(jobs, identifier, reply.job.id)
-                assert done.execution == "cancelled" and len(provider.calls) == 1
+                assert done.execution == "cancelled" and len(runtime.calls) == 1 and not provider.calls
             else:
                 done = await settled(jobs, identifier, reply.job.id, publication="saved")
                 await asyncio.wait_for(jobs.fixed.renders[done.id], 10)
-                assert len(provider.calls) == 2 and service.read(identifier).project
+                assert len(runtime.calls) == 1 and not provider.calls and service.read(identifier).project
         current, checksum = service.storage.read_committed(identifier)
         assert current.title == "Keep the interleaved title" and current.title_manually_set
         assert jobs.store.load(identifier).history.workspace_sha256 == checksum == digest_bytes(current)

@@ -23,6 +23,7 @@ from .rich_mutations import ActionCapture
 from .recovery import Rules
 from ..resume_assessment import ResumeAssessment
 from ..gui_normalization import GuiNormalizedResult
+from .importing import IMPORT_TOOLS, ImportDraft
 
 Execution = Literal["queued", "starting", "running", "cancelling", "completed", "failed", "cancelled", "interrupted"]
 Publication = Literal["none", "ready", "waiting_for_sync", "needs_review", "committing", "saved", "no_change",
@@ -30,7 +31,8 @@ Publication = Literal["none", "ready", "waiting_for_sync", "needs_review", "comm
 JobKind = Literal["agent", "processing", "rewrite", "reconciliation"]
 SchedulingClass = Literal["background", "interactive", "reconciliation"]
 Tool = Literal["get_resume_context", "find_resume_content", "get_working_facts", "get_original_source",
-    "get_conversation_context", "get_project_resources", "check_resume", "read_public_page", "publish_findings", "prepare_edit_batch", "apply_edit_batch", "project_action"]
+    "get_conversation_context", "get_project_resources", "check_resume", "read_public_page", "publish_findings", "prepare_edit_batch", "apply_edit_batch", "project_action",
+    "read_import", "save_import", "finish_import"]
 ScopeKey = Annotated[str, Field(min_length=1, max_length=512)]
 Counter = Annotated[int, Field(ge=0, le=9007199254740991)]
 
@@ -167,6 +169,9 @@ class JobSubmissionV1(BackgroundWire):
             "rewrite": ["rewrite"], "reconciliation": ["reconciliation"]}[self.kind]
         expected_input = {"agent": "agent_journal", "processing": "processing",
             "rewrite": "rich_sync", "reconciliation": "rich_sync"}[self.kind]
+        importer = self.kind == "processing" and set(self.tools) == set(IMPORT_TOOLS)
+        if importer:
+            expected_stages = ["extraction"]
         if (self.scheduling_class != expected_class or [m.stage for m in self.models] != expected_stages
                 or self.input.kind != expected_input or len(self.tools) != len(set(self.tools))):
             raise ValueError("invalid server-assigned job capture")
@@ -174,8 +179,10 @@ class JobSubmissionV1(BackgroundWire):
             raise ValueError("check-only job cannot capture edit authority")
         if not self.allow_web and "read_public_page" in self.tools:
             raise ValueError("web-disabled job cannot capture page fetching")
-        if self.kind != "agent" and (self.tools or not self.allow_edits or self.allow_web):
+        if self.kind != "agent" and (self.tools and not importer or not self.allow_edits or self.allow_web):
             raise ValueError("fixed jobs have no agent tools and use conditional publication")
+        if self.kind == "agent" and set(self.tools) & set(IMPORT_TOOLS):
+            raise ValueError("import tools are restricted to initial processing")
         return self
 
 
@@ -1194,13 +1201,17 @@ class ProcessingCandidateV1(BackgroundWire):
     schema_version: Literal[1]
     id: AgentId
     input_id: AgentId
-    assessment: ResumeAssessment
+    assessment: ResumeAssessment | None
     normalized: GuiNormalizedResult | None
     workspace: WorkspaceV6 | None
+    import_draft: ImportDraft | None = Field(default=None, exclude_if=lambda value: value is None)
 
     @model_validator(mode="after")
     def complete_assembly(self):
-        if (self.normalized is None) != (self.workspace is None) or self.workspace is not None and self.workspace.project is None:
+        if self.import_draft is not None:
+            if not self.import_draft.finished or self.normalized is not None or self.workspace is None or self.workspace.project is None:
+                raise ValueError("import candidate needs a finished draft and assembled workspace")
+        elif self.assessment is None or (self.normalized is None) != (self.workspace is None) or self.workspace is not None and self.workspace.project is None:
             raise ValueError("processing candidate needs the complete original assembly")
         return self
 

@@ -40,13 +40,13 @@ def config_result(value):
 
 
 def model_result(value):
-    return {"data": [{"model": value.model, "supportedReasoningEfforts": [{"reasoningEffort": "medium"}]}], "nextCursor": None}
+    return {"data": [{"model": value.model, "supportedReasoningEfforts": [{"reasoningEffort": value.reasoning_effort}]}], "nextCursor": None}
 
 
 def thread_result(value):
     return {"thread": {"id": "thread_1"}, "model": value.model, "modelProvider": "openai",
         "approvalPolicy": "never", "approvalsReviewer": "user", "sandbox": {"type": "readOnly", "networkAccess": False},
-        "instructionSources": [], "runtimeWorkspaceRoots": [], "reasoningEffort": "medium"}
+        "instructionSources": [], "runtimeWorkspaceRoots": [], "reasoningEffort": value.reasoning_effort}
 
 
 def notification(method, **params):
@@ -96,9 +96,16 @@ def runtime(tmp_path, value, steps, **options):
 
 
 @pytest.mark.asyncio
-async def test_scripted_native_driver_correlates_out_of_order_replies_and_replaces_usage(tmp_path):
+@pytest.mark.parametrize("effort", ["medium", "high"])
+async def test_scripted_native_driver_correlates_out_of_order_replies_and_replaces_usage(tmp_path, effort, monkeypatch):
     calls, events = [], []
-    value = input_value(before_start=lambda: calls.append("start"))
+    requests = []
+    original = NativeSession.request
+    def observed(session, method, params):
+        requests.append({"method": method, "params": params})
+        return original(session, method, params)
+    monkeypatch.setattr(NativeSession, "request", observed)
+    value = input_value(before_start=lambda: calls.append("start"), reasoning_effort=effort)
     driver = runtime(tmp_path, value, script(value, turn_events=complete_events()))
     result = await driver.run(value, threading.Event(), lambda kind, payload: events.append((kind, payload)))
     assert result.state == "completed" and result.error is None
@@ -107,6 +114,38 @@ async def test_scripted_native_driver_correlates_out_of_order_replies_and_replac
     assert "HIDDEN_CANARY" not in json.dumps(events) and "LATE_CANARY" not in result.text
     assert not any((tmp_path / "operations").iterdir())
     assert result.timings["cleanup"] < 5
+    assert next(r for r in requests if r["method"] == "thread/start")["params"]["config"]["model_reasoning_effort"] == effort
+    assert next(r for r in requests if r["method"] == "turn/start")["params"]["effort"] == effort
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("mismatch", ["unsupported", "downgraded"])
+async def test_requested_effort_is_verified_before_start_without_fallback(tmp_path, mismatch):
+    value = input_value(reasoning_effort="high")
+    steps = script(value, turn_events=complete_events())
+    if mismatch == "unsupported":
+        steps[3]["send"][0]["result"] = model_result(input_value())
+    else:
+        steps[4]["send"][0]["result"] = thread_result(input_value())
+    result = await runtime(tmp_path, value, steps).run(value, threading.Event(), lambda *_: None)
+    assert result.error == ("AGENT_MODEL_INCOMPATIBLE" if mismatch == "unsupported" else "AGENT_RUNTIME_UNSUPPORTED")
+    assert not result.native_started
+
+
+@pytest.mark.asyncio
+async def test_shared_runtime_does_not_silently_downgrade_an_unsupported_effort():
+    from resume_api.jobs.appserver import SharedAgentRuntime
+    closed = []
+    async def close(_seconds):
+        closed.append(True)
+        return True
+    def client(_value):
+        pytest.fail("Unsupported effort reached the tool client")
+    server = SimpleNamespace(cleanup_failed=False, live={})
+    value = input_value(reasoning_effort="high", close_tools=close)
+    result = await SharedAgentRuntime(server, client_factory=client).run(value, threading.Event(), lambda *_: None)
+    assert result.error == "AGENT_MODEL_INCOMPATIBLE" and not result.native_started
+    assert result.cleanup_verified and closed == [True]
 
 
 @pytest.mark.asyncio

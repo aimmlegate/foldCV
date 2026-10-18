@@ -78,7 +78,7 @@ export function App({ portalHost }: { portalHost: HTMLElement }) {
       <div className="screen uir-proof-screen" hidden={settings}>
         {error && <div className="workspace-alert notice error" role="alert"><span>{error}</span><button className="icon" aria-label="Скрыть сообщение" onClick={workspace.dismissError}><Icon name="close" /></button></div>}
         {workspace.loading && <div className="workspace-loading" role="status">Открываем резюме…</div>}
-        {view === "progress" && response && generation && <Progress generation={generation} sourceName={source?.originalName ?? (input.kind === "file" ? input.file.name : "Вставленный текст")} busy={busy}
+        {view === "progress" && response && generation && <Progress key={`${response.workspace.projectId}:${generation.id}`} response={{ ...response, generation }} sourceName={source?.originalName ?? (input.kind === "file" ? input.file.name : "Вставленный текст")} busy={busy}
           cancel={() => void action(async () => acknowledge(await projectRequest(`/${response.workspace.projectId}/cancel`, "POST", {})))} />}
         {view === "assessment" && response && <Assessment response={response} open={() => setReviewed(reviewId(response))} back={() => setSourceOpen(true)} />}
         {view === "editor" && response?.workspace.project && <>

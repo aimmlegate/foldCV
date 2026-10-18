@@ -18,6 +18,13 @@ HISTORICAL_REVISION = "dad17565c05b600b3965c3fad9329ff7b3958390"
 CASE_IDS = frozenset("IN01 IN02 IN03 IN04 IN05 FA01 FA02 FA03 FM01 FM02 FM03 FM04 AG01 AG02 AG03 AG04 AG05 AG06 LC01 LC02 LC03 LC04 UI01 DX01 DX02 E2E01 E2E02".split())
 
 
+def observe_provider_generation(provider, wrap):
+    if not getattr(provider, "_manual_qa_observed", False):
+        provider._generate = wrap(provider._generate)
+        provider._manual_qa_observed = True
+    return provider
+
+
 def historical_sources(paths: list[str]) -> dict[str, str]:
     return {name: hashlib.sha256(subprocess.check_output(
         ["git", "show", f"{HISTORICAL_REVISION}:{name}"], cwd=ROOT)).hexdigest() for name in paths}

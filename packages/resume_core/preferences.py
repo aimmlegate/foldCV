@@ -38,7 +38,8 @@ class PreferencesStore:
                     result[key] = value
                 return result
             value = Preferences.model_validate(json.loads(raw, object_pairs_hook=unique))
-            if value.selected_model is not None and not MODEL.fullmatch(value.selected_model):raise ValueError()
+            for model in (value.selected_model, value.selected_import_model):
+                if model is not None and not MODEL.fullmatch(model):raise ValueError()
             return value
         except (OSError, ValueError, ValidationError):
             raise PreferencesFailure('PREFERENCES_CORRUPT') from None
@@ -65,6 +66,18 @@ class PreferencesStore:
             with locked_root(self.root, '.preferences.lock'):
                 value = self._read()
                 value.automatic_analysis = enabled
+                self._write(value)
+                return value
+        except StorageFailure:
+            raise PreferencesFailure('PREFERENCES_SAVE_FAILED') from None
+
+    def select_import_model(self, model):
+        if model is not None and not MODEL.fullmatch(model):
+            raise PreferencesFailure('MODEL_DENIED')
+        try:
+            with locked_root(self.root, '.preferences.lock'):
+                value = self._read()
+                value.selected_import_model = model
                 self._write(value)
                 return value
         except StorageFailure:

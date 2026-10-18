@@ -157,6 +157,7 @@ def canonical_source(result: ExtractResult, *, source_id: str | None = None) -> 
                       "location": {"kind": kind, "index": index if index is not None else unit.order,
                                    "row": location.row if kind == "table_cell" else None,
                                    "column": location.column if kind == "table_cell" else None},
+                      "structure": unit.structure.model_dump(by_alias=True) if unit.structure else None,
                       "disposition": "unresolved", "representedFactIds": []})
     return Source.model_validate({"id": identity, "revision": 1, "originalName": result.original_name,
                                   "mimeType": result.mime_type, "byteSha256": result.byte_sha256,

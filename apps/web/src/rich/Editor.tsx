@@ -21,7 +21,8 @@ import type { AgentFinding } from "../contracts/generated/agent_finding";
 import { Timeline, type TimelineControls } from "./Timeline";
 import { dateAnchors, type DateAnchor } from "./date-edit";
 import { presentationPlugin, type PresentationBlocks } from "./presentation";
-import { presentationLogos } from "./presentation-assets";
+import { brand, presentationLogos } from "./presentation-assets";
+import { referenceVariables } from "./template";
 import type { TimelineReport } from "../contracts/generated/timeline_report";
 import type { DateCascadeProposal } from "../contracts/generated/date_cascade_proposal";
 import { selectedRange } from "./selection";
@@ -56,7 +57,7 @@ import { FactsPanel } from "../workbench/facts/FactsPanel";
 import { BackgroundWriter, type WriterMode } from "../background/writer";
 import type { AttachedWriter } from "../background/connection";
 import { projectJobs } from "../background/jobs";
-import { allowRichCodeStyles } from "./styles";
+import { allowRichCodeStyles, allowRichColors } from "./styles";
 import { captureCaret, restoreCaret } from "./caret";
 
 type FactIntent = { kind: "panel"; command: PanelCommand } | { kind: "cascade"; proposal: DateCascadeProposal };
@@ -100,6 +101,7 @@ const schema = BlockNoteSchema.create({ blockSpecs: { paragraph: defaultBlockSpe
   table: defaultBlockSpecs.table, image: image(), region: region(), section: section() },
   inlineContentSpecs: { ...defaultInlineContentSpecs, factField } });
 allowRichCodeStyles(schema);
+allowRichColors(schema);
 type EditorBlock = Block<typeof schema.blockSchema, typeof schema.inlineContentSchema, typeof schema.styleSchema>;
 type InputBlock = PartialBlock<typeof schema.blockSchema, typeof schema.inlineContentSchema, typeof schema.styleSchema>;
 type Stored = StoredBlock;
@@ -964,9 +966,9 @@ export function RichEditor({ initial, acknowledge, onStatus, ref, onHistoryNavig
       {contextActions}</div>
     <fieldset className="contents uir-editor-controls" disabled={applying || recovery}>
     <div className="paper-scroll">
-    <div className="cv-document resume-paper uir-prototype" data-project-id={initial.workspace.projectId}
+    <div className="cv-document resume-paper uir-prototype" style={referenceVariables} data-project-id={initial.workspace.projectId}
       data-history-position={bridge.history?.position ?? 0} data-history-length={bridge.history?.length ?? 0} data-composing={bridge.composing}>
-      <div className="uir-engine-sheet"><span className="template-wordmark" aria-label="generic">generic</span>
+      <div className="uir-engine-sheet"><img className="cv-template-brand" src={brand} alt="generic" />
       <BlockNoteView editor={editor} theme="light" linkToolbar={!selecting} filePanel={false} slashMenu={false} formattingToolbar={false} sideMenu={false} tableHandles={false}
         {...(portalHost ? { portalElements: { default: portalHost } } : {})}>
         <FormattingToolbarController formattingToolbar={selectionToolbar} portalElement={portalHost ?? window.document.body}

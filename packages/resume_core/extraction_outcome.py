@@ -4,6 +4,7 @@ from collections import Counter
 import re
 
 from .models.rich_facts import ExtractionIssue, ExtractionReport
+from .source_dates import MONTH_PATTERN
 
 SECTIONS = {
     "employment": r"(?:опыт\s+работы|профессиональный\s+опыт|employment|work\s+experience|career\s+history)",
@@ -12,6 +13,31 @@ SECTIONS = {
     "certifications": r"(?:сертификаты|сертификации|certifications|certificates)",
     "technology": r"(?:ключевые\s+навыки|технические\s+навыки|technical\s+skills|technologies)",
 }
+
+_DATE = rf"(?:(?:{MONTH_PATTERN})\.?\s+\d{{4}}|\d{{1,2}}[./]\d{{4}}|\d{{4}}(?:-\d{{2}})?)"
+_DATED_RANGE = re.compile(rf"(?<!\w){_DATE}\s*(?:[—–-]|to|по)\s*"
+    rf"(?:{_DATE}|present|current|настоящее\s+время|н\.?\s*в\.?)(?!\w)", re.I)
+_OTHER_SECTION = "|".join([*[pattern for key, pattern in SECTIONS.items() if key != "employment"],
+    r"(?:personal\s+)?projects?", r"личные\s+проекты", r"courses", r"курсы", r"about\s+me", r"о\s+себе"])
+
+
+def has_dated_employment(sources):
+    for source in sources:
+        active, lines = False, []
+        for unit in source.units:
+            for line in unit.text.splitlines():
+                text = " ".join(line.split())
+                employment = re.match(rf"^{SECTIONS['employment']}(?=\W|$)", text, re.I)
+                if employment or re.match(rf"^(?:{_OTHER_SECTION})(?=\W|$)", text, re.I):
+                    if active and _DATED_RANGE.search(" ".join(lines)):
+                        return True
+                    active = bool(employment) and not re.search(r"[:—–-]\s*(?:нет|none|no\s+experience)\s*$", text, re.I)
+                    lines = []
+                if active:
+                    lines.append(text)
+        if active and _DATED_RANGE.search(" ".join(lines)):
+            return True
+    return False
 
 
 def extraction_report(result, *, request_bytes, recovered_rows):

@@ -4863,6 +4863,209 @@
       "title": "SourceOverlay",
       "type": "object"
     },
+    "SourceStructure": {
+      "additionalProperties": false,
+      "description": "Observed layout cues, never semantic resume fields.",
+      "properties": {
+        "blankBefore": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Blankbefore"
+        },
+        "bold": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Bold"
+        },
+        "bounds": {
+          "anyOf": [
+            {
+              "items": {
+                "type": "number"
+              },
+              "maxItems": 4,
+              "minItems": 4,
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Bounds"
+        },
+        "column": {
+          "anyOf": [
+            {
+              "minimum": 1,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Column"
+        },
+        "columnSpan": {
+          "anyOf": [
+            {
+              "maximum": 1000,
+              "minimum": 1,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Columnspan"
+        },
+        "fontSize": {
+          "anyOf": [
+            {
+              "exclusiveMinimum": 0,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Fontsize"
+        },
+        "gapBefore": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Gapbefore"
+        },
+        "group": {
+          "anyOf": [
+            {
+              "minimum": 1,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Group"
+        },
+        "headingLevel": {
+          "anyOf": [
+            {
+              "maximum": 9,
+              "minimum": 1,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Headinglevel"
+        },
+        "indent": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Indent"
+        },
+        "layoutUncertain": {
+          "default": false,
+          "title": "Layoutuncertain",
+          "type": "boolean"
+        },
+        "listLevel": {
+          "anyOf": [
+            {
+              "maximum": 8,
+              "minimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Listlevel"
+        },
+        "part": {
+          "anyOf": [
+            {
+              "maxLength": 120,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Part"
+        },
+        "rowMerge": {
+          "anyOf": [
+            {
+              "enum": [
+                "start",
+                "continue"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Rowmerge"
+        },
+        "style": {
+          "anyOf": [
+            {
+              "maxLength": 120,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Style"
+        }
+      },
+      "title": "SourceStructure",
+      "type": "object"
+    },
     "SourceUnit": {
       "additionalProperties": false,
       "properties": {
@@ -4903,6 +5106,17 @@
           "minimum": 1,
           "title": "Revision",
           "type": "integer"
+        },
+        "structure": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/SourceStructure"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
         },
         "text": {
           "title": "Text",

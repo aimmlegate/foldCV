@@ -1,0 +1,2172 @@
+{
+  "git": {
+    "url": "https://raw.githubusercontent.com/devicons/devicon/6a37858047b0e8d9c9c0e68f4a071fc410652e89/icons/git/git-original.svg",
+    "provider": "devicon",
+    "kind": "brand",
+    "revision": "6a37858047b0e8d9c9c0e68f4a071fc410652e89",
+    "license": "MIT",
+    "sourceFile": "git.svg",
+    "sourceSha256": "717a57ea97bf7e86de721dab3e68afac66332a10676d5c9abce4ae6a5a9c9983",
+    "pngSha256": "34bc6092fa3bd0b0f65578b0235d94a1d13e8fcae2c5bd5e5ec264c80c98fcab",
+    "normalization": {
+      "canvas": 192,
+      "padding": 12,
+      "preserveAspectRatio": true
+    }
+  },
+  "ansible": {
+    "url": "https://raw.githubusercontent.com/devicons/devicon/6a37858047b0e8d9c9c0e68f4a071fc410652e89/icons/ansible/ansible-original.svg",
+    "provider": "devicon",
+    "kind": "brand",
+    "revision": "6a37858047b0e8d9c9c0e68f4a071fc410652e89",
+    "license": "MIT",
+    "sourceFile": "ansible.svg",
+    "sourceSha256": "6e318caf2d49685f921a72231816106859e0bf93e440a70d0445a3f7f030fc9f",
+    "pngSha256": "4219972ada79606d2f94c5d94dadffa2a45e2c5adb3efa614b076e74703702de",
+    "normalization": {
+      "canvas": 192,
+      "padding": 12,
+      "preserveAspectRatio": true
+    }
+  },
+  "terraform": {
+    "url": "https://raw.githubusercontent.com/devicons/devicon/6a37858047b0e8d9c9c0e68f4a071fc410652e89/icons/terraform/terraform-original.svg",
+    "provider": "devicon",
+    "kind": "brand",
+    "revision": "6a37858047b0e8d9c9c0e68f4a071fc410652e89",
+    "license": "MIT",
+    "sourceFile": "terraform.svg",
+    "sourceSha256": "0be6427291ae47f057b75f9010dffd6f58a40f0c83c43606ff68851cef1621dc",
+    "pngSha256": "47b00e3af454743eb4c4b440ccfa1fa2e2cfe6f50d20796bce6e9af24b727c38",
+    "normalization": {
+      "canvas": 192,
+      "padding": 12,
+      "preserveAspectRatio": true
+    }
+  },
+  "jenkins": {
+    "url": "https://raw.githubusercontent.com/devicons/devicon/6a37858047b0e8d9c9c0e68f4a071fc410652e89/icons/jenkins/jenkins-original.svg",
+    "provider": "devicon",
+    "kind": "brand",
+    "revision": "6a37858047b0e8d9c9c0e68f4a071fc410652e89",
+    "license": "MIT",
+    "sourceFile": "jenkins.svg",
+    "sourceSha256": "917c7525a9d6c544f4b5d1d4318778e2dee5ef2d47be075ee494613cb10d2a4e",
+    "pngSha256": "d901a12ac3e9b76f2a76f1df509686add1d1559b43e85355446236b0f88ea8e2",
+    "normalization": {
+      "canvas": 192,
+      "padding": 12,
+      "preserveAspectRatio": true
+    }
+  },
+  "javascript": {
+    "url": "https://raw.githubusercontent.com/devicons/devicon/6a37858047b0e8d9c9c0e68f4a071fc410652e89/icons/javascript/javascript-original.svg",
+    "provider": "devicon",
+    "kind": "brand",
+    "revision": "6a37858047b0e8d9c9c0e68f4a071fc410652e89",
+    "license": "MIT",
+    "sourceFile": "javascript.svg",
+    "sourceSha256": "0656ff65fc8eeacda5c78d7f9ffe91ec1eb919db64f56e0b7dcd460af4bbd36c",
+    "pngSha256": "92092cb45506706581529539ab1e3b832e6ff26eea5493f5acce9ebf601ff33f",
+    "normalization": {
+      "canvas": 192,
+      "padding": 12,
+      "preserveAspectRatio": true
+    }
+  },
+  "typescript": {
+    "url": "https://raw.githubusercontent.com/devicons/devicon/6a37858047b0e8d9c9c0e68f4a071fc410652e89/icons/typescript/typescript-original.svg",
+    "provider": "devicon",
+    "kind": "brand",
+    "revision": "6a37858047b0e8d9c9c0e68f4a071fc410652e89",
+    "license": "MIT",
+    "sourceFile": "typescript.svg",
+    "sourceSha256": "c9191199f4049920c2fc19035b8a6664f37f4689fcd9e8434e786097e78863f0",
+    "pngSha256": "1a0abdc7553b04ccbbd343d2beee7ebbcdfec123dd9018f2d259ebb522770858",
+    "normalization": {
+      "canvas": 192,
+      "padding": 12,
+      "preserveAspectRatio": true
+    }
+  },
+  "java": {
+    "url": "https://raw.githubusercontent.com/devicons/devicon/6a37858047b0e8d9c9c0e68f4a071fc410652e89/icons/java/java-original.svg",
+    "provider": "devicon",
+    "kind": "brand",
+    "revision": "6a37858047b0e8d9c9c0e68f4a071fc410652e89",
+    "license": "MIT",
+    "sourceFile": "java.svg",
+    "sourceSha256": "7582e518a9c02425f97155e5a3bd39d1a3a7d421b78caf9c8df7443dad3edc5d",
+    "pngSha256": "3b5e7a6ae2f0533454daec7a6250af1f025c3323974c3ba7707939db9705ff05",
+    "normalization": {
+      "canvas": 192,
+      "padding": 12,
+      "preserveAspectRatio": true
+    }
+  },
+  "rust": {
+    "url": "https://raw.githubusercontent.com/devicons/devicon/6a37858047b0e8d9c9c0e68f4a071fc410652e89/icons/rust/rust-original.svg",
+    "provider": "devicon",
+    "kind": "brand",
+    "revision": "6a37858047b0e8d9c9c0e68f4a071fc410652e89",
+    "license": "MIT",
+    "sourceFile": "rust.svg",
+    "sourceSha256": "16c6c6a98e990944fc5e1cc64cc8fc7b8be3a662ec4ee7951b7995d2e52f5e12",
+    "pngSha256": "59de7542e3da52b2ee001190ce0d2c7be52a674994672f2b903edd30271c3afb",
+    "normalization": {
+      "canvas": 192,
+      "padding": 12,
+      "preserveAspectRatio": true
+    }
+  },
+  "mysql": {
+    "url": "https://raw.githubusercontent.com/devicons/devicon/6a37858047b0e8d9c9c0e68f4a071fc410652e89/icons/mysql/mysql-original.svg",
+    "provider": "devicon",
+    "kind": "brand",
+    "revision": "6a37858047b0e8d9c9c0e68f4a071fc410652e89",
+    "license": "MIT",
+    "sourceFile": "mysql.svg",
+    "sourceSha256": "f73fa5d6b9da33fbf540ff96f5360c24b6d29d883ecfe6fcaecf89a8d3456067",
+    "pngSha256": "3597a6811920953235249594d4da9e104d5cb94b817766ea8b39479ecb2d4855",
+    "normalization": {
+      "canvas": 192,
+      "padding": 12,
+      "preserveAspectRatio": true
+    }
+  },
+  "mongodb": {
+    "url": "https://raw.githubusercontent.com/devicons/devicon/6a37858047b0e8d9c9c0e68f4a071fc410652e89/icons/mongodb/mongodb-original.svg",
+    "provider": "devicon",
+    "kind": "brand",
+    "revision": "6a37858047b0e8d9c9c0e68f4a071fc410652e89",
+    "license": "MIT",
+    "sourceFile": "mongodb.svg",
+    "sourceSha256": "d9f2bf7041264f4747e9969fb82ede0199c0ac97dfa8632aa0687d702ec05f7b",
+    "pngSha256": "089e6c9b198a99ae4e1f90bbefe443a64ac38d1f0d5bd4d3d6cc1c6499e0d577",
+    "normalization": {
+      "canvas": 192,
+      "padding": 12,
+      "preserveAspectRatio": true
+    }
+  },
+  "elasticsearch": {
+    "url": "https://raw.githubusercontent.com/devicons/devicon/6a37858047b0e8d9c9c0e68f4a071fc410652e89/icons/elasticsearch/elasticsearch-original.svg",
+    "provider": "devicon",
+    "kind": "brand",
+    "revision": "6a37858047b0e8d9c9c0e68f4a071fc410652e89",
+    "license": "MIT",
+    "sourceFile": "elasticsearch.svg",
+    "sourceSha256": "7efc44ea67eac2a877248c0502e498bca8f61de490852c1a5c572db0b5d3f84d",
+    "pngSha256": "c3593e8d94bb99a142b797da520fac13c7ed3a969e2082e0d30fdee3b0feda0a",
+    "normalization": {
+      "canvas": 192,
+      "padding": 12,
+      "preserveAspectRatio": true
+    }
+  },
+  "prometheus": {
+    "url": "https://raw.githubusercontent.com/devicons/devicon/6a37858047b0e8d9c9c0e68f4a071fc410652e89/icons/prometheus/prometheus-original.svg",
+    "provider": "devicon",
+    "kind": "brand",
+    "revision": "6a37858047b0e8d9c9c0e68f4a071fc410652e89",
+    "license": "MIT",
+    "sourceFile": "prometheus.svg",
+    "sourceSha256": "cae70cfcf9a8b88de32ab1035819d0c7c9a2b278048112f8c9f99dae42b5b657",
+    "pngSha256": "a723041ecd35d68a1ad5b154d1cd8971921f345347a1c04c34f907ddd70cb7e0",
+    "normalization": {
+      "canvas": 192,
+      "padding": 12,
+      "preserveAspectRatio": true
+    }
+  },
+  "nginx": {
+    "url": "https://raw.githubusercontent.com/devicons/devicon/6a37858047b0e8d9c9c0e68f4a071fc410652e89/icons/nginx/nginx-original.svg",
+    "provider": "devicon",
+    "kind": "brand",
+    "revision": "6a37858047b0e8d9c9c0e68f4a071fc410652e89",
+    "license": "MIT",
+    "sourceFile": "nginx.svg",
+    "sourceSha256": "a28c7002fda6748bb018fa5f89ba3d38c622db720d65aa88668208a3cc839900",
+    "pngSha256": "22864c6bd3a9e224cc3869b6763dabb0fe9270e79c64992e903bb197b7182a82",
+    "normalization": {
+      "canvas": 192,
+      "padding": 12,
+      "preserveAspectRatio": true
+    }
+  },
+  "apache": {
+    "url": "https://raw.githubusercontent.com/devicons/devicon/6a37858047b0e8d9c9c0e68f4a071fc410652e89/icons/apache/apache-original.svg",
+    "provider": "devicon",
+    "kind": "brand",
+    "revision": "6a37858047b0e8d9c9c0e68f4a071fc410652e89",
+    "license": "MIT",
+    "sourceFile": "apache.svg",
+    "sourceSha256": "843d8cb7cf9a54eb70e09669d2fadf0b1b59419f92526e94b4359d9366b40ece",
+    "pngSha256": "b678fac90329bd61098d49c294b05f4a2e41b0545fd4bf5d7150af0b8ebd4b85",
+    "normalization": {
+      "canvas": 192,
+      "padding": 12,
+      "preserveAspectRatio": true
+    }
+  },
+  "bash": {
+    "url": "https://raw.githubusercontent.com/devicons/devicon/6a37858047b0e8d9c9c0e68f4a071fc410652e89/icons/bash/bash-original.svg",
+    "provider": "devicon",
+    "kind": "brand",
+    "revision": "6a37858047b0e8d9c9c0e68f4a071fc410652e89",
+    "license": "MIT",
+    "sourceFile": "bash.svg",
+    "sourceSha256": "8e9b1f859331c8d11571e77b1371c5d7ac7e380abfcd2f31160ed81dc37de403",
+    "pngSha256": "4dde78a5f412283378e179001ff4dc8cf7c71bedfc6c7b0edb620058e54c387a",
+    "normalization": {
+      "canvas": 192,
+      "padding": 12,
+      "preserveAspectRatio": true
+    }
+  },
+  "gitlab": {
+    "url": "https://raw.githubusercontent.com/devicons/devicon/6a37858047b0e8d9c9c0e68f4a071fc410652e89/icons/gitlab/gitlab-original.svg",
+    "provider": "devicon",
+    "kind": "brand",
+    "revision": "6a37858047b0e8d9c9c0e68f4a071fc410652e89",
+    "license": "MIT",
+    "sourceFile": "gitlab.svg",
+    "sourceSha256": "d057a46d414f4edcb7edf96976ef7b91c2b347a990e99685e48d38de737967b0",
+    "pngSha256": "242f9cbfd90b611104b0525a91cb6ce5f199d9b725b25d50bc4f7667412fa0a2",
+    "normalization": {
+      "canvas": 192,
+      "padding": 12,
+      "preserveAspectRatio": true
+    }
+  },
+  "github": {
+    "url": "https://raw.githubusercontent.com/devicons/devicon/6a37858047b0e8d9c9c0e68f4a071fc410652e89/icons/github/github-original.svg",
+    "provider": "devicon",
+    "kind": "brand",
+    "revision": "6a37858047b0e8d9c9c0e68f4a071fc410652e89",
+    "license": "MIT",
+    "sourceFile": "github.svg",
+    "sourceSha256": "45262793de6292206a895ed63593cdb1eaed82074173f7f4b5bdb3e427ca805a",
+    "pngSha256": "46728b079400450cb31d5583af4729600d97d004ef1fee6929944d61e7b46e3a",
+    "normalization": {
+      "canvas": 192,
+      "padding": 12,
+      "preserveAspectRatio": true
+    }
+  },
+  "amazonwebservices": {
+    "url": "https://raw.githubusercontent.com/devicons/devicon/6a37858047b0e8d9c9c0e68f4a071fc410652e89/icons/amazonwebservices/amazonwebservices-original-wordmark.svg",
+    "svgSha256": "5b4d8371d79a5c0d3a27ea4e929f772e68d47f7d267496bf9211d5f60fcf8084",
+    "pngSha256": "446ce1f57a31de2b87803c8c3e8df4c287f39008f6d9b4f7c4c940927bc3a521"
+  },
+  "azure": {
+    "url": "https://raw.githubusercontent.com/devicons/devicon/6a37858047b0e8d9c9c0e68f4a071fc410652e89/icons/azure/azure-original.svg",
+    "provider": "devicon",
+    "kind": "brand",
+    "revision": "6a37858047b0e8d9c9c0e68f4a071fc410652e89",
+    "license": "MIT",
+    "sourceFile": "azure.svg",
+    "sourceSha256": "7923db83e3f9755bd412241a683fa996fb7a9d0259b5084de449e6be92f7ca20",
+    "pngSha256": "d36ddae38925c8d1a7b546c177111e742a9cec5c05ef8991fdf9b065088d5501",
+    "normalization": {
+      "canvas": 192,
+      "padding": 12,
+      "preserveAspectRatio": true
+    }
+  },
+  "googlecloud": {
+    "url": "https://raw.githubusercontent.com/devicons/devicon/6a37858047b0e8d9c9c0e68f4a071fc410652e89/icons/googlecloud/googlecloud-original.svg",
+    "svgSha256": "1615b3e53228faa14378f1abb2b78e5f6c3f0ec562bc37db3efde885714e6c2f",
+    "pngSha256": "cfb17fca01d7d36cffa51786df27e3ef7a0feb2a9f91b947cdfd7859ee318bd9"
+  },
+  "react": {
+    "url": "https://raw.githubusercontent.com/devicons/devicon/6a37858047b0e8d9c9c0e68f4a071fc410652e89/icons/react/react-original.svg",
+    "provider": "devicon",
+    "kind": "brand",
+    "revision": "6a37858047b0e8d9c9c0e68f4a071fc410652e89",
+    "license": "MIT",
+    "sourceFile": "react.svg",
+    "sourceSha256": "5825b649c8c04dec13ecf01d0182401bd0ec71789d2fa06224866d882cd1515f",
+    "pngSha256": "12dad23beeaf6a0c4bb8c8edbc87491103da46b356e6b9bda55f41e7d9c94f9d",
+    "normalization": {
+      "canvas": 192,
+      "padding": 12,
+      "preserveAspectRatio": true
+    }
+  },
+  "vuejs": {
+    "url": "https://raw.githubusercontent.com/devicons/devicon/6a37858047b0e8d9c9c0e68f4a071fc410652e89/icons/vuejs/vuejs-original.svg",
+    "svgSha256": "4cc1153600c0845c645ac6c718c11d516d6899079a0dc406e3d62f68b1d02c49",
+    "pngSha256": "52b2acdd71f1601d1ff8fb895ef92052275a58a26a2f69dfa042715034d00e5c"
+  },
+  "angular": {
+    "url": "https://raw.githubusercontent.com/devicons/devicon/6a37858047b0e8d9c9c0e68f4a071fc410652e89/icons/angular/angular-original.svg",
+    "provider": "devicon",
+    "kind": "brand",
+    "revision": "6a37858047b0e8d9c9c0e68f4a071fc410652e89",
+    "license": "MIT",
+    "sourceFile": "angular.svg",
+    "sourceSha256": "9666f86466e1175ba5e0c685fb423123e93a544732fd7b241e92a192cbb613ab",
+    "pngSha256": "7e61e067ddcab4dfa3031b95a4e21605e27823aa23a980b7e6024acaef920953",
+    "normalization": {
+      "canvas": 192,
+      "padding": 12,
+      "preserveAspectRatio": true
+    }
+  },
+  "django": {
+    "url": "https://raw.githubusercontent.com/devicons/devicon/6a37858047b0e8d9c9c0e68f4a071fc410652e89/icons/django/django-plain.svg",
+    "provider": "devicon",
+    "kind": "brand",
+    "revision": "6a37858047b0e8d9c9c0e68f4a071fc410652e89",
+    "license": "MIT",
+    "sourceFile": "django.svg",
+    "sourceSha256": "c3037ac285dd5f85ee148a151afb85e64b2a03b62c3affc178376d82ebff6a46",
+    "pngSha256": "ab4e5352f7413c266a3923810b61e3038a7bbe8eaa9ea4b481f5af0972002c54",
+    "normalization": {
+      "canvas": 192,
+      "padding": 12,
+      "preserveAspectRatio": true
+    }
+  },
+  "flask": {
+    "url": "https://raw.githubusercontent.com/devicons/devicon/6a37858047b0e8d9c9c0e68f4a071fc410652e89/icons/flask/flask-original.svg",
+    "provider": "devicon",
+    "kind": "brand",
+    "revision": "6a37858047b0e8d9c9c0e68f4a071fc410652e89",
+    "license": "MIT",
+    "sourceFile": "flask.svg",
+    "sourceSha256": "7a27bb8cb739a080c285066c16c75828bc2eca4d76fa06eff76d556e0274a9d7",
+    "pngSha256": "2166a63d4f39094efa2d35eeaf9a0e1973f32845bf481fb2f12b8e8571d40b02",
+    "normalization": {
+      "canvas": 192,
+      "padding": 12,
+      "preserveAspectRatio": true
+    }
+  },
+  "spring": {
+    "url": "https://raw.githubusercontent.com/devicons/devicon/6a37858047b0e8d9c9c0e68f4a071fc410652e89/icons/spring/spring-original.svg",
+    "provider": "devicon",
+    "kind": "brand",
+    "revision": "6a37858047b0e8d9c9c0e68f4a071fc410652e89",
+    "license": "MIT",
+    "sourceFile": "spring.svg",
+    "sourceSha256": "4bae92720d27acb7d8cde3bed758a26aed07cd81c353f59ab379b8dd651ff973",
+    "pngSha256": "8ab6f4b42dfc8adcb4aa9040b7f0207b392a8559c3daebdb083216b1b1474e8b",
+    "normalization": {
+      "canvas": 192,
+      "padding": 12,
+      "preserveAspectRatio": true
+    }
+  },
+  "swift": {
+    "url": "https://raw.githubusercontent.com/devicons/devicon/6a37858047b0e8d9c9c0e68f4a071fc410652e89/icons/swift/swift-original.svg",
+    "provider": "devicon",
+    "kind": "brand",
+    "revision": "6a37858047b0e8d9c9c0e68f4a071fc410652e89",
+    "license": "MIT",
+    "sourceFile": "swift.svg",
+    "sourceSha256": "46b6e4abd3ab12c589b8e276295f9439e2869bc4788d918efbc6e76147e8a06e",
+    "pngSha256": "d086fa3a62ebe0f8e7e14b9b81872702d4905af1e3ab20d9480016774b16d0ac",
+    "normalization": {
+      "canvas": 192,
+      "padding": 12,
+      "preserveAspectRatio": true
+    }
+  },
+  "kotlin": {
+    "url": "https://raw.githubusercontent.com/devicons/devicon/6a37858047b0e8d9c9c0e68f4a071fc410652e89/icons/kotlin/kotlin-original.svg",
+    "provider": "devicon",
+    "kind": "brand",
+    "revision": "6a37858047b0e8d9c9c0e68f4a071fc410652e89",
+    "license": "MIT",
+    "sourceFile": "kotlin.svg",
+    "sourceSha256": "5053c2e1288582d1ac2cfc1e807eabb7f6059b1aa2f7d04e5cf00063682a2cbe",
+    "pngSha256": "8470fbfb89d8fb01887b305b353f3fdfe9950eb7060f454cfc619d36b4e18749",
+    "normalization": {
+      "canvas": 192,
+      "padding": 12,
+      "preserveAspectRatio": true
+    }
+  },
+  "ruby": {
+    "url": "https://raw.githubusercontent.com/devicons/devicon/6a37858047b0e8d9c9c0e68f4a071fc410652e89/icons/ruby/ruby-original.svg",
+    "provider": "devicon",
+    "kind": "brand",
+    "revision": "6a37858047b0e8d9c9c0e68f4a071fc410652e89",
+    "license": "MIT",
+    "sourceFile": "ruby.svg",
+    "sourceSha256": "74ead50b8f0f31e1b34618088bc0b0e16c04f1d4539039ef9358717d8505a63c",
+    "pngSha256": "3e3e65b0af664c87844fe924fb92756a7f53c4477bd4f0e437512bdcc966d137",
+    "normalization": {
+      "canvas": 192,
+      "padding": 12,
+      "preserveAspectRatio": true
+    }
+  },
+  "rails": {
+    "url": "https://raw.githubusercontent.com/devicons/devicon/6a37858047b0e8d9c9c0e68f4a071fc410652e89/icons/rails/rails-plain.svg",
+    "provider": "devicon",
+    "kind": "brand",
+    "revision": "6a37858047b0e8d9c9c0e68f4a071fc410652e89",
+    "license": "MIT",
+    "sourceFile": "rails.svg",
+    "sourceSha256": "4b3c11c91fbe94ebc123089599c6567d73489b855ef6550b0da0356da0c9ceea",
+    "pngSha256": "3c27cceaece0f6e32fa645cab57b97edc61511855bb328fa68d8fafc6a99a78d",
+    "normalization": {
+      "canvas": 192,
+      "padding": 12,
+      "preserveAspectRatio": true
+    }
+  },
+  "sqlite": {
+    "url": "https://raw.githubusercontent.com/devicons/devicon/6a37858047b0e8d9c9c0e68f4a071fc410652e89/icons/sqlite/sqlite-original.svg",
+    "provider": "devicon",
+    "kind": "brand",
+    "revision": "6a37858047b0e8d9c9c0e68f4a071fc410652e89",
+    "license": "MIT",
+    "sourceFile": "sqlite.svg",
+    "sourceSha256": "2b91c30887d3602479ba845cc012ef6ae577fba71eb96705a05b12e35d2c5e7e",
+    "pngSha256": "192ca15e7744fd41897f9620ba7ddec5b6a5c53791db4ac7c7706d500ee6f173",
+    "normalization": {
+      "canvas": 192,
+      "padding": 12,
+      "preserveAspectRatio": true
+    }
+  },
+  "windows11": {
+    "url": "https://raw.githubusercontent.com/devicons/devicon/6a37858047b0e8d9c9c0e68f4a071fc410652e89/icons/windows11/windows11-original.svg",
+    "svgSha256": "11ac9b1e84c8c36c21629d03f26ce699b7d2e56bf702ea2e8eb2637cd2271c56",
+    "pngSha256": "801269c78056545ea53b864795adcac293b6c333ca382e11d6b0b5cfc14489bf"
+  },
+  "vault": {
+    "url": "https://raw.githubusercontent.com/devicons/devicon/6a37858047b0e8d9c9c0e68f4a071fc410652e89/icons/vault/vault-original.svg",
+    "provider": "devicon",
+    "kind": "brand",
+    "revision": "6a37858047b0e8d9c9c0e68f4a071fc410652e89",
+    "license": "MIT",
+    "sourceFile": "vault.svg",
+    "sourceSha256": "7ba6a343ddad8558691960d4649e337ac30e4182adb91702980c4cc06f0c8ef3",
+    "pngSha256": "551c760f57272e35eb602796195d2bb1d2577cb624aa2982b08d64670c7921db",
+    "normalization": {
+      "canvas": 192,
+      "padding": 12,
+      "preserveAspectRatio": true
+    }
+  },
+  "linux": {
+    "url": "https://raw.githubusercontent.com/devicons/devicon/6a37858047b0e8d9c9c0e68f4a071fc410652e89/icons/linux/linux-original.svg",
+    "provider": "devicon",
+    "kind": "brand",
+    "revision": "6a37858047b0e8d9c9c0e68f4a071fc410652e89",
+    "license": "MIT",
+    "sourceFile": "linux.svg",
+    "sourceSha256": "cf50ae4a263c6142963fad3561f7cb0311d0d41cc6189eadfb34f81a8a36acb0",
+    "pngSha256": "6d887116c2aa89fabb88644a9c2f776515554274238295bf2dee247c117138ca",
+    "normalization": {
+      "canvas": 192,
+      "padding": 12,
+      "preserveAspectRatio": true
+    }
+  },
+  "ubuntu": {
+    "url": "https://raw.githubusercontent.com/devicons/devicon/6a37858047b0e8d9c9c0e68f4a071fc410652e89/icons/ubuntu/ubuntu-original.svg",
+    "provider": "devicon",
+    "kind": "brand",
+    "revision": "6a37858047b0e8d9c9c0e68f4a071fc410652e89",
+    "license": "MIT",
+    "sourceFile": "ubuntu.svg",
+    "sourceSha256": "af8ddf6c709f61d1b7ac00d5417cf389ad23db2258f0776e0c7854f37105caed",
+    "pngSha256": "8267c866b099153e50705755748c4a2b2b465b194c99fa2a7c460ad5dfe384ce",
+    "normalization": {
+      "canvas": 192,
+      "padding": 12,
+      "preserveAspectRatio": true
+    }
+  },
+  "debian": {
+    "url": "https://raw.githubusercontent.com/devicons/devicon/6a37858047b0e8d9c9c0e68f4a071fc410652e89/icons/debian/debian-original.svg",
+    "provider": "devicon",
+    "kind": "brand",
+    "revision": "6a37858047b0e8d9c9c0e68f4a071fc410652e89",
+    "license": "MIT",
+    "sourceFile": "debian.svg",
+    "sourceSha256": "09b14c9813a322b58b11aa5390fb1a2b4e9bfd02868321482f1a19534a66ec54",
+    "pngSha256": "ca883618dba782346748e1fbfad74ae33e47f66af72c7caafae39fcd6097fda9",
+    "normalization": {
+      "canvas": 192,
+      "padding": 12,
+      "preserveAspectRatio": true
+    }
+  },
+  "centos": {
+    "url": "https://raw.githubusercontent.com/devicons/devicon/6a37858047b0e8d9c9c0e68f4a071fc410652e89/icons/centos/centos-original.svg",
+    "provider": "devicon",
+    "kind": "brand",
+    "revision": "6a37858047b0e8d9c9c0e68f4a071fc410652e89",
+    "license": "MIT",
+    "sourceFile": "centos.svg",
+    "sourceSha256": "b54c6ad8e100208fd0ade26633abd996c9d979b19c13c1b91caf48b49ed8c8d2",
+    "pngSha256": "ef7aa1f86d47a75784a7820cec51bccdbf9ad70cf6e3ad19b3c7e522ce2679dc",
+    "normalization": {
+      "canvas": 192,
+      "padding": 12,
+      "preserveAspectRatio": true
+    }
+  },
+  "redhat": {
+    "url": "https://raw.githubusercontent.com/devicons/devicon/6a37858047b0e8d9c9c0e68f4a071fc410652e89/icons/redhat/redhat-original.svg",
+    "svgSha256": "c7ec409610e7c222191166a5fe7bd52b57e6d057cb8e51ee44d12a2743401e21",
+    "pngSha256": "e6af8c62fd58fd3df15cdae9082128c42f922474ba8e1fb74c2fbc42c4f36008"
+  },
+  "docker": {
+    "url": "https://raw.githubusercontent.com/devicons/devicon/6a37858047b0e8d9c9c0e68f4a071fc410652e89/icons/docker/docker-original.svg",
+    "provider": "devicon",
+    "kind": "brand",
+    "revision": "6a37858047b0e8d9c9c0e68f4a071fc410652e89",
+    "license": "MIT",
+    "sourceFile": "docker.svg",
+    "sourceSha256": "3fd830ea69431ed7a0b8d068cd5b34ad3f00a1a78195d50f13ff56713f2462e1",
+    "pngSha256": "b56dddad3568aeaf19f82de226d1699592c8d194253a16361f555dcdd3cc7429",
+    "normalization": {
+      "canvas": 192,
+      "padding": 12,
+      "preserveAspectRatio": true
+    }
+  },
+  "kubernetes": {
+    "url": "https://raw.githubusercontent.com/devicons/devicon/6a37858047b0e8d9c9c0e68f4a071fc410652e89/icons/kubernetes/kubernetes-original.svg",
+    "provider": "devicon",
+    "kind": "brand",
+    "revision": "6a37858047b0e8d9c9c0e68f4a071fc410652e89",
+    "license": "MIT",
+    "sourceFile": "kubernetes.svg",
+    "sourceSha256": "fb31e4163238978201cfde0601728ee5168b74e476c32c37739bed626fa281ae",
+    "pngSha256": "79bbed1c54aa7a5d0ae7849e590796aed097a9f82f883a59f4d3b7776d2ac0e9",
+    "normalization": {
+      "canvas": 192,
+      "padding": 12,
+      "preserveAspectRatio": true
+    }
+  },
+  "helm": {
+    "url": "https://raw.githubusercontent.com/devicons/devicon/6a37858047b0e8d9c9c0e68f4a071fc410652e89/icons/helm/helm-original.svg",
+    "provider": "devicon",
+    "kind": "brand",
+    "revision": "6a37858047b0e8d9c9c0e68f4a071fc410652e89",
+    "license": "MIT",
+    "sourceFile": "helm.svg",
+    "sourceSha256": "83efc74139c06f09c29cab6592fdad80c8ce9e5090fc1da3ba39d40686fb511b",
+    "pngSha256": "e986194cdb88b63769b094556e25dbfc72a3b2c0ec183b9b9966c17a3fa53535",
+    "normalization": {
+      "canvas": 192,
+      "padding": 12,
+      "preserveAspectRatio": true
+    }
+  },
+  "argocd": {
+    "url": "https://raw.githubusercontent.com/devicons/devicon/6a37858047b0e8d9c9c0e68f4a071fc410652e89/icons/argocd/argocd-original.svg",
+    "provider": "devicon",
+    "kind": "brand",
+    "revision": "6a37858047b0e8d9c9c0e68f4a071fc410652e89",
+    "license": "MIT",
+    "sourceFile": "argocd.svg",
+    "sourceSha256": "946ce9ce2e6a2513846c2ec90095fd1938ee079d8aa0f5ac2039db7cb37532bb",
+    "pngSha256": "36f6fa1c07a68b8ea9900eb8513ffd13efadf461d4146af71c3498b9e6616026",
+    "normalization": {
+      "canvas": 192,
+      "padding": 12,
+      "preserveAspectRatio": true
+    }
+  },
+  "csharp": {
+    "url": "https://raw.githubusercontent.com/devicons/devicon/6a37858047b0e8d9c9c0e68f4a071fc410652e89/icons/csharp/csharp-original.svg",
+    "provider": "devicon",
+    "kind": "brand",
+    "revision": "6a37858047b0e8d9c9c0e68f4a071fc410652e89",
+    "license": "MIT",
+    "sourceFile": "csharp.svg",
+    "sourceSha256": "7093478d0888e22a224b6fa832da6c9ffd14c433de8bd14aab0c1cb50925f3ee",
+    "pngSha256": "85f35ecfac9740fd7ea8a06fc4e2844a2d140eca7bb1c5928831a937210ce206",
+    "normalization": {
+      "canvas": 192,
+      "padding": 12,
+      "preserveAspectRatio": true
+    }
+  },
+  "golang": {
+    "url": "https://raw.githubusercontent.com/devicons/devicon/6a37858047b0e8d9c9c0e68f4a071fc410652e89/icons/go/go-original.svg",
+    "provider": "devicon",
+    "kind": "brand",
+    "revision": "6a37858047b0e8d9c9c0e68f4a071fc410652e89",
+    "license": "MIT",
+    "sourceFile": "golang.svg",
+    "sourceSha256": "2d4558b96d3ec71d0d922a62668cb2ea5a5d83ed7d4caf6b0479b3266f795a2f",
+    "pngSha256": "ae88b86fb4e4c968d968c2f39d6d80ab97f282a823d511c4a01dde198e464212",
+    "normalization": {
+      "canvas": 192,
+      "padding": 12,
+      "preserveAspectRatio": true
+    }
+  },
+  "python": {
+    "url": "https://raw.githubusercontent.com/devicons/devicon/6a37858047b0e8d9c9c0e68f4a071fc410652e89/icons/python/python-original.svg",
+    "provider": "devicon",
+    "kind": "brand",
+    "revision": "6a37858047b0e8d9c9c0e68f4a071fc410652e89",
+    "license": "MIT",
+    "sourceFile": "python.svg",
+    "sourceSha256": "71493b4a732f0532b3a03a7a95da3ee11a65766367c8303b901ffbe7bf91a3a2",
+    "pngSha256": "a6f733a444dfd8f26c2353f4333b8f415ca0df29fe06e2bae252905cb1352553",
+    "normalization": {
+      "canvas": 192,
+      "padding": 12,
+      "preserveAspectRatio": true
+    }
+  },
+  "cplusplus": {
+    "url": "https://raw.githubusercontent.com/devicons/devicon/6a37858047b0e8d9c9c0e68f4a071fc410652e89/icons/cplusplus/cplusplus-original.svg",
+    "provider": "devicon",
+    "kind": "brand",
+    "revision": "6a37858047b0e8d9c9c0e68f4a071fc410652e89",
+    "license": "MIT",
+    "sourceFile": "cplusplus.svg",
+    "sourceSha256": "7ff8253551235e3a6b002a7c2bd6e3190d85113a64fcb40f2254473caeb025d4",
+    "pngSha256": "89c7262fb881c1d0ff412de443cd5b34187afa0a6c6fdda42ca46ddb2dc4d514",
+    "normalization": {
+      "canvas": 192,
+      "padding": 12,
+      "preserveAspectRatio": true
+    }
+  },
+  "dotnet": {
+    "url": "https://raw.githubusercontent.com/devicons/devicon/6a37858047b0e8d9c9c0e68f4a071fc410652e89/icons/dot-net/dot-net-original.svg",
+    "provider": "devicon",
+    "kind": "brand",
+    "revision": "6a37858047b0e8d9c9c0e68f4a071fc410652e89",
+    "license": "MIT",
+    "sourceFile": "dotnet.svg",
+    "sourceSha256": "6175b41fd7331abcd610d2c5aa2b28bc9628a6232be7628b948aa85a9216fc58",
+    "pngSha256": "87b53775f2e6fb892bee47039eefe36b6f73dbaadc349b3010142528f0dd4e8f",
+    "normalization": {
+      "canvas": 192,
+      "padding": 12,
+      "preserveAspectRatio": true
+    }
+  },
+  "postgresql": {
+    "url": "https://raw.githubusercontent.com/devicons/devicon/6a37858047b0e8d9c9c0e68f4a071fc410652e89/icons/postgresql/postgresql-original.svg",
+    "provider": "devicon",
+    "kind": "brand",
+    "revision": "6a37858047b0e8d9c9c0e68f4a071fc410652e89",
+    "license": "MIT",
+    "sourceFile": "postgresql.svg",
+    "sourceSha256": "f220a436258ed014c512ba4f9c0de6b9e5c2c4b55331a0a29f8c7a1a12c36443",
+    "pngSha256": "c9456519a8b68e8ab51562e14e26371eb3bec584ae1fd800ad27b3c790588526",
+    "normalization": {
+      "canvas": 192,
+      "padding": 12,
+      "preserveAspectRatio": true
+    }
+  },
+  "kafka": {
+    "url": "https://raw.githubusercontent.com/devicons/devicon/6a37858047b0e8d9c9c0e68f4a071fc410652e89/icons/apachekafka/apachekafka-original.svg",
+    "provider": "devicon",
+    "kind": "brand",
+    "revision": "6a37858047b0e8d9c9c0e68f4a071fc410652e89",
+    "license": "MIT",
+    "sourceFile": "kafka.svg",
+    "sourceSha256": "2505c5b688c18c8fd5dd8e888561eb7b23a56a75d291ff17e8ee18770193f3e8",
+    "pngSha256": "cd9e9334abfc3870cf53888a47fb960577f8972e7fe39d6eba46e0a724de7f8c",
+    "normalization": {
+      "canvas": 192,
+      "padding": 12,
+      "preserveAspectRatio": true
+    }
+  },
+  "rabbitmq": {
+    "url": "https://raw.githubusercontent.com/devicons/devicon/6a37858047b0e8d9c9c0e68f4a071fc410652e89/icons/rabbitmq/rabbitmq-original.svg",
+    "provider": "devicon",
+    "kind": "brand",
+    "revision": "6a37858047b0e8d9c9c0e68f4a071fc410652e89",
+    "license": "MIT",
+    "sourceFile": "rabbitmq.svg",
+    "sourceSha256": "3aad30605375d85bd2fc293880be7e1b07def3f7191c8f063feb775cca5b7006",
+    "pngSha256": "6ade827d641199be9782814810f73a6260bd3cbe44c0e9ecadae02c5ac25c03f",
+    "normalization": {
+      "canvas": 192,
+      "padding": 12,
+      "preserveAspectRatio": true
+    }
+  },
+  "php": {
+    "url": "https://raw.githubusercontent.com/devicons/devicon/6a37858047b0e8d9c9c0e68f4a071fc410652e89/icons/php/php-original.svg",
+    "provider": "devicon",
+    "kind": "brand",
+    "revision": "6a37858047b0e8d9c9c0e68f4a071fc410652e89",
+    "license": "MIT",
+    "sourceFile": "php.svg",
+    "sourceSha256": "f22619a19c99a123e4678d71826f65f223721a739631dff46de39827c9ee0633",
+    "pngSha256": "0ad486e8fac78c3ef0484179e23e9701905424262e641dbd41470237d9c9d693",
+    "normalization": {
+      "canvas": 192,
+      "padding": 12,
+      "preserveAspectRatio": true
+    }
+  },
+  "redis": {
+    "url": "https://raw.githubusercontent.com/devicons/devicon/6a37858047b0e8d9c9c0e68f4a071fc410652e89/icons/redis/redis-original.svg",
+    "provider": "devicon",
+    "kind": "brand",
+    "revision": "6a37858047b0e8d9c9c0e68f4a071fc410652e89",
+    "license": "MIT",
+    "sourceFile": "redis.svg",
+    "sourceSha256": "4707378b190878f36f7e6e1c01fa3ee7e7884c76101809d191dddd943a2e6bdb",
+    "pngSha256": "5e4cf7c1c8b52e1dafeb8358673f86f56ba817f39887e370a0aafadc30202c86",
+    "normalization": {
+      "canvas": 192,
+      "padding": 12,
+      "preserveAspectRatio": true
+    }
+  },
+  "grpc": {
+    "url": "https://raw.githubusercontent.com/devicons/devicon/6a37858047b0e8d9c9c0e68f4a071fc410652e89/icons/grpc/grpc-plain.svg",
+    "provider": "devicon",
+    "kind": "brand",
+    "revision": "6a37858047b0e8d9c9c0e68f4a071fc410652e89",
+    "license": "MIT",
+    "sourceFile": "grpc.svg",
+    "sourceSha256": "a639a8c1f30d792fcd7473aba22263a14eb0783dc9527e0a2fad6f8b0a64b1d7",
+    "pngSha256": "5c108baf2587eab768a9c8b9055fd7636f88939218493d67c515ee576d8268d8",
+    "normalization": {
+      "canvas": 192,
+      "padding": 12,
+      "preserveAspectRatio": true
+    }
+  },
+  "nodejs": {
+    "url": "https://raw.githubusercontent.com/devicons/devicon/6a37858047b0e8d9c9c0e68f4a071fc410652e89/icons/nodejs/nodejs-original.svg",
+    "provider": "devicon",
+    "kind": "brand",
+    "revision": "6a37858047b0e8d9c9c0e68f4a071fc410652e89",
+    "license": "MIT",
+    "sourceFile": "nodejs.svg",
+    "sourceSha256": "3218687c5ea24a4d4c0a33dc5c287da38c33a72dcfe9382469d7ce4e0bf661fb",
+    "pngSha256": "3a3d191f5e2b4946fa3654395ceb74ae1d54662081842a2366f386dd3d46cf26",
+    "normalization": {
+      "canvas": 192,
+      "padding": 12,
+      "preserveAspectRatio": true
+    }
+  },
+  "djangorest": {
+    "url": "https://raw.githubusercontent.com/devicons/devicon/6a37858047b0e8d9c9c0e68f4a071fc410652e89/icons/djangorest/djangorest-original.svg",
+    "provider": "devicon",
+    "kind": "brand",
+    "revision": "6a37858047b0e8d9c9c0e68f4a071fc410652e89",
+    "license": "MIT",
+    "sourceFile": "djangorest.svg",
+    "sourceSha256": "0d27c70594ad23d2a6e811dba0530d8fd9cd5edac0ad3b0592cbd0c2a5f8dd2e",
+    "pngSha256": "0c1b2570f9165088d12da049326b1cf4c0bf3b0bd51e33514bda72c154ed5f93",
+    "normalization": {
+      "canvas": 192,
+      "padding": 12,
+      "preserveAspectRatio": true
+    }
+  },
+  "grafana": {
+    "url": "https://raw.githubusercontent.com/devicons/devicon/6a37858047b0e8d9c9c0e68f4a071fc410652e89/icons/grafana/grafana-original.svg",
+    "provider": "devicon",
+    "kind": "brand",
+    "revision": "6a37858047b0e8d9c9c0e68f4a071fc410652e89",
+    "license": "MIT",
+    "sourceFile": "grafana.svg",
+    "sourceSha256": "2dec200d4e56521bec8dd463173c623b33b8c97e6159cac9b3ed00b6bff0f6ad",
+    "pngSha256": "da7c66cc7a8d282e411964aed2fdb0a05c1a822b5b6df7a61903bdf7c9c41f78",
+    "normalization": {
+      "canvas": 192,
+      "padding": 12,
+      "preserveAspectRatio": true
+    }
+  },
+  "fastapi": {
+    "url": "https://raw.githubusercontent.com/devicons/devicon/6a37858047b0e8d9c9c0e68f4a071fc410652e89/icons/fastapi/fastapi-original.svg",
+    "provider": "devicon",
+    "kind": "brand",
+    "revision": "6a37858047b0e8d9c9c0e68f4a071fc410652e89",
+    "license": "MIT",
+    "sourceFile": "fastapi.svg",
+    "sourceSha256": "7ef41f6a363b00ff595e6d0b933c025c92cbfae29dc1df24b2f6eb8b476ee486",
+    "pngSha256": "434314ad02ecf36597929019de242507f1ed6cc118915624da4d361d763ba39b",
+    "normalization": {
+      "canvas": 192,
+      "padding": 12,
+      "preserveAspectRatio": true
+    }
+  },
+  "kibana": {
+    "url": "https://raw.githubusercontent.com/devicons/devicon/6a37858047b0e8d9c9c0e68f4a071fc410652e89/icons/kibana/kibana-original.svg",
+    "provider": "devicon",
+    "kind": "brand",
+    "revision": "6a37858047b0e8d9c9c0e68f4a071fc410652e89",
+    "license": "MIT",
+    "sourceFile": "kibana.svg",
+    "sourceSha256": "836bb17d110cf81c4081f33a666f2cd035908546a4bd4eea7f627b16f2def5f9",
+    "pngSha256": "23031bdc38a1ca6b16a15a6bd0d717e1320499da09bacf75c98a33afff71cb48",
+    "normalization": {
+      "canvas": 192,
+      "padding": 12,
+      "preserveAspectRatio": true
+    }
+  },
+  "c": {
+    "url": "https://raw.githubusercontent.com/devicons/devicon/6a37858047b0e8d9c9c0e68f4a071fc410652e89/icons/c/c-original.svg",
+    "provider": "devicon",
+    "kind": "brand",
+    "revision": "6a37858047b0e8d9c9c0e68f4a071fc410652e89",
+    "license": "MIT",
+    "sourceFile": "c.svg",
+    "sourceSha256": "8cce48da91084256f15653e02bfd7046ccb34489d030cb1aa34dee766daad6b7",
+    "pngSha256": "a2e9fd3278763db1576e6c611a6e60775c1af5a45ed004d5b4e45ad93feca676",
+    "normalization": {
+      "canvas": 192,
+      "padding": 12,
+      "preserveAspectRatio": true
+    }
+  },
+  "mariadb": {
+    "url": "https://raw.githubusercontent.com/devicons/devicon/6a37858047b0e8d9c9c0e68f4a071fc410652e89/icons/mariadb/mariadb-original.svg",
+    "provider": "devicon",
+    "kind": "brand",
+    "revision": "6a37858047b0e8d9c9c0e68f4a071fc410652e89",
+    "license": "MIT",
+    "sourceFile": "mariadb.svg",
+    "sourceSha256": "90f14c26b478447171ad800791535f5f5ab0f9abf80387edefb410b6fc85cbdc",
+    "pngSha256": "fcfcdd206f6ddfffe43e6bd785191c49264b17d5fc6e0301554fa9277571b487",
+    "normalization": {
+      "canvas": 192,
+      "padding": 12,
+      "preserveAspectRatio": true
+    }
+  },
+  "oracle": {
+    "url": "https://raw.githubusercontent.com/devicons/devicon/6a37858047b0e8d9c9c0e68f4a071fc410652e89/icons/oracle/oracle-original.svg",
+    "provider": "devicon",
+    "kind": "brand",
+    "revision": "6a37858047b0e8d9c9c0e68f4a071fc410652e89",
+    "license": "MIT",
+    "sourceFile": "oracle.svg",
+    "sourceSha256": "6afd3872d2ecb9a619fc10048b6a18bc3b948dfd7c97d1a694af26c6a7153cbf",
+    "pngSha256": "3f34ed3c8d2e32bf81e18a2a5761226ccc587115cee969126cb23502435d56db",
+    "normalization": {
+      "canvas": 192,
+      "padding": 12,
+      "preserveAspectRatio": true
+    }
+  },
+  "mssql": {
+    "url": "https://raw.githubusercontent.com/devicons/devicon/6a37858047b0e8d9c9c0e68f4a071fc410652e89/icons/microsoftsqlserver/microsoftsqlserver-original.svg",
+    "provider": "devicon",
+    "kind": "brand",
+    "revision": "6a37858047b0e8d9c9c0e68f4a071fc410652e89",
+    "license": "MIT",
+    "sourceFile": "mssql.svg",
+    "sourceSha256": "f52b63cb5ff8c17efc079ae93eb7e2f1a04ca34eb736310c3576b19c0b9db21d",
+    "pngSha256": "0ae857f30e2ceed87f54b646a9f37304a34d551d6047c2fec0e8a2d54626f19d",
+    "normalization": {
+      "canvas": 192,
+      "padding": 12,
+      "preserveAspectRatio": true
+    }
+  },
+  "clickhouse": {
+    "url": "https://raw.githubusercontent.com/devicons/devicon/6a37858047b0e8d9c9c0e68f4a071fc410652e89/icons/clickhouse/clickhouse-original.svg",
+    "provider": "devicon",
+    "kind": "brand",
+    "revision": "6a37858047b0e8d9c9c0e68f4a071fc410652e89",
+    "license": "MIT",
+    "sourceFile": "clickhouse.svg",
+    "sourceSha256": "12cde67e9662314d8934293bc609875d111f761cb4ebb71a946f1a46cd66f841",
+    "pngSha256": "87a8a8f9c21a1a1b17b8625af0bd02a86b40ee6805a3c1e88df2b3129c1bc0d2",
+    "normalization": {
+      "canvas": 192,
+      "padding": 12,
+      "preserveAspectRatio": true
+    }
+  },
+  "logstash": {
+    "url": "https://raw.githubusercontent.com/devicons/devicon/6a37858047b0e8d9c9c0e68f4a071fc410652e89/icons/logstash/logstash-original.svg",
+    "provider": "devicon",
+    "kind": "brand",
+    "revision": "6a37858047b0e8d9c9c0e68f4a071fc410652e89",
+    "license": "MIT",
+    "sourceFile": "logstash.svg",
+    "sourceSha256": "01fe7b38a1a5c40c789f6ed15e43049556569be1cc48330d20c11d3d6ff71ae7",
+    "pngSha256": "b6ca59d2f6e9f249a0aa7d95401f233fccd6c78db436cfedb7e46cc0fb3b3469",
+    "normalization": {
+      "canvas": 192,
+      "padding": 12,
+      "preserveAspectRatio": true
+    }
+  },
+  "cassandra": {
+    "url": "https://raw.githubusercontent.com/devicons/devicon/6a37858047b0e8d9c9c0e68f4a071fc410652e89/icons/cassandra/cassandra-original.svg",
+    "provider": "devicon",
+    "kind": "brand",
+    "revision": "6a37858047b0e8d9c9c0e68f4a071fc410652e89",
+    "license": "MIT",
+    "sourceFile": "cassandra.svg",
+    "sourceSha256": "9b768d3057b8963787ebddf6ecd83ad876956884c8354455b6ac99343df382ae",
+    "pngSha256": "b5360786610f71c7e08fc978112e9791fed5c648b9e13959b60a177da2616fad",
+    "normalization": {
+      "canvas": 192,
+      "padding": 12,
+      "preserveAspectRatio": true
+    }
+  },
+  "opensearch": {
+    "url": "https://raw.githubusercontent.com/simple-icons/simple-icons/4d29a35c954699b389a834aacc97dd6e7e74143c/icons/opensearch.svg",
+    "provider": "simple-icons",
+    "kind": "brand",
+    "revision": "4d29a35c954699b389a834aacc97dd6e7e74143c",
+    "license": "CC0-1.0",
+    "sourceFile": "opensearch.svg",
+    "sourceSha256": "592db3a9af1d67d31831a9973ad311ef6e958071084cf2134cc2703db1750ecb",
+    "pngSha256": "4a96b3131dc0bb9d3ab46cfb132ebf79ede498378acd33f856b5533e95e1ff9e",
+    "normalization": {
+      "canvas": 192,
+      "padding": 12,
+      "preserveAspectRatio": true
+    }
+  },
+  "powershell": {
+    "url": "https://raw.githubusercontent.com/devicons/devicon/6a37858047b0e8d9c9c0e68f4a071fc410652e89/icons/powershell/powershell-original.svg",
+    "provider": "devicon",
+    "kind": "brand",
+    "revision": "6a37858047b0e8d9c9c0e68f4a071fc410652e89",
+    "license": "MIT",
+    "sourceFile": "powershell.svg",
+    "sourceSha256": "f72bc9843ff04005045b659f1ce960d03ddf7707fe02cb5d3dee373914a6d750",
+    "pngSha256": "5ca7381331725384ce87fbaca81f3b964ee8ab6d626f17d68737668065282637",
+    "normalization": {
+      "canvas": 192,
+      "padding": 12,
+      "preserveAspectRatio": true
+    }
+  },
+  "aws": {
+    "url": "https://raw.githubusercontent.com/devicons/devicon/6a37858047b0e8d9c9c0e68f4a071fc410652e89/icons/amazonwebservices/amazonwebservices-original-wordmark.svg",
+    "provider": "devicon",
+    "kind": "brand",
+    "revision": "6a37858047b0e8d9c9c0e68f4a071fc410652e89",
+    "license": "MIT",
+    "sourceFile": "aws.svg",
+    "sourceSha256": "5b4d8371d79a5c0d3a27ea4e929f772e68d47f7d267496bf9211d5f60fcf8084",
+    "pngSha256": "a37fb094fe5e51c4d9909058d9eba3cb699d2d73e67c21b6c54e2132fd48e1b3",
+    "normalization": {
+      "canvas": 192,
+      "padding": 12,
+      "preserveAspectRatio": true
+    }
+  },
+  "gcp": {
+    "url": "https://raw.githubusercontent.com/devicons/devicon/6a37858047b0e8d9c9c0e68f4a071fc410652e89/icons/googlecloud/googlecloud-original.svg",
+    "provider": "devicon",
+    "kind": "brand",
+    "revision": "6a37858047b0e8d9c9c0e68f4a071fc410652e89",
+    "license": "MIT",
+    "sourceFile": "gcp.svg",
+    "sourceSha256": "1615b3e53228faa14378f1abb2b78e5f6c3f0ec562bc37db3efde885714e6c2f",
+    "pngSha256": "44b5fad22a153a4819202e7dbabdbcedabd2d3497671b40c6886cbad805fc9c7",
+    "normalization": {
+      "canvas": 192,
+      "padding": 12,
+      "preserveAspectRatio": true
+    }
+  },
+  "vue": {
+    "url": "https://raw.githubusercontent.com/devicons/devicon/6a37858047b0e8d9c9c0e68f4a071fc410652e89/icons/vuejs/vuejs-original.svg",
+    "provider": "devicon",
+    "kind": "brand",
+    "revision": "6a37858047b0e8d9c9c0e68f4a071fc410652e89",
+    "license": "MIT",
+    "sourceFile": "vue.svg",
+    "sourceSha256": "4cc1153600c0845c645ac6c718c11d516d6899079a0dc406e3d62f68b1d02c49",
+    "pngSha256": "5106b59492e80cb8cadc0f71343612e8450bde8b51b7a0a3d6c9af3e55ab78a1",
+    "normalization": {
+      "canvas": 192,
+      "padding": 12,
+      "preserveAspectRatio": true
+    }
+  },
+  "zabbix": {
+    "url": "https://raw.githubusercontent.com/zabbix/zabbix/d0f5b81a20f2a864947392e604d8512a04f3905e/sass/img/zabbix-logo-compact.svg",
+    "provider": "zabbix",
+    "kind": "brand",
+    "revision": "d0f5b81a20f2a864947392e604d8512a04f3905e",
+    "license": "Vendor brand asset; trademark retained",
+    "sourceFile": "zabbix.svg",
+    "sourceSha256": "a4535a3869dcafa49a8ac957b2180d07e57aa3fa64d3a44c5f45d2bc25fddb5d",
+    "pngSha256": "f9937504c625722e10710618929740170932304a7025e67d564baa3ba858c39a",
+    "normalization": {
+      "canvas": 192,
+      "padding": 12,
+      "preserveAspectRatio": true
+    }
+  },
+  "windows": {
+    "url": "https://raw.githubusercontent.com/devicons/devicon/6a37858047b0e8d9c9c0e68f4a071fc410652e89/icons/windows11/windows11-original.svg",
+    "provider": "devicon",
+    "kind": "brand",
+    "revision": "6a37858047b0e8d9c9c0e68f4a071fc410652e89",
+    "license": "MIT",
+    "sourceFile": "windows.svg",
+    "sourceSha256": "11ac9b1e84c8c36c21629d03f26ce699b7d2e56bf702ea2e8eb2637cd2271c56",
+    "pngSha256": "100425b4bd5faff1be4f894a9a8f56da6b7345d5a0e3d76cd1f6ce32cefcb6de",
+    "normalization": {
+      "canvas": 192,
+      "padding": 12,
+      "preserveAspectRatio": true
+    }
+  },
+  "rhel": {
+    "url": "https://raw.githubusercontent.com/devicons/devicon/6a37858047b0e8d9c9c0e68f4a071fc410652e89/icons/redhat/redhat-original.svg",
+    "provider": "devicon",
+    "kind": "brand",
+    "revision": "6a37858047b0e8d9c9c0e68f4a071fc410652e89",
+    "license": "MIT",
+    "sourceFile": "rhel.svg",
+    "sourceSha256": "c7ec409610e7c222191166a5fe7bd52b57e6d057cb8e51ee44d12a2743401e21",
+    "pngSha256": "ca9a0fc5e8434e132f1909cfc38793457e8984b38dbbcc1d857bf12c9e785ae4",
+    "normalization": {
+      "canvas": 192,
+      "padding": 12,
+      "preserveAspectRatio": true
+    }
+  },
+  "html": {
+    "url": "https://raw.githubusercontent.com/devicons/devicon/6a37858047b0e8d9c9c0e68f4a071fc410652e89/icons/html5/html5-original.svg",
+    "provider": "devicon",
+    "kind": "brand",
+    "revision": "6a37858047b0e8d9c9c0e68f4a071fc410652e89",
+    "license": "MIT",
+    "sourceFile": "html.svg",
+    "sourceSha256": "34826e5b3315daadf4fa15f723a3c1d5ba4a89277bfd94e22ac4d7d3d54338c5",
+    "pngSha256": "eeae40a007e5339a0431fddca0ce240452df9f55f4811b3c03a534161c87f355",
+    "normalization": {
+      "canvas": 192,
+      "padding": 12,
+      "preserveAspectRatio": true
+    }
+  },
+  "http": {
+    "url": "https://raw.githubusercontent.com/lucide-icons/lucide/1ef60af944de207e0d5176905a0759ba12e6ee8d/icons/globe.svg",
+    "provider": "lucide",
+    "kind": "symbol",
+    "revision": "1ef60af944de207e0d5176905a0759ba12e6ee8d",
+    "license": "ISC; see LUCIDE-LICENSE",
+    "sourceFile": "http.svg",
+    "sourceSha256": "82c6b8fa0b8e8d775ec9becd86f74a4e50bff7bee4c81f7362de45348504f14d",
+    "pngSha256": "8206adf31502c5e8f75d53f582781287abeb4ca067ee0180dfc841215a025df3",
+    "normalization": {
+      "canvas": 192,
+      "padding": 12,
+      "preserveAspectRatio": true
+    }
+  },
+  "sql": {
+    "url": "https://raw.githubusercontent.com/lucide-icons/lucide/1ef60af944de207e0d5176905a0759ba12e6ee8d/icons/database.svg",
+    "provider": "lucide",
+    "kind": "symbol",
+    "revision": "1ef60af944de207e0d5176905a0759ba12e6ee8d",
+    "license": "ISC; see LUCIDE-LICENSE",
+    "sourceFile": "sql.svg",
+    "sourceSha256": "471eb14bc8d144896a82dfc4aa9daf350f769f0896f4bef33e50aabdbb51130d",
+    "pngSha256": "242dce88a8eb9be00284d5c2bfa3be4385c17df143248967b60d78bd315e0129",
+    "normalization": {
+      "canvas": 192,
+      "padding": 12,
+      "preserveAspectRatio": true
+    }
+  },
+  "css": {
+    "url": "https://raw.githubusercontent.com/devicons/devicon/6a37858047b0e8d9c9c0e68f4a071fc410652e89/icons/css3/css3-original.svg",
+    "provider": "devicon",
+    "kind": "brand",
+    "revision": "6a37858047b0e8d9c9c0e68f4a071fc410652e89",
+    "license": "MIT",
+    "sourceFile": "css.svg",
+    "sourceSha256": "36b7d94b657d571d3f94042acbf6a4c86a5301a222f83f4b4583ad2acf6e297d",
+    "pngSha256": "1d682d61673cd49ab37774ae46b16fe847729ca2a5534fb394854998773761a7",
+    "normalization": {
+      "canvas": 192,
+      "padding": 12,
+      "preserveAspectRatio": true
+    }
+  },
+  "dns": {
+    "url": "https://raw.githubusercontent.com/lucide-icons/lucide/1ef60af944de207e0d5176905a0759ba12e6ee8d/icons/network.svg",
+    "provider": "lucide",
+    "kind": "symbol",
+    "revision": "1ef60af944de207e0d5176905a0759ba12e6ee8d",
+    "license": "ISC; see LUCIDE-LICENSE",
+    "sourceFile": "dns.svg",
+    "sourceSha256": "626be730feea1e5ea7539fbf78b4a3fcb927ce5d7dc43364f2216908672ac792",
+    "pngSha256": "a51fd14613ecf8a9307240ce8634f61069a2eaa1ae7327714fa9bf0e1825ef66",
+    "normalization": {
+      "canvas": 192,
+      "padding": 12,
+      "preserveAspectRatio": true
+    }
+  },
+  "tcpip": {
+    "url": "https://raw.githubusercontent.com/lucide-icons/lucide/1ef60af944de207e0d5176905a0759ba12e6ee8d/icons/network.svg",
+    "provider": "lucide",
+    "kind": "symbol",
+    "revision": "1ef60af944de207e0d5176905a0759ba12e6ee8d",
+    "license": "ISC; see LUCIDE-LICENSE",
+    "sourceFile": "tcpip.svg",
+    "sourceSha256": "626be730feea1e5ea7539fbf78b4a3fcb927ce5d7dc43364f2216908672ac792",
+    "pngSha256": "a51fd14613ecf8a9307240ce8634f61069a2eaa1ae7327714fa9bf0e1825ef66",
+    "normalization": {
+      "canvas": 192,
+      "padding": 12,
+      "preserveAspectRatio": true
+    }
+  },
+  "graphql": {
+    "url": "https://raw.githubusercontent.com/devicons/devicon/6a37858047b0e8d9c9c0e68f4a071fc410652e89/icons/graphql/graphql-plain.svg",
+    "provider": "devicon",
+    "kind": "brand",
+    "revision": "6a37858047b0e8d9c9c0e68f4a071fc410652e89",
+    "license": "MIT",
+    "sourceFile": "graphql.svg",
+    "sourceSha256": "1fafe03a1f77be5a1c25c20db6e52f292ed8ae5a9b2536f807ee2a3d2e78d3d3",
+    "pngSha256": "adc40676c8ea89d3944639898c77225bfc4a6f1bcd9b5d15ceb53f716e4e2cba",
+    "normalization": {
+      "canvas": 192,
+      "padding": 12,
+      "preserveAspectRatio": true
+    }
+  },
+  "openapi": {
+    "url": "https://raw.githubusercontent.com/devicons/devicon/6a37858047b0e8d9c9c0e68f4a071fc410652e89/icons/openapi/openapi-original.svg",
+    "provider": "devicon",
+    "kind": "brand",
+    "revision": "6a37858047b0e8d9c9c0e68f4a071fc410652e89",
+    "license": "MIT",
+    "sourceFile": "openapi.svg",
+    "sourceSha256": "ddb256e268a9e147d4edc6411062fe02b3c9fdd4b3b657d74aee15c4e6206e16",
+    "pngSha256": "c2a6ecd3fc3a8f0fd0f9dda50bb88980c2964d14f129fb0c645ee6a4e7a785b9",
+    "normalization": {
+      "canvas": 192,
+      "padding": 12,
+      "preserveAspectRatio": true
+    }
+  },
+  "oauth": {
+    "url": "https://raw.githubusercontent.com/devicons/devicon/6a37858047b0e8d9c9c0e68f4a071fc410652e89/icons/oauth/oauth-original.svg",
+    "provider": "devicon",
+    "kind": "brand",
+    "revision": "6a37858047b0e8d9c9c0e68f4a071fc410652e89",
+    "license": "MIT",
+    "sourceFile": "oauth.svg",
+    "sourceSha256": "a4040dba46f380d2637b1fef8f2393c3cf960108287f2e8339461249ae9e32ae",
+    "pngSha256": "ced4b16ed8dc57f26fe7fa1661e006193df366aeb8d9d2b3e8968855d068eeb7",
+    "normalization": {
+      "canvas": 192,
+      "padding": 12,
+      "preserveAspectRatio": true
+    }
+  },
+  "rest": {
+    "url": "https://raw.githubusercontent.com/lucide-icons/lucide/1ef60af944de207e0d5176905a0759ba12e6ee8d/icons/braces.svg",
+    "provider": "lucide",
+    "kind": "symbol",
+    "revision": "1ef60af944de207e0d5176905a0759ba12e6ee8d",
+    "license": "ISC; see LUCIDE-LICENSE",
+    "sourceFile": "rest.svg",
+    "sourceSha256": "4180c1c93504e1220e60a53411f7d7d2cdda5361f68f5210202a0380eb011431",
+    "pngSha256": "d724d1633aff9438208fab1611d4205a94cb0b4faca4853ad7e7cab601053330",
+    "normalization": {
+      "canvas": 192,
+      "padding": 12,
+      "preserveAspectRatio": true
+    }
+  },
+  "ldap": {
+    "url": "https://raw.githubusercontent.com/lucide-icons/lucide/1ef60af944de207e0d5176905a0759ba12e6ee8d/icons/contact.svg",
+    "provider": "lucide",
+    "kind": "symbol",
+    "revision": "1ef60af944de207e0d5176905a0759ba12e6ee8d",
+    "license": "ISC; see LUCIDE-LICENSE",
+    "sourceFile": "ldap.svg",
+    "sourceSha256": "eefb74f714f0c516c6624b5cd8872714e700ad67a8ca34c7b1d078527a2e4331",
+    "pngSha256": "04c4c1cbd525dad46690dc278b8e408a22b14d6ee37a3c6d0cb922bdc5ffc824",
+    "normalization": {
+      "canvas": 192,
+      "padding": 12,
+      "preserveAspectRatio": true
+    }
+  },
+  "vmware": {
+    "url": "https://raw.githubusercontent.com/simple-icons/simple-icons/4d29a35c954699b389a834aacc97dd6e7e74143c/icons/vmware.svg",
+    "provider": "simple-icons",
+    "kind": "brand",
+    "revision": "4d29a35c954699b389a834aacc97dd6e7e74143c",
+    "license": "CC0-1.0",
+    "sourceFile": "vmware.svg",
+    "sourceSha256": "4c3970bf3955a3e95c7d9eef7f4f45528c487dffa92092ce9273913f8271029a",
+    "pngSha256": "21a22c60187599e11b4ca902b3661836a0378f28676d8df696da61170cd81c86",
+    "normalization": {
+      "canvas": 192,
+      "padding": 12,
+      "preserveAspectRatio": true
+    }
+  },
+  "vagrant": {
+    "url": "https://raw.githubusercontent.com/devicons/devicon/6a37858047b0e8d9c9c0e68f4a071fc410652e89/icons/vagrant/vagrant-original.svg",
+    "provider": "devicon",
+    "kind": "brand",
+    "revision": "6a37858047b0e8d9c9c0e68f4a071fc410652e89",
+    "license": "MIT",
+    "sourceFile": "vagrant.svg",
+    "sourceSha256": "daddd8af47a144d7ebda068664b02b1c2f09fcdef261d3d002824634160f7f4f",
+    "pngSha256": "f76cd424d96096174b51083e8cd73a8ee76063e350c155219333f87de083f49d",
+    "normalization": {
+      "canvas": 192,
+      "padding": 12,
+      "preserveAspectRatio": true
+    }
+  },
+  "proxmox": {
+    "url": "https://raw.githubusercontent.com/devicons/devicon/6a37858047b0e8d9c9c0e68f4a071fc410652e89/icons/proxmox/proxmox-original.svg",
+    "provider": "devicon",
+    "kind": "brand",
+    "revision": "6a37858047b0e8d9c9c0e68f4a071fc410652e89",
+    "license": "MIT",
+    "sourceFile": "proxmox.svg",
+    "sourceSha256": "949f4afc9bd7e166602e1d99bd667335d1db01bdbdd864152c082cd10d3b9695",
+    "pngSha256": "ed5ffd711894f0d2cffd3e6aa29ae26d77cb4a053f39fafa6653124fecb9de73",
+    "normalization": {
+      "canvas": 192,
+      "padding": 12,
+      "preserveAspectRatio": true
+    }
+  },
+  "haproxy": {
+    "url": "https://www.haproxy.org/img/logo-med.png",
+    "provider": "vendor",
+    "kind": "brand",
+    "revision": null,
+    "license": "Vendor brand asset; trademark retained",
+    "sourceFile": "haproxy.source",
+    "sourceSha256": "c97de724e4f7cfc5933a1f3a245cd341e43df85829a6024d077f847918bb69c4",
+    "pngSha256": "634c518fefdfc870325d91d9c79fff238f0e06273405333e7bb801ce8995044c",
+    "normalization": {
+      "canvas": 192,
+      "padding": 12,
+      "preserveAspectRatio": true
+    }
+  },
+  "puppet": {
+    "url": "https://raw.githubusercontent.com/simple-icons/simple-icons/4d29a35c954699b389a834aacc97dd6e7e74143c/icons/puppet.svg",
+    "provider": "simple-icons",
+    "kind": "brand",
+    "revision": "4d29a35c954699b389a834aacc97dd6e7e74143c",
+    "license": "CC0-1.0",
+    "sourceFile": "puppet.svg",
+    "sourceSha256": "ca720ac1b1286841308bf9f445b8f379aa54c7be1507d65210fa28cfd491686c",
+    "pngSha256": "85a0834fe568fab4df8880d3d977002af9b531ca7f7fa50198f5d2c4476cab0b",
+    "normalization": {
+      "canvas": 192,
+      "padding": 12,
+      "preserveAspectRatio": true
+    }
+  },
+  "saltstack": {
+    "url": "https://raw.githubusercontent.com/simple-icons/simple-icons/4d29a35c954699b389a834aacc97dd6e7e74143c/icons/saltproject.svg",
+    "provider": "simple-icons",
+    "kind": "brand",
+    "revision": "4d29a35c954699b389a834aacc97dd6e7e74143c",
+    "license": "CC0-1.0",
+    "sourceFile": "saltstack.svg",
+    "sourceSha256": "3affe357f60e3683e3612a8f7a4644d07a0f3632b72adf64b36a124d2de3c2fa",
+    "pngSha256": "906cacd4f7892c244762cb39a66a9101dec46c9238659bf051756880af94d45f",
+    "normalization": {
+      "canvas": 192,
+      "padding": 12,
+      "preserveAspectRatio": true
+    }
+  },
+  "s3": {
+    "url": "https://raw.githubusercontent.com/devicons/devicon/6a37858047b0e8d9c9c0e68f4a071fc410652e89/icons/amazonwebservices/amazonwebservices-original-wordmark.svg",
+    "provider": "devicon",
+    "kind": "family",
+    "revision": "6a37858047b0e8d9c9c0e68f4a071fc410652e89",
+    "license": "MIT",
+    "sourceFile": "s3.svg",
+    "sourceSha256": "5b4d8371d79a5c0d3a27ea4e929f772e68d47f7d267496bf9211d5f60fcf8084",
+    "pngSha256": "a37fb094fe5e51c4d9909058d9eba3cb699d2d73e67c21b6c54e2132fd48e1b3",
+    "normalization": {
+      "canvas": 192,
+      "padding": 12,
+      "preserveAspectRatio": true
+    }
+  },
+  "consul": {
+    "url": "https://raw.githubusercontent.com/devicons/devicon/6a37858047b0e8d9c9c0e68f4a071fc410652e89/icons/consul/consul-original.svg",
+    "provider": "devicon",
+    "kind": "brand",
+    "revision": "6a37858047b0e8d9c9c0e68f4a071fc410652e89",
+    "license": "MIT",
+    "sourceFile": "consul.svg",
+    "sourceSha256": "5719703e2668ec60d82c4fbdd625102adf0fd9fb0604945f05deac8d50877ea3",
+    "pngSha256": "ea9bc0e06ff9c8d2be81ba3bb8e9d851e2e926852c0e7012715ce792abfc2c08",
+    "normalization": {
+      "canvas": 192,
+      "padding": 12,
+      "preserveAspectRatio": true
+    }
+  },
+  "kvm": {
+    "url": "https://www.linux-kvm.org/kvmless/kvmbanner-logo3.png",
+    "provider": "vendor",
+    "kind": "brand",
+    "revision": null,
+    "license": "Vendor brand asset; trademark retained",
+    "sourceFile": "kvm.source",
+    "sourceSha256": "79c38eb915552130b4487869ff049ec6da910cb35b9f05a3ffa1d871dcf5bd1e",
+    "pngSha256": "a1c3326469af5e5b074d94c428ada461b855fb61ceffbd98c84fb0bbe78189fa",
+    "normalization": {
+      "canvas": 192,
+      "padding": 12,
+      "preserveAspectRatio": true
+    }
+  },
+  "minio": {
+    "url": "https://raw.githubusercontent.com/simple-icons/simple-icons/4d29a35c954699b389a834aacc97dd6e7e74143c/icons/minio.svg",
+    "provider": "simple-icons",
+    "kind": "brand",
+    "revision": "4d29a35c954699b389a834aacc97dd6e7e74143c",
+    "license": "CC0-1.0",
+    "sourceFile": "minio.svg",
+    "sourceSha256": "2367d2631b71093061d589e4ec8de7853b35c0f46ba88285387ba192553004b0",
+    "pngSha256": "cdaa31d8018fab996871e1db4023b010832b7b91983cec0249ae5b431b7df581",
+    "normalization": {
+      "canvas": 192,
+      "padding": 12,
+      "preserveAspectRatio": true
+    }
+  },
+  "etcd": {
+    "url": "https://raw.githubusercontent.com/simple-icons/simple-icons/4d29a35c954699b389a834aacc97dd6e7e74143c/icons/etcd.svg",
+    "provider": "simple-icons",
+    "kind": "brand",
+    "revision": "4d29a35c954699b389a834aacc97dd6e7e74143c",
+    "license": "CC0-1.0",
+    "sourceFile": "etcd.svg",
+    "sourceSha256": "547451df94e413731a7d45f6d62bce98d4085e9a9c8462570c0f43d744054e44",
+    "pngSha256": "6deb0490f6e11fb11eb21bf1d14c5c01c99b8ce2612eda1eb722614e9236bcdf",
+    "normalization": {
+      "canvas": 192,
+      "padding": 12,
+      "preserveAspectRatio": true
+    }
+  },
+  "ceph": {
+    "url": "https://raw.githubusercontent.com/simple-icons/simple-icons/4d29a35c954699b389a834aacc97dd6e7e74143c/icons/ceph.svg",
+    "provider": "simple-icons",
+    "kind": "brand",
+    "revision": "4d29a35c954699b389a834aacc97dd6e7e74143c",
+    "license": "CC0-1.0",
+    "sourceFile": "ceph.svg",
+    "sourceSha256": "d86e5a80df62b084b473f06a5d5b10f87e96931c049c94862b02de7443a22f44",
+    "pngSha256": "b5999c5dda0aa2dfecfc289777bfc281a7290e74fecddd2b35222c9d4679620c",
+    "normalization": {
+      "canvas": 192,
+      "padding": 12,
+      "preserveAspectRatio": true
+    }
+  },
+  "openstack": {
+    "url": "https://raw.githubusercontent.com/devicons/devicon/6a37858047b0e8d9c9c0e68f4a071fc410652e89/icons/openstack/openstack-original.svg",
+    "provider": "devicon",
+    "kind": "brand",
+    "revision": "6a37858047b0e8d9c9c0e68f4a071fc410652e89",
+    "license": "MIT",
+    "sourceFile": "openstack.svg",
+    "sourceSha256": "19d8a58082b2601c9e0a7a6e3965f62240a6955c7d83c6a7da6ce97e2b6bca9b",
+    "pngSha256": "e7937c72f2e5aaab39d3e564315225637c2faa68e06de342094c88661c89b3a6",
+    "normalization": {
+      "canvas": 192,
+      "padding": 12,
+      "preserveAspectRatio": true
+    }
+  },
+  "istio": {
+    "url": "https://raw.githubusercontent.com/simple-icons/simple-icons/4d29a35c954699b389a834aacc97dd6e7e74143c/icons/istio.svg",
+    "provider": "simple-icons",
+    "kind": "brand",
+    "revision": "4d29a35c954699b389a834aacc97dd6e7e74143c",
+    "license": "CC0-1.0",
+    "sourceFile": "istio.svg",
+    "sourceSha256": "9d727a658f005398b77cb96e1822f534470b655c3f8ede93892775f1f988ad5f",
+    "pngSha256": "cc1a4d5490dcb062ac890572f065d3b8aaf000210e22fdf375615c4467862555",
+    "normalization": {
+      "canvas": 192,
+      "padding": 12,
+      "preserveAspectRatio": true
+    }
+  },
+  "openshift": {
+    "url": "https://raw.githubusercontent.com/simple-icons/simple-icons/4d29a35c954699b389a834aacc97dd6e7e74143c/icons/redhatopenshift.svg",
+    "provider": "simple-icons",
+    "kind": "brand",
+    "revision": "4d29a35c954699b389a834aacc97dd6e7e74143c",
+    "license": "CC0-1.0",
+    "sourceFile": "openshift.svg",
+    "sourceSha256": "f2dc25fae16dfee78416f402178359c59b28ab46f6eaaa2fdad3c4fb3c726f81",
+    "pngSha256": "c9c52aacfa0266f64dc95b223dc05390e7f26644da1c729e5168e5eeeaf5c53e",
+    "normalization": {
+      "canvas": 192,
+      "padding": 12,
+      "preserveAspectRatio": true
+    }
+  },
+  "loki": {
+    "url": "https://raw.githubusercontent.com/devicons/devicon/6a37858047b0e8d9c9c0e68f4a071fc410652e89/icons/grafana/grafana-original.svg",
+    "provider": "devicon",
+    "kind": "family",
+    "revision": "6a37858047b0e8d9c9c0e68f4a071fc410652e89",
+    "license": "MIT",
+    "sourceFile": "loki.svg",
+    "sourceSha256": "2dec200d4e56521bec8dd463173c623b33b8c97e6159cac9b3ed00b6bff0f6ad",
+    "pngSha256": "da7c66cc7a8d282e411964aed2fdb0a05c1a822b5b6df7a61903bdf7c9c41f78",
+    "normalization": {
+      "canvas": 192,
+      "padding": 12,
+      "preserveAspectRatio": true
+    }
+  },
+  "fluentd": {
+    "url": "https://raw.githubusercontent.com/simple-icons/simple-icons/4d29a35c954699b389a834aacc97dd6e7e74143c/icons/fluentd.svg",
+    "provider": "simple-icons",
+    "kind": "brand",
+    "revision": "4d29a35c954699b389a834aacc97dd6e7e74143c",
+    "license": "CC0-1.0",
+    "sourceFile": "fluentd.svg",
+    "sourceSha256": "f37050e9aa78e9782f444bf5f65dbf5feffb7d98b351b6fbe873c0edea2cab1c",
+    "pngSha256": "92505df526a69e25c95b7cfca0f1f8b966a12f580cf599bf5eaefcda9d1cdd57",
+    "normalization": {
+      "canvas": 192,
+      "padding": 12,
+      "preserveAspectRatio": true
+    }
+  },
+  "envoy": {
+    "url": "https://raw.githubusercontent.com/devicons/devicon/6a37858047b0e8d9c9c0e68f4a071fc410652e89/icons/envoy/envoy-original.svg",
+    "provider": "devicon",
+    "kind": "brand",
+    "revision": "6a37858047b0e8d9c9c0e68f4a071fc410652e89",
+    "license": "MIT",
+    "sourceFile": "envoy.svg",
+    "sourceSha256": "e499e22cdf5040db98e73def727c567745782190c3bf2583e5cd3120382f5d2b",
+    "pngSha256": "1b6bac21f9039375b4f023dae0ab1a735e8749689dda7cd64bc7762629e2789b",
+    "normalization": {
+      "canvas": 192,
+      "padding": 12,
+      "preserveAspectRatio": true
+    }
+  },
+  "fluentbit": {
+    "url": "https://raw.githubusercontent.com/simple-icons/simple-icons/4d29a35c954699b389a834aacc97dd6e7e74143c/icons/fluentbit.svg",
+    "provider": "simple-icons",
+    "kind": "brand",
+    "revision": "4d29a35c954699b389a834aacc97dd6e7e74143c",
+    "license": "CC0-1.0",
+    "sourceFile": "fluentbit.svg",
+    "sourceSha256": "abe055f0a3b1812062ec568bb0fe8764ea001c11fdb95380753457908389daa4",
+    "pngSha256": "4154a70a926c4680ce9f715514528cc9467fe0c2093a373fd93a8cc20bb371e0",
+    "normalization": {
+      "canvas": 192,
+      "padding": 12,
+      "preserveAspectRatio": true
+    }
+  },
+  "victoriametrics": {
+    "url": "https://raw.githubusercontent.com/simple-icons/simple-icons/4d29a35c954699b389a834aacc97dd6e7e74143c/icons/victoriametrics.svg",
+    "provider": "simple-icons",
+    "kind": "brand",
+    "revision": "4d29a35c954699b389a834aacc97dd6e7e74143c",
+    "license": "CC0-1.0",
+    "sourceFile": "victoriametrics.svg",
+    "sourceSha256": "09b8f723b651e04dfe8766eb5630ce0f0138f489cdda3b0f6c41f6cfee9faaf4",
+    "pngSha256": "15676a83886baede3e59143b164961565b1516f9751fdb5ba115b7347ae962a5",
+    "normalization": {
+      "canvas": 192,
+      "padding": 12,
+      "preserveAspectRatio": true
+    }
+  },
+  "opentelemetry": {
+    "url": "https://raw.githubusercontent.com/devicons/devicon/6a37858047b0e8d9c9c0e68f4a071fc410652e89/icons/opentelemetry/opentelemetry-original.svg",
+    "provider": "devicon",
+    "kind": "brand",
+    "revision": "6a37858047b0e8d9c9c0e68f4a071fc410652e89",
+    "license": "MIT",
+    "sourceFile": "opentelemetry.svg",
+    "sourceSha256": "4a610f674b648395f6460d3648d995e114cf34ad58004c01b9380c1deb7a19cd",
+    "pngSha256": "9beb59ff6190b5e378943d0ada173d6b04d2bc982e6a278794e0651a350b5848",
+    "normalization": {
+      "canvas": 192,
+      "padding": 12,
+      "preserveAspectRatio": true
+    }
+  },
+  "jaeger": {
+    "url": "https://raw.githubusercontent.com/simple-icons/simple-icons/4d29a35c954699b389a834aacc97dd6e7e74143c/icons/jaeger.svg",
+    "provider": "simple-icons",
+    "kind": "brand",
+    "revision": "4d29a35c954699b389a834aacc97dd6e7e74143c",
+    "license": "CC0-1.0",
+    "sourceFile": "jaeger.svg",
+    "sourceSha256": "1bc03584440ea837c6ed8208ab85b132c9b325e0cfb60e9dfa1b4fb051b228c3",
+    "pngSha256": "6a6342cc768c1cb1381c5fda763d71afd52f8473e0c6d10dd4f148e5228cec4d",
+    "normalization": {
+      "canvas": 192,
+      "padding": 12,
+      "preserveAspectRatio": true
+    }
+  },
+  "bamboo": {
+    "url": "https://raw.githubusercontent.com/devicons/devicon/6a37858047b0e8d9c9c0e68f4a071fc410652e89/icons/bamboo/bamboo-original.svg",
+    "provider": "devicon",
+    "kind": "brand",
+    "revision": "6a37858047b0e8d9c9c0e68f4a071fc410652e89",
+    "license": "MIT",
+    "sourceFile": "bamboo.svg",
+    "sourceSha256": "740a953f358ac31fa2a77d4871ad042df1bb403f755742936c23b2d8b1c25cae",
+    "pngSha256": "212456581373dc0915db99466d8740937132d4fab341d067b969ec911021c87a",
+    "normalization": {
+      "canvas": 192,
+      "padding": 12,
+      "preserveAspectRatio": true
+    }
+  },
+  "maven": {
+    "url": "https://raw.githubusercontent.com/devicons/devicon/6a37858047b0e8d9c9c0e68f4a071fc410652e89/icons/maven/maven-original.svg",
+    "provider": "devicon",
+    "kind": "brand",
+    "revision": "6a37858047b0e8d9c9c0e68f4a071fc410652e89",
+    "license": "MIT",
+    "sourceFile": "maven.svg",
+    "sourceSha256": "eb546e1cfd7c0df769193160d2a03e1ec5243ae68eef48c70934a24ece6bbe31",
+    "pngSha256": "47fe3828b8dd7646959d2601f15834d0f3f4dfcf9ad6cf38d7ae84f09df8f4b9",
+    "normalization": {
+      "canvas": 192,
+      "padding": 12,
+      "preserveAspectRatio": true
+    }
+  },
+  "gradle": {
+    "url": "https://raw.githubusercontent.com/devicons/devicon/6a37858047b0e8d9c9c0e68f4a071fc410652e89/icons/gradle/gradle-original.svg",
+    "provider": "devicon",
+    "kind": "brand",
+    "revision": "6a37858047b0e8d9c9c0e68f4a071fc410652e89",
+    "license": "MIT",
+    "sourceFile": "gradle.svg",
+    "sourceSha256": "2caf72625f88b8062f38ee4bed0193f5fe910b6ec73951e239584d55c1bde55a",
+    "pngSha256": "322f7a10f637c3af5ce79bb7f02b80c64131634cf0abcbdeba140e9cf4f21058",
+    "normalization": {
+      "canvas": 192,
+      "padding": 12,
+      "preserveAspectRatio": true
+    }
+  },
+  "teamcity": {
+    "url": "https://raw.githubusercontent.com/simple-icons/simple-icons/4d29a35c954699b389a834aacc97dd6e7e74143c/icons/teamcity.svg",
+    "provider": "simple-icons",
+    "kind": "brand",
+    "revision": "4d29a35c954699b389a834aacc97dd6e7e74143c",
+    "license": "CC0-1.0",
+    "sourceFile": "teamcity.svg",
+    "sourceSha256": "0a397c8f3d0e04319dcb12744c5456fde74921c95d92496b91510c9aab3fec4c",
+    "pngSha256": "d6c670512ffd9a6fda2669dc8cff3712a061e5cf0bfd5932a0d6a50807416cfa",
+    "normalization": {
+      "canvas": 192,
+      "padding": 12,
+      "preserveAspectRatio": true
+    }
+  },
+  "yarn": {
+    "url": "https://raw.githubusercontent.com/devicons/devicon/6a37858047b0e8d9c9c0e68f4a071fc410652e89/icons/yarn/yarn-original.svg",
+    "provider": "devicon",
+    "kind": "brand",
+    "revision": "6a37858047b0e8d9c9c0e68f4a071fc410652e89",
+    "license": "MIT",
+    "sourceFile": "yarn.svg",
+    "sourceSha256": "98f289573da1bdde48ed718babc1fb2ca8bbdeef66b56cd60d64dba72b20d7f6",
+    "pngSha256": "b9b8991c0e5239c6d4d7f0ad5a111c77dedc7f9f40a692a19a32ba3c6bb10902",
+    "normalization": {
+      "canvas": 192,
+      "padding": 12,
+      "preserveAspectRatio": true
+    }
+  },
+  "npm": {
+    "url": "https://raw.githubusercontent.com/devicons/devicon/6a37858047b0e8d9c9c0e68f4a071fc410652e89/icons/npm/npm-original.svg",
+    "provider": "devicon",
+    "kind": "brand",
+    "revision": "6a37858047b0e8d9c9c0e68f4a071fc410652e89",
+    "license": "MIT",
+    "sourceFile": "npm.svg",
+    "sourceSha256": "348709a9c0ed8fc6663413bfb9984360ec12d747183177d1a78eb795f89c5cc3",
+    "pngSha256": "6f7c0155bb8872054f0e769b1dae0ac2a120a957f7601a3c8c484b2bd5923415",
+    "normalization": {
+      "canvas": 192,
+      "padding": 12,
+      "preserveAspectRatio": true
+    }
+  },
+  "webpack": {
+    "url": "https://raw.githubusercontent.com/devicons/devicon/6a37858047b0e8d9c9c0e68f4a071fc410652e89/icons/webpack/webpack-original.svg",
+    "provider": "devicon",
+    "kind": "brand",
+    "revision": "6a37858047b0e8d9c9c0e68f4a071fc410652e89",
+    "license": "MIT",
+    "sourceFile": "webpack.svg",
+    "sourceSha256": "5e0a1544a06b2314e780a59ee0e4fcb833101f42ac8ef3cbb3f206d1f3f8e8da",
+    "pngSha256": "d9ddb784aea6e9e140a9c3c315275cb9246168a7fd6a2a4a92ad0220dd621195",
+    "normalization": {
+      "canvas": 192,
+      "padding": 12,
+      "preserveAspectRatio": true
+    }
+  },
+  "vite": {
+    "url": "https://raw.githubusercontent.com/devicons/devicon/6a37858047b0e8d9c9c0e68f4a071fc410652e89/icons/vite/vite-original.svg",
+    "provider": "devicon",
+    "kind": "brand",
+    "revision": "6a37858047b0e8d9c9c0e68f4a071fc410652e89",
+    "license": "MIT",
+    "sourceFile": "vite.svg",
+    "sourceSha256": "4f1efe20dcae967dfe94ee5cab513caf5be12b9b1fe5ac9d0e73e352addcd678",
+    "pngSha256": "51c1bb14edea66622b337f75074a8dcb665997b5160ec83f25e8f3c7bf401eda",
+    "normalization": {
+      "canvas": 192,
+      "padding": 12,
+      "preserveAspectRatio": true
+    }
+  },
+  "pandas": {
+    "url": "https://raw.githubusercontent.com/devicons/devicon/6a37858047b0e8d9c9c0e68f4a071fc410652e89/icons/pandas/pandas-original.svg",
+    "provider": "devicon",
+    "kind": "brand",
+    "revision": "6a37858047b0e8d9c9c0e68f4a071fc410652e89",
+    "license": "MIT",
+    "sourceFile": "pandas.svg",
+    "sourceSha256": "0051003a5e5f8739c3304386456843a51be4717dab49c4fea6732ecc6e891b3d",
+    "pngSha256": "4d0eb66318f16277cbccda3e3fa225104f228df59af22b6d18b900cb9c8515ed",
+    "normalization": {
+      "canvas": 192,
+      "padding": 12,
+      "preserveAspectRatio": true
+    }
+  },
+  "numpy": {
+    "url": "https://raw.githubusercontent.com/devicons/devicon/6a37858047b0e8d9c9c0e68f4a071fc410652e89/icons/numpy/numpy-original.svg",
+    "provider": "devicon",
+    "kind": "brand",
+    "revision": "6a37858047b0e8d9c9c0e68f4a071fc410652e89",
+    "license": "MIT",
+    "sourceFile": "numpy.svg",
+    "sourceSha256": "efd53b9bf8637500d43ece39fe7ac43c972066f7166e408c5fd13e7cb73d7a05",
+    "pngSha256": "3519d2f9a93dcf282d9530bd2a8cff83f8cb28be5af16ff2ad5fc9dfa88859d3",
+    "normalization": {
+      "canvas": 192,
+      "padding": 12,
+      "preserveAspectRatio": true
+    }
+  },
+  "tensorflow": {
+    "url": "https://raw.githubusercontent.com/devicons/devicon/6a37858047b0e8d9c9c0e68f4a071fc410652e89/icons/tensorflow/tensorflow-original.svg",
+    "provider": "devicon",
+    "kind": "brand",
+    "revision": "6a37858047b0e8d9c9c0e68f4a071fc410652e89",
+    "license": "MIT",
+    "sourceFile": "tensorflow.svg",
+    "sourceSha256": "44f2bb3db305bc30f50ec0578f7a4a840c82c3544d36e436ab7d8afee3937b71",
+    "pngSha256": "5761a6808e73fc64e38833f093e226aad77a245bd481c1dff1a08595869722e9",
+    "normalization": {
+      "canvas": 192,
+      "padding": 12,
+      "preserveAspectRatio": true
+    }
+  },
+  "pytorch": {
+    "url": "https://raw.githubusercontent.com/devicons/devicon/6a37858047b0e8d9c9c0e68f4a071fc410652e89/icons/pytorch/pytorch-original.svg",
+    "provider": "devicon",
+    "kind": "brand",
+    "revision": "6a37858047b0e8d9c9c0e68f4a071fc410652e89",
+    "license": "MIT",
+    "sourceFile": "pytorch.svg",
+    "sourceSha256": "7fb9c244f59aa3261ed17d6166ef50d0f07e6e5bc4e5211ca53b6e4837e09e75",
+    "pngSha256": "b3b0a81e17b17c598db42c28eeef4c7ca058ab97a57cb1acdd6c471b9e2e7ac8",
+    "normalization": {
+      "canvas": 192,
+      "padding": 12,
+      "preserveAspectRatio": true
+    }
+  },
+  "asyncio": {
+    "url": "https://raw.githubusercontent.com/devicons/devicon/6a37858047b0e8d9c9c0e68f4a071fc410652e89/icons/python/python-original.svg",
+    "provider": "devicon",
+    "kind": "family",
+    "revision": "6a37858047b0e8d9c9c0e68f4a071fc410652e89",
+    "license": "MIT",
+    "sourceFile": "asyncio.svg",
+    "sourceSha256": "71493b4a732f0532b3a03a7a95da3ee11a65766367c8303b901ffbe7bf91a3a2",
+    "pngSha256": "a6f733a444dfd8f26c2353f4333b8f415ca0df29fe06e2bae252905cb1352553",
+    "normalization": {
+      "canvas": 192,
+      "padding": 12,
+      "preserveAspectRatio": true
+    }
+  },
+  "hadoop": {
+    "url": "https://raw.githubusercontent.com/devicons/devicon/6a37858047b0e8d9c9c0e68f4a071fc410652e89/icons/hadoop/hadoop-original.svg",
+    "provider": "devicon",
+    "kind": "brand",
+    "revision": "6a37858047b0e8d9c9c0e68f4a071fc410652e89",
+    "license": "MIT",
+    "sourceFile": "hadoop.svg",
+    "sourceSha256": "9a2eca34378dc1c0d7bf7d16a9993ef76ce7e4382075eda1c3ad513bf374afc3",
+    "pngSha256": "56e39b26972556cc43fad6aafd66ab072a0e30a6808f6e3731fa229d3e9039d6",
+    "normalization": {
+      "canvas": 192,
+      "padding": 12,
+      "preserveAspectRatio": true
+    }
+  },
+  "spark": {
+    "url": "https://raw.githubusercontent.com/devicons/devicon/6a37858047b0e8d9c9c0e68f4a071fc410652e89/icons/apachespark/apachespark-original.svg",
+    "provider": "devicon",
+    "kind": "brand",
+    "revision": "6a37858047b0e8d9c9c0e68f4a071fc410652e89",
+    "license": "MIT",
+    "sourceFile": "spark.svg",
+    "sourceSha256": "c9eea5d3f0bc25067fa5d2f8ec6c40226854ae85b7658e3d9cf07a15f702cc9a",
+    "pngSha256": "a688622bff9516827fadf17b857c6e96d46aa6ebe559687e354456fbfbacd8b5",
+    "normalization": {
+      "canvas": 192,
+      "padding": 12,
+      "preserveAspectRatio": true
+    }
+  },
+  "airflow": {
+    "url": "https://raw.githubusercontent.com/devicons/devicon/6a37858047b0e8d9c9c0e68f4a071fc410652e89/icons/apacheairflow/apacheairflow-original.svg",
+    "provider": "devicon",
+    "kind": "brand",
+    "revision": "6a37858047b0e8d9c9c0e68f4a071fc410652e89",
+    "license": "MIT",
+    "sourceFile": "airflow.svg",
+    "sourceSha256": "0c83b226d54e77eda3336a4a7138a8ba61d82b5a8fee2bc026c135a239ec1814",
+    "pngSha256": "11cf5e4d33fc4421da2eaceb4caaccdd8bf44c8279d050d344a41cc3ad2aae07",
+    "normalization": {
+      "canvas": 192,
+      "padding": 12,
+      "preserveAspectRatio": true
+    }
+  },
+  "celery": {
+    "url": "https://raw.githubusercontent.com/simple-icons/simple-icons/4d29a35c954699b389a834aacc97dd6e7e74143c/icons/celery.svg",
+    "provider": "simple-icons",
+    "kind": "brand",
+    "revision": "4d29a35c954699b389a834aacc97dd6e7e74143c",
+    "license": "CC0-1.0",
+    "sourceFile": "celery.svg",
+    "sourceSha256": "10deb22e3e052358ab1722b2e41619bdef863b2aeaf81475bd14d2031b236c67",
+    "pngSha256": "751bc42c481a169d1e985a62d001cbe7c9117ce6e95b04382922fcbf34168e4f",
+    "normalization": {
+      "canvas": 192,
+      "padding": 12,
+      "preserveAspectRatio": true
+    }
+  },
+  "laravel": {
+    "url": "https://raw.githubusercontent.com/devicons/devicon/6a37858047b0e8d9c9c0e68f4a071fc410652e89/icons/laravel/laravel-original.svg",
+    "provider": "devicon",
+    "kind": "brand",
+    "revision": "6a37858047b0e8d9c9c0e68f4a071fc410652e89",
+    "license": "MIT",
+    "sourceFile": "laravel.svg",
+    "sourceSha256": "b293960cd642537d2b19a1442168a396f25bdd31eb10f4f92447623cfc5730df",
+    "pngSha256": "4678c8b8ac7e13b1cf26abc192279e3970977214095da4285c167b5355159dcc",
+    "normalization": {
+      "canvas": 192,
+      "padding": 12,
+      "preserveAspectRatio": true
+    }
+  },
+  "symfony": {
+    "url": "https://raw.githubusercontent.com/devicons/devicon/6a37858047b0e8d9c9c0e68f4a071fc410652e89/icons/symfony/symfony-original.svg",
+    "provider": "devicon",
+    "kind": "brand",
+    "revision": "6a37858047b0e8d9c9c0e68f4a071fc410652e89",
+    "license": "MIT",
+    "sourceFile": "symfony.svg",
+    "sourceSha256": "9efe9dd777673188b8ee15afad54c0f097ad73ecaf9510ff2acc17a40ce80004",
+    "pngSha256": "448eb5187cd1041bab8ac3028e802c3af9bf215276c3ece0c8282ed0f3f8710a",
+    "normalization": {
+      "canvas": 192,
+      "padding": 12,
+      "preserveAspectRatio": true
+    }
+  },
+  "stl": {
+    "url": "https://raw.githubusercontent.com/devicons/devicon/6a37858047b0e8d9c9c0e68f4a071fc410652e89/icons/cplusplus/cplusplus-original.svg",
+    "provider": "devicon",
+    "kind": "family",
+    "revision": "6a37858047b0e8d9c9c0e68f4a071fc410652e89",
+    "license": "MIT",
+    "sourceFile": "stl.svg",
+    "sourceSha256": "7ff8253551235e3a6b002a7c2bd6e3190d85113a64fcb40f2254473caeb025d4",
+    "pngSha256": "89c7262fb881c1d0ff412de443cd5b34187afa0a6c6fdda42ca46ddb2dc4d514",
+    "normalization": {
+      "canvas": 192,
+      "padding": 12,
+      "preserveAspectRatio": true
+    }
+  },
+  "wpf": {
+    "url": "https://raw.githubusercontent.com/devicons/devicon/6a37858047b0e8d9c9c0e68f4a071fc410652e89/icons/dot-net/dot-net-original.svg",
+    "provider": "devicon",
+    "kind": "family",
+    "revision": "6a37858047b0e8d9c9c0e68f4a071fc410652e89",
+    "license": "MIT",
+    "sourceFile": "wpf.svg",
+    "sourceSha256": "6175b41fd7331abcd610d2c5aa2b28bc9628a6232be7628b948aa85a9216fc58",
+    "pngSha256": "87b53775f2e6fb892bee47039eefe36b6f73dbaadc349b3010142528f0dd4e8f",
+    "normalization": {
+      "canvas": 192,
+      "padding": 12,
+      "preserveAspectRatio": true
+    }
+  },
+  "sqlalchemy": {
+    "url": "https://raw.githubusercontent.com/devicons/devicon/6a37858047b0e8d9c9c0e68f4a071fc410652e89/icons/sqlalchemy/sqlalchemy-original.svg",
+    "provider": "devicon",
+    "kind": "brand",
+    "revision": "6a37858047b0e8d9c9c0e68f4a071fc410652e89",
+    "license": "MIT",
+    "sourceFile": "sqlalchemy.svg",
+    "sourceSha256": "f7cd6f77f031d112250e3fff789a616d5fdd9a7be95856cf3adf1c9d7e30882a",
+    "pngSha256": "dca028d89c7d44f703255a52897e4e172fceb652373f02afcf878df339e95dca",
+    "normalization": {
+      "canvas": 192,
+      "padding": 12,
+      "preserveAspectRatio": true
+    }
+  },
+  "yii": {
+    "url": "https://raw.githubusercontent.com/devicons/devicon/6a37858047b0e8d9c9c0e68f4a071fc410652e89/icons/yii/yii-original.svg",
+    "provider": "devicon",
+    "kind": "brand",
+    "revision": "6a37858047b0e8d9c9c0e68f4a071fc410652e89",
+    "license": "MIT",
+    "sourceFile": "yii.svg",
+    "sourceSha256": "804d4ab25328a6d55f266c16931a82b4a96b03a40eee06420849fecfeb113f31",
+    "pngSha256": "1ddc7db0faf34819360722b410a7ca1927f9f3cd15e5509dce56700c5de4a81d",
+    "normalization": {
+      "canvas": 192,
+      "padding": 12,
+      "preserveAspectRatio": true
+    }
+  },
+  "aiohttp": {
+    "url": "https://raw.githubusercontent.com/simple-icons/simple-icons/4d29a35c954699b389a834aacc97dd6e7e74143c/icons/aiohttp.svg",
+    "provider": "simple-icons",
+    "kind": "brand",
+    "revision": "4d29a35c954699b389a834aacc97dd6e7e74143c",
+    "license": "CC0-1.0",
+    "sourceFile": "aiohttp.svg",
+    "sourceSha256": "4c9e2d068289dda72bbede307fa21adaeff79f31c45878f655885223192ebc1d",
+    "pngSha256": "62d15c8667c20a36ef1d2f3257a78da73d6aa15b83d1d0b2605774ee1db7d719",
+    "normalization": {
+      "canvas": 192,
+      "padding": 12,
+      "preserveAspectRatio": true
+    }
+  },
+  "qt": {
+    "url": "https://raw.githubusercontent.com/devicons/devicon/6a37858047b0e8d9c9c0e68f4a071fc410652e89/icons/qt/qt-original.svg",
+    "provider": "devicon",
+    "kind": "brand",
+    "revision": "6a37858047b0e8d9c9c0e68f4a071fc410652e89",
+    "license": "MIT",
+    "sourceFile": "qt.svg",
+    "sourceSha256": "03b72b7d8c57fcedfaaac7052e8b2b0abfb65fe11910a8a14b1d7fbbd69e1332",
+    "pngSha256": "fe8e1ebf4b99eb8abe830172ea29edd2401ef0d0bb3248af4b7ce7e6b2c7c717",
+    "normalization": {
+      "canvas": 192,
+      "padding": 12,
+      "preserveAspectRatio": true
+    }
+  },
+  "aspnet": {
+    "url": "https://raw.githubusercontent.com/devicons/devicon/6a37858047b0e8d9c9c0e68f4a071fc410652e89/icons/dotnetcore/dotnetcore-original.svg",
+    "provider": "devicon",
+    "kind": "family",
+    "revision": "6a37858047b0e8d9c9c0e68f4a071fc410652e89",
+    "license": "MIT",
+    "sourceFile": "aspnet.svg",
+    "sourceSha256": "b1b71d747aaf277a00efeab3f5f5844578fc4a42bb605f60c3b0510256009ca4",
+    "pngSha256": "330f874f027e4c51bee36ddba337c7a202e8121f5860a4a391399a3b7d6f63e6",
+    "normalization": {
+      "canvas": 192,
+      "padding": 12,
+      "preserveAspectRatio": true
+    }
+  },
+  "entityframework": {
+    "url": "https://raw.githubusercontent.com/devicons/devicon/6a37858047b0e8d9c9c0e68f4a071fc410652e89/icons/entityframeworkcore/entityframeworkcore-original.svg",
+    "provider": "devicon",
+    "kind": "brand",
+    "revision": "6a37858047b0e8d9c9c0e68f4a071fc410652e89",
+    "license": "MIT",
+    "sourceFile": "entityframework.svg",
+    "sourceSha256": "b3877f0b5ee88d14d2c9c5c55a4b5568c1fbd0ee12a0973aad1f6c1ca2f22ec0",
+    "pngSha256": "1e7b92c12d523f7a038066e26908e89f7967191c4290e586ef5a71fa239fe0dc",
+    "normalization": {
+      "canvas": 192,
+      "padding": 12,
+      "preserveAspectRatio": true
+    }
+  },
+  "unittest": {
+    "url": "https://raw.githubusercontent.com/devicons/devicon/6a37858047b0e8d9c9c0e68f4a071fc410652e89/icons/python/python-original.svg",
+    "provider": "devicon",
+    "kind": "family",
+    "revision": "6a37858047b0e8d9c9c0e68f4a071fc410652e89",
+    "license": "MIT",
+    "sourceFile": "unittest.svg",
+    "sourceSha256": "71493b4a732f0532b3a03a7a95da3ee11a65766367c8303b901ffbe7bf91a3a2",
+    "pngSha256": "a6f733a444dfd8f26c2353f4333b8f415ca0df29fe06e2bae252905cb1352553",
+    "normalization": {
+      "canvas": 192,
+      "padding": 12,
+      "preserveAspectRatio": true
+    }
+  },
+  "boost": {
+    "url": "https://raw.githubusercontent.com/simple-icons/simple-icons/4d29a35c954699b389a834aacc97dd6e7e74143c/icons/boost.svg",
+    "provider": "simple-icons",
+    "kind": "brand",
+    "revision": "4d29a35c954699b389a834aacc97dd6e7e74143c",
+    "license": "CC0-1.0",
+    "sourceFile": "boost.svg",
+    "sourceSha256": "5299ef56a676b3aa06e956a645b082f96b76147b80d1b5981cad7ff5a68875d3",
+    "pngSha256": "9cdebf63c88b3abbe3b62be6142663ccc8d0919dd8a48470d46a594783881c71",
+    "normalization": {
+      "canvas": 192,
+      "padding": 12,
+      "preserveAspectRatio": true
+    }
+  },
+  "unity": {
+    "url": "https://raw.githubusercontent.com/devicons/devicon/6a37858047b0e8d9c9c0e68f4a071fc410652e89/icons/unity/unity-original.svg",
+    "provider": "devicon",
+    "kind": "brand",
+    "revision": "6a37858047b0e8d9c9c0e68f4a071fc410652e89",
+    "license": "MIT",
+    "sourceFile": "unity.svg",
+    "sourceSha256": "92f5736155fc1d6a4829b6b5798e0821f56ba7b61d2999c0fca6840cc1f7b6af",
+    "pngSha256": "dcdf93572daae95f4f43c8abda15ffce820cd67a1bd6cf8dfe15c2e6d10cea3e",
+    "normalization": {
+      "canvas": 192,
+      "padding": 12,
+      "preserveAspectRatio": true
+    }
+  },
+  "unreal": {
+    "url": "https://raw.githubusercontent.com/devicons/devicon/6a37858047b0e8d9c9c0e68f4a071fc410652e89/icons/unrealengine/unrealengine-original.svg",
+    "provider": "devicon",
+    "kind": "brand",
+    "revision": "6a37858047b0e8d9c9c0e68f4a071fc410652e89",
+    "license": "MIT",
+    "sourceFile": "unreal.svg",
+    "sourceSha256": "dcbe912c9f76a86ef0185021f6a6387df855cb64716c08015e713798d34942d5",
+    "pngSha256": "7d1ebcf141c267a3c1de85c277ac5c12087863baa78be7c1000d238548c419d6",
+    "normalization": {
+      "canvas": 192,
+      "padding": 12,
+      "preserveAspectRatio": true
+    }
+  },
+  "selenium": {
+    "url": "https://raw.githubusercontent.com/devicons/devicon/6a37858047b0e8d9c9c0e68f4a071fc410652e89/icons/selenium/selenium-original.svg",
+    "provider": "devicon",
+    "kind": "brand",
+    "revision": "6a37858047b0e8d9c9c0e68f4a071fc410652e89",
+    "license": "MIT",
+    "sourceFile": "selenium.svg",
+    "sourceSha256": "aa2338673c2880af0489b216512dc14a63a2b1dff4f65ebde0f4c3f61beda693",
+    "pngSha256": "75a4e576a3a8129b93e3ededf7b0d0c7994b95be9c6e26b203893625f266ffbd",
+    "normalization": {
+      "canvas": 192,
+      "padding": 12,
+      "preserveAspectRatio": true
+    }
+  },
+  "pytest": {
+    "url": "https://raw.githubusercontent.com/devicons/devicon/6a37858047b0e8d9c9c0e68f4a071fc410652e89/icons/pytest/pytest-original.svg",
+    "provider": "devicon",
+    "kind": "brand",
+    "revision": "6a37858047b0e8d9c9c0e68f4a071fc410652e89",
+    "license": "MIT",
+    "sourceFile": "pytest.svg",
+    "sourceSha256": "e3073e7f520866f93a40e76b633efc29715539150423178cdb2e33f7077e4be1",
+    "pngSha256": "8363c8a6721fde4183f9bf73406d7ef0cb7d99a49341021909c51cae000f13d5",
+    "normalization": {
+      "canvas": 192,
+      "padding": 12,
+      "preserveAspectRatio": true
+    }
+  },
+  "junit": {
+    "url": "https://raw.githubusercontent.com/devicons/devicon/6a37858047b0e8d9c9c0e68f4a071fc410652e89/icons/junit/junit-original.svg",
+    "provider": "devicon",
+    "kind": "brand",
+    "revision": "6a37858047b0e8d9c9c0e68f4a071fc410652e89",
+    "license": "MIT",
+    "sourceFile": "junit.svg",
+    "sourceSha256": "547001df5fceec5b31bd15c9c9909abcfd42fe9daef9c2dc38d12beb8310a44a",
+    "pngSha256": "5492300c6b12def4afab31993474180cd26658b5b8cc77cc7d089d5a43be6096",
+    "normalization": {
+      "canvas": 192,
+      "padding": 12,
+      "preserveAspectRatio": true
+    }
+  },
+  "playwright": {
+    "url": "https://raw.githubusercontent.com/devicons/devicon/6a37858047b0e8d9c9c0e68f4a071fc410652e89/icons/playwright/playwright-original.svg",
+    "provider": "devicon",
+    "kind": "brand",
+    "revision": "6a37858047b0e8d9c9c0e68f4a071fc410652e89",
+    "license": "MIT",
+    "sourceFile": "playwright.svg",
+    "sourceSha256": "c829ee41780a2c9748b9aeeeec530dc9ceeade68687e252ff7f044c16a8c384b",
+    "pngSha256": "984b435ee903032fbbbd770a58ae99c17c512ed96bf8272245908b205c16c4bd",
+    "normalization": {
+      "canvas": 192,
+      "padding": 12,
+      "preserveAspectRatio": true
+    }
+  },
+  "cypress": {
+    "url": "https://raw.githubusercontent.com/devicons/devicon/6a37858047b0e8d9c9c0e68f4a071fc410652e89/icons/cypressio/cypressio-original.svg",
+    "provider": "devicon",
+    "kind": "brand",
+    "revision": "6a37858047b0e8d9c9c0e68f4a071fc410652e89",
+    "license": "MIT",
+    "sourceFile": "cypress.svg",
+    "sourceSha256": "17cfd19e56397859714a8d4ee6e97b9e9afb0bffd9be87a70240d01e47dfda3b",
+    "pngSha256": "1da721e1802c4dd99fd3b2e2402a7d0565bebd4fc0be97ef399cee6eebf81a15",
+    "normalization": {
+      "canvas": 192,
+      "padding": 12,
+      "preserveAspectRatio": true
+    }
+  },
+  "postman": {
+    "url": "https://raw.githubusercontent.com/devicons/devicon/6a37858047b0e8d9c9c0e68f4a071fc410652e89/icons/postman/postman-original.svg",
+    "provider": "devicon",
+    "kind": "brand",
+    "revision": "6a37858047b0e8d9c9c0e68f4a071fc410652e89",
+    "license": "MIT",
+    "sourceFile": "postman.svg",
+    "sourceSha256": "0b366c7a023328b0d95e8c90d9050519b8c31d206f8b34db17742488f72efccb",
+    "pngSha256": "690a66cb35a40d5e0075a5f3e4d55ff661b972a8abe0d8bd1a2cc89cbe0cc2bc",
+    "normalization": {
+      "canvas": 192,
+      "padding": 12,
+      "preserveAspectRatio": true
+    }
+  },
+  "jmeter": {
+    "url": "https://raw.githubusercontent.com/simple-icons/simple-icons/4d29a35c954699b389a834aacc97dd6e7e74143c/icons/apachejmeter.svg",
+    "provider": "simple-icons",
+    "kind": "brand",
+    "revision": "4d29a35c954699b389a834aacc97dd6e7e74143c",
+    "license": "CC0-1.0",
+    "sourceFile": "jmeter.svg",
+    "sourceSha256": "fe08f8745af3bd4775d8084c1dc2abcd62af7fb2f9728129ec338d5b1f63a52d",
+    "pngSha256": "bb3ac8d15c0accef5e64869a78cfcd698f42e0a749556886293e264582658e82",
+    "normalization": {
+      "canvas": 192,
+      "padding": 12,
+      "preserveAspectRatio": true
+    }
+  },
+  "jest": {
+    "url": "https://raw.githubusercontent.com/devicons/devicon/6a37858047b0e8d9c9c0e68f4a071fc410652e89/icons/jest/jest-plain.svg",
+    "provider": "devicon",
+    "kind": "brand",
+    "revision": "6a37858047b0e8d9c9c0e68f4a071fc410652e89",
+    "license": "MIT",
+    "sourceFile": "jest.svg",
+    "sourceSha256": "56aa3bd209339d2253cdce508143109d20f6d7342db07db7a2d1e8a59ba202f3",
+    "pngSha256": "b0394874525f71b1c9d7480c200b3d191e2fc7aff832210bda5ab7fa86b0bb16",
+    "normalization": {
+      "canvas": 192,
+      "padding": 12,
+      "preserveAspectRatio": true
+    }
+  },
+  "jooq": {
+    "url": "https://www.jooq.org/img/jooq-logo-black.png",
+    "provider": "vendor",
+    "kind": "brand",
+    "revision": null,
+    "license": "Vendor brand asset; trademark retained",
+    "sourceFile": "jooq.source",
+    "sourceSha256": "85141feb15a66215b26a1aa3e63267cdb1c7910a82c3ee78821b86b2eae4c671",
+    "pngSha256": "05ed3cba0691542857d4f8796eb394674650867f6810ec06fa2c64d2af07e31c",
+    "normalization": {
+      "canvas": 192,
+      "padding": 12,
+      "preserveAspectRatio": true
+    }
+  },
+  "locust": {
+    "url": "https://raw.githubusercontent.com/simple-icons/simple-icons/4d29a35c954699b389a834aacc97dd6e7e74143c/icons/locust.svg",
+    "provider": "simple-icons",
+    "kind": "brand",
+    "revision": "4d29a35c954699b389a834aacc97dd6e7e74143c",
+    "license": "CC0-1.0",
+    "sourceFile": "locust.svg",
+    "sourceSha256": "42cc64af486bcd341bcb4885db078147589b3985e7ff1dd79f78b5fbc94a1871",
+    "pngSha256": "9120f0efdf8e5b301f96aded2ecc8bc48e097528b26b4baf0d699e896d6a5f03",
+    "normalization": {
+      "canvas": 192,
+      "padding": 12,
+      "preserveAspectRatio": true
+    }
+  },
+  "hibernate": {
+    "url": "https://raw.githubusercontent.com/devicons/devicon/6a37858047b0e8d9c9c0e68f4a071fc410652e89/icons/hibernate/hibernate-original.svg",
+    "provider": "devicon",
+    "kind": "brand",
+    "revision": "6a37858047b0e8d9c9c0e68f4a071fc410652e89",
+    "license": "MIT",
+    "sourceFile": "hibernate.svg",
+    "sourceSha256": "4948181bdbeead662ae7f5a76c252285176f896bf55e56b973176b12513d7515",
+    "pngSha256": "b9bd8fc811f464c2898646394d285db7cf168d0189c49aacbffe83e82d168f1c",
+    "normalization": {
+      "canvas": 192,
+      "padding": 12,
+      "preserveAspectRatio": true
+    }
+  }
+}

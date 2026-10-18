@@ -75,6 +75,9 @@ export type Tools = (
   | "prepare_edit_batch"
   | "apply_edit_batch"
   | "project_action"
+  | "read_import"
+  | "save_import"
+  | "finish_import"
 )[];
 
 export interface JobSubmissionV1 {

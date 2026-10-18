@@ -1,5 +1,6 @@
 import Ajv2020, { type ValidateFunction } from "ajv/dist/2020.js";
 import addFormats from "ajv-formats";
+import { taggedSchema } from "./tagged-schema.js";
 import { validateAgentShape } from "./agent-validate.js";
 import { sameValue, sha256 } from "../background/wire.js";
 import rich_mutation from "../../../../contracts/json-schema/rich_mutation.schema.json" with { type: "json" };
@@ -55,7 +56,7 @@ import background_fixed_reply_v1 from "../../../../contracts/json-schema/backgro
 import background_fixed_input_v1 from "../../../../contracts/json-schema/background_fixed_input_v1.schema.json" with { type: "json" };
 import background_processing_candidate_v1 from "../../../../contracts/json-schema/background_processing_candidate_v1.schema.json" with { type: "json" };
 
-const ajv = new Ajv2020({ allErrors: true, strict: false });
+const ajv = new Ajv2020({ allErrors: true, strict: false, discriminator: true });
 addFormats(ajv);
 ajv.addKeyword({ keyword: "x-maxSerializedBytes", schemaType: "number",
   validate: (limit: number, value: unknown): boolean => new TextEncoder().encode(JSON.stringify(value)).length <= limit });
@@ -67,12 +68,12 @@ schemas.set("background_summary_v1", background_summary_v1);
 schemas.set("background_index_v1", background_index_v1);
 schemas.set("background_tool_saved_v3", background_tool_saved_v3);
 const validators = new Map<string, ValidateFunction<unknown>>();
-const mutationShape = ajv.compile<unknown>(rich_mutation);
+const mutationShape = ajv.compile<unknown>(taggedSchema(rich_mutation));
 export function prepareWriterContracts(): void {
   for (const kind of ["background_writer_view_v1", "background_barrier_v1", "background_draft_v1", "background_writer_draft_read_v1",
     "background_writer_publication_v1", "background_writer_history_offer_v1", "background_undo_v1", "background_writer_history_result_v1"]) {
     const schema = schemas.get(kind);
-    if (schema && !validators.has(kind)) validators.set(kind, ajv.compile<unknown>(schema));
+    if (schema && !validators.has(kind)) validators.set(kind, ajv.compile<unknown>(taggedSchema(schema)));
   }
 }
 function record(value: unknown): value is Record<string, unknown> {
@@ -299,7 +300,7 @@ export function validateBackgroundShape(kind: string, value: unknown): boolean {
   if (validate === undefined) {
     const schema = schemas.get(kind);
     if (schema === undefined) return false;
-    validate = ajv.compile<unknown>(schema);
+    validate = ajv.compile<unknown>(taggedSchema(schema));
     validators.set(kind, validate);
   }
   return validate(value) && semantics(value);

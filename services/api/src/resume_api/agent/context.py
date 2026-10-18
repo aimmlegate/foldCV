@@ -85,6 +85,8 @@ def query_value(workspace, query):
         if query.ids and {record.id for record in records} != set(query.ids):
             raise AgentFailure("AGENT_NOT_FOUND")
         result = {"records": records}
+        if project.facts.mode in {"digest", "imported"}:
+            result.update(mode=project.facts.mode, extraction=project.facts.extraction)
         if query.parent_id == "linked":
             ids = {record.id for record in records}
             result["linkedOccurrences"] = [{"recordId": group.record_id, "fieldKey": group.key,

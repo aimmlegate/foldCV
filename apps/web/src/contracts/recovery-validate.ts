@@ -30,6 +30,7 @@ import error from "../../../../contracts/json-schema/docx_error.schema.json" wit
 import plan from "../../../../contracts/json-schema/editorial_plan.schema.json" with { type: "json" };
 import mutation from "../../../../contracts/json-schema/mutation.schema.json" with { type: "json" };
 import result from "../../../../contracts/json-schema/mutation_result.schema.json" with { type: "json" };
+import importModelPreference from "../../../../contracts/json-schema/save_import_model_preference.schema.json" with { type: "json" };
 import preferences from "../../../../contracts/json-schema/preferences.schema.json" with { type: "json" };
 import registry from "../../../../contracts/json-schema/registry.schema.json" with { type: "json" };
 import render from "../../../../contracts/json-schema/render_snapshot_v4.schema.json" with { type: "json" };
@@ -43,7 +44,7 @@ const ajv = new Ajv2020({ allErrors: true, strict: false });
 const schemas = { gui_archive_request: archiveRequest, gui_project_list_response: projectList, gui_delete_project_request: deleteProject, gui_delete_project_result: deleteResult, gui_analysis_request: analysisRequest, save_analysis_preference: analysisPreference, gui_reconcile_proposal: analysisProposal, gui_export_request: exportRequest, gui_rewrite_request: rewriteRequest, gui_rewrite_proposal: rewriteProposal, gui_rename_project_request: renameProject, gui_create_project_request: createProject, gui_start_generation_request: startGeneration,
   rich_panel_request: panelRequest, gui_project_response: projectResponse, project_v4: project, workspace_v5: workspace, archive_manifest_v5: archive,
   document, docx_error: error, editorial_plan: plan, mutation, mutation_result: result,
-  preferences, registry, render_snapshot_v4: render, rules, selection, source_context: context, source_context_request: contextRequest, save_rules_request: saveRules, rules_settings_error: rulesError, rules_settings: rulesSettings, gui_normalize_request: guiRequest, gui_semantic_proposal: guiProposal, gui_normalized_result: guiResult, gui_draft_request: draftRequest, gui_draft_proposal: draftProposal, gui_draft_result: draftResult };
+  preferences, save_import_model_preference: importModelPreference, registry, render_snapshot_v4: render, rules, selection, source_context: context, source_context_request: contextRequest, save_rules_request: saveRules, rules_settings_error: rulesError, rules_settings: rulesSettings, gui_normalize_request: guiRequest, gui_semantic_proposal: guiProposal, gui_normalized_result: guiResult, gui_draft_request: draftRequest, gui_draft_proposal: draftProposal, gui_draft_result: draftResult };
 const validators = new Map(Object.entries(schemas).map(([name, schema]) => [name, ajv.compile(schema)]));
 
 export function validateRecoveryShape(kind: string, value: unknown): boolean {

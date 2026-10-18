@@ -60,13 +60,20 @@ class JobService:
         self.fixed = FixedJobs(self)
         self.publisher.processing_validator = self.fixed.validate_processing
         agent_factory = factory or (lambda job, model: JobRuntime(self, job, model))
+        def runtime_factory(job, model):
+            if job.submission.kind == "agent":
+                return agent_factory(job, model)
+            if job.submission.kind == "processing" and "save_import" in job.submission.tools:
+                from ..importer.job import ImportJobRuntime
+                return ImportJobRuntime(self, job, model)
+            return FixedRuntime(self, job, model)
         async def observed(name, identifier):
             if observer is not None:
                 await observer(name, identifier)
             if name == "slot_released":
                 await self.projects.drain_catalog_actions(run_id=identifier)
         self.supervisor = JobSupervisor(self.store,
-            lambda job, model: agent_factory(job, model) if job.submission.kind == "agent" else FixedRuntime(self, job, model),
+            runtime_factory,
             clock=clock, preflight=self.preflight, admit=self.admit, eligible=self.eligible, parallel=parallel,
             observer=observed)
         self.parallel_owner = None

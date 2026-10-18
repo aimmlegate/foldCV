@@ -15,13 +15,13 @@ NS = {"w": "http://schemas.openxmlformats.org/wordprocessingml/2006/main",
       "wp": "http://schemas.openxmlformats.org/drawingml/2006/wordprocessingDrawing"}
 
 
-def test_focus_decoration_caps_logos_without_truncating_unknown_or_later_entries():
+def test_focus_decoration_keeps_all_available_logos_without_truncating_unknown_entries():
     document, _ = fixture()
     before = document.model_dump()
     roles = presentation(document).blocks
-    assert sum(view.logo is not None for view in roles.values()) == 8
+    assert sum(view.logo is not None for view in roles.values()) == 9
     assert all(roles[f"focus-{i}"].role == "focus_entry" for i in range(10))
-    assert roles["focus-8"].logo is roles["focus-9"].logo is None
+    assert roles["focus-8"].logo is not None and roles["focus-9"].logo is None
     assert roles["profile"].role == "profile_heading"
     assert roles["experience"].role == "section_heading"
     assert roles["job-0"].role == "group"
@@ -42,14 +42,20 @@ def test_native_template_keeps_measured_columns_bands_brand_and_repeat_footer():
         assert tables[0].xpath("w:tblGrid/w:gridCol/@w:w", namespaces=NS) == ["9000"]
         assert tables[1].xpath("w:tblGrid/w:gridCol/@w:w", namespaces=NS) == ["2360", "125", "8900"]
         assert tables[1].xpath("w:tr[1]/w:trPr/w:tblHeader", namespaces=NS)
-        bands = xml.xpath("//w:tc[w:tcPr/w:shd[@w:fill='EFEFEF']]", namespaces=NS)
-        assert ["".join(cell.xpath(".//w:t/text()", namespaces=NS)) for cell in bands] == ["ОПЫТ", "НАВЫКИ"]
-        assert all(cell.xpath("w:tcPr/w:tcW/@w:w", namespaces=NS) == ["8900"] for cell in bands)
-        assert not xml.xpath("//w:cantSplit|//w:keepNext[@w:val='1']", namespaces=NS)
+        bands = xml.xpath("//w:p[w:pPr/w:shd[@w:fill='EFEFEF']]", namespaces=NS)
+        assert ["".join(p.xpath(".//w:t/text()", namespaces=NS)) for p in bands] == ["ОПЫТ", "НАВЫКИ"]
+        assert all(p.xpath("w:pPr/w:ind/@w:left", namespaces=NS) == ["0"]
+            and p.xpath("w:pPr/w:ind/@w:right", namespaces=NS) == ["0"]
+            and p.xpath("w:pPr/w:ind/@w:firstLine", namespaces=NS) == ["100"] for p in bands)
+        assert all(p.xpath("w:pPr/w:keepNext[not(@w:val) or @w:val='1']|ancestor::w:tr/w:trPr/w:cantSplit", namespaces=NS) for p in bands)
+        prefixes = xml.xpath("//w:tbl[w:tblPr/w:tblCaption[@w:val='Job header' or @w:val='Section header']]", namespaces=NS)
+        assert all(len("".join(t.xpath(".//w:t/text()", namespaces=NS))) <= 1000 for t in prefixes)
+        assert len(xml.xpath("//w:cantSplit", namespaces=NS)) == len(prefixes)
+        assert not tables[1].xpath("w:tr/w:trPr/w:cantSplit", namespaces=NS)
         headers = [etree.fromstring(archive.read(name)) for name in archive.namelist() if name.startswith("word/header") and name.endswith(".xml")]
         anchor = next(node for header in headers for node in header.xpath("//wp:anchor", namespaces=NS))
         assert int(anchor.xpath("wp:positionH/wp:posOffset/text()", namespaces=NS)[0]) == round(487.6 * 12700)
-        assert len(xml.xpath("//wp:docPr[@descr='Focus technology logo']", namespaces=NS)) == 8
+        assert len(xml.xpath("//wp:docPr[@descr='Focus technology logo']", namespaces=NS)) == 9
         footers = [etree.fromstring(archive.read(name)) for name in archive.namelist() if name.startswith("word/footer") and name.endswith(".xml")]
         assert len(footers) == 2
         assert all("".join(footer.xpath("//w:t/text()", namespaces=NS)) == "mail@example.com" for footer in footers)

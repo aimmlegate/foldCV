@@ -78,6 +78,6 @@ class FixedInputs:
         if reference.kind != "processing":
             raise BackgroundFailure("JOB_SCOPE_INVALID")
         value = self.processing(directory, reference.candidate_id)
-        if value.workspace is None or value.normalized is None or value.workspace.project_id != state.project_id:
+        if value.workspace is None or (value.normalized is None and value.import_draft is None) or value.workspace.project_id != state.project_id:
             raise BackgroundFailure("OUTCOME_UNKNOWN")
         return encoded(value.model_dump(mode="json", by_alias=True))

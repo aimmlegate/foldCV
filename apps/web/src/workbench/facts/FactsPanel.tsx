@@ -2,7 +2,7 @@ import { useEffect, useState, type ReactNode } from "react";
 import type { WorkingFacts } from "../../contracts/generated/working_facts";
 import type { RichDocumentV1 } from "../../contracts/generated/rich_document_v1";
 import type { PanelCommand } from "../../rich/synchronization";
-import { labels, needsCheck, type RecordValue } from "../../rich/fact-fields";
+import { labels, needsCheck, type Kind, type RecordValue } from "../../rich/fact-fields";
 import { TechnologySelect } from "./TechnologySelect";
 import { FactDialog, type FactTarget } from "./FactDialog";
 import { Icon } from "../ui/Icon";
@@ -16,6 +16,7 @@ function summary(record: RecordValue): [string, string] {
     ...record.periods.map(period => `${dateText(period.start) || "?"} — ${period.present.value ? "по настоящее время" : dateText(period.end) || "?"}`)].filter(Boolean).join("\n")];
   if (record.kind === "education") return [record.institution.rawText || "Без названия", [record.qualification.rawText, record.specialty.rawText, dateText(record.completion)].filter(Boolean).join("\n")];
   if (record.kind === "language") return [record.language.rawText || "Без названия", record.level.rawText];
+  if (record.kind === "claim") return [record.value.rawText || "Новый факт", ""];
   return ["", ""];
 }
 export function FactsPanel({ facts, document, submit, pending, paused, timeline, hidden, close }: {
@@ -23,6 +24,8 @@ export function FactsPanel({ facts, document, submit, pending, paused, timeline,
   timeline: ReactNode; hidden: boolean; close: () => void;
 }) {
   const [target, setTarget] = useState<FactTarget | null>(null), [error, setError] = useState<{ message: string; save: boolean } | null>(null);
+  const groups: Kind[] = ["candidate", "employment", "technology", "education", "language"];
+  if ((facts.mode === "digest" || facts.mode === "imported") && facts.records.some(record => record.kind === "claim")) groups.push("claim");
   useEffect(() => { if (error?.save && !paused && !pending.length) setError(null); }, [error, paused, pending.length]);
   async function apply(command: PanelCommand) {
     setError(null);
@@ -35,14 +38,14 @@ export function FactsPanel({ facts, document, submit, pending, paused, timeline,
     {error && <p className="notice warning" role="alert">{error.message}</p>}
     {facts.extraction && <div className="notice" role="status">
       <p>{facts.extraction.status === "complete" ? "Факты извлечены" : "Факты извлечены частично"}: {facts.extraction.factCount}.</p>
-      {facts.extraction.unresolved.length > 0 && <details><summary>Не удалось подтвердить: {facts.extraction.unresolved.length}</summary>
+      {facts.extraction.unresolved.length > 0 && <details><summary>Требует проверки: {facts.extraction.unresolved.length}</summary>
         <ul>{facts.extraction.unresolved.map((issue, index) => <li key={`${issue.sourceId}:${issue.unitId ?? "result"}:${index}`}>
-          {issue.code === "FACT_SECTION_OMITTED" ? `Не извлечён раздел: ${issue.section}` : issue.code === "FACT_ROWS_RECOVERED" ? "Часть строк ответа модели отклонена; подтверждённые факты сохранены" : "Сведения исходника не представлены в фактах"}
-          {issue.page ? `, стр. ${issue.page}` : ""} ({issue.code})</li>)}</ul>
+          {issue.code === "FACT_SECTION_OMITTED" ? `Не извлечён раздел: ${issue.section}` : issue.code === "FACT_ROWS_RECOVERED" ? "Часть строк ответа модели отклонена; подтверждённые факты сохранены" : issue.section || "Сведения исходника не представлены в фактах"}
+          {issue.page ? `, стр. ${issue.page}` : ""}</li>)}</ul>
         <p>Сверьте исходник и внесите исправления вручную или повторите обработку.</p></details>}
     </div>}
     {pending.length > 0 && <small className="uir-facts-pending" role="status">{paused ? "Ожидает повторного сохранения" : `Сохраняем изменения: ${pending.length}`}</small>}
-    {(["candidate", "employment", "technology", "education", "language"] as const).map(kind => <details className="fact-group" key={kind} data-group={kind} open>
+    {groups.map(kind => <details className="fact-group" key={kind} data-group={kind} open={kind !== "claim"}>
       <summary>{labels[kind]}</summary>
       {kind === "technology" ? <TechnologySelect facts={facts} document={document} jobId={null} label="общий список" pending={pending} paused={paused} submit={apply} />
         : facts.records.filter(record => record.kind === kind).map(record => {
@@ -55,7 +58,7 @@ export function FactsPanel({ facts, document, submit, pending, paused, timeline,
         })}
       {kind === "employment" && timeline}
       {kind !== "technology" && (kind !== "candidate" || !facts.records.some(record => record.kind === "candidate")) && <button className="text-button fact-add" disabled={paused}
-        onClick={() => setTarget({ kind, record: null })}>+ {kind === "employment" ? "Место работы" : kind === "language" ? "Язык" : labels[kind]}</button>}
+        onClick={() => setTarget({ kind, record: null })}>+ {kind === "employment" ? "Место работы" : kind === "language" ? "Язык" : kind === "claim" ? "Факт" : labels[kind]}</button>}
     </details>)}
   </aside>{target && <FactDialog target={target} close={() => setTarget(null)} submit={apply} />}</>;
 }

@@ -103,6 +103,8 @@ class SharedAgentRuntime:
             await client.close()
             return await invoke(value.close_tools, agent_limits.CLEANUP_SECONDS) is True
         try:
+            if value.reasoning_effort != "medium":
+                raise TransportFailure("MODEL_DENIED")
             if value.job_id is None or value.cancelled is None:
                 raise TransportFailure("INVALID_INPUT")
             client = self.client_factory(value)

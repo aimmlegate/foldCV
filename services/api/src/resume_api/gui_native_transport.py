@@ -3,6 +3,8 @@
 import json
 from copy import deepcopy
 
+from packages.resume_core.extraction_outcome import has_dated_employment
+
 from .gui_native_input import NativeInput
 from .gui_native_recovery import NativeRecovery
 from .gui_normalization_transport import NormalizationTransport
@@ -17,12 +19,23 @@ class NativeNormalizationTransport(NormalizationTransport):
     def output_schema(self, schema):
         result = deepcopy(schema)
         result["properties"]["facts"]["minItems"] = 1
+        if has_dated_employment(self.request.sources):
+            result["properties"]["jobs"]["minItems"] = 1
         for name, definition in result.get("$defs", {}).items():
             properties = definition.get("properties", {})
             if name == "GuiFactProposal":
                 properties["literalEvidence"]["minItems"] = 1
             if name == "TextValue":
                 properties["text"]["minLength"] = 1
+        fact = result["$defs"]["GuiFactProposal"]
+        branches = []
+        for kind, value in {"text": "TextValue", "technology": "TechnologyValue", "date": "PartialDate",
+                "metric": "MetricValue", "leadership": "LeadershipValue"}.items():
+            branch = deepcopy(fact)
+            branch["properties"]["kind"]["enum"] = [kind]
+            branch["properties"]["value"] = {"$ref": f"#/$defs/{value}"}
+            branches.append(branch)
+        result["$defs"]["GuiFactProposal"] = {"anyOf": branches}
         return result
 
     def encode(self, text):

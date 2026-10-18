@@ -1,0 +1,23 @@
+{
+  "repository": "https://github.com/devicons/devicon",
+  "revision": "6a37858047b0e8d9c9c0e68f4a071fc410652e89",
+  "license": "MIT",
+  "rasterizer": "resvg-py 0.5.0",
+  "providers": {
+    "devicon": {
+      "repository": "https://github.com/devicons/devicon",
+      "revision": "6a37858047b0e8d9c9c0e68f4a071fc410652e89",
+      "license": "MIT"
+    },
+    "simple-icons": {
+      "repository": "https://github.com/simple-icons/simple-icons",
+      "revision": "4d29a35c954699b389a834aacc97dd6e7e74143c",
+      "license": "CC0-1.0"
+    },
+    "lucide": {
+      "repository": "https://github.com/lucide-icons/lucide",
+      "revision": "1ef60af944de207e0d5176905a0759ba12e6ee8d",
+      "license": "ISC"
+    }
+  }
+}

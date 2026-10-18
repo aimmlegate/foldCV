@@ -170,6 +170,9 @@ export type Tools = (
   | "prepare_edit_batch"
   | "apply_edit_batch"
   | "project_action"
+  | "read_import"
+  | "save_import"
+  | "finish_import"
 )[];
 export type Undoexpired = boolean;
 export type Updatedat = string;
@@ -194,9 +197,12 @@ export type Durability = "pending" | "durable" | "failed";
 export type Errorcode = string | null;
 export type Id4 = string;
 export type Stage2 = "assess_resume" | "normalize_semantics" | "draft_prose" | "assemble" | "render";
+export type Startedat = string | null;
 export type Status = "queued" | "running" | "completed" | "failed" | "cancelled" | "interrupted";
 export type Subtitle = string;
 export type Title = string;
+export type Experience = string | null;
+export type Experiencenote = string | null;
 export type Logo = string | null;
 export type Role =
   | "body"
@@ -235,6 +241,7 @@ export type Unitid = string | null;
  * @maxItems 5000
  */
 export type Unresolved = ExtractionIssue[];
+export type Mode = "structured" | "digest" | "imported";
 export type Sourceid1 = string;
 export type Sourcerevision = number;
 export type Text = string;
@@ -296,6 +303,7 @@ export type Kind11 = "technology";
 export type Origin4 = "source" | "user";
 export type Revision9 = number;
 export type Subprojectid = string | null;
+export type Technical = boolean | null;
 export type Usercorrected7 = boolean;
 export type Evidence6 = EvidenceSpan[];
 export type Id11 = string;
@@ -389,11 +397,95 @@ export type Orderindex = number;
 export type Recordid = string;
 export type Revision20 = number;
 export type Tombstones = RecordTombstone[];
+export type Category1 =
+  ("identity" | "contacts" | "summary" | "experience" | "education" | "skills" | "languages" | "other") | null;
+/**
+ * @maxItems 1000
+ */
+export type Duplicateof = string[];
+export type Id18 = string;
+export type Kind19 = "paragraph" | "heading" | "section" | "bullet_list" | "duplicate";
+export type Listitem = boolean;
+export type Modelblock = boolean;
+export type Region = "header" | "sidebar" | "main";
+/**
+ * @maxItems 1000
+ */
+export type Sourcekeys = string[];
+export type Title1 = string | null;
+/**
+ * @maxItems 5000
+ */
+export type Blocks1 = ImportBlock[];
+export type Id19 = string;
+export type Record = (ImportEmployment | ImportEducation | ImportTechnology | ImportLanguage) | null;
+export type Employer = string;
+export type Kind20 = "employment";
+export type End = string;
+export type Present = boolean;
+export type Start = string;
+/**
+ * @maxItems 40
+ */
+export type Periods2 = ImportPeriod[];
+export type Role1 = string;
+export type Display = string;
+export type Experience1 = string;
+export type Technical1 = boolean | null;
+/**
+ * @maxItems 100
+ */
+export type Technologies = (string | ImportSkill)[];
+export type Completion = string;
+export type Institution = string;
+export type Kind21 = "education";
+export type Qualification = string;
+export type Specialty = string;
+export type Display1 = string;
+export type Experience2 = string;
+export type Kind22 = "technology";
+export type Technical2 = boolean | null;
+export type Kind23 = "language";
+export type Language = string;
+export type Level = string;
+/**
+ * @maxItems 1000
+ */
+export type Sourcekeys1 = string[];
+export type Text1 = string;
+/**
+ * @maxItems 1000
+ */
+export type Facts = ImportFact[];
+export type Finished = boolean;
+/**
+ * @maxItems 100
+ */
+export type Issues = string[];
+export type Location = string;
+export type Name = string;
+/**
+ * @maxItems 1000
+ */
+export type Sourcekeys2 = string[];
+export type Title2 = string;
+export type Batchid1 = string;
+export type Requestsha2562 = string;
+export type Sequence = number;
+/**
+ * @maxItems 128
+ */
+export type Receipts = ImportReceipt[];
+export type Runid = string;
+export type Sequence1 = number;
+export type Skillsha256 = string;
+export type Sourcesha256 = string;
+export type Version = 1;
 export type Actionid2 = string | null;
 export type Dependencies1 = DependencyStamp[];
 export type Errorcode1 = string | null;
-export type Id18 = string;
-export type Kind19 =
+export type Id20 = string;
+export type Kind24 =
   | "extract"
   | "assess_resume"
   | "normalize_semantics"
@@ -408,28 +500,43 @@ export type Selectedinput = "text" | "file";
 export type Selectedsourceid = string | null;
 export type Byteref = string;
 export type Bytesha256 = string;
-export type Id19 = string;
+export type Id21 = string;
 export type Mimetype = string;
 export type Originalname = string;
-export type Id20 = string;
+export type Id22 = string;
 export type Origin12 = "user";
 export type Revision21 = number;
-export type Text1 = string;
+export type Text2 = string;
 export type Unitid2 = string;
 export type Overlays = SourceOverlay[];
 export type Parser = string;
 export type Parserversion = string;
 export type Revision22 = number;
 export type Disposition = "shown" | "condensed" | "archived" | "duplicate" | "unresolved" | "administrative";
-export type Id21 = string;
+export type Id23 = string;
 export type Column = number | null;
 export type Index = number;
-export type Kind20 = "page" | "paragraph" | "table_cell" | "pasted";
+export type Kind25 = "page" | "paragraph" | "table_cell" | "pasted";
 export type Row = number | null;
 export type Order = number;
 export type Representedfactids = string[];
 export type Revision23 = number;
-export type Text2 = string;
+export type Blankbefore = number | null;
+export type Bold = boolean | null;
+export type Bounds = [number, number, number, number] | null;
+export type Column1 = number | null;
+export type Columnspan = number | null;
+export type Fontsize = number | null;
+export type Gapbefore = number | null;
+export type Group = number | null;
+export type Headinglevel = number | null;
+export type Indent = number | null;
+export type Layoutuncertain = boolean;
+export type Listlevel = number | null;
+export type Part = string | null;
+export type Rowmerge = ("start" | "continue") | null;
+export type Style = string | null;
+export type Text3 = string;
 export type Units = SourceUnit[];
 export type Code2 = string;
 export type Page1 = number | null;
@@ -438,7 +545,7 @@ export type Warnings = string[];
 export type Sources = Source[];
 export type Warnings1 = string[];
 export type Height = number;
-export type Id22 = string;
+export type Id24 = string;
 export type Mimetype1 = "image/png" | "image/jpeg";
 export type Path = string;
 export type Sha2561 = string;
@@ -466,13 +573,13 @@ export type Children11 = (
   | SectionBlock
 )[];
 export type Backgroundcolor = string;
-export type Bold = boolean;
+export type Bold1 = boolean;
 export type Code3 = boolean;
 export type Italic = boolean;
 export type Strike = boolean;
 export type Textcolor = string;
 export type Underline = boolean;
-export type Text3 = string;
+export type Text4 = string;
 export type Type = "text";
 export type Content1 = StyledText[];
 export type Href = string;
@@ -482,10 +589,10 @@ export type Bindingrootid = string | null;
 export type Fieldkey = string;
 export type Recordid1 = string;
 export type Syncedfactrevision = number;
-export type Text4 = string;
+export type Text5 = string;
 export type Type2 = "fact_field";
 export type Content = (StyledText | Hyperlink | FactFieldSpan)[];
-export type Id23 = string;
+export type Id25 = string;
 export type Alignment = "left" | "center" | "right" | "justify";
 export type Backgroundcolor1 = string;
 export type Presentation = "standard" | "focus";
@@ -493,22 +600,22 @@ export type Recordid2 = string | null;
 export type Textcolor1 = string;
 export type Evidence13 = EvidenceSpan[];
 export type Fieldkeys = string[];
-export type Id24 = string;
-export type Kind21 = "citation";
+export type Id26 = string;
+export type Kind26 = "citation";
 export type Recordid3 = string;
 export type Fieldkey1 = string;
-export type Id25 = string;
-export type Kind22 = "field_binding";
+export type Id27 = string;
+export type Kind27 = "field_binding";
 export type Recordid4 = string;
-export type Id26 = string;
-export type Kind23 = "working_owner";
+export type Id28 = string;
+export type Kind28 = "working_owner";
 export type Recordid5 = string;
 /**
  * @minItems 1
  */
 export type Evidence14 = [EvidenceSpan, ...EvidenceSpan[]];
-export type Id27 = string;
-export type Kind24 = "source";
+export type Id29 = string;
+export type Kind29 = "source";
 export type Provenance = (NarrativeCitation | FieldBinding | WorkingOwnership | SourceWitness)[];
 export type Revision24 = number;
 export type Type3 = "section";
@@ -527,7 +634,7 @@ export type Children10 = (
   | SectionBlock
 )[];
 export type Content2 = null;
-export type Id28 = string;
+export type Id30 = string;
 export type Alignment1 = "left" | "center" | "right";
 export type Alt = string;
 export type Assetid = string;
@@ -565,12 +672,12 @@ export type Alignment2 = "left" | "center" | "right" | "justify";
 export type Backgroundcolor2 = string;
 export type Colspan = number;
 export type Content3 = (StyledText | Hyperlink | FactFieldSpan)[];
-export type Id29 = string;
+export type Id31 = string;
 export type Revision26 = number;
 export type Rowspan = number;
 export type Cells = TableCell[];
-export type Id30 = string;
-export type Id31 = string;
+export type Id32 = string;
+export type Id33 = string;
 export type Alignment3 = "left" | "center" | "right" | "justify";
 export type Backgroundcolor3 = string;
 export type Textcolor2 = string;
@@ -592,7 +699,7 @@ export type Children8 = (
   | SectionBlock
 )[];
 export type Content4 = null;
-export type Id32 = string;
+export type Id34 = string;
 export type Provenance3 = (NarrativeCitation | FieldBinding | WorkingOwnership | SourceWitness)[];
 export type Revision28 = number;
 export type Type6 = "divider";
@@ -611,9 +718,9 @@ export type Children7 = (
   | SectionBlock
 )[];
 export type Content5 = string;
-export type Id33 = string;
+export type Id35 = string;
 export type Backgroundcolor4 = string;
-export type Language = string;
+export type Language1 = string;
 export type Provenance4 = (NarrativeCitation | FieldBinding | WorkingOwnership | SourceWitness)[];
 export type Revision29 = number;
 export type Type7 = "code";
@@ -632,7 +739,7 @@ export type Children6 = (
   | SectionBlock
 )[];
 export type Content6 = (StyledText | Hyperlink | FactFieldSpan)[];
-export type Id34 = string;
+export type Id36 = string;
 export type Provenance5 = (NarrativeCitation | FieldBinding | WorkingOwnership | SourceWitness)[];
 export type Revision30 = number;
 export type Type8 = "quote";
@@ -651,7 +758,7 @@ export type Children5 = (
   | SectionBlock
 )[];
 export type Content7 = (StyledText | Hyperlink | FactFieldSpan)[];
-export type Id35 = string;
+export type Id37 = string;
 export type Provenance6 = (NarrativeCitation | FieldBinding | WorkingOwnership | SourceWitness)[];
 export type Revision31 = number;
 export type Type9 = "toggle_list";
@@ -670,7 +777,7 @@ export type Children4 = (
   | SectionBlock
 )[];
 export type Content8 = (StyledText | Hyperlink | FactFieldSpan)[];
-export type Id36 = string;
+export type Id38 = string;
 export type Alignment4 = "left" | "center" | "right" | "justify";
 export type Backgroundcolor5 = string;
 export type Checked = boolean;
@@ -693,10 +800,10 @@ export type Children3 = (
   | SectionBlock
 )[];
 export type Content9 = (StyledText | Hyperlink | FactFieldSpan)[];
-export type Id37 = string;
+export type Id39 = string;
 export type Alignment5 = "left" | "center" | "right" | "justify";
 export type Backgroundcolor6 = string;
-export type Start = number | null;
+export type Start1 = number | null;
 export type Textcolor4 = string;
 export type Provenance8 = (NarrativeCitation | FieldBinding | WorkingOwnership | SourceWitness)[];
 export type Revision33 = number;
@@ -716,7 +823,7 @@ export type Children2 = (
   | SectionBlock
 )[];
 export type Content10 = (StyledText | Hyperlink | FactFieldSpan)[];
-export type Id38 = string;
+export type Id40 = string;
 export type Provenance9 = (NarrativeCitation | FieldBinding | WorkingOwnership | SourceWitness)[];
 export type Revision34 = number;
 export type Type12 = "bullet_list";
@@ -735,10 +842,10 @@ export type Children1 = (
   | SectionBlock
 )[];
 export type Content11 = (StyledText | Hyperlink | FactFieldSpan)[];
-export type Id39 = string;
+export type Id41 = string;
 export type Alignment6 = "left" | "center" | "right" | "justify";
 export type Backgroundcolor7 = string;
-export type Level = 1 | 2 | 3;
+export type Level1 = 1 | 2 | 3;
 export type Textcolor5 = string;
 export type Provenance10 = (NarrativeCitation | FieldBinding | WorkingOwnership | SourceWitness)[];
 export type Revision35 = number;
@@ -758,11 +865,11 @@ export type Children = (
   | SectionBlock
 )[];
 export type Content12 = (StyledText | Hyperlink | FactFieldSpan)[];
-export type Id40 = string;
+export type Id42 = string;
 export type Provenance11 = (NarrativeCitation | FieldBinding | WorkingOwnership | SourceWitness)[];
 export type Revision36 = number;
 export type Type14 = "paragraph";
-export type Blocks1 = (
+export type Blocks2 = (
   | ParagraphBlock
   | HeadingBlock
   | BulletBlock
@@ -776,13 +883,13 @@ export type Blocks1 = (
   | ImageBlock
   | SectionBlock
 )[];
-export type Id41 = string;
+export type Id43 = string;
 export type Revision37 = number;
-export type Role1 = "header" | "sidebar" | "main";
+export type Role2 = "header" | "sidebar" | "main";
 export type Revision38 = number;
 export type Schemaversion6 = 1;
 export type Evidence15 = EvidenceSpan[];
-export type Id42 = string;
+export type Id44 = string;
 export type Rawtext5 = string;
 export type Evidencerecords = ImmutableFactEvidence[];
 export type Blockids1 = string[];
@@ -798,7 +905,7 @@ export type Docxpath = string;
 export type Docxsha256 = string;
 export type Docxsize = number;
 export type Factsrevision1 = number;
-export type Id43 = string;
+export type Id45 = string;
 export type Renderersha256 = string;
 export type Rendererversion = string;
 export type Templatesha256 = string;
@@ -811,9 +918,9 @@ export type Sha2562 = string;
 export type Size1 = number;
 export type Assets1 = AssetRef[];
 export type Contentpolicyversion = string;
-export type Id44 = string;
+export type Id46 = string;
 export type Packagesha256 = string;
-export type Version = string;
+export type Version1 = string;
 export type Projectid3 = string;
 export type Projectrevision1 = number;
 export type Markdown = string;
@@ -826,9 +933,9 @@ export type Dependencies2 = DependencyStamp[];
 export type Errorcode2 = string | null;
 export type Factids = string[];
 export type Fieldkeys1 = string[];
-export type Id45 = string;
+export type Id47 = string;
 export type Instruction = string | null;
-export type Kind25 = "completion" | "rewrite" | "reconciliation" | "conflict" | "panel";
+export type Kind30 = "completion" | "rewrite" | "reconciliation" | "conflict" | "panel";
 export type Afterid = string | null;
 export type Beforerevision = number | null;
 export type Block =
@@ -845,15 +952,15 @@ export type Block =
   | ImageBlock
   | SectionBlock;
 export type Keepchildren = boolean;
-export type Kind26 = "put_block";
+export type Kind31 = "put_block";
 export type Parentid = string;
 export type Beforerevision1 = number;
 export type Blockid1 = string;
-export type Kind27 = "remove_block";
+export type Kind32 = "remove_block";
 export type Afterid1 = string | null;
 export type Beforerevision2 = number;
 export type Blockid2 = string;
-export type Kind28 = "move_block";
+export type Kind33 = "move_block";
 export type Parentid1 = string;
 export type Beforerevision3 = number;
 export type Blockid3 = string;
@@ -862,16 +969,16 @@ export type Content13 = (StyledText | Hyperlink | FactFieldSpan)[];
 /**
  * UTF-16 code units within the selected inline field.
  */
-export type End = number;
+export type End1 = number;
 export type Field = "content" | "caption";
-export type Kind29 = "replace_inline_range";
+export type Kind34 = "replace_inline_range";
 /**
  * UTF-16 code units within the selected inline field.
  */
-export type Start1 = number;
+export type Start2 = number;
 export type Beforerevision4 = number | null;
-export type Kind30 = "put_record";
-export type Record =
+export type Kind35 = "put_record";
+export type Record1 =
   | CandidateRecord
   | DetailRecord
   | EmploymentRecord
@@ -885,7 +992,7 @@ export type Record =
   | LeadershipRecord
   | UnresolvedRecord;
 export type Beforerevision5 = number;
-export type Kind31 = "remove_record";
+export type Kind36 = "remove_record";
 export type Recordid6 = string;
 /**
  * @maxItems 1000
@@ -894,7 +1001,7 @@ export type Proposedsteps = (PutBlock | RemoveBlock | MoveBlock | ReplaceInlineR
 export type Ready = boolean;
 export type Status9 = "pending" | "failed" | "conflict" | "applied" | "stale";
 export type Syncrecords = RichSyncRecord[];
-export type Title1 = string;
+export type Title3 = string;
 export type Titlemanuallyset = boolean;
 export type Updatedat1 = string;
 export type Blockids3 = string[];
@@ -905,7 +1012,7 @@ export type Sourcerevision1 = number;
 export type Unitid4 = string;
 export type Unitrevision1 = number;
 export type Evidence16 = Evidence17[];
-export type Id46 = string;
+export type Id48 = string;
 export type Page2 = number | null;
 export type Sourceid4 = string;
 export type Locations = WarningLocation[];
@@ -916,18 +1023,18 @@ export type Accountgeneration1 = number;
 export type Authority = "active" | "revoked";
 export type Executiondeadline = string;
 export type Executiongeneration2 = number;
-export type Id47 = string;
+export type Id49 = string;
 export type Jobid7 = string;
 export type Lineage2 = string;
 export type Payload = AgentPayloadReference | FixedPayloadReference | ProcessingPayloadReference;
-export type Batchid1 = string;
+export type Batchid2 = string;
 export type Conversationid = string;
-export type Kind32 = "agent_journal";
-export type Runid = string;
-export type Kind33 = "rich_sync";
+export type Kind37 = "agent_journal";
+export type Runid1 = string;
+export type Kind38 = "rich_sync";
 export type Syncid = string;
 export type Candidateid = string;
-export type Kind34 = "processing";
+export type Kind39 = "processing";
 export type Payloadbytes = number;
 export type Payloadsha2561 = string;
 export type Projectid4 = string;
@@ -943,7 +1050,7 @@ export type Assetpinssha2562 = string | null;
 export type Baserevision = number;
 export type Basesha256 = string;
 export type Checkpointedat = string;
-export type Id48 = string;
+export type Id50 = string;
 export type Incarnation1 = string;
 export type Lineage3 = string;
 export type Payloadbytes1 = number;
@@ -951,7 +1058,7 @@ export type Payloadref = string;
 export type Payloadsha2562 = string;
 export type Projectid5 = string;
 export type Schemaversion11 = 1;
-export type Sequence = number;
+export type Sequence2 = number;
 /**
  * @maxItems 100
  */
@@ -1157,6 +1264,7 @@ export interface RichGenerationState {
   errorCode: Errorcode;
   id: Id4;
   stage: Stage2;
+  startedAt?: Startedat;
   status: Status;
 }
 export interface ResumeIdentity {
@@ -1170,6 +1278,8 @@ export interface Blocks {
   [k: string]: BlockPresentation;
 }
 export interface BlockPresentation {
+  experience?: Experience;
+  experienceNote?: Experiencenote;
   logo?: Logo;
   role: Role;
 }
@@ -1186,7 +1296,7 @@ export interface WorkspaceV6 {
   schemaVersion: Schemaversion8;
   sourceObservedAt: PartialDate | null;
   syncRecords: Syncrecords;
-  title: Title1;
+  title: Title3;
   titleManuallySet: Titlemanuallyset;
   updatedAt: Updatedat1;
   warnings: Warnings2;
@@ -1204,6 +1314,7 @@ export interface RichMutationReplay {
 }
 export interface RichPreDraft {
   facts: WorkingFacts;
+  importDraft?: ImportDraft | null;
   operations: Operations;
   selectedInput: Selectedinput;
   selectedSourceId: Selectedsourceid;
@@ -1212,6 +1323,7 @@ export interface RichPreDraft {
 }
 export interface WorkingFacts {
   extraction?: ExtractionReport | null;
+  mode?: Mode;
   records: Records;
   revision: Revision19;
   tombstones: Tombstones;
@@ -1322,12 +1434,14 @@ export interface TechnologyRecord {
   canonicalId: WorkingFieldStr;
   display: WorkingFieldStr;
   evidence: Evidence5;
+  experience?: WorkingFieldStr;
   id: Id10;
   jobId: Jobid3;
   kind: Kind11;
   origin: Origin4;
   revision: Revision9;
   subprojectId: Subprojectid;
+  technical?: Technical;
   userCorrected?: Usercorrected7;
 }
 export interface EducationRecord {
@@ -1445,18 +1559,94 @@ export interface RecordTombstone {
   recordId: Recordid;
   revision: Revision20;
 }
+export interface ImportDraft {
+  blocks?: Blocks1;
+  facts?: Facts;
+  finished?: Finished;
+  issues?: Issues;
+  profile?: ImportProfile;
+  receipts?: Receipts;
+  runId: Runid;
+  sequence?: Sequence1;
+  skillSha256: Skillsha256;
+  sourceSha256: Sourcesha256;
+  version?: Version;
+}
+export interface ImportBlock {
+  category?: Category1;
+  duplicateOf?: Duplicateof;
+  id: Id18;
+  kind?: Kind19;
+  listItem?: Listitem;
+  modelBlock?: Modelblock;
+  region?: Region;
+  sourceKeys?: Sourcekeys;
+  title?: Title1;
+}
+export interface ImportFact {
+  id: Id19;
+  record?: Record;
+  sourceKeys?: Sourcekeys1;
+  text?: Text1;
+}
+export interface ImportEmployment {
+  employer?: Employer;
+  kind: Kind20;
+  periods?: Periods2;
+  role?: Role1;
+  technologies?: Technologies;
+}
+export interface ImportPeriod {
+  end?: End;
+  present?: Present;
+  start?: Start;
+}
+export interface ImportSkill {
+  display: Display;
+  experience?: Experience1;
+  technical?: Technical1;
+}
+export interface ImportEducation {
+  completion?: Completion;
+  institution?: Institution;
+  kind: Kind21;
+  qualification?: Qualification;
+  specialty?: Specialty;
+}
+export interface ImportTechnology {
+  display: Display1;
+  experience?: Experience2;
+  kind: Kind22;
+  technical?: Technical2;
+}
+export interface ImportLanguage {
+  kind: Kind23;
+  language?: Language;
+  level?: Level;
+}
+export interface ImportProfile {
+  location?: Location;
+  name?: Name;
+  sourceKeys?: Sourcekeys2;
+  title?: Title2;
+}
+export interface ImportReceipt {
+  batchId: Batchid1;
+  requestSha256: Requestsha2562;
+  sequence: Sequence;
+}
 export interface RichOperation {
   actionId: Actionid2;
   dependencies: Dependencies1;
   errorCode: Errorcode1;
-  id: Id18;
-  kind: Kind19;
+  id: Id20;
+  kind: Kind24;
   status: Status8;
 }
 export interface Source {
   byteRef: Byteref;
   byteSha256: Bytesha256;
-  id: Id19;
+  id: Id21;
   mimeType: Mimetype;
   originalName: Originalname;
   overlays: Overlays;
@@ -1468,26 +1658,47 @@ export interface Source {
   warnings: Warnings;
 }
 export interface SourceOverlay {
-  id: Id20;
+  id: Id22;
   origin: Origin12;
   revision: Revision21;
-  text: Text1;
+  text: Text2;
   unitId: Unitid2;
 }
 export interface SourceUnit {
   disposition: Disposition;
-  id: Id21;
+  id: Id23;
   location: SourceLocation;
   order: Order;
   representedFactIds: Representedfactids;
   revision: Revision23;
-  text: Text2;
+  structure?: SourceStructure | null;
+  text: Text3;
 }
 export interface SourceLocation {
   column: Column;
   index: Index;
-  kind: Kind20;
+  kind: Kind25;
   row: Row;
+}
+/**
+ * Observed layout cues, never semantic resume fields.
+ */
+export interface SourceStructure {
+  blankBefore?: Blankbefore;
+  bold?: Bold;
+  bounds?: Bounds;
+  column?: Column1;
+  columnSpan?: Columnspan;
+  fontSize?: Fontsize;
+  gapBefore?: Gapbefore;
+  group?: Group;
+  headingLevel?: Headinglevel;
+  indent?: Indent;
+  layoutUncertain?: Layoutuncertain;
+  listLevel?: Listlevel;
+  part?: Part;
+  rowMerge?: Rowmerge;
+  style?: Style;
 }
 export interface SourceWarning {
   code: Code2;
@@ -1510,7 +1721,7 @@ export interface ProjectV5 {
 }
 export interface LocalImageAsset {
   height: Height;
-  id: Id22;
+  id: Id24;
   mimeType: Mimetype1;
   path: Path;
   sha256: Sha2561;
@@ -1523,15 +1734,15 @@ export interface RichDocumentV1 {
   schemaVersion: Schemaversion6;
 }
 export interface RichRegion {
-  blocks: Blocks1;
-  id: Id41;
+  blocks: Blocks2;
+  id: Id43;
   revision: Revision37;
-  role: Role1;
+  role: Role2;
 }
 export interface ParagraphBlock {
   children: Children;
   content: Content12;
-  id: Id40;
+  id: Id42;
   props: ParagraphProps;
   provenance: Provenance11;
   revision: Revision36;
@@ -1540,7 +1751,7 @@ export interface ParagraphBlock {
 export interface HeadingBlock {
   children: Children1;
   content: Content11;
-  id: Id39;
+  id: Id41;
   props: HeadingProps;
   provenance: Provenance10;
   revision: Revision35;
@@ -1549,7 +1760,7 @@ export interface HeadingBlock {
 export interface BulletBlock {
   children: Children2;
   content: Content10;
-  id: Id38;
+  id: Id40;
   props: ParagraphProps;
   provenance: Provenance9;
   revision: Revision34;
@@ -1558,7 +1769,7 @@ export interface BulletBlock {
 export interface NumberedBlock {
   children: Children3;
   content: Content9;
-  id: Id37;
+  id: Id39;
   props: NumberedProps;
   provenance: Provenance8;
   revision: Revision33;
@@ -1567,7 +1778,7 @@ export interface NumberedBlock {
 export interface ChecklistBlock {
   children: Children4;
   content: Content8;
-  id: Id36;
+  id: Id38;
   props: ChecklistProps;
   provenance: Provenance7;
   revision: Revision32;
@@ -1576,7 +1787,7 @@ export interface ChecklistBlock {
 export interface ToggleBlock {
   children: Children5;
   content: Content7;
-  id: Id35;
+  id: Id37;
   props: ParagraphProps;
   provenance: Provenance6;
   revision: Revision31;
@@ -1585,7 +1796,7 @@ export interface ToggleBlock {
 export interface QuoteBlock {
   children: Children6;
   content: Content6;
-  id: Id34;
+  id: Id36;
   props: ParagraphProps;
   provenance: Provenance5;
   revision: Revision30;
@@ -1594,7 +1805,7 @@ export interface QuoteBlock {
 export interface CodeBlock {
   children: Children7;
   content: Content5;
-  id: Id33;
+  id: Id35;
   props: CodeProps;
   provenance: Provenance4;
   revision: Revision29;
@@ -1603,7 +1814,7 @@ export interface CodeBlock {
 export interface DividerBlock {
   children: Children8;
   content: Content4;
-  id: Id32;
+  id: Id34;
   props: EmptyProps;
   provenance: Provenance3;
   revision: Revision28;
@@ -1612,7 +1823,7 @@ export interface DividerBlock {
 export interface TableBlock {
   children: Children9;
   content: TableContent;
-  id: Id31;
+  id: Id33;
   props: ParagraphProps;
   provenance: Provenance2;
   revision: Revision27;
@@ -1621,7 +1832,7 @@ export interface TableBlock {
 export interface ImageBlock {
   children: Children10;
   content: Content2;
-  id: Id28;
+  id: Id30;
   props: ImageProps;
   provenance: Provenance1;
   revision: Revision25;
@@ -1630,7 +1841,7 @@ export interface ImageBlock {
 export interface SectionBlock {
   children: Children11;
   content: Content;
-  id: Id23;
+  id: Id25;
   props: SectionProps;
   provenance: Provenance;
   revision: Revision24;
@@ -1638,12 +1849,12 @@ export interface SectionBlock {
 }
 export interface StyledText {
   styles: InlineStyles;
-  text: Text3;
+  text: Text4;
   type: Type;
 }
 export interface InlineStyles {
   backgroundColor?: Backgroundcolor;
-  bold?: Bold;
+  bold?: Bold1;
   code?: Code3;
   italic?: Italic;
   strike?: Strike;
@@ -1662,7 +1873,7 @@ export interface FactFieldSpan {
   recordId: Recordid1;
   styles: InlineStyles;
   syncedFactRevision: Syncedfactrevision;
-  text: Text4;
+  text: Text5;
   type: Type2;
 }
 export interface SectionProps {
@@ -1675,25 +1886,25 @@ export interface SectionProps {
 export interface NarrativeCitation {
   evidence: Evidence13;
   fieldKeys: Fieldkeys;
-  id: Id24;
-  kind: Kind21;
+  id: Id26;
+  kind: Kind26;
   recordId: Recordid3;
 }
 export interface FieldBinding {
   fieldKey: Fieldkey1;
-  id: Id25;
-  kind: Kind22;
+  id: Id27;
+  kind: Kind27;
   recordId: Recordid4;
 }
 export interface WorkingOwnership {
-  id: Id26;
-  kind: Kind23;
+  id: Id28;
+  kind: Kind28;
   recordId: Recordid5;
 }
 export interface SourceWitness {
   evidence: Evidence14;
-  id: Id27;
-  kind: Kind24;
+  id: Id29;
+  kind: Kind29;
 }
 export interface ImageProps {
   alignment: Alignment1;
@@ -1711,14 +1922,14 @@ export interface TableContent {
 }
 export interface TableRow {
   cells: Cells;
-  id: Id30;
+  id: Id32;
 }
 export interface TableCell {
   alignment?: Alignment2;
   backgroundColor?: Backgroundcolor2;
   colspan?: Colspan;
   content: Content3;
-  id: Id29;
+  id: Id31;
   revision: Revision26;
   rowspan?: Rowspan;
 }
@@ -1730,7 +1941,7 @@ export interface ParagraphProps {
 export interface EmptyProps {}
 export interface CodeProps {
   backgroundColor?: Backgroundcolor4;
-  language: Language;
+  language: Language1;
 }
 export interface ChecklistProps {
   alignment?: Alignment4;
@@ -1741,18 +1952,18 @@ export interface ChecklistProps {
 export interface NumberedProps {
   alignment?: Alignment5;
   backgroundColor?: Backgroundcolor6;
-  start?: Start;
+  start?: Start1;
   textColor?: Textcolor4;
 }
 export interface HeadingProps {
   alignment?: Alignment6;
   backgroundColor?: Backgroundcolor7;
-  level: Level;
+  level: Level1;
   textColor?: Textcolor5;
 }
 export interface ImmutableFactEvidence {
   evidence: Evidence15;
-  id: Id42;
+  id: Id44;
   rawText: Rawtext5;
 }
 export interface ImportCoverage {
@@ -1768,7 +1979,7 @@ export interface RichRenderSnapshot {
   docxSha256: Docxsha256;
   docxSize: Docxsize;
   factsRevision: Factsrevision1;
-  id: Id43;
+  id: Id45;
   rendererSha256: Renderersha256;
   rendererVersion: Rendererversion;
   templateSha256: Templatesha256;
@@ -1776,9 +1987,9 @@ export interface RichRenderSnapshot {
 export interface TemplateManifest {
   assets: Assets1;
   contentPolicyVersion: Contentpolicyversion;
-  id: Id44;
+  id: Id46;
   packageSha256: Packagesha256;
-  version: Version;
+  version: Version1;
 }
 export interface AssetRef {
   path: Path1;
@@ -1797,9 +2008,9 @@ export interface RichSyncRecord {
   errorCode: Errorcode2;
   factIds: Factids;
   fieldKeys: Fieldkeys1;
-  id: Id45;
+  id: Id47;
   instruction?: Instruction;
-  kind?: Kind25;
+  kind?: Kind30;
   proposedSteps?: Proposedsteps;
   ready?: Ready;
   selection?: RichSelection | null;
@@ -1810,19 +2021,19 @@ export interface PutBlock {
   beforeRevision: Beforerevision;
   block: Block;
   keepChildren?: Keepchildren;
-  kind: Kind26;
+  kind: Kind31;
   parentId: Parentid;
 }
 export interface RemoveBlock {
   beforeRevision: Beforerevision1;
   blockId: Blockid1;
-  kind: Kind27;
+  kind: Kind32;
 }
 export interface MoveBlock {
   afterId: Afterid1;
   beforeRevision: Beforerevision2;
   blockId: Blockid2;
-  kind: Kind28;
+  kind: Kind33;
   parentId: Parentid1;
 }
 export interface ReplaceInlineRange {
@@ -1830,19 +2041,19 @@ export interface ReplaceInlineRange {
   blockId: Blockid3;
   cellId: Cellid1;
   content: Content13;
-  end: End;
+  end: End1;
   field: Field;
-  kind: Kind29;
-  start: Start1;
+  kind: Kind34;
+  start: Start2;
 }
 export interface PutRecord {
   beforeRevision: Beforerevision4;
-  kind: Kind30;
-  record: Record;
+  kind: Kind35;
+  record: Record1;
 }
 export interface RemoveRecord {
   beforeRevision: Beforerevision5;
-  kind: Kind31;
+  kind: Kind36;
   recordId: Recordid6;
 }
 export interface RichWarning {
@@ -1850,7 +2061,7 @@ export interface RichWarning {
   code: Code4;
   count?: Count;
   evidence: Evidence16;
-  id: Id46;
+  id: Id48;
   locations?: Locations;
   recordIds: Recordids;
 }
@@ -1871,7 +2082,7 @@ export interface ProposalBindingV1 {
   executionDeadline: Executiondeadline;
   executionGeneration: Executiongeneration2;
   guards: ScopeGuardV1;
-  id: Id47;
+  id: Id49;
   jobId: Jobid7;
   lineage: Lineage2;
   payload: Payload;
@@ -1884,18 +2095,18 @@ export interface ProposalBindingV1 {
   turnId: Turnid;
 }
 export interface AgentPayloadReference {
-  batchId: Batchid1;
+  batchId: Batchid2;
   conversationId: Conversationid;
-  kind: Kind32;
-  runId: Runid;
+  kind: Kind37;
+  runId: Runid1;
 }
 export interface FixedPayloadReference {
-  kind: Kind33;
+  kind: Kind38;
   syncId: Syncid;
 }
 export interface ProcessingPayloadReference {
   candidateId: Candidateid;
-  kind: Kind34;
+  kind: Kind39;
 }
 export interface WriterViewV1 {
   canonicalReady: Canonicalready;
@@ -1915,7 +2126,7 @@ export interface DraftCheckpointV1 {
   baseRevision: Baserevision;
   baseSha256: Basesha256;
   checkpointedAt: Checkpointedat;
-  id: Id48;
+  id: Id50;
   incarnation: Incarnation1;
   lineage: Lineage3;
   payloadBytes: Payloadbytes1;
@@ -1923,7 +2134,7 @@ export interface DraftCheckpointV1 {
   payloadSha256: Payloadsha2562;
   projectId: Projectid5;
   schemaVersion: Schemaversion11;
-  sequence: Sequence;
+  sequence: Sequence2;
   touches: Touches;
   writerEpoch: Writerepoch1;
 }

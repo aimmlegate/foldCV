@@ -14,6 +14,9 @@ from zipfile import BadZipFile, ZipFile
 import pymupdf
 
 from .models import ExtractGap, ExtractLink, ExtractLocation, ExtractResult, ExtractUnit
+from .pdf_layout import page_blocks
+from .docx_structure import ParagraphStyles, number
+from packages.resume_core.models.contracts import SourceStructure
 
 MAX_SOURCE = 6 * 1024 * 1024
 MAX_PAGES = 40
@@ -42,14 +45,15 @@ class Collected:
         self.text_bytes = 0
         self.text_chars = 0
 
-    def add(self, text: str, location: ExtractLocation) -> None:
+    def add(self, text: str, location: ExtractLocation, structure: SourceStructure | None = None) -> None:
         size = len(text.encode("utf-8"))
         if len(self.units) >= MAX_UNITS:
             raise ExtractFailure("EXTRACT_UNIT_LIMIT")
         if self.text_bytes + size > MAX_TEXT_BYTES or self.text_chars + len(text) > MAX_TEXT_CHARS:
             raise ExtractFailure("EXTRACT_TEXT_LIMIT")
         order = len(self.units)
-        self.units.append(ExtractUnit(id=f"unit_{order + 1}", order=order, text=text, location=location))
+        self.units.append(ExtractUnit(id=f"unit_{order + 1}", order=order, text=text,
+                                      location=location, structure=structure))
         self.text_bytes += size
         self.text_chars += len(text)
 
@@ -70,8 +74,22 @@ def _text_lines(data: bytes, kind: str, out: Collected) -> None:
         out.add("", ExtractLocation(kind="pasted" if kind == "paste" else "paragraph", paragraph=0))
         out.gap("NO_TEXT", out.units[0].location)
         return
+    blank_before = 0
+    fence = None
     for index, line in enumerate(text.splitlines(keepends=True)):
-        out.add(line, ExtractLocation(kind="pasted" if kind == "paste" else "paragraph", paragraph=index))
+        expanded = line.expandtabs(4)
+        indent = len(expanded) - len(expanded.lstrip(" "))
+        heading = re.match(r" {0,3}(#{1,6})\s+", line) if kind == "markdown" and fence is None else None
+        marker = re.match(r" {0,3}(`{3,}|~{3,})(.*)", line) if kind == "markdown" else None
+        if marker:
+            if fence is None:
+                fence = marker[1]
+            elif marker[1][0] == fence[0] and len(marker[1]) >= len(fence) and not marker[2].strip():
+                fence = None
+        out.add(line, ExtractLocation(kind="pasted" if kind == "paste" else "paragraph", paragraph=index),
+                SourceStructure(indent=indent, blank_before=blank_before,
+                                heading_level=len(heading[1]) if heading else None))
+        blank_before = blank_before + 1 if not line.strip() else 0
 
 
 def _pdf(data: bytes, out: Collected) -> int:
@@ -87,26 +105,17 @@ def _pdf(data: bytes, out: Collected) -> int:
             raise ExtractFailure("EXTRACT_PAGE_LIMIT")
         for page_number in range(1, doc.page_count + 1):
             page = doc.load_page(page_number - 1)
-            blocks = page.get_text("blocks", sort=False)
             visible_text = False
-            image_seen = False
-            for index, block in enumerate(blocks):
+            for text, index, structure in page_blocks(page):
                 location = ExtractLocation(kind="page", page=page_number, paragraph=index)
-                if len(block) >= 7 and block[6] == 1:
-                    out.gap("IMAGE", ExtractLocation(kind="image", page=page_number, paragraph=index))
-                    image_seen = True
-                    continue
-                if len(block) < 5 or not isinstance(block[4], str):
-                    continue
-                text = block[4]
                 if text:
-                    out.add(text, location)
+                    out.add(text, location, structure)
                     visible_text = visible_text or bool(text.strip())
             if not visible_text:
                 location = ExtractLocation(kind="page", page=page_number)
                 out.add("", location)
                 out.gap("NO_TEXT", location)
-            if not image_seen and page.get_images(full=True):
+            if page.get_image_info():
                 out.gap("IMAGE", ExtractLocation(kind="image", page=page_number))
         return doc.page_count
     except ExtractFailure:
@@ -235,9 +244,12 @@ def _paragraph_text(paragraph: ET.Element) -> str:
     return "".join(parts)
 
 
-def _paragraph(paragraph: ET.Element, location: ExtractLocation, out: Collected) -> None:
+def _paragraph(paragraph: ET.Element, location: ExtractLocation, out: Collected,
+               styles: ParagraphStyles, *, column_span=None, row_merge=None) -> None:
     text = _paragraph_text(paragraph)
-    out.add(text, location)
+    structure = styles.hints(paragraph, location.part)
+    structure.column_span, structure.row_merge = column_span, row_merge
+    out.add(text, location, structure)
     tags = {node.tag.rsplit("}", 1)[-1] for node in paragraph.iter()}
     if "txbxContent" in tags:
         out.gap("TEXT_BOX", location)
@@ -247,7 +259,7 @@ def _paragraph(paragraph: ET.Element, location: ExtractLocation, out: Collected)
         out.gap("IMAGE", location)
 
 
-def _table(table: ET.Element, index: int, out: Collected, part: str | None = None) -> None:
+def _table(table: ET.Element, index: int, out: Collected, styles: ParagraphStyles, part: str | None = None) -> None:
     row_index = 0
     for table_child in table:
         if table_child.tag in {W + "tblPr", W + "tblGrid"}:
@@ -255,7 +267,8 @@ def _table(table: ET.Element, index: int, out: Collected, part: str | None = Non
         if table_child.tag != W + "tr":
             out.gap("UNSUPPORTED_CONTENT", ExtractLocation(kind="table_cell", table=index, part=part))
             continue
-        column = 0
+        before = table_child.find(W + "trPr/" + W + "gridBefore")
+        column = number(before.get(W + "val") if before is not None else None, 0, 1000) or 0
         for row_child in table_child:
             if row_child.tag in {W + "trPr", W + "tblPrEx"}:
                 continue
@@ -264,17 +277,21 @@ def _table(table: ET.Element, index: int, out: Collected, part: str | None = Non
                                                                  row=row_index, part=part))
                 continue
             paragraph_index = 0
+            span = row_child.find(W + "tcPr/" + W + "gridSpan")
+            column_span = number(span.get(W + "val") if span is not None else None, 1, 1000) or 1
+            merge = row_child.find(W + "tcPr/" + W + "vMerge")
+            row_merge = ("start" if merge.get(W + "val") == "restart" else "continue") if merge is not None else None
             for cell_child in row_child:
                 if cell_child.tag == W + "tcPr":
                     continue
                 location = ExtractLocation(kind="table_cell", table=index, row=row_index,
                                            column=column, paragraph=paragraph_index, part=part)
                 if cell_child.tag == W + "p":
-                    _paragraph(cell_child, location, out)
+                    _paragraph(cell_child, location, out, styles, column_span=column_span, row_merge=row_merge)
                     paragraph_index += 1
                 else:
                     out.gap("UNSUPPORTED_CONTENT", location)
-            column += 1
+            column += column_span
         row_index += 1
 
 
@@ -285,6 +302,7 @@ def _docx(data: bytes, out: Collected) -> None:
     except BadZipFile:
         raise ExtractFailure("EXTRACT_MALFORMED") from None
     document = _check_xml(contents["word/document.xml"])
+    styles = ParagraphStyles(_check_xml(contents["word/styles.xml"]) if "word/styles.xml" in contents else None)
     body = document.find(W + "body")
     if body is None:
         raise ExtractFailure("EXTRACT_MALFORMED")
@@ -292,10 +310,10 @@ def _docx(data: bytes, out: Collected) -> None:
     table_index = 0
     for child in body:
         if child.tag == W + "p":
-            _paragraph(child, ExtractLocation(kind="paragraph", paragraph=paragraph_index, part="word/document.xml"), out)
+            _paragraph(child, ExtractLocation(kind="paragraph", paragraph=paragraph_index, part="word/document.xml"), out, styles)
             paragraph_index += 1
         elif child.tag == W + "tbl":
-            _table(child, table_index, out, "word/document.xml")
+            _table(child, table_index, out, styles, "word/document.xml")
             table_index += 1
         elif child.tag != W + "sectPr":
             out.gap("UNSUPPORTED_CONTENT", ExtractLocation(kind="paragraph", paragraph=paragraph_index, part="word/document.xml"))
@@ -311,10 +329,10 @@ def _docx(data: bytes, out: Collected) -> None:
             table_index = 0
             for child in root:
                 if child.tag == W + "p":
-                    _paragraph(child, ExtractLocation(kind=kind, paragraph=paragraph_index, part=name), out)
+                    _paragraph(child, ExtractLocation(kind=kind, paragraph=paragraph_index, part=name), out, styles)
                     paragraph_index += 1
                 elif child.tag == W + "tbl":
-                    _table(child, table_index, out, name)
+                    _table(child, table_index, out, styles, name)
                     table_index += 1
                 else:
                     out.gap("UNSUPPORTED_CONTENT", ExtractLocation(kind=kind, paragraph=paragraph_index, part=name))
@@ -329,16 +347,16 @@ def extract(data: bytes, original_name: str, pasted: bool = False) -> ExtractRes
         raise ExtractFailure("EXTRACT_EMPTY" if not data else "INPUT_TOO_LARGE")
     extension = PurePosixPath(original_name).suffix.lower()
     if pasted:
-        kind, mime, parser, version = "paste", "text/plain", "utf8", "1"
+        kind, mime, parser, version = "paste", "text/plain", "utf8", "2"
     elif extension in {".doc", ".docm", ".dot", ".dotm"}:
         raise ExtractFailure("EXTRACT_UNSUPPORTED")
     elif extension == ".pdf" and data.startswith(b"%PDF-"):
-        kind, mime, parser, version = "pdf", "application/pdf", "pymupdf", pymupdf.VersionBind
+        kind, mime, parser, version = "pdf", "application/pdf", "pymupdf", pymupdf.VersionBind + "/layout2"
     elif extension == ".docx" and data.startswith(b"PK\x03\x04"):
-        kind, mime, parser, version = "docx", "application/vnd.openxmlformats-officedocument.wordprocessingml.document", "ooxml", "1"
+        kind, mime, parser, version = "docx", "application/vnd.openxmlformats-officedocument.wordprocessingml.document", "ooxml", "2"
     elif extension in {".txt", ".md", ".markdown"} and not data.startswith((b"%PDF-", b"PK\x03\x04", b"\xd0\xcf\x11\xe0")):
         kind = "markdown" if extension in {".md", ".markdown"} else "txt"
-        mime, parser, version = "text/markdown" if kind == "markdown" else "text/plain", "utf8", "1"
+        mime, parser, version = "text/markdown" if kind == "markdown" else "text/plain", "utf8", "2"
     else:
         raise ExtractFailure("EXTRACT_UNSUPPORTED")
     out = Collected()

@@ -17,6 +17,7 @@ import type { RulesSettings } from "../contracts/generated/rules_settings";
 import type { SaveRulesRequest } from "../contracts/generated/save_rules_request";
 import type { GuiExportRequest } from "../contracts/generated/gui_export_request";
 import type { Preferences } from "../contracts/generated/preferences";
+import type { SaveImportModelPreference } from "../contracts/generated/save_import_model_preference";
 import { validateContract } from "../contracts/validate";
 
 export type Workspace = GuiProjectResponse["workspace"];
@@ -32,7 +33,7 @@ function errorCode(value: unknown): string {
   return typeof error === "object" && error !== null && "code" in error && typeof error.code === "string"
     ? error.code : "REQUEST_FAILED";
 }
-async function request(path: string, method = "GET", body?: GuiCreateProjectRequest | GuiStartGenerationRequest | SourceContextRequest | GuiRewriteRequest | GuiExportRequest | GuiAnalysisRequest | SaveAnalysisPreference | GuiDeleteProjectRequest | GuiRenameProjectRequest | SaveRulesRequest | Mutation | Record<string, never> | FormData): Promise<unknown> {
+async function request(path: string, method = "GET", body?: GuiCreateProjectRequest | GuiStartGenerationRequest | SourceContextRequest | GuiRewriteRequest | GuiExportRequest | GuiAnalysisRequest | SaveAnalysisPreference | SaveImportModelPreference | GuiDeleteProjectRequest | GuiRenameProjectRequest | SaveRulesRequest | Mutation | Record<string, never> | FormData): Promise<unknown> {
   const init: RequestInit = { method, credentials: "same-origin", cache: "no-store" };
   if (body instanceof FormData) init.body = body;
   else if (body !== undefined) { init.body = JSON.stringify(body); init.headers = { "Content-Type": "application/json" }; }
@@ -83,6 +84,11 @@ export async function saveRulesRequest(body: SaveRulesRequest): Promise<RulesSet
   return value;
 }
 function isPreferences(value: unknown): value is Preferences { return validateContract("preferences", value); }
+export async function saveImportModelRequest(model: string | null): Promise<Preferences> {
+  const value = await request("/v1/settings/import-model", "PUT", { model });
+  if (!isPreferences(value)) throw new Error("Invalid preferences response");
+  return value;
+}
 export async function preferencesRequest(automaticAnalysis?: boolean): Promise<Preferences> {
   const value = automaticAnalysis === undefined ? await request("/v1/settings/preferences")
     : await request("/v1/settings/preferences", "PUT", { automaticAnalysis });

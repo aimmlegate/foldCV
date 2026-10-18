@@ -1,0 +1,23 @@
+{
+  "additionalProperties": false,
+  "properties": {
+    "model": {
+      "anyOf": [
+        {
+          "maxLength": 80,
+          "pattern": "^[a-zA-Z0-9][a-zA-Z0-9._-]{0,79}$",
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "title": "Model"
+    }
+  },
+  "required": [
+    "model"
+  ],
+  "title": "SaveImportModelPreference",
+  "type": "object"
+}

@@ -249,13 +249,18 @@ def test_check_only_capture_cannot_acquire_write_tools_or_use_interactive_admiss
 def test_job_tool_capture_uses_the_actual_bound_mcp_names():
     sys.path.insert(0, str(ROOT / "services/api/src"))
     from resume_api.agent.tools import TOOL_NAMES
-    assert set(get_args(Tool)) == set(TOOL_NAMES)
+    from packages.resume_core.models.importing import IMPORT_TOOLS
+    assert set(get_args(Tool)) == set(TOOL_NAMES) | set(IMPORT_TOOLS)
     value = submission()
     value["tools"].append("read_public_page")
     with pytest.raises(ValidationError, match="web-disabled"):
         JobSubmissionV1.model_validate(value)
     value["allowWeb"] = True
     JobSubmissionV1.model_validate(value)
+    for name in IMPORT_TOOLS:
+        denied = {**value, "tools": [*value["tools"], name]}
+        with pytest.raises(ValidationError, match="import tools are restricted"):
+            JobSubmissionV1.model_validate(denied)
 
 
 @pytest.mark.parametrize("fault", ["none", "foreign-project", "duplicate-request", "missing-request", "changed-hash",

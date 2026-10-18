@@ -48,6 +48,7 @@ from packages.resume_core.rules import PRESET_HEADINGS, RulesFailure, RulesStore
 from packages.resume_core.models.recovery import SaveRulesRequest, RulesSettingsError, RulesSettings
 from .gui_projects import GuiProjectService, ProjectFailure
 from packages.resume_core.preferences import PreferencesStore, PreferencesFailure
+from packages.resume_core.models.recovery import SaveImportModelPreference
 from packages.resume_core.project_store import ProjectStore
 from .gui_routes import mount_projects
 from .inference_admission import INFERENCE, AdmissionBlocked, AdmissionTimeout, AdmissionCancelled
@@ -341,14 +342,14 @@ def create_app(*, origin: str, secret: str, temp_root: Path, dist: Path, runner:
     connection_epoch = 0
     connection_namespace = secrets.token_hex(12)
 
-    def experimental_authorized() -> bool:
+    def experimental_authorized(model=None) -> bool:
         return (experimental_profile is not None and not unsafe_cleanup and not INFERENCE.blocked
                 and connection_state.state == "connected" and connection_state.metadataReady
                 and connection_state.quota.state == "available"
-                and connection_state.selectedModel in connection_state.models)
+                and (model or connection_state.selectedModel) in connection_state.models)
 
-    def experimental_ready() -> bool:
-        return (experimental_authorized()
+    def experimental_ready(model=None) -> bool:
+        return (experimental_authorized(model)
                 and not any(not task.done() for task in connection_work))
 
     def accepted_operation_valid(epoch: int) -> bool:
@@ -406,6 +407,21 @@ def create_app(*, origin: str, secret: str, temp_root: Path, dist: Path, runner:
 
     gui_options = {"clock": gui_clock} if gui_clock is not None else {}
     preferences_store = PreferencesStore(rules_store.root)
+    def import_selected_provider():
+        try:
+            model = preferences_store.load().selected_import_model
+        except PreferencesFailure as error:
+            raise ProjectFailure(error.code, 409) from None
+        if model is None:
+            return gui_selected_provider()
+        if not connection_state.metadataReady or model not in connection_state.models:
+            raise ProjectFailure("MODEL_DENIED", 409)
+        if gui_provider is not None and not unsafe_cleanup:
+            return gui_provider, model
+        if experimental_ready(model) and provider is not None:
+            return provider, model
+        return None
+
     gui_projects = GuiProjectService(temp_root, rules_store, gui_selected_provider,
         worker_slot=gui_worker_slot, cleanup_error=lifecycle_code,
         renderer=gui_renderer or GuiDocxRenderer(executor=render_executor),
@@ -415,6 +431,7 @@ def create_app(*, origin: str, secret: str, temp_root: Path, dist: Path, runner:
     from .rich_projects import RichProjectService
     from .rich_routes import mount_rich_projects
     rich_projects = RichProjectService(temp_root, rules_store, gui_selected_provider,
+        import_provider_factory=import_selected_provider,
         worker_slot=gui_worker_slot, cleanup_error=lifecycle_code, preferences=preferences_store,
         renderer=RichDocxRenderer(executor=render_executor), **gui_options)
     app.state.rich_projects = rich_projects
@@ -1046,6 +1063,18 @@ def create_app(*, origin: str, secret: str, temp_root: Path, dist: Path, runner:
             return JSONResponse(value.model_dump(mode="json", by_alias=True), headers={"Cache-Control": "no-store"})
         except (PreferencesFailure, RulesFailure, ProjectFailure) as error:
             return problem(error.code, 409, "settings")
+
+    @app.put("/v1/settings/import-model")
+    async def save_import_model(payload: SaveImportModelPreference):
+        async with gate:
+            if payload.model is not None and (not connection_state.metadataReady or payload.model not in connection_state.models):
+                return problem("MODEL_DENIED", 409, "settings")
+            try:
+                rules_store.load()
+                value = preferences_store.select_import_model(payload.model)
+                return JSONResponse(value.model_dump(mode="json", by_alias=True), headers={"Cache-Control": "no-store"})
+            except (PreferencesFailure, RulesFailure) as error:
+                return problem(error.code, 409, "settings")
 
     async def connection_job(kind: str, work):
         nonlocal active, connection_epoch, connection_state, login_task

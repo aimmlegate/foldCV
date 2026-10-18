@@ -488,6 +488,7 @@ export type Kind18 = "technology";
 export type Origin4 = "source" | "user";
 export type Revision22 = number;
 export type Subprojectid = string | null;
+export type Technical = boolean | null;
 export type Usercorrected7 = boolean;
 export type Evidence8 = EvidenceSpan[];
 export type Id26 = string;
@@ -1020,12 +1021,14 @@ export interface TechnologyRecord {
   canonicalId: WorkingFieldStr;
   display: WorkingFieldStr;
   evidence: Evidence7;
+  experience?: WorkingFieldStr;
   id: Id25;
   jobId: Jobid1;
   kind: Kind18;
   origin: Origin4;
   revision: Revision22;
   subprojectId: Subprojectid;
+  technical?: Technical;
   userCorrected?: Usercorrected7;
 }
 export interface EducationRecord {

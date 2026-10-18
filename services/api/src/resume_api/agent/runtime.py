@@ -99,6 +99,7 @@ class RuntimeInput:
     child_started: Callable[[], None] = lambda: None
     job_id: str | None = None
     cancelled: asyncio.Event | None = None
+    reasoning_effort: str = "medium"
 
 
 @dataclass
@@ -240,7 +241,8 @@ class NativeSession:
         return self.request("thread/start", {"model": self.value.model, "cwd": str(self.operation),
             "ephemeral": True, "allowProviderModelFallback": False, "approvalPolicy": "never",
             "approvalsReviewer": "user", "sandbox": "read-only", "baseInstructions": BASE_INSTRUCTIONS,
-            "developerInstructions": self.value.developer_instructions, "environments": [], "runtimeWorkspaceRoots": []})
+            "developerInstructions": self.value.developer_instructions, "environments": [], "runtimeWorkspaceRoots": [],
+            "config": {"model_reasoning_effort": self.value.reasoning_effort}})
 
     def accept(self, raw):
         message = strict_json(raw, max_bytes=2 * 1024 * 1024)
@@ -285,7 +287,7 @@ class NativeSession:
             selected = next((item for item in result.get("data", []) if item.get("model") == self.value.model), None)
             if selected is None:
                 raise AgentFailure("AGENT_MODEL_UNAVAILABLE")
-            if "medium" not in {part.get("reasoningEffort") for part in selected.get("supportedReasoningEfforts", [])}:
+            if self.value.reasoning_effort not in {part.get("reasoningEffort") for part in selected.get("supportedReasoningEfforts", [])}:
                 raise AgentFailure("AGENT_MODEL_INCOMPATIBLE")
             self.model_metadata = selected
             return self.ready_thread()
@@ -294,7 +296,7 @@ class NativeSession:
             if (result.get("model") != self.value.model or result.get("modelProvider") != "openai"
                     or result.get("approvalPolicy") != "never" or result.get("approvalsReviewer") != "user"
                     or result.get("sandbox", {}).get("type") != "readOnly" or result.get("instructionSources")
-                    or result.get("runtimeWorkspaceRoots") or result.get("reasoningEffort") != "medium"):
+                    or result.get("runtimeWorkspaceRoots") or result.get("reasoningEffort") != self.value.reasoning_effort):
                 raise AgentFailure("AGENT_RUNTIME_UNSUPPORTED")
             return self.request("mcpServerStatus/list", {"threadId": self.thread})
         if operation == "mcpServerStatus/list":
@@ -309,7 +311,7 @@ class NativeSession:
             self.value.before_start()
             self.active_started = self.clock()
             self.result.native_started = True
-            return self.request("turn/start", {"threadId": self.thread, "effort": "medium", "summary": "none",
+            return self.request("turn/start", {"threadId": self.thread, "effort": self.value.reasoning_effort, "summary": "none",
                 "input": [{"type": "text", "text": self.value.prompt}]})
         if operation == "turn/start":
             turn = result.get("turn", {})
@@ -571,6 +573,7 @@ class CodexAgentRuntime:
                     "nativePid": native_pid, "hostPids": list(host_pids), "operation": str(operation_path) if operation_path else None,
                     "operationRemoved": operation_path is None or not operation_path.exists(), "framedStdoutBytes": raw_bytes,
                     "normalizedBytes": session.normalized if session else 0, "state": result.state, "error": result.error,
+                    "model": value.model, "reasoningEffort": value.reasoning_effort,
                     "nativeStarted": result.native_started, "toolCalls": result.tool_calls, "webActions": result.web_actions,
                     "usage": result.usage.model_dump(by_alias=True) if result.usage else None, "timings": result.timings})
         return result

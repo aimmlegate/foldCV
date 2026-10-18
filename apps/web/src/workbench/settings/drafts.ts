@@ -4,11 +4,12 @@ import type { AgentSettings } from "../../contracts/generated/agent_settings";
 import type { AgentSettingsRequest } from "../../contracts/generated/agent_settings_request";
 import type { SaveRulesRequest } from "../../contracts/generated/save_rules_request";
 
-export type SettingsPart = "model" | "analysis" | "assistant" | "rules";
-export type SettingsValues = { model: string | null; automatic: boolean; agentEnabled: boolean; agentModel: string | null; markdown: string };
+export type SettingsPart = "model" | "import" | "analysis" | "assistant" | "rules";
+export type SettingsValues = { model: string | null; importModel: string | null; automatic: boolean; agentEnabled: boolean; agentModel: string | null; markdown: string };
 export type SettingsApi = {
   preferences: () => Promise<Preferences>; rules: () => Promise<RulesSettings>; assistant: () => Promise<AgentSettings>;
   select: (model: string | null) => Promise<string>; analysis: (enabled: boolean) => Promise<Preferences>;
+  selectImport: (model: string | null) => Promise<Preferences>;
   saveRules: (value: SaveRulesRequest) => Promise<RulesSettings>; saveAssistant: (value: AgentSettingsRequest) => Promise<AgentSettings>;
 };
 export type SettingsState = {
@@ -26,13 +27,13 @@ function message(error: unknown, part: SettingsPart): string {
   const code = error instanceof Error && "code" in error && typeof error.code === "string" ? error.code : "";
   if (part === "rules" && rulesErrors[code]) return rulesErrors[code];
   if (code === "AGENT_SETTINGS_CONFLICT") return "Настройки помощника изменились. Загрузите актуальную версию; ваш выбор останется в форме.";
-  if (part === "model") return "Не удалось сохранить модель. Проверьте подключение и выберите доступную модель.";
+  if (part === "model" || part === "import") return "Не удалось сохранить модель. Проверьте подключение и выберите доступную модель.";
   return "Не удалось сохранить этот раздел. Черновик остался в форме; повторите действие.";
 }
 
 export class SettingsDrafts {
   state: SettingsState = { preferences: null, rules: null, assistant: null,
-    draft: { model: null, automatic: true, agentEnabled: false, agentModel: null, markdown: "" },
+    draft: { model: null, importModel: null, automatic: true, agentEnabled: false, agentModel: null, markdown: "" },
     loading: false, saving: false, staleRules: false, comparison: false, saved: [], errors: {}, message: "" };
   private closed = false;
   private epoch = 0;
@@ -44,6 +45,7 @@ export class SettingsDrafts {
   get dirty(): SettingsPart[] {
     const { preferences, rules, assistant, draft } = this.state, result: SettingsPart[] = [];
     if (preferences && draft.model !== preferences.selectedModel) result.push("model");
+    if (preferences && draft.importModel !== (preferences.selectedImportModel ?? null)) result.push("import");
     if (preferences && draft.automatic !== preferences.automaticAnalysis) result.push("analysis");
     if (assistant && (draft.agentEnabled !== assistant.enabled || draft.agentModel !== assistant.selectedAgentModel)) result.push("assistant");
     if (rules && draft.markdown !== rules.markdown) result.push("rules");
@@ -60,6 +62,7 @@ export class SettingsDrafts {
     const draft = { ...this.state.draft }, errors = { ...this.state.errors };
     if (preferences.status === "fulfilled") {
       if (!this.state.preferences) { draft.model = preferences.value.selectedModel; draft.automatic = preferences.value.automaticAnalysis;
+        draft.importModel = preferences.value.selectedImportModel ?? null;
         this.publish({ preferences: preferences.value }); delete errors.model; delete errors.analysis; }
     } else errors.model = "Не удалось загрузить настройки обработки. Повторите загрузку.";
     if (rules.status === "fulfilled") {
@@ -75,6 +78,7 @@ export class SettingsDrafts {
     if (this.state.saving) return;
     const { preferences, rules, assistant, draft } = this.state;
     this.publish({ draft: { model: preferences ? preferences.selectedModel : draft.model, automatic: preferences?.automaticAnalysis ?? draft.automatic,
+      importModel: preferences ? preferences.selectedImportModel ?? null : draft.importModel,
       agentEnabled: assistant?.enabled ?? draft.agentEnabled, agentModel: assistant ? assistant.selectedAgentModel : draft.agentModel,
       markdown: rules?.markdown ?? draft.markdown }, errors: this.state.staleRules ? { rules: rulesErrors["RULES_STALE"] ?? "Обновите правила." } : {},
       saved: [], message: "Несохранённые изменения отменены." });
@@ -112,6 +116,11 @@ export class SettingsDrafts {
           const model = await this.api.select(submitted.model);
           if (this.state.preferences) this.publish({ preferences: { ...this.state.preferences, selectedModel: model },
             draft: { ...this.state.draft, model: this.state.draft.model === submitted.model ? model : this.state.draft.model } });
+        } else if (part === "import") {
+          const preferences = await this.api.selectImport(submitted.importModel);
+          const model = preferences.selectedImportModel ?? null;
+          if (this.state.preferences) this.publish({ preferences: { ...this.state.preferences, selectedImportModel: model },
+            draft: { ...this.state.draft, importModel: this.state.draft.importModel === submitted.importModel ? model : this.state.draft.importModel } });
         } else if (part === "analysis") {
           const preferences = await this.api.analysis(submitted.automatic);
           if (this.state.preferences) this.publish({ preferences: { ...this.state.preferences, automaticAnalysis: preferences.automaticAnalysis },

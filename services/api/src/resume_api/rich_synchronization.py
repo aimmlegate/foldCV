@@ -38,14 +38,18 @@ class RichSynchronization:
         blocks = [block for block in workspace.project.document.blocks() if any(
             link.kind == "citation" and link.record_id in ids for link in block.provenance)
             and not any(link.kind == "field_binding" for link in block.provenance) and not has_exact_fields(block)]
-        sync = self.add_sync(identifier, request.capture, [block.id for block in blocks], "panel", sorted(ids & records.keys()))
+        digest_ids = {key for key in ids & records.keys() if records[key].kind == "claim"}
+        protected = [block for block in workspace.project.document.blocks() if has_exact_fields(block)
+            and any(link.kind == "citation" and link.record_id in digest_ids for link in block.provenance)]
+        sync = self.add_sync(identifier, request.capture, [block.id for block in [*blocks, *protected]], "panel", sorted(ids & records.keys()))
         sync.fact_ids = sorted(ids)
         if any(link.kind == "citation" and link.record_id in ids - records.keys() for block in blocks for link in block.provenance):
             sync.status, sync.error_code = "conflict", "DELETED_RECORD_MENTIONS"
             self.publish_sync(identifier, sync)
             return self.response(identifier)
         if not blocks:
-            sync.status = "applied"
+            sync.status = "conflict" if protected else "applied"
+            sync.error_code = "NARRATIVE_REQUIRES_SCOPED_EDIT" if protected else None
             self.publish_sync(identifier, sync)
             return self.response(identifier)
         try:
@@ -54,7 +58,9 @@ class RichSynchronization:
                 "deletedRecordIds": sorted(ids - records.keys())}, RichPanelProposal)
             sync.proposed_steps = narrative_steps(workspace, blocks, proposal)
             sync.ready = bool(sync.proposed_steps)
-            sync.status = "conflict" if proposal.uncertain else "pending" if sync.ready else "applied"
+            sync.status = "conflict" if proposal.uncertain or protected else "pending" if sync.ready else "applied"
+            if protected:
+                sync.error_code = "NARRATIVE_REQUIRES_SCOPED_EDIT"
             if not dependencies_current(self.workspaces[identifier], sync.dependencies):
                 sync.status, sync.ready, sync.error_code = "stale", False, "STALE_SYNC"
         except (ContentFailure, AdmissionCancelled, ProjectFailure, SpikeError, ValidationError, ValueError) as error:
@@ -236,18 +242,25 @@ class RichSynchronization:
         blocks = [block for block in workspace.project.document.blocks() if block.id in request.block_ids]
         linked = {link.record_id for block in blocks for link in block.provenance if link.kind == "citation"}
         records = {record.id: record for record in workspace.project.facts.records}
+        digest_ids = {key for key in linked if key in records and records[key].kind == "claim"}
+        related = [block for block in workspace.project.document.blocks() if block.id not in request.block_ids
+            and any(link.kind == "citation" and link.record_id in digest_ids for link in block.provenance)]
         sync = self.add_sync(identifier, request.capture, request.block_ids, "completion", sorted(touched | linked))
+        if related:
+            sync.dependencies = scoped_dependencies(workspace, [*request.block_ids, *[b.id for b in related]], sorted(touched | linked))
         sync.proposed_steps, sync.ready = steps, bool(steps)
         sync.field_keys = [key for _, key in conflicts]
         sync.status = "conflict" if conflicts else "pending"
         try:
             # Exact fields and moves are deterministic. Only linked narrative needs interpretation.
             exact_blocks = {identifier for group in occurrences(workspace.project.document).values() for identifier in group.block_ids}
-            narrative = [block for block in blocks if block.id not in exact_blocks and any(link.kind == "citation" for link in block.provenance)
-                and not any(link.kind == "field_binding" for link in block.provenance)]
+            narrative = [block for block in blocks if any(link.kind == "citation" for link in block.provenance)
+                and (any(link.kind == "citation" and link.record_id in digest_ids - touched for link in block.provenance)
+                    or block.id not in exact_blocks and not any(link.kind == "field_binding" for link in block.provenance))]
             if request.interpret and narrative and linked - touched:
                 sync.kind = "reconciliation"
                 proposal = await self.sync_content(identifier, sync, {"blocks": [block.model_dump(mode="json", by_alias=True) for block in narrative],
+                    "relatedBlocks": [block.model_dump(mode="json", by_alias=True) for block in related],
                     "facts": [records[key].model_dump(mode="json", by_alias=True) for key in sorted(linked - touched) if key in records]}, RichReconcileProposal)
                 edits = {step.record.id: step.record for step in steps if isinstance(step, PutRecord)}
                 for record in proposal.records:

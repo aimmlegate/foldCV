@@ -8,7 +8,7 @@ from .background_store import BackgroundFailure
 from .models.rich_workspace import WorkspaceV6
 
 COLLECTIONS = frozenset({"operations", "sources", "assets", "syncRecords", "warnings", "renders"})
-ATOMIC = frozenset({"document", "facts", "evidenceRecords", "template", "rulesUsed", "mutationReplay", "metadata_record"})
+ATOMIC = frozenset({"document", "facts", "evidenceRecords", "template", "rulesUsed", "mutationReplay", "metadata_record", "importDraft"})
 
 
 def item_key(item, field):

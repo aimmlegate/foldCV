@@ -135,7 +135,7 @@ class CanonicalCoordinator:
         if proposal.payload.kind == "processing":
             from .models.background import ProcessingCandidateV1
             value = ProcessingCandidateV1.model_validate(strict_json(raw))
-            if (value.id != proposal.payload.candidate_id or value.workspace is None or value.normalized is None
+            if (value.id != proposal.payload.candidate_id or value.workspace is None or (value.normalized is None and value.import_draft is None)
                     or value.workspace.project_id != state.project_id or value.workspace.project is None):
                 raise BackgroundFailure("OUTCOME_UNKNOWN")
             return value

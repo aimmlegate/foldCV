@@ -39,6 +39,9 @@ def section(key, text, first, *, record=None, focus=False):
 
 
 def format_document(document, facts):
+    # Imports already carry interpreted layout; a fixed taxonomy cannot rebuild it.
+    if facts.mode in {"digest", "imported"}:
+        return document.model_copy(deep=True)
     body = [block for region in document.regions[1:] for block in region.blocks]
     if document.regions[0].blocks and body and all(block.type == "section" for block in body):
         return document.model_copy(deep=True)

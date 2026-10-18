@@ -1,12 +1,13 @@
 import { useEffect, useState } from "react";
 import { ConnectionWorkflow, type ConnectionView } from "../../connection/workflow";
 import { AgentBrowserApi } from "../../assistant/api";
-import { preferencesRequest, rulesRequest, saveRulesRequest } from "../../api/client";
+import { preferencesRequest, rulesRequest, saveRulesRequest, saveImportModelRequest } from "../../api/client";
 import { SettingsDrafts, type SettingsPart, type SettingsState } from "./drafts";
 import { Connection } from "./Connection";
+import { ModelSelect } from "./ModelSelect";
 import { Button } from "../ui/Button";
 
-const partNames: Record<SettingsPart, string> = { model: "модель обработки", analysis: "проверка изменений", assistant: "помощник", rules: "правила" };
+const partNames: Record<SettingsPart, string> = { model: "модель обработки", import: "модель импорта", analysis: "проверка изменений", assistant: "помощник", rules: "правила" };
 export function Settings({ close, connectionChanged }: { close: () => void; connectionChanged: (view: ConnectionView) => void }) {
   const [section, setSection] = useState<"model" | "rules" | "analysis">("model");
   const [view, setView] = useState<ConnectionView>(() => new ConnectionWorkflow(() => {}).view);
@@ -16,6 +17,7 @@ export function Settings({ close, connectionChanged }: { close: () => void; conn
     const api = new AgentBrowserApi("");
     return new SettingsDrafts({ preferences: () => preferencesRequest(), rules: rulesRequest, assistant: () => api.settings(),
       analysis: enabled => preferencesRequest(enabled), saveRules: saveRulesRequest, saveAssistant: value => api.saveSettings(value),
+      selectImport: saveImportModelRequest,
       select: async model => {
         if (!model || !workflow.view.snapshot.metadataReady || !workflow.view.snapshot.models.includes(model)) throw new Error("MODEL_UNAVAILABLE");
         await workflow.select(model);
@@ -25,8 +27,6 @@ export function Settings({ close, connectionChanged }: { close: () => void; conn
   });
   useEffect(() => { void controller.load(); void workflow.peek(); return () => { controller.close(); workflow.close(); }; }, [controller, workflow]);
   const current = state ?? controller.state, dirty = controller.dirty.length > 0, busy = current.loading || current.saving;
-  const agentChoices = current.draft.agentModel && !view.snapshot.models.includes(current.draft.agentModel)
-    ? [current.draft.agentModel, ...view.snapshot.models] : view.snapshot.models;
   return <section className="settings-screen" aria-label="Настройки">
     <div className="settings-title"><button className="text-button" disabled={current.saving} onClick={close}>← Вернуться к резюме</button></div>
     <div className="settings-layout"><nav className="settings-nav" aria-label="Разделы настроек">
@@ -36,13 +36,19 @@ export function Settings({ close, connectionChanged }: { close: () => void; conn
       </button>)}
     </nav><div className="settings-content">
       {section === "model" && <><Connection view={view} workflow={workflow} model={current.draft.model} change={value => controller.change("model", value)} disabled={current.saving} selectionDisabled={!current.preferences} />
+        <div className="uir-assistant-options"><h3>Импорт резюме</h3>
+          <ModelSelect id="import-model-select" label="Модель импорта" value={current.draft.importModel} models={view.snapshot.models}
+            defaultLabel="Использовать модель обработки" disabled={busy || !current.preferences || view.pending || !view.snapshot.metadataReady}
+            change={value => controller.change("importModel", value)} />
+          <p className="settings-disclosure">Извлекает факты и собирает резюме из исходника. Сохранённый выбор применяется к следующему импорту.</p>
+        </div>
         <div className="uir-assistant-options"><h3>Помощник</h3><div className="switch-line"><label htmlFor="assistant-enabled">Включить помощника<small>Использует это же подключение. Открытие панели не включает помощника.</small></label>
           <input className="switch" id="assistant-enabled" aria-label="Включить помощника" role="switch" type="checkbox" checked={current.draft.agentEnabled} disabled={!current.assistant}
             onChange={event => controller.change("agentEnabled", event.currentTarget.checked)} /></div>
-          <label htmlFor="assistant-model-select">Модель помощника</label><select className="model-select" id="assistant-model-select" aria-label="Модель помощника"
-            value={current.draft.agentModel ?? ""} disabled={!current.assistant || !view.snapshot.metadataReady} onChange={event => controller.change("agentModel", event.currentTarget.value || null)}>
-            <option value="">Выберите модель помощника</option>{agentChoices.map(model => <option key={model} value={model} disabled={!view.snapshot.models.includes(model)}>{model}{!view.snapshot.models.includes(model) ? " · недоступна" : ""}</option>)}
-          </select><p className="settings-disclosure">Модель обработки и модель помощника сохраняются отдельно.</p>
+          <ModelSelect id="assistant-model-select" label="Модель помощника" value={current.draft.agentModel} models={view.snapshot.models}
+            defaultLabel="Выберите модель помощника" disabled={busy || !current.assistant || view.pending || !view.snapshot.metadataReady}
+            change={value => controller.change("agentModel", value)} />
+          <p className="settings-disclosure">Выбор модели помощника сохраняется отдельно.</p>
           {current.errors.assistant && current.assistant && <button className="text-button" disabled={busy} onClick={() => void controller.reloadAssistant()}>Загрузить настройки помощника</button>}
         </div></>}
       {section === "rules" && <><h3>Общие правила и команды</h3><p>Эти правила действуют для всех резюме и применяются при следующей обработке текста.</p>

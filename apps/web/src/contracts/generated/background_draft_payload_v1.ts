@@ -352,6 +352,7 @@ export type Unitid1 = string | null;
  * @maxItems 5000
  */
 export type Unresolved = ExtractionIssue[];
+export type Mode = "structured" | "digest" | "imported";
 export type Evidence2 = EvidenceSpan[];
 export type Id19 = string;
 export type Kind4 = "candidate";
@@ -412,6 +413,7 @@ export type Kind8 = "technology";
 export type Origin4 = "source" | "user";
 export type Revision23 = number;
 export type Subprojectid = string | null;
+export type Technical = boolean | null;
 export type Usercorrected7 = boolean;
 export type Evidence8 = EvidenceSpan[];
 export type Id25 = string;
@@ -858,6 +860,7 @@ export interface HeadingProps {
 }
 export interface WorkingFacts {
   extraction?: ExtractionReport | null;
+  mode?: Mode;
   records: Records;
   revision: Revision33;
   tombstones: Tombstones;
@@ -967,12 +970,14 @@ export interface TechnologyRecord {
   canonicalId: WorkingFieldStr;
   display: WorkingFieldStr;
   evidence: Evidence7;
+  experience?: WorkingFieldStr;
   id: Id24;
   jobId: Jobid1;
   kind: Kind8;
   origin: Origin4;
   revision: Revision23;
   subprojectId: Subprojectid;
+  technical?: Technical;
   userCorrected?: Usercorrected7;
 }
 export interface EducationRecord {

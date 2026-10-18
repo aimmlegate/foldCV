@@ -11,6 +11,7 @@ export type Unitid = string | null;
  * @maxItems 5000
  */
 export type Unresolved = ExtractionIssue[];
+export type Mode = "structured" | "digest" | "imported";
 export type Sourceid1 = string;
 export type Sourcerevision = number;
 export type Text = string;
@@ -76,6 +77,7 @@ export type Kind4 = "technology";
 export type Origin4 = "source" | "user";
 export type Revision8 = number;
 export type Subprojectid = string | null;
+export type Technical = boolean | null;
 export type Usercorrected7 = boolean;
 export type Evidence6 = EvidenceSpan[];
 export type Id6 = string;
@@ -172,6 +174,7 @@ export type Tombstones = RecordTombstone[];
 
 export interface WorkingFacts {
   extraction?: ExtractionReport | null;
+  mode?: Mode;
   records: Records;
   revision: Revision18;
   tombstones: Tombstones;
@@ -288,12 +291,14 @@ export interface TechnologyRecord {
   canonicalId: WorkingFieldStr;
   display: WorkingFieldStr;
   evidence: Evidence5;
+  experience?: WorkingFieldStr;
   id: Id5;
   jobId: Jobid1;
   kind: Kind4;
   origin: Origin4;
   revision: Revision8;
   subprojectId: Subprojectid;
+  technical?: Technical;
   userCorrected?: Usercorrected7;
 }
 export interface EducationRecord {

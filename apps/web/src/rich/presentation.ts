@@ -17,9 +17,19 @@ export function presentationPlugin(current: () => PresentationBlocks, logos: Rea
       const attributes: Record<string, string> = { "data-cv-role": view.role, "data-cv-logo": logo ? "true" : "false",
         "data-cv-bound": bound ? "true" : "false",
         "data-cv-empty": node.firstChild?.textContent.trim() ? "false" : "true",
+        "data-cv-marker": /^\s*(?:[•\-—]|\d+[.)])\s/u.test(node.firstChild?.textContent ?? "") ? "true" : "false",
         "data-cv-active": state.selection.from > position && state.selection.from < end ? "true" : "false" };
       if (logo) attributes["style"] = `--cv-focus-logo: url("${logo}")`;
       decorations.push(Decoration.node(position, position + node.nodeSize, attributes));
+      if (view.role === "focus_entry" && view.experience) {
+        const text = view.experience, note = view.experienceNote ?? "";
+        decorations.push(Decoration.widget(end - 1, () => {
+          const label = document.createElement("span");
+          label.className = "cv-focus-experience"; label.contentEditable = "false";
+          label.textContent = text; label.title = note;
+          return label;
+        }, { side: 1, key: `experience:${id}:${text}:${note}`, ignoreSelection: true }));
+      }
     });
     return DecorationSet.create(state.doc, decorations);
   } } });

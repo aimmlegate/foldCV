@@ -1,14 +1,15 @@
 import type { WorkingFacts, WorkingFieldPartialDate } from "../contracts/generated/working_facts";
 
 export type RecordValue = WorkingFacts["records"][number];
-export type Kind = "candidate" | "employment" | "technology" | "education" | "language";
+export type Kind = "candidate" | "employment" | "technology" | "education" | "language" | "claim";
 type Field = { key: string; label: string; text: string; checked?: boolean; date?: WorkingFieldPartialDate };
-export const labels = { candidate: "Кандидат", employment: "Опыт", technology: "Технологии", education: "Образование", language: "Языки" };
+export const labels = { candidate: "Кандидат", employment: "Опыт", technology: "Технологии", education: "Образование", language: "Языки", claim: "Дополнительно" };
 export const names: Record<Kind, readonly (readonly [string, string])[]> = {
   candidate: [["name", "Имя"], ["title", "Должность"], ["location", "Город"]],
-  employment: [["employer", "Компания"], ["role", "Роль"]], technology: [["display", "Технология"]],
+  employment: [["employer", "Компания"], ["role", "Роль"]], technology: [["display", "Технология"], ["experience", "Опыт, как в резюме"]],
   education: [["institution", "Учебное заведение"], ["qualification", "Квалификация"], ["specialty", "Специальность"], ["completion", "Дата окончания"]],
   language: [["language", "Язык"], ["level", "Уровень"]],
+  claim: [["value", "Содержание и пометки"]],
 };
 export function fields(record: RecordValue): Field[] {
   if (!(record.kind in names)) return [];
@@ -30,11 +31,21 @@ export function title(record: RecordValue): string {
   if (record.kind === "technology") return record.display.rawText || "Без названия";
   if (record.kind === "education") return record.institution.rawText || "Без названия";
   if (record.kind === "language") return record.language.rawText || "Без названия";
+  if (record.kind === "claim") return record.value.rawText || "Новый факт";
   return "Кандидат";
 }
 export function needsCheck(value: unknown): boolean {
   if (Array.isArray(value)) return value.some(needsCheck);
   if (typeof value !== "object" || value === null) return false;
   if ("status" in value && "rawText" in value) return value.rawText !== "" && value.status !== "known";
-  return Object.values(value).some(needsCheck);
+  const current = "present" in value && typeof value.present === "object" && value.present !== null
+    && "value" in value.present && value.present.value === true;
+  if (current && "end" in value && typeof value.end === "object" && value.end !== null
+    && "rawText" in value.end && typeof value.end.rawText === "string" && value.end.rawText.trim()) {
+    const marker = /^(?:present|current|now|настоящее время|по настоящее время|н\.?\s*в\.?)$/iu.test(value.end.rawText.trim());
+    if (!marker) return true;
+    return Object.entries(value).some(([key, field]) => key !== "end" && needsCheck(field));
+  }
+  return Object.entries(value).some(([key, field]) =>
+    !(key === "canonicalId" && "kind" in value && value.kind === "technology") && needsCheck(field));
 }

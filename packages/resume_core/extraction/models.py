@@ -6,7 +6,7 @@ from typing import Literal
 
 from pydantic import ConfigDict, Field, model_validator
 
-from packages.resume_core.models.contracts import Wire, Sha256
+from packages.resume_core.models.contracts import Wire, Sha256, SourceStructure
 
 
 class ExtractLocation(Wire):
@@ -26,6 +26,7 @@ class ExtractUnit(Wire):
     order: int = Field(ge=0)
     text: str = Field(max_length=750_000)
     location: ExtractLocation
+    structure: SourceStructure | None = Field(default=None, exclude_if=lambda value: value is None)
 
 
 class ExtractGap(Wire):
