@@ -14,3 +14,12 @@ apps/web/dist-uir-proof/
 apps/web/test-results/
 apps/web/playwright-report/
 .coverage
+.private/
+# Keep resume QA artifacts local.
+docs/gui/handoffs/**/gui-fixture/
+docs/gui/handoffs/**/*.docx
+docs/gui/handoffs/**/*.foldcv
+docs/gui/handoffs/**/*.pdf
+docs/gui/handoffs/**/*.png
+!docs/gui/handoffs/**/before/assets/**/*.png
+!docs/gui/handoffs/**/after/assets/**/*.png

@@ -3578,6 +3578,9 @@
       "skills/format-resume/tests/test_policy.py::PolicyTests::test_global_or_undated_technology_has_no_duration",
       "skills/format-resume/tests/test_policy.py::PolicyTests::test_invented_dates_are_rejected",
       "skills/format-resume/tests/test_policy.py::PolicyTests::test_cutoff_and_year_precision"
+    ],
+    "gitResumePrivacy": [
+      "tests/foundation/test_private_resume_git.py"
     ]
   },
   "partialChecks": {

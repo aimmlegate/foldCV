@@ -1,0 +1,8 @@
+#!/bin/sh
+set -eu
+root=$(git rev-parse --show-toplevel)
+cd "$root"
+if [ -x .venv/bin/python ]; then
+  exec .venv/bin/python tools/check_private_resume_data.py
+fi
+exec python3 tools/check_private_resume_data.py
