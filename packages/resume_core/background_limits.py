@@ -7,7 +7,7 @@ from . import agent_limits
 
 @dataclass(frozen=True)
 class BackgroundLimits:
-    policy_version: int = 1
+    policy_version: int = 2
     executions: int = 3
     noninteractive_executions: int = 2
     serial_executions: int = 1
@@ -26,8 +26,8 @@ class BackgroundLimits:
     local_barrier_ms: int = 750
     sidecar_global_bytes: int = 64 * 1024 * 1024
     sidecar_project_bytes: int = agent_limits.PROJECT_BYTES
-    metadata_global_records: int = 8192
-    metadata_project_records: int = 512
+    metadata_global_records: int = 32768
+    metadata_project_records: int = 4096
     proposal_bytes: int = agent_limits.RUN_BYTES
     inverse_bytes: int = agent_limits.RUN_BYTES
     replay_events: int = 512

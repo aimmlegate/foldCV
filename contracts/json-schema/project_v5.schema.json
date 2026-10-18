@@ -1136,6 +1136,115 @@
       "title": "EvidenceSpan",
       "type": "object"
     },
+    "ExtractionIssue": {
+      "additionalProperties": false,
+      "properties": {
+        "code": {
+          "enum": [
+            "FACT_SOURCE_UNRESOLVED",
+            "FACT_SECTION_OMITTED",
+            "FACT_ROWS_RECOVERED"
+          ],
+          "title": "Code",
+          "type": "string"
+        },
+        "page": {
+          "anyOf": [
+            {
+              "minimum": 1,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Page"
+        },
+        "section": {
+          "title": "Section",
+          "type": "string"
+        },
+        "sourceId": {
+          "minLength": 1,
+          "title": "Sourceid",
+          "type": "string"
+        },
+        "unitId": {
+          "anyOf": [
+            {
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Unitid"
+        }
+      },
+      "required": [
+        "code",
+        "sourceId",
+        "unitId",
+        "section"
+      ],
+      "title": "ExtractionIssue",
+      "type": "object"
+    },
+    "ExtractionReport": {
+      "additionalProperties": false,
+      "properties": {
+        "counts": {
+          "additionalProperties": {
+            "type": "integer"
+          },
+          "title": "Counts",
+          "type": "object"
+        },
+        "factCount": {
+          "minimum": 1,
+          "title": "Factcount",
+          "type": "integer"
+        },
+        "recoveredRows": {
+          "minimum": 0,
+          "title": "Recoveredrows",
+          "type": "integer"
+        },
+        "requestBytes": {
+          "minimum": 0,
+          "title": "Requestbytes",
+          "type": "integer"
+        },
+        "status": {
+          "enum": [
+            "complete",
+            "partial"
+          ],
+          "title": "Status",
+          "type": "string"
+        },
+        "unresolved": {
+          "items": {
+            "$ref": "#/$defs/ExtractionIssue"
+          },
+          "maxItems": 5000,
+          "title": "Unresolved",
+          "type": "array"
+        }
+      },
+      "required": [
+        "status",
+        "factCount",
+        "counts",
+        "requestBytes",
+        "recoveredRows",
+        "unresolved"
+      ],
+      "title": "ExtractionReport",
+      "type": "object"
+    },
     "FactFieldSpan": {
       "additionalProperties": false,
       "properties": {
@@ -1672,6 +1781,57 @@
         "rawText"
       ],
       "title": "ImmutableFactEvidence",
+      "type": "object"
+    },
+    "ImportCoverage": {
+      "additionalProperties": false,
+      "properties": {
+        "blockIds": {
+          "items": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "title": "Blockids",
+          "type": "array"
+        },
+        "disposition": {
+          "enum": [
+            "placed",
+            "excluded"
+          ],
+          "title": "Disposition",
+          "type": "string"
+        },
+        "reason": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Reason"
+        },
+        "sourceId": {
+          "minLength": 1,
+          "title": "Sourceid",
+          "type": "string"
+        },
+        "unitId": {
+          "minLength": 1,
+          "title": "Unitid",
+          "type": "string"
+        }
+      },
+      "required": [
+        "sourceId",
+        "unitId",
+        "disposition",
+        "blockIds",
+        "reason"
+      ],
+      "title": "ImportCoverage",
       "type": "object"
     },
     "InlineStyles": {
@@ -3299,6 +3459,13 @@
           "title": "Units",
           "type": "array"
         },
+        "warningDetails": {
+          "items": {
+            "$ref": "#/$defs/SourceWarning"
+          },
+          "title": "Warningdetails",
+          "type": "array"
+        },
         "warnings": {
           "items": {
             "type": "string"
@@ -3467,6 +3634,33 @@
         "representedFactIds"
       ],
       "title": "SourceUnit",
+      "type": "object"
+    },
+    "SourceWarning": {
+      "additionalProperties": false,
+      "properties": {
+        "code": {
+          "title": "Code",
+          "type": "string"
+        },
+        "page": {
+          "anyOf": [
+            {
+              "minimum": 1,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Page"
+        }
+      },
+      "required": [
+        "code"
+      ],
+      "title": "SourceWarning",
       "type": "object"
     },
     "SourceWitness": {
@@ -4212,6 +4406,17 @@
     "WorkingFacts": {
       "additionalProperties": false,
       "properties": {
+        "extraction": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ExtractionReport"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
         "records": {
           "items": {
             "discriminator": {
@@ -4690,6 +4895,13 @@
     },
     "facts": {
       "$ref": "#/$defs/WorkingFacts"
+    },
+    "importCoverage": {
+      "items": {
+        "$ref": "#/$defs/ImportCoverage"
+      },
+      "title": "Importcoverage",
+      "type": "array"
     },
     "operations": {
       "items": {

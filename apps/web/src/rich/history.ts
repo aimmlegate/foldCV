@@ -96,6 +96,30 @@ export class SessionHistory {
     return true;
   }
 
+  navigation(direction: "undo" | "redo"): { actionId: string; changes: CellChange[] } | null {
+    const action = this.actions[direction === "undo" ? this.cursor - 1 : this.cursor];
+    if (this.closed || !action) return null;
+    const changes = direction === "undo" ? action.changes.map(change => ({ key: change.key, before: change.after, after: change.before }))
+      : action.changes.map(change => ({ ...change }));
+    return this.valid(changes) ? { actionId: action.id, changes } : null;
+  }
+
+  navigationMatches(direction: "undo" | "redo", changes: readonly CellChange[]): boolean {
+    const expected = this.navigation(direction)?.changes.filter(change => !change.key.startsWith("request:"));
+    return expected !== undefined && expected.length === changes.length && expected.every(change => changes.some(actual =>
+      actual.key === change.key && actual.before === change.before && actual.after === change.after));
+  }
+
+  publishNavigation(reservation: HistoryReservation, direction: "undo" | "redo", changes: readonly CellChange[]): boolean {
+    const value = this.navigation(direction), action = this.actions[direction === "undo" ? this.cursor - 1 : this.cursor];
+    if (!value || !action || !this.reserved(reservation) || !this.navigationMatches(direction, changes)
+      || !this.apply(value.changes, { mode: "prepared", actionId: action.id, kind: direction }, reservation)) return false;
+    action.token++;
+    this.cursor += direction === "undo" ? -1 : 1;
+    this.reservation = null;
+    return true;
+  }
+
   redo(): boolean {
     const action = this.actions[this.cursor];
     if (!action || !this.apply(action.changes,

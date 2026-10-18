@@ -45,6 +45,7 @@ export interface AgentRunRequest {
   owner: AgentOwner;
   projectRevision: Projectrevision;
   scope: Scope;
+  selectionContext?: RichSelection | null;
   settingsRevision: Settingsrevision;
 }
 export interface AgentOwner {

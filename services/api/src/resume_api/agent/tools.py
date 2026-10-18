@@ -13,7 +13,7 @@ from mcp.types import CallToolResult, TextContent
 
 from packages.resume_core import agent_limits as limits
 from packages.resume_core.agent_store import AgentFailure, digest, identity, run_in
-from packages.resume_core.models.agent import AgentAnchor, AgentApplyRequest, AgentFetchRequest, AgentFinding, AgentPrepareRequest, AgentPublishFindings, AgentQuery, TERMINAL_RUNS
+from packages.resume_core.models.agent import AgentAnchor, AgentApplyRequest, AgentFetchRequest, AgentFinding, AgentPrepareRequest, AgentProjectAction, AgentPublishFindings, AgentQuery, TERMINAL_RUNS
 from packages.resume_core.rich_dependencies import dependency
 from packages.resume_core.rich_fields import inline_groups, working_field
 from packages.resume_core.rich_mutations import inline_text, utf16_slice
@@ -25,8 +25,9 @@ from .mcp import PrivateMcp
 from .web import PublicFetcher
 
 READ_TOOLS = {"get_resume_context": "context", "find_resume_content": "find", "get_working_facts": "facts",
-    "get_original_source": "source", "get_conversation_context": "history"}
-TOOL_NAMES = (*READ_TOOLS, "check_resume", "read_public_page", "publish_findings", "prepare_edit_batch", "apply_edit_batch")
+    "get_original_source": "source", "get_conversation_context": "history", "get_project_resources": "resources"}
+WRITE_TOOLS = {"prepare_edit_batch", "apply_edit_batch", "project_action"}
+TOOL_NAMES = (*READ_TOOLS, "check_resume", "read_public_page", "publish_findings", "prepare_edit_batch", "apply_edit_batch", "project_action")
 
 
 class ContextQuery(AgentQuery):
@@ -50,8 +51,13 @@ class HistoryQuery(AgentQuery):
     kind: Literal["history"] = "history"
 
 
+class ResourcesQuery(AgentQuery):
+    kind: Literal["resources"] = "resources"
+
+
 READ_QUERIES = {"get_resume_context": ContextQuery, "find_resume_content": FindQuery,
-    "get_working_facts": FactsQuery, "get_original_source": SourceQuery, "get_conversation_context": HistoryQuery}
+    "get_working_facts": FactsQuery, "get_original_source": SourceQuery, "get_conversation_context": HistoryQuery,
+    "get_project_resources": ResourcesQuery}
 
 
 class AgentTools:
@@ -130,10 +136,19 @@ class ToolSession(PrivateMcp):
     def writer_session_id(self):
         return self.service.leases.require(self.control.project_id, epoch=self.control.owner_epoch).session_id
 
+    def write_guard(self):
+        from packages.resume_core.project_catalog import AccessChanged
+        if not self.run.allow_edits:
+            raise AgentFailure("AGENT_TOOL_DENIED")
+        try:
+            self.service.projects.catalog.require_write(self.control.project_id, self.run.access_revision)
+        except AccessChanged:
+            raise AgentFailure("AGENT_TOOL_DENIED") from None
+
     def register(self):
         @self.sdk.tool(structured_output=False)
         async def get_resume_context(query: ContextQuery | None = None) -> CallToolResult:
-            """Read the resume outline, or full blocks/cells by IDs with query:{kind:"document",ids:["block_id"]}. For a literal substring edit, get exact UTF-16 start/end from find_resume_content, then read the full target here. Prepare with this full-read snapshotId and the unchanged search offsets; never count characters. Use nextCursor with the same query for later pages."""
+            """Read the project index with query:{kind:"context"}. Read ALL document blocks with query:{kind:"document"}, or filter by ids. Each page contains whole blocks; only an oversized item uses json-fragments. Pass snapshot.nextCursor as query.cursor with the SAME query until nextCursor is null. Reading is complete only then. For substring edits, copy UTF-16 offsets from find_resume_content and use a full-read snapshotId."""
             return self.wire(await self.call("get_resume_context", query or ContextQuery()))
 
         @self.sdk.tool(structured_output=False)
@@ -157,6 +172,11 @@ class ToolSession(PrivateMcp):
             return self.wire(await self.call("get_conversation_context", query or HistoryQuery()))
 
         @self.sdk.tool(structured_output=False)
+        async def get_project_resources(query: ResourcesQuery | None = None) -> CallToolResult:
+            """Read retained assets and their uses, sources, local dates, template specification, captured rules and operation history. Follow nextCursor with the same query until null."""
+            return self.wire(await self.call("get_project_resources", query or ResourcesQuery()))
+
+        @self.sdk.tool(structured_output=False)
         async def check_resume() -> CallToolResult:
             """Check current timeline, links, structure and export readiness without inference or edits."""
             return self.wire(await self.call("check_resume", None))
@@ -173,13 +193,18 @@ class ToolSession(PrivateMcp):
 
         @self.sdk.tool(structured_output=False)
         async def prepare_edit_batch(request: AgentPrepareRequest) -> CallToolResult:
-            """Compile edits without saving. Example arguments: {"request":{"key":"edit_1","snapshotIds":["read_id"],"operations":[{"kind":"replace_text","target":{"snapshotId":"read_id","blockId":"block_id","cellId":null,"field":"content","start":0,"end":1},"content":[{"text":"Existing claim rephrased"}]}]}}. Read real IDs/ranges first. cellId is required: use null outside tables. Content uses text/marks, not document styles. One saved batch per turn."""
+            """Compile edits without saving. For template formatting, first read the entire document through nextCursor:null, then operations:[{kind:"format_template",snapshotId:"completed_read_id"}]. This preserves current wording and creates one shared undo action. Text edits use replace_text with target:{snapshotId,blockId,cellId:null,field:"content",start,end}, content:[{text:"..."}]. Copy exact UTF-16 offsets from find_resume_content. Insert headings/sections/lists with insert_blocks, tables with insert_table, retained images with insert_asset. Facts support create_fact/update_fact/delete_fact with evidence. Read real targets first. One saved batch per turn."""
             return self.wire(await self.call("prepare_edit_batch", request))
 
         async def apply_edit_batch(request: AgentApplyRequest) -> CallToolResult:
             return self.wire(await self.call("apply_edit_batch", request))
         apply_edit_batch.__doc__ = self.apply_description
         self.sdk.tool(structured_output=False)(apply_edit_batch)
+
+        @self.sdk.tool(structured_output=False)
+        async def project_action(request: AgentProjectAction) -> CallToolResult:
+            """Perform one explicit bound-project operation after a complete get_project_resources read. Use its snapshotId and a unique key. Actions: rename (value:title), formatting_date (value:ISO date), add_source_text (value:literal text), remove_source (targetId; only unreferenced), import_asset (value:base64 PNG/JPEG/WebP), remove_asset (targetId; only unreferenced), export_docx/export_project (returns durable download), archive/restore/delete, undo/redo. Destructive actions require the user's explicit command. Editing permission is checked again at commit. Finish the turn after a project operation."""
+            return self.wire(await self.call("project_action", request))
 
     def wire(self, value):
         text = json_text(value)
@@ -188,7 +213,6 @@ class ToolSession(PrivateMcp):
             if self.result_bytes + size > limits.TOOL_TOTAL_BYTES:
                 self.service.revoke(self.control, "AGENT_TOOL_LIMIT")
                 return CallToolResult(content=[], isError=True)
-            self.result_bytes += size
         return CallToolResult(content=[TextContent(type="text", text=text)], isError=value.get("error") is not None)
 
     def preflight(self, params):
@@ -213,10 +237,11 @@ class ToolSession(PrivateMcp):
                     raise ValueError("invalid check envelope")
             elif name == "read_public_page":
                 AgentFetchRequest.model_validate(arguments)
-            elif name in {"prepare_edit_batch", "apply_edit_batch", "publish_findings"}:
+            elif name in {"prepare_edit_batch", "apply_edit_batch", "publish_findings", "project_action"}:
                 if set(arguments) != {"request"}:
                     raise ValueError("invalid request envelope")
                 {"prepare_edit_batch": AgentPrepareRequest, "apply_edit_batch": AgentApplyRequest,
+                    "project_action": AgentProjectAction,
                     "publish_findings": AgentPublishFindings}[name].model_validate(arguments["request"])
             else:
                 raise ValueError("unknown tool")
@@ -225,6 +250,9 @@ class ToolSession(PrivateMcp):
             return error.code
         except ValidationError as error:
             self.calls += 1
+            if name in READ_TOOLS:
+                self.argument_issues = [{"path": "query", "issue": "Use query:{kind,ids?,cursor?}; omit ids to read the whole collection."}]
+                return "AGENT_ARGUMENT_INVALID"
             if name == "prepare_edit_batch":
                 safe = {"operations", "target", "content", "text", "marks", "snapshotId", "blockId", "cellId", "field", "start", "end", "key", "snapshotIds", "kind", "replace_text"}
                 self.argument_issues = [{"path": ".".join(str(part) if type(part) is int and 0 <= part <= 100 else part if part in safe else "*" for part in issue["loc"])[:160],
@@ -234,6 +262,9 @@ class ToolSession(PrivateMcp):
             return "AGENT_TOOL_DENIED"
         except (ValueError, TypeError):
             self.calls += 1
+            if name in READ_TOOLS:
+                self.argument_issues = [{"path": "query", "issue": "Use the query object wrapper, not top-level kind/ids/cursor."}]
+                return "AGENT_ARGUMENT_INVALID"
             if name == "prepare_edit_batch":
                 self.argument_issues = [{"path": "request", "issue": "expected_object"}]
                 return "AGENT_EDIT_INVALID"
@@ -243,7 +274,8 @@ class ToolSession(PrivateMcp):
         result = {"error": {"code": code}}
         if self.argument_issues:
             result["argumentIssues"] = self.argument_issues
-            result["format"] = "Use the advertised request wrapper. replace_text target requires snapshotId, blockId, cellId (null outside tables), field, start, end. content contains text and optional marks, not styles. Correct shape errors only; never retry permission denial."
+            result["format"] = ("Read arguments use {query:{kind:'document',cursor:null}}. Omit ids to read all blocks, or pass known IDs. Follow nextCursor using the same query."
+                if code == "AGENT_ARGUMENT_INVALID" else "Use the advertised request wrapper. replace_text target requires snapshotId, blockId, cellId (null outside tables), field, start, end. content contains text and optional marks, not styles. Correct shape errors only; never retry permission denial.")
         return result
 
     async def call(self, name, arguments):
@@ -300,6 +332,9 @@ class ToolSession(PrivateMcp):
                     if not self.run.allow_edits:
                         raise AgentFailure("AGENT_TOOL_DENIED")
                     result = await self.service.publication.offer(self, arguments.batch_id)
+                elif name == "project_action":
+                    from .project_actions import project_action
+                    result = await project_action(self, arguments)
                 else:
                     raise AgentFailure("AGENT_TOOL_DENIED")
                 self.guard()
@@ -314,11 +349,13 @@ class ToolSession(PrivateMcp):
                 self.service.revoke(self.control, error.code)
                 self.service.cleanup_error(error.code)
             failure = {"error": {"code": error.code}}
+            if name in READ_TOOLS and error.code in {"AGENT_SCOPE_INVALID", "AGENT_STALE_READ"}:
+                failure["format"] = "The cursor is invalid, expired, or belongs to a changed snapshot. Restart this read with cursor:null; do not edit from the incomplete read."
             if name == "publish_findings" and error.code == "AGENT_EVIDENCE_INVALID":
                 failure["format"] = "Use a full document read snapshot. Prose targets require cellId, recordId, fieldKey, start and end all null for the whole block. sourceIds must be stored IDs, not URLs."
             return failure
         except (ValidationError, ValueError):
-            return {"error": {"code": "AGENT_TOOL_DENIED"}}
+            return {"error": {"code": "AGENT_ARGUMENT_INVALID"}, "format": "Correct the declared argument shape; access has not been denied."}
         except Exception:
             return {"error": {"code": "AGENT_PROTOCOL"}}
 

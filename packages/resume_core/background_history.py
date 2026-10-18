@@ -173,7 +173,7 @@ class ScopeHistory:
             if stamp.kind != scope_kind(selector) or stamp.fingerprint != actual:
                 self._fence(state.project_id)
             guards[key] = stamp.model_copy(deep=True)
-        if len(guards) > 100:
+        if len(guards) > 4096:
             raise BackgroundFailure("JOB_STORAGE_FULL")
         values = list(guards.values())
         return ScopeGuardV1(schemaVersion=1, reads=[] if write else values, writes=values if write else [])

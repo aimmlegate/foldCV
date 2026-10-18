@@ -365,7 +365,7 @@ def test_content_service_uses_one_scoped_provider_call_and_no_draft(tmp_path):
         def generate(self, content, files, cancel):
             self.calls.append(content.text)
             assert content.result_type is SemanticProposal
-            assert content.policy.max_input_bytes == 65_536
+            assert content.policy.max_input_bytes == 256 * 1024
             return ContentResult(proposal, ReportedUsage(input_tokens=40, output_tokens=10, complete=True),
                                  "synthetic", "fixture", 0.1, 1)
 

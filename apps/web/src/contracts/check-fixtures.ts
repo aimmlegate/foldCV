@@ -71,9 +71,8 @@ for (const name of ["project_v4", "workspace_v5", "archive_manifest_v5", "render
 }
 const cases = array(read("cases.json")) as Case[];
 bases.rich_panel_request = read("recovery/rich_panel_request.json");
-for (const name of ["agent_settings", "agent_run_request", "agent_message", "agent_web_source", "agent_finding", "agent_conversation",
-  "agent_commit_result", "agent_event", "agent_prepare_request", "agent_prepare_result", "agent_edit_receipt", "agent_run", "agent_read_snapshot"]) {
-  bases[name] = read(`agent/${name}.json`);
+for (const file of readdirSync(resolve(examples, "agent")).filter(file => file.endsWith(".json"))) {
+  bases[file.slice(0, -5)] = read(`agent/${file}`);
 }
 for (const file of readdirSync(resolve(examples, "background")).filter(file => file.endsWith(".json"))) {
   bases[file.slice(0, -5)] = read(`background/${file}`);

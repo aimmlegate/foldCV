@@ -144,7 +144,7 @@ class JobArtifacts(AgentStore):
             for stamp in guards.reads:
                 # A later read cannot erase a dependency already observed by this turn.
                 reads.setdefault((stamp.kind, stamp.key), stamp)
-            if len(reads) > 100:
+            if len(reads) > 4096:
                 raise BackgroundFailure("JOB_STORAGE_FULL")
             record.observed_guards = ScopeGuardV1(schemaVersion=1, reads=list(reads.values()),
                 writes=original.writes if original else [])
@@ -200,6 +200,7 @@ class JobArtifacts(AgentStore):
             clientRequestId=request.client_request_id, ownerEpoch=job.execution_generation,
             state="queued" if job.execution == "starting" else job.execution,
             allowEdits=job.submission.allow_edits, allowWeb=job.submission.allow_web, scope=job.submission.scope,
+            selectionContext=request.selection_context, accessRevision=job.submission.access_revision,
             model=job.submission.models[-1].model, connectionEpoch=record.connection_epoch,
             settingsRevision=request.settings_revision, createdAt=job.created_at,
             deadline=job.attempts[-1].active_deadline if job.attempts else expiration(job.created_at, 195),

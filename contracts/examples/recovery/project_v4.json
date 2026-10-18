@@ -36,7 +36,8 @@
         }
       ],
       "overlays": [],
-      "warnings": []
+      "warnings": [],
+      "warningDetails": []
     }
   ],
   "facts": [],

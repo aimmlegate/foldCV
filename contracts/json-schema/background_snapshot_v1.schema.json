@@ -479,6 +479,12 @@
     "JobSubmissionV1": {
       "additionalProperties": false,
       "properties": {
+        "accessRevision": {
+          "default": 1,
+          "minimum": 1,
+          "title": "Accessrevision",
+          "type": "integer"
+        },
         "accountGeneration": {
           "minimum": 1,
           "title": "Accountgeneration",
@@ -571,15 +577,17 @@
               "get_working_facts",
               "get_original_source",
               "get_conversation_context",
+              "get_project_resources",
               "check_resume",
               "read_public_page",
               "publish_findings",
               "prepare_edit_batch",
-              "apply_edit_batch"
+              "apply_edit_batch",
+              "project_action"
             ],
             "type": "string"
           },
-          "maxItems": 10,
+          "maxItems": 32,
           "title": "Tools",
           "type": "array"
         }
@@ -725,7 +733,7 @@
           "items": {
             "$ref": "#/$defs/GenerationStamp"
           },
-          "maxItems": 100,
+          "maxItems": 4096,
           "title": "Reads",
           "type": "array"
         },
@@ -738,7 +746,7 @@
           "items": {
             "$ref": "#/$defs/GenerationStamp"
           },
-          "maxItems": 100,
+          "maxItems": 4096,
           "title": "Writes",
           "type": "array"
         }

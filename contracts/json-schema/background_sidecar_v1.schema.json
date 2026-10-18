@@ -126,7 +126,8 @@
             "find",
             "facts",
             "source",
-            "history"
+            "history",
+            "resources"
           ],
           "title": "Kind",
           "type": "string"
@@ -271,7 +272,7 @@
           "items": {
             "$ref": "#/$defs/HistoryDefinitionV1"
           },
-          "maxItems": 512,
+          "maxItems": 4096,
           "title": "Definitions",
           "type": "array"
         },
@@ -1215,6 +1216,12 @@
     "JobSubmissionV1": {
       "additionalProperties": false,
       "properties": {
+        "accessRevision": {
+          "default": 1,
+          "minimum": 1,
+          "title": "Accessrevision",
+          "type": "integer"
+        },
         "accountGeneration": {
           "minimum": 1,
           "title": "Accountgeneration",
@@ -1307,15 +1314,17 @@
               "get_working_facts",
               "get_original_source",
               "get_conversation_context",
+              "get_project_resources",
               "check_resume",
               "read_public_page",
               "publish_findings",
               "prepare_edit_batch",
-              "apply_edit_batch"
+              "apply_edit_batch",
+              "project_action"
             ],
             "type": "string"
           },
-          "maxItems": 10,
+          "maxItems": 32,
           "title": "Tools",
           "type": "array"
         }
@@ -2288,7 +2297,7 @@
           "items": {
             "$ref": "#/$defs/GenerationStamp"
           },
-          "maxItems": 100,
+          "maxItems": 4096,
           "title": "Reads",
           "type": "array"
         },
@@ -2301,7 +2310,7 @@
           "items": {
             "$ref": "#/$defs/GenerationStamp"
           },
-          "maxItems": 100,
+          "maxItems": 4096,
           "title": "Writes",
           "type": "array"
         }
@@ -2721,7 +2730,7 @@
       "items": {
         "$ref": "#/$defs/AssetPinV1"
       },
-      "maxItems": 512,
+      "maxItems": 4096,
       "title": "Assetpins",
       "type": "array"
     },
@@ -2739,7 +2748,7 @@
       "items": {
         "type": "string"
       },
-      "maxItems": 512,
+      "maxItems": 4096,
       "title": "Cleanuprefs",
       "type": "array"
     },
@@ -2747,7 +2756,7 @@
       "items": {
         "$ref": "#/$defs/DraftCheckpointV1"
       },
-      "maxItems": 512,
+      "maxItems": 4096,
       "title": "Drafts",
       "type": "array"
     },
@@ -2761,7 +2770,7 @@
       "items": {
         "$ref": "#/$defs/FixedInvalidationV1"
       },
-      "maxItems": 512,
+      "maxItems": 4096,
       "title": "Fixedinvalidations",
       "type": "array"
     },
@@ -2769,7 +2778,7 @@
       "items": {
         "$ref": "#/$defs/GenerationStamp"
       },
-      "maxItems": 512,
+      "maxItems": 4096,
       "title": "Generations",
       "type": "array"
     },
@@ -2788,7 +2797,7 @@
       "items": {
         "$ref": "#/$defs/HistoryCommandReceiptV1"
       },
-      "maxItems": 512,
+      "maxItems": 4096,
       "title": "Historycommands",
       "type": "array"
     },
@@ -2811,7 +2820,7 @@
       "items": {
         "$ref": "#/$defs/PublicationIntentV1"
       },
-      "maxItems": 512,
+      "maxItems": 4096,
       "title": "Intents",
       "type": "array"
     },
@@ -2827,7 +2836,7 @@
       "items": {
         "$ref": "#/$defs/JobSnapshotV1"
       },
-      "maxItems": 512,
+      "maxItems": 4096,
       "title": "Jobs",
       "type": "array"
     },
@@ -2842,7 +2851,7 @@
       "items": {
         "$ref": "#/$defs/ManualIntentV1"
       },
-      "maxItems": 512,
+      "maxItems": 4096,
       "title": "Manualintents",
       "type": "array"
     },
@@ -2850,7 +2859,7 @@
       "items": {
         "$ref": "#/$defs/OrphanAssetV1"
       },
-      "maxItems": 512,
+      "maxItems": 4096,
       "title": "Orphanassets",
       "type": "array"
     },
@@ -2865,7 +2874,7 @@
       "items": {
         "$ref": "#/$defs/ProposalBindingV1"
       },
-      "maxItems": 512,
+      "maxItems": 4096,
       "title": "Proposals",
       "type": "array"
     },
@@ -2879,7 +2888,7 @@
       "items": {
         "$ref": "#/$defs/RequestReplayV1"
       },
-      "maxItems": 512,
+      "maxItems": 4096,
       "title": "Requests",
       "type": "array"
     },
@@ -2913,7 +2922,7 @@
       "items": {
         "$ref": "#/$defs/WriterTouchReceiptV1"
       },
-      "maxItems": 512,
+      "maxItems": 4096,
       "title": "Writertouches",
       "type": "array"
     }
@@ -2939,6 +2948,6 @@
   ],
   "title": "BackgroundSidecarV1",
   "type": "object",
-  "x-maxMetadataRecords": 512,
+  "x-maxMetadataRecords": 4096,
   "x-maxSerializedBytes": 10485760
 }

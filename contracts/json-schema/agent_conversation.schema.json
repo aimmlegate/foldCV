@@ -172,6 +172,7 @@
             "AGENT_TOOL_LIMIT",
             "AGENT_OUTPUT_LIMIT",
             "AGENT_CONTEXT_LIMIT",
+            "AGENT_ARGUMENT_INVALID",
             "AGENT_WEB_DISABLED",
             "AGENT_SOURCE_UNAVAILABLE",
             "AGENT_SOURCE_DENIED",
@@ -415,6 +416,12 @@
     "AgentRun": {
       "additionalProperties": false,
       "properties": {
+        "accessRevision": {
+          "default": 1,
+          "minimum": 1,
+          "title": "Accessrevision",
+          "type": "integer"
+        },
         "allowEdits": {
           "title": "Allowedits",
           "type": "boolean"
@@ -538,6 +545,17 @@
             }
           ],
           "title": "Scope"
+        },
+        "selectionContext": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/RichSelection"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
         },
         "settingsRevision": {
           "minimum": 1,

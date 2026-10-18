@@ -213,7 +213,7 @@ async def test_tool_and_fetch_exact_counts_and_cumulative_results(tmp_path, monk
         for _ in range(5):
             assert "source" in await session.call("read_public_page", "https://public.example")
         assert (await session.call("read_public_page", "https://public.example"))["error"]["code"] == "AGENT_SOURCE_LIMIT"
-        while session.calls < 24:
+        while session.calls < limits.TOOL_CALLS:
             assert "error" not in await session.call("check_resume", None)
         assert (await session.call("check_resume", None))["error"]["code"] == "AGENT_TOOL_LIMIT"
         session.calls = 0
@@ -229,7 +229,7 @@ async def test_mcp_text_exact_bytes_are_single_copy_and_failure_cannot_overrun_t
     try:
         # A single JSON string field has twelve bytes of framing.
         monkeypatch.setattr(session, "check", lambda: {"value": "x" * (limits.TOOL_BYTES - 12)})
-        for _ in range(4):
+        for _ in range(limits.TOOL_TOTAL_BYTES // limits.TOOL_BYTES):
             result = await session.call("check_resume", None)
             wire = session.wire(result)
             assert len(wire.content[0].text.encode()) == limits.TOOL_BYTES

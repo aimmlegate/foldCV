@@ -18,6 +18,7 @@ export type Text = string;
  * @maxItems 100
  */
 export type Affected = AgentAnchor[];
+export type Affectedcount = number | null;
 export type Kind1 = "entity";
 export type Fingerprint1 = string;
 export type Kind2 = "query";
@@ -26,7 +27,7 @@ export type Cursor = string | null;
  * @maxItems 100
  */
 export type Ids = string[];
-export type Kind3 = "context" | "document" | "find" | "facts" | "source" | "history";
+export type Kind3 = "context" | "document" | "find" | "facts" | "source" | "history" | "resources";
 export type Parentid = string | null;
 export type Text1 = string;
 /**
@@ -566,7 +567,7 @@ export type Recordid6 = string;
 export type Ownerepoch = number;
 export type Previewsha256 = string;
 /**
- * @maxItems 24
+ * @maxItems 64
  */
 export type Readsnapshotids = string[];
 export type Requestsha256 = string;
@@ -600,6 +601,7 @@ export type Toolkey = string;
 
 export interface AgentEditBatch {
   affected: Affected;
+  affectedCount?: Affectedcount;
   dependencies: Dependencies1;
   factRecordIds: Factrecordids;
   id: Id1;

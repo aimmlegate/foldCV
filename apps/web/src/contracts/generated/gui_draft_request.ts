@@ -30,9 +30,22 @@ export type Id4 = string;
 export type Name = string;
 export type Subprojects = Subproject[];
 export type Employment = Job[];
+export type Factcount = number;
+export type Recoveredrows = number;
+export type Requestbytes = number;
+export type Status = "complete" | "partial";
+export type Code1 = "FACT_SOURCE_UNRESOLVED" | "FACT_SECTION_OMITTED" | "FACT_ROWS_RECOVERED";
+export type Page = number | null;
+export type Section = string;
 export type Sourceid1 = string;
+export type Unitid1 = string | null;
+/**
+ * @maxItems 5000
+ */
+export type Unresolved = ExtractionIssue[];
+export type Sourceid2 = string;
 export type Sourcerevision1 = number;
-export type Unitid1 = string;
+export type Unitid2 = string;
 export type Unitrevision1 = number;
 export type Evidence2 = Evidence3[];
 export type Id5 = string;
@@ -215,7 +228,7 @@ export type Importance14 = "essential" | "normal" | "minor";
 export type Jobtempid = string | null;
 export type Kind15 = "text" | "technology" | "date" | "metric" | "leadership";
 export type Literalevidence6 = EvidenceSpan[];
-export type Sourceid2 = string;
+export type Sourceid3 = string;
 export type Subprojecttempid = string | null;
 export type Tempid = string;
 /**
@@ -462,7 +475,7 @@ export type Evidence20 = EvidenceSpan[];
 export type Present2 = boolean;
 export type Starttext2 = string | null;
 export type Role2 = string;
-export type Sourceid3 = string;
+export type Sourceid4 = string;
 export type Name1 = string;
 export type Tempid1 = string;
 /**
@@ -496,8 +509,8 @@ export type Schemaversion = 1;
 export type Disposition = "facts" | "administrative" | "duplicate" | "unresolved";
 export type Duplicateof = string | null;
 export type Facttempids = string[];
-export type Sourceid4 = string;
-export type Unitid2 = string;
+export type Sourceid5 = string;
+export type Unitid3 = string;
 /**
  * @maxItems 5000
  */
@@ -512,7 +525,7 @@ export type Id23 = string;
 export type Origin14 = "user";
 export type Revision16 = number;
 export type Text4 = string;
-export type Unitid3 = string;
+export type Unitid4 = string;
 export type Overlays = SourceOverlay[];
 export type Parser = string;
 export type Parserversion = string;
@@ -528,6 +541,9 @@ export type Representedfactids = string[];
 export type Revision18 = number;
 export type Text5 = string;
 export type Units1 = SourceUnit[];
+export type Code2 = string;
+export type Page1 = number | null;
+export type Warningdetails = SourceWarning[];
 export type Warnings = string[];
 export type Sources = Source[];
 export type Projectid = string;
@@ -552,6 +568,7 @@ export interface GuiNormalizedResult {
   conflicts?: Conflicts;
   education: Education;
   employment?: Employment;
+  extraction?: ExtractionReport | null;
   facts: Facts;
   fieldFactIds: Fieldfactids;
   jobPeriods?: Jobperiods;
@@ -619,6 +636,24 @@ export interface Subproject {
   name: Name;
   period: Period | null;
 }
+export interface ExtractionReport {
+  counts: Counts;
+  factCount: Factcount;
+  recoveredRows: Recoveredrows;
+  requestBytes: Requestbytes;
+  status: Status;
+  unresolved: Unresolved;
+}
+export interface Counts {
+  [k: string]: number;
+}
+export interface ExtractionIssue {
+  code: Code1;
+  page?: Page;
+  section: Section;
+  sourceId: Sourceid1;
+  unitId: Unitid1;
+}
 export interface GuiTextFact {
   evidence: Evidence2;
   id: Id5;
@@ -632,9 +667,9 @@ export interface GuiTextFact {
   value: TextValue;
 }
 export interface Evidence3 {
-  sourceId: Sourceid1;
+  sourceId: Sourceid2;
   sourceRevision: Sourcerevision1;
-  unitId: Unitid1;
+  unitId: Unitid2;
   unitRevision: Unitrevision1;
 }
 export interface TextValue {
@@ -883,7 +918,7 @@ export interface GuiFactProposal {
   jobTempId?: Jobtempid;
   kind: Kind15;
   literalEvidence?: Literalevidence6;
-  sourceId: Sourceid2;
+  sourceId: Sourceid3;
   subprojectTempId?: Subprojecttempid;
   tempId: Tempid;
   unitIds: Unitids;
@@ -893,7 +928,7 @@ export interface GuiJobProposal {
   employer: Employer2;
   periods: Periods2;
   role: Role2;
-  sourceId: Sourceid3;
+  sourceId: Sourceid4;
   subprojects?: Subprojects2;
   tempId: Tempid2;
   unitIds: Unitids2;
@@ -916,8 +951,8 @@ export interface UnitProposal {
   disposition: Disposition;
   duplicateOf?: Duplicateof;
   factTempIds: Facttempids;
-  sourceId: Sourceid4;
-  unitId: Unitid2;
+  sourceId: Sourceid5;
+  unitId: Unitid3;
 }
 export interface Source {
   byteRef: Byteref;
@@ -930,6 +965,7 @@ export interface Source {
   parserVersion: Parserversion;
   revision: Revision17;
   units: Units1;
+  warningDetails?: Warningdetails;
   warnings: Warnings;
 }
 export interface SourceOverlay {
@@ -937,7 +973,7 @@ export interface SourceOverlay {
   origin: Origin14;
   revision: Revision16;
   text: Text4;
-  unitId: Unitid3;
+  unitId: Unitid4;
 }
 export interface SourceUnit {
   disposition: Disposition1;
@@ -953,4 +989,8 @@ export interface SourceLocation {
   index: Index;
   kind: Kind16;
   row: Row;
+}
+export interface SourceWarning {
+  code: Code2;
+  page?: Page1;
 }

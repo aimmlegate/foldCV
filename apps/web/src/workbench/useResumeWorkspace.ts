@@ -4,28 +4,24 @@ import type { GuiProjectListResponse } from "../contracts/generated/gui_project_
 import type { RichEditorHandle } from "../rich/Editor";
 import type { AssistantHandle } from "../assistant/Drawer";
 import { hasInput, importBody, type ResumeInput } from "../rich/import-source";
-import { deleteProject, download, listProjects, projectRequest, RichApiFailure } from "../rich/api";
+import { deleteProject, download, listProjects, projectRequest, request, RichApiFailure } from "../rich/api";
 import { attachExclusiveWriter, type AttachedWriter } from "../background/connection";
 import { FixedOperations } from "../background/fixed";
 import { JobsApi } from "../background/api";
+import { warningLabel } from "./import/notices";
+export { warningLabel } from "./import/notices";
 
 function label(error: unknown): string {
   if (error instanceof RichApiFailure && error.code === "PROJECT_VERSION_UNSUPPORTED") return "Версия проекта не поддерживается. Исходные файлы сохранены.";
   if (error instanceof RichApiFailure && error.code === "ARCHIVE_VERSION_UNSUPPORTED") return "Версия файла проекта не поддерживается.";
   if (error instanceof RichApiFailure && error.code === "RICH_EXPORT_UNSUPPORTED") return "Этот блок пока не поддерживает экспорт. Изменения сохранены.";
   if (error instanceof RichApiFailure && error.code === "CONNECTION_REQUIRED") return "Настройте подключение модели и повторите обработку. Источник сохранён.";
-  if (error instanceof RichApiFailure) return "Не удалось выполнить действие. Повторите попытку.";
+  if (error instanceof RichApiFailure) return `${warningLabel(error.code)} (${error.code})`;
   if (error instanceof TypeError) return "Нет связи с локальным сервисом. Проверьте его запуск и повторите попытку.";
   return error instanceof Error ? error.message : "Не удалось выполнить действие";
 }
 export const stageLabels = { assess_resume: "Проверяем, похоже ли содержимое на резюме", normalize_semantics: "Извлекаем факты", draft_prose: "Редактируем текст",
-  assemble: "Открываем исходный текст", render: "Готовим DOCX" };
-export function warningLabel(code: string): string {
-  if (code === "source_not_resume") return "Модель считает, что исходный текст не похож на резюме. Проверьте выбранный источник. Импорт продолжен.";
-  if (code === "source_resume_uncertain") return "Модель не смогла уверенно определить, похоже ли содержимое на резюме. Импорт продолжен.";
-  if (code === "source_details_unresolved") return "Часть сведений требует проверки. Сверьте факты с исходником.";
-  return "Исходник сохранён. Часть сведений требует проверки.";
-}
+  assemble: "Применяем структуру шаблона", render: "Готовим DOCX" };
 export function useResumeWorkspace() {
   const [response, setResponse] = useState<RichProjectResponse | null>(null);
   const [writer, setWriter] = useState<AttachedWriter | null>(null);
@@ -61,6 +57,8 @@ export function useResumeWorkspace() {
       try { await new JobsApi(id).projectJobs(); available = true; }
       catch (error) { if (!(error instanceof RichApiFailure) || error.code !== "JOB_DISABLED") throw error; }
     }
+    await projectRequest(`/${id}/activate`, "POST", {});
+    setProjects(await listProjects());
     return { next: connection?.view.response ?? next, connection, available };
   }
   async function leave() {
@@ -108,6 +106,21 @@ export function useResumeWorkspace() {
       if (response?.workspace.projectId === id) clear();
       setProjects(await listProjects());
       if (result.status === "cleanup_incomplete") throw new RichApiFailure(result.errorCode ?? "PROJECT_CLEANUP_INCOMPLETE");
+    });
+  }
+  async function archive(id: string, archived: boolean) {
+    return action(async () => {
+      if (archived && activeProject.current === id) await leave();
+      await request(`/${id}/catalog/${archived ? "archive" : "restore"}`, "POST", {});
+      if (archived && activeProject.current === id) clear();
+      setProjects(await listProjects());
+    });
+  }
+  async function projectLifecycle(id: string, kind: "archive" | "delete") {
+    return action(async () => {
+      if (activeProject.current !== id) return;
+      if (kind === "archive") await leave();
+      clear(); setProjects(await listProjects());
     });
   }
   useEffect(() => {
@@ -181,5 +194,5 @@ export function useResumeWorkspace() {
     });
   }
   return { response, writer, background, projects, input, setInput, textDraft, error, status, setStatus, busy, loading, settings, setSettings,
-    editor, assistant, acknowledge, action, fresh, open, remove, process, upload, exportFile, dismissError };
+    editor, assistant, acknowledge, action, fresh, open, remove, archive, projectLifecycle, process, upload, exportFile, dismissError };
 }

@@ -3,12 +3,12 @@ export type Generation = number;
 export type Key = string;
 export type Kind = "entity" | "structure" | "query" | "source" | "rules";
 /**
- * @maxItems 100
+ * @maxItems 4096
  */
 export type Reads = GenerationStamp[];
 export type Schemaversion = 1;
 /**
- * @maxItems 100
+ * @maxItems 4096
  */
 export type Writes = GenerationStamp[];
 

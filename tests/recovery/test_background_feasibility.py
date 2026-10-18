@@ -3,20 +3,30 @@
 import copy
 import json
 from pathlib import Path
+import subprocess
 
 import pytest
 
 from resume_api.jobs import feasibility
 
 
+@pytest.fixture(scope="session")
+def retained_transport_sources():
+    # Load Git objects before the per-test synthetic child fence.
+    root = Path.cwd()
+    proof = json.loads((root / feasibility.PROOF).read_bytes())
+    return {path: subprocess.check_output(["git", "show", f"{proof['executedRevision']}:{path}"], cwd=root)
+        for path in feasibility.CRITICAL_SOURCES}
+
+
 @pytest.fixture
-def accepted_copy(tmp_path, monkeypatch):
+def accepted_copy(tmp_path, monkeypatch, retained_transport_sources):
     root = Path.cwd()
     files = (feasibility.PROOF, feasibility.ACCEPTANCE, feasibility.MANIFEST, feasibility.VALIDATION)
     cache = {(feasibility.MILESTONE, path): (root / path).read_bytes() for path in files}
     proof = json.loads(cache[(feasibility.MILESTONE, feasibility.PROOF)])
     for path in feasibility.CRITICAL_SOURCES:
-        cache[(proof["executedRevision"], path)] = (root / path).read_bytes()
+        cache[(proof["executedRevision"], path)] = retained_transport_sources[path]
     for (_revision, path), raw in cache.items():
         target = tmp_path / path
         target.parent.mkdir(parents=True, exist_ok=True)

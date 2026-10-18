@@ -1,0 +1,65 @@
+{
+  "additionalProperties": false,
+  "properties": {
+    "action": {
+      "enum": [
+        "rename",
+        "formatting_date",
+        "add_source_text",
+        "remove_source",
+        "import_asset",
+        "remove_asset",
+        "export_docx",
+        "export_project",
+        "archive",
+        "restore",
+        "delete",
+        "undo",
+        "redo"
+      ],
+      "title": "Action",
+      "type": "string"
+    },
+    "key": {
+      "maxLength": 128,
+      "minLength": 1,
+      "pattern": "^[A-Za-z0-9_-]+$",
+      "title": "Key",
+      "type": "string"
+    },
+    "snapshotId": {
+      "maxLength": 128,
+      "minLength": 1,
+      "pattern": "^[A-Za-z0-9_-]+$",
+      "title": "Snapshotid",
+      "type": "string"
+    },
+    "targetId": {
+      "anyOf": [
+        {
+          "maxLength": 256,
+          "minLength": 1,
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Targetid"
+    },
+    "value": {
+      "default": "",
+      "maxLength": 64000,
+      "title": "Value",
+      "type": "string"
+    }
+  },
+  "required": [
+    "key",
+    "snapshotId",
+    "action"
+  ],
+  "title": "AgentProjectAction",
+  "type": "object"
+}

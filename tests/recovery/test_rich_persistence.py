@@ -62,6 +62,46 @@ def patch(workspace, text="Changed", identifier="change-1"):
             "beforeRevision": block.revision, "block": block.model_dump(by_alias=True)}]})
 
 
+@pytest.mark.asyncio
+async def test_extraction_diagnostics_survive_typing_undo_and_durable_reopen(tmp_path):
+    from packages.resume_core.background_inverse import inverse_mutation
+    from packages.resume_core.rich_mutations import locate
+    provider = CreationProvider()
+    store_root = tmp_path / "store"
+    service = RichProjectService(tmp_path / "operations", RulesStore(store_root), lambda: (provider, "fixture"))
+    try:
+        data = Path("tests/fixtures/recovery/E1.txt").read_bytes()
+        selected = await service.select(data, "E1.txt", True)
+        pid = selected.project_id
+        generation = service.start(pid)
+        await service.tasks[(pid, generation)]
+        before = service.read(pid).model_copy(deep=True)
+        report = before.project.facts.extraction.model_copy(deep=True)
+        block = next(block for block in before.project.document.blocks() if block.type == "paragraph"
+            and isinstance(block.content, list) and any(span.type == "text" for span in block.content)).model_copy(deep=True)
+        next(span for span in block.content if span.type == "text").text += " QA edit"
+        siblings, index, parent = locate(before.project.document, block.id)
+        request = RichMutation(schemaVersion=1, projectId=pid, clientMutationId="keep-report", actionId="keep-report",
+            kind="typing", capture={"sessionId": "qa", "actionId": "keep-report", "actionToken": 0, "dependencies": []},
+            steps=[{"kind": "put_block", "parentId": parent.id, "afterId": siblings[index - 1].id if index else None,
+                "beforeRevision": block.revision, "block": block.model_dump(by_alias=True), "keepChildren": True}])
+        service.mutate(pid, request)
+        edited = service.read(pid).model_copy(deep=True)
+        assert edited.project.facts.extraction == report
+        assert before.project.facts.extraction == report
+        undo = inverse_mutation(before, edited, mutation_id="undo-report", session_id="qa")
+        service.mutate(pid, undo)
+        assert service.read(pid).project.facts.extraction == report
+        transferred, *_ = open_rich_archive(service.portable(pid), "report-copy")
+        assert transferred.project.facts.extraction == report
+        assert service.originals[(pid, before.project.sources[0].id)] == data
+        assert len(provider.calls) == 2
+    finally:
+        await service.shutdown()
+    reopened = RichProjectService(tmp_path / "reopened", RulesStore(store_root), lambda: None)
+    assert reopened.read(pid).project.facts.extraction == report
+
+
 def test_rich_snapshot_and_portable_preserve_styles_ids_owned_image_bytes(tmp_path):
     workspace = without_sources(); asset, blob = image_asset(workspace)
     store = RichProjectStore(tmp_path / "store")
@@ -96,9 +136,9 @@ def test_unsupported_local_versions_stay_listed_unchanged_and_supported_projects
     assert {e.project_id for e in registry.entries} == {workspace.project_id, "unsupported"}
     assert path.read_bytes() == before
     store.tombstone("unsupported")
-    with pytest.raises(ProjectStoreFailure, match="PROJECT_VERSION_UNSUPPORTED"):
-        store.cleanup_deleted("unsupported")
-    assert path.read_bytes() == before
+    assert store.cleanup_deleted("unsupported").cleanup_status == "complete"
+    assert not path.exists()
+    assert store.load_all()[0][workspace.project_id][0] == workspace
 
 
 @pytest.mark.parametrize("version", [5, 99])
@@ -207,8 +247,12 @@ async def test_fresh_rich_creation_initial_docx_restart_and_portable_without_inf
     assert service.durability(identifier) == "durable" and workspace.project.renders
     from packages.resume_core.rich_presentation import authored_text
     units = workspace.project.sources[0].units
-    assert [authored_text(block) for block in workspace.project.document.regions[2].blocks] == [unit.text for unit in units]
-    assert "".join(authored_text(block) for block in workspace.project.document.regions[2].blocks) == data.decode()
+    from collections import Counter
+    import re
+    text = " ".join(authored_text(block) for block in workspace.project.document.blocks())
+    assert not (Counter(re.findall(r"\w+", data.decode())) - Counter(re.findall(r"\w+", text)))
+    assert all(region.blocks for region in workspace.project.document.regions)
+    assert len(workspace.project.import_coverage) == len(units)
     assert any(record.kind == "employment" for record in workspace.project.facts.records)
     assert {operation.kind for operation in workspace.project.operations} == {"assess_resume", "normalize_semantics", "render"}
     assert service.originals[(identifier, workspace.project.sources[0].id)] == data
@@ -250,7 +294,7 @@ async def test_technical_render_failure_keeps_imported_rich_content_but_cannot_c
 
 
 @pytest.mark.asyncio
-async def test_valid_empty_native_result_keeps_unresolved_source_editable_warned_and_portable(tmp_path):
+async def test_valid_empty_native_result_fails_with_recoverable_source_and_durable_error(tmp_path):
     from packages.resume_core.gui_normalization import GuiSemanticProposal
     from resume_api.providers.content import ContentResult, ReportedUsage
     from tests.recovery.employment_fixtures import employment_proposal
@@ -277,15 +321,14 @@ async def test_valid_empty_native_result_keeps_unresolved_source_editable_warned
     service = RichProjectService(tmp_path / "operations", RulesStore(tmp_path / "store"), lambda: (EmptyProvider(), "fixture"), clock=frozen_now)
     selected = await service.select(data, "pasted.txt", True)
     generation = service.start(selected.project_id); await service.tasks[(selected.project_id, generation)]
-    assert service.generations[selected.project_id].status == "completed"
+    assert service.generations[selected.project_id].status == "failed"
+    assert service.generations[selected.project_id].error_code == "FACT_EXTRACTION_EMPTY"
     workspace = service.read(selected.project_id)
-    assert "source_details_unresolved" in {warning.code for warning in workspace.warnings}
-    assert not any(record.kind == "employment" for record in workspace.project.facts.records)
-    literal = workspace.project.document.regions[2].blocks
-    units = workspace.project.sources[0].units
-    assert [block.content[0].text for block in literal] == [unit.text for unit in units]
-    assert all(block.provenance[0].evidence[0].text == block.content[0].text for block in literal)
+    assert workspace.project is None and workspace.pre_draft is not None
+    assert any(operation.error_code == "FACT_EXTRACTION_EMPTY" for operation in workspace.pre_draft.operations)
+    assert "".join(unit.text for unit in workspace.pre_draft.sources[0].units) == data.decode()
+    assert service.originals[(selected.project_id, workspace.pre_draft.selected_source_id)] == data
     reopened = RichProjectService(tmp_path / "operations-2", RulesStore(tmp_path / "store"), lambda: None, clock=frozen_now)
     assert reopened.read(selected.project_id) == workspace
     imported, *_ = open_rich_archive(reopened.portable(selected.project_id), "empty-import")
-    assert imported.project.document == workspace.project.document and imported.warnings == workspace.warnings
+    assert imported.pre_draft == workspace.pre_draft and imported.warnings == workspace.warnings

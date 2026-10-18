@@ -33,7 +33,8 @@
             "find",
             "facts",
             "source",
-            "history"
+            "history",
+            "resources"
           ],
           "title": "Kind",
           "type": "string"

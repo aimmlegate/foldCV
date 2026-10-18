@@ -77,6 +77,14 @@ class RichRenderSnapshot(Wire):
         return self
 
 
+class ImportCoverage(Wire):
+    source_id: Id
+    unit_id: Id
+    disposition: Literal["placed", "excluded"]
+    block_ids: list[Id]
+    reason: str | None
+
+
 class ProjectV5(Wire):
     schema_version: Literal[5]
     project_id: Id
@@ -90,6 +98,7 @@ class ProjectV5(Wire):
     operations: list[RichOperation]
     renders: list[RichRenderSnapshot]
     template: TemplateManifest
+    import_coverage: list[ImportCoverage] = Field(default_factory=list)
 
     @model_validator(mode="after")
     def identity(self) -> ProjectV5:
@@ -149,12 +158,19 @@ class RichMutationReplay(Wire):
     resulting_revision: Revision
 
 
+class WarningLocation(Wire):
+    source_id: Id
+    page: int | None = Field(default=None, ge=1)
+
+
 class RichWarning(Wire):
     id: Id
     code: Id
     block_ids: list[Id]
     record_ids: list[Id]
     evidence: list[Evidence]
+    count: int = Field(default=1, ge=1)
+    locations: list[WarningLocation] = Field(default_factory=list)
 
 
 class WorkspaceV6(Wire):

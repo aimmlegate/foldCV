@@ -29,6 +29,19 @@ from tests.recovery.test_gui_projects import finish
 from tests.recovery.test_project_store import service
 
 
+def test_equal_extraction_warnings_retain_count_sources_and_pages():
+    from packages.resume_core.import_diagnostics import source_warnings
+    captured = normalization_request("Readable source\n")
+    source = captured.sources[0]
+    from packages.resume_core.models.contracts import SourceWarning
+    source.warnings = ["IMAGE"] * 7 + ["UNKNOWN_EXTRACTION_CODE"]
+    source.warning_details = [SourceWarning(code="IMAGE", page=page) for page in range(1, 8)] + [SourceWarning(code="UNKNOWN_EXTRACTION_CODE", page=3)]
+    notices = source_warnings([source])
+    assert [(notice.code, notice.count) for notice in notices] == [("IMAGE", 7), ("UNKNOWN_EXTRACTION_CODE", 1)]
+    assert [location.page for location in notices[0].locations] == list(range(1, 8))
+    assert {location.source_id for location in notices[0].locations} == {source.id}
+
+
 @pytest.mark.parametrize("scope", ["global", "other-job"])
 def test_wrong_job_citations_and_unknown_references_preserve_text_and_neighboring_fields(scope):
     request = draft_request()
@@ -94,17 +107,45 @@ def test_invalid_draft_response_retains_literal_prose_and_accounts_for_single_ca
     assert "IMPORT_CONTENT_RECOVERED" in {mark.code for mark in result.annotations}
 
 
-def test_invalid_normalization_response_keeps_original_text_editable(tmp_path):
+def test_invalid_normalization_response_fails_explicitly_and_preserves_source(tmp_path):
     request = normalization_request("Unusual resume layout\nKeep every source line\n")
+    before = request.model_dump(mode="json", by_alias=True)
     provider = InvalidResponse()
-    normalized, usage = GuiNormalizationContentService(provider, "fixture").run(request, RULES, OperationFiles(tmp_path), threading.Event())
-    assert usage["logicalAttempts"] == provider.calls == 1 and normalized._native_recovery_count > 0
-    from packages.resume_core.gui_drafting import GuiDraftRequest
-    draft = GuiDraftRequest(projectId="fallback", projectRevision=1, documentRevision=1,
-                            normalized=normalized, formattingAsOf=request.formatting_as_of)
-    result, _ = GuiDraftingContentService(InvalidResponse(), "fixture").run(draft, RULES, OperationFiles(tmp_path), threading.Event())
-    assert result.document.profile.text.text == "\n".join(unit.text for unit in request.sources[0].units)
-    assert [unit.text for unit in normalized.sources[0].units] == [unit.text for unit in request.sources[0].units]
+    with pytest.raises(ContentFailure, match="INVALID_RESULT") as error:
+        GuiNormalizationContentService(provider, "fixture").run(request, RULES, OperationFiles(tmp_path), threading.Event())
+    assert error.value.logical_attempts == provider.calls == 1
+    assert error.value.usage.input_tokens == 11 and error.value.usage.output_tokens == 7
+    assert request.model_dump(mode="json", by_alias=True) == before
+
+
+def test_empty_candidate_recovery_is_not_counted_as_extracted_facts(tmp_path):
+    captured = normalization_request("Candidate\nWork experience\nExample employer 2020–2024\n")
+    class Empty:
+        calls = 0
+        def generate(self, request, files, cancel):
+            self.calls += 1
+            return ContentResult({"candidate": {}}, ReportedUsage(input_tokens=19, output_tokens=3), "fixture", "fixture", 0, 1)
+    provider = Empty()
+    with pytest.raises(ContentFailure, match="FACT_EXTRACTION_EMPTY") as error:
+        GuiNormalizationContentService(provider, "fixture").run(captured, RULES, OperationFiles(tmp_path), threading.Event())
+    assert error.value.logical_attempts == provider.calls == 1
+    assert captured.sources[0].units[-1].text == "Example employer 2020–2024\n"
+
+
+def test_partial_extraction_reports_present_missing_sections_without_inventing_absent_fields():
+    from packages.resume_core.extraction_outcome import extraction_report
+    from tests.recovery.employment_fixtures import employment_proposal
+    from tests.recovery.test_normalization_transport import source
+    captured = source()
+    proposal = employment_proposal(captured)
+    proposal.education = []
+    normalized = normalize_employment(captured, proposal, normalize_candidate(captured, proposal, RULES))
+    report = extraction_report(normalized, request_bytes=1234, recovered_rows=1)
+    assert report.status == "partial" and report.fact_count > 0
+    assert report.counts["employment"] == 3 and report.counts["education"] == 0
+    assert any(issue.code == "FACT_SECTION_OMITTED" and issue.section == "education" for issue in report.unresolved)
+    assert any(issue.code == "FACT_ROWS_RECOVERED" for issue in report.unresolved)
+    assert normalized.education == [] and len(normalized.employment) == 3
 
 
 @pytest.mark.parametrize("stage", ["normalization", "draft"])

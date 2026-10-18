@@ -18,6 +18,7 @@ export type Text = string;
  * @maxItems 100
  */
 export type Affected = AgentAnchor[];
+export type Affectedcount = number | null;
 export type Kind1 = "entity";
 export type Fingerprint1 = string;
 export type Kind2 = "query";
@@ -26,7 +27,7 @@ export type Cursor = string | null;
  * @maxItems 100
  */
 export type Ids = string[];
-export type Kind3 = "context" | "document" | "find" | "facts" | "source" | "history";
+export type Kind3 = "context" | "document" | "find" | "facts" | "source" | "history" | "resources";
 export type Parentid = string | null;
 export type Text1 = string;
 /**
@@ -566,7 +567,7 @@ export type Recordid6 = string;
 export type Ownerepoch = number;
 export type Previewsha256 = string;
 /**
- * @maxItems 24
+ * @maxItems 64
  */
 export type Readsnapshotids = string[];
 export type Requestsha256 = string;
@@ -654,6 +655,7 @@ export type Code1 =
   | "AGENT_TOOL_LIMIT"
   | "AGENT_OUTPUT_LIMIT"
   | "AGENT_CONTEXT_LIMIT"
+  | "AGENT_ARGUMENT_INVALID"
   | "AGENT_WEB_DISABLED"
   | "AGENT_SOURCE_UNAVAILABLE"
   | "AGENT_SOURCE_DENIED"
@@ -689,6 +691,7 @@ export type Toolkey1 = string;
  * @maxItems 100
  */
 export type Affected1 = AgentAnchor[];
+export type Affectedcount1 = number | null;
 export type Batchid1 = string | null;
 export type Disposition1 = "prepared" | "no_change";
 export type Preview = string;
@@ -1064,12 +1067,12 @@ export type Generation = number;
 export type Key1 = string;
 export type Kind31 = "entity" | "structure" | "query" | "source" | "rules";
 /**
- * @maxItems 100
+ * @maxItems 4096
  */
 export type Reads = GenerationStamp[];
 export type Schemaversion1 = 1;
 /**
- * @maxItems 100
+ * @maxItems 4096
  */
 export type Writes = GenerationStamp[];
 export type AgentMessage = {
@@ -1098,7 +1101,7 @@ export type Nextcursor = string | null;
 export type Runid3 = string;
 export type Truncated = boolean;
 /**
- * @maxItems 24
+ * @maxItems 64
  */
 export type Snapshots = AgentReadSnapshot[];
 /**
@@ -1367,6 +1370,7 @@ export interface AgentBatchJournal {
 }
 export interface AgentEditBatch {
   affected: Affected;
+  affectedCount?: Affectedcount;
   dependencies: Dependencies1;
   factRecordIds: Factrecordids;
   id: Id1;
@@ -1951,6 +1955,7 @@ export interface AgentError {
 }
 export interface AgentPrepareResult {
   affected: Affected1;
+  affectedCount?: Affectedcount1;
   batchId: Batchid1;
   disposition: Disposition1;
   preview: Preview;
@@ -1990,6 +1995,7 @@ export interface AgentJournalRequest {
   message: Message1;
   projectRevision: Projectrevision3;
   scope: Scope2;
+  selectionContext?: RichSelection | null;
   settingsRevision: Settingsrevision;
 }
 export interface AgentReadSnapshot {

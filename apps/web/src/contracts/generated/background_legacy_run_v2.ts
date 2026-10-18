@@ -11,6 +11,7 @@ export type Publication =
   | "outcome_unknown"
   | "discarded"
   | "cancelled";
+export type Accessrevision = number;
 export type Allowedits = boolean;
 export type Allowweb = boolean;
 export type Clientrequestid = string;
@@ -45,6 +46,7 @@ export type Code =
   | "AGENT_TOOL_LIMIT"
   | "AGENT_OUTPUT_LIMIT"
   | "AGENT_CONTEXT_LIMIT"
+  | "AGENT_ARGUMENT_INVALID"
   | "AGENT_WEB_DISABLED"
   | "AGENT_SOURCE_UNAVAILABLE"
   | "AGENT_SOURCE_DENIED"
@@ -118,6 +120,7 @@ export interface JobLegacyRunV2 {
   schemaVersion: Schemaversion;
 }
 export interface AgentRun {
+  accessRevision?: Accessrevision;
   allowEdits: Allowedits;
   allowWeb: Allowweb;
   clientRequestId: Clientrequestid;
@@ -134,6 +137,7 @@ export interface AgentRun {
   projectId: Projectid;
   savedBatchId: Savedbatchid;
   scope: Scope;
+  selectionContext?: RichSelection | null;
   settingsRevision: Settingsrevision;
   state: State;
   usage: AgentUsage | null;

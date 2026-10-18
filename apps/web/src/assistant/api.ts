@@ -1,4 +1,7 @@
 import type { AgentCapabilities } from "../contracts/generated/agent_capabilities";
+import type { AgentAccess } from "../contracts/generated/agent_access";
+import type { AgentHistoryOffer } from "../contracts/generated/agent_history_offer";
+import type { AgentProjectOperations } from "../contracts/generated/agent_project_operations";
 import type { AgentSettings } from "../contracts/generated/agent_settings";
 import type { AgentSettingsRequest } from "../contracts/generated/agent_settings_request";
 import type { AgentConversation } from "../contracts/generated/agent_conversation";
@@ -21,7 +24,7 @@ import { validateContract } from "../contracts/validate";
 import type { PreparedApi } from "./editor-bridge";
 
 type MessagePage = Omit<AgentMessagePage, "items"> & { items: AgentMessage[] };
-type Replies = { agent_capabilities: AgentCapabilities; agent_settings: AgentSettings; agent_conversation: AgentConversation;
+type Replies = { agent_project_operations: AgentProjectOperations; agent_access: AgentAccess; agent_capabilities: AgentCapabilities; agent_settings: AgentSettings; agent_conversation: AgentConversation;
   agent_conversation_page: AgentConversationPage; agent_message_page: MessagePage; agent_resource_page: AgentResourcePage;
   agent_lease: AgentLease; agent_run: AgentRun; agent_run_read: AgentRunRead; agent_claim_result: AgentClaimResult;
   agent_commit_result: AgentCommitResult; agent_edit_receipt: AgentEditReceipt; agent_empty_request: Record<string, never>;
@@ -68,6 +71,14 @@ export class AgentBrowserApi {
     return value;
   }
   settings(): Promise<AgentSettings> { return this.request("agent_settings", "/v1/settings/assistant", "GET"); }
+  access(): Promise<AgentAccess> { return this.request("agent_access", this.prefix + "/access", "GET"); }
+  operations(): Promise<AgentProjectOperations> { return this.request("agent_project_operations", this.prefix + "/operations", "GET"); }
+  offerHistory(value: AgentHistoryOffer): Promise<Record<string, never>> {
+    return this.request("agent_empty_request", this.prefix + "/history/offer", "POST", value);
+  }
+  setAccess(expectedRevision: number, readOnly: boolean): Promise<AgentAccess> {
+    return this.request("agent_access", this.prefix + "/access", "PUT", { expectedRevision, readOnly });
+  }
   saveSettings(value: AgentSettingsRequest): Promise<AgentSettings> { return this.request("agent_settings", "/v1/settings/assistant", "PUT", value); }
   capabilities(flags: AgentFlags): Promise<AgentCapabilities> {
     return this.request("agent_capabilities", this.prefix + "/capabilities", "GET", {}, {

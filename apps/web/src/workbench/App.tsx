@@ -19,12 +19,13 @@ import { useGlobalJobs } from "../background/useGlobalJobs";
 import { projectActivity } from "../background/status";
 import { BackgroundJobs } from "./background/BackgroundJobs";
 import { Icon } from "./ui/Icon";
+import { groupedWarnings, processingFailure } from "./import/notices";
 
 export function App({ portalHost }: { portalHost: HTMLElement }) {
   const workspace = useResumeWorkspace();
   const jobs = useGlobalJobs();
   const { response, writer, background, projects, input, setInput, textDraft, error, status, setStatus, busy, settings, setSettings,
-    editor, assistant, acknowledge, action, fresh, open, remove, process, upload, exportFile } = workspace;
+    editor, assistant, acknowledge, action, fresh, open, remove, archive, process, upload, exportFile } = workspace;
   const [collapsed, setCollapsed] = useState(() => innerWidth <= 600);
   useEffect(() => {
     const narrow = matchMedia("(max-width: 600px)"), collapse = () => { if (narrow.matches) setCollapsed(true); };
@@ -66,7 +67,7 @@ export function App({ portalHost }: { portalHost: HTMLElement }) {
   const navigate = (id: string) => open(id).then(done => { if (done) { setSourceOpen(false); if (innerWidth <= 600) setCollapsed(true); } return done; });
   return <main className={`app-shell${collapsed ? " history-collapsed" : ""}`} data-app="foldcv" data-busy={busy}>
     <History projects={projects} activeId={response?.workspace.projectId ?? null} activity={projectActivity(jobs.view.jobs)} busy={busy || creating && !background} collapse={() => setCollapsed(true)}
-      fresh={() => { void fresh(); setSourceOpen(false); if (innerWidth <= 600) setCollapsed(true); }} open={navigate} remove={remove} openFile={() => openFile("open")} settings={openSettings}
+      fresh={() => { void fresh(); setSourceOpen(false); if (innerWidth <= 600) setCollapsed(true); }} open={navigate} remove={remove} archive={archive} openFile={() => openFile("open")} settings={openSettings}
       connection={connection?.snapshot.state === "connected" ? "Codex · подписка" : connection?.snapshot.state === "unchecked" ? "Подключение не проверено" : "Модель отключена"} />
     <section className="main-area">
       <Header title={settings ? "Настройки" : response?.identity?.title ?? response?.workspace.title ?? (workspace.loading ? "Открываем резюме…" : "Новое резюме")}
@@ -84,16 +85,19 @@ export function App({ portalHost }: { portalHost: HTMLElement }) {
           <RichEditor key={response.workspace.projectId} initial={response} writer={writer} acknowledge={acknowledge} onStatus={setStatus} ref={editor} portalHost={portalHost}
             onHistoryNavigation={() => assistant.current?.history()} onAssistantFence={saved => assistant.current?.fence(saved)}
             assistant={<AssistantDrawer key={response.workspace.projectId} projectId={response.workspace.projectId} editor={editor} settingsOpen={settings} ref={assistant} background={writer !== null}
+              onProjectLifecycle={kind => workspace.projectLifecycle(response.workspace.projectId, kind)}
               title={projectTitle} settings={openSettings} />}
-            contextActions={response.workspace.warnings.length > 0 && <button onClick={() => setWarningsOpen(true)}>Замечания к исходнику</button>} />
+            contextActions={response.workspace.warnings.length > 0 && <button className="text-button" onClick={() => setWarningsOpen(true)}>Замечания к исходнику</button>} />
         </>}
         {view === "source" && !workspace.loading && <SourceForm input={input} change={setInput} textDraft={textDraft} busy={busy || creating} sourceName={source?.originalName ?? null}
-          process={() => { setSourceOpen(false); void process(); }} warnings={response?.workspace.preDraft?.warnings.map(warningLabel) ?? []}
-          failure={generation?.status === "failed" ? "Не удалось завершить обработку." : generation?.status === "cancelled" ? "Обработка отменена." : generation?.status === "interrupted" ? "Обработка прервана." : null} />}
+          process={() => { setSourceOpen(false); void process(); }} warnings={groupedWarnings(response?.workspace.preDraft?.warnings ?? [], response?.workspace.preDraft?.sources)}
+          failure={processingFailure(generation)} />}
       </div>
       {settingsVisited && <div className="screen" hidden={!settings}><Settings close={() => void action(async () => { await editor.current?.resume(); setSettings(false); })} connectionChanged={setConnection} /></div>}
       <Dialog open={warningsOpen} close={() => setWarningsOpen(false)} title="Замечания к исходнику">
-        {response?.workspace.warnings.map(warning => <p className="dialog-copy" key={warning.id}>{warningLabel(warning.code)}</p>)}
+        {response?.workspace.warnings.map(warning => <p className="dialog-copy" key={warning.id}>{warningLabel(warning.code)}
+          {(warning.count ?? 1) > 1 && ` Повторов: ${warning.count}.`}
+          {(warning.locations ?? []).map(location => `${location.sourceId}${location.page ? `, стр. ${location.page}` : ""}`).join("; ")}</p>)}
       </Dialog>
     </section>
     {fileMode && <FileDialog key={fileMode} mode={fileMode} title={projectTitle} subtitle={response?.identity?.subtitle ?? ""} filename={filename}

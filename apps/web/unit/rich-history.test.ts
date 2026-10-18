@@ -1,6 +1,60 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { SessionHistory, type CellChange, type DependencyCapture } from "../src/rich/history";
+import fixture from "../../../tests/fixtures/rich_workspace.json" with { type: "json" };
+import { validateRichWorkspaceShape } from "../src/rich/validate";
+import { factCells, factsFromCells, factFieldCell } from "../src/rich/fact-cells";
+import { documentCells, type StoredBlock } from "../src/rich/document-cells";
+import { historyMutation } from "../src/rich/history-offer";
+
+test("prepared Undo and Redo use the same history cursor and preserve request cancellation", () => {
+  const h = history();
+  h.commit("typing", [edit(h, "block:other", "Edited"), { key: "request:pending", before: null, after: "pending" }]);
+  const offered = h.navigation("undo");
+  assert.ok(offered);
+  assert.equal(h.position, 1);
+  const saved = offered.changes.filter(change => !change.key.startsWith("request:"));
+  const reservation = h.reserve("native-undo");
+  assert.ok(reservation);
+  assert.equal(h.publishNavigation(reservation, "undo", [{ ...saved[0]!, after: "Foreign" }]), false);
+  assert.equal(h.position, 1);
+  assert.equal(h.publishNavigation(reservation, "undo", saved), true);
+  assert.equal(h.position, 0);
+  assert.equal(h.length, 1);
+  assert.equal(h.read("request:pending"), null);
+  const redo = h.navigation("redo"), next = h.reserve("native-redo");
+  assert.ok(redo && next);
+  assert.equal(h.publishNavigation(next, "redo", redo.changes.filter(change => !change.key.startsWith("request:"))), true);
+  assert.equal(h.position, 1);
+  assert.equal(h.length, 1);
+  assert.equal(h.read("block:other"), "Edited");
+});
+
+test("history offers reuse the mutation compiler and fact cells retain extraction diagnostics", () => {
+  const value: unknown = structuredClone(fixture);
+  assert.ok(validateRichWorkspaceShape(value) && value.project);
+  const project = value.project;
+  project.facts.extraction = { status: "partial", factCount: project.facts.records.length,
+    counts: { candidate: 1 }, requestBytes: 80000, recoveredRows: 0, unresolved: [] };
+  const cache = new Map<string, StoredBlock>(), current = new Map([...documentCells(project.document, cache), ...factCells(project.facts)]);
+  const h = new SessionHistory("editor-owner", current), candidate = project.facts.records.find(record => record.kind === "candidate");
+  assert.ok(candidate);
+  const key = factFieldCell(candidate.id, "name"), before = h.read(key);
+  assert.ok(before);
+  const changed = JSON.stringify({ ...candidate.name, rawText: "Changed by user", value: "Changed by user" });
+  h.commit("panel", [{ key, before, after: changed }]);
+  const cells = new Map(current);cells.set(key, changed);
+  const edited = { ...project, facts: factsFromCells(cells, project.facts) };
+  assert.deepEqual(edited.facts.extraction, project.facts.extraction);
+  const undo = h.navigation("undo");assert.ok(undo);
+  const request = historyMutation(edited, h.session, "undo", undo.changes, cells, cache);
+  assert.ok(request);
+  assert.equal(request.kind, "undo");
+  assert.equal(request.capture.sessionId, h.session);
+  const restored = request.steps.find(step => step.kind === "put_record");assert.ok(restored?.kind === "put_record");
+  assert.equal(restored.record.kind, "candidate");
+  if (restored.record.kind === "candidate") assert.equal(restored.record.name.rawText, candidate.name.rawText);
+});
 
 function history() { return new SessionHistory("session-1", new Map([
   ["block:name", "Alex"], ["fact:name", "Alex"], ["block:narrative", "Alex leads"],

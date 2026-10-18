@@ -12,6 +12,8 @@ import type { RichMutation } from "../contracts/generated/rich_mutation";
 import type { ImageSessionRequest } from "../contracts/generated/image_session_request";
 import { documentCells, type StoredBlock } from "./document-cells";
 import { factCells, factsFromCells } from "./fact-cells";
+import { historyMutation } from "./history-offer";
+import type { AgentHistoryOffer } from "../contracts/generated/agent_history_offer";
 import { RichSynchronization, selectionChecksum, type PanelCommand } from "./synchronization";
 import { PreparedEditorBridge, type PreparedApi } from "../assistant/editor-bridge";
 import { anchorCurrent } from "../assistant/presentation";
@@ -44,8 +46,7 @@ import { Toolbar, type ToolbarCommand } from "../workbench/editor/Toolbar";
 import { RewritePanel } from "../workbench/editor/RewritePanel";
 import { LinkDialog } from "../workbench/editor/LinkDialog";
 import { Icon } from "../workbench/ui/Icon";
-import { restoreEmptyRegions } from "../workbench/editor/regions";
-import { BlockPanel } from "../workbench/editor/BlockPanel";
+import { projectRegionChildren } from "../workbench/editor/regions";
 import { SourceDialog } from "../workbench/editor/SourceDialog";
 import { EditorNotices } from "../workbench/editor/EditorNotices";
 import { allowsBasicEdit, basicPastedSlice } from "./basic-editing";
@@ -127,7 +128,8 @@ export type CapturedEditorSelection = { selection: Omit<RichSelection, "capture"
 export type RichEditorHandle = { flush: () => Promise<RichProjectResponse>; undo: () => void; redo: () => void;
   background: boolean; navigate: () => Promise<void>; resume: () => Promise<void>;
   sessionId: string; captureSelection: () => CapturedEditorSelection | null;
-  assistantBaseline: (captured: CapturedEditorSelection | null) => Promise<{ response: RichProjectResponse; selection: RichSelection | null }>;
+  assistantBaseline: (captured: CapturedEditorSelection | null) => Promise<{ response: RichProjectResponse; selection: RichSelection | null;
+    historyOffers: Pick<AgentHistoryOffer, "undo" | "redo"> }>;
   focusFinding: (anchor: AgentFinding["anchors"][number]) => boolean;
   applyAssistant: (batchId: string, api: PreparedApi) => Promise<void> };
 export function RichEditor({ initial, acknowledge, onStatus, ref, onHistoryNavigation, onAssistantFence, portalHost, contextActions, assistant, writer: writerConnection = null }: { initial: RichProjectResponse;
@@ -157,18 +159,14 @@ export function RichEditor({ initial, acknowledge, onStatus, ref, onHistoryNavig
   const linkCapture = useRef<{ doc: ProseMirrorNode; bookmark: SelectionBookmark } | null>(null);
   const imageTarget = useRef<string | undefined>(undefined);
   const [rewriteSource, setRewriteSource] = useState("");
-  const [blockTarget, setBlockTarget] = useState<string | null>(null);
   useEffect(() => {
-    const narrow = matchMedia("(max-width: 600px)"), collapse = () => { if (narrow.matches) { setFactsVisible(false); setBlockTarget(null); } };
+    const narrow = matchMedia("(max-width: 600px)"), collapse = () => { if (narrow.matches) setFactsVisible(false); };
     narrow.addEventListener("change", collapse); return () => narrow.removeEventListener("change", collapse);
   }, []);
-  const selectedBlock = useRef<string | null>(null);
-  selectedBlock.current = blockTarget;
   const [syncRecords, setSyncRecords] = useState(initial.workspace.syncRecords);
   const rewriteSelection = useRef<ReturnType<typeof selectedRange>>(null);
   const rewriteCapture = useRef<CapturedEditorSelection | null>(null);
   const [editorWarning, setEditorWarning] = useState("");
-  const [targets, setTargets] = useState<{ id: string; label: string }[]>([]);
   const [applying, setApplying] = useState(false);
   const [recovery, setRecovery] = useState(false);
   const [writerMode, setWriterMode] = useState<WriterMode | null>(null);
@@ -183,6 +181,7 @@ export function RichEditor({ initial, acknowledge, onStatus, ref, onHistoryNavig
     writer: null as BackgroundWriter | null, backgroundHistory: false, compositionWaiters: new Set<() => void>(),
     latestSelection: null as ReturnType<typeof selectedRange>,
     assistantFlush: async (): Promise<RichProjectResponse> => { throw new Error("Редактор ещё открывается"); },
+    historyOffers: (): Pick<AgentHistoryOffer, "undo" | "redo"> => ({ undo: null, redo: null }),
     timeline: async (): Promise<TimelineReport> => ({ warnings: [], estimates: [] }),
     cascadePreview: async (_anchor: DateAnchor): Promise<DateCascadeProposal> => { throw new Error("Редактор ещё открывается"); },
     cascadeApply: async (_proposal: DateCascadeProposal): Promise<void> => {},
@@ -198,7 +197,7 @@ export function RichEditor({ initial, acknowledge, onStatus, ref, onHistoryNavig
       handleDOMEvents: { drop: (_view, event) => assets.paste(event) },
     } })] })],
     prosemirrorPlugins: [tableIdentityPlugin(), bindingIdentityPlugin(), structureIdentityPlugin(), pastedRegionsPlugin(), presentationPlugin(() => presentation.blocks, presentationLogos),
-      prototypePresentation(() => prototypeFacts.current, () => selectedBlock.current), new Plugin({
+      prototypePresentation(() => prototypeFacts.current, () => null), new Plugin({
     key: new PluginKey("foldcv-rich-session"), filterTransaction: transaction => {
       if (!transaction.docChanged) return true;
       if ((bridge.applying || bridge.fenced || bridge.writer && !bridge.writer.writable) && !bridge.replaying) return false;
@@ -254,7 +253,6 @@ export function RichEditor({ initial, acknowledge, onStatus, ref, onHistoryNavig
     const next = editor.transact(tr => selectedRange(tr)); bridge.latestSelection = next; setSelecting(next !== null);
     refresh(value => value + 1);
   }), [editor, bridge]);
-  useEffect(() => { editor.transact(tr => { tr.setMeta("foldcv-uir-target", true); }); }, [editor, blockTarget]);
   const captureSelected = useCallback((selection: ReturnType<typeof selectedRange>): CapturedEditorSelection | null => {
     if (!selection || !bridge.history) return null;
     const keys = new Set(selection.blockIds.map(id => `block:${id}`));
@@ -377,8 +375,8 @@ export function RichEditor({ initial, acknowledge, onStatus, ref, onHistoryNavig
       document.regions.forEach(region => region.blocks.forEach(remember));
       editor.transact(tr => {
         const caret = captureCaret(tr);
-        document.regions.forEach(region => editor.updateBlock(region.id, { children: region.blocks.map(toBlock) }));
-        restoreEmptyRegions(tr, new Set(document.regions.filter(region => !region.blocks.length).map(region => region.id)));
+        projectRegionChildren(tr, document.regions.map(region => ({ id: region.id, children: region.blocks.map(toBlock) })),
+          (id, children) => editor.updateBlock(id, { children }));
         restoreTableIdentities(tr, tableIds(document));
         restoreCaret(tr, caret);
       });
@@ -440,16 +438,13 @@ export function RichEditor({ initial, acknowledge, onStatus, ref, onHistoryNavig
         try {
           editor.transact(tr => {
             const caret = captureCaret(tr);
-            const empty = new Set<string>();
-            originalDocument.regions.forEach(region => {
-            const value = next.get(`region:${region.id}`);
-            const ids: unknown = value ? JSON.parse(value) : [];
-            if (!Array.isArray(ids) || !ids.every((id: unknown) => typeof id === "string")) throw new Error("History region is invalid");
-            const children = ids.map((id: string) => toBlock(rebuild(id, next)));
-            if (!children.length) empty.add(region.id);
-            editor.updateBlock(region.id, { children });
+            const regions = originalDocument.regions.map(region => {
+              const value = next.get(`region:${region.id}`);
+              const ids: unknown = value ? JSON.parse(value) : [];
+              if (!Array.isArray(ids) || !ids.every((id: unknown) => typeof id === "string")) throw new Error("History region is invalid");
+              return { id: region.id, children: ids.map((id: string) => toBlock(rebuild(id, next))) };
             });
-            restoreEmptyRegions(tr, empty);
+            projectRegionChildren(tr, regions, (id, children) => editor.updateBlock(id, { children }));
             const tables = new Map<string, TableRowIdentity[]>();
             for (const value of next.values()) {
               const stored = value ? bridge.values.get(value) : undefined;
@@ -478,6 +473,15 @@ export function RichEditor({ initial, acknowledge, onStatus, ref, onHistoryNavig
       if (context.mode !== "prepared") queueMicrotask(() => { void publishImageReferences().catch(error => onStatus(error instanceof Error ? error.message : "IMAGE_IMPORT_FAILED")); });
     }, context => !bridge.writer || bridge.writer.writable || context.mode === "prepared" || bridge.backgroundHistory);
     bridge.history = history;
+    bridge.historyOffers = () => {
+      const current = queue.baseline.workspace.project;
+      if (!current || bridge.writer) return { undo: null, redo: null };
+      const offer = (direction: "undo" | "redo") => {
+        const value = history.navigation(direction);
+        return value ? historyMutation(current, bridge.session, direction, value.changes, bridge.current, bridge.values) : null;
+      };
+      return { undo: offer("undo"), redo: offer("redo") };
+    };
     const sync = new RichSynchronization({ history, queue, current: () => bridge.current, background: writerConnection !== null,
       cells: response => {
         const current = response.workspace.project; if (!current) throw new Error("Document missing");
@@ -720,13 +724,6 @@ export function RichEditor({ initial, acknowledge, onStatus, ref, onHistoryNavig
       let next: Map<string, CellValue>;
       try { const doc = document(); next = new Map([...bridge.current].filter(([key]) => !key.startsWith("block:") && !key.startsWith("region:")));
         for (const [key, value] of cells(doc)) next.set(key, value); bridge.projectionError = null;
-        const destinations: { id: string; label: string }[] = doc.regions.map(region => ({ id: region.id,
-          label: region.role === "header" ? "Заголовок" : region.role === "sidebar" ? "Боковая колонка" : "Основная колонка" }));
-        const title = (block: RichBlock): string => Array.isArray(block.content) ? block.content.map(span => span.type === "link"
-          ? span.content.map(text => text.text).join("") : span.text).join("") : "";
-        const visit = (block: RichBlock) => { if (block.type === "section") destinations.push({ id: block.id,
-          label: title(block) || block.children.map(title).find(text => text.trim()) || "Раздел" }); block.children.forEach(visit); };
-        doc.regions.forEach(region => region.blocks.forEach(visit)); setTargets(destinations);
       }
       catch (error) { bridge.projectionError = error instanceof Error ? error.message : "RICH_CONTENT_UNSUPPORTED"; onStatus(bridge.projectionError); return; }
       const changes: CellChange[] = [];
@@ -864,7 +861,8 @@ export function RichEditor({ initial, acknowledge, onStatus, ref, onHistoryNavig
     if (!valid()) throw new Error("AGENT_STALE_READ");
     const response = await bridge.assistantFlush(), project = response.workspace.project;
     if (!valid() || !project) throw new Error("AGENT_STALE_READ");
-    if (!captured) return { response, selection: null };
+    const historyOffers = bridge.historyOffers();
+    if (!captured) return { response, selection: null, historyOffers };
     const revisions = new Map<string, number>(), blocksById = new Map<string, RichBlock>();
     function visit(blocks: RichBlock[]) { for (const block of blocks) { revisions.set(block.id, block.revision); blocksById.set(block.id, block); visit(block.children); } }
     project.document.regions.forEach(region => visit(region.blocks));
@@ -884,7 +882,7 @@ export function RichEditor({ initial, acknowledge, onStatus, ref, onHistoryNavig
         dependencies } };
     selection.textSha256 = await selectionChecksum(project.document, selection);
     if (!valid()) throw new Error("AGENT_STALE_READ");
-    return { response, selection };
+    return { response, selection, historyOffers };
   }, applyAssistant: async (batchId, api) => {
     if (!bridge.prepared) throw new Error("Редактор ещё открывается");
     await bridge.prepared.apply(batchId, api);
@@ -900,7 +898,7 @@ export function RichEditor({ initial, acknowledge, onStatus, ref, onHistoryNavig
     if (command === "undo") bridge.undo();
     else if (command === "redo") bridge.redo();
     else if (command === "facts") setFactsVisible(value => !value);
-    else if (command === "block") { const target = blockTarget ? null : commandBlock(editor.getTextCursorPosition().block.id, id => editor.getBlock(id)).id; setBlockTarget(target); }
+    else if (command === "source") setSourceOpen(true);
     else if (command === "rewrite") openRewrite();
     else if (command === "image") { imageTarget.current = commandBlock(editor.getTextCursorPosition().block.id, id => editor.getBlock(id)).id; imageInput.current?.click(); }
     else if (command === "link") {
@@ -934,7 +932,7 @@ export function RichEditor({ initial, acknowledge, onStatus, ref, onHistoryNavig
     </>
     <div className="contents uir-editor-session">
     <fieldset className="contents uir-editor-controls" disabled={applying || recovery || writerMode === "read_only" || writerMode === "detached"}>
-    <><Toolbar command={toolbarCommand} factsVisible={factsVisible} blockVisible={blockTarget !== null}
+    <><Toolbar command={toolbarCommand} factsVisible={factsVisible}
       canUndo={!factIntents.pending.length && (bridge.history?.position ?? 0) > 0} canRedo={!factIntents.pending.length && (bridge.history?.position ?? 0) < (bridge.history?.length ?? 0)} selecting={selecting}
       active={{ bold: editor.getActiveStyles().bold === true, italic: editor.getActiveStyles().italic === true, underline: editor.getActiveStyles().underline === true }}
       style={(() => { const block = editor.getTextCursorPosition().block; return block.type === "heading" && block.props.level === 2 ? "h2" : block.type === "heading" && block.props.level === 3 ? "h3" : "p"; })()}
@@ -957,18 +955,17 @@ export function RichEditor({ initial, acknowledge, onStatus, ref, onHistoryNavig
       timeline={ready ? <Timeline facts={facts} anchors={anchors} controls={timelineControls} /> : null} />
     </fieldset>
     <div className="document-workspace">
-    <div className="document-context"><div className="context-left"><span>Исходный текст</span><span>Шаблон FoldCV</span></div><div className="context-notices">
+    <div className="editor-status-actions">
       {applying && <span className="editor-applying" role="status">Сохраняем правки…</span>}
       <EditorNotices mode={writerMode} localDraft={!!writerConnection?.local} warning={editorWarning} clearWarning={() => setEditorWarning("")}
         resolveDraft={async choice => { await bridge.writer?.resolveDraft(choice); location.reload(); }} syncRecords={syncRecords}
         resolve={id => bridge.resolve(id)} retry={id => bridge.retry(id)} report={setEditorWarning}
         dismiss={async id => { const response = await projectRequest(`/${initial.workspace.projectId}/sync/${id}`, "POST", { status: "stale" }); setSyncRecords(response.workspace.syncRecords); }} />
-      {contextActions}</div></div>
+      {contextActions}</div>
     <fieldset className="contents uir-editor-controls" disabled={applying || recovery}>
     <div className="paper-scroll">
     <div className="cv-document resume-paper uir-prototype" data-project-id={initial.workspace.projectId}
       data-history-position={bridge.history?.position ?? 0} data-history-length={bridge.history?.length ?? 0} data-composing={bridge.composing}>
-      <div className="paper-kicker"><span>РЕЗЮМЕ СПЕЦИАЛИСТА</span><span>F / РЕЗЮМЕ</span></div>
       <div className="uir-engine-sheet"><span className="template-wordmark" aria-label="generic">generic</span>
       <BlockNoteView editor={editor} theme="light" linkToolbar={!selecting} filePanel={false} slashMenu={false} formattingToolbar={false} sideMenu={false} tableHandles={false}
         {...(portalHost ? { portalElements: { default: portalHost } } : {})}>
@@ -976,18 +973,10 @@ export function RichEditor({ initial, acknowledge, onStatus, ref, onHistoryNavig
           floatingUIOptions={selectionFloating} />
       </BlockNoteView>
       </div>
-      <footer className="paper-footer"><span>mail@example.com</span><span>FoldCV</span></footer>
     </div></div>
-    <footer className="editor-footer"><span>Исходный текст</span><button onClick={() => setSourceOpen(true)}><Icon name="file" />Исходник</button></footer>
     </fieldset>
     {(assistant ?? <div className="uir-chat-reservation" aria-hidden="true" />)}
     </div>
-    <fieldset className="contents uir-editor-controls" disabled={applying || recovery}>
-    {blockTarget && (<BlockPanel id={blockTarget} available={!!editor.getBlock(blockTarget)} text={(() => {
-      const key = bridge.current.get(`block:${blockTarget}`), block = key ? bridge.values.get(key)?.block : null;
-      return typeof block?.content === "string" ? block.content : Array.isArray(block?.content) ? block.content.map(span => span.type === "link" ? span.content.map(part => part.text).join("") : span.text).join("") : "";
-    })()} close={() => { setBlockTarget(null); editor.focus(); }} command={(command, target) => assets.command(blockTarget, command, target)} destinations={targets} />)}
-    </fieldset>
     </div>
     </div>
   </ImageActions.Provider></EditorActions.Provider>;

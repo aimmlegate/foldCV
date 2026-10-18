@@ -1,0 +1,20 @@
+{
+  "additionalProperties": false,
+  "properties": {
+    "readOnly": {
+      "title": "Readonly",
+      "type": "boolean"
+    },
+    "revision": {
+      "minimum": 1,
+      "title": "Revision",
+      "type": "integer"
+    }
+  },
+  "required": [
+    "revision",
+    "readOnly"
+  ],
+  "title": "AgentAccess",
+  "type": "object"
+}

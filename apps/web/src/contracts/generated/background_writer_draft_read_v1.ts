@@ -365,13 +365,26 @@ export type Revision13 = number;
 export type Role = "header" | "sidebar" | "main";
 export type Revision14 = number;
 export type Schemaversion1 = 1;
+export type Factcount = number;
+export type Recoveredrows = number;
+export type Requestbytes = number;
+export type Status = "complete" | "partial";
+export type Code1 = "FACT_SOURCE_UNRESOLVED" | "FACT_SECTION_OMITTED" | "FACT_ROWS_RECOVERED";
+export type Page = number | null;
+export type Section = string;
+export type Sourceid1 = string;
+export type Unitid1 = string | null;
+/**
+ * @maxItems 5000
+ */
+export type Unresolved = ExtractionIssue[];
 export type Evidence2 = EvidenceSpan[];
 export type Id20 = string;
 export type Kind5 = "candidate";
 export type Pendingrawtext = string | null;
 export type Rawtext = string;
 export type Revision15 = number;
-export type Status = "known" | "unknown" | "unresolved" | "pending" | "conflict";
+export type Status1 = "known" | "unknown" | "unresolved" | "pending" | "conflict";
 export type Usercorrected = boolean;
 export type Value = string | null;
 export type Origin = "source" | "user";
@@ -392,7 +405,7 @@ export type Origin2 = "source" | "user";
 export type Pendingrawtext1 = string | null;
 export type Rawtext1 = string;
 export type Revision18 = number;
-export type Status1 = "known" | "unknown" | "unresolved" | "pending" | "conflict";
+export type Status2 = "known" | "unknown" | "unresolved" | "pending" | "conflict";
 export type Usercorrected3 = boolean;
 export type Day = number | null;
 export type Month = number | null;
@@ -403,7 +416,7 @@ export type Id23 = string;
 export type Pendingrawtext2 = string | null;
 export type Rawtext2 = string;
 export type Revision19 = number;
-export type Status2 = "known" | "unknown" | "unresolved" | "pending" | "conflict";
+export type Status3 = "known" | "unknown" | "unresolved" | "pending" | "conflict";
 export type Usercorrected4 = boolean;
 export type Value1 = boolean | null;
 export type Revision20 = number;
@@ -463,7 +476,7 @@ export type Usercorrected12 = boolean;
 export type Pendingrawtext3 = string | null;
 export type Rawtext3 = string;
 export type Revision29 = number;
-export type Status3 = "known" | "unknown" | "unresolved" | "pending" | "conflict";
+export type Status4 = "known" | "unknown" | "unresolved" | "pending" | "conflict";
 export type Usercorrected13 = boolean;
 export type Attribution = "personal" | "team" | "organization" | "unknown";
 export type Baseline = string | null;
@@ -486,7 +499,7 @@ export type Usercorrected14 = boolean;
 export type Pendingrawtext4 = string | null;
 export type Rawtext4 = string;
 export type Revision31 = number;
-export type Status4 = "known" | "unknown" | "unresolved" | "pending" | "conflict";
+export type Status5 = "known" | "unknown" | "unresolved" | "pending" | "conflict";
 export type Usercorrected15 = boolean;
 export type Action = string;
 export type Attribution1 = "personal" | "team" | "organization" | "unknown";
@@ -496,7 +509,7 @@ export type Id32 = string;
 export type Kind16 = "unresolved";
 export type Origin11 = "source" | "user";
 export type Revision32 = number;
-export type Status5 = "unresolved" | "pending" | "conflict";
+export type Status6 = "unresolved" | "pending" | "conflict";
 export type Usercorrected16 = boolean;
 export type Records = (
   | CandidateRecord
@@ -900,9 +913,28 @@ export interface HeadingProps {
   textColor?: Textcolor5;
 }
 export interface WorkingFacts {
+  extraction?: ExtractionReport | null;
   records: Records;
   revision: Revision33;
   tombstones: Tombstones;
+}
+export interface ExtractionReport {
+  counts: Counts;
+  factCount: Factcount;
+  recoveredRows: Recoveredrows;
+  requestBytes: Requestbytes;
+  status: Status;
+  unresolved: Unresolved;
+}
+export interface Counts {
+  [k: string]: number;
+}
+export interface ExtractionIssue {
+  code: Code1;
+  page?: Page;
+  section: Section;
+  sourceId: Sourceid1;
+  unitId: Unitid1;
 }
 export interface CandidateRecord {
   evidence: Evidence2;
@@ -919,7 +951,7 @@ export interface WorkingFieldStr {
   pendingRawText: Pendingrawtext;
   rawText: Rawtext;
   revision: Revision15;
-  status: Status;
+  status: Status1;
   userCorrected?: Usercorrected;
   value: Value;
 }
@@ -957,7 +989,7 @@ export interface WorkingFieldPartialDate {
   pendingRawText: Pendingrawtext1;
   rawText: Rawtext1;
   revision: Revision18;
-  status: Status1;
+  status: Status2;
   userCorrected?: Usercorrected3;
   value: PartialDate | null;
 }
@@ -971,7 +1003,7 @@ export interface WorkingFieldBool {
   pendingRawText: Pendingrawtext2;
   rawText: Rawtext2;
   revision: Revision19;
-  status: Status2;
+  status: Status3;
   userCorrected?: Usercorrected4;
   value: Value1;
 }
@@ -1058,7 +1090,7 @@ export interface WorkingFieldMetricValue {
   pendingRawText: Pendingrawtext3;
   rawText: Rawtext3;
   revision: Revision29;
-  status: Status3;
+  status: Status4;
   userCorrected?: Usercorrected13;
   value: MetricValue | null;
 }
@@ -1089,7 +1121,7 @@ export interface WorkingFieldLeadershipValue {
   pendingRawText: Pendingrawtext4;
   rawText: Rawtext4;
   revision: Revision31;
-  status: Status4;
+  status: Status5;
   userCorrected?: Usercorrected15;
   value: LeadershipValue | null;
 }
@@ -1105,7 +1137,7 @@ export interface UnresolvedRecord {
   kind: Kind16;
   origin: Origin11;
   revision: Revision32;
-  status: Status5;
+  status: Status6;
   userCorrected?: Usercorrected16;
 }
 export interface RecordTombstone {

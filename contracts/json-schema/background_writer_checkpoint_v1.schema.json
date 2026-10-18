@@ -1206,6 +1206,115 @@
       "title": "EvidenceSpan",
       "type": "object"
     },
+    "ExtractionIssue": {
+      "additionalProperties": false,
+      "properties": {
+        "code": {
+          "enum": [
+            "FACT_SOURCE_UNRESOLVED",
+            "FACT_SECTION_OMITTED",
+            "FACT_ROWS_RECOVERED"
+          ],
+          "title": "Code",
+          "type": "string"
+        },
+        "page": {
+          "anyOf": [
+            {
+              "minimum": 1,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Page"
+        },
+        "section": {
+          "title": "Section",
+          "type": "string"
+        },
+        "sourceId": {
+          "minLength": 1,
+          "title": "Sourceid",
+          "type": "string"
+        },
+        "unitId": {
+          "anyOf": [
+            {
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Unitid"
+        }
+      },
+      "required": [
+        "code",
+        "sourceId",
+        "unitId",
+        "section"
+      ],
+      "title": "ExtractionIssue",
+      "type": "object"
+    },
+    "ExtractionReport": {
+      "additionalProperties": false,
+      "properties": {
+        "counts": {
+          "additionalProperties": {
+            "type": "integer"
+          },
+          "title": "Counts",
+          "type": "object"
+        },
+        "factCount": {
+          "minimum": 1,
+          "title": "Factcount",
+          "type": "integer"
+        },
+        "recoveredRows": {
+          "minimum": 0,
+          "title": "Recoveredrows",
+          "type": "integer"
+        },
+        "requestBytes": {
+          "minimum": 0,
+          "title": "Requestbytes",
+          "type": "integer"
+        },
+        "status": {
+          "enum": [
+            "complete",
+            "partial"
+          ],
+          "title": "Status",
+          "type": "string"
+        },
+        "unresolved": {
+          "items": {
+            "$ref": "#/$defs/ExtractionIssue"
+          },
+          "maxItems": 5000,
+          "title": "Unresolved",
+          "type": "array"
+        }
+      },
+      "required": [
+        "status",
+        "factCount",
+        "counts",
+        "requestBytes",
+        "recoveredRows",
+        "unresolved"
+      ],
+      "title": "ExtractionReport",
+      "type": "object"
+    },
     "FactFieldSpan": {
       "additionalProperties": false,
       "properties": {
@@ -4336,6 +4445,17 @@
     "WorkingFacts": {
       "additionalProperties": false,
       "properties": {
+        "extraction": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ExtractionReport"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
         "records": {
           "items": {
             "discriminator": {

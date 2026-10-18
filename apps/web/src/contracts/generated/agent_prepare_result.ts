@@ -18,12 +18,14 @@ export type Text = string;
  * @maxItems 100
  */
 export type Affected = AgentAnchor[];
+export type Affectedcount = number | null;
 export type Batchid = string | null;
 export type Disposition = "prepared" | "no_change";
 export type Preview = string;
 
 export interface AgentPrepareResult {
   affected: Affected;
+  affectedCount?: Affectedcount;
   batchId: Batchid;
   disposition: Disposition;
   preview: Preview;

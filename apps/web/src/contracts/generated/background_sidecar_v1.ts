@@ -12,7 +12,7 @@ export type Size = number;
  */
 export type References = AssetReferenceV1[];
 /**
- * @maxItems 512
+ * @maxItems 4096
  */
 export type Assetpins = AssetPinV1[];
 export type Acknowledgedrevision = number;
@@ -28,7 +28,7 @@ export type Token = string;
 export type Touchgeneration = number;
 export type Writerepoch = number;
 /**
- * @maxItems 512
+ * @maxItems 4096
  */
 export type Cleanuprefs = string[];
 export type Actioncursor1 = number;
@@ -55,7 +55,7 @@ export type Kind2 = "entity" | "structure" | "query" | "source" | "rules";
 export type Touches = GenerationStamp[];
 export type Writerepoch1 = number;
 /**
- * @maxItems 512
+ * @maxItems 4096
  */
 export type Drafts = DraftCheckpointV1[];
 export type Expiredthroughepoch = number;
@@ -64,11 +64,11 @@ export type Actiontoken = number;
 export type Requestepoch = number;
 export type Sessionid = string;
 /**
- * @maxItems 512
+ * @maxItems 4096
  */
 export type Fixedinvalidations = FixedInvalidationV1[];
 /**
- * @maxItems 512
+ * @maxItems 4096
  */
 export type Generations = GenerationStamp[];
 export type Key1 = string;
@@ -86,11 +86,11 @@ export type Cursor = string | null;
  * @maxItems 100
  */
 export type Ids = string[];
-export type Kind6 = "context" | "document" | "find" | "facts" | "source" | "history";
+export type Kind6 = "context" | "document" | "find" | "facts" | "source" | "history" | "resources";
 export type Parentid = string | null;
 export type Text = string;
 /**
- * @maxItems 512
+ * @maxItems 4096
  */
 export type Definitions = HistoryDefinitionV1[];
 export type Namespace = string;
@@ -107,7 +107,7 @@ export type Proposalid = string;
 export type Requestsha256 = string;
 export type Resultingrevision = number;
 /**
- * @maxItems 512
+ * @maxItems 4096
  */
 export type Historycommands = HistoryCommandReceiptV1[];
 export type Historynamespace = string | null;
@@ -185,7 +185,7 @@ export type Resolvedat = string | null;
 export type Schemaversion3 = 1;
 export type Writerepoch2 = number | null;
 /**
- * @maxItems 512
+ * @maxItems 4096
  */
 export type Intents = PublicationIntentV1[];
 /**
@@ -423,12 +423,12 @@ export type Commandref = string | null;
 export type Direction = "undo" | "redo" | "closed";
 export type Expiresat1 = string;
 /**
- * @maxItems 100
+ * @maxItems 4096
  */
 export type Reads = GenerationStamp[];
 export type Schemaversion4 = 1;
 /**
- * @maxItems 100
+ * @maxItems 4096
  */
 export type Writes = GenerationStamp[];
 export type Incarnation3 = string | null;
@@ -494,6 +494,7 @@ export type Requestsha2562 = string;
 export type Schemaversion7 = 1;
 export type Workspacesha2561 = string;
 export type Schemaversion8 = 1;
+export type Accessrevision = number;
 export type Accountgeneration1 = number;
 export type Allowedits = boolean;
 export type Allowweb = boolean;
@@ -537,692 +538,26 @@ export type Kind11 = "text" | "blocks" | "table_cells";
 export type Textsha256 = string;
 export type Submittedat = string;
 /**
- * @maxItems 10
+ * @maxItems 32
  */
-export type Tools =
-  | []
-  | [
-      | "get_resume_context"
-      | "find_resume_content"
-      | "get_working_facts"
-      | "get_original_source"
-      | "get_conversation_context"
-      | "check_resume"
-      | "read_public_page"
-      | "publish_findings"
-      | "prepare_edit_batch"
-      | "apply_edit_batch"
-    ]
-  | [
-      (
-        | "get_resume_context"
-        | "find_resume_content"
-        | "get_working_facts"
-        | "get_original_source"
-        | "get_conversation_context"
-        | "check_resume"
-        | "read_public_page"
-        | "publish_findings"
-        | "prepare_edit_batch"
-        | "apply_edit_batch"
-      ),
-      (
-        | "get_resume_context"
-        | "find_resume_content"
-        | "get_working_facts"
-        | "get_original_source"
-        | "get_conversation_context"
-        | "check_resume"
-        | "read_public_page"
-        | "publish_findings"
-        | "prepare_edit_batch"
-        | "apply_edit_batch"
-      )
-    ]
-  | [
-      (
-        | "get_resume_context"
-        | "find_resume_content"
-        | "get_working_facts"
-        | "get_original_source"
-        | "get_conversation_context"
-        | "check_resume"
-        | "read_public_page"
-        | "publish_findings"
-        | "prepare_edit_batch"
-        | "apply_edit_batch"
-      ),
-      (
-        | "get_resume_context"
-        | "find_resume_content"
-        | "get_working_facts"
-        | "get_original_source"
-        | "get_conversation_context"
-        | "check_resume"
-        | "read_public_page"
-        | "publish_findings"
-        | "prepare_edit_batch"
-        | "apply_edit_batch"
-      ),
-      (
-        | "get_resume_context"
-        | "find_resume_content"
-        | "get_working_facts"
-        | "get_original_source"
-        | "get_conversation_context"
-        | "check_resume"
-        | "read_public_page"
-        | "publish_findings"
-        | "prepare_edit_batch"
-        | "apply_edit_batch"
-      )
-    ]
-  | [
-      (
-        | "get_resume_context"
-        | "find_resume_content"
-        | "get_working_facts"
-        | "get_original_source"
-        | "get_conversation_context"
-        | "check_resume"
-        | "read_public_page"
-        | "publish_findings"
-        | "prepare_edit_batch"
-        | "apply_edit_batch"
-      ),
-      (
-        | "get_resume_context"
-        | "find_resume_content"
-        | "get_working_facts"
-        | "get_original_source"
-        | "get_conversation_context"
-        | "check_resume"
-        | "read_public_page"
-        | "publish_findings"
-        | "prepare_edit_batch"
-        | "apply_edit_batch"
-      ),
-      (
-        | "get_resume_context"
-        | "find_resume_content"
-        | "get_working_facts"
-        | "get_original_source"
-        | "get_conversation_context"
-        | "check_resume"
-        | "read_public_page"
-        | "publish_findings"
-        | "prepare_edit_batch"
-        | "apply_edit_batch"
-      ),
-      (
-        | "get_resume_context"
-        | "find_resume_content"
-        | "get_working_facts"
-        | "get_original_source"
-        | "get_conversation_context"
-        | "check_resume"
-        | "read_public_page"
-        | "publish_findings"
-        | "prepare_edit_batch"
-        | "apply_edit_batch"
-      )
-    ]
-  | [
-      (
-        | "get_resume_context"
-        | "find_resume_content"
-        | "get_working_facts"
-        | "get_original_source"
-        | "get_conversation_context"
-        | "check_resume"
-        | "read_public_page"
-        | "publish_findings"
-        | "prepare_edit_batch"
-        | "apply_edit_batch"
-      ),
-      (
-        | "get_resume_context"
-        | "find_resume_content"
-        | "get_working_facts"
-        | "get_original_source"
-        | "get_conversation_context"
-        | "check_resume"
-        | "read_public_page"
-        | "publish_findings"
-        | "prepare_edit_batch"
-        | "apply_edit_batch"
-      ),
-      (
-        | "get_resume_context"
-        | "find_resume_content"
-        | "get_working_facts"
-        | "get_original_source"
-        | "get_conversation_context"
-        | "check_resume"
-        | "read_public_page"
-        | "publish_findings"
-        | "prepare_edit_batch"
-        | "apply_edit_batch"
-      ),
-      (
-        | "get_resume_context"
-        | "find_resume_content"
-        | "get_working_facts"
-        | "get_original_source"
-        | "get_conversation_context"
-        | "check_resume"
-        | "read_public_page"
-        | "publish_findings"
-        | "prepare_edit_batch"
-        | "apply_edit_batch"
-      ),
-      (
-        | "get_resume_context"
-        | "find_resume_content"
-        | "get_working_facts"
-        | "get_original_source"
-        | "get_conversation_context"
-        | "check_resume"
-        | "read_public_page"
-        | "publish_findings"
-        | "prepare_edit_batch"
-        | "apply_edit_batch"
-      )
-    ]
-  | [
-      (
-        | "get_resume_context"
-        | "find_resume_content"
-        | "get_working_facts"
-        | "get_original_source"
-        | "get_conversation_context"
-        | "check_resume"
-        | "read_public_page"
-        | "publish_findings"
-        | "prepare_edit_batch"
-        | "apply_edit_batch"
-      ),
-      (
-        | "get_resume_context"
-        | "find_resume_content"
-        | "get_working_facts"
-        | "get_original_source"
-        | "get_conversation_context"
-        | "check_resume"
-        | "read_public_page"
-        | "publish_findings"
-        | "prepare_edit_batch"
-        | "apply_edit_batch"
-      ),
-      (
-        | "get_resume_context"
-        | "find_resume_content"
-        | "get_working_facts"
-        | "get_original_source"
-        | "get_conversation_context"
-        | "check_resume"
-        | "read_public_page"
-        | "publish_findings"
-        | "prepare_edit_batch"
-        | "apply_edit_batch"
-      ),
-      (
-        | "get_resume_context"
-        | "find_resume_content"
-        | "get_working_facts"
-        | "get_original_source"
-        | "get_conversation_context"
-        | "check_resume"
-        | "read_public_page"
-        | "publish_findings"
-        | "prepare_edit_batch"
-        | "apply_edit_batch"
-      ),
-      (
-        | "get_resume_context"
-        | "find_resume_content"
-        | "get_working_facts"
-        | "get_original_source"
-        | "get_conversation_context"
-        | "check_resume"
-        | "read_public_page"
-        | "publish_findings"
-        | "prepare_edit_batch"
-        | "apply_edit_batch"
-      ),
-      (
-        | "get_resume_context"
-        | "find_resume_content"
-        | "get_working_facts"
-        | "get_original_source"
-        | "get_conversation_context"
-        | "check_resume"
-        | "read_public_page"
-        | "publish_findings"
-        | "prepare_edit_batch"
-        | "apply_edit_batch"
-      )
-    ]
-  | [
-      (
-        | "get_resume_context"
-        | "find_resume_content"
-        | "get_working_facts"
-        | "get_original_source"
-        | "get_conversation_context"
-        | "check_resume"
-        | "read_public_page"
-        | "publish_findings"
-        | "prepare_edit_batch"
-        | "apply_edit_batch"
-      ),
-      (
-        | "get_resume_context"
-        | "find_resume_content"
-        | "get_working_facts"
-        | "get_original_source"
-        | "get_conversation_context"
-        | "check_resume"
-        | "read_public_page"
-        | "publish_findings"
-        | "prepare_edit_batch"
-        | "apply_edit_batch"
-      ),
-      (
-        | "get_resume_context"
-        | "find_resume_content"
-        | "get_working_facts"
-        | "get_original_source"
-        | "get_conversation_context"
-        | "check_resume"
-        | "read_public_page"
-        | "publish_findings"
-        | "prepare_edit_batch"
-        | "apply_edit_batch"
-      ),
-      (
-        | "get_resume_context"
-        | "find_resume_content"
-        | "get_working_facts"
-        | "get_original_source"
-        | "get_conversation_context"
-        | "check_resume"
-        | "read_public_page"
-        | "publish_findings"
-        | "prepare_edit_batch"
-        | "apply_edit_batch"
-      ),
-      (
-        | "get_resume_context"
-        | "find_resume_content"
-        | "get_working_facts"
-        | "get_original_source"
-        | "get_conversation_context"
-        | "check_resume"
-        | "read_public_page"
-        | "publish_findings"
-        | "prepare_edit_batch"
-        | "apply_edit_batch"
-      ),
-      (
-        | "get_resume_context"
-        | "find_resume_content"
-        | "get_working_facts"
-        | "get_original_source"
-        | "get_conversation_context"
-        | "check_resume"
-        | "read_public_page"
-        | "publish_findings"
-        | "prepare_edit_batch"
-        | "apply_edit_batch"
-      ),
-      (
-        | "get_resume_context"
-        | "find_resume_content"
-        | "get_working_facts"
-        | "get_original_source"
-        | "get_conversation_context"
-        | "check_resume"
-        | "read_public_page"
-        | "publish_findings"
-        | "prepare_edit_batch"
-        | "apply_edit_batch"
-      )
-    ]
-  | [
-      (
-        | "get_resume_context"
-        | "find_resume_content"
-        | "get_working_facts"
-        | "get_original_source"
-        | "get_conversation_context"
-        | "check_resume"
-        | "read_public_page"
-        | "publish_findings"
-        | "prepare_edit_batch"
-        | "apply_edit_batch"
-      ),
-      (
-        | "get_resume_context"
-        | "find_resume_content"
-        | "get_working_facts"
-        | "get_original_source"
-        | "get_conversation_context"
-        | "check_resume"
-        | "read_public_page"
-        | "publish_findings"
-        | "prepare_edit_batch"
-        | "apply_edit_batch"
-      ),
-      (
-        | "get_resume_context"
-        | "find_resume_content"
-        | "get_working_facts"
-        | "get_original_source"
-        | "get_conversation_context"
-        | "check_resume"
-        | "read_public_page"
-        | "publish_findings"
-        | "prepare_edit_batch"
-        | "apply_edit_batch"
-      ),
-      (
-        | "get_resume_context"
-        | "find_resume_content"
-        | "get_working_facts"
-        | "get_original_source"
-        | "get_conversation_context"
-        | "check_resume"
-        | "read_public_page"
-        | "publish_findings"
-        | "prepare_edit_batch"
-        | "apply_edit_batch"
-      ),
-      (
-        | "get_resume_context"
-        | "find_resume_content"
-        | "get_working_facts"
-        | "get_original_source"
-        | "get_conversation_context"
-        | "check_resume"
-        | "read_public_page"
-        | "publish_findings"
-        | "prepare_edit_batch"
-        | "apply_edit_batch"
-      ),
-      (
-        | "get_resume_context"
-        | "find_resume_content"
-        | "get_working_facts"
-        | "get_original_source"
-        | "get_conversation_context"
-        | "check_resume"
-        | "read_public_page"
-        | "publish_findings"
-        | "prepare_edit_batch"
-        | "apply_edit_batch"
-      ),
-      (
-        | "get_resume_context"
-        | "find_resume_content"
-        | "get_working_facts"
-        | "get_original_source"
-        | "get_conversation_context"
-        | "check_resume"
-        | "read_public_page"
-        | "publish_findings"
-        | "prepare_edit_batch"
-        | "apply_edit_batch"
-      ),
-      (
-        | "get_resume_context"
-        | "find_resume_content"
-        | "get_working_facts"
-        | "get_original_source"
-        | "get_conversation_context"
-        | "check_resume"
-        | "read_public_page"
-        | "publish_findings"
-        | "prepare_edit_batch"
-        | "apply_edit_batch"
-      )
-    ]
-  | [
-      (
-        | "get_resume_context"
-        | "find_resume_content"
-        | "get_working_facts"
-        | "get_original_source"
-        | "get_conversation_context"
-        | "check_resume"
-        | "read_public_page"
-        | "publish_findings"
-        | "prepare_edit_batch"
-        | "apply_edit_batch"
-      ),
-      (
-        | "get_resume_context"
-        | "find_resume_content"
-        | "get_working_facts"
-        | "get_original_source"
-        | "get_conversation_context"
-        | "check_resume"
-        | "read_public_page"
-        | "publish_findings"
-        | "prepare_edit_batch"
-        | "apply_edit_batch"
-      ),
-      (
-        | "get_resume_context"
-        | "find_resume_content"
-        | "get_working_facts"
-        | "get_original_source"
-        | "get_conversation_context"
-        | "check_resume"
-        | "read_public_page"
-        | "publish_findings"
-        | "prepare_edit_batch"
-        | "apply_edit_batch"
-      ),
-      (
-        | "get_resume_context"
-        | "find_resume_content"
-        | "get_working_facts"
-        | "get_original_source"
-        | "get_conversation_context"
-        | "check_resume"
-        | "read_public_page"
-        | "publish_findings"
-        | "prepare_edit_batch"
-        | "apply_edit_batch"
-      ),
-      (
-        | "get_resume_context"
-        | "find_resume_content"
-        | "get_working_facts"
-        | "get_original_source"
-        | "get_conversation_context"
-        | "check_resume"
-        | "read_public_page"
-        | "publish_findings"
-        | "prepare_edit_batch"
-        | "apply_edit_batch"
-      ),
-      (
-        | "get_resume_context"
-        | "find_resume_content"
-        | "get_working_facts"
-        | "get_original_source"
-        | "get_conversation_context"
-        | "check_resume"
-        | "read_public_page"
-        | "publish_findings"
-        | "prepare_edit_batch"
-        | "apply_edit_batch"
-      ),
-      (
-        | "get_resume_context"
-        | "find_resume_content"
-        | "get_working_facts"
-        | "get_original_source"
-        | "get_conversation_context"
-        | "check_resume"
-        | "read_public_page"
-        | "publish_findings"
-        | "prepare_edit_batch"
-        | "apply_edit_batch"
-      ),
-      (
-        | "get_resume_context"
-        | "find_resume_content"
-        | "get_working_facts"
-        | "get_original_source"
-        | "get_conversation_context"
-        | "check_resume"
-        | "read_public_page"
-        | "publish_findings"
-        | "prepare_edit_batch"
-        | "apply_edit_batch"
-      ),
-      (
-        | "get_resume_context"
-        | "find_resume_content"
-        | "get_working_facts"
-        | "get_original_source"
-        | "get_conversation_context"
-        | "check_resume"
-        | "read_public_page"
-        | "publish_findings"
-        | "prepare_edit_batch"
-        | "apply_edit_batch"
-      )
-    ]
-  | [
-      (
-        | "get_resume_context"
-        | "find_resume_content"
-        | "get_working_facts"
-        | "get_original_source"
-        | "get_conversation_context"
-        | "check_resume"
-        | "read_public_page"
-        | "publish_findings"
-        | "prepare_edit_batch"
-        | "apply_edit_batch"
-      ),
-      (
-        | "get_resume_context"
-        | "find_resume_content"
-        | "get_working_facts"
-        | "get_original_source"
-        | "get_conversation_context"
-        | "check_resume"
-        | "read_public_page"
-        | "publish_findings"
-        | "prepare_edit_batch"
-        | "apply_edit_batch"
-      ),
-      (
-        | "get_resume_context"
-        | "find_resume_content"
-        | "get_working_facts"
-        | "get_original_source"
-        | "get_conversation_context"
-        | "check_resume"
-        | "read_public_page"
-        | "publish_findings"
-        | "prepare_edit_batch"
-        | "apply_edit_batch"
-      ),
-      (
-        | "get_resume_context"
-        | "find_resume_content"
-        | "get_working_facts"
-        | "get_original_source"
-        | "get_conversation_context"
-        | "check_resume"
-        | "read_public_page"
-        | "publish_findings"
-        | "prepare_edit_batch"
-        | "apply_edit_batch"
-      ),
-      (
-        | "get_resume_context"
-        | "find_resume_content"
-        | "get_working_facts"
-        | "get_original_source"
-        | "get_conversation_context"
-        | "check_resume"
-        | "read_public_page"
-        | "publish_findings"
-        | "prepare_edit_batch"
-        | "apply_edit_batch"
-      ),
-      (
-        | "get_resume_context"
-        | "find_resume_content"
-        | "get_working_facts"
-        | "get_original_source"
-        | "get_conversation_context"
-        | "check_resume"
-        | "read_public_page"
-        | "publish_findings"
-        | "prepare_edit_batch"
-        | "apply_edit_batch"
-      ),
-      (
-        | "get_resume_context"
-        | "find_resume_content"
-        | "get_working_facts"
-        | "get_original_source"
-        | "get_conversation_context"
-        | "check_resume"
-        | "read_public_page"
-        | "publish_findings"
-        | "prepare_edit_batch"
-        | "apply_edit_batch"
-      ),
-      (
-        | "get_resume_context"
-        | "find_resume_content"
-        | "get_working_facts"
-        | "get_original_source"
-        | "get_conversation_context"
-        | "check_resume"
-        | "read_public_page"
-        | "publish_findings"
-        | "prepare_edit_batch"
-        | "apply_edit_batch"
-      ),
-      (
-        | "get_resume_context"
-        | "find_resume_content"
-        | "get_working_facts"
-        | "get_original_source"
-        | "get_conversation_context"
-        | "check_resume"
-        | "read_public_page"
-        | "publish_findings"
-        | "prepare_edit_batch"
-        | "apply_edit_batch"
-      ),
-      (
-        | "get_resume_context"
-        | "find_resume_content"
-        | "get_working_facts"
-        | "get_original_source"
-        | "get_conversation_context"
-        | "check_resume"
-        | "read_public_page"
-        | "publish_findings"
-        | "prepare_edit_batch"
-        | "apply_edit_batch"
-      )
-    ];
+export type Tools = (
+  | "get_resume_context"
+  | "find_resume_content"
+  | "get_working_facts"
+  | "get_original_source"
+  | "get_conversation_context"
+  | "get_project_resources"
+  | "check_resume"
+  | "read_public_page"
+  | "publish_findings"
+  | "prepare_edit_batch"
+  | "apply_edit_batch"
+  | "project_action"
+)[];
 export type Undoexpired = boolean;
 export type Updatedat = string;
 /**
- * @maxItems 512
+ * @maxItems 4096
  */
 export type Jobs = JobSnapshotV1[];
 export type Lineage5 = string;
@@ -1261,13 +596,13 @@ export type Schemaversion10 = 1;
 export type Stepssha256 = string | null;
 export type Writerepoch4 = number | null;
 /**
- * @maxItems 512
+ * @maxItems 4096
  */
 export type Manualintents = ManualIntentV1[];
 export type Orphanedat = string;
 export type Path1 = string;
 /**
- * @maxItems 512
+ * @maxItems 4096
  */
 export type Orphanassets = OrphanAssetV1[];
 export type Projectid6 = string;
@@ -1296,7 +631,7 @@ export type Schemaversion11 = 1;
 export type Scope1 = WholeResumeScope | SelectionScope;
 export type Turnid = string;
 /**
- * @maxItems 512
+ * @maxItems 4096
  */
 export type Proposals = ProposalBindingV1[];
 export type Requestepochexpiresat = string;
@@ -1304,7 +639,7 @@ export type Expiresat2 = string;
 export type Jobid5 = string;
 export type Payloadsha2563 = string;
 /**
- * @maxItems 512
+ * @maxItems 4096
  */
 export type Requests = RequestReplayV1[];
 export type Schemaversion12 = 1;
@@ -1331,7 +666,7 @@ export type Writerepoch5 = number;
 export type Cursor1 = number;
 export type Sha2562 = string;
 /**
- * @maxItems 512
+ * @maxItems 4096
  */
 export type Writertouches = WriterTouchReceiptV1[];
 
@@ -1566,6 +901,7 @@ export interface CanonicalReceiptV1 {
   workspaceSha256: Workspacesha2561;
 }
 export interface JobSubmissionV1 {
+  accessRevision?: Accessrevision;
   accountGeneration: Accountgeneration1;
   allowEdits: Allowedits;
   allowWeb: Allowweb;

@@ -60,10 +60,15 @@ class JobService:
         self.fixed = FixedJobs(self)
         self.publisher.processing_validator = self.fixed.validate_processing
         agent_factory = factory or (lambda job, model: JobRuntime(self, job, model))
+        async def observed(name, identifier):
+            if observer is not None:
+                await observer(name, identifier)
+            if name == "slot_released":
+                await self.projects.drain_catalog_actions(run_id=identifier)
         self.supervisor = JobSupervisor(self.store,
             lambda job, model: agent_factory(job, model) if job.submission.kind == "agent" else FixedRuntime(self, job, model),
             clock=clock, preflight=self.preflight, admit=self.admit, eligible=self.eligible, parallel=parallel,
-            **({"observer": observer} if observer else {}))
+            observer=observed)
         self.parallel_owner = None
         if parallel:
             from .parallel import ParallelOwner
@@ -103,7 +108,7 @@ class JobService:
         values = {(stamp.kind, stamp.key): stamp for stamp in original.reads} if original else {}
         for stamp in reads.reads:
             values.setdefault((stamp.kind, stamp.key), stamp)
-        if len(values) > 100:
+        if len(values) > 4096:
             raise BackgroundFailure("JOB_STORAGE_FULL")
         record.prepared_guards = ScopeGuardV1(schemaVersion=1, reads=list(values.values()), writes=writes.writes)
         self.store._write(directory, state, self.store._all())
@@ -221,8 +226,11 @@ class JobService:
             if self.projects.durability(project) != "durable":
                 raise AgentFailure("AGENT_SAVE_FAILED")
             Scope(workspace, logical.scope)
+            access = self.projects.catalog.get(project)
+            if logical.allow_edits and access.read_only:
+                raise AgentFailure("AGENT_TOOL_DENIED")
             record = self.artifacts.prepare_input(identity, logical, connection.epoch, digest(workspace.rules_used))
-            names = [name for name in TOOL_NAMES if (logical.allow_edits or name not in {"prepare_edit_batch", "apply_edit_batch"})
+            names = [name for name in TOOL_NAMES if (logical.allow_edits or name not in {"prepare_edit_batch", "apply_edit_batch", "project_action"})
                 and (logical.allow_web or name != "read_public_page")]
             config = digest({"base": CONFIG_SHA256, "protocol": PROTOCOL_V2_SHA256,
                 "tools": names, "allowEdits": logical.allow_edits, "allowWeb": logical.allow_web})
@@ -230,7 +238,7 @@ class JobService:
                 kind="agent", schedulingClass="background", input={"kind": "agent_journal", "id": record.id,
                     "sha256": record.request_sha256}, models=[{"stage": "agent", "model": settings.selected_agent_model,
                     "configSha256": config}], accountGeneration=state.account_generation, tools=names,
-                allowEdits=logical.allow_edits, allowWeb=logical.allow_web, scope=logical.scope,
+                allowEdits=logical.allow_edits, accessRevision=access.access_revision, allowWeb=logical.allow_web, scope=logical.scope,
                 guards={"schemaVersion": 1, "reads": [], "writes": []}, submittedAt=self.store.clock())
             job, created = self.store.submit(captured)
             self.artifacts.bind(job)
@@ -327,7 +335,7 @@ class JobService:
 
     async def stop_project(self, project):
         controls = [control for control in self.supervisor.controls.values()
-            if control.project_id == project and control.task is not None and not control.task.done()]
+            if control.project_id == project and control.task is not None and control.task is not asyncio.current_task() and not control.task.done()]
         for control in controls:
             control.stop("PROJECT_DELETED", revoke_publication=True)
         if (self.store.projects / project).exists():

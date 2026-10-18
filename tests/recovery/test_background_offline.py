@@ -276,7 +276,8 @@ def test_sidecar_keeps_request_identity_retention_and_foreign_authority_separate
     elif fault == "changed-hash":
         request["payloadSha256"] = "b" * 64
     elif fault == "metadata-full":
-        sidecar["generations"] = [fixtures["background_scope_guard_v1"]["reads"][0]] * 511
+        from packages.resume_core.background_limits import LIMITS
+        sidecar["generations"] = [fixtures["background_scope_guard_v1"]["reads"][0]] * LIMITS.metadata_project_records
     elif fault.startswith("archived-"):
         sidecar["jobs"] = []
         request["archivedResult"] = job

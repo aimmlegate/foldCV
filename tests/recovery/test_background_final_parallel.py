@@ -79,7 +79,10 @@ async def test_integrated_native_harness_closes_resources_and_keeps_real_counter
     original = real_ledger.read_bytes()
     copied = tmp_path / "docs/gui/handoffs/BACKGROUND-WORK/native-attempts.json"
     copied.parent.mkdir(parents=True)
-    copied.write_bytes(original)
+    fixture_ledger = json.loads(original)
+    fixture_ledger["attempts"] = [row for row in fixture_ledger["attempts"] if row["pool"] != "NB07b"]
+    fixture_ledger["pools"]["NB07b"].update(spent=0, dispatchClosed=False)
+    copied.write_text(json.dumps(fixture_ledger))
     monkeypatch.setattr(native_integrated, "LEDGER", copied)
     monkeypatch.setattr(native_integrated, "HANDOFF", tmp_path / "retained")
     monkeypatch.setattr(native_integrated, "assert_native_bindings",

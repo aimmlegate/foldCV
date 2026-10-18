@@ -48,9 +48,15 @@ export function Timeline({ facts, anchors, controls }: { facts: WorkingFacts; an
   }
   const overlaps = report?.warnings.filter(warning => warning.kind === "overlap") ?? [];
   const estimate = report?.estimates.find(estimate => estimate.scopeId === "employment");
+  const estimateReasons: Readonly<Record<string, string>> = {
+    DATE_INCOMPLETE: "В периодах не хватает дат или есть неразобранные значения.",
+    SOURCE_OBSERVATION_REQUIRED: "Для текущей работы нужна указанная в исходнике дата наблюдения.",
+    FUTURE_OR_INVALID_PERIOD: "Есть будущие даты или начало позже конца периода.",
+    NO_DATED_EMPLOYMENT: "Нет мест работы с пригодными для расчёта датами.",
+  };
   return <div className={"uir-timeline"} aria-label="Проверка периодов">
     {estimate?.monthsMin !== null && estimate?.monthsMin !== undefined ? <small>Месяцев опыта без двойного счёта: {estimate.monthsMin}{estimate.monthsMax !== estimate.monthsMin ? `–${estimate.monthsMax ?? "?"}` : ""}</small>
-      : <small>Оценка опыта недоступна. Проверьте даты и дату наблюдения источника.</small>}
+      : <small>Оценка опыта недоступна. {estimateReasons[estimate?.reason ?? ""] ?? "Проверьте даты и дату наблюдения источника."}</small>}
     {overlaps.length > 0 && <details open><summary>Пересечения: {overlaps.length}</summary><small>Параллельная работа допустима. Сохранение и экспорт доступны.</small>
       <ul>{overlaps.map(warning => <li key={warning.id}>{warning.certainty === "certain" ? "Пересечение" : "Возможное пересечение"}: {warning.periodIds.map(period).join(" / ")}</li>)}</ul>
       {anchors.filter(anchor => overlaps.some(warning => warning.periodIds.includes(anchor.periodId))).map(anchor => <button key={anchor.periodId} disabled={busy}

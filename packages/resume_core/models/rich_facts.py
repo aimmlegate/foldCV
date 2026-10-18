@@ -166,10 +166,28 @@ class RecordTombstone(Wire):
     order_index: int = Field(ge=0)
 
 
+class ExtractionIssue(Wire):
+    code: Literal["FACT_SOURCE_UNRESOLVED", "FACT_SECTION_OMITTED", "FACT_ROWS_RECOVERED"]
+    source_id: Id
+    unit_id: Id | None
+    page: int | None = Field(default=None, ge=1)
+    section: str
+
+
+class ExtractionReport(Wire):
+    status: Literal["complete", "partial"]
+    fact_count: int = Field(ge=1)
+    counts: dict[str, int]
+    request_bytes: int = Field(ge=0)
+    recovered_rows: int = Field(ge=0)
+    unresolved: list[ExtractionIssue] = Field(max_length=5000)
+
+
 class WorkingFacts(Wire):
     revision: Revision
     records: list[RichFact]
     tombstones: list[RecordTombstone]
+    extraction: ExtractionReport | None = None
 
     @model_validator(mode="after")
     def identity(self) -> WorkingFacts:

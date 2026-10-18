@@ -300,7 +300,7 @@
           "items": {
             "$ref": "#/$defs/GenerationStamp"
           },
-          "maxItems": 100,
+          "maxItems": 4096,
           "title": "Reads",
           "type": "array"
         },
@@ -313,7 +313,7 @@
           "items": {
             "$ref": "#/$defs/GenerationStamp"
           },
-          "maxItems": 100,
+          "maxItems": 4096,
           "title": "Writes",
           "type": "array"
         }

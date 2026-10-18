@@ -36,6 +36,8 @@ class ProjectReadError(Wire):
 
 
 class GuiProjectListEntry(RegistryEntry):
+    last_opened_at: str | None = None
+    archived: bool = False
     subtitle: str | None = None
 
 

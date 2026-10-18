@@ -33,6 +33,14 @@ export function FactsPanel({ facts, document, submit, pending, paused, timeline,
     onKeyDown={event => { if (event.key === "Escape") { event.preventDefault(); event.stopPropagation(); close(); } }}>
     <div className="panel-heading"><h2>Факты</h2><button className="icon" aria-label="Скрыть факты" onClick={close}><Icon name="close" /></button></div>
     {error && <p className="notice warning" role="alert">{error.message}</p>}
+    {facts.extraction && <div className="notice" role="status">
+      <p>{facts.extraction.status === "complete" ? "Факты извлечены" : "Факты извлечены частично"}: {facts.extraction.factCount}.</p>
+      {facts.extraction.unresolved.length > 0 && <details><summary>Не удалось подтвердить: {facts.extraction.unresolved.length}</summary>
+        <ul>{facts.extraction.unresolved.map((issue, index) => <li key={`${issue.sourceId}:${issue.unitId ?? "result"}:${index}`}>
+          {issue.code === "FACT_SECTION_OMITTED" ? `Не извлечён раздел: ${issue.section}` : issue.code === "FACT_ROWS_RECOVERED" ? "Часть строк ответа модели отклонена; подтверждённые факты сохранены" : "Сведения исходника не представлены в фактах"}
+          {issue.page ? `, стр. ${issue.page}` : ""} ({issue.code})</li>)}</ul>
+        <p>Сверьте исходник и внесите исправления вручную или повторите обработку.</p></details>}
+    </div>}
     {pending.length > 0 && <small className="uir-facts-pending" role="status">{paused ? "Ожидает повторного сохранения" : `Сохраняем изменения: ${pending.length}`}</small>}
     {(["candidate", "employment", "technology", "education", "language"] as const).map(kind => <details className="fact-group" key={kind} data-group={kind} open>
       <summary>{labels[kind]}</summary>

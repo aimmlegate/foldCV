@@ -6,6 +6,7 @@ import hashlib
 import json
 from pathlib import Path
 from datetime import date
+from collections.abc import Callable
 
 from pydantic import Field
 
@@ -99,7 +100,8 @@ def draft_skeleton(normalized: GuiNormalizedResult) -> Document:
     return Document.model_validate(doc)
 
 
-def drafting_input(request: GuiDraftRequest, rules: Rules) -> str:
+def drafting_input(request: GuiDraftRequest, rules: Rules, *, transform: Callable[[str], str] | None = None,
+                   return_canonical: bool = False) -> str:
     skeleton = draft_skeleton(request.normalized)
     excerpts = []
     for source in request.normalized.sources:
@@ -135,8 +137,7 @@ def drafting_input(request: GuiDraftRequest, rules: Rules) -> str:
                "activeJobs": active_jobs,
                "facts": facts, "skeleton": skeleton.model_dump(by_alias=True), "sourceExcerpts": excerpts,
                "blockedConflictFactIds": sorted(blocked), "output": "Write prose fields only: profile/text, skills-focus/skillsText, early-career/text and job context/tasks/results/stack. Keep structured skeleton fields unchanged. Supply an EditorialPlan accounting for all active jobs. Do not omit supported prose or use blocked conflict claims for authored text."}
-    # The native transport checks its 64 KiB input limit after compacting references.
-    return content_input("draft_prose", payload, rules, max_bytes=262_144)
+    return content_input("draft_prose", payload, rules, transform=transform, return_canonical=return_canonical)
 
 
 def validate_draft(request: GuiDraftRequest, proposal: GuiDraftProposal, rules: Rules,

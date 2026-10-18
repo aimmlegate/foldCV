@@ -304,6 +304,19 @@
           "title": "Affected",
           "type": "array"
         },
+        "affectedCount": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Affectedcount"
+        },
         "dependencies": {
           "items": {
             "discriminator": {
@@ -363,7 +376,7 @@
             "pattern": "^[A-Za-z0-9_-]+$",
             "type": "string"
           },
-          "maxItems": 24,
+          "maxItems": 64,
           "title": "Readsnapshotids",
           "type": "array"
         },
@@ -606,6 +619,7 @@
             "AGENT_TOOL_LIMIT",
             "AGENT_OUTPUT_LIMIT",
             "AGENT_CONTEXT_LIMIT",
+            "AGENT_ARGUMENT_INVALID",
             "AGENT_WEB_DISABLED",
             "AGENT_SOURCE_UNAVAILABLE",
             "AGENT_SOURCE_DENIED",
@@ -854,6 +868,17 @@
           ],
           "title": "Scope"
         },
+        "selectionContext": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/RichSelection"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
         "settingsRevision": {
           "minimum": 1,
           "title": "Settingsrevision",
@@ -1002,6 +1027,19 @@
           "title": "Affected",
           "type": "array"
         },
+        "affectedCount": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Affectedcount"
+        },
         "batchId": {
           "anyOf": [
             {
@@ -1106,7 +1144,8 @@
             "find",
             "facts",
             "source",
-            "history"
+            "history",
+            "resources"
           ],
           "title": "Kind",
           "type": "string"
@@ -1261,6 +1300,12 @@
     "AgentRun": {
       "additionalProperties": false,
       "properties": {
+        "accessRevision": {
+          "default": 1,
+          "minimum": 1,
+          "title": "Accessrevision",
+          "type": "integer"
+        },
         "allowEdits": {
           "title": "Allowedits",
           "type": "boolean"
@@ -1385,6 +1430,17 @@
           ],
           "title": "Scope"
         },
+        "selectionContext": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/RichSelection"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
         "settingsRevision": {
           "minimum": 1,
           "title": "Settingsrevision",
@@ -1480,7 +1536,7 @@
           "items": {
             "$ref": "#/$defs/AgentReadSnapshot"
           },
-          "maxItems": 24,
+          "maxItems": 64,
           "title": "Snapshots",
           "type": "array"
         }

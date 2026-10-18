@@ -172,7 +172,7 @@ class CanonicalCoordinator:
         from .background_assets import guard_removal
         guard_removal(state, before, after)
         inverse = inverse_mutation(before, after, mutation_id="inverse_" + mutation.client_mutation_id,
-            session_id=mutation.capture.session_id) if mutation is not None and (job or history_binding) else None
+            session_id=mutation.capture.session_id) if mutation is not None else None
         if inverse is not None:
             self.history.register(state, before, mutation_selectors(before, inverse), write=True)
             from .models.agent import AgentEntityDependency
@@ -339,6 +339,20 @@ class CanonicalCoordinator:
         return value
 
     def publish(self, project, job_id, proposal_sha256, *, originals=None, artifacts=None, images=None, expected_claim=None):
+        from .project_catalog import AccessChanged
+        job = self.jobs.read(project, job_id)
+        catalog = getattr(self.canonical, "catalog", None)
+        if job.submission.kind == "agent" and job.receipt is None and catalog is not None:
+            try:
+                with catalog.authority(project, job.submission.access_revision):
+                    return self._publish(project, job_id, proposal_sha256, originals=originals,
+                        artifacts=artifacts, images=images, expected_claim=expected_claim)
+            except AccessChanged:
+                raise BackgroundFailure("DEPENDENCY_CHANGED") from None
+        return self._publish(project, job_id, proposal_sha256, originals=originals,
+            artifacts=artifacts, images=images, expected_claim=expected_claim)
+
+    def _publish(self, project, job_id, proposal_sha256, *, originals=None, artifacts=None, images=None, expected_claim=None):
         with self._writer(project):
             known_job = self.jobs.read(project, job_id)
             if known_job.receipt is not None or known_job.publication == "no_change":

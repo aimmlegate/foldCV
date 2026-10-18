@@ -109,7 +109,8 @@ class InvalidFinal(ContentFailure):
 
 
 class Events:
-    def __init__(self):
+    def __init__(self, *, max_bytes: int = MAX_RESULT):
+        self.max_bytes = max_bytes
         self.thread = False
         self.turn = False
         self.complete = False
@@ -118,7 +119,7 @@ class Events:
         self.usage = ReportedUsage()
 
     def accept(self, raw: bytes) -> None:
-        event = strict_json(raw)
+        event = strict_json(raw, max_bytes=self.max_bytes)
         if not isinstance(event, dict) or not isinstance(event.get("type"), str) or self.complete:
             raise ContentFailure("INVALID_RESULT")
         kind = event["type"]
@@ -166,7 +167,7 @@ class Events:
         if not self.complete or self.text is None:
             raise ContentFailure("INCOMPLETE_STREAM")
         try:
-            value = strict_json(self.text)
+            value = strict_json(self.text, max_bytes=self.max_bytes)
             if not isinstance(value, dict):
                 raise InvalidFinal()
             restored = schema.restore(value, model)
@@ -368,7 +369,10 @@ class CodexCliProvider:
                 or request.result_type.model_config.get("extra") != "forbid"):
             raise ContentFailure("INVALID_SCHEMA")
         try:
-            output_schema = StructuredSchema(request.result_type.model_json_schema())
+            result_schema = request.result_type.model_json_schema()
+            if request.transport is not None and hasattr(request.transport, "output_schema"):
+                result_schema = request.transport.output_schema(result_schema)
+            output_schema = StructuredSchema(result_schema)
             schema = json.dumps(output_schema.wire, ensure_ascii=False,
                                 allow_nan=False, separators=(",", ":")).encode("utf-8")
         except (ValueError, TypeError, UnicodeError, KeyError, RecursionError):
@@ -400,7 +404,7 @@ class CodexCliProvider:
                     raise ContentFailure("BUDGET_EXCEEDED")
                 if consumed_output >= policy.max_total_output_bytes:
                     raise ContentFailure("BUDGET_EXCEEDED")
-                events = Events()
+                events = Events(max_bytes=policy.max_total_output_bytes - consumed_output)
                 attempts += 1
                 try:
                     try:
@@ -409,6 +413,7 @@ class CodexCliProvider:
                         output, errors = self._run(files, args, deadline, cancel,
                                                    data=prompt, on_line=events.accept,
                                                    on_spawn=self.model_started,
+                                                   max_line=policy.max_total_output_bytes - consumed_output,
                                                    max_output=policy.max_total_output_bytes - consumed_output)
                     finally:
                         usages.append(events.usage)

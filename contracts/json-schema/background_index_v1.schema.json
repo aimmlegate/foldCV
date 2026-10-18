@@ -224,7 +224,7 @@
       "items": {
         "$ref": "#/$defs/JobSummaryV1"
       },
-      "maxItems": 8192,
+      "maxItems": 32768,
       "title": "Jobs",
       "type": "array"
     },

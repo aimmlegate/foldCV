@@ -136,8 +136,11 @@ class AgentService:
                 return existing, False
             # Catalog/project reads precede the store's non-reentrant file locks.
             settings, connection = self.validate_new(project_id, request)
+            access = self.projects.catalog.get(project_id)
+            if request.allow_edits and access.read_only:
+                raise AgentFailure("AGENT_TOOL_DENIED")
             return self.store.submit(project_id, request, model=settings.selected_agent_model,
-                connection_epoch=connection.epoch)
+                connection_epoch=connection.epoch, access_revision=access.access_revision)
 
     def start(self, project_id, run_id, *, seed=None):
         if self.closed:
@@ -193,7 +196,7 @@ class AgentService:
 
     async def stop_project(self, project_id):
         tasks = [control.task for control in self.controls.values() if control.project_id == project_id
-            and control.task is not None and not control.task.done()]
+            and control.task is not None and control.task is not asyncio.current_task() and not control.task.done()]
         if tasks:
             await self._wait(tasks)
 
@@ -345,3 +348,4 @@ class AgentService:
                             text=result.text.encode()[:1024].decode("utf-8", "ignore"), truncated=bool(result.text))
                     except AgentFailure:
                         self.startup_errors[control.project_id] = "AGENT_STORE_UNAVAILABLE"
+            await self.projects.drain_catalog_actions(run_id=control.run_id)

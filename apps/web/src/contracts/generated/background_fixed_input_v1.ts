@@ -599,6 +599,19 @@ export type Clientmutationid = string;
 export type Requestsha256 = string;
 export type Resultingrevision = number;
 export type Mutationreplay = RichMutationReplay[];
+export type Factcount = number;
+export type Recoveredrows = number;
+export type Requestbytes = number;
+export type Status7 = "complete" | "partial";
+export type Code1 = "FACT_SOURCE_UNRESOLVED" | "FACT_SECTION_OMITTED" | "FACT_ROWS_RECOVERED";
+export type Page = number | null;
+export type Section = string;
+export type Sourceid1 = string;
+export type Unitid1 = string | null;
+/**
+ * @maxItems 5000
+ */
+export type Unresolved = ExtractionIssue[];
 export type Records = (
   | CandidateRecord
   | DetailRecord
@@ -632,7 +645,7 @@ export type Kind30 =
   | "project_save"
   | "rewrite_prose"
   | "reconcile_edits";
-export type Status7 = "queued" | "running" | "completed" | "failed" | "cancelled" | "interrupted";
+export type Status8 = "queued" | "running" | "completed" | "failed" | "cancelled" | "interrupted";
 export type Operations = RichOperation[];
 export type Selectedinput = "text" | "file";
 export type Selectedsourceid = string | null;
@@ -645,7 +658,7 @@ export type Id36 = string;
 export type Origin12 = "user";
 export type Revision35 = number;
 export type Text3 = string;
-export type Unitid1 = string;
+export type Unitid2 = string;
 export type Overlays = SourceOverlay[];
 export type Parser = string;
 export type Parserversion = string;
@@ -661,6 +674,9 @@ export type Representedfactids = string[];
 export type Revision37 = number;
 export type Text4 = string;
 export type Units = SourceUnit[];
+export type Code2 = string;
+export type Page1 = number | null;
+export type Warningdetails = SourceWarning[];
 export type Warnings = string[];
 export type Sources = Source[];
 export type Warnings1 = string[];
@@ -701,6 +717,12 @@ export type Evidence15 = EvidenceSpan[];
 export type Id40 = string;
 export type Rawtext5 = string;
 export type Evidencerecords = ImmutableFactEvidence[];
+export type Blockids3 = string[];
+export type Disposition1 = "placed" | "excluded";
+export type Reason = string | null;
+export type Sourceid2 = string;
+export type Unitid3 = string;
+export type Importcoverage = ImportCoverage[];
 export type Operations1 = RichOperation[];
 export type Projectid1 = string;
 export type Documentrevision1 = number;
@@ -731,14 +753,18 @@ export type Syncrecords = RichSyncRecord[];
 export type Title = string;
 export type Titlemanuallyset = boolean;
 export type Updatedat = string;
-export type Blockids3 = string[];
-export type Code1 = string;
-export type Sourceid1 = string;
+export type Blockids4 = string[];
+export type Code3 = string;
+export type Count = number;
+export type Sourceid3 = string;
 export type Sourcerevision1 = number;
-export type Unitid2 = string;
+export type Unitid4 = string;
 export type Unitrevision1 = number;
 export type Evidence16 = Evidence17[];
 export type Id43 = string;
+export type Page2 = number | null;
+export type Sourceid4 = string;
+export type Locations = WarningLocation[];
 export type Recordids1 = string[];
 export type Warnings2 = RichWarning[];
 
@@ -1360,9 +1386,28 @@ export interface RichPreDraft {
   warnings: Warnings1;
 }
 export interface WorkingFacts {
+  extraction?: ExtractionReport | null;
   records: Records;
   revision: Revision33;
   tombstones: Tombstones;
+}
+export interface ExtractionReport {
+  counts: Counts;
+  factCount: Factcount;
+  recoveredRows: Recoveredrows;
+  requestBytes: Requestbytes;
+  status: Status7;
+  unresolved: Unresolved;
+}
+export interface Counts {
+  [k: string]: number;
+}
+export interface ExtractionIssue {
+  code: Code1;
+  page?: Page;
+  section: Section;
+  sourceId: Sourceid1;
+  unitId: Unitid1;
 }
 export interface RecordTombstone {
   actionId: Actionid3;
@@ -1376,7 +1421,7 @@ export interface RichOperation {
   errorCode: Errorcode1;
   id: Id34;
   kind: Kind30;
-  status: Status7;
+  status: Status8;
 }
 export interface Source {
   byteRef: Byteref;
@@ -1389,6 +1434,7 @@ export interface Source {
   parserVersion: Parserversion;
   revision: Revision36;
   units: Units;
+  warningDetails?: Warningdetails;
   warnings: Warnings;
 }
 export interface SourceOverlay {
@@ -1396,7 +1442,7 @@ export interface SourceOverlay {
   origin: Origin12;
   revision: Revision35;
   text: Text3;
-  unitId: Unitid1;
+  unitId: Unitid2;
 }
 export interface SourceUnit {
   disposition: Disposition;
@@ -1413,12 +1459,17 @@ export interface SourceLocation {
   kind: Kind31;
   row: Row;
 }
+export interface SourceWarning {
+  code: Code2;
+  page?: Page1;
+}
 export interface ProjectV5 {
   assets: Assets;
   createdAt: Createdat1;
   document: RichDocumentV1;
   evidenceRecords: Evidencerecords;
   facts: WorkingFacts;
+  importCoverage?: Importcoverage;
   operations: Operations1;
   projectId: Projectid1;
   renders: Renders;
@@ -1452,6 +1503,13 @@ export interface ImmutableFactEvidence {
   id: Id40;
   rawText: Rawtext5;
 }
+export interface ImportCoverage {
+  blockIds: Blockids3;
+  disposition: Disposition1;
+  reason: Reason;
+  sourceId: Sourceid2;
+  unitId: Unitid3;
+}
 export interface RichRenderSnapshot {
   documentRevision: Documentrevision1;
   docxPath: Docxpath;
@@ -1476,15 +1534,21 @@ export interface AssetRef {
   size: Size1;
 }
 export interface RichWarning {
-  blockIds: Blockids3;
-  code: Code1;
+  blockIds: Blockids4;
+  code: Code3;
+  count?: Count;
   evidence: Evidence16;
   id: Id43;
+  locations?: Locations;
   recordIds: Recordids1;
 }
 export interface Evidence17 {
-  sourceId: Sourceid1;
+  sourceId: Sourceid3;
   sourceRevision: Sourcerevision1;
-  unitId: Unitid2;
+  unitId: Unitid4;
   unitRevision: Unitrevision1;
+}
+export interface WarningLocation {
+  page?: Page2;
+  sourceId: Sourceid4;
 }

@@ -62,7 +62,7 @@ export function factsFromCells(cells: ReadonlyMap<string, CellValue>, baseline: 
     });
     return record;
   });
-  const value: unknown = { revision: baseline.revision, records, tombstones: baseline.tombstones.filter(item => !order.includes(item.recordId)) };
+  const value: unknown = { ...baseline, records, tombstones: baseline.tombstones.filter(item => !order.includes(item.recordId)) };
   if (!validateWorkingFacts(value)) throw new Error("Invalid working facts");
   return value;
 }

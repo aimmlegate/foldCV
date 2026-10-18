@@ -46,7 +46,8 @@ export type Blocks = [AgentNewBlock, ...AgentNewBlock[]];
  */
 export type Content1 = AgentInline[];
 export type Key1 = string;
-export type Kind1 = "paragraph" | "bullet_list_item" | "numbered_list_item";
+export type Kind1 = "paragraph" | "bullet_list_item" | "numbered_list_item" | "heading" | "section";
+export type Level = 1 | 2 | 3;
 export type Afterid = string | null;
 export type Parentid = string;
 export type Snapshotid1 = string;
@@ -603,6 +604,23 @@ export type Recordkind =
 export type Kind10 = "delete_fact";
 export type Recordid2 = string;
 export type Snapshotid5 = string;
+export type Kind11 = "format_template";
+export type Snapshotid6 = string;
+export type Headerrows = number;
+export type Kind12 = "insert_table";
+/**
+ * @minItems 1
+ * @maxItems 100
+ */
+export type Rows = [string[], ...string[][]];
+export type Alt = string;
+export type Assetid = string;
+export type Height = number;
+export type Kind13 = "insert_asset";
+export type Width = number;
+export type Direction = "undo" | "redo";
+export type Kind14 = "history";
+export type Snapshotid7 = string;
 /**
  * @maxItems 100
  */
@@ -614,9 +632,13 @@ export type Operations = (
   | AgentUpdateFact
   | AgentCreateFact
   | AgentDeleteFact
+  | AgentFormatTemplate
+  | AgentInsertTable
+  | AgentInsertAsset
+  | AgentHistoryCommand
 )[];
 /**
- * @maxItems 24
+ * @maxItems 64
  */
 export type Snapshotids = string[];
 
@@ -651,6 +673,7 @@ export interface AgentNewBlock {
   content: Content1;
   key: Key1;
   kind: Kind1;
+  level?: Level;
 }
 export interface AgentBlockAnchor {
   afterId: Afterid;
@@ -735,4 +758,27 @@ export interface AgentDeleteFact {
   kind: Kind10;
   recordId: Recordid2;
   snapshotId: Snapshotid5;
+}
+export interface AgentFormatTemplate {
+  kind: Kind11;
+  snapshotId: Snapshotid6;
+}
+export interface AgentInsertTable {
+  destination: AgentBlockAnchor;
+  headerRows?: Headerrows;
+  kind: Kind12;
+  rows: Rows;
+}
+export interface AgentInsertAsset {
+  alt: Alt;
+  assetId: Assetid;
+  destination: AgentBlockAnchor;
+  height: Height;
+  kind: Kind13;
+  width: Width;
+}
+export interface AgentHistoryCommand {
+  direction: Direction;
+  kind: Kind14;
+  snapshotId: Snapshotid7;
 }

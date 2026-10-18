@@ -1,4 +1,4 @@
-"""Keep the first document literal while extracting editable working facts."""
+"""Place every source fragment into the template without drafting new prose."""
 
 import re
 
@@ -6,6 +6,9 @@ from .gui_drafting import draft_skeleton
 from .models.rich_workspace import ProjectV5
 from .rendering.rich_template import require_rich_template
 from .rich_assembly import assemble_facts, identity
+from .models.rich_document import RichDocumentV1
+from .models.rich_facts import WorkingFacts
+from .rich_format import compact, format_document, section_role
 
 
 def literal_content(text, source, unit, records):
@@ -50,21 +53,77 @@ def assemble_import(workspace, normalized):
         for period in record.get("periods", []):
             if period["present"]["value"] is True:
                 period["present"]["rawText"] = period["end"]["rawText"]
-    blocks = []
+    blocks, excluded = [], {}
+    candidate = next(record for record in records if record["kind"] == "candidate")
+    headers = {compact(record[key]["rawText"]) for record in records for key in ("employer", "role") if key in record}
+    def fragments(text):
+        chunks = []
+        for line in text.splitlines():
+            stripped = line.strip()
+            if not stripped or re.fullmatch(r"[,.;:]+", stripped):
+                continue
+            marker = re.match(r"^(?:[•●▪]|[-–]\s|\d+[.)]\s)\s*", stripped)
+            structural = bool(section_role(stripped) or compact(stripped) in headers or re.search(r"\d{4}\s*[—–-]", stripped))
+            if marker:
+                chunks.append(["bullet_list", stripped[marker.end():], False])
+            elif structural or not chunks or chunks[-1][2]:
+                chunks.append(["paragraph", stripped, structural])
+            else:
+                chunks[-1][1] += " " + stripped
+        return chunks
+
     for source in normalized.sources:
+        last_by_page = {}
         for unit in sorted(source.units, key=lambda item: item.order):
+            if unit.location.kind == "page" and unit.text.strip():
+                last_by_page[unit.location.index] = unit
+        footer_names = [unit for unit in last_by_page.values() if compact(unit.text) == compact(candidate["name"]["rawText"]) and unit.text.strip()]
+        footer_ids = {unit.id for unit in footer_names} if len(footer_names) >= 2 else set()
+        for unit in sorted(source.units, key=lambda item: item.order):
+            if unit.id in footer_ids or not unit.text.strip():
+                excluded[(source.id, unit.id)] = "Repeated candidate name in the last text block of multiple PDF pages." if unit.id in footer_ids else "Whitespace only."
+                continue
             evidence = {"sourceId": source.id, "sourceRevision": source.revision, "unitId": unit.id,
                 "unitRevision": unit.revision, "text": unit.text}
-            blocks.append({"id": identity("source-literal"), "revision": 1, "type": "paragraph", "props": {},
-                "content": literal_content(unit.text, source, unit, records), "children": [],
-                "provenance": [{"kind": "source", "id": identity("source-link"), "evidence": [evidence]}]})
+            cuts = []
+            for key in ("name", "title"):
+                value = candidate[key]["rawText"]
+                if not value or not any(span["sourceId"] == source.id and span["unitId"] == unit.id for span in candidate["evidence"]):
+                    continue
+                pattern = r"(?<!\w)" + r"\s+".join(re.escape(word) for word in value.split()) + r"(?!\w)"
+                for match in re.finditer(pattern, unit.text, re.I):
+                    cuts.append((match.start(), match.end(), key))
+            cursor, parts = 0, []
+            for start, end, key in sorted(cuts):
+                if start < cursor:
+                    continue
+                if start > cursor:
+                    parts.extend((kind, text, None) for kind, text, _ in fragments(unit.text[cursor:start]))
+                parts.append(("paragraph", " ".join(unit.text[start:end].split()), key)); cursor = end
+            parts.extend((kind, text, None) for kind, text, _ in fragments(unit.text[cursor:]))
+            for kind, text, key in parts:
+                content = ([{"type": "fact_field", "bindingId": identity("binding"), "recordId": candidate["id"],
+                    "fieldKey": key, "text": text, "styles": {}, "syncedFactRevision": 1}] if key else literal_content(text, source, unit, records))
+                blocks.append({"id": identity("source-literal"), "revision": 1, "type": kind, "props": {},
+                    "content": content, "children": [], "provenance": [{"kind": "source", "id": identity("source-link"), "evidence": [evidence]}]})
+    facts = WorkingFacts.model_validate({"revision": 1, "records": records, "tombstones": [],
+        "extraction": normalized.extraction.model_dump(by_alias=True) if normalized.extraction else None})
+    document = format_document(RichDocumentV1.model_validate({"schemaVersion": 1, "revision": workspace.document_revision + 1, "regions": [
+        {"id": "header", "role": "header", "revision": 1, "blocks": []},
+        {"id": "sidebar", "role": "sidebar", "revision": 1, "blocks": []},
+        {"id": "main", "role": "main", "revision": 1, "blocks": blocks}]}), facts)
+    placements = {}
+    for block in document.blocks():
+        for link in block.provenance:
+            for span in getattr(link, "evidence", []):
+                placements.setdefault((span.source_id, span.unit_id), []).append(block.id)
+    coverage = [{"sourceId": source.id, "unitId": unit.id,
+        "disposition": "excluded" if (source.id, unit.id) in excluded else "placed",
+        "blockIds": list(dict.fromkeys(placements.get((source.id, unit.id), []))),
+        "reason": excluded.get((source.id, unit.id))} for source in normalized.sources for unit in source.units]
     return ProjectV5.model_validate({"schemaVersion": 5, "projectId": workspace.project_id,
         "revision": workspace.project_revision + 1, "createdAt": workspace.created_at,
         "sources": [source.model_dump(by_alias=True) for source in normalized.sources], "evidenceRecords": evidence_records,
-        "facts": {"revision": 1, "records": records, "tombstones": []},
-        "document": {"schemaVersion": 1, "revision": workspace.document_revision + 1, "regions": [
-            {"id": "header", "role": "header", "revision": 1, "blocks": []},
-            {"id": "sidebar", "role": "sidebar", "revision": 1, "blocks": []},
-            {"id": "main", "role": "main", "revision": 1, "blocks": blocks}]}, "assets": [],
+        "facts": facts.model_dump(by_alias=True), "document": document.model_dump(by_alias=True), "importCoverage": coverage, "assets": [],
         "operations": [op.model_dump(by_alias=True) for op in workspace.pre_draft.operations], "renders": [],
         "template": require_rich_template().manifest.model_dump(by_alias=True)})

@@ -496,6 +496,9 @@ export type Representedfactids = string[];
 export type Revision30 = number;
 export type Text9 = string;
 export type Units = SourceUnit[];
+export type Code2 = string;
+export type Page = number | null;
+export type Warningdetails = SourceWarning[];
 export type Warnings = string[];
 export type Sources = Source[];
 export type Warnings1 = string[];
@@ -1231,6 +1234,7 @@ export interface Source {
   parserVersion: Parserversion;
   revision: Revision29;
   units: Units;
+  warningDetails?: Warningdetails;
   warnings: Warnings;
 }
 export interface SourceOverlay {
@@ -1254,6 +1258,10 @@ export interface SourceLocation {
   index: Index;
   kind: Kind29;
   row: Row;
+}
+export interface SourceWarning {
+  code: Code2;
+  page?: Page;
 }
 export interface ProjectV4 {
   asOf: PartialDate | null;

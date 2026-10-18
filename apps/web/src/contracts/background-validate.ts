@@ -14,6 +14,7 @@ import background_barrier_v1 from "../../../../contracts/json-schema/background_
 import background_draft_v1 from "../../../../contracts/json-schema/background_draft_v1.schema.json" with { type: "json" };
 import background_receipt_v1 from "../../../../contracts/json-schema/background_receipt_v1.schema.json" with { type: "json" };
 import background_apply_v2 from "../../../../contracts/json-schema/background_apply_v2.schema.json" with { type: "json" };
+import background_tool_saved_v3 from "../../../../contracts/json-schema/background_tool_saved_v3.schema.json" with { type: "json" };
 import background_event_v1 from "../../../../contracts/json-schema/background_event_v1.schema.json" with { type: "json" };
 import background_intent_v1 from "../../../../contracts/json-schema/background_intent_v1.schema.json" with { type: "json" };
 import background_undo_v1 from "../../../../contracts/json-schema/background_undo_v1.schema.json" with { type: "json" };
@@ -64,6 +65,7 @@ const schemas = new Map<string, object>(Object.entries({ background_submission_v
   background_undo_v1, background_sidecar_v1, background_attempt_v1, background_draft_payload_v1, background_dispatch_v1, background_agent_request_v1, background_artifact_v1, background_legacy_run_v2, background_project_v1, background_replay_request_v1, background_replay_v1, background_writer_proof_v1, background_writer_open_v1, background_writer_advance_v1, background_writer_barrier_ack_v1, background_writer_barrier_command_v1, background_writer_checkpoint_v1, background_writer_abandon_v1, background_writer_view_v1, background_writer_mutation_v1, background_writer_publish_v1, background_writer_publication_v1, background_writer_history_request_v1, background_writer_history_offer_v1, background_writer_history_command_v1, background_writer_history_result_v1, background_writer_draft_reference_v1, background_writer_draft_command_v1, background_writer_draft_read_v1, background_writer_draft_resolve_v1, background_fixed_request_v1, background_fixed_reply_v1, background_fixed_input_v1, background_processing_candidate_v1 }));
 schemas.set("background_summary_v1", background_summary_v1);
 schemas.set("background_index_v1", background_index_v1);
+schemas.set("background_tool_saved_v3", background_tool_saved_v3);
 const validators = new Map<string, ValidateFunction<unknown>>();
 const mutationShape = ajv.compile<unknown>(rich_mutation);
 export function prepareWriterContracts(): void {
@@ -219,6 +221,8 @@ function semantics(value: unknown): boolean {
       (value.cleanupVerified === true && ["reserved", "starting", "running", "cleanup_failed"].includes(String(value.state))))) return false;
   if (value.disposition === "saved" && value.schemaVersion === 2 &&
       (!record(value.result) || !record(value.result.receipt) || value.result.receipt.durable !== true || !validateAgentShape("agent_commit_result", value.result))) return false;
+  if (value.disposition === "saved" && value.schemaVersion === 3 &&
+      (!record(value.receipt) || value.receipt.durable !== true || !validateAgentShape("agent_edit_receipt", value.receipt))) return false;
   if ("snapshot" in value && "cursor" in value) {
     if (!record(value.snapshot) || !record(value.snapshot.submission) || !record(value.snapshot.submission.identity) ||
         value.snapshot.id !== value.jobId || value.snapshot.submission.identity.projectId !== value.projectId ||

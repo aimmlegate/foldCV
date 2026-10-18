@@ -1,0 +1,20 @@
+{
+  "additionalProperties": false,
+  "properties": {
+    "expectedRevision": {
+      "minimum": 1,
+      "title": "Expectedrevision",
+      "type": "integer"
+    },
+    "readOnly": {
+      "title": "Readonly",
+      "type": "boolean"
+    }
+  },
+  "required": [
+    "expectedRevision",
+    "readOnly"
+  ],
+  "title": "AgentAccessRequest",
+  "type": "object"
+}

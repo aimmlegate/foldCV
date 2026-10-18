@@ -4356,7 +4356,7 @@
     "name": "background_sidecar_v1 counts history metadata",
     "contract": "background_sidecar_v1",
     "base": "background_history_metadata_full_v1",
-    "valid": false,
+    "valid": true,
     "edits": []
   },
   {
@@ -6366,4 +6366,143 @@
       }
     ]
   }
+,
+
+  {
+    "name": "agent_access_valid",
+    "contract": "agent_access",
+    "base": "agent_access",
+    "valid": true,
+    "edits": []
+  },
+  {
+    "name": "agent_access_request_valid",
+    "contract": "agent_access_request",
+    "base": "agent_access_request",
+    "valid": true,
+    "edits": []
+  },
+  {
+    "name": "agent_project_action_valid",
+    "contract": "agent_project_action",
+    "base": "agent_project_action",
+    "valid": true,
+    "edits": []
+  },
+  {
+    "name": "background_tool_saved_v3_valid",
+    "contract": "background_tool_saved_v3",
+    "base": "background_tool_saved_v3",
+    "valid": true,
+    "edits": []
+  },
+  {
+    "name": "agent_access_reject_string_permission",
+    "contract": "agent_access_request",
+    "base": "agent_access_request",
+    "valid": false,
+    "edits": [
+      {
+        "op": "set",
+        "path": [
+          "readOnly"
+        ],
+        "value": "false"
+      }
+    ]
+  },
+  {
+    "name": "project_action_reject_unknown_command",
+    "contract": "agent_project_action",
+    "base": "agent_project_action",
+    "valid": false,
+    "edits": [
+      {
+        "op": "set",
+        "path": [
+          "action"
+        ],
+        "value": "other_project"
+      }
+    ]
+  },
+  {
+    "name": "compact_receipt_reject_false_save",
+    "contract": "background_tool_saved_v3",
+    "base": "background_tool_saved_v3",
+    "valid": false,
+    "edits": [
+      {
+        "op": "set",
+        "path": [
+          "receipt",
+          "durable"
+        ],
+        "value": false
+      }
+    ]
+  },
+  {
+    "name": "compact_receipt_reject_oversized_body",
+    "contract": "background_tool_saved_v3",
+    "base": "background_tool_saved_v3",
+    "valid": false,
+    "edits": [
+      {
+        "op": "repeat_text",
+        "path": [
+          "projectRef"
+        ],
+        "text": "x",
+        "count": 4096
+      }
+    ]
+  }
+
+,
+{
+  "name": "agent_project_operations_valid",
+  "contract": "agent_project_operations",
+  "base": "agent_project_operations",
+  "valid": true,
+  "edits": []
+},
+{
+  "name": "agent_history_offer valid owner-bound empty history",
+  "contract": "agent_history_offer",
+  "base": "agent_history_offer",
+  "valid": true,
+  "edits": []
+},
+{
+  "name": "agent_history_offer rejects short owner capability",
+  "contract": "agent_history_offer",
+  "base": "agent_history_offer",
+  "valid": false,
+  "edits": [
+    {
+      "op": "set",
+      "path": [
+        "owner",
+        "token"
+      ],
+      "value": "short"
+    }
+  ]
+},
+{
+  "name": "agent_history_offer rejects an unknown field",
+  "contract": "agent_history_offer",
+  "base": "agent_history_offer",
+  "valid": false,
+  "edits": [
+    {
+      "op": "set",
+      "path": [
+        "foreignProject"
+      ],
+      "value": "other"
+    }
+  ]
+}
 ]

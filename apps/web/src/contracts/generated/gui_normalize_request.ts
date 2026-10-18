@@ -43,6 +43,9 @@ export type Representedfactids = string[];
 export type Revision3 = number;
 export type Text1 = string;
 export type Units = SourceUnit[];
+export type Code = string;
+export type Page = number | null;
+export type Warningdetails = SourceWarning[];
 export type Warnings = string[];
 
 export interface GuiNormalizeRequest {
@@ -67,6 +70,7 @@ export interface Source {
   parserVersion: Parserversion;
   revision: Revision2;
   units: Units;
+  warningDetails?: Warningdetails;
   warnings: Warnings;
 }
 export interface SourceOverlay {
@@ -90,4 +94,8 @@ export interface SourceLocation {
   index: Index;
   kind: Kind;
   row: Row;
+}
+export interface SourceWarning {
+  code: Code;
+  page?: Page;
 }

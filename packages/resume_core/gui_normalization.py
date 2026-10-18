@@ -9,13 +9,14 @@ from typing import Literal
 from pydantic import Field, PrivateAttr, model_validator
 
 from .extraction.models import ExtractResult
-from .gui_prompts import content_input
+from .gui_prompts import CONTENT_INPUT_BYTES, content_input
 from .models.contracts import Evidence, Id, Job, PartialDate, Revision, Source, Wire
 from .models.recovery import (
     CandidateFact, EvidenceSpan, NameAssessment, NameAssessmentFact, ObservationAssessment,
     ObservationFact, RecoveryFact, Rules,
 )
 from .normalization import ProposedFact, ProposedJob, SemanticProposal, _id
+from .models.rich_facts import ExtractionReport
 
 
 class SupportedText(Wire):
@@ -135,6 +136,7 @@ class GuiNormalizedResult(Wire):
     employment: list[Job] = Field(default_factory=list)
     job_periods: dict[str, list[NormalizedPeriod]] = Field(default_factory=dict)
     conflicts: list[FactConflict] = Field(default_factory=list)
+    extraction: ExtractionReport | None = None
 
 
 class NormalizationFailure(Exception):
@@ -161,7 +163,8 @@ def canonical_source(result: ExtractResult, *, source_id: str | None = None) -> 
                                   "byteRef": f"sources/{identity}/original",
                                   "parser": result.parser, "parserVersion": result.parser_version,
                                   "units": units, "overlays": [],
-                                  "warnings": [gap.code for gap in result.gaps]})
+                                  "warnings": [gap.code for gap in result.gaps],
+                                  "warningDetails": [{"code": gap.code, "page": gap.location.page} for gap in result.gaps]})
 
 
 def source_fingerprint(sources: list[Source]) -> str:
@@ -170,7 +173,7 @@ def source_fingerprint(sources: list[Source]) -> str:
     return hashlib.sha256(json.dumps(payload, ensure_ascii=False, sort_keys=True, separators=(",", ":")).encode()).hexdigest()
 
 
-def normalization_input(request: GuiNormalizeRequest, rules: Rules) -> str:
+def normalization_input(request: GuiNormalizeRequest, rules: Rules, *, transform=None, max_bytes=CONTENT_INPUT_BYTES, return_canonical=False) -> str:
     payload = request.model_dump(mode="json", by_alias=True)
     payload["assessmentInstructions"] = (
         "missingSurname is true only with explicit source evidence of absence, false for a supported surname or explicit mononym, null otherwise. "
@@ -181,7 +184,7 @@ def normalization_input(request: GuiNormalizeRequest, rules: Rules) -> str:
         "Keep global skills separate from job/subproject skills. Keep conflicting claims separate, without asserting personal leadership. "
         "Set present=true only for explicit ongoing work; a missing end date alone is not present. Preserve incomplete/unknown period text."
     )
-    return content_input("normalize_semantics", payload, rules)
+    return content_input("normalize_semantics", payload, rules, transform=transform, max_bytes=max_bytes, return_canonical=return_canonical)
 
 
 def validate_span(span: EvidenceSpan, sources: list[Source]) -> Evidence:

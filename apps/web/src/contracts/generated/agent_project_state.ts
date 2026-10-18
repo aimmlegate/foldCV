@@ -376,6 +376,7 @@ export type AgentMessage = {
  */
 export type Messages = AgentMessage[];
 export type Projectid = string;
+export type Accessrevision = number;
 export type Allowedits = boolean;
 export type Allowweb = boolean;
 export type Clientrequestid = string;
@@ -410,6 +411,7 @@ export type Code =
   | "AGENT_TOOL_LIMIT"
   | "AGENT_OUTPUT_LIMIT"
   | "AGENT_CONTEXT_LIMIT"
+  | "AGENT_ARGUMENT_INVALID"
   | "AGENT_WEB_DISABLED"
   | "AGENT_SOURCE_UNAVAILABLE"
   | "AGENT_SOURCE_DENIED"
@@ -488,6 +490,7 @@ export type Conversations = AgentConversation[];
  * @maxItems 100
  */
 export type Affected = AgentAnchor[];
+export type Affectedcount = number | null;
 export type Kind4 = "entity";
 export type Fingerprint1 = string;
 export type Kind5 = "query";
@@ -496,7 +499,7 @@ export type Cursor = string | null;
  * @maxItems 100
  */
 export type Ids = string[];
-export type Kind6 = "context" | "document" | "find" | "facts" | "source" | "history";
+export type Kind6 = "context" | "document" | "find" | "facts" | "source" | "history" | "resources";
 export type Parentid = string | null;
 export type Text2 = string;
 /**
@@ -1032,7 +1035,7 @@ export type Recordid6 = string;
 export type Ownerepoch1 = number;
 export type Previewsha256 = string;
 /**
- * @maxItems 24
+ * @maxItems 64
  */
 export type Readsnapshotids = string[];
 export type Requestsha256 = string;
@@ -1088,6 +1091,7 @@ export type Toolkey1 = string;
  * @maxItems 100
  */
 export type Affected1 = AgentAnchor[];
+export type Affectedcount1 = number | null;
 export type Batchid1 = string | null;
 export type Disposition1 = "prepared" | "no_change";
 export type Preview = string;
@@ -1187,7 +1191,7 @@ export type Nextcursor = string | null;
 export type Runid11 = string;
 export type Truncated1 = boolean;
 /**
- * @maxItems 24
+ * @maxItems 64
  */
 export type Snapshots = AgentReadSnapshot[];
 export type Journals = AgentRunJournal[];
@@ -1240,6 +1244,7 @@ export interface DependencyStamp {
   revision: Revision;
 }
 export interface AgentRun {
+  accessRevision?: Accessrevision;
   allowEdits: Allowedits;
   allowWeb: Allowweb;
   clientRequestId: Clientrequestid;
@@ -1256,6 +1261,7 @@ export interface AgentRun {
   projectId: Projectid1;
   savedBatchId: Savedbatchid;
   scope: Scope;
+  selectionContext?: RichSelection | null;
   settingsRevision: Settingsrevision;
   state: State;
   usage: AgentUsage | null;
@@ -1328,6 +1334,7 @@ export interface AgentBatchJournal {
 }
 export interface AgentEditBatch {
   affected: Affected;
+  affectedCount?: Affectedcount;
   dependencies: Dependencies2;
   factRecordIds: Factrecordids;
   id: Id5;
@@ -1867,6 +1874,7 @@ export interface AgentEditReceipt {
 }
 export interface AgentPrepareResult {
   affected: Affected1;
+  affectedCount?: Affectedcount1;
   batchId: Batchid1;
   disposition: Disposition1;
   preview: Preview;
@@ -1969,6 +1977,7 @@ export interface AgentJournalRequest {
   message: Message1;
   projectRevision: Projectrevision3;
   scope: Scope3;
+  selectionContext?: RichSelection | null;
   settingsRevision: Settingsrevision1;
 }
 export interface AgentReadSnapshot {

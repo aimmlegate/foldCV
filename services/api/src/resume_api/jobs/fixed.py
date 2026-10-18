@@ -11,6 +11,7 @@ from packages.resume_core.background_history import digest_bytes
 from packages.resume_core.background_scopes import mutation_selectors
 from packages.resume_core.background_store import BackgroundFailure, TERMINAL_EXECUTION, claimed, expiration, job_in
 from packages.resume_core.gui_normalization import GuiNormalizeRequest
+from packages.resume_core.import_diagnostics import source_warnings
 from packages.resume_core.models.agent import AgentEntityDependency
 from packages.resume_core.models.background import (FixedInputV1, JobFixedReplyV1, JobIdentity, JobSubmissionV1,
     ProcessingCandidateV1, ProposalBindingV1, ScopeGuardV1, JobFailure, FixedInvalidationV1)
@@ -391,7 +392,9 @@ class FixedJobs:
                     workspace.title = result.candidate.name.text or workspace.title
                 codes = {"unlikely": "source_not_resume", "uncertain": "source_resume_uncertain"}
                 warnings = [codes[candidate.assessment.verdict]] if candidate.assessment.verdict in codes else []
-                warnings += [code for source in result.sources for code in source.warnings]
+                workspace.warnings = [w for w in workspace.warnings if w.code not in {
+                    *[code for source in result.sources for code in source.warnings], "source_details_unresolved"}]
+                workspace.warnings.extend(source_warnings(result.sources))
                 if result._native_recovery_count or unresolved_source_units(result):
                     warnings.append("source_details_unresolved")
                 for code in dict.fromkeys(warnings):

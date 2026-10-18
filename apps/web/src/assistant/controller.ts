@@ -6,6 +6,7 @@ import type { AgentWebSource } from "../contracts/generated/agent_web_source";
 import type { AgentFinding } from "../contracts/generated/agent_finding";
 import type { AgentRun } from "../contracts/generated/agent_run";
 import type { AgentRunRequest } from "../contracts/generated/agent_run_request";
+import type { AgentHistoryOffer } from "../contracts/generated/agent_history_offer";
 import type { AgentEditReceipt } from "../contracts/generated/agent_edit_receipt";
 import type { AgentEvent } from "../contracts/generated/agent_event";
 import type { RichProjectResponse } from "../contracts/generated/rich_project_response";
@@ -25,9 +26,11 @@ export type AssistantView = {
   draft: string; submitting: boolean; pendingSend: boolean; error: string | null;
 };
 export type AssistantEditor = { sessionId: string; apply: (batchId: string, api: PreparedApi) => Promise<void> };
-export type TurnBaseline = () => Promise<{ response: RichProjectResponse; scope: AgentRunRequest["scope"] }>;
+export type TurnBaseline = () => Promise<{ response: RichProjectResponse; scope: AgentRunRequest["scope"]; selectionContext?: AgentRunRequest["selectionContext"];
+  historyOffers?: Pick<AgentHistoryOffer, "undo" | "redo"> }>;
 export type AssistantApi = Pick<AgentBrowserApi, "projectId" | "settings" | "saveSettings" | "capabilities" | "conversations" | "conversation" |
-  "messages" | "resources" | "open" | "renew" | "close" | "submit" | "read" | "cancel" | "events" | "prepared">;
+  "messages" | "resources" | "open" | "renew" | "close" | "submit" | "read" | "cancel" | "events" | "prepared">
+  & Partial<Pick<AgentBrowserApi, "access" | "setAccess" | "offerHistory">>;
 const pause = (milliseconds: number) => new Promise<void>(resolve => { setTimeout(resolve, milliseconds); });
 function code(error: unknown): string { return error instanceof AgentApiFailure || error instanceof RichApiFailure ? error.code : error instanceof Error && error.message.startsWith("AGENT_") ? error.message : "REQUEST_FAILED"; }
 
@@ -42,6 +45,7 @@ export class AssistantController {
   private epoch = 0;
   private sequence = 0;
   private metadataEpoch = 0;
+  private accessRevision = 1;
   private pending: AgentRunRequest | null = null;
   private readonly applying = new Set<string>();
   private readonly drafts = new Map<string, string>();
@@ -60,10 +64,23 @@ export class AssistantController {
     this.view = { ...this.view, ...update }; this.changed(this.view);
   }
   draft(value: string): void { this.publish({ draft: value }); }
-  flags(value: AgentFlags): void { this.publish({ flags: { ...value } }); void this.refresh().catch(error => this.publish({ error: code(error) })); }
+  flags(value: AgentFlags): void {
+    if (!this.api.setAccess) { this.publish({ flags: { ...value } }); return; }
+    this.publish({ submitting: true });
+    void this.api.setAccess(this.accessRevision, !value.allowEdits).then(access => {
+      this.accessRevision = access.revision;
+      this.publish({ flags: { ...value, allowEdits: !access.readOnly }, error: null });
+    }).catch(error => this.publish({ error: code(error) }))
+      .finally(() => { this.publish({ submitting: false }); void this.refresh().catch(error => this.publish({ error: code(error) })); });
+  }
 
   async refresh(): Promise<void> {
     const epoch = ++this.metadataEpoch;
+    const access = await this.api.access?.();
+    if (access && epoch === this.metadataEpoch) {
+      this.accessRevision = access.revision;
+      this.publish({ flags: { ...this.view.flags, allowEdits: !access.readOnly } });
+    }
     const [settings, capabilities, conversations] = await Promise.all([this.api.settings(), this.api.capabilities(this.view.flags), this.api.conversations()]);
     if (epoch === this.metadataEpoch) this.publish({ settings, capabilities, conversations: conversations.items, conversationCursor: conversations.nextCursor });
   }
@@ -170,7 +187,8 @@ export class AssistantController {
   }
   async send(baseline: TurnBaseline): Promise<void> {
     if (this.closed || this.view.submitting || this.view.run && !terminal(this.view.run) || this.applying.size) return;
-    const message = this.view.draft, flags = { ...this.view.flags };
+    const message = this.view.draft;
+    let flags = { ...this.view.flags };
     if (!message.trim() || [...message].length > 8000) return;
     if (this.jobs) { await this.sendBackground(baseline); return; }
     this.publish({ submitting: true, error: null });
@@ -179,13 +197,18 @@ export class AssistantController {
       if (request && request.message !== message) throw new AgentApiFailure("AGENT_IDEMPOTENCY_CONFLICT");
       if (!request) {
         await this.refresh();
+        flags = { ...this.view.flags };
         if (!this.view.capabilities?.ready || !this.view.settings) throw new AgentApiFailure(this.view.capabilities?.unavailable?.code ?? "AGENT_CONNECTION_UNAVAILABLE");
         const settingsRevision = this.view.settings.revision;
         const owner = await this.ensureOwner(), conversationId = await this.ensureConversation();
         const current = await baseline(), workspace = current.response.workspace;
         if (this.closed) throw new AgentApiFailure("AGENT_INTERRUPTED");
         if (!workspace.project) throw new AgentApiFailure("AGENT_NOT_FOUND");
+        if (flags.allowEdits && current.historyOffers && this.api.offerHistory) await this.api.offerHistory({ owner,
+          projectRevision: workspace.projectRevision, documentRevision: workspace.documentRevision,
+          factsRevision: workspace.project.facts.revision, ...current.historyOffers });
         request = { clientRequestId: crypto.randomUUID(), conversationId, owner, message, ...flags, scope: current.scope,
+          selectionContext: current.selectionContext ?? null,
           settingsRevision, projectRevision: workspace.projectRevision,
           documentRevision: workspace.documentRevision, factsRevision: workspace.project.facts.revision };
         this.pending = request;
@@ -224,7 +247,7 @@ export class AssistantController {
         if (!workspace.project || this.closed) throw new AgentApiFailure("AGENT_STALE_READ");
         pending = { schemaVersion: 1, lineage: project.lineage, requestEpoch: project.requestEpoch,
           request: { clientRequestId: crypto.randomUUID(), conversationId, message: this.view.draft, ...this.view.flags,
-            scope: current.scope, settingsRevision: settings.revision, projectRevision: workspace.projectRevision,
+            scope: current.scope, selectionContext: current.selectionContext ?? null, settingsRevision: settings.revision, projectRevision: workspace.projectRevision,
             documentRevision: workspace.documentRevision, factsRevision: workspace.project.facts.revision } };
         this.pendingBackground = pending;
       }

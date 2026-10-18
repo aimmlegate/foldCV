@@ -14,7 +14,8 @@ APPLY_DESCRIPTION = (
     "Store one prepared proposal with apply protocol v2. waiting_for_sync or needs_review means "
     "proposalStored:true and durable:false: finish this turn without polling, another batch, regeneration "
     "or a save claim. Only saved with durable:true and an exact receipt proves a canonical save. "
-    "Check-only mode forbids writes."
+    "Saved tool results use compact schemaVersion:3 with the exact receipt and workspaceSha256; "
+    "the full project is available through paged read tools. Check-only mode forbids writes."
 )
 DEVELOPER_INSTRUCTIONS_V2 = (
     "Use only the captured FoldCV tools and native web search when enabled. Never use shell, files, "
@@ -100,12 +101,13 @@ class JobToolSession(ToolSession):
             async with self.gate:
                 self.guard()
                 from packages.resume_core import agent_limits as limits
-                if self.calls >= limits.TOOL_CALLS or self.result_bytes >= limits.TOOL_TOTAL_BYTES:
+                if self.calls >= limits.TOOL_CALLS or self.result_bytes > limits.TOOL_TOTAL_BYTES - 4096:
                     raise AgentFailure("AGENT_TOOL_LIMIT")
                 self.calls += 1
                 job = self.control.job
                 if not job.submission.allow_edits or name not in job.submission.tools:
                     raise AgentFailure("AGENT_TOOL_DENIED")
+                self.write_guard()
                 _, _, journal = run_in(self.service.store.load(self.control.project_id), job.id)
                 item = next((item for item in journal.batches if item.result.batch_id == arguments.batch_id), None)
                 if item is None or item.batch is None:
@@ -139,6 +141,13 @@ class JobToolSession(ToolSession):
                     await self.service.jobs.supervisor._emit(published)
                     result = (self.service.jobs.publication.native_result(self.control.project_id, job.id)
                         if published.receipt is not None else manager.result(published))
+                if result.disposition == "saved":
+                    from packages.resume_core.models.background import ToolSavedV3
+                    saved = self.service.jobs.store.read(self.control.project_id, job.id)
+                    result = ToolSavedV3(schemaVersion=3, disposition="saved", jobId=job.id,
+                        proposalId=saved.proposal_id, proposalStored=True, durable=True,
+                        receipt=result.result.receipt, workspaceSha256=saved.receipt.workspace_sha256,
+                        projectRef=f"/v1/rich/projects/{self.control.project_id}")
                 value = result.model_dump(mode="json", by_alias=True)
                 self.result_bytes += len(json_text(value).encode())
                 return value

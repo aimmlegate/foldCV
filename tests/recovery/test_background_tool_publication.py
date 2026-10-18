@@ -15,7 +15,7 @@ from tests.recovery.test_background_inverse import mutation, put
 
 @pytest.mark.asyncio
 async def test_apply_v2_returns_one_exact_saved_receipt_when_no_writer_is_attached(tmp_path):
-    from packages.resume_core.models.background import SavedApplyV2
+    from packages.resume_core.models.background import ToolSavedV3
     service, factory, workspace, payload, _connection, _old = await environment(tmp_path)
     results = []
     async def execute(control, _actor):
@@ -25,9 +25,9 @@ async def test_apply_v2_returns_one_exact_saved_receipt_when_no_writer_is_attach
             prepared = await session.call("prepare_edit_batch", command(replace(
                 AgentReadSnapshot.model_validate(read["snapshot"]), "narrative", 0, 6, "Saved now")))
             request = AgentApplyRequest(batchId=prepared["batchId"])
-            saved = SavedApplyV2.model_validate(await session.call("apply_edit_batch", request))
-            assert saved.disposition == "saved" and saved.durable and saved.result.receipt.durable
-            assert SavedApplyV2.model_validate(await session.call("apply_edit_batch", request)) == saved
+            saved = ToolSavedV3.model_validate(await session.call("apply_edit_batch", request))
+            assert saved.disposition == "saved" and saved.durable and saved.receipt.durable
+            assert ToolSavedV3.model_validate(await session.call("apply_edit_batch", request)) == saved
             results.append(saved)
             return ExecutionOutcome(finished_at=service.supervisor.clock.now())
         finally:
@@ -40,7 +40,7 @@ async def test_apply_v2_returns_one_exact_saved_receipt_when_no_writer_is_attach
         persisted = service.projects.storage.read_committed(workspace.project_id)[0]
         assert len(results) == len(persisted.mutation_replay) == 1
         stored = service.store.read(workspace.project_id, job.id)
-        assert stored.receipt.request_sha256 == results[0].result.receipt.request_sha256
+        assert stored.receipt.request_sha256 == results[0].receipt.request_sha256
         assert stored.publication == "saved" and factory.calls == [(job.id, "agent")]
     finally:
         await service.shutdown()

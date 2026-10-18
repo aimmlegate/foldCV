@@ -82,6 +82,8 @@ export class PreparedEditorBridge {
         || preview.workspace.documentRevision !== editor.queue.baseline.workspace.documentRevision + 1) throw new Error("AGENT_STALE_READ");
       const proposed = cellChanges(before, editor.cells(preview));
       if (!editor.history.reserved(reservation) || proposed.some(change => editor.history.read(change.key) !== change.before)) throw new Error("AGENT_STALE_READ");
+      const direction = batch.mutation.kind === "undo" || batch.mutation.kind === "redo" ? batch.mutation.kind : null;
+      if (direction && !editor.history.navigationMatches(direction, proposed)) throw new Error("AGENT_STALE_READ");
       if (this.closed) throw new Error("AGENT_CANCELLED");
       commitStarted = true;
       let result: AgentCommitResult | null;
@@ -99,7 +101,7 @@ export class PreparedEditorBridge {
         || result.project.workspace.documentRevision !== saved.documentRevision || proof?.requestSha256 !== batch.requestSha256
         || proof.resultingRevision !== saved.projectRevision || JSON.stringify(changes) !== JSON.stringify(proposed)) throw new Error("AGENT_OUTCOME_UNKNOWN");
       editor.queue.adoptPrepared(batch.id, result.project);
-      if (!editor.history.publish(reservation, changes)) throw new Error("AGENT_OUTCOME_UNKNOWN");
+      if (!(direction ? editor.history.publishNavigation(reservation, direction, changes) : editor.history.publish(reservation, changes))) throw new Error("AGENT_OUTCOME_UNKNOWN");
       reservation = null;
       await editor.retainImages();
       this.completed.add(batch.id);

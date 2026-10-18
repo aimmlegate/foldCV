@@ -51,11 +51,52 @@ def test_native_cli_task_precedes_json_without_changing_source_or_rules():
     transport = NativeNormalizationTransport(captured, RULES)
     encoded = transport.encode(normalization_input(captured, RULES))
     task, payload = encoded.split("\n\nRequest payload:\n", 1)
-    assert task.startswith("Extract the actual resume")
+    assert task.startswith("Perform fact extraction on the actual resume")
     request = json.loads(payload)
     assert request["rulesUsed"] == RULES.model_dump(mode="json", by_alias=True)
     assert [row["text"] for row in request["input"]["sources"][0]["units"]] == [unit.text for unit in captured.sources[0].units]
     assert len(encoded.encode()) < 65_536
+
+
+def test_native_output_schema_rejects_empty_extraction_but_keeps_sparse_unknown_fields():
+    from jsonschema import Draft202012Validator
+    captured = source()
+    transport = NativeNormalizationTransport(captured, RULES)
+    schema = transport.output_schema(GuiSemanticProposal.model_json_schema())
+    validator = Draft202012Validator(schema)
+    valid = employment_proposal(captured).model_dump(mode="json", by_alias=True)
+    assert not list(validator.iter_errors(valid))
+    empty = deepcopy(valid)
+    empty["jobs"], empty["facts"] = [], []
+    errors = list(validator.iter_errors(empty))
+    assert any(list(error.path) == ["facts"] for error in errors)
+    sparse = deepcopy(valid)
+    sparse["candidate"]["location"] = {"text": "", "evidence": []}
+    assert not list(validator.iter_errors(sparse))
+
+
+@pytest.mark.parametrize("absence", ["Опыт работы: нет", "No work experience", "Employment: none"])
+def test_native_schema_accepts_supported_skills_without_inventing_employment(absence):
+    from jsonschema import Draft202012Validator
+    captured = request(f"Student\n{absence}\nPython\n")
+    source_row = captured.sources[0]
+    evidence = span(source_row, "Python")
+    raw = employment_proposal(source()).model_dump(mode="json", by_alias=True)
+    raw.update(jobs=[], education=[], certifications=[], languages=[], privateDetails=[],
+        candidate={key: value(source_row, "") for key in ("name", "title", "location")},
+        nameAssessment={"missingSurname": None, "evidence": [], "revision": 1},
+        facts=[{"tempId": "python", "kind": "technology", "value": {
+            "canonicalId": "python", "display": "Python", "scope": "global"},
+            "sourceId": source_row.id, "unitIds": [evidence["unitId"]], "jobTempId": None,
+            "subprojectTempId": None, "importance": "normal", "literalEvidence": [evidence]}],
+        units=[{"sourceId": source_row.id, "unitId": unit.id, "disposition": "unresolved",
+            "factTempIds": [], "duplicateOf": None} for unit in source_row.units])
+    schema = NativeNormalizationTransport(captured, RULES).output_schema(GuiSemanticProposal.model_json_schema())
+    assert not list(Draft202012Validator(schema).iter_errors(raw))
+    _, normalized, unresolved = recover(captured, raw)
+    assert not normalized.employment and unresolved == 0
+    assert any(fact.kind == "technology" and fact.value.display == "Python" and fact.job_id is None
+        for fact in normalized.facts)
 
 
 @pytest.mark.parametrize("change", ["citation", "ownership", "malformed", "unknown_kind"])

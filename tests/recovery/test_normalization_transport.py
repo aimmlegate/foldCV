@@ -17,6 +17,71 @@ from tests.recovery.employment_fixtures import employment_proposal
 from tests.recovery.test_employment_normalization import RULES
 
 
+def test_complete_compact_request_is_sized_after_redundant_metadata_is_removed():
+    captured = source()
+    source_row = captured.sources[0]
+    originals = source_row.units[:]
+    source_row.units = [unit.model_copy(update={"id": "redundant-" * 20 + str(index), "order": index})
+        for index, unit in enumerate(originals * 100)]
+    source_row.units = source_row.units[:200]
+    with pytest.raises(ValueError, match="INPUT_TOO_LARGE"):
+        normalization_input(captured, RULES, max_bytes=65_536)
+    from resume_api.gui_native_transport import NativeNormalizationTransport
+    transport = NativeNormalizationTransport(captured, RULES)
+    encoded = transport.prompt(RULES)
+    payload = json.loads(encoded.split("\n\nRequest payload:\n", 1)[1])
+    assert len(encoded.encode("utf-8")) <= 65_536
+    assert [row["text"] for row in payload["input"]["sources"][0]["units"]] == [unit.text for unit in source_row.units]
+    assert len(transport.units) == len(source_row.units)
+    assert transport.encode(encoded) == encoded
+
+
+def test_complete_native_utf8_request_honors_exact_byte_boundary():
+    from resume_api.gui_native_transport import NativeNormalizationTransport
+    captured = source()
+    transform = NativeNormalizationTransport(captured, RULES).encode
+    text = normalization_input(captured, RULES, transform=transform)
+    size = len(text.encode("utf-8"))
+    assert size > len(text)
+    assert normalization_input(captured, RULES, transform=transform, max_bytes=size) == text
+    assert normalization_input(captured, RULES, transform=transform, max_bytes=size + 1) == text
+    with pytest.raises(ValueError, match="INPUT_TOO_LARGE"):
+        normalization_input(captured, RULES, transform=transform, max_bytes=size - 1)
+
+
+def test_normalization_reports_typed_size_failure_without_provider_retry(tmp_path):
+    import threading
+    from resume_api.gui_normalization_content import GuiNormalizationContentService
+    from resume_api.lifecycle import OperationFiles
+    from resume_api.providers.content import ContentFailure
+    captured = source()
+    captured.sources[0].units[0].text = "Сведения " * 30_000
+    class NoCalls:
+        def generate(self, *_args):
+            raise AssertionError("Oversized input reached the provider")
+    with pytest.raises(ContentFailure, match="INPUT_TOO_LARGE") as error:
+        GuiNormalizationContentService(NoCalls(), "fixture").run(captured, RULES, OperationFiles(tmp_path), threading.Event())
+    assert error.value.logical_attempts == 0
+
+
+def test_default_request_limit_is_four_times_larger_without_truncating_cyrillic():
+    from resume_api.gui_native_transport import NativeNormalizationTransport
+    captured = source()
+    captured.sources[0].units[0].text = "Сведения " * 10_000
+    transport = NativeNormalizationTransport(captured, RULES)
+    outgoing = transport.prompt(RULES)
+    assert 65_536 < len(outgoing.encode()) < 256 * 1024
+    payload = json.loads(outgoing.split("\n\nRequest payload:\n", 1)[1])
+    assert payload["input"]["sources"][0]["units"][0]["text"] == captured.sources[0].units[0].text
+    from packages.resume_core.gui_prompts import content_input
+    small = content_input("normalize_semantics", {}, RULES)
+    padding = 256 * 1024 - len(small.encode())
+    at_limit = content_input("normalize_semantics", {}, RULES, transform=lambda text: text + " " * padding)
+    assert len(at_limit.encode()) == 256 * 1024
+    with pytest.raises(ValueError, match="INPUT_TOO_LARGE"):
+        content_input("normalize_semantics", {}, RULES, transform=lambda text: text + " " * (padding + 1))
+
+
 def source(example="E1"):
     return request((ROOT / (example + ".txt")).read_text())
 

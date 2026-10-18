@@ -119,7 +119,7 @@ class Scope:
 
 def require_block(book, snapshot_id, identifier, cell_id=None):
     capture = book.require(snapshot_id, kind="document")
-    if identifier not in capture.query.ids and cell_id not in capture.query.ids:
+    if capture.query.ids and identifier not in capture.query.ids and cell_id not in capture.query.ids:
         raise AgentFailure("AGENT_SCOPE_INVALID")
     found = locate(capture.workspace.project.document, identifier)
     if found is None:
@@ -199,7 +199,7 @@ def compile_batch(workspace, run, journal, request, book, session_id):
             siblings = []
         else:
             parent_items(capture.workspace.project.document, anchor.parent_id)
-            if capture.query.kind == "document" and anchor.parent_id not in capture.query.ids:
+            if capture.query.kind == "document" and capture.query.ids and anchor.parent_id not in capture.query.ids:
                 raise AgentFailure("AGENT_SCOPE_INVALID")
             siblings, _ = parent_items(document, parent_id)
         if after_id is not None and after_id not in {block.id for block in siblings} and after_id not in symbols.values():
@@ -212,7 +212,34 @@ def compile_batch(workspace, run, journal, request, book, session_id):
         return parent_id, after_id
 
     for operation in request.operations:
-        if operation.kind == "replace_text":
+        if operation.kind == "format_template":
+            capture = book.require(operation.snapshot_id, kind="document")
+            if not scope.whole or capture.query.ids or len(request.operations) != 1:
+                raise AgentFailure("AGENT_SCOPE_INVALID")
+            from .rich_format import format_steps
+            steps.extend(format_steps(document, workspace.project.facts))
+            write_blocks.update(blocks)
+            read_ids.add(operation.snapshot_id)
+        elif operation.kind in {"insert_table", "insert_asset"}:
+            parent_id, after_id = structural_anchor(operation.destination)
+            if operation.kind == "insert_table":
+                columns = len(operation.rows[0])
+                if not 0 < columns <= 20 or any(len(row) != columns or any(len(text) > 16000 for text in row) for row in operation.rows):
+                    raise AgentFailure("AGENT_EDIT_INVALID")
+                value = {"type": "table", "props": {}, "content": {"columnWidths": [None] * columns,
+                    "headerRows": operation.header_rows, "rows": [{"id": identity("row"), "cells": [
+                        {"id": identity("cell"), "revision": 1, "content": [{"type": "text", "text": text, "styles": {}}]}
+                        for text in row]} for row in operation.rows]}}
+            else:
+                if not any(asset.id == operation.asset_id for asset in workspace.project.assets):
+                    raise AgentFailure("AGENT_NOT_FOUND")
+                value = {"type": "image", "content": None, "props": {"assetId": operation.asset_id, "alt": operation.alt,
+                    "caption": [], "width": operation.width, "height": operation.height, "alignment": "left"}}
+            block = TypeAdapter(RichBlock).validate_python({**value, "id": identity("block"), "revision": 1,
+                "children": [], "provenance": []})
+            steps.append(PutBlock(kind="put_block", parentId=parent_id, afterId=after_id, beforeRevision=None, block=block))
+            write_blocks.add(block.id)
+        elif operation.kind == "replace_text":
             target = operation.target
             original = require_block(book, target.snapshot_id, target.block_id, target.cell_id)
             if target.cell_id is not None:
@@ -250,8 +277,9 @@ def compile_batch(workspace, run, journal, request, book, session_id):
                 block_id = symbols[new.key] = identity("block")
                 new_parents[block_id] = parent_id
                 block = TypeAdapter(RichBlock).validate_python({"id": block_id, "revision": 1,
-                    "type": {"paragraph": "paragraph", "bullet_list_item": "bullet_list", "numbered_list_item": "numbered_list"}[new.kind],
-                    "props": {}, "children": [], "content": [{"type": "text", "text": part.text,
+                    "type": {"bullet_list_item": "bullet_list", "numbered_list_item": "numbered_list"}.get(new.kind, new.kind),
+                    "props": {"level": new.level} if new.kind == "heading" else {"recordId": None} if new.kind == "section" else {},
+                    "children": [], "content": [{"type": "text", "text": part.text,
                         "styles": {name: True for name in part.marks}} for part in new.content],
                     "provenance": [{"kind": "working_owner", "id": identity("owner"), "recordId": owner}] if owner else []})
                 steps.append(PutBlock(kind="put_block", parentId=parent_id, afterId=after_id, beforeRevision=None, block=block))
@@ -367,8 +395,11 @@ def compile_batch(workspace, run, journal, request, book, session_id):
     old_groups, new_groups = occurrences(document), occurrences(interim.project.document)
     removed_fields = [{"recordId": group.record_id, "fieldKey": group.key, "rootId": group.root}
         for key, group in old_groups.items() if key not in new_groups and set(group.block_ids) & text_blocks]
-    computed, conflicts = exact_completion(interim, RichCompletionRequest(capture=capture,
-        blockIds=[key for key in write_blocks if locate(interim.project.document, key)], movedIds=list(moved), removedFields=removed_fields, interpret=False))
+    if any(operation.kind == "format_template" for operation in request.operations):
+        computed, conflicts = [], []
+    else:
+        computed, conflicts = exact_completion(interim, RichCompletionRequest(capture=capture,
+            blockIds=[key for key in write_blocks if locate(interim.project.document, key)], movedIds=list(moved), removedFields=removed_fields, interpret=False))
     for step in computed:
         if not isinstance(step, PutRecord):
             continue
@@ -431,11 +462,12 @@ def compile_batch(workspace, run, journal, request, book, session_id):
     candidate = apply_rich_mutation(workspace, mutation)[0]
     validate_references(candidate)
     affected = [AgentAnchor(blockId=key, cellId=None, recordId=None, fieldKey=None, start=None, end=None,
-        text="", dependencies=[]) for key in sorted(write_blocks)]
+        text="", dependencies=[]) for key in sorted(write_blocks)[:100]]
     preview = "Update " + str(len(write_blocks)) + " blocks and " + str(len(edited) + len(removed)) + " facts."
     batch = AgentEditBatch(id=batch_id, runId=run.id, toolKey=request.key, ownerEpoch=run.owner_epoch,
         state="prepared", scope=run.scope, readSnapshotIds=list(dict.fromkeys(snapshot.id for snapshot in journal.snapshots)),
         dependencies=dependencies, mutation=mutation, requestSha256=mutation_sha256(mutation),
         previewSha256=digest([step.model_dump(mode="json", by_alias=True) for step in mutation.steps]),
-        affected=affected, factRecordIds=list(dict.fromkeys([*edited, *removed])))
-    return AgentPrepareResult(disposition="prepared", batchId=batch.id, affected=affected, preview=preview), batch
+        affected=affected, affectedCount=len(write_blocks), factRecordIds=list(dict.fromkeys([*edited, *removed])))
+    return AgentPrepareResult(disposition="prepared", batchId=batch.id, affected=affected,
+        affectedCount=len(write_blocks), preview=preview), batch

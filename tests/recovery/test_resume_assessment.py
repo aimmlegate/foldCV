@@ -1,6 +1,8 @@
 """Advisory resume classification stays bounded and never rejects source content."""
 
 import json
+import re
+from collections import Counter
 from pathlib import Path
 import threading
 import sys
@@ -59,7 +61,10 @@ async def test_assessment_precedes_facts_and_negative_result_keeps_original_dura
     assert provider.calls[1]["task"] == "normalize_semantics"
     assert [op.kind for op in workspace.project.operations] == ["assess_resume", "normalize_semantics", "render"]
     from packages.resume_core.rich_presentation import authored_text
-    assert "".join(authored_text(block) for block in workspace.project.document.regions[2].blocks) == data.decode()
+    visible = " ".join(authored_text(block) for block in workspace.project.document.blocks())
+    assert not (Counter(re.findall(r"\w+", data.decode())) - Counter(re.findall(r"\w+", visible)))
+    source = workspace.project.sources[0]
+    assert {item.unit_id for item in workspace.project.import_coverage} == {unit.id for unit in source.units}
     assert service.originals[(identifier, workspace.project.sources[0].id)] == data
     assert {w.code for w in workspace.warnings} == ({warning} if warning else set())
     reopened = RichProjectService(tmp_path / "reopened", RulesStore(tmp_path / "store"), lambda: None)

@@ -5,7 +5,7 @@ from __future__ import annotations
 from datetime import datetime
 from typing import Annotated, Literal, Union
 
-from pydantic import AfterValidator, ConfigDict, Field, RootModel, model_validator
+from pydantic import AfterValidator, ConfigDict, Field, RootModel, model_validator, model_serializer
 
 from .. import agent_limits as limits
 from .contracts import MetricValue, PartialDate, Revision, Sha256, Wire, _unique
@@ -33,7 +33,7 @@ ErrorCode = Literal[
     "AGENT_BUSY", "AGENT_CANCELLED", "AGENT_INTERRUPTED", "AGENT_DEADLINE", "AGENT_STARTUP_TIMEOUT",
     "AGENT_PROTOCOL", "AGENT_PROCESS_FAILED", "AGENT_CLEANUP_FAILED", "AGENT_RUNTIME_UNSUPPORTED",
     "AGENT_MODEL_REROUTED", "AGENT_UNEXPECTED_COMPACTION", "AGENT_TOOL_DENIED", "AGENT_TOOL_LIMIT",
-    "AGENT_OUTPUT_LIMIT", "AGENT_CONTEXT_LIMIT", "AGENT_WEB_DISABLED", "AGENT_SOURCE_UNAVAILABLE",
+    "AGENT_OUTPUT_LIMIT", "AGENT_CONTEXT_LIMIT", "AGENT_ARGUMENT_INVALID", "AGENT_WEB_DISABLED", "AGENT_SOURCE_UNAVAILABLE",
     "AGENT_SOURCE_DENIED", "AGENT_SOURCE_LIMIT", "AGENT_SCOPE_INVALID", "AGENT_STALE_READ",
     "AGENT_EDIT_INVALID", "AGENT_EDIT_LIMIT", "AGENT_EVIDENCE_INVALID", "AGENT_NO_OWNER",
     "AGENT_LEASE_EXPIRED", "AGENT_OWNER_MISMATCH", "AGENT_TICKET_INVALID", "AGENT_RECEIPT_TIMEOUT",
@@ -82,6 +82,16 @@ class AgentError(AgentWire):
 
 class AgentEmptyRequest(AgentWire):
     pass
+
+
+class AgentAccess(AgentWire):
+    revision: Revision
+    read_only: bool = Field(strict=True)
+
+
+class AgentAccessRequest(AgentWire):
+    expected_revision: Revision
+    read_only: bool = Field(strict=True)
 
 
 class AgentSettings(AgentWire):
@@ -154,6 +164,14 @@ class AgentOwnerRequest(AgentWire):
     owner: AgentOwner
 
 
+class AgentHistoryOffer(AgentOwnerRequest):
+    project_revision: Revision
+    document_revision: Revision
+    facts_revision: Revision
+    undo: RichMutation | None
+    redo: RichMutation | None
+
+
 class AgentRunRequest(AgentOwnerRequest):
     client_request_id: AgentId
     conversation_id: AgentId
@@ -161,6 +179,7 @@ class AgentRunRequest(AgentOwnerRequest):
     allow_edits: bool
     allow_web: bool
     scope: AgentScope
+    selection_context: RichSelection | None = None
     settings_revision: Revision
     project_revision: Revision
     document_revision: Revision
@@ -168,7 +187,7 @@ class AgentRunRequest(AgentOwnerRequest):
 
 
 class AgentQuery(AgentWire):
-    kind: Literal["context", "document", "find", "facts", "source", "history"]
+    kind: Literal["context", "document", "find", "facts", "source", "history", "resources"]
     text: str = Field(default="", max_length=1000)
     ids: list[ReferenceId] = Field(default_factory=list, max_length=100)
     parent_id: ReferenceId | None = None
@@ -215,6 +234,8 @@ class AgentRun(AgentWire):
     allow_edits: bool
     allow_web: bool
     scope: AgentScope
+    selection_context: RichSelection | None = None
+    access_revision: Revision = 1
     model: ModelId
     connection_epoch: AgentId
     settings_revision: Revision
@@ -355,8 +376,9 @@ class AgentBlockAnchor(AgentWire):
 
 class AgentNewBlock(AgentWire):
     key: AgentId
-    kind: Literal["paragraph", "bullet_list_item", "numbered_list_item"]
+    kind: Literal["paragraph", "bullet_list_item", "numbered_list_item", "heading", "section"]
     content: list[AgentInline] = Field(max_length=100)
+    level: Literal[1, 2, 3] = 2
 
 
 class AgentInsertBlocks(AgentWire):
@@ -374,6 +396,33 @@ class AgentDeleteBlocks(AgentWire):
 class AgentMoveBlocks(AgentDeleteBlocks):
     kind: Literal["move_blocks"]
     destination: AgentBlockAnchor
+
+
+class AgentFormatTemplate(AgentWire):
+    kind: Literal["format_template"]
+    snapshot_id: AgentId
+
+
+class AgentHistoryCommand(AgentWire):
+    kind: Literal["history"]
+    snapshot_id: AgentId
+    direction: Literal["undo", "redo"]
+
+
+class AgentInsertTable(AgentWire):
+    kind: Literal["insert_table"]
+    destination: AgentBlockAnchor
+    rows: list[list[str]] = Field(min_length=1, max_length=100)
+    header_rows: int = Field(default=1, ge=0, le=100)
+
+
+class AgentInsertAsset(AgentWire):
+    kind: Literal["insert_asset"]
+    destination: AgentBlockAnchor
+    asset_id: ReferenceId
+    alt: str = Field(max_length=1000)
+    width: float = Field(gt=0, le=2000)
+    height: float = Field(gt=0, le=2000)
 
 
 class AgentSourceEvidence(AgentWire):
@@ -444,17 +493,42 @@ class AgentDeleteFact(AgentWire):
 
 
 AgentEditOperation = Annotated[Union[AgentReplaceText, AgentInsertBlocks, AgentDeleteBlocks,
-    AgentMoveBlocks, AgentUpdateFact, AgentCreateFact, AgentDeleteFact], Field(discriminator="kind")]
+    AgentMoveBlocks, AgentUpdateFact, AgentCreateFact, AgentDeleteFact, AgentFormatTemplate,
+    AgentInsertTable, AgentInsertAsset, AgentHistoryCommand], Field(discriminator="kind")]
 
 
 class AgentPrepareRequest(AgentWire):
     key: AgentId
-    snapshot_ids: list[AgentId] = Field(max_length=24)
+    snapshot_ids: list[AgentId] = Field(max_length=limits.TOOL_CALLS)
     operations: list[AgentEditOperation] = Field(max_length=limits.EDIT_OPERATIONS)
 
 
 class AgentApplyRequest(AgentWire):
     batch_id: AgentId
+
+
+class AgentProjectAction(AgentWire):
+    key: AgentId
+    snapshot_id: AgentId
+    action: Literal["rename", "formatting_date", "add_source_text", "remove_source", "import_asset", "remove_asset",
+        "export_docx", "export_project", "archive", "restore", "delete", "undo", "redo"]
+    value: str = Field(default="", max_length=64000)
+    target_id: ReferenceId | None = None
+
+
+class AgentProjectOperation(AgentWire):
+    id: AgentId
+    project_id: AgentId
+    run_id: AgentId
+    action: str = Field(max_length=40)
+    status: str = Field(max_length=40)
+    durable: bool
+    download_url: str | None
+    error_code: str | None
+
+
+class AgentProjectOperations(AgentWire):
+    items: list[AgentProjectOperation] = Field(max_length=500)
 
 
 class AgentEditBatch(AgentWire):
@@ -464,17 +538,18 @@ class AgentEditBatch(AgentWire):
     owner_epoch: Revision
     state: EditState
     scope: AgentScope
-    read_snapshot_ids: list[AgentId] = Field(max_length=24)
+    read_snapshot_ids: list[AgentId] = Field(max_length=limits.TOOL_CALLS)
     dependencies: list[AgentSnapshotDependency] = Field(max_length=2000)
     mutation: RichMutation
     request_sha256: Sha256
     preview_sha256: Sha256
     affected: list[AgentAnchor] = Field(max_length=100)
+    affected_count: int | None = Field(default=None, ge=0)
     fact_record_ids: list[ReferenceId] = Field(max_length=100)
 
     @model_validator(mode="after")
     def journal_limit(self):
-        if self.mutation.kind != "structure":
+        if self.mutation.kind not in {"structure", "undo", "redo"}:
             raise ValueError("prepared edit uses the shared structure action")
         bounded(self, limits.JOURNAL_BYTES)
         return self
@@ -508,6 +583,7 @@ class AgentPrepareResult(AgentWire):
     disposition: Literal["prepared", "no_change"]
     batch_id: AgentId | None
     affected: list[AgentAnchor] = Field(max_length=100)
+    affected_count: int | None = Field(default=None, ge=0)
     preview: str = Field(max_length=4000)
 
     @model_validator(mode="after")
@@ -761,10 +837,19 @@ class AgentJournalRequest(AgentWire):
     allow_edits: bool
     allow_web: bool
     scope: AgentScope
+    selection_context: RichSelection | None = None
     settings_revision: Revision
     project_revision: Revision
     document_revision: Revision
     facts_revision: Revision
+
+    @model_serializer(mode="wrap")
+    def stored_request(self, handler):
+        value = handler(self)
+        if self.selection_context is None:
+            value.pop("selectionContext", None)
+            value.pop("selection_context", None)
+        return value
 
 
 class AgentHistoryAction(AgentWire):
@@ -799,7 +884,7 @@ class AgentRunJournal(AgentWire):
     request: AgentJournalRequest
     request_sha256: Sha256
     reserved: bool
-    snapshots: list[AgentReadSnapshot] = Field(max_length=24)
+    snapshots: list[AgentReadSnapshot] = Field(max_length=limits.TOOL_CALLS)
     batches: list[AgentBatchJournal] = Field(max_length=100)
     events: list[AgentEvent]
 
@@ -855,6 +940,8 @@ class AgentProjectState(AgentWire):
 
 
 AGENT_CONTRACTS = {
+    "agent_history_offer": AgentHistoryOffer,
+    "agent_access": AgentAccess, "agent_access_request": AgentAccessRequest,
     "agent_error": AgentError, "agent_empty_request": AgentEmptyRequest, "agent_capabilities": AgentCapabilities,
     "agent_settings": AgentSettings, "agent_settings_request": AgentSettingsRequest,
     "agent_conversation": AgentConversation, "agent_message": AgentMessage,
@@ -862,6 +949,8 @@ AGENT_CONTRACTS = {
     "agent_read_snapshot": AgentReadSnapshot, "agent_web_source": AgentWebSource,
     "agent_finding": AgentFinding, "agent_prepare_request": AgentPrepareRequest,
     "agent_prepare_result": AgentPrepareResult, "agent_apply_request": AgentApplyRequest,
+    "agent_project_action": AgentProjectAction,
+    "agent_project_operations": AgentProjectOperations,
     "agent_edit_batch": AgentEditBatch, "agent_edit_receipt": AgentEditReceipt,
     "agent_event": AgentEvent, "agent_page_request": AgentPageRequest,
     "agent_conversation_page": AgentConversationPage, "agent_message_page": AgentMessagePage,

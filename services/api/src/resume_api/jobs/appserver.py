@@ -172,7 +172,10 @@ class SharedContentProvider:
             text = request.transport.encode(request.text) if request.transport else request.text
             if not isinstance(text, str) or not text or len(text.encode()) > min(policy.max_input_bytes, policy.max_total_input_bytes):
                 raise ContentFailure("INPUT_TOO_LARGE")
-            schema = StructuredSchema(result_type.model_json_schema())
+            result_schema = result_type.model_json_schema()
+            if request.transport is not None and hasattr(request.transport, "output_schema"):
+                result_schema = request.transport.output_schema(result_schema)
+            schema = StructuredSchema(result_schema)
             if len(json.dumps(schema.wire, ensure_ascii=False).encode()) > MAX_SCHEMA:
                 raise ContentFailure("INVALID_SCHEMA")
             async def ready():

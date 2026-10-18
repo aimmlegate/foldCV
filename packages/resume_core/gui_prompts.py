@@ -1,8 +1,11 @@
 """Captured Rules replace editorial policy on the new GUI content path."""
 
 import json
+from collections.abc import Callable
 
 from .models.recovery import ContentKind, Rules
+
+CONTENT_INPUT_BYTES = 256 * 1024
 
 
 GROUNDING = [
@@ -21,18 +24,20 @@ TASK_CONSTRAINTS = {
 }
 
 
-def content_input(kind: ContentKind, payload: dict[str, object], rules: Rules, *, max_bytes: int = 65_536) -> str:
+def content_input(kind: ContentKind, payload: dict[str, object], rules: Rules, *, max_bytes: int = CONTENT_INPUT_BYTES,
+                  transform: Callable[[str], str] | None = None, return_canonical: bool = False) -> str:
     if kind not in TASK_CONSTRAINTS:
         raise ValueError("INVALID_CONTENT_KIND")
-    if type(max_bytes) is not int or not 0 < max_bytes <= 262_144:
+    if type(max_bytes) is not int or not 0 < max_bytes <= CONTENT_INPUT_BYTES:
         raise ValueError("INVALID_CONTENT_LIMIT")
     captured = rules.model_dump(mode="json", by_alias=True)
     value = {"instructionVersion": 2, "task": kind, "rulesUsed": captured,
              "constraints": [*GROUNDING, TASK_CONSTRAINTS[kind]], "input": payload}
     try:
         text = json.dumps(value, ensure_ascii=False, allow_nan=False, separators=(",", ":"))
-        if len(text.encode("utf-8", "strict")) > max_bytes:
+        outgoing = transform(text) if transform is not None else text
+        if len(outgoing.encode("utf-8", "strict")) > max_bytes:
             raise ValueError("INPUT_TOO_LARGE")
     except (TypeError, UnicodeError):
         raise ValueError("INVALID_CONTENT_INPUT") from None
-    return text
+    return text if return_canonical else outgoing

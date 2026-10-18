@@ -613,6 +613,7 @@ async def test_launcher_bounds_startup_and_shutdown(tmp_path, monkeypatch, phase
     monkeypatch.setattr(launcher, "require_supported_host", lambda: None)
     monkeypatch.setattr(launcher, "STARTUP_TIMEOUT_SECONDS", 0.02)
     monkeypatch.setattr(launcher, "SHUTDOWN_TIMEOUT_SECONDS", 0.02)
+    monkeypatch.setattr(launcher, "create_app", lambda **_kwargs: object())
 
     class SlowServer:
         def __init__(self, _config):

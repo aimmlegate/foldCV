@@ -7,7 +7,7 @@ from packages.resume_core.rich_presentation import authored_text
 from tests.recovery.draft_fixtures import draft_request
 
 
-def test_original_units_keep_order_blank_lines_contacts_and_unsupported_text():
+def test_original_units_keep_contacts_and_unknown_wording_with_complete_source_accounting():
     normalized = draft_request().normalized
     source = normalized.sources[0]
     texts = ["  Original wording.\n", "\n", "Phone: +1 555 0100\n", "Unknown detail: preserve exactly.  "]
@@ -18,12 +18,45 @@ def test_original_units_keep_order_blank_lines_contacts_and_unsupported_text():
         created_at="2026-10-15T00:00:00Z", pre_draft=SimpleNamespace(operations=[]))
     before = normalized.model_dump(by_alias=True)
     project = assemble_import(workspace, normalized)
-    assert [authored_text(block) for block in project.document.regions[2].blocks] == texts
-    assert not project.document.regions[0].blocks and not project.document.regions[1].blocks
-    assert [block.provenance[0].evidence[0].unit_id for block in project.document.regions[2].blocks] == [unit.id for unit in units]
+    visible = "\n".join(authored_text(block) for block in project.document.blocks())
+    assert all(text.strip() in visible for text in texts if text.strip())
+    assert {row.unit_id for row in project.import_coverage} == {unit.id for unit in units}
+    assert all(row.block_ids or row.reason == "Whitespace only." for row in project.import_coverage)
     assert normalized.model_dump(by_alias=True) == before
     assert project.sources == normalized.sources
     assert any(record.kind == "employment" for record in project.facts.records)
+
+
+def test_template_places_header_sidebar_jobs_and_preserves_every_source_word():
+    from collections import Counter
+    import re
+    normalized = draft_request().normalized
+    workspace = SimpleNamespace(project_id="template-import", project_revision=1, document_revision=1,
+        created_at="2026-10-17T00:00:00Z", pre_draft=SimpleNamespace(operations=[]))
+    project = assemble_import(workspace, normalized)
+    assert all(region.blocks for region in project.document.regions)
+    assert [block.props.level for block in project.document.regions[0].blocks] == [1, 2]
+    owners = [block.props.record_id for block in project.document.blocks() if block.type == "section" and block.props.record_id]
+    assert set(owners) == {record.id for record in project.facts.records if record.kind == "employment"}
+    original = Counter(re.findall(r"\w+", " ".join(unit.text for source in normalized.sources for unit in source.units)))
+    visible = Counter(re.findall(r"\w+", " ".join(authored_text(block) for block in project.document.blocks())))
+    assert not (original - visible)
+    assert all(row.disposition == "placed" and row.block_ids for row in project.import_coverage)
+
+
+def test_reformat_is_stable_and_keeps_current_edited_wording():
+    from packages.resume_core.rich_format import format_document
+    normalized = draft_request().normalized
+    workspace = SimpleNamespace(project_id="template-repeat", project_revision=1, document_revision=1,
+        created_at="2026-10-17T00:00:00Z", pre_draft=SimpleNamespace(operations=[]))
+    project = assemble_import(workspace, normalized)
+    document = project.document
+    assert format_document(document, project.facts) == document
+    target = next(block for block in document.blocks() if block.type == "paragraph" and block.content and block.content[0].type == "text")
+    target.content[0].text = "Current user wording with 37% and team attribution."
+    result = format_document(document, project.facts)
+    assert any("Current user wording with 37%" in authored_text(block) for block in result.blocks())
+    assert format_document(result, project.facts) == result
 
 
 def record(identifier, text, unit="unit", key="employer"):

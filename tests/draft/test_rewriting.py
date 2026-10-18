@@ -79,7 +79,7 @@ def test_single_content_call_uses_provider_repair_authority(tmp_path):
         def generate(self, input, files, cancel):
             self.calls += 1
             assert input.result_type is RewriteProposal
-            assert input.policy.max_input_bytes == 65_536
+            assert input.policy.max_input_bytes == 256 * 1024
             return ContentResult(value=RewriteProposal(blockId="prose_recent",
                 replacementText="Built a clearer service.", factIds=["safe"]),
                 usage=ReportedUsage(input_tokens=12, output_tokens=6), cli_version="fixture",

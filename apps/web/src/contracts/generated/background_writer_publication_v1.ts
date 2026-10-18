@@ -92,6 +92,7 @@ export type Requestsha256 = string;
 export type Schemaversion1 = 1;
 export type Workspacesha256 = string;
 export type Schemaversion2 = 1;
+export type Accessrevision = number;
 export type Accountgeneration = number;
 export type Allowedits = boolean;
 export type Allowweb = boolean;
@@ -100,12 +101,12 @@ export type Generation = number;
 export type Key = string;
 export type Kind = "entity" | "structure" | "query" | "source" | "rules";
 /**
- * @maxItems 100
+ * @maxItems 4096
  */
 export type Reads = GenerationStamp[];
 export type Schemaversion3 = 1;
 /**
- * @maxItems 100
+ * @maxItems 4096
  */
 export type Writes = GenerationStamp[];
 export type Lineage1 = string;
@@ -153,688 +154,22 @@ export type Kind6 = "text" | "blocks" | "table_cells";
 export type Textsha256 = string;
 export type Submittedat = string;
 /**
- * @maxItems 10
+ * @maxItems 32
  */
-export type Tools =
-  | []
-  | [
-      | "get_resume_context"
-      | "find_resume_content"
-      | "get_working_facts"
-      | "get_original_source"
-      | "get_conversation_context"
-      | "check_resume"
-      | "read_public_page"
-      | "publish_findings"
-      | "prepare_edit_batch"
-      | "apply_edit_batch"
-    ]
-  | [
-      (
-        | "get_resume_context"
-        | "find_resume_content"
-        | "get_working_facts"
-        | "get_original_source"
-        | "get_conversation_context"
-        | "check_resume"
-        | "read_public_page"
-        | "publish_findings"
-        | "prepare_edit_batch"
-        | "apply_edit_batch"
-      ),
-      (
-        | "get_resume_context"
-        | "find_resume_content"
-        | "get_working_facts"
-        | "get_original_source"
-        | "get_conversation_context"
-        | "check_resume"
-        | "read_public_page"
-        | "publish_findings"
-        | "prepare_edit_batch"
-        | "apply_edit_batch"
-      )
-    ]
-  | [
-      (
-        | "get_resume_context"
-        | "find_resume_content"
-        | "get_working_facts"
-        | "get_original_source"
-        | "get_conversation_context"
-        | "check_resume"
-        | "read_public_page"
-        | "publish_findings"
-        | "prepare_edit_batch"
-        | "apply_edit_batch"
-      ),
-      (
-        | "get_resume_context"
-        | "find_resume_content"
-        | "get_working_facts"
-        | "get_original_source"
-        | "get_conversation_context"
-        | "check_resume"
-        | "read_public_page"
-        | "publish_findings"
-        | "prepare_edit_batch"
-        | "apply_edit_batch"
-      ),
-      (
-        | "get_resume_context"
-        | "find_resume_content"
-        | "get_working_facts"
-        | "get_original_source"
-        | "get_conversation_context"
-        | "check_resume"
-        | "read_public_page"
-        | "publish_findings"
-        | "prepare_edit_batch"
-        | "apply_edit_batch"
-      )
-    ]
-  | [
-      (
-        | "get_resume_context"
-        | "find_resume_content"
-        | "get_working_facts"
-        | "get_original_source"
-        | "get_conversation_context"
-        | "check_resume"
-        | "read_public_page"
-        | "publish_findings"
-        | "prepare_edit_batch"
-        | "apply_edit_batch"
-      ),
-      (
-        | "get_resume_context"
-        | "find_resume_content"
-        | "get_working_facts"
-        | "get_original_source"
-        | "get_conversation_context"
-        | "check_resume"
-        | "read_public_page"
-        | "publish_findings"
-        | "prepare_edit_batch"
-        | "apply_edit_batch"
-      ),
-      (
-        | "get_resume_context"
-        | "find_resume_content"
-        | "get_working_facts"
-        | "get_original_source"
-        | "get_conversation_context"
-        | "check_resume"
-        | "read_public_page"
-        | "publish_findings"
-        | "prepare_edit_batch"
-        | "apply_edit_batch"
-      ),
-      (
-        | "get_resume_context"
-        | "find_resume_content"
-        | "get_working_facts"
-        | "get_original_source"
-        | "get_conversation_context"
-        | "check_resume"
-        | "read_public_page"
-        | "publish_findings"
-        | "prepare_edit_batch"
-        | "apply_edit_batch"
-      )
-    ]
-  | [
-      (
-        | "get_resume_context"
-        | "find_resume_content"
-        | "get_working_facts"
-        | "get_original_source"
-        | "get_conversation_context"
-        | "check_resume"
-        | "read_public_page"
-        | "publish_findings"
-        | "prepare_edit_batch"
-        | "apply_edit_batch"
-      ),
-      (
-        | "get_resume_context"
-        | "find_resume_content"
-        | "get_working_facts"
-        | "get_original_source"
-        | "get_conversation_context"
-        | "check_resume"
-        | "read_public_page"
-        | "publish_findings"
-        | "prepare_edit_batch"
-        | "apply_edit_batch"
-      ),
-      (
-        | "get_resume_context"
-        | "find_resume_content"
-        | "get_working_facts"
-        | "get_original_source"
-        | "get_conversation_context"
-        | "check_resume"
-        | "read_public_page"
-        | "publish_findings"
-        | "prepare_edit_batch"
-        | "apply_edit_batch"
-      ),
-      (
-        | "get_resume_context"
-        | "find_resume_content"
-        | "get_working_facts"
-        | "get_original_source"
-        | "get_conversation_context"
-        | "check_resume"
-        | "read_public_page"
-        | "publish_findings"
-        | "prepare_edit_batch"
-        | "apply_edit_batch"
-      ),
-      (
-        | "get_resume_context"
-        | "find_resume_content"
-        | "get_working_facts"
-        | "get_original_source"
-        | "get_conversation_context"
-        | "check_resume"
-        | "read_public_page"
-        | "publish_findings"
-        | "prepare_edit_batch"
-        | "apply_edit_batch"
-      )
-    ]
-  | [
-      (
-        | "get_resume_context"
-        | "find_resume_content"
-        | "get_working_facts"
-        | "get_original_source"
-        | "get_conversation_context"
-        | "check_resume"
-        | "read_public_page"
-        | "publish_findings"
-        | "prepare_edit_batch"
-        | "apply_edit_batch"
-      ),
-      (
-        | "get_resume_context"
-        | "find_resume_content"
-        | "get_working_facts"
-        | "get_original_source"
-        | "get_conversation_context"
-        | "check_resume"
-        | "read_public_page"
-        | "publish_findings"
-        | "prepare_edit_batch"
-        | "apply_edit_batch"
-      ),
-      (
-        | "get_resume_context"
-        | "find_resume_content"
-        | "get_working_facts"
-        | "get_original_source"
-        | "get_conversation_context"
-        | "check_resume"
-        | "read_public_page"
-        | "publish_findings"
-        | "prepare_edit_batch"
-        | "apply_edit_batch"
-      ),
-      (
-        | "get_resume_context"
-        | "find_resume_content"
-        | "get_working_facts"
-        | "get_original_source"
-        | "get_conversation_context"
-        | "check_resume"
-        | "read_public_page"
-        | "publish_findings"
-        | "prepare_edit_batch"
-        | "apply_edit_batch"
-      ),
-      (
-        | "get_resume_context"
-        | "find_resume_content"
-        | "get_working_facts"
-        | "get_original_source"
-        | "get_conversation_context"
-        | "check_resume"
-        | "read_public_page"
-        | "publish_findings"
-        | "prepare_edit_batch"
-        | "apply_edit_batch"
-      ),
-      (
-        | "get_resume_context"
-        | "find_resume_content"
-        | "get_working_facts"
-        | "get_original_source"
-        | "get_conversation_context"
-        | "check_resume"
-        | "read_public_page"
-        | "publish_findings"
-        | "prepare_edit_batch"
-        | "apply_edit_batch"
-      )
-    ]
-  | [
-      (
-        | "get_resume_context"
-        | "find_resume_content"
-        | "get_working_facts"
-        | "get_original_source"
-        | "get_conversation_context"
-        | "check_resume"
-        | "read_public_page"
-        | "publish_findings"
-        | "prepare_edit_batch"
-        | "apply_edit_batch"
-      ),
-      (
-        | "get_resume_context"
-        | "find_resume_content"
-        | "get_working_facts"
-        | "get_original_source"
-        | "get_conversation_context"
-        | "check_resume"
-        | "read_public_page"
-        | "publish_findings"
-        | "prepare_edit_batch"
-        | "apply_edit_batch"
-      ),
-      (
-        | "get_resume_context"
-        | "find_resume_content"
-        | "get_working_facts"
-        | "get_original_source"
-        | "get_conversation_context"
-        | "check_resume"
-        | "read_public_page"
-        | "publish_findings"
-        | "prepare_edit_batch"
-        | "apply_edit_batch"
-      ),
-      (
-        | "get_resume_context"
-        | "find_resume_content"
-        | "get_working_facts"
-        | "get_original_source"
-        | "get_conversation_context"
-        | "check_resume"
-        | "read_public_page"
-        | "publish_findings"
-        | "prepare_edit_batch"
-        | "apply_edit_batch"
-      ),
-      (
-        | "get_resume_context"
-        | "find_resume_content"
-        | "get_working_facts"
-        | "get_original_source"
-        | "get_conversation_context"
-        | "check_resume"
-        | "read_public_page"
-        | "publish_findings"
-        | "prepare_edit_batch"
-        | "apply_edit_batch"
-      ),
-      (
-        | "get_resume_context"
-        | "find_resume_content"
-        | "get_working_facts"
-        | "get_original_source"
-        | "get_conversation_context"
-        | "check_resume"
-        | "read_public_page"
-        | "publish_findings"
-        | "prepare_edit_batch"
-        | "apply_edit_batch"
-      ),
-      (
-        | "get_resume_context"
-        | "find_resume_content"
-        | "get_working_facts"
-        | "get_original_source"
-        | "get_conversation_context"
-        | "check_resume"
-        | "read_public_page"
-        | "publish_findings"
-        | "prepare_edit_batch"
-        | "apply_edit_batch"
-      )
-    ]
-  | [
-      (
-        | "get_resume_context"
-        | "find_resume_content"
-        | "get_working_facts"
-        | "get_original_source"
-        | "get_conversation_context"
-        | "check_resume"
-        | "read_public_page"
-        | "publish_findings"
-        | "prepare_edit_batch"
-        | "apply_edit_batch"
-      ),
-      (
-        | "get_resume_context"
-        | "find_resume_content"
-        | "get_working_facts"
-        | "get_original_source"
-        | "get_conversation_context"
-        | "check_resume"
-        | "read_public_page"
-        | "publish_findings"
-        | "prepare_edit_batch"
-        | "apply_edit_batch"
-      ),
-      (
-        | "get_resume_context"
-        | "find_resume_content"
-        | "get_working_facts"
-        | "get_original_source"
-        | "get_conversation_context"
-        | "check_resume"
-        | "read_public_page"
-        | "publish_findings"
-        | "prepare_edit_batch"
-        | "apply_edit_batch"
-      ),
-      (
-        | "get_resume_context"
-        | "find_resume_content"
-        | "get_working_facts"
-        | "get_original_source"
-        | "get_conversation_context"
-        | "check_resume"
-        | "read_public_page"
-        | "publish_findings"
-        | "prepare_edit_batch"
-        | "apply_edit_batch"
-      ),
-      (
-        | "get_resume_context"
-        | "find_resume_content"
-        | "get_working_facts"
-        | "get_original_source"
-        | "get_conversation_context"
-        | "check_resume"
-        | "read_public_page"
-        | "publish_findings"
-        | "prepare_edit_batch"
-        | "apply_edit_batch"
-      ),
-      (
-        | "get_resume_context"
-        | "find_resume_content"
-        | "get_working_facts"
-        | "get_original_source"
-        | "get_conversation_context"
-        | "check_resume"
-        | "read_public_page"
-        | "publish_findings"
-        | "prepare_edit_batch"
-        | "apply_edit_batch"
-      ),
-      (
-        | "get_resume_context"
-        | "find_resume_content"
-        | "get_working_facts"
-        | "get_original_source"
-        | "get_conversation_context"
-        | "check_resume"
-        | "read_public_page"
-        | "publish_findings"
-        | "prepare_edit_batch"
-        | "apply_edit_batch"
-      ),
-      (
-        | "get_resume_context"
-        | "find_resume_content"
-        | "get_working_facts"
-        | "get_original_source"
-        | "get_conversation_context"
-        | "check_resume"
-        | "read_public_page"
-        | "publish_findings"
-        | "prepare_edit_batch"
-        | "apply_edit_batch"
-      )
-    ]
-  | [
-      (
-        | "get_resume_context"
-        | "find_resume_content"
-        | "get_working_facts"
-        | "get_original_source"
-        | "get_conversation_context"
-        | "check_resume"
-        | "read_public_page"
-        | "publish_findings"
-        | "prepare_edit_batch"
-        | "apply_edit_batch"
-      ),
-      (
-        | "get_resume_context"
-        | "find_resume_content"
-        | "get_working_facts"
-        | "get_original_source"
-        | "get_conversation_context"
-        | "check_resume"
-        | "read_public_page"
-        | "publish_findings"
-        | "prepare_edit_batch"
-        | "apply_edit_batch"
-      ),
-      (
-        | "get_resume_context"
-        | "find_resume_content"
-        | "get_working_facts"
-        | "get_original_source"
-        | "get_conversation_context"
-        | "check_resume"
-        | "read_public_page"
-        | "publish_findings"
-        | "prepare_edit_batch"
-        | "apply_edit_batch"
-      ),
-      (
-        | "get_resume_context"
-        | "find_resume_content"
-        | "get_working_facts"
-        | "get_original_source"
-        | "get_conversation_context"
-        | "check_resume"
-        | "read_public_page"
-        | "publish_findings"
-        | "prepare_edit_batch"
-        | "apply_edit_batch"
-      ),
-      (
-        | "get_resume_context"
-        | "find_resume_content"
-        | "get_working_facts"
-        | "get_original_source"
-        | "get_conversation_context"
-        | "check_resume"
-        | "read_public_page"
-        | "publish_findings"
-        | "prepare_edit_batch"
-        | "apply_edit_batch"
-      ),
-      (
-        | "get_resume_context"
-        | "find_resume_content"
-        | "get_working_facts"
-        | "get_original_source"
-        | "get_conversation_context"
-        | "check_resume"
-        | "read_public_page"
-        | "publish_findings"
-        | "prepare_edit_batch"
-        | "apply_edit_batch"
-      ),
-      (
-        | "get_resume_context"
-        | "find_resume_content"
-        | "get_working_facts"
-        | "get_original_source"
-        | "get_conversation_context"
-        | "check_resume"
-        | "read_public_page"
-        | "publish_findings"
-        | "prepare_edit_batch"
-        | "apply_edit_batch"
-      ),
-      (
-        | "get_resume_context"
-        | "find_resume_content"
-        | "get_working_facts"
-        | "get_original_source"
-        | "get_conversation_context"
-        | "check_resume"
-        | "read_public_page"
-        | "publish_findings"
-        | "prepare_edit_batch"
-        | "apply_edit_batch"
-      ),
-      (
-        | "get_resume_context"
-        | "find_resume_content"
-        | "get_working_facts"
-        | "get_original_source"
-        | "get_conversation_context"
-        | "check_resume"
-        | "read_public_page"
-        | "publish_findings"
-        | "prepare_edit_batch"
-        | "apply_edit_batch"
-      )
-    ]
-  | [
-      (
-        | "get_resume_context"
-        | "find_resume_content"
-        | "get_working_facts"
-        | "get_original_source"
-        | "get_conversation_context"
-        | "check_resume"
-        | "read_public_page"
-        | "publish_findings"
-        | "prepare_edit_batch"
-        | "apply_edit_batch"
-      ),
-      (
-        | "get_resume_context"
-        | "find_resume_content"
-        | "get_working_facts"
-        | "get_original_source"
-        | "get_conversation_context"
-        | "check_resume"
-        | "read_public_page"
-        | "publish_findings"
-        | "prepare_edit_batch"
-        | "apply_edit_batch"
-      ),
-      (
-        | "get_resume_context"
-        | "find_resume_content"
-        | "get_working_facts"
-        | "get_original_source"
-        | "get_conversation_context"
-        | "check_resume"
-        | "read_public_page"
-        | "publish_findings"
-        | "prepare_edit_batch"
-        | "apply_edit_batch"
-      ),
-      (
-        | "get_resume_context"
-        | "find_resume_content"
-        | "get_working_facts"
-        | "get_original_source"
-        | "get_conversation_context"
-        | "check_resume"
-        | "read_public_page"
-        | "publish_findings"
-        | "prepare_edit_batch"
-        | "apply_edit_batch"
-      ),
-      (
-        | "get_resume_context"
-        | "find_resume_content"
-        | "get_working_facts"
-        | "get_original_source"
-        | "get_conversation_context"
-        | "check_resume"
-        | "read_public_page"
-        | "publish_findings"
-        | "prepare_edit_batch"
-        | "apply_edit_batch"
-      ),
-      (
-        | "get_resume_context"
-        | "find_resume_content"
-        | "get_working_facts"
-        | "get_original_source"
-        | "get_conversation_context"
-        | "check_resume"
-        | "read_public_page"
-        | "publish_findings"
-        | "prepare_edit_batch"
-        | "apply_edit_batch"
-      ),
-      (
-        | "get_resume_context"
-        | "find_resume_content"
-        | "get_working_facts"
-        | "get_original_source"
-        | "get_conversation_context"
-        | "check_resume"
-        | "read_public_page"
-        | "publish_findings"
-        | "prepare_edit_batch"
-        | "apply_edit_batch"
-      ),
-      (
-        | "get_resume_context"
-        | "find_resume_content"
-        | "get_working_facts"
-        | "get_original_source"
-        | "get_conversation_context"
-        | "check_resume"
-        | "read_public_page"
-        | "publish_findings"
-        | "prepare_edit_batch"
-        | "apply_edit_batch"
-      ),
-      (
-        | "get_resume_context"
-        | "find_resume_content"
-        | "get_working_facts"
-        | "get_original_source"
-        | "get_conversation_context"
-        | "check_resume"
-        | "read_public_page"
-        | "publish_findings"
-        | "prepare_edit_batch"
-        | "apply_edit_batch"
-      ),
-      (
-        | "get_resume_context"
-        | "find_resume_content"
-        | "get_working_facts"
-        | "get_original_source"
-        | "get_conversation_context"
-        | "check_resume"
-        | "read_public_page"
-        | "publish_findings"
-        | "prepare_edit_batch"
-        | "apply_edit_batch"
-      )
-    ];
+export type Tools = (
+  | "get_resume_context"
+  | "find_resume_content"
+  | "get_working_facts"
+  | "get_original_source"
+  | "get_conversation_context"
+  | "get_project_resources"
+  | "check_resume"
+  | "read_public_page"
+  | "publish_findings"
+  | "prepare_edit_batch"
+  | "apply_edit_batch"
+  | "project_action"
+)[];
 export type Undoexpired = boolean;
 export type Updatedat = string;
 export type Schemaversion5 = 1;
@@ -910,10 +245,23 @@ export type Clientmutationid1 = string;
 export type Requestsha2561 = string;
 export type Resultingrevision = number;
 export type Mutationreplay = RichMutationReplay[];
+export type Factcount = number;
+export type Recoveredrows = number;
+export type Requestbytes = number;
+export type Status1 = "complete" | "partial";
+export type Code1 = "FACT_SOURCE_UNRESOLVED" | "FACT_SECTION_OMITTED" | "FACT_ROWS_RECOVERED";
+export type Page = number | null;
+export type Section = string;
 export type Sourceid = string;
+export type Unitid = string | null;
+/**
+ * @maxItems 5000
+ */
+export type Unresolved = ExtractionIssue[];
+export type Sourceid1 = string;
 export type Sourcerevision = number;
 export type Text = string;
-export type Unitid = string;
+export type Unitid1 = string;
 export type Unitrevision = number;
 export type Evidence = EvidenceSpan[];
 export type Id6 = string;
@@ -921,7 +269,7 @@ export type Kind7 = "candidate";
 export type Pendingrawtext = string | null;
 export type Rawtext = string;
 export type Revision1 = number;
-export type Status1 = "known" | "unknown" | "unresolved" | "pending" | "conflict";
+export type Status2 = "known" | "unknown" | "unresolved" | "pending" | "conflict";
 export type Usercorrected = boolean;
 export type Value = string | null;
 export type Origin = "source" | "user";
@@ -942,14 +290,14 @@ export type Origin2 = "source" | "user";
 export type Pendingrawtext1 = string | null;
 export type Rawtext1 = string;
 export type Revision4 = number;
-export type Status2 = "known" | "unknown" | "unresolved" | "pending" | "conflict";
+export type Status3 = "known" | "unknown" | "unresolved" | "pending" | "conflict";
 export type Usercorrected3 = boolean;
 export type Evidence3 = EvidenceSpan[];
 export type Id9 = string;
 export type Pendingrawtext2 = string | null;
 export type Rawtext2 = string;
 export type Revision5 = number;
-export type Status3 = "known" | "unknown" | "unresolved" | "pending" | "conflict";
+export type Status4 = "known" | "unknown" | "unresolved" | "pending" | "conflict";
 export type Usercorrected4 = boolean;
 export type Value1 = boolean | null;
 export type Revision6 = number;
@@ -1009,7 +357,7 @@ export type Usercorrected12 = boolean;
 export type Pendingrawtext3 = string | null;
 export type Rawtext3 = string;
 export type Revision15 = number;
-export type Status4 = "known" | "unknown" | "unresolved" | "pending" | "conflict";
+export type Status5 = "known" | "unknown" | "unresolved" | "pending" | "conflict";
 export type Usercorrected13 = boolean;
 export type Attribution = "personal" | "team" | "organization" | "unknown";
 export type Baseline = string | null;
@@ -1032,7 +380,7 @@ export type Usercorrected14 = boolean;
 export type Pendingrawtext4 = string | null;
 export type Rawtext4 = string;
 export type Revision17 = number;
-export type Status5 = "known" | "unknown" | "unresolved" | "pending" | "conflict";
+export type Status6 = "known" | "unknown" | "unresolved" | "pending" | "conflict";
 export type Usercorrected15 = boolean;
 export type Action = string;
 export type Attribution1 = "personal" | "team" | "organization" | "unknown";
@@ -1042,7 +390,7 @@ export type Id18 = string;
 export type Kind18 = "unresolved";
 export type Origin11 = "source" | "user";
 export type Revision18 = number;
-export type Status6 = "unresolved" | "pending" | "conflict";
+export type Status7 = "unresolved" | "pending" | "conflict";
 export type Usercorrected16 = boolean;
 export type Records = (
   | CandidateRecord
@@ -1077,7 +425,7 @@ export type Kind19 =
   | "project_save"
   | "rewrite_prose"
   | "reconcile_edits";
-export type Status7 = "queued" | "running" | "completed" | "failed" | "cancelled" | "interrupted";
+export type Status8 = "queued" | "running" | "completed" | "failed" | "cancelled" | "interrupted";
 export type Operations = RichOperation[];
 export type Selectedinput = "text" | "file";
 export type Selectedsourceid = string | null;
@@ -1090,7 +438,7 @@ export type Id21 = string;
 export type Origin12 = "user";
 export type Revision21 = number;
 export type Text1 = string;
-export type Unitid1 = string;
+export type Unitid2 = string;
 export type Overlays = SourceOverlay[];
 export type Parser = string;
 export type Parserversion = string;
@@ -1106,6 +454,9 @@ export type Representedfactids = string[];
 export type Revision23 = number;
 export type Text2 = string;
 export type Units = SourceUnit[];
+export type Code2 = string;
+export type Page1 = number | null;
+export type Warningdetails = SourceWarning[];
 export type Warnings = string[];
 export type Sources = Source[];
 export type Warnings1 = string[];
@@ -1139,7 +490,7 @@ export type Children11 = (
 )[];
 export type Backgroundcolor = string;
 export type Bold = boolean;
-export type Code1 = boolean;
+export type Code3 = boolean;
 export type Italic = boolean;
 export type Strike = boolean;
 export type Textcolor = string;
@@ -1457,6 +808,12 @@ export type Evidence15 = EvidenceSpan[];
 export type Id43 = string;
 export type Rawtext5 = string;
 export type Evidencerecords = ImmutableFactEvidence[];
+export type Blockids1 = string[];
+export type Disposition1 = "placed" | "excluded";
+export type Reason = string | null;
+export type Sourceid2 = string;
+export type Unitid3 = string;
+export type Importcoverage = ImportCoverage[];
 export type Operations1 = RichOperation[];
 export type Projectid3 = string;
 export type Documentrevision2 = number;
@@ -1487,7 +844,7 @@ export type Revision40 = number;
 export type Sha2563 = string;
 export type Schemaversion10 = 6;
 export type Actionid3 = string;
-export type Blockids1 = string[];
+export type Blockids2 = string[];
 export type Dependencies2 = DependencyStamp[];
 export type Errorcode2 = string | null;
 export type Factids = string[];
@@ -1558,19 +915,23 @@ export type Recordid6 = string;
  */
 export type Proposedsteps = (PutBlock | RemoveBlock | MoveBlock | ReplaceInlineRange | PutRecord | RemoveRecord)[];
 export type Ready = boolean;
-export type Status8 = "pending" | "failed" | "conflict" | "applied" | "stale";
+export type Status9 = "pending" | "failed" | "conflict" | "applied" | "stale";
 export type Syncrecords = RichSyncRecord[];
 export type Title1 = string;
 export type Titlemanuallyset = boolean;
 export type Updatedat1 = string;
-export type Blockids2 = string[];
-export type Code2 = string;
-export type Sourceid1 = string;
+export type Blockids3 = string[];
+export type Code4 = string;
+export type Count = number;
+export type Sourceid3 = string;
 export type Sourcerevision1 = number;
-export type Unitid2 = string;
+export type Unitid4 = string;
 export type Unitrevision1 = number;
 export type Evidence16 = Evidence17[];
 export type Id47 = string;
+export type Page2 = number | null;
+export type Sourceid4 = string;
+export type Locations = WarningLocation[];
 export type Recordids = string[];
 export type Warnings2 = RichWarning[];
 export type Schemaversion11 = 1;
@@ -1591,7 +952,7 @@ export type Projectid5 = string;
 export type Resumecredentialsha256 = string;
 export type Schemaversion12 = 1;
 export type Sessionid1 = string;
-export type Status9 = "attached" | "recovering" | "clean_detached" | "fenced";
+export type Status10 = "attached" | "recovering" | "clean_detached" | "fenced";
 export type Touchfloor = number;
 export type Touchgeneration = number;
 
@@ -1654,6 +1015,7 @@ export interface CanonicalReceiptV1 {
   workspaceSha256: Workspacesha256;
 }
 export interface JobSubmissionV1 {
+  accessRevision?: Accessrevision;
   accountGeneration: Accountgeneration;
   allowEdits: Allowedits;
   allowWeb: Allowweb;
@@ -1845,9 +1207,28 @@ export interface RichPreDraft {
   warnings: Warnings1;
 }
 export interface WorkingFacts {
+  extraction?: ExtractionReport | null;
   records: Records;
   revision: Revision19;
   tombstones: Tombstones;
+}
+export interface ExtractionReport {
+  counts: Counts;
+  factCount: Factcount;
+  recoveredRows: Recoveredrows;
+  requestBytes: Requestbytes;
+  status: Status1;
+  unresolved: Unresolved;
+}
+export interface Counts {
+  [k: string]: number;
+}
+export interface ExtractionIssue {
+  code: Code1;
+  page?: Page;
+  section: Section;
+  sourceId: Sourceid;
+  unitId: Unitid;
 }
 export interface CandidateRecord {
   evidence: Evidence;
@@ -1861,17 +1242,17 @@ export interface CandidateRecord {
   userCorrected?: Usercorrected1;
 }
 export interface EvidenceSpan {
-  sourceId: Sourceid;
+  sourceId: Sourceid1;
   sourceRevision: Sourcerevision;
   text: Text;
-  unitId: Unitid;
+  unitId: Unitid1;
   unitRevision: Unitrevision;
 }
 export interface WorkingFieldStr {
   pendingRawText: Pendingrawtext;
   rawText: Rawtext;
   revision: Revision1;
-  status: Status1;
+  status: Status2;
   userCorrected?: Usercorrected;
   value: Value;
 }
@@ -1909,7 +1290,7 @@ export interface WorkingFieldPartialDate {
   pendingRawText: Pendingrawtext1;
   rawText: Rawtext1;
   revision: Revision4;
-  status: Status2;
+  status: Status3;
   userCorrected?: Usercorrected3;
   value: PartialDate | null;
 }
@@ -1917,7 +1298,7 @@ export interface WorkingFieldBool {
   pendingRawText: Pendingrawtext2;
   rawText: Rawtext2;
   revision: Revision5;
-  status: Status3;
+  status: Status4;
   userCorrected?: Usercorrected4;
   value: Value1;
 }
@@ -2004,7 +1385,7 @@ export interface WorkingFieldMetricValue {
   pendingRawText: Pendingrawtext3;
   rawText: Rawtext3;
   revision: Revision15;
-  status: Status4;
+  status: Status5;
   userCorrected?: Usercorrected13;
   value: MetricValue | null;
 }
@@ -2035,7 +1416,7 @@ export interface WorkingFieldLeadershipValue {
   pendingRawText: Pendingrawtext4;
   rawText: Rawtext4;
   revision: Revision17;
-  status: Status5;
+  status: Status6;
   userCorrected?: Usercorrected15;
   value: LeadershipValue | null;
 }
@@ -2051,7 +1432,7 @@ export interface UnresolvedRecord {
   kind: Kind18;
   origin: Origin11;
   revision: Revision18;
-  status: Status6;
+  status: Status7;
   userCorrected?: Usercorrected16;
 }
 export interface RecordTombstone {
@@ -2066,7 +1447,7 @@ export interface RichOperation {
   errorCode: Errorcode1;
   id: Id19;
   kind: Kind19;
-  status: Status7;
+  status: Status8;
 }
 export interface Source {
   byteRef: Byteref;
@@ -2079,6 +1460,7 @@ export interface Source {
   parserVersion: Parserversion;
   revision: Revision22;
   units: Units;
+  warningDetails?: Warningdetails;
   warnings: Warnings;
 }
 export interface SourceOverlay {
@@ -2086,7 +1468,7 @@ export interface SourceOverlay {
   origin: Origin12;
   revision: Revision21;
   text: Text1;
-  unitId: Unitid1;
+  unitId: Unitid2;
 }
 export interface SourceUnit {
   disposition: Disposition;
@@ -2103,12 +1485,17 @@ export interface SourceLocation {
   kind: Kind20;
   row: Row;
 }
+export interface SourceWarning {
+  code: Code2;
+  page?: Page1;
+}
 export interface ProjectV5 {
   assets: Assets;
   createdAt: Createdat2;
   document: RichDocumentV1;
   evidenceRecords: Evidencerecords;
   facts: WorkingFacts;
+  importCoverage?: Importcoverage;
   operations: Operations1;
   projectId: Projectid3;
   renders: Renders;
@@ -2253,7 +1640,7 @@ export interface StyledText {
 export interface InlineStyles {
   backgroundColor?: Backgroundcolor;
   bold?: Bold;
-  code?: Code1;
+  code?: Code3;
   italic?: Italic;
   strike?: Strike;
   textColor?: Textcolor;
@@ -2364,6 +1751,13 @@ export interface ImmutableFactEvidence {
   id: Id43;
   rawText: Rawtext5;
 }
+export interface ImportCoverage {
+  blockIds: Blockids1;
+  disposition: Disposition1;
+  reason: Reason;
+  sourceId: Sourceid2;
+  unitId: Unitid3;
+}
 export interface RichRenderSnapshot {
   documentRevision: Documentrevision2;
   docxPath: Docxpath;
@@ -2394,7 +1788,7 @@ export interface Rules {
 }
 export interface RichSyncRecord {
   actionId: Actionid3;
-  blockIds: Blockids1;
+  blockIds: Blockids2;
   dependencies: Dependencies2;
   errorCode: Errorcode2;
   factIds: Factids;
@@ -2405,7 +1799,7 @@ export interface RichSyncRecord {
   proposedSteps?: Proposedsteps;
   ready?: Ready;
   selection?: RichSelection | null;
-  status: Status8;
+  status: Status9;
 }
 export interface PutBlock {
   afterId: Afterid;
@@ -2448,17 +1842,23 @@ export interface RemoveRecord {
   recordId: Recordid6;
 }
 export interface RichWarning {
-  blockIds: Blockids2;
-  code: Code2;
+  blockIds: Blockids3;
+  code: Code4;
+  count?: Count;
   evidence: Evidence16;
   id: Id47;
+  locations?: Locations;
   recordIds: Recordids;
 }
 export interface Evidence17 {
-  sourceId: Sourceid1;
+  sourceId: Sourceid3;
   sourceRevision: Sourcerevision1;
-  unitId: Unitid2;
+  unitId: Unitid4;
   unitRevision: Unitrevision1;
+}
+export interface WarningLocation {
+  page?: Page2;
+  sourceId: Sourceid4;
 }
 export interface WriterSessionV1 {
   abandonedEpoch?: Abandonedepoch;
@@ -2476,7 +1876,7 @@ export interface WriterSessionV1 {
   resumeCredentialSha256: Resumecredentialsha256;
   schemaVersion: Schemaversion12;
   sessionId: Sessionid1;
-  status: Status9;
+  status: Status10;
   touchFloor?: Touchfloor;
   touchGeneration: Touchgeneration;
 }

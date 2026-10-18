@@ -15,7 +15,7 @@ export function Composer({ view, captured, active, applying, title, draft, flags
   return <form className="chat-composer" onSubmit={event => { event.preventDefault(); if (enabled) send(); }}>
     <div className="chat-context" aria-label="Область следующей задачи"><span className="chat-context-resume" title={title}><Icon name="file" />{title}</span>
       <button className={`chat-scope${captured ? " has-selection" : ""}`} type="button" disabled={!captured} onClick={clear}
-        aria-label={captured ? "Убрать выделение из задачи" : "Всё резюме"}>{captured ? <><Icon name="check" />Выделенный фрагмент · {captured}<Icon name="close" /></> : "Всё резюме"}</button></div>
+        aria-label={captured ? "Убрать выделение из задачи" : "Доступ ко всему проекту"}>{captured ? <><Icon name="check" />Контекст: выделение · {captured}<Icon name="close" /></> : "Доступ ко всему проекту"}</button></div>
     <div className="chat-input-box"><textarea id="chat-input" aria-label="Сообщение помощнику" value={view.draft} placeholder="Что проверить или изменить в резюме?" rows={2}
       disabled={view.submitting || view.pendingSend} onChange={event => draft(event.target.value)}
       onCompositionStart={() => { composing.current = true; }} onCompositionEnd={() => { composing.current = false; }}
@@ -26,14 +26,14 @@ export function Composer({ view, captured, active, applying, title, draft, flags
         <select id="chat-model" aria-label="Модель помощника" value={selected} disabled={!view.settings || view.submitting} onChange={event => model(event.target.value || null)}>
           <option value="">Выберите модель помощника</option>{choices.map(item => <option key={item.model} value={item.model}>{item.model}{item.state === "unavailable" ? " · недоступна" : item.state === "incompatible" ? " · инструменты недоступны" : ""}</option>)}
         </select></label>
-        <label className="chat-mode"><input type="checkbox" checked={!view.flags.allowEdits} disabled={view.submitting || view.pendingSend}
-          onChange={event => flags(!event.target.checked, view.flags.allowWeb)} />Только проверка</label>
+        <label className="chat-mode"><input type="checkbox" checked={view.flags.allowEdits} disabled={view.submitting || view.pendingSend}
+          onChange={event => flags(event.target.checked, view.flags.allowWeb)} />Разрешить правки</label>
         <label className="chat-mode chat-internet"><input type="checkbox" checked={view.flags.allowWeb} disabled={view.submitting || view.pendingSend}
           onChange={event => flags(view.flags.allowEdits, event.target.checked)} /><Icon name="globe" /><span>Интернет</span></label></div>
         {active && <button className="chat-send is-stop" type="button" title="Остановить" aria-label="Остановить" onClick={stop} disabled={view.submitting}><Icon name="stop" /></button>}
         {(!active || view.pendingSend) && <button className="chat-send" type="submit" disabled={!enabled} title={view.pendingSend ? "Повторить отправку" : "Отправить"}
           aria-label={view.pendingSend ? "Повторить отправку" : "Отправить"}><Icon name="arrow" /></button>}</div></div>
-    <div className="chat-composer-footer"><span>{active ? "Выбор относится к следующей задаче. Текущая область и режим уже зафиксированы." : "Правки сохраняются в общей истории редактора."}</span><span>Enter — отправить · Shift+Enter — новая строка</span></div>
+    <div className="chat-composer-footer"><span>{view.flags.allowEdits ? "Чтение всего проекта, включая факты. Правки сохраняются в общей истории." : "Чтение всего проекта, включая факты. Запись запрещена."}</span><span>Enter — отправить · Shift+Enter — новая строка</span></div>
     {[...view.draft].length > 8000 && <p className="chat-error" role="alert">Сообщение длиннее 8000 символов.</p>}
     {view.capabilities?.unavailable && <p className="chat-error">{errorText(view.capabilities.unavailable.code)} <button className="text-button" type="button" onClick={settings}>Настройки</button></p>}
   </form>;

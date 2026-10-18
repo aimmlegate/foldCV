@@ -102,6 +102,11 @@ class SourceOverlay(Wire):
     origin: Literal["user"]
 
 
+class SourceWarning(Wire):
+    code: str
+    page: int | None = Field(default=None, ge=1)
+
+
 class Source(Wire):
     id: Id
     revision: Revision
@@ -114,6 +119,7 @@ class Source(Wire):
     units: list[SourceUnit]
     overlays: list[SourceOverlay]
     warnings: list[str]
+    warning_details: list[SourceWarning] = Field(default_factory=list)
 
 
 class Evidence(Wire):

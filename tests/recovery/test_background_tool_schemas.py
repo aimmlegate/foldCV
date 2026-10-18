@@ -36,7 +36,7 @@ async def test_read_tool_schemas_match_their_authority_and_load_known_blocks_wit
                     wrong = {**query, "kind": "facts" if query["kind"] != "facts" else "document"}
                     assert not validator.is_valid({"query": wrong})
                     denied = await rpc("tools/call", {"name": name, "arguments": {"query": wrong}})
-                    assert denied["isError"] and json.loads(denied["content"][0]["text"])["error"]["code"] == "AGENT_TOOL_DENIED"
+                    assert denied["isError"] and json.loads(denied["content"][0]["text"])["error"]["code"] == "AGENT_ARGUMENT_INVALID"
                     valid = await rpc("tools/call", {"name": name, "arguments": {"query": query}})
                     result = json.loads(valid["content"][0]["text"])
                     assert not valid.get("isError") and result["snapshot"]["id"]

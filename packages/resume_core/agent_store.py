@@ -197,7 +197,7 @@ class AgentStore:
         return self.update(project_id, create)
 
     def submit(self, project_id: str, request: AgentRunRequest, *, model: str,
-               connection_epoch: str, validate_new=lambda: None):
+               connection_epoch: str, validate_new=lambda: None, access_revision=1):
         logical = journal_request(request)
         request_hash = digest(logical)
         with self._guard(project_id) as directory:
@@ -218,6 +218,7 @@ class AgentStore:
             run = AgentRun(id=identity("run"), projectId=project_id, conversationId=conversation.id,
                 clientRequestId=request.client_request_id, ownerEpoch=request.owner.epoch, state="queued",
                 allowEdits=request.allow_edits, allowWeb=request.allow_web, scope=request.scope,
+                selectionContext=request.selection_context, accessRevision=access_revision,
                 model=model, connectionEpoch=connection_epoch, settingsRevision=request.settings_revision,
                 createdAt=now, deadline=deadline, finishedAt=None, usage=None, error=None,
                 savedBatchId=None, outcomeUnknown=False)

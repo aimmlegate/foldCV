@@ -51,6 +51,7 @@ export interface AgentJournalRequest {
   message: Message;
   projectRevision: Projectrevision;
   scope: Scope;
+  selectionContext?: RichSelection | null;
   settingsRevision: Settingsrevision;
 }
 export interface WholeResumeScope {

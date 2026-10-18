@@ -6,16 +6,44 @@ import { AssistantController, type AssistantView } from "./controller";
 import { drawerSize, errorText } from "./presentation";
 import { DrawerView } from "../workbench/assistant/DrawerView";
 import { projectJobs } from "../background/jobs";
+import type { AgentProjectOperations } from "../contracts/generated/agent_project_operations";
+import { limitsEditToSelection } from "./selection-intent";
 
 export type AssistantHandle = { stop: () => Promise<void>; history: () => void; fence: (saved: boolean) => void };
 const key = "foldcv.assistant.drawer";
 function storedSize() { try { const value: unknown = JSON.parse(localStorage.getItem(key) ?? "null"); return drawerSize(value); } catch { return drawerSize(null); } }
-export function AssistantDrawer({ projectId, editor, settingsOpen, settings, ref, title = "Резюме", background = false }: { projectId: string; editor: RefObject<RichEditorHandle | null>;
-  settingsOpen: boolean; settings: () => void; ref: Ref<AssistantHandle>; title?: string; background?: boolean }) {
+export function AssistantDrawer({ projectId, editor, settingsOpen, settings, ref, title = "Резюме", background = false, onProjectLifecycle }: { projectId: string; editor: RefObject<RichEditorHandle | null>;
+  settingsOpen: boolean; settings: () => void; ref: Ref<AssistantHandle>; title?: string; background?: boolean;
+  onProjectLifecycle?: (kind: "archive" | "delete") => Promise<boolean> }) {
   const [view, setView] = useState<AssistantView | null>(null), [size, setSize] = useState(storedSize);
   const [captured, setCaptured] = useState<CapturedEditorSelection | null>(null), [fence, setFence] = useState<string | null>(null);
   const controller = useRef<AssistantController | null>(null), selectionKey = useRef(""), log = useRef<HTMLDivElement>(null);
   const [failure, setFailure] = useState<string | null>(null);
+  const [operations, setOperations] = useState<AgentProjectOperations["items"]>([]);
+  const lifecycle = useRef(onProjectLifecycle);
+  lifecycle.current = onProjectLifecycle;
+  useEffect(() => {
+    let alive = true;
+    let initialized = false;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const handled = new Set<string>(), api = new AgentBrowserApi(projectId);
+    async function refreshOperations() {
+      try {
+        const value = await api.operations();
+        if (!alive) return;
+        setOperations(value.items);
+        if (!initialized) { value.items.forEach(item => handled.add(item.id)); initialized = true; }
+        for (const item of value.items) {
+          if (!alive) break;
+          const kind = item.action === "archive" && item.status === "completed" ? "archive" : item.action === "delete" && item.status === "deleted" ? "delete" : null;
+          if (kind && !handled.has(item.id) && await lifecycle.current?.(kind)) handled.add(item.id);
+        }
+      } catch (error) { if (alive) setFailure(error instanceof AgentApiFailure ? error.code : "REQUEST_FAILED"); }
+      finally { if (alive) timer = setTimeout(() => { void refreshOperations(); }, 2000); }
+    }
+    void refreshOperations();
+    return () => { alive = false; if (timer) clearTimeout(timer); };
+  }, [projectId]);
   const report = (work: Promise<void> | undefined) => { void work?.catch(error => setFailure(error instanceof AgentApiFailure ? error.code : "REQUEST_FAILED")); };
   useEffect(() => {
     const mounted = editor.current;
@@ -57,7 +85,9 @@ export function AssistantDrawer({ projectId, editor, settingsOpen, settings, ref
     setFailure(null);
     report(current.send(async () => {
       const value = await mounted.assistantBaseline(scope);
-      return { response: value.response, scope: value.selection ? { kind: "selection", selection: value.selection } : { kind: "resume" } };
+      const onlySelection = limitsEditToSelection(current.view.draft);
+      return { response: value.response, scope: onlySelection && value.selection ? { kind: "selection", selection: value.selection } : { kind: "resume" },
+        selectionContext: value.selection, historyOffers: value.historyOffers };
     }));
   }
   const active = controller.current?.active ?? false;
@@ -70,6 +100,7 @@ export function AssistantDrawer({ projectId, editor, settingsOpen, settings, ref
     model={model => report(controller.current?.chooseModel(model))} send={send} stop={() => report(controller.current?.stop())} clear={() => setCaptured(null)} settings={settings}
     select={id => report(controller.current?.select(id))} fresh={() => report(controller.current?.newConversation())}
     more={() => report(controller.current?.moreConversations())} older={() => report(controller.current?.older())}
+    operations={operations}
     resource={(kind, id) => report(controller.current?.resource(kind, id))} focus={anchor => editor.current?.focusFinding(anchor) ?? false} />
     : <section id="agent-chat-host" aria-label="Помощник"><p role="status">Открываем помощника…</p></section>;
 }

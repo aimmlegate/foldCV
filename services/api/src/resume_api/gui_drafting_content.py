@@ -23,7 +23,7 @@ class GuiDraftingContentService:
         transport = DraftingTransport(captured)
         recovered = False
         try:
-            prompt = drafting_input(captured, rules)
+            prompt = drafting_input(captured, rules, transform=transport.encode, return_canonical=True)
         except ValueError as error:
             if str(error) not in {"INPUT_TOO_LARGE", "INVALID_CONTENT_INPUT"}:
                 raise

@@ -99,6 +99,17 @@
           ],
           "title": "Scope"
         },
+        "selectionContext": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/RichSelection"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
         "settingsRevision": {
           "minimum": 1,
           "title": "Settingsrevision",

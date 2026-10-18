@@ -1,6 +1,7 @@
 """Native-only tolerant decoding around the strict normalization transport."""
 
 import json
+from copy import deepcopy
 
 from .gui_native_input import NativeInput
 from .gui_native_recovery import NativeRecovery
@@ -13,7 +14,20 @@ class NativeNormalizationTransport(NormalizationTransport):
         self.incoming = NativeInput(request)
         self.recovery = NativeRecovery(request, rules)
 
+    def output_schema(self, schema):
+        result = deepcopy(schema)
+        result["properties"]["facts"]["minItems"] = 1
+        for name, definition in result.get("$defs", {}).items():
+            properties = definition.get("properties", {})
+            if name == "GuiFactProposal":
+                properties["literalEvidence"]["minItems"] = 1
+            if name == "TextValue":
+                properties["text"]["minLength"] = 1
+        return result
+
     def encode(self, text):
+        if "\n\nRequest payload:\n" in text and not text.startswith("{"):
+            return text
         payload = json.loads(super().encode(text))
         instruction = payload.pop("instruction")
         # Give the CLI a direct task before its captured JSON data and constraints.

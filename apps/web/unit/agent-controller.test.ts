@@ -6,6 +6,7 @@ import type { AgentRunRequest } from "../src/contracts/generated/agent_run_reque
 import type { AgentEvent } from "../src/contracts/generated/agent_event";
 import type { AgentSettings } from "../src/contracts/generated/agent_settings";
 import type { AgentCapabilities } from "../src/contracts/generated/agent_capabilities";
+import type { AgentHistoryOffer } from "../src/contracts/generated/agent_history_offer";
 import type { AgentClaimResult } from "../src/contracts/generated/agent_claim_result";
 import type { AgentCommitResult } from "../src/contracts/generated/agent_commit_result";
 import type { RichProjectResponse } from "../src/contracts/generated/rich_project_response";
@@ -15,6 +16,59 @@ import { validateRichWorkspaceShape } from "../src/rich/validate";
 
 const now = "2026-10-15T12:00:00Z";
 const wait = () => new Promise<void>(resolve => { setImmediate(resolve); });
+
+test("foreground send binds editor history to its owner before submission and skips it in read-only", async () => {
+  for (const readOnly of [false, true]) {
+    const h = harness(), offers: AgentHistoryOffer[] = [];
+    h.api.access = () => Promise.resolve({ revision: 1, readOnly });
+    h.api.offerHistory = value => {
+      assert.equal(h.requests.length, 0);
+      offers.push(value);
+      return Promise.resolve({});
+    };
+    try {
+      await h.controller.init();
+      h.controller.draft("Read the whole project and its facts.");
+      await h.controller.send(async () => ({ ...await baseline(), historyOffers: { undo: null, redo: null } }));
+      assert.equal(offers.length, readOnly ? 0 : 1);
+      assert.equal(h.requests[0]?.allowEdits, !readOnly);
+      if (!readOnly) {
+        assert.equal(offers[0]?.owner.epoch, h.requests[0]?.owner.epoch);
+        assert.equal(offers[0]?.projectRevision, h.requests[0]?.projectRevision);
+        assert.equal(offers[0]?.documentRevision, h.requests[0]?.documentRevision);
+      }
+    } finally { h.controller.close(); }
+  }
+});
+
+test("edit permission follows the bound server state and changes only after its save acknowledgement", async () => {
+  const h = harness();
+  let access = { revision: 5, readOnly: true };
+  h.api.access = () => Promise.resolve(access);
+  h.api.setAccess = (revision, readOnly) => {
+    assert.equal(revision, access.revision);
+    access = { revision: revision + 1, readOnly };
+    return Promise.resolve(access);
+  };
+  try {
+    await h.controller.init();
+    assert.equal(h.controller.view.flags.allowEdits, false);
+    h.controller.flags({ allowEdits: true, allowWeb: false });
+    assert.equal(h.controller.view.flags.allowEdits, false);
+    await wait();
+    assert.equal(h.controller.view.flags.allowEdits, true);
+    access = { revision: access.revision + 1, readOnly: true };
+    h.controller.draft("Read all facts and sources.");
+    await h.controller.send(baseline);
+    assert.equal(h.requests[0]?.allowEdits, false);
+    assert.equal(h.requests[0]?.scope.kind, "resume");
+    h.api.setAccess = () => Promise.reject(new AgentApiFailure("AGENT_SETTINGS_CONFLICT"));
+    h.controller.flags({ allowEdits: true, allowWeb: false });
+    await wait();
+    assert.equal(h.controller.view.flags.allowEdits, false);
+    assert.equal(h.controller.view.error, "AGENT_SETTINGS_CONFLICT");
+  } finally { h.controller.close(); }
+});
 function baseline(): Promise<{ response: RichProjectResponse; scope: { kind: "resume" } }> {
   const workspace: unknown = structuredClone(fixture); assert.ok(validateRichWorkspaceShape(workspace));
   return Promise.resolve({ response: { workspace, durability: "durable", savedProjectRevision: 1, savedDocumentRevision: 1, saveError: null, generation: null }, scope: { kind: "resume" } });

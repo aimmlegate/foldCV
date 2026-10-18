@@ -61,7 +61,7 @@ def query_touches(state, before, after, mutation):
             targets = set(query.ids)
             for workspace in (before, after):
                 for block in workspace.project.document.blocks():
-                    if block.id in query.ids:
+                    if not query.ids or block.id in query.ids:
                         targets.update(child.id for child in subtree(block))
                     if block.type == "table" and any(cell.id in query.ids for row in block.content.rows for cell in row.cells):
                         targets.add(block.id)

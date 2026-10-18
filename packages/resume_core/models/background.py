@@ -7,8 +7,9 @@ from typing import Annotated, Literal, Union
 from pydantic import ConfigDict, Field, RootModel, model_validator
 
 from ..background_limits import LIMITS
+from .. import agent_limits
 from ..rich_api import RichProjectResponse
-from .agent import (AgentBatchJournal, AgentCommitResult, AgentFinding, AgentId, AgentJournalRequest,
+from .agent import (AgentBatchJournal, AgentCommitResult, AgentEditReceipt, AgentFinding, AgentId, AgentJournalRequest,
     AgentMessage, AgentReadSnapshot, AgentRun, AgentScope, AgentSnapshotDependency, AgentUsage, AgentWebSource, AgentWire,
     ModelId, Timestamp, bounded)
 from .contracts import Id, Revision, Sha256
@@ -29,7 +30,7 @@ Publication = Literal["none", "ready", "waiting_for_sync", "needs_review", "comm
 JobKind = Literal["agent", "processing", "rewrite", "reconciliation"]
 SchedulingClass = Literal["background", "interactive", "reconciliation"]
 Tool = Literal["get_resume_context", "find_resume_content", "get_working_facts", "get_original_source",
-    "get_conversation_context", "check_resume", "read_public_page", "publish_findings", "prepare_edit_batch", "apply_edit_batch"]
+    "get_conversation_context", "get_project_resources", "check_resume", "read_public_page", "publish_findings", "prepare_edit_batch", "apply_edit_batch", "project_action"]
 ScopeKey = Annotated[str, Field(min_length=1, max_length=512)]
 Counter = Annotated[int, Field(ge=0, le=9007199254740991)]
 
@@ -54,8 +55,8 @@ class GenerationStamp(BackgroundWire):
 
 class ScopeGuardV1(BackgroundWire):
     schema_version: Literal[1]
-    reads: list[GenerationStamp] = Field(max_length=100)
-    writes: list[GenerationStamp] = Field(max_length=100)
+    reads: list[GenerationStamp] = Field(max_length=4096)
+    writes: list[GenerationStamp] = Field(max_length=4096)
 
     @model_validator(mode="after")
     def unique_scopes(self):
@@ -95,7 +96,7 @@ class JobArtifactV1(BackgroundWire):
     rules_sha256: Sha256
     job_id: AgentId | None
     created_at: Timestamp
-    snapshots: list[AgentReadSnapshot] = Field(max_length=24)
+    snapshots: list[AgentReadSnapshot] = Field(max_length=agent_limits.TOOL_CALLS)
     batches: list[AgentBatchJournal] = Field(max_length=100)
     sources: list[AgentWebSource] = Field(max_length=20)
     findings: list[AgentFinding] = Field(max_length=100)
@@ -150,8 +151,9 @@ class JobSubmissionV1(BackgroundWire):
     input: InputReference
     models: list[ModelCapture] = Field(min_length=1, max_length=2)
     account_generation: Revision
-    tools: list[Tool] = Field(max_length=10)
+    tools: list[Tool] = Field(max_length=32)
     allow_edits: bool
+    access_revision: Revision = 1
     allow_web: bool
     scope: AgentScope
     guards: ScopeGuardV1
@@ -168,7 +170,7 @@ class JobSubmissionV1(BackgroundWire):
         if (self.scheduling_class != expected_class or [m.stage for m in self.models] != expected_stages
                 or self.input.kind != expected_input or len(self.tools) != len(set(self.tools))):
             raise ValueError("invalid server-assigned job capture")
-        if not self.allow_edits and (self.guards.writes or {"prepare_edit_batch", "apply_edit_batch"} & set(self.tools)):
+        if not self.allow_edits and (self.guards.writes or {"prepare_edit_batch", "apply_edit_batch", "project_action"} & set(self.tools)):
             raise ValueError("check-only job cannot capture edit authority")
         if not self.allow_web and "read_public_page" in self.tools:
             raise ValueError("web-disabled job cannot capture page fetching")
@@ -526,6 +528,26 @@ class SavedApplyV2(BackgroundWire):
 
 class ApplyResultV2(RootModel[Annotated[Union[DeferredApplyV2, SavedApplyV2], Field(discriminator="disposition")]]):
     pass
+
+
+class ToolSavedV3(BackgroundWire):
+    model_config = ConfigDict(json_schema_extra={"x-maxSerializedBytes": 4096})
+    schema_version: Literal[3]
+    disposition: Literal["saved"]
+    job_id: AgentId
+    proposal_id: AgentId
+    proposal_stored: Literal[True]
+    durable: Literal[True]
+    receipt: AgentEditReceipt
+    workspace_sha256: Sha256
+    project_ref: str
+
+    @model_validator(mode="after")
+    def exact_receipt(self):
+        if not self.receipt.durable or self.receipt.disposition != "saved":
+            raise ValueError("saved tool result needs its durable receipt")
+        bounded(self, 4096)
+        return self
 
 
 class JobFailure(BackgroundWire):
@@ -1229,4 +1251,5 @@ BACKGROUND_CONTRACTS["background_writer_draft_resolve_v1"] = WriterDraftResolveV
 BACKGROUND_CONTRACTS.update({"background_fixed_request_v1": JobFixedRequestV1,
     "background_fixed_reply_v1": JobFixedReplyV1, "background_fixed_input_v1": FixedInputV1,
     "background_processing_candidate_v1": ProcessingCandidateV1})
-BACKGROUND_CONTRACTS.update({"background_summary_v1": JobSummaryV1, "background_index_v1": JobIndexV1})
+BACKGROUND_CONTRACTS.update({"background_summary_v1": JobSummaryV1, "background_index_v1": JobIndexV1,
+    "background_tool_saved_v3": ToolSavedV3})

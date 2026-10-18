@@ -3,6 +3,11 @@
     "GuiProjectListEntry": {
       "additionalProperties": false,
       "properties": {
+        "archived": {
+          "default": false,
+          "title": "Archived",
+          "type": "boolean"
+        },
         "cleanupStatus": {
           "enum": [
             "none",
@@ -12,6 +17,18 @@
           ],
           "title": "Cleanupstatus",
           "type": "string"
+        },
+        "lastOpenedAt": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Lastopenedat"
         },
         "projectId": {
           "minLength": 1,

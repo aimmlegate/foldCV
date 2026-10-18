@@ -1,12 +1,15 @@
 """Same-origin browser routes are separate from the private MCP capability."""
 
 from fastapi import Request
-from fastapi.responses import JSONResponse, StreamingResponse
+from fastapi.responses import JSONResponse, StreamingResponse, Response
 
 from packages.resume_core.agent_store import AgentFailure, conversation_in, run_in
 from packages.resume_core.models.agent import (
     AgentEmptyRequest, AgentSettingsRequest, AgentPageRequest, AgentLeaseOpen, AgentOwnerRequest,
     AgentRunRequest, AgentEventsRequest, AgentRunRead, AgentCommitRequest, AgentResultRequest,
+    AgentAccess, AgentAccessRequest,
+    AgentHistoryOffer,
+    AgentProjectOperation, AgentProjectOperations,
 )
 
 
@@ -54,6 +57,65 @@ def mount_agent(app, service):
                 raise AgentFailure("AGENT_TOOL_DENIED")
             values[name] = not matches or matches[0] == b"1"
         return response(service.capabilities(project_id, **values))
+
+    @app.get(prefix + "/access")
+    async def access(project_id: str):
+        project(project_id)
+        entry = service.projects.catalog.get(project_id)
+        return response(AgentAccess(revision=entry.access_revision, readOnly=entry.read_only))
+
+    @app.post(prefix + "/history/offer")
+    async def history_offer(project_id: str, payload: AgentHistoryOffer):
+        project(project_id)
+        service.publication.offer_editor_history(project_id, payload)
+        return JSONResponse({}, headers={"Cache-Control": "no-store"})
+
+    @app.get(prefix + "/operations")
+    async def operations(project_id: str):
+        items = []
+        for key, command in service.projects.catalog.actions().items():
+            if command["projectId"] != project_id:
+                continue
+            result = command["result"]
+            error = result.get("error") or {}
+            items.append(AgentProjectOperation(id=key, projectId=project_id, runId=command["runId"],
+                action=command["action"], status=command["status"], durable=result.get("durable", False),
+                downloadUrl=result.get("downloadUrl"), errorCode=result.get("errorCode") or error.get("code")))
+        return response(AgentProjectOperations(items=items))
+
+    @app.put(prefix + "/access")
+    async def set_access(project_id: str, payload: AgentAccessRequest):
+        from packages.resume_core.project_catalog import AccessChanged
+        with service.projects.state_lock:
+            project(project_id)
+            try:
+                entry = service.projects.catalog.update(project_id, read_only=payload.read_only,
+                    expected_revision=payload.expected_revision)
+            except AccessChanged:
+                raise AgentFailure("AGENT_SETTINGS_CONFLICT") from None
+            return response(AgentAccess(revision=entry.access_revision, readOnly=entry.read_only))
+
+    @app.get(prefix + "/exports/{filename}")
+    async def exported(project_id: str, filename: str):
+        import hashlib
+        import re
+        from packages.resume_core.project_store import owned_file
+        from packages.resume_core.storage import StorageFailure
+        project(project_id)
+        if re.fullmatch(r"[0-9a-f]{64}\.(?:docx|foldcv)", filename) is None:
+            raise AgentFailure("AGENT_NOT_FOUND")
+        path = service.projects.storage._directory(project_id) / "renders" / filename
+        try:
+            owned_file(path, 64 * 1024 * 1024)
+            raw = path.read_bytes()
+        except (OSError, ValueError, StorageFailure):
+            raise AgentFailure("AGENT_NOT_FOUND") from None
+        if hashlib.sha256(raw).hexdigest() != filename.split(".", 1)[0]:
+            raise AgentFailure("AGENT_NOT_FOUND")
+        extension = filename.rsplit(".", 1)[1]
+        return Response(raw, media_type="application/vnd.foldcv.project+zip" if extension == "foldcv" else
+            "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+            headers={"Cache-Control": "no-store", "Content-Disposition": f'attachment; filename="resume.{extension}"'})
 
     @app.post(prefix + "/conversations/read")
     async def conversations(project_id: str, payload: AgentPageRequest):

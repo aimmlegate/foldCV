@@ -296,8 +296,6 @@ class RichProjectStore(ProjectStore):
             directory = self._directory(id)
             target = directory / "workspace.json"
             owned_file(target)
-            # Unsupported files are never eligible for rich cleanup, even after a list action.
-            decode_rich_snapshot(target.read_bytes())
             try:
                 self._observe("before_tombstone_cleanup", id)
                 files, folders = [], []
@@ -306,7 +304,7 @@ class RichProjectStore(ProjectStore):
                         owned_file(path); files.append(path)
                     elif path.name in {"sources", "renders", "images"}:
                         private_directory(path)
-                        suffix = {"sources": "bin", "renders": "docx", "images": "(?:png|jpg)"}[path.name]
+                        suffix = {"sources": "bin", "renders": "(?:docx|foldcv)", "images": "(?:png|jpg)"}[path.name]
                         for blob in path.iterdir():
                             if re.fullmatch(r"[0-9a-f]{64}\." + suffix, blob.name) is None:
                                 raise StorageFailure("UNSAFE_STORAGE")

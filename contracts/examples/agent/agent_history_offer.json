@@ -1,0 +1,11 @@
+{
+  "owner": {
+    "token": "synthetic_owner_capability_0123456789",
+    "epoch": 1
+  },
+  "projectRevision": 1,
+  "documentRevision": 1,
+  "factsRevision": 1,
+  "undo": null,
+  "redo": null
+}

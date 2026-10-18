@@ -273,6 +273,61 @@
       "title": "AgentFactValue",
       "type": "object"
     },
+    "AgentFormatTemplate": {
+      "additionalProperties": false,
+      "properties": {
+        "kind": {
+          "const": "format_template",
+          "title": "Kind",
+          "type": "string"
+        },
+        "snapshotId": {
+          "maxLength": 128,
+          "minLength": 1,
+          "pattern": "^[A-Za-z0-9_-]+$",
+          "title": "Snapshotid",
+          "type": "string"
+        }
+      },
+      "required": [
+        "kind",
+        "snapshotId"
+      ],
+      "title": "AgentFormatTemplate",
+      "type": "object"
+    },
+    "AgentHistoryCommand": {
+      "additionalProperties": false,
+      "properties": {
+        "direction": {
+          "enum": [
+            "undo",
+            "redo"
+          ],
+          "title": "Direction",
+          "type": "string"
+        },
+        "kind": {
+          "const": "history",
+          "title": "Kind",
+          "type": "string"
+        },
+        "snapshotId": {
+          "maxLength": 128,
+          "minLength": 1,
+          "pattern": "^[A-Za-z0-9_-]+$",
+          "title": "Snapshotid",
+          "type": "string"
+        }
+      },
+      "required": [
+        "kind",
+        "snapshotId",
+        "direction"
+      ],
+      "title": "AgentHistoryCommand",
+      "type": "object"
+    },
     "AgentInline": {
       "additionalProperties": false,
       "properties": {
@@ -303,6 +358,52 @@
       "title": "AgentInline",
       "type": "object"
     },
+    "AgentInsertAsset": {
+      "additionalProperties": false,
+      "properties": {
+        "alt": {
+          "maxLength": 1000,
+          "title": "Alt",
+          "type": "string"
+        },
+        "assetId": {
+          "maxLength": 256,
+          "minLength": 1,
+          "title": "Assetid",
+          "type": "string"
+        },
+        "destination": {
+          "$ref": "#/$defs/AgentBlockAnchor"
+        },
+        "height": {
+          "exclusiveMinimum": 0,
+          "maximum": 2000,
+          "title": "Height",
+          "type": "number"
+        },
+        "kind": {
+          "const": "insert_asset",
+          "title": "Kind",
+          "type": "string"
+        },
+        "width": {
+          "exclusiveMinimum": 0,
+          "maximum": 2000,
+          "title": "Width",
+          "type": "number"
+        }
+      },
+      "required": [
+        "kind",
+        "destination",
+        "assetId",
+        "alt",
+        "width",
+        "height"
+      ],
+      "title": "AgentInsertAsset",
+      "type": "object"
+    },
     "AgentInsertBlocks": {
       "additionalProperties": false,
       "properties": {
@@ -330,6 +431,45 @@
         "blocks"
       ],
       "title": "AgentInsertBlocks",
+      "type": "object"
+    },
+    "AgentInsertTable": {
+      "additionalProperties": false,
+      "properties": {
+        "destination": {
+          "$ref": "#/$defs/AgentBlockAnchor"
+        },
+        "headerRows": {
+          "default": 1,
+          "maximum": 100,
+          "minimum": 0,
+          "title": "Headerrows",
+          "type": "integer"
+        },
+        "kind": {
+          "const": "insert_table",
+          "title": "Kind",
+          "type": "string"
+        },
+        "rows": {
+          "items": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "maxItems": 100,
+          "minItems": 1,
+          "title": "Rows",
+          "type": "array"
+        }
+      },
+      "required": [
+        "kind",
+        "destination",
+        "rows"
+      ],
+      "title": "AgentInsertTable",
       "type": "object"
     },
     "AgentMoveBlocks": {
@@ -393,10 +533,22 @@
           "enum": [
             "paragraph",
             "bullet_list_item",
-            "numbered_list_item"
+            "numbered_list_item",
+            "heading",
+            "section"
           ],
           "title": "Kind",
           "type": "string"
+        },
+        "level": {
+          "default": 2,
+          "enum": [
+            1,
+            2,
+            3
+          ],
+          "title": "Level",
+          "type": "integer"
         }
       },
       "required": [
@@ -846,7 +998,11 @@
             "create_fact": "#/$defs/AgentCreateFact",
             "delete_blocks": "#/$defs/AgentDeleteBlocks",
             "delete_fact": "#/$defs/AgentDeleteFact",
+            "format_template": "#/$defs/AgentFormatTemplate",
+            "history": "#/$defs/AgentHistoryCommand",
+            "insert_asset": "#/$defs/AgentInsertAsset",
             "insert_blocks": "#/$defs/AgentInsertBlocks",
+            "insert_table": "#/$defs/AgentInsertTable",
             "move_blocks": "#/$defs/AgentMoveBlocks",
             "replace_text": "#/$defs/AgentReplaceText",
             "update_fact": "#/$defs/AgentUpdateFact"
@@ -874,6 +1030,18 @@
           },
           {
             "$ref": "#/$defs/AgentDeleteFact"
+          },
+          {
+            "$ref": "#/$defs/AgentFormatTemplate"
+          },
+          {
+            "$ref": "#/$defs/AgentInsertTable"
+          },
+          {
+            "$ref": "#/$defs/AgentInsertAsset"
+          },
+          {
+            "$ref": "#/$defs/AgentHistoryCommand"
           }
         ]
       },
@@ -888,7 +1056,7 @@
         "pattern": "^[A-Za-z0-9_-]+$",
         "type": "string"
       },
-      "maxItems": 24,
+      "maxItems": 64,
       "title": "Snapshotids",
       "type": "array"
     }

@@ -66,7 +66,7 @@ export type Schemaversion = 1;
 export type Stage = ("agent" | "assessment" | "extraction" | "rewrite" | "reconciliation") | null;
 export type Updatedat = string;
 /**
- * @maxItems 8192
+ * @maxItems 32768
  */
 export type Jobs = JobSummaryV1[];
 export type Schemaversion1 = 1;

@@ -94,7 +94,6 @@
   .uir-rewrite { top: calc(var(--uir-gap) + 99px); }
 }
 
-.uir-editor-body .uir-block-panel { top: 149px; }
 [data-uir-engine-ui] .uir-selection-action { position: static; min-width: 0; min-height: 0; padding: 7px 11px; border: 1px solid #728363; border-radius: 5px; background: var(--accent); color: #fff; font: 10px var(--sans); }
 [data-uir-engine-ui] .uir-selection-action svg { width: 13px; height: 13px; stroke-width: 1.5; }
 [data-uir-engine-ui] .rich-block-handle svg { width: 14px; height: 14px; stroke-width: 1.5; }
@@ -110,9 +109,6 @@
 .uir-period-actions { display: flex; flex-wrap: wrap; gap: 12px; }
 .uir-assistant-options { margin-top: 32px; padding-top: 24px; border-top: 1px solid var(--line); }
 .demo-file-row > span { min-width: 0; overflow-wrap: anywhere; }
-@media (max-width: 1080px) { .uir-editor-body .uir-block-panel { top: 143px; } }
-@media (max-width: 800px) { .uir-editor-body .uir-block-panel { top: 135px; } }
-@media (max-width: 600px) { .uir-editor-body .uir-block-panel { top: 121px; } }
 .uir-chat-active-bar { display: flex; align-items: center; padding-right: 12px; }
 .uir-chat-active-bar .chat-launcher { min-width: 0; }
 .uir-chat-active-bar > .chat-icon { flex-shrink: 0; }

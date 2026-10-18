@@ -230,7 +230,7 @@ def test_native_draft_budget_uses_compact_wire_input_without_dropping_long_fact_
 
     request = draft_request()
     job = request.normalized.employment[0]
-    added = [TextFact(id=f"claim-{index}-" + "x" * 350, revision=1, kind="text",
+    added = [TextFact(id=f"claim-{index}-" + "x" * 1600, revision=1, kind="text",
         value={"text": f"Supported user claim {index}"}, evidence=[], origin="user",
         importance="normal", jobId=job.id, subprojectId=None) for index in range(180)]
     request.normalized.facts.extend(added)

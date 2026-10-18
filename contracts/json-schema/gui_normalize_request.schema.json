@@ -102,6 +102,13 @@
           "title": "Units",
           "type": "array"
         },
+        "warningDetails": {
+          "items": {
+            "$ref": "#/$defs/SourceWarning"
+          },
+          "title": "Warningdetails",
+          "type": "array"
+        },
         "warnings": {
           "items": {
             "type": "string"
@@ -270,6 +277,33 @@
         "representedFactIds"
       ],
       "title": "SourceUnit",
+      "type": "object"
+    },
+    "SourceWarning": {
+      "additionalProperties": false,
+      "properties": {
+        "code": {
+          "title": "Code",
+          "type": "string"
+        },
+        "page": {
+          "anyOf": [
+            {
+              "minimum": 1,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Page"
+        }
+      },
+      "required": [
+        "code"
+      ],
+      "title": "SourceWarning",
       "type": "object"
     }
   },

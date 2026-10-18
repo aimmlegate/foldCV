@@ -29,6 +29,7 @@ PYTHON_SUITES = {
     "fast": ["tests/contracts", "tests/core", "tests/draft", "tests/extract", "tests/foundation", "tests/normalize", "tests/service", "tests/devloop", "tests/devloop_antigravity", "tests/recovery", "tests/docx", "skills/format-resume/tests"],
     "integration-render": ["tests/cli_spike", "tests/render_spike", "tests/render"],
 }
+MANUAL_QA_EXTRA_TARGETS = ("tests/cli_spike/test_codex_adapter.py",)
 PROTOTYPE_TESTS = (
     "skills/format-resume/tests/test_policy.py::PolicyTests::test_valid_case",
     "skills/format-resume/tests/test_policy.py::PolicyTests::test_source_and_selection_fail_closed",
@@ -97,12 +98,12 @@ def background_spec(*, require_native=False, retained_native=False) -> dict:
         raise SystemExit("NB matrix due variants do not match execution bindings")
     assert_manual_bindings(spec.get("manualBindings", {}), manual, ROOT)
     if retained_native:
-        from tools.manual_qa_evidence import historical_sources
-        native_sources = historical_sources(spec["sources"])
+        from tools.manual_qa_evidence import validate_retained_native
+        spec["pendingNative"] = validate_retained_native(spec)
     else:
         native_sources = background_source_hashes(spec["sources"])
-    spec["pendingNative"] = assert_native_bindings(spec.get("nativeBindings", {}), native, ROOT,
-        sources=native_sources, require_pass=require_native)
+        spec["pendingNative"] = assert_native_bindings(spec.get("nativeBindings", {}), native, ROOT,
+            sources=native_sources, require_pass=require_native)
     matrix_bindings = {b["variant"]: b["nodes"] for c in matrix["cases"] for b in c["testBindings"] if b["suite"] == "fast"}
     if any(matrix_bindings.get(variant) != nodes for variant, nodes in spec["bindings"].items()):
         raise SystemExit("NB matrix executable identities do not match the runner")
@@ -117,7 +118,7 @@ def background_context(root: Path, suite: str, sources: dict[str, str]) -> dict:
 
 def pytest_group(name: str, evidence_dir: Path | None = None, diagnosis: Path | None = None, *, prepared: dict | None = None) -> None:
     require_python()
-    targets = PYTHON_SUITES[name]
+    targets = [*PYTHON_SUITES[name], *(prepared or {}).get("extraTargets", [])]
     with tempfile.TemporaryDirectory(prefix="foldcv-coverage-") as temp:
         temp_root = Path(temp).resolve()
         env = safe_env()
@@ -307,7 +308,10 @@ def validate_map(node_context: Path | None = None, *, manual_qa: bool = False) -
     print("Unimplemented or partial requirements: " + ", ".join(gaps), flush=True)
     if manual_qa:
         from tools.manual_qa_evidence import HANDOFF, validate_bindings
-        validate_bindings(json.loads((HANDOFF / "case-bindings.json").read_text()), collected | exact_state_nodes)
+        targets = [*PYTHON_SUITES["fast"], *MANUAL_QA_EXTRA_TARGETS]
+        qa_collected = {node for node in collected if any(node.partition("::")[0] == target
+            or node.startswith(target + "/") for target in targets)}
+        validate_bindings(json.loads((HANDOFF / "case-bindings.json").read_text()), qa_collected | exact_state_nodes)
 
 
 def browser() -> None:
@@ -350,7 +354,8 @@ def fast(evidence_dir: Path | None, diagnosis: Path | None, *, manual_qa: bool =
                             ["npm", "run", "build"]):
                 run(command, WEB)
             pytest_group("fast", evidence_dir, diagnosis,
-                prepared={"context": context, "nodeReport": str(node_report), "history": history, "spec": spec})
+                prepared={"context": context, "nodeReport": str(node_report), "history": history, "spec": spec,
+                    "extraTargets": list(MANUAL_QA_EXTRA_TARGETS) if manual_qa else []})
             if manual_qa:
                 from tools.manual_qa_evidence import HANDOFF, validate_bindings, validate_execution
                 report = read_report(Path(context["reportPath"]))

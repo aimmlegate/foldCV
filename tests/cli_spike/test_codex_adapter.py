@@ -69,7 +69,7 @@ def test_encoded_transport_size_is_bounded_before_cli_dispatch(fake):
 
     class Oversized:
         def encode(self, _text):
-            return "x" * 65_537
+            return "x" * (256 * 1024 + 1)
 
         def restore(self, value):
             return value
@@ -348,13 +348,55 @@ def test_input_and_schema_fail_before_spawn(fake) -> None:
 
     with OperationFiles(root).open() as files:
         for candidate, code in [
-            (ContentInput("☃" * 22_000, Summary, GenerationPolicy("gpt-6-luna")), "INPUT_TOO_LARGE"),
+            (ContentInput("☃" * 90_000, Summary, GenerationPolicy("gpt-6-luna")), "INPUT_TOO_LARGE"),
             (ContentInput(PROMPT, Summary, GenerationPolicy("--unsafe")), "MODEL_DENIED"),
             (ContentInput(PROMPT, Loose, GenerationPolicy("gpt-6-luna")), "INVALID_SCHEMA"),
         ]:
             with pytest.raises(ContentFailure, match=code):
                 provider.generate(candidate, files, threading.Event())
     assert starts() == 0 and list(root.iterdir()) == [keep]
+
+
+@pytest.mark.parametrize("size", [65_537, 256 * 1024])
+def test_larger_complete_utf8_prompt_reaches_cli_once_without_truncation(fake, size):
+    cli, root, keep, configure, starts = fake
+    prompt = "Ж" * (size // 2) + (" " if size % 2 else "")
+    configure(prompt=prompt)
+    provider = CodexCliProvider(cli, fixture_transport=FixtureTransport(cli))
+    policy = GenerationPolicy("gpt-6-luna", timeout_seconds=3, allow_repair=False)
+    with OperationFiles(root).open() as files:
+        result = provider.generate(ContentInput(prompt, Summary, policy), files, threading.Event())
+    assert result.value.summary and starts() == 1
+    assert len(prompt.encode()) == size and list(root.iterdir()) == [keep]
+
+
+@pytest.mark.parametrize("size", [65_537, 196_608])
+def test_complete_utf8_result_above_old_line_limit_uses_declared_output_budget(fake, size):
+    class FullResult(BaseModel):
+        model_config = ConfigDict(extra="forbid", strict=True)
+        summary: str = Field(min_length=1, max_length=256 * 1024)
+
+    cli, root, keep, configure, starts = fake
+    text = "Ж" * (size // 2) + (" " if size % 2 else "")
+    configure(result_text=json.dumps({"summary": text}, ensure_ascii=False))
+    provider = CodexCliProvider(cli, fixture_transport=FixtureTransport(cli))
+    policy = GenerationPolicy("gpt-6-luna", timeout_seconds=3, allow_repair=False)
+    with OperationFiles(root).open() as files:
+        result = provider.generate(ContentInput(PROMPT, FullResult, policy), files, threading.Event())
+    assert result.value.summary == text and len(text.encode()) == size
+    assert result.logical_attempts == starts() == 1 and list(root.iterdir()) == [keep]
+
+
+def test_structured_result_still_obeys_a_smaller_total_stream_budget(fake):
+    cli, root, keep, configure, starts = fake
+    configure(result_text=json.dumps({"summary": "Ж" * 40_000}, ensure_ascii=False))
+    provider = CodexCliProvider(cli, fixture_transport=FixtureTransport(cli))
+    policy = GenerationPolicy("gpt-6-luna", timeout_seconds=3, max_total_output_bytes=32 * 1024,
+        allow_repair=False)
+    with pytest.raises(ContentFailure, match="OUTPUT_TOO_LARGE"):
+        with OperationFiles(root).open() as files:
+            provider.generate(ContentInput(PROMPT, Summary, policy), files, threading.Event())
+    assert starts() == 1 and list(root.iterdir()) == [keep]
 
 
 def test_deadline_stops_hung_child(fake) -> None:

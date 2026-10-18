@@ -4,6 +4,9 @@
 .project-select { gap: 2px; padding-block: 9px; }
 .project-select small { line-height: 1.35; }
 .project-select em { margin-top: 3px; }
+.project-row .project-select { padding-bottom: 31px; }
+.project-archive { position: absolute; bottom: 7px; left: 12px; border: 0; background: transparent; color: var(--muted); font-size: 10px; padding: 2px; }
+.project-archive:hover { color: var(--ink); }
 .project-list { gap: 3px; }
 .history-footer > button > svg:last-child { margin-left: auto; }
 .history-footer > button { border-radius: 5px; padding-inline: 4px; }
@@ -19,7 +22,8 @@
 .workspace-alert > span { overflow-wrap: anywhere; }
 .workspace-alert .icon { flex-shrink: 0; }
 .workspace-loading { display: grid; flex: 1; place-items: center; color: var(--muted); }
-.document-context { position: relative; height: 48px; min-height: 48px; flex: 0 0 48px; gap: 8px; }
+.editor-status-actions { position: relative; display: flex; justify-content: flex-end; gap: 8px; flex-wrap: wrap; }
+.editor-status-actions:empty { display: none; }
 .context-left { min-width: 0; }
 .context-notices { display: flex; align-items: center; justify-content: flex-end; gap: 8px; min-width: 0; max-width: 100%; margin-left: auto; }
 .context-notices > button { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -68,10 +72,10 @@
 @media (max-width: 800px) { .session-status { max-width: 140px; } .context-left > span:last-child { display: none; } }
 @media (max-width: 600px) {
   .workspace-alert { top: 78px; right: 10px; max-width: calc(100% - 20px); }
-  .document-context { padding-inline: 12px; }
+
   .notice-control { position: static; }
   .notice-panel { top: calc(100% + 4px); right: 10px; width: calc(100vw - 20px); }
-  .document-context .context-left { display: none; }
+
   .context-notices { width: 100%; gap: 5px; }
   .notice-control > summary > span:first-of-type { max-width: 90px; overflow: hidden; text-overflow: ellipsis; }
   .date-input-row { grid-template-columns: 100px minmax(0, 1fr); }

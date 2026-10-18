@@ -1,6 +1,11 @@
 import { Ajv2020 } from "ajv/dist/2020.js";
 import type { ValidateFunction } from "ajv";
 import addFormats from "ajv-formats";
+import agent_access from "../../../../contracts/json-schema/agent_access.schema.json" with { type: "json" };
+import agent_history_offer from "../../../../contracts/json-schema/agent_history_offer.schema.json" with { type: "json" };
+import agent_access_request from "../../../../contracts/json-schema/agent_access_request.schema.json" with { type: "json" };
+import agent_project_action from "../../../../contracts/json-schema/agent_project_action.schema.json" with { type: "json" };
+import agent_project_operations from "../../../../contracts/json-schema/agent_project_operations.schema.json" with { type: "json" };
 import agent_error from "../../../../contracts/json-schema/agent_error.schema.json" with { type: "json" };
 import agent_capabilities from "../../../../contracts/json-schema/agent_capabilities.schema.json" with { type: "json" };
 import agent_settings from "../../../../contracts/json-schema/agent_settings.schema.json" with { type: "json" };
@@ -51,6 +56,11 @@ ajv.addKeyword({ keyword: "x-maxUtf8Bytes", schemaType: "number", type: "string"
   validate: (limit: number, value: string): boolean => encoder.encode(value).length <= limit });
 const schemas = { agent_error, agent_empty_request, agent_capabilities, agent_settings, agent_settings_request, agent_conversation, agent_message, agent_run_request, agent_run, agent_read_snapshot, agent_web_source, agent_finding, agent_prepare_request, agent_prepare_result, agent_apply_request, agent_edit_batch, agent_edit_receipt, agent_event, agent_page_request, agent_conversation_page, agent_message_page, agent_resource_page, agent_lease_open, agent_lease, agent_owner_request, agent_commit_request, agent_commit_result, agent_claim_result, agent_result_request, agent_events_request, agent_run_read, agent_tool_read, agent_tool_result, agent_fetch_request, agent_publish_findings, agent_project_state };
 const schemaByName = new Map<string, object>(Object.entries(schemas));
+schemaByName.set("agent_access", agent_access);
+schemaByName.set("agent_history_offer", agent_history_offer);
+schemaByName.set("agent_access_request", agent_access_request);
+schemaByName.set("agent_project_action", agent_project_action);
+schemaByName.set("agent_project_operations", agent_project_operations);
 const validators = new Map<string, ValidateFunction<unknown>>();
 
 function record(value: unknown): value is Record<string, unknown> {
@@ -120,7 +130,7 @@ function semantics(value: unknown): boolean {
   if (value.disposition === "prepared" && "batchId" in value && value.batchId === null) return false;
   if ((value.status === "known" || value.status === "uncertain") && "text" in value && "value" in value &&
       (value.status === "uncertain") !== (value.value === null)) return false;
-  if ("mutation" in value && record(value.mutation) && value.mutation.kind !== "structure") return false;
+  if ("mutation" in value && record(value.mutation) && !["structure", "undo", "redo"].includes(String(value.mutation.kind))) return false;
   return Object.values(value).every(semantics);
 }
 

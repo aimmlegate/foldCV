@@ -1,0 +1,14 @@
+{
+  "items": [
+    {
+      "id": "operation_1",
+      "projectId": "project-1",
+      "runId": "run_1",
+      "action": "export_docx",
+      "status": "completed",
+      "durable": true,
+      "downloadUrl": "/v1/rich/projects/project-1/assistant/exports/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.docx",
+      "errorCode": null
+    }
+  ]
+}

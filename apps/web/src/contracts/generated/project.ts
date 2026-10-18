@@ -179,6 +179,9 @@ export type Representedfactids = string[];
 export type Revision9 = number;
 export type Text3 = string;
 export type Units = SourceUnit[];
+export type Code = string;
+export type Page = number | null;
+export type Warningdetails = SourceWarning[];
 export type Warnings = string[];
 export type Sources = Source[];
 export type Assets = AssetRef[];
@@ -425,6 +428,7 @@ export interface Source {
   parserVersion: Parserversion;
   revision: Revision8;
   units: Units;
+  warningDetails?: Warningdetails;
   warnings: Warnings;
 }
 export interface SourceOverlay {
@@ -448,6 +452,10 @@ export interface SourceLocation {
   index: Index;
   kind: Kind7;
   row: Row;
+}
+export interface SourceWarning {
+  code: Code;
+  page?: Page;
 }
 export interface TemplateManifest {
   assets: Assets;

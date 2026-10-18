@@ -296,6 +296,7 @@ def create_app(*, origin: str, secret: str, temp_root: Path, dist: Path, runner:
 
     @asynccontextmanager
     async def lifespan(_app: FastAPI):
+        await rich_projects.drain_catalog_actions()
         agent.recover()
         await jobs.start()
         yield

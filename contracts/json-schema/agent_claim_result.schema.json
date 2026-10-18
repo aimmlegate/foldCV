@@ -152,6 +152,19 @@
           "title": "Affected",
           "type": "array"
         },
+        "affectedCount": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Affectedcount"
+        },
         "dependencies": {
           "items": {
             "discriminator": {
@@ -211,7 +224,7 @@
             "pattern": "^[A-Za-z0-9_-]+$",
             "type": "string"
           },
-          "maxItems": 24,
+          "maxItems": 64,
           "title": "Readsnapshotids",
           "type": "array"
         },
@@ -338,7 +351,8 @@
             "find",
             "facts",
             "source",
-            "history"
+            "history",
+            "resources"
           ],
           "title": "Kind",
           "type": "string"

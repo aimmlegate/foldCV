@@ -11,9 +11,11 @@ from packages.resume_core.background_history import digest_bytes
 from packages.resume_core.background_store import identity as command_identity
 from packages.resume_core.gui_archive_zip import ArchiveFailure
 from packages.resume_core.gui_normalization import GuiNormalizeRequest, canonical_source
+from packages.resume_core.import_diagnostics import source_warnings
 from packages.resume_core.models.contracts import Source
 from packages.resume_core.models.rich_workspace import RichOperation, RichRenderSnapshot, RichWarning, WorkspaceV6
 from packages.resume_core.project_store import ProjectStoreFailure
+from packages.resume_core.project_catalog import ProjectCatalog
 from packages.resume_core.rich_api import RichGenerationState, RichProjectResponse
 from packages.resume_core.rich_archive import archive_payload, export_rich_archive, open_rich_archive
 from packages.resume_core.rich_assembly import identity
@@ -44,6 +46,8 @@ class RichProjectService(RichSynchronization, RichAssets, GuiProjectService):
         options.setdefault("storage", RichProjectStore(rules.root))
         options.setdefault("renderer", RichDocxRenderer())
         super().__init__(temp_root, rules, provider_factory, **options)
+        self.catalog = ProjectCatalog(self.storage)
+        self.storage.catalog = self.catalog
         self.images = {}
         self.generations = {}
         self.saved_baselines = {}
@@ -193,15 +197,83 @@ class RichProjectService(RichSynchronization, RichAssets, GuiProjectService):
     def listing(self):
         self.ensure_loaded()
         entries = []
+        catalog = self.catalog.entries()
         for entry in self.storage.registry().entries:
-            if entry.tombstoned:
+            if entry.tombstoned and entry.cleanup_status == "complete":
                 continue
             value = entry.model_dump(mode="json", by_alias=True)
+            meta = catalog.get(entry.project_id)
+            value.update(lastOpenedAt=meta.last_opened_at if meta else None, archived=meta.archived if meta else False)
             if entry.project_id in self.workspaces:
                 identity = resume_identity(self.workspaces[entry.project_id])
                 value.update(title=identity.title, subtitle=identity.subtitle)
             entries.append(value)
+        entries.sort(key=lambda entry: (entry["lastOpenedAt"] or entry["updatedAt"], entry["projectId"]), reverse=True)
         return {"entries": entries, "errors": [{"projectId": identifier, "errorCode": code} for identifier, code in self.load_errors.items()]}
+
+    def activate(self, identifier):
+        result = self.response(identifier)
+        self.catalog.update(identifier, opened=True)
+        return result
+
+    def archive_entry(self, identifier, archived):
+        with self.state_lock:
+            self.catalog.update(identifier, archived=archived)
+            return self.listing()
+
+    async def drain_catalog_actions(self, *, run_id=None):
+        from packages.resume_core.agent_store import AgentFailure
+        from packages.resume_core.project_catalog import AccessChanged
+        for key, command in self.catalog.actions().items():
+            if command.get("action") != "delete" or command.get("status") not in {"pending", "deleting"}:
+                continue
+            if run_id is not None and command["runId"] != run_id:
+                continue
+            identifier = command["projectId"]
+            entry = next((entry for entry in self.storage.registry().entries if entry.project_id == identifier), None)
+            if command["status"] == "pending" and entry is not None and entry.tombstoned:
+                command["status"] = "deleting"
+                self.catalog.record_action(key, command)
+            if command["status"] == "pending":
+                completed = False
+                jobs, agent = getattr(self, "background_jobs", None), getattr(self, "agent", None)
+                current_revision = None
+                try:
+                    if entry is not None and jobs is not None and jobs.enabled:
+                        job = next((job for job in jobs.store.load(identifier).jobs if job.id == command["runId"]), None)
+                        completed = job is not None and job.execution == "completed" and job.error is None
+                    elif entry is not None and agent is not None:
+                        from packages.resume_core.agent_store import run_in
+                        run = run_in(agent.store.load(identifier), command["runId"])[1]
+                        completed = run.state == "completed" and run.error is None
+                    if completed:
+                        current_revision = self.read(identifier).project_revision
+                except (AgentFailure, BackgroundFailure, ProjectFailure, ProjectStoreFailure, OSError, ValueError):
+                    completed = False
+                if not completed or current_revision != command.get("projectRevision"):
+                    command["status"] = "cancelled"
+                    command["result"] = {"durable": False, "error": {"code": "AGENT_CANCELLED" if not completed else "AGENT_STALE_READ"}}
+                    self.catalog.record_action(key, command)
+                    continue
+                try:
+                    with self.state_lock, self.catalog.authority(identifier, command["accessRevision"]):
+                        self.storage.tombstone(identifier)
+                        self.deleted_ids.add(identifier)
+                        command["status"] = "deleting"
+                        self.catalog.record_action(key, command)
+                except AccessChanged:
+                    command["status"] = "cancelled"
+                    command["result"] = {"durable": False, "error": {"code": "AGENT_TOOL_DENIED"}}
+                    self.catalog.record_action(key, command)
+                    continue
+            try:
+                result = await self.delete_project(identifier)
+            except (ProjectFailure, ProjectStoreFailure) as error:
+                from packages.resume_core.gui_projects import GuiDeleteProjectResult
+                result = GuiDeleteProjectResult(projectId=identifier, status="cleanup_incomplete", errorCode=error.code)
+            command["status"] = result.status
+            command["result"] = {"durable": result.status == "deleted", **result.model_dump(mode="json", by_alias=True)}
+            self.catalog.record_action(key, command)
 
     def allocate(self, title):
         self.ensure_loaded()
@@ -373,7 +445,10 @@ class RichProjectService(RichSynchronization, RichAssets, GuiProjectService):
                 if not workspace.title_manually_set:
                     workspace.title = normalized.candidate.name.text or workspace.title
                 unresolved = ["source_details_unresolved"] if normalized._native_recovery_count or unresolved_source_units(normalized) else []
-                for code in dict.fromkeys([*[code for source in normalized.sources for code in source.warnings], *unresolved]):
+                workspace.warnings = [warning for warning in workspace.warnings if warning.code not in {
+                    *[code for source in normalized.sources for code in source.warnings], "source_details_unresolved"}]
+                workspace.warnings.extend(source_warnings(normalized.sources))
+                for code in unresolved:
                     workspace.warnings.append(RichWarning(id=identity("warning"), code=code, blockIds=[], recordIds=[], evidence=[]))
                 if self.persist(identifier) == "failed":
                     raise ProjectFailure("PROJECT_SAVE_FAILED", 503)
@@ -552,11 +627,13 @@ class RichProjectService(RichSynchronization, RichAssets, GuiProjectService):
         return identifier
 
     async def delete_project(self, identifier):
-        # Verify the rich version before the shared tombstone can alter its registry entry.
         self.ensure_loaded()
         tombstoned = any(entry.project_id == identifier and entry.tombstoned for entry in self.storage.registry().entries)
         if not tombstoned:
-            self.read(identifier)
+            try:
+                self.storage._directory(identifier)
+            except ProjectStoreFailure as error:
+                raise ProjectFailure(error.code, 409) from None
         agent = getattr(self, "agent", None)
         agent_error = None
         if agent is not None:

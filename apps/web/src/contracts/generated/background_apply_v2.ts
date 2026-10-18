@@ -49,10 +49,23 @@ export type Clientmutationid = string;
 export type Requestsha256 = string;
 export type Resultingrevision = number;
 export type Mutationreplay = RichMutationReplay[];
+export type Factcount = number;
+export type Recoveredrows = number;
+export type Requestbytes = number;
+export type Status1 = "complete" | "partial";
+export type Code = "FACT_SOURCE_UNRESOLVED" | "FACT_SECTION_OMITTED" | "FACT_ROWS_RECOVERED";
+export type Page = number | null;
+export type Section = string;
 export type Sourceid = string;
+export type Unitid = string | null;
+/**
+ * @maxItems 5000
+ */
+export type Unresolved = ExtractionIssue[];
+export type Sourceid1 = string;
 export type Sourcerevision = number;
 export type Text = string;
-export type Unitid = string;
+export type Unitid1 = string;
 export type Unitrevision = number;
 export type Evidence = EvidenceSpan[];
 export type Id1 = string;
@@ -60,7 +73,7 @@ export type Kind = "candidate";
 export type Pendingrawtext = string | null;
 export type Rawtext = string;
 export type Revision = number;
-export type Status1 = "known" | "unknown" | "unresolved" | "pending" | "conflict";
+export type Status2 = "known" | "unknown" | "unresolved" | "pending" | "conflict";
 export type Usercorrected = boolean;
 export type Value = string | null;
 export type Origin = "source" | "user";
@@ -81,14 +94,14 @@ export type Origin2 = "source" | "user";
 export type Pendingrawtext1 = string | null;
 export type Rawtext1 = string;
 export type Revision3 = number;
-export type Status2 = "known" | "unknown" | "unresolved" | "pending" | "conflict";
+export type Status3 = "known" | "unknown" | "unresolved" | "pending" | "conflict";
 export type Usercorrected3 = boolean;
 export type Evidence3 = EvidenceSpan[];
 export type Id4 = string;
 export type Pendingrawtext2 = string | null;
 export type Rawtext2 = string;
 export type Revision4 = number;
-export type Status3 = "known" | "unknown" | "unresolved" | "pending" | "conflict";
+export type Status4 = "known" | "unknown" | "unresolved" | "pending" | "conflict";
 export type Usercorrected4 = boolean;
 export type Value1 = boolean | null;
 export type Revision5 = number;
@@ -148,7 +161,7 @@ export type Usercorrected12 = boolean;
 export type Pendingrawtext3 = string | null;
 export type Rawtext3 = string;
 export type Revision14 = number;
-export type Status4 = "known" | "unknown" | "unresolved" | "pending" | "conflict";
+export type Status5 = "known" | "unknown" | "unresolved" | "pending" | "conflict";
 export type Usercorrected13 = boolean;
 export type Attribution = "personal" | "team" | "organization" | "unknown";
 export type Baseline = string | null;
@@ -171,7 +184,7 @@ export type Usercorrected14 = boolean;
 export type Pendingrawtext4 = string | null;
 export type Rawtext4 = string;
 export type Revision16 = number;
-export type Status5 = "known" | "unknown" | "unresolved" | "pending" | "conflict";
+export type Status6 = "known" | "unknown" | "unresolved" | "pending" | "conflict";
 export type Usercorrected15 = boolean;
 export type Action = string;
 export type Attribution1 = "personal" | "team" | "organization" | "unknown";
@@ -181,7 +194,7 @@ export type Id13 = string;
 export type Kind11 = "unresolved";
 export type Origin11 = "source" | "user";
 export type Revision17 = number;
-export type Status6 = "unresolved" | "pending" | "conflict";
+export type Status7 = "unresolved" | "pending" | "conflict";
 export type Usercorrected16 = boolean;
 export type Records = (
   | CandidateRecord
@@ -221,7 +234,7 @@ export type Kind13 =
   | "project_save"
   | "rewrite_prose"
   | "reconcile_edits";
-export type Status7 = "queued" | "running" | "completed" | "failed" | "cancelled" | "interrupted";
+export type Status8 = "queued" | "running" | "completed" | "failed" | "cancelled" | "interrupted";
 export type Operations = RichOperation[];
 export type Selectedinput = "text" | "file";
 export type Selectedsourceid = string | null;
@@ -234,7 +247,7 @@ export type Id17 = string;
 export type Origin12 = "user";
 export type Revision21 = number;
 export type Text1 = string;
-export type Unitid1 = string;
+export type Unitid2 = string;
 export type Overlays = SourceOverlay[];
 export type Parser = string;
 export type Parserversion = string;
@@ -250,6 +263,9 @@ export type Representedfactids = string[];
 export type Revision23 = number;
 export type Text2 = string;
 export type Units = SourceUnit[];
+export type Code1 = string;
+export type Page1 = number | null;
+export type Warningdetails = SourceWarning[];
 export type Warnings = string[];
 export type Sources = Source[];
 export type Warnings1 = string[];
@@ -283,7 +299,7 @@ export type Children11 = (
 )[];
 export type Backgroundcolor = string;
 export type Bold = boolean;
-export type Code = boolean;
+export type Code2 = boolean;
 export type Italic = boolean;
 export type Strike = boolean;
 export type Textcolor = string;
@@ -601,6 +617,12 @@ export type Evidence15 = EvidenceSpan[];
 export type Id39 = string;
 export type Rawtext5 = string;
 export type Evidencerecords = ImmutableFactEvidence[];
+export type Blockids = string[];
+export type Disposition3 = "placed" | "excluded";
+export type Reason1 = string | null;
+export type Sourceid2 = string;
+export type Unitid3 = string;
+export type Importcoverage = ImportCoverage[];
 export type Operations1 = RichOperation[];
 export type Projectid = string;
 export type Documentrevision1 = number;
@@ -631,7 +653,7 @@ export type Revision40 = number;
 export type Sha2562 = string;
 export type Schemaversion3 = 6;
 export type Actionid2 = string;
-export type Blockids = string[];
+export type Blockids1 = string[];
 export type Dependencies1 = DependencyStamp[];
 export type Errorcode2 = string | null;
 export type Factids = string[];
@@ -711,31 +733,35 @@ export type Offset = number;
 /**
  * @minItems 1
  */
-export type Blockids1 = [string, ...string[]];
+export type Blockids2 = [string, ...string[]];
 export type Actionid3 = string;
 export type Actiontoken = number;
 export type Dependencies2 = DependencyStamp[];
 export type Sessionid = string;
 export type Kind26 = "text" | "blocks" | "table_cells";
 export type Textsha256 = string;
-export type Status8 = "pending" | "failed" | "conflict" | "applied" | "stale";
+export type Status9 = "pending" | "failed" | "conflict" | "applied" | "stale";
 export type Syncrecords = RichSyncRecord[];
 export type Title1 = string;
 export type Titlemanuallyset = boolean;
 export type Updatedat = string;
-export type Blockids2 = string[];
-export type Code1 = string;
-export type Sourceid1 = string;
+export type Blockids3 = string[];
+export type Code3 = string;
+export type Count = number;
+export type Sourceid3 = string;
 export type Sourcerevision1 = number;
-export type Unitid2 = string;
+export type Unitid4 = string;
 export type Unitrevision1 = number;
 export type Evidence16 = Evidence17[];
 export type Id43 = string;
+export type Page2 = number | null;
+export type Sourceid4 = string;
+export type Locations = WarningLocation[];
 export type Recordids = string[];
 export type Warnings2 = RichWarning[];
 export type Batchid = string;
 export type Clientmutationid1 = string;
-export type Disposition3 =
+export type Disposition4 =
   | "prepared"
   | "offered"
   | "applying"
@@ -747,7 +773,7 @@ export type Disposition3 =
   | "outcome_unknown";
 export type Documentrevision2 = number | null;
 export type Durable2 = boolean;
-export type Code2 =
+export type Code4 =
   | "AGENT_DISABLED"
   | "AGENT_MODEL_REQUIRED"
   | "AGENT_MODEL_UNAVAILABLE"
@@ -774,6 +800,7 @@ export type Code2 =
   | "AGENT_TOOL_LIMIT"
   | "AGENT_OUTPUT_LIMIT"
   | "AGENT_CONTEXT_LIMIT"
+  | "AGENT_ARGUMENT_INVALID"
   | "AGENT_WEB_DISABLED"
   | "AGENT_SOURCE_UNAVAILABLE"
   | "AGENT_SOURCE_DENIED"
@@ -897,9 +924,28 @@ export interface RichPreDraft {
   warnings: Warnings1;
 }
 export interface WorkingFacts {
+  extraction?: ExtractionReport | null;
   records: Records;
   revision: Revision18;
   tombstones: Tombstones;
+}
+export interface ExtractionReport {
+  counts: Counts;
+  factCount: Factcount;
+  recoveredRows: Recoveredrows;
+  requestBytes: Requestbytes;
+  status: Status1;
+  unresolved: Unresolved;
+}
+export interface Counts {
+  [k: string]: number;
+}
+export interface ExtractionIssue {
+  code: Code;
+  page?: Page;
+  section: Section;
+  sourceId: Sourceid;
+  unitId: Unitid;
 }
 export interface CandidateRecord {
   evidence: Evidence;
@@ -913,17 +959,17 @@ export interface CandidateRecord {
   userCorrected?: Usercorrected1;
 }
 export interface EvidenceSpan {
-  sourceId: Sourceid;
+  sourceId: Sourceid1;
   sourceRevision: Sourcerevision;
   text: Text;
-  unitId: Unitid;
+  unitId: Unitid1;
   unitRevision: Unitrevision;
 }
 export interface WorkingFieldStr {
   pendingRawText: Pendingrawtext;
   rawText: Rawtext;
   revision: Revision;
-  status: Status1;
+  status: Status2;
   userCorrected?: Usercorrected;
   value: Value;
 }
@@ -961,7 +1007,7 @@ export interface WorkingFieldPartialDate {
   pendingRawText: Pendingrawtext1;
   rawText: Rawtext1;
   revision: Revision3;
-  status: Status2;
+  status: Status3;
   userCorrected?: Usercorrected3;
   value: PartialDate | null;
 }
@@ -969,7 +1015,7 @@ export interface WorkingFieldBool {
   pendingRawText: Pendingrawtext2;
   rawText: Rawtext2;
   revision: Revision4;
-  status: Status3;
+  status: Status4;
   userCorrected?: Usercorrected4;
   value: Value1;
 }
@@ -1056,7 +1102,7 @@ export interface WorkingFieldMetricValue {
   pendingRawText: Pendingrawtext3;
   rawText: Rawtext3;
   revision: Revision14;
-  status: Status4;
+  status: Status5;
   userCorrected?: Usercorrected13;
   value: MetricValue | null;
 }
@@ -1087,7 +1133,7 @@ export interface WorkingFieldLeadershipValue {
   pendingRawText: Pendingrawtext4;
   rawText: Rawtext4;
   revision: Revision16;
-  status: Status5;
+  status: Status6;
   userCorrected?: Usercorrected15;
   value: LeadershipValue | null;
 }
@@ -1103,7 +1149,7 @@ export interface UnresolvedRecord {
   kind: Kind11;
   origin: Origin11;
   revision: Revision17;
-  status: Status6;
+  status: Status7;
   userCorrected?: Usercorrected16;
 }
 export interface RecordTombstone {
@@ -1118,7 +1164,7 @@ export interface RichOperation {
   errorCode: Errorcode1;
   id: Id15;
   kind: Kind13;
-  status: Status7;
+  status: Status8;
 }
 export interface DependencyStamp {
   fingerprint: Fingerprint;
@@ -1137,6 +1183,7 @@ export interface Source {
   parserVersion: Parserversion;
   revision: Revision22;
   units: Units;
+  warningDetails?: Warningdetails;
   warnings: Warnings;
 }
 export interface SourceOverlay {
@@ -1144,7 +1191,7 @@ export interface SourceOverlay {
   origin: Origin12;
   revision: Revision21;
   text: Text1;
-  unitId: Unitid1;
+  unitId: Unitid2;
 }
 export interface SourceUnit {
   disposition: Disposition2;
@@ -1161,12 +1208,17 @@ export interface SourceLocation {
   kind: Kind14;
   row: Row;
 }
+export interface SourceWarning {
+  code: Code1;
+  page?: Page1;
+}
 export interface ProjectV5 {
   assets: Assets;
   createdAt: Createdat1;
   document: RichDocumentV1;
   evidenceRecords: Evidencerecords;
   facts: WorkingFacts;
+  importCoverage?: Importcoverage;
   operations: Operations1;
   projectId: Projectid;
   renders: Renders;
@@ -1311,7 +1363,7 @@ export interface StyledText {
 export interface InlineStyles {
   backgroundColor?: Backgroundcolor;
   bold?: Bold;
-  code?: Code;
+  code?: Code2;
   italic?: Italic;
   strike?: Strike;
   textColor?: Textcolor;
@@ -1422,6 +1474,13 @@ export interface ImmutableFactEvidence {
   id: Id39;
   rawText: Rawtext5;
 }
+export interface ImportCoverage {
+  blockIds: Blockids;
+  disposition: Disposition3;
+  reason: Reason1;
+  sourceId: Sourceid2;
+  unitId: Unitid3;
+}
 export interface RichRenderSnapshot {
   documentRevision: Documentrevision1;
   docxPath: Docxpath;
@@ -1452,7 +1511,7 @@ export interface Rules {
 }
 export interface RichSyncRecord {
   actionId: Actionid2;
-  blockIds: Blockids;
+  blockIds: Blockids1;
   dependencies: Dependencies1;
   errorCode: Errorcode2;
   factIds: Factids;
@@ -1463,7 +1522,7 @@ export interface RichSyncRecord {
   proposedSteps?: Proposedsteps;
   ready?: Ready;
   selection?: RichSelection | null;
-  status: Status8;
+  status: Status9;
 }
 export interface PutBlock {
   afterId: Afterid;
@@ -1507,7 +1566,7 @@ export interface RemoveRecord {
 }
 export interface RichSelection {
   anchor: RichPosition;
-  blockIds: Blockids1;
+  blockIds: Blockids2;
   capture: ActionCapture;
   head: RichPosition;
   kind: Kind26;
@@ -1525,22 +1584,28 @@ export interface ActionCapture {
   sessionId: Sessionid;
 }
 export interface RichWarning {
-  blockIds: Blockids2;
-  code: Code1;
+  blockIds: Blockids3;
+  code: Code3;
+  count?: Count;
   evidence: Evidence16;
   id: Id43;
+  locations?: Locations;
   recordIds: Recordids;
 }
 export interface Evidence17 {
-  sourceId: Sourceid1;
+  sourceId: Sourceid3;
   sourceRevision: Sourcerevision1;
-  unitId: Unitid2;
+  unitId: Unitid4;
   unitRevision: Unitrevision1;
+}
+export interface WarningLocation {
+  page?: Page2;
+  sourceId: Sourceid4;
 }
 export interface AgentEditReceipt {
   batchId: Batchid;
   clientMutationId: Clientmutationid1;
-  disposition: Disposition3;
+  disposition: Disposition4;
   documentRevision: Documentrevision2;
   durable: Durable2;
   error: AgentError | null;
@@ -1551,5 +1616,5 @@ export interface AgentEditReceipt {
   toolKey: Toolkey;
 }
 export interface AgentError {
-  code: Code2;
+  code: Code4;
 }

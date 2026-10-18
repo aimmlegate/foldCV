@@ -101,10 +101,12 @@ def test_shared_native_release_gate_requires_real_overlap_charged_turns_and_sepa
             assert_native_bindings(bindings, {"NB-R05:v01"}, tmp_path, sources=sources, require_pass=True)
 
 
-def test_native_feasibility_refuses_a_stale_controlled_gate_before_profile_or_attempt(tmp_path):
+def test_native_feasibility_refuses_a_stale_controlled_gate_before_profile_or_attempt(tmp_path, monkeypatch):
     from pathlib import Path
     from uuid import uuid4
     from spikes.background.native_parallel import Feasibility
+    monkeypatch.setattr("spikes.background.native_parallel.background_spec",
+        lambda: {"sources": ["services/api/src/resume_api/jobs/appserver.py"]})
     (tmp_path / "context.json").write_text(json.dumps({"sourceHashes": {}}))
     (tmp_path / "validation.json").write_text(json.dumps({"outcome": "passed"}))
     root = Path("/private/tmp/foldcv-nb00b-native-stale-" + uuid4().hex)

@@ -64,6 +64,18 @@ def mount_rich_projects(app, service, problem):
     async def read(identifier: str):
         return response(identifier)
 
+    @app.post(prefix + "/{identifier}/activate")
+    async def activate(identifier: str, _payload: EmptyRequest):
+        return JSONResponse(service.activate(identifier).model_dump(mode="json", by_alias=True), headers={"Cache-Control": "no-store"})
+
+    @app.post(prefix + "/{identifier}/catalog/archive")
+    async def archive_entry(identifier: str, _payload: EmptyRequest):
+        return JSONResponse(service.archive_entry(identifier, True), headers={"Cache-Control": "no-store"})
+
+    @app.post(prefix + "/{identifier}/catalog/restore")
+    async def restore_entry(identifier: str, _payload: EmptyRequest):
+        return JSONResponse(service.archive_entry(identifier, False), headers={"Cache-Control": "no-store"})
+
     @app.put(prefix + "/{identifier}/title")
     async def rename(identifier: str, payload: GuiRenameProjectRequest):
         service.rename(identifier, payload)

@@ -149,6 +149,7 @@
             "AGENT_TOOL_LIMIT",
             "AGENT_OUTPUT_LIMIT",
             "AGENT_CONTEXT_LIMIT",
+            "AGENT_ARGUMENT_INVALID",
             "AGENT_WEB_DISABLED",
             "AGENT_SOURCE_UNAVAILABLE",
             "AGENT_SOURCE_DENIED",

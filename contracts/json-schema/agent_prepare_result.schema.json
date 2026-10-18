@@ -167,6 +167,19 @@
       "title": "Affected",
       "type": "array"
     },
+    "affectedCount": {
+      "anyOf": [
+        {
+          "minimum": 0,
+          "type": "integer"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Affectedcount"
+    },
     "batchId": {
       "anyOf": [
         {

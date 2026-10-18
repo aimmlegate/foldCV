@@ -1,4 +1,6 @@
+export type Archived = boolean;
 export type Cleanupstatus = "none" | "pending" | "complete" | "failed";
+export type Lastopenedat = string | null;
 export type Projectid = string;
 export type Subtitle = string | null;
 export type Title = string;
@@ -14,7 +16,9 @@ export interface GuiProjectListResponse {
   errors: Errors;
 }
 export interface GuiProjectListEntry {
+  archived?: Archived;
   cleanupStatus: Cleanupstatus;
+  lastOpenedAt?: Lastopenedat;
   projectId: Projectid;
   subtitle?: Subtitle;
   title: Title;

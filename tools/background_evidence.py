@@ -222,7 +222,7 @@ def assert_native_bindings(bindings: dict, expected: set[str], root: Path, *, so
 
 def assert_report(path: Path, *, run_id: str, suite: str, sources: dict[str, str], started_at: str,
         bindings: dict[str, list[str]], required_traces: dict[str, dict], required_actions: set[str],
-        required_orders: set[str]) -> dict:
+        required_orders: set[str], binding_scope: Literal["background", "manual-qa"] = "background") -> dict:
     report = read_report(path)
     if (not report.complete or report.exit_status != 0 or report.run_id != run_id or report.suite != suite
             or report.started_at != started_at or not report.finished_at
@@ -236,9 +236,15 @@ def assert_report(path: Path, *, run_id: str, suite: str, sources: dict[str, str
     expected = {node for nodes in bindings.values() for node in nodes}
     if not bindings or any(not nodes for nodes in bindings.values()) or not expected:
         raise SystemExit("NB bindings are empty")
-    if any(not node.startswith(("tests/recovery/test_background_", "tests/foundation/test_runner_gates.py::"))
-            and re.fullmatch(r"apps/web/unit/background-[A-Za-z0-9_-]+\.test\.ts::.+", node) is None
-            for node in expected):
+    if binding_scope not in {"background", "manual-qa"}:
+        raise SystemExit("NB binding scope is unknown")
+    if binding_scope == "background":
+        permitted = {node for node in expected if node.startswith(("tests/recovery/test_background_", "tests/foundation/test_runner_gates.py::"))
+            or re.fullmatch(r"apps/web/unit/background-[A-Za-z0-9_-]+\.test\.ts::.+", node)}
+    else:
+        permitted = {node for node in expected if re.fullmatch(
+            r"(?:tests|skills/format-resume/tests)/[A-Za-z0-9_/-]+\.py::.+|apps/web/unit/[A-Za-z0-9_-]+\.test\.ts::.+", node)}
+    if expected != permitted:
         raise SystemExit("NB binding is outside its required Python/Node suite")
     results = {}
     for item in report.records:

@@ -15,7 +15,7 @@ from packages.resume_core.models.agent import (
     AgentClaimResult, AgentCommitResult, AgentEditReceipt, AgentHistoryAction, AgentPublicationStamp, TERMINAL_RUNS,
 )
 from packages.resume_core.rich_project_store import rich_snapshot_bytes
-from packages.resume_core.rich_mutations import apply_rich_mutation, mutation_sha256
+from packages.resume_core.rich_mutations import RichMutationFailure, apply_rich_mutation, mutation_sha256
 from packages.resume_core.storage import locked_root
 
 from .context import current_dependencies
@@ -44,6 +44,52 @@ class AgentPublication:
     def __init__(self, service, *, clock=time.monotonic):
         self.service, self.clock = service, clock
         self.tickets = {}
+        self.editor_history = {}
+
+    def _prune_editor_history(self):
+        leases = self.service.leases
+        self.editor_history = {project: offer for project, offer in self.editor_history.items()
+            if project in leases.leases and leases.leases[project].epoch == offer[0]
+            and leases.leases[project].expires > leases.clock()}
+
+    def offer_editor_history(self, project_id, request):
+        with self.service.projects.state_lock:
+            self._prune_editor_history()
+            lease = self.service.leases.require(project_id, request.owner)
+            if self.service.projects.catalog.get(project_id).read_only:
+                raise AgentFailure("AGENT_TOOL_DENIED")
+            current = self.service.projects.read(project_id)
+            if current.project is None or (current.project_revision, current.document_revision, current.project.facts.revision) != (
+                    request.project_revision, request.document_revision, request.facts_revision):
+                raise AgentFailure("AGENT_STALE_READ")
+            for direction in ("undo", "redo"):
+                mutation = getattr(request, direction)
+                if mutation is None:
+                    continue
+                if (mutation.project_id != project_id or mutation.kind != direction
+                        or mutation.capture.session_id != lease.session_id):
+                    raise AgentFailure("AGENT_EDIT_INVALID")
+                try:
+                    candidate, replay = apply_rich_mutation(current, mutation)
+                    from packages.resume_core.agent_edits import validate_references
+                    validate_references(candidate)
+                except (ValueError, RichMutationFailure):
+                    raise AgentFailure("AGENT_EDIT_INVALID") from None
+                if replay:
+                    raise AgentFailure("AGENT_STALE_READ")
+            self.editor_history[project_id] = (lease.epoch, current.project_revision, request.model_copy(deep=True))
+
+    def resolve_editor_history(self, project_id, epoch, revision, direction):
+        with self.service.projects.state_lock:
+            self._prune_editor_history()
+            self.service.leases.require(project_id, epoch=epoch)
+            offer = self.editor_history.get(project_id)
+            if offer is None or offer[:2] != (epoch, revision):
+                raise AgentFailure("AGENT_STALE_READ")
+            mutation = getattr(offer[2], direction)
+            if mutation is None:
+                raise AgentFailure("AGENT_NOT_FOUND")
+            return mutation.model_copy(deep=True)
 
     def _load(self, project_id, run_id, batch_id):
         state = self.service.store.load(project_id)
@@ -66,6 +112,11 @@ class AgentPublication:
             raise AgentFailure("AGENT_CONNECTION_CHANGED")
         if not run.allow_edits:
             raise AgentFailure("AGENT_TOOL_DENIED")
+        from packages.resume_core.project_catalog import AccessChanged
+        try:
+            service.projects.catalog.require_write(project_id, run.access_revision)
+        except AccessChanged:
+            raise AgentFailure("AGENT_TOOL_DENIED") from None
         if datetime.now(timezone.utc) >= datetime.fromisoformat(run.deadline):
             raise AgentFailure("AGENT_DEADLINE")
         if run.saved_batch_id is not None:
@@ -170,6 +221,18 @@ class AgentPublication:
             raise AgentFailure("AGENT_TICKET_INVALID")
 
     def commit(self, project_id, run_id, batch_id, request):
+        from packages.resume_core.project_catalog import AccessChanged
+        with self.service.projects.state_lock:
+            _, run, _, item = self._load(project_id, run_id, batch_id)[1]
+            if item.receipt is not None:
+                return self._commit(project_id, run_id, batch_id, request)
+            try:
+                with self.service.projects.catalog.authority(project_id, run.access_revision):
+                    return self._commit(project_id, run_id, batch_id, request)
+            except AccessChanged:
+                raise AgentFailure("AGENT_TOOL_DENIED") from None
+
+    def _commit(self, project_id, run_id, batch_id, request):
         service, projects = self.service, self.service.projects
         with projects.state_lock:
             _, (_, _, _, known) = self._load(project_id, run_id, batch_id)
