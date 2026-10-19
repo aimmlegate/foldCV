@@ -8,7 +8,7 @@ from pydantic import TypeAdapter
 import pytest
 
 from packages.resume_core.background_inverse import inverse_mutation
-from packages.resume_core.models.rich_document import RichBlock
+from packages.resume_core.models.rich_document import RichBlock, StyledText
 from packages.resume_core.rich_archive import export_rich_archive, open_rich_archive
 from packages.resume_core.rich_mutations import apply_rich_mutation
 from packages.resume_core.rich_panel import field_block, panel_mutation
@@ -173,6 +173,21 @@ def test_split_styling_and_prose_punctuation_survive_removal():
         "content": [{"type": "text", "text": "Built services using ", "styles": {}}], "provenance": [], "children": []}).content[0])
     changed = apply(workspace, operation="remove", recordId=records["Docker"].id)
     assert authored_text(tools(changed)) == "Built services using Python, SQL"
+
+
+@pytest.mark.parametrize("prefix", ["", "Built services using ", "Stack: "])
+def test_removing_unseparated_bindings_preserves_authored_text_and_styles(prefix):
+    workspace, records = fixture()
+    block = tools(workspace)
+    block.content = [span for span in block.content if span.type == "fact_field"]
+    if prefix:
+        block.content.insert(0, StyledText(type="text", text=prefix, styles={"bold": True}))
+    expected = [span for span in block.content if span.type != "fact_field" or span.record_id != records["Docker"].id]
+    before = workspace.model_dump_json()
+    changed = apply(workspace, operation="remove", recordId=records["Docker"].id)
+    assert authored_text(tools(changed)) == prefix + "PythonSQL"
+    assert tools(changed).content == expected
+    assert workspace.model_dump_json() == before
 
 
 def test_bulk_clear_of_a_raw_group_does_not_restore_removed_children():

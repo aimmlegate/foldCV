@@ -35,7 +35,9 @@ def list_parts(content, records):
                 elif not SEPARATOR.fullmatch(text):
                     return None
                 pending = []
-            if entries and entries[-1][0].record_id == span.record_id and not separated:
+            if entries and not separated:
+                if entries[-1][0].record_id != span.record_id:
+                    return None
                 entries[-1].append(span)
             else:
                 entries.append([span])

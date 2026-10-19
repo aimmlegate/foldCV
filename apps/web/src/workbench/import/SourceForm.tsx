@@ -10,7 +10,7 @@ export function SourceForm({ input, change, busy, sourceName, process, textDraft
   const fileInput = useRef<HTMLInputElement>(null);
   const name = input.kind === "file" ? input.file.name : sourceName;
   return <section className="new-screen" aria-label="Новое резюме"><div className="source-form">
-    <h2>Добавить исходник</h2><p>Загрузите резюме или вставьте текст. Мы извлечём факты и оформим его по шаблону.</p>
+    <h2>Добавить исходник</h2>
     <button className="dropzone" type="button" disabled={busy} onClick={() => fileInput.current?.click()}
       onDragOver={event => event.preventDefault()} onDrop={event => { event.preventDefault(); const file = event.dataTransfer.files[0]; if (file && !busy) change({ kind: "file", file }); }}>
       <span className="upload-mark"><Icon name="upload" /></span><span><strong>Выбрать файл</strong><small>PDF, DOCX, TXT, Markdown</small></span>
@@ -23,7 +23,7 @@ export function SourceForm({ input, change, busy, sourceName, process, textDraft
     {input.kind === "file" && <p className="small muted">Будет обработан выбранный файл. Уберите его, чтобы использовать текст.</p>}
     <label className="source-rewrite"><input type="checkbox" checked={allowTextRewrite} disabled={busy}
       aria-label="Разрешить переписывание текста" aria-describedby="source-rewrite-help" onChange={event => changeTextRewrite(event.currentTarget.checked)} />
-      <span>Разрешить переписывание текста<small id="source-rewrite-help">Улучшить формулировки по правилам шаблона, сохранив факты. Без галочки — только структура и оформление.</small></span></label>
+      <span>Разрешить переписывание текста<small id="source-rewrite-help">Без галочки — только оформление.</small></span></label>
     <div className="source-bottom"><Button className="ml-auto" variant="primary" busy={busy} busyLabel="Подготовка…" disabled={!hasInput(input) && !sourceName} onClick={process}>Обработать<Icon name="arrow" /></Button></div>
   </div></section>;
 }
