@@ -2026,7 +2026,8 @@
             "heading",
             "section",
             "bullet_list",
-            "duplicate"
+            "duplicate",
+            "source_only"
           ],
           "title": "Kind",
           "type": "string"
@@ -2040,6 +2041,20 @@
           "default": false,
           "title": "Modelblock",
           "type": "boolean"
+        },
+        "reason": {
+          "anyOf": [
+            {
+              "maxLength": 4000,
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Reason"
         },
         "region": {
           "default": "main",
@@ -2197,6 +2212,14 @@
           "pattern": "^[a-f0-9]{64}$",
           "title": "Sourcesha256",
           "type": "string"
+        },
+        "technologyGroups": {
+          "items": {
+            "$ref": "#/$defs/ImportTechnologyGroup"
+          },
+          "maxItems": 40,
+          "title": "Technologygroups",
+          "type": "array"
         },
         "version": {
           "const": 1,
@@ -2553,6 +2576,52 @@
         "kind"
       ],
       "title": "ImportTechnology",
+      "type": "object"
+    },
+    "ImportTechnologyGroup": {
+      "additionalProperties": false,
+      "properties": {
+        "heading": {
+          "maxLength": 200,
+          "minLength": 1,
+          "title": "Heading",
+          "type": "string"
+        },
+        "region": {
+          "default": "main",
+          "enum": [
+            "sidebar",
+            "main"
+          ],
+          "title": "Region",
+          "type": "string"
+        },
+        "sourceKeys": {
+          "items": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "maxItems": 1000,
+          "title": "Sourcekeys",
+          "type": "array"
+        },
+        "technologies": {
+          "items": {
+            "maxLength": 4000,
+            "minLength": 1,
+            "type": "string"
+          },
+          "maxItems": 100,
+          "minItems": 1,
+          "title": "Technologies",
+          "type": "array"
+        }
+      },
+      "required": [
+        "heading",
+        "technologies"
+      ],
+      "title": "ImportTechnologyGroup",
       "type": "object"
     },
     "InlineStyles": {
@@ -4733,6 +4802,11 @@
           "title": "Instruction",
           "type": "string"
         },
+        "previewOnly": {
+          "default": false,
+          "title": "Previewonly",
+          "type": "boolean"
+        },
         "selection": {
           "$ref": "#/$defs/RichSelection"
         }
@@ -4913,6 +4987,31 @@
           "default": false,
           "title": "Ready",
           "type": "boolean"
+        },
+        "rewriteResult": {
+          "anyOf": [
+            {
+              "maxLength": 65536,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Rewriteresult"
+        },
+        "rewriteSource": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Rewritesource"
         },
         "selection": {
           "anyOf": [
@@ -7140,6 +7239,28 @@
         }
       ],
       "default": null
+    },
+    "reasoningEffort": {
+      "anyOf": [
+        {
+          "enum": [
+            "none",
+            "minimal",
+            "low",
+            "medium",
+            "high",
+            "xhigh",
+            "max",
+            "ultra"
+          ],
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Reasoningeffort"
     },
     "request": {
       "$ref": "#/$defs/JobFixedRequestV1"

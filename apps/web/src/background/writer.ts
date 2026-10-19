@@ -339,12 +339,13 @@ export class BackgroundWriter {
       this.completed.add(job.id); this.last = this.editor.snapshot(); this.editor.saved(job);
     } finally { this.editor.history.discard(reservation); this.reservations.delete(reservation); }
   }
-  async publish(job: JobSnapshotV1, proposal: ProposalBindingV1): Promise<void> {
+  async publish(job: JobSnapshotV1, proposal: ProposalBindingV1, approve = false): Promise<void> {
     if (this.active) await this.active.catch(() => {});
     if (this.completed.has(job.id) || this.mode !== "normal") return;
     if (job.submission.identity.projectId !== this.connection.api.project || job.submission.identity.lineage !== this.proof.lineage
       || job.id !== proposal.jobId || job.proposalId !== proposal.id) throw new Error("INVALID_RESULT");
     const key = `publication:${job.id}`;
+    let declined = false;
     let command: { schemaVersion: 1; proof: WriterProofV1; generation: number; token: string } | null = null;
     try {
       await this.bounded(async ticket => {
@@ -358,19 +359,21 @@ export class BackgroundWriter {
         const barrier = await this.connection.api.barrier({ ...this.header(), ...command, touchGeneration: this.view.writer.touchGeneration }); this.current(ticket);
         await this.observe("barrier_acked"); this.current(ticket);
         if (barrier.generation !== command.generation || barrier.token !== command.token || barrier.actionCursor !== this.cursor) throw new Error("INVALID_RESULT");
-        const result = await this.connection.api.publish({ ...command, jobId: job.id, proposalSha256: proposal.payloadSha256 }); this.current(ticket);
+        const result = await this.connection.api.publish({ ...command, jobId: job.id, proposalSha256: proposal.payloadSha256, ...(approve ? { approve: true } : {}) }); this.current(ticket);
         if (result.job.id !== job.id || result.job.proposalId !== proposal.id
           || result.job.receipt && result.job.receipt.proposalSha256 !== proposal.payloadSha256) throw new Error("INVALID_RESULT");
         this.acknowledge(result.view);
         if (result.job.receipt) await this.adopt(result.job, ticket, key);
         else await this.connection.api.revoke(command);
         this.current(ticket); this.editor.queue.endPrepared(key); this.recoveryJob = null;
+        declined = approve && !result.job.receipt && result.job.publication !== "no_change";
       });
     } catch (error) {
       if (command) void this.connection.api.revoke(command).catch(() => {});
       void this.checkpoint().catch(() => {});
       throw error;
     }
+    if (declined) throw new Error("Результат устарел. Запросите правку заново.");
   }
   async adoptHeadless(job: JobSnapshotV1): Promise<void> {
     if (this.active) await this.active.catch(() => {});

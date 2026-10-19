@@ -61,7 +61,14 @@ class ImportFact(Wire):
 
     @model_validator(mode="after")
     def content(self):
-        if self.record is None and not self.text:
+        record = self.record
+        meaningful = (record is not None and any(isinstance(value, str) and value.strip()
+            for key, value in record.model_dump().items() if key != "kind"))
+        if isinstance(record, ImportEmployment):
+            meaningful = meaningful or any((skill if isinstance(skill, str) else skill.display).strip()
+                for skill in record.technologies) or any(
+                period.start.strip() or period.end.strip() or period.present for period in record.periods)
+        if not meaningful and not self.text.strip():
             raise ValueError("Provide a fact record or a retained note")
         return self
 
@@ -70,11 +77,12 @@ class ImportBlock(Wire):
     id: Id
     source_keys: list[Id] = Field(default_factory=list, max_length=1000)
     region: Literal["header", "sidebar", "main"] = "main"
-    kind: Literal["paragraph", "heading", "section", "bullet_list", "duplicate"] = "paragraph"
+    kind: Literal["paragraph", "heading", "section", "bullet_list", "duplicate", "source_only"] = "paragraph"
     title: str | None = Field(default=None, max_length=200)
     list_item: bool = Field(default=False, exclude_if=lambda value: not value)
     model_block: bool = Field(default=False, exclude_if=lambda value: not value)
     duplicate_of: list[Id] = Field(default_factory=list, max_length=1000, exclude_if=lambda value: not value)
+    reason: ImportNote | None = Field(default=None, exclude_if=lambda value: value is None)
     category: Literal["identity", "contacts", "summary", "experience", "education", "skills", "languages", "other"] | None = Field(
         default=None, exclude_if=lambda value: value is None)
 
@@ -84,6 +92,9 @@ class ImportBlock(Wire):
             raise ValueError("A block needs source keys or a section heading")
         if (self.kind == "duplicate") != bool(self.duplicate_of):
             raise ValueError("Only a duplicate block needs duplicate targets")
+        if (self.kind == "source_only" and not (self.reason and self.reason.strip())
+                or self.kind != "source_only" and self.reason is not None):
+            raise ValueError("Only a source-only block needs an omission reason")
         return self
 
 
@@ -94,12 +105,21 @@ class ImportProfile(Wire):
     source_keys: list[Id] = Field(default_factory=list, max_length=1000)
 
 
+class ImportTechnologyGroup(Wire):
+    heading: str = Field(min_length=1, max_length=200)
+    region: Literal["sidebar", "main"] = "main"
+    technologies: list[ImportNote] = Field(min_length=1, max_length=100)
+    source_keys: list[Id] = Field(default_factory=list, max_length=1000)
+
+
 class ImportBatch(Wire):
     batch_id: Id
     sequence: int = Field(ge=0, le=128)
     facts: list[ImportFact] = Field(default_factory=list, max_length=100)
     blocks: list[ImportBlock] = Field(default_factory=list, max_length=5000)
     profile: ImportProfile | None = None
+    technology_groups: list[ImportTechnologyGroup] | None = Field(default=None, max_length=40,
+        exclude_if=lambda value: value is None)
     remove_fact_ids: list[Id] = Field(default_factory=list, max_length=100)
     remove_block_ids: list[Id] = Field(default_factory=list, max_length=5000)
 
@@ -144,23 +164,31 @@ class ContentLanguage(ImportLanguage, ContentRefs):
 
 
 class ContentBlock(Wire):
-    type: Literal["paragraph", "heading", "section", "list_item", "duplicate"]
+    type: Literal["paragraph", "heading", "section", "list_item", "duplicate", "source_only"]
     refs: list[ParagraphRef] = Field(min_length=1, max_length=2000,
         description="Source paragraphs in this complete block, in reading order. Keep source wording.")
     duplicate_of: list[ParagraphRef] = Field(default_factory=list, max_length=2000,
         exclude_if=lambda value: not value,
         description="For a duplicate only: refs to its visible occurrence in this outline. Retain the original source.")
+    reason: ImportNote | None = Field(default=None, exclude_if=lambda value: value is None,
+        description="For source_only: why the configured template omits this block from the visible resume. "
+        "Source text and extracted facts remain saved.")
 
     @model_validator(mode="after")
     def duplicate_targets(self):
         if (self.type == "duplicate") != bool(self.duplicate_of):
             raise ValueError("Only a duplicate block needs duplicateOf refs")
+        if (self.type == "source_only" and not (self.reason and self.reason.strip())
+                or self.type != "source_only" and self.reason is not None):
+            raise ValueError("Only a source-only block needs an omission reason")
         return self
 
 
 class ContentSection(Wire):
     category: Literal["identity", "contacts", "summary", "experience", "education", "skills", "languages", "other"] = "other"
     heading: str = Field(default="", max_length=200)
+    region: Literal["sidebar", "main"] | None = Field(default=None,
+        description="Optional template column. Education and courses use sidebar; identity stays in the header.")
     refs: list[ParagraphRef] = Field(default_factory=list, max_length=2000,
         description="Source paragraphs in reading order. Ranges such as p3-p8 are inclusive.")
     list_items: list[Annotated[list[ParagraphRef], Field(min_length=1, max_length=2000)]] = Field(
@@ -186,6 +214,14 @@ class ContentProfile(Wire):
     refs: list[ParagraphRef] = Field(default_factory=list, max_length=2000)
 
 
+class ContentTechnologyGroup(ContentRefs):
+    heading: str = Field(min_length=1, max_length=200,
+        description="Tool group heading from the import skill. Group names and their order are not fixed by Python.")
+    technologies: list[ImportNote] = Field(min_length=1, max_length=100,
+        description="Source-stated tool names in display order. Prefer the exact display names saved in facts.")
+    region: Literal["sidebar", "main"] = "main"
+
+
 class ImportContent(Wire):
     facts: list[ContentEmployment | ContentEducation | ContentTechnology | ContentLanguage | ContentFact] | None = Field(
         default=None, max_length=100,
@@ -194,11 +230,14 @@ class ImportContent(Wire):
     sections: list[ContentSection] | None = Field(default=None, max_length=40,
         description="Replace the whole outline. Omit to keep the saved sections. Python applies the layout.")
     profile: ContentProfile | None = None
+    technology_groups: list[ContentTechnologyGroup] | None = Field(default=None, max_length=40,
+        description="Replace the grouped tool summary in skill order. Include supporting refs, and cover the "
+        "headings and text of technical-only skills sections replaced by these groups. Omit to retain saved groups.")
 
     @model_validator(mode="after")
     def content(self):
-        if self.facts is None and self.sections is None and self.profile is None:
-            raise ValueError("Provide facts, sections or profile; omitted fields keep their saved values")
+        if self.facts is None and self.sections is None and self.profile is None and self.technology_groups is None:
+            raise ValueError("Provide facts, sections, profile or technologyGroups; omitted fields keep their saved values")
         return self
 
 
@@ -221,6 +260,8 @@ class ImportDraft(Wire):
     facts: list[ImportFact] = Field(default_factory=list, max_length=1000)
     blocks: list[ImportBlock] = Field(default_factory=list, max_length=5000)
     profile: ImportProfile = Field(default_factory=ImportProfile)
+    technology_groups: list[ImportTechnologyGroup] = Field(default_factory=list, max_length=40,
+        exclude_if=lambda value: not value)
     receipts: list[ImportReceipt] = Field(default_factory=list, max_length=128)
     finished: bool = False
     issues: list[ImportNote] = Field(default_factory=list, max_length=100)

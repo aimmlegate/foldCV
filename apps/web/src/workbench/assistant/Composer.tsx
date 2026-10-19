@@ -2,6 +2,7 @@ import { useRef } from "react";
 import type { AssistantView } from "../../assistant/controller";
 import { canSend, errorText, submitKey } from "../../assistant/presentation";
 import { Icon } from "../ui/Icon";
+import { Spinner } from "../ui/OperationStatus";
 
 export type ComposerProps = {
   view: AssistantView; captured: string | null; active: boolean; applying: boolean; title: string;
@@ -30,7 +31,7 @@ export function Composer({ view, captured, active, applying, title, draft, flags
           onChange={event => flags(event.target.checked, view.flags.allowWeb)} />Разрешить правки</label>
         <label className="chat-mode chat-internet"><input type="checkbox" checked={view.flags.allowWeb} disabled={view.submitting || view.pendingSend}
           onChange={event => flags(view.flags.allowEdits, event.target.checked)} /><Icon name="globe" /><span>Интернет</span></label></div>
-        {active && <button className="chat-send is-stop" type="button" title="Остановить" aria-label="Остановить" onClick={stop} disabled={view.submitting}><Icon name="stop" /></button>}
+        {active && <button className="chat-send is-stop" type="button" title="Остановить" aria-label="Остановить" onClick={stop} disabled={view.submitting || view.run?.state === "cancelling" || view.loading === "Останавливаем задачу"}>{view.submitting || view.run?.state === "cancelling" || view.loading === "Останавливаем задачу" ? <Spinner /> : <Icon name="stop" />}</button>}
         {(!active || view.pendingSend) && <button className="chat-send" type="submit" disabled={!enabled} title={view.pendingSend ? "Повторить отправку" : "Отправить"}
           aria-label={view.pendingSend ? "Повторить отправку" : "Отправить"}><Icon name="arrow" /></button>}</div></div>
     <div className="chat-composer-footer"><span>{view.flags.allowEdits ? "Чтение всего проекта, включая факты. Правки сохраняются в общей истории." : "Чтение всего проекта, включая факты. Запись запрещена."}</span><span>Enter — отправить · Shift+Enter — новая строка</span></div>

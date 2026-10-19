@@ -286,18 +286,35 @@ class RichProjectStore(ProjectStore):
         return workspace, originals, artifacts, images
 
     def cleanup_deleted(self, id):
+        try:
+            return self._cleanup_deleted(id)
+        except ProjectStoreFailure:
+            raise
+        except (StorageFailure, OSError, ValueError):
+            raise ProjectStoreFailure("PROJECT_DELETE_FAILED") from None
+
+    def _cleanup_deleted(self, id):
         with locked_root(self.root, ".projects.lock"):
             registry = self._registry()
             entry = next((item for item in registry.entries if item.project_id == id), None)
             if entry is None or not entry.tombstoned:
                 raise ProjectStoreFailure("PROJECT_NOT_DELETED")
-            if entry.cleanup_status == "complete" and not (self.projects / id).exists():
-                return entry.model_copy(deep=True)
-            directory = self._directory(id)
-            target = directory / "workspace.json"
-            owned_file(target)
+            directory = self.projects / id
             try:
                 self._observe("before_tombstone_cleanup", id)
+                if not directory.exists() and not directory.is_symlink():
+                    entry.cleanup_status = "complete"
+                    self._write_registry(registry)
+                    return entry.model_copy(deep=True)
+                marker = directory / ".project-identity.json"
+                if (not marker.exists() and not directory.is_symlink() and directory.is_dir()
+                        and not any(directory.iterdir())):
+                    private_directory(directory)
+                    directory.rmdir()
+                    entry.cleanup_status = "complete"
+                    self._write_registry(registry)
+                    return entry.model_copy(deep=True)
+                directory = self._directory(id)
                 files, folders = [], []
                 for path in directory.iterdir():
                     if path.name in {"workspace.json", ".project-identity.json"}:

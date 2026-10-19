@@ -63,6 +63,11 @@
           "title": "Allowedits",
           "type": "boolean"
         },
+        "approvalRequired": {
+          "default": false,
+          "title": "Approvalrequired",
+          "type": "boolean"
+        },
         "error": {
           "anyOf": [
             {

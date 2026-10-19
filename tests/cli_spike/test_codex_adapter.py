@@ -121,6 +121,17 @@ def test_success_reports_usage_and_native_metadata_without_idle_generation(fake)
     assert result.logical_attempts == count == 1
 
 
+def test_rewrite_diagnostics_separate_cli_preflight_startup_and_model_turn(fake, tmp_path):
+    from resume_api.rewrite_timing import rewrite_timing
+    with rewrite_timing(tmp_path / "diagnostics-root", 1):
+        result, count = generate(fake)
+    row, = json.loads((tmp_path / "diagnostics-root/diagnostics/rewrite-timings.json").read_text())
+    phases = row["milliseconds"]
+    assert {"preflight", "cli_startup", "model_turn", "cli_process", "decode", "total"} <= phases.keys()
+    assert phases["cli_process"] >= phases["model_turn"]
+    assert PROMPT not in json.dumps(row) and count == result.logical_attempts == 1
+
+
 @pytest.mark.parametrize("case,code", [
     ("malformed_event", "INVALID_RESULT"), ("invalid_utf8", "INVALID_RESULT"),
     ("utf16", "INVALID_RESULT"), ("utf32", "INVALID_RESULT"),
@@ -517,3 +528,49 @@ def test_terminal_failure_releases_generation_for_another_instance(fake) -> None
         result = second.generate(request(), files, threading.Event())
     assert result.logical_attempts == 1 and starts() == 2
     assert list(root.iterdir()) == [keep]
+
+
+@pytest.mark.parametrize("reply", ["A short plain reply.", "Обычный текст 🚀\n\nВторой абзац."])
+def test_plain_rewrite_uses_stdin_without_schema_and_passes_selected_reasoning(fake, reply):
+    from packages.resume_core.text_rewrite import PlainTextReply
+    cli, root, keep, configure, starts = fake
+    configure(plain_text=True, result_text=reply)
+    provider = CodexCliProvider(cli, fixture_transport=FixtureTransport(cli))
+    request = ContentInput(PROMPT, PlainTextReply,
+        GenerationPolicy(model="gpt-6-luna", reasoning_effort="low", allow_repair=False))
+    for _ in range(2):
+        with OperationFiles(root).open() as files:
+            result = provider.generate(request, files, threading.Event())
+        assert result.value.text == reply and result.logical_attempts == 1
+    rows = [json.loads(line) for line in (cli.parent / "audit.jsonl").read_text().splitlines()]
+    generations = [row for row in rows if row.get("generation")]
+    assert starts() == len(generations) == 2
+    for row in generations:
+        assert "--output-schema" not in row["args"]
+        assert 'model_reasoning_effort="low"' in row["args"]
+    assert len([row for row in rows if row.get("args", [None])[0] == "app-server"]) == 1
+    assert list(root.iterdir()) == [keep]
+
+
+def test_plain_rewrite_rejects_unsupported_effort_before_generation(fake):
+    from packages.resume_core.text_rewrite import PlainTextReply
+    cli, root, _, configure, starts = fake
+    configure(plain_text=True, result_text="Reply")
+    provider = CodexCliProvider(cli, fixture_transport=FixtureTransport(cli))
+    with OperationFiles(root).open() as files:
+        with pytest.raises(ContentFailure, match="MODEL_DENIED"):
+            provider.generate(ContentInput(PROMPT, PlainTextReply,
+                GenerationPolicy(model="gpt-6-luna", reasoning_effort="ultra", allow_repair=False)), files, threading.Event())
+    assert starts() == 0
+
+
+def test_plain_empty_reply_fails_once_without_repair(fake):
+    from packages.resume_core.text_rewrite import PlainTextReply
+    cli, root, _, configure, starts = fake
+    configure(plain_text=True, result_text="  \n")
+    provider = CodexCliProvider(cli, fixture_transport=FixtureTransport(cli))
+    with OperationFiles(root).open() as files:
+        with pytest.raises(ContentFailure, match="INVALID_RESULT"):
+            provider.generate(ContentInput(PROMPT, PlainTextReply,
+                GenerationPolicy(model="gpt-6-luna", allow_repair=False)), files, threading.Event())
+    assert starts() == 1

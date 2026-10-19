@@ -87,6 +87,46 @@
     }
   },
   "additionalProperties": false,
+  "else": {
+    "if": {
+      "properties": {
+        "operation": {
+          "enum": [
+            "add_to_focus",
+            "remove_from_focus"
+          ]
+        }
+      },
+      "required": [
+        "operation"
+      ]
+    },
+    "then": {
+      "properties": {
+        "jobId": {
+          "type": "null"
+        },
+        "periodId": {
+          "type": "null"
+        },
+        "recordId": {
+          "type": "string"
+        },
+        "recordKind": {
+          "enum": [
+            null,
+            "technology"
+          ]
+        },
+        "values": {
+          "maxProperties": 0
+        }
+      },
+      "required": [
+        "recordId"
+      ]
+    }
+  },
   "if": {
     "properties": {
       "operation": {
@@ -131,7 +171,9 @@
         "remove",
         "add_period",
         "remove_period",
-        "clear_technologies"
+        "clear_technologies",
+        "add_to_focus",
+        "remove_from_focus"
       ],
       "title": "Operation",
       "type": "string"

@@ -4,6 +4,26 @@ import { AssistantController } from "../src/assistant/controller";
 import { deferred, before, job, proposal, published, saved, harness } from "./support/background-writer";
 import { assistantApi, conversation, jobsHarness, running, run } from "./support/background-jobs";
 
+for (const phase of ["baseline", "submit"] as const) {
+  test(`Stop fences a background send during ${phase}`, async () => {
+    const h = jobsHarness(undefined, []), metadata = assistantApi(), reached = deferred<void>(), release = deferred<void>();
+    const controller = new AssistantController(metadata.api, { sessionId: "session", apply: () => Promise.resolve() }, () => {}, 5000, h.jobs);
+    try {
+      await controller.init(); await h.jobs.refresh(); controller.draft("Keep background draft");
+      if (phase === "submit") { const original = h.api.submit; h.api.submit = async request => { const value = await original(request); reached.resolve(); await release.promise; return value; }; }
+      const sending = controller.send(async () => {
+        if (phase === "baseline") { reached.resolve(); await release.promise; }
+        return { response: before.response, scope: { kind: "resume" } };
+      });
+      await reached.promise; await controller.stop(); release.resolve(); await sending;
+      assert.equal(h.calls.submit.length, phase === "submit" ? 1 : 0);
+      assert.equal(h.calls.cancel, phase === "submit" ? 1 : 0);
+      assert.equal(controller.view.draft, "Keep background draft");
+      assert.equal(controller.view.pendingSend, false);
+    } finally { release.resolve(); controller.close(); h.close(); }
+  });
+}
+
 for (const [index, target] of ["other-project", job.submission.identity.projectId].entries()) {
   test(`NB-W10:v${index ? "06" : "04"} old project metadata cannot publish into ${index ? "a new instance" : "another project"}`, async () => {
     const old = jobsHarness(), next = jobsHarness(target), held = deferred<typeof old.state>(), reached = deferred<void>();

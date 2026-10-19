@@ -83,7 +83,14 @@ export type Role =
   | "section_heading"
   | "focus_heading"
   | "focus_entry"
-  | "group";
+  | "group"
+  | "hidden";
+export type Display = string;
+export type Logo1 = string;
+export type Recordid = string;
+export type Years = number | null;
+export type Focusentries = FocusTechnology[];
+export type Focusoptions = FocusTechnology[];
 export type Saveerror = string | null;
 export type Saveddocumentrevision = number | null;
 export type Savedprojectrevision = number | null;
@@ -263,7 +270,7 @@ export type Records = (
 export type Revision18 = number;
 export type Actionid = string;
 export type Orderindex = number;
-export type Recordid = string;
+export type Recordid1 = string;
 export type Revision19 = number;
 export type Tombstones = RecordTombstone[];
 export type Category1 =
@@ -273,9 +280,10 @@ export type Category1 =
  */
 export type Duplicateof = string[];
 export type Id15 = string;
-export type Kind13 = "paragraph" | "heading" | "section" | "bullet_list" | "duplicate";
+export type Kind13 = "paragraph" | "heading" | "section" | "bullet_list" | "duplicate" | "source_only";
 export type Listitem = boolean;
 export type Modelblock = boolean;
+export type Reason = string | null;
 export type Region = "header" | "sidebar" | "main";
 /**
  * @maxItems 1000
@@ -298,7 +306,7 @@ export type Start = string;
  */
 export type Periods2 = ImportPeriod[];
 export type Role1 = string;
-export type Display = string;
+export type Display1 = string;
 export type Experience1 = string;
 export type Technical1 = boolean | null;
 /**
@@ -310,7 +318,7 @@ export type Institution = string;
 export type Kind15 = "education";
 export type Qualification = string;
 export type Specialty = string;
-export type Display1 = string;
+export type Display2 = string;
 export type Experience2 = string;
 export type Kind16 = "technology";
 export type Technical2 = boolean | null;
@@ -349,6 +357,21 @@ export type Runid = string;
 export type Sequence2 = number;
 export type Skillsha256 = string;
 export type Sourcesha256 = string;
+export type Heading = string;
+export type Region1 = "sidebar" | "main";
+/**
+ * @maxItems 1000
+ */
+export type Sourcekeys3 = string[];
+/**
+ * @minItems 1
+ * @maxItems 100
+ */
+export type Technologies1 = [string, ...string[]];
+/**
+ * @maxItems 40
+ */
+export type Technologygroups = ImportTechnologyGroup[];
 export type Version = 1;
 export type Actionid1 = string | null;
 export type Fingerprint1 = string | null;
@@ -461,7 +484,7 @@ export type Type1 = "link";
 export type Bindingid = string;
 export type Bindingrootid = string | null;
 export type Fieldkey = string;
-export type Recordid1 = string;
+export type Recordid2 = string;
 export type Syncedfactrevision = number;
 export type Text5 = string;
 export type Type2 = "fact_field";
@@ -470,20 +493,20 @@ export type Id23 = string;
 export type Alignment = "left" | "center" | "right" | "justify";
 export type Backgroundcolor1 = string;
 export type Presentation = "standard" | "focus";
-export type Recordid2 = string | null;
+export type Recordid3 = string | null;
 export type Textcolor1 = string;
 export type Evidence13 = EvidenceSpan[];
 export type Fieldkeys = string[];
 export type Id24 = string;
 export type Kind21 = "citation";
-export type Recordid3 = string;
+export type Recordid4 = string;
 export type Fieldkey1 = string;
 export type Id25 = string;
 export type Kind22 = "field_binding";
-export type Recordid4 = string;
+export type Recordid5 = string;
 export type Id26 = string;
 export type Kind23 = "working_owner";
-export type Recordid5 = string;
+export type Recordid6 = string;
 /**
  * @minItems 1
  */
@@ -768,7 +791,7 @@ export type Rawtext5 = string;
 export type Evidencerecords = ImmutableFactEvidence[];
 export type Blockids = string[];
 export type Disposition1 = "placed" | "excluded";
-export type Reason = string | null;
+export type Reason1 = string | null;
 export type Sourceid2 = string;
 export type Unitid3 = string;
 export type Importcoverage = ImportCoverage[];
@@ -867,12 +890,14 @@ export type Record1 =
   | UnresolvedRecord;
 export type Beforerevision5 = number;
 export type Kind31 = "remove_record";
-export type Recordid6 = string;
+export type Recordid7 = string;
 /**
  * @maxItems 1000
  */
 export type Proposedsteps = (PutBlock | RemoveBlock | MoveBlock | ReplaceInlineRange | PutRecord | RemoveRecord)[];
 export type Ready = boolean;
+export type Rewriteresult = string | null;
+export type Rewritesource = string | null;
 export type Blockid3 = string;
 export type Cellid1 = string | null;
 /**
@@ -1030,6 +1055,8 @@ export interface ResumeIdentity {
 }
 export interface RichPresentation {
   blocks: Blocks;
+  focusEntries?: Focusentries;
+  focusOptions?: Focusoptions;
 }
 export interface Blocks {
   [k: string]: BlockPresentation;
@@ -1039,6 +1066,12 @@ export interface BlockPresentation {
   experienceNote?: Experiencenote;
   logo?: Logo;
   role: Role;
+}
+export interface FocusTechnology {
+  display: Display;
+  logo: Logo1;
+  recordId: Recordid;
+  years: Years;
 }
 export interface WorkspaceV6 {
   createdAt: Createdat;
@@ -1313,7 +1346,7 @@ export interface UnresolvedRecord {
 export interface RecordTombstone {
   actionId: Actionid;
   orderIndex: Orderindex;
-  recordId: Recordid;
+  recordId: Recordid1;
   revision: Revision19;
 }
 export interface ImportDraft {
@@ -1327,6 +1360,7 @@ export interface ImportDraft {
   sequence?: Sequence2;
   skillSha256: Skillsha256;
   sourceSha256: Sourcesha256;
+  technologyGroups?: Technologygroups;
   version?: Version;
 }
 export interface ImportBlock {
@@ -1336,6 +1370,7 @@ export interface ImportBlock {
   kind?: Kind13;
   listItem?: Listitem;
   modelBlock?: Modelblock;
+  reason?: Reason;
   region?: Region;
   sourceKeys?: Sourcekeys;
   title?: Title1;
@@ -1359,7 +1394,7 @@ export interface ImportPeriod {
   start?: Start;
 }
 export interface ImportSkill {
-  display: Display;
+  display: Display1;
   experience?: Experience1;
   technical?: Technical1;
 }
@@ -1371,7 +1406,7 @@ export interface ImportEducation {
   specialty?: Specialty;
 }
 export interface ImportTechnology {
-  display: Display1;
+  display: Display2;
   experience?: Experience2;
   kind: Kind16;
   technical?: Technical2;
@@ -1391,6 +1426,12 @@ export interface ImportReceipt {
   batchId: Batchid;
   requestSha256: Requestsha2562;
   sequence: Sequence1;
+}
+export interface ImportTechnologyGroup {
+  heading: Heading;
+  region?: Region1;
+  sourceKeys?: Sourcekeys3;
+  technologies: Technologies1;
 }
 export interface RichOperation {
   actionId: Actionid1;
@@ -1633,7 +1674,7 @@ export interface FactFieldSpan {
   bindingId: Bindingid;
   bindingRootId?: Bindingrootid;
   fieldKey: Fieldkey;
-  recordId: Recordid1;
+  recordId: Recordid2;
   styles: InlineStyles;
   syncedFactRevision: Syncedfactrevision;
   text: Text5;
@@ -1643,7 +1684,7 @@ export interface SectionProps {
   alignment?: Alignment;
   backgroundColor?: Backgroundcolor1;
   presentation?: Presentation;
-  recordId: Recordid2;
+  recordId: Recordid3;
   textColor?: Textcolor1;
 }
 export interface NarrativeCitation {
@@ -1651,18 +1692,18 @@ export interface NarrativeCitation {
   fieldKeys: Fieldkeys;
   id: Id24;
   kind: Kind21;
-  recordId: Recordid3;
+  recordId: Recordid4;
 }
 export interface FieldBinding {
   fieldKey: Fieldkey1;
   id: Id25;
   kind: Kind22;
-  recordId: Recordid4;
+  recordId: Recordid5;
 }
 export interface WorkingOwnership {
   id: Id26;
   kind: Kind23;
-  recordId: Recordid5;
+  recordId: Recordid6;
 }
 export interface SourceWitness {
   evidence: Evidence14;
@@ -1732,7 +1773,7 @@ export interface ImmutableFactEvidence {
 export interface ImportCoverage {
   blockIds: Blockids;
   disposition: Disposition1;
-  reason: Reason;
+  reason: Reason1;
   sourceId: Sourceid2;
   unitId: Unitid3;
 }
@@ -1776,6 +1817,8 @@ export interface RichSyncRecord {
   kind?: Kind25;
   proposedSteps?: Proposedsteps;
   ready?: Ready;
+  rewriteResult?: Rewriteresult;
+  rewriteSource?: Rewritesource;
   selection?: RichSelection | null;
   status: Status9;
 }
@@ -1817,7 +1860,7 @@ export interface PutRecord {
 export interface RemoveRecord {
   beforeRevision: Beforerevision5;
   kind: Kind31;
-  recordId: Recordid6;
+  recordId: Recordid7;
 }
 export interface RichSelection {
   anchor: RichPosition;

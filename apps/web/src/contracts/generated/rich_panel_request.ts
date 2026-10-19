@@ -10,7 +10,15 @@ export type Sessionid = string;
 export type Documentrevision = number;
 export type Factsrevision = number;
 export type Jobid = string | null;
-export type Operation = "add" | "edit" | "remove" | "add_period" | "remove_period" | "clear_technologies";
+export type Operation =
+  | "add"
+  | "edit"
+  | "remove"
+  | "add_period"
+  | "remove_period"
+  | "clear_technologies"
+  | "add_to_focus"
+  | "remove_from_focus";
 export type Periodid = string | null;
 export type Recordid = string | null;
 export type Recordkind = ("candidate" | "employment" | "technology" | "education" | "language" | "claim") | null;

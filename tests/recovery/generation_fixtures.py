@@ -14,6 +14,7 @@ from packages.resume_core.rich_panel import RichPanelProposal
 from packages.resume_core.resume_assessment import ResumeAssessment
 from packages.resume_core.models.recovery import WorkspaceV5, record_slot
 from packages.resume_core.rules import captured_rules
+from packages.resume_core.text_rewrite import PlainTextReply
 from resume_api.providers.content import ContentResult, ContentFailure, ReportedUsage
 from tests.recovery.draft_fixtures import draft_request, draft_reply, RULES
 from tests.recovery.employment_fixtures import employment_proposal
@@ -40,6 +41,13 @@ class CreationProvider:
         if request.result_type is ResumeAssessment:
             self.calls.append({"task": "assess_resume"})
             return ContentResult(ResumeAssessment(verdict=self.assessment), ReportedUsage(), "fixture", request.policy.model, .01, 1)
+        if request.result_type is PlainTextReply:
+            instruction, text = request.text.split("Instruction:\n", 1)[1].split("\n\nSelected text:\n", 1)
+            self.calls.append({"task": "rewrite", "input": {"instruction": instruction, "text": text}})
+            if instruction == "TEST_ERROR" or self.fail_kind in {"PlainTextReply", "RichRewriteProposal"}:
+                raise ContentFailure("MODEL_DENIED")
+            reply = PlainTextReply(text="\n\n".join("Clearer: " + part for part in text.split("\n\n")))
+            return ContentResult(reply, ReportedUsage(), "fixture", request.policy.model, .01, 1)
         payload = json.loads(request.text)
         self.calls.append(payload)
         assert request.policy.allow_repair is False

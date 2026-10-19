@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import type { RichProjectResponse } from "../../contracts/generated/rich_project_response";
 import { Icon } from "../ui/Icon";
 import { elapsedLabel, importProgress, importStages, progressMessage } from "./progress-state";
+import { Spinner } from "../ui/OperationStatus";
 
 export function Progress({ response, sourceName, cancel, busy }: {
   response: RichProjectResponse & { generation: NonNullable<RichProjectResponse["generation"]> };
@@ -19,7 +20,7 @@ export function Progress({ response, sourceName, cancel, busy }: {
   const message = progressMessage(generation, found.saved, (now - observed.at) / 1000);
   const jobs = found.jobs.filter(job => job.employer || job.role);
   return <section className="progress-screen" aria-label="Обработка резюме"><div className="progress-content">
-    <div className="import-progress-heading"><div className="progress-icon"><Icon name="fold" /></div>
+    <div className="import-progress-heading"><div className="progress-icon"><Icon name="fold" /><Spinner /></div>
       <span className="import-elapsed" role="timer" aria-live="off" aria-label={`Прошло ${elapsedLabel(elapsed)}`}>{elapsedLabel(elapsed)}</span>
     </div>
     <h2>Обработка резюме</h2><p className="import-source-name">{sourceName}</p>
@@ -27,7 +28,7 @@ export function Progress({ response, sourceName, cancel, busy }: {
       <div className="import-process">
         <ol className="progress-list" aria-label="Этапы обработки">{importStages.map((item, index) => <li key={item.stage}
           className={index < step ? "done" : index === step ? "current" : ""} aria-current={index === step ? "step" : undefined}>
-          <span className="step-indicator" aria-hidden="true">{index < step ? <Icon name="check" /> : index + 1}</span>{item.label}
+          <span className="step-indicator" aria-hidden="true">{index < step ? <Icon name="check" /> : index === step ? <Spinner /> : index + 1}</span>{item.label}
         </li>)}</ol>
         <div className="import-live-message" role="status"><span className="import-activity-dot" aria-hidden="true" /><p>{message}</p></div>
       </div>
@@ -54,7 +55,7 @@ export function Progress({ response, sourceName, cancel, busy }: {
         </>}
       </section>
     </div>
-    <div className="import-progress-footer"><button className="text-button" disabled={busy} onClick={cancel}>Отменить обработку</button>
+    <div className="import-progress-footer"><button className="text-button" disabled={busy} onClick={cancel}>{busy && <Spinner />}{busy ? "Останавливаем…" : "Отменить обработку"}</button>
       <span>Редактирование откроется после обработки</span></div>
   </div></section>;
 }

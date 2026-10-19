@@ -12,6 +12,7 @@ import { SessionHistory, type CellValue } from "../src/rich/history";
 import { RichSaveQueue, type RichBlock } from "../src/rich/save-queue";
 import { RichSynchronization, type PanelCommand } from "../src/rich/synchronization";
 import { IntentQueue } from "../src/rich/intent-queue";
+import type { RewriteActivity } from "../src/rich/rewrite-progress";
 
 const python = `import json,sys
 from packages.resume_core.models.rich_workspace import WorkspaceV6
@@ -23,7 +24,8 @@ r=panel_mutation(w,RichPanelRequest.model_validate(x['body'])) if x['panel'] els
 if r is not None: w,_=apply_rich_mutation(w,r)
 print(w.model_dump_json(by_alias=True))`;
 
-export function panelHarness(options: { preview?: (count: number) => Promise<void>; save?: (count: number) => Promise<void>; workspace?: unknown } = {}) {
+export function panelHarness(options: { preview?: (count: number) => Promise<void>; save?: (count: number) => Promise<void>; workspace?: unknown;
+  rewriteProgress?: (activity: RewriteActivity) => void } = {}) {
   const directory = mkdtempSync(join(tmpdir(), "foldcv-panel-queue-")); let sequence = 0;
   const file = (value: unknown) => { const path = join(directory, `${++sequence}.json`); writeFileSync(path, JSON.stringify(value)); return path; };
   const raw: unknown = JSON.parse(execFileSync(".venv/bin/python", ["-c", "import sys;from pathlib import Path;from packages.resume_core.models.rich_workspace import WorkspaceV6;print(WorkspaceV6.model_validate_json(Path(sys.argv[1]).read_text()).model_dump_json(by_alias=True))", file(options.workspace ?? fixture)],
@@ -57,9 +59,11 @@ export function panelHarness(options: { preview?: (count: number) => Promise<voi
   const originalFetch = globalThis.fetch;
   globalThis.fetch = async (input, init) => {
     if (String(input).endsWith("/panel/preview")) { const count = ++previews; await options.preview?.(count); return Response.json(call(JSON.parse(String(init?.body)) as unknown, true)); }
+    if (String(input).endsWith("/preview")) { const count = ++previews; await options.preview?.(count); return Response.json(call(JSON.parse(String(init?.body)) as unknown, false)); }
     return Response.json(response);
   };
-  const sync = new RichSynchronization({ history, queue, current: () => current, cells, changed: publish, report: () => {} }, response.workspace.projectId);
+  const sync = new RichSynchronization({ history, queue, current: () => current, cells, changed: publish, report: () => {},
+    rewriteProgress: activity => options.rewriteProgress?.(activity) }, response.workspace.projectId);
   const intents = new IntentQueue<PanelCommand>(command => sync.panel(command), () => {});
   const facts = () => factsFromCells(current, baseline.facts);
   return { history, queue, sync, intents, publish, facts, current, document, previews: () => previews, saves: () => saves,

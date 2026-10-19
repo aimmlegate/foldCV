@@ -2,6 +2,7 @@ export type Accessrevision = number;
 export type Accountgeneration = number;
 export type Allowedits = boolean;
 export type Allowweb = boolean;
+export type Approvalrequired = boolean;
 export type Fingerprint = string;
 export type Generation = number;
 export type Key = string;
@@ -85,6 +86,7 @@ export interface JobSubmissionV1 {
   accountGeneration: Accountgeneration;
   allowEdits: Allowedits;
   allowWeb: Allowweb;
+  approvalRequired?: Approvalrequired;
   guards: ScopeGuardV1;
   identity: JobIdentity;
   input: InputReference;

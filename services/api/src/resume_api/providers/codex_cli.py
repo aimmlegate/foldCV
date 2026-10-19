@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field, replace
 import json
 import math
 from pathlib import Path
@@ -20,10 +20,14 @@ from resume_api.cli.experimental_profile import ExperimentalCliProfile, Experime
 from resume_api.lifecycle import OperationFiles, SpikeError
 from resume_api.inference_admission import INFERENCE, AdmissionTimeout, AdmissionBlocked
 from resume_api.profile_ownership import native_profile
+from resume_api.rewrite_timing import add_phase, measure
+from packages.resume_core.text_rewrite import PlainTextReply
+from packages.resume_core.reasoning import ModelReasoning, model_reasoning
 from packages.resume_core.storage import StorageFailure
 from resume_api.providers.content import (ContentFailure, ContentInput, ContentResult,
                                           ReportedUsage, ResultT)
 from resume_api.providers.structured_schema import StructuredSchema
+from resume_api.providers.preflight import PreflightCache, preflight_key
 from spikes.cli.profile import FIXTURE_VERSION, GAPS, REQUIRED_FLAGS, VERSION, exec_arguments, overrides
 
 
@@ -167,6 +171,10 @@ class Events:
         if not self.complete or self.text is None:
             raise ContentFailure("INCOMPLETE_STREAM")
         try:
+            if model is PlainTextReply:
+                if len(self.text.encode()) > self.max_bytes:
+                    raise InvalidFinal()
+                return PlainTextReply(text=self.text)
             value = strict_json(self.text, max_bytes=self.max_bytes)
             if not isinstance(value, dict):
                 raise InvalidFinal()
@@ -182,6 +190,7 @@ class Probe:
     auth_mode: str
     generation_ready: bool
     gaps: tuple[str, ...]
+    reasoning: dict[str, ModelReasoning] = field(default_factory=dict)
 
 
 @dataclass(frozen=True)
@@ -202,9 +211,38 @@ class CodexCliProvider:
         self.fixture_transport = fixture_transport
         self.experimental_profile = experimental_profile
         self.clock = clock
+        self.preflight_cache = PreflightCache[Probe](clock)
         self.model_started = None
         self.process = ProcessRunner(self.executable, clock=clock,
                                      launch=experimental_profile.launch if experimental_profile else None)
+
+    def invalidate_preflight(self):
+        self.preflight_cache.invalidate()
+
+    def preflight(self, files, cancel, model, *, deadline, effort=None):
+        self.process._check(deadline, cancel)
+        key = preflight_key(self.executable, self.experimental_profile, self.fixture_transport)
+        epoch, cached = self.preflight_cache.read(key, model)
+        if cached is not None:
+            self.check_effort(cached, model, effort)
+            return cached
+        probe = self.probe(files, cancel, deadline=deadline)
+        if not probe.generation_ready:
+            raise ContentFailure("CLI_PROFILE_UNSAFE")
+        metadata = {}
+        models = self.list_models(files, cancel, deadline=deadline, reasoning=metadata)
+        probe = replace(probe, reasoning=metadata)
+        if model not in models:
+            raise ContentFailure("MODEL_DENIED")
+        if key == preflight_key(self.executable, self.experimental_profile, self.fixture_transport):
+            self.preflight_cache.remember(epoch, key, probe, models)
+        self.check_effort(probe, model, effort)
+        return probe
+
+    @staticmethod
+    def check_effort(probe, model, effort):
+        if effort is not None and (model not in probe.reasoning or effort not in probe.reasoning[model].supported):
+            raise ContentFailure("MODEL_DENIED")
 
     def _run(self, files: OperationFiles, args: tuple[str, ...], deadline: float,
              cancel: threading.Event, *, login_status: bool = False,
@@ -246,7 +284,7 @@ class CodexCliProvider:
         return Probe(version, "chatgpt", fixture_ready or experimental_ready,
                      () if fixture_ready or experimental_ready else GAPS)
 
-    def list_models(self, files: OperationFiles, cancel: threading.Event, *, deadline: float | None = None) -> tuple[str, ...]:
+    def list_models(self, files: OperationFiles, cancel: threading.Event, *, deadline: float | None = None, reasoning=None) -> tuple[str, ...]:
         end = deadline if deadline is not None else self.clock() + 15
         state = {"id": 0, "models": ()}
 
@@ -289,6 +327,11 @@ class CodexCliProvider:
                 if not isinstance(name, str) or not MODEL.fullmatch(name) or name in models:
                     raise ContentFailure("METADATA_FAILED")
                 models.append(name)
+                if reasoning is not None:
+                    try:
+                        reasoning[name] = model_reasoning(item)
+                    except ValueError:
+                        raise ContentFailure("METADATA_FAILED") from None
             state["models"] = tuple(models)
             state["id"] = 3
             return b""
@@ -317,8 +360,10 @@ class CodexCliProvider:
     def generate_queued(self, request: ContentInput[ResultT], files: OperationFiles,
                         cancel: threading.Event, admitted) -> ContentResult[ResultT]:
         try:
+            waiting = time.perf_counter()
             with INFERENCE.hold(cancel):
                 with self._profile_owner(cancel, files.root):
+                    add_phase("account_queue", time.perf_counter() - waiting)
                     admitted()
                     return self._generate(request, files, cancel)
         except AdmissionBlocked:
@@ -369,6 +414,7 @@ class CodexCliProvider:
                 or request.result_type.model_config.get("extra") != "forbid"):
             raise ContentFailure("INVALID_SCHEMA")
         try:
+            plain = request.result_type is PlainTextReply
             result_schema = request.result_type.model_json_schema()
             if request.transport is not None and hasattr(request.transport, "output_schema"):
                 result_schema = request.transport.output_schema(result_schema)
@@ -387,15 +433,13 @@ class CodexCliProvider:
         consumed_input = 0
         consumed_output = 0
         try:
-            probe = self.probe(files, cancel, deadline=deadline)
-            if not probe.generation_ready:
-                raise ContentFailure("CLI_PROFILE_UNSAFE")
-            if policy.model not in self.list_models(files, cancel, deadline=deadline):
-                raise ContentFailure("MODEL_DENIED")
+            with measure("preflight"):
+                probe = self.preflight(files, cancel, policy.model, deadline=deadline, effort=policy.reasoning_effort)
             if files.path is None:
                 raise ContentFailure("TEMP_FAILED")
-            (files.path / "schema.json").write_bytes(schema)
-            attempt_limit = 2 if policy.allow_repair else 1
+            if not plain:
+                (files.path / "schema.json").write_bytes(schema)
+            attempt_limit = 2 if policy.allow_repair and not plain else 1
             for index in range(attempt_limit):
                 self.process._check(deadline, cancel)
                 prompt = original if index == 0 else original + b"\n\n" + REPAIR_FEEDBACK.encode()
@@ -410,15 +454,32 @@ class CodexCliProvider:
                     try:
                         args = (self.experimental_profile.exec_arguments(files.path, policy.model)
                                 if self.experimental_profile else tuple(exec_arguments(files.path, policy.model)))
-                        output, errors = self._run(files, args, deadline, cancel,
-                                                   data=prompt, on_line=events.accept,
-                                                   on_spawn=self.model_started,
-                                                   max_line=policy.max_total_output_bytes - consumed_output,
-                                                   max_output=policy.max_total_output_bytes - consumed_output)
+                        if plain:
+                            at = args.index("--output-schema")
+                            args = args[:at] + args[at + 2:]
+                        if policy.reasoning_effort is not None:
+                            args = (*args[:-1], "--config", "model_reasoning_effort=" + json.dumps(policy.reasoning_effort), args[-1])
+                        began, active = time.perf_counter(), None
+                        def accept(raw):
+                            nonlocal active
+                            events.accept(raw)
+                            now = time.perf_counter()
+                            if events.turn and active is None:
+                                active = now
+                                add_phase("cli_startup", now - began)
+                            if events.complete and active is not None:
+                                add_phase("model_turn", now - active)
+                        with measure("cli_process"):
+                            output, errors = self._run(files, args, deadline, cancel,
+                                                       data=prompt, on_line=accept,
+                                                       on_spawn=self.model_started,
+                                                       max_line=policy.max_total_output_bytes - consumed_output,
+                                                       max_output=policy.max_total_output_bytes - consumed_output)
                     finally:
                         usages.append(events.usage)
                     consumed_output += len(output) + len(errors)
-                    value = events.result(request.result_type, output_schema, getattr(request.transport, "decode", None))
+                    with measure("decode"):
+                        value = events.result(request.result_type, output_schema, getattr(request.transport, "decode", None))
                     if request.transport:
                         try:
                             value = request.result_type.model_validate(request.transport.restore(value), strict=True)
@@ -436,4 +497,7 @@ class CodexCliProvider:
         except OSError:
             raise ContentFailure("TEMP_FAILED", logical_attempts=attempts, usage=_combine(usages)) from None
         except ContentFailure as error:
+            if error.code in {"AUTH_REQUIRED", "AUTH_MODE_MISMATCH", "MODEL_DENIED", "CLI_UNSUPPORTED",
+                    "CLI_PROFILE_UNSAFE", "CLI_FAILED", "METADATA_FAILED", "PROCESS_CLEANUP_FAILED"}:
+                self.invalidate_preflight()
             raise ContentFailure(error.code, logical_attempts=attempts, usage=_combine(usages)) from None

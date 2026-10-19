@@ -10,6 +10,7 @@ from ..gui_content import generate_admitted
 from ..lifecycle import OperationFiles, SpikeError
 from ..providers.content import ContentFailure, ContentInput, GenerationPolicy
 from ..rich_synchronization import sync_prompt
+from packages.resume_core.text_rewrite import PlainTextReply, plain_prompt
 from .fixed_projection import FixedProjection
 
 ERRORS = {"QUOTA_EXHAUSTED": "RATE_LIMITED", "RATE_LIMITED": "RATE_LIMITED",
@@ -100,9 +101,11 @@ class FixedRuntime:
 
     async def sync_content(self, sync, payload, result_type):
         await self.authorize()
-        request = ContentInput(sync_prompt(sync.kind if sync.kind in {"rewrite", "panel"} else "reconcile",
-            payload, self.captured.rules), result_type,
-            GenerationPolicy(model=self.model.model, timeout_seconds=180, allow_repair=False))
+        plain = result_type is PlainTextReply
+        prompt = plain_prompt(payload["instruction"], payload["text"]) if plain else sync_prompt(
+            sync.kind if sync.kind in {"rewrite", "panel"} else "reconcile", payload, self.captured.rules)
+        request = ContentInput(prompt, result_type, GenerationPolicy(model=self.model.model, timeout_seconds=180,
+            allow_repair=False, reasoning_effort=self.captured.reasoning_effort if plain else None))
         response = await self.content(lambda files: generate_admitted(self.provider, request, files, self.control.cancel))
         return result_type.model_validate(response.value)
 

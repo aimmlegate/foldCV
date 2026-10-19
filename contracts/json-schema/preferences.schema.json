@@ -5,6 +5,28 @@
       "title": "Automaticanalysis",
       "type": "boolean"
     },
+    "rewriteReasoningEffort": {
+      "anyOf": [
+        {
+          "enum": [
+            "none",
+            "minimal",
+            "low",
+            "medium",
+            "high",
+            "xhigh",
+            "max",
+            "ultra"
+          ],
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Rewritereasoningeffort"
+    },
     "schemaVersion": {
       "const": 1,
       "title": "Schemaversion",

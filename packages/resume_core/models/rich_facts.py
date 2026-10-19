@@ -22,7 +22,7 @@ class WorkingField(Wire, Generic[T]):
 
     @model_validator(mode="after")
     def authority(self) -> WorkingField[T]:
-        if self.status == "known" and self.value is None:
+        if self.status == "known" and (self.value is None or isinstance(self.value, str) and not self.value.strip()):
             raise ValueError("known field needs a value")
         if self.status in {"unknown", "unresolved"} and self.value is not None:
             raise ValueError("unknown field cannot claim a typed value")
@@ -106,7 +106,8 @@ class TechnologyRecord(WorkingRecord):
     canonical_id: TextField
     technical: bool | None = Field(default=None, exclude_if=lambda value: value is None)
     experience: TextField = Field(default_factory=lambda: TextField(value=None, rawText="", status="unknown",
-        revision=1, pendingRawText=None), exclude_if=lambda value: not value.raw_text and not value.user_corrected)
+        revision=1, pendingRawText=None), exclude_if=lambda value: value.status == "unknown"
+            and value.value is None and not value.raw_text and value.pending_raw_text is None and not value.user_corrected)
 
 
 class EducationRecord(WorkingRecord):

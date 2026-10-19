@@ -6,6 +6,8 @@ from typing import Annotated, Literal, Union
 
 from pydantic import ConfigDict, Field, RootModel, model_validator
 
+from ..reasoning import ReasoningEffort
+
 from .contracts import (
     ArchiveEntry, AssetRef, Block, Evidence, Fact, Id, Job, Subproject, Operation, PartialDate,
     OperationEvent, Proposal, RenderSnapshot, Review, Revision, Sha256, Source, TemplateManifest,
@@ -783,6 +785,7 @@ class Preferences(Wire):
     theme: Literal["light", "dark", "system"]
     selected_model: str | None
     selected_import_model: str | None = None
+    rewrite_reasoning_effort: ReasoningEffort | None = None
 
 
 class SaveImportModelPreference(Wire):

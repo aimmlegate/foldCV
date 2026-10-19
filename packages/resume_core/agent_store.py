@@ -321,7 +321,9 @@ class AgentStore:
                 item.receipt = AgentEditReceipt(batchId=batch.id, runId=run.id, toolKey=batch.tool_key,
                     clientMutationId=batch.mutation.client_mutation_id, requestSha256=batch.request_sha256,
                     disposition=batch.state, projectRevision=None, documentRevision=None, factsRevision=None,
-                    durable=False, error={"code": "AGENT_OUTCOME_UNKNOWN" if run.outcome_unknown else "AGENT_CANCELLED"})
+                    durable=False, error={"code": "AGENT_OUTCOME_UNKNOWN" if batch.state == "outcome_unknown"
+                        else error or ("AGENT_PROTOCOL" if disposition == "failed" else "AGENT_INTERRUPTED"
+                            if disposition == "interrupted" else "AGENT_CANCELLED")})
             run.state = disposition
             run.error = AgentError(code=error) if error else None
             run.finished_at = self.clock()

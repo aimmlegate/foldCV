@@ -6,12 +6,13 @@ from typing import Annotated, Literal, Union
 
 from pydantic import ConfigDict, Field, RootModel, model_validator
 
+from ..reasoning import ReasoningEffort
 from ..background_limits import LIMITS
 from .. import agent_limits
 from ..rich_api import RichProjectResponse
 from .agent import (AgentBatchJournal, AgentCommitResult, AgentEditReceipt, AgentFinding, AgentId, AgentJournalRequest,
     AgentMessage, AgentReadSnapshot, AgentRun, AgentScope, AgentSnapshotDependency, AgentUsage, AgentWebSource, AgentWire,
-    ModelId, Timestamp, bounded)
+    AgentEvent, ModelId, Timestamp, bounded)
 from .contracts import Id, Revision, Sha256
 from .rich_document import RichDocumentV1
 from .rich_facts import WorkingFacts
@@ -155,6 +156,7 @@ class JobSubmissionV1(BackgroundWire):
     account_generation: Revision
     tools: list[Tool] = Field(max_length=32)
     allow_edits: bool
+    approval_required: bool = Field(default=False, exclude_if=lambda value: not value)
     access_revision: Revision = 1
     allow_web: bool
     scope: AgentScope
@@ -163,6 +165,8 @@ class JobSubmissionV1(BackgroundWire):
 
     @model_validator(mode="after")
     def server_capture(self):
+        if self.approval_required and (self.kind != "rewrite" or self.scope.kind != "selection"):
+            raise ValueError("only selection rewrites require approval")
         expected_class = {"agent": "background", "processing": "background", "rewrite": "interactive",
             "reconciliation": "reconciliation"}[self.kind]
         expected_stages = {"agent": ["agent"], "processing": ["assessment", "extraction"],
@@ -609,9 +613,16 @@ class JobSnapshotV1(BackgroundWire):
     undo_expired: bool = False
     asset_pins_sha256: Sha256 | None = None
     capture_invalidated: bool = False
+    activity: list[AgentEvent] = Field(default_factory=list, max_length=40, exclude_if=lambda value: not value)
 
     @model_validator(mode="after")
     def exact_saved(self):
+        if self.activity and (self.submission.kind != "agent" or any(event.root.run_id != self.id
+                or event.root.project_id != self.submission.identity.project_id
+                or event.root.type not in {"activity.updated", "tool.started", "tool.completed", "tool.failed"} for event in self.activity)):
+            raise ValueError("job activity must contain only its public progress")
+        if any(a.root.sequence >= b.root.sequence for a, b in zip(self.activity, self.activity[1:])):
+            raise ValueError("job activity must be ordered")
         if self.undo_expired and self.receipt is None:
             raise ValueError("only a saved job can report inverse expiry")
         if self.publication in {"saved", "no_change", "none"} and self.publication_error is not None:
@@ -708,6 +719,7 @@ class JobSummaryV1(BackgroundWire):
     execution_generation: Revision
     event_cursor: Counter
     allow_edits: bool = Field(strict=True)
+    approval_required: bool = Field(default=False, exclude_if=lambda value: not value)
     saved: bool = Field(strict=True)
     error: JobFailure | None
     publication_error: JobFailure | None
@@ -715,6 +727,8 @@ class JobSummaryV1(BackgroundWire):
 
     @model_validator(mode="after")
     def saved_authority(self):
+        if self.approval_required and self.kind != "rewrite":
+            raise ValueError("only rewrite summaries require approval")
         if self.saved != (self.publication == "saved") or not self.allow_edits and self.publication != "none":
             raise ValueError("summary must preserve saved and check-only authority")
         return self
@@ -1057,6 +1071,7 @@ class DispatchStateV1(BackgroundWire):
 class WriterPublishV1(WriterBarrierCommandV1):
     job_id: AgentId
     proposal_sha256: Sha256
+    approve: bool = Field(default=False, exclude_if=lambda value: not value)
 
 
 class WriterPublicationV1(BackgroundWire):
@@ -1177,6 +1192,7 @@ class FixedInputV1(BackgroundWire):
     sync_id: AgentId | None
     action_id: Id | None
     original_sync: RichSyncRecord | None = None
+    reasoning_effort: ReasoningEffort | None = None
 
     @model_validator(mode="after")
     def exact_capture(self):

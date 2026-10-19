@@ -5,7 +5,7 @@ import { backgroundReply, GlobalJobsApi, JobsApi, type BackgroundRequest } from 
 import { FixedOperations } from "../src/background/fixed";
 import { GlobalJobs, type GlobalJobsTransport } from "../src/background/global";
 import { ProjectJobs } from "../src/background/jobs";
-import { active, jobKey, projectActivity, statusLabel, summary } from "../src/background/status";
+import { active, attention, jobKey, projectActivity, statusLabel, summary } from "../src/background/status";
 import type { JobIndexV1 } from "../src/contracts/generated/background_index_v1";
 import type { JobSnapshotV1 } from "../src/contracts/generated/background_snapshot_v1";
 import type { RichSelection } from "../src/contracts/generated/rich_selection";
@@ -240,4 +240,18 @@ test("discarding a real conflicted result clears its review notice and preserves
     const after = (await bridge.writer(ready.project).bootstrap()).response.workspace.project;
     assert.deepEqual(after?.document, before?.document); assert.deepEqual(after?.facts, before?.facts); passed = true;
   } finally { await held.release(); h.close(); await bridge.close(!passed); }
+});
+
+test("rewrite approval stays quiet without a running spinner or duplicate saved toast", async () => {
+  const source = running("rewrite-preview");
+  const ready: JobSnapshotV1 = { ...source, execution: "completed", publication: "waiting_for_sync",
+    submission: { ...source.submission, kind: "rewrite", approvalRequired: true } };
+  const row = summary(ready, "Synthetic resume");
+  assert.equal(active(row), false); assert.equal(attention(row), false); assert.equal(statusLabel(row), "Ожидает применения");
+  const h = globalHarness([ready]);
+  try {
+    await h.registry.refresh();
+    h.set([{ ...row, execution: "completed", publication: "saved", saved: true, eventCursor: row.eventCursor + 1 }]);
+    await h.registry.refresh(); assert.deepEqual(h.registry.view.notices, []);
+  } finally { h.close(); }
 });

@@ -1,5 +1,105 @@
 {
   "$defs": {
+    "ActivityEvent": {
+      "additionalProperties": false,
+      "properties": {
+        "conversationId": {
+          "maxLength": 128,
+          "minLength": 1,
+          "pattern": "^[A-Za-z0-9_-]+$",
+          "title": "Conversationid",
+          "type": "string"
+        },
+        "id": {
+          "maxLength": 128,
+          "minLength": 1,
+          "pattern": "^[A-Za-z0-9_-]+$",
+          "title": "Id",
+          "type": "string"
+        },
+        "payload": {
+          "$ref": "#/$defs/ActivityPayload"
+        },
+        "projectId": {
+          "maxLength": 128,
+          "minLength": 1,
+          "pattern": "^[A-Za-z0-9_-]+$",
+          "title": "Projectid",
+          "type": "string"
+        },
+        "runId": {
+          "maxLength": 128,
+          "minLength": 1,
+          "pattern": "^[A-Za-z0-9_-]+$",
+          "title": "Runid",
+          "type": "string"
+        },
+        "schemaVersion": {
+          "const": 1,
+          "title": "Schemaversion",
+          "type": "integer"
+        },
+        "sequence": {
+          "minimum": 1,
+          "title": "Sequence",
+          "type": "integer"
+        },
+        "timestamp": {
+          "format": "date-time",
+          "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(?:\\.\\d+)?(?:Z|\\+00:00)$",
+          "title": "Timestamp",
+          "type": "string"
+        },
+        "type": {
+          "const": "activity.updated",
+          "title": "Type",
+          "type": "string"
+        }
+      },
+      "required": [
+        "schemaVersion",
+        "id",
+        "sequence",
+        "projectId",
+        "conversationId",
+        "runId",
+        "timestamp",
+        "type",
+        "payload"
+      ],
+      "title": "ActivityEvent",
+      "type": "object"
+    },
+    "ActivityPayload": {
+      "additionalProperties": false,
+      "properties": {
+        "itemId": {
+          "maxLength": 128,
+          "minLength": 1,
+          "pattern": "^[A-Za-z0-9_-]+$",
+          "title": "Itemid",
+          "type": "string"
+        },
+        "kind": {
+          "const": "summary",
+          "title": "Kind",
+          "type": "string"
+        },
+        "text": {
+          "maxLength": 1200,
+          "minLength": 1,
+          "title": "Text",
+          "type": "string"
+        }
+      },
+      "required": [
+        "itemId",
+        "kind",
+        "text"
+      ],
+      "title": "ActivityPayload",
+      "type": "object"
+    },
     "AgentError": {
       "additionalProperties": false,
       "properties": {
@@ -701,6 +801,7 @@
   },
   "discriminator": {
     "mapping": {
+      "activity.updated": "#/$defs/ActivityEvent",
       "edit.offered": "#/$defs/EditEvent",
       "edit.result": "#/$defs/EditEvent",
       "finding.ready": "#/$defs/ResourceEvent",
@@ -717,6 +818,9 @@
   "oneOf": [
     {
       "$ref": "#/$defs/MessageDelta"
+    },
+    {
+      "$ref": "#/$defs/ActivityEvent"
     },
     {
       "$ref": "#/$defs/ToolEvent"

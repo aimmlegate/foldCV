@@ -4,6 +4,17 @@ import { deferred, harness, job, proposal, saved, published, offer } from "./sup
 import { RichApiFailure } from "../src/rich/api";
 import type { CellChange, HistoryKind } from "../src/rich/history";
 
+test("a rejected approval releases publication protection without entering recovery", async () => {
+  const h = harness();
+  try {
+    const declined = { ...structuredClone(job), publication: "needs_review" as const, receipt: null };
+    h.publishReply(() => Promise.resolve({ schemaVersion: 1, job: declined, view: h.connection.view }));
+    await assert.rejects(h.writer.publish(job, proposal, true), /Результат устарел/);
+    assert.equal(h.writer.mode, "normal"); assert.equal(h.locked(), false);
+    assert.equal(h.history.length, 0); assert.ok(h.type("Continue typing"));
+  } finally { h.close(); }
+});
+
 function injectedOrigin(h: ReturnType<typeof harness>, index: number): () => unknown {
   if (index <= 2) return () => h.type(index === 1 ? "Blocked typing" : "Pasted first line\nSecond line");
   if (index === 3) return () => h.history.undo();

@@ -1,13 +1,15 @@
 import { useEffect, useState } from "react";
 import { ConnectionWorkflow, type ConnectionView } from "../../connection/workflow";
 import { AgentBrowserApi } from "../../assistant/api";
-import { preferencesRequest, rulesRequest, saveRulesRequest, saveImportModelRequest } from "../../api/client";
+import { preferencesRequest, rulesRequest, saveRulesRequest, saveImportModelRequest, saveRewriteReasoningRequest } from "../../api/client";
 import { SettingsDrafts, type SettingsPart, type SettingsState } from "./drafts";
 import { Connection } from "./Connection";
 import { ModelSelect } from "./ModelSelect";
+import { ReasoningSelect } from "./ReasoningSelect";
 import { Button } from "../ui/Button";
+import { OperationStatus } from "../ui/OperationStatus";
 
-const partNames: Record<SettingsPart, string> = { model: "модель обработки", import: "модель импорта", analysis: "проверка изменений", assistant: "помощник", rules: "правила" };
+const partNames: Record<SettingsPart, string> = { reasoning: "reasoning правки текста", model: "модель обработки", import: "модель импорта", analysis: "проверка изменений", assistant: "помощник", rules: "правила" };
 export function Settings({ close, connectionChanged }: { close: () => void; connectionChanged: (view: ConnectionView) => void }) {
   const [section, setSection] = useState<"model" | "rules" | "analysis">("model");
   const [view, setView] = useState<ConnectionView>(() => new ConnectionWorkflow(() => {}).view);
@@ -17,7 +19,7 @@ export function Settings({ close, connectionChanged }: { close: () => void; conn
     const api = new AgentBrowserApi("");
     return new SettingsDrafts({ preferences: () => preferencesRequest(), rules: rulesRequest, assistant: () => api.settings(),
       analysis: enabled => preferencesRequest(enabled), saveRules: saveRulesRequest, saveAssistant: value => api.saveSettings(value),
-      selectImport: saveImportModelRequest,
+      selectImport: saveImportModelRequest, saveReasoning: saveRewriteReasoningRequest,
       select: async model => {
         if (!model || !workflow.view.snapshot.metadataReady || !workflow.view.snapshot.models.includes(model)) throw new Error("MODEL_UNAVAILABLE");
         await workflow.select(model);
@@ -35,7 +37,16 @@ export function Settings({ close, connectionChanged }: { close: () => void; conn
         {value === "model" ? "Модель и подключение" : value === "rules" ? "Общие правила и команды" : "Проверка изменений"}
       </button>)}
     </nav><div className="settings-content">
+      <div className="settings-feedback">
+        {current.loading && <OperationStatus label="Загружаем настройки" detail="Подключение, модели и сохранённые правила." timed />}
+        {current.saved.length > 0 && <OperationStatus state="success" label={`Сохранено: ${current.saved.map(part => partNames[part]).join(", ")}.`} />}
+        {current.message && <p className="notice" role="status">{current.message}</p>}
+        {Object.entries(current.errors).map(([part, error]) => <p className="notice error" role="alert" key={part}>{partNames[part as SettingsPart]}: {error}</p>)}
+      </div>
       {section === "model" && <><Connection view={view} workflow={workflow} model={current.draft.model} change={value => controller.change("model", value)} disabled={current.saving} selectionDisabled={!current.preferences} />
+        <ReasoningSelect value={current.draft.reasoning} metadata={view.snapshot.modelReasoning?.[current.draft.model ?? ""]}
+          disabled={busy || !current.preferences || view.pending || !view.snapshot.metadataReady || !current.draft.model}
+          change={value => controller.change("reasoning", value)} />
         <div className="uir-assistant-options"><h3>Импорт резюме</h3>
           <ModelSelect id="import-model-select" label="Модель импорта" value={current.draft.importModel} models={view.snapshot.models}
             defaultLabel="Использовать модель обработки" disabled={busy || !current.preferences || view.pending || !view.snapshot.metadataReady}
@@ -65,12 +76,8 @@ export function Settings({ close, connectionChanged }: { close: () => void; conn
             onChange={event => controller.change("automatic", event.currentTarget.checked)} /></div>
         <p className="settings-disclosure">Параллельные периоды работы допустимы. Подсказки не блокируют редактирование, сохранение или экспорт.</p>
       </>}
-      {current.loading && <p className="notice" role="status">Загружаем настройки…</p>}
       {!controller.ready && !current.loading && <Button className="small" onClick={() => void controller.load()}>Повторить загрузку настроек</Button>}
-      {current.saved.length > 0 && <p className="notice" role="status">Сохранено: {current.saved.map(part => partNames[part]).join(", ")}.{dirty && " Остальные черновики остаются в форме."}</p>}
-      {current.message && <p className="notice" role="status">{current.message}</p>}
-      {Object.entries(current.errors).map(([part, error]) => <p className="notice error" role="alert" key={part}>{partNames[part as SettingsPart]}: {error}</p>)}
-      <div className="settings-actions"><Button variant="primary" disabled={!dirty || busy || view.pending} onClick={() => void controller.save()}>Сохранить изменения</Button>
+      <div className="settings-actions"><Button variant="primary" busy={current.saving} busyLabel="Сохраняем…" disabled={!dirty || current.loading || view.pending} onClick={() => void controller.save()}>Сохранить изменения</Button>
         <Button variant="quiet" disabled={!dirty || busy} onClick={() => controller.cancel()}>Отмена</Button>
         <span className="settings-saved" role="status">{current.saving ? "Сохраняем по разделам…" : dirty ? "Есть несохранённые изменения" : current.staleRules ? "Нужно обновить правила" : controller.ready ? "Изменения сохранены" : "Не все настройки доступны"}</span>
       </div>

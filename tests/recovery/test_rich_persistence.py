@@ -255,7 +255,7 @@ async def test_fresh_rich_creation_initial_docx_restart_and_portable_without_inf
     import re
     text = " ".join(authored_text(block) for block in workspace.project.document.blocks())
     assert not (Counter(re.findall(r"\w+", data.decode())) - Counter(re.findall(r"\w+", text)))
-    assert all(region.blocks for region in workspace.project.document.regions)
+    assert all(region.blocks for region in workspace.project.document.regions if region.role != "sidebar")
     assert len(workspace.project.import_coverage) == len(units)
     assert workspace.project.facts.mode == "digest" and any(record.kind == "claim" for record in workspace.project.facts.records)
     assert {operation.kind for operation in workspace.project.operations} == {"normalize_semantics", "render"}
@@ -315,7 +315,7 @@ async def test_empty_digest_keeps_source_as_an_editable_partial_result(tmp_path,
     assert workspace.project is not None and workspace.pre_draft is None
     report = workspace.project.facts.extraction
     assert report.fact_count == 0 and report.status == "partial"
-    assert any("пуста" in issue.section for issue in report.unresolved)
+    assert any("фактов" in issue.section.lower() for issue in report.unresolved)
     assert any(warning.code == "source_details_unresolved" for warning in workspace.warnings)
     assert "".join(unit.text for unit in workspace.project.sources[0].units) == data.decode()
     assert service.originals[(selected.project_id, workspace.project.sources[0].id)] == data

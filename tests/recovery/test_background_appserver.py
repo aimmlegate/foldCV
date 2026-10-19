@@ -1105,7 +1105,7 @@ async def test_cleanup_failure_and_flag_rollback_preserve_durable_state(tmp_path
 @pytest.mark.asyncio
 async def test_shared_fixed_rewrite_publishes_captured_output_while_agent_turn_stays_live(tmp_path):
     import threading
-    from packages.resume_core.rich_sync import RichRewriteProposal
+    from packages.resume_core.text_rewrite import PlainTextReply
     from resume_api.jobs.appserver import SharedContentProvider
     from resume_api.providers.content import ContentInput, GenerationPolicy
     from tests.recovery.generation_fixtures import CreationProvider
@@ -1122,11 +1122,11 @@ async def test_shared_fixed_rewrite_publishes_captured_output_while_agent_turn_s
         assert await job_ready(a, job_a, ra) == job_a.id
         assert await job_ready(b, reply.job, rb) == reply.job.id
         live = server.live[reply.job.id]
-        assert live.value.output_schema and not live.value.tools
-        fixture_request = ContentInput(live.value.prompt, RichRewriteProposal,
+        assert live.value.output_schema is None and live.value.plain_text and not live.value.tools
+        fixture_request = ContentInput(live.value.prompt, PlainTextReply,
             GenerationPolicy(model="gpt-6-luna", allow_repair=False))
         output = CreationProvider().generate(fixture_request, None, threading.Event()).value
-        complete_shared(server, live.slot.job, output.model_dump_json(by_alias=True))
+        complete_shared(server, live.slot.job, output.text)
         result_b = await settled(b, wb.project_id, reply.job.id, publication="saved")
         assert result_b.execution == "completed" and len(result_b.attempts) == 1
         assert result_b.attempts[-1].cleanup_verified and not result_b.attempts[-1].native_started
@@ -1259,3 +1259,36 @@ async def test_pipe_cleanup_inventory_exception_never_allows_runtime_or_command_
             CodexAgentRuntime(None, tmp_path)
     finally:
         await peer.close()
+
+
+@pytest.mark.asyncio
+async def test_shared_plain_rewrite_has_no_schema_tools_or_agent_instructions_and_uses_low(tmp_path):
+    import threading
+    from packages.resume_core.text_rewrite import PlainTextReply, plain_prompt
+    from resume_api.jobs.appserver import SharedContentProvider
+    from resume_api.providers.content import ContentInput, GenerationPolicy
+    server = shared_peer(tmp_path)
+    frames, audits, ready = [], [], asyncio.Event()
+    server.wire_audit = frames.append
+    provider = SharedContentProvider(server, native=False, audit=audits.append)
+    provider.loop, provider.job_id, provider.cancelled = asyncio.get_running_loop(), "plain-edit", asyncio.Event()
+    provider.model_started = ready.set
+    task = asyncio.create_task(provider.execute(ContentInput(plain_prompt("Clarify", "Selected text"), PlainTextReply,
+        GenerationPolicy(model="gpt-6-luna", reasoning_effort="low", allow_repair=False)), threading.Event()))
+    try:
+        await asyncio.wait_for(ready.wait(), 5)
+        requests = [row["frame"] for row in frames if row["direction"] == "client"]
+        thread = next(row["params"] for row in requests if row.get("method") == "thread/start")
+        turn = next(row["params"] for row in requests if row.get("method") == "turn/start")
+        assert thread["dynamicTools"] == [] and thread["config"]["web_search"] == "disabled"
+        assert thread["config"]["features"]["code_mode"] is False
+        assert "resume assistant" not in thread["baseInstructions"]
+        assert thread["config"]["model_reasoning_effort"] == turn["effort"] == "low"
+        assert "outputSchema" not in turn
+        complete_shared(server, "plain-edit", "Clear plain text.")
+        result = await asyncio.wait_for(task, 5)
+        assert result.value.text == "Clear plain text." and result.logical_attempts == 1
+        assert audits[-1]["textValidated"] and not audits[-1]["schemaValidated"]
+    finally:
+        await server.close()
+        await asyncio.gather(task, return_exceptions=True)

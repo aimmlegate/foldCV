@@ -9,3 +9,6 @@
 @import "./import-progress.css";
 @import "../../rich/reference-fonts.css";
 @import "./reference-document.css";
+@import "./original-source.css";
+@import "./comparison-workspace.css";
+@import "./operation-feedback.css";

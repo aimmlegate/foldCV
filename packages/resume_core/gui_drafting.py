@@ -19,7 +19,7 @@ from .models.recovery import (
     Rules, JobDisposition, DocumentAnchor, authored_fields,
 )
 from .normalization import _id
-from .technologies import BY_ID
+from .technologies import BY_ID, logo_path
 
 
 class GuiDraftRequest(Wire):
@@ -54,8 +54,8 @@ class DraftFailure(Exception):
 
 
 def available_focus_ids() -> set[str]:
-    root = Path(__file__).resolve().parents[2] / "skills/format-resume/assets"
-    return {id for id, entry in BY_ID.items() if entry.logo and (root / entry.logo).is_file()}
+    root = Path(__file__).resolve().parents[2]
+    return {id for id, entry in BY_ID.items() if (path := logo_path(entry)) and (root / path).is_file()}
 
 
 def _field(id: str, text: str = "", facts: list[str] | None = None) -> dict:
@@ -169,12 +169,10 @@ def validate_draft(request: GuiDraftRequest, proposal: GuiDraftProposal, rules: 
     fields = {field.field_id: field for record in document.records() for field in authored_fields(record)}
     prose_ids = {"profile/text", "skills-focus/skillsText", "early-career/text"}
     prose_ids.update(f"job:{id}/{key}" for id in jobs for key in ("context", "tasks", "results", "stack"))
-    seen, unplaced, texts = set(), [], {}
+    seen, texts = set(), {}
     for item in proposal.fields:
         if item.field_id not in fields:
             warnings.add("INVALID_DRAFT_FIELD_REFERENCE")
-            if item.text.strip():
-                unplaced.append(item.text)
             continue
         field = fields[item.field_id]
         if item.field_id not in prose_ids:
@@ -199,16 +197,13 @@ def validate_draft(request: GuiDraftRequest, proposal: GuiDraftProposal, rules: 
         field.fact_ids = list(dict.fromkeys([*field.fact_ids, *refs]))
         field.evidence = [ref for id in field.fact_ids for ref in facts[id].evidence]
         field.origin = "generated"
-    if unplaced:
-        document.profile.text.text = "\n\n".join([document.profile.text.text, *unplaced]).strip()
-        warnings.add("DRAFT_TEXT_NEEDS_FACTS", "profile/text")
     required = {"profile/text", "skills-focus/skillsText", "early-career/text"}
     detailed = [item.job_id for item in plan.jobs if item.disposition == "detailed"]
     early = [item.job_id for item in plan.jobs if item.disposition == "early-career"]
     required.update(f"job:{id}/{key}" for id in detailed for key in ("context", "tasks", "results", "stack"))
     for missing in required - seen:
         warnings.add("INCOMPLETE_DRAFT_FIELDS", missing)
-    supported = public_context_facts(normalized.facts)
+    supported = [fact for fact in public_context_facts(normalized.facts) if fact.id not in blocked]
     prose_kinds = {"text", "technology", "metric", "leadership"}
     if any(fact.kind in prose_kinds for fact in supported) and not document.profile.text.text.strip():
         warnings.add("EMPTY_SUPPORTED_DRAFT_PROSE", "profile/text")
@@ -244,8 +239,7 @@ def validate_draft(request: GuiDraftRequest, proposal: GuiDraftProposal, rules: 
     for mark in warnings.marks.values():
         if mark.anchor.kind == "field" and mark.anchor.field_id not in visible_fields:
             mark.anchor = DocumentAnchor(kind="document")
-    if not any(field.text.strip() for record in document.records() for field in authored_fields(record)) or (
-            normalized._native_recovery_count and not document.profile.text.text.strip()):
+    if not blocked and not any(field.text.strip() for record in document.records() for field in authored_fields(record)):
         document.profile.text.text = "\n".join(unit.text for source in normalized.sources for unit in source.units if unit.text.strip())
         document.profile.text.origin = "source"
         warnings.add("IMPORT_CONTENT_RECOVERED", "profile/text")
@@ -260,8 +254,14 @@ def validate_draft(request: GuiDraftRequest, proposal: GuiDraftProposal, rules: 
         if reason:
             removed.append({"catalogId": item.catalog_id, "reason": reason})
             continue
-        if not item.fact_ids or any(facts[id].kind != "technology" or facts[id].value.canonical_id != item.catalog_id for id in item.fact_ids):
+        refs = [id for id in item.fact_ids if id not in blocked and facts[id].kind == "technology"
+                and facts[id].value.canonical_id == item.catalog_id]
+        if not refs or refs != item.fact_ids:
             warnings.add("FOCUS_FACT_MISMATCH", "skills-focus/skillsText")
+        if not refs:
+            continue
+        item.fact_ids = refs
+        item.display = facts[refs[0]].value.display
         accepted.append(item)
         id = _id("focus", item.catalog_id)
         focus.append({"id": id, "catalogId": item.catalog_id,
@@ -271,7 +271,8 @@ def validate_draft(request: GuiDraftRequest, proposal: GuiDraftProposal, rules: 
     document.skills_focus.focus = [FocusEntry.model_validate(item) for item in focus]
     annotations = list(warnings.marks.values())
     if removed:
-        fingerprint = hashlib.sha256(drafting_input(request, rules).encode()).hexdigest()
+        fingerprint = hashlib.sha256(json.dumps({"request": request.model_dump(mode="json", by_alias=True),
+            "rulesSha256": rules.sha256}, sort_keys=True, ensure_ascii=True).encode()).hexdigest()
         annotations.append(Annotation.model_validate({"id": _id("annotation", "focus-removals", request.project_id),
             "type": "warning", "code": "focus_entry_removed", "anchor": {"kind": "section", "sectionId": "skills-focus"},
             "dependencies": {"projectRevision": request.project_revision, "documentRevision": request.document_revision,

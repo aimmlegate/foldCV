@@ -3,10 +3,12 @@ import type { TimelineReport } from "../../contracts/generated/timeline_report";
 import { Dialog } from "../ui/Dialog";
 import { Button } from "../ui/Button";
 import { Icon } from "../ui/Icon";
+import { OperationStatus } from "../ui/OperationStatus";
 
 export type FileMode = "open" | "save" | "export";
-export function FileDialog({ mode, title, subtitle, filename, timeline, error, busy, close, download, upload }: {
+export function FileDialog({ mode, title, subtitle, filename, timeline, error, busy, operation, close, download, upload }: {
   mode: FileMode; title: string; subtitle: string; filename: string; timeline: TimelineReport | null; error: string; busy: boolean;
+  operation?: string | undefined;
   close: () => void; download: () => Promise<boolean>; upload: (file: File) => Promise<boolean>;
 }) {
   const input = useRef<HTMLInputElement>(null), [message, setMessage] = useState("");
@@ -21,7 +23,7 @@ export function FileDialog({ mode, title, subtitle, filename, timeline, error, b
     </> : <><p className="dialog-copy">Файл .foldcv хранит исходник, факты и документ.</p>
       <p className="notice">{opening ? "Выберите файл .foldcv. Текущие изменения сохранятся перед открытием." : "Рабочая версия сохраняется на этом компьютере. Файл .foldcv можно перенести и открыть в FoldCV."}</p>
       <div className="demo-file-row"><span>{opening ? "Файл .foldcv" : filename}</span>
-        <Button className="small" disabled={busy} onClick={() => {
+        <Button className="small" busy={busy} busyLabel={opening ? "Открываем…" : "Готовим…"} onClick={() => {
           setMessage("");
           if (opening) input.current?.click();
           else void download().then(done => { if (done) setMessage("Файл передан браузеру для сохранения."); });
@@ -32,10 +34,10 @@ export function FileDialog({ mode, title, subtitle, filename, timeline, error, b
         if (file) void upload(file).then(done => { if (done) close(); });
       }} />}
     </>}
-    {busy && <p className="notice" role="status">{opening ? "Открываем файл…" : "Готовим файл…"}</p>}
-    {message && <p className="notice" role="status">{message}</p>}{error && <p className="notice error" role="alert">{error}</p>}
+    <div className="operation-slot">{busy ? <OperationStatus label={operation ?? (opening ? "Открываем файл" : "Готовим файл")} timed />
+      : error ? <p className="notice error" role="alert">{error}</p> : message ? <OperationStatus state="success" label={message} /> : null}</div>
     <div className="dialog-actions">{exporting ? <><button className="text-button" disabled={busy} onClick={close}>Вернуться к тексту</button>
-      <Button variant="primary" disabled={busy} onClick={() => { setMessage(""); void download().then(done => { if (done) setMessage("Документ передан браузеру для сохранения."); }); }}>Скачать DOCX<Icon name="download" /></Button></>
+      <Button variant="primary" busy={busy} busyLabel="Готовим DOCX…" onClick={() => { setMessage(""); void download().then(done => { if (done) setMessage("Документ передан браузеру для сохранения."); }); }}>Скачать DOCX<Icon name="download" /></Button></>
       : <Button disabled={busy} onClick={close}>Закрыть</Button>}
     </div>
   </Dialog>;

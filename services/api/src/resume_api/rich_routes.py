@@ -12,12 +12,15 @@ from .contracts import EmptyRequest
 from .extracting import UploadFailure, parse_one_part
 from .gui_projects import ProjectFailure
 from .rich_assets import ImageSessionRequest, ImageUploadCapture
+from .rewrite_timing import rewrite_timing
+from .original_sources import mount_original_sources
 from packages.resume_core.rich_sync import RichCompletionRequest, RichRewriteRequest, RichSyncDisposition
 from packages.resume_core.rich_panel import RichPanelRequest, RichPanelSyncRequest
 from packages.resume_core.rich_timeline import CascadeRequest, CascadeApplyRequest, timeline_report, cascade_proposal, cascade_mutation
 
 
 def mount_rich_projects(app, service, problem):
+    mount_original_sources(app, service)
     prefix = "/v1/rich/projects"
     def response(identifier, status=200):
         return JSONResponse(service.response(identifier).model_dump(mode="json", by_alias=True),
@@ -164,8 +167,11 @@ def mount_rich_projects(app, service, problem):
     @app.post(prefix + "/{identifier}/rewrite")
     async def rewrite(identifier: str, payload: RichRewriteRequest):
         legacy_fixed()
-        await service.rewrite_rich(identifier, payload)
-        return response(identifier)
+        with rewrite_timing(service.rules.root, len(payload.selection.block_ids)) as timing:
+            result = await service.rewrite_rich(identifier, payload)
+            timing.outcome = next(item.status for item in reversed(result.workspace.sync_records)
+                if item.action_id == payload.selection.capture.action_id)
+            return JSONResponse(result.model_dump(mode="json", by_alias=True), headers={"Cache-Control": "no-store"})
 
     @app.post(prefix + "/{identifier}/sync/{sync_id}")
     async def disposition(identifier: str, sync_id: str, payload: RichSyncDisposition):

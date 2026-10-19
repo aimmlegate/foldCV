@@ -5,7 +5,7 @@ import uuid
 import hashlib
 from typing import Literal
 
-from pydantic import Field
+from pydantic import Field, model_validator
 
 from .models.contracts import Id, Wire
 from .models.rich_document import RichBlock
@@ -33,6 +33,17 @@ class RichCompletionRequest(Wire):
 class RichRewriteRequest(Wire):
     selection: RichSelection
     instruction: str = Field(min_length=1, max_length=4000)
+    preview_only: bool = Field(default=False, exclude_if=lambda value: not value)
+
+    @model_validator(mode="after")
+    def preview_scope(self):
+        selection = self.selection
+        if self.preview_only and (selection.kind == "blocks" or len(selection.block_ids) != 1
+                or selection.block_ids[0] != selection.anchor.block_id
+                or selection.anchor.block_id != selection.head.block_id or selection.anchor.cell_id != selection.head.cell_id
+                or selection.anchor.offset >= selection.head.offset):
+            raise ValueError("rewrite preview requires one text block or cell")
+        return self
 
 
 class RichReplacement(Wire):
@@ -336,7 +347,7 @@ def rewrite_steps(workspace, selection, proposal):
                     outputs.append(after)
             if any(output.type == "section" and output.props.record_id is not None for output in outputs[1:]):
                 raise ValueError("REWRITE_SCOPE_INVALID")
-            outputs[-1].children.extend(original.children)
+        outputs[-1].children.extend(child.model_copy(deep=True) for child in original.children)
         parent, previous, _ = placements(workspace.project.document)[original.id]
         for index, output in enumerate(outputs):
             if index == 0:

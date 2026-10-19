@@ -271,10 +271,12 @@ class JobSupervisor:
             done, _ = await asyncio.wait([run, stop, active], return_when=asyncio.FIRST_COMPLETED)
             if stop in done:
                 return self._stopped(control), run
-            if self.clock.now() >= control.active_deadline:
+            result = self._outcome(await run) if run in done else None
+            finished = result.finished_at if result is not None and result.finished_at is not None else self.clock.now()
+            if finished >= control.active_deadline:
                 control.stop("DEADLINE")
                 return ExecutionOutcome("failed", "DEADLINE"), run
-            return self._outcome(await run), run
+            return result if result is not None else self._outcome(await run), run
         finally:
             for waiter in (ready, stop, startup, active):
                 if waiter is not None:

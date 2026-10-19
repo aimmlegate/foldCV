@@ -36,7 +36,7 @@ export function History({ projects, activeId, busy, collapse, fresh, open, remov
       <button disabled={busy} onClick={settings}><Icon name="settings" />Настройки<Icon name="chevron" /></button></footer>
     <Dialog open={deleting !== null} close={() => setDeleting(null)} title="Удалить резюме?">
       <p className="dialog-copy">Проект и его локальные файлы будут удалены.</p><div className="dialog-actions">
-        <Button disabled={busy} onClick={() => setDeleting(null)}>Отмена</Button><Button variant="danger" disabled={busy} onClick={() => { if (deleting) void remove(deleting).then(done => { if (done) setDeleting(null); }); }}>Удалить окончательно</Button>
+        <Button disabled={busy} onClick={() => setDeleting(null)}>Отмена</Button><Button variant="danger" busy={busy} busyLabel="Удаляем…" onClick={() => { if (deleting) void remove(deleting).then(done => { if (done) setDeleting(null); }); }}>Удалить окончательно</Button>
       </div>
     </Dialog>
   </aside>;

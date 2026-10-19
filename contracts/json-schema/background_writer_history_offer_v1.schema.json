@@ -35,6 +35,217 @@
       "title": "ActionCapture",
       "type": "object"
     },
+    "ActivityEvent": {
+      "additionalProperties": false,
+      "properties": {
+        "conversationId": {
+          "maxLength": 128,
+          "minLength": 1,
+          "pattern": "^[A-Za-z0-9_-]+$",
+          "title": "Conversationid",
+          "type": "string"
+        },
+        "id": {
+          "maxLength": 128,
+          "minLength": 1,
+          "pattern": "^[A-Za-z0-9_-]+$",
+          "title": "Id",
+          "type": "string"
+        },
+        "payload": {
+          "$ref": "#/$defs/ActivityPayload"
+        },
+        "projectId": {
+          "maxLength": 128,
+          "minLength": 1,
+          "pattern": "^[A-Za-z0-9_-]+$",
+          "title": "Projectid",
+          "type": "string"
+        },
+        "runId": {
+          "maxLength": 128,
+          "minLength": 1,
+          "pattern": "^[A-Za-z0-9_-]+$",
+          "title": "Runid",
+          "type": "string"
+        },
+        "schemaVersion": {
+          "const": 1,
+          "title": "Schemaversion",
+          "type": "integer"
+        },
+        "sequence": {
+          "minimum": 1,
+          "title": "Sequence",
+          "type": "integer"
+        },
+        "timestamp": {
+          "format": "date-time",
+          "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(?:\\.\\d+)?(?:Z|\\+00:00)$",
+          "title": "Timestamp",
+          "type": "string"
+        },
+        "type": {
+          "const": "activity.updated",
+          "title": "Type",
+          "type": "string"
+        }
+      },
+      "required": [
+        "schemaVersion",
+        "id",
+        "sequence",
+        "projectId",
+        "conversationId",
+        "runId",
+        "timestamp",
+        "type",
+        "payload"
+      ],
+      "title": "ActivityEvent",
+      "type": "object"
+    },
+    "ActivityPayload": {
+      "additionalProperties": false,
+      "properties": {
+        "itemId": {
+          "maxLength": 128,
+          "minLength": 1,
+          "pattern": "^[A-Za-z0-9_-]+$",
+          "title": "Itemid",
+          "type": "string"
+        },
+        "kind": {
+          "const": "summary",
+          "title": "Kind",
+          "type": "string"
+        },
+        "text": {
+          "maxLength": 1200,
+          "minLength": 1,
+          "title": "Text",
+          "type": "string"
+        }
+      },
+      "required": [
+        "itemId",
+        "kind",
+        "text"
+      ],
+      "title": "ActivityPayload",
+      "type": "object"
+    },
+    "AgentError": {
+      "additionalProperties": false,
+      "properties": {
+        "code": {
+          "enum": [
+            "AGENT_DISABLED",
+            "AGENT_MODEL_REQUIRED",
+            "AGENT_MODEL_UNAVAILABLE",
+            "AGENT_MODEL_INCOMPATIBLE",
+            "AGENT_SETTINGS_CONFLICT",
+            "AGENT_SETTINGS_CORRUPT",
+            "AGENT_SETTINGS_SAVE_FAILED",
+            "AGENT_CONNECTION_UNAVAILABLE",
+            "AGENT_CONNECTION_CHANGED",
+            "AGENT_AUTH_REQUIRED",
+            "AGENT_QUOTA",
+            "AGENT_BUSY",
+            "AGENT_CANCELLED",
+            "AGENT_INTERRUPTED",
+            "AGENT_DEADLINE",
+            "AGENT_STARTUP_TIMEOUT",
+            "AGENT_PROTOCOL",
+            "AGENT_PROCESS_FAILED",
+            "AGENT_CLEANUP_FAILED",
+            "AGENT_RUNTIME_UNSUPPORTED",
+            "AGENT_MODEL_REROUTED",
+            "AGENT_UNEXPECTED_COMPACTION",
+            "AGENT_TOOL_DENIED",
+            "AGENT_TOOL_LIMIT",
+            "AGENT_OUTPUT_LIMIT",
+            "AGENT_CONTEXT_LIMIT",
+            "AGENT_ARGUMENT_INVALID",
+            "AGENT_WEB_DISABLED",
+            "AGENT_SOURCE_UNAVAILABLE",
+            "AGENT_SOURCE_DENIED",
+            "AGENT_SOURCE_LIMIT",
+            "AGENT_SCOPE_INVALID",
+            "AGENT_STALE_READ",
+            "AGENT_EDIT_INVALID",
+            "AGENT_EDIT_LIMIT",
+            "AGENT_EVIDENCE_INVALID",
+            "AGENT_NO_OWNER",
+            "AGENT_LEASE_EXPIRED",
+            "AGENT_OWNER_MISMATCH",
+            "AGENT_TICKET_INVALID",
+            "AGENT_RECEIPT_TIMEOUT",
+            "AGENT_SAVE_FAILED",
+            "AGENT_OUTCOME_UNKNOWN",
+            "AGENT_IDEMPOTENCY_CONFLICT",
+            "AGENT_NOT_FOUND",
+            "AGENT_CONVERSATION_FULL",
+            "AGENT_PROJECT_FULL",
+            "AGENT_STORE_CORRUPT",
+            "AGENT_STORE_UNAVAILABLE",
+            "AGENT_STORE_SAVE_FAILED",
+            "AGENT_PROJECT_DELETED",
+            "AGENT_CLEANUP_INCOMPLETE",
+            "AGENT_RESYNC_REQUIRED"
+          ],
+          "title": "Code",
+          "type": "string"
+        }
+      },
+      "required": [
+        "code"
+      ],
+      "title": "AgentError",
+      "type": "object"
+    },
+    "AgentEvent": {
+      "discriminator": {
+        "mapping": {
+          "activity.updated": "#/$defs/ActivityEvent",
+          "edit.offered": "#/$defs/EditEvent",
+          "edit.result": "#/$defs/EditEvent",
+          "finding.ready": "#/$defs/ResourceEvent",
+          "message.delta": "#/$defs/MessageDelta",
+          "run.state_changed": "#/$defs/RunStateEvent",
+          "source.ready": "#/$defs/ResourceEvent",
+          "tool.completed": "#/$defs/ToolEvent",
+          "tool.failed": "#/$defs/ToolEvent",
+          "tool.started": "#/$defs/ToolEvent",
+          "usage.reported": "#/$defs/UsageEvent"
+        },
+        "propertyName": "type"
+      },
+      "oneOf": [
+        {
+          "$ref": "#/$defs/MessageDelta"
+        },
+        {
+          "$ref": "#/$defs/ActivityEvent"
+        },
+        {
+          "$ref": "#/$defs/ToolEvent"
+        },
+        {
+          "$ref": "#/$defs/ResourceEvent"
+        },
+        {
+          "$ref": "#/$defs/EditEvent"
+        },
+        {
+          "$ref": "#/$defs/UsageEvent"
+        },
+        {
+          "$ref": "#/$defs/RunStateEvent"
+        }
+      ],
+      "title": "AgentEvent"
+    },
     "AgentPayloadReference": {
       "additionalProperties": false,
       "properties": {
@@ -72,6 +283,39 @@
         "batchId"
       ],
       "title": "AgentPayloadReference",
+      "type": "object"
+    },
+    "AgentUsage": {
+      "additionalProperties": false,
+      "properties": {
+        "cachedInputTokens": {
+          "minimum": 0,
+          "title": "Cachedinputtokens",
+          "type": "integer"
+        },
+        "inputTokens": {
+          "minimum": 0,
+          "title": "Inputtokens",
+          "type": "integer"
+        },
+        "outputTokens": {
+          "minimum": 0,
+          "title": "Outputtokens",
+          "type": "integer"
+        },
+        "totalTokens": {
+          "minimum": 0,
+          "title": "Totaltokens",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "inputTokens",
+        "cachedInputTokens",
+        "outputTokens",
+        "totalTokens"
+      ],
+      "title": "AgentUsage",
       "type": "object"
     },
     "AssetRef": {
@@ -150,7 +394,8 @@
             "section_heading",
             "focus_heading",
             "focus_entry",
-            "group"
+            "group",
+            "hidden"
           ],
           "title": "Role",
           "type": "string"
@@ -1335,6 +1580,123 @@
       "title": "DraftCheckpointV1",
       "type": "object"
     },
+    "EditEvent": {
+      "additionalProperties": false,
+      "properties": {
+        "conversationId": {
+          "maxLength": 128,
+          "minLength": 1,
+          "pattern": "^[A-Za-z0-9_-]+$",
+          "title": "Conversationid",
+          "type": "string"
+        },
+        "id": {
+          "maxLength": 128,
+          "minLength": 1,
+          "pattern": "^[A-Za-z0-9_-]+$",
+          "title": "Id",
+          "type": "string"
+        },
+        "payload": {
+          "$ref": "#/$defs/EditPayload"
+        },
+        "projectId": {
+          "maxLength": 128,
+          "minLength": 1,
+          "pattern": "^[A-Za-z0-9_-]+$",
+          "title": "Projectid",
+          "type": "string"
+        },
+        "runId": {
+          "maxLength": 128,
+          "minLength": 1,
+          "pattern": "^[A-Za-z0-9_-]+$",
+          "title": "Runid",
+          "type": "string"
+        },
+        "schemaVersion": {
+          "const": 1,
+          "title": "Schemaversion",
+          "type": "integer"
+        },
+        "sequence": {
+          "minimum": 1,
+          "title": "Sequence",
+          "type": "integer"
+        },
+        "timestamp": {
+          "format": "date-time",
+          "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(?:\\.\\d+)?(?:Z|\\+00:00)$",
+          "title": "Timestamp",
+          "type": "string"
+        },
+        "type": {
+          "enum": [
+            "edit.offered",
+            "edit.result"
+          ],
+          "title": "Type",
+          "type": "string"
+        }
+      },
+      "required": [
+        "schemaVersion",
+        "id",
+        "sequence",
+        "projectId",
+        "conversationId",
+        "runId",
+        "timestamp",
+        "type",
+        "payload"
+      ],
+      "title": "EditEvent",
+      "type": "object"
+    },
+    "EditPayload": {
+      "additionalProperties": false,
+      "properties": {
+        "batchId": {
+          "maxLength": 128,
+          "minLength": 1,
+          "pattern": "^[A-Za-z0-9_-]+$",
+          "title": "Batchid",
+          "type": "string"
+        },
+        "disposition": {
+          "enum": [
+            "prepared",
+            "offered",
+            "applying",
+            "saved",
+            "stale",
+            "rejected",
+            "cancelled",
+            "save_failed",
+            "outcome_unknown"
+          ],
+          "title": "Disposition",
+          "type": "string"
+        },
+        "error": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/AgentError"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "batchId",
+        "disposition",
+        "error"
+      ],
+      "title": "EditPayload",
+      "type": "object"
+    },
     "EducationRecord": {
       "additionalProperties": false,
       "properties": {
@@ -1767,6 +2129,43 @@
         "syncId"
       ],
       "title": "FixedPayloadReference",
+      "type": "object"
+    },
+    "FocusTechnology": {
+      "additionalProperties": false,
+      "properties": {
+        "display": {
+          "title": "Display",
+          "type": "string"
+        },
+        "logo": {
+          "title": "Logo",
+          "type": "string"
+        },
+        "recordId": {
+          "minLength": 1,
+          "title": "Recordid",
+          "type": "string"
+        },
+        "years": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Years"
+        }
+      },
+      "required": [
+        "recordId",
+        "display",
+        "logo",
+        "years"
+      ],
+      "title": "FocusTechnology",
       "type": "object"
     },
     "GenerationStamp": {
@@ -2300,7 +2699,8 @@
             "heading",
             "section",
             "bullet_list",
-            "duplicate"
+            "duplicate",
+            "source_only"
           ],
           "title": "Kind",
           "type": "string"
@@ -2314,6 +2714,20 @@
           "default": false,
           "title": "Modelblock",
           "type": "boolean"
+        },
+        "reason": {
+          "anyOf": [
+            {
+              "maxLength": 4000,
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Reason"
         },
         "region": {
           "default": "main",
@@ -2471,6 +2885,14 @@
           "pattern": "^[a-f0-9]{64}$",
           "title": "Sourcesha256",
           "type": "string"
+        },
+        "technologyGroups": {
+          "items": {
+            "$ref": "#/$defs/ImportTechnologyGroup"
+          },
+          "maxItems": 40,
+          "title": "Technologygroups",
+          "type": "array"
         },
         "version": {
           "const": 1,
@@ -2829,6 +3251,52 @@
       "title": "ImportTechnology",
       "type": "object"
     },
+    "ImportTechnologyGroup": {
+      "additionalProperties": false,
+      "properties": {
+        "heading": {
+          "maxLength": 200,
+          "minLength": 1,
+          "title": "Heading",
+          "type": "string"
+        },
+        "region": {
+          "default": "main",
+          "enum": [
+            "sidebar",
+            "main"
+          ],
+          "title": "Region",
+          "type": "string"
+        },
+        "sourceKeys": {
+          "items": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "maxItems": 1000,
+          "title": "Sourcekeys",
+          "type": "array"
+        },
+        "technologies": {
+          "items": {
+            "maxLength": 4000,
+            "minLength": 1,
+            "type": "string"
+          },
+          "maxItems": 100,
+          "minItems": 1,
+          "title": "Technologies",
+          "type": "array"
+        }
+      },
+      "required": [
+        "heading",
+        "technologies"
+      ],
+      "title": "ImportTechnologyGroup",
+      "type": "object"
+    },
     "InlineStyles": {
       "additionalProperties": false,
       "properties": {
@@ -3116,6 +3584,14 @@
     "JobSnapshotV1": {
       "additionalProperties": false,
       "properties": {
+        "activity": {
+          "items": {
+            "$ref": "#/$defs/AgentEvent"
+          },
+          "maxItems": 40,
+          "title": "Activity",
+          "type": "array"
+        },
         "assetPinsSha256": {
           "anyOf": [
             {
@@ -3300,6 +3776,11 @@
         },
         "allowWeb": {
           "title": "Allowweb",
+          "type": "boolean"
+        },
+        "approvalRequired": {
+          "default": false,
+          "title": "Approvalrequired",
           "type": "boolean"
         },
         "guards": {
@@ -3642,6 +4123,91 @@
         "height"
       ],
       "title": "LocalImageAsset",
+      "type": "object"
+    },
+    "MessageDelta": {
+      "additionalProperties": false,
+      "properties": {
+        "conversationId": {
+          "maxLength": 128,
+          "minLength": 1,
+          "pattern": "^[A-Za-z0-9_-]+$",
+          "title": "Conversationid",
+          "type": "string"
+        },
+        "id": {
+          "maxLength": 128,
+          "minLength": 1,
+          "pattern": "^[A-Za-z0-9_-]+$",
+          "title": "Id",
+          "type": "string"
+        },
+        "payload": {
+          "$ref": "#/$defs/MessageDeltaPayload"
+        },
+        "projectId": {
+          "maxLength": 128,
+          "minLength": 1,
+          "pattern": "^[A-Za-z0-9_-]+$",
+          "title": "Projectid",
+          "type": "string"
+        },
+        "runId": {
+          "maxLength": 128,
+          "minLength": 1,
+          "pattern": "^[A-Za-z0-9_-]+$",
+          "title": "Runid",
+          "type": "string"
+        },
+        "schemaVersion": {
+          "const": 1,
+          "title": "Schemaversion",
+          "type": "integer"
+        },
+        "sequence": {
+          "minimum": 1,
+          "title": "Sequence",
+          "type": "integer"
+        },
+        "timestamp": {
+          "format": "date-time",
+          "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(?:\\.\\d+)?(?:Z|\\+00:00)$",
+          "title": "Timestamp",
+          "type": "string"
+        },
+        "type": {
+          "const": "message.delta",
+          "title": "Type",
+          "type": "string"
+        }
+      },
+      "required": [
+        "schemaVersion",
+        "id",
+        "sequence",
+        "projectId",
+        "conversationId",
+        "runId",
+        "timestamp",
+        "type",
+        "payload"
+      ],
+      "title": "MessageDelta",
+      "type": "object"
+    },
+    "MessageDeltaPayload": {
+      "additionalProperties": false,
+      "properties": {
+        "text": {
+          "maxLength": 8000,
+          "title": "Text",
+          "type": "string"
+        }
+      },
+      "required": [
+        "text"
+      ],
+      "title": "MessageDeltaPayload",
       "type": "object"
     },
     "MetricRecord": {
@@ -5182,6 +5748,96 @@
       "title": "ReplaceInlineRange",
       "type": "object"
     },
+    "ResourceEvent": {
+      "additionalProperties": false,
+      "properties": {
+        "conversationId": {
+          "maxLength": 128,
+          "minLength": 1,
+          "pattern": "^[A-Za-z0-9_-]+$",
+          "title": "Conversationid",
+          "type": "string"
+        },
+        "id": {
+          "maxLength": 128,
+          "minLength": 1,
+          "pattern": "^[A-Za-z0-9_-]+$",
+          "title": "Id",
+          "type": "string"
+        },
+        "payload": {
+          "$ref": "#/$defs/ResourcePayload"
+        },
+        "projectId": {
+          "maxLength": 128,
+          "minLength": 1,
+          "pattern": "^[A-Za-z0-9_-]+$",
+          "title": "Projectid",
+          "type": "string"
+        },
+        "runId": {
+          "maxLength": 128,
+          "minLength": 1,
+          "pattern": "^[A-Za-z0-9_-]+$",
+          "title": "Runid",
+          "type": "string"
+        },
+        "schemaVersion": {
+          "const": 1,
+          "title": "Schemaversion",
+          "type": "integer"
+        },
+        "sequence": {
+          "minimum": 1,
+          "title": "Sequence",
+          "type": "integer"
+        },
+        "timestamp": {
+          "format": "date-time",
+          "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(?:\\.\\d+)?(?:Z|\\+00:00)$",
+          "title": "Timestamp",
+          "type": "string"
+        },
+        "type": {
+          "enum": [
+            "source.ready",
+            "finding.ready"
+          ],
+          "title": "Type",
+          "type": "string"
+        }
+      },
+      "required": [
+        "schemaVersion",
+        "id",
+        "sequence",
+        "projectId",
+        "conversationId",
+        "runId",
+        "timestamp",
+        "type",
+        "payload"
+      ],
+      "title": "ResourceEvent",
+      "type": "object"
+    },
+    "ResourcePayload": {
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "maxLength": 128,
+          "minLength": 1,
+          "pattern": "^[A-Za-z0-9_-]+$",
+          "title": "Id",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id"
+      ],
+      "title": "ResourcePayload",
+      "type": "object"
+    },
     "ResumeIdentity": {
       "additionalProperties": false,
       "properties": {
@@ -5519,6 +6175,20 @@
           },
           "title": "Blocks",
           "type": "object"
+        },
+        "focusEntries": {
+          "items": {
+            "$ref": "#/$defs/FocusTechnology"
+          },
+          "title": "Focusentries",
+          "type": "array"
+        },
+        "focusOptions": {
+          "items": {
+            "$ref": "#/$defs/FocusTechnology"
+          },
+          "title": "Focusoptions",
+          "type": "array"
         }
       },
       "required": [
@@ -5948,6 +6618,31 @@
           "title": "Ready",
           "type": "boolean"
         },
+        "rewriteResult": {
+          "anyOf": [
+            {
+              "maxLength": 65536,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Rewriteresult"
+        },
+        "rewriteSource": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Rewritesource"
+        },
         "selection": {
           "anyOf": [
             {
@@ -6068,6 +6763,131 @@
         "sha256"
       ],
       "title": "Rules",
+      "type": "object"
+    },
+    "RunStateEvent": {
+      "additionalProperties": false,
+      "properties": {
+        "conversationId": {
+          "maxLength": 128,
+          "minLength": 1,
+          "pattern": "^[A-Za-z0-9_-]+$",
+          "title": "Conversationid",
+          "type": "string"
+        },
+        "id": {
+          "maxLength": 128,
+          "minLength": 1,
+          "pattern": "^[A-Za-z0-9_-]+$",
+          "title": "Id",
+          "type": "string"
+        },
+        "payload": {
+          "$ref": "#/$defs/RunStatePayload"
+        },
+        "projectId": {
+          "maxLength": 128,
+          "minLength": 1,
+          "pattern": "^[A-Za-z0-9_-]+$",
+          "title": "Projectid",
+          "type": "string"
+        },
+        "runId": {
+          "maxLength": 128,
+          "minLength": 1,
+          "pattern": "^[A-Za-z0-9_-]+$",
+          "title": "Runid",
+          "type": "string"
+        },
+        "schemaVersion": {
+          "const": 1,
+          "title": "Schemaversion",
+          "type": "integer"
+        },
+        "sequence": {
+          "minimum": 1,
+          "title": "Sequence",
+          "type": "integer"
+        },
+        "timestamp": {
+          "format": "date-time",
+          "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(?:\\.\\d+)?(?:Z|\\+00:00)$",
+          "title": "Timestamp",
+          "type": "string"
+        },
+        "type": {
+          "const": "run.state_changed",
+          "title": "Type",
+          "type": "string"
+        }
+      },
+      "required": [
+        "schemaVersion",
+        "id",
+        "sequence",
+        "projectId",
+        "conversationId",
+        "runId",
+        "timestamp",
+        "type",
+        "payload"
+      ],
+      "title": "RunStateEvent",
+      "type": "object"
+    },
+    "RunStatePayload": {
+      "additionalProperties": false,
+      "properties": {
+        "error": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/AgentError"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "outcomeUnknown": {
+          "title": "Outcomeunknown",
+          "type": "boolean"
+        },
+        "savedBatchId": {
+          "anyOf": [
+            {
+              "maxLength": 128,
+              "minLength": 1,
+              "pattern": "^[A-Za-z0-9_-]+$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Savedbatchid"
+        },
+        "state": {
+          "enum": [
+            "queued",
+            "running",
+            "waiting_for_editor",
+            "cancelling",
+            "completed",
+            "failed",
+            "cancelled",
+            "interrupted"
+          ],
+          "title": "State",
+          "type": "string"
+        }
+      },
+      "required": [
+        "state",
+        "error",
+        "savedBatchId",
+        "outcomeUnknown"
+      ],
+      "title": "RunStatePayload",
       "type": "object"
     },
     "ScopeGuardV1": {
@@ -7478,6 +8298,115 @@
       "title": "ToggleBlock",
       "type": "object"
     },
+    "ToolEvent": {
+      "additionalProperties": false,
+      "properties": {
+        "conversationId": {
+          "maxLength": 128,
+          "minLength": 1,
+          "pattern": "^[A-Za-z0-9_-]+$",
+          "title": "Conversationid",
+          "type": "string"
+        },
+        "id": {
+          "maxLength": 128,
+          "minLength": 1,
+          "pattern": "^[A-Za-z0-9_-]+$",
+          "title": "Id",
+          "type": "string"
+        },
+        "payload": {
+          "$ref": "#/$defs/ToolPayload"
+        },
+        "projectId": {
+          "maxLength": 128,
+          "minLength": 1,
+          "pattern": "^[A-Za-z0-9_-]+$",
+          "title": "Projectid",
+          "type": "string"
+        },
+        "runId": {
+          "maxLength": 128,
+          "minLength": 1,
+          "pattern": "^[A-Za-z0-9_-]+$",
+          "title": "Runid",
+          "type": "string"
+        },
+        "schemaVersion": {
+          "const": 1,
+          "title": "Schemaversion",
+          "type": "integer"
+        },
+        "sequence": {
+          "minimum": 1,
+          "title": "Sequence",
+          "type": "integer"
+        },
+        "timestamp": {
+          "format": "date-time",
+          "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(?:\\.\\d+)?(?:Z|\\+00:00)$",
+          "title": "Timestamp",
+          "type": "string"
+        },
+        "type": {
+          "enum": [
+            "tool.started",
+            "tool.completed",
+            "tool.failed"
+          ],
+          "title": "Type",
+          "type": "string"
+        }
+      },
+      "required": [
+        "schemaVersion",
+        "id",
+        "sequence",
+        "projectId",
+        "conversationId",
+        "runId",
+        "timestamp",
+        "type",
+        "payload"
+      ],
+      "title": "ToolEvent",
+      "type": "object"
+    },
+    "ToolPayload": {
+      "additionalProperties": false,
+      "properties": {
+        "callId": {
+          "maxLength": 128,
+          "minLength": 1,
+          "pattern": "^[A-Za-z0-9_-]+$",
+          "title": "Callid",
+          "type": "string"
+        },
+        "error": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/AgentError"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "name": {
+          "maxLength": 128,
+          "minLength": 1,
+          "title": "Name",
+          "type": "string"
+        }
+      },
+      "required": [
+        "callId",
+        "name",
+        "error"
+      ],
+      "title": "ToolPayload",
+      "type": "object"
+    },
     "UndoOwnershipV1": {
       "additionalProperties": false,
       "properties": {
@@ -7723,6 +8652,76 @@
         "status"
       ],
       "title": "UnresolvedRecord",
+      "type": "object"
+    },
+    "UsageEvent": {
+      "additionalProperties": false,
+      "properties": {
+        "conversationId": {
+          "maxLength": 128,
+          "minLength": 1,
+          "pattern": "^[A-Za-z0-9_-]+$",
+          "title": "Conversationid",
+          "type": "string"
+        },
+        "id": {
+          "maxLength": 128,
+          "minLength": 1,
+          "pattern": "^[A-Za-z0-9_-]+$",
+          "title": "Id",
+          "type": "string"
+        },
+        "payload": {
+          "$ref": "#/$defs/AgentUsage"
+        },
+        "projectId": {
+          "maxLength": 128,
+          "minLength": 1,
+          "pattern": "^[A-Za-z0-9_-]+$",
+          "title": "Projectid",
+          "type": "string"
+        },
+        "runId": {
+          "maxLength": 128,
+          "minLength": 1,
+          "pattern": "^[A-Za-z0-9_-]+$",
+          "title": "Runid",
+          "type": "string"
+        },
+        "schemaVersion": {
+          "const": 1,
+          "title": "Schemaversion",
+          "type": "integer"
+        },
+        "sequence": {
+          "minimum": 1,
+          "title": "Sequence",
+          "type": "integer"
+        },
+        "timestamp": {
+          "format": "date-time",
+          "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(?:\\.\\d+)?(?:Z|\\+00:00)$",
+          "title": "Timestamp",
+          "type": "string"
+        },
+        "type": {
+          "const": "usage.reported",
+          "title": "Type",
+          "type": "string"
+        }
+      },
+      "required": [
+        "schemaVersion",
+        "id",
+        "sequence",
+        "projectId",
+        "conversationId",
+        "runId",
+        "timestamp",
+        "type",
+        "payload"
+      ],
+      "title": "UsageEvent",
       "type": "object"
     },
     "WarningLocation": {

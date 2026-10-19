@@ -128,7 +128,7 @@ def restore(workspace, payload):
     session = workspace.edit_sessions.get(slot)
     if session and payload.session_id not in (None, session.session_id):
         raise MutationFailure("SESSION_MISMATCH")
-    changed_buffer = session and content(record) != content(session.baseline.record)
+    changed_buffer = session and (bool(session.buffered_fields) or content(record) != content(session.baseline.record))
     target = session.baseline if changed_buffer else workspace.undo_slots.get(slot)
     if target is None:
         return []
@@ -211,6 +211,24 @@ def edit(workspace, payload):
     session = workspace.edit_sessions.get(slot)
     if session and session.session_id != payload.session_id:
         raise MutationFailure("SESSION_MISMATCH")
+    baselines = [session.baseline if session else None, workspace.undo_slots.get(slot)]
+    original_fields = {field.field_id: field for field in authored_fields(record)}
+    for field in authored_fields(value):
+        original = original_fields.get(field.field_id)
+        if original is not None and original.text == field.text:
+            continue
+        previous = next((old for baseline in baselines if baseline for old in authored_fields(baseline.record)
+            if old.field_id == field.field_id and old.text == field.text), None)
+        if value.kind == "skills-focus":
+            entry = next((item for item in value.focus if item.display.field_id == field.field_id), None)
+            if entry is not None:
+                old_entry = next((item for baseline in baselines if baseline for item in baseline.record.focus
+                    if item.id == entry.id and item.catalog_id == entry.catalog_id and item.display.text == field.text), None)
+                previous = old_entry.display if old_entry else None
+                if old_entry:
+                    entry.fact_ids = old_entry.fact_ids[:]
+        if previous is not None:
+            field.fact_ids, field.evidence, field.origin = previous.fact_ids[:], previous.evidence[:], previous.origin
     changed = before != content(value)
     if changed:
         if session is None:
@@ -220,6 +238,8 @@ def edit(workspace, payload):
         value.revision += 1
         replace_record(workspace.project.document, slot, value)
         session.buffered_fields = [BufferedField(fieldId=field.field_id, text=field.text) for field in authored_fields(value)]
+    elif value != record:
+        replace_record(workspace.project.document, slot, value)
     if payload.completion == "slot":
         complete_session(workspace, slot)
     return [slot] if changed else []

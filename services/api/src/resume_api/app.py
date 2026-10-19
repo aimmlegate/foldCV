@@ -25,7 +25,7 @@ from pydantic import ValidationError
 
 from .contracts import (CompletedEvent, CompletedPayload, ConnectionPayload, DraftRequest, EmptyRequest, ErrorEnvelope, ErrorPayload,
                         FailedEvent, NormalizeRequest, OperationResult, RenderRequest, RewriteRequest, StartedEvent,
-                        SelectModelRequest, QuotaPayload, ValidateRequest,
+                        SelectModelRequest, SelectReasoningRequest, QuotaPayload, ValidateRequest,
                         StartedPayload, TextRequest, UsagePayload)
 from .lifecycle import OperationFiles, SpikeError, has_blocked_owned, reap_owned
 from .connection import ConnectionAdapter, ConnectionFailure, Metadata
@@ -1076,6 +1076,19 @@ def create_app(*, origin: str, secret: str, temp_root: Path, dist: Path, runner:
             except (PreferencesFailure, RulesFailure) as error:
                 return problem(error.code, 409, "settings")
 
+    @app.put("/v1/settings/rewrite-reasoning")
+    async def save_rewrite_reasoning(payload: SelectReasoningRequest):
+        async with gate:
+            metadata = connection_state.modelReasoning.get(payload.model)
+            if (not connection_state.metadataReady or payload.model != connection_state.selectedModel
+                    or payload.effort is not None and (metadata is None or payload.effort not in metadata.supported)):
+                return problem("MODEL_DENIED", 409, "settings")
+            try:
+                value = preferences_store.select_rewrite_reasoning(payload.model, payload.effort)
+                return JSONResponse(value.model_dump(mode="json", by_alias=True), headers={"Cache-Control": "no-store"})
+            except PreferencesFailure as error:
+                return problem(error.code, 409, "settings")
+
     async def connection_job(kind: str, work):
         nonlocal active, connection_epoch, connection_state, login_task
         async with gate:
@@ -1091,6 +1104,8 @@ def create_app(*, origin: str, secret: str, temp_root: Path, dist: Path, runner:
                 return problem("LOGIN_NOT_AVAILABLE", 409, "host")
             if cancellation_pending or active >= MAX_CONCURRENT or connection_work:
                 return problem("BUSY", 429, "host", True)
+            if provider is not None:
+                provider.invalidate_preflight()
             active += 1
             epoch = connection_epoch
             files = OperationFiles(temp_root)
@@ -1135,7 +1150,7 @@ def create_app(*, origin: str, secret: str, temp_root: Path, dist: Path, runner:
                 state = ("unchecked" if kind == "discover" else "quota_exhausted" if quota.state == "exhausted"
                          else "unknown_limits" if quota.state == "unknown" else "connected")
                 connection_state = ConnectionPayload(state=state, version=result.version, plan=result.plan,
-                                                     models=list(result.models), selectedModel=selected, quota=quota,
+                                                     models=list(result.models), selectedModel=selected, quota=quota, modelReasoning=result.reasoning,
                                                      metadataReady=kind != "discover")
                 return connection_response()
         except (AdmissionTimeout, AdmissionCancelled):
@@ -1210,6 +1225,8 @@ def create_app(*, origin: str, secret: str, temp_root: Path, dist: Path, runner:
     async def detach(_payload: EmptyRequest):
         nonlocal connection_epoch, connection_state
         async with gate:
+            if provider is not None:
+                provider.invalidate_preflight()
             connection_epoch += 1
             connection_state = ConnectionPayload(state="detached")
             if background_enabled:
@@ -1239,6 +1256,8 @@ def create_app(*, origin: str, secret: str, temp_root: Path, dist: Path, runner:
             current = login_task
             if current is None or current not in connection_work:
                 return connection_response()
+            if provider is not None:
+                provider.invalidate_preflight()
             connection_epoch += 1
             agent.request_stop(reason="AGENT_CONNECTION_CHANGED")
             connection_state = ConnectionPayload(state="login_required", version=connection_state.version)

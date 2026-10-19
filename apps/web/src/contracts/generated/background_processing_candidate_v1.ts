@@ -7,9 +7,10 @@ export type Category =
  */
 export type Duplicateof = string[];
 export type Id1 = string;
-export type Kind = "paragraph" | "heading" | "section" | "bullet_list" | "duplicate";
+export type Kind = "paragraph" | "heading" | "section" | "bullet_list" | "duplicate" | "source_only";
 export type Listitem = boolean;
 export type Modelblock = boolean;
+export type Reason = string | null;
 export type Region = "header" | "sidebar" | "main";
 /**
  * @maxItems 1000
@@ -83,6 +84,21 @@ export type Runid = string;
 export type Sequence1 = number;
 export type Skillsha256 = string;
 export type Sourcesha256 = string;
+export type Heading = string;
+export type Region1 = "sidebar" | "main";
+/**
+ * @maxItems 1000
+ */
+export type Sourcekeys3 = string[];
+/**
+ * @minItems 1
+ * @maxItems 100
+ */
+export type Technologies1 = [string, ...string[]];
+/**
+ * @maxItems 40
+ */
+export type Technologygroups = ImportTechnologyGroup[];
 export type Version = 1;
 export type Inputid = string;
 export type Sourceid = string;
@@ -1167,7 +1183,7 @@ export type Rawtext5 = string;
 export type Evidencerecords = ImmutableFactEvidence[];
 export type Blockids = string[];
 export type Disposition2 = "placed" | "excluded";
-export type Reason = string | null;
+export type Reason1 = string | null;
 export type Sourceid6 = string;
 export type Unitid5 = string;
 export type Importcoverage = ImportCoverage[];
@@ -1272,6 +1288,8 @@ export type Recordid6 = string;
  */
 export type Proposedsteps = (PutBlock | RemoveBlock | MoveBlock | ReplaceInlineRange | PutRecord | RemoveRecord)[];
 export type Ready = boolean;
+export type Rewriteresult = string | null;
+export type Rewritesource = string | null;
 export type Blockid3 = string;
 export type Cellid1 = string | null;
 /**
@@ -1327,6 +1345,7 @@ export interface ImportDraft {
   sequence?: Sequence1;
   skillSha256: Skillsha256;
   sourceSha256: Sourcesha256;
+  technologyGroups?: Technologygroups;
   version?: Version;
 }
 export interface ImportBlock {
@@ -1336,6 +1355,7 @@ export interface ImportBlock {
   kind?: Kind;
   listItem?: Listitem;
   modelBlock?: Modelblock;
+  reason?: Reason;
   region?: Region;
   sourceKeys?: Sourcekeys;
   title?: Title;
@@ -1391,6 +1411,12 @@ export interface ImportReceipt {
   batchId: Batchid;
   requestSha256: Requestsha256;
   sequence: Sequence;
+}
+export interface ImportTechnologyGroup {
+  heading: Heading;
+  region?: Region1;
+  sourceKeys?: Sourcekeys3;
+  technologies: Technologies1;
 }
 export interface GuiNormalizedResult {
   candidate: CandidateDetails;
@@ -2358,7 +2384,7 @@ export interface ImmutableFactEvidence {
 export interface ImportCoverage {
   blockIds: Blockids;
   disposition: Disposition2;
-  reason: Reason;
+  reason: Reason1;
   sourceId: Sourceid6;
   unitId: Unitid5;
 }
@@ -2402,6 +2428,8 @@ export interface RichSyncRecord {
   kind?: Kind40;
   proposedSteps?: Proposedsteps;
   ready?: Ready;
+  rewriteResult?: Rewriteresult;
+  rewriteSource?: Rewritesource;
   selection?: RichSelection | null;
   status: Status8;
 }

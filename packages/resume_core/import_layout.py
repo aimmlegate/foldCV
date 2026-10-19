@@ -5,7 +5,7 @@ import re
 
 from .rendering.rich_template import require_rich_template
 from .import_cleanup import merge_evidence, normalized
-from .technologies import is_technical, resolve_technology
+from .technologies import is_technical
 
 
 def split_profile(block, identity):
@@ -38,8 +38,8 @@ def split_profile(block, identity):
         result.append(copy)
     return result
 
-def arrange_import(regions, metadata, records, identity):
-    if not any(block.category for block in metadata.values()):
+def arrange_import(regions, metadata, records, identity, *, technology_groups=()):
+    if not any(block.category for block in metadata.values()) and not technology_groups:
         return regions
     by_id = {record["id"]: record for record in records}
     candidate = by_id.get("candidate")
@@ -131,6 +131,14 @@ def arrange_import(regions, metadata, records, identity):
                 and by_id[link["recordId"]]["kind"] == "employment"}
             employer_heading = category == "experience" and any(span["fieldKey"] == "employer"
                 and by_id[span["recordId"]]["kind"] == "employment" for span in fields)
+            if (block["type"] in {"section", "heading"} and parent["content"] and not parent["children"]
+                    and not any(link["kind"] == "source" for link in parent["provenance"])
+                    and any(link["kind"] == "source" for link in block["provenance"])
+                    and normalized(authored_text_dict(block)).removesuffix(":").rstrip().casefold()
+                        == normalized(authored_text_dict(parent)).removesuffix(":").rstrip().casefold()):
+                # Prefer the source heading over an optional label for the same band.
+                parent["content"], parent["provenance"] = block["content"], block["provenance"]
+                continue
             if block["type"] == "section":
                 generated_employer = category == "experience" and not any(link["kind"] == "source" for link in block["provenance"]) and any(
                     re.sub(r"\s*\((?:continued|continuation|продолжение)\)$", "", normalized(authored_text_dict(block)), flags=re.I)
@@ -197,24 +205,17 @@ def arrange_import(regions, metadata, records, identity):
                 parent["props"]["presentation"] = "focus"
             else:
                 groups[key] = ("main", category, parent)
+    for index, (region, section) in enumerate(technology_groups):
+        groups[("technology_group", index)] = (region, "skills", section)
     for region in ("sidebar", "main"):
         order = {"summary": 0, "experience": 1, "skills": 2, "other": 3} if region == "main" else {
             "skills": 0, "education": 1, "languages": 2, "contacts": 3}
         regions[region] = [block for target, _category, block in sorted(groups.values(), key=lambda row: order.get(row[1], 4)) if target == region]
     if not any(block["props"].get("presentation") == "focus" for block in regions["sidebar"]):
-        technologies = [record for record in records if record["kind"] == "technology" and is_technical(record)]
-        general = [record for record in technologies if record["jobId"] is None]
-        selected, seen = [], set()
+        from .technology_focus import focus_candidates
         spec = require_rich_template().specification["focus"]
         count = spec["referenceLogoEntries"] + spec["referenceTextOnlyEntries"]
-        pool = general + [r for r in technologies if r["jobId"] is not None]
-        for record in pool:
-            key = record["canonicalId"]["value"] or resolve_technology(record["display"]["rawText"]).canonical_id or record["display"]["rawText"].strip().casefold()
-            if key and key not in seen:
-                selected.append(record)
-                seen.add(key)
-            if len(selected) == count:
-                break
+        selected = focus_candidates(records, count)
         if selected:
             russian = any(re.search(r"[а-яё]", authored_text_dict(block), re.I) for _region, _category, block in groups.values())
             focus = {"id": identity("focus", "summary"), "revision": 1, "type": "section",

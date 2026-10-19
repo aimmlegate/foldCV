@@ -26,6 +26,74 @@ from tests.recovery.test_import_lists import fixture as list_fixture
 
 
 @pytest.mark.asyncio
+@pytest.mark.parametrize("block_type", ["section", "heading"])
+@pytest.mark.parametrize("category,title,source_title", [
+    ("skills", "КЛЮЧЕВЫЕ НАВЫКИ", "КЛЮЧЕВЫЕ НАВЫКИ"),
+    ("other", "ОПЫТ ВОЖДЕНИЯ", "ОПЫТ ВОЖДЕНИЯ"),
+    ("other", "ДОПОЛНИТЕЛЬНО", "ДОПОЛНИТЕЛЬНО"),
+    ("education", "Education", "EDUCATION:"),
+])
+async def test_optional_section_label_uses_the_leading_source_heading_once(
+        tmp_path, monkeypatch, block_type, category, title, source_title):
+    service, identifier, *_ = await selected_service(tmp_path, monkeypatch)
+    sources, parts, paragraphs = paragraphs_fixture(["Candidate", source_title, "Keep this detail."])
+    workspace = service.workspaces[identifier]
+    workspace.pre_draft.sources = sources
+    workspace.pre_draft.selected_source_id = sources[0].id
+    saved = update_content(draft_fixture(), ImportContent(
+        facts=[{"text": "Keep this detail.", "refs": ["p3"]}],
+        sections=[{"category": "identity", "blocks": [{"type": "heading", "refs": ["p1"]}]},
+            {"category": category, "heading": title, "blocks": [
+                {"type": block_type, "refs": ["p2"]}, {"type": "paragraph", "refs": ["p3"]}]}]),
+        paragraphs, parts)
+    saved.finished = True
+    try:
+        project = assemble_agent_import(workspace, saved)
+        visible = [authored_text(b) for b in project.document.blocks() if authored_text(b)]
+        assert visible == ["Candidate", source_title, "Keep this detail."]
+        heading = next(b for b in project.document.blocks() if authored_text(b) == source_title)
+        assert heading.type == "section"
+        assert any(link.kind == "source" and link.evidence[0].text == source_title for link in heading.provenance)
+        assert project.import_coverage[1].block_ids == [heading.id]
+        assert project.sources == sources
+        assert next(r for r in project.facts.records if r.kind == "claim").value.raw_text == "Keep this detail."
+        with ZipFile(BytesIO(render_rich_docx(project.document, facts=project.facts))) as archive:
+            xml = etree.fromstring(archive.read("word/document.xml"))
+        ns = {"w": "http://schemas.openxmlformats.org/wordprocessingml/2006/main"}
+        paragraphs = ["".join(p.xpath(".//w:t/text()", namespaces=ns)) for p in xml.xpath("//w:p", namespaces=ns)]
+        assert paragraphs.count(source_title) == 1
+        assert title == source_title or title not in paragraphs
+        assert "Keep this detail." in paragraphs
+    finally:
+        await service.shutdown()
+
+
+@pytest.mark.asyncio
+async def test_optional_label_does_not_hide_repeated_source_headings_or_qualified_content(tmp_path, monkeypatch):
+    service, identifier, *_ = await selected_service(tmp_path, monkeypatch)
+    texts = ["Skills", "Skills", "Skills: current focus", "Details"]
+    sources, parts, paragraphs = paragraphs_fixture(texts)
+    workspace = service.workspaces[identifier]
+    workspace.pre_draft.sources = sources
+    workspace.pre_draft.selected_source_id = sources[0].id
+    saved = update_content(draft_fixture(), ImportContent(sections=[
+        {"category": "other", "heading": "Skills", "blocks": [
+            {"type": "section", "refs": ["p1"]}, {"type": "section", "refs": ["p2"]}]},
+        {"category": "other", "heading": "Skills", "blocks": [
+            {"type": "section", "refs": ["p3"]}, {"type": "paragraph", "refs": ["p4"]}]}]),
+        paragraphs, parts)
+    saved.finished = True
+    try:
+        project = assemble_agent_import(workspace, saved)
+        assert [authored_text(b) for b in project.document.blocks() if authored_text(b)] == [
+            "Skills", "Skills", "Skills", "Skills: current focus", "Details"]
+        assert project.sources == sources
+        assert all(row.disposition == "placed" and row.block_ids for row in project.import_coverage)
+    finally:
+        await service.shutdown()
+
+
+@pytest.mark.asyncio
 async def test_semantic_blocks_join_split_period_and_stack_but_keep_role_and_distinct_contacts(tmp_path, monkeypatch):
     service, identifier, _runtime, _sessions = await selected_service(tmp_path, monkeypatch)
     texts = ["Candidate\n", "Tech Lead\n", "Company | 2012 –\n", "2020\n", "•\n", "• php, nodejs, nats,\n",

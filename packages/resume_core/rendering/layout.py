@@ -241,7 +241,7 @@ def _append_with_budget(pages: list[list], item, height: float) -> None:
         raise ValueError("One resume block exceeds the page budget")
     page = pages[-1]
     used = sum(existing[1] for existing in page)
-    if page and used + height > _page_budget(len(pages) - 1):
+    if used + height > _page_budget(len(pages) - 1):
         pages.append([])
     if height > _page_budget(len(pages) - 1):
         raise ValueError("Resume block cannot fit on its planned page")

@@ -152,6 +152,8 @@ class RichSyncRecord(Wire):
     proposed_steps: list[RichStep] = Field(default_factory=list, max_length=1000)
     selection: RichSelection | None = None
     instruction: str | None = None
+    rewrite_source: str | None = Field(default=None, exclude_if=lambda value: value is None)
+    rewrite_result: str | None = Field(default=None, max_length=65536, exclude_if=lambda value: value is None)
 
 
 class RichMutationReplay(Wire):

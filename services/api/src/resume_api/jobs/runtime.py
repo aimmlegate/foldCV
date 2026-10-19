@@ -7,6 +7,8 @@ import time
 from packages.resume_core.agent_store import AgentFailure
 from packages.resume_core.background_store import BackgroundFailure
 from packages.resume_core.background_supervisor import ExecutionOutcome
+from packages.resume_core.models.agent import AgentEvent
+from packages.resume_core.rich_assembly import identity
 
 from ..agent.runtime import RuntimeInput
 from .tools import DEVELOPER_INSTRUCTIONS_V2
@@ -45,6 +47,10 @@ class JobRuntime:
         try:
             self.session = self.open_session(control)
             await self.session.start()
+            conversation = None
+            if control.job.submission.kind == "agent":
+                _job, artifact = self.service.artifacts.record(control.project_id, control.run_id)
+                conversation = artifact.request.conversation_id
             if control.cancel.is_set():
                 raise BackgroundFailure("CANCELLED")
             runtime = copy.copy(self.service.runtime)
@@ -76,8 +82,21 @@ class JobRuntime:
                 else:
                     await self.service.supervisor.observer("scripted_model_ready", control.run_id)
             def emit(kind, payload):
-                if kind == "run.state" and payload.get("error", {}).get("code") in {"AGENT_QUOTA", "AGENT_AUTH_REQUIRED"}:
-                    loop.call_soon_threadsafe(self.service.supervisor.pause, ERRORS[payload["error"]["code"]])
+                error = payload.get("error")
+                if kind == "run.state" and isinstance(error, dict) and error.get("code") in {"AGENT_QUOTA", "AGENT_AUTH_REQUIRED"}:
+                    loop.call_soon_threadsafe(self.service.supervisor.pause, ERRORS[error["code"]])
+                if conversation is None or kind not in {"activity.updated", "tool.started", "tool.completed", "tool.failed"}:
+                    return
+                def progress(_state, job):
+                    if job.execution_generation != control.job.execution_generation or job.execution not in {"starting", "running", "cancelling"}:
+                        return
+                    event = AgentEvent.model_validate({"schemaVersion": 1, "id": identity("activity"), "sequence": job.event_cursor + 1,
+                        "projectId": control.project_id, "runId": job.id, "conversationId": conversation,
+                        "timestamp": self.service.store.clock(), "type": kind, "payload": payload})
+                    if kind == "activity.updated":
+                        job.activity = [item for item in job.activity if item.root.type != kind or item.root.payload.item_id != event.root.payload.item_id]
+                    job.activity = [*job.activity, event][-40:]
+                self.service.store.update(control.project_id, control.run_id, progress)
             value = RuntimeInput(model=self.model.model, prompt=self.session.prompt, url=self.session.url,
                 token=self.session.token, tools=tuple(control.job.submission.tools), allow_web=control.job.submission.allow_web,
                 queued_at=time.monotonic(), before_start=ready_shared if multiplexed else

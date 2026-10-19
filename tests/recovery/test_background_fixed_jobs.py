@@ -40,11 +40,7 @@ class HeldProvider(CreationProvider):
             raise ContentFailure("CANCELLED")
         response = super().generate(request, files, cancel)
         if self.replace_bound:
-            for replacement in response.value.replacements:
-                for block in replacement.blocks:
-                    for span in block.content if isinstance(block.content, list) else []:
-                        if span.type == "fact_field":
-                            span.text = "Rewritten"
+            response.value.text = "Rewritten"
         return response
 
     def release_all(self):
@@ -602,3 +598,65 @@ async def test_failed_automatic_replacement_keeps_the_old_job_and_removes_inert_
         await service.shutdown()
         factory.verify()
         service.supervisor.clock.verify()
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize('outcome', ['apply', 'edit', 'discard'])
+async def test_preview_rewrite_waits_for_approval_and_keeps_capture_guards(tmp_path, outcome):
+    service, factory, workspace, _request, _connection, _old = await environment(tmp_path)
+    provider = CreationProvider()
+    service.projects.provider_factory = lambda: (provider, 'processing-model')
+    try:
+        command = rewrite_command(workspace)
+        command['request']['previewOnly'] = True
+        reply, _created = await service.fixed.submit(workspace.project_id,
+            fixed_request(service, workspace.project_id, 'preview-rewrite', command))
+        ready = await settled(service, workspace.project_id, reply.job.id, publication='waiting_for_sync')
+        assert ready.submission.approval_required and ready.receipt is None
+        before, _checksum = service.projects.storage.read_committed(workspace.project_id)
+        assert before.project == workspace.project
+        record = next(record for record in before.sync_records if record.id == reply.sync_id)
+        assert record.rewrite_source == 'Styled' and record.rewrite_result == 'Clearer: Styled'
+        proposal = next(proposal for proposal in service.store.load(workspace.project_id).proposals if proposal.job_id == ready.id)
+        unapproved = service.publication.publish(workspace.project_id, ready.id, proposal.payload_sha256)
+        assert unapproved.receipt is None
+        assert service.projects.storage.read_committed(workspace.project_id)[0].project == before.project
+        if outcome == 'edit':
+            save_and_detach(service, workspace.project_id, mutation(before, [put(before, 'narrative', text='My new text')]))
+        elif outcome == 'discard':
+            await service.discard(workspace.project_id, ready.id)
+            with pytest.raises(BackgroundFailure, match='CANCELLED'):
+                service.publication.publish(workspace.project_id, ready.id, proposal.payload_sha256, approved=True)
+            assert service.projects.storage.read_committed(workspace.project_id)[0].project == before.project
+            return
+        result = service.publication.publish(workspace.project_id, ready.id, proposal.payload_sha256, approved=True)
+        saved = service.projects.storage.read_committed(workspace.project_id)[0]
+        text = next(block for block in saved.project.document.blocks() if block.id == 'narrative').content[0].text
+        if outcome == 'apply':
+            assert result.receipt is not None and text.startswith('Clearer: Styled')
+            assert service.publication.publish(workspace.project_id, ready.id, proposal.payload_sha256, approved=True).receipt == result.receipt
+        else:
+            assert result.receipt is None and result.publication == 'needs_review' and text == 'My new text'
+        assert len(provider.calls) == 1
+    finally:
+        await service.shutdown()
+        factory.verify()
+        service.supervisor.clock.verify()
+
+
+@pytest.mark.parametrize('boundary', ['blocks', 'block', 'cell'])
+def test_preview_rewrite_rejects_multi_target_ranges_before_submission(boundary):
+    from pydantic import ValidationError
+    from packages.resume_core.rich_sync import RichRewriteRequest
+    from tests.recovery.test_rich_persistence import without_sources
+    selected = selection(without_sources()).model_dump(by_alias=True)
+    if boundary == 'blocks':
+        selected['kind'] = 'blocks'
+    elif boundary == 'block':
+        selected['blockIds'].append('other-block')
+        selected['head']['blockId'] = 'other-block'
+    else:
+        selected['kind'] = 'table_cells'
+        selected['anchor']['cellId'], selected['head']['cellId'] = 'cell-one', 'cell-two'
+    with pytest.raises(ValidationError):
+        RichRewriteRequest.model_validate({'selection': selected, 'instruction': 'Clarify', 'previewOnly': True})

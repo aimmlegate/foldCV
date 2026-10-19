@@ -25,7 +25,7 @@ import { brand, presentationLogos } from "./presentation-assets";
 import { referenceVariables } from "./template";
 import type { TimelineReport } from "../contracts/generated/timeline_report";
 import type { DateCascadeProposal } from "../contracts/generated/date_cascade_proposal";
-import { selectedRange } from "./selection";
+import { selectedRange, singleRewriteRange } from "./selection";
 import type { RichSelection } from "../contracts/generated/rich_selection";
 import type { RichCompletionRequest } from "../contracts/generated/rich_completion_request";
 import { SessionHistory, type CellChange, type CellValue } from "./history";
@@ -45,10 +45,13 @@ import { commandBlock } from "./block-target";
 import { prototypePresentation } from "../workbench/editor/presentation";
 import { Toolbar, type ToolbarCommand } from "../workbench/editor/Toolbar";
 import { RewritePanel } from "../workbench/editor/RewritePanel";
+import { rewriteActive, type RewriteActivity, type RewritePreview } from "./rewrite-progress";
 import { LinkDialog } from "../workbench/editor/LinkDialog";
 import { Icon } from "../workbench/ui/Icon";
 import { projectRegionChildren } from "../workbench/editor/regions";
 import { SourceDialog } from "../workbench/editor/SourceDialog";
+import { ComparisonWorkspace, WorkspaceViews, type WorkspaceView } from "../workbench/editor/ComparisonWorkspace";
+import { LayoutControls } from "../workbench/editor/LayoutControls";
 import { EditorNotices } from "../workbench/editor/EditorNotices";
 import { allowsBasicEdit, basicPastedSlice } from "./basic-editing";
 import { capturedSelectionCurrent } from "../workbench/editor/capture";
@@ -59,6 +62,7 @@ import type { AttachedWriter } from "../background/connection";
 import { projectJobs } from "../background/jobs";
 import { allowRichCodeStyles, allowRichColors } from "./styles";
 import { captureCaret, restoreCaret } from "./caret";
+import { OperationStatus, Spinner } from "../workbench/ui/OperationStatus";
 
 type FactIntent = { kind: "panel"; command: PanelCommand } | { kind: "cascade"; proposal: DateCascadeProposal };
 
@@ -134,9 +138,9 @@ export type RichEditorHandle = { flush: () => Promise<RichProjectResponse>; undo
     historyOffers: Pick<AgentHistoryOffer, "undo" | "redo"> }>;
   focusFinding: (anchor: AgentFinding["anchors"][number]) => boolean;
   applyAssistant: (batchId: string, api: PreparedApi) => Promise<void> };
-export function RichEditor({ initial, acknowledge, onStatus, ref, onHistoryNavigation, onAssistantFence, portalHost, contextActions, assistant, writer: writerConnection = null }: { initial: RichProjectResponse;
+export function RichEditor({ initial, acknowledge, onStatus, ref, onHistoryNavigation, onAssistantFence, onComparisonOpen, portalHost, assistant, writer: writerConnection = null }: { initial: RichProjectResponse;
   acknowledge: (response: RichProjectResponse) => void; onStatus: (status: string) => void; ref: Ref<RichEditorHandle>;
-  onHistoryNavigation?: () => void; onAssistantFence?: (saved: boolean) => void; portalHost?: HTMLElement; contextActions?: ReactNode; assistant?: ReactNode; writer?: AttachedWriter | null }) {
+  onComparisonOpen?: () => void; onHistoryNavigation?: () => void; onAssistantFence?: (saved: boolean) => void; portalHost?: HTMLElement; assistant?: ReactNode; writer?: AttachedWriter | null }) {
   const canonicalProject = initial.workspace.project;
   const project = canonicalProject && writerConnection?.local ? { ...canonicalProject,
     document: writerConnection.local.payload.document, facts: writerConnection.local.payload.facts } : canonicalProject;
@@ -154,10 +158,22 @@ export function RichEditor({ initial, acknowledge, onStatus, ref, onHistoryNavig
   const [rewriting, setRewriting] = useState(false);
   const [rewriteOpen, setRewriteOpen] = useState(false);
   const [rewriteError, setRewriteError] = useState("");
-  const [factsVisible, setFactsVisible] = useState(() => window.innerWidth > 600);
+  const [rewritePreview, setRewritePreview] = useState<RewritePreview | null>(null);
+  const [rewriteAnchor, setRewriteAnchor] = useState<{ left: number; top: number; bottom: number } | null>(null);
+  const [rewriteFocus, setRewriteFocus] = useState(true);
+  const [rewriteActivities, setRewriteActivities] = useState<RewriteActivity[]>([]);
+  const rewriteAction = useRef<string | null>(null);
+  const latestRewrite = [...rewriteActivities].reverse().find(activity => rewriteActive(activity.stage) || ["preview", "failed", "review"].includes(activity.stage));
+  const [factsVisible, setFactsVisible] = useState(false);
   const [linkOpen, setLinkOpen] = useState(false);
   const [linkText, setLinkText] = useState("");
-  const [sourceOpen, setSourceOpen] = useState(false);
+  const [workspaceView, setWorkspaceView] = useState<WorkspaceView>("layout");
+  const [sourceVisited, setSourceVisited] = useState(false);
+  function changeWorkspaceView(view: WorkspaceView) {
+    if (view !== "layout") { setSourceVisited(true); setFactsVisible(false); }
+    if (view === "compare" && workspaceView !== "compare") onComparisonOpen?.();
+    setWorkspaceView(view);
+  }
   const linkCapture = useRef<{ doc: ProseMirrorNode; bookmark: SelectionBookmark } | null>(null);
   const imageTarget = useRef<string | undefined>(undefined);
   const [rewriteSource, setRewriteSource] = useState("");
@@ -168,8 +184,10 @@ export function RichEditor({ initial, acknowledge, onStatus, ref, onHistoryNavig
   const [syncRecords, setSyncRecords] = useState(initial.workspace.syncRecords);
   const rewriteSelection = useRef<ReturnType<typeof selectedRange>>(null);
   const rewriteCapture = useRef<CapturedEditorSelection | null>(null);
+  const rewriteExpectedChecksum = useRef<string | null>(null);
   const [editorWarning, setEditorWarning] = useState("");
   const [applying, setApplying] = useState(false);
+  const [imageUploads, setImageUploads] = useState(0);
   const [recovery, setRecovery] = useState(false);
   const [writerMode, setWriterMode] = useState<WriterMode | null>(null);
   const assistantCallbacks = useRef({ onHistoryNavigation, onAssistantFence });
@@ -189,7 +207,9 @@ export function RichEditor({ initial, acknowledge, onStatus, ref, onHistoryNavig
     cascadeApply: async (_proposal: DateCascadeProposal): Promise<void> => {},
     fragments: new Map<string, string>(), projectionError: null as string | null,
     current: new Map<string, CellValue>(), values: new Map<string, Stored>(), original: new Map<string, RichBlock>(),
-    undo: () => {}, redo: () => {}, complete: () => {}, panel: async (_command: PanelCommand): Promise<void> => {}, rewrite: async (_instruction: string): Promise<void> => {}, retry: async (_id: string): Promise<void> => {}, resolve: async (_id: string): Promise<void> => {}, timer: null as ReturnType<typeof setTimeout> | null }), []);
+    undo: () => {}, redo: () => {}, complete: () => {}, panel: async (_command: PanelCommand): Promise<void> => {}, rewrite: async (_instruction: string): Promise<void> => {},
+    previewRewrite: (_id: string): RewritePreview | null => null, applyRewrite: async (_id: string): Promise<void> => {},
+    cancelRewrite: async (_id: string): Promise<void> => {}, retry: async (_id: string): Promise<void> => {}, resolve: async (_id: string): Promise<void> => {}, timer: null as ReturnType<typeof setTimeout> | null }), []);
   const assets = useMemo(() => ({ upload: async (_file: File, _block?: string, _after?: string): Promise<void> => {}, cancel: (_block: string) => {},
     paste: (_event: ClipboardEvent | DragEvent): boolean => false, command: (_id: string, _command: string, _target?: string) => {} }), []);
   const timelineControls = useMemo<TimelineControls>(() => ({ read: () => bridge.timeline(),
@@ -271,9 +291,19 @@ export function RichEditor({ initial, acknowledge, onStatus, ref, onHistoryNavig
       epochs: new Map([...keys].map(key => [key, bridge.history?.revision(key) ?? 0])) };
 
   }, [bridge]);
-  const openRewrite = useCallback(() => {
+  const openRewrite = useCallback((focus = true) => {
+    if (rewriting) { setRewriteOpen(true); return; }
     const selected = editor.transact(tr => selectedRange(tr)), browserSelection = window.getSelection();
-    if (!selected || !browserSelection?.rangeCount) return;
+    if (!selected || !browserSelection?.rangeCount || !editor.domElement?.contains(browserSelection.anchorNode)
+      || !editor.domElement.contains(browserSelection.focusNode)) return;
+    const rect = browserSelection.getRangeAt(0).getBoundingClientRect();
+    setRewriteAnchor({ left: rect.left, top: rect.top, bottom: rect.bottom }); setRewriteFocus(focus);
+    if (!singleRewriteRange(selected)) {
+      rewriteSelection.current = null; rewriteAction.current = null; setRewritePreview(null); setRewriteSource("");
+      setRewriteError("Выделите текст внутри одного блока или ячейки, без соседних блоков и колонок."); setRewriteOpen(true); return;
+    }
+    rewriteExpectedChecksum.current = null;
+    setRewritePreview(null); rewriteAction.current = null;
     setRewriteSource(browserSelection.toString());
     rewriteCapture.current = captureSelected(selected);
     if (rewriteCapture.current) {
@@ -294,8 +324,19 @@ export function RichEditor({ initial, acknowledge, onStatus, ref, onHistoryNavig
       rewriteCapture.current = { ...rewriteCapture.current, epochs };
     }
     rewriteSelection.current = structuredClone(selected); setRewriteError(""); setRewriteOpen(true);
-  }, [editor, bridge, captureSelected]);
-  const selectionToolbar = useCallback(() => selecting ? <SelectionToolbar rewrite={openRewrite} disabled={rewriting} /> : null, [openRewrite, selecting, rewriting]);
+  }, [editor, bridge, captureSelected, rewriting]);
+  useEffect(() => {
+    const root = editor.domElement;
+    if (!root) return;
+    const reveal = () => {
+      if (rewriting) return;
+      requestAnimationFrame(() => { if (singleRewriteRange(editor.transact(tr => selectedRange(tr)))) openRewrite(false); });
+    };
+    const keyboard = (event: KeyboardEvent) => { if (event.key === "Shift") reveal(); };
+    root.addEventListener("pointerup", reveal); root.addEventListener("keyup", keyboard);
+    return () => { root.removeEventListener("pointerup", reveal); root.removeEventListener("keyup", keyboard); };
+  }, [editor, openRewrite, rewriting, ready]);
+  const selectionToolbar = useCallback(() => selecting && !rewriteOpen ? <SelectionToolbar rewrite={() => openRewrite()} disabled={rewriting} /> : null, [openRewrite, selecting, rewriting, rewriteOpen]);
   const selectionFloating = useMemo(() => ({ useFloatingOptions: { placement: "top-start" as const,
     middleware: [{ name: "uir-selection-position", fn: ({ x, y }: { x: number; y: number }) => {
       const selection = window.getSelection(), range = selection?.rangeCount ? selection.getRangeAt(0).getBoundingClientRect() : null;
@@ -473,7 +514,7 @@ export function RichEditor({ initial, acknowledge, onStatus, ref, onHistoryNavig
       queueMicrotask(() => sync.invalidate());
       imageRevision++;
       if (context.mode !== "prepared") queueMicrotask(() => { void publishImageReferences().catch(error => onStatus(error instanceof Error ? error.message : "IMAGE_IMPORT_FAILED")); });
-    }, context => !bridge.writer || bridge.writer.writable || context.mode === "prepared" || bridge.backgroundHistory);
+    }, context => !bridge.writer || bridge.writer.writable || context.mode === "prepared" || bridge.backgroundHistory, `${bridge.session}:${crypto.randomUUID()}`);
     bridge.history = history;
     bridge.historyOffers = () => {
       const current = queue.baseline.workspace.project;
@@ -492,6 +533,19 @@ export function RichEditor({ initial, acknowledge, onStatus, ref, onHistoryNavig
         factsFromCells(bridge.current, queue.baseline.workspace.project?.facts ?? initialFacts)); schedule(); },
       report: response => { setSyncRecords(response.workspace.syncRecords); },
       failed: error => setEditorWarning(error instanceof Error ? error.message : "Синхронизация не завершена"),
+      rewriteProgress: activity => {
+        if (activity.stage === "saving") rewriteAction.current = activity.actionId;
+        if (rewriteAction.current === activity.actionId) setRewriting(rewriteActive(activity.stage));
+        setRewriteActivities(current => current.some(item => item.actionId === activity.actionId)
+          ? current.map(item => item.actionId === activity.actionId ? activity : item) : [...current, activity]);
+      },
+      rewritePreview: preview => { if (rewriteAction.current === preview.actionId) setRewritePreview(preview); refresh(value => value + 1); },
+      approveRewrite: async job => {
+        available();
+        const writer = bridge.writer;
+        if (!writer) throw new Error("Редактор ещё открывается");
+        await writer.publish(job, await projectJobs(initial.workspace.projectId).api.proposal(job.id), true);
+      },
       applied: (action, changes) => { const next = dateAnchors(action, changes); if (next.length) setAnchors(next); },
     }, initial.workspace.projectId);
     let pendingAction: string | null = null;
@@ -565,10 +619,20 @@ export function RichEditor({ initial, acknowledge, onStatus, ref, onHistoryNavig
       if (!rewriteSelection.current || bridge.composing) throw new Error("Выделите фрагмент текста");
       if (!capturedSelectionCurrent(rewriteCapture.current, bridge.history, bridge.session))
         throw new Error("Выделение устарело. Запросите правку заново.");
+      if (rewriteExpectedChecksum.current) {
+        await queue.flush();
+        const current = queue.baseline.workspace.project;
+        if (!current || await selectionChecksum(current.document, { ...rewriteSelection.current, textSha256: rewriteExpectedChecksum.current,
+          capture: { sessionId: bridge.session, actionId: bridge.session, actionToken: 0, dependencies: [] } }) !== rewriteExpectedChecksum.current)
+          throw new Error("Выделение устарело. Запросите правку заново.");
+      }
       const captured: RichSelection = { ...rewriteSelection.current, textSha256: "0".repeat(64), capture: { sessionId: bridge.session,
         actionId: bridge.session, actionToken: 0, dependencies: [] } };
-      await sync.rewrite(captured, instruction);
+      await sync.rewrite(captured, instruction, true);
     };
+    bridge.previewRewrite = id => sync.previewRewrite(id);
+    bridge.applyRewrite = id => { available(); return sync.applyRewrite(id); };
+    bridge.cancelRewrite = id => sync.cancelRewrite(id);
     bridge.resolve = id => { available(); return sync.resolve(id); };
     bridge.timeline = async () => { await queue.flush(); return readTimeline(initial.workspace.projectId); };
     bridge.cascadePreview = async anchor => { available(); await intents.drain(); return sync.cascadePreview(anchor.jobId, anchor.periodId, anchor.actionId); };
@@ -636,6 +700,7 @@ export function RichEditor({ initial, acknowledge, onStatus, ref, onHistoryNavig
       if (!cursor || cursor.type === "region") throw new Error("Выберите место в документе");
       const controller = new AbortController(), key = blockId ?? crypto.randomUUID();
       uploads.get(key)?.abort(); uploads.set(key, controller);
+      setImageUploads(uploads.size);
       try {
         await queue.flush(); await publishImageReferences();
         available();
@@ -654,6 +719,7 @@ export function RichEditor({ initial, acknowledge, onStatus, ref, onHistoryNavig
         else editor.insertBlocks([imageBlock], cursor.id, "after");
       } finally {
         if (uploads.get(key) === controller) uploads.delete(key);
+        if (open) setImageUploads(uploads.size);
         imageRevision++; await publishImageReferences().catch(() => {});
       }
     };
@@ -801,7 +867,7 @@ export function RichEditor({ initial, acknowledge, onStatus, ref, onHistoryNavig
           if (["closed", "detached", "read_only"].includes(writer.mode)) return;
           writer.observeJob(job);
           if (writer.mode === "recovering") { await writer.recoverPublication(job); continue; }
-          if (["ready", "waiting_for_sync"].includes(job.publication) && job.proposalId) await writer.publish(job, await jobs.api.proposal(job.id));
+          if (!job.submission.approvalRequired && ["ready", "waiting_for_sync"].includes(job.publication) && job.proposalId) await writer.publish(job, await jobs.api.proposal(job.id));
           else if (job.receipt && !job.undoExpired) await writer.adoptHeadless(job);
         }
       }).catch(error => { if (writer.mode !== "closed") setEditorWarning(error instanceof Error ? error.message : "JOB_REQUEST_FAILED"); });
@@ -890,9 +956,26 @@ export function RichEditor({ initial, acknowledge, onStatus, ref, onHistoryNavig
     await bridge.prepared.apply(batchId, api);
   } }), [bridge]);
   function submitRewrite() {
+    setRewriting(true); setRewriteError(""); setRewritePreview(null);
+    void bridge.rewrite(instruction).catch(error => { setRewriting(false); setRewriteError(error instanceof Error && /stale|устар|обнов|измен/i.test(error.message)
+      ? "Документ изменился. Выделите фрагмент и запросите правку заново." : "Не удалось изменить текст. Можно повторить запрос.");
+    });
+  }
+  function reviewRewrite(id: string) {
+    const preview = bridge.previewRewrite(id);
+    if (!preview) return;
+    rewriteAction.current = id; setRewritePreview(preview); setRewriteSource(preview.source); setInstruction(preview.instruction);
+    rewriteSelection.current = structuredClone(preview.selection); rewriteCapture.current = captureSelected(preview.selection);
+    rewriteExpectedChecksum.current = preview.selection.textSha256;
+    const block = editor.domElement?.querySelector(`[data-id="${CSS.escape(preview.selection.anchor.blockId)}"]`), rect = block?.getBoundingClientRect();
+    setRewriteAnchor(rect ? { left: rect.left, top: rect.top, bottom: rect.bottom } : null); setRewriteFocus(false);
+    setRewriteError(""); setRewriting(false); setRewriteOpen(true);
+  }
+  function applyRewrite() {
+    if (!rewritePreview || rewriting) return;
     setRewriting(true); setRewriteError("");
-    void bridge.rewrite(instruction).then(() => setRewriteOpen(false)).catch(error => setRewriteError(error instanceof Error && /stale|устар|обнов|измен/i.test(error.message)
-      ? "Документ изменился. Выделите фрагмент и запросите правку заново." : "Не удалось изменить текст. Можно повторить запрос."))
+    void bridge.applyRewrite(rewritePreview.actionId).then(() => { setRewriteOpen(false); setRewritePreview(null); })
+      .catch(() => setRewriteError("Не удалось применить результат. Если фрагмент изменился, выделите его и запросите правку заново."))
       .finally(() => setRewriting(false));
   }
   function toolbarCommand(command: ToolbarCommand) {
@@ -900,7 +983,6 @@ export function RichEditor({ initial, acknowledge, onStatus, ref, onHistoryNavig
     if (command === "undo") bridge.undo();
     else if (command === "redo") bridge.redo();
     else if (command === "facts") setFactsVisible(value => !value);
-    else if (command === "source") setSourceOpen(true);
     else if (command === "rewrite") openRewrite();
     else if (command === "image") { imageTarget.current = commandBlock(editor.getTextCursorPosition().block.id, id => editor.getBlock(id)).id; imageInput.current?.click(); }
     else if (command === "link") {
@@ -923,18 +1005,43 @@ export function RichEditor({ initial, acknowledge, onStatus, ref, onHistoryNavig
     bridge.complete(); editor.focus();
   } }}><ImageActions.Provider value={{ source: asset => imageSource(initial.workspace.projectId, asset), upload: assets.upload, cancel: assets.cancel }}>
     <><RewritePanel open={rewriteOpen} close={() => setRewriteOpen(false)} instruction={instruction} change={setInstruction}
-      submit={submitRewrite} busy={rewriting} source={rewriteSource} error={rewriteError} />
+      submit={submitRewrite} busy={rewriting} source={rewriteSource} error={rewriteError}
+      preview={rewritePreview} apply={applyRewrite}
+      anchor={rewriteAnchor} focusInstruction={rewriteFocus}
+      activity={rewriteActivities.find(activity => activity.actionId === rewriteAction.current) ?? null}
+      cancel={id => { void bridge.cancelRewrite(id); }} />
       {linkOpen && <LinkDialog open selectedText={linkText} close={() => { setLinkOpen(false); editor.focus(); }} apply={(href, text) => {
         const capture = linkCapture.current;
         if (!capture || capture.doc !== editor.prosemirrorState.doc) { setEditorWarning("Документ изменился. Выделите текст и добавьте ссылку заново."); return; }
         editor.transact(tr => { tr.setSelection(capture.bookmark.resolve(tr.doc)); });
         editor.createLink(href, text === linkText ? undefined : text); bridge.complete();
       }} />}
-      {sourceOpen && <SourceDialog sources={project.sources} close={() => setSourceOpen(false)} />}
     </>
     <div className="contents uir-editor-session">
+    <WorkspaceViews view={workspaceView} change={changeWorkspaceView} hasSource={project.sources.length > 0} notices={<>
+      {!rewriteOpen && latestRewrite && <button className="rewrite-status-trigger" onClick={() => {
+        if (bridge.previewRewrite(latestRewrite.actionId)) reviewRewrite(latestRewrite.actionId); else { setRewriteFocus(true); setRewriteOpen(true); }
+      }}>{rewriteActive(latestRewrite.stage) && <Spinner />}{latestRewrite.stage === "preview" ? "Посмотреть вариант" : rewriteActive(latestRewrite.stage) ? "Меняем текст…" : "Проверить правку"}</button>}
+      <EditorNotices mode={writerMode} localDraft={!!writerConnection?.local} warning={editorWarning} clearWarning={() => setEditorWarning("")}
+        onOpen={() => setFactsVisible(false)}
+        resolveDraft={async choice => { await bridge.writer?.resolveDraft(choice); location.reload(); }} syncRecords={syncRecords}
+        resolve={id => bridge.resolve(id)} retry={id => bridge.retry(id)} report={setEditorWarning}
+        dismiss={async id => { const response = await projectRequest(`/${initial.workspace.projectId}/sync/${id}`, "POST", { status: "stale", errorCode: "USER_DISMISSED" }); setSyncRecords(response.workspace.syncRecords); }} />
+    </>} />
+    <div className="editor-body uir-editor-body">
+    <aside className="editor-notifications" aria-label="Уведомления редактора">
+    <div className="editor-status-actions">
+      {applying && !rewriting && <OperationStatus label="Сохраняем правки" />}
+      {imageUploads > 0 && <OperationStatus label="Загружаем изображение" detail={imageUploads > 1 ? `Файлов в работе: ${imageUploads}` : "Проверяем файл и добавляем его в документ."} timed />}
+      </div>
+    </aside>
+    <ComparisonWorkspace view={workspaceView} original={sourceVisited && <SourceDialog projectId={initial.workspace.projectId} sources={project.sources}
+      expanded={workspaceView === "original"} toggle={() => changeWorkspaceView(workspaceView === "original" ? "compare" : "original")}
+      close={() => { changeWorkspaceView("layout"); requestAnimationFrame(() => editor.focus()); }} />} layout={
+    <div className="document-workspace">
     <fieldset className="contents uir-editor-controls" disabled={applying || recovery || writerMode === "read_only" || writerMode === "detached"}>
     <><Toolbar command={toolbarCommand} factsVisible={factsVisible}
+      layoutControls={<LayoutControls comparing={workspaceView === "compare"} expand={() => changeWorkspaceView("layout")} />}
       canUndo={!factIntents.pending.length && (bridge.history?.position ?? 0) > 0} canRedo={!factIntents.pending.length && (bridge.history?.position ?? 0) < (bridge.history?.length ?? 0)} selecting={selecting}
       active={{ bold: editor.getActiveStyles().bold === true, italic: editor.getActiveStyles().italic === true, underline: editor.getActiveStyles().underline === true }}
       style={(() => { const block = editor.getTextCursorPosition().block; return block.type === "heading" && block.props.level === 2 ? "h2" : block.type === "heading" && block.props.level === 3 ? "h3" : "p"; })()}
@@ -950,20 +1057,12 @@ export function RichEditor({ initial, acknowledge, onStatus, ref, onHistoryNavig
       <input hidden ref={imageInput} type="file" accept="image/png,image/jpeg,image/webp" aria-label="Файл изображения"
         onChange={event => { const file = event.currentTarget.files?.[0]; event.currentTarget.value = ""; if (file) void assets.upload(file, undefined, imageTarget.current).catch(error => setEditorWarning(error instanceof Error ? error.message : "Не удалось добавить изображение")); }} /></>
     </fieldset>
-    <div className="editor-body uir-editor-body">
     <fieldset className="contents uir-editor-controls" disabled={applying || recovery || writerMode === "read_only" || writerMode === "detached"}>
-    <FactsPanel facts={facts} document={project.document} submit={command => bridge.panel(command)} hidden={!factsVisible} close={() => { setFactsVisible(false); editor.focus(); }}
+    <FactsPanel facts={facts} document={project.document} focusEntries={initial.presentation?.focusEntries ?? []} focusOptions={initial.presentation?.focusOptions ?? []}
+      submit={command => bridge.panel(command)} hidden={!factsVisible} close={() => { setFactsVisible(false); editor.focus(); }}
       pending={factIntents.pending.flatMap(intent => intent.kind === "panel" ? [intent.command] : [])} paused={factIntents.paused}
       timeline={ready ? <Timeline facts={facts} anchors={anchors} controls={timelineControls} /> : null} />
     </fieldset>
-    <div className="document-workspace">
-    <div className="editor-status-actions">
-      {applying && <span className="editor-applying" role="status">Сохраняем правки…</span>}
-      <EditorNotices mode={writerMode} localDraft={!!writerConnection?.local} warning={editorWarning} clearWarning={() => setEditorWarning("")}
-        resolveDraft={async choice => { await bridge.writer?.resolveDraft(choice); location.reload(); }} syncRecords={syncRecords}
-        resolve={id => bridge.resolve(id)} retry={id => bridge.retry(id)} report={setEditorWarning}
-        dismiss={async id => { const response = await projectRequest(`/${initial.workspace.projectId}/sync/${id}`, "POST", { status: "stale" }); setSyncRecords(response.workspace.syncRecords); }} />
-      {contextActions}</div>
     <fieldset className="contents uir-editor-controls" disabled={applying || recovery}>
     <div className="paper-scroll">
     <div className="cv-document resume-paper uir-prototype" style={referenceVariables} data-project-id={initial.workspace.projectId}
@@ -978,7 +1077,7 @@ export function RichEditor({ initial, acknowledge, onStatus, ref, onHistoryNavig
     </div></div>
     </fieldset>
     {(assistant ?? <div className="uir-chat-reservation" aria-hidden="true" />)}
-    </div>
+    </div>} />
     </div>
     </div>
   </ImageActions.Provider></EditorActions.Provider>;

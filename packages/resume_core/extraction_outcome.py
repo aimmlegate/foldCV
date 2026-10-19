@@ -7,7 +7,7 @@ from .models.rich_facts import ExtractionIssue, ExtractionReport
 from .source_dates import MONTH_PATTERN
 
 SECTIONS = {
-    "employment": r"(?:опыт\s+работы|профессиональный\s+опыт|employment|work\s+experience|career\s+history)",
+    "employment": r"(?:опыт\s+работы|профессиональный\s+опыт|employment(?:\s+history)?|work\s+experience|career\s+history)",
     "education": r"(?:образование|education)",
     "languages": r"(?:знание\s+языков|языки|languages)",
     "certifications": r"(?:сертификаты|сертификации|certifications|certificates)",
@@ -21,14 +21,18 @@ _OTHER_SECTION = "|".join([*[pattern for key, pattern in SECTIONS.items() if key
     r"(?:personal\s+)?projects?", r"личные\s+проекты", r"courses", r"курсы", r"about\s+me", r"о\s+себе"])
 
 
+def section_heading(pattern, text):
+    return re.fullmatch(rf"(?:{pattern})(?:\s*[:：].*|\s*[—–-]?\s*\d[\d\s\w.,-]*)?", text, re.I)
+
+
 def has_dated_employment(sources):
     for source in sources:
         active, lines = False, []
         for unit in source.units:
             for line in unit.text.splitlines():
                 text = " ".join(line.split())
-                employment = re.match(rf"^{SECTIONS['employment']}(?=\W|$)", text, re.I)
-                if employment or re.match(rf"^(?:{_OTHER_SECTION})(?=\W|$)", text, re.I):
+                employment = section_heading(SECTIONS['employment'], text)
+                if employment or section_heading(_OTHER_SECTION, text):
                     if active and _DATED_RANGE.search(" ".join(lines)):
                         return True
                     active = bool(employment) and not re.search(r"[:—–-]\s*(?:нет|none|no\s+experience)\s*$", text, re.I)
@@ -56,7 +60,8 @@ def extraction_report(result, *, request_bytes, recovered_rows):
             text = " ".join(unit.text.split())
             if not text or unit.disposition in {"administrative", "duplicate"}:
                 continue
-            section = next((key for key, pattern in SECTIONS.items() if re.search(pattern, text, re.I)), None)
+            section = next((key for key, pattern in SECTIONS.items()
+                if any(section_heading(pattern, line.strip()) for line in unit.text.splitlines())), None)
             page = unit.location.index + 1 if unit.location.kind == "page" else None
             if section and not counts.get(section):
                 issues.append(ExtractionIssue(code="FACT_SECTION_OMITTED", sourceId=source.id, unitId=unit.id, page=page, section=section))

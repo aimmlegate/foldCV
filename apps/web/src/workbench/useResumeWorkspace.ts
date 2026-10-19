@@ -34,6 +34,8 @@ export function useResumeWorkspace() {
   const dismissError = useCallback(() => setError(""), []);
   const [status, setStatus] = useState("Сохранено");
   const [busy, setBusy] = useState(false);
+  const [operation, setOperation] = useState<{ label: string; startedAt: number } | null>(null);
+  function stage(label: string) { setOperation(current => current ? { ...current, label } : { label, startedAt: Date.now() }); }
   const [loading, setLoading] = useState(() => new URLSearchParams(location.search).has("project"));
   const [settings, setSettings] = useState(false);
   const editor = useRef<RichEditorHandle>(null);
@@ -65,10 +67,10 @@ export function useResumeWorkspace() {
     if (!editor.current?.background) await assistant.current?.stop();
     if (editor.current) await editor.current.navigate();
   }
-  async function action(work: () => Promise<void>): Promise<boolean> {
+  async function action(work: () => Promise<void>, labelText = "Сохраняем последние изменения"): Promise<boolean> {
     if (acting.current) return false;
     const previousEditor = editor.current, previousProject = activeProject.current;
-    acting.current = true; setBusy(true); setError("");
+    acting.current = true; setBusy(true); setOperation({ label: labelText, startedAt: Date.now() }); setError("");
     try { await work(); return true; } catch (error) {
       let message = label(error);
       if (!settings && previousEditor?.background && editor.current === previousEditor && activeProject.current === previousProject) {
@@ -76,7 +78,7 @@ export function useResumeWorkspace() {
       }
       setError(message); return false;
     }
-    finally { acting.current = false; setBusy(false); }
+    finally { acting.current = false; setBusy(false); setOperation(null); }
   }
   function clear() {
     ++epoch.current; activeProject.current = null; setResponse(null); setWriter(null); setBackground(false); setStatus("Сохранено"); prepared.current = null;
@@ -86,7 +88,7 @@ export function useResumeWorkspace() {
     await action(async () => {
       await leave();
       clear(); setSettings(false);
-    });
+    }, "Подготавливаем новое резюме");
   }
   async function open(id: string) {
     return action(async () => {
@@ -97,7 +99,7 @@ export function useResumeWorkspace() {
         setWriter(connection); select(next, available); setStatus("Сохранено"); prepared.current = null;
         setInput({ kind: "text", text: "" }); setSettings(false);
       }
-    });
+    }, "Открываем резюме");
   }
   async function remove(id: string) {
     return action(async () => {
@@ -106,7 +108,7 @@ export function useResumeWorkspace() {
       if (response?.workspace.projectId === id) clear();
       setProjects(await listProjects());
       if (result.status === "cleanup_incomplete") throw new RichApiFailure(result.errorCode ?? "PROJECT_CLEANUP_INCOMPLETE");
-    });
+    }, "Удаляем резюме");
   }
   async function archive(id: string, archived: boolean) {
     return action(async () => {
@@ -114,7 +116,7 @@ export function useResumeWorkspace() {
       await request(`/${id}/catalog/${archived ? "archive" : "restore"}`, "POST", {});
       if (archived && activeProject.current === id) clear();
       setProjects(await listProjects());
-    });
+    }, archived ? "Перемещаем резюме в архив" : "Восстанавливаем резюме");
   }
   async function projectLifecycle(id: string, kind: "archive" | "delete") {
     return action(async () => {
@@ -164,13 +166,14 @@ export function useResumeWorkspace() {
         }
       }
       if (id) {
+        stage("Запускаем обработку резюме");
         try { await new FixedOperations(id).submit({ kind: "processing" }); select(await projectRequest(`/${id}`), true); }
         catch (error) {
           if (error instanceof RichApiFailure && error.code === "JOB_DISABLED") select(await projectRequest(`/${id}/generation`, "POST", {}));
           else throw error;
         }
       }
-    });
+    }, input.kind === "file" ? "Загружаем и читаем файл" : "Читаем исходный текст");
   }
   async function upload(file: File) {
     return action(async () => {
@@ -181,18 +184,19 @@ export function useResumeWorkspace() {
       const connection = imported.workspace.project ? await attachExclusiveWriter(imported.workspace.projectId) : null;
       setWriter(connection); select(connection?.view.response ?? imported, connection !== null);
       prepared.current = null; setInput({ kind: "text", text: "" }); setSettings(false); setProjects(await listProjects());
-    });
+    }, "Открываем файл проекта");
   }
   async function exportFile(kind: "export" | "archive", filename?: string | ((current: RichProjectResponse) => string)) {
     return action(async () => {
       const current = editor.current ? await editor.current.flush() : response;
       if (!current) throw new Error("Откройте резюме перед сохранением файла.");
+      stage(kind === "export" ? "Создаём документ DOCX" : "Собираем файл проекта");
       const blob = await download(current.workspace.projectId, kind, current.workspace);
       const url = URL.createObjectURL(blob), anchor = document.createElement("a");
       anchor.href = url; anchor.download = typeof filename === "function" ? filename(current) : filename ?? (kind === "export" ? "resume.docx" : "project.foldcv");
       anchor.click(); setTimeout(() => URL.revokeObjectURL(url), 1000);
-    });
+    }, "Сохраняем изменения перед скачиванием");
   }
-  return { response, writer, background, projects, input, setInput, textDraft, error, status, setStatus, busy, loading, settings, setSettings,
+  return { response, writer, background, projects, input, setInput, textDraft, error, status, setStatus, busy, operation, loading, settings, setSettings,
     editor, assistant, acknowledge, action, fresh, open, remove, archive, projectLifecycle, process, upload, exportFile, dismissError };
 }

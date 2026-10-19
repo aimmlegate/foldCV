@@ -2,6 +2,30 @@ import react from "@vitejs/plugin-react";
 import tailwindcss from "@tailwindcss/vite";
 import { defineConfig, type Plugin } from "vite";
 import { fileURLToPath } from "node:url";
+import { readFile, readdir } from "node:fs/promises";
+
+function pdfAssets(): Plugin {
+  const prefix = "pdfjs/6.4.299/";
+  async function files() {
+    const assets = new Map<string, Buffer>();
+    for (const folder of ["cmaps", "standard_fonts", "wasm", "iccs"]) {
+      const root = new URL(`./node_modules/pdfjs-dist/${folder}/`, import.meta.url);
+      for (const name of await readdir(root)) assets.set(`${prefix}${folder}/${name}`, await readFile(new URL(name, root)));
+    }
+    return assets;
+  }
+  return { name: "foldcv-pdf-assets", async generateBundle() {
+    for (const [fileName, source] of await files()) this.emitFile({ type: "asset", fileName, source });
+  }, async configureServer(server) {
+    const assets = await files();
+    server.middlewares.use((request, response, next) => {
+      const name = request.url?.split("?")[0]?.slice(1) ?? "", content = assets.get(name);
+      if (!content) { next(); return; }
+      response.setHeader("Content-Type", name.endsWith(".wasm") ? "application/wasm" : "application/octet-stream");
+      response.end(content);
+    });
+  } };
+}
 
 function proofBoundary(mode: string): Plugin {
   return { name: "foldcv-uir-boundary", generateBundle() {
@@ -24,7 +48,7 @@ function proofBoundary(mode: string): Plugin {
 }
 
 export default defineConfig(({ mode }) => ({
-  plugins: [react(), tailwindcss(), proofBoundary(mode)],
+  plugins: [react(), tailwindcss(), proofBoundary(mode), pdfAssets()],
   server: { host: "127.0.0.1", fs: { allow: [
     fileURLToPath(new URL("./", import.meta.url)),
     fileURLToPath(new URL("../../contracts", import.meta.url)),

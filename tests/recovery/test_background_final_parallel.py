@@ -71,7 +71,8 @@ def test_final_conflict_measurement_keeps_narrow_independence_and_actual_rejecti
 async def test_integrated_native_harness_closes_resources_and_keeps_real_counters_unchanged(tmp_path, monkeypatch, failure):
     import httpx
     from packages.resume_core.models.agent import AgentReadSnapshot
-    from packages.resume_core.rich_sync import RichRewriteProposal, RichReconcileProposal
+    from packages.resume_core.rich_sync import RichReconcileProposal
+    from packages.resume_core.text_rewrite import PlainTextReply
     from resume_api.jobs.appserver import CapabilityClient, SharedAgentRuntime, SharedContentProvider
     from tests.recovery.test_agent_edits import command, replace
     from tools.background_evidence import assert_native_bindings
@@ -101,21 +102,14 @@ async def test_integrated_native_harness_closes_resources_and_keeps_real_counter
     outputs = {}
     class Structured(SharedContentProvider):
         async def execute(self, request, cancel):
-            payload = json.loads(request.text)
-            if request.result_type is RichRewriteProposal:
-                replacements = []
-                for block in payload["input"]["selection"]:
-                    block = json.loads(json.dumps(block))
-                    cell = block.pop("cellId", None)
-                    for span in block["content"]:
-                        if span["type"] == "text":
-                            span["text"] = span["text"].replace("Python. Wrote", "Python; Wrote")
-                    replacements.append(dict(blockId=block["id"], cellId=cell, blocks=[block]))
-                value = RichRewriteProposal.model_validate(dict(replacements=replacements))
+            if request.result_type is PlainTextReply:
+                text = request.text.split("\n\nSelected text:\n", 1)[1]
+                value = PlainTextReply(text=text.replace("Python. Wrote", "Python; Wrote"))
+                outputs[self.job_id] = " " if failure else value.text
             else:
                 assert request.result_type is RichReconcileProposal
                 value = RichReconcileProposal(updates=[dict(recordId="candidate-1", fieldKey="title", text="Python API Engineer")])
-            outputs[self.job_id] = "invalid structured result" if failure else value.model_dump_json(by_alias=True)
+                outputs[self.job_id] = "invalid structured result" if failure else value.model_dump_json(by_alias=True)
             return await super().execute(request, cancel)
     monkeypatch.setattr("resume_api.jobs.parallel.SharedContentProvider", Structured)
     def server(root, _connection, *, wire_audit):

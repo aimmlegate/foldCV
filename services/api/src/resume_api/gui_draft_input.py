@@ -1,6 +1,7 @@
 """Recover draft fields independently before canonical document assembly."""
 
 from pydantic import ValidationError
+import re
 
 from packages.resume_core.gui_drafting import DraftField, GuiDraftProposal
 from packages.resume_core.models.recovery import EditorialPlan, JobDisposition, PlanFocus, TechnologyGroup
@@ -54,14 +55,18 @@ class DraftInput:
         if not isinstance(plan, dict):
             self.unresolved += 1
             plan = {}
+        source = "\n".join(unit.text for item in self.request.normalized.sources for unit in item.units)
+        language = "ru" if len(re.findall(r"[А-Яа-яЁё]", source)) > len(re.findall(r"[A-Za-z]", source)) else "en"
         defaults = dict(origin="model", revision=1, rulesRevision=self.request.normalized.rules_revision,
-            formattingAsOf=self.request.formatting_as_of.model_dump(by_alias=True), sourceLanguage="ru",
-            profileLanguage="ru", jobs=[], focus=[], technologyGroups=[], factIds=[])
+            formattingAsOf=self.request.formatting_as_of.model_dump(by_alias=True), sourceLanguage=language,
+            profileLanguage=language, jobs=[], focus=[], technologyGroups=[], factIds=[])
         for key in ("origin", "revision", "rulesRevision", "formattingAsOf", "sourceLanguage", "profileLanguage"):
             if key in plan:
                 trial = {**defaults, key: plan[key]}
                 if self.typed(EditorialPlan, trial) is not None:
                     defaults[key] = plan[key]
+        if "profileLanguage" not in plan and defaults["sourceLanguage"] in {"ru", "en"}:
+            defaults["profileLanguage"] = defaults["sourceLanguage"]
         for key, model, limit in (("jobs", JobDisposition, 100), ("focus", PlanFocus, 1000),
                                   ("technologyGroups", TechnologyGroup, 1000)):
             rows, seen = [], set()

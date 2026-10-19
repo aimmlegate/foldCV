@@ -140,6 +140,7 @@ class JobService:
                     stage=job.attempts[-1].stage if job.attempts else None, execution=job.execution,
                     publication=job.publication, executionGeneration=job.execution_generation,
                     eventCursor=job.event_cursor, allowEdits=job.submission.allow_edits,
+                    approvalRequired=job.submission.approval_required,
                     saved=job.receipt is not None, error=job.error, publicationError=job.publication_error,
                     updatedAt=job.updated_at))
         return JobIndexV1(schemaVersion=1, jobs=rows)
@@ -329,7 +330,7 @@ class JobService:
         try:
             state = self.store.load(project)
             for job in state.jobs:
-                if job.publication not in {"ready", "waiting_for_sync", "save_failed"} or job.proposal_id is None:
+                if job.submission.approval_required or job.publication not in {"ready", "waiting_for_sync", "save_failed"} or job.proposal_id is None:
                     continue
                 proposal = next(item for item in state.proposals if item.id == job.proposal_id)
                 result = self.publication.publish(project, job.id, proposal.payload_sha256)

@@ -1100,7 +1100,8 @@ export type Preview = string;
  * @maxItems 100
  */
 export type Batches = AgentBatchJournal[];
-export type AgentEvent = MessageDelta | ToolEvent | ResourceEvent | EditEvent | UsageEvent | RunStateEvent;
+export type AgentEvent =
+  MessageDelta | ActivityEvent | ToolEvent | ResourceEvent | EditEvent | UsageEvent | RunStateEvent;
 export type Conversationid1 = string;
 export type Id37 = string;
 export type Text6 = string;
@@ -1112,25 +1113,36 @@ export type Timestamp1 = string;
 export type Type15 = "message.delta";
 export type Conversationid2 = string;
 export type Id38 = string;
-export type Callid = string;
-export type Name = string;
+export type Itemid = string;
+export type Kind31 = "summary";
+export type Text7 = string;
 export type Projectid4 = string;
 export type Runid5 = string;
 export type Schemaversion3 = 1;
 export type Sequence1 = number;
 export type Timestamp2 = string;
-export type Type16 = "tool.started" | "tool.completed" | "tool.failed";
+export type Type16 = "activity.updated";
 export type Conversationid3 = string;
 export type Id39 = string;
-export type Id40 = string;
+export type Callid = string;
+export type Name = string;
 export type Projectid5 = string;
 export type Runid6 = string;
 export type Schemaversion4 = 1;
 export type Sequence2 = number;
 export type Timestamp3 = string;
-export type Type17 = "source.ready" | "finding.ready";
+export type Type17 = "tool.started" | "tool.completed" | "tool.failed";
 export type Conversationid4 = string;
+export type Id40 = string;
 export type Id41 = string;
+export type Projectid6 = string;
+export type Runid7 = string;
+export type Schemaversion5 = 1;
+export type Sequence3 = number;
+export type Timestamp4 = string;
+export type Type18 = "source.ready" | "finding.ready";
+export type Conversationid5 = string;
+export type Id42 = string;
 export type Batchid2 = string;
 export type Disposition2 =
   | "prepared"
@@ -1142,37 +1154,37 @@ export type Disposition2 =
   | "cancelled"
   | "save_failed"
   | "outcome_unknown";
-export type Projectid6 = string;
-export type Runid7 = string;
-export type Schemaversion5 = 1;
-export type Sequence3 = number;
-export type Timestamp4 = string;
-export type Type18 = "edit.offered" | "edit.result";
-export type Conversationid5 = string;
-export type Id42 = string;
 export type Projectid7 = string;
 export type Runid8 = string;
 export type Schemaversion6 = 1;
 export type Sequence4 = number;
 export type Timestamp5 = string;
-export type Type19 = "usage.reported";
+export type Type19 = "edit.offered" | "edit.result";
 export type Conversationid6 = string;
 export type Id43 = string;
-export type Outcomeunknown1 = boolean;
-export type Savedbatchid1 = string | null;
-export type State2 =
-  "queued" | "running" | "waiting_for_editor" | "cancelling" | "completed" | "failed" | "cancelled" | "interrupted";
 export type Projectid8 = string;
 export type Runid9 = string;
 export type Schemaversion7 = 1;
 export type Sequence5 = number;
 export type Timestamp6 = string;
-export type Type20 = "run.state_changed";
+export type Type20 = "usage.reported";
+export type Conversationid7 = string;
+export type Id44 = string;
+export type Outcomeunknown1 = boolean;
+export type Savedbatchid1 = string | null;
+export type State2 =
+  "queued" | "running" | "waiting_for_editor" | "cancelling" | "completed" | "failed" | "cancelled" | "interrupted";
+export type Projectid9 = string;
+export type Runid10 = string;
+export type Schemaversion8 = 1;
+export type Sequence6 = number;
+export type Timestamp7 = string;
+export type Type21 = "run.state_changed";
 export type Events = AgentEvent[];
 export type Allowedits1 = boolean;
 export type Allowweb1 = boolean;
 export type Clientrequestid1 = string;
-export type Conversationid7 = string;
+export type Conversationid8 = string;
 export type Documentrevision2 = number;
 export type Factsrevision2 = number;
 export type Message1 = string;
@@ -1181,15 +1193,15 @@ export type Scope3 = WholeResumeScope | SelectionScope;
 export type Settingsrevision1 = number;
 export type Requestsha2563 = string;
 export type Reserved = boolean;
-export type Runid10 = string;
+export type Runid11 = string;
 export type Contentsha2561 = string;
 /**
  * @maxItems 2000
  */
 export type Dependencies3 = (AgentEntityDependency | AgentQueryDependency)[];
-export type Id44 = string;
+export type Id45 = string;
 export type Nextcursor = string | null;
-export type Runid11 = string;
+export type Runid12 = string;
 export type Truncated1 = boolean;
 /**
  * @maxItems 64
@@ -1197,17 +1209,17 @@ export type Truncated1 = boolean;
 export type Snapshots = AgentReadSnapshot[];
 export type Journals = AgentRunJournal[];
 export type Ownerepoch2 = number;
-export type Projectid9 = string;
+export type Projectid10 = string;
 export type Revision32 = number;
-export type Schemaversion8 = 1;
+export type Schemaversion9 = 1;
 
 export interface AgentProjectState {
   conversations: Conversations;
   journals: Journals;
   ownerEpoch: Ownerepoch2;
-  projectId: Projectid9;
+  projectId: Projectid10;
   revision: Revision32;
-  schemaVersion: Schemaversion8;
+  schemaVersion: Schemaversion9;
 }
 export interface AgentConversation {
   createdAt: Createdat;
@@ -1320,7 +1332,7 @@ export interface AgentRunJournal {
   request: AgentJournalRequest;
   requestSha256: Requestsha2563;
   reserved: Reserved;
-  runId: Runid10;
+  runId: Runid11;
   snapshots: Snapshots;
 }
 export interface AgentBatchJournal {
@@ -1896,10 +1908,10 @@ export interface MessageDelta {
 export interface MessageDeltaPayload {
   text: Text6;
 }
-export interface ToolEvent {
+export interface ActivityEvent {
   conversationId: Conversationid2;
   id: Id38;
-  payload: ToolPayload;
+  payload: ActivityPayload;
   projectId: Projectid4;
   runId: Runid5;
   schemaVersion: Schemaversion3;
@@ -1907,15 +1919,15 @@ export interface ToolEvent {
   timestamp: Timestamp2;
   type: Type16;
 }
-export interface ToolPayload {
-  callId: Callid;
-  error: AgentError | null;
-  name: Name;
+export interface ActivityPayload {
+  itemId: Itemid;
+  kind: Kind31;
+  text: Text7;
 }
-export interface ResourceEvent {
+export interface ToolEvent {
   conversationId: Conversationid3;
   id: Id39;
-  payload: ResourcePayload;
+  payload: ToolPayload;
   projectId: Projectid5;
   runId: Runid6;
   schemaVersion: Schemaversion4;
@@ -1923,13 +1935,15 @@ export interface ResourceEvent {
   timestamp: Timestamp3;
   type: Type17;
 }
-export interface ResourcePayload {
-  id: Id40;
+export interface ToolPayload {
+  callId: Callid;
+  error: AgentError | null;
+  name: Name;
 }
-export interface EditEvent {
+export interface ResourceEvent {
   conversationId: Conversationid4;
-  id: Id41;
-  payload: EditPayload;
+  id: Id40;
+  payload: ResourcePayload;
   projectId: Projectid6;
   runId: Runid7;
   schemaVersion: Schemaversion5;
@@ -1937,15 +1951,13 @@ export interface EditEvent {
   timestamp: Timestamp4;
   type: Type18;
 }
-export interface EditPayload {
-  batchId: Batchid2;
-  disposition: Disposition2;
-  error: AgentError | null;
+export interface ResourcePayload {
+  id: Id41;
 }
-export interface UsageEvent {
+export interface EditEvent {
   conversationId: Conversationid5;
   id: Id42;
-  payload: AgentUsage;
+  payload: EditPayload;
   projectId: Projectid7;
   runId: Runid8;
   schemaVersion: Schemaversion6;
@@ -1953,16 +1965,32 @@ export interface UsageEvent {
   timestamp: Timestamp5;
   type: Type19;
 }
-export interface RunStateEvent {
+export interface EditPayload {
+  batchId: Batchid2;
+  disposition: Disposition2;
+  error: AgentError | null;
+}
+export interface UsageEvent {
   conversationId: Conversationid6;
   id: Id43;
-  payload: RunStatePayload;
+  payload: AgentUsage;
   projectId: Projectid8;
   runId: Runid9;
   schemaVersion: Schemaversion7;
   sequence: Sequence5;
   timestamp: Timestamp6;
   type: Type20;
+}
+export interface RunStateEvent {
+  conversationId: Conversationid7;
+  id: Id44;
+  payload: RunStatePayload;
+  projectId: Projectid9;
+  runId: Runid10;
+  schemaVersion: Schemaversion8;
+  sequence: Sequence6;
+  timestamp: Timestamp7;
+  type: Type21;
 }
 export interface RunStatePayload {
   error: AgentError | null;
@@ -1974,7 +2002,7 @@ export interface AgentJournalRequest {
   allowEdits: Allowedits1;
   allowWeb: Allowweb1;
   clientRequestId: Clientrequestid1;
-  conversationId: Conversationid7;
+  conversationId: Conversationid8;
   documentRevision: Documentrevision2;
   factsRevision: Factsrevision2;
   message: Message1;
@@ -1986,8 +2014,8 @@ export interface AgentJournalRequest {
 export interface AgentReadSnapshot {
   contentSha256: Contentsha2561;
   dependencies: Dependencies3;
-  id: Id44;
+  id: Id45;
   nextCursor: Nextcursor;
-  runId: Runid11;
+  runId: Runid12;
   truncated: Truncated1;
 }

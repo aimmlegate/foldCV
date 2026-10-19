@@ -77,7 +77,7 @@ and profession only. Put contacts, location, personal details and work preferenc
 in `contacts`. Use `summary` for a professional profile or about section,
 `experience` for work and projects, and `skills` for technical skill lists.
 The template places the professional profile before work, with general skills
-after work; compact standalone skill entries can form the left focus column.
+after work. Apply the tool group configuration below to the main technical lists.
 Use `other` for unusual content. Keep distinct jobs in distinct sections even
 when Python later combines their shared experience band.
 Ranges such as `p12-p25` are inclusive. Usually place a paragraph once; shared refs
@@ -92,6 +92,69 @@ in `other` when they have no retained counterpart.
 Python retains any unassigned text with a review note and preserves exact wording,
 including contact details.
 It applies the block structure, fonts, columns and spacing from the template.
+
+## Visible template sections
+
+The supplied examples use profile and work/projects followed by the configured
+tool groups in main, and Focus, education/courses, location and languages in the
+sidebar. Do not reproduce administrative source-form sections as extra gray bands.
+The user explicitly excludes these sections from the visible resume:
+- `Опыт вождения`
+- `Дополнительно` (citizenship, work permission and commute preferences)
+- `Сфера работы`
+- `Дата обновления резюме кандидатом`
+
+Save their headings and complete contents as `type: "source_only"` blocks with
+their refs and a short `reason`, for example `Не входит в выбранный шаблон.`
+Extract useful facts normally; the original text and those facts stay in the
+project. These exclusions do not apply to duties, achievements or substantive
+project details merely because they appear under an unusual heading. Keep other
+unique source prose visible unless it is explicitly replaced or excluded here.
+
+## Tool group configuration
+
+This section owns the group names, order, membership rules and placement. Change
+or extend this list here when the desired resume structure changes; Python does
+not contain a tool taxonomy or a fixed set of group headings.
+
+Use these groups in order, all in the `main` column:
+1. `ИНФРАСТРУКТУРА, ТАСК-МЕНЕДЖЕРЫ`: infrastructure, cloud, containers, CI/CD,
+   configuration, deployment, monitoring, version control and task/project tools.
+2. `ЯП, СУБД, ФРЕЙМВОРКИ, БИБЛИОТЕКИ`: programming and scripting languages,
+   database systems, frameworks and software libraries.
+3. `ОС`: operating systems and their source-stated distributions/versions.
+
+Save `technologyGroups` with each `heading`, `region: "main"`, ordered
+`technologies` names and supporting paragraph `refs`. Include every distinct
+technical tool stated anywhere in the resume, including job stacks. Preserve
+source spelling, versions and qualifications; use the exact technology display
+saved in facts when possible. Assign each tool to its best fitting configured
+group once. Omit empty groups. Do not add tools from general knowledge or treat
+soft skills, professional practices or certification names as tools.
+The template displays each main group as one compact comma-separated paragraph
+under its section band, matching the supplied resume examples. Do not also emit
+an item-per-tool list or the original technical skills heading in the main text.
+
+These groups replace standalone technical skills sections in the main text;
+they do not remove technologies from their job context. The separate sidebar
+Focus uses explicit technologies with available icons, ordered by whole years.
+Practices such as DevOps do not belong in Focus. Python derives rounded exposure;
+never invent a duration. Users can set or clear years in the facts panel. Keep
+the replaced source headings and technical-only paragraphs in `skills` sections,
+and include all of their refs in the groups' supporting refs. Python replaces
+only fully covered `skills` sections. Keep mixed prose, soft skills and other
+unique text in separate source blocks outside those replaced sections; never
+hide unique content just to fit a tool list.
+
+## Education and courses
+
+Keep degrees separate from courses/certifications. Place education and courses in
+the sidebar. Use an `education` section with `region: "sidebar"` and the source heading, using one
+`list_item` per complete course entry. Keep the year, provider and course names
+or codes together with their source refs. Do not combine several courses into
+one paragraph or split a course at a wrapped line. Keep exact names, code lists,
+years and qualifications. Do not shorten them to make the sidebar fit.
+The section region survives rereads.
 
 Repair broken structure while preparing blocks. PDF paragraphs and line breaks
 are not reliable boundaries. Join a wrapped employer/date line into one heading:

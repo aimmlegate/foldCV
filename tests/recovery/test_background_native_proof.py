@@ -499,7 +499,7 @@ async def test_every_native_fixed_fixture_publishes_its_exact_captured_change_wi
     from pathlib import Path
     from spikes.background.native_parallel import Feasibility
     from resume_api.jobs.appserver import SharedContentProvider
-    from packages.resume_core.rich_sync import RichRewriteProposal, RichReconcileProposal
+    from packages.resume_core.rich_sync import RichReconcileProposal
     from tests.recovery.test_background_appserver import shared_peer, complete_shared
     ledger = Path("docs/gui/handoffs/BACKGROUND-WORK/native-attempts.json")
     before = ledger.read_bytes()
@@ -519,19 +519,18 @@ async def test_every_native_fixed_fixture_publishes_its_exact_captured_change_wi
         await proof.submit(participant)
         await asyncio.wait_for(ready.wait(), 5)
         live = server.live[participant.job.id]
-        payload = json.loads(live.value.prompt)["input"]
-        assert live.value.output_schema and not live.value.tools
+        assert not live.value.tools
         if role == "structured-sync-C":
+            assert live.value.output_schema
             assert "Current job title: Python API Engineer." in live.value.prompt
-            output = RichReconcileProposal(updates=[dict(recordId="candidate-1", fieldKey="title", text="Python API Engineer")])
+            output = RichReconcileProposal(updates=[dict(recordId="candidate-1", fieldKey="title", text="Python API Engineer")]).model_dump_json(by_alias=True)
         else:
-            block = payload["selection"][0]
-            text = "".join(span["text"] for span in block["content"])
+            assert live.value.output_schema is None and live.value.plain_text
+            text = live.value.prompt.split("\n\nSelected text:\n", 1)[1]
             original = next(block for block in participant.workspace.project.document.blocks() if block.id == "narrative").content[0].text
             assert text == original and participant.marker in text and "Python. Wrote" in text
-            block["content"][0]["text"] = text.replace("Python. Wrote", "Python; Wrote", 1)
-            output = RichRewriteProposal(replacements=[dict(blockId=block["id"], blocks=[block])])
-        complete_shared(server, participant.job.id, output.model_dump_json(by_alias=True))
+            output = text.replace("Python. Wrote", "Python; Wrote", 1)
+        complete_shared(server, participant.job.id, output)
         result = await asyncio.wait_for(proof.completed(participant), 10)
         assert result.execution == "completed" and result.publication == "saved" and result.receipt.durable
         current = service.projects.storage.read_committed(project)[0]
@@ -556,7 +555,8 @@ async def test_every_native_fixed_fixture_publishes_its_exact_captured_change_wi
                 before_block.revision = actual_blocks[before_block.id].revision
             assert current.project.document == expected and current.project.facts == participant.workspace.project.facts
         assert result.attempts[-1].cleanup_verified and not result.attempts[-1].native_started
-        assert participant.runtime["schemaValidated"] and participant.runtime["logicalAttempts"] == 1
+        assert participant.runtime["schemaValidated" if role == "structured-sync-C" else "textValidated"]
+        assert participant.runtime["logicalAttempts"] == 1
         assert participant.runtime["repairTurns"] == 0 and not participant.runtime["nativeStarted"]
         assert not service.admission.locked() and ledger.read_bytes() == before
     finally:

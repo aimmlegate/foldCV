@@ -5,7 +5,7 @@ import json
 import re
 
 from .import_agent import ImportFailure, checksum, update_draft
-from .models.importing import ContentFact, ImportBatch, ImportBlock, ImportFact, ImportProfile
+from .models.importing import ContentFact, ImportBatch, ImportBlock, ImportFact, ImportProfile, ImportTechnologyGroup
 
 
 @dataclass(frozen=True)
@@ -107,11 +107,15 @@ def paragraph_refs(keys, paragraphs):
     return list(dict.fromkeys(by_key[key] for key in keys if key in by_key))
 
 
+def section_region(category):
+    return ("header" if category == "identity" else "sidebar"
+        if category in {"contacts", "education", "skills", "languages"} else "main")
+
+
 def content_blocks(sections, paragraphs):
     blocks = []
     for index, section in enumerate(sections):
-        region = ("header" if section.category == "identity" else "sidebar"
-            if section.category in {"contacts", "education", "skills", "languages"} else "main")
+        region = "header" if section.category == "identity" else section.region or section_region(section.category)
         if section.blocks:
             if section.heading.strip() and section.category != "identity":
                 blocks.append(ImportBlock(id=f"outline_{index}_heading", kind="section", region=region,
@@ -121,7 +125,7 @@ def content_blocks(sections, paragraphs):
                     sourceKeys=source_keys(block.refs, paragraphs), region=region,
                     kind="bullet_list" if block.type == "list_item" else block.type,
                     category=section.category, modelBlock=True, listItem=block.type == "list_item",
-                    duplicateOf=source_keys(block.duplicate_of, paragraphs)))
+                    duplicateOf=source_keys(block.duplicate_of, paragraphs), reason=block.reason))
                 if len(blocks) > 5000:
                     raise ImportFailure("IMPORT_DRAFT_TOO_LARGE")
             continue
@@ -173,13 +177,16 @@ def update_content(draft, request, paragraphs, parts):
     profile = (draft.profile if request.profile is None else ImportProfile(name=request.profile.name,
         title=request.profile.title, location=request.profile.location,
         sourceKeys=source_keys(request.profile.refs, paragraphs)))
+    technology_groups = (draft.technology_groups if request.technology_groups is None else [
+        ImportTechnologyGroup(heading=group.heading, region=group.region, technologies=group.technologies,
+            sourceKeys=source_keys(group.refs, paragraphs)) for group in request.technology_groups])
     if draft.finished:
         raise ImportFailure("IMPORT_STALE_BATCH")
-    if (facts, blocks, profile) == (draft.facts, draft.blocks, draft.profile):
+    if (facts, blocks, profile, technology_groups) == (draft.facts, draft.blocks, draft.profile, draft.technology_groups):
         return draft.model_copy(deep=True)
     fact_ids, block_ids = {item.id for item in facts}, {item.id for item in blocks}
     batch = ImportBatch(batchId="content_" + checksum([draft.sequence, request]), sequence=draft.sequence,
-        facts=facts, blocks=blocks, profile=profile,
+        facts=facts, blocks=blocks, profile=profile, technologyGroups=technology_groups,
         removeFactIds=[f.id for f in draft.facts if f.id not in fact_ids],
         removeBlockIds=[b.id for b in draft.blocks if b.id not in block_ids])
     updated = update_draft(draft, batch, parts)[0]
@@ -192,6 +199,9 @@ def update_content(draft, request, paragraphs, parts):
 def draft_content(draft, paragraphs):
     items = [{"profile": {"name": draft.profile.name, "title": draft.profile.title,
         "location": draft.profile.location, "refs": paragraph_refs(draft.profile.source_keys, paragraphs)}}]
+    if draft.technology_groups:
+        items.append({"technologyGroups": [{"heading": group.heading, "region": group.region, "technologies": group.technologies,
+            "refs": paragraph_refs(group.source_keys, paragraphs)} for group in draft.technology_groups]})
     items.extend({"fact": {**(fact.record.model_dump(by_alias=True) if fact.record else {"text": fact.text}),
         "refs": paragraph_refs(fact.source_keys, paragraphs)}}
         for fact in draft.facts)
@@ -201,6 +211,8 @@ def draft_content(draft, paragraphs):
         outlines.setdefault(group, []).append(block)
     for blocks in outlines.values():
         outline = {"category": blocks[0].category or "other", "heading": ""}
+        if blocks[0].region != section_region(outline["category"]) and blocks[0].region != "header":
+            outline["region"] = blocks[0].region
         explicit = any(block.model_block for block in blocks)
         outline["blocks" if explicit else "refs"] = []
         for block in blocks:
@@ -209,6 +221,8 @@ def draft_content(draft, paragraphs):
                 value = {"type": "list_item" if block.list_item else block.kind, "refs": refs}
                 if block.duplicate_of:
                     value["duplicateOf"] = paragraph_refs(block.duplicate_of, paragraphs)
+                if block.reason is not None:
+                    value["reason"] = block.reason
                 outline["blocks"].append(value)
             else:
                 if block.kind == "section":

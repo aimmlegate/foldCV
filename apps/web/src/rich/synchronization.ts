@@ -11,8 +11,11 @@ import type { RichBlock, RichSaveQueue } from "./save-queue";
 import { AppliedIntentFailure } from "./intent-queue";
 import { currentPanelIntent } from "./panel-intents";
 import { FixedOperations, operationSync, type FixedCommand } from "../background/fixed";
-import { projectJobs, type ProjectJobs } from "../background/jobs";
+import { pendingJob, projectJobs, type ProjectJobs } from "../background/jobs";
 import type { JobSnapshotV1 } from "../contracts/generated/background_snapshot_v1";
+import { rewriteActive, rewriteCancellable, rewriteStage, type RewriteActivity, type RewritePreview, type RewriteStage } from "./rewrite-progress";
+import { singleRewriteRange } from "./selection";
+import { failureLabel } from "../background/status";
 
 type Sync = RichProjectResponse["workspace"]["syncRecords"][number];
 type Capture = DependencyCapture & { epochs: ReadonlyMap<string, number> };
@@ -48,6 +51,9 @@ export type SyncAdapter = {
   changed: () => void; report: (response: RichProjectResponse) => void;
   failed?: (error: unknown) => void;
   applied?: (actionId: string, changes: CellChange[]) => void;
+  rewriteProgress?: (activity: RewriteActivity) => void;
+  rewritePreview?: (preview: RewritePreview) => void;
+  approveRewrite?: (job: JobSnapshotV1) => Promise<void>;
   background?: boolean;
 };
 export type PanelCommand = Omit<RichPanelRequest, "capture" | "factsRevision" | "documentRevision">;
@@ -59,7 +65,12 @@ export class RichSynchronization {
   private readonly fixed: FixedOperations | null;
   private readonly jobs: ProjectJobs | null;
   private readonly submitted = new Map<string, string>();
+  private readonly previews = new Map<string, { value: RewritePreview; sync: Sync; capture: Capture | null; job: JobSnapshotV1 | null }>();
+  private readonly loadingPreviews = new Set<string>();
+  private readonly applyingPreviews = new Set<string>();
   private readonly unsubscribe: (() => void) | null;
+  private readonly rewrites = new Map<string, { activity: RewriteActivity; capture: Capture | null; jobId: string | null;
+    stamp: { generation: number; cursor: number } | null; cancelled: boolean }>();
   constructor(private readonly adapter: SyncAdapter, private readonly projectId: string) {
     this.fixed = adapter.background ? new FixedOperations(projectId) : null;
     this.jobs = this.fixed ? projectJobs(projectId) : null;
@@ -67,14 +78,112 @@ export class RichSynchronization {
   }
   close(): void {
     this.invalidate();
-    this.closed = true; this.unsubscribe?.(); this.cascades.clear(); this.invalidate(); this.submitted.clear();
+    this.closed = true; this.unsubscribe?.(); this.cascades.clear(); this.invalidate(); this.submitted.clear(); this.rewrites.clear();
   }
   private finished(jobs: JobSnapshotV1[]): void {
     if (this.closed) return;
     for (const job of jobs) {
+      if (job.submission.kind === "rewrite" && job.submission.scope.kind === "selection") {
+        const id = job.submission.scope.selection.capture.actionId;
+        if (!this.rewrites.has(id) && pendingJob(job)) {
+          const started = Date.parse(job.submission.submittedAt);
+          const activity: RewriteActivity = { actionId: id, stage: "queued", startedAt: Number.isFinite(started) ? started : Date.now(), finishedAt: null, detail: null };
+          this.rewrites.set(id, { activity, capture: null, jobId: job.id, stamp: null, cancelled: false });
+          this.adapter.rewriteProgress?.(activity);
+        }
+        const entry = this.rewrites.get(id);
+        if (entry && (!entry.jobId || entry.jobId === job.id) && (!entry.stamp || job.executionGeneration > entry.stamp.generation
+            || job.executionGeneration === entry.stamp.generation && job.eventCursor >= entry.stamp.cursor)) {
+          entry.jobId = job.id;
+          entry.stamp = { generation: job.executionGeneration, cursor: job.eventCursor };
+          if (!this.applyingPreviews.has(id) || rewriteStage(job) !== "preview")
+            this.progress(id, rewriteStage(job), failureLabel(job.publicationError?.code ?? job.error?.code));
+          if (rewriteStage(job) === "preview" && !this.previews.has(id) && !this.loadingPreviews.has(id)) void this.loadPreview(job, id);
+        }
+      }
       const action = this.submitted.get(job.id);
       if (!action || !job.proposalId && !["completed", "failed", "cancelled", "interrupted"].includes(job.execution)) continue;
       this.submitted.delete(job.id); this.active.delete(action); this.adapter.history.discardPending(action);
+    }
+  }
+  private retainPreview(sync: Sync, capture: Capture | null, job: JobSnapshotV1 | null): void {
+    if (!sync.selection || typeof sync.rewriteSource !== "string" || typeof sync.rewriteResult !== "string" || !sync.rewriteResult.trim())
+      throw new RichApiFailure("INVALID_RESULT");
+    const value: RewritePreview = { actionId: sync.actionId, source: sync.rewriteSource, text: sync.rewriteResult, instruction: sync.instruction ?? "", selection: sync.selection };
+    this.previews.set(sync.actionId, { value, sync, capture, job });
+    this.adapter.rewritePreview?.(value);
+    this.progress(sync.actionId, "preview");
+  }
+  private async loadPreview(job: JobSnapshotV1, id: string): Promise<void> {
+    this.loadingPreviews.add(id);
+    try {
+      const response = await projectRequest(`/${this.projectId}`);
+      if (this.closed || this.rewrites.get(id)?.cancelled) return;
+      const sync = response.workspace.syncRecords.find(record => record.id === job.submission.input.id && record.actionId === id);
+      if (response.workspace.projectId !== this.projectId || !sync || sync.kind !== "rewrite") throw new RichApiFailure("INVALID_RESULT");
+      this.retainPreview(sync, this.rewrites.get(id)?.capture ?? null, job);
+    } catch { this.progress(id, "review", "Не удалось открыть результат. Откройте резюме заново."); }
+    finally { this.loadingPreviews.delete(id); }
+  }
+  previewRewrite(id: string): RewritePreview | null { return this.previews.get(id)?.value ?? null; }
+  async applyRewrite(id: string): Promise<void> {
+    const preview = this.previews.get(id);
+    if (!preview || this.closed || this.rewrites.get(id)?.cancelled || this.applyingPreviews.has(id)) throw new RichApiFailure("STALE_SELECTION");
+    this.applyingPreviews.add(id);
+    this.progress(id, "applying");
+    try {
+      if (preview.job && this.jobs && this.adapter.approveRewrite) {
+        await this.jobs.refresh();
+        const job = this.jobs.view.project?.jobs.find(item => item.id === preview.job?.id);
+        if (!job || rewriteStage(job) !== "preview") throw new RichApiFailure("STALE_SELECTION");
+        await this.adapter.approveRewrite(job);
+        await this.jobs.refresh();
+        const saved = this.jobs.view.project?.jobs.find(item => item.id === job.id);
+        if (!saved?.receipt && saved?.publication !== "no_change") throw new RichApiFailure("STALE_SELECTION");
+        this.progress(id, saved.receipt ? "saved" : "no_change");
+      } else {
+        const origin = preview.capture, history = this.adapter.history;
+        if (!origin || [...origin.dependencies].some(([key, revision]) => history.revision(key) !== revision)) throw new RichApiFailure("STALE_SELECTION");
+        const marker = `request:${crypto.randomUUID()}`, action = history.commit("rewrite", [{ key: marker, before: null, after: "apply" }]);
+        const capture = action ? this.capture(action, preview.sync.blockIds) : null;
+        if (!capture) throw new RichApiFailure("STALE_SELECTION");
+        try {
+          const disposition = await this.apply(preview.sync, { ...capture, dependencies: origin.dependencies, epochs: origin.epochs });
+          if (disposition && disposition !== "applied") throw new RichApiFailure("STALE_SELECTION");
+          this.progress(id, disposition === "applied" ? "saved" : "no_change");
+        } finally { history.discardPending(action ?? ""); }
+      }
+      this.previews.delete(id);
+    } catch (error) { this.progress(id, "review", "Результат не применён. Проверьте фрагмент или запросите правку заново."); throw error; }
+    finally { this.applyingPreviews.delete(id); }
+  }
+  private progress(id: string, stage: RewriteStage, detail: string | null = null): void {
+    const entry = this.rewrites.get(id);
+    if (!entry || this.closed || entry.activity.stage === stage && entry.activity.detail === detail) return;
+    if (entry.cancelled && ["saving", "queued", "starting", "running"].includes(stage)) return;
+    entry.activity = { ...entry.activity, stage, detail,
+      startedAt: stage === "applying" && entry.activity.stage === "preview" ? Date.now() : entry.activity.startedAt,
+      finishedAt: rewriteActive(stage) ? null : Date.now() };
+    this.adapter.rewriteProgress?.(entry.activity);
+  }
+  async cancelRewrite(id: string): Promise<void> {
+    const entry = this.rewrites.get(id);
+    if (!entry || !rewriteCancellable(entry.activity.stage) && !this.previews.has(id)) return;
+    const preview = this.previews.get(id);
+    entry.cancelled = true; this.invalidated.add(id);
+    this.progress(id, "cancelling");
+    this.active.delete(id);
+    this.adapter.history.discardPending(id);
+    try {
+      if (preview?.job && this.jobs) { this.finished([await this.jobs.discard(preview.job.id)]); this.previews.delete(id); }
+      else if (entry.jobId && this.jobs) this.finished([await this.jobs.stop(entry.jobId)]);
+      else if (entry.capture) {
+        await projectRequest(`/${this.projectId}/cancel-action`, "POST", this.wireCapture(entry.capture));
+        this.progress(id, "cancelled");
+      }
+      this.previews.delete(id);
+    } catch {
+      this.progress(id, "failed", "Не удалось подтвердить отмену. Проверьте состояние задачи перед повторным запросом.");
     }
   }
   private async background(command: FixedCommand, capture: Capture): Promise<boolean> {
@@ -99,7 +208,11 @@ export class RichSynchronization {
       this.active.delete(id);
       if (this.closed && this.fixed) continue;
       this.invalidated.add(id);
-      void projectRequest(`/${this.projectId}/cancel-action`, "POST", this.wireCapture(capture)).catch(() => {});
+      const rewrite = this.rewrites.get(id);
+      if (rewrite) { rewrite.cancelled = true; this.progress(id, "cancelling", "Выделенный фрагмент изменился. Останавливаем этот запрос."); }
+      void projectRequest(`/${this.projectId}/cancel-action`, "POST", this.wireCapture(capture))
+        .then(() => { if (rewrite && !rewrite.jobId) this.progress(id, "cancelled", "Выделенный фрагмент изменился."); })
+        .catch(() => { if (rewrite) this.progress(id, "failed", "Не удалось подтвердить отмену. Проверьте состояние задачи."); });
       if (this.fixed) this.adapter.history.discardPending(id);
     }
   }
@@ -147,7 +260,8 @@ export class RichSynchronization {
     await this.apply(operationSync(response, this.projectId, capture.actionId), capture);
     if (!this.closed) this.adapter.report(await projectRequest(`/${this.projectId}`));
   }
-  async rewrite(selection: RichSelection, instruction: string): Promise<void> {
+  async rewrite(selection: RichSelection, instruction: string, previewOnly = false): Promise<void> {
+    if (previewOnly && !singleRewriteRange(selection)) throw new Error("Выделите текст внутри одного блока или ячейки.");
     const marker = `request:${crypto.randomUUID()}`, history = this.adapter.history;
     const action = history.commit("rewrite", [{ key: marker, before: null, after: "pending" }]);
     if (!action) return;
@@ -155,25 +269,41 @@ export class RichSynchronization {
     try {
     const capture = this.capture(action, selection.blockIds);
     if (!capture) return;
+    const activity: RewriteActivity = { actionId: action, stage: "saving", startedAt: Date.now(), finishedAt: null, detail: null };
+    this.rewrites.set(action, { activity, capture, jobId: null, stamp: null, cancelled: false });
+    this.adapter.rewriteProgress?.(activity);
     await this.adapter.queue.flush();
-    if (!history.current(capture) || this.closed) return;
+    if (this.invalidated.has(action) || this.closed) return;
+    if (!history.current(capture)) throw new RichApiFailure("STALE_SELECTION");
     const project = this.adapter.queue.baseline.workspace.project;
     if (!project) return;
     selection.textSha256 = await selectionChecksum(project.document, selection);
-    if (!history.current(capture) || this.closed) return;
+    if (this.invalidated.has(action) || this.closed) return;
+    if (!history.current(capture)) throw new RichApiFailure("STALE_SELECTION");
     const blocks = new Map<string, number>();
     function visit(items: RichBlock[]) { for (const block of items) { blocks.set(block.id, block.revision); visit(block.children); } }
     project.document.regions.forEach(region => visit(region.blocks));
     selection.capture = { ...this.wireCapture(capture), dependencies: selection.blockIds.map(id => ({ kind: "block", id, revision: blocks.get(id) ?? 1, fingerprint: null })) };
-    if (await this.background({ kind: "rewrite", request: { selection, instruction } }, capture)) { queued = true; return; }
-    const response = await this.admitted(`/${this.projectId}/rewrite`, { selection, instruction }, capture);
+    this.progress(action, this.fixed ? "queued" : "running");
+    const request = { selection, instruction, ...(previewOnly ? { previewOnly: true } : {}) };
+    if (await this.background({ kind: "rewrite", request }, capture)) { queued = true; this.finished(this.jobs?.view.project?.jobs ?? []); return; }
+    const response = await this.admitted(`/${this.projectId}/rewrite`, request, capture);
+    if (this.invalidated.has(action) || this.closed) return;
     const sync = operationSync(response, this.projectId, capture.actionId);
     if (sync.status === "failed" || sync.status === "stale") {
       this.adapter.report(response); throw new RichApiFailure(sync.errorCode ?? "REWRITE_FAILED");
     }
+    if (previewOnly) { this.retainPreview(sync, capture, null); return; }
+    this.progress(action, "applying");
     const disposition = await this.apply(sync, capture);
     if (disposition && disposition !== "applied") throw new Error("Правка устарела. Запросите её заново.");
     if (!this.closed) this.adapter.report(await projectRequest(`/${this.projectId}`));
+    this.progress(action, disposition === "applied" ? "saved" : "no_change");
+    } catch (error) {
+      if (!this.rewrites.get(action)?.cancelled) {
+        this.progress(action, "failed", "Правка не завершена. Проверьте текст и состояние сохранения перед повторным запросом.");
+        throw error;
+      }
     } finally { if (!queued) history.discardPending(action); }
   }
   async resolve(id: string): Promise<void> {

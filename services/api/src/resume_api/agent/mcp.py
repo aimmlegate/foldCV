@@ -15,6 +15,7 @@ from mcp.server.transport_security import TransportSecuritySettings
 from starlette.responses import JSONResponse, Response
 import uvicorn
 from resume_api.providers.codex_cli import strict_json
+from resume_api.providers.content import ContentFailure
 
 
 class ListenerServer(uvicorn.Server):
@@ -82,7 +83,7 @@ class PrivateMcp:
                 return await Response(status_code=400)(scope, receive, send)
             try:
                 payload = strict_json(bytes(body), max_bytes=65536)
-            except (ValueError, UnicodeError, RecursionError):
+            except (ContentFailure, ValueError, UnicodeError, RecursionError):
                 return await Response(status_code=400)(scope, receive, send)
             if not isinstance(payload, dict):
                 return await Response(status_code=400)(scope, receive, send)

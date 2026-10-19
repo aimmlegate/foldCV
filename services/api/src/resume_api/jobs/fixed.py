@@ -183,7 +183,8 @@ class FixedJobs:
                     workspace=captured, rules=rules, connectionEpoch=connection.epoch, model=selected[1],
                     sourceSha256=processing_source(captured, rules) if processing else digest(captured.project),
                     syncId=identifier if record else None, actionId=record.action_id if record else None,
-                    originalSync=original)
+                    originalSync=original, reasoningEffort=(projects.preferences.load().rewrite_reasoning_effort
+                        if record and record.kind == "rewrite" and projects.preferences else None))
                 checksum = self.inputs.prepare(directory, state, value)
                 service.store._write(directory, state, service.store._all())
             kind = "processing" if processing else "rewrite" if record.kind == "rewrite" else "reconciliation"
@@ -194,6 +195,7 @@ class FixedJobs:
                 input={"kind": "processing" if processing else "rich_sync", "id": identifier, "sha256": checksum},
                 models=[{"stage": stage, "model": selected[1], "configSha256": digest([SKILL_SHA256 if processing else PROTOCOL, stage, rules])} for stage in models],
                 accountGeneration=state.account_generation, tools=list(IMPORT_TOOLS) if processing else [], allowEdits=True, allowWeb=False,
+                approvalRequired=command.kind == "rewrite" and command.request.preview_only,
                 scope={"kind": "selection", "selection": record.selection} if record and record.selection else {"kind": "resume"},
                 guards=guards, submittedAt=service.store.clock())
             # Retire only queued automatic work; explicit requests and active attempts keep their visible outcome.

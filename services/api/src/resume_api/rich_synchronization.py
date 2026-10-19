@@ -2,6 +2,7 @@
 
 import asyncio
 import threading
+import time
 from pydantic import ValidationError
 from packages.resume_core.background_store import BackgroundFailure
 
@@ -12,8 +13,11 @@ from packages.resume_core.rich_fields import set_text, working_field, occurrence
 from packages.resume_core.rich_mutations import apply_rich_mutation
 from packages.resume_core.rich_snapshot_merge import reconcile
 from packages.resume_core.rich_assembly import identity
-from packages.resume_core.rich_sync import (RichRewriteProposal, RichReconcileProposal, exact_completion,
-    scoped_dependencies, selection_parts, selection_checksum, rewrite_steps, sync_prompt, linked_field_steps, RichCompletionRequest)
+from packages.resume_core.rich_sync import (RichReconcileProposal, exact_completion,
+    scoped_dependencies, selection_parts, selection_checksum, sync_prompt, linked_field_steps, RichCompletionRequest)
+from packages.resume_core.preferences import PreferencesFailure
+from packages.resume_core.text_rewrite import PlainTextReply, plain_prompt, selection_targets, selection_text, plain_rewrite_steps
+from .rewrite_timing import add_phase, measure
 from .gui_admission import QueuedProvider, AdmissionCancelled
 from .gui_content import generate_admitted
 from .gui_projects import ProjectFailure
@@ -115,6 +119,11 @@ class RichSynchronization:
         selected = self.provider_factory()
         if selected is None:
             raise ContentFailure("CONNECTION_REQUIRED")
+        plain = result_type is PlainTextReply
+        try:
+            effort = self.preferences.load().rewrite_reasoning_effort if plain and self.preferences else None
+        except PreferencesFailure as error:
+            raise ContentFailure(error.code) from None
         key = (identifier, sync.id)
         cancel, files = threading.Event(), OperationFiles(self.temp_root)
         self.tasks[key], self.cancels[key], self.files[key] = asyncio.current_task(), cancel, files
@@ -125,20 +134,24 @@ class RichSynchronization:
                 self.finish_operation(identifier, operation.id, "running")
                 if self.persist(identifier) == "failed":
                     raise ProjectFailure("PROJECT_SAVE_FAILED", 503)
-        prompt = sync_prompt(sync.kind if sync.kind in {"rewrite", "panel"} else "reconcile", payload, self.workspaces[identifier].rules_used)
-        request = ContentInput(prompt, result_type, GenerationPolicy(model=selected[1], timeout_seconds=180, allow_repair=False))
+        prompt = plain_prompt(payload["instruction"], payload["text"]) if plain else sync_prompt(
+            sync.kind if sync.kind in {"rewrite", "panel"} else "reconcile", payload, self.workspaces[identifier].rules_used)
+        request = ContentInput(prompt, result_type, GenerationPolicy(model=selected[1], timeout_seconds=180,
+            allow_repair=False, reasoning_effort=effort))
         def run():
             with files.open():
                 return generate_admitted(QueuedProvider(selected[0], admitted), request, files, cancel)
         try:
+            waiting = time.perf_counter()
             async with self.worker_slot(cancel):
+                add_phase("worker_queue", time.perf_counter() - waiting)
                 response = await asyncio.to_thread(run)
             if cancel.is_set():
                 raise ContentFailure("CANCELLED")
             value = result_type.model_validate(response.value)
             with self.state_lock:
+                # The caller saves this status and the compiled proposal together before returning.
                 self.finish_operation(identifier, operation.id, "completed")
-                self.persist(identifier)
             return value
         except Exception as error:
             with self.state_lock:
@@ -149,7 +162,6 @@ class RichSynchronization:
             raise
         finally:
             self.tasks.pop(key, None); self.cancels.pop(key, None); self.files.pop(key, None)
-            self.persist(identifier)
 
     def add_sync(self, identifier, capture, block_ids, kind, records=()):
         with self.state_lock:
@@ -265,14 +277,14 @@ class RichSynchronization:
                 edits = {step.record.id: step.record for step in steps if isinstance(step, PutRecord)}
                 for record in proposal.records:
                     original = records.get(record.id)
-                    if original is None or record.id not in linked or any(getattr(original, key, None) != getattr(record, key, None)
+                    if original is None or record.id not in linked - touched or any(getattr(original, key, None) != getattr(record, key, None)
                             for key in ("kind", "origin", "evidence", "job_id", "subproject_id")):
                         raise ValueError("RECONCILE_SCOPE_INVALID")
                     edits[record.id] = record
                     record.user_corrected = True
                 for update in proposal.updates:
                     original = records.get(update.record_id)
-                    if original is None or update.record_id not in linked:
+                    if original is None or update.record_id not in linked - touched:
                         raise ValueError("RECONCILE_SCOPE_INVALID")
                     target = working_field(original, update.field_key)
                     if target is None or (target.value is not None and not isinstance(target.value, str)):
@@ -281,7 +293,7 @@ class RichSynchronization:
                     set_text(copy, update.field_key, update.text)
                 for update in proposal.uncertain:
                     original = records.get(update.record_id)
-                    if original is None or original.id not in linked:
+                    if original is None or original.id not in linked - touched:
                         raise ValueError("RECONCILE_SCOPE_INVALID")
                     copy = edits.setdefault(original.id, original.model_copy(deep=True))
                     target = working_field(copy, update.field_key)
@@ -304,32 +316,46 @@ class RichSynchronization:
         return self.response(identifier)
 
     async def rewrite_rich(self, identifier, request):
-        workspace = self.read(identifier)
+        with measure("prepare"):
+            workspace = self.read(identifier)
+            try:
+                parts = selection_parts(workspace, request.selection)
+                if selection_checksum(parts) != request.selection.text_sha256:
+                    raise ValueError("STALE_SELECTION")
+                targets = selection_targets(workspace, request.selection)
+            except ValueError as error:
+                raise ProjectFailure(str(error), 409) from None
+            target_ids = list(dict.fromkeys([*request.selection.block_ids, *(target.block.id for target in targets)]))
+            records = {link.record_id for target in targets for link in target.block.provenance if link.kind in {"citation", "field_binding"}}
+            sync = self.add_sync(identifier, request.selection.capture, target_ids, "rewrite", sorted(records))
+            sync.selection, sync.instruction = request.selection, request.instruction
         try:
-            parts = selection_parts(workspace, request.selection)
-            if selection_checksum(parts) != request.selection.text_sha256:
-                raise ValueError("STALE_SELECTION")
-        except ValueError as error:
-            raise ProjectFailure(str(error), 409) from None
-        records = {link.record_id for block, *_ in parts for link in block.provenance if link.kind in {"citation", "field_binding"}}
-        sync = self.add_sync(identifier, request.selection.capture, request.selection.block_ids, "rewrite", sorted(records))
-        sync.selection, sync.instruction = request.selection, request.instruction
-        try:
-            proposal = await self.sync_content(identifier, sync, {"instruction": request.instruction,
-                "selection": [part[-1] for part in parts]}, RichRewriteProposal)
-            steps = rewrite_steps(workspace, request.selection, proposal)
-            preview = RichMutation(schemaVersion=1, projectId=identifier, clientMutationId=identity("preview"),
-                actionId=sync.action_id, kind="rewrite", capture=request.selection.capture, steps=steps)
-            candidate, _ = apply_rich_mutation(workspace, preview)
-            completion = RichCompletionRequest(capture=request.selection.capture, blockIds=[block.id for block in candidate.project.document.blocks()
-                if block.id not in {old.id for old in workspace.project.document.blocks()} or block.id in request.selection.block_ids],
-                movedIds=[], removedFields=[], interpret=False)
-            fact_steps, conflicts = exact_completion(candidate, completion)
-            sync.proposed_steps, sync.ready = [*steps, *fact_steps], True
-            sync.status = "conflict" if conflicts else "pending"
-            if not dependencies_current(self.workspaces[identifier], sync.dependencies):
-                sync.status, sync.ready, sync.error_code = "stale", False, "STALE_SYNC"
+            with measure("content"):
+                proposal = await self.sync_content(identifier, sync, {"instruction": request.instruction,
+                    "text": selection_text(targets)}, PlainTextReply)
+                sync.rewrite_source, sync.rewrite_result = selection_text(targets), proposal.text
+            with measure("proposal"):
+                steps = plain_rewrite_steps(workspace, request.selection, proposal)
+                candidate = workspace
+                if steps:
+                    preview = RichMutation(schemaVersion=1, projectId=identifier, clientMutationId=identity("preview"),
+                        actionId=sync.action_id, kind="rewrite", capture=request.selection.capture, steps=steps)
+                    candidate, _ = apply_rich_mutation(workspace, preview)
+                remaining = occurrences(candidate.project.document)
+                removed = [{"recordId": group.record_id, "fieldKey": group.key, "rootId": group.root}
+                    for key, group in occurrences(workspace.project.document).items()
+                    if key not in remaining and set(group.block_ids) & set(target_ids)]
+                completion = RichCompletionRequest(capture=request.selection.capture, blockIds=[block.id for block in candidate.project.document.blocks()
+                    if block.id not in {old.id for old in workspace.project.document.blocks()} or block.id in target_ids],
+                    movedIds=[], removedFields=removed, interpret=False)
+                fact_steps, conflicts = exact_completion(candidate, completion) if steps else ([], [])
+                sync.proposed_steps, sync.ready = [*steps, *fact_steps], bool(steps or fact_steps)
+                sync.status = "conflict" if conflicts else "pending" if sync.ready else "applied"
+                if not dependencies_current(self.workspaces[identifier], sync.dependencies):
+                    sync.status, sync.ready, sync.error_code = "stale", False, "STALE_SYNC"
         except (ContentFailure, AdmissionCancelled, ProjectFailure, SpikeError, ValidationError, ValueError) as error:
             sync.status, sync.error_code = "failed", getattr(error, "code", "INVALID_RESULT")
-        self.publish_sync(identifier, sync)
-        return self.response(identifier)
+        with measure("publish"):
+            self.publish_sync(identifier, sync)
+        with measure("response"):
+            return self.response(identifier)

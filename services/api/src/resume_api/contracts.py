@@ -6,6 +6,7 @@ from typing import Annotated, Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from packages.resume_core.reasoning import ModelReasoning, ReasoningEffort
 from packages.resume_core.models.contracts import Block, Fact, Proposal, SourceUnit
 from packages.resume_core.rendering.models import RenderRequest
 
@@ -71,6 +72,11 @@ class SelectModelRequest(Transport):
     model: str = Field(min_length=1, max_length=80, pattern=r"^[a-zA-Z0-9][a-zA-Z0-9._-]*$")
 
 
+class SelectReasoningRequest(Transport):
+    model: str = Field(min_length=1, max_length=80)
+    effort: ReasoningEffort | None
+
+
 class QuotaPayload(Transport):
     state: Literal["unknown", "available", "exhausted"]
     usedPercent: float | None = Field(default=None, ge=0, le=100)
@@ -85,6 +91,7 @@ class ConnectionPayload(Transport):
     plan: str | None = None
     models: list[str] = Field(default_factory=list, max_length=100)
     selectedModel: str | None = None
+    modelReasoning: dict[str, ModelReasoning] = Field(default_factory=dict)
     quota: QuotaPayload = Field(default_factory=lambda: QuotaPayload(state="unknown"))
     metadataReady: bool = False
     generationReady: bool = False

@@ -1,4 +1,5 @@
 export type Allowedits = boolean;
+export type Approvalrequired = boolean;
 export type Code =
   | "AUTH_REQUIRED"
   | "RATE_LIMITED"
@@ -68,6 +69,7 @@ export type Updatedat = string;
 
 export interface JobSummaryV1 {
   allowEdits: Allowedits;
+  approvalRequired?: Approvalrequired;
   error: JobFailure | null;
   eventCursor: Eventcursor;
   execution: Execution;

@@ -73,7 +73,7 @@ if args and args[0] == "app-server":
             if case == "metadata_account_only":
                 sys.exit(0)
         elif method == "model/list":
-            emit({"id": event["id"], "result": {"data": [{"model": "gpt-6-luna"}], "nextCursor": None}})
+            emit({"id": event["id"], "result": {"data": [{"model": "gpt-6-luna", "supportedReasoningEfforts": [{"reasoningEffort": e} for e in config.get("efforts", ["low", "medium", "high"])], "defaultReasoningEffort": "medium"}], "nextCursor": None}})
             if case == "metadata_duplicate_catalog":
                 emit({"id": event["id"], "result": {"data": [{"model": "gpt-6-luna"}], "nextCursor": None}})
         else:
@@ -94,8 +94,12 @@ for name in ["shell_tool", "unified_exec", "browser_use", "computer_use", "apps"
 assert not any(key.startswith(("OPENAI_", "CODEX_", "T3CODE_", "PYTHON", "HTTP_PROXY", "HTTPS_PROXY")) for key in os.environ)
 for key in ["TMPDIR", "XDG_CACHE_HOME", "XDG_DATA_HOME", "XDG_STATE_HOME"]:
     assert Path(os.environ[key]).is_relative_to(Path.cwd())
-schema = json.loads(Path(args[args.index("--output-schema") + 1]).read_text())
-assert schema["required"] == config.get("schema_required", ["summary"]) and schema["additionalProperties"] is False
+if config.get("plain_text"):
+    assert "--output-schema" not in args and not Path("schema.json").exists()
+    schema = {}
+else:
+    schema = json.loads(Path(args[args.index("--output-schema") + 1]).read_text())
+    assert schema["required"] == config.get("schema_required", ["summary"]) and schema["additionalProperties"] is False
 
 
 def schema_error(node):

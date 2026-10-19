@@ -33,7 +33,7 @@ function errorCode(value: unknown): string {
   return typeof error === "object" && error !== null && "code" in error && typeof error.code === "string"
     ? error.code : "REQUEST_FAILED";
 }
-async function request(path: string, method = "GET", body?: GuiCreateProjectRequest | GuiStartGenerationRequest | SourceContextRequest | GuiRewriteRequest | GuiExportRequest | GuiAnalysisRequest | SaveAnalysisPreference | SaveImportModelPreference | GuiDeleteProjectRequest | GuiRenameProjectRequest | SaveRulesRequest | Mutation | Record<string, never> | FormData): Promise<unknown> {
+async function request(path: string, method = "GET", body?: GuiCreateProjectRequest | GuiStartGenerationRequest | SourceContextRequest | GuiRewriteRequest | GuiExportRequest | GuiAnalysisRequest | SaveAnalysisPreference | SaveImportModelPreference | { model: string | null; effort: Preferences["rewriteReasoningEffort"] } | GuiDeleteProjectRequest | GuiRenameProjectRequest | SaveRulesRequest | Mutation | Record<string, never> | FormData): Promise<unknown> {
   const init: RequestInit = { method, credentials: "same-origin", cache: "no-store" };
   if (body instanceof FormData) init.body = body;
   else if (body !== undefined) { init.body = JSON.stringify(body); init.headers = { "Content-Type": "application/json" }; }
@@ -84,6 +84,11 @@ export async function saveRulesRequest(body: SaveRulesRequest): Promise<RulesSet
   return value;
 }
 function isPreferences(value: unknown): value is Preferences { return validateContract("preferences", value); }
+export async function saveRewriteReasoningRequest(model: string | null, effort: Preferences["rewriteReasoningEffort"]): Promise<Preferences> {
+  const value = await request("/v1/settings/rewrite-reasoning", "PUT", { model, effort: effort ?? null });
+  if (!isPreferences(value)) throw new Error("Invalid preferences response");
+  return value;
+}
 export async function saveImportModelRequest(model: string | null): Promise<Preferences> {
   const value = await request("/v1/settings/import-model", "PUT", { model });
   if (!isPreferences(value)) throw new Error("Invalid preferences response");

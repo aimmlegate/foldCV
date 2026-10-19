@@ -263,7 +263,7 @@ class Feasibility:
         if participant.role.startswith("agent-"):
             if runtime["toolCalls"] < (1 if cancelled else 2) or runtime["mcpListenerClosed"] is not True:
                 raise ValueError("Required native tool use or capability cleanup is absent")
-        elif not runtime.get("schemaValidated") or runtime.get("logicalAttempts") != 1 or runtime.get("repairTurns") != 0:
+        elif not runtime.get("schemaValidated" if participant.role == "structured-sync-C" else "textValidated") or runtime.get("logicalAttempts") != 1 or runtime.get("repairTurns") != 0:
             raise ValueError("The fixed native turn did not pass its original one-attempt grammar")
         elif job.publication != "saved" or job.receipt is None or not job.receipt.durable:
             raise ValueError("The fixed native result did not reach durable publication")

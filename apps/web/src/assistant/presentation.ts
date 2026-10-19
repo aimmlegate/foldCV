@@ -36,7 +36,7 @@ export function runText(view: AssistantView): string {
   return view.run ? labels[view.run.state] : "";
 }
 export function canSend(view: AssistantView, applying = false): boolean {
-  return !view.submitting && !applying && (!view.run || ["completed", "failed", "cancelled", "interrupted"].includes(view.run.state))
+  return !view.submitting && !view.loading && !applying && (!view.run || ["completed", "failed", "cancelled", "interrupted"].includes(view.run.state))
     && (view.pendingSend || view.capabilities?.ready === true) && !!view.draft.trim() && [...view.draft].length <= 8000;
 }
 export function submitKey(key: string, shift: boolean, composing: boolean, nativeComposing: boolean, keyCode: number): boolean {

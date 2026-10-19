@@ -26,9 +26,11 @@ test("template decorations leave authored text marks and history untouched and a
   assert.equal(decorations().length, 2);
   const first = decorations()[0], second = decorations()[1]; assert.ok(first && second);
   assert.deepEqual(first, Decoration.node(first.from, first.to, { "data-cv-role": "focus_entry", "data-cv-logo": "true",
+    "data-cv-experience": "false",
     "data-cv-bound": "false", "data-cv-empty": "false", "data-cv-marker": "false", "data-cv-active": "true",
     "style": '--cv-focus-logo: url("/assets/python.png")' }));
   assert.deepEqual(second, Decoration.node(second.from, second.to, { "data-cv-role": "support", "data-cv-logo": "false",
+    "data-cv-experience": "false",
     "data-cv-bound": "true", "data-cv-empty": "true", "data-cv-marker": "false", "data-cv-active": "false" }));
   roles = { focus: { role: "body" } };
   const tr = state.tr.setMeta("foldcv-presentation", true);
@@ -52,6 +54,7 @@ test("an authored list marker stays in the text and suppresses a second marker",
   assert.ok(set instanceof DecorationSet);
   const decoration = set.find()[0]; assert.ok(decoration);
   assert.deepEqual(decoration, Decoration.node(decoration.from, decoration.to, { "data-cv-role": "body", "data-cv-logo": "false",
+    "data-cv-experience": "false",
     "data-cv-bound": "false", "data-cv-empty": "false", "data-cv-marker": "true", "data-cv-active": "false" }));
   assert.equal(state.doc.textContent, "- Original task.");
   assert.equal(undoDepth(state), 0);
@@ -63,7 +66,7 @@ test("duration labels remain derived decorations and leave authored text and und
     paragraph: { content: "text*" }, text: {},
   } });
   const doc = schema.node("doc", null, schema.node("blockContainer", null, schema.node("paragraph", null, schema.text("Python"))));
-  const roles: PresentationBlocks = { tech: { role: "focus_entry", experience: "≈ 3 года", experienceNote: "По датам мест работы" } };
+  const roles: PresentationBlocks = { tech: { role: "focus_entry", experience: "3 года", experienceNote: "По датам мест работы" } };
   const plugin = presentationPlugin(() => roles, new Map());
   const state = EditorState.create({ doc, selection: new AllSelection(doc), plugins: [history(), plugin] });
   const set = plugin.props.decorations?.call(plugin, state);
@@ -71,7 +74,7 @@ test("duration labels remain derived decorations and leave authored text and und
   assert.equal(set.find().length, 2);
   assert.equal(set.find().filter(d => {
     const spec: unknown = d.spec;
-    return typeof spec === "object" && spec !== null && "key" in spec && spec.key === "experience:tech:≈ 3 года:По датам мест работы";
+    return typeof spec === "object" && spec !== null && "key" in spec && spec.key === "experience:tech:3 года:По датам мест работы";
   }).length, 1);
   assert.equal(state.doc.textContent, "Python");
   assert.equal(undoDepth(state), 0);

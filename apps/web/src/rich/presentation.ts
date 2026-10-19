@@ -15,6 +15,7 @@ export function presentationPlugin(current: () => PresentationBlocks, logos: Rea
       let bound = false;
       node.firstChild?.descendants(child => { if (child.type.name === "factField") bound = true; });
       const attributes: Record<string, string> = { "data-cv-role": view.role, "data-cv-logo": logo ? "true" : "false",
+        "data-cv-experience": view.experience ? "true" : "false",
         "data-cv-bound": bound ? "true" : "false",
         "data-cv-empty": node.firstChild?.textContent.trim() ? "false" : "true",
         "data-cv-marker": /^\s*(?:[•\-—]|\d+[.)])\s/u.test(node.firstChild?.textContent ?? "") ? "true" : "false",

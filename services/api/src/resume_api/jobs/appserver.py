@@ -9,6 +9,7 @@ import httpx
 from pydantic import BaseModel, ValidationError
 
 from packages.resume_core import agent_limits
+from packages.resume_core.text_rewrite import PlainTextReply
 from ..agent.runtime import RuntimeResult
 from ..cli.experimental_profile import VERSION
 from ..providers.codex_cli import Events, MAX_SCHEMA, strict_json
@@ -162,6 +163,7 @@ class SharedContentProvider:
         if (not isinstance(result_type, type) or not issubclass(result_type, BaseModel)
                 or result_type.model_config.get("extra") != "forbid"):
             raise ContentFailure("INVALID_SCHEMA")
+        plain = result_type is PlainTextReply
         began, attempts = self.server.clock.now(), 0
         def guard():
             if cancel.is_set(): raise ContentFailure("CANCELLED")
@@ -189,12 +191,14 @@ class SharedContentProvider:
             self.cleanup_verified = False
             turn_job = self.job_id if self.sequence == 1 else self.job_id + "_" + str(self.sequence)
             response = await self.server.run(TurnInput(turn_job, policy.model,
-                text, "Return only the captured structured result. Use no tools or invented facts.", self.cancelled,
-                before_turn=ready, started=self.model_started, output_schema=schema.wire,
+                text, "Return only the replacement text. Use no tools." if plain else
+                    "Return only the captured structured result. Use no tools or invented facts.", self.cancelled,
+                before_turn=ready, started=self.model_started, output_schema=None if plain else schema.wire,
+                plain_text=plain, reasoning_effort=policy.reasoning_effort if plain else "medium",
                 text_limit=policy.max_total_output_bytes, active_seconds=policy.timeout_seconds))
             self.cleanup_verified = response["cleanupVerified"] and not self.server.cleanup_failed
             if response["state"] != "completed" or response["error"] or not response["cleanupVerified"]:
-                self.audit({**response["witness"], "transport": "shared_appserver_v1", "structured": True,
+                self.audit({**response["witness"], "transport": "shared_appserver_v1", "structured": not plain,
                     "state": response["state"], "schemaValidated": False, "cleanupVerified": self.cleanup_verified})
                 code = response["error"] or ("CANCELLED" if response["state"] == "cancelled" else "CLI_FAILED")
                 raise ContentFailure(code, logical_attempts=attempts)
@@ -205,9 +209,9 @@ class SharedContentProvider:
             if request.transport:
                 value = result_type.model_validate(request.transport.restore(value), strict=True)
             guard()
-            self.audit({**response["witness"], "transport": "shared_appserver_v1", "structured": True,
+            self.audit({**response["witness"], "transport": "shared_appserver_v1", "structured": not plain,
                 "nativeStarted": self.native and response["nativeStarted"], "state": response["state"],
-                "schemaValidated": True, "logicalAttempts": 1, "repairTurns": 0, "toolCalls": 0,
+                "schemaValidated": not plain, "textValidated": plain, "logicalAttempts": 1, "repairTurns": 0, "toolCalls": 0,
                 "cleanupVerified": self.cleanup_verified})
             usage = response["usage"]
             reported = ReportedUsage(usage["inputTokens"], usage["cachedInputTokens"], usage["outputTokens"], True) if usage else ReportedUsage()

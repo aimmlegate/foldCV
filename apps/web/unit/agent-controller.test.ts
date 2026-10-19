@@ -12,6 +12,7 @@ import type { AgentCommitResult } from "../src/contracts/generated/agent_commit_
 import type { RichProjectResponse } from "../src/contracts/generated/rich_project_response";
 import { AgentApiFailure } from "../src/assistant/api";
 import { AssistantController, type AssistantApi } from "../src/assistant/controller";
+import { deferred } from "./support/background-writer";
 import { validateRichWorkspaceShape } from "../src/rich/validate";
 
 const now = "2026-10-15T12:00:00Z";
@@ -122,6 +123,30 @@ function harness(heartbeatMs = 5000) {
     script: (script: typeof eventScript) => { eventScript = script; }, lose: () => { lostReply = true; },
     expire: () => { renewFails = true; }, finish: () => { assert.ok(current); current = { ...current, state: "completed", finishedAt: now }; },
     counts: () => ({ submitted, closes, cancelled }) };
+}
+
+for (const phase of ["metadata", "owner", "baseline", "history", "submit"] as const) {
+  test(`Stop fences a send while waiting for ${phase}`, async () => {
+    const h = harness(), reached = deferred<void>(), release = deferred<void>();
+    const hold = async () => { reached.resolve(); await release.promise; };
+    try {
+      await h.controller.init(); h.controller.draft("Keep this draft");
+      if (phase === "metadata") { const original = h.api.settings; h.api.settings = async () => { await hold(); return original(); }; }
+      if (phase === "owner") { const original = h.api.open; h.api.open = async session => { await hold(); return original(session); }; }
+      if (phase === "history") h.api.offerHistory = async () => { await hold(); return {}; };
+      if (phase === "submit") { const original = h.api.submit; h.api.submit = async request => { const value = await original(request); await hold(); return value; }; }
+      const sending = h.controller.send(async () => {
+        if (phase === "baseline") await hold();
+        return { ...await baseline(), historyOffers: { undo: null, redo: null } };
+      });
+      await reached.promise; await h.controller.stop(); release.resolve(); await sending;
+      assert.equal(h.counts().submitted, phase === "submit" ? 1 : 0);
+      assert.equal(h.controller.view.draft, "Keep this draft");
+      assert.equal(h.controller.view.pendingSend, false);
+      assert.equal(h.controller.active, false);
+      if (phase === "submit") assert.equal(h.counts().cancelled, 1);
+    } finally { release.resolve(); h.controller.close(); }
+  });
 }
 
 test("assistant technical Send retry keeps its request identity across settings changes", async () => {

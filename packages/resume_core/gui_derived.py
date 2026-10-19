@@ -114,8 +114,10 @@ def initial_derived(document: Document, facts: list[RecoveryFact], employment: l
                 associated = [sub.period] if sub and sub.period else []
                 full = full and bool(associated) and complete[job.id]
                 if current and any(field.origin == "user" for period in current.periods for field in (period.start_text, period.end_text)):
-                    contained = all(any(bound.start.lower() <= period.start.lower() and bound.end is not None
-                        and period.end is not None and period.end.upper() <= bound.end.upper() for bound in periods[job.id]) for period in associated)
+                    contained = all(any(bound.start.lower() <= period.start.lower()
+                        and (bound.end is None or (period.end or observed) is not None
+                             and (period.end or observed).upper() <= bound.end.upper())
+                        for bound in periods[job.id]) for period in associated)
                     if not contained:
                         associated, full = [], False
             else:

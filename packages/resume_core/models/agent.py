@@ -647,6 +647,17 @@ class MessageDelta(EventBase):
     payload: MessageDeltaPayload
 
 
+class ActivityPayload(AgentWire):
+    item_id: AgentId
+    kind: Literal["summary"]
+    text: str = Field(min_length=1, max_length=1200)
+
+
+class ActivityEvent(EventBase):
+    type: Literal["activity.updated"]
+    payload: ActivityPayload
+
+
 class ToolPayload(AgentWire):
     call_id: AgentId
     name: str = Field(min_length=1, max_length=128)
@@ -695,7 +706,7 @@ class RunStateEvent(EventBase):
     payload: RunStatePayload
 
 
-class AgentEvent(RootModel[Annotated[Union[MessageDelta, ToolEvent, ResourceEvent, EditEvent,
+class AgentEvent(RootModel[Annotated[Union[MessageDelta, ActivityEvent, ToolEvent, ResourceEvent, EditEvent,
         UsageEvent, RunStateEvent], Field(discriminator="type")]]):
     pass
 

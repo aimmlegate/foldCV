@@ -9,6 +9,9 @@ import { Icon } from "../ui/Icon";
 import { factError } from "./error";
 import { AppliedIntentFailure } from "../../rich/intent-queue";
 import { dateText } from "./dates";
+import type { RichProjectResponse } from "../../contracts/generated/rich_project_response";
+import { FocusYears } from "./FocusYears";
+import { OperationStatus } from "../ui/OperationStatus";
 
 function summary(record: RecordValue): [string, string] {
   if (record.kind === "candidate") return [record.name.rawText || "Кандидат", [record.title.rawText, record.location.rawText].filter(Boolean).join("\n")];
@@ -19,8 +22,10 @@ function summary(record: RecordValue): [string, string] {
   if (record.kind === "claim") return [record.value.rawText || "Новый факт", ""];
   return ["", ""];
 }
-export function FactsPanel({ facts, document, submit, pending, paused, timeline, hidden, close }: {
+export function FactsPanel({ facts, document, focusEntries = [], focusOptions = [], submit, pending, paused, timeline, hidden, close }: {
   facts: WorkingFacts; document: RichDocumentV1; submit: (command: PanelCommand) => Promise<void>; pending: readonly PanelCommand[]; paused: boolean;
+  focusEntries?: NonNullable<RichProjectResponse["presentation"]>["focusEntries"];
+  focusOptions?: NonNullable<RichProjectResponse["presentation"]>["focusOptions"];
   timeline: ReactNode; hidden: boolean; close: () => void;
 }) {
   const [target, setTarget] = useState<FactTarget | null>(null), [error, setError] = useState<{ message: string; save: boolean } | null>(null);
@@ -35,7 +40,10 @@ export function FactsPanel({ facts, document, submit, pending, paused, timeline,
   return <><aside className="facts-panel" aria-label="Факты резюме" id="rich-facts-panel" hidden={hidden}
     onKeyDown={event => { if (event.key === "Escape") { event.preventDefault(); event.stopPropagation(); close(); } }}>
     <div className="panel-heading"><h2>Факты</h2><button className="icon" aria-label="Скрыть факты" onClick={close}><Icon name="close" /></button></div>
-    {error && <p className="notice warning" role="alert">{error.message}</p>}
+    <div className="facts-feedback">
+      {error && <p className="notice warning" role="alert">{error.message}</p>}
+      {pending.length > 0 && <OperationStatus state={paused ? "error" : "working"} label={paused ? "Ожидает повторного сохранения" : `Сохраняем изменения: ${pending.length}`} timed={!paused} />}
+    </div>
     {facts.extraction && <div className="notice" role="status">
       <p>{facts.extraction.status === "complete" ? "Факты извлечены" : "Факты извлечены частично"}: {facts.extraction.factCount}.</p>
       {facts.extraction.unresolved.length > 0 && <details><summary>Требует проверки: {facts.extraction.unresolved.length}</summary>
@@ -44,10 +52,10 @@ export function FactsPanel({ facts, document, submit, pending, paused, timeline,
           {issue.page ? `, стр. ${issue.page}` : ""}</li>)}</ul>
         <p>Сверьте исходник и внесите исправления вручную или повторите обработку.</p></details>}
     </div>}
-    {pending.length > 0 && <small className="uir-facts-pending" role="status">{paused ? "Ожидает повторного сохранения" : `Сохраняем изменения: ${pending.length}`}</small>}
     {groups.map(kind => <details className="fact-group" key={kind} data-group={kind} open={kind !== "claim"}>
       <summary>{labels[kind]}</summary>
-      {kind === "technology" ? <TechnologySelect facts={facts} document={document} jobId={null} label="общий список" pending={pending} paused={paused} submit={apply} />
+      {kind === "technology" ? <><FocusYears entries={focusEntries} options={focusOptions} paused={paused || pending.length > 0} submit={apply} />
+        <TechnologySelect facts={facts} document={document} jobId={null} label="общий список" pending={pending} paused={paused} submit={apply} /></>
         : facts.records.filter(record => record.kind === kind).map(record => {
           const [name, sub] = summary(record);
           return <div key={record.id}><div className="fact-row" data-fact-id={record.id}>

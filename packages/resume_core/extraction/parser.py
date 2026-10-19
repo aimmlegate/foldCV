@@ -201,7 +201,9 @@ def _check_archive(archive: ZipFile, out: Collected) -> dict[str, bytes]:
                 for node in root.iter():
                     if node.tag == R + "Relationship" and node.attrib.get("Type") == "http://schemas.openxmlformats.org/officeDocument/2006/relationships/printerSettings":
                         target = node.attrib.get("Target", "")
-                        if node.attrib.get("TargetMode", "").lower() == "external" or target.startswith("/") or "\\" in target:
+                        if node.attrib.get("TargetMode", "").lower() == "external":
+                            continue
+                        if target.startswith("/") or "\\" in target:
                             raise ExtractFailure("EXTRACT_UNSAFE_ARCHIVE")
                         relative = posixpath.normpath(posixpath.join(posixpath.dirname(posixpath.dirname(name)), target))
                         if relative not in printer_bins:
@@ -213,17 +215,21 @@ def _check_archive(archive: ZipFile, out: Collected) -> dict[str, bytes]:
                         if (relationship_type != "http://schemas.openxmlformats.org/officeDocument/2006/relationships/hyperlink" or
                                 not target.lower().startswith(("https://", "http://", "mailto:")) or
                                 len(target) > 2048 or any(ord(char) < 32 for char in target) or len(out.links) >= 100):
-                            raise ExtractFailure("EXTRACT_EXTERNAL_LINK")
+                            continue
                         out.links.append(ExtractLink(part=name, relationship_id=node.attrib.get("Id", ""), target=target))
     if printer_bins != printer_targets:
         raise ExtractFailure("EXTRACT_UNSUPPORTED")
     return contents
 
 
-def _paragraph_text(paragraph: ET.Element) -> str:
+def _paragraph_text(paragraph: ET.Element, styles: ParagraphStyles | None = None) -> str:
     parts: list[str] = []
     def visit(node: ET.Element) -> None:
         if node.tag.endswith("}txbxContent"):
+            return
+        if node.tag in {W + "del", W + "moveFrom"}:
+            return
+        if node.tag == W + "r" and (styles or ParagraphStyles()).hidden(node, paragraph):
             return
         if node.tag == MC + "AlternateContent":
             selected = node.find(MC + "Fallback")
@@ -246,7 +252,7 @@ def _paragraph_text(paragraph: ET.Element) -> str:
 
 def _paragraph(paragraph: ET.Element, location: ExtractLocation, out: Collected,
                styles: ParagraphStyles, *, column_span=None, row_merge=None) -> None:
-    text = _paragraph_text(paragraph)
+    text = _paragraph_text(paragraph, styles)
     structure = styles.hints(paragraph, location.part)
     structure.column_span, structure.row_merge = column_span, row_merge
     out.add(text, location, structure)
@@ -260,12 +266,17 @@ def _paragraph(paragraph: ET.Element, location: ExtractLocation, out: Collected,
 
 
 def _table(table: ET.Element, index: int, out: Collected, styles: ParagraphStyles, part: str | None = None) -> None:
+    def wrapped_rows(node):
+        if node.tag == W + "tr":
+            return 1
+        return sum(wrapped_rows(child) for child in node if child.tag != W + "tbl")
     row_index = 0
     for table_child in table:
         if table_child.tag in {W + "tblPr", W + "tblGrid"}:
             continue
         if table_child.tag != W + "tr":
             out.gap("UNSUPPORTED_CONTENT", ExtractLocation(kind="table_cell", table=index, part=part))
+            row_index += wrapped_rows(table_child)
             continue
         before = table_child.find(W + "trPr/" + W + "gridBefore")
         column = number(before.get(W + "val") if before is not None else None, 0, 1000) or 0

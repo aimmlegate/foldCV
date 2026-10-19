@@ -9,9 +9,11 @@ export function summary(job: JobSnapshotV1, title: string): JobSummaryV1 {
     jobId: job.id, projectTitle: title, kind: job.submission.kind, stage: job.attempts.at(-1)?.stage ?? null,
     execution: job.execution, publication: job.publication, executionGeneration: job.executionGeneration,
     eventCursor: job.eventCursor, allowEdits: job.submission.allowEdits, saved: job.receipt !== null,
-    error: job.error, publicationError: job.publicationError ?? null, updatedAt: job.updatedAt };
+    error: job.error, publicationError: job.publicationError ?? null, updatedAt: job.updatedAt,
+    ...(job.submission.approvalRequired ? { approvalRequired: true } : {}) };
 }
 export function active(job: JobSummaryV1): boolean {
+  if (job.approvalRequired && job.execution === "completed" && ["ready", "waiting_for_sync"].includes(job.publication)) return false;
   return !["completed", "failed", "cancelled", "interrupted"].includes(job.execution)
     || ["ready", "waiting_for_sync", "committing", "outcome_unknown"].includes(job.publication);
 }
@@ -32,16 +34,19 @@ export function statusLabel(job: JobSummaryV1): string {
   if (job.publication === "needs_review") return "Нужна проверка результата";
   if (job.publication === "outcome_unknown") return "Сохранение пока не подтверждено";
   if (job.publication === "save_failed") return "Не удалось сохранить результат";
+  if (job.execution === "failed") return "Не удалось завершить";
+  if (job.execution === "interrupted") return "Выполнение прервано";
+  if (job.approvalRequired && ["ready", "waiting_for_sync"].includes(job.publication)) return "Ожидает применения";
   if (job.publication === "waiting_for_sync" || job.publication === "ready") return "Ожидает синхронизации";
   if (job.publication === "committing") return "Сохраняется";
   if (job.publication === "discarded") return "Результат отброшен";
   if (job.execution === "cancelled" || job.publication === "cancelled") return "Отменено";
   if (job.execution === "cancelling") return "Останавливается";
-  if (job.execution === "failed") return "Не удалось завершить";
-  if (job.execution === "interrupted") return "Выполнение прервано";
   if (job.execution === "queued") return "В очереди";
+  if (job.execution === "starting") return "Подготавливаем модель";
   if (job.execution === "completed") return job.allowEdits ? "Завершено без изменений" : "Проверка завершена";
-  return "Выполняется";
+  return job.stage === "extraction" ? "Извлекаем факты" : job.stage === "rewrite" ? "Переписываем фрагмент"
+    : job.stage === "assessment" ? "Читаем исходник" : job.stage === "reconciliation" ? "Проверяем связанные изменения" : "Модель выполняет задачу";
 }
 export function projectActivity(jobs: readonly JobSummaryV1[]): ReadonlyMap<string, string> {
   const groups = new Map<string, { active: number; attention: number }>();

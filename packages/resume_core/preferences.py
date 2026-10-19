@@ -61,6 +61,18 @@ class PreferencesStore:
         except StorageFailure:
             raise PreferencesFailure('PREFERENCES_SAVE_FAILED') from None
 
+    def select_rewrite_reasoning(self, model, effort):
+        try:
+            with locked_root(self.root, '.preferences.lock'):
+                value = self._read()
+                if value.selected_model != model:
+                    raise PreferencesFailure('MODEL_DENIED')
+                value.rewrite_reasoning_effort = effort
+                self._write(value)
+                return value
+        except StorageFailure:
+            raise PreferencesFailure('PREFERENCES_SAVE_FAILED') from None
+
     def save_analysis(self, enabled):
         try:
             with locked_root(self.root, '.preferences.lock'):

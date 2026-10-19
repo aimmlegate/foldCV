@@ -79,13 +79,13 @@ for line in sys.stdin:
         elif method == "config/read":
             result = config["effectiveConfig"]
         elif method == "model/list":
-            result = {"data": [{"model": "gpt-6-luna", "supportedReasoningEfforts": [{"reasoningEffort": "medium"}]}], "nextCursor": None}
+            result = {"data": [{"model": "gpt-6-luna", "supportedReasoningEfforts": [{"reasoningEffort": effort} for effort in ["low", "medium", "high"]], "defaultReasoningEffort": "medium"}], "nextCursor": None}
         elif method == "thread/start":
             identifier = "thread_" + str(len(threads) + 1)
             threads[identifier] = params
             result = {"thread": {"id": identifier, "ephemeral": True, "path": None}, "model": params["model"], "modelProvider": "openai",
                 "approvalPolicy": "never", "approvalsReviewer": "user", "sandbox": {"type": "readOnly", "networkAccess": False},
-                "reasoningEffort": "medium", "cwd": params["cwd"], "instructionSources": [], "runtimeWorkspaceRoots": []}
+                "reasoningEffort": params.get("config", {}).get("model_reasoning_effort", "medium"), "cwd": params["cwd"], "instructionSources": [], "runtimeWorkspaceRoots": []}
         elif method == "turn/start":
             identifier = "turn_" + params["threadId"]
             turns[params["threadId"]] = identifier

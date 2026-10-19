@@ -20,13 +20,13 @@ class JobPublication:
         self.service.projects.adopt_committed(project, workspace, checksum, preserve=preserve)
         self.service.publisher.observer("registry_cache_update", project)
 
-    def publish(self, project, job_id, proposal_sha256, *, expected_claim=None):
+    def publish(self, project, job_id, proposal_sha256, *, expected_claim=None, approved=False):
         service, projects = self.service, self.service.projects
         with projects.state_lock:
             from packages.resume_core.background_retention import JobRetention
             JobRetention(service.store).sweep(project)
             job = service.publisher.publish(project, job_id, proposal_sha256, originals=projects.originals,
-                artifacts=projects.artifacts, images=projects.images, expected_claim=expected_claim)
+                artifacts=projects.artifacts, images=projects.images, expected_claim=expected_claim, approved=approved)
             if job.receipt is not None:
                 try:
                     current, checksum = projects.storage.read_committed(project)

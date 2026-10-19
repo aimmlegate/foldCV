@@ -1,5 +1,4 @@
 import type { RichProjectResponse } from "../../contracts/generated/rich_project_response";
-import { warningLabel } from "../useResumeWorkspace";
 import { Button } from "../ui/Button";
 import { Icon } from "../ui/Icon";
 
@@ -14,8 +13,6 @@ export function Assessment({ response, open, back }: { response: RichProjectResp
       <p>Факты извлечены. Исходный текст сохранён без переписывания.</p></div></div>
     <div className="check-tags">{groups.map(group => { const count = records.filter(record => record.kind === group.kind).length;
       return count > 0 && <span key={group.kind}>{group.label}: {count}</span>; })}</div>
-    {warnings.map(warning => <p className="small muted" key={warning.id}>{warningLabel(warning.code)}</p>)}
-    {response.generation?.status === "failed" && <p className="notice warning">Документ создан, но подготовка не завершилась. Экспорт можно повторить в редакторе.</p>}
     <p className="small muted">Можно продолжить, даже если это не резюме.</p>
     <div className="check-actions"><Button variant="primary" onClick={open}>{uncertain ? "Всё равно продолжить" : "Открыть редактор"}<Icon name="arrow" /></Button>
       <button className="text-button" onClick={back}>Вернуться к исходнику</button></div>

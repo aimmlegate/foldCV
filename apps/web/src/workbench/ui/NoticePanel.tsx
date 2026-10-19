@@ -1,22 +1,19 @@
-import { useEffect, useRef, type ReactNode } from "react";
+import * as Popover from "@radix-ui/react-popover";
+import type { ReactNode } from "react";
 import { Icon } from "./Icon";
 
-export function NoticePanel({ count, label = "Замечания", attention = "", children }: {
-  count: number; label?: string; attention?: string; children: ReactNode;
+export function NoticePanel({ count, label = "Уведомления", onOpen, children }: {
+  count: number; label?: string; onOpen?: () => void; children: ReactNode;
 }) {
-  const root = useRef<HTMLDetailsElement>(null);
-  useEffect(() => { if (attention && root.current) root.current.open = true; }, [attention]);
-  useEffect(() => {
-    const outside = (event: PointerEvent) => { if (event.target instanceof Node && !root.current?.contains(event.target) && root.current) root.current.open = false; };
-    document.addEventListener("pointerdown", outside); return () => document.removeEventListener("pointerdown", outside);
-  }, []);
   if (!count) return null;
-  return <details className="notice-control" ref={root} onToggle={event => {
-    const current = event.currentTarget;
-    if (current.open) current.parentElement?.querySelectorAll<HTMLDetailsElement>(".notice-control[open]").forEach(other => { if (other !== current) other.open = false; });
-  }} onKeyDown={event => {
-    if (event.key === "Escape" && root.current?.open) { event.preventDefault(); event.stopPropagation(); root.current.open = false; root.current.querySelector("summary")?.focus(); }
-  }}><summary><Icon name="info" /><span>{label}</span><span className="notice-count">{count}</span></summary>
-    <section className="notice-panel" aria-label={label}><div className="notice-panel-heading"><strong>{label}</strong><button type="button" className="icon" aria-label={`Скрыть: ${label}`} onClick={() => { if (root.current) { root.current.open = false; root.current.querySelector("summary")?.focus(); } }}><Icon name="close" /></button></div>{children}</section>
-  </details>;
+  return <Popover.Root onOpenChange={open => { if (open) onOpen?.(); }}>
+    <Popover.Trigger asChild><button type="button" className="notice-trigger" aria-label={`${label}: ${count}`}>
+      <Icon name="info" /><span className="notice-trigger-label">{label}</span><span className="notice-count">{count}</span>
+    </button></Popover.Trigger>
+    <Popover.Portal><Popover.Content className="notice-panel" aria-label={label} align="end" sideOffset={8} collisionPadding={12}>
+      <div className="notice-panel-heading"><strong>{label}</strong><Popover.Close asChild>
+        <button type="button" className="icon" aria-label="Закрыть уведомления"><Icon name="close" /></button>
+      </Popover.Close></div>{children}
+    </Popover.Content></Popover.Portal>
+  </Popover.Root>;
 }

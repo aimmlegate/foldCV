@@ -169,7 +169,7 @@ def mount_writers(app, service):
         known = await asyncio.to_thread(service.store.read, project_id, payload.job_id)
         claim = None if known.receipt is not None else await asyncio.to_thread(service.writers.publication_claim, project_id, payload)
         job = await asyncio.to_thread(service.publication.publish, project_id, payload.job_id,
-            payload.proposal_sha256, expected_claim=claim)
+            payload.proposal_sha256, expected_claim=claim, approved=payload.approve)
         await service.supervisor._emit(job)
         view = await asyncio.to_thread(service.writers.read_snapshot, project_id, payload.proof)
         result = WriterPublicationV1(schemaVersion=1, job=job, view=view)

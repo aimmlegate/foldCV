@@ -4,6 +4,148 @@ export type Jobid = string;
 export type Lineage = string;
 export type Projectid = string;
 export type Schemaversion = 1;
+export type AgentEvent =
+  MessageDelta | ActivityEvent | ToolEvent | ResourceEvent | EditEvent | UsageEvent | RunStateEvent;
+export type Conversationid = string;
+export type Id = string;
+export type Text = string;
+export type Projectid1 = string;
+export type Runid = string;
+export type Schemaversion1 = 1;
+export type Sequence = number;
+export type Timestamp = string;
+export type Type = "message.delta";
+export type Conversationid1 = string;
+export type Id1 = string;
+export type Itemid = string;
+export type Kind = "summary";
+export type Text1 = string;
+export type Projectid2 = string;
+export type Runid1 = string;
+export type Schemaversion2 = 1;
+export type Sequence1 = number;
+export type Timestamp1 = string;
+export type Type1 = "activity.updated";
+export type Conversationid2 = string;
+export type Id2 = string;
+export type Callid = string;
+export type Code =
+  | "AGENT_DISABLED"
+  | "AGENT_MODEL_REQUIRED"
+  | "AGENT_MODEL_UNAVAILABLE"
+  | "AGENT_MODEL_INCOMPATIBLE"
+  | "AGENT_SETTINGS_CONFLICT"
+  | "AGENT_SETTINGS_CORRUPT"
+  | "AGENT_SETTINGS_SAVE_FAILED"
+  | "AGENT_CONNECTION_UNAVAILABLE"
+  | "AGENT_CONNECTION_CHANGED"
+  | "AGENT_AUTH_REQUIRED"
+  | "AGENT_QUOTA"
+  | "AGENT_BUSY"
+  | "AGENT_CANCELLED"
+  | "AGENT_INTERRUPTED"
+  | "AGENT_DEADLINE"
+  | "AGENT_STARTUP_TIMEOUT"
+  | "AGENT_PROTOCOL"
+  | "AGENT_PROCESS_FAILED"
+  | "AGENT_CLEANUP_FAILED"
+  | "AGENT_RUNTIME_UNSUPPORTED"
+  | "AGENT_MODEL_REROUTED"
+  | "AGENT_UNEXPECTED_COMPACTION"
+  | "AGENT_TOOL_DENIED"
+  | "AGENT_TOOL_LIMIT"
+  | "AGENT_OUTPUT_LIMIT"
+  | "AGENT_CONTEXT_LIMIT"
+  | "AGENT_ARGUMENT_INVALID"
+  | "AGENT_WEB_DISABLED"
+  | "AGENT_SOURCE_UNAVAILABLE"
+  | "AGENT_SOURCE_DENIED"
+  | "AGENT_SOURCE_LIMIT"
+  | "AGENT_SCOPE_INVALID"
+  | "AGENT_STALE_READ"
+  | "AGENT_EDIT_INVALID"
+  | "AGENT_EDIT_LIMIT"
+  | "AGENT_EVIDENCE_INVALID"
+  | "AGENT_NO_OWNER"
+  | "AGENT_LEASE_EXPIRED"
+  | "AGENT_OWNER_MISMATCH"
+  | "AGENT_TICKET_INVALID"
+  | "AGENT_RECEIPT_TIMEOUT"
+  | "AGENT_SAVE_FAILED"
+  | "AGENT_OUTCOME_UNKNOWN"
+  | "AGENT_IDEMPOTENCY_CONFLICT"
+  | "AGENT_NOT_FOUND"
+  | "AGENT_CONVERSATION_FULL"
+  | "AGENT_PROJECT_FULL"
+  | "AGENT_STORE_CORRUPT"
+  | "AGENT_STORE_UNAVAILABLE"
+  | "AGENT_STORE_SAVE_FAILED"
+  | "AGENT_PROJECT_DELETED"
+  | "AGENT_CLEANUP_INCOMPLETE"
+  | "AGENT_RESYNC_REQUIRED";
+export type Name = string;
+export type Projectid3 = string;
+export type Runid2 = string;
+export type Schemaversion3 = 1;
+export type Sequence2 = number;
+export type Timestamp2 = string;
+export type Type2 = "tool.started" | "tool.completed" | "tool.failed";
+export type Conversationid3 = string;
+export type Id3 = string;
+export type Id4 = string;
+export type Projectid4 = string;
+export type Runid3 = string;
+export type Schemaversion4 = 1;
+export type Sequence3 = number;
+export type Timestamp3 = string;
+export type Type3 = "source.ready" | "finding.ready";
+export type Conversationid4 = string;
+export type Id5 = string;
+export type Batchid = string;
+export type Disposition =
+  | "prepared"
+  | "offered"
+  | "applying"
+  | "saved"
+  | "stale"
+  | "rejected"
+  | "cancelled"
+  | "save_failed"
+  | "outcome_unknown";
+export type Projectid5 = string;
+export type Runid4 = string;
+export type Schemaversion5 = 1;
+export type Sequence4 = number;
+export type Timestamp4 = string;
+export type Type4 = "edit.offered" | "edit.result";
+export type Conversationid5 = string;
+export type Id6 = string;
+export type Cachedinputtokens = number;
+export type Inputtokens = number;
+export type Outputtokens = number;
+export type Totaltokens = number;
+export type Projectid6 = string;
+export type Runid5 = string;
+export type Schemaversion6 = 1;
+export type Sequence5 = number;
+export type Timestamp5 = string;
+export type Type5 = "usage.reported";
+export type Conversationid6 = string;
+export type Id7 = string;
+export type Outcomeunknown = boolean;
+export type Savedbatchid = string | null;
+export type State =
+  "queued" | "running" | "waiting_for_editor" | "cancelling" | "completed" | "failed" | "cancelled" | "interrupted";
+export type Projectid7 = string;
+export type Runid6 = string;
+export type Schemaversion7 = 1;
+export type Sequence6 = number;
+export type Timestamp6 = string;
+export type Type6 = "run.state_changed";
+/**
+ * @maxItems 40
+ */
+export type Activity = AgentEvent[];
 export type Assetpinssha256 = string | null;
 /**
  * @maxItems 2
@@ -13,7 +155,7 @@ export type Activedeadline = string;
 export type Childstartedat = string | null;
 export type Cleanupverified = boolean;
 export type Dispatchedat = string;
-export type Code =
+export type Code1 =
   | "AUTH_REQUIRED"
   | "RATE_LIMITED"
   | "BUSY"
@@ -55,12 +197,12 @@ export type Code =
   | "UNSAFE_TEMP_ROOT"
   | "INCOMPLETE_STREAM";
 export type Executiongeneration = number;
-export type Id = string;
+export type Id8 = string;
 export type Nativestarted = boolean;
-export type Schemaversion1 = 1;
+export type Schemaversion8 = 1;
 export type Stage = "agent" | "assessment" | "extraction" | "rewrite" | "reconciliation";
 export type Startupdeadline = string;
-export type State =
+export type State1 =
   "reserved" | "starting" | "running" | "completed" | "failed" | "cancelled" | "interrupted" | "cleanup_failed";
 export type Captureinvalidated = boolean;
 export type Createdat = string;
@@ -68,7 +210,7 @@ export type Eventcursor = number;
 export type Execution =
   "queued" | "starting" | "running" | "cancelling" | "completed" | "failed" | "cancelled" | "interrupted";
 export type Executiongeneration1 = number;
-export type Id1 = string;
+export type Id9 = string;
 export type Proposalid = string | null;
 export type Publication =
   | "none"
@@ -90,39 +232,40 @@ export type Generationssha256 = string;
 export type Jobid1 = string;
 export type Lineage1 = string;
 export type Persistedat = string;
-export type Projectid1 = string;
+export type Projectid8 = string;
 export type Projectrevision = number;
 export type Proposalid1 = string;
 export type Proposalsha256 = string;
 export type Requestsha256 = string;
-export type Schemaversion2 = 1;
+export type Schemaversion9 = 1;
 export type Workspacesha256 = string;
-export type Schemaversion3 = 1;
+export type Schemaversion10 = 1;
 export type Accessrevision = number;
 export type Accountgeneration = number;
 export type Allowedits = boolean;
 export type Allowweb = boolean;
+export type Approvalrequired = boolean;
 export type Fingerprint = string;
 export type Generation1 = number;
 export type Key = string;
-export type Kind = "entity" | "structure" | "query" | "source" | "rules";
+export type Kind1 = "entity" | "structure" | "query" | "source" | "rules";
 /**
  * @maxItems 4096
  */
 export type Reads = GenerationStamp[];
-export type Schemaversion4 = 1;
+export type Schemaversion11 = 1;
 /**
  * @maxItems 4096
  */
 export type Writes = GenerationStamp[];
 export type Lineage2 = string;
-export type Projectid2 = string;
+export type Projectid9 = string;
 export type Requestepoch = number;
 export type Requestid = string;
-export type Id2 = string;
-export type Kind1 = "agent_journal" | "rich_sync" | "processing";
+export type Id10 = string;
+export type Kind2 = "agent_journal" | "rich_sync" | "processing";
 export type Sha256 = string;
-export type Kind2 = "agent" | "processing" | "rewrite" | "reconciliation";
+export type Kind3 = "agent" | "processing" | "rewrite" | "reconciliation";
 /**
  * @minItems 1
  * @maxItems 2
@@ -133,10 +276,10 @@ export type Model = string;
 export type Stage1 = "agent" | "assessment" | "extraction" | "rewrite" | "reconciliation";
 export type Payloadsha256 = string;
 export type Schedulingclass = "background" | "interactive" | "reconciliation";
-export type Schemaversion5 = 1;
+export type Schemaversion12 = 1;
 export type Scope = WholeResumeScope | SelectionScope;
-export type Kind3 = "resume";
-export type Kind4 = "selection";
+export type Kind4 = "resume";
+export type Kind5 = "selection";
 export type Blockid = string;
 export type Cellid = string | null;
 /**
@@ -150,13 +293,13 @@ export type Blockids = [string, ...string[]];
 export type Actionid = string;
 export type Actiontoken = number;
 export type Fingerprint1 = string | null;
-export type Id3 = string;
-export type Kind5 =
+export type Id11 = string;
+export type Kind6 =
   "block" | "record" | "field" | "period" | "ownership" | "source" | "rules" | "asset" | "timeline_order";
 export type Revision = number;
 export type Dependencies = DependencyStamp[];
 export type Sessionid = string;
-export type Kind6 = "text" | "blocks" | "table_cells";
+export type Kind7 = "text" | "blocks" | "table_cells";
 export type Textsha256 = string;
 export type Submittedat = string;
 /**
@@ -181,7 +324,7 @@ export type Tools = (
 )[];
 export type Undoexpired = boolean;
 export type Updatedat = string;
-export type Type = "job.snapshot" | "cursor.gap";
+export type Type7 = "job.snapshot" | "cursor.gap";
 
 export interface JobEventV1 {
   cursor: Cursor;
@@ -191,9 +334,10 @@ export interface JobEventV1 {
   projectId: Projectid;
   schemaVersion: Schemaversion;
   snapshot: JobSnapshotV1;
-  type: Type;
+  type: Type7;
 }
 export interface JobSnapshotV1 {
+  activity?: Activity;
   assetPinsSha256?: Assetpinssha256;
   attempts: Attempts;
   captureInvalidated?: Captureinvalidated;
@@ -202,15 +346,128 @@ export interface JobSnapshotV1 {
   eventCursor: Eventcursor;
   execution: Execution;
   executionGeneration: Executiongeneration1;
-  id: Id1;
+  id: Id9;
   proposalId: Proposalid;
   publication: Publication;
   publicationError?: JobFailure | null;
   receipt: CanonicalReceiptV1 | null;
-  schemaVersion: Schemaversion3;
+  schemaVersion: Schemaversion10;
   submission: JobSubmissionV1;
   undoExpired?: Undoexpired;
   updatedAt: Updatedat;
+}
+export interface MessageDelta {
+  conversationId: Conversationid;
+  id: Id;
+  payload: MessageDeltaPayload;
+  projectId: Projectid1;
+  runId: Runid;
+  schemaVersion: Schemaversion1;
+  sequence: Sequence;
+  timestamp: Timestamp;
+  type: Type;
+}
+export interface MessageDeltaPayload {
+  text: Text;
+}
+export interface ActivityEvent {
+  conversationId: Conversationid1;
+  id: Id1;
+  payload: ActivityPayload;
+  projectId: Projectid2;
+  runId: Runid1;
+  schemaVersion: Schemaversion2;
+  sequence: Sequence1;
+  timestamp: Timestamp1;
+  type: Type1;
+}
+export interface ActivityPayload {
+  itemId: Itemid;
+  kind: Kind;
+  text: Text1;
+}
+export interface ToolEvent {
+  conversationId: Conversationid2;
+  id: Id2;
+  payload: ToolPayload;
+  projectId: Projectid3;
+  runId: Runid2;
+  schemaVersion: Schemaversion3;
+  sequence: Sequence2;
+  timestamp: Timestamp2;
+  type: Type2;
+}
+export interface ToolPayload {
+  callId: Callid;
+  error: AgentError | null;
+  name: Name;
+}
+export interface AgentError {
+  code: Code;
+}
+export interface ResourceEvent {
+  conversationId: Conversationid3;
+  id: Id3;
+  payload: ResourcePayload;
+  projectId: Projectid4;
+  runId: Runid3;
+  schemaVersion: Schemaversion4;
+  sequence: Sequence3;
+  timestamp: Timestamp3;
+  type: Type3;
+}
+export interface ResourcePayload {
+  id: Id4;
+}
+export interface EditEvent {
+  conversationId: Conversationid4;
+  id: Id5;
+  payload: EditPayload;
+  projectId: Projectid5;
+  runId: Runid4;
+  schemaVersion: Schemaversion5;
+  sequence: Sequence4;
+  timestamp: Timestamp4;
+  type: Type4;
+}
+export interface EditPayload {
+  batchId: Batchid;
+  disposition: Disposition;
+  error: AgentError | null;
+}
+export interface UsageEvent {
+  conversationId: Conversationid5;
+  id: Id6;
+  payload: AgentUsage;
+  projectId: Projectid6;
+  runId: Runid5;
+  schemaVersion: Schemaversion6;
+  sequence: Sequence5;
+  timestamp: Timestamp5;
+  type: Type5;
+}
+export interface AgentUsage {
+  cachedInputTokens: Cachedinputtokens;
+  inputTokens: Inputtokens;
+  outputTokens: Outputtokens;
+  totalTokens: Totaltokens;
+}
+export interface RunStateEvent {
+  conversationId: Conversationid6;
+  id: Id7;
+  payload: RunStatePayload;
+  projectId: Projectid7;
+  runId: Runid6;
+  schemaVersion: Schemaversion7;
+  sequence: Sequence6;
+  timestamp: Timestamp6;
+  type: Type6;
+}
+export interface RunStatePayload {
+  error: AgentError | null;
+  outcomeUnknown: Outcomeunknown;
+  savedBatchId: Savedbatchid;
+  state: State;
 }
 export interface JobAttemptV1 {
   activeDeadline: Activedeadline;
@@ -219,15 +476,15 @@ export interface JobAttemptV1 {
   dispatchedAt: Dispatchedat;
   error: JobFailure | null;
   executionGeneration: Executiongeneration;
-  id: Id;
+  id: Id8;
   nativeStarted: Nativestarted;
-  schemaVersion: Schemaversion1;
+  schemaVersion: Schemaversion8;
   stage: Stage;
   startupDeadline: Startupdeadline;
-  state: State;
+  state: State1;
 }
 export interface JobFailure {
-  code: Code;
+  code: Code1;
 }
 export interface CanonicalReceiptV1 {
   clientMutationId: Clientmutationid;
@@ -238,12 +495,12 @@ export interface CanonicalReceiptV1 {
   jobId: Jobid1;
   lineage: Lineage1;
   persistedAt: Persistedat;
-  projectId: Projectid1;
+  projectId: Projectid8;
   projectRevision: Projectrevision;
   proposalId: Proposalid1;
   proposalSha256: Proposalsha256;
   requestSha256: Requestsha256;
-  schemaVersion: Schemaversion2;
+  schemaVersion: Schemaversion9;
   workspaceSha256: Workspacesha256;
 }
 export interface JobSubmissionV1 {
@@ -251,38 +508,39 @@ export interface JobSubmissionV1 {
   accountGeneration: Accountgeneration;
   allowEdits: Allowedits;
   allowWeb: Allowweb;
+  approvalRequired?: Approvalrequired;
   guards: ScopeGuardV1;
   identity: JobIdentity;
   input: InputReference;
-  kind: Kind2;
+  kind: Kind3;
   models: Models;
   payloadSha256: Payloadsha256;
   schedulingClass: Schedulingclass;
-  schemaVersion: Schemaversion5;
+  schemaVersion: Schemaversion12;
   scope: Scope;
   submittedAt: Submittedat;
   tools: Tools;
 }
 export interface ScopeGuardV1 {
   reads: Reads;
-  schemaVersion: Schemaversion4;
+  schemaVersion: Schemaversion11;
   writes: Writes;
 }
 export interface GenerationStamp {
   fingerprint: Fingerprint;
   generation: Generation1;
   key: Key;
-  kind: Kind;
+  kind: Kind1;
 }
 export interface JobIdentity {
   lineage: Lineage2;
-  projectId: Projectid2;
+  projectId: Projectid9;
   requestEpoch: Requestepoch;
   requestId: Requestid;
 }
 export interface InputReference {
-  id: Id2;
-  kind: Kind1;
+  id: Id10;
+  kind: Kind2;
   sha256: Sha256;
 }
 export interface ModelCapture {
@@ -291,10 +549,10 @@ export interface ModelCapture {
   stage: Stage1;
 }
 export interface WholeResumeScope {
-  kind: Kind3;
+  kind: Kind4;
 }
 export interface SelectionScope {
-  kind: Kind4;
+  kind: Kind5;
   selection: RichSelection;
 }
 export interface RichSelection {
@@ -302,7 +560,7 @@ export interface RichSelection {
   blockIds: Blockids;
   capture: ActionCapture;
   head: RichPosition;
-  kind: Kind6;
+  kind: Kind7;
   textSha256: Textsha256;
 }
 export interface RichPosition {
@@ -318,7 +576,7 @@ export interface ActionCapture {
 }
 export interface DependencyStamp {
   fingerprint: Fingerprint1;
-  id: Id3;
-  kind: Kind5;
+  id: Id11;
+  kind: Kind6;
   revision: Revision;
 }

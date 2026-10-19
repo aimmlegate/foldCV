@@ -12,6 +12,7 @@ from .rich_assembly import field, identity
 from .rich_dependencies import placements
 from .rich_fields import inline_groups, set_text
 from .rich_sync import linked_field_steps
+from .technology_focus import focus_order_steps, focus_membership_steps
 
 PanelKind = Literal["candidate", "employment", "technology", "education", "language", "claim"]
 FIELDS = {"candidate": ("name", "title", "location"), "employment": ("employer", "role"),
@@ -24,8 +25,11 @@ class RichPanelRequest(Wire):
         "if": {"properties": {"operation": {"const": "clear_technologies"}}, "required": ["operation"]},
         "then": {"properties": {"recordKind": {"const": "technology"}, "recordId": {"type": "null"},
             "periodId": {"type": "null"}, "values": {"maxProperties": 0}}, "required": ["recordKind"]},
+        "else": {"if": {"properties": {"operation": {"enum": ["add_to_focus", "remove_from_focus"]}}, "required": ["operation"]},
+            "then": {"properties": {"recordId": {"type": "string"}, "recordKind": {"enum": [None, "technology"]},
+                "jobId": {"type": "null"}, "periodId": {"type": "null"}, "values": {"maxProperties": 0}}, "required": ["recordId"]}},
     })
-    operation: Literal["add", "edit", "remove", "add_period", "remove_period", "clear_technologies"]
+    operation: Literal["add", "edit", "remove", "add_period", "remove_period", "clear_technologies", "add_to_focus", "remove_from_focus"]
     record_id: Id | None = None
     record_kind: PanelKind | None = None
     job_id: Id | None = None
@@ -36,7 +40,10 @@ class RichPanelRequest(Wire):
     capture: ActionCapture
 
     @model_validator(mode="after")
-    def clear_scope(self):
+    def operation_scope(self):
+        if self.operation in {"add_to_focus", "remove_from_focus"} and (self.record_id is None
+                or self.record_kind not in {None, "technology"} or self.job_id is not None or self.period_id is not None or self.values):
+            raise ValueError("FOCUS_SCOPE_INVALID")
         if self.operation == "clear_technologies" and (self.record_kind != "technology" or self.record_id is not None
                 or self.period_id is not None or self.values):
             raise ValueError("PANEL_CLEAR_INVALID")
@@ -109,6 +116,10 @@ def panel_mutation(workspace, request):
     if project is None or (project.facts.revision, project.document.revision) != (request.facts_revision, request.document_revision):
         raise ValueError("STALE_PANEL_EDIT")
     records = {record.id: record for record in project.facts.records}
+    if request.operation in {"add_to_focus", "remove_from_focus"}:
+        steps = focus_membership_steps(workspace, request.record_id, request.operation == "add_to_focus")
+        return RichMutation(schemaVersion=1, projectId=workspace.project_id, clientMutationId=identity("panel"),
+            actionId=request.capture.action_id, capture=request.capture, kind="panel", steps=steps) if steps else None
     if request.operation == "clear_technologies":
         if request.job_id is not None and (request.job_id not in records or records[request.job_id].kind != "employment"):
             raise ValueError("PANEL_OWNER_INVALID")
@@ -206,7 +217,7 @@ def panel_mutation(workspace, request):
             if request.operation in {"add_period", "remove_period"}:
                 steps = period_blocks(project, record, old, steps, positions)
     return RichMutation(schemaVersion=1, projectId=workspace.project_id, clientMutationId=identity("panel"),
-        actionId=request.capture.action_id, capture=request.capture, kind="panel", steps=steps)
+        actionId=request.capture.action_id, capture=request.capture, kind="panel", steps=steps + focus_order_steps(workspace, steps))
 
 
 def removal_steps(project, records, removed):
@@ -290,7 +301,9 @@ def period_blocks(project, record, old, steps, positions):
     removed = {p.id for p in old.periods} - current
     added = current - {p.id for p in old.periods}
     for block in project.document.blocks():
-        copy, changed = block.model_copy(deep=True), False
+        staged = next((step.block for step in reversed(steps) if isinstance(step, PutBlock)
+                       and step.block.id == block.id), block)
+        copy, changed = staged.model_copy(deep=True), False
         for _, content in inline_groups(copy):
             kept = [s for s in content if not isinstance(s, FactFieldSpan) or s.record_id != record.id
                 or not any(s.field_key.startswith(f"period:{id}:") for id in removed)]

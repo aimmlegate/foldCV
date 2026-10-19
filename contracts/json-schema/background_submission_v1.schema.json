@@ -402,6 +402,11 @@
       "title": "Allowweb",
       "type": "boolean"
     },
+    "approvalRequired": {
+      "default": false,
+      "title": "Approvalrequired",
+      "type": "boolean"
+    },
     "guards": {
       "$ref": "#/$defs/ScopeGuardV1"
     },

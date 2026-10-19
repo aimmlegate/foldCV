@@ -22,6 +22,7 @@ from resume_api import app as app_module
 from resume_api.app import create_app
 from resume_api.cli.experimental_profile import BINARY, ExperimentalCliProfile, ExperimentalProfileError, VERSION
 from resume_api.connection import Metadata, Quota
+from resume_api.providers.codex_cli import CodexCliProvider
 from resume_api.contracts import EmptyRequest, SelectModelRequest
 
 
@@ -55,6 +56,49 @@ async def test_readiness_requires_opt_in_status_and_selection_then_detaches(tmp_
         detached = (await client.post("/v1/host/detach", headers={"Origin": ORIGIN}, json={})).json()
         assert detached["generationReady"] is False and detached["state"] == "detached"
         assert (await client.get("/v1/capabilities")).json()["generationReady"] is False
+
+
+@pytest.mark.asyncio
+async def test_connection_refresh_login_detach_and_cancel_invalidate_content_preflight(tmp_path, monkeypatch):
+    from resume_api.connection import ConnectionFailure
+    calls = []
+    invalidate = CodexCliProvider.invalidate_preflight
+    def invalidated(provider):
+        calls.append(provider)
+        invalidate(provider)
+    monkeypatch.setattr(CodexCliProvider, "invalidate_preflight", invalidated)
+    class LoginMetadata(MetadataOnly):
+        missing = False
+        started = threading.Event()
+        def inspect(self, files, cancel, *, full=True):
+            if self.missing:
+                raise ConnectionFailure("LOGIN_REQUIRED")
+            return super().inspect(files, cancel) if full else Metadata(VERSION, (), None, Quota("unknown"))
+        def login(self, _files, cancel):
+            self.started.set()
+            if cancel.wait(3):
+                raise ConnectionFailure("CANCELLED")
+    metadata = LoginMetadata()
+    dist = tmp_path / "dist"
+    dist.mkdir()
+    (dist / "index.html").write_text("fixture")
+    app = create_app(origin=ORIGIN, secret=SECRET, temp_root=tmp_path / "operations", dist=dist,
+        data_root=tmp_path / "store", connection_adapter=metadata,
+        experimental_profile=ExperimentalCliProfile(tmp_path / "profile"))
+    async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url=ORIGIN) as client:
+        await client.post("/v1/session/exchange", headers={"Origin": ORIGIN}, json={"secret": SECRET})
+        async def post(action):
+            return await client.post("/v1/host/" + action, headers={"Origin": ORIGIN}, json={})
+        for action in ["discover", "status", "models", "detach"]:
+            assert (await post(action)).status_code == 200
+        assert len(calls) == 4
+        metadata.missing = True
+        assert (await post("status")).json()["state"] == "login_required"
+        pending = asyncio.create_task(post("login"))
+        assert await asyncio.to_thread(metadata.started.wait, 3)
+        assert (await post("cancel-login")).status_code == 200
+        assert (await pending).status_code == 200
+    assert len(calls) == 7 and len({id(provider) for provider in calls}) == 1
 
 
 def test_profile_rejects_an_existing_unowned_root(tmp_path: Path):

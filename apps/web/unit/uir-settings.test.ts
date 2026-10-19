@@ -17,6 +17,9 @@ function setup() {
   const api: SettingsApi = {
     preferences: async () => structuredClone(server.preferences), rules: async () => structuredClone(server.rules), assistant: async () => structuredClone(server.assistant),
     select: async model => { calls.push({ part: "model", value: model }); if (!model || fail.has("model")) throw new Error("unavailable"); server.preferences.selectedModel = model; return model; },
+    saveReasoning: async (model, effort) => { calls.push({ part: "reasoning", value: { model, effort } });
+      if (fail.has("reasoning") || model !== server.preferences.selectedModel) throw new Error("unsupported");
+      server.preferences.rewriteReasoningEffort = effort; return structuredClone(server.preferences); },
     selectImport: async model => { calls.push({ part: "import", value: model }); if (fail.has("import")) throw new Error("unavailable");
       server.preferences.selectedImportModel = model; return structuredClone(server.preferences); },
     analysis: async automatic => { calls.push({ part: "analysis", value: automatic }); if (fail.has("analysis")) throw new Error("disk full");
@@ -135,4 +138,21 @@ test("download names retain Unicode, remove path/control characters and stay wit
   assert.equal(projectFilename(" ../CV/Name\n\u0000:*? ", "docx"), "CV Name.docx");
   assert.equal(projectFilename("...", "docx"), "resume.docx");
   assert.ok(new TextEncoder().encode(projectFilename("😀".repeat(200), "foldcv")).length <= 255);
+});
+
+test("reasoning saves with the chosen model, retains failed drafts and restores on Cancel", async () => {
+  const h = setup(); await h.controller.load();
+  h.controller.change("model", "model-b"); h.controller.change("reasoning", "low");
+  h.fail.add("reasoning"); await h.controller.save();
+  assert.equal(h.server.preferences.selectedModel, "model-b");
+  assert.deepEqual(h.controller.dirty, ["reasoning"]);
+  assert.equal(h.controller.state.draft.reasoning, "low");
+  h.fail.clear(); await h.controller.save();
+  assert.equal(h.server.preferences.rewriteReasoningEffort, "low");
+  const count = h.calls.length;
+  h.controller.change("reasoning", "high"); h.controller.cancel();
+  assert.equal(h.controller.state.draft.reasoning, "low");
+  assert.equal(h.calls.length, count);
+  h.controller.change("reasoning", null); await h.controller.save();
+  assert.equal(h.server.preferences.rewriteReasoningEffort, null);
 });

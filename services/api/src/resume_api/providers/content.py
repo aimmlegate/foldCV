@@ -9,6 +9,7 @@ from typing import Generic, Protocol, TypeVar
 
 from pydantic import BaseModel
 
+from packages.resume_core.reasoning import EFFORTS, ReasoningEffort
 from packages.resume_core.gui_prompts import CONTENT_INPUT_BYTES
 from resume_api.lifecycle import OperationFiles
 
@@ -30,13 +31,15 @@ class GenerationPolicy:
     max_total_input_bytes: int = 2 * CONTENT_INPUT_BYTES
     max_total_output_bytes: int = 262_144
     allow_repair: bool = True
+    reasoning_effort: ReasoningEffort | None = None
 
     def __post_init__(self) -> None:
         if (not math.isfinite(self.timeout_seconds) or not 0 < self.timeout_seconds <= MAX_GENERATION_SECONDS
                 or not 0 < self.max_input_bytes <= CONTENT_INPUT_BYTES
                 or not 0 < self.max_total_input_bytes <= 2 * CONTENT_INPUT_BYTES
                 or not 0 < self.max_total_output_bytes <= 262_144
-                or type(self.allow_repair) is not bool):
+                or type(self.allow_repair) is not bool
+                or self.reasoning_effort is not None and self.reasoning_effort not in EFFORTS):
             raise ValueError("invalid generation limits")
 
 

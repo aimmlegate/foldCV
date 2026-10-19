@@ -60,7 +60,7 @@ export function FactDialog({ target, close, submit }: { target: FactTarget; clos
       </>}
       {error && <p className="notice warning" role="alert">{error}</p>}
       <div className="dialog-actions"><Button disabled={busy} onClick={close}>Отмена</Button>
-        <Button type="submit" variant={target.remove ? "danger" : "primary"} disabled={busy}>{target.remove ? "Удалить факт" : "Сохранить факт"}{!target.remove && <Icon name="check" />}</Button></div>
+        <Button type="submit" variant={target.remove ? "danger" : "primary"} busy={busy} busyLabel={target.remove ? "Удаляем…" : "Сохраняем…"}>{target.remove ? "Удалить факт" : "Сохранить факт"}{!target.remove && <Icon name="check" />}</Button></div>
     </form>
   </Dialog>;
 }

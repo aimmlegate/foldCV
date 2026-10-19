@@ -61,6 +61,10 @@ def compact_contacts(blocks, metadata, sources):
                 continue
             if left["id"] in removed or right["id"] in matches:
                 continue
+            label = normalized("".join(span["text"] for span in left["content"])).rstrip(":").casefold()
+            if label not in {"phone", "telephone", "mobile", "телефон", "тел.", "email", "e-mail",
+                    "почта", "эл. почта", "telegram", "телеграм", "skype", "linkedin", "website", "сайт"}:
+                continue
             content = deepcopy(left["content"])
             if not content or content[-1]["type"] != "text":
                 continue

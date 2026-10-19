@@ -533,6 +533,8 @@ export type Recordid5 = string;
  */
 export type Proposedsteps = (PutBlock | RemoveBlock | MoveBlock | ReplaceInlineRange | PutRecord | RemoveRecord)[];
 export type Ready = boolean;
+export type Rewriteresult = string | null;
+export type Rewritesource = string | null;
 export type Blockid3 = string;
 export type Cellid1 = string | null;
 /**
@@ -550,6 +552,7 @@ export type Sessionid = string;
 export type Kind24 = "text" | "blocks" | "table_cells";
 export type Textsha256 = string;
 export type Status6 = "pending" | "failed" | "conflict" | "applied" | "stale";
+export type Reasoningeffort = ("none" | "minimal" | "low" | "medium" | "high" | "xhigh" | "max" | "ultra") | null;
 export type Clientrequestid = string;
 export type Command =
   FixedProcessingCommand | FixedCompletionCommand | FixedRewriteCommand | FixedPanelCommand | FixedRetryCommand;
@@ -577,6 +580,7 @@ export type Removedfields = FieldReference[];
 export type Removedrecordids = string[];
 export type Kind27 = "rewrite";
 export type Instruction1 = string;
+export type Previewonly = boolean;
 export type Kind28 = "panel";
 /**
  * @minItems 1
@@ -641,9 +645,10 @@ export type Category1 =
  */
 export type Duplicateof = string[];
 export type Id34 = string;
-export type Kind30 = "paragraph" | "heading" | "section" | "bullet_list" | "duplicate";
+export type Kind30 = "paragraph" | "heading" | "section" | "bullet_list" | "duplicate" | "source_only";
 export type Listitem = boolean;
 export type Modelblock = boolean;
+export type Reason = string | null;
 export type Region = "header" | "sidebar" | "main";
 /**
  * @maxItems 1000
@@ -717,6 +722,21 @@ export type Runid = string;
 export type Sequence1 = number;
 export type Skillsha256 = string;
 export type Sourcesha2561 = string;
+export type Heading = string;
+export type Region1 = "sidebar" | "main";
+/**
+ * @maxItems 1000
+ */
+export type Sourcekeys3 = string[];
+/**
+ * @minItems 1
+ * @maxItems 100
+ */
+export type Technologies1 = [string, ...string[]];
+/**
+ * @maxItems 40
+ */
+export type Technologygroups = ImportTechnologyGroup[];
 export type Version = 1;
 export type Actionid4 = string | null;
 export type Dependencies2 = DependencyStamp[];
@@ -820,7 +840,7 @@ export type Rawtext5 = string;
 export type Evidencerecords = ImmutableFactEvidence[];
 export type Blockids3 = string[];
 export type Disposition1 = "placed" | "excluded";
-export type Reason = string | null;
+export type Reason1 = string | null;
 export type Sourceid2 = string;
 export type Unitid3 = string;
 export type Importcoverage = ImportCoverage[];
@@ -876,6 +896,7 @@ export interface FixedInputV1 {
   identity: JobIdentity;
   model: Model;
   originalSync?: RichSyncRecord | null;
+  reasoningEffort?: Reasoningeffort;
   request: JobFixedRequestV1;
   rules: Rules | null;
   schemaVersion: Schemaversion1;
@@ -901,6 +922,8 @@ export interface RichSyncRecord {
   kind?: Kind1;
   proposedSteps?: Proposedsteps;
   ready?: Ready;
+  rewriteResult?: Rewriteresult;
+  rewriteSource?: Rewritesource;
   selection?: RichSelection | null;
   status: Status6;
 }
@@ -1437,6 +1460,7 @@ export interface FixedRewriteCommand {
 }
 export interface RichRewriteRequest {
   instruction: Instruction1;
+  previewOnly?: Previewonly;
   selection: RichSelection;
 }
 export interface FixedPanelCommand {
@@ -1531,6 +1555,7 @@ export interface ImportDraft {
   sequence?: Sequence1;
   skillSha256: Skillsha256;
   sourceSha256: Sourcesha2561;
+  technologyGroups?: Technologygroups;
   version?: Version;
 }
 export interface ImportBlock {
@@ -1540,6 +1565,7 @@ export interface ImportBlock {
   kind?: Kind30;
   listItem?: Listitem;
   modelBlock?: Modelblock;
+  reason?: Reason;
   region?: Region;
   sourceKeys?: Sourcekeys;
   title?: Title;
@@ -1595,6 +1621,12 @@ export interface ImportReceipt {
   batchId: Batchid;
   requestSha256: Requestsha2561;
   sequence: Sequence;
+}
+export interface ImportTechnologyGroup {
+  heading: Heading;
+  region?: Region1;
+  sourceKeys?: Sourcekeys3;
+  technologies: Technologies1;
 }
 export interface RichOperation {
   actionId: Actionid4;
@@ -1708,7 +1740,7 @@ export interface ImmutableFactEvidence {
 export interface ImportCoverage {
   blockIds: Blockids3;
   disposition: Disposition1;
-  reason: Reason;
+  reason: Reason1;
   sourceId: Sourceid2;
   unitId: Unitid3;
 }

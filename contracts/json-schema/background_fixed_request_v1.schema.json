@@ -338,6 +338,11 @@
           "title": "Instruction",
           "type": "string"
         },
+        "previewOnly": {
+          "default": false,
+          "title": "Previewonly",
+          "type": "boolean"
+        },
         "selection": {
           "$ref": "#/$defs/RichSelection"
         }

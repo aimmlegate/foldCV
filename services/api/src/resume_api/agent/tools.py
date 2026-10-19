@@ -163,7 +163,7 @@ class ToolSession(PrivateMcp):
 
         @self.sdk.tool(structured_output=False)
         async def get_original_source(query: SourceQuery | None = None) -> CallToolResult:
-            """Read stored original text, optionally filtered by source or unit IDs, without network. Use nextCursor with the same query for later pages."""
+            """Read the original resume content from all saved PDF/DOCX/TXT/Markdown sources, including text omitted from the current layout. Always available in read-only mode, independently of the visible pane, without network. Returns stored extracted text, locations, layout cues, format and extraction warnings; not page images or rendered appearance. Omit query or use query:{kind:"source"}; filter by source or unit ids when needed. Follow snapshot.nextCursor with the SAME query until null; ordered json-fragments reconstruct an oversized item. Empty/unavailable extracted text does not prove that the original file is empty. Read originals before source comparisons, and report gaps instead of inferring missing content from the edited document."""
             return self.wire(await self.call("get_original_source", query or SourceQuery()))
 
         @self.sdk.tool(structured_output=False)
@@ -259,7 +259,8 @@ class ToolSession(PrivateMcp):
                     "issue": issue["type"] if issue["type"] in {"missing", "extra_forbidden", "string_type", "list_type", "int_type", "literal_error", "union_tag_invalid", "union_tag_not_found", "too_long", "value_error", "greater_than_equal", "string_too_long"} else "invalid"}
                     for issue in error.errors(include_input=False, include_context=False, include_url=False)[:3]]
                 return "AGENT_EDIT_INVALID"
-            return "AGENT_TOOL_DENIED"
+            self.argument_issues = [{"path": "arguments", "issue": "Use the advertised tool argument schema."}]
+            return "AGENT_ARGUMENT_INVALID"
         except (ValueError, TypeError):
             self.calls += 1
             if name in READ_TOOLS:
@@ -268,6 +269,9 @@ class ToolSession(PrivateMcp):
             if name == "prepare_edit_batch":
                 self.argument_issues = [{"path": "request", "issue": "expected_object"}]
                 return "AGENT_EDIT_INVALID"
+            if name in {"check_resume", "read_public_page", "apply_edit_batch", "publish_findings", "project_action"}:
+                self.argument_issues = [{"path": "arguments", "issue": "Use the advertised tool argument wrapper."}]
+                return "AGENT_ARGUMENT_INVALID"
             return "AGENT_TOOL_DENIED"
 
     def preflight_failure(self, code):
@@ -275,7 +279,7 @@ class ToolSession(PrivateMcp):
         if self.argument_issues:
             result["argumentIssues"] = self.argument_issues
             result["format"] = ("Read arguments use {query:{kind:'document',cursor:null}}. Omit ids to read all blocks, or pass known IDs. Follow nextCursor using the same query."
-                if code == "AGENT_ARGUMENT_INVALID" else "Use the advertised request wrapper. replace_text target requires snapshotId, blockId, cellId (null outside tables), field, start, end. content contains text and optional marks, not styles. Correct shape errors only; never retry permission denial.")
+                if self.argument_issues[0]["path"] == "query" else "Use the advertised request wrapper. replace_text target requires snapshotId, blockId, cellId (null outside tables), field, start, end. content contains text and optional marks, not styles. Correct shape errors only; never retry permission denial.")
         return result
 
     async def call(self, name, arguments):
@@ -363,15 +367,24 @@ class ToolSession(PrivateMcp):
         with self.service.projects.state_lock:
             self.guard()
             workspace = self.service.projects.read(self.control.project_id)
+            structure, links = "valid", "valid"
             try:
                 type(workspace).model_validate(workspace.model_dump(by_alias=True))
+            except ValueError:
+                structure, links = "invalid", "invalid"
+            try:
+                from packages.resume_core.agent_edits import validate_references
+                validate_references(workspace)
+            except AgentFailure:
+                links = "invalid"
+            try:
                 validate_export(workspace.project.document)
                 export = "ready"
             except ValueError:
                 export = "invalid"
             return {"changed": False, "documentRevision": workspace.document_revision,
                 "factsRevision": workspace.project.facts.revision, "timeline": timeline_report(workspace),
-                "structure": "valid", "links": "valid", "export": export,
+                "structure": structure, "links": links, "export": export,
                 "semanticReview": "Use read tools and publish anchored findings; no semantic inference was run by this check."}
 
     def findings(self, request):

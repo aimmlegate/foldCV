@@ -20,6 +20,7 @@ docs/gui/handoffs/**/gui-fixture/
 docs/gui/handoffs/**/*.docx
 docs/gui/handoffs/**/*.foldcv
 docs/gui/handoffs/**/*.pdf
+docs/gui/handoffs/**/*.zip
 docs/gui/handoffs/**/*.png
 !docs/gui/handoffs/**/before/assets/**/*.png
 !docs/gui/handoffs/**/after/assets/**/*.png

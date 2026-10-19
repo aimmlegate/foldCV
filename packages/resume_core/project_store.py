@@ -152,6 +152,11 @@ class ProjectStore:
                 snapshot = encoded(workspace.model_dump(mode="json", by_alias=True))
                 if len(snapshot) > MAX_SNAPSHOT_BYTES:
                     raise ProjectStoreFailure("PROJECT_TOO_LARGE")
+                from .gui_archive_zip import ArchiveFailure, json_bytes
+                try:
+                    json_bytes(workspace.model_dump(mode="json", by_alias=True))
+                except ArchiveFailure:
+                    raise ProjectStoreFailure("PROJECT_TOO_LARGE") from None
                 target = directory / "workspace.json"
                 if target.exists(): owned_file(target)
                 atomic_write(target, snapshot)

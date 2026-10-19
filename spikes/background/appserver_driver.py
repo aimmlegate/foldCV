@@ -2,7 +2,7 @@
 
 import asyncio
 from contextlib import contextmanager
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 import hashlib
 import inspect
 import json
@@ -10,6 +10,8 @@ import math
 import os
 
 from packages.resume_core import agent_limits
+from packages.resume_core.reasoning import model_reasoning
+from packages.resume_core.agent_progress import PublicProgress
 from packages.resume_core.background_clock import Deadlines
 from resume_api.agent.runtime import BASE_INSTRUCTIONS, provider_error
 from resume_api.lifecycle import OperationFiles
@@ -52,6 +54,8 @@ class TurnInput:
     allow_web: bool = False
     epoch: int = 1
     active_seconds: float = agent_limits.ACTIVE_SECONDS
+    reasoning_effort: str | None = "medium"
+    plain_text: bool = False
 
 
 @dataclass
@@ -65,6 +69,7 @@ class LiveTurn:
     calls: dict = field(default_factory=dict)
     items: dict = field(default_factory=dict)
     completed: set = field(default_factory=set)
+    progress: PublicProgress = field(default_factory=PublicProgress)
     final_text: str | None = None
     usage: dict | None = None
     error: str | None = None
@@ -98,6 +103,8 @@ class SharedAppServer:
         self.cleanup_failed = False
         self.generation = self.wire_bytes = 0
         self.models, self.host_pids, self.shutdowns = frozenset(), (), []
+        self.reasoning = {}
+        self.summary_models = frozenset()
 
     @classmethod
     def native(cls, root, connection, **kwargs):
@@ -161,9 +168,11 @@ class SharedAppServer:
                 metadata = await self.until(self.rpc("model/list", {"includeHidden": False, "limit": 100}), deadline)
                 if metadata.get("nextCursor") is not None or not isinstance(metadata.get("data"), list):
                     raise TransportFailure("MODEL_DENIED")
-                self.models = frozenset(item["model"] for item in metadata["data"]
-                    if isinstance(item, dict) and key(item.get("model")) and "medium" in {
-                        part.get("reasoningEffort") for part in item.get("supportedReasoningEfforts", [])})
+                self.reasoning = {item["model"]: model_reasoning(item) for item in metadata["data"]
+                    if isinstance(item, dict) and key(item.get("model"))}
+                self.models = frozenset(self.reasoning)
+                self.summary_models = frozenset(item["model"] for item in metadata["data"]
+                    if isinstance(item, dict) and key(item.get("model")) and item.get("supportsReasoningSummaries") is not False)
             except BaseException:
                 await self.fence("STARTUP_FAILED")
                 raise
@@ -257,6 +266,7 @@ class SharedAppServer:
 
     def item(self, live, frame):
         params, method = frame["params"], frame["method"]
+        live.progress.accept(method, params, live.value.emit)
         if method == "thread/tokenUsage/updated":
             from packages.resume_core.models.agent import AgentUsage
             usage = params["tokenUsage"]["total"]
@@ -316,7 +326,7 @@ class SharedAppServer:
         if (result.get("model") != live.value.model or result.get("modelProvider") != "openai"
                 or result.get("approvalPolicy") != "never" or result.get("approvalsReviewer") != "user"
                 or result.get("sandbox", {}).get("type") != "readOnly" or result.get("instructionSources")
-                or result.get("runtimeWorkspaceRoots") or result.get("reasoningEffort") != "medium"
+                or result.get("runtimeWorkspaceRoots") or result.get("reasoningEffort") != live.value.reasoning_effort
                 or result.get("cwd") != str(live.operation)
                 or result.get("sandbox", {}).get("networkAccess") is not False
                 or result.get("thread", {}).get("ephemeral") is not True
@@ -334,6 +344,13 @@ class SharedAppServer:
         await self.prepare()
         if value.model not in self.models:
             raise TransportFailure("MODEL_DENIED")
+        metadata = self.reasoning[value.model]
+        effort = value.reasoning_effort or metadata.default
+        if effort not in metadata.supported:
+            raise TransportFailure("MODEL_DENIED")
+        value = replace(value, reasoning_effort=effort)
+        if value.plain_text and (value.tools or value.allow_web or value.output_schema is not None):
+            raise TransportFailure("INVALID_INPUT")
         names = [tool.get("name") for tool in value.tools]
         if len(names) != len(set(names)) or any(not key(name) for name in names):
             raise TransportFailure("INVALID_INPUT")
@@ -356,14 +373,16 @@ class SharedAppServer:
             tools = [{"type": "namespace", "name": namespace, "description": "This job's captured FoldCV tools",
                 "tools": [{"type": "function", "name": tool["name"], "description": tool.get("description", ""),
                     "inputSchema": tool["inputSchema"]} for tool in value.tools]}] if value.tools else []
-            config = {"web_search": "live" if value.allow_web else "disabled"}
-            if value.output_schema is not None:
+            config = {"web_search": "live" if value.allow_web else "disabled",
+                "model_reasoning_effort": value.reasoning_effort}
+            if value.output_schema is not None or value.plain_text:
                 config["features"] = structured_features()
             if self.ownership is not None:
                 self.ownership.thread_pending()
             result = await self.until(self.rpc("thread/start", {"model": value.model, "cwd": str(files.path),
                 "ephemeral": True, "allowProviderModelFallback": False, "approvalPolicy": "never",
-                "approvalsReviewer": "user", "sandbox": "read-only", "baseInstructions": BASE_INSTRUCTIONS,
+                "approvalsReviewer": "user", "sandbox": "read-only", "baseInstructions":
+                    "Follow the text editing instruction. Use no tools." if value.plain_text else BASE_INSTRUCTIONS,
                 "developerInstructions": value.developer, "environments": [], "runtimeWorkspaceRoots": [],
                 "dynamicTools": tools, "config": config},
                 job=value.job), slot.startup_deadline)
@@ -380,7 +399,8 @@ class SharedAppServer:
             await invoke(value.before_turn)
             if value.cancelled.is_set():
                 raise TransportFailure("CANCELLED")
-            params = {"threadId": slot.thread, "effort": "medium", "summary": "none",
+            params = {"threadId": slot.thread, "effort": value.reasoning_effort,
+                "summary": "auto" if value.tools and value.model in self.summary_models else "none",
                 "input": [{"type": "text", "text": value.prompt}]}
             if value.output_schema is not None:
                 params["outputSchema"] = value.output_schema

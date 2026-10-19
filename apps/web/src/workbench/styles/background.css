@@ -17,7 +17,5 @@
 .job-details { padding: 10px; border-radius: 6px; background: var(--surface); }
 .job-answer { white-space: pre-wrap; }
 .job-pages { justify-content: space-between; padding-top: 10px; border-top: 1px solid var(--line); }
-.job-notices { position: fixed; right: calc(var(--uir-gap) + 16px); bottom: calc(var(--uir-gap) + 16px); z-index: 125; display: grid; gap: 8px; width: min(360px, calc(100vw - 32px)); pointer-events: none; }
-.job-notice > .icon { pointer-events: auto; }
 .job-notice { display: flex; gap: 12px; align-items: flex-start; justify-content: space-between; padding: 14px; border: 1px solid var(--line); border-radius: 9px; background: var(--paper); box-shadow: 0 5px 16px var(--line); text-align: left; }
 @media (max-width: 600px) { .global-jobs { position: fixed; top: 90px; right: 16px; } .global-job-control > .button { padding-inline: 8px; } }

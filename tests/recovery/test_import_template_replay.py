@@ -169,7 +169,7 @@ def test_focus_selection_keeps_every_underlying_technology_record():
     records, _evidence, _links = assemble_import_facts(draft, identify, lambda keys: [])
     regions = arrange_import({"header": [], "sidebar": [], "main": []},
         {"source": SimpleNamespace(category="skills")}, records, identify)
-    assert len(regions["sidebar"][0]["children"]) == 10
+    assert regions["sidebar"] == []
     assert [record["display"]["rawText"] for record in records] == labels
 
 

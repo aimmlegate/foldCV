@@ -23,7 +23,7 @@ export type AssistantView = {
   conversations: AgentConversationPage["items"][number][]; conversationCursor: string | null; conversationId: string | null; messages: AgentMessage[];
   messageCursor: string | null; sources: AgentWebSource[]; findings: AgentFinding[]; run: AgentRun | null;
   receipts: AgentEditReceipt[]; activity: AgentEvent[]; partial: string; partialTruncated: boolean;
-  draft: string; submitting: boolean; pendingSend: boolean; error: string | null;
+  draft: string; submitting: boolean; pendingSend: boolean; error: string | null; loading?: string | null;
 };
 export type AssistantEditor = { sessionId: string; apply: (batchId: string, api: PreparedApi) => Promise<void> };
 export type TurnBaseline = () => Promise<{ response: RichProjectResponse; scope: AgentRunRequest["scope"]; selectionContext?: AgentRunRequest["selectionContext"];
@@ -43,6 +43,7 @@ export class AssistantController {
   private stream: AbortController | null = null;
   private closed = false;
   private epoch = 0;
+  private sendEpoch = 0;
   private sequence = 0;
   private metadataEpoch = 0;
   private accessRevision = 1;
@@ -63,18 +64,25 @@ export class AssistantController {
     if (this.closed) return;
     this.view = { ...this.view, ...update }; this.changed(this.view);
   }
+  private readonly waiting = new Map<symbol, string>();
+  private async wait<T>(label: string, work: () => Promise<T>): Promise<T> {
+    const key = Symbol(); this.waiting.set(key, label); this.publish({ loading: label });
+    try { return await work(); }
+    finally { this.waiting.delete(key); this.publish({ loading: [...this.waiting.values()].at(-1) ?? null }); }
+  }
   draft(value: string): void { this.publish({ draft: value }); }
   flags(value: AgentFlags): void {
     if (!this.api.setAccess) { this.publish({ flags: { ...value } }); return; }
-    this.publish({ submitting: true });
+    this.publish({ submitting: true, loading: "Обновляем разрешение на правки" });
     void this.api.setAccess(this.accessRevision, !value.allowEdits).then(access => {
       this.accessRevision = access.revision;
       this.publish({ flags: { ...value, allowEdits: !access.readOnly }, error: null });
     }).catch(error => this.publish({ error: code(error) }))
-      .finally(() => { this.publish({ submitting: false }); void this.refresh().catch(error => this.publish({ error: code(error) })); });
+      .finally(() => { this.publish({ submitting: false, loading: null }); void this.refresh().catch(error => this.publish({ error: code(error) })); });
   }
 
-  async refresh(): Promise<void> {
+  async refresh(): Promise<void> { return this.wait("Обновляем подключение и диалоги", () => this.refreshWork()); }
+  private async refreshWork(): Promise<void> {
     const epoch = ++this.metadataEpoch;
     const access = await this.api.access?.();
     if (access && epoch === this.metadataEpoch) {
@@ -84,7 +92,8 @@ export class AssistantController {
     const [settings, capabilities, conversations] = await Promise.all([this.api.settings(), this.api.capabilities(this.view.flags), this.api.conversations()]);
     if (epoch === this.metadataEpoch) this.publish({ settings, capabilities, conversations: conversations.items, conversationCursor: conversations.nextCursor });
   }
-  async init(): Promise<void> {
+  async init(): Promise<void> { return this.wait("Открываем помощника", () => this.initialize()); }
+  private async initialize(): Promise<void> {
     try {
       await this.refresh();
       if (!this.closed && !this.view.conversationId && this.view.conversations.length) {
@@ -94,6 +103,9 @@ export class AssistantController {
     } catch (error) { this.publish({ error: code(error) }); }
   }
   async chooseModel(model: string | null, enabled = this.view.settings?.enabled ?? false): Promise<void> {
+    return this.wait("Сохраняем модель помощника", () => this.chooseModelWork(model, enabled));
+  }
+  private async chooseModelWork(model: string | null, enabled: boolean): Promise<void> {
     const settings = this.view.settings;
     if (!settings) return;
     try {
@@ -136,7 +148,8 @@ export class AssistantController {
     this.publish({ conversationId: conversation.id, messages: [], sources: [], findings: [], messageCursor: null });
     return conversation.id;
   }
-  async newConversation(): Promise<void> {
+  async newConversation(): Promise<void> { return this.wait("Создаём диалог", () => this.newConversationWork()); }
+  private async newConversationWork(): Promise<void> {
     if (this.view.submitting) throw new AgentApiFailure("AGENT_BUSY");
     if (this.active && !this.jobs) await this.stop();
     if (this.applying.size) throw new AgentApiFailure("AGENT_BUSY");
@@ -147,7 +160,8 @@ export class AssistantController {
       receipts: [], activity: [], partial: "", partialTruncated: false, draft: "", error: null });
     await this.refresh();
   }
-  async select(id: string): Promise<void> {
+  async select(id: string): Promise<void> { return this.wait("Открываем диалог", () => this.selectWork(id)); }
+  private async selectWork(id: string): Promise<void> {
     if (id === this.view.conversationId) return;
     if (this.view.submitting) throw new AgentApiFailure("AGENT_BUSY");
     if (this.active && !this.jobs) await this.stop();
@@ -160,7 +174,8 @@ export class AssistantController {
       receipts: [], activity: [], partial: "", partialTruncated: false, draft: this.drafts.get(id) ?? "", error: null });
     if (this.jobs) await this.reloadBackground();
   }
-  async older(): Promise<void> {
+  async older(): Promise<void> { return this.wait("Загружаем предыдущие сообщения", () => this.olderWork()); }
+  private async olderWork(): Promise<void> {
     const id = this.view.conversationId, cursor = this.view.messageCursor, epoch = this.epoch;
     if (!id || !cursor) return;
     const page = await this.api.messages(id, cursor);
@@ -168,7 +183,8 @@ export class AssistantController {
     const known = new Set(this.view.messages.map(message => message.id));
     this.publish({ messages: [...page.items.filter(message => !known.has(message.id)), ...this.view.messages], messageCursor: page.nextCursor });
   }
-  async moreConversations(): Promise<void> {
+  async moreConversations(): Promise<void> { return this.wait("Загружаем диалоги", () => this.moreConversationsWork()); }
+  private async moreConversationsWork(): Promise<void> {
     const cursor = this.view.conversationCursor;
     if (!cursor) return;
     const page = await this.api.conversations(cursor), known = new Set(this.view.conversations.map(item => item.id));
@@ -176,7 +192,8 @@ export class AssistantController {
     // Each response is bounded; the visible selector may contain several pages.
     this.publish({ conversations: items, conversationCursor: page.nextCursor });
   }
-  async resource(kind: "sources" | "findings", id: string): Promise<void> {
+  async resource(kind: "sources" | "findings", id: string): Promise<void> { return this.wait("Открываем результат", () => this.resourceWork(kind, id)); }
+  private async resourceWork(kind: "sources" | "findings", id: string): Promise<void> {
     if (this.jobs) { await this.reloadBackground(); if (this.view[kind].some(item => item.id === id)) return; }
     const conversation = this.view.conversationId, epoch = this.epoch;
     if (!conversation) return;
@@ -191,29 +208,39 @@ export class AssistantController {
     let flags = { ...this.view.flags };
     if (!message.trim() || [...message].length > 8000) return;
     if (this.jobs) { await this.sendBackground(baseline); return; }
+    const epoch = ++this.sendEpoch;
+    const currentSend = () => { if (this.closed || epoch !== this.sendEpoch) throw new AgentApiFailure("AGENT_CANCELLED"); };
     this.publish({ submitting: true, error: null });
     try {
       let request = this.pending;
       if (request && request.message !== message) throw new AgentApiFailure("AGENT_IDEMPOTENCY_CONFLICT");
       if (!request) {
         await this.refresh();
+        currentSend();
         flags = { ...this.view.flags };
         if (!this.view.capabilities?.ready || !this.view.settings) throw new AgentApiFailure(this.view.capabilities?.unavailable?.code ?? "AGENT_CONNECTION_UNAVAILABLE");
         const settingsRevision = this.view.settings.revision;
-        const owner = await this.ensureOwner(), conversationId = await this.ensureConversation();
+        const owner = await this.ensureOwner(); currentSend();
+        const conversationId = await this.ensureConversation(); currentSend();
         const current = await baseline(), workspace = current.response.workspace;
-        if (this.closed) throw new AgentApiFailure("AGENT_INTERRUPTED");
+        currentSend();
         if (!workspace.project) throw new AgentApiFailure("AGENT_NOT_FOUND");
         if (flags.allowEdits && current.historyOffers && this.api.offerHistory) await this.api.offerHistory({ owner,
           projectRevision: workspace.projectRevision, documentRevision: workspace.documentRevision,
           factsRevision: workspace.project.facts.revision, ...current.historyOffers });
+        currentSend();
         request = { clientRequestId: crypto.randomUUID(), conversationId, owner, message, ...flags, scope: current.scope,
           selectionContext: current.selectionContext ?? null,
           settingsRevision, projectRevision: workspace.projectRevision,
           documentRevision: workspace.documentRevision, factsRevision: workspace.project.facts.revision };
         this.pending = request;
       }
+      currentSend();
       const run = await this.api.submit(request);
+      if (this.closed || epoch !== this.sendEpoch) {
+        if (!terminal(run)) await this.api.cancel(run.id, request.owner).catch(() => {});
+        return;
+      }
       this.pending = null; this.sequence = 0;
       this.publish({ run, draft: "", partial: "", partialTruncated: false, activity: [], receipts: [], pendingSend: false });
       if (!terminal(run)) {
@@ -222,6 +249,7 @@ export class AssistantController {
       }
       await this.reloadMessages();
     } catch (error) {
+      if (this.closed || epoch !== this.sendEpoch) return;
       if (error instanceof AgentApiFailure && error.status >= 400 && error.status < 500) this.pending = null;
       this.publish({ error: code(error), pendingSend: this.pending !== null });
     } finally { this.publish({ submitting: false }); }
@@ -235,15 +263,18 @@ export class AssistantController {
   }
   private async sendBackground(baseline: TurnBaseline): Promise<void> {
     const jobs = this.jobs; if (!jobs) return;
+    const epoch = ++this.sendEpoch;
+    const currentSend = () => { if (this.closed || epoch !== this.sendEpoch) throw new AgentApiFailure("AGENT_CANCELLED"); };
     this.publish({ submitting: true, error: null });
     try {
       let pending = this.pendingBackground;
       if (pending && pending.request.message !== this.view.draft) throw new AgentApiFailure("AGENT_IDEMPOTENCY_CONFLICT");
       if (!pending) {
-        await this.refresh(); await jobs.refresh();
+        await this.refresh(); currentSend(); await jobs.refresh(); currentSend();
         const project = jobs.view.project, settings = this.view.settings;
         if (!project || !settings || !this.view.capabilities?.ready) throw new AgentApiFailure(this.view.capabilities?.unavailable?.code ?? "AGENT_CONNECTION_UNAVAILABLE");
-        const conversationId = await this.ensureConversation(), current = await baseline(), workspace = current.response.workspace;
+        const conversationId = await this.ensureConversation(); currentSend();
+        const current = await baseline(), workspace = current.response.workspace; currentSend();
         if (!workspace.project || this.closed) throw new AgentApiFailure("AGENT_STALE_READ");
         pending = { schemaVersion: 1, lineage: project.lineage, requestEpoch: project.requestEpoch,
           request: { clientRequestId: crypto.randomUUID(), conversationId, message: this.view.draft, ...this.view.flags,
@@ -251,9 +282,13 @@ export class AssistantController {
             documentRevision: workspace.documentRevision, factsRevision: workspace.project.facts.revision } };
         this.pendingBackground = pending;
       }
-      await jobs.submit(pending); this.pendingBackground = null;
+      currentSend();
+      const job = await jobs.submit(pending);
+      if (this.closed || epoch !== this.sendEpoch) { await jobs.stop(job.id); return; }
+      this.pendingBackground = null;
       this.publish({ draft: "", pendingSend: false }); await this.reloadBackground();
     } catch (error) {
+      if (this.closed || epoch !== this.sendEpoch) return;
       if ((error instanceof AgentApiFailure || error instanceof RichApiFailure) && error.status >= 400 && error.status < 500) this.pendingBackground = null;
       this.publish({ error: code(error), pendingSend: this.pendingBackground !== null });
     } finally { this.publish({ submitting: false }); }
@@ -296,7 +331,7 @@ export class AssistantController {
     const latest = [...runs.values()].sort((a, b) => a.createdAt.localeCompare(b.createdAt)).at(-1);
     this.publish({ conversations: [...summaries.values()].sort((a, b) => b.updatedAt.localeCompare(a.updatedAt)),
       messages: [...messages.values()].sort((a, b) => a.timestamp.localeCompare(b.timestamp)), sources: [...sources.values()], findings: [...findings.values()],
-      run: latest ?? null, error: jobs.view.error });
+      activity: project.jobs.find(job => job.id === latest?.id)?.activity ?? [], run: latest ?? null, error: jobs.view.error });
   }
   private startStream(run: AgentRun, owner: AgentOwner): void {
     this.stream?.abort(); const stream = new AbortController(); this.stream = stream;
@@ -333,7 +368,8 @@ export class AssistantController {
     }
   }
   private accept(event: AgentEvent, owner: AgentOwner): void {
-    const update: Partial<AssistantView> = { activity: [...this.view.activity, event].slice(-40) };
+    const activity = event.type === "activity.updated" ? this.view.activity.filter(item => item.type !== "activity.updated" || item.payload.itemId !== event.payload.itemId) : this.view.activity;
+    const update: Partial<AssistantView> = { activity: event.type === "message.delta" ? activity : [...activity, event].slice(-40) };
     if (event.type === "message.delta") {
       const raw = new TextEncoder().encode(this.view.partial + event.payload.text);
       update.partial = new TextDecoder("utf-8", { fatal: true }).decode(raw.slice(0, 65536), { stream: true });
@@ -357,7 +393,9 @@ export class AssistantController {
     }
     this.publish(update);
   }
-  async stop(): Promise<void> {
+  async stop(): Promise<void> { return this.wait("Останавливаем задачу", () => this.stopWork()); }
+  private async stopWork(): Promise<void> {
+    ++this.sendEpoch;
     if (this.jobs) {
       if (this.view.run && !terminal(this.view.run)) await this.jobs.stop(this.view.run.id);
       this.pendingBackground = null; this.publish({ pendingSend: false }); await this.reloadBackground(); return;
@@ -380,7 +418,7 @@ export class AssistantController {
     this.pending = null; this.publish({ pendingSend: false });
   }
   close(): void {
-    this.closed = true; ++this.epoch; this.stream?.abort();
+    this.closed = true; ++this.epoch; ++this.sendEpoch; this.stream?.abort();
     if (this.beat) clearTimeout(this.beat);
     this.unsubscribeBackground?.(); this.unsubscribeBackground = null;
     const owner = this.owner; this.owner = null;

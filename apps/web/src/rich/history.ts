@@ -26,7 +26,8 @@ export class SessionHistory {
 
   constructor(readonly session: string, initial: ReadonlyMap<string, CellValue>,
     private readonly effect: (changes: readonly CellChange[], context: HistoryEffectContext) => void = () => {},
-    private readonly allowed: (context: HistoryEffectContext) => boolean = () => true) {
+    private readonly allowed: (context: HistoryEffectContext) => boolean = () => true,
+    private readonly actionPrefix: string = session) {
     for (const [key, value] of initial) this.cells.set(key, value);
   }
 
@@ -81,7 +82,7 @@ export class SessionHistory {
       previous.token++;
       return previous.id;
     }
-    const id = `${this.session}:${++this.sequence}`;
+    const id = `${this.actionPrefix}:${++this.sequence}`;
     this.actions.push({ id, token: 0, kind, group, changes: effective.map(change => ({ ...change })) });
     this.cursor++;
     return id;

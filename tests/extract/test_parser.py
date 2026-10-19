@@ -182,7 +182,8 @@ def test_zip_duplicate_traversal_symlink_external_xml_and_bomb_rejected() -> Non
     failure(rebuild(extra=("word/evil", b"target"), symlink=True), "link.docx", "EXTRACT_UNSAFE_ARCHIVE")
     rels = (b'<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">'
             b'<Relationship Id="rId9" Target="https://invalid.example/file" TargetMode="External"/></Relationships>')
-    failure(rebuild(extra=("word/_rels/new.xml.rels", rels)), "external.docx", "EXTRACT_EXTERNAL_LINK")
+    result = extract(rebuild(extra=("word/_rels/new.xml.rels", rels)), "external.docx")
+    assert all(link.relationship_id != "rId9" for link in result.links)
     xml = b'<!DOCTYPE x [<!ENTITY e SYSTEM "https://invalid.example/e">]><w:document/>'
     failure(rebuild({"word/document.xml": xml}), "entity.docx", "EXTRACT_UNSAFE_XML")
     failure(rebuild(extra=("word/huge.xml", b" " * (parser.MAX_ZIP_ENTRY + 1))), "bomb.docx", "EXTRACT_ARCHIVE_LIMIT")

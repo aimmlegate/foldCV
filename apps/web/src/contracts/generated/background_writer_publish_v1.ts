@@ -1,3 +1,4 @@
+export type Approve = boolean;
 export type Generation = number;
 export type Jobid = string;
 export type Credential = string;
@@ -11,6 +12,7 @@ export type Schemaversion1 = 1;
 export type Token = string;
 
 export interface WriterPublishV1 {
+  approve?: Approve;
   generation: Generation;
   jobId: Jobid;
   proof: WriterProofV1;

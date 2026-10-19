@@ -66,10 +66,10 @@ def validate_draft(draft, parts):
     for items in (draft.facts, draft.blocks):
         if len({item.id for item in items}) != len(items):
             raise ImportFailure("IMPORT_DUPLICATE_ID")
-    for item in [*draft.facts, *draft.blocks, draft.profile]:
+    for item in [*draft.facts, *draft.blocks, draft.profile, *draft.technology_groups]:
         if len(set(item.source_keys)) != len(item.source_keys) or not set(item.source_keys) <= keys:
             raise ImportFailure("IMPORT_REFERENCE_INVALID")
-    visible = {key for block in draft.blocks if block.kind != "duplicate" for key in block.source_keys}
+    visible = {key for block in draft.blocks if block.kind not in {"duplicate", "source_only"} for key in block.source_keys}
     for block in draft.blocks:
         targets = set(block.duplicate_of)
         if (len(targets) != len(block.duplicate_of) or not targets <= visible
@@ -102,6 +102,8 @@ def update_draft(draft, batch, parts):
         setattr(updated, key, list(old.values()))
     if batch.profile is not None:
         updated.profile = batch.profile.model_copy(deep=True)
+    if batch.technology_groups is not None:
+        updated.technology_groups = [group.model_copy(deep=True) for group in batch.technology_groups]
     updated.sequence += 1
     receipt = ImportReceipt(batchId=batch.batch_id, requestSha256=request_sha, sequence=updated.sequence)
     updated.receipts.append(receipt)
@@ -143,6 +145,9 @@ def assemble_agent_import(workspace, draft):
     def evidence(keys):
         return [by_key[key].evidence for key in keys]
     records, evidence_records, fact_links = assemble_import_facts(draft, identity, evidence)
+    from .import_technology_groups import grouped_technologies, replaced_skill_outlines
+    technology_groups = grouped_technologies(draft.technology_groups, records, identity, evidence)
+    replaced = replaced_skill_outlines(draft)
     regions = {key: [] for key in ("header", "sidebar", "main")}
     metadata = {}
     covered = set()
@@ -219,6 +224,14 @@ def assemble_agent_import(workspace, draft):
         regions[region].append(block)
         return block
     for block in draft.blocks:
+        if block.category == "skills" and block.id.rsplit("_", 1)[0] in replaced:
+            covered.update(block.source_keys)
+            continue
+        if block.kind == "source_only":
+            for key in block.source_keys:
+                omitted[key] = block.reason
+            covered.update(block.source_keys)
+            continue
         if block.kind == "duplicate":
             targets = list(dict.fromkeys(by_key[key].evidence["unitId"] for key in block.duplicate_of))
             for key in block.source_keys:
@@ -235,7 +248,7 @@ def assemble_agent_import(workspace, draft):
         if part.key not in covered:
             add_block(["retained", part.key], [part.key])
     regions["sidebar"] = compact_contacts(regions["sidebar"], metadata, sources)
-    regions = arrange_import(regions, metadata, records, identity)
+    regions = arrange_import(regions, metadata, records, identity, technology_groups=technology_groups)
     if categorized:
         from .import_lists import format_import_lists
         regions = format_import_lists(regions, sources, identity,
@@ -251,7 +264,7 @@ def assemble_agent_import(workspace, draft):
     issues = list(draft.issues)
     if any("IMAGE" in source.warnings for source in sources):
         issues.append("Изображения в исходнике не обработаны; использован доступный текстовый слой.")
-    placements = [key for block in draft.blocks if block.kind != "duplicate" for key in block.source_keys]
+    placements = [key for block in draft.blocks if block.kind not in {"duplicate", "source_only"} for key in block.source_keys]
     if len(placements) != len(set(placements)):
         issues.append("Некоторые фрагменты исходника размещены повторно. Проверьте, нужны ли эти повторы.")
     if not draft.facts:

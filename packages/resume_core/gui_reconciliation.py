@@ -219,6 +219,10 @@ def apply_reconciliation(workspace, field_ids, proposal, dependencies, rules, up
     for item in proposal.field_facts:
         field, slot = indexed[item.field_id]
         if field: field.fact_ids = item.fact_ids[:];field.evidence = []
+        if slot == 'skills-focus':
+            for entry in candidate.project.document.skills_focus.focus:
+                if entry.display.field_id == item.field_id:
+                    entry.fact_ids = item.fact_ids[:]
     if proposal.editorial_plan:
         candidate.editorial_plan = proposal.editorial_plan.model_copy(deep=True)
         candidate.annotations = [mark for mark in candidate.annotations if mark.code != 'editorial_plan_stale']

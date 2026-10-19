@@ -1,3 +1,145 @@
+export type AgentEvent =
+  MessageDelta | ActivityEvent | ToolEvent | ResourceEvent | EditEvent | UsageEvent | RunStateEvent;
+export type Conversationid = string;
+export type Id = string;
+export type Text = string;
+export type Projectid = string;
+export type Runid = string;
+export type Schemaversion = 1;
+export type Sequence = number;
+export type Timestamp = string;
+export type Type = "message.delta";
+export type Conversationid1 = string;
+export type Id1 = string;
+export type Itemid = string;
+export type Kind = "summary";
+export type Text1 = string;
+export type Projectid1 = string;
+export type Runid1 = string;
+export type Schemaversion1 = 1;
+export type Sequence1 = number;
+export type Timestamp1 = string;
+export type Type1 = "activity.updated";
+export type Conversationid2 = string;
+export type Id2 = string;
+export type Callid = string;
+export type Code =
+  | "AGENT_DISABLED"
+  | "AGENT_MODEL_REQUIRED"
+  | "AGENT_MODEL_UNAVAILABLE"
+  | "AGENT_MODEL_INCOMPATIBLE"
+  | "AGENT_SETTINGS_CONFLICT"
+  | "AGENT_SETTINGS_CORRUPT"
+  | "AGENT_SETTINGS_SAVE_FAILED"
+  | "AGENT_CONNECTION_UNAVAILABLE"
+  | "AGENT_CONNECTION_CHANGED"
+  | "AGENT_AUTH_REQUIRED"
+  | "AGENT_QUOTA"
+  | "AGENT_BUSY"
+  | "AGENT_CANCELLED"
+  | "AGENT_INTERRUPTED"
+  | "AGENT_DEADLINE"
+  | "AGENT_STARTUP_TIMEOUT"
+  | "AGENT_PROTOCOL"
+  | "AGENT_PROCESS_FAILED"
+  | "AGENT_CLEANUP_FAILED"
+  | "AGENT_RUNTIME_UNSUPPORTED"
+  | "AGENT_MODEL_REROUTED"
+  | "AGENT_UNEXPECTED_COMPACTION"
+  | "AGENT_TOOL_DENIED"
+  | "AGENT_TOOL_LIMIT"
+  | "AGENT_OUTPUT_LIMIT"
+  | "AGENT_CONTEXT_LIMIT"
+  | "AGENT_ARGUMENT_INVALID"
+  | "AGENT_WEB_DISABLED"
+  | "AGENT_SOURCE_UNAVAILABLE"
+  | "AGENT_SOURCE_DENIED"
+  | "AGENT_SOURCE_LIMIT"
+  | "AGENT_SCOPE_INVALID"
+  | "AGENT_STALE_READ"
+  | "AGENT_EDIT_INVALID"
+  | "AGENT_EDIT_LIMIT"
+  | "AGENT_EVIDENCE_INVALID"
+  | "AGENT_NO_OWNER"
+  | "AGENT_LEASE_EXPIRED"
+  | "AGENT_OWNER_MISMATCH"
+  | "AGENT_TICKET_INVALID"
+  | "AGENT_RECEIPT_TIMEOUT"
+  | "AGENT_SAVE_FAILED"
+  | "AGENT_OUTCOME_UNKNOWN"
+  | "AGENT_IDEMPOTENCY_CONFLICT"
+  | "AGENT_NOT_FOUND"
+  | "AGENT_CONVERSATION_FULL"
+  | "AGENT_PROJECT_FULL"
+  | "AGENT_STORE_CORRUPT"
+  | "AGENT_STORE_UNAVAILABLE"
+  | "AGENT_STORE_SAVE_FAILED"
+  | "AGENT_PROJECT_DELETED"
+  | "AGENT_CLEANUP_INCOMPLETE"
+  | "AGENT_RESYNC_REQUIRED";
+export type Name = string;
+export type Projectid2 = string;
+export type Runid2 = string;
+export type Schemaversion2 = 1;
+export type Sequence2 = number;
+export type Timestamp2 = string;
+export type Type2 = "tool.started" | "tool.completed" | "tool.failed";
+export type Conversationid3 = string;
+export type Id3 = string;
+export type Id4 = string;
+export type Projectid3 = string;
+export type Runid3 = string;
+export type Schemaversion3 = 1;
+export type Sequence3 = number;
+export type Timestamp3 = string;
+export type Type3 = "source.ready" | "finding.ready";
+export type Conversationid4 = string;
+export type Id5 = string;
+export type Batchid = string;
+export type Disposition =
+  | "prepared"
+  | "offered"
+  | "applying"
+  | "saved"
+  | "stale"
+  | "rejected"
+  | "cancelled"
+  | "save_failed"
+  | "outcome_unknown";
+export type Projectid4 = string;
+export type Runid4 = string;
+export type Schemaversion4 = 1;
+export type Sequence4 = number;
+export type Timestamp4 = string;
+export type Type4 = "edit.offered" | "edit.result";
+export type Conversationid5 = string;
+export type Id6 = string;
+export type Cachedinputtokens = number;
+export type Inputtokens = number;
+export type Outputtokens = number;
+export type Totaltokens = number;
+export type Projectid5 = string;
+export type Runid5 = string;
+export type Schemaversion5 = 1;
+export type Sequence5 = number;
+export type Timestamp5 = string;
+export type Type5 = "usage.reported";
+export type Conversationid6 = string;
+export type Id7 = string;
+export type Outcomeunknown = boolean;
+export type Savedbatchid = string | null;
+export type State =
+  "queued" | "running" | "waiting_for_editor" | "cancelling" | "completed" | "failed" | "cancelled" | "interrupted";
+export type Projectid6 = string;
+export type Runid6 = string;
+export type Schemaversion6 = 1;
+export type Sequence6 = number;
+export type Timestamp6 = string;
+export type Type6 = "run.state_changed";
+/**
+ * @maxItems 40
+ */
+export type Activity = AgentEvent[];
 export type Assetpinssha256 = string | null;
 /**
  * @maxItems 2
@@ -7,7 +149,7 @@ export type Activedeadline = string;
 export type Childstartedat = string | null;
 export type Cleanupverified = boolean;
 export type Dispatchedat = string;
-export type Code =
+export type Code1 =
   | "AUTH_REQUIRED"
   | "RATE_LIMITED"
   | "BUSY"
@@ -49,12 +191,12 @@ export type Code =
   | "UNSAFE_TEMP_ROOT"
   | "INCOMPLETE_STREAM";
 export type Executiongeneration = number;
-export type Id = string;
+export type Id8 = string;
 export type Nativestarted = boolean;
-export type Schemaversion = 1;
+export type Schemaversion7 = 1;
 export type Stage = "agent" | "assessment" | "extraction" | "rewrite" | "reconciliation";
 export type Startupdeadline = string;
-export type State =
+export type State1 =
   "reserved" | "starting" | "running" | "completed" | "failed" | "cancelled" | "interrupted" | "cleanup_failed";
 export type Captureinvalidated = boolean;
 export type Createdat = string;
@@ -62,7 +204,7 @@ export type Eventcursor = number;
 export type Execution =
   "queued" | "starting" | "running" | "cancelling" | "completed" | "failed" | "cancelled" | "interrupted";
 export type Executiongeneration1 = number;
-export type Id1 = string;
+export type Id9 = string;
 export type Proposalid = string | null;
 export type Publication =
   | "none"
@@ -84,39 +226,40 @@ export type Generationssha256 = string;
 export type Jobid = string;
 export type Lineage = string;
 export type Persistedat = string;
-export type Projectid = string;
+export type Projectid7 = string;
 export type Projectrevision = number;
 export type Proposalid1 = string;
 export type Proposalsha256 = string;
 export type Requestsha256 = string;
-export type Schemaversion1 = 1;
+export type Schemaversion8 = 1;
 export type Workspacesha256 = string;
-export type Schemaversion2 = 1;
+export type Schemaversion9 = 1;
 export type Accessrevision = number;
 export type Accountgeneration = number;
 export type Allowedits = boolean;
 export type Allowweb = boolean;
+export type Approvalrequired = boolean;
 export type Fingerprint = string;
 export type Generation = number;
 export type Key = string;
-export type Kind = "entity" | "structure" | "query" | "source" | "rules";
+export type Kind1 = "entity" | "structure" | "query" | "source" | "rules";
 /**
  * @maxItems 4096
  */
 export type Reads = GenerationStamp[];
-export type Schemaversion3 = 1;
+export type Schemaversion10 = 1;
 /**
  * @maxItems 4096
  */
 export type Writes = GenerationStamp[];
 export type Lineage1 = string;
-export type Projectid1 = string;
+export type Projectid8 = string;
 export type Requestepoch = number;
 export type Requestid = string;
-export type Id2 = string;
-export type Kind1 = "agent_journal" | "rich_sync" | "processing";
+export type Id10 = string;
+export type Kind2 = "agent_journal" | "rich_sync" | "processing";
 export type Sha256 = string;
-export type Kind2 = "agent" | "processing" | "rewrite" | "reconciliation";
+export type Kind3 = "agent" | "processing" | "rewrite" | "reconciliation";
 /**
  * @minItems 1
  * @maxItems 2
@@ -127,10 +270,10 @@ export type Model = string;
 export type Stage1 = "agent" | "assessment" | "extraction" | "rewrite" | "reconciliation";
 export type Payloadsha256 = string;
 export type Schedulingclass = "background" | "interactive" | "reconciliation";
-export type Schemaversion4 = 1;
+export type Schemaversion11 = 1;
 export type Scope = WholeResumeScope | SelectionScope;
-export type Kind3 = "resume";
-export type Kind4 = "selection";
+export type Kind4 = "resume";
+export type Kind5 = "selection";
 export type Blockid = string;
 export type Cellid = string | null;
 /**
@@ -144,13 +287,13 @@ export type Blockids = [string, ...string[]];
 export type Actionid = string;
 export type Actiontoken = number;
 export type Fingerprint1 = string | null;
-export type Id3 = string;
-export type Kind5 =
+export type Id11 = string;
+export type Kind6 =
   "block" | "record" | "field" | "period" | "ownership" | "source" | "rules" | "asset" | "timeline_order";
 export type Revision = number;
 export type Dependencies = DependencyStamp[];
 export type Sessionid = string;
-export type Kind6 = "text" | "blocks" | "table_cells";
+export type Kind7 = "text" | "blocks" | "table_cells";
 export type Textsha256 = string;
 export type Submittedat = string;
 /**
@@ -175,22 +318,22 @@ export type Tools = (
 )[];
 export type Undoexpired = boolean;
 export type Updatedat = string;
-export type Schemaversion5 = 1;
+export type Schemaversion12 = 1;
 export type Canonicalready = boolean;
 export type Actioncursor = number;
 export type Assetpinssha2561 = string | null;
 export type Baserevision = number;
 export type Basesha256 = string;
 export type Checkpointedat = string;
-export type Id4 = string;
+export type Id12 = string;
 export type Incarnation = string;
 export type Lineage2 = string;
 export type Payloadbytes = number;
 export type Payloadref = string;
 export type Payloadsha2561 = string;
-export type Projectid2 = string;
-export type Schemaversion6 = 1;
-export type Sequence = number;
+export type Projectid9 = string;
+export type Schemaversion13 = 1;
+export type Sequence7 = number;
 /**
  * @maxItems 100
  */
@@ -210,7 +353,7 @@ export type Inversesha256 = string;
 export type Jobid1 = string;
 export type Owner = "session" | "backend" | "transferring" | "expired";
 export type Proposalid2 = string;
-export type Schemaversion7 = 1;
+export type Schemaversion14 = 1;
 export type Transferid = string;
 export type Writerepoch1 = number | null;
 export type Inverses = UndoOwnershipV1[];
@@ -218,7 +361,7 @@ export type Mutationwire = string | null;
 export type Replayed = boolean;
 export type Durability = "pending" | "durable" | "failed";
 export type Errorcode = string | null;
-export type Id5 = string;
+export type Id13 = string;
 export type Stage2 = "assess_resume" | "normalize_semantics" | "draft_prose" | "assemble" | "render";
 export type Startedat = string | null;
 export type Status = "queued" | "running" | "completed" | "failed" | "cancelled" | "interrupted";
@@ -237,7 +380,14 @@ export type Role =
   | "section_heading"
   | "focus_heading"
   | "focus_entry"
-  | "group";
+  | "group"
+  | "hidden";
+export type Display = string;
+export type Logo1 = string;
+export type Recordid = string;
+export type Years = number | null;
+export type Focusentries = FocusTechnology[];
+export type Focusoptions = FocusTechnology[];
 export type Saveerror = string | null;
 export type Saveddocumentrevision = number | null;
 export type Savedprojectrevision = number | null;
@@ -255,7 +405,7 @@ export type Factcount = number;
 export type Recoveredrows = number;
 export type Requestbytes = number;
 export type Status1 = "complete" | "partial";
-export type Code1 = "FACT_SOURCE_UNRESOLVED" | "FACT_SECTION_OMITTED" | "FACT_ROWS_RECOVERED";
+export type Code2 = "FACT_SOURCE_UNRESOLVED" | "FACT_SECTION_OMITTED" | "FACT_ROWS_RECOVERED";
 export type Page = number | null;
 export type Section = string;
 export type Sourceid = string;
@@ -267,12 +417,12 @@ export type Unresolved = ExtractionIssue[];
 export type Mode = "structured" | "digest" | "imported";
 export type Sourceid1 = string;
 export type Sourcerevision = number;
-export type Text = string;
+export type Text2 = string;
 export type Unitid1 = string;
 export type Unitrevision = number;
 export type Evidence = EvidenceSpan[];
-export type Id6 = string;
-export type Kind7 = "candidate";
+export type Id14 = string;
+export type Kind8 = "candidate";
 export type Pendingrawtext = string | null;
 export type Rawtext = string;
 export type Revision1 = number;
@@ -284,15 +434,15 @@ export type Revision2 = number;
 export type Usercorrected1 = boolean;
 export type Detailtype = "phone" | "email" | "url" | "messenger" | "age" | "birth_date" | "metadata" | "other";
 export type Evidence1 = EvidenceSpan[];
-export type Id7 = string;
-export type Kind8 = "detail";
+export type Id15 = string;
+export type Kind9 = "detail";
 export type Label = string;
 export type Origin1 = "source" | "user";
 export type Revision3 = number;
 export type Usercorrected2 = boolean;
 export type Evidence2 = EvidenceSpan[];
-export type Id8 = string;
-export type Kind9 = "employment";
+export type Id16 = string;
+export type Kind10 = "employment";
 export type Origin2 = "source" | "user";
 export type Pendingrawtext1 = string | null;
 export type Rawtext1 = string;
@@ -300,7 +450,7 @@ export type Revision4 = number;
 export type Status3 = "known" | "unknown" | "unresolved" | "pending" | "conflict";
 export type Usercorrected3 = boolean;
 export type Evidence3 = EvidenceSpan[];
-export type Id9 = string;
+export type Id17 = string;
 export type Pendingrawtext2 = string | null;
 export type Rawtext2 = string;
 export type Revision5 = number;
@@ -312,52 +462,52 @@ export type Periods = WorkingPeriod[];
 export type Revision7 = number;
 export type Usercorrected5 = boolean;
 export type Evidence4 = EvidenceSpan[];
-export type Id10 = string;
+export type Id18 = string;
 export type Jobid2 = string;
-export type Kind10 = "subproject";
+export type Kind11 = "subproject";
 export type Origin3 = "source" | "user";
 export type Periods1 = WorkingPeriod[];
 export type Revision8 = number;
 export type Usercorrected6 = boolean;
 export type Evidence5 = EvidenceSpan[];
-export type Id11 = string;
+export type Id19 = string;
 export type Jobid3 = string | null;
-export type Kind11 = "technology";
+export type Kind12 = "technology";
 export type Origin4 = "source" | "user";
 export type Revision9 = number;
 export type Subprojectid = string | null;
 export type Technical = boolean | null;
 export type Usercorrected7 = boolean;
 export type Evidence6 = EvidenceSpan[];
-export type Id12 = string;
-export type Kind12 = "education";
+export type Id20 = string;
+export type Kind13 = "education";
 export type Origin5 = "source" | "user";
 export type Revision10 = number;
 export type Usercorrected8 = boolean;
 export type Evidence7 = EvidenceSpan[];
-export type Id13 = string;
-export type Kind13 = "language";
+export type Id21 = string;
+export type Kind14 = "language";
 export type Origin6 = "source" | "user";
 export type Revision11 = number;
 export type Usercorrected9 = boolean;
 export type Evidence8 = EvidenceSpan[];
-export type Id14 = string;
-export type Kind14 = "certification";
+export type Id22 = string;
+export type Kind15 = "certification";
 export type Origin7 = "source" | "user";
 export type Revision12 = number;
 export type Usercorrected10 = boolean;
 export type Evidence9 = EvidenceSpan[];
-export type Id15 = string;
+export type Id23 = string;
 export type Jobid4 = string | null;
-export type Kind15 = "claim";
+export type Kind16 = "claim";
 export type Origin8 = "source" | "user";
 export type Revision13 = number;
 export type Subprojectid1 = string | null;
 export type Usercorrected11 = boolean;
 export type Evidence10 = EvidenceSpan[];
-export type Id16 = string;
+export type Id24 = string;
 export type Jobid5 = string | null;
-export type Kind16 = "metric";
+export type Kind17 = "metric";
 export type Origin9 = "source" | "user";
 export type Revision14 = number;
 export type Subprojectid2 = string | null;
@@ -378,9 +528,9 @@ export type Scope1 = string | null;
 export type Unit = string;
 export type Uppernumber = number | null;
 export type Evidence11 = EvidenceSpan[];
-export type Id17 = string;
+export type Id25 = string;
 export type Jobid6 = string | null;
-export type Kind17 = "leadership";
+export type Kind18 = "leadership";
 export type Origin10 = "source" | "user";
 export type Revision16 = number;
 export type Subprojectid3 = string | null;
@@ -394,8 +544,8 @@ export type Action = string;
 export type Attribution1 = "personal" | "team" | "organization" | "unknown";
 export type Category = "education" | "certification" | "language" | "employment" | "detail" | "other";
 export type Evidence12 = EvidenceSpan[];
-export type Id18 = string;
-export type Kind18 = "unresolved";
+export type Id26 = string;
+export type Kind19 = "unresolved";
 export type Origin11 = "source" | "user";
 export type Revision18 = number;
 export type Status7 = "unresolved" | "pending" | "conflict";
@@ -417,7 +567,7 @@ export type Records = (
 export type Revision19 = number;
 export type Actionid1 = string;
 export type Orderindex = number;
-export type Recordid = string;
+export type Recordid1 = string;
 export type Revision20 = number;
 export type Tombstones = RecordTombstone[];
 export type Category1 =
@@ -426,10 +576,11 @@ export type Category1 =
  * @maxItems 1000
  */
 export type Duplicateof = string[];
-export type Id19 = string;
-export type Kind19 = "paragraph" | "heading" | "section" | "bullet_list" | "duplicate";
+export type Id27 = string;
+export type Kind20 = "paragraph" | "heading" | "section" | "bullet_list" | "duplicate" | "source_only";
 export type Listitem = boolean;
 export type Modelblock = boolean;
+export type Reason = string | null;
 export type Region = "header" | "sidebar" | "main";
 /**
  * @maxItems 1000
@@ -440,10 +591,10 @@ export type Title1 = string | null;
  * @maxItems 5000
  */
 export type Blocks1 = ImportBlock[];
-export type Id20 = string;
+export type Id28 = string;
 export type Record = (ImportEmployment | ImportEducation | ImportTechnology | ImportLanguage) | null;
 export type Employer = string;
-export type Kind20 = "employment";
+export type Kind21 = "employment";
 export type End = string;
 export type Present = boolean;
 export type Start = string;
@@ -452,7 +603,7 @@ export type Start = string;
  */
 export type Periods2 = ImportPeriod[];
 export type Role1 = string;
-export type Display = string;
+export type Display1 = string;
 export type Experience1 = string;
 export type Technical1 = boolean | null;
 /**
@@ -461,21 +612,21 @@ export type Technical1 = boolean | null;
 export type Technologies = (string | ImportSkill)[];
 export type Completion = string;
 export type Institution = string;
-export type Kind21 = "education";
+export type Kind22 = "education";
 export type Qualification = string;
 export type Specialty = string;
-export type Display1 = string;
+export type Display2 = string;
 export type Experience2 = string;
-export type Kind22 = "technology";
+export type Kind23 = "technology";
 export type Technical2 = boolean | null;
-export type Kind23 = "language";
+export type Kind24 = "language";
 export type Language = string;
 export type Level = string;
 /**
  * @maxItems 1000
  */
 export type Sourcekeys1 = string[];
-export type Text1 = string;
+export type Text3 = string;
 /**
  * @maxItems 1000
  */
@@ -486,29 +637,44 @@ export type Finished = boolean;
  */
 export type Issues = string[];
 export type Location = string;
-export type Name = string;
+export type Name1 = string;
 /**
  * @maxItems 1000
  */
 export type Sourcekeys2 = string[];
 export type Title2 = string;
-export type Batchid = string;
+export type Batchid1 = string;
 export type Requestsha2562 = string;
-export type Sequence1 = number;
+export type Sequence8 = number;
 /**
  * @maxItems 128
  */
 export type Receipts = ImportReceipt[];
-export type Runid = string;
-export type Sequence2 = number;
+export type Runid7 = string;
+export type Sequence9 = number;
 export type Skillsha256 = string;
 export type Sourcesha256 = string;
+export type Heading = string;
+export type Region1 = "sidebar" | "main";
+/**
+ * @maxItems 1000
+ */
+export type Sourcekeys3 = string[];
+/**
+ * @minItems 1
+ * @maxItems 100
+ */
+export type Technologies1 = [string, ...string[]];
+/**
+ * @maxItems 40
+ */
+export type Technologygroups = ImportTechnologyGroup[];
 export type Version = 1;
 export type Actionid2 = string | null;
 export type Dependencies1 = DependencyStamp[];
 export type Errorcode1 = string | null;
-export type Id21 = string;
-export type Kind24 =
+export type Id29 = string;
+export type Kind25 =
   | "extract"
   | "assess_resume"
   | "normalize_semantics"
@@ -523,23 +689,23 @@ export type Selectedinput = "text" | "file";
 export type Selectedsourceid = string | null;
 export type Byteref = string;
 export type Bytesha256 = string;
-export type Id22 = string;
+export type Id30 = string;
 export type Mimetype = string;
 export type Originalname = string;
-export type Id23 = string;
+export type Id31 = string;
 export type Origin12 = "user";
 export type Revision21 = number;
-export type Text2 = string;
+export type Text4 = string;
 export type Unitid2 = string;
 export type Overlays = SourceOverlay[];
 export type Parser = string;
 export type Parserversion = string;
 export type Revision22 = number;
-export type Disposition = "shown" | "condensed" | "archived" | "duplicate" | "unresolved" | "administrative";
-export type Id24 = string;
+export type Disposition1 = "shown" | "condensed" | "archived" | "duplicate" | "unresolved" | "administrative";
+export type Id32 = string;
 export type Column = number | null;
 export type Index = number;
-export type Kind25 = "page" | "paragraph" | "table_cell" | "pasted";
+export type Kind26 = "page" | "paragraph" | "table_cell" | "pasted";
 export type Row = number | null;
 export type Order = number;
 export type Representedfactids = string[];
@@ -559,16 +725,16 @@ export type Listlevel = number | null;
 export type Part = string | null;
 export type Rowmerge = ("start" | "continue") | null;
 export type Style = string | null;
-export type Text3 = string;
+export type Text5 = string;
 export type Units = SourceUnit[];
-export type Code2 = string;
+export type Code3 = string;
 export type Page1 = number | null;
 export type Warningdetails = SourceWarning[];
 export type Warnings = string[];
 export type Sources = Source[];
 export type Warnings1 = string[];
 export type Height = number;
-export type Id25 = string;
+export type Id33 = string;
 export type Mimetype1 = "image/png" | "image/jpeg";
 export type Path = string;
 export type Sha2561 = string;
@@ -597,51 +763,51 @@ export type Children11 = (
 )[];
 export type Backgroundcolor = string;
 export type Bold1 = boolean;
-export type Code3 = boolean;
+export type Code4 = boolean;
 export type Italic = boolean;
 export type Strike = boolean;
 export type Textcolor = string;
 export type Underline = boolean;
-export type Text4 = string;
-export type Type = "text";
+export type Text6 = string;
+export type Type7 = "text";
 export type Content1 = StyledText[];
 export type Href = string;
-export type Type1 = "link";
+export type Type8 = "link";
 export type Bindingid = string;
 export type Bindingrootid = string | null;
 export type Fieldkey = string;
-export type Recordid1 = string;
+export type Recordid2 = string;
 export type Syncedfactrevision = number;
-export type Text5 = string;
-export type Type2 = "fact_field";
+export type Text7 = string;
+export type Type9 = "fact_field";
 export type Content = (StyledText | Hyperlink | FactFieldSpan)[];
-export type Id26 = string;
+export type Id34 = string;
 export type Alignment = "left" | "center" | "right" | "justify";
 export type Backgroundcolor1 = string;
 export type Presentation = "standard" | "focus";
-export type Recordid2 = string | null;
+export type Recordid3 = string | null;
 export type Textcolor1 = string;
 export type Evidence13 = EvidenceSpan[];
 export type Fieldkeys = string[];
-export type Id27 = string;
-export type Kind26 = "citation";
-export type Recordid3 = string;
-export type Fieldkey1 = string;
-export type Id28 = string;
-export type Kind27 = "field_binding";
+export type Id35 = string;
+export type Kind27 = "citation";
 export type Recordid4 = string;
-export type Id29 = string;
-export type Kind28 = "working_owner";
+export type Fieldkey1 = string;
+export type Id36 = string;
+export type Kind28 = "field_binding";
 export type Recordid5 = string;
+export type Id37 = string;
+export type Kind29 = "working_owner";
+export type Recordid6 = string;
 /**
  * @minItems 1
  */
 export type Evidence14 = [EvidenceSpan, ...EvidenceSpan[]];
-export type Id30 = string;
-export type Kind29 = "source";
+export type Id38 = string;
+export type Kind30 = "source";
 export type Provenance = (NarrativeCitation | FieldBinding | WorkingOwnership | SourceWitness)[];
 export type Revision24 = number;
-export type Type3 = "section";
+export type Type10 = "section";
 export type Children10 = (
   | ParagraphBlock
   | HeadingBlock
@@ -657,7 +823,7 @@ export type Children10 = (
   | SectionBlock
 )[];
 export type Content2 = null;
-export type Id31 = string;
+export type Id39 = string;
 export type Alignment1 = "left" | "center" | "right";
 export type Alt = string;
 export type Assetid = string;
@@ -666,7 +832,7 @@ export type Height1 = number;
 export type Width1 = number;
 export type Provenance1 = (NarrativeCitation | FieldBinding | WorkingOwnership | SourceWitness)[];
 export type Revision25 = number;
-export type Type4 = "image";
+export type Type11 = "image";
 export type Children9 = (
   | ParagraphBlock
   | HeadingBlock
@@ -695,18 +861,18 @@ export type Alignment2 = "left" | "center" | "right" | "justify";
 export type Backgroundcolor2 = string;
 export type Colspan = number;
 export type Content3 = (StyledText | Hyperlink | FactFieldSpan)[];
-export type Id32 = string;
+export type Id40 = string;
 export type Revision26 = number;
 export type Rowspan = number;
 export type Cells = TableCell[];
-export type Id33 = string;
-export type Id34 = string;
+export type Id41 = string;
+export type Id42 = string;
 export type Alignment3 = "left" | "center" | "right" | "justify";
 export type Backgroundcolor3 = string;
 export type Textcolor2 = string;
 export type Provenance2 = (NarrativeCitation | FieldBinding | WorkingOwnership | SourceWitness)[];
 export type Revision27 = number;
-export type Type5 = "table";
+export type Type12 = "table";
 export type Children8 = (
   | ParagraphBlock
   | HeadingBlock
@@ -722,10 +888,10 @@ export type Children8 = (
   | SectionBlock
 )[];
 export type Content4 = null;
-export type Id35 = string;
+export type Id43 = string;
 export type Provenance3 = (NarrativeCitation | FieldBinding | WorkingOwnership | SourceWitness)[];
 export type Revision28 = number;
-export type Type6 = "divider";
+export type Type13 = "divider";
 export type Children7 = (
   | ParagraphBlock
   | HeadingBlock
@@ -741,12 +907,12 @@ export type Children7 = (
   | SectionBlock
 )[];
 export type Content5 = string;
-export type Id36 = string;
+export type Id44 = string;
 export type Backgroundcolor4 = string;
 export type Language1 = string;
 export type Provenance4 = (NarrativeCitation | FieldBinding | WorkingOwnership | SourceWitness)[];
 export type Revision29 = number;
-export type Type7 = "code";
+export type Type14 = "code";
 export type Children6 = (
   | ParagraphBlock
   | HeadingBlock
@@ -762,10 +928,10 @@ export type Children6 = (
   | SectionBlock
 )[];
 export type Content6 = (StyledText | Hyperlink | FactFieldSpan)[];
-export type Id37 = string;
+export type Id45 = string;
 export type Provenance5 = (NarrativeCitation | FieldBinding | WorkingOwnership | SourceWitness)[];
 export type Revision30 = number;
-export type Type8 = "quote";
+export type Type15 = "quote";
 export type Children5 = (
   | ParagraphBlock
   | HeadingBlock
@@ -781,10 +947,10 @@ export type Children5 = (
   | SectionBlock
 )[];
 export type Content7 = (StyledText | Hyperlink | FactFieldSpan)[];
-export type Id38 = string;
+export type Id46 = string;
 export type Provenance6 = (NarrativeCitation | FieldBinding | WorkingOwnership | SourceWitness)[];
 export type Revision31 = number;
-export type Type9 = "toggle_list";
+export type Type16 = "toggle_list";
 export type Children4 = (
   | ParagraphBlock
   | HeadingBlock
@@ -800,14 +966,14 @@ export type Children4 = (
   | SectionBlock
 )[];
 export type Content8 = (StyledText | Hyperlink | FactFieldSpan)[];
-export type Id39 = string;
+export type Id47 = string;
 export type Alignment4 = "left" | "center" | "right" | "justify";
 export type Backgroundcolor5 = string;
 export type Checked = boolean;
 export type Textcolor3 = string;
 export type Provenance7 = (NarrativeCitation | FieldBinding | WorkingOwnership | SourceWitness)[];
 export type Revision32 = number;
-export type Type10 = "check_list";
+export type Type17 = "check_list";
 export type Children3 = (
   | ParagraphBlock
   | HeadingBlock
@@ -823,14 +989,14 @@ export type Children3 = (
   | SectionBlock
 )[];
 export type Content9 = (StyledText | Hyperlink | FactFieldSpan)[];
-export type Id40 = string;
+export type Id48 = string;
 export type Alignment5 = "left" | "center" | "right" | "justify";
 export type Backgroundcolor6 = string;
 export type Start1 = number | null;
 export type Textcolor4 = string;
 export type Provenance8 = (NarrativeCitation | FieldBinding | WorkingOwnership | SourceWitness)[];
 export type Revision33 = number;
-export type Type11 = "numbered_list";
+export type Type18 = "numbered_list";
 export type Children2 = (
   | ParagraphBlock
   | HeadingBlock
@@ -846,10 +1012,10 @@ export type Children2 = (
   | SectionBlock
 )[];
 export type Content10 = (StyledText | Hyperlink | FactFieldSpan)[];
-export type Id41 = string;
+export type Id49 = string;
 export type Provenance9 = (NarrativeCitation | FieldBinding | WorkingOwnership | SourceWitness)[];
 export type Revision34 = number;
-export type Type12 = "bullet_list";
+export type Type19 = "bullet_list";
 export type Children1 = (
   | ParagraphBlock
   | HeadingBlock
@@ -865,14 +1031,14 @@ export type Children1 = (
   | SectionBlock
 )[];
 export type Content11 = (StyledText | Hyperlink | FactFieldSpan)[];
-export type Id42 = string;
+export type Id50 = string;
 export type Alignment6 = "left" | "center" | "right" | "justify";
 export type Backgroundcolor7 = string;
 export type Level1 = 1 | 2 | 3;
 export type Textcolor5 = string;
 export type Provenance10 = (NarrativeCitation | FieldBinding | WorkingOwnership | SourceWitness)[];
 export type Revision35 = number;
-export type Type13 = "heading";
+export type Type20 = "heading";
 export type Children = (
   | ParagraphBlock
   | HeadingBlock
@@ -888,10 +1054,10 @@ export type Children = (
   | SectionBlock
 )[];
 export type Content12 = (StyledText | Hyperlink | FactFieldSpan)[];
-export type Id43 = string;
+export type Id51 = string;
 export type Provenance11 = (NarrativeCitation | FieldBinding | WorkingOwnership | SourceWitness)[];
 export type Revision36 = number;
-export type Type14 = "paragraph";
+export type Type21 = "paragraph";
 export type Blocks2 = (
   | ParagraphBlock
   | HeadingBlock
@@ -906,59 +1072,59 @@ export type Blocks2 = (
   | ImageBlock
   | SectionBlock
 )[];
-export type Id44 = string;
+export type Id52 = string;
 export type Revision37 = number;
 export type Role2 = "header" | "sidebar" | "main";
 export type Revision38 = number;
-export type Schemaversion8 = 1;
+export type Schemaversion15 = 1;
 export type Evidence15 = EvidenceSpan[];
-export type Id45 = string;
+export type Id53 = string;
 export type Rawtext5 = string;
 export type Evidencerecords = ImmutableFactEvidence[];
 export type Blockids1 = string[];
-export type Disposition1 = "placed" | "excluded";
-export type Reason = string | null;
+export type Disposition2 = "placed" | "excluded";
+export type Reason1 = string | null;
 export type Sourceid2 = string;
 export type Unitid3 = string;
 export type Importcoverage = ImportCoverage[];
 export type Operations1 = RichOperation[];
-export type Projectid3 = string;
+export type Projectid10 = string;
 export type Documentrevision2 = number;
 export type Docxpath = string;
 export type Docxsha256 = string;
 export type Docxsize = number;
 export type Factsrevision1 = number;
-export type Id46 = string;
+export type Id54 = string;
 export type Renderersha256 = string;
 export type Rendererversion = string;
 export type Templatesha256 = string;
 export type Renders = RichRenderSnapshot[];
 export type Revision39 = number;
-export type Schemaversion9 = 5;
+export type Schemaversion16 = 5;
 export type Sources1 = Source[];
 export type Path1 = string;
 export type Sha2562 = string;
 export type Size1 = number;
 export type Assets1 = AssetRef[];
 export type Contentpolicyversion = string;
-export type Id47 = string;
+export type Id55 = string;
 export type Packagesha256 = string;
 export type Version1 = string;
-export type Projectid4 = string;
+export type Projectid11 = string;
 export type Projectrevision1 = number;
 export type Markdown = string;
 export type Revision40 = number;
 export type Sha2563 = string;
-export type Schemaversion10 = 6;
+export type Schemaversion17 = 6;
 export type Actionid3 = string;
 export type Blockids2 = string[];
 export type Dependencies2 = DependencyStamp[];
 export type Errorcode2 = string | null;
 export type Factids = string[];
 export type Fieldkeys1 = string[];
-export type Id48 = string;
+export type Id56 = string;
 export type Instruction = string | null;
-export type Kind30 = "completion" | "rewrite" | "reconciliation" | "conflict" | "panel";
+export type Kind31 = "completion" | "rewrite" | "reconciliation" | "conflict" | "panel";
 export type Afterid = string | null;
 export type Beforerevision = number | null;
 export type Block =
@@ -975,15 +1141,15 @@ export type Block =
   | ImageBlock
   | SectionBlock;
 export type Keepchildren = boolean;
-export type Kind31 = "put_block";
+export type Kind32 = "put_block";
 export type Parentid = string;
 export type Beforerevision1 = number;
 export type Blockid1 = string;
-export type Kind32 = "remove_block";
+export type Kind33 = "remove_block";
 export type Afterid1 = string | null;
 export type Beforerevision2 = number;
 export type Blockid2 = string;
-export type Kind33 = "move_block";
+export type Kind34 = "move_block";
 export type Parentid1 = string;
 export type Beforerevision3 = number;
 export type Blockid3 = string;
@@ -994,13 +1160,13 @@ export type Content13 = (StyledText | Hyperlink | FactFieldSpan)[];
  */
 export type End1 = number;
 export type Field = "content" | "caption";
-export type Kind34 = "replace_inline_range";
+export type Kind35 = "replace_inline_range";
 /**
  * UTF-16 code units within the selected inline field.
  */
 export type Start2 = number;
 export type Beforerevision4 = number | null;
-export type Kind35 = "put_record";
+export type Kind36 = "put_record";
 export type Record1 =
   | CandidateRecord
   | DetailRecord
@@ -1015,33 +1181,35 @@ export type Record1 =
   | LeadershipRecord
   | UnresolvedRecord;
 export type Beforerevision5 = number;
-export type Kind36 = "remove_record";
-export type Recordid6 = string;
+export type Kind37 = "remove_record";
+export type Recordid7 = string;
 /**
  * @maxItems 1000
  */
 export type Proposedsteps = (PutBlock | RemoveBlock | MoveBlock | ReplaceInlineRange | PutRecord | RemoveRecord)[];
 export type Ready = boolean;
+export type Rewriteresult = string | null;
+export type Rewritesource = string | null;
 export type Status9 = "pending" | "failed" | "conflict" | "applied" | "stale";
 export type Syncrecords = RichSyncRecord[];
 export type Title3 = string;
 export type Titlemanuallyset = boolean;
 export type Updatedat1 = string;
 export type Blockids3 = string[];
-export type Code4 = string;
+export type Code5 = string;
 export type Count = number;
 export type Sourceid3 = string;
 export type Sourcerevision1 = number;
 export type Unitid4 = string;
 export type Unitrevision1 = number;
 export type Evidence16 = Evidence17[];
-export type Id49 = string;
+export type Id57 = string;
 export type Page2 = number | null;
 export type Sourceid4 = string;
 export type Locations = WarningLocation[];
 export type Recordids = string[];
 export type Warnings2 = RichWarning[];
-export type Schemaversion11 = 1;
+export type Schemaversion18 = 1;
 export type Workspacesha2561 = string;
 export type Workspacewire = string;
 export type Abandonedepoch = number | null;
@@ -1055,9 +1223,9 @@ export type Epoch = number;
 export type Incarnation2 = string;
 export type Leaseexpiresat = string;
 export type Lineage3 = string;
-export type Projectid5 = string;
+export type Projectid12 = string;
 export type Resumecredentialsha256 = string;
-export type Schemaversion12 = 1;
+export type Schemaversion19 = 1;
 export type Sessionid1 = string;
 export type Status10 = "attached" | "recovering" | "clean_detached" | "fenced";
 export type Touchfloor = number;
@@ -1065,10 +1233,11 @@ export type Touchgeneration = number;
 
 export interface WriterPublicationV1 {
   job: JobSnapshotV1;
-  schemaVersion: Schemaversion5;
+  schemaVersion: Schemaversion12;
   view: WriterViewV1;
 }
 export interface JobSnapshotV1 {
+  activity?: Activity;
   assetPinsSha256?: Assetpinssha256;
   attempts: Attempts;
   captureInvalidated?: Captureinvalidated;
@@ -1077,15 +1246,128 @@ export interface JobSnapshotV1 {
   eventCursor: Eventcursor;
   execution: Execution;
   executionGeneration: Executiongeneration1;
-  id: Id1;
+  id: Id9;
   proposalId: Proposalid;
   publication: Publication;
   publicationError?: JobFailure | null;
   receipt: CanonicalReceiptV1 | null;
-  schemaVersion: Schemaversion2;
+  schemaVersion: Schemaversion9;
   submission: JobSubmissionV1;
   undoExpired?: Undoexpired;
   updatedAt: Updatedat;
+}
+export interface MessageDelta {
+  conversationId: Conversationid;
+  id: Id;
+  payload: MessageDeltaPayload;
+  projectId: Projectid;
+  runId: Runid;
+  schemaVersion: Schemaversion;
+  sequence: Sequence;
+  timestamp: Timestamp;
+  type: Type;
+}
+export interface MessageDeltaPayload {
+  text: Text;
+}
+export interface ActivityEvent {
+  conversationId: Conversationid1;
+  id: Id1;
+  payload: ActivityPayload;
+  projectId: Projectid1;
+  runId: Runid1;
+  schemaVersion: Schemaversion1;
+  sequence: Sequence1;
+  timestamp: Timestamp1;
+  type: Type1;
+}
+export interface ActivityPayload {
+  itemId: Itemid;
+  kind: Kind;
+  text: Text1;
+}
+export interface ToolEvent {
+  conversationId: Conversationid2;
+  id: Id2;
+  payload: ToolPayload;
+  projectId: Projectid2;
+  runId: Runid2;
+  schemaVersion: Schemaversion2;
+  sequence: Sequence2;
+  timestamp: Timestamp2;
+  type: Type2;
+}
+export interface ToolPayload {
+  callId: Callid;
+  error: AgentError | null;
+  name: Name;
+}
+export interface AgentError {
+  code: Code;
+}
+export interface ResourceEvent {
+  conversationId: Conversationid3;
+  id: Id3;
+  payload: ResourcePayload;
+  projectId: Projectid3;
+  runId: Runid3;
+  schemaVersion: Schemaversion3;
+  sequence: Sequence3;
+  timestamp: Timestamp3;
+  type: Type3;
+}
+export interface ResourcePayload {
+  id: Id4;
+}
+export interface EditEvent {
+  conversationId: Conversationid4;
+  id: Id5;
+  payload: EditPayload;
+  projectId: Projectid4;
+  runId: Runid4;
+  schemaVersion: Schemaversion4;
+  sequence: Sequence4;
+  timestamp: Timestamp4;
+  type: Type4;
+}
+export interface EditPayload {
+  batchId: Batchid;
+  disposition: Disposition;
+  error: AgentError | null;
+}
+export interface UsageEvent {
+  conversationId: Conversationid5;
+  id: Id6;
+  payload: AgentUsage;
+  projectId: Projectid5;
+  runId: Runid5;
+  schemaVersion: Schemaversion5;
+  sequence: Sequence5;
+  timestamp: Timestamp5;
+  type: Type5;
+}
+export interface AgentUsage {
+  cachedInputTokens: Cachedinputtokens;
+  inputTokens: Inputtokens;
+  outputTokens: Outputtokens;
+  totalTokens: Totaltokens;
+}
+export interface RunStateEvent {
+  conversationId: Conversationid6;
+  id: Id7;
+  payload: RunStatePayload;
+  projectId: Projectid6;
+  runId: Runid6;
+  schemaVersion: Schemaversion6;
+  sequence: Sequence6;
+  timestamp: Timestamp6;
+  type: Type6;
+}
+export interface RunStatePayload {
+  error: AgentError | null;
+  outcomeUnknown: Outcomeunknown;
+  savedBatchId: Savedbatchid;
+  state: State;
 }
 export interface JobAttemptV1 {
   activeDeadline: Activedeadline;
@@ -1094,15 +1376,15 @@ export interface JobAttemptV1 {
   dispatchedAt: Dispatchedat;
   error: JobFailure | null;
   executionGeneration: Executiongeneration;
-  id: Id;
+  id: Id8;
   nativeStarted: Nativestarted;
-  schemaVersion: Schemaversion;
+  schemaVersion: Schemaversion7;
   stage: Stage;
   startupDeadline: Startupdeadline;
-  state: State;
+  state: State1;
 }
 export interface JobFailure {
-  code: Code;
+  code: Code1;
 }
 export interface CanonicalReceiptV1 {
   clientMutationId: Clientmutationid;
@@ -1113,12 +1395,12 @@ export interface CanonicalReceiptV1 {
   jobId: Jobid;
   lineage: Lineage;
   persistedAt: Persistedat;
-  projectId: Projectid;
+  projectId: Projectid7;
   projectRevision: Projectrevision;
   proposalId: Proposalid1;
   proposalSha256: Proposalsha256;
   requestSha256: Requestsha256;
-  schemaVersion: Schemaversion1;
+  schemaVersion: Schemaversion8;
   workspaceSha256: Workspacesha256;
 }
 export interface JobSubmissionV1 {
@@ -1126,38 +1408,39 @@ export interface JobSubmissionV1 {
   accountGeneration: Accountgeneration;
   allowEdits: Allowedits;
   allowWeb: Allowweb;
+  approvalRequired?: Approvalrequired;
   guards: ScopeGuardV1;
   identity: JobIdentity;
   input: InputReference;
-  kind: Kind2;
+  kind: Kind3;
   models: Models;
   payloadSha256: Payloadsha256;
   schedulingClass: Schedulingclass;
-  schemaVersion: Schemaversion4;
+  schemaVersion: Schemaversion11;
   scope: Scope;
   submittedAt: Submittedat;
   tools: Tools;
 }
 export interface ScopeGuardV1 {
   reads: Reads;
-  schemaVersion: Schemaversion3;
+  schemaVersion: Schemaversion10;
   writes: Writes;
 }
 export interface GenerationStamp {
   fingerprint: Fingerprint;
   generation: Generation;
   key: Key;
-  kind: Kind;
+  kind: Kind1;
 }
 export interface JobIdentity {
   lineage: Lineage1;
-  projectId: Projectid1;
+  projectId: Projectid8;
   requestEpoch: Requestepoch;
   requestId: Requestid;
 }
 export interface InputReference {
-  id: Id2;
-  kind: Kind1;
+  id: Id10;
+  kind: Kind2;
   sha256: Sha256;
 }
 export interface ModelCapture {
@@ -1166,10 +1449,10 @@ export interface ModelCapture {
   stage: Stage1;
 }
 export interface WholeResumeScope {
-  kind: Kind3;
+  kind: Kind4;
 }
 export interface SelectionScope {
-  kind: Kind4;
+  kind: Kind5;
   selection: RichSelection;
 }
 export interface RichSelection {
@@ -1177,7 +1460,7 @@ export interface RichSelection {
   blockIds: Blockids;
   capture: ActionCapture;
   head: RichPosition;
-  kind: Kind6;
+  kind: Kind7;
   textSha256: Textsha256;
 }
 export interface RichPosition {
@@ -1193,8 +1476,8 @@ export interface ActionCapture {
 }
 export interface DependencyStamp {
   fingerprint: Fingerprint1;
-  id: Id3;
-  kind: Kind5;
+  id: Id11;
+  kind: Kind6;
   revision: Revision;
 }
 export interface WriterViewV1 {
@@ -1204,7 +1487,7 @@ export interface WriterViewV1 {
   mutationWire?: Mutationwire;
   replayed?: Replayed;
   response: RichProjectResponse;
-  schemaVersion: Schemaversion11;
+  schemaVersion: Schemaversion18;
   workspaceSha256: Workspacesha2561;
   workspaceWire: Workspacewire;
   writer: WriterSessionV1;
@@ -1215,15 +1498,15 @@ export interface DraftCheckpointV1 {
   baseRevision: Baserevision;
   baseSha256: Basesha256;
   checkpointedAt: Checkpointedat;
-  id: Id4;
+  id: Id12;
   incarnation: Incarnation;
   lineage: Lineage2;
   payloadBytes: Payloadbytes;
   payloadRef: Payloadref;
   payloadSha256: Payloadsha2561;
-  projectId: Projectid2;
-  schemaVersion: Schemaversion6;
-  sequence: Sequence;
+  projectId: Projectid9;
+  schemaVersion: Schemaversion13;
+  sequence: Sequence7;
   touches: Touches;
   writerEpoch: Writerepoch;
 }
@@ -1242,7 +1525,7 @@ export interface UndoOwnershipV1 {
   jobId: Jobid1;
   owner: Owner;
   proposalId: Proposalid2;
-  schemaVersion: Schemaversion7;
+  schemaVersion: Schemaversion14;
   transferId: Transferid;
   writerEpoch: Writerepoch1;
 }
@@ -1258,7 +1541,7 @@ export interface RichProjectResponse {
 }
 export interface RichGenerationState {
   errorCode: Errorcode;
-  id: Id5;
+  id: Id13;
   stage: Stage2;
   startedAt?: Startedat;
   status: Status;
@@ -1269,6 +1552,8 @@ export interface ResumeIdentity {
 }
 export interface RichPresentation {
   blocks: Blocks;
+  focusEntries?: Focusentries;
+  focusOptions?: Focusoptions;
 }
 export interface Blocks {
   [k: string]: BlockPresentation;
@@ -1279,6 +1564,12 @@ export interface BlockPresentation {
   logo?: Logo;
   role: Role;
 }
+export interface FocusTechnology {
+  display: Display;
+  logo: Logo1;
+  recordId: Recordid;
+  years: Years;
+}
 export interface WorkspaceV6 {
   createdAt: Createdat1;
   documentRevision: Documentrevision1;
@@ -1286,10 +1577,10 @@ export interface WorkspaceV6 {
   mutationReplay: Mutationreplay;
   preDraft: RichPreDraft | null;
   project: ProjectV5 | null;
-  projectId: Projectid4;
+  projectId: Projectid11;
   projectRevision: Projectrevision1;
   rulesUsed: Rules | null;
-  schemaVersion: Schemaversion10;
+  schemaVersion: Schemaversion17;
   sourceObservedAt: PartialDate | null;
   syncRecords: Syncrecords;
   title: Title3;
@@ -1336,7 +1627,7 @@ export interface Counts {
   [k: string]: number;
 }
 export interface ExtractionIssue {
-  code: Code1;
+  code: Code2;
   page?: Page;
   section: Section;
   sourceId: Sourceid;
@@ -1344,8 +1635,8 @@ export interface ExtractionIssue {
 }
 export interface CandidateRecord {
   evidence: Evidence;
-  id: Id6;
-  kind: Kind7;
+  id: Id14;
+  kind: Kind8;
   location: WorkingFieldStr;
   name: WorkingFieldStr;
   origin: Origin;
@@ -1356,7 +1647,7 @@ export interface CandidateRecord {
 export interface EvidenceSpan {
   sourceId: Sourceid1;
   sourceRevision: Sourcerevision;
-  text: Text;
+  text: Text2;
   unitId: Unitid1;
   unitRevision: Unitrevision;
 }
@@ -1371,8 +1662,8 @@ export interface WorkingFieldStr {
 export interface DetailRecord {
   detailType: Detailtype;
   evidence: Evidence1;
-  id: Id7;
-  kind: Kind8;
+  id: Id15;
+  kind: Kind9;
   label: Label;
   origin: Origin1;
   revision: Revision3;
@@ -1382,8 +1673,8 @@ export interface DetailRecord {
 export interface EmploymentRecord {
   employer: WorkingFieldStr;
   evidence: Evidence2;
-  id: Id8;
-  kind: Kind9;
+  id: Id16;
+  kind: Kind10;
   origin: Origin2;
   periods: Periods;
   revision: Revision7;
@@ -1393,7 +1684,7 @@ export interface EmploymentRecord {
 export interface WorkingPeriod {
   end: WorkingFieldPartialDate;
   evidence: Evidence3;
-  id: Id9;
+  id: Id17;
   present: WorkingFieldBool;
   revision: Revision6;
   start: WorkingFieldPartialDate;
@@ -1416,9 +1707,9 @@ export interface WorkingFieldBool {
 }
 export interface SubprojectRecord {
   evidence: Evidence4;
-  id: Id10;
+  id: Id18;
   jobId: Jobid2;
-  kind: Kind10;
+  kind: Kind11;
   name: WorkingFieldStr;
   origin: Origin3;
   periods: Periods1;
@@ -1431,9 +1722,9 @@ export interface TechnologyRecord {
   display: WorkingFieldStr;
   evidence: Evidence5;
   experience?: WorkingFieldStr;
-  id: Id11;
+  id: Id19;
   jobId: Jobid3;
-  kind: Kind11;
+  kind: Kind12;
   origin: Origin4;
   revision: Revision9;
   subprojectId: Subprojectid;
@@ -1443,9 +1734,9 @@ export interface TechnologyRecord {
 export interface EducationRecord {
   completion: WorkingFieldPartialDate;
   evidence: Evidence6;
-  id: Id12;
+  id: Id20;
   institution: WorkingFieldStr;
-  kind: Kind12;
+  kind: Kind13;
   origin: Origin5;
   qualification: WorkingFieldStr;
   revision: Revision10;
@@ -1454,8 +1745,8 @@ export interface EducationRecord {
 }
 export interface LanguageRecord {
   evidence: Evidence7;
-  id: Id13;
-  kind: Kind13;
+  id: Id21;
+  kind: Kind14;
   language: WorkingFieldStr;
   level: WorkingFieldStr;
   origin: Origin6;
@@ -1465,9 +1756,9 @@ export interface LanguageRecord {
 export interface CertificationRecord {
   date: WorkingFieldPartialDate;
   evidence: Evidence8;
-  id: Id14;
+  id: Id22;
   issuer: WorkingFieldStr;
-  kind: Kind14;
+  kind: Kind15;
   name: WorkingFieldStr;
   origin: Origin7;
   revision: Revision12;
@@ -1475,9 +1766,9 @@ export interface CertificationRecord {
 }
 export interface ClaimRecord {
   evidence: Evidence9;
-  id: Id15;
+  id: Id23;
   jobId: Jobid4;
-  kind: Kind15;
+  kind: Kind16;
   origin: Origin8;
   revision: Revision13;
   subprojectId: Subprojectid1;
@@ -1486,9 +1777,9 @@ export interface ClaimRecord {
 }
 export interface MetricRecord {
   evidence: Evidence10;
-  id: Id16;
+  id: Id24;
   jobId: Jobid5;
-  kind: Kind16;
+  kind: Kind17;
   origin: Origin9;
   revision: Revision14;
   subprojectId: Subprojectid2;
@@ -1517,9 +1808,9 @@ export interface MetricValue {
 }
 export interface LeadershipRecord {
   evidence: Evidence11;
-  id: Id17;
+  id: Id25;
   jobId: Jobid6;
-  kind: Kind17;
+  kind: Kind18;
   origin: Origin10;
   revision: Revision16;
   subprojectId: Subprojectid3;
@@ -1542,8 +1833,8 @@ export interface LeadershipValue {
 export interface UnresolvedRecord {
   category: Category;
   evidence: Evidence12;
-  id: Id18;
-  kind: Kind18;
+  id: Id26;
+  kind: Kind19;
   origin: Origin11;
   revision: Revision18;
   status: Status7;
@@ -1552,7 +1843,7 @@ export interface UnresolvedRecord {
 export interface RecordTombstone {
   actionId: Actionid1;
   orderIndex: Orderindex;
-  recordId: Recordid;
+  recordId: Recordid1;
   revision: Revision20;
 }
 export interface ImportDraft {
@@ -1562,32 +1853,34 @@ export interface ImportDraft {
   issues?: Issues;
   profile?: ImportProfile;
   receipts?: Receipts;
-  runId: Runid;
-  sequence?: Sequence2;
+  runId: Runid7;
+  sequence?: Sequence9;
   skillSha256: Skillsha256;
   sourceSha256: Sourcesha256;
+  technologyGroups?: Technologygroups;
   version?: Version;
 }
 export interface ImportBlock {
   category?: Category1;
   duplicateOf?: Duplicateof;
-  id: Id19;
-  kind?: Kind19;
+  id: Id27;
+  kind?: Kind20;
   listItem?: Listitem;
   modelBlock?: Modelblock;
+  reason?: Reason;
   region?: Region;
   sourceKeys?: Sourcekeys;
   title?: Title1;
 }
 export interface ImportFact {
-  id: Id20;
+  id: Id28;
   record?: Record;
   sourceKeys?: Sourcekeys1;
-  text?: Text1;
+  text?: Text3;
 }
 export interface ImportEmployment {
   employer?: Employer;
-  kind: Kind20;
+  kind: Kind21;
   periods?: Periods2;
   role?: Role1;
   technologies?: Technologies;
@@ -1598,51 +1891,57 @@ export interface ImportPeriod {
   start?: Start;
 }
 export interface ImportSkill {
-  display: Display;
+  display: Display1;
   experience?: Experience1;
   technical?: Technical1;
 }
 export interface ImportEducation {
   completion?: Completion;
   institution?: Institution;
-  kind: Kind21;
+  kind: Kind22;
   qualification?: Qualification;
   specialty?: Specialty;
 }
 export interface ImportTechnology {
-  display: Display1;
+  display: Display2;
   experience?: Experience2;
-  kind: Kind22;
+  kind: Kind23;
   technical?: Technical2;
 }
 export interface ImportLanguage {
-  kind: Kind23;
+  kind: Kind24;
   language?: Language;
   level?: Level;
 }
 export interface ImportProfile {
   location?: Location;
-  name?: Name;
+  name?: Name1;
   sourceKeys?: Sourcekeys2;
   title?: Title2;
 }
 export interface ImportReceipt {
-  batchId: Batchid;
+  batchId: Batchid1;
   requestSha256: Requestsha2562;
-  sequence: Sequence1;
+  sequence: Sequence8;
+}
+export interface ImportTechnologyGroup {
+  heading: Heading;
+  region?: Region1;
+  sourceKeys?: Sourcekeys3;
+  technologies: Technologies1;
 }
 export interface RichOperation {
   actionId: Actionid2;
   dependencies: Dependencies1;
   errorCode: Errorcode1;
-  id: Id21;
-  kind: Kind24;
+  id: Id29;
+  kind: Kind25;
   status: Status8;
 }
 export interface Source {
   byteRef: Byteref;
   byteSha256: Bytesha256;
-  id: Id22;
+  id: Id30;
   mimeType: Mimetype;
   originalName: Originalname;
   overlays: Overlays;
@@ -1654,26 +1953,26 @@ export interface Source {
   warnings: Warnings;
 }
 export interface SourceOverlay {
-  id: Id23;
+  id: Id31;
   origin: Origin12;
   revision: Revision21;
-  text: Text2;
+  text: Text4;
   unitId: Unitid2;
 }
 export interface SourceUnit {
-  disposition: Disposition;
-  id: Id24;
+  disposition: Disposition1;
+  id: Id32;
   location: SourceLocation;
   order: Order;
   representedFactIds: Representedfactids;
   revision: Revision23;
   structure?: SourceStructure | null;
-  text: Text3;
+  text: Text5;
 }
 export interface SourceLocation {
   column: Column;
   index: Index;
-  kind: Kind25;
+  kind: Kind26;
   row: Row;
 }
 /**
@@ -1697,7 +1996,7 @@ export interface SourceStructure {
   style?: Style;
 }
 export interface SourceWarning {
-  code: Code2;
+  code: Code3;
   page?: Page1;
 }
 export interface ProjectV5 {
@@ -1708,16 +2007,16 @@ export interface ProjectV5 {
   facts: WorkingFacts;
   importCoverage?: Importcoverage;
   operations: Operations1;
-  projectId: Projectid3;
+  projectId: Projectid10;
   renders: Renders;
   revision: Revision39;
-  schemaVersion: Schemaversion9;
+  schemaVersion: Schemaversion16;
   sources: Sources1;
   template: TemplateManifest;
 }
 export interface LocalImageAsset {
   height: Height;
-  id: Id25;
+  id: Id33;
   mimeType: Mimetype1;
   path: Path;
   sha256: Sha2561;
@@ -1727,131 +2026,131 @@ export interface LocalImageAsset {
 export interface RichDocumentV1 {
   regions: Regions;
   revision: Revision38;
-  schemaVersion: Schemaversion8;
+  schemaVersion: Schemaversion15;
 }
 export interface RichRegion {
   blocks: Blocks2;
-  id: Id44;
+  id: Id52;
   revision: Revision37;
   role: Role2;
 }
 export interface ParagraphBlock {
   children: Children;
   content: Content12;
-  id: Id43;
+  id: Id51;
   props: ParagraphProps;
   provenance: Provenance11;
   revision: Revision36;
-  type: Type14;
+  type: Type21;
 }
 export interface HeadingBlock {
   children: Children1;
   content: Content11;
-  id: Id42;
+  id: Id50;
   props: HeadingProps;
   provenance: Provenance10;
   revision: Revision35;
-  type: Type13;
+  type: Type20;
 }
 export interface BulletBlock {
   children: Children2;
   content: Content10;
-  id: Id41;
+  id: Id49;
   props: ParagraphProps;
   provenance: Provenance9;
   revision: Revision34;
-  type: Type12;
+  type: Type19;
 }
 export interface NumberedBlock {
   children: Children3;
   content: Content9;
-  id: Id40;
+  id: Id48;
   props: NumberedProps;
   provenance: Provenance8;
   revision: Revision33;
-  type: Type11;
+  type: Type18;
 }
 export interface ChecklistBlock {
   children: Children4;
   content: Content8;
-  id: Id39;
+  id: Id47;
   props: ChecklistProps;
   provenance: Provenance7;
   revision: Revision32;
-  type: Type10;
+  type: Type17;
 }
 export interface ToggleBlock {
   children: Children5;
   content: Content7;
-  id: Id38;
+  id: Id46;
   props: ParagraphProps;
   provenance: Provenance6;
   revision: Revision31;
-  type: Type9;
+  type: Type16;
 }
 export interface QuoteBlock {
   children: Children6;
   content: Content6;
-  id: Id37;
+  id: Id45;
   props: ParagraphProps;
   provenance: Provenance5;
   revision: Revision30;
-  type: Type8;
+  type: Type15;
 }
 export interface CodeBlock {
   children: Children7;
   content: Content5;
-  id: Id36;
+  id: Id44;
   props: CodeProps;
   provenance: Provenance4;
   revision: Revision29;
-  type: Type7;
+  type: Type14;
 }
 export interface DividerBlock {
   children: Children8;
   content: Content4;
-  id: Id35;
+  id: Id43;
   props: EmptyProps;
   provenance: Provenance3;
   revision: Revision28;
-  type: Type6;
+  type: Type13;
 }
 export interface TableBlock {
   children: Children9;
   content: TableContent;
-  id: Id34;
+  id: Id42;
   props: ParagraphProps;
   provenance: Provenance2;
   revision: Revision27;
-  type: Type5;
+  type: Type12;
 }
 export interface ImageBlock {
   children: Children10;
   content: Content2;
-  id: Id31;
+  id: Id39;
   props: ImageProps;
   provenance: Provenance1;
   revision: Revision25;
-  type: Type4;
+  type: Type11;
 }
 export interface SectionBlock {
   children: Children11;
   content: Content;
-  id: Id26;
+  id: Id34;
   props: SectionProps;
   provenance: Provenance;
   revision: Revision24;
-  type: Type3;
+  type: Type10;
 }
 export interface StyledText {
   styles: InlineStyles;
-  text: Text4;
-  type: Type;
+  text: Text6;
+  type: Type7;
 }
 export interface InlineStyles {
   backgroundColor?: Backgroundcolor;
   bold?: Bold1;
-  code?: Code3;
+  code?: Code4;
   italic?: Italic;
   strike?: Strike;
   textColor?: Textcolor;
@@ -1860,47 +2159,47 @@ export interface InlineStyles {
 export interface Hyperlink {
   content: Content1;
   href: Href;
-  type: Type1;
+  type: Type8;
 }
 export interface FactFieldSpan {
   bindingId: Bindingid;
   bindingRootId?: Bindingrootid;
   fieldKey: Fieldkey;
-  recordId: Recordid1;
+  recordId: Recordid2;
   styles: InlineStyles;
   syncedFactRevision: Syncedfactrevision;
-  text: Text5;
-  type: Type2;
+  text: Text7;
+  type: Type9;
 }
 export interface SectionProps {
   alignment?: Alignment;
   backgroundColor?: Backgroundcolor1;
   presentation?: Presentation;
-  recordId: Recordid2;
+  recordId: Recordid3;
   textColor?: Textcolor1;
 }
 export interface NarrativeCitation {
   evidence: Evidence13;
   fieldKeys: Fieldkeys;
-  id: Id27;
-  kind: Kind26;
-  recordId: Recordid3;
-}
-export interface FieldBinding {
-  fieldKey: Fieldkey1;
-  id: Id28;
+  id: Id35;
   kind: Kind27;
   recordId: Recordid4;
 }
-export interface WorkingOwnership {
-  id: Id29;
+export interface FieldBinding {
+  fieldKey: Fieldkey1;
+  id: Id36;
   kind: Kind28;
   recordId: Recordid5;
 }
+export interface WorkingOwnership {
+  id: Id37;
+  kind: Kind29;
+  recordId: Recordid6;
+}
 export interface SourceWitness {
   evidence: Evidence14;
-  id: Id30;
-  kind: Kind29;
+  id: Id38;
+  kind: Kind30;
 }
 export interface ImageProps {
   alignment: Alignment1;
@@ -1918,14 +2217,14 @@ export interface TableContent {
 }
 export interface TableRow {
   cells: Cells;
-  id: Id33;
+  id: Id41;
 }
 export interface TableCell {
   alignment?: Alignment2;
   backgroundColor?: Backgroundcolor2;
   colspan?: Colspan;
   content: Content3;
-  id: Id32;
+  id: Id40;
   revision: Revision26;
   rowspan?: Rowspan;
 }
@@ -1959,13 +2258,13 @@ export interface HeadingProps {
 }
 export interface ImmutableFactEvidence {
   evidence: Evidence15;
-  id: Id45;
+  id: Id53;
   rawText: Rawtext5;
 }
 export interface ImportCoverage {
   blockIds: Blockids1;
-  disposition: Disposition1;
-  reason: Reason;
+  disposition: Disposition2;
+  reason: Reason1;
   sourceId: Sourceid2;
   unitId: Unitid3;
 }
@@ -1975,7 +2274,7 @@ export interface RichRenderSnapshot {
   docxSha256: Docxsha256;
   docxSize: Docxsize;
   factsRevision: Factsrevision1;
-  id: Id46;
+  id: Id54;
   rendererSha256: Renderersha256;
   rendererVersion: Rendererversion;
   templateSha256: Templatesha256;
@@ -1983,7 +2282,7 @@ export interface RichRenderSnapshot {
 export interface TemplateManifest {
   assets: Assets1;
   contentPolicyVersion: Contentpolicyversion;
-  id: Id47;
+  id: Id55;
   packageSha256: Packagesha256;
   version: Version1;
 }
@@ -2004,11 +2303,13 @@ export interface RichSyncRecord {
   errorCode: Errorcode2;
   factIds: Factids;
   fieldKeys: Fieldkeys1;
-  id: Id48;
+  id: Id56;
   instruction?: Instruction;
-  kind?: Kind30;
+  kind?: Kind31;
   proposedSteps?: Proposedsteps;
   ready?: Ready;
+  rewriteResult?: Rewriteresult;
+  rewriteSource?: Rewritesource;
   selection?: RichSelection | null;
   status: Status9;
 }
@@ -2017,19 +2318,19 @@ export interface PutBlock {
   beforeRevision: Beforerevision;
   block: Block;
   keepChildren?: Keepchildren;
-  kind: Kind31;
+  kind: Kind32;
   parentId: Parentid;
 }
 export interface RemoveBlock {
   beforeRevision: Beforerevision1;
   blockId: Blockid1;
-  kind: Kind32;
+  kind: Kind33;
 }
 export interface MoveBlock {
   afterId: Afterid1;
   beforeRevision: Beforerevision2;
   blockId: Blockid2;
-  kind: Kind33;
+  kind: Kind34;
   parentId: Parentid1;
 }
 export interface ReplaceInlineRange {
@@ -2039,25 +2340,25 @@ export interface ReplaceInlineRange {
   content: Content13;
   end: End1;
   field: Field;
-  kind: Kind34;
+  kind: Kind35;
   start: Start2;
 }
 export interface PutRecord {
   beforeRevision: Beforerevision4;
-  kind: Kind35;
+  kind: Kind36;
   record: Record1;
 }
 export interface RemoveRecord {
   beforeRevision: Beforerevision5;
-  kind: Kind36;
-  recordId: Recordid6;
+  kind: Kind37;
+  recordId: Recordid7;
 }
 export interface RichWarning {
   blockIds: Blockids3;
-  code: Code4;
+  code: Code5;
   count?: Count;
   evidence: Evidence16;
-  id: Id49;
+  id: Id57;
   locations?: Locations;
   recordIds: Recordids;
 }
@@ -2083,9 +2384,9 @@ export interface WriterSessionV1 {
   incarnation: Incarnation2;
   leaseExpiresAt: Leaseexpiresat;
   lineage: Lineage3;
-  projectId: Projectid5;
+  projectId: Projectid12;
   resumeCredentialSha256: Resumecredentialsha256;
-  schemaVersion: Schemaversion12;
+  schemaVersion: Schemaversion19;
   sessionId: Sessionid1;
   status: Status10;
   touchFloor?: Touchfloor;

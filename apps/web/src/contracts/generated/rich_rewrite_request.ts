@@ -1,4 +1,5 @@
 export type Instruction = string;
+export type Previewonly = boolean;
 export type Blockid = string;
 export type Cellid = string | null;
 /**
@@ -23,6 +24,7 @@ export type Textsha256 = string;
 
 export interface RichRewriteRequest {
   instruction: Instruction;
+  previewOnly?: Previewonly;
   selection: RichSelection;
 }
 export interface RichSelection {

@@ -1,3 +1,5 @@
+import { validReasoning, type ModelReasoning } from "./reasoning";
+
 export type ConnectionState = "unchecked" | "detached" | "cli_missing" | "launcher_unsupported" | "unsupported_version" |
   "login_required" | "api_key_mode" | "metadata_failed" | "quota_exhausted" |
   "unknown_limits" | "connected" | "login_pending" | "login_failed" | "cleanup_blocked";
@@ -8,6 +10,7 @@ export type ConnectionSnapshot = {
   plan: string | null;
   models: string[];
   selectedModel: string | null;
+  modelReasoning?: Record<string, ModelReasoning>;
   quota: { state: "unknown" | "available" | "exhausted"; usedPercent: number | null; resetsAt: number | null };
   metadataReady: boolean;
   generationReady: boolean;
@@ -38,6 +41,7 @@ export function validConnection(value: unknown): value is ConnectionSnapshot {
       !(value.selectedModel === null || (typeof value.selectedModel === "string" && value.models.includes(value.selectedModel))) ||
       typeof value.metadataReady !== "boolean" || typeof value.generationReady !== "boolean" ||
       typeof value.experimentalMode !== "boolean" || !record(value.quota)) return false;
+  if (value.modelReasoning !== undefined && !validReasoning(value.modelReasoning, value.models)) return false;
   if (value.generationReady && (!value.experimentalMode || value.state !== "connected" || !value.metadataReady ||
       value.selectedModel === null || value.quota.state !== "available")) return false;
   const quota = value.quota;

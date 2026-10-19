@@ -1,0 +1,19 @@
+.source-viewer { display: flex; flex-direction: column; flex: 1; min-width: 0; min-height: 0; background: var(--surface); color: var(--ink); }
+.source-viewer-file { display: flex; align-items: center; gap: 12px; min-height: 47px; padding: 8px 16px; font-size: 12px; border-bottom: 1px solid var(--line); }
+.source-viewer-file > span, .source-viewer-file > select { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.source-viewer-file > .source-file-type { flex: 0 0 auto; color: var(--muted); font-size: 10px; letter-spacing: .06em; }
+.source-viewer-file select { min-height: 30px; padding: 5px 10px; }
+.source-viewer-note { order: 2; margin: 0; padding: 8px 16px; font-size: 11px; line-height: 1.5; color: var(--muted); border-top: 1px solid var(--line); }
+.source-viewer-message { padding: 16px; font-size: 13px; line-height: 1.6; }
+.source-viewer-message button { display: block; margin-top: 12px; }
+.source-preview-frame { order: 1; flex: 1; width: 100%; min-height: 0; border: 0; background: var(--paper); }
+.source-preview-frame[hidden] { display: none; }
+.source-text-preview { flex: 1; min-height: 0; overflow: auto; padding: 24px 12px; background: var(--paper); }
+.source-text-preview .bn-editor { padding: 0 20px; background: transparent; }
+.source-text-preview .bn-inline-content { white-space: pre-wrap; tab-size: 4; }
+.source-text-preview .bn-container { color: var(--ink); }
+.source-pdf-controls { order: 2; display: flex; align-items: center; gap: 12px; padding: 5px 16px; border-top: 1px solid var(--line); font-size: 12px; }
+.source-pdf-controls select { margin-left: auto; min-width: 0; min-height: 28px; padding: 4px 8px; }
+.source-pdf-controls > span, .source-pdf-controls > button { white-space: nowrap; flex-shrink: 0; }
+.source-pdf-scroll { order: 1; flex: 1; min-height: 0; overflow: auto; padding: 24px; background: var(--desk); }
+.source-pdf-scroll canvas { display: block; margin: 0 auto; }

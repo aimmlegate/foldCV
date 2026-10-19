@@ -338,7 +338,7 @@ class CanonicalCoordinator:
             self.history._ready(proof, directory, history.history.workspace_sha256)
         return value
 
-    def publish(self, project, job_id, proposal_sha256, *, originals=None, artifacts=None, images=None, expected_claim=None):
+    def publish(self, project, job_id, proposal_sha256, *, originals=None, artifacts=None, images=None, expected_claim=None, approved=False):
         from .project_catalog import AccessChanged
         job = self.jobs.read(project, job_id)
         catalog = getattr(self.canonical, "catalog", None)
@@ -346,13 +346,13 @@ class CanonicalCoordinator:
             try:
                 with catalog.authority(project, job.submission.access_revision):
                     return self._publish(project, job_id, proposal_sha256, originals=originals,
-                        artifacts=artifacts, images=images, expected_claim=expected_claim)
+                        artifacts=artifacts, images=images, expected_claim=expected_claim, approved=approved)
             except AccessChanged:
                 raise BackgroundFailure("DEPENDENCY_CHANGED") from None
         return self._publish(project, job_id, proposal_sha256, originals=originals,
-            artifacts=artifacts, images=images, expected_claim=expected_claim)
+            artifacts=artifacts, images=images, expected_claim=expected_claim, approved=approved)
 
-    def _publish(self, project, job_id, proposal_sha256, *, originals=None, artifacts=None, images=None, expected_claim=None):
+    def _publish(self, project, job_id, proposal_sha256, *, originals=None, artifacts=None, images=None, expected_claim=None, approved=False):
         with self._writer(project):
             known_job = self.jobs.read(project, job_id)
             if known_job.receipt is not None or known_job.publication == "no_change":
@@ -382,6 +382,8 @@ class CanonicalCoordinator:
                     self._persist(directory, state)
                     return job
                 self._gate(state, job, proposal)
+                if job.submission.approval_required and not approved:
+                    return job
                 if job.publication == "needs_review":
                     return job
                 try:

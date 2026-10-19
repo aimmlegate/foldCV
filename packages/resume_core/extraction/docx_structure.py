@@ -27,6 +27,23 @@ def enabled(node):
 class ParagraphStyles:
     def __init__(self, root=None):
         self.styles = {node.get(W + "styleId"): node for node in root.findall(W + "style")} if root is not None else {}
+        self.defaults = root.find(W + "docDefaults/" + W + "rPrDefault/" + W + "rPr") if root is not None else None
+
+    def hidden(self, run, paragraph):
+        properties = [run.find(W + "rPr")]
+        for style_id in (value(run.find(W + "rPr"), W + "rStyle"),
+                         value(paragraph.find(W + "pPr"), W + "pStyle") or next(
+                             (key for key, node in self.styles.items() if node.get(W + "type") == "paragraph"
+                              and node.get(W + "default") in {"1", "true"}), None)):
+            seen = set()
+            while style_id in self.styles and style_id not in seen and len(seen) < 32:
+                seen.add(style_id)
+                style = self.styles[style_id]
+                properties.append(style.find(W + "rPr"))
+                style_id = value(style, W + "basedOn")
+        properties.append(self.defaults)
+        return next((enabled(node) for prop in properties if prop is not None
+                     and (node := prop.find(W + "vanish")) is not None), False)
 
     def hints(self, paragraph, part):
         direct = paragraph.find(W + "pPr")

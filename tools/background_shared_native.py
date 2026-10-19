@@ -135,9 +135,10 @@ def assert_shared_case(binding, variant, report, ledger, root, sources):
         require(number(runtime["startedAt"]) and number(runtime["endedAt"])
             and runtime["startedAt"] < runtime["endedAt"], "Invalid turn interval")
         agent = turn["role"].startswith("agent-")
+        plain = turn["role"].startswith("structured-rewrite-") and runtime.get("textValidated") is True
         require((runtime["toolCalls"] >= (1 if expected_state == "cancelled" else 2) and runtime["mcpListenerClosed"] is True)
-            if agent else (runtime["toolCalls"] == 0 and runtime["schemaValidated"] is True
-                and runtime["logicalAttempts"] == 1 and runtime["repairTurns"] == 0), "Missing tools or structured grammar")
+            if agent else (runtime["toolCalls"] == 0 and runtime["schemaValidated"] is (not plain)
+                and runtime["logicalAttempts"] == 1 and runtime["repairTurns"] == 0), "Missing tools or output validation")
         def events(method, direction):
             return [frame for frame in wire if frame["direction"] == direction
                 and frame["frame"].get("method") == method
@@ -148,7 +149,8 @@ def assert_shared_case(binding, variant, report, ledger, root, sources):
             and ended[0]["frame"]["params"]["turn"]["status"] == ("interrupted" if expected_state == "cancelled" else "completed")
             and began[0]["at"] == runtime["startedAt"] and ended[0]["at"] == runtime["endedAt"], "No actual turn interval")
         if not agent:
-            require(starts[0]["frame"]["params"].get("outputSchema"), "Missing pinned output grammar")
+            schema = starts[0]["frame"]["params"].get("outputSchema")
+            require(schema is None if plain else bool(schema), "Wrong output format")
             publication = runtime["fixedPublication"]
             job = artifact(root, case, publication["jobArtifact"])
             require(publication["exactRequestedChange"] is True and job["id"] == runtime["jobId"]

@@ -1,0 +1,61 @@
+.operation-spinner { display: inline-block; flex: 0 0 auto; width: 14px; height: 14px; box-sizing: border-box; border: 1.5px solid currentColor; border-right-color: transparent; border-radius: 50%; animation: operation-spin .8s linear infinite; }
+@keyframes operation-spin { to { transform: rotate(360deg); } }
+.operation-status { display: flex; align-items: center; gap: 9px; min-width: 0; color: var(--muted); font-size: 12px; line-height: 1.5; }
+.operation-status > svg { flex: 0 0 auto; width: 16px; height: 16px; }
+.operation-copy { min-width: 0; flex: 1; overflow-wrap: anywhere; }
+.operation-copy small { display: block; margin-top: 3px; font-size: 11px; }
+.operation-status[data-state="error"] { color: var(--warn); }
+.operation-status[data-state="success"] { color: var(--accent); }
+.operation-elapsed { flex: 0 0 auto; font-size: 11px; font-variant-numeric: tabular-nums; color: var(--muted); white-space: nowrap; }
+.button { position: relative; }
+.button-content { display: inline-flex; align-items: center; justify-content: center; gap: inherit; min-width: 0; }
+.button[aria-busy="true"] .button-content { visibility: hidden; }
+.button-progress { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; gap: 7px; padding: 0 9px; }
+.button-progress > span:last-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.main-area { position: relative; }
+.workspace-operation { position: absolute; top: 94px; right: 12px; z-index: 180; width: min(390px, calc(100% - 24px)); padding: 12px 14px; border: 1px solid var(--line); border-radius: 9px; background: var(--paper); box-shadow: 0 4px 12px color-mix(in srgb, var(--ink) 8%, transparent); }
+.workspace-loading { display: grid; place-items: center; }
+.workspace-loading .operation-status { max-width: 350px; }
+.facts-feedback { position: sticky; top: 0; z-index: 5; height: 0; display: grid; gap: 7px; pointer-events: none; }
+.facts-feedback > * { margin: 0; padding: 10px 12px; border: 1px solid var(--line); border-radius: 7px; background: var(--paper); box-shadow: 0 4px 12px color-mix(in srgb, var(--ink) 8%, transparent); pointer-events: auto; }
+.facts-feedback .notice { margin: 0; }
+.facts-feedback:empty { display: none; }
+.operation-slot { height: 64px; min-height: 64px; overflow-y: auto; display: grid; align-items: center; margin-top: 10px; }
+.rewrite-progress-slot { height: 54px; display: flex; align-items: center; justify-content: space-between; gap: 10px; overflow-y: auto; margin: 7px 0; }
+.rewrite-progress-slot .notice { margin: 0; }
+.rewrite-progress-slot .operation-status { flex: 1; }
+.dialog-feedback { position: absolute; bottom: 68px; left: 24px; right: 24px; display: grid; gap: 6px; z-index: 3; pointer-events: none; }
+.dialog-feedback > * { margin: 0; padding: 10px; border: 1px solid var(--line); border-radius: 7px; background: var(--paper); pointer-events: auto; }
+.settings-content { position: relative; }
+.settings-feedback { position: sticky; top: 0; height: 0; z-index: 5; display: grid; gap: 6px; pointer-events: none; }
+.settings-feedback > * { margin: 0; padding: 10px 12px; border: 1px solid var(--line); border-radius: 7px; background: var(--paper); box-shadow: 0 4px 12px color-mix(in srgb, var(--ink) 8%, transparent); pointer-events: auto; }
+.source-render-status { position: absolute; top: 16px; left: 16px; right: 16px; z-index: 2; padding: 10px 12px; border: 1px solid var(--line); border-radius: 7px; background: var(--paper); }
+.source-viewer, .source-pdf-scroll { position: relative; }
+.import-progress-heading .progress-icon { position: relative; }
+.import-progress-heading .operation-spinner { position: absolute; inset: -5px; width: auto; height: auto; color: var(--accent); }
+.progress-list .step-indicator .operation-spinner { width: 16px; height: 16px; }
+.technology-chip[aria-busy="true"] > button:last-child svg { display: none; }
+.technology-chip > .operation-spinner { flex: 0 0 14px; width: 14px; height: 14px; }
+.technology-chip[aria-busy="true"] > button:last-child::after { content: ""; width: 12px; height: 12px; border: 1.5px solid currentColor; border-right-color: transparent; border-radius: 50%; animation: operation-spin .8s linear infinite; }
+.job-status-line { display: flex; align-items: center; gap: 8px; }
+.job-status-line .operation-status { flex: 1; }
+.job-details-loading { padding-top: 8px; }
+.chat-activity-preview { display: block; margin-top: 5px; color: var(--muted); font-size: 12px; line-height: 1.5; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.chat-activity summary > .operation-copy { flex: 1; }
+.chat-activity > summary { min-height: 54px; align-items: center; }
+.chat-activity-preview { max-width: 100%; min-height: 18px; }
+.agent-chat-panel { position: relative; }
+.chat-load-status { position: absolute; top: 58px; left: 16px; right: 16px; z-index: 3; padding: 10px; border: 1px solid var(--line); border-radius: 7px; background: var(--paper); }
+.chat-activity-log { max-height: 180px; overflow-y: auto; overscroll-behavior: contain; }
+.chat-activity-log li { display: flex; align-items: flex-start; gap: 8px; padding: 5px 0; }
+.chat-activity-log li > svg { flex: 0 0 auto; width: 14px; height: 14px; margin-top: 2px; }
+.chat-activity-log li > span:not(.operation-spinner) { flex: 1; min-width: 0; overflow-wrap: anywhere; white-space: pre-wrap; }
+.chat-activity-log li > .operation-spinner { flex: 0 0 14px; width: 14px; height: 14px; margin-top: 2px; }
+.chat-activity-log li small { display: block; color: var(--muted); font-size: 10px; }
+.chat-activity-note { font-size: 10px; color: var(--muted); }
+.chat-launcher small { min-width: 0; }
+.chat-launcher .agent-compact-label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 260px; }
+.chat-launcher .operation-elapsed { font-size: 10px; }
+.chat-loading { display: flex; align-items: center; min-height: 38px; padding: 8px 16px; border-top: 1px solid var(--line); }
+@media (max-width: 600px) { .app-header .button.quiet > .button-content { display: inline-flex; } .app-header .button.quiet .button-content > span { display: none; } .app-header .button.quiet .button-progress > span:last-child { display: none; } .chat-launcher .agent-compact-label { max-width: 150px; } .workspace-operation { right: 10px; } }
+@media (prefers-reduced-motion: reduce) { .operation-spinner, .technology-chip[aria-busy="true"] > button:last-child::after { animation: none; border-style: dotted; } }

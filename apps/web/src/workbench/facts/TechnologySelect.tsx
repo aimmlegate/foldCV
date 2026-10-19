@@ -6,6 +6,7 @@ import { technologyKey, technologyName } from "../../rich/panel-intents";
 import { Icon } from "../ui/Icon";
 import { technologySuggestions } from "./technology-catalog";
 import { FactDialog } from "./FactDialog";
+import { Spinner } from "../ui/OperationStatus";
 
 export function TechnologySelect({ facts, document: resumeDocument, jobId, label, pending, paused, submit }: {
   facts: WorkingFacts; document: RichDocumentV1; jobId: string | null; label: string; pending: readonly PanelCommand[]; paused: boolean;
@@ -43,7 +44,7 @@ export function TechnologySelect({ facts, document: resumeDocument, jobId, label
     setQuery(""); setActive(0); setExpanded(true); setOpen(true); input.current?.focus();
   }
   return <div className="technology-select" data-technology-scope={jobId ?? ""} ref={root}>
-    {jobId && <span className="technology-label">Технологии</span>}
+    <span className="technology-label">{jobId ? "Технологии" : "Все технологии"}</span>
     <ul className="technology-values" id={`${id}-values`} aria-label={`Выбранные технологии: ${label}`}>
         {(expanded ? records : records.slice(0, 8)).map(record => <li key={record.id} className="technology-chip" data-fact-id={record.id}
           aria-busy={scoped.some(command => command.operation === "clear_technologies" || command.recordId === record.id ||
@@ -56,14 +57,14 @@ export function TechnologySelect({ facts, document: resumeDocument, jobId, label
             onClick={event => { event.stopPropagation(); apply({ operation: "remove", recordId: record.id }); }}><Icon name="close" /></button>
         </li>)}
         {[...new Set(adding)].filter(name => !records.some(record => technologyKey(record.display.rawText) === technologyKey(name))).map(name =>
-          <li key={technologyKey(name)} className="technology-chip" aria-busy="true"><span>{name}</span><small>…</small></li>)}
+          <li key={technologyKey(name)} className="technology-chip" aria-busy="true"><span>{name}</span><Spinner /></li>)}
     </ul>
     {records.length > 8 && <button type="button" className="technology-expand" aria-expanded={expanded} aria-controls={`${id}-values`}
       onClick={() => { setExpanded(value => !value); }}>{expanded ? "Свернуть список" : `Ещё ${records.length - 8}`}</button>}
     <div className="technology-field" onClick={() => input.current?.focus()}>
         <input ref={input} id={id} className="technology-search" role="combobox" aria-label={`Технологии: ${label}`} aria-autocomplete="list"
           aria-expanded={open} aria-controls={`${id}-options`} aria-activedescendant={open && choices.length ? `${id}-option-${activeIndex}` : undefined}
-          autoComplete="off" maxLength={80} placeholder={records.length ? "Найти…" : "Выбрать технологии"} value={query}
+          autoComplete="off" maxLength={80} placeholder="Добавить технологию…" value={query} disabled={paused}
           onFocus={() => setOpen(true)} onChange={event => { setQuery(event.target.value); setActive(0); setOpen(true); }}
           onKeyDown={event => {
             if (event.key === "Escape" && open) { event.preventDefault(); event.stopPropagation(); setOpen(false); }
@@ -72,9 +73,8 @@ export function TechnologySelect({ facts, document: resumeDocument, jobId, label
             else if (event.key === "Enter" && open) { event.preventDefault(); const choice = choices[activeIndex]; if (choice) choose(choice.name); }
           }} />
       <div className="technology-field-actions">
-        {(records.length > 0 || adding.length > 0) && <button type="button" aria-label={`Убрать все технологии: ${label}`} title="Убрать все" disabled={paused}
-          onClick={event => { event.stopPropagation(); apply({ operation: "clear_technologies", recordKind: "technology", jobId, recordId: null, periodId: null, values: {} }); }}><Icon name="close" /></button>}
         <button type="button" data-technology-toggle aria-label={`Показать список технологий: ${label}`} aria-expanded={open} aria-controls={`${id}-options`}
+          disabled={paused}
           onClick={event => { event.stopPropagation(); setOpen(value => !value); }}><Icon name="chevron" /></button>
       </div>
     </div>
@@ -85,6 +85,8 @@ export function TechnologySelect({ facts, document: resumeDocument, jobId, label
         : <span className="technology-no-results">Нет доступных вариантов</span>}
       {available.length > 60 && <span className="technology-no-results">Уточните название, чтобы увидеть остальные варианты.</span>}
     </div>
+    {open && (records.length > 0 || adding.length > 0) && <button type="button" className="text-button" aria-label={`Убрать все технологии: ${label}`} disabled={paused}
+      onClick={() => { apply({ operation: "clear_technologies", recordKind: "technology", jobId, recordId: null, periodId: null, values: {} }); }}>Убрать все технологии</button>}
     {editedRecord && <FactDialog target={{ kind: "technology", record: editedRecord }} close={() => { setEditing(null); }} submit={submit} />}
   </div>;
 }

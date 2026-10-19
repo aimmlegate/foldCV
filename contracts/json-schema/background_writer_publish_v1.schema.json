@@ -56,6 +56,11 @@
   },
   "additionalProperties": false,
   "properties": {
+    "approve": {
+      "default": false,
+      "title": "Approve",
+      "type": "boolean"
+    },
     "generation": {
       "minimum": 1,
       "title": "Generation",

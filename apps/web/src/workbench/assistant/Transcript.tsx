@@ -2,13 +2,10 @@ import { useState } from "react";
 import type { AgentFinding } from "../../contracts/generated/agent_finding";
 import type { AssistantView } from "../../assistant/controller";
 import { sourceUrl } from "../../assistant/presentation";
-import { activityText } from "./status";
+import { Activity } from "./AgentActivity";
 import { MessageText } from "../../assistant/MessageText";
 import { Icon } from "../ui/Icon";
 
-const tools: Record<string, string> = { web_search: "Поиск в интернете", get_resume_context: "Чтение резюме", find_resume_content: "Поиск в резюме",
-  get_working_facts: "Чтение фактов", get_original_source: "Чтение исходника", get_conversation_context: "Чтение диалога", check_resume: "Проверка резюме",
-  read_public_page: "Открытие страницы", publish_findings: "Сохранение замечаний", prepare_edit_batch: "Подготовка правок", apply_edit_batch: "Сохранение изменений" };
 export function Transcript({ view, active, resource, focus, draft }: { view: AssistantView; active: boolean;
   resource: (kind: "sources" | "findings", id: string) => void; focus: (anchor: AgentFinding["anchors"][number]) => boolean; draft: (value: string) => void }) {
   const [stale, setStale] = useState<Set<string>>(() => new Set()), [copy, setCopy] = useState("");
@@ -28,11 +25,8 @@ export function Transcript({ view, active, resource, focus, draft }: { view: Ass
         {message.error && !active && <button className="chat-retry" onClick={() => { const index = view.messages.indexOf(message); const prior = view.messages.slice(0, index).reverse().find(item => item.role === "user");
           if (prior) { draft(prior.text); document.getElementById("chat-input")?.focus(); } }}><Icon name="redo" />Повторить задачу</button>}</div>}
     </article>)}
-    {view.run && <article className="chat-message"><details className="chat-activity"><summary>{active ? <span className="chat-spinner" /> : <Icon name={view.run.state === "completed" ? "check" : "info"} />}<span role="status">{activityText(view, active)}</span><Icon name="chevron" /></summary>
-      <ol><li>Модель задачи: {view.run.model}</li>{view.activity.map(event => event.type === "tool.started" || event.type === "tool.completed" || event.type === "tool.failed"
-        ? <li key={event.sequence}>{tools[event.payload.name] ?? "Работа с резюме"} · {event.type === "tool.started" ? "выполняется" : event.type === "tool.failed" ? "не удалось выполнить" : "готово"}</li> : null)}</ol></details>
+    {(view.run || view.submitting || view.pendingSend) && <article className="chat-message"><Activity key={view.run?.id ?? "sending"} view={view} active={active} />
       {view.partial && <div className="chat-message-text" aria-label="Текущий ответ"><p>{view.partial}</p>{view.partialTruncated && <small>Ответ сокращён.</small>}</div>}
-      {active && !view.partial && <div className="chat-thinking" aria-label="Задача выполняется"><i /><i /><i /></div>}
       {view.receipts.map(receipt => <div className="chat-receipt" key={receipt.batchId}><span><Icon name={receipt.durable && receipt.disposition === "saved" ? "check" : "info"} /><strong>{receipt.durable && receipt.disposition === "saved" ? "Изменения сохранены" : receipt.disposition === "outcome_unknown" ? "Проверяем результат сохранения" : "Правки не применены"}</strong>
         <small>{receipt.durable && receipt.disposition === "saved" ? `Одна отмена в истории редактора · версия ${String(receipt.projectRevision)}` : "Состояние сохранения"}</small></span></div>)}
     </article>}

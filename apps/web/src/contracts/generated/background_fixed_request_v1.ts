@@ -34,6 +34,7 @@ export type Removedfields = FieldReference[];
 export type Removedrecordids = string[];
 export type Kind3 = "rewrite";
 export type Instruction = string;
+export type Previewonly = boolean;
 export type Blockid = string;
 export type Cellid = string | null;
 /**
@@ -103,6 +104,7 @@ export interface FixedRewriteCommand {
 }
 export interface RichRewriteRequest {
   instruction: Instruction;
+  previewOnly?: Previewonly;
   selection: RichSelection;
 }
 export interface RichSelection {

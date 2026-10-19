@@ -163,6 +163,8 @@ class NativeSession:
         self.items = {}
         self.completed_items = set()
         self.texts = {}
+        from packages.resume_core.agent_progress import PublicProgress
+        self.progress = PublicProgress(clock)
         self.normalized = 0
         self.result = RuntimeResult()
         self.before_turn = lambda: None
@@ -311,7 +313,8 @@ class NativeSession:
             self.value.before_start()
             self.active_started = self.clock()
             self.result.native_started = True
-            return self.request("turn/start", {"threadId": self.thread, "effort": self.value.reasoning_effort, "summary": "none",
+            return self.request("turn/start", {"threadId": self.thread, "effort": self.value.reasoning_effort,
+                "summary": "none" if self.model_metadata.get("supportsReasoningSummaries") is False else "auto",
                 "input": [{"type": "text", "text": self.value.prompt}]})
         if operation == "turn/start":
             turn = result.get("turn", {})
@@ -389,6 +392,8 @@ class NativeSession:
                 raise AgentFailure("AGENT_PROTOCOL")
             raise AgentFailure(provider_error(params.get("error")))
         elif method in HARMLESS:
+            if method == "item/reasoning/summaryTextDelta":
+                self.progress.accept(method, params, self.publish)
             if method == "remoteControl/status/changed" and params.get("status") != "disabled":
                 raise AgentFailure("AGENT_RUNTIME_UNSUPPORTED")
             if method == "serverRequest/resolved" and self.abort_at is None:
@@ -421,6 +426,7 @@ class NativeSession:
             if self.normalized > limits.RUN_BYTES - limits.TERMINAL_BYTES:
                 raise AgentFailure("AGENT_OUTPUT_LIMIT")
             self.items[identifier] = kind
+            self.progress.accept(method, {"item": item}, self.publish)
             if kind == "webSearch":
                 self.result.web_actions += 1
                 if self.result.web_actions >= limits.WEB_ACTIONS:
@@ -438,6 +444,7 @@ class NativeSession:
             if identifier in self.completed_items:
                 return
             self.completed_items.add(identifier)
+            self.progress.accept(method, {"item": item}, self.publish)
             if kind in {"mcpToolCall", "webSearch"}:
                 failed = kind == "mcpToolCall" and item.get("status") != "completed"
                 self.publish("tool.failed" if failed else "tool.completed", {"callId": self.public_id(identifier),

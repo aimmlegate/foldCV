@@ -3,9 +3,9 @@ import { hasInput, type ResumeInput } from "../../rich/import-source";
 import { Button } from "../ui/Button";
 import { Icon } from "../ui/Icon";
 
-export function SourceForm({ input, change, busy, sourceName, process, textDraft, warnings, failure }: {
+export function SourceForm({ input, change, busy, sourceName, process, textDraft }: {
   input: ResumeInput; change: (input: ResumeInput) => void; busy: boolean; sourceName: string | null;
-  process: () => void; textDraft: string; warnings: readonly string[]; failure: string | null;
+  process: () => void; textDraft: string;
 }) {
   const fileInput = useRef<HTMLInputElement>(null);
   const name = input.kind === "file" ? input.file.name : sourceName;
@@ -21,8 +21,6 @@ export function SourceForm({ input, change, busy, sourceName, process, textDraft
     <label htmlFor="source-text">Текст резюме</label><textarea className="source-text" id="source-text" aria-label="Текст резюме" placeholder="Имя, опыт работы, навыки…"
       disabled={busy || input.kind === "file"} value={textDraft} onChange={event => change({ kind: "text", text: event.currentTarget.value })} />
     {input.kind === "file" && <p className="small muted">Будет обработан выбранный файл. Уберите его, чтобы использовать текст.</p>}
-    {failure && <p className="notice warning" role="alert">{failure}</p>}
-    {warnings.map((warning, index) => <p className="notice warning" key={`${warning}:${index}`}>{warning}</p>)}
-    <div className="source-bottom"><span className="small muted">Исходник останется в проекте</span><Button variant="primary" disabled={busy || (!hasInput(input) && !sourceName)} onClick={process}>Обработать<Icon name="arrow" /></Button></div>
+    <div className="source-bottom"><span className="small muted">Исходник останется в проекте</span><Button variant="primary" busy={busy} busyLabel="Подготовка…" disabled={!hasInput(input) && !sourceName} onClick={process}>Обработать<Icon name="arrow" /></Button></div>
   </div></section>;
 }

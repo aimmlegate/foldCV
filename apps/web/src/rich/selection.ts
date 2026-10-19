@@ -1,6 +1,12 @@
 import type { Transaction } from "@tiptap/pm/state";
 import type { RichSelection } from "../contracts/generated/rich_selection";
 
+export function singleRewriteRange(selection: ReturnType<typeof selectedRange>): boolean {
+  return !!selection && selection.kind !== "blocks" && selection.blockIds.length === 1
+    && selection.anchor.blockId === selection.head.blockId && selection.blockIds[0] === selection.anchor.blockId
+    && selection.anchor.cellId === selection.head.cellId && selection.anchor.offset < selection.head.offset;
+}
+
 /** Public ProseMirror positions are converted to offsets inside FoldCV's stable nodes. */
 export function selectedRange(tr: Transaction): Omit<RichSelection, "capture" | "textSha256"> | null {
   if (tr.selection.empty) return null;

@@ -16,6 +16,6 @@ export function DatePreview({ proposal, job, reason, busy, error, close, apply, 
     <div className="notice warning">Редактирование и экспорт доступны при любом решении.</div>
     {error && <p className="notice warning" role="alert">{error}</p>}
     <div className="dialog-actions"><button type="button" className="text-button" disabled={busy} onClick={close}>Оставить даты</button>
-      {proposal.status === "available" && <Button variant="primary" disabled={busy} onClick={apply}>Изменить даты</Button>}</div>
+      {proposal.status === "available" && <Button variant="primary" busy={busy} busyLabel="Сохраняем даты…" onClick={apply}>Изменить даты</Button>}</div>
   </Dialog>;
 }

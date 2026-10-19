@@ -91,7 +91,15 @@ function earlier(left: string, right: string): boolean {
 function semantics(value: unknown): boolean {
   if (Array.isArray(value)) return value.every(semantics);
   if (!record(value)) return true;
+  if (value.previewOnly === true) {
+    const selected = value.selection;
+    if (!record(selected) || selected.kind === "blocks" || !record(selected.anchor) || !record(selected.head)
+      || list(selected.blockIds).length !== 1 || list(selected.blockIds)[0] !== selected.anchor.blockId
+      || selected.anchor.blockId !== selected.head.blockId || selected.anchor.cellId !== selected.head.cellId
+      || typeof selected.anchor.offset !== "number" || typeof selected.head.offset !== "number" || selected.anchor.offset >= selected.head.offset) return false;
+  }
   if ("projectTitle" in value && "saved" in value && "jobId" in value) {
+    if (value.approvalRequired === true && value.kind !== "rewrite") return false;
     if (value.saved !== (value.publication === "saved") || value.allowEdits === false && value.publication !== "none") return false;
   }
   if (value.schemaVersion === 1 && "jobs" in value && Object.keys(value).every(key => ["schemaVersion", "jobs"].includes(key))) {
@@ -131,17 +139,31 @@ function semantics(value: unknown): boolean {
       if (new Set(group.map((item: unknown) => record(item) ? JSON.stringify([item.kind, item.key]) : null)).size !== group.length) return false;
     }
   }
+  if ("activity" in value && record(value.submission) && record(value.submission.identity)) {
+    const activity = list(value.activity), projectId = value.submission.identity.projectId;
+    if (activity.length > 0 && value.submission.kind !== "agent") return false;
+    if (activity.some((event, index) => {
+      const previous = activity[index - 1];
+      return !record(event) || event.runId !== value.id || event.projectId !== projectId
+        || !["activity.updated", "tool.started", "tool.completed", "tool.failed"].includes(String(event.type))
+        || record(previous) && Number(event.sequence) <= Number(previous.sequence);
+    })) return false;
+  }
   if ("schedulingClass" in value) {
+    if (value.approvalRequired === true && (value.kind !== "rewrite" || !record(value.scope) || value.scope.kind !== "selection")) return false;
     const classes: Record<string, string> = { agent: "background", processing: "background", rewrite: "interactive", reconciliation: "reconciliation" };
     const stages: Record<string, string[]> = { agent: ["agent"], processing: ["assessment", "extraction"], rewrite: ["rewrite"], reconciliation: ["reconciliation"] };
     const inputs: Record<string, string> = { agent: "agent_journal", processing: "processing", rewrite: "rich_sync", reconciliation: "rich_sync" };
+    const tools = list(value.tools), importTools = ["read_import", "save_import", "finish_import"];
+    const importer = value.kind === "processing" && tools.length === importTools.length && importTools.every(tool => tools.includes(tool));
+    if (importer) stages.processing = ["extraction"];
     if (typeof value.kind !== "string" || value.schedulingClass !== classes[value.kind] || !record(value.input) || value.input.kind !== inputs[value.kind] ||
         JSON.stringify(list(value.models).map((model: unknown) => record(model) ? model.stage : null)) !== JSON.stringify(stages[value.kind])) return false;
-    const tools = list(value.tools);
     if (new Set(tools).size !== tools.length || !record(value.guards)) return false;
-    if (value.allowEdits === false && (list(value.guards.writes).length > 0 || tools.some((tool) => ["prepare_edit_batch", "apply_edit_batch"].includes(String(tool))))) return false;
+    if (value.allowEdits === false && (list(value.guards.writes).length > 0 || tools.some((tool) => ["prepare_edit_batch", "apply_edit_batch", "project_action"].includes(String(tool))))) return false;
     if (value.allowWeb === false && tools.includes("read_public_page")) return false;
-    if (value.kind !== "agent" && (tools.length > 0 || value.allowEdits !== true || value.allowWeb !== false)) return false;
+    if (value.kind !== "agent" && (tools.length > 0 && !importer || value.allowEdits !== true || value.allowWeb !== false)) return false;
+    if (value.kind === "agent" && tools.some(tool => importTools.includes(String(tool)))) return false;
   }
   if ("authority" in value && ((value.authority === "revoked") !== (value.revocation !== null) ||
       typeof value.acceptedAt !== "string" || typeof value.executionDeadline !== "string" || !earlier(value.acceptedAt, value.executionDeadline))) return false;

@@ -26,12 +26,12 @@ from ..rich_presentation import presentation, authored_text
 from .rich_template import PACKAGE_SHA256, ROOT, require_rich_template
 from .template import RenderFailure
 
-RENDERER_VERSION = "1.1.0"
+RENDERER_VERSION = "1.1.1"
 INITIAL_BLOCKS = {"paragraph", "heading", "section", "bullet_list", "numbered_list", "check_list", "toggle_list", "quote", "code", "divider", "table", "image"}
 
 
 def renderer_sha256():
-    sources = [Path(__file__), Path(__file__).with_name("worker.py"), ROOT / "packages/resume_core/rich_presentation.py", ROOT / "packages/resume_core/technologies.py", ROOT / "packages/resume_core/technology_experience.py"]
+    sources = [Path(__file__), Path(__file__).with_name("worker.py"), ROOT / "packages/resume_core/rich_presentation.py", ROOT / "packages/resume_core/technologies.py", ROOT / "packages/resume_core/technology_experience.py", ROOT / "packages/resume_core/technology_focus.py"]
     sources += sorted((ROOT / "assets/technology-library").glob("*.png"))
     return hashlib.sha256(b"".join(path.name.encode() + b"\0" + path.read_bytes() for path in sources)).hexdigest()
 
@@ -327,6 +327,8 @@ class Writer:
     def block(self, container, block, width, region, depth=0, focus=False, sequence=None, profile=False):
         view = self.roles.get(block.id)
         role = view.role if view else "body"
+        if role == "hidden":
+            return
         profile = profile or role == "profile_heading"
         if block.type == "section" and not authored_text(block).strip():
             self.blocks(container, block.children, width, region, depth, block.props.presentation == "focus", job=bool(block.props.record_id))
@@ -397,7 +399,7 @@ class Writer:
             paragraph.paragraph_format.first_line_indent = Pt(-18)
         face, size = "light", 10
         if block.type in {"bullet_list", "numbered_list"}:
-            paragraph.paragraph_format.space_after = Pt(3)
+            paragraph.paragraph_format.space_after = Pt(6 if region == "sidebar" else 3)
         if block.type == "heading":
             paragraph.style = self.document.styles[f"Heading {block.props.level}"]
             paragraph.paragraph_format.keep_with_next = region != "header"
@@ -422,6 +424,9 @@ class Writer:
             face, size = "semibold", 10
             paragraph.paragraph_format.left_indent = Pt(base_left + self.spec["focus"]["textFromSidebar"])
             paragraph.paragraph_format.space_after = Pt(25.43)
+            centered = 9.5 if view and not view.experience else 0
+            paragraph.paragraph_format.space_before = Pt(centered)
+            paragraph.paragraph_format.space_after -= Pt(centered)
             if view and view.logo and (ROOT / view.logo).is_file():
                 from PIL import Image
                 box = self.spec["focus"]["logoBox"]
@@ -430,7 +435,7 @@ class Writer:
                     image_width, image_height = image.width * ratio, image.height * ratio
                 self.floating_image(paragraph, ROOT / view.logo, image_width, image_height,
                     box["xFromSidebar"] - self.spec["focus"]["textFromSidebar"] + (box["width"] - image_width) / 2,
-                    (box["height"] - image_height) / 2, horizontal="character", vertical="paragraph", label="Focus technology logo")
+                    (box["height"] - image_height) / 2 - centered, horizontal="character", vertical="paragraph", label="Focus technology logo")
         if block.type == "quote":
             paragraph.paragraph_format.left_indent = Pt(base_left + min(12 + min(depth, 12) * 18, max(0, width - 24)))
             border = element("w:pBdr"); border.append(element("w:left", val="single", sz=6, color="888888", space=4))
@@ -565,6 +570,12 @@ class Writer:
 
     def render(self, document, facts=None):
         spec = self.spec
+        if facts is not None:
+            from ..technology_focus import ordered_focus_children
+            document = document.model_copy(deep=True)
+            for section in document.blocks():
+                if section.type == "section" and section.props.presentation == "focus":
+                    section.children = ordered_focus_children(section, facts)
         self.roles = presentation(document, facts).blocks
         self.brand()
         from docx.enum.table import WD_ROW_HEIGHT_RULE

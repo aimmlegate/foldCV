@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 import math
 import json
 import os
@@ -12,6 +12,7 @@ import shutil
 import threading
 import time
 
+from packages.resume_core.reasoning import ModelReasoning, model_reasoning
 from resume_api.cli.process_runner import ProcessExit, ProcessRunner
 from resume_api.cli.experimental_profile import ExperimentalCliProfile, ExperimentalProfileError, VERSION as EXPERIMENTAL_VERSION
 from resume_api.lifecycle import OperationFiles, SpikeError
@@ -43,6 +44,7 @@ class Metadata:
     models: tuple[str, ...]
     plan: str | None
     quota: Quota
+    reasoning: dict[str, ModelReasoning] = field(default_factory=dict)
 
 
 def quota_from_result(raw: object) -> Quota:
@@ -157,6 +159,7 @@ class ConnectionAdapter:
             raise ConnectionFailure("TEMP_FAILED")
         stage = 0
         models: tuple[str, ...] = ()
+        reasoning = {}
         plan: str | None = None
         quota = Quota()
 
@@ -221,6 +224,10 @@ class ConnectionAdapter:
                     if not isinstance(name, str) or not MODEL.fullmatch(name) or name in names or item.get("hidden") is True:
                         raise ConnectionFailure("METADATA_FAILED")
                     names.append(name)
+                    try:
+                        reasoning[name] = model_reasoning(item)
+                    except ValueError:
+                        raise ConnectionFailure("METADATA_FAILED") from None
                 models = tuple(names)
                 stage = 3
                 return request(3, "account/rateLimits/read")
@@ -237,7 +244,7 @@ class ConnectionAdapter:
                   on_line=accept, interactive=True)
         if stage != 4:
             raise ConnectionFailure("METADATA_FAILED")
-        return Metadata(version, models, plan, quota)
+        return Metadata(version, models, plan, quota, reasoning)
 
     def inspect(self, files: OperationFiles, cancel: threading.Event, *, full: bool = True) -> Metadata:
         deadline = time.monotonic() + 15

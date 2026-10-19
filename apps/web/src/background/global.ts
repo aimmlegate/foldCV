@@ -18,6 +18,7 @@ const api = new GlobalJobsApi();
 const transport: GlobalJobsTransport = { index: () => api.index(), stop: (project, id) => projectJobs(project).stop(id),
   discard: (project, id) => projectJobs(project).discard(id) };
 function noticeKind(job: JobSummaryV1): JobNotice["kind"] | null {
+  if (job.approvalRequired && (job.saved || job.execution === "completed" && job.publication === "no_change")) return null;
   return job.execution === "cancelled" ? "cancelled" : ["failed", "interrupted"].includes(job.execution) ? "failed"
     : job.publication === "needs_review" ? "review" : job.saved && job.kind !== "reconciliation" ? "saved"
     : job.kind !== "reconciliation" && job.execution === "completed" && ["none", "no_change"].includes(job.publication) ? "completed" : null;

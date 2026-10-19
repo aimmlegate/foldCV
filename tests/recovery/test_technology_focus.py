@@ -43,17 +43,16 @@ def job(start, end, technology="Python", **period):
         "periods": [{"start": start, "end": end, **period}]}
 
 
-def test_focus_keeps_technical_unknowns_without_a_logo_and_retains_soft_skills_as_facts():
+def test_focus_requires_a_known_icon_and_keeps_unshown_technologies_as_facts():
     facts, doc = imported([{"kind": "technology", "display": "Командная работа"},
         {"kind": "technology", "display": "Python", "technical": False},
         {"kind": "technology", "display": "NovelEngine", "technical": True},
         {"kind": "technology", "display": "Ansible"}, {"kind": "technology", "display": "SQL"}])
     focus = doc.regions[1].blocks[0]
-    assert [b.content[0].text for b in focus.children] == ["NovelEngine", "Ansible", "SQL"]
+    assert [b.content[0].text for b in focus.children] == ["Ansible", "SQL"]
     roles = presentation(doc, facts).blocks
-    assert roles[focus.children[0].id].logo is None
-    assert roles[focus.children[1].id].logo == "assets/technology-library/ansible.png"
-    assert roles[focus.children[2].id].logo == "assets/technology-library/sql.png"
+    assert roles[focus.children[0].id].logo == "assets/technology-library/ansible.png"
+    assert roles[focus.children[1].id].logo == "assets/technology-library/sql.png"
     assert len(facts.records) == 5
     assert not is_technical(facts.records[0])
 
@@ -87,10 +86,10 @@ def test_stated_qualified_experience_wins_is_editable_and_exports_the_same_label
     assert technology_experience(facts)["python"][0] == "Более 5 лет"
     set_text(selected, "experience", "Около 6 лет")
     labels = [v.experience for v in presentation(doc, facts).blocks.values() if v.role == "focus_entry"]
-    assert labels == ["Около 6 лет"]
+    assert labels == ["6 years"]
     with ZipFile(BytesIO(render_rich_docx(doc, facts=facts))) as archive:
         xml = etree.fromstring(archive.read("word/document.xml"))
-        assert "Около 6 лет" in xml.xpath("//w:t/text()", namespaces={"w": "http://schemas.openxmlformats.org/wordprocessingml/2006/main"})
+        assert "6 years" in xml.xpath("//w:t/text()", namespaces={"w": "http://schemas.openxmlformats.org/wordprocessingml/2006/main"})
     assert WorkingFacts.model_validate_json(facts.model_dump_json(by_alias=True)).records == facts.records
 
 
@@ -137,7 +136,7 @@ def test_panel_experience_edit_refreshes_focus_without_rewriting_source_or_techn
     assert changed.project.facts.records[0].display.raw_text == "Python"
     assert changed.project.facts.records[0].experience.user_corrected
     roles = presentation(changed.project.document, changed.project.facts).blocks
-    assert [r.experience for r in roles.values() if r.role == "focus_entry"] == ["Более 4 лет"]
+    assert [r.experience for r in roles.values() if r.role == "focus_entry"] == ["4 years"]
 
 
 def test_invalid_and_undated_links_do_not_become_zero_or_inflate_experience():
@@ -154,8 +153,8 @@ def test_job_technology_metadata_keeps_its_owner_and_stated_duration_without_cat
     technology = next(r for r in facts.records if r.kind == "technology" and r.display.raw_text == "NovelEngine")
     assert technology.job_id == employment.id and technology.canonical_id.value is None
     assert is_technical(technology)
-    role = next(v for v in presentation(doc, facts).blocks.values() if v.experience == "Около 2 лет")
-    assert role.role == "focus_entry" and role.logo is None
+    assert not any(v.experience == "Около 2 лет" for v in presentation(doc, facts).blocks.values())
+    assert all(entry.display != "NovelEngine" for entry in presentation(doc, facts).focus_entries)
 
 
 def test_pending_source_duration_does_not_fall_back_to_a_stale_statement_or_estimate():
