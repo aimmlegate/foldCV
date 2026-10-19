@@ -138,6 +138,19 @@
     ]
   },
   "properties": {
+    "beforeRecordId": {
+      "anyOf": [
+        {
+          "minLength": 1,
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Beforerecordid"
+    },
     "capture": {
       "$ref": "#/$defs/ActionCapture"
     },
@@ -173,7 +186,9 @@
         "remove_period",
         "clear_technologies",
         "add_to_focus",
-        "remove_from_focus"
+        "remove_from_focus",
+        "move_technology",
+        "move_focus"
       ],
       "title": "Operation",
       "type": "string"

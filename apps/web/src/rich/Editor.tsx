@@ -77,7 +77,7 @@ const region = createReactBlockSpec({ type: "region", content: "none", propSchem
     <button type="button" className="uir-empty-region" aria-label={`Добавить текст в ${label}`} onClick={() => addText(block.id)}>Добавить текст</button>}</div>;
 } });
 const section = createReactBlockSpec({ type: "section", content: "inline", propSchema: {
-  recordId: { default: "" }, presentation: { default: "standard", values: ["standard", "focus"] },
+  recordId: { default: "" }, presentation: { default: "standard", values: ["standard", "focus"] }, manualOrder: { default: false },
   textAlignment: { default: "left", values: ["left", "center", "right", "justify"] }, textColor: { default: "default" }, backgroundColor: { default: "default" },
 } }, { render: ({ contentRef }) => <h2 className="cv-section-title" ref={contentRef} /> });
 const factField = createReactInlineContentSpec({ type: "factField", content: "styled", propSchema: {
@@ -116,7 +116,7 @@ function toBlock(block: RichBlock): InputBlock {
   if (block.type !== "code" && block.type !== "divider" && block.type !== "table" && block.type !== "image") {
     const props = { textAlignment: block.props.alignment ?? "left", textColor: block.props.textColor ?? "default", backgroundColor: block.props.backgroundColor ?? "default" };
     if (block.type === "heading") return { id: block.id, type: "heading", props: { ...props, level: block.props.level }, content: toInline(block.content), children };
-    if (block.type === "section") return { id: block.id, type: "section", props: { ...props, recordId: block.props.recordId ?? "", presentation: block.props.presentation ?? "standard" }, content: toInline(block.content), children };
+    if (block.type === "section") return { id: block.id, type: "section", props: { ...props, recordId: block.props.recordId ?? "", presentation: block.props.presentation ?? "standard", manualOrder: block.props.manualOrder ?? false }, content: toInline(block.content), children };
     if (block.type === "bullet_list") return { id: block.id, type: "bulletListItem", props, content: toInline(block.content), children };
     if (block.type === "numbered_list") return { id: block.id, type: "numberedListItem", props: block.props.start === null || block.props.start === undefined ? props : { ...props, start: block.props.start }, content: toInline(block.content), children };
     if (block.type === "check_list") return { id: block.id, type: "checkListItem", props: { ...props, checked: block.props.checked }, content: toInline(block.content), children };
@@ -392,7 +392,8 @@ export function RichEditor({ initial, acknowledge, onStatus, ref, onHistoryNavig
       }) };
       const props = { alignment: block.props.textAlignment, textColor: wireColor(block.props.textColor, "text"), backgroundColor: wireColor(block.props.backgroundColor, "background") };
       if (block.type === "heading") return { ...common, type: "heading", props: { ...props, level: block.props.level } };
-      if (block.type === "section") return { ...common, type: "section", props: { ...props, recordId: block.props.recordId || null, presentation: block.props.presentation } };
+      if (block.type === "section") return { ...common, type: "section", props: { ...props, recordId: block.props.recordId || null, presentation: block.props.presentation,
+        ...(block.props.manualOrder ? { manualOrder: true } : {}) } };
       if (block.type === "bulletListItem") return { ...common, type: "bullet_list", props };
       if (block.type === "numberedListItem") return { ...common, type: "numbered_list", props: { ...props, start: block.props.start ?? null } };
       if (block.type === "checkListItem") return { ...common, type: "check_list", props: { ...props, checked: block.props.checked } };

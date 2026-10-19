@@ -5553,6 +5553,11 @@
           "title": "Backgroundcolor",
           "type": "string"
         },
+        "manualOrder": {
+          "default": false,
+          "title": "Manualorder",
+          "type": "boolean"
+        },
         "presentation": {
           "default": "standard",
           "enum": [

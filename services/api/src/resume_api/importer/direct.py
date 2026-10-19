@@ -5,6 +5,7 @@ import copy
 import time
 
 from packages.resume_core.agent_store import AgentFailure
+from packages.resume_core import agent_limits
 from packages.resume_core.background_history import digest_bytes
 from packages.resume_core.import_agent import ImportFailure
 from packages.resume_core.models.importing import IMPORT_TOOLS
@@ -18,7 +19,7 @@ from .result import import_workspace
 from .session import ImportCoordinator, ImportSession, SKILL
 
 
-async def run_import(projects, identifier, generation, rules, selected):
+async def run_import(projects, identifier, generation, rules, selected, *, allow_text_rewrite=True):
     cancel = projects.cancels[(identifier, generation.id)]
     session, operation = None, None
     generation.status = "running"
@@ -39,7 +40,8 @@ async def run_import(projects, identifier, generation, rules, selected):
                 if not current.ready or current.epoch != connection.epoch:
                     raise ImportFailure("AGENT_CONNECTION_CHANGED")
         operation = projects.new_operation(identifier, "normalize_semantics")
-        coordinator = ImportCoordinator(projects, identifier, generation.id, rules, cancel, guard=guard)
+        coordinator = ImportCoordinator(projects, identifier, generation.id, rules, cancel, guard=guard,
+            allow_text_rewrite=allow_text_rewrite)
         coordinator.begin()
         session = ImportSession(coordinator)
         await session.start()
@@ -52,7 +54,8 @@ async def run_import(projects, identifier, generation, rules, selected):
             if projects.persist(identifier) == "failed":
                 raise ProjectFailure("PROJECT_SAVE_FAILED", 503)
         value = RuntimeInput(model=selected[1], prompt=session.prompt, url=session.url, token=session.token,
-            tools=IMPORT_TOOLS, allow_web=False, before_start=ready, revoke=session.revoke,
+            tools=IMPORT_TOOLS, allow_web=False, active_seconds=agent_limits.IMPORT_ACTIVE_SECONDS,
+            before_start=ready, revoke=session.revoke,
             close_tools=close_tools, developer_instructions=SKILL, queued_at=time.monotonic())
         result = await runtime.run(value, cancel, lambda _kind, _payload: None)
         if not result.cleanup_verified:

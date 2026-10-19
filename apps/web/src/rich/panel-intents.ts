@@ -26,6 +26,13 @@ export function currentPanelIntent(command: PanelCommand, facts: WorkingFacts): 
     if (command.operation === "remove") return null;
     throw new Error("Факт уже удалён. Откройте его заново.");
   }
+  if (command.operation === "move_technology" || command.operation === "move_focus") {
+    if (record.kind !== "technology") throw new Error("Технология уже удалена.");
+    if (command.beforeRecordId === record.id) return null;
+    const target = command.beforeRecordId == null ? null : records.find(record => record.id === command.beforeRecordId);
+    if (command.beforeRecordId != null && (!target || target.kind !== "technology" ||
+        command.operation === "move_technology" && target.jobId !== record.jobId)) throw new Error("Список технологий изменился. Повторите перенос.");
+  }
   if ((command.operation === "add_period" || command.operation === "remove_period") && record.kind !== "employment")
     throw new Error("Работа уже удалена.");
   if (command.operation === "remove_period" && record.kind === "employment" && !record.periods.some(period => period.id === command.periodId))

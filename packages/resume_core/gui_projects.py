@@ -13,6 +13,7 @@ class GuiCreateProjectRequest(Wire):
 
 class GuiStartGenerationRequest(Wire):
     text: str | None = Field(default=None, max_length=60000)
+    allow_text_rewrite: bool = Field(default=True, strict=True)
 
 
 class GuiProjectResponse(Wire):

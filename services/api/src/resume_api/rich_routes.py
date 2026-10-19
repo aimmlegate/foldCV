@@ -5,7 +5,7 @@ import asyncio
 from fastapi import Request
 from fastapi.responses import JSONResponse, Response
 
-from packages.resume_core.gui_projects import GuiCreateProjectRequest, GuiArchiveRequest, GuiRenameProjectRequest, GuiDeleteProjectRequest
+from packages.resume_core.gui_projects import GuiCreateProjectRequest, GuiStartGenerationRequest, GuiArchiveRequest, GuiRenameProjectRequest, GuiDeleteProjectRequest
 from packages.resume_core.models.rich_mutations import RichMutation, ActionCapture
 from packages.resume_core.rendering.template import RenderFailure
 from .contracts import EmptyRequest
@@ -95,9 +95,9 @@ def mount_rich_projects(app, service, problem):
         return response(identifier)
 
     @app.post(prefix + "/{identifier}/generation")
-    async def generation(identifier: str, _payload: EmptyRequest):
+    async def generation(identifier: str, payload: GuiStartGenerationRequest):
         legacy_fixed()
-        service.start(identifier)
+        service.start(identifier, allow_text_rewrite=payload.allow_text_rewrite)
         return response(identifier, 202)
 
     @app.post(prefix + "/{identifier}/cancel")

@@ -201,6 +201,64 @@ def test_state_changing_notifications_fail_closed(method, code):
         NativeSession(input_value(), threading.Event(), lambda *_: None).accept(frame(None, method, {}))
 
 
+def captured_settings(value, cwd):
+    return {"threadId": "thread_1", "threadSettings": {"model": value.model, "modelProvider": "openai",
+        "cwd": str(cwd), "approvalPolicy": "never", "approvalsReviewer": "user", "effort": value.reasoning_effort,
+        "sandboxPolicy": {"type": "readOnly", "networkAccess": False},
+        "collaborationMode": {"mode": "default", "settings": {"model": value.model,
+            "reasoning_effort": value.reasoning_effort, "developer_instructions": None}}}}
+
+
+def test_native_settings_echo_keeps_captured_permissions_and_emits_no_payload(tmp_path):
+    value = input_value()
+    events = []
+    session = NativeSession(value, threading.Event(), lambda *event: events.append(event))
+    session.thread, session.operation = "thread_1", tmp_path
+    assert session.accept(frame(None, "thread/settings/updated", captured_settings(value, tmp_path))) is None
+    assert not events and session.result.error is None and session.turn is None
+
+
+@pytest.mark.parametrize(("key", "changed", "code"), [
+    ("model", "other-model", "AGENT_MODEL_REROUTED"),
+    ("modelProvider", "foreign", "AGENT_RUNTIME_UNSUPPORTED"),
+    ("approvalPolicy", "never-again", "AGENT_RUNTIME_UNSUPPORTED"),
+    ("approvalsReviewer", "auto_review", "AGENT_RUNTIME_UNSUPPORTED"),
+    ("cwd", "/different", "AGENT_RUNTIME_UNSUPPORTED"),
+    ("effort", "high", "AGENT_RUNTIME_UNSUPPORTED"),
+    ("sandboxPolicy", {"type": "readOnly", "networkAccess": True}, "AGENT_RUNTIME_UNSUPPORTED"),
+    ("sandboxPolicy", {"type": "workspaceWrite"}, "AGENT_RUNTIME_UNSUPPORTED"),
+    ("sandboxPolicy", None, "AGENT_RUNTIME_UNSUPPORTED"),
+    ("collaborationMode", {"mode": "plan", "settings": {}}, "AGENT_RUNTIME_UNSUPPORTED"),
+    ("collaborationMode", {"mode": "default", "settings": {"model": "different"}}, "AGENT_RUNTIME_UNSUPPORTED"),
+])
+def test_native_settings_echo_rejects_model_or_permission_changes(tmp_path, key, changed, code):
+    value = input_value()
+    session = NativeSession(value, threading.Event(), lambda *_: None)
+    session.thread, session.operation = "thread_1", tmp_path
+    params = captured_settings(value, tmp_path)
+    params["threadSettings"][key] = changed
+    with pytest.raises(AgentFailure, match=code):
+        session.accept(frame(None, "thread/settings/updated", params))
+
+
+def test_native_settings_echo_requires_the_bound_thread_and_settings(tmp_path):
+    session = NativeSession(input_value(), threading.Event(), lambda *_: None)
+    session.thread, session.operation = "thread_1", tmp_path
+    for params in ({"threadId": "thread_1"}, {"threadId": "foreign", "threadSettings": {}},
+            {"threadId": "thread_1", "threadSettings": []}):
+        with pytest.raises(AgentFailure, match="AGENT_PROTOCOL"):
+            session.accept(frame(None, "thread/settings/updated", params))
+
+
+def test_import_runtime_rejects_host_resource_discovery_before_a_tool_can_execute():
+    from packages.resume_core.models.importing import IMPORT_TOOLS
+    session = NativeSession(input_value(tools=IMPORT_TOOLS), threading.Event(), lambda *_: None)
+    with pytest.raises(AgentFailure, match="AGENT_TOOL_DENIED"):
+        session.item("item/started", {"id": "resource-discovery", "type": "mcpToolCall",
+            "server": "codex", "tool": "list_mcp_resources"})
+    assert session.result.tool_calls == 0 and session.items == {}
+
+
 @pytest.mark.parametrize(("error", "code"), [({"code": "insufficient_quota"}, "AGENT_QUOTA"),
     ({"code": "unauthorized"}, "AGENT_AUTH_REQUIRED"), ({"code": "unsupported_model"}, "AGENT_MODEL_INCOMPATIBLE")])
 @pytest.mark.asyncio
@@ -222,6 +280,14 @@ async def test_startup_and_active_deadlines_have_distinct_typed_outcomes(tmp_pat
     active = runtime(tmp_path / "active", value, script(value), active_seconds=0.1)
     result = await active.run(value, threading.Event(), lambda *_: None)
     assert result.error == "AGENT_DEADLINE" and result.native_started
+
+
+@pytest.mark.asyncio
+async def test_per_import_duration_overrides_the_runtime_default(tmp_path):
+    value = input_value(active_seconds=300)
+    driver = runtime(tmp_path, value, script(value, turn_events=complete_events()), active_seconds=0.001)
+    result = await driver.run(value, threading.Event(), lambda *_: None)
+    assert result.state == "completed" and result.cleanup_verified
 
 
 def test_untrusted_configuration_and_web_off_fail_before_side_effects():

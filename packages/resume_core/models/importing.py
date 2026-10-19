@@ -79,6 +79,8 @@ class ImportBlock(Wire):
     region: Literal["header", "sidebar", "main"] = "main"
     kind: Literal["paragraph", "heading", "section", "bullet_list", "duplicate", "source_only"] = "paragraph"
     title: str | None = Field(default=None, max_length=200)
+    text: str | None = Field(default=None, min_length=1, max_length=16000,
+        exclude_if=lambda value: value is None)
     list_item: bool = Field(default=False, exclude_if=lambda value: not value)
     model_block: bool = Field(default=False, exclude_if=lambda value: not value)
     duplicate_of: list[Id] = Field(default_factory=list, max_length=1000, exclude_if=lambda value: not value)
@@ -95,6 +97,9 @@ class ImportBlock(Wire):
         if (self.kind == "source_only" and not (self.reason and self.reason.strip())
                 or self.kind != "source_only" and self.reason is not None):
             raise ValueError("Only a source-only block needs an omission reason")
+        if self.text is not None and (not self.text.strip() or not self.source_keys
+                or self.kind in {"duplicate", "source_only"}):
+            raise ValueError("Rewritten text needs source keys and a visible block")
         return self
 
 
@@ -166,7 +171,11 @@ class ContentLanguage(ImportLanguage, ContentRefs):
 class ContentBlock(Wire):
     type: Literal["paragraph", "heading", "section", "list_item", "duplicate", "source_only"]
     refs: list[ParagraphRef] = Field(min_length=1, max_length=2000,
-        description="Source paragraphs in this complete block, in reading order. Keep source wording.")
+        description="Source paragraphs supporting this complete block, in reading order.")
+    text: str | None = Field(default=None, min_length=1, max_length=16000,
+        exclude_if=lambda value: value is None,
+        description="Optional edited wording, only when allowTextRewrite is true. Cite all supporting refs. "
+        "Omit to preserve source wording. Facts must remain source-backed.")
     duplicate_of: list[ParagraphRef] = Field(default_factory=list, max_length=2000,
         exclude_if=lambda value: not value,
         description="For a duplicate only: refs to its visible occurrence in this outline. Retain the original source.")
@@ -181,6 +190,8 @@ class ContentBlock(Wire):
         if (self.type == "source_only" and not (self.reason and self.reason.strip())
                 or self.type != "source_only" and self.reason is not None):
             raise ValueError("Only a source-only block needs an omission reason")
+        if self.text is not None and (not self.text.strip() or self.type in {"duplicate", "source_only"}):
+            raise ValueError("Rewritten text needs a visible block")
         return self
 
 
@@ -256,6 +267,8 @@ class ImportDraft(Wire):
     source_sha256: Sha256
     skill_sha256: Sha256
     run_id: Id
+    # Older checkpoints never authorized editorial changes.
+    allow_text_rewrite: bool = Field(default=False, strict=True, exclude_if=lambda value: not value)
     sequence: int = Field(default=0, ge=0, le=128)
     facts: list[ImportFact] = Field(default_factory=list, max_length=1000)
     blocks: list[ImportBlock] = Field(default_factory=list, max_length=5000)

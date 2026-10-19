@@ -334,7 +334,7 @@ class RichProjectService(RichSynchronization, RichAssets, GuiProjectService):
                 self.persist(identifier)
         return self.read(identifier)
 
-    def start(self, identifier, previous=None):
+    def start(self, identifier, previous=None, *, allow_text_rewrite=True):
         self.require_agent_writable(identifier)
         workspace = self.read(identifier)
         if self.persist(identifier) == "failed":
@@ -359,7 +359,8 @@ class RichProjectService(RichSynchronization, RichAssets, GuiProjectService):
         key = (identifier, generation.id)
         self.cancels[key] = threading.Event()
         from .importer.direct import run_import
-        self.tasks[key] = asyncio.create_task(run_import(self, identifier, generation, rules, selected))
+        self.tasks[key] = asyncio.create_task(run_import(self, identifier, generation, rules, selected,
+            allow_text_rewrite=allow_text_rewrite))
         return generation.id
 
     def new_operation(self, identifier, kind):

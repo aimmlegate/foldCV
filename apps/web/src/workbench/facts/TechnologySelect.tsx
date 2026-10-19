@@ -7,6 +7,8 @@ import { Icon } from "../ui/Icon";
 import { technologySuggestions } from "./technology-catalog";
 import { FactDialog } from "./FactDialog";
 import { Spinner } from "../ui/OperationStatus";
+import { documentTechnologies } from "../../rich/technology-order";
+import { useTechnologyDrag } from "./useTechnologyDrag";
 
 export function TechnologySelect({ facts, document: resumeDocument, jobId, label, pending, paused, submit, focusRecordId }: {
   facts: WorkingFacts; document: RichDocumentV1; jobId: string | null; label: string; pending: readonly PanelCommand[]; paused: boolean;
@@ -17,13 +19,14 @@ export function TechnologySelect({ facts, document: resumeDocument, jobId, label
   const [open, setOpen] = useState(false), [query, setQuery] = useState(""), [active, setActive] = useState(0);
   const [editing, setEditing] = useState<string | null>(null);
   const [expanded, setExpanded] = useState(false);
-  const records = facts.records.filter((record): record is Extract<WorkingFacts["records"][number], { kind: "technology" }> => record.kind === "technology" && record.jobId === jobId);
+  const records = documentTechnologies(facts, resumeDocument, jobId);
   const focused = records.some(record => record.id === focusRecordId);
   useEffect(() => { if (focused) setExpanded(true); }, [focused]);
   const editedRecord = records.find(record => record.id === editing);
   const scoped = pending.filter(command => command.operation === "clear_technologies" ? (command.jobId ?? null) === jobId
     : command.operation === "add" ? command.recordKind === "technology" && (command.jobId ?? null) === jobId
       : records.some(record => record.id === command.recordId));
+  const drag = useTechnologyDrag(records.map(record => record.id), "move_technology", paused || pending.length > 0, submit);
   const adding = scoped.filter(command => command.operation === "add").map(command => technologyName(command.values?.["display"] ?? ""));
   const selected = new Set([...records.map(record => technologyKey(record.display.rawText)), ...adding.map(technologyKey)]);
   const catalog = useMemo(() => technologySuggestions(facts, jobId, query, resumeDocument), [facts, jobId, query, resumeDocument]);
@@ -49,9 +52,11 @@ export function TechnologySelect({ facts, document: resumeDocument, jobId, label
   return <div className="technology-select" data-technology-scope={jobId ?? ""} ref={root}>
     <span className="technology-label">{jobId ? "Технологии" : "Все технологии"}</span>
     <ul className="technology-values" id={`${id}-values`} aria-label={`Выбранные технологии: ${label}`}>
-        {(expanded || focused ? records : records.slice(0, 8)).map(record => <li key={record.id} className="technology-chip" data-fact-id={record.id}
+        {(expanded || focused ? records : records.slice(0, 8)).map(record => <li key={record.id} className="technology-chip" data-fact-id={record.id} {...drag.target(record.id)}
           aria-busy={scoped.some(command => command.operation === "clear_technologies" || command.recordId === record.id ||
             command.operation === "add" && technologyKey(command.values?.["display"] ?? "") === technologyKey(record.display.rawText))}>
+          <button type="button" className="technology-drag" aria-label={`Порядок: ${record.display.rawText}`} title="Перетащите или нажмите Alt+↑ / Alt+↓"
+            disabled={paused || pending.length > 0} {...drag.handle(record.id)}><span aria-hidden="true">⠿</span></button>
           <button type="button" className="technology-edit" aria-label={`Изменить ${record.display.rawText} и срок опыта`} disabled={paused}
             onClick={event => { event.stopPropagation(); setOpen(false); setEditing(record.id); }}>
             <span>{record.display.rawText}</span>{record.experience?.rawText && <small>{record.experience.rawText}</small>}
@@ -62,6 +67,7 @@ export function TechnologySelect({ facts, document: resumeDocument, jobId, label
         {[...new Set(adding)].filter(name => !records.some(record => technologyKey(record.display.rawText) === technologyKey(name))).map(name =>
           <li key={technologyKey(name)} className="technology-chip" aria-busy="true"><span>{name}</span><Spinner /></li>)}
     </ul>
+    {drag.dragging && <div className="technology-drop-end" {...drag.target(null)}>В конец списка</div>}
     {records.length > 8 && <button type="button" className="technology-expand" aria-expanded={expanded} aria-controls={`${id}-values`}
       onClick={() => { setExpanded(value => !value); }}>{expanded ? "Свернуть список" : `Ещё ${records.length - 8}`}</button>}
     <div className="technology-field" onClick={() => input.current?.focus()}>

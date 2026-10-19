@@ -101,6 +101,7 @@ class RuntimeInput:
     job_id: str | None = None
     cancelled: asyncio.Event | None = None
     reasoning_effort: str = "medium"
+    active_seconds: float | None = None
 
 
 @dataclass
@@ -361,6 +362,25 @@ class NativeSession:
             elif self.result.state == "cancelled":
                 self.result.error = "AGENT_CANCELLED"
             return b""
+        elif method == "thread/settings/updated":
+            settings = params.get("threadSettings")
+            if self.thread is None or params.get("threadId") != self.thread or not isinstance(settings, dict):
+                raise AgentFailure("AGENT_PROTOCOL")
+            if settings.get("model") != self.value.model:
+                raise AgentFailure("AGENT_MODEL_REROUTED")
+            sandbox = settings.get("sandboxPolicy", {})
+            collaboration = settings.get("collaborationMode", {})
+            mode_settings = collaboration.get("settings", {}) if isinstance(collaboration, dict) else {}
+            # A settings echo is valid only while captured permissions and model stay unchanged.
+            if (settings.get("modelProvider") != "openai" or settings.get("approvalPolicy") != "never"
+                    or settings.get("approvalsReviewer") != "user" or settings.get("cwd") != str(self.operation)
+                    or settings.get("effort") != self.value.reasoning_effort or not isinstance(sandbox, dict)
+                    or sandbox.get("type") != "readOnly" or sandbox.get("networkAccess", False) is not False
+                    or not isinstance(collaboration, dict) or collaboration.get("mode") != "default"
+                    or not isinstance(mode_settings, dict) or mode_settings.get("model") != self.value.model
+                    or mode_settings.get("reasoning_effort") != self.value.reasoning_effort
+                    or mode_settings.get("developer_instructions") not in (None, self.value.developer_instructions)):
+                raise AgentFailure("AGENT_RUNTIME_UNSUPPORTED")
         elif method == "turn/moderationMetadata":
             # Pinned CLI metadata is opaque and grants no tool or publication authority.
             if (self.thread is None or self.turn is None or params.get("threadId") != self.thread
@@ -484,6 +504,7 @@ class CodexAgentRuntime:
         native_pid, host_pids, operation_path, raw_bytes = None, (), None, 0
         elapsed = value.elapsed_clock
         began_elapsed = elapsed()
+        active_seconds = self.active_seconds if value.active_seconds is None else value.active_seconds
         try:
             if len((value.prompt + BASE_INSTRUCTIONS + value.developer_instructions).encode()) > limits.CONTEXT_BYTES:
                 raise AgentFailure("AGENT_CONTEXT_LIMIT")
@@ -493,7 +514,7 @@ class CodexAgentRuntime:
                     value, self.admission, lambda: cleanup_started):
                 result.timings["admission"] = time.monotonic() - queued
                 session = NativeSession(value, cancel, emit, startup=self.startup_seconds,
-                    active=self.active_seconds, clock=elapsed)
+                    active=active_seconds, clock=elapsed)
                 session.result.timings = result.timings
                 result = session.result
                 with OperationFiles(self.temp_root).open() as files:
@@ -527,7 +548,7 @@ class CodexAgentRuntime:
                         value.revoke()
                     try:
                         try:
-                            runner.run(files, arguments, data=session.begin(), deadline=elapsed() + self.startup_seconds + self.active_seconds,
+                            runner.run(files, arguments, data=session.begin(), deadline=elapsed() + self.startup_seconds + active_seconds,
                                 cancel=threading.Event(), on_line=accept, poll_input=session.poll,
                                 before_cleanup=before_cleanup, on_spawn=value.child_started, interactive=True,
                                 max_line=2 * 1024 * 1024, max_stdout=8 * 1024 * 1024, max_stderr=256 * 1024,

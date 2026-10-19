@@ -253,7 +253,7 @@ async def test_processing_stage_boundaries_keep_captured_input_and_stop_authorit
         if variant == "NB-F03:v08":
             await asyncio.wait_for(entered.wait(), 10)
             control = service.supervisor.controls[reply.job.id]
-            service.supervisor.clock.advance(180)
+            service.supervisor.clock.advance(300)
             await asyncio.wait_for(control.cancelled.wait(), 10)
             release.set()
         elif variant != "NB-F03:v05":

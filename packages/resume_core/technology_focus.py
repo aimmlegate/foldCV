@@ -83,6 +83,8 @@ def focus_membership_steps(workspace, record_id, include):
 
 
 def ordered_focus_children(section, facts):
+    if section.props.manual_order:
+        return list(section.children)
     records = {record.id: record for record in facts.records}
     years = technology_years(facts)
     def key(block):
@@ -91,18 +93,46 @@ def ordered_focus_children(section, facts):
     return sorted(section.children, key=key)
 
 
+def focus_move_steps(workspace, record_id, before_id):
+    from .rich_panel import put_block
+    from .rich_dependencies import placements
+    from .technologies import technology_identity
+    records = {record.id: record for record in workspace.project.facts.records}
+    source = technology_identity(records[record_id])
+    target = technology_identity(records[before_id]) if before_id else None
+    sections = [block for block in workspace.project.document.blocks() if block.type == "section" and block.props.presentation == "focus"]
+    def matches(block, canonical):
+        record = focus_entry_record(block, records)
+        return record is not None and technology_identity(record) == canonical
+    section = next((section for section in sections if any(matches(child, source) for child in section.children)), None)
+    if section is None or target and not any(matches(child, target) for child in section.children):
+        raise ValueError("TECHNOLOGY_TARGET_MISSING")
+    if source == target:
+        return []
+    changed = section.model_copy(deep=True)
+    moving = next(child for child in changed.children if matches(child, source))
+    changed.children.remove(moving)
+    index = next((index for index, child in enumerate(changed.children) if matches(child, target)), len(changed.children))
+    changed.children.insert(index, moving)
+    changed.props.manual_order = True
+    return [put_block(changed, placements(workspace.project.document)).model_copy(update={"block": changed, "keep_children": False})]
+
+
 def focus_order_steps(workspace, steps):
-    from .models.rich_mutations import MoveBlock, PutRecord, RemoveRecord
+    from .models.rich_mutations import MoveBlock, PutRecord, RemoveRecord, RemoveBlock
     preview = workspace.project.facts.model_copy(deep=True)
     changed = {step.record.id: step.record for step in steps if isinstance(step, PutRecord)}
     removed = {step.record_id for step in steps if isinstance(step, RemoveRecord)}
+    removed_blocks = {step.block_id for step in steps if isinstance(step, RemoveBlock)}
     preview.records = [changed.get(record.id, record) for record in preview.records if record.id not in removed]
     result = []
     for section in workspace.project.document.blocks():
-        if section.type != "section" or section.props.presentation != "focus":
+        if section.type != "section" or section.props.presentation != "focus" or section.id in removed_blocks:
             continue
-        current = [block.id for block in section.children]
-        ordered = ordered_focus_children(section, preview)
+        remaining = section.model_copy(deep=True)
+        remaining.children = [child for child in remaining.children if child.id not in removed_blocks]
+        current = [block.id for block in remaining.children]
+        ordered = ordered_focus_children(remaining, preview)
         for index, block in enumerate(ordered):
             if current[index] != block.id:
                 result.append(MoveBlock(kind="move_block", blockId=block.id, beforeRevision=block.revision,

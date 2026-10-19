@@ -30,14 +30,15 @@ def checksum(value):
         default=lambda item: item.model_dump(mode="json", by_alias=True)).encode()).hexdigest()
 
 
-def import_identity(workspace, rules, skill_sha256):
+def import_identity(workspace, rules, skill_sha256, *, allow_text_rewrite=False):
     pre = workspace.pre_draft
     return checksum({"project": workspace.project_id, "created": workspace.project is not None,
         "sources": [s.model_dump(mode="json", by_alias=True) for s in pre.sources
             if s.id == pre.selected_source_id] if pre else [],
         "formatting": workspace.formatting_as_of.model_dump(by_alias=True),
         "rules": rules.model_dump(mode="json", by_alias=True), "skill": skill_sha256,
-        "template": require_rich_template().manifest.model_dump(by_alias=True)})
+        "template": require_rich_template().manifest.model_dump(by_alias=True),
+        **({"allowTextRewrite": True} if allow_text_rewrite else {})})
 
 
 @dataclass(frozen=True)
@@ -63,6 +64,8 @@ def source_parts(sources):
 
 def validate_draft(draft, parts):
     keys = {part.key for part in parts}
+    if not draft.allow_text_rewrite and any(block.text is not None for block in draft.blocks):
+        raise ImportFailure("IMPORT_REWRITE_DISABLED")
     for items in (draft.facts, draft.blocks):
         if len({item.id for item in items}) != len(items):
             raise ImportFailure("IMPORT_DUPLICATE_ID")
@@ -164,7 +167,8 @@ def assemble_agent_import(workspace, draft):
             repeated_names.add(key)
     omitted = {}
     categorized = any(block.category for block in draft.blocks)
-    def add_block(identifier, keys, region="main", kind="paragraph", title=None, *, model_block=False, model_item=False):
+    def add_block(identifier, keys, region="main", kind="paragraph", title=None, *, model_block=False, model_item=False,
+            edited_text=None):
         pieces, previous = [], None
         for key in keys:
             part = by_key[key]
@@ -174,6 +178,8 @@ def assemble_agent_import(workspace, draft):
             pieces.append(part.text)
             previous = part
         text = "".join(pieces) if keys else title
+        if edited_text is not None:
+            text = edited_text
         if model_block and kind in {"paragraph", "heading", "section"}:
             text = " ".join(text.split())
         if keys:
@@ -240,7 +246,7 @@ def assemble_agent_import(workspace, draft):
             continue
         repeated = not block.model_block and block.category == "other" and block.id.rsplit("_", 1)[0] in repeated_names
         rendered = None if repeated else add_block(["draft", block.id], block.source_keys, block.region, block.kind,
-            block.title, model_block=block.model_block, model_item=block.list_item)
+            block.title, model_block=block.model_block, model_item=block.list_item, edited_text=block.text)
         if rendered:
             metadata[rendered["id"]] = block
         covered.update(block.source_keys)
@@ -264,7 +270,9 @@ def assemble_agent_import(workspace, draft):
     issues = list(draft.issues)
     if any("IMAGE" in source.warnings for source in sources):
         issues.append("Изображения в исходнике не обработаны; использован доступный текстовый слой.")
-    placements = [key for block in draft.blocks if block.kind not in {"duplicate", "source_only"} for key in block.source_keys]
+    # Edited summaries can cite the same evidence as detailed project blocks.
+    placements = [key for block in draft.blocks if block.kind not in {"duplicate", "source_only"}
+        and block.text is None for key in block.source_keys]
     if len(placements) != len(set(placements)):
         issues.append("Некоторые фрагменты исходника размещены повторно. Проверьте, нужны ли эти повторы.")
     if not draft.facts:

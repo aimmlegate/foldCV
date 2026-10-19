@@ -1,3 +1,4 @@
+export type Beforerecordid = string | null;
 export type Actionid = string;
 export type Actiontoken = number;
 export type Fingerprint = string | null;
@@ -18,12 +19,15 @@ export type Operation =
   | "remove_period"
   | "clear_technologies"
   | "add_to_focus"
-  | "remove_from_focus";
+  | "remove_from_focus"
+  | "move_technology"
+  | "move_focus";
 export type Periodid = string | null;
 export type Recordid = string | null;
 export type Recordkind = ("candidate" | "employment" | "technology" | "education" | "language" | "claim") | null;
 
 export interface RichPanelRequest {
+  beforeRecordId?: Beforerecordid;
   capture: ActionCapture;
   documentRevision: Documentrevision;
   factsRevision: Factsrevision;

@@ -28,9 +28,10 @@ MODELS = {"read_import": ImportRead, "save_import": ImportContent, "finish_impor
 
 
 class ImportCoordinator:
-    def __init__(self, projects, identifier, run_id, rules, cancel, *, guard=lambda: None):
+    def __init__(self, projects, identifier, run_id, rules, cancel, *, guard=lambda: None, allow_text_rewrite=False):
         self.projects, self.identifier, self.run_id = projects, identifier, run_id
         self.rules, self.cancel, self.authorize = rules, cancel, guard
+        self.allow_text_rewrite = allow_text_rewrite
         self.failure_code = None
         self.workspace = projects.read(identifier).model_copy(deep=True)
         if self.workspace.project is not None or self.workspace.pre_draft is None:
@@ -42,7 +43,7 @@ class ImportCoordinator:
             raise ImportFailure("NO_USABLE_TEXT")
         if len(self.parts) > 2000 or sum(len(part.text.encode()) for part in self.parts) > 256 * 1024:
             raise ImportFailure("IMPORT_INPUT_TOO_LARGE")
-        self.source_sha256 = import_identity(self.workspace, rules, SKILL_SHA256)
+        self.source_sha256 = import_identity(self.workspace, rules, SKILL_SHA256, allow_text_rewrite=self.allow_text_rewrite)
 
     def guard(self):
         if self.failure_code:
@@ -51,7 +52,8 @@ class ImportCoordinator:
             raise ImportFailure("CANCELLED")
         self.authorize()
         current = self.projects.read(self.identifier)
-        if import_identity(current, self.projects.rules.load(), SKILL_SHA256) != self.source_sha256:
+        if import_identity(current, self.projects.rules.load(), SKILL_SHA256,
+                allow_text_rewrite=self.allow_text_rewrite) != self.source_sha256:
             raise ImportFailure("STALE_GENERATION")
         return current
 
@@ -92,7 +94,8 @@ class ImportCoordinator:
                 draft = old.model_copy(deep=True)
                 draft.run_id, draft.finished = self.run_id, False
             else:
-                draft = ImportDraft(sourceSha256=self.source_sha256, skillSha256=SKILL_SHA256, runId=self.run_id)
+                draft = ImportDraft(sourceSha256=self.source_sha256, skillSha256=SKILL_SHA256, runId=self.run_id,
+                    allowTextRewrite=self.allow_text_rewrite)
             self.save(draft, begin=True)
 
     def update(self, request):
@@ -218,6 +221,8 @@ class ImportDispatcher:
                     result["error"]["message"] = "Use narrower supporting references for each fact or profile; evidence exceeds the storage limit."
                 elif error.code == "IMPORT_DRAFT_TOO_LARGE":
                     result["error"]["message"] = "The draft exceeds the storage limit. Reduce repeated placements or shorten fact values."
+                elif error.code == "IMPORT_REWRITE_DISABLED":
+                    result["error"]["message"] = "Text rewriting is disabled. Omit block text and use source refs only."
                 return result
 
 
@@ -227,7 +232,10 @@ class ImportSession(PrivateMcp):
         dispatcher = ImportDispatcher(coordinator)
         super().__init__(dispatcher)
         self.prompt = json.dumps({"task": "Import the complete selected resume using the bundled instructions.",
-            "sources": [source.original_name for source in coordinator.sources]}, ensure_ascii=False)
+            "sources": [source.original_name for source in coordinator.sources],
+            "allowTextRewrite": coordinator.allow_text_rewrite,
+            **({"formattingAsOf": coordinator.workspace.formatting_as_of.model_dump(mode="json", by_alias=True)}
+                if coordinator.allow_text_rewrite else {})}, ensure_ascii=False)
         if len((self.prompt + SKILL + BASE_INSTRUCTIONS).encode()) > limits.CONTEXT_BYTES:
             self.listener.close()
             raise ImportFailure("IMPORT_INPUT_TOO_LARGE")

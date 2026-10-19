@@ -44,3 +44,21 @@ test("import draft shape rejects unknown block kinds and malformed duplicate lin
     assert.equal(validateRichWorkspaceShape(invalid), false);
   }
 });
+
+test("import progress accepts edited text with its captured permission and source keys", async () => {
+  const workspace = await draftWorkspace();
+  const draft = workspace.preDraft?.importDraft;
+  assert.ok(draft);
+  draft.allowTextRewrite = true;
+  const block = draft.blocks?.[0];
+  assert.ok(block);
+  block.text = "A clearer source-backed heading";
+  assert.ok(validateRichWorkspaceShape(workspace));
+  for (const [key, value] of [["allowTextRewrite", "false"], ["text", 42]] as const) {
+    const invalid = structuredClone(workspace);
+    const target = key === "allowTextRewrite" ? invalid.preDraft?.importDraft : invalid.preDraft?.importDraft?.blocks?.[0];
+    assert.ok(target);
+    Reflect.set(target, key, value);
+    assert.equal(validateRichWorkspaceShape(invalid), false);
+  }
+});

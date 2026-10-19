@@ -104,6 +104,7 @@ class JobRuntime:
                 child_started=started_shared if multiplexed else lambda: call(control.child_started()),
                 revoke=revoke, close_tools=close_shared if multiplexed else close_tools,
                 developer_instructions=self.instructions, elapsed_clock=self.service.supervisor.clock.now,
+                active_seconds=control.active_seconds,
                 job_id=control.run_id, cancelled=control.cancelled)
             self.runtime_entered = True
             self.result = await runtime.run(value, control.cancel, emit)

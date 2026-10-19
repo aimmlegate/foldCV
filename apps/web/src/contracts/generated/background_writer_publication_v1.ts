@@ -571,6 +571,7 @@ export type Orderindex = number;
 export type Recordid1 = string;
 export type Revision20 = number;
 export type Tombstones = RecordTombstone[];
+export type Allowtextrewrite = boolean;
 export type Category1 =
   ("identity" | "contacts" | "summary" | "experience" | "education" | "skills" | "languages" | "other") | null;
 /**
@@ -587,6 +588,7 @@ export type Region = "header" | "sidebar" | "main";
  * @maxItems 1000
  */
 export type Sourcekeys = string[];
+export type Text3 = string | null;
 export type Title1 = string | null;
 /**
  * @maxItems 5000
@@ -627,7 +629,7 @@ export type Level = string;
  * @maxItems 1000
  */
 export type Sourcekeys1 = string[];
-export type Text3 = string;
+export type Text4 = string;
 /**
  * @maxItems 1000
  */
@@ -696,7 +698,7 @@ export type Originalname = string;
 export type Id31 = string;
 export type Origin12 = "user";
 export type Revision21 = number;
-export type Text4 = string;
+export type Text5 = string;
 export type Unitid2 = string;
 export type Overlays = SourceOverlay[];
 export type Parser = string;
@@ -726,7 +728,7 @@ export type Listlevel = number | null;
 export type Part = string | null;
 export type Rowmerge = ("start" | "continue") | null;
 export type Style = string | null;
-export type Text5 = string;
+export type Text6 = string;
 export type Units = SourceUnit[];
 export type Code3 = string;
 export type Page1 = number | null;
@@ -769,7 +771,7 @@ export type Italic = boolean;
 export type Strike = boolean;
 export type Textcolor = string;
 export type Underline = boolean;
-export type Text6 = string;
+export type Text7 = string;
 export type Type7 = "text";
 export type Content1 = StyledText[];
 export type Href = string;
@@ -779,12 +781,13 @@ export type Bindingrootid = string | null;
 export type Fieldkey = string;
 export type Recordid2 = string;
 export type Syncedfactrevision = number;
-export type Text7 = string;
+export type Text8 = string;
 export type Type9 = "fact_field";
 export type Content = (StyledText | Hyperlink | FactFieldSpan)[];
 export type Id34 = string;
 export type Alignment = "left" | "center" | "right" | "justify";
 export type Backgroundcolor1 = string;
+export type Manualorder = boolean;
 export type Presentation = "standard" | "focus";
 export type Recordid3 = string | null;
 export type Textcolor1 = string;
@@ -1848,6 +1851,7 @@ export interface RecordTombstone {
   revision: Revision20;
 }
 export interface ImportDraft {
+  allowTextRewrite?: Allowtextrewrite;
   blocks?: Blocks1;
   facts?: Facts;
   finished?: Finished;
@@ -1871,13 +1875,14 @@ export interface ImportBlock {
   reason?: Reason;
   region?: Region;
   sourceKeys?: Sourcekeys;
+  text?: Text3;
   title?: Title1;
 }
 export interface ImportFact {
   id: Id28;
   record?: Record;
   sourceKeys?: Sourcekeys1;
-  text?: Text3;
+  text?: Text4;
 }
 export interface ImportEmployment {
   employer?: Employer;
@@ -1957,7 +1962,7 @@ export interface SourceOverlay {
   id: Id31;
   origin: Origin12;
   revision: Revision21;
-  text: Text4;
+  text: Text5;
   unitId: Unitid2;
 }
 export interface SourceUnit {
@@ -1968,7 +1973,7 @@ export interface SourceUnit {
   representedFactIds: Representedfactids;
   revision: Revision23;
   structure?: SourceStructure | null;
-  text: Text5;
+  text: Text6;
 }
 export interface SourceLocation {
   column: Column;
@@ -2145,7 +2150,7 @@ export interface SectionBlock {
 }
 export interface StyledText {
   styles: InlineStyles;
-  text: Text6;
+  text: Text7;
   type: Type7;
 }
 export interface InlineStyles {
@@ -2169,12 +2174,13 @@ export interface FactFieldSpan {
   recordId: Recordid2;
   styles: InlineStyles;
   syncedFactRevision: Syncedfactrevision;
-  text: Text7;
+  text: Text8;
   type: Type9;
 }
 export interface SectionProps {
   alignment?: Alignment;
   backgroundColor?: Backgroundcolor1;
+  manualOrder?: Manualorder;
   presentation?: Presentation;
   recordId: Recordid3;
   textColor?: Textcolor1;

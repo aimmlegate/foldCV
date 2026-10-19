@@ -47,3 +47,6 @@
 @media (max-width: 1000px) { .progress-screen { padding: 26px; } .import-progress-grid { gap: 24px; grid-template-columns: minmax(170px, .8fr) minmax(0, 1.2fr); } }
 @media (max-width: 700px) { .progress-screen { align-items: flex-start; padding: 24px; } .import-progress-grid { grid-template-columns: minmax(0, 1fr); gap: 14px; margin-top: 22px; } .import-live-message { min-height: 0; margin-top: 14px; } .progress-screen .progress-content h2 { font-size: 29px; } .import-discoveries { padding: 18px; } .import-progress-footer { align-items: flex-start; flex-direction: column; gap: 10px; margin-top: 20px; } }
 @media (prefers-reduced-motion: reduce) { .import-activity-dot { animation: none; } }
+.source-form .source-rewrite { display: flex; align-items: flex-start; gap: 10px; margin-top: 18px; font-size: 12px; line-height: 1.5; color: var(--ink); cursor: pointer; }
+.source-rewrite input { width: 16px; height: 16px; margin: 2px 0 0; flex-shrink: 0; accent-color: var(--accent); }
+.source-rewrite small { display: block; margin-top: 4px; font-size: 11px; font-weight: 400; color: var(--muted); }

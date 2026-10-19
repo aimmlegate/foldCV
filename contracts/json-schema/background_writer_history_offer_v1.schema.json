@@ -2748,6 +2748,20 @@
           "title": "Sourcekeys",
           "type": "array"
         },
+        "text": {
+          "anyOf": [
+            {
+              "maxLength": 16000,
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Text"
+        },
         "title": {
           "anyOf": [
             {
@@ -2822,6 +2836,11 @@
     "ImportDraft": {
       "additionalProperties": false,
       "properties": {
+        "allowTextRewrite": {
+          "default": false,
+          "title": "Allowtextrewrite",
+          "type": "boolean"
+        },
         "blocks": {
           "items": {
             "$ref": "#/$defs/ImportBlock"
@@ -7092,6 +7111,11 @@
           "pattern": "^(default|#[a-fA-F0-9]{6})$",
           "title": "Backgroundcolor",
           "type": "string"
+        },
+        "manualOrder": {
+          "default": false,
+          "title": "Manualorder",
+          "type": "boolean"
         },
         "presentation": {
           "default": "standard",

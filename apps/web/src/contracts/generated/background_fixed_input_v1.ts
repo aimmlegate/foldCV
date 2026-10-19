@@ -72,6 +72,7 @@ export type Content = (StyledText | Hyperlink | FactFieldSpan)[];
 export type Id3 = string;
 export type Alignment = "left" | "center" | "right" | "justify";
 export type Backgroundcolor1 = string;
+export type Manualorder = boolean;
 export type Presentation = "standard" | "focus";
 export type Recordid1 = string | null;
 export type Textcolor1 = string;
@@ -556,6 +557,7 @@ export type Reasoningeffort = ("none" | "minimal" | "low" | "medium" | "high" | 
 export type Clientrequestid = string;
 export type Command =
   FixedProcessingCommand | FixedCompletionCommand | FixedRewriteCommand | FixedPanelCommand | FixedRetryCommand;
+export type Allowtextrewrite = boolean;
 export type Kind25 = "processing";
 export type Kind26 = "completion";
 /**
@@ -638,6 +640,7 @@ export type Orderindex = number;
 export type Recordid7 = string;
 export type Revision34 = number;
 export type Tombstones = RecordTombstone[];
+export type Allowtextrewrite1 = boolean;
 export type Category1 =
   ("identity" | "contacts" | "summary" | "experience" | "education" | "skills" | "languages" | "other") | null;
 /**
@@ -654,6 +657,7 @@ export type Region = "header" | "sidebar" | "main";
  * @maxItems 1000
  */
 export type Sourcekeys = string[];
+export type Text3 = string | null;
 export type Title = string | null;
 /**
  * @maxItems 5000
@@ -694,7 +698,7 @@ export type Level1 = string;
  * @maxItems 1000
  */
 export type Sourcekeys1 = string[];
-export type Text3 = string;
+export type Text4 = string;
 /**
  * @maxItems 1000
  */
@@ -763,7 +767,7 @@ export type Originalname = string;
 export type Id38 = string;
 export type Origin12 = "user";
 export type Revision35 = number;
-export type Text4 = string;
+export type Text5 = string;
 export type Unitid2 = string;
 export type Overlays = SourceOverlay[];
 export type Parser = string;
@@ -793,7 +797,7 @@ export type Listlevel = number | null;
 export type Part = string | null;
 export type Rowmerge = ("start" | "continue") | null;
 export type Style = string | null;
-export type Text5 = string;
+export type Text6 = string;
 export type Units = SourceUnit[];
 export type Code2 = string;
 export type Page1 = number | null;
@@ -1081,6 +1085,7 @@ export interface FactFieldSpan {
 export interface SectionProps {
   alignment?: Alignment;
   backgroundColor?: Backgroundcolor1;
+  manualOrder?: Manualorder;
   presentation?: Presentation;
   recordId: Recordid1;
   textColor?: Textcolor1;
@@ -1435,6 +1440,7 @@ export interface JobFixedRequestV1 {
   schemaVersion: Schemaversion;
 }
 export interface FixedProcessingCommand {
+  allowTextRewrite?: Allowtextrewrite;
   kind: Kind25;
 }
 export interface FixedCompletionCommand {
@@ -1545,6 +1551,7 @@ export interface RecordTombstone {
   revision: Revision34;
 }
 export interface ImportDraft {
+  allowTextRewrite?: Allowtextrewrite1;
   blocks?: Blocks;
   facts?: Facts;
   finished?: Finished;
@@ -1568,13 +1575,14 @@ export interface ImportBlock {
   reason?: Reason;
   region?: Region;
   sourceKeys?: Sourcekeys;
+  text?: Text3;
   title?: Title;
 }
 export interface ImportFact {
   id: Id35;
   record?: Record1;
   sourceKeys?: Sourcekeys1;
-  text?: Text3;
+  text?: Text4;
 }
 export interface ImportEmployment {
   employer?: Employer;
@@ -1654,7 +1662,7 @@ export interface SourceOverlay {
   id: Id38;
   origin: Origin12;
   revision: Revision35;
-  text: Text4;
+  text: Text5;
   unitId: Unitid2;
 }
 export interface SourceUnit {
@@ -1665,7 +1673,7 @@ export interface SourceUnit {
   representedFactIds: Representedfactids;
   revision: Revision37;
   structure?: SourceStructure | null;
-  text: Text5;
+  text: Text6;
 }
 export interface SourceLocation {
   column: Column;

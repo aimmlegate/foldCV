@@ -1,6 +1,7 @@
 export type Clientrequestid = string;
 export type Command =
   FixedProcessingCommand | FixedCompletionCommand | FixedRewriteCommand | FixedPanelCommand | FixedRetryCommand;
+export type Allowtextrewrite = boolean;
 export type Kind = "processing";
 export type Kind1 = "completion";
 /**
@@ -67,6 +68,7 @@ export interface JobFixedRequestV1 {
   schemaVersion: Schemaversion;
 }
 export interface FixedProcessingCommand {
+  allowTextRewrite?: Allowtextrewrite;
   kind: Kind;
 }
 export interface FixedCompletionCommand {

@@ -109,6 +109,7 @@ class EmptyProps(Wire):
 class SectionProps(ParagraphProps):
     record_id: Id | None
     presentation: Literal["standard", "focus"] = "standard"
+    manual_order: bool = Field(default=False, exclude_if=lambda value: not value)
 
 
 class ImageProps(Wire):

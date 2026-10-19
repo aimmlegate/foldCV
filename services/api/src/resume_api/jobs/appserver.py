@@ -113,7 +113,8 @@ class SharedAgentRuntime:
             response = await self.server.run(TurnInput(value.job_id, value.model, value.prompt,
                 value.developer_instructions, value.cancelled, tools=tools, call=client.call,
                 revoke=value.revoke, close_tools=close, before_turn=value.before_start,
-                started=value.child_started, emit=publish, allow_web=value.allow_web))
+                started=value.child_started, emit=publish, allow_web=value.allow_web,
+                active_seconds=agent_limits.ACTIVE_SECONDS if value.active_seconds is None else value.active_seconds))
             result.state, result.text = response["state"], response["text"] or ""
             result.native_started = self.native and response["nativeStarted"]
             result.cleanup_verified, result.tool_calls = response["cleanupVerified"], response["toolCalls"]

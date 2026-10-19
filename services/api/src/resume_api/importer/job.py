@@ -26,7 +26,8 @@ class ImportJobRuntime(JobRuntime):
             if reason:
                 raise ImportFailure(reason)
         self.coordinator = ImportCoordinator(self.service.projects, control.project_id, control.run_id,
-            captured.rules, control.cancel, guard=guard)
+            captured.rules, control.cancel, guard=guard,
+            allow_text_rewrite=captured.request.command.allow_text_rewrite)
         self.coordinator.begin()
         return ImportSession(self.coordinator)
 

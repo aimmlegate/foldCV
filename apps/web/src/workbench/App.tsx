@@ -108,6 +108,7 @@ export function App({ portalHost }: { portalHost: HTMLElement }) {
               title={projectTitle} settings={openSettings} />} />
         </>}
         {view === "source" && !workspace.loading && <SourceForm input={input} change={setInput} textDraft={textDraft} busy={busy || creating} sourceName={source?.originalName ?? null}
+          allowTextRewrite={workspace.allowTextRewrite} changeTextRewrite={workspace.setAllowTextRewrite}
           process={() => { setSourceOpen(false); void process(); }} />}
       </div>
       {settingsVisited && <div className="screen" hidden={!settings}><Settings close={() => void action(async () => { await editor.current?.resume(); setSettings(false); })} connectionChanged={setConnection} /></div>}

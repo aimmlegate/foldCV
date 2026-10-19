@@ -1144,6 +1144,7 @@ class WriterHistoryOfferV1(BackgroundWire):
 
 class FixedProcessingCommand(BackgroundWire):
     kind: Literal["processing"]
+    allow_text_rewrite: bool = Field(default=True, strict=True, exclude_if=lambda value: value)
 
 
 class FixedCompletionCommand(BackgroundWire):

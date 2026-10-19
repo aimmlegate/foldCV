@@ -13,6 +13,8 @@ from .rich_dependencies import placements
 from .rich_fields import inline_groups, set_text
 from .rich_sync import linked_field_steps
 from .technology_focus import focus_order_steps, focus_membership_steps
+from .technology_lists import (additional_bindings, bind_edit_lists, insert_technology, list_parts, rebuild,
+    patch_lists, prune_empty_lists, remove_from_prose)
 
 PanelKind = Literal["candidate", "employment", "technology", "education", "language", "claim"]
 FIELDS = {"candidate": ("name", "title", "location"), "employment": ("employer", "role"),
@@ -29,11 +31,12 @@ class RichPanelRequest(Wire):
             "then": {"properties": {"recordId": {"type": "string"}, "recordKind": {"enum": [None, "technology"]},
                 "jobId": {"type": "null"}, "periodId": {"type": "null"}, "values": {"maxProperties": 0}}, "required": ["recordId"]}},
     })
-    operation: Literal["add", "edit", "remove", "add_period", "remove_period", "clear_technologies", "add_to_focus", "remove_from_focus"]
+    operation: Literal["add", "edit", "remove", "add_period", "remove_period", "clear_technologies", "add_to_focus", "remove_from_focus", "move_technology", "move_focus"]
     record_id: Id | None = None
     record_kind: PanelKind | None = None
     job_id: Id | None = None
     period_id: Id | None = None
+    before_record_id: Id | None = Field(default=None, exclude_if=lambda value: value is None)
     values: dict[str, str] = Field(default_factory=dict, max_length=50)
     facts_revision: Revision
     document_revision: Revision
@@ -41,6 +44,11 @@ class RichPanelRequest(Wire):
 
     @model_validator(mode="after")
     def operation_scope(self):
+        if self.before_record_id is not None and self.operation not in {"move_technology", "move_focus"}:
+            raise ValueError("TECHNOLOGY_MOVE_INVALID")
+        if self.operation in {"move_technology", "move_focus"} and (self.record_id is None
+                or self.record_kind not in {None, "technology"} or self.job_id is not None or self.period_id is not None or self.values):
+            raise ValueError("TECHNOLOGY_MOVE_INVALID")
         if self.operation in {"add_to_focus", "remove_from_focus"} and (self.record_id is None
                 or self.record_kind not in {None, "technology"} or self.job_id is not None or self.period_id is not None or self.values):
             raise ValueError("FOCUS_SCOPE_INVALID")
@@ -116,6 +124,19 @@ def panel_mutation(workspace, request):
     if project is None or (project.facts.revision, project.document.revision) != (request.facts_revision, request.document_revision):
         raise ValueError("STALE_PANEL_EDIT")
     records = {record.id: record for record in project.facts.records}
+    if request.operation in {"move_technology", "move_focus"}:
+        record = records.get(request.record_id)
+        target = records.get(request.before_record_id) if request.before_record_id else None
+        if record is None or record.kind != "technology" or request.before_record_id and (target is None
+                or target.kind != "technology" or request.operation == "move_technology" and target.job_id != record.job_id):
+            raise ValueError("TECHNOLOGY_MOVE_INVALID")
+        if request.operation == "move_focus":
+            from .technology_focus import focus_move_steps
+            steps = focus_move_steps(workspace, record.id, request.before_record_id)
+        else:
+            steps = insert_technology(project, record, request.before_record_id, moving=True)
+        return RichMutation(schemaVersion=1, projectId=workspace.project_id, clientMutationId=identity("panel"),
+            actionId=request.capture.action_id, capture=request.capture, kind="panel", steps=steps) if steps else None
     if request.operation in {"add_to_focus", "remove_from_focus"}:
         steps = focus_membership_steps(workspace, request.record_id, request.operation == "add_to_focus")
         return RichMutation(schemaVersion=1, projectId=workspace.project_id, clientMutationId=identity("panel"),
@@ -127,9 +148,11 @@ def panel_mutation(workspace, request):
         if not removed:
             return None
         candidate = project.model_copy(deep=True)
+        bind_edit_lists(candidate, request.job_id)
         for identifier in sorted(removed):
             bind_exact_technology(candidate.document, records[identifier], removed)
         steps = removal_steps(candidate, records, removed)
+        steps += additional_bindings(project, steps, patch_lists(project, candidate))
         return RichMutation(schemaVersion=1, projectId=workspace.project_id, clientMutationId=identity("panel"),
             actionId=request.capture.action_id, capture=request.capture, kind="panel", steps=steps)
     if request.operation == "add":
@@ -161,13 +184,17 @@ def panel_mutation(workspace, request):
             return RichMutation(schemaVersion=1, projectId=workspace.project_id, clientMutationId=identity("panel"),
                 actionId=request.capture.action_id, capture=request.capture, kind="panel", steps=steps)
         if record.kind == "technology":
+            original = project
             project = project.model_copy(deep=True)
+            bind_edit_lists(project, record.job_id)
             bind_exact_technology(project.document, record)
-            blocks = list(project.document.blocks())
+            rebound = patch_lists(original, project)
         removed = {record.id}
         if record.kind == "employment":
             removed.update(r.id for r in records.values() if getattr(r, "job_id", None) == record.id)
         steps += removal_steps(project, records, removed)
+        if record.kind == "technology":
+            steps += additional_bindings(project, steps, rebound)
     else:
         if request.operation in {"add_period", "remove_period"}:
             if record.kind != "employment":
@@ -194,7 +221,9 @@ def panel_mutation(workspace, request):
             set_text(record, key, value)
         record.user_corrected = True
         steps.append(PutRecord(kind="put_record", beforeRevision=old.revision if old else None, record=record))
-        if old is None:
+        if old is None and record.kind == "technology":
+            steps += insert_technology(project, record)
+        elif old is None:
             parent = next((b for b in blocks if getattr(b.props, "record_id", None) == request.job_id), None) if request.job_id else None
             region = "main" if record.kind in {"employment", "technology"} else "header" if record.kind == "candidate" else "sidebar"
             siblings = parent.children if parent else next(r.blocks for r in project.document.regions if r.id == region)
@@ -207,9 +236,12 @@ def panel_mutation(workspace, request):
                 previous = block.id
         else:
             preview = workspace.model_copy(deep=True)
+            rebound = set()
+            if record.kind == "technology":
+                rebound = bind_edit_lists(preview.project, record.job_id)
+                rebound |= bind_exact_technology(preview.project.document, old)
             preview.project.facts.records = [record if r.id == record.id else r for r in preview.project.facts.records]
-            rebound = bind_exact_technology(preview.project.document, old) if record.kind == "technology" else set()
-            steps += linked_field_steps(preview, [record.id])
+            steps += linked_field_steps(preview, [record.id], tuple(values) if record.kind == "technology" else ())
             replaced = {step.block.id for step in steps if isinstance(step, PutBlock)}
             steps += [put_block(block, positions) for block in preview.project.document.blocks() if block.id in rebound - replaced]
             if record.kind == "employment":
@@ -247,16 +279,20 @@ def removal_steps(project, records, removed):
         if changed:
             copy.provenance = [link for link in copy.provenance if link.kind != "field_binding" or link.record_id not in removed]
             steps.append(put_block(copy, positions))
-    return steps
+    return prune_empty_lists(project, steps)
 
 
 def technology_delimiters(before, kept, records):
+    parts = list_parts(before, records)
+    if parts:
+        retained = {span.record_id for span in kept if isinstance(span, FactFieldSpan)}
+        return rebuild(parts, [entry for entry in parts[1] if entry[0].record_id in retained])
     def delimiter(span):
         return isinstance(span, StyledText) and not span.text.strip(" \t\r\n·,;|/")
     if not any(isinstance(span, FactFieldSpan) for span in before) or not all(delimiter(span) or
             isinstance(span, FactFieldSpan) and span.field_key == "display" and span.record_id in records
             and records[span.record_id].kind == "technology" for span in before):
-        return kept
+        return remove_from_prose(before, kept, records)
     # Only technology-only list separators can collapse; authored prose stays literal.
     result = []
     for span in kept:

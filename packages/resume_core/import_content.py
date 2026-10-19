@@ -125,7 +125,7 @@ def content_blocks(sections, paragraphs):
                     sourceKeys=source_keys(block.refs, paragraphs), region=region,
                     kind="bullet_list" if block.type == "list_item" else block.type,
                     category=section.category, modelBlock=True, listItem=block.type == "list_item",
-                    duplicateOf=source_keys(block.duplicate_of, paragraphs), reason=block.reason))
+                    duplicateOf=source_keys(block.duplicate_of, paragraphs), reason=block.reason, text=block.text))
                 if len(blocks) > 5000:
                     raise ImportFailure("IMPORT_DRAFT_TOO_LARGE")
             continue
@@ -223,6 +223,8 @@ def draft_content(draft, paragraphs):
                     value["duplicateOf"] = paragraph_refs(block.duplicate_of, paragraphs)
                 if block.reason is not None:
                     value["reason"] = block.reason
+                if block.text is not None:
+                    value["text"] = block.text
                 outline["blocks"].append(value)
             else:
                 if block.kind == "section":

@@ -1,6 +1,11 @@
 {
   "additionalProperties": false,
   "properties": {
+    "allowTextRewrite": {
+      "default": true,
+      "title": "Allowtextrewrite",
+      "type": "boolean"
+    },
     "text": {
       "anyOf": [
         {

@@ -8,7 +8,7 @@ from .models.contracts import Id, Wire
 from .models.rich_document import FactFieldSpan, Hyperlink
 from .technologies import BY_ID, logo_path, resolve_technology, technology_identity
 from .technology_experience import technology_experience, technology_years, whole_years_text
-from .technology_focus import focus_entry_record, focus_sort_key, focus_logo, focus_choices
+from .technology_focus import focus_entry_record, focus_logo, focus_choices
 
 
 class BlockPresentation(Wire):
@@ -87,7 +87,7 @@ def presentation(document, facts=None):
     for region in document.regions:
         visit(region.blocks, region.role)
     entries = [FocusTechnology(recordId=record.id, display=record.display.raw_text, logo=logo,
-        years=years.get(technology_identity(record))) for record, logo in sorted(focused.values(), key=lambda item: focus_sort_key(item[0], years))]
+        years=years.get(technology_identity(record))) for record, logo in focused.values()]
     options = [FocusTechnology(recordId=record.id, display=record.display.raw_text, logo=focus_logo(record),
         years=years.get(technology_identity(record))) for record in focus_choices(facts)
         if technology_identity(record) not in focused] if facts is not None else []

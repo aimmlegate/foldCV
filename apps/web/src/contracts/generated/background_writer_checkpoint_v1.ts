@@ -48,6 +48,7 @@ export type Content = (StyledText | Hyperlink | FactFieldSpan)[];
 export type Id1 = string;
 export type Alignment = "left" | "center" | "right" | "justify";
 export type Backgroundcolor1 = string;
+export type Manualorder = boolean;
 export type Presentation = "standard" | "focus";
 export type Recordid1 = string | null;
 export type Textcolor1 = string;
@@ -794,6 +795,7 @@ export interface FactFieldSpan {
 export interface SectionProps {
   alignment?: Alignment;
   backgroundColor?: Backgroundcolor1;
+  manualOrder?: Manualorder;
   presentation?: Presentation;
   recordId: Recordid1;
   textColor?: Textcolor1;

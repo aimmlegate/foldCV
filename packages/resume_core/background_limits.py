@@ -1,4 +1,4 @@
-"""Background policy v1. Changing a bound requires a new reviewed policy version."""
+"""Versioned background limits; changed bounds retain a separate review record."""
 
 from dataclasses import asdict, dataclass
 
@@ -7,7 +7,7 @@ from . import agent_limits
 
 @dataclass(frozen=True)
 class BackgroundLimits:
-    policy_version: int = 2
+    policy_version: int = 3
     executions: int = 3
     noninteractive_executions: int = 2
     serial_executions: int = 1
@@ -19,6 +19,7 @@ class BackgroundLimits:
     reconciliation_dispatch_bound: int = 3
     startup_seconds: int = agent_limits.STARTUP_SECONDS
     active_seconds: int = agent_limits.ACTIVE_SECONDS
+    import_active_seconds: int = agent_limits.IMPORT_ACTIVE_SECONDS
     cleanup_seconds: int = agent_limits.CLEANUP_SECONDS
     writer_lease_seconds: int = agent_limits.LEASE_SECONDS
     writer_heartbeat_seconds: int = 5

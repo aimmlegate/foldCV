@@ -81,6 +81,37 @@ async def test_attempt_deadlines_use_elapsed_time_at_the_exact_boundary(tmp_path
 
 
 @pytest.mark.asyncio
+@pytest.mark.parametrize("processing", [False, True])
+@pytest.mark.parametrize("offset", [-0.001, 0])
+async def test_import_has_five_minutes_and_other_jobs_keep_three(tmp_path, processing, offset):
+    store, state, clock, factory, supervisor = await environment(tmp_path)
+    factory.hold_results.add("duration")
+    changes = ({"kind": "processing", "schedulingClass": "background",
+        "input": {"kind": "processing", "id": "fixed_duration", "sha256": "a" * 64},
+        "models": [{"stage": "extraction", "model": "synthetic-model", "configSha256": "b" * 64}],
+        "tools": ["read_import", "save_import", "finish_import"]} if processing else {})
+    try:
+        job, _ = await supervisor.submit(capture(state, "duration", **changes))
+        actor = await factory.actor(job)
+        await asyncio.wait_for(actor.started.wait(), 10)
+        expected = 300 if processing else 180
+        attempt = store.read(state.project_id, job.id).attempts[-1]
+        assert (datetime.fromisoformat(attempt.active_deadline) - datetime.fromisoformat(attempt.dispatched_at)).total_seconds() == expected
+        clock.advance(expected + offset)
+        if offset < 0:
+            actor.result.set()
+        await asyncio.wait_for(supervisor.controls[job.id].task, 10)
+        done = store.read(state.project_id, job.id)
+        assert done.execution == ("completed" if offset < 0 else "failed")
+        assert (done.error.code if done.error else None) == (None if offset < 0 else "DEADLINE")
+    finally:
+        for actor in factory.actors.values():
+            actor.ready_permission.set(); actor.result.set(); actor.cleanup_permission.set()
+        await supervisor.shutdown()
+        factory.verify(); clock.verify()
+
+
+@pytest.mark.asyncio
 async def test_cancellation_after_slot_grant_prevents_the_owned_child_start(tmp_path):
     reached, release = asyncio.Event(), asyncio.Event()
     async def observer(name, _job):

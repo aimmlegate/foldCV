@@ -1,5 +1,6 @@
 export type Verdict = "likely" | "unlikely" | "uncertain";
 export type Id = string;
+export type Allowtextrewrite = boolean;
 export type Category =
   ("identity" | "contacts" | "summary" | "experience" | "education" | "skills" | "languages" | "other") | null;
 /**
@@ -16,6 +17,7 @@ export type Region = "header" | "sidebar" | "main";
  * @maxItems 1000
  */
 export type Sourcekeys = string[];
+export type Text = string | null;
 export type Title = string | null;
 /**
  * @maxItems 5000
@@ -56,7 +58,7 @@ export type Level = string;
  * @maxItems 1000
  */
 export type Sourcekeys1 = string[];
-export type Text = string;
+export type Text1 = string;
 /**
  * @maxItems 1000
  */
@@ -103,11 +105,11 @@ export type Version = 1;
 export type Inputid = string;
 export type Sourceid = string;
 export type Sourcerevision = number;
-export type Text1 = string;
+export type Text2 = string;
 export type Unitid = string;
 export type Unitrevision = number;
 export type Evidence = EvidenceSpan[];
-export type Text2 = string;
+export type Text3 = string;
 export type Id3 = string;
 export type Certifications = CertificationDetails[];
 export type Code = "team_size_conflict";
@@ -158,7 +160,7 @@ export type Literalevidence = EvidenceSpan[];
 export type Origin = "source" | "user";
 export type Revision = number;
 export type Subprojectid = string | null;
-export type Text3 = string;
+export type Text4 = string;
 export type Evidence4 = Evidence3[];
 export type Id9 = string;
 export type Importance1 = "essential" | "normal" | "minor";
@@ -260,7 +262,7 @@ export type Revision10 = number;
 export type Subprojectid10 = string | null;
 export type Field = "name" | "title" | "location" | "education" | "certification" | "language" | "private_metadata";
 export type Fieldid = string | null;
-export type Text4 = string;
+export type Text5 = string;
 export type Evidence14 = Evidence3[];
 export type Id19 = string;
 export type Importance11 = "essential" | "normal" | "minor";
@@ -626,7 +628,7 @@ export type Originalname = string;
 export type Id26 = string;
 export type Origin14 = "user";
 export type Revision16 = number;
-export type Text5 = string;
+export type Text6 = string;
 export type Unitid4 = string;
 export type Overlays = SourceOverlay[];
 export type Parser = string;
@@ -656,7 +658,7 @@ export type Listlevel = number | null;
 export type Part = string | null;
 export type Rowmerge = ("start" | "continue") | null;
 export type Style = string | null;
-export type Text6 = string;
+export type Text7 = string;
 export type Units1 = SourceUnit[];
 export type Code2 = string;
 export type Page1 = number | null;
@@ -868,7 +870,7 @@ export type Italic = boolean;
 export type Strike = boolean;
 export type Textcolor = string;
 export type Underline = boolean;
-export type Text7 = string;
+export type Text8 = string;
 export type Type = "text";
 export type Content1 = StyledText[];
 export type Href = string;
@@ -878,12 +880,13 @@ export type Bindingrootid = string | null;
 export type Fieldkey = string;
 export type Recordid1 = string;
 export type Syncedfactrevision = number;
-export type Text8 = string;
+export type Text9 = string;
 export type Type2 = "fact_field";
 export type Content = (StyledText | Hyperlink | FactFieldSpan)[];
 export type Id44 = string;
 export type Alignment = "left" | "center" | "right" | "justify";
 export type Backgroundcolor1 = string;
+export type Manualorder = boolean;
 export type Presentation = "standard" | "focus";
 export type Recordid2 = string | null;
 export type Textcolor1 = string;
@@ -1335,6 +1338,7 @@ export interface ResumeAssessment {
   verdict: Verdict;
 }
 export interface ImportDraft {
+  allowTextRewrite?: Allowtextrewrite;
   blocks?: Blocks;
   facts?: Facts;
   finished?: Finished;
@@ -1358,13 +1362,14 @@ export interface ImportBlock {
   reason?: Reason;
   region?: Region;
   sourceKeys?: Sourcekeys;
+  text?: Text;
   title?: Title;
 }
 export interface ImportFact {
   id: Id2;
   record?: Record;
   sourceKeys?: Sourcekeys1;
-  text?: Text;
+  text?: Text1;
 }
 export interface ImportEmployment {
   employer?: Employer;
@@ -1445,12 +1450,12 @@ export interface CandidateDetails {
 }
 export interface SupportedText {
   evidence: Evidence;
-  text: Text2;
+  text: Text3;
 }
 export interface EvidenceSpan {
   sourceId: Sourceid;
   sourceRevision: Sourcerevision;
-  text: Text1;
+  text: Text2;
   unitId: Unitid;
   unitRevision: Unitrevision;
 }
@@ -1535,7 +1540,7 @@ export interface Evidence3 {
   unitRevision: Unitrevision1;
 }
 export interface TextValue {
-  text: Text3;
+  text: Text4;
 }
 export interface GuiTechnologyFact {
   evidence: Evidence4;
@@ -1676,7 +1681,7 @@ export interface CandidateFact {
 export interface CandidateDetail {
   field: Field;
   fieldId?: Fieldid;
-  text: Text4;
+  text: Text5;
 }
 export interface NameAssessmentFact {
   evidence: Evidence14;
@@ -1834,7 +1839,7 @@ export interface SourceOverlay {
   id: Id26;
   origin: Origin14;
   revision: Revision16;
-  text: Text5;
+  text: Text6;
   unitId: Unitid4;
 }
 export interface SourceUnit {
@@ -1845,7 +1850,7 @@ export interface SourceUnit {
   representedFactIds: Representedfactids;
   revision: Revision18;
   structure?: SourceStructure | null;
-  text: Text6;
+  text: Text7;
 }
 export interface SourceLocation {
   column: Column;
@@ -2264,7 +2269,7 @@ export interface SectionBlock {
 }
 export interface StyledText {
   styles: InlineStyles;
-  text: Text7;
+  text: Text8;
   type: Type;
 }
 export interface InlineStyles {
@@ -2288,12 +2293,13 @@ export interface FactFieldSpan {
   recordId: Recordid1;
   styles: InlineStyles;
   syncedFactRevision: Syncedfactrevision;
-  text: Text8;
+  text: Text9;
   type: Type2;
 }
 export interface SectionProps {
   alignment?: Alignment;
   backgroundColor?: Backgroundcolor1;
+  manualOrder?: Manualorder;
   presentation?: Presentation;
   recordId: Recordid2;
   textColor?: Textcolor1;

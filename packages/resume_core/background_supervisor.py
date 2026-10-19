@@ -61,6 +61,11 @@ class JobControl:
     def owner_epoch(self):
         return self.job.execution_generation
 
+    @property
+    def active_seconds(self):
+        return (LIMITS.import_active_seconds if self.job.submission.kind == "processing"
+            and "save_import" in self.job.submission.tools else LIMITS.active_seconds)
+
     def stop(self, reason="INTERRUPTED", *, revoke_publication=False):
         self.revoked = True
         self.stop_reason = self.stop_reason or reason
@@ -84,14 +89,14 @@ class JobControl:
             raise BackgroundFailure("ACCOUNT_CHANGED")
         if self.supervisor.clock.now() >= self.startup_deadline:
             raise BackgroundFailure("STARTUP_TIMEOUT")
-        self.active_deadline = self.supervisor.clock.now() + LIMITS.active_seconds
+        self.active_deadline = self.supervisor.clock.now() + self.active_seconds
         def running(_state, job):
             if job.execution != "starting":
                 raise BackgroundFailure("CANCELLED")
             job.execution = "running"
             attempt = next(a for a in job.attempts if a.id == self.attempt_id)
             attempt.state = "running"
-            attempt.active_deadline = expiration(self.supervisor.store.clock(), LIMITS.active_seconds)
+            attempt.active_deadline = expiration(self.supervisor.store.clock(), self.active_seconds)
         self.job = self.supervisor.store.update(self.job.submission.identity.project_id, self.job.id, running)
         self.ready.set()
         await self.supervisor._emit(self.job)
@@ -371,7 +376,7 @@ class JobSupervisor:
                     job.error = None
                     job.attempts.append(JobAttemptV1(schemaVersion=1, id=control.attempt_id, stage=model.stage,
                         executionGeneration=job.execution_generation, state="starting", dispatchedAt=now,
-                        startupDeadline=expiration(now, LIMITS.startup_seconds), activeDeadline=expiration(now, LIMITS.active_seconds),
+                        startupDeadline=expiration(now, LIMITS.startup_seconds), activeDeadline=expiration(now, control.active_seconds),
                         nativeStarted=False, childStartedAt=None, cleanupVerified=False, error=None))
                 control.job = self.store.update(project, control.job.id, reserve)
                 await self._emit(control.job)

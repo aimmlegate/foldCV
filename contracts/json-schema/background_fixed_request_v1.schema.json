@@ -153,6 +153,11 @@
     "FixedProcessingCommand": {
       "additionalProperties": false,
       "properties": {
+        "allowTextRewrite": {
+          "default": true,
+          "title": "Allowtextrewrite",
+          "type": "boolean"
+        },
         "kind": {
           "const": "processing",
           "title": "Kind",

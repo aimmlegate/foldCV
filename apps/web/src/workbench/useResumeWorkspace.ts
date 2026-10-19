@@ -29,6 +29,7 @@ export function useResumeWorkspace() {
   const [projects, setProjects] = useState<GuiProjectListResponse | null>(null);
   const [input, storeInput] = useState<ResumeInput>({ kind: "text", text: "" });
   const [textDraft, setTextDraft] = useState("");
+  const [allowTextRewrite, setAllowTextRewrite] = useState(true);
   function setInput(next: ResumeInput) { storeInput(next); if (next.kind === "text") setTextDraft(next.text); }
   const [error, setError] = useState("");
   const dismissError = useCallback(() => setError(""), []);
@@ -50,7 +51,13 @@ export function useResumeWorkspace() {
     const url = new URL(location.href); url.searchParams.set("project", next.workspace.projectId);
     history.replaceState(null, "", url.pathname + url.search);
   }, []);
-  function select(next: RichProjectResponse, available = false) { setBackground(available); activeProject.current = next.workspace.projectId; acknowledge(next); }
+  function select(next: RichProjectResponse, available = false) {
+    if (activeProject.current !== next.workspace.projectId) {
+      const draft = next.workspace.preDraft?.importDraft;
+      setAllowTextRewrite(draft ? draft.allowTextRewrite ?? false : true);
+    }
+    setBackground(available); activeProject.current = next.workspace.projectId; acknowledge(next);
+  }
   async function load(id: string) {
     const next = await projectRequest(`/${id}`);
     const connection = next.workspace.project ? await attachExclusiveWriter(id) : null;
@@ -82,6 +89,7 @@ export function useResumeWorkspace() {
   }
   function clear() {
     ++epoch.current; activeProject.current = null; setResponse(null); setWriter(null); setBackground(false); setStatus("Сохранено"); prepared.current = null;
+    setAllowTextRewrite(true);
     setInput({ kind: "text", text: "" }); history.replaceState(null, "", location.pathname);
   }
   async function fresh() {
@@ -160,16 +168,16 @@ export function useResumeWorkspace() {
         if (prepared.current?.input === input && !response?.workspace.project) id = prepared.current.projectId;
         else {
           const selected = await projectRequest("/input", "POST", importBody(input));
-          select(selected); id = selected.workspace.projectId;
+          select(selected); setAllowTextRewrite(allowTextRewrite); id = selected.workspace.projectId;
           prepared.current = { input, projectId: id };
           setProjects(await listProjects());
         }
       }
       if (id) {
         stage("Запускаем обработку резюме");
-        try { await new FixedOperations(id).submit({ kind: "processing" }); select(await projectRequest(`/${id}`), true); }
+        try { await new FixedOperations(id).submit({ kind: "processing", allowTextRewrite }); select(await projectRequest(`/${id}`), true); }
         catch (error) {
-          if (error instanceof RichApiFailure && error.code === "JOB_DISABLED") select(await projectRequest(`/${id}/generation`, "POST", {}));
+          if (error instanceof RichApiFailure && error.code === "JOB_DISABLED") select(await projectRequest(`/${id}/generation`, "POST", { allowTextRewrite }));
           else throw error;
         }
       }
@@ -197,6 +205,6 @@ export function useResumeWorkspace() {
       anchor.click(); setTimeout(() => URL.revokeObjectURL(url), 1000);
     }, "Сохраняем изменения перед скачиванием");
   }
-  return { response, writer, background, projects, input, setInput, textDraft, error, status, setStatus, busy, operation, loading, settings, setSettings,
+  return { response, writer, background, projects, input, setInput, textDraft, allowTextRewrite, setAllowTextRewrite, error, status, setStatus, busy, operation, loading, settings, setSettings,
     editor, assistant, acknowledge, action, fresh, open, remove, archive, projectLifecycle, process, upload, exportFile, dismissError };
 }
