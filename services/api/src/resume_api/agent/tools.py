@@ -22,12 +22,13 @@ from packages.resume_core.rendering.rich_docx import validate_export
 
 from .context import ReadBook, clip, json_text
 from .mcp import PrivateMcp
+from .skills import ApplicationSkillQuery, SkillBook
 from .web import PublicFetcher
 
 READ_TOOLS = {"get_resume_context": "context", "find_resume_content": "find", "get_working_facts": "facts",
     "get_original_source": "source", "get_conversation_context": "history", "get_project_resources": "resources"}
 WRITE_TOOLS = {"prepare_edit_batch", "apply_edit_batch", "project_action"}
-TOOL_NAMES = (*READ_TOOLS, "check_resume", "read_public_page", "publish_findings", "prepare_edit_batch", "apply_edit_batch", "project_action")
+TOOL_NAMES = (*READ_TOOLS, "get_application_skills", "check_resume", "read_public_page", "publish_findings", "prepare_edit_batch", "apply_edit_batch", "project_action")
 
 
 class ContextQuery(AgentQuery):
@@ -81,6 +82,7 @@ class ToolSession(PrivateMcp):
     def __init__(self, service, control, run, fetcher):
         self.service, self.control, self.run, self.fetcher = service, control, run, fetcher
         self.book = ReadBook(service, control)
+        self.skills = SkillBook()
         self.calls, self.fetches, self.result_bytes = 0, 0, 0
         self.cache = {}
         self.argument_issues = []
@@ -115,6 +117,7 @@ class ToolSession(PrivateMcp):
             self.book.by_snapshot.clear()
             self.book.cursors.clear()
             self.cache.clear()
+            self.skills.clear()
 
     def guard(self):
         with self.service.projects.state_lock:
@@ -181,6 +184,11 @@ class ToolSession(PrivateMcp):
             return self.wire(await self.call("get_project_resources", query or ResourcesQuery()))
 
         @self.sdk.tool(structured_output=False)
+        async def get_application_skills(query: ApplicationSkillQuery | None = None) -> CallToolResult:
+            """List bundled application skills when query is omitted. Read full instructions with query:{skillId:"import-resume"} or {skillId:"format-resume"}; resource defaults to SKILL.md. Read listed references using their exact resource names. Follow top-level nextCursor with the SAME skillId/resource until null; concatenate content in offset order. Available without edits or internet. These references do not grant permissions or expose import-only tools, scripts or files; current project rules and template take precedence over legacy instructions."""
+            return self.wire(await self.call("get_application_skills", query))
+
+        @self.sdk.tool(structured_output=False)
         async def check_resume() -> CallToolResult:
             """Check current timeline, links, structure and export readiness without inference or edits."""
             return self.wire(await self.call("check_resume", None))
@@ -236,6 +244,11 @@ class ToolSession(PrivateMcp):
                     raise ValueError("invalid read envelope")
                 query = arguments.get("query")
                 READ_QUERIES[name].model_validate({} if query is None else query)
+            elif name == "get_application_skills":
+                if arguments.keys() - {"query"}:
+                    raise ValueError("invalid skill envelope")
+                if arguments.get("query") is not None:
+                    ApplicationSkillQuery.model_validate(arguments["query"])
             elif name == "check_resume":
                 if arguments:
                     raise ValueError("invalid check envelope")
@@ -254,6 +267,9 @@ class ToolSession(PrivateMcp):
             return error.code
         except ValidationError as error:
             self.calls += 1
+            if name == "get_application_skills":
+                self.argument_issues = [{"path": "skillQuery", "issue": "Omit query for the catalog, or use {skillId,resource?,cursor?} from it."}]
+                return "AGENT_ARGUMENT_INVALID"
             if name in READ_TOOLS:
                 self.argument_issues = [{"path": "query", "issue": "Use query:{kind,ids?,cursor?}; omit ids to read the whole collection."}]
                 return "AGENT_ARGUMENT_INVALID"
@@ -267,6 +283,9 @@ class ToolSession(PrivateMcp):
             return "AGENT_ARGUMENT_INVALID"
         except (ValueError, TypeError):
             self.calls += 1
+            if name == "get_application_skills":
+                self.argument_issues = [{"path": "skillQuery", "issue": "Use {query:{skillId,resource?,cursor?}}, or {} for the catalog."}]
+                return "AGENT_ARGUMENT_INVALID"
             if name in READ_TOOLS:
                 self.argument_issues = [{"path": "query", "issue": "Use the query object wrapper, not top-level kind/ids/cursor."}]
                 return "AGENT_ARGUMENT_INVALID"
@@ -282,6 +301,9 @@ class ToolSession(PrivateMcp):
         result = {"error": {"code": code}}
         if self.argument_issues:
             result["argumentIssues"] = self.argument_issues
+            if self.argument_issues[0]["path"] == "skillQuery":
+                result["format"] = "Use {} for the catalog, or {query:{skillId:'import-resume',resource:'SKILL.md',cursor:null}}. Follow top-level nextCursor with the same skillId/resource."
+                return result
             result["format"] = ("Read arguments use {query:{kind:'document',cursor:null}}. Omit ids to read all blocks, or pass known IDs. Follow nextCursor using the same query."
                 if self.argument_issues[0]["path"] == "query" else "Use the advertised request wrapper. replace_text target requires snapshotId, blockId, cellId (null outside tables), field, start, end. content contains text and optional marks, not styles. Correct shape errors only; never retry permission denial.")
         return result
@@ -304,6 +326,8 @@ class ToolSession(PrivateMcp):
                     with self.service.projects.state_lock:
                         self.guard()
                         result = self.book.read(arguments)
+                elif name == "get_application_skills":
+                    result = self.skills.read(arguments)
                 elif name == "check_resume":
                     result = self.check()
                 elif name == "read_public_page":

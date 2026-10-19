@@ -1,8 +1,10 @@
-import { useRef } from "react";
+import { useRef, useState } from "react";
 import type { AssistantView } from "../../assistant/controller";
 import { canSend, errorText, submitKey } from "../../assistant/presentation";
 import { Icon } from "../ui/Icon";
 import { Spinner } from "../ui/OperationStatus";
+import { commandCompletion, commandSuggestions } from "../../assistant/commands";
+import { CommandMenu } from "./CommandMenu";
 
 export type ComposerProps = {
   view: AssistantView; captured: string | null; active: boolean; applying: boolean; title: string;
@@ -11,16 +13,34 @@ export type ComposerProps = {
 };
 export function Composer({ view, captured, active, applying, title, draft, flags, model, send, stop, clear, settings }: ComposerProps) {
   const composing = useRef(false), enabled = canSend(view, applying);
+  const input = useRef<HTMLTextAreaElement>(null);
+  const [commandIndex, setCommandIndex] = useState(0), [dismissed, setDismissed] = useState<string | null>(null);
+  const suggestions = commandSuggestions(view.draft), commandOpen = suggestions.length > 0 && dismissed !== view.draft && !view.submitting && !view.pendingSend;
+  const selectedCommand = commandIndex < suggestions.length ? commandIndex : 0;
+  const chooseCommand = (value: string) => { draft(value); setCommandIndex(0); input.current?.focus(); };
   const selected = view.settings?.selectedAgentModel ?? "", models = view.capabilities?.models ?? [];
   const choices = selected && !models.some(item => item.model === selected) ? [{ model: selected, state: "unavailable" }, ...models] : models;
   return <form className="chat-composer" onSubmit={event => { event.preventDefault(); if (enabled) send(); }}>
     <div className="chat-context" aria-label="Область следующей задачи"><span className="chat-context-resume" title={title}><Icon name="file" />{title}</span>
       <button className={`chat-scope${captured ? " has-selection" : ""}`} type="button" disabled={!captured} onClick={clear}
         aria-label={captured ? "Убрать выделение из задачи" : "Доступ ко всему проекту"}>{captured ? <><Icon name="check" />Контекст: выделение · {captured}<Icon name="close" /></> : "Доступ ко всему проекту"}</button></div>
-    <div className="chat-input-box"><textarea id="chat-input" aria-label="Сообщение помощнику" value={view.draft} placeholder="Что проверить или изменить в резюме?" rows={2}
-      disabled={view.submitting || view.pendingSend} onChange={event => draft(event.target.value)}
+    <div className="chat-input-box">{commandOpen && <CommandMenu choices={suggestions} selected={selectedCommand} choose={chooseCommand} />}
+      <textarea ref={input} id="chat-input" aria-label="Сообщение помощнику" value={view.draft} placeholder="Что проверить или изменить? / — команды" rows={2}
+      role="combobox" aria-autocomplete="list" aria-expanded={commandOpen} aria-controls={commandOpen ? "assistant-commands" : undefined}
+      aria-activedescendant={commandOpen ? `assistant-command-${String(selectedCommand)}` : undefined}
+      disabled={view.submitting || view.pendingSend} onChange={event => { draft(event.target.value); setCommandIndex(0); setDismissed(null); }}
       onCompositionStart={() => { composing.current = true; }} onCompositionEnd={() => { composing.current = false; }}
-      onKeyDown={event => { if (submitKey(event.key, event.shiftKey, composing.current, event.nativeEvent.isComposing, event.keyCode)) {
+      onKeyDown={event => {
+        const inComposition = composing.current || event.nativeEvent.isComposing || event.keyCode === 229;
+        if (commandOpen && !inComposition && !event.shiftKey) {
+          if (event.key === "Escape") { event.preventDefault(); event.stopPropagation(); setDismissed(view.draft); return; }
+          if (event.key === "ArrowDown" || event.key === "ArrowUp") {
+            event.preventDefault(); setCommandIndex((selectedCommand + (event.key === "ArrowDown" ? 1 : suggestions.length - 1)) % suggestions.length); return;
+          }
+          const completion = commandCompletion(view.draft, selectedCommand, event.key, event.shiftKey, inComposition);
+          if (completion) { event.preventDefault(); chooseCommand(completion); return; }
+        }
+        if (submitKey(event.key, event.shiftKey, composing.current, event.nativeEvent.isComposing, event.keyCode)) {
         event.preventDefault(); if (enabled) send();
       } }} />
       <div className="chat-composer-controls"><div className="chat-controls-left"><label className="chat-model-label"><span className="visually-hidden">Модель помощника</span>
@@ -34,7 +54,7 @@ export function Composer({ view, captured, active, applying, title, draft, flags
         {active && <button className="chat-send is-stop" type="button" title="Остановить" aria-label="Остановить" onClick={stop} disabled={view.submitting || view.run?.state === "cancelling" || view.loading === "Останавливаем задачу"}>{view.submitting || view.run?.state === "cancelling" || view.loading === "Останавливаем задачу" ? <Spinner /> : <Icon name="stop" />}</button>}
         {(!active || view.pendingSend) && <button className="chat-send" type="submit" disabled={!enabled} title={view.pendingSend ? "Повторить отправку" : "Отправить"}
           aria-label={view.pendingSend ? "Повторить отправку" : "Отправить"}><Icon name="arrow" /></button>}</div></div>
-    <div className="chat-composer-footer"><span>{view.flags.allowEdits ? "Чтение всего проекта, включая факты. Правки сохраняются в общей истории." : "Чтение всего проекта, включая факты. Запись запрещена."}</span><span>Enter — отправить · Shift+Enter — новая строка</span></div>
+    <div className="chat-composer-footer"><span>{view.flags.allowEdits ? "Чтение всего проекта, включая факты. Правки сохраняются в общей истории." : "Чтение всего проекта, включая факты. Запись запрещена."}</span><span>/ — команды · Enter — отправить · Shift+Enter — новая строка</span></div>
     {[...view.draft].length > 8000 && <p className="chat-error" role="alert">Сообщение длиннее 8000 символов.</p>}
     {view.capabilities?.unavailable && <p className="chat-error">{errorText(view.capabilities.unavailable.code)} <button className="text-button" type="button" onClick={settings}>Настройки</button></p>}
   </form>;

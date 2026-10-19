@@ -17,7 +17,7 @@ class AgentSettingsStore:
 
     def _read(self) -> AgentSettings:
         if not self.path.exists() and not self.path.is_symlink():
-            return AgentSettings(schemaVersion=1, revision=1, enabled=False, selectedAgentModel=None)
+            return AgentSettings(schemaVersion=1, revision=1, enabled=True, selectedAgentModel=None)
         try:
             owned_file(self.path, 4096)
             with self.path.open("rb") as stream:

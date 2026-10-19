@@ -32,7 +32,7 @@ Publication = Literal["none", "ready", "waiting_for_sync", "needs_review", "comm
 JobKind = Literal["agent", "processing", "rewrite", "reconciliation"]
 SchedulingClass = Literal["background", "interactive", "reconciliation"]
 Tool = Literal["get_resume_context", "find_resume_content", "get_working_facts", "get_original_source",
-    "get_conversation_context", "get_project_resources", "check_resume", "read_public_page", "publish_findings", "prepare_edit_batch", "apply_edit_batch", "project_action",
+    "get_conversation_context", "get_project_resources", "get_application_skills", "check_resume", "read_public_page", "publish_findings", "prepare_edit_batch", "apply_edit_batch", "project_action",
     "read_import", "save_import", "finish_import"]
 ScopeKey = Annotated[str, Field(min_length=1, max_length=512)]
 Counter = Annotated[int, Field(ge=0, le=9007199254740991)]

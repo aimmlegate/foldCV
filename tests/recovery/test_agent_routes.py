@@ -56,7 +56,7 @@ async def enabled(client):
 @pytest.mark.asyncio
 async def test_settings_capabilities_and_public_reads_are_authenticated_inference_free_and_independent(tmp_path):
     async with application(tmp_path, None) as (client, app, service, workspace, conversation, prefix, runtime, adapter):
-        assert (await client.get("/v1/settings/assistant")).json()["enabled"] is False
+        assert (await client.get("/v1/settings/assistant")).json()["enabled"] is True
         assert not service.settings.path.exists()
         saved = await enabled(client)
         assert saved["revision"] == 2 and PreferencesStore(service.projects.storage.root).load().selected_model is None

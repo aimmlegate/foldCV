@@ -8,7 +8,6 @@ import { DrawerView } from "../workbench/assistant/DrawerView";
 import { projectJobs } from "../background/jobs";
 import type { AgentProjectOperations } from "../contracts/generated/agent_project_operations";
 import { limitsEditToSelection } from "./selection-intent";
-import { OperationStatus } from "../workbench/ui/OperationStatus";
 
 export type AssistantHandle = { stop: () => Promise<void>; history: () => void; fence: (saved: boolean) => void };
 const key = "foldcv.assistant.drawer";
@@ -92,7 +91,7 @@ export function AssistantDrawer({ projectId, editor, settingsOpen, settings, ref
     }));
   }
   const active = controller.current?.active ?? false;
-  return view ? <DrawerView view={view} active={active} title={title} collapsed={size.collapsed} expanded={size.height >= 500}
+  return view?.settings?.enabled ? <DrawerView view={view} active={active} title={title} collapsed={size.collapsed} expanded={size.height >= 500}
     toggle={() => setSize(value => ({ ...value, collapsed: !value.collapsed }))} expand={() => setSize(value => ({ ...value, height: value.height >= 500 ? 320 : 520 }))}
     log={log} captured={captured ? `${String(captured.selection.blockIds.length)} ${captured.selection.blockIds.length === 1 ? "блок" : "блоков"}` : null}
     applying={active && !view.pendingSend && (!view.run || ["completed", "failed", "cancelled", "interrupted"].includes(view.run.state))}
@@ -103,5 +102,5 @@ export function AssistantDrawer({ projectId, editor, settingsOpen, settings, ref
     more={() => report(controller.current?.moreConversations())} older={() => report(controller.current?.older())}
     operations={operations}
     resource={(kind, id) => report(controller.current?.resource(kind, id))} focus={anchor => editor.current?.focusFinding(anchor) ?? false} />
-    : <section id="agent-chat-host" className="chat-loading" aria-label="Помощник"><OperationStatus label="Открываем помощника" /></section>;
+    : null;
 }

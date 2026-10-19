@@ -35,7 +35,7 @@ function message(error: unknown, part: SettingsPart): string {
 
 export class SettingsDrafts {
   state: SettingsState = { preferences: null, rules: null, assistant: null,
-    draft: { reasoning: null, model: null, importModel: null, automatic: true, agentEnabled: false, agentModel: null, markdown: "" },
+    draft: { reasoning: null, model: null, importModel: null, automatic: true, agentEnabled: true, agentModel: null, markdown: "" },
     loading: false, saving: false, staleRules: false, comparison: false, saved: [], errors: {}, message: "" };
   private closed = false;
   private epoch = 0;

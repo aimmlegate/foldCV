@@ -15,6 +15,7 @@ from packages.resume_core.models.agent import (
 from packages.resume_core.rich_dependencies import dependency, dependencies_current, placements
 from packages.resume_core.rich_fields import inline_groups, occurrences
 from packages.resume_core.rich_mutations import inline_text, subtree
+from .skills import skill_catalog, skill_command
 
 
 def json_text(value):
@@ -362,6 +363,8 @@ class ReadBook:
             summary, clipped = clip(json_text(prior), 4096)
             context = {"scope": run.scope, "selectionContext": run.selection_context,
                 "allowEdits": run.allow_edits, "allowWeb": run.allow_web,
+                "applicationSkills": {"tool": "get_application_skills", "skills": skill_catalog(),
+                    "catalogCommand": "/skills", "command": skill_command(journal.request.message)},
                 "originalSourceAccess": original_source_access(current.project.sources),
                 "projectIndex": {"id": current.project_id, "name": current.title,
                     "regions": [{"id": area.id, "role": area.role} for area in current.project.document.regions],

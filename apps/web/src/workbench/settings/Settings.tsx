@@ -53,7 +53,7 @@ export function Settings({ close, connectionChanged }: { close: () => void; conn
             change={value => controller.change("importModel", value)} />
           <p className="settings-disclosure">Извлекает факты и собирает резюме из исходника. Сохранённый выбор применяется к следующему импорту.</p>
         </div>
-        <div className="uir-assistant-options"><h3>Помощник</h3><div className="switch-line"><label htmlFor="assistant-enabled">Включить помощника<small>Использует это же подключение. Открытие панели не включает помощника.</small></label>
+        <div className="uir-assistant-options"><h3>Помощник</h3><div className="switch-line"><label htmlFor="assistant-enabled">Включить помощника<small>Включён по умолчанию. При выключении панель помощника скрывается.</small></label>
           <input className="switch" id="assistant-enabled" aria-label="Включить помощника" role="switch" type="checkbox" checked={current.draft.agentEnabled} disabled={!current.assistant}
             onChange={event => controller.change("agentEnabled", event.currentTarget.checked)} /></div>
           <ModelSelect id="assistant-model-select" label="Модель помощника" value={current.draft.agentModel} models={view.snapshot.models}

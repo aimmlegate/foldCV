@@ -26,6 +26,7 @@ from resume_api.profile_ownership import native_profile
 from spikes.agent.profile import CODE_MODE_HOST, TOKEN_ENV
 
 from .profile import AgentProfile
+from .skills import SKILL_INSTRUCTIONS
 
 BASE_INSTRUCTIONS = (
     "You are the FoldCV resume assistant. Follow the user's request using the supplied tools. "
@@ -35,13 +36,13 @@ BASE_INSTRUCTIONS = (
 )
 DEVELOPER_INSTRUCTIONS = (
     "Use only the bound FoldCV MCP tools and native web search when enabled. Do not use shell, files, "
-    "plugins, skills, other agents or alternate providers. Read context before editing. Prepare and apply "
+    "plugins, host skills, other agents or alternate providers. Read context before editing. Prepare and apply "
     "at most one successful batch, then reread and check it. Tool success requires a durable save. "
     "Keep unsupported facts as findings. Explain source failures and unresolved edit outcomes accurately."
     " If a tool returns argumentIssues, correct its shape to the declared schema and retry that tool within "
     "the same turn. Do not retry permission/owner/mode denial or start another model turn."
     " Write final answers in plain Russian. Explain failures without internal codes, paths or tool names; "
-    "use stored source IDs for citations."
+    "use stored source IDs for citations." + SKILL_INSTRUCTIONS
 )
 SERVER_REQUESTS = frozenset({"account/chatgptAuthTokens/refresh", "applyPatchApproval", "attestation/generate",
     "currentTime/read", "execCommandApproval", "item/commandExecution/requestApproval",

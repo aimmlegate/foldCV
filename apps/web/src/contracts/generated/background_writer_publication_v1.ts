@@ -306,6 +306,7 @@ export type Tools = (
   | "get_original_source"
   | "get_conversation_context"
   | "get_project_resources"
+  | "get_application_skills"
   | "check_resume"
   | "read_public_page"
   | "publish_findings"

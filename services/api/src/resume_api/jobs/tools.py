@@ -9,6 +9,7 @@ from packages.resume_core.models.background import ProposalBindingV1
 
 from ..agent.context import ReadBook, canonical_capture, current_dependencies, json_text
 from ..agent.tools import TOOL_NAMES, ToolSession
+from ..agent.skills import SKILL_INSTRUCTIONS
 
 APPLY_DESCRIPTION = (
     "Store one prepared proposal with apply protocol v2. waiting_for_sync or needs_review means "
@@ -19,7 +20,7 @@ APPLY_DESCRIPTION = (
 )
 DEVELOPER_INSTRUCTIONS_V2 = (
     "Use only the captured FoldCV tools and native web search when enabled. Never use shell, files, "
-    "plugins, skills, other agents or alternate providers. Read full targets and prepare at most one "
+    "plugins, host skills, other agents or alternate providers. Read full targets and prepare at most one "
     "proposal. For literal substring edits, call find_resume_content with the exact old text and copy "
     "its UTF-16 start/end offsets unchanged; never count character positions. Read the full target "
     "with get_resume_context and use that full-read snapshotId with the search offsets, never the "
@@ -27,7 +28,7 @@ DEVELOPER_INSTRUCTIONS_V2 = (
     "do not poll, prepare another batch, regenerate, or claim a save. Report it as waiting for safe "
     "publication or review. Only durable:true with an exact saved receipt proves a save. Keep unsupported "
     "facts as findings. Correct declared argument shape errors only; never retry permission denial or "
-    "start another model turn. Write final answers in plain Russian with stored source IDs for citations."
+    "start another model turn. Write final answers in plain Russian with stored source IDs for citations." + SKILL_INSTRUCTIONS
 )
 PROTOCOL_V2_SHA256 = hashlib.sha256((APPLY_DESCRIPTION + DEVELOPER_INSTRUCTIONS_V2).encode()).hexdigest()
 

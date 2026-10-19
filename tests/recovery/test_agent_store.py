@@ -51,7 +51,7 @@ def test_settings_choices_are_independent_revisioned_and_retained_without_catalo
     processing.select_model("processing-model")
     original = processing.path.read_bytes()
     settings = AgentSettingsStore(tmp_path)
-    assert settings.load().selected_agent_model is None and not settings.load().enabled
+    assert settings.load().selected_agent_model is None and settings.load().enabled
     assert not settings.path.exists()
     request = AgentSettingsRequest(expectedRevision=1, enabled=True, selectedAgentModel="assistant-model")
     saved = settings.save(request, ("assistant-model", "processing-model"))
@@ -62,6 +62,7 @@ def test_settings_choices_are_independent_revisioned_and_retained_without_catalo
         settings.save(request, None)
     assert settings.save(AgentSettingsRequest(expectedRevision=2, enabled=False,
         selectedAgentModel="assistant-model"), None).selected_agent_model == "assistant-model"
+    assert not AgentSettingsStore(tmp_path).load().enabled
     processing.select_model("other-processing")
     assert settings.load().selected_agent_model == "assistant-model"
     with pytest.raises(AgentFailure, match="AGENT_MODEL_UNAVAILABLE"):
