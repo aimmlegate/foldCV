@@ -22,6 +22,5 @@ export function ReasoningSelect({ value, metadata, disabled, change }: {
         {labels[effort]}{!supported.includes(effort) ? " · недоступен" : ""}
       </option>)}
     </select>
-    <p className="small muted">Глубина рассуждений для правки выделения. Low обычно быстрее. Применится к следующему запросу.</p>
   </>;
 }

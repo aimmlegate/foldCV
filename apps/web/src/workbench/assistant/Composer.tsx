@@ -54,7 +54,6 @@ export function Composer({ view, captured, active, applying, title, draft, flags
         {active && <button className="chat-send is-stop" type="button" title="Остановить" aria-label="Остановить" onClick={stop} disabled={view.submitting || view.run?.state === "cancelling" || view.loading === "Останавливаем задачу"}>{view.submitting || view.run?.state === "cancelling" || view.loading === "Останавливаем задачу" ? <Spinner /> : <Icon name="stop" />}</button>}
         {(!active || view.pendingSend) && <button className="chat-send" type="submit" disabled={!enabled} title={view.pendingSend ? "Повторить отправку" : "Отправить"}
           aria-label={view.pendingSend ? "Повторить отправку" : "Отправить"}><Icon name="arrow" /></button>}</div></div>
-    <div className="chat-composer-footer"><span>{view.flags.allowEdits ? "Чтение всего проекта, включая факты. Правки сохраняются в общей истории." : "Чтение всего проекта, включая факты. Запись запрещена."}</span><span>/ — команды · Enter — отправить · Shift+Enter — новая строка</span></div>
     {[...view.draft].length > 8000 && <p className="chat-error" role="alert">Сообщение длиннее 8000 символов.</p>}
     {view.capabilities?.unavailable && <p className="chat-error">{errorText(view.capabilities.unavailable.code)} <button className="text-button" type="button" onClick={settings}>Настройки</button></p>}
   </form>;

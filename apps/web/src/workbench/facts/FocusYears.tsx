@@ -51,11 +51,11 @@ export function FocusYears({ entries, options, paused, submit }: { entries: read
   return <div className="focus-years" aria-label="Фокус в резюме">
     <p className="technology-label">Фокус в резюме · лет опыта</p>
     {entries.map(entry => <YearsRow key={entry.recordId} entry={entry} paused={paused} submit={submit} />)}
-    {options.length > 0 ? <form className="focus-add" onSubmit={event => { event.preventDefault(); void add(); }}>
+    {options.length > 0 && <form className="focus-add" onSubmit={event => { event.preventDefault(); void add(); }}>
       <select aria-label="Технология для фокуса" value={choice} disabled={paused || busy} onChange={event => setSelected(event.target.value)}>
         {options.map(option => <option key={option.recordId} value={option.recordId}>{option.display}</option>)}
       </select>
       <Button type="submit" variant="quiet" busy={busy} busyLabel="Добавляем…" disabled={paused}>Добавить в фокус</Button>
-    </form> : <small className="focus-add-hint">В фокус можно добавить технологии из списка ниже, если для них есть иконка.</small>}
+    </form>}
   </div>;
 }

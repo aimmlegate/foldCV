@@ -9,11 +9,9 @@ export function Assessment({ response, open, back }: { response: RichProjectResp
   const groups = [{ kind: "candidate", label: "Кандидат" }, { kind: "employment", label: "Места работы" }, { kind: "technology", label: "Технологии" },
     { kind: "education", label: "Образование" }, { kind: "language", label: "Языки" }];
   return <section className="check-screen" aria-label="Первичная проверка"><div className="check-content"><h2>Результат проверки</h2>
-    <div className="check-result"><Icon name={uncertain ? "info" : "check"} /><div><strong>{uncertain ? "Проверьте выбранный источник" : "Текст похож на резюме"}</strong>
-      <p>Факты извлечены. Исходный текст сохранён без переписывания.</p></div></div>
+    <div className="check-result"><Icon name={uncertain ? "info" : "check"} /><div><strong>{uncertain ? "Проверьте выбранный источник" : "Текст похож на резюме"}</strong></div></div>
     <div className="check-tags">{groups.map(group => { const count = records.filter(record => record.kind === group.kind).length;
       return count > 0 && <span key={group.kind}>{group.label}: {count}</span>; })}</div>
-    <p className="small muted">Можно продолжить, даже если это не резюме.</p>
     <div className="check-actions"><Button variant="primary" onClick={open}>{uncertain ? "Всё равно продолжить" : "Открыть редактор"}<Icon name="arrow" /></Button>
       <button className="text-button" onClick={back}>Вернуться к исходнику</button></div>
   </div></section>;

@@ -11,7 +11,7 @@ export function Transcript({ view, active, resource, focus, draft }: { view: Ass
   const [stale, setStale] = useState<Set<string>>(() => new Set()), [copy, setCopy] = useState("");
   return <>
     {!view.messages.length && !active && <div className="chat-empty"><span className="chat-empty-icon"><Icon name="spark" /></span><h3>Чат по этому резюме</h3>
-      <p>Проверьте резюме или попросите изменить выбранный фрагмент.<br />Правки попадут в общую историю отмены.</p><div className="chat-suggestions">
+      <div className="chat-suggestions">
         {["Проверь резюме", "Сократи текст", "Сравни с вакансией"].map(text => <button key={text} onClick={() => { draft(text); document.getElementById("chat-input")?.focus(); }}><Icon name="spark" />{text}</button>)}
       </div></div>}
     {view.messages.map(message => <article key={message.id} className={`chat-message${message.role === "user" ? " from-user" : ""}`}>

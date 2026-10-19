@@ -13,7 +13,7 @@ export function SourceForm({ input, change, busy, sourceName, process, textDraft
     <h2>Добавить исходник</h2><p>Загрузите резюме или вставьте текст. Он откроется в редакторе без переписывания.</p>
     <button className="dropzone" type="button" disabled={busy} onClick={() => fileInput.current?.click()}
       onDragOver={event => event.preventDefault()} onDrop={event => { event.preventDefault(); const file = event.dataTransfer.files[0]; if (file && !busy) change({ kind: "file", file }); }}>
-      <span className="upload-mark"><Icon name="upload" /></span><span><strong>Выбрать файл</strong><small>PDF, DOCX, TXT, Markdown · можно перетащить сюда</small></span>
+      <span className="upload-mark"><Icon name="upload" /></span><span><strong>Выбрать файл</strong><small>PDF, DOCX, TXT, Markdown</small></span>
     </button>
     <input ref={fileInput} hidden type="file" aria-label="Исходное резюме" accept=".pdf,.docx,.txt,.md,.markdown" disabled={busy}
       onChange={event => { const file = event.currentTarget.files?.[0]; event.currentTarget.value = ""; if (file) change({ kind: "file", file }); }} />
@@ -21,6 +21,6 @@ export function SourceForm({ input, change, busy, sourceName, process, textDraft
     <label htmlFor="source-text">Текст резюме</label><textarea className="source-text" id="source-text" aria-label="Текст резюме" placeholder="Имя, опыт работы, навыки…"
       disabled={busy || input.kind === "file"} value={textDraft} onChange={event => change({ kind: "text", text: event.currentTarget.value })} />
     {input.kind === "file" && <p className="small muted">Будет обработан выбранный файл. Уберите его, чтобы использовать текст.</p>}
-    <div className="source-bottom"><span className="small muted">Исходник останется в проекте</span><Button variant="primary" busy={busy} busyLabel="Подготовка…" disabled={!hasInput(input) && !sourceName} onClick={process}>Обработать<Icon name="arrow" /></Button></div>
+    <div className="source-bottom"><Button className="ml-auto" variant="primary" busy={busy} busyLabel="Подготовка…" disabled={!hasInput(input) && !sourceName} onClick={process}>Обработать<Icon name="arrow" /></Button></div>
   </div></section>;
 }

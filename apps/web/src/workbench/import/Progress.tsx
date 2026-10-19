@@ -47,15 +47,13 @@ export function Progress({ response, sourceName, cancel, busy }: {
           {found.technologies.length > 0 && <div className="import-found-group"><h4>Технологии</h4><ul className="import-found-technologies">
             {found.technologies.slice(0, 8).map(name => <li key={name}>{name}</li>)}
           </ul>{found.technologies.length > 8 && <p className="import-found-more">Ещё технологий: {found.technologies.length - 8}</p>}</div>}
-          <p className="import-discovery-note">Это промежуточные сведения. После обработки их можно будет исправить.</p>
         </> : <>
           {found.pages > 0 && <p className="import-source-pages">Страниц с текстом: {found.pages}</p>}
           {found.excerpt && <blockquote className="import-source-excerpt">{found.excerpt}</blockquote>}
-          <p className="import-discovery-note">Здесь появятся найденные места работы, технологии и другие факты.</p>
         </>}
       </section>
     </div>
     <div className="import-progress-footer"><button className="text-button" disabled={busy} onClick={cancel}>{busy && <Spinner />}{busy ? "Останавливаем…" : "Отменить обработку"}</button>
-      <span>Редактирование откроется после обработки</span></div>
+</div>
   </div></section>;
 }

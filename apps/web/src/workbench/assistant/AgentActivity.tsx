@@ -26,6 +26,6 @@ export function Activity({ view, active }: { view: AssistantView; active: boolea
       {item.state === "working" && active ? <Spinner /> : <Icon name={item.state === "success" ? "check" : item.state === "summary" ? "spark" : "info"} />}
       <span>{item.text || item.label}<small>{item.state === "summary" ? "Краткое сообщение модели" : item.state === "error" ? "Не удалось выполнить" : item.state === "success" ? "Готово" : active ? "В работе" : "Выполнение завершено"}</small></span>
     </li>)}</ol>
-    <p className="chat-activity-note">Модель: {view.run?.model ?? "подготавливаем"}. Здесь показаны действия и доступные краткие сообщения модели.</p>
+    <p className="chat-activity-note">Модель: {view.run?.model ?? "подготавливаем"}</p>
   </details>;
 }

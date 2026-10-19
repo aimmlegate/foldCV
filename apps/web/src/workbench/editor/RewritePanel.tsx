@@ -52,6 +52,5 @@ export function RewritePanel({ open, close, instruction, change, submit, apply, 
     <div className="rewrite-actions"><Button variant="primary" busy={busy} busyLabel={preview ? "Применяем…" : "Готовим вариант…"} disabled={!preview && (!instruction.trim() || !source.trim())} onClick={preview ? apply : submit}>{preview ? "Применить" : "Изменить текст"}<Icon name={preview ? "check" : "spark"} /></Button>
       {preview && <Button variant="quiet" disabled={busy || !instruction.trim()} onClick={submit}>Ещё вариант</Button>}
     </div>
-    <p className="rewrite-boundary">{preview ? "В резюме ещё ничего не изменено." : "⌘ / Ctrl + Enter — получить вариант"}</p>
   </section>;
 }

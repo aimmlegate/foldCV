@@ -17,11 +17,10 @@ export function FileDialog({ mode, title, subtitle, filename, timeline, error, b
     {exporting ? <><p className="dialog-copy">{title}<br />{subtitle}</p>
       <div className="export-format"><span className="format-icon">W</span><div><strong>Документ Word</strong><small>DOCX · редактируемый текст и таблицы</small></div><Icon name="check" /></div>
       <div className="export-summary"><span>Шаблон</span><strong>FoldCV / две колонки</strong></div>
-      {(timeline?.warnings.some(warning => warning.kind === "overlap") ?? false) && <p className="notice warning">Есть пересечение дат. Оно не мешает экспорту; проверьте, что параллельная работа указана верно.</p>}
+      {(timeline?.warnings.some(warning => warning.kind === "overlap") ?? false) && <p className="notice warning">Проверьте пересекающиеся периоды работы.</p>}
       {timeline === null && <p className="notice">Проверка дат сейчас недоступна. Экспорт доступен.</p>}
-      <p className="dialog-subtitle">Перед скачиванием сохраним последние изменения. Файл .foldcv — ⌘S / Ctrl+S в редакторе.</p>
     </> : <><p className="dialog-copy">Файл .foldcv хранит исходник, факты и документ.</p>
-      <p className="notice">{opening ? "Выберите файл .foldcv. Текущие изменения сохранятся перед открытием." : "Рабочая версия сохраняется на этом компьютере. Файл .foldcv можно перенести и открыть в FoldCV."}</p>
+      <p className="notice">{opening ? "Текущие изменения сохранятся перед открытием." : "Файл .foldcv можно открыть на другом компьютере."}</p>
       <div className="demo-file-row"><span>{opening ? "Файл .foldcv" : filename}</span>
         <Button className="small" busy={busy} busyLabel={opening ? "Открываем…" : "Готовим…"} onClick={() => {
           setMessage("");

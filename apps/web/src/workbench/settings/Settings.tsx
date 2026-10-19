@@ -51,15 +51,13 @@ export function Settings({ close, connectionChanged }: { close: () => void; conn
           <ModelSelect id="import-model-select" label="Модель импорта" value={current.draft.importModel} models={view.snapshot.models}
             defaultLabel="Использовать модель обработки" disabled={busy || !current.preferences || view.pending || !view.snapshot.metadataReady}
             change={value => controller.change("importModel", value)} />
-          <p className="settings-disclosure">Извлекает факты и собирает резюме из исходника. Сохранённый выбор применяется к следующему импорту.</p>
         </div>
-        <div className="uir-assistant-options"><h3>Помощник</h3><div className="switch-line"><label htmlFor="assistant-enabled">Включить помощника<small>Включён по умолчанию. При выключении панель помощника скрывается.</small></label>
+        <div className="uir-assistant-options"><h3>Помощник</h3><div className="switch-line"><label htmlFor="assistant-enabled">Включить помощника</label>
           <input className="switch" id="assistant-enabled" aria-label="Включить помощника" role="switch" type="checkbox" checked={current.draft.agentEnabled} disabled={!current.assistant}
             onChange={event => controller.change("agentEnabled", event.currentTarget.checked)} /></div>
           <ModelSelect id="assistant-model-select" label="Модель помощника" value={current.draft.agentModel} models={view.snapshot.models}
             defaultLabel="Выберите модель помощника" disabled={busy || !current.assistant || view.pending || !view.snapshot.metadataReady}
             change={value => controller.change("agentModel", value)} />
-          <p className="settings-disclosure">Выбор модели помощника сохраняется отдельно.</p>
           {current.errors.assistant && current.assistant && <button className="text-button" disabled={busy} onClick={() => void controller.reloadAssistant()}>Загрузить настройки помощника</button>}
         </div></>}
       {section === "rules" && <><h3>Общие правила и команды</h3><p>Эти правила действуют для всех резюме и применяются при следующей обработке текста.</p>
@@ -70,11 +68,10 @@ export function Settings({ close, connectionChanged }: { close: () => void; conn
         {current.comparison && current.rules && <><label htmlFor="rules-comparison">Сохранённая версия для сравнения</label>
           <textarea className="rules-text" id="rules-comparison" aria-label="Сохранённая версия правил" readOnly value={current.rules.markdown} /></>}
       </>}
-      {section === "analysis" && <><h3>Проверка изменений</h3><p>Проверять факты и даты после редактирования.</p>
+      {section === "analysis" && <><h3>Проверка изменений</h3>
         <div className="switch-line"><label htmlFor="analysis-toggle">Автоматически проверять изменения<small>Другие упоминания меняются только с вашего согласия.</small></label>
           <input className="switch" id="analysis-toggle" aria-label="Автоматически проверять изменения" type="checkbox" role="switch" disabled={!current.preferences} checked={current.draft.automatic}
             onChange={event => controller.change("automatic", event.currentTarget.checked)} /></div>
-        <p className="settings-disclosure">Параллельные периоды работы допустимы. Подсказки не блокируют редактирование, сохранение или экспорт.</p>
       </>}
       {!controller.ready && !current.loading && <Button className="small" onClick={() => void controller.load()}>Повторить загрузку настроек</Button>}
       <div className="settings-actions"><Button variant="primary" busy={current.saving} busyLabel="Сохраняем…" disabled={!dirty || current.loading || view.pending} onClick={() => void controller.save()}>Сохранить изменения</Button>

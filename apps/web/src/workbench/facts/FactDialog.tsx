@@ -39,7 +39,6 @@ export function FactDialog({ target, close, submit }: { target: FactTarget; clos
       void apply(record ? { operation: "edit", recordId: record.id, values } : { operation: "add", recordKind: target.kind, values });
     }}>
       {target.remove ? <p className="dialog-copy">{target.kind === "claim" ? "Заметка будет удалена. Текст резюме сохранится." : "Связанные поля будут удалены из документа. Остальной текст сохранится."}</p> : <>
-        <p className="dialog-subtitle">{target.kind === "claim" ? "Исправьте содержание или пометки. Связанный текст резюме будет проверен после сохранения." : "Изменения появятся в документе после сохранения."}</p>
         <div className="fact-form-grid">{[...inputs, ...addingPeriod].map((field, index) => "date" in field || field.key === "start" || field.key === "end" || field.key === "completion"
           ? <DateInput key={field.key} name={field.key} label={field.label} field={"date" in field ? field.date : undefined} disabled={busy} />
           : target.kind === "claim" ? <div key={field.key} className="full">
@@ -50,7 +49,6 @@ export function FactDialog({ target, close, submit }: { target: FactTarget; clos
             type={field.checked === undefined ? "text" : "checkbox"} defaultValue={field.checked === undefined ? field.text : "present"}
             defaultChecked={field.checked} autoFocus={index === 0} disabled={busy} maxLength={16000} />
         </div>)}</div>
-        {(target.kind === "employment" || target.kind === "education") && <p className="dialog-subtitle">Укажите год, месяц или полную дату, как в исходнике. Неясные даты сохранятся для проверки.</p>}
         {record?.kind === "employment" && <div className="uir-period-actions">
           {record.periods.map((period, index) => <button className="text-button" type="button" key={period.id} disabled={busy}
             onClick={() => { if (form.current) void apply({ operation: "remove_period", recordId: record.id, periodId: period.id,

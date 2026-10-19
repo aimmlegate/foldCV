@@ -15,7 +15,6 @@ export function Connection({ view, workflow, model, change, disabled, selectionD
     <ModelSelect id="model-select" label="Модель обработки" value={model} models={snapshot.models}
       disabled={disabled || selectionDisabled || view.pending || !snapshot.metadataReady}
       change={value => { if (value) change(value); }} />
-    <p className="small muted">Список получен от подключения. Наличие модели в списке не подтверждает доступ.</p>
     <div className="quota-line">{snapshot.quota.usedPercent !== null && <span className="quota-bar"><span style={{ width: `${snapshot.quota.usedPercent}%` }} /></span>}
       {snapshot.quota.usedPercent !== null ? `Использовано ${snapshot.quota.usedPercent}%` : "Использование неизвестно"}
       {` · Лимит ${snapshot.quota.state === "available" ? "доступен" : snapshot.quota.state === "exhausted" ? "исчерпан" : "неизвестен"}`}
