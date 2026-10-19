@@ -95,6 +95,9 @@ class ConnectionAdapter:
         self.experimental_profile = experimental_profile
 
     def _launcher(self) -> tuple[Path, tuple[str, ...]]:
+        if self.executable is None:
+            selected = shutil.which("codex")
+            self.executable = Path(selected).absolute() if selected is not None else None
         if self.executable is None or not self.executable.is_file():
             raise ConnectionFailure("CLI_MISSING")
         try:

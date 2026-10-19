@@ -7,6 +7,7 @@ from typing import Annotated, Literal
 from pydantic import BaseModel, ConfigDict, Field
 
 from packages.resume_core.reasoning import ModelReasoning, ReasoningEffort
+from packages.resume_core.models.connection import CliInstallationPayload
 from packages.resume_core.models.contracts import Block, Fact, Proposal, SourceUnit
 from packages.resume_core.rendering.models import RenderRequest
 
@@ -96,6 +97,7 @@ class ConnectionPayload(Transport):
     metadataReady: bool = False
     generationReady: bool = False
     experimentalMode: bool = False
+    installation: CliInstallationPayload | None = None
 
 
 TextRequest = NormalizeRequest | DraftRequest | RewriteRequest

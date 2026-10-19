@@ -29,7 +29,8 @@ from .contracts import (CompletedEvent, CompletedPayload, ConnectionPayload, Dra
                         StartedPayload, TextRequest, UsagePayload)
 from .lifecycle import OperationFiles, SpikeError, has_blocked_owned, reap_owned
 from .connection import ConnectionAdapter, ConnectionFailure, Metadata
-from .cli.experimental_profile import BINARY, ExperimentalCliProfile
+from .cli.experimental_profile import ExperimentalCliProfile, ExperimentalProfileError
+from .cli.installation import CliInstallation
 from .providers.codex_cli import CodexCliProvider
 from .providers.content import ContentFailure
 from .normalization_content import NormalizationContentService
@@ -66,7 +67,7 @@ BODY_TIMEOUT_SECONDS = 10
 CANCEL_GRACE_SECONDS = 0.5
 POST_ONLY_PATHS = frozenset({"session/exchange", "extract", "facts", "facts/normalize", "facts/draft", "facts/rewrite", "normalize", "draft", "rewrite",
                             "validate", "prepare-render", "render", "host/discover", "host/status", "host/login",
-                            "host/detach", "host/models", "host/select", "host/cancel-login"})
+                            "host/detach", "host/models", "host/select", "host/cancel-login", "host/install", "host/cancel-install"})
 JSON_POST_PATHS = frozenset("/v1/" + path for path in POST_ONLY_PATHS if path != "extract")
 JSON_PUT_PATHS = frozenset({"/v1/settings/rules", "/v1/settings/assistant"})
 
@@ -333,13 +334,14 @@ def create_app(*, origin: str, secret: str, temp_root: Path, dist: Path, runner:
     from .gui_rendering import GuiDocxRenderer, RichDocxRenderer
     render_executor = ThreadPoolExecutor(max_workers=BACKGROUND_LIMITS.render_workers, thread_name_prefix="foldcv-render")
     document_renderer = DocumentRenderer(executor=render_executor)
-    connection = connection_adapter or ConnectionAdapter(BINARY if experimental_profile else cli_executable,
+    connection = connection_adapter or ConnectionAdapter(experimental_profile.executable if experimental_profile else cli_executable,
                                                           experimental_profile=experimental_profile)
     if background_parallel and experimental_profile is not None:
         from spikes.background.appserver_driver import SharedAppServer
         background_server_factory = lambda: SharedAppServer.native(background_operations, connection)
-    provider = (CodexCliProvider(BINARY, experimental_profile=experimental_profile)
+    provider = (CodexCliProvider(experimental_profile.executable, experimental_profile=experimental_profile)
                 if experimental_profile else None)
+    installation = CliInstallation(experimental_profile.root.parent / "cli-runtime") if experimental_profile else None
     connection_state = ConnectionPayload(state="unchecked")
     connection_epoch = 0
     connection_namespace = secrets.token_hex(12)
@@ -1037,10 +1039,12 @@ def create_app(*, origin: str, secret: str, temp_root: Path, dist: Path, runner:
             watcher.cancel()
 
     login_task: asyncio.Task | None = None
+    install_task: asyncio.Task | None = None
 
     def connection_response() -> JSONResponse:
-        state = connection_state.model_copy(update={"experimentalMode": experimental_profile is not None,
-                                                    "generationReady": experimental_ready()})
+        state = ConnectionPayload(**(connection_state.model_dump() | {"experimentalMode": experimental_profile is not None,
+                                                    "generationReady": experimental_ready(),
+                                                    "installation": installation.snapshot() if installation else None}))
         return JSONResponse(state.model_dump(), headers={"Cache-Control": "no-store"})
 
     @app.get("/v1/settings/connection")
@@ -1092,7 +1096,7 @@ def create_app(*, origin: str, secret: str, temp_root: Path, dist: Path, runner:
                 return problem(error.code, 409, "settings")
 
     async def connection_job(kind: str, work):
-        nonlocal active, connection_epoch, connection_state, login_task
+        nonlocal active, connection_epoch, connection_state, login_task, install_task, experimental_profile, provider
         async with gate:
             if unsafe_cleanup:
                 connection_state = ConnectionPayload(state="cleanup_blocked")
@@ -1101,9 +1105,12 @@ def create_app(*, origin: str, secret: str, temp_root: Path, dist: Path, runner:
                 connection_state = ConnectionPayload(state="cleanup_blocked")
                 return connection_response()
             if INFERENCE.locked() or background_enabled and not jobs.supervisor.login_allowed():
-                return connection_response() if kind != "login" else problem("BUSY", 429, "host", True)
+                return connection_response() if kind not in {"login", "install"} else problem("BUSY", 429, "host", True)
             if kind == "login" and connection_state.state != "login_required":
                 return problem("LOGIN_NOT_AVAILABLE", 409, "host")
+            if kind == "install" and (installation is None or connection_state.state not in {
+                    "cli_missing", "unsupported_version", "launcher_unsupported"}):
+                return problem("INSTALL_NOT_AVAILABLE", 409, "host")
             if cancellation_pending or active >= MAX_CONCURRENT or connection_work:
                 return problem("BUSY", 429, "host", True)
             if provider is not None:
@@ -1112,27 +1119,51 @@ def create_app(*, origin: str, secret: str, temp_root: Path, dist: Path, runner:
             epoch = connection_epoch
             files = OperationFiles(temp_root)
             cancel = threading.Event()
+            if kind == "install":
+                installation.cancel = cancel
+                installation.update(state="downloading", downloadedBytes=0, error=None)
 
             def execute():
-                with INFERENCE.hold(cancel, deadline=time.monotonic() + 15), native_profile(
-                        experimental_profile, cancel, deadline=time.monotonic() + 15, blocking=False,
-                        operations_root=temp_root):
-                    with files.open():
+                if kind == "install":
+                    with INFERENCE.hold(cancel, deadline=time.monotonic() + 15), files.open():
                         return work(files, cancel)
+                if experimental_profile is not None and not experimental_profile.executable.is_file():
+                    raise ConnectionFailure("CLI_MISSING")
+                try:
+                    with INFERENCE.hold(cancel, deadline=time.monotonic() + 15), native_profile(
+                            experimental_profile, cancel, deadline=time.monotonic() + 15, blocking=False,
+                            operations_root=temp_root):
+                        with files.open():
+                            return work(files, cancel)
+                except ExperimentalProfileError as error:
+                    raise ConnectionFailure("UNSUPPORTED_VERSION" if str(error) == "CLI_UNSUPPORTED" else "METADATA_FAILED") from None
 
             task = asyncio.create_task(asyncio.to_thread(execute))
             operations[task] = files
             connection_work[task] = (files, cancel)
             task.add_done_callback(operation_done)
-            if kind == "login":
+            if kind in {"login", "install"}:
                 connection_epoch += 1
                 epoch = connection_epoch
                 agent.request_stop(reason="AGENT_CONNECTION_CHANGED")
-                login_task = task
-                connection_state = ConnectionPayload(state="login_pending", version=connection_state.version)
+                if kind == "install":
+                    install_task = task
+                else:
+                    login_task = task
+                    connection_state = ConnectionPayload(state="login_pending", version=connection_state.version)
         try:
             result = await asyncio.shield(task)
             async with gate:
+                if kind == "install":
+                    if isinstance(result, Path) and experimental_profile is not None:
+                        experimental_profile = ExperimentalCliProfile(experimental_profile.root, result)
+                        connection.executable = result
+                        connection.experimental_profile = experimental_profile
+                        provider = CodexCliProvider(result, experimental_profile=experimental_profile)
+                        agent.runtime = CodexAgentRuntime(connection, temp_root)
+                        if epoch == connection_epoch:
+                            connection_state = ConnectionPayload(state="unchecked")
+                    return connection_response()
                 if epoch != connection_epoch:
                     return connection_response()
                 if kind == "login":
@@ -1156,8 +1187,13 @@ def create_app(*, origin: str, secret: str, temp_root: Path, dist: Path, runner:
                                                      metadataReady=kind != "discover")
                 return connection_response()
         except (AdmissionTimeout, AdmissionCancelled):
+            if kind == "install":
+                installation.update(state="cancelled" if cancel.is_set() else "failed",
+                                    error="cancelled" if cancel.is_set() else "busy")
             return connection_response()
         except AdmissionBlocked:
+            if kind == "install":
+                installation.update(state="failed", error="install_failed")
             INFERENCE.block()
             connection_state = ConnectionPayload(state="cleanup_blocked")
             return connection_response()
@@ -1178,6 +1214,8 @@ def create_app(*, origin: str, secret: str, temp_root: Path, dist: Path, runner:
                 connection_state = ConnectionPayload(state=state, version=error.version)
                 return connection_response()
         except SpikeError as error:
+            if kind == "install":
+                installation.update(state="failed", error="install_failed")
             lifecycle_code(error)
             async with gate:
                 if unsafe_cleanup:
@@ -1187,8 +1225,12 @@ def create_app(*, origin: str, secret: str, temp_root: Path, dist: Path, runner:
                 return connection_response()
         except asyncio.CancelledError:
             await stop_connection(task, files, cancel)
+            if kind == "install" and installation.snapshot()["state"] in {"downloading", "verifying", "extracting"}:
+                installation.update(state="cancelled", error="cancelled")
             raise
         except Exception:
+            if kind == "install":
+                installation.update(state="failed", error="install_failed")
             async with gate:
                 if unsafe_cleanup:
                     connection_state = ConnectionPayload(state="cleanup_blocked")
@@ -1198,6 +1240,8 @@ def create_app(*, origin: str, secret: str, temp_root: Path, dist: Path, runner:
         finally:
             if login_task is task:
                 login_task = None
+            if install_task is task:
+                install_task = None
 
     async def discover(_payload: EmptyRequest):
         return await connection_job("discover", lambda files, cancel: connection.inspect(files, cancel, full=False))
@@ -1210,6 +1254,28 @@ def create_app(*, origin: str, secret: str, temp_root: Path, dist: Path, runner:
 
     async def login(_payload: EmptyRequest):
         return await connection_job("login", connection.login)
+
+    async def install_cli(_payload: EmptyRequest):
+        if installation is None:
+            return problem("INSTALL_NOT_AVAILABLE", 409, "host")
+        return await connection_job("install", lambda files, _cancel: installation.install(files))
+
+    async def cancel_install(_payload: EmptyRequest):
+        nonlocal connection_epoch
+        async with gate:
+            current = install_task
+            if current is None or current not in connection_work:
+                return connection_response()
+            if installation.snapshot()["state"] == "ready":
+                return connection_response()
+            connection_epoch += 1
+            files, cancel = connection_work[current]
+        code = await stop_connection(current, files, cancel)
+        if installation.snapshot()["state"] in {"downloading", "verifying", "extracting"}:
+            installation.update(state="cancelled", error="cancelled")
+        if code is not None or unsafe_cleanup:
+            return problem("PROCESS_CLEANUP_FAILED", 503, "host")
+        return connection_response()
 
     async def select(payload: SelectModelRequest):
         nonlocal connection_state
@@ -1283,7 +1349,7 @@ def create_app(*, origin: str, secret: str, temp_root: Path, dist: Path, runner:
     app.add_api_route("/v1/render", render, methods=["POST"])
     for path, handler in (("discover", discover), ("status", status), ("models", models),
                           ("login", login), ("select", select), ("detach", detach),
-                          ("cancel-login", cancel_login)):
+                          ("cancel-login", cancel_login), ("install", install_cli), ("cancel-install", cancel_install)):
         app.add_api_route(f"/v1/host/{path}", handler, methods=["POST"])
 
     async def text_operation(kind: str, request: Request, payload: TextRequest):

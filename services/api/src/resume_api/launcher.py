@@ -17,7 +17,7 @@ import uvicorn
 from .app import create_app
 from .contracts import HostLaunchOptions
 from .lifecycle import require_supported_host
-from .cli.experimental_profile import BINARY, ExperimentalCliProfile
+from .cli.experimental_profile import installed_profile
 
 
 ROOT = Path(__file__).resolve().parents[4]
@@ -48,10 +48,10 @@ async def launch(*, port: int = 0, open_browser: bool = True,
         actual_port = listener.getsockname()[1]
         origin = f"http://127.0.0.1:{actual_port}"
         secret = secrets.token_urlsafe(32)
-        profile = (ExperimentalCliProfile(Path.home() / "Library/Application Support/FoldCV/cli-experiment")
+        profile = (installed_profile(Path.home() / "Library/Application Support/FoldCV/cli-experiment")
                    if experimental_cli else None)
         app = create_app(origin=origin, secret=secret, temp_root=temp_root, dist=dist,
-                         cli_executable=BINARY if profile else cli_executable,
+                         cli_executable=profile.executable if profile else cli_executable,
                          experimental_profile=profile)
         config = uvicorn.Config(app, host="127.0.0.1", port=actual_port, proxy_headers=False,
                                 access_log=False, server_header=False, log_level="critical",

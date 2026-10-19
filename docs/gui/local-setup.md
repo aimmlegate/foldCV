@@ -59,6 +59,26 @@ configuration. CLI login availability would not open D004 by itself.
 
 ## Personal CLI experiment
 
+### Install Codex from FoldCV
+
+The opt-in launcher now starts when Codex is missing. Open Settings → Model and
+connection and click **Install Codex**. FoldCV downloads the official pinned
+`0.162.0-alpha.17.2` macOS arm64 package (about 133 MB), checks its SHA-256, and
+installs into `~/Library/Application Support/FoldCV/cli-runtime`. The download
+shows actual byte progress and supports cancellation and retry. Terminal setup,
+Node.js, Homebrew and administrator access are not required for this CLI step.
+
+FoldCV detects the installed package immediately and offers **Sign in through
+ChatGPT** using the existing native browser flow. After sign-in, connection and
+model metadata refresh automatically. The dedicated profile and existing login
+remain in `cli-experiment`; tokens are never copied. Compatible installed native
+binaries are reused. No package is downloaded at startup, and other platforms
+remain unsupported by this local service.
+
+The signed host app and the official archive have distinct pinned binary and
+companion hashes. Runtime checks and assistant capabilities identify the selected
+binary; both profiles keep the existing sandbox and no paid-provider fallback.
+
 After reviewing the experiment's limits, start the separate mode from this
 checkout:
 
@@ -66,10 +86,10 @@ checkout:
 .venv/bin/python tools/run-local.py --experimental-cli
 ```
 
-In the opened app, choose **Refresh connection**, then **Sign in with Codex CLI**
-and complete the official ChatGPT browser flow. Refresh again and choose a
+In the opened app, open connection settings, install Codex if prompted, then
+choose **Sign in through ChatGPT** and complete the official browser flow. Choose a
 reported model. The default launcher command above remains manual-only. The
-experiment pins the installed native `0.162.0-alpha.17.2` binary by SHA-256;
+experiment pins the native `0.162.0-alpha.17.2` binaries by SHA-256;
 `--codex-executable` and `FOLDCV_CODEX_EXECUTABLE` cannot override it. A changed
 binary or missing sandbox stops the mode. `--check --experimental-cli` checks
 the separate profile without generating text.

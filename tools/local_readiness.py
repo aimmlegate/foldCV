@@ -147,16 +147,21 @@ def check_cli(executable: Path | None = None) -> str:
 
 
 def check_experimental_cli() -> str:
-    from resume_api.cli.experimental_profile import BINARY, ExperimentalCliProfile
+    from resume_api.cli.experimental_profile import installed_profile, ExperimentalProfileError
     from resume_api.connection import ConnectionAdapter, ConnectionFailure
     from resume_api.launcher import trusted_temp_root
     from resume_api.lifecycle import OperationFiles, SpikeError
 
-    profile = ExperimentalCliProfile(Path.home() / "Library/Application Support/FoldCV/cli-experiment")
+    profile = installed_profile(Path.home() / "Library/Application Support/FoldCV/cli-experiment")
     try:
+        profile.prepare_directories()
+        if not profile.executable.is_file():
+            return "Personal CLI is not installed; install Codex from the app's connection settings."
         with OperationFiles(trusted_temp_root()).open() as files:
-            metadata = ConnectionAdapter(BINARY, experimental_profile=profile).inspect(files, threading.Event())
+            metadata = ConnectionAdapter(profile.executable, experimental_profile=profile).inspect(files, threading.Event())
         return f"Personal CLI profile ready ({metadata.version}); choose a model in the app."
+    except ExperimentalProfileError as error:
+        raise ReadinessError(f"Personal CLI profile unavailable ({error}); check the dedicated profile.") from None
     except ConnectionFailure as error:
         if error.code in {"PROCESS_CLEANUP_FAILED", "CLEANUP_FAILED"}:
             raise ReadinessError("CLI process cleanup failed; inspect owned operations before launching.") from None

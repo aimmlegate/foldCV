@@ -4,13 +4,17 @@ import { Button } from "../ui/Button";
 import { Icon } from "../ui/Icon";
 import { ModelSelect } from "./ModelSelect";
 import { Spinner } from "../ui/OperationStatus";
+import { Installation } from "./Installation";
 
 export function Connection({ view, workflow, model, change, disabled, selectionDisabled }: { view: ConnectionView; workflow: ConnectionWorkflow;
   model: string | null; change: (value: string) => void; disabled: boolean; selectionDisabled: boolean }) {
   const snapshot = view.snapshot;
+  const installation = snapshot.installation;
+  const installing = installation && ["downloading", "verifying", "extracting"].includes(installation.state);
+  const canInstall = installation?.available && ["cli_missing", "launcher_unsupported", "unsupported_version"].includes(snapshot.state);
   return <><h3>Модель и подключение</h3><p>Подключение через Codex по подписке ChatGPT.</p>
     <div className="connection-status"><span className="connection-check">{view.pending || view.detaching || snapshot.state === "login_pending" ? <Spinner /> : <Icon name={snapshot.state === "connected" ? "check" : "info"} />}</span>
-      <div><strong role="status">{view.detaching ? "Останавливаем подключение…" : view.pending ? "Проверяем CLI, вход и доступные модели…" : connectionMessages[snapshot.state]}</strong>
+      <div><strong role="status">{view.detaching ? "Останавливаем подключение…" : installing ? "Подготавливаем подключение ChatGPT…" : snapshot.state === "login_pending" ? connectionMessages.login_pending : view.pending ? "Проверяем CLI, вход и доступные модели…" : connectionMessages[snapshot.state]}</strong>
         <small>{[snapshot.plan, snapshot.version].filter(Boolean).join(" · ") || "Сведения о подписке ещё не получены"}</small></div></div>
     <ModelSelect id="model-select" label="Модель обработки" value={model} models={snapshot.models}
       disabled={disabled || selectionDisabled || view.pending || !snapshot.metadataReady}
@@ -20,8 +24,12 @@ export function Connection({ view, workflow, model, change, disabled, selectionD
       {` · Лимит ${snapshot.quota.state === "available" ? "доступен" : snapshot.quota.state === "exhausted" ? "исчерпан" : "неизвестен"}`}
       {snapshot.quota.resetsAt !== null && ` · Сброс ${new Date(snapshot.quota.resetsAt * 1000).toLocaleString()}`}
     </div>
-    <div className="settings-actions"><Button className="small" busy={view.pending} busyLabel="Проверяем…" disabled={disabled} onClick={() => void workflow.refresh()}>Проверить подключение</Button>
-      {snapshot.experimentalMode && snapshot.state === "login_required" && <button className="text-button" disabled={disabled || view.pending} onClick={() => void workflow.login()}>Войти в Codex</button>}
+    {installation && <Installation value={installation} />}
+    {canInstall && <p className="small muted">Codex будет установлен с сайта OpenAI.</p>}
+    <div className="settings-actions"><Button className="small" busy={view.pending && !installing && snapshot.state !== "login_pending"} busyLabel="Проверяем…" disabled={disabled || view.pending || Boolean(installing)} onClick={() => void workflow.refresh()}>Проверить подключение</Button>
+      {canInstall && <Button variant="primary" className="small" busy={Boolean(installing)} busyLabel="Устанавливаем…" disabled={disabled || view.pending} onClick={() => void workflow.install()}>Установить Codex</Button>}
+      {installing && <button className="text-button" disabled={disabled} onClick={() => void workflow.cancelInstall()}>Отменить установку</button>}
+      {snapshot.experimentalMode && snapshot.state === "login_required" && <button className="text-button" disabled={disabled || view.pending} onClick={() => void workflow.login()}>Войти через ChatGPT</button>}
       {snapshot.state === "login_pending" && <button className="text-button" disabled={disabled} onClick={() => void workflow.cancelLogin()}>Отменить вход</button>}
       <Button variant="quiet" busy={view.detaching} busyLabel="Отключаем…" disabled={disabled} onClick={() => void workflow.detach()}>Отключить модель</Button>
     </div>

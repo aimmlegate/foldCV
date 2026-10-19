@@ -10,6 +10,7 @@ from pathlib import Path
 import stat
 
 from spikes.cli.profile import overrides
+from . import distribution
 
 
 VERSION = "codex-cli 0.162.0-alpha.17.2"
@@ -47,6 +48,14 @@ class ExperimentalCliProfile:
     executable: Path = BINARY
 
     @property
+    def binary_sha256(self) -> str:
+        return BINARY_SHA256 if self.executable == BINARY else distribution.CLI_SHA256
+
+    @property
+    def package_root(self) -> Path:
+        return self.executable.parents[3] if self.executable == BINARY else self.executable.parent.parent
+
+    @property
     def home(self) -> Path:
         return self.root / "home"
 
@@ -55,6 +64,10 @@ class ExperimentalCliProfile:
         return self.root / "codex"
 
     def prepare(self) -> None:
+        self.prepare_directories()
+        self.check_binary()
+
+    def prepare_directories(self) -> None:
         if self.root.exists() and not (self.root / MARKER).is_file():
             raise ExperimentalProfileError("CLI_PROFILE_UNSAFE")
         native_home = Path.home().resolve()
@@ -72,16 +85,17 @@ class ExperimentalCliProfile:
             raise ExperimentalProfileError("CLI_PROFILE_UNSAFE")
         _safe_directory(self.home, create=True)
         _safe_directory(self.codex_home, create=True)
-        self.check_binary()
         sandbox = Path("/usr/bin/sandbox-exec")
         if not sandbox.is_file() or not os.access(sandbox, os.X_OK):
             raise ExperimentalProfileError("CLI_PROFILE_UNSAFE")
 
     def check_binary(self) -> None:
-        if self.executable != BINARY or not self.executable.is_file() or self.executable.is_symlink():
+        if (not self.executable.is_file() or not os.access(self.executable, os.X_OK)
+                or any(part.is_symlink() for part in (self.executable, *self.executable.parents))):
             raise ExperimentalProfileError("CLI_UNSUPPORTED")
-        digest = hashlib.sha256(self.executable.read_bytes()).hexdigest()
-        if digest != BINARY_SHA256:
+        with self.executable.open("rb") as stream:
+            digest = hashlib.file_digest(stream, "sha256").hexdigest()
+        if digest != self.binary_sha256:
             raise ExperimentalProfileError("CLI_UNSUPPORTED")
 
     def config(self, operation: Path) -> list[str]:
@@ -93,7 +107,7 @@ class ExperimentalCliProfile:
                 "--config", "skills.config=" + entries]
 
     def _policy(self, operation: Path, args: tuple[str, ...]) -> str:
-        app = self.executable.parents[2]
+        app = self.executable.parents[2] if self.executable == BINARY else self.package_root
         paths = (self.root, operation)
         read = " ".join("(subpath " + _literal(path) + ")" for path in (*paths, app))
         write = " ".join("(subpath " + _literal(path) + ")" for path in paths)
@@ -135,3 +149,23 @@ class ExperimentalCliProfile:
                "XDG_DATA_HOME": str(owned / "data"), "XDG_STATE_HOME": str(owned / "state")}
         command = ("-p", self._policy(owned, args), str(executable), *args)
         return Path("/usr/bin/sandbox-exec"), command, env
+
+
+def installed_profile(root: Path) -> ExperimentalCliProfile:
+    import shutil
+    from spikes.agent.profile import check_host
+
+    managed = distribution.managed_executable(root.parent / "cli-runtime")
+    candidates = [managed, BINARY]
+    detected = shutil.which("codex")
+    if detected is not None:
+        candidates.append(Path(detected).resolve())
+    for executable in candidates:
+        profile = ExperimentalCliProfile(root, executable)
+        try:
+            profile.check_binary()
+            check_host() if executable == BINARY else check_host(profile.package_root)
+            return profile
+        except (OSError, ExperimentalProfileError):
+            continue
+    return ExperimentalCliProfile(root, managed)

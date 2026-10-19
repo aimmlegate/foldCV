@@ -1,0 +1,68 @@
+{
+  "additionalProperties": false,
+  "properties": {
+    "available": {
+      "title": "Available",
+      "type": "boolean"
+    },
+    "downloadedBytes": {
+      "minimum": 0,
+      "title": "Downloadedbytes",
+      "type": "integer"
+    },
+    "error": {
+      "anyOf": [
+        {
+          "enum": [
+            "unsafe_directory",
+            "busy",
+            "cancelled",
+            "unsupported_platform",
+            "download_failed",
+            "invalid_package",
+            "checksum_failed",
+            "install_failed"
+          ],
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "title": "Error"
+    },
+    "state": {
+      "enum": [
+        "idle",
+        "downloading",
+        "verifying",
+        "extracting",
+        "ready",
+        "failed",
+        "cancelled"
+      ],
+      "title": "State",
+      "type": "string"
+    },
+    "totalBytes": {
+      "exclusiveMinimum": 0,
+      "title": "Totalbytes",
+      "type": "integer"
+    },
+    "version": {
+      "pattern": "^[0-9a-zA-Z.-]{1,60}$",
+      "title": "Version",
+      "type": "string"
+    }
+  },
+  "required": [
+    "state",
+    "downloadedBytes",
+    "totalBytes",
+    "version",
+    "error",
+    "available"
+  ],
+  "title": "CliInstallationPayload",
+  "type": "object"
+}

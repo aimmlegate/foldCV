@@ -122,7 +122,8 @@ class SharedAppServer:
             yield profile.launch(profile.executable, arguments, operation)
         return cls(root, lambda: OwnedRpcPipe(root, launch),
             owner=lambda: shared_profile(profile, cancel, deadline=time.monotonic() + 30, operations_root=root),
-            verify_host=lambda pipe: asyncio.to_thread(CodexAgentRuntime.check_owned_host, pipe.files, require_host=False), **kwargs)
+            verify_host=lambda pipe: asyncio.to_thread(CodexAgentRuntime.check_owned_host, pipe.files,
+                require_host=False, host=profile.host_path), **kwargs)
 
     async def until(self, awaitable, deadline):
         task, timer = asyncio.ensure_future(awaitable), asyncio.create_task(self.clock.wait(deadline))

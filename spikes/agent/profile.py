@@ -9,6 +9,7 @@ from pathlib import Path
 import stat
 
 from resume_api.cli.experimental_profile import BINARY, ExperimentalCliProfile, ExperimentalProfileError
+from resume_api.cli import distribution
 
 
 TOKEN_ENV = "FOLDCV_AGENT_MCP_CAPABILITY"
@@ -21,26 +22,39 @@ MANIFEST_SHA256 = "95ea87bed0ff10cb2cbd9b0541b0e332b4c87f74efd961924029beb33bebb
 APP_SERVER_PREFIX = ("app-server", "--strict-config", "--listen", "stdio://")
 
 
-def check_host() -> None:
-    for path, digest in ((CODE_MODE_HOST, HOST_SHA256), (PACKAGE_MANIFEST, MANIFEST_SHA256)):
+def check_host(package: Path | None = None) -> None:
+    host = CODE_MODE_HOST if package is None else package / "bin/codex-code-mode-host"
+    manifest = PACKAGE_MANIFEST if package is None else package / "codex-package.json"
+    for path, digest in ((host, HOST_SHA256 if package is None else distribution.HOST_SHA256),
+                         (manifest, MANIFEST_SHA256)):
         try:
-            if (any(part.is_symlink() for part in (path, *path.parents))
-                    or not stat.S_ISREG(path.stat().st_mode)
-                    or hashlib.sha256(path.read_bytes()).hexdigest() != digest):
+            if any(part.is_symlink() for part in (path, *path.parents)) or not stat.S_ISREG(path.stat().st_mode):
+                raise ExperimentalProfileError("AGENT_CODE_MODE_HOST_UNSUPPORTED")
+            with path.open("rb") as stream:
+                actual = hashlib.file_digest(stream, "sha256").hexdigest()
+            if actual != digest:
                 raise ExperimentalProfileError("AGENT_CODE_MODE_HOST_UNSUPPORTED")
         except OSError as error:
             raise ExperimentalProfileError("AGENT_CODE_MODE_HOST_UNSUPPORTED") from error
-    if not os.access(CODE_MODE_HOST, os.X_OK):
+    if not os.access(host, os.X_OK):
         raise ExperimentalProfileError("AGENT_CODE_MODE_HOST_UNSUPPORTED")
 
 
 class AgentProofProfile(ExperimentalCliProfile):
+    @property
+    def host_path(self) -> Path:
+        return CODE_MODE_HOST if self.executable == BINARY else self.package_root / "bin/codex-code-mode-host"
+
+    @property
+    def manifest_path(self) -> Path:
+        return PACKAGE_MANIFEST if self.executable == BINARY else self.package_root / "codex-package.json"
+
     def launch(self, executable: Path, args: tuple[str, ...], operation: Path
                ) -> tuple[Path, tuple[str, ...], dict[str, str]]:
         if (args[:4] != APP_SERVER_PREFIX or (len(args) - 4) % 2
                 or any(arg != "--config" for arg in args[4::2])):
             raise ExperimentalProfileError("AGENT_RUNTIME_ONLY")
-        check_host()
+        check_host() if self.executable == BINARY else check_host(self.package_root)
         return super().launch(executable, args, operation)
 
     def _policy(self, operation: Path, args: tuple[str, ...]) -> str:
@@ -49,9 +63,9 @@ class AgentProofProfile(ExperimentalCliProfile):
             return policy
         # D086 permits only the pinned companion, never its surrounding directory.
         return policy + "\n" + "\n".join((
-            '(allow file-read-data (literal ' + json.dumps(str(CODE_MODE_HOST))
-            + ') (literal ' + json.dumps(str(PACKAGE_MANIFEST)) + '))',
-            '(allow process-exec (literal ' + json.dumps(str(CODE_MODE_HOST)) + '))',
+            '(allow file-read-data (literal ' + json.dumps(str(self.host_path))
+            + ') (literal ' + json.dumps(str(self.manifest_path)) + '))',
+            '(allow process-exec (literal ' + json.dumps(str(self.host_path)) + '))',
         ))
 
     def config(self, operation: Path, *, url: str | None = None,

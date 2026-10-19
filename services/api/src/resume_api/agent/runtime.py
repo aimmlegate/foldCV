@@ -533,7 +533,7 @@ class CodexAgentRuntime:
                         def ready():
                             nonlocal native_pid, host_pids
                             native_pid = files.process.pid
-                            host_pids = self.check_owned_host(files)
+                            host_pids = self.check_owned_host(files, host=self.profile.host_path)
                         session.before_turn = ready
                     def accept(raw):
                         nonlocal raw_bytes, native_pid
@@ -608,11 +608,11 @@ class CodexAgentRuntime:
         return result
 
     @staticmethod
-    def check_owned_host(files, *, require_host=True):
+    def check_owned_host(files, *, require_host=True, host=CODE_MODE_HOST):
         rows = subprocess.check_output(["/bin/ps", "-axo", "pid=,ppid=,command="], text=True, timeout=2)
         children = [row.strip().split(None, 2) for row in rows.splitlines()]
         owned = [parts for parts in children if len(parts) == 3 and int(parts[1]) == files.process.pid]
-        if (require_host and not owned) or any(parts[2] != str(CODE_MODE_HOST) for parts in owned):
+        if (require_host and not owned) or any(parts[2] != str(host) for parts in owned):
             raise AgentFailure("AGENT_RUNTIME_UNSUPPORTED")
         listeners = subprocess.run(["/usr/sbin/lsof", "-nP", "-a", "-p",
             ",".join([str(files.process.pid), *(parts[0] for parts in owned)]), "-iTCP", "-sTCP:LISTEN"],

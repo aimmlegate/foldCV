@@ -31,6 +31,7 @@ from packages.resume_core.rich_panel import RichPanelRequest, RichPanelSyncReque
 from packages.resume_core.rich_timeline import TimelineReport, CascadeRequest, CascadeApplyRequest
 from packages.resume_core.models.agent import AGENT_CONTRACTS
 from packages.resume_core.models.background import BACKGROUND_CONTRACTS
+from packages.resume_core.models.connection import CliInstallationPayload
 
 OUT = ROOT / "contracts" / "json-schema"
 RICH_CONTRACTS = {
@@ -47,7 +48,7 @@ RICH_CONTRACTS = {
     "rich_project_response": RichProjectResponse,
     "image_session_request": ImageSessionRequest, "image_upload_capture": ImageUploadCapture,
 }
-RECOVERY_MODELS = {**RECOVERY_CONTRACTS, **GUI_NORMALIZATION_CONTRACTS, **GUI_DRAFT_CONTRACTS, **GUI_PROJECT_CONTRACTS, **GUI_REWRITE_CONTRACTS, **GUI_EXPORT_CONTRACTS, **GUI_RECONCILE_CONTRACTS, **RICH_CONTRACTS, **AGENT_CONTRACTS, **BACKGROUND_CONTRACTS}
+RECOVERY_MODELS = {**RECOVERY_CONTRACTS, **GUI_NORMALIZATION_CONTRACTS, **GUI_DRAFT_CONTRACTS, **GUI_PROJECT_CONTRACTS, **GUI_REWRITE_CONTRACTS, **GUI_EXPORT_CONTRACTS, **GUI_RECONCILE_CONTRACTS, **RICH_CONTRACTS, **AGENT_CONTRACTS, **BACKGROUND_CONTRACTS, "cli_installation_payload": CliInstallationPayload}
 
 
 def main() -> None:

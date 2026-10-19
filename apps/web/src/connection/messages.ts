@@ -2,8 +2,8 @@ import type { ConnectionState } from "./workflow";
 
 export const connectionMessages: Record<ConnectionState, string> = {
   unchecked: "Подключение ещё не проверено.", detached: "Модель отключена от FoldCV. Вход в CLI остаётся в силе.",
-  cli_missing: "Codex CLI не найден. Установите его и перезапустите приложение.",
-  launcher_unsupported: "Для запуска этого CLI нужен Node. Установите Node и перезапустите приложение.",
+  cli_missing: "Codex не найден. Установите его для подключения ChatGPT.",
+  launcher_unsupported: "Установите совместимую версию Codex для FoldCV.",
   unsupported_version: "Эта версия CLI не поддерживается в выбранном режиме.",
   login_required: "Нужен вход с подпиской ChatGPT в выделенном профиле CLI.",
   api_key_mode: "Обнаружен вход по API-ключу. Для этого приложения нужна подписка ChatGPT.",

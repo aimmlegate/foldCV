@@ -81,10 +81,14 @@ class AgentService:
 
     def config_digest(self, allow_edits, allow_web):
         return digest({"base": CONFIG_SHA256, "allowEdits": allow_edits, "allowWeb": allow_web,
-            "tools": sorted(getattr(self.tools, "names", ()))})
+            "binary": self.binary_sha256, "tools": sorted(getattr(self.tools, "names", ()))})
+
+    @property
+    def binary_sha256(self):
+        return getattr(getattr(self.runtime, "profile", None), "binary_sha256", BINARY_SHA256)
 
     def capability_key(self, epoch, model, allow_edits, allow_web):
-        return (BINARY_SHA256, PROTOCOL_SHA256, self.config_digest(allow_edits, allow_web), epoch, model)
+        return (self.binary_sha256, PROTOCOL_SHA256, self.config_digest(allow_edits, allow_web), epoch, model)
 
     def capabilities(self, project_id=None, *, allow_edits=True, allow_web=True):
         connection = self.connection()
@@ -99,14 +103,14 @@ class AgentService:
         models = []
         for model in connection.models:
             state, error = self.capability_states.get(self.capability_key(connection.epoch, model, allow_edits, allow_web), ("unverified", None))
-            models.append(AgentModelCapability(model=model, state=state, binarySha256=BINARY_SHA256,
+            models.append(AgentModelCapability(model=model, state=state, binarySha256=self.binary_sha256,
                 protocolSha256=PROTOCOL_SHA256, configSha256=self.config_digest(allow_edits, allow_web), accountEpoch=connection.epoch,
                 reason=AgentError(code=error) if error else None))
         selected = next((model for model in models if model.model == settings.selected_agent_model), None)
         if reason is None and selected is not None and selected.state == "incompatible":
             reason = "AGENT_MODEL_INCOMPATIBLE"
         return AgentCapabilities(schemaVersion=1, ready=reason is None, binaryVersion=VERSION,
-            binarySha256=BINARY_SHA256, protocolSha256=PROTOCOL_SHA256, configSha256=self.config_digest(allow_edits, allow_web),
+            binarySha256=self.binary_sha256, protocolSha256=PROTOCOL_SHA256, configSha256=self.config_digest(allow_edits, allow_web),
             connectionEpoch=connection.epoch, modes=["edit", "check_only"],
             tools=list(getattr(self.tools, "names", ())), webAvailable=self.runtime is not None,
             models=models, unavailable=AgentError(code=reason) if reason else None)

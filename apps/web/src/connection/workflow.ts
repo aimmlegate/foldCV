@@ -1,8 +1,11 @@
 import { validReasoning, type ModelReasoning } from "./reasoning";
+import type { CliInstallationPayload } from "../contracts/generated/cli_installation_payload";
 
 export type ConnectionState = "unchecked" | "detached" | "cli_missing" | "launcher_unsupported" | "unsupported_version" |
   "login_required" | "api_key_mode" | "metadata_failed" | "quota_exhausted" |
   "unknown_limits" | "connected" | "login_pending" | "login_failed" | "cleanup_blocked";
+
+export type CliInstallation = CliInstallationPayload;
 
 export type ConnectionSnapshot = {
   state: ConnectionState;
@@ -15,6 +18,7 @@ export type ConnectionSnapshot = {
   metadataReady: boolean;
   generationReady: boolean;
   experimentalMode: boolean;
+  installation?: CliInstallation | null;
 };
 
 export type ConnectionView = { snapshot: ConnectionSnapshot; pending: boolean; detaching: boolean; error: string | null };
@@ -31,6 +35,17 @@ function record(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
+function validInstallation(value: unknown): value is CliInstallation {
+  const errors: readonly string[] = ["unsafe_directory", "busy", "cancelled", "unsupported_platform", "download_failed",
+    "invalid_package", "checksum_failed", "install_failed"];
+  return record(value) && typeof value.state === "string" && ["idle", "downloading", "verifying", "extracting", "ready", "failed", "cancelled"].includes(value.state) &&
+    typeof value.downloadedBytes === "number" && Number.isSafeInteger(value.downloadedBytes) && value.downloadedBytes >= 0 &&
+    typeof value.totalBytes === "number" && Number.isSafeInteger(value.totalBytes) && value.totalBytes > 0 &&
+    value.downloadedBytes <= value.totalBytes && typeof value.available === "boolean" &&
+    typeof value.version === "string" && /^[0-9a-zA-Z.-]{1,60}$/.test(value.version) &&
+    (value.error === null || typeof value.error === "string" && errors.includes(value.error));
+}
+
 export function validConnection(value: unknown): value is ConnectionSnapshot {
   if (!record(value) || typeof value.state !== "string" || !states.has(value.state as ConnectionState) ||
       !(value.version === null || (typeof value.version === "string" && value.version.length <= 80)) ||
@@ -42,6 +57,7 @@ export function validConnection(value: unknown): value is ConnectionSnapshot {
       typeof value.metadataReady !== "boolean" || typeof value.generationReady !== "boolean" ||
       typeof value.experimentalMode !== "boolean" || !record(value.quota)) return false;
   if (value.modelReasoning !== undefined && !validReasoning(value.modelReasoning, value.models)) return false;
+  if (value.installation !== undefined && value.installation !== null && !validInstallation(value.installation)) return false;
   if (value.generationReady && (!value.experimentalMode || value.state !== "connected" || !value.metadataReady ||
       value.selectedModel === null || value.quota.state !== "available")) return false;
   const quota = value.quota;
@@ -53,12 +69,41 @@ export function validConnection(value: unknown): value is ConnectionSnapshot {
 export class ConnectionWorkflow {
   private epoch = 0;
   private abort: AbortController | null = null;
+  private installationPoll: ReturnType<typeof setInterval> | null = null;
+  private pollingInstallation = false;
   view: ConnectionView = { snapshot: initial, pending: false, detaching: false, error: null };
 
   constructor(private readonly onChange: (view: ConnectionView) => void,
               private readonly request: typeof fetch = (input, init) => fetch(input, init)) {}
 
-  private publish(view: ConnectionView): void { this.view = view; this.onChange(view); }
+  private publish(view: ConnectionView): void {
+    this.view = view;
+    this.onChange(view);
+    const active = view.snapshot.installation && ["downloading", "verifying", "extracting"].includes(view.snapshot.installation.state);
+    if (active && !view.detaching && this.installationPoll === null) {
+      this.installationPoll = setInterval(() => { void this.pollInstallation(); }, 300);
+    } else if ((!active || view.detaching) && this.installationPoll !== null) {
+      clearInterval(this.installationPoll);
+      this.installationPoll = null;
+    }
+  }
+
+  private async pollInstallation(): Promise<void> {
+    if (this.pollingInstallation || this.view.detaching) return;
+    const epoch = this.epoch;
+    this.pollingInstallation = true;
+    try {
+      const snapshot = await this.post("peek", {});
+      if (epoch !== this.epoch || !snapshot.installation) return;
+      if (this.view.pending) {
+        this.publish({ ...this.view, snapshot: { ...this.view.snapshot, installation: snapshot.installation } });
+      } else {
+        this.publish({ snapshot, pending: false, detaching: false, error: null });
+        if (snapshot.installation.state === "ready" && snapshot.state !== "detached") await this.refresh();
+      }
+    } catch { /* Keep the last observed progress until the next poll. */ }
+    finally { this.pollingInstallation = false; }
+  }
 
   private async post(path: string, body: object, signal?: AbortSignal): Promise<ConnectionSnapshot> {
     const peek = path === "peek";
@@ -109,11 +154,37 @@ export class ConnectionWorkflow {
   }
 
   refresh(): Promise<void> { return this.run("status"); }
-  peek(): Promise<void> { return this.run("peek"); }
+  async peek(): Promise<void> {
+    const epoch = this.epoch + 1;
+    await this.run("peek");
+    if (epoch === this.epoch && !this.view.error && this.view.snapshot.state === "unchecked") await this.refresh();
+  }
   discover(): Promise<void> { return this.run("discover"); }
   select(modelName: string): Promise<void> {
     if (!this.view.snapshot.models.includes(modelName)) return Promise.resolve();
     return this.run("select", { model: modelName });
+  }
+  async install(): Promise<void> {
+    const installation = this.view.snapshot.installation;
+    if (this.view.pending || !installation?.available || ["downloading", "verifying", "extracting"].includes(installation.state)
+        || !["cli_missing", "launcher_unsupported", "unsupported_version"].includes(this.view.snapshot.state)) return;
+    this.publish({ ...this.view, snapshot: { ...this.view.snapshot, installation: { ...installation, state: "downloading", downloadedBytes: 0, error: null } } });
+    const epoch = this.epoch + 1;
+    await this.run("install");
+    if (epoch === this.epoch && !this.view.error && this.view.snapshot.installation?.state === "ready") await this.refresh();
+  }
+  async cancelInstall(): Promise<void> {
+    if (this.view.detaching) return;
+    this.epoch += 1;
+    const epoch = this.epoch;
+    this.publish({ ...this.view, pending: true, error: null });
+    try {
+      const snapshot = await this.post("cancel-install", {});
+      if (epoch === this.epoch) {
+        this.publish({ snapshot, pending: false, detaching: false, error: null });
+        if (snapshot.installation?.state === "ready" && snapshot.state !== "detached") await this.refresh();
+      }
+    } catch { if (epoch === this.epoch) this.publish({ ...this.view, pending: false, error: "Could not cancel installation. Try again." }); }
   }
   async login(): Promise<void> {
     if (this.view.snapshot.state !== "login_required") return;
@@ -149,5 +220,11 @@ export class ConnectionWorkflow {
     } catch { if (epoch === this.epoch) this.publish({ snapshot: initial, pending: false, detaching: false,
       error: "Could not confirm detach. Try again." }); }
   }
-  close(): void { this.epoch += 1; this.abort?.abort(); this.abort = null; }
+  close(): void {
+    this.epoch += 1;
+    this.abort?.abort();
+    this.abort = null;
+    if (this.installationPoll !== null) clearInterval(this.installationPoll);
+    this.installationPoll = null;
+  }
 }
