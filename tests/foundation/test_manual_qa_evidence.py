@@ -2,23 +2,57 @@
 
 import hashlib
 import json
+from io import BytesIO
+from types import SimpleNamespace
+import tarfile
+from pathlib import Path
+import sys
 from copy import deepcopy
 
 import pytest
 
-from tools.manual_qa_evidence import CASE_IDS, ROOT, validate_bindings, validate_execution, validate_observation, validate_retained_native
+sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "services/api/src"))
+from tools.manual_qa_evidence import CASE_IDS, validate_bindings, validate_execution, validate_observation, validate_retained_native
 from tools.background_evidence import assert_report
 from tests.foundation.test_runner_gates import nb_report_fixture
 from tools.manual_qa_evidence import observe_provider_generation
 
 
-def test_retained_native_guard_uses_its_whole_revision_and_rejects_rebound_cases():
-    spec = json.loads((ROOT / "tests/requirements.json").read_text())["backgroundExecution"]
-    assert validate_retained_native(spec) == []
-    changed = deepcopy(spec)
-    changed["nativeBindings"]["NB-X03:v01"]["evidence"] = "foreign.json"
-    with pytest.raises(SystemExit, match="Historical native bindings"):
-        validate_retained_native(changed)
+@pytest.mark.parametrize("fault", ["none", "binding", "sources"])
+def test_retained_native_guard_uses_its_whole_revision_and_rejects_rebound_cases(tmp_path, monkeypatch, fault):
+    from tools import manual_qa_evidence as evidence
+    spec = {"sources": ["runtime.py"], "nativeBindings": {"NB-X03:v01": {"evidence": "proof.json"}}}
+    historical = deepcopy(spec)
+    if fault == "binding": spec["nativeBindings"]["NB-X03:v01"]["evidence"] = "foreign.json"
+    if fault == "sources": spec["sources"].append("unbound.py")
+    calls = []
+    def output(argv, **_options):
+        if argv[1] == "show":
+            assert argv == ["git", "show", f"{evidence.HISTORICAL_REVISION}:tests/requirements.json"]
+            return json.dumps({"backgroundExecution": historical}).encode()
+        assert argv == ["git", "rev-parse", "--absolute-git-dir"]
+        return str(tmp_path / ".git") + "\n"
+    def run(argv, **options):
+        calls.append(argv)
+        if argv[0] == "git":
+            assert argv == ["git", "archive", "--format=tar", evidence.HISTORICAL_REVISION]
+            with tarfile.open(fileobj=options["stdout"], mode="w") as archive:
+                data = b"pinned runtime\n"; entry = tarfile.TarInfo("runtime.py"); entry.size = len(data)
+                archive.addfile(entry, BytesIO(data))
+        else:
+            assert "background_spec()['pendingNative']" in argv[-1]
+            assert (options["cwd"] / "runtime.py").read_bytes() == b"pinned runtime\n"
+            assert options["env"]["GIT_DIR"] == str(tmp_path / ".git")
+            assert options["env"]["PYTHONPATH"].endswith(str(options["cwd"]))
+            return SimpleNamespace(stdout="[]")
+    monkeypatch.setattr(evidence.subprocess, "check_output", output)
+    monkeypatch.setattr(evidence.subprocess, "run", run)
+    if fault == "none":
+        assert validate_retained_native(spec) == [] and len(calls) == 2
+    else:
+        with pytest.raises(SystemExit, match="Historical native bindings"):
+            validate_retained_native(spec)
+        assert not calls
 
 
 def test_qa_cases_require_collected_tests_or_explicit_observations():

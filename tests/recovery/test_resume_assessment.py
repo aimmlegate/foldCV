@@ -18,7 +18,7 @@ from resume_api.providers.content import ContentFailure, ContentResult, Reported
 from resume_api.resume_assessment_content import ResumeAssessmentContentService
 from resume_api.rich_projects import RichProjectService
 from resume_api.agent.runtime import RuntimeResult
-from packages.resume_core.models.importing import ImportFinish
+from packages.resume_core.models.importing import ImportContentFinish
 from tests.recovery.generation_fixtures import CreationProvider, frozen_now
 from tests.support.importing import importer, complete
 
@@ -51,8 +51,9 @@ def test_assessment_bounds_unicode_and_escaped_text_and_discloses_head_tail_samp
 @pytest.mark.asyncio
 async def test_import_keeps_questionable_source_with_readable_review_notes(tmp_path, monkeypatch, note):
     async def turn(session, _value, _cancel):
-        saved = await complete(session, finish=False)
-        await session.dispatcher.call("finish_import", ImportFinish(sequence=saved["sequence"], issues=[note] if note else []))
+        await complete(session, finish=False)
+        result = await session.dispatcher.call("finish_import", ImportContentFinish(issues=[note] if note else []))
+        assert result.get("readyForPublication"), result
         return RuntimeResult(state="completed")
     runtime, _ = importer(monkeypatch, turn)
     provider = CreationProvider(fail_kind="GuiDraftProposal")

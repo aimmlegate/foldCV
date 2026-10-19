@@ -149,7 +149,7 @@ def test_unknown_and_versioned_skills_are_grouped_without_changing_facts() -> No
     project = with_skills()
     before = project.model_dump()
     groups = group_technologies(project)
-    assert "Rust 1.75" in groups["other"]
+    assert "Rust 1.75" in groups["language"]
     assert ".NET Core 8" in groups["framework"]
     assert "Python 3.11" in groups["language"]
     assert project.model_dump() == before

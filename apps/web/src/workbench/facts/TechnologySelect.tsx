@@ -8,15 +8,18 @@ import { technologySuggestions } from "./technology-catalog";
 import { FactDialog } from "./FactDialog";
 import { Spinner } from "../ui/OperationStatus";
 
-export function TechnologySelect({ facts, document: resumeDocument, jobId, label, pending, paused, submit }: {
+export function TechnologySelect({ facts, document: resumeDocument, jobId, label, pending, paused, submit, focusRecordId }: {
   facts: WorkingFacts; document: RichDocumentV1; jobId: string | null; label: string; pending: readonly PanelCommand[]; paused: boolean;
   submit: (command: PanelCommand) => Promise<void>;
+  focusRecordId?: string | undefined;
 }) {
   const id = useId(), root = useRef<HTMLDivElement>(null), input = useRef<HTMLInputElement>(null);
   const [open, setOpen] = useState(false), [query, setQuery] = useState(""), [active, setActive] = useState(0);
   const [editing, setEditing] = useState<string | null>(null);
   const [expanded, setExpanded] = useState(false);
   const records = facts.records.filter((record): record is Extract<WorkingFacts["records"][number], { kind: "technology" }> => record.kind === "technology" && record.jobId === jobId);
+  const focused = records.some(record => record.id === focusRecordId);
+  useEffect(() => { if (focused) setExpanded(true); }, [focused]);
   const editedRecord = records.find(record => record.id === editing);
   const scoped = pending.filter(command => command.operation === "clear_technologies" ? (command.jobId ?? null) === jobId
     : command.operation === "add" ? command.recordKind === "technology" && (command.jobId ?? null) === jobId
@@ -46,7 +49,7 @@ export function TechnologySelect({ facts, document: resumeDocument, jobId, label
   return <div className="technology-select" data-technology-scope={jobId ?? ""} ref={root}>
     <span className="technology-label">{jobId ? "Технологии" : "Все технологии"}</span>
     <ul className="technology-values" id={`${id}-values`} aria-label={`Выбранные технологии: ${label}`}>
-        {(expanded ? records : records.slice(0, 8)).map(record => <li key={record.id} className="technology-chip" data-fact-id={record.id}
+        {(expanded || focused ? records : records.slice(0, 8)).map(record => <li key={record.id} className="technology-chip" data-fact-id={record.id}
           aria-busy={scoped.some(command => command.operation === "clear_technologies" || command.recordId === record.id ||
             command.operation === "add" && technologyKey(command.values?.["display"] ?? "") === technologyKey(record.display.rawText))}>
           <button type="button" className="technology-edit" aria-label={`Изменить ${record.display.rawText} и срок опыта`} disabled={paused}

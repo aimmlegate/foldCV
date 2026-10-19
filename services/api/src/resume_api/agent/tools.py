@@ -138,10 +138,14 @@ class ToolSession(PrivateMcp):
 
     def write_guard(self):
         from packages.resume_core.project_catalog import AccessChanged
+        from resume_api.gui_projects import ProjectFailure
         if not self.run.allow_edits:
             raise AgentFailure("AGENT_TOOL_DENIED")
         try:
+            self.service.projects.require_agent_writable(self.control.project_id)
             self.service.projects.catalog.require_write(self.control.project_id, self.run.access_revision)
+        except ProjectFailure as error:
+            raise AgentFailure(error.code) from None
         except AccessChanged:
             raise AgentFailure("AGENT_TOOL_DENIED") from None
 

@@ -2,5 +2,7 @@
   "schemaVersion": 1,
   "automaticAnalysis": true,
   "theme": "system",
-  "selectedModel": null
+  "selectedModel": null,
+  "selectedImportModel": null,
+  "rewriteReasoningEffort": null
 }

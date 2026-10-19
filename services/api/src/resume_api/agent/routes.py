@@ -44,6 +44,9 @@ def mount_agent(app, service):
         connection = service.connection()
         saved = service.settings.save(payload, connection.models or None)
         if prior.enabled and not saved.enabled:
+            jobs = getattr(service.projects, "background_jobs", None)
+            if jobs is not None and jobs.enabled:
+                await jobs.stop_agents()
             await service.stop_all(reason="AGENT_DISABLED")
         return response(saved)
 
@@ -79,7 +82,7 @@ def mount_agent(app, service):
             result = command["result"]
             error = result.get("error") or {}
             items.append(AgentProjectOperation(id=key, projectId=project_id, runId=command["runId"],
-                action=command["action"], status=command["status"], durable=result.get("durable", False),
+                action=command["action"], status=command["status"], durable=command["status"] in {"completed", "deleted"} and result.get("durable", False),
                 downloadUrl=result.get("downloadUrl"), errorCode=result.get("errorCode") or error.get("code")))
         return response(AgentProjectOperations(items=items))
 

@@ -7,7 +7,7 @@ from typing import Iterable, Mapping
 
 from .dates import ExperienceEstimate, month_bounds, old_job, project_experience
 from .models.contracts import Job, PartialDate, Project, TechnologyFact
-from .technologies import BY_ID, CATALOG, CatalogEntry, resolve_technology
+from .technologies import BY_ID, CATALOG, CatalogEntry, logo_path, resolve_technology
 
 
 @dataclass(frozen=True)
@@ -53,7 +53,9 @@ def select_focus(project: Project, available_logo_paths: Iterable[str],
     ranked = []
     for entry in CATALOG:
         facts = facts_by_id.get(entry.canonical_id, [])
-        if not any(fact.job_id is not None for fact in facts) or entry.logo is None or entry.logo not in available:
+        logo = next((path for path in (entry.logo, logo_path(entry),
+            f"images/{entry.canonical_id}.png", f"devicon/{entry.canonical_id}.png") if path is not None and path in available), None)
+        if not any(fact.job_id is not None for fact in facts) or logo is None:
             continue
         facts.sort(key=lambda fact: (fact.job_id is None, fact.id))
         experience = project_experience(project, entry.canonical_id)
@@ -65,7 +67,7 @@ def select_focus(project: Project, available_logo_paths: Iterable[str],
                priorities.get(entry.canonical_id, 10_000), 0 if recent else 1,
                -last_use, -months, entry.canonical_id)
         ranked.append((key, FocusItem(entry.canonical_id, facts[0].value.display,
-                                       entry.logo, experience,
+                                       logo, experience,
                                        tuple(sorted(fact.id for fact in facts)))))
     return tuple(item for _, item in sorted(ranked, key=lambda item: item[0])[:limit])
 

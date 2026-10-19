@@ -113,7 +113,12 @@ mandatory. Raw worker logs and malformed reports are retained before parsing or
 merging. Combined branch coverage includes the base suite and all workers.
 
 Native-only variants have separate release bindings. Passing fast cannot satisfy
-them. The release validator requires an authorized attempt in the sole ledger,
+them. `tools/checks.py fast` validates portable automated evidence without reading
+private historical screenshots or native artifacts. `tools/checks.py acceptance`
+validates retained manual evidence and current native proof; `--retained-native`
+checks the pinned historical native revision instead. Missing or changed private
+artifacts fail acceptance. Word remains a separate manual gate.
+The release validator requires an authorized attempt in the sole ledger,
 the current exact source hashes, retained native runtime/cleanup witnesses and
 unchanged artifacts. Pending, scripted, stale, wrong-pool and unverified-cleanup
 fixtures must fail release validation. The later [native authorization](handoffs/BACKGROUND-WORK/native-final-authorization.json)

@@ -2,6 +2,7 @@
 
 from contextlib import contextmanager
 from datetime import datetime, timezone
+import os
 import threading
 
 from pydantic import Field
@@ -96,10 +97,19 @@ class ProjectCatalog:
         with self.authority(identifier, revision):
             pass
 
-    def actions(self):
+    def actions(self, *, synchronize=False):
         import json
         with self._lock():
-            return {key: json.loads(value) for key, value in self._read().actions.items()}
+            state = self._read()
+            if synchronize and self.path.exists():
+                with self.path.open("rb") as stream:
+                    os.fsync(stream.fileno())
+                descriptor = os.open(self.root, os.O_RDONLY | getattr(os, "O_DIRECTORY", 0))
+                try:
+                    os.fsync(descriptor)
+                finally:
+                    os.close(descriptor)
+            return {key: json.loads(value) for key, value in state.actions.items()}
 
     def record_action(self, key, value):
         import json
@@ -107,6 +117,24 @@ class ProjectCatalog:
             state = self._read()
             if key not in state.actions and len(state.actions) >= 500:
                 raise ProjectStoreFailure("PROJECT_TOO_LARGE")
+            state.actions[key] = json.dumps(value, ensure_ascii=False, separators=(",", ":"))
+            raw = state.model_dump_json(by_alias=True).encode()
+            if len(raw) > 4 * 1024 * 1024:
+                raise ProjectStoreFailure("PROJECT_TOO_LARGE")
+            atomic_write(self.path, raw)
+
+    def reserve_action(self, key, value):
+        # The reservation also holds space for a terminal result at the byte limit.
+        self.record_action(key, {**value, "receiptReserve": " " * 1024})
+
+    def archive_action(self, identifier, archived, key, value):
+        import json
+        with self._lock():
+            self._owned(identifier)
+            state = self._read()
+            if key not in state.actions and len(state.actions) >= 500:
+                raise ProjectStoreFailure("PROJECT_TOO_LARGE")
+            state.entries.setdefault(identifier, CatalogEntry()).archived = archived
             state.actions[key] = json.dumps(value, ensure_ascii=False, separators=(",", ":"))
             raw = state.model_dump_json(by_alias=True).encode()
             if len(raw) > 4 * 1024 * 1024:

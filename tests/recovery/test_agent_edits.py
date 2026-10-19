@@ -53,6 +53,33 @@ def candidate(session, service, workspace, request):
 
 
 @pytest.mark.asyncio
+@pytest.mark.parametrize("end", [3, 8])
+async def test_selected_fact_fragment_does_not_authorize_unselected_styled_fragments(tmp_path, end):
+    def scope(workspace):
+        title = next(block for block in workspace.project.document.blocks() if block.id == "title")
+        first = title.content[0]
+        first.text, first.binding_root_id = "Eng", "title-root"
+        second = first.model_copy(deep=True)
+        second.text, second.binding_id, second.styles.bold = "ineer", "title-second", True
+        title.content.append(second)
+        return selection(workspace, "title", 0, end)
+    session, service, workspace, _ = tools_setup(tmp_path, scope_builder=scope, message="Change to Architect.")
+    try:
+        read = session.book.read(AgentQuery(kind="facts", ids=["candidate-1"]))
+        changed, _ = candidate(session, service, workspace, command({"kind": "update_fact", "snapshotId": read.snapshot.id,
+            "recordId": "candidate-1", "fieldKey": "title", "periodId": None,
+            "value": {"status": "known", "value": "Architect", "text": "Architect"},
+            "evidence": [{"kind": "user_correction", "quote": "Change to Architect."}]}))
+        title = next(block for block in changed.project.document.blocks() if block.id == "title")
+        fact = changed.project.facts.records[0].title
+        assert "".join(span.text for span in title.content) == ("Engineer" if end == 3 else "Architect")
+        assert fact.status == ("conflict" if end == 3 else "known")
+        assert title.content[1].styles.bold
+    finally:
+        await session.close()
+
+
+@pytest.mark.asyncio
 async def test_partial_utf16_cell_preserves_other_cells_marks_and_unpublished_workspace(tmp_path):
     session, service, workspace, _ = tools_setup(tmp_path)
     try:

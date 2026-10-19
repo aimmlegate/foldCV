@@ -50,7 +50,7 @@ class JobService:
         self.history = ScopeHistory(self.store, query_fingerprint)
         self.publisher = CanonicalCoordinator(self.store, self.history, projects.storage, self.load_payload)
         self.publication = JobPublication(self)
-        self.writers = WriterSessions(self.publisher, blocked=lambda project: project in self.projects.agent_recovery_fences)
+        self.writers = WriterSessions(self.publisher, blocked=lambda project: project in self.projects.agent_recovery_fences | self.projects.catalog_recovery_fences)
         self.artifacts.prepare_capture = self.capture_preparation
         self.settings = AgentSettingsStore(projects.storage.root)
         self.proposals = {}
@@ -180,6 +180,8 @@ class JobService:
             return error.code
         if job.submission.kind != "agent":
             return self.fixed.preflight(job)
+        if not self.settings.load().enabled:
+            return "JOB_DISABLED"
         _job, artifact = self.artifacts.record(job.submission.identity.project_id, job.id)
         if connection.epoch != artifact.connection_epoch:
             return "ACCOUNT_CHANGED"
@@ -190,7 +192,7 @@ class JobService:
         return None
 
     def eligible(self, job):
-        return job.submission.identity.project_id not in self.store.fences
+        return job.submission.identity.project_id not in self.store.fences and job.submission.identity.project_id not in self.projects.catalog_recovery_fences
 
     async def admit(self, control):
         try:
@@ -330,6 +332,8 @@ class JobService:
         try:
             state = self.store.load(project)
             for job in state.jobs:
+                if job.submission.kind == "agent" and not self.settings.load().enabled:
+                    continue
                 if job.submission.approval_required or job.publication not in {"ready", "waiting_for_sync", "save_failed"} or job.proposal_id is None:
                     continue
                 proposal = next(item for item in state.proposals if item.id == job.proposal_id)
@@ -340,6 +344,18 @@ class JobService:
             if error.code not in {"PROJECT_DELETED", "JOB_NOT_FOUND"}:
                 self.store.fences.setdefault(project, error.code)
         return updated
+
+    async def stop_agents(self):
+        controls = [control for control in self.supervisor.controls.values() if control.job.submission.kind == "agent"]
+        for control in controls:
+            control.stop("CANCELLED", revoke_publication=True)
+        for project, state in self.store.snapshots().items():
+            for job in state.jobs:
+                if job.submission.kind == "agent" and (job.execution not in TERMINAL_EXECUTION or job.publication not in RESOLVED_PUBLICATION):
+                    await self.supervisor.cancel(project, job.id)
+        tasks = [control.task for control in controls if control.task is not None and control.task is not asyncio.current_task()]
+        if tasks:
+            await asyncio.gather(*tasks, return_exceptions=True)
 
     async def stop_project(self, project):
         controls = [control for control in self.supervisor.controls.values()

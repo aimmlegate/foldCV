@@ -25,7 +25,8 @@ import { brand, presentationLogos } from "./presentation-assets";
 import { referenceVariables } from "./template";
 import type { TimelineReport } from "../contracts/generated/timeline_report";
 import type { DateCascadeProposal } from "../contracts/generated/date_cascade_proposal";
-import { selectedRange, singleRewriteRange } from "./selection";
+import { selectedRange, selectionLocation, singleRewriteRange } from "./selection";
+import { PendingEdits } from "./pending-edits";
 import type { RichSelection } from "../contracts/generated/rich_selection";
 import type { RichCompletionRequest } from "../contracts/generated/rich_completion_request";
 import { SessionHistory, type CellChange, type CellValue } from "./history";
@@ -165,6 +166,7 @@ export function RichEditor({ initial, acknowledge, onStatus, ref, onHistoryNavig
   const rewriteAction = useRef<string | null>(null);
   const latestRewrite = [...rewriteActivities].reverse().find(activity => rewriteActive(activity.stage) || ["preview", "failed", "review"].includes(activity.stage));
   const [factsVisible, setFactsVisible] = useState(false);
+  const [factFocus, setFactFocus] = useState<{ recordId: string } | null>(null);
   const [linkOpen, setLinkOpen] = useState(false);
   const [linkText, setLinkText] = useState("");
   const [workspaceView, setWorkspaceView] = useState<WorkspaceView>("layout");
@@ -199,7 +201,7 @@ export function RichEditor({ initial, acknowledge, onStatus, ref, onHistoryNavig
     lastTypingAt: 0, history: null as SessionHistory | null, queue: null as RichSaveQueue | null, intents: null as IntentQueue<FactIntent> | null,
     prepared: null as PreparedEditorBridge | null, applying: false, fenced: false,
     writer: null as BackgroundWriter | null, backgroundHistory: false, compositionWaiters: new Set<() => void>(),
-    latestSelection: null as ReturnType<typeof selectedRange>,
+    latestSelection: null as ReturnType<typeof selectedRange>, location: null as string | null,
     assistantFlush: async (): Promise<RichProjectResponse> => { throw new Error("Редактор ещё открывается"); },
     historyOffers: (): Pick<AgentHistoryOffer, "undo" | "redo"> => ({ undo: null, redo: null }),
     timeline: async (): Promise<TimelineReport> => ({ warnings: [], estimates: [] }),
@@ -272,6 +274,9 @@ export function RichEditor({ initial, acknowledge, onStatus, ref, onHistoryNavig
     project.document.regions.map(region => ({ id: region.id, type: "region", props: { role: region.role }, children: region.blocks.map(toBlock) })) }, []);
 
   useEffect(() => editor.onSelectionChange(() => {
+    const location = editor.transact(tr => selectionLocation(tr));
+    if (!bridge.composing && bridge.location !== null && bridge.location !== location) { bridge.complete(); bridge.group++; }
+    bridge.location = location;
     const next = editor.transact(tr => selectedRange(tr)); bridge.latestSelection = next; setSelecting(next !== null);
     refresh(value => value + 1);
   }), [editor, bridge]);
@@ -548,15 +553,13 @@ export function RichEditor({ initial, acknowledge, onStatus, ref, onHistoryNavig
       },
       applied: (action, changes) => { const next = dateAnchors(action, changes); if (next.length) setAnchors(next); },
     }, initial.workspace.projectId);
-    let pendingAction: string | null = null;
-    const pendingBlocks = new Set<string>(), movedBlocks = new Set<string>(), removedRecords = new Set<string>();
-    const removedFields = new Map<string, RichCompletionRequest["removedFields"][number]>();
-    const completedActions = new Set<string>();
+    const pendingEdits = new PendingEdits();
     function finishEdit() {
-      if (!pendingAction || completedActions.has(pendingAction) || bridge.composing || !open) return;
-      const action = pendingAction, ids = [...pendingBlocks], moved = [...movedBlocks], removed = [...removedFields.values()], deleted = [...removedRecords];
-      completedActions.add(action); pendingAction = null; pendingBlocks.clear(); movedBlocks.clear(); removedFields.clear(); removedRecords.clear();
-      void sync.complete(action, ids.filter(id => !!editor.getBlock(id)), moved, removed, true, deleted).catch(error => setEditorWarning(error instanceof Error ? error.message : "Синхронизация не завершена"));
+      if (bridge.composing || !open) return;
+      for (const [action, edit] of pendingEdits.take()) {
+        void sync.complete(action, [...edit.blocks].filter(id => !!editor.getBlock(id)), [...edit.moved], [...edit.removedFields.values()], true,
+          [...edit.removedRecords]).catch(error => setEditorWarning(error instanceof Error ? error.message : "Синхронизация не завершена"));
+      }
     }
     function available() {
       if (bridge.applying || bridge.fenced) throw new Error("Дождитесь завершения сохранения");
@@ -800,7 +803,8 @@ export function RichEditor({ initial, acknowledge, onStatus, ref, onHistoryNavig
         if (before !== after) changes.push({ key, before, after });
       }
       const now = performance.now();
-      if (!bridge.composing && now - bridge.lastTypingAt > 500) bridge.group++;
+      // Keep a paragraph's pending fact update in the same Undo action across pauses.
+      if (!bridge.composing && pendingEdits.empty && now - bridge.lastTypingAt > 500) bridge.group++;
       bridge.lastTypingAt = now; bridge.observing = true;
       try {
         const structure = changes.some(change => {
@@ -817,7 +821,7 @@ export function RichEditor({ initial, acknowledge, onStatus, ref, onHistoryNavig
         const id = history.commit(kind, changes, kind === "typing" || kind === "composition" ? `typing:${bridge.group}` : null);
         if (id) {
           if (!bridge.writer || bridge.writer.mode === "normal") queue.update(document(), id, kind, factsFromCells(bridge.current, queue.baseline.workspace.project?.facts ?? initialFacts));
-          pendingAction = id; completedActions.delete(id);
+          const { blocks: pendingBlocks, moved: movedBlocks, removedFields, removedRecords } = pendingEdits.forAction(id);
           for (const change of changes) {
             if (change.key.startsWith("block:")) {
               const blockId = change.key.slice(6); pendingBlocks.add(blockId);
@@ -916,12 +920,9 @@ export function RichEditor({ initial, acknowledge, onStatus, ref, onHistoryNavig
       editor.focus(); element.scrollIntoView({ block: "center", behavior: "smooth" }); return true;
     }
     if (!anchor.recordId) return false;
+      if (!prototypeFacts.current.records.some(record => record.id === anchor.recordId)) return false;
     setFactsVisible(true);
-    requestAnimationFrame(() => {
-      const element = window.document.querySelector<HTMLElement>(`.rich-fact-row[data-fact-id="${CSS.escape(anchor.recordId ?? "")}"]`);
-      const details = element?.closest("details"); if (details) details.open = true;
-      element?.scrollIntoView({ block: "center", behavior: "smooth" }); element?.querySelector("button")?.focus();
-    });
+    setFactFocus({ recordId: anchor.recordId });
     return true;
   }, captureSelection: () => captureSelected(bridge.latestSelection), assistantBaseline: async captured => {
     const valid = () => !captured || captured.session === bridge.session && !!bridge.history
@@ -1059,6 +1060,7 @@ export function RichEditor({ initial, acknowledge, onStatus, ref, onHistoryNavig
     </fieldset>
     <fieldset className="contents uir-editor-controls" disabled={applying || recovery || writerMode === "read_only" || writerMode === "detached"}>
     <FactsPanel facts={facts} document={project.document} focusEntries={initial.presentation?.focusEntries ?? []} focusOptions={initial.presentation?.focusOptions ?? []}
+      focusRequest={factFocus} onFocused={() => setFactFocus(null)}
       submit={command => bridge.panel(command)} hidden={!factsVisible} close={() => { setFactsVisible(false); editor.focus(); }}
       pending={factIntents.pending.flatMap(intent => intent.kind === "panel" ? [intent.command] : [])} paused={factIntents.paused}
       timeline={ready ? <Timeline facts={facts} anchors={anchors} controls={timelineControls} /> : null} />

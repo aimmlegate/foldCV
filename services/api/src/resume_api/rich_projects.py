@@ -46,12 +46,13 @@ class RichProjectService(RichSynchronization, RichAssets, GuiProjectService):
         self.generations = {}
         self.saved_baselines = {}
         self.agent_recovery_fences = set()
+        self.catalog_recovery_fences = set()
         self.import_runtime = import_runtime
         self.import_provider_factory = import_provider_factory or (lambda: self.provider_factory())
         self.initialize_images()
 
     def require_agent_writable(self, identifier):
-        if identifier in self.agent_recovery_fences:
+        if identifier in self.agent_recovery_fences or identifier in self.catalog_recovery_fences:
             raise ProjectFailure("AGENT_OUTCOME_UNKNOWN", 409)
         jobs = getattr(self, "background_jobs", None)
         if jobs is not None and jobs.enabled and (jobs.store.projects / identifier).exists():
@@ -71,6 +72,8 @@ class RichProjectService(RichSynchronization, RichAssets, GuiProjectService):
         with self.state_lock:
             if self.loaded:
                 return
+            from .agent.project_action_recovery import recover_actions
+            recover_actions(self)
             try:
                 loaded, self.load_errors, registry = self.storage.load_all()
             except ProjectStoreFailure as error:
@@ -130,7 +133,7 @@ class RichProjectService(RichSynchronization, RichAssets, GuiProjectService):
 
     def persist(self, identifier):
         with self.state_lock:
-            if identifier in self.agent_recovery_fences:
+            if identifier in self.agent_recovery_fences or identifier in self.catalog_recovery_fences:
                 self.save_errors[identifier] = "AGENT_OUTCOME_UNKNOWN"
                 return "failed"
             if identifier in self.deleted_ids:

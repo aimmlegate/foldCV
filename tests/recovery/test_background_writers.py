@@ -7,6 +7,8 @@ import pytest
 from packages.resume_core.background_history import digest_bytes
 from packages.resume_core.background_store import BackgroundFailure
 from packages.resume_core.models.rich_workspace import RichOperation
+from packages.resume_core.models.agent import AgentSettingsRequest
+from packages.resume_core.agent_settings import AgentSettingsStore
 from packages.resume_core.project_store import ProjectStoreFailure
 from packages.resume_core.rich_snapshot_merge import merge_snapshot
 from packages.resume_core.rules import RulesStore
@@ -17,8 +19,13 @@ def projects_for(fixture, directory):
     from resume_api.jobs.publication import JobPublication
     from resume_api.rich_projects import RichProjectService
     service = RichProjectService(directory / "operations", RulesStore(fixture.root), lambda: None, storage=fixture.canonical)
+    settings = AgentSettingsStore(fixture.root)
+    current = settings.load()
+    if not current.enabled:
+        settings.save(AgentSettingsRequest(expectedRevision=current.revision, enabled=True,
+            selectedAgentModel="synthetic-model"), ("synthetic-model",))
     jobs = SimpleNamespace(enabled=True, store=fixture.jobs, publisher=fixture.coordinator, projects=service,
-        artifacts=fixture.artifacts, fixed=SimpleNamespace(generation=lambda _project: None))
+        artifacts=fixture.artifacts, fixed=SimpleNamespace(generation=lambda _project: None), settings=settings)
     jobs.publication = JobPublication(jobs)
     service.background_jobs = jobs
     service.ensure_loaded()

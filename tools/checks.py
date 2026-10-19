@@ -83,7 +83,7 @@ def require_converter() -> None:
             raise SystemExit(f"Missing or changed app-local font: {font.name}")
 
 
-def background_spec(*, require_native=False, retained_native=False) -> dict:
+def background_spec(*, require_native=False, retained_native=False, acceptance=True) -> dict:
     from tools.background_evidence import assert_manual_bindings, assert_native_bindings
     data = json.loads((ROOT / "tests/requirements.json").read_text())
     spec = data["backgroundExecution"]
@@ -96,8 +96,13 @@ def background_spec(*, require_native=False, retained_native=False) -> dict:
     native = {v["id"] for c in matrix["cases"] if c["layers"] == ["native"] for v in c["requiredVariants"] if v["requiredBy"] in spec["coveredSlices"]}
     if set(spec["bindings"]) != due - manual - native or not due:
         raise SystemExit("NB matrix due variants do not match execution bindings")
-    assert_manual_bindings(spec.get("manualBindings", {}), manual, ROOT)
-    if retained_native:
+    if set(spec.get("manualBindings", {})) != manual or set(spec.get("nativeBindings", {})) != native:
+        raise SystemExit("NB manual/native variants do not match their evidence bindings")
+    if acceptance:
+        assert_manual_bindings(spec.get("manualBindings", {}), manual, ROOT)
+    if not acceptance:
+        spec["pendingNative"] = sorted(native)
+    elif retained_native:
         from tools.manual_qa_evidence import validate_retained_native
         spec["pendingNative"] = validate_retained_native(spec)
     else:
@@ -124,7 +129,7 @@ def pytest_group(name: str, evidence_dir: Path | None = None, diagnosis: Path | 
         env = safe_env()
         env["COVERAGE_FILE"] = str(temp_root / ".coverage")
         arguments = []
-        spec = (prepared["spec"] if prepared and "spec" in prepared else background_spec()) if name == "fast" else None
+        spec = (prepared["spec"] if prepared and "spec" in prepared else background_spec(acceptance=False)) if name == "fast" else None
         history = []
         retained = []
         if spec is not None:
@@ -302,8 +307,11 @@ def validate_map(node_context: Path | None = None, *, manual_qa: bool = False) -
         if name == "browserShell":
             if not (ROOT / node).is_file():
                 raise SystemExit(f"Missing browser shell test: {node}")
-        elif node not in mapped_ids:
-            raise SystemExit(f"Missing foundation test: {node}")
+        else:
+            for required in node if isinstance(node, list) else [node]:
+                if not isinstance(required, str) or not (required in mapped_ids or "::" not in required
+                        and any(test.startswith(required + "::") for test in collected)):
+                    raise SystemExit(f"Missing foundation test: {required}")
     gaps = [entry["id"] for entry in entries if entry["status"] != "implemented"]
     print("Unimplemented or partial requirements: " + ", ".join(gaps), flush=True)
     if manual_qa:
@@ -326,7 +334,7 @@ def browser() -> None:
 
 def fast(evidence_dir: Path | None, diagnosis: Path | None, *, manual_qa: bool = False) -> None:
     require_node()
-    spec = background_spec(retained_native=True) if manual_qa else background_spec()
+    spec = background_spec(acceptance=False)
     if manual_qa:
         from tools.manual_qa_evidence import current_sources
         spec["sources"] = list(current_sources())
@@ -356,6 +364,7 @@ def fast(evidence_dir: Path | None, diagnosis: Path | None, *, manual_qa: bool =
             pytest_group("fast", evidence_dir, diagnosis,
                 prepared={"context": context, "nodeReport": str(node_report), "history": history, "spec": spec,
                     "extraTargets": list(MANUAL_QA_EXTRA_TARGETS) if manual_qa else []})
+            print("Automated verification only; retained manual/native evidence and Word acceptance are separate gates.", flush=True)
             if manual_qa:
                 from tools.manual_qa_evidence import HANDOFF, validate_bindings, validate_execution
                 report = read_report(Path(context["reportPath"]))
@@ -379,11 +388,19 @@ def fast(evidence_dir: Path | None, diagnosis: Path | None, *, manual_qa: bool =
 
 def main() -> None:
     parser = argparse.ArgumentParser()
-    parser.add_argument("group", choices=["fast", "manual-qa", "integration-render", "browser"])
+    parser.add_argument("group", choices=["fast", "manual-qa", "integration-render", "browser", "acceptance"])
     parser.add_argument("--evidence-dir", type=Path)
     parser.add_argument("--nb-diagnosis", type=Path)
+    parser.add_argument("--retained-native", action="store_true", help="Validate the pinned historical native revision for acceptance")
     args = parser.parse_args()
-    if args.group in {"fast", "manual-qa"}:
+    if args.retained_native and args.group != "acceptance":
+        parser.error("--retained-native requires acceptance")
+    if args.group == "acceptance":
+        spec = background_spec(require_native=True, retained_native=args.retained_native)
+        if spec["pendingNative"]:
+            raise SystemExit("Native acceptance remains pending")
+        print("Retained manual/native evidence verified; Word acceptance remains separate.")
+    elif args.group in {"fast", "manual-qa"}:
         fast(args.evidence_dir, args.nb_diagnosis, manual_qa=args.group == "manual-qa")
     elif args.group == "integration-render":
         require_converter()

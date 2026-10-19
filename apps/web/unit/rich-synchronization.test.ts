@@ -9,6 +9,7 @@ import { factCells, factsFromCells } from "../src/rich/fact-cells";
 import { SessionHistory, type CellValue } from "../src/rich/history";
 import { RichSaveQueue, type RichBlock } from "../src/rich/save-queue";
 import { RichSynchronization } from "../src/rich/synchronization";
+import { PendingEdits } from "../src/rich/pending-edits";
 
 function initial(): RichProjectResponse {
   const workspace: unknown = structuredClone(fixture); assert.ok(validateRichWorkspaceShape(workspace));
@@ -30,7 +31,10 @@ test("fact cells keep independent fields, retained date precision and tombstone-
   assert.ok(history.redo()); assert.deepEqual(factCells(factsFromCells(cells, facts)), after);
 });
 
-for (const lateUndo of [false, true]) test(`delayed completion ${lateUndo ? "rejects undo/redo with equal text" : "attaches to its edit across unrelated typing"}`, async () => {
+for (const timing of ["immediate", "after-next-edit", "undo-redo"]) test(timing === "undo-redo"
+  ? "delayed completion rejects undo/redo with equal text" : timing === "immediate"
+    ? "delayed completion attaches to its edit across unrelated typing" : "delayed completion retains its origin after the next paragraph edit", async () => {
+  const lateUndo = timing === "undo-redo";
   let response = initial(); const project = response.workspace.project; assert.ok(project);
   const initialDocument = project.document, initialFacts = project.facts;
   const cache = new Map<string, StoredBlock>();
@@ -101,16 +105,27 @@ for (const lateUndo of [false, true]) test(`delayed completion ${lateUndo ? "rej
       const next = documentCells(doc, cache), key = `block:${id}`;
       const action = history.commit("typing", [{ key, before: current.get(key) ?? null, after: next.get(key) ?? null }]); assert.ok(action); publish(); return action;
     }
-    const action = edit("title", "Senior Engineer"), pending = sync.complete(action, ["title"], [], []);
+    const action = edit("title", "Senior Engineer"), edits = new PendingEdits();
+    edits.forAction(action).blocks.add("title");
+    if (timing === "after-next-edit") edits.forAction(edit("name", "Unrelated typing")).blocks.add("name");
+    const completions = edits.take(), origin = completions.find(([id]) => id === action);
+    assert.ok(origin); assert.deepEqual([...origin[1].blocks], ["title"]);
+    assert.equal(completions.length, timing === "after-next-edit" ? 2 : 1);
+    if (completions.length === 2) assert.deepEqual([...completions[1]![1].blocks], ["name"]);
+    assert.deepEqual(edits.take(), []);
+    const pending = sync.complete(origin[0], [...origin[1].blocks], [...origin[1].moved], [...origin[1].removedFields.values()]);
     await ready;
     if (lateUndo) { assert.ok(history.undo()); assert.ok(history.redo()); publish(); }
-    else edit("name", "Unrelated typing");
+    else if (timing !== "after-next-edit") edit("name", "Unrelated typing");
     finish?.(); await pending;
     const candidate = factsFromCells(current, initialFacts).records[0]; assert.ok(candidate?.kind === "candidate");
     assert.equal(candidate.title.value, lateUndo ? "Engineer" : "Senior Engineer");
     assert.equal(disposition, lateUndo ? "stale" : "applied"); assert.equal(previewCount, lateUndo ? 0 : 1);
     if (!lateUndo) {
-      assert.ok(history.undo()); publish(); assert.ok(history.undo()); publish();
+      assert.ok(history.undo()); publish();
+      const afterNameUndo = factsFromCells(current, initialFacts).records[0];
+      assert.ok(afterNameUndo?.kind === "candidate"); assert.equal(afterNameUndo.title.value, "Senior Engineer");
+      assert.ok(history.undo()); publish();
       const undone = factsFromCells(current, initialFacts).records[0]; assert.ok(undone?.kind === "candidate"); assert.equal(undone.title.value, "Engineer");
       assert.equal(document().regions[0]?.blocks[1]?.id, "title");
       assert.ok(history.redo()); publish(); assert.ok(history.redo()); publish();

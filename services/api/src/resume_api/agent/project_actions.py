@@ -9,9 +9,12 @@ from packages.resume_core.agent_store import AgentFailure, digest, run_in
 from packages.resume_core.dates import partial_date
 from packages.resume_core.gui_normalization import canonical_source
 from packages.resume_core.project_catalog import AccessChanged
+from packages.resume_core.project_store import ProjectStoreFailure
+from packages.resume_core.models.rich_workspace import RichMutationReplay
 from packages.resume_core.rich_images import normalize_image
 from packages.resume_core.rich_limits import retained_image_bytes, ImageReferences
-from packages.resume_core.storage import atomic_write, private_directory
+from packages.resume_core.storage import StorageFailure, atomic_write, private_directory
+from .project_action_recovery import reconcile_action, recover_actions
 from resume_api.extracting import run_extract
 from resume_api.lifecycle import OperationFiles
 
@@ -23,20 +26,26 @@ def owned_projects(session):
 
 async def project_action(session, request):
     projects, project_id = owned_projects(session), session.control.project_id
+    key = digest([project_id, session.control.run_id, request.key])
+    checksum = digest(request)
+    if project_id in projects.catalog_recovery_fences:
+        recover_actions(projects)
+    prior = projects.catalog.actions(synchronize=True).get(key)
+    if prior is not None:
+        if prior["payloadSha256"] != checksum:
+            raise AgentFailure("AGENT_IDEMPOTENCY_CONFLICT")
+        if prior["status"] == "applying":
+            return reconcile_action(projects, key, prior)
+        return prior["result"]
     session.write_guard()
+    if session.run.scope.kind != "resume":
+        raise AgentFailure("AGENT_SCOPE_INVALID")
     if request.action in {"undo", "redo"}:
         from .edits import prepare
         from packages.resume_core.models.agent import AgentPrepareRequest
         return prepare(session, AgentPrepareRequest(key=request.key, snapshotIds=[request.snapshot_id],
             operations=[{"kind": "history", "snapshotId": request.snapshot_id, "direction": request.action}]))
     capture = session.book.require(request.snapshot_id, kind="resources")
-    key = digest([project_id, session.control.run_id, request.key])
-    checksum = digest(request)
-    prior = projects.catalog.actions().get(key)
-    if prior is not None:
-        if prior["payloadSha256"] != checksum:
-            raise AgentFailure("AGENT_IDEMPOTENCY_CONFLICT")
-        return prior["result"]
     with projects.state_lock:
         session.guard()
         workspace = projects.read(project_id).model_copy(deep=True)
@@ -82,24 +91,42 @@ async def project_action(session, request):
             extension = "foldcv"
     try:
         with projects.state_lock, projects.catalog.authority(project_id, session.run.access_revision):
+            prior = projects.catalog.actions().get(key)
+            if prior is not None:
+                if prior["payloadSha256"] != checksum:
+                    raise AgentFailure("AGENT_IDEMPOTENCY_CONFLICT")
+                return reconcile_action(projects, key, prior) if prior["status"] == "applying" else prior["result"]
             session.guard()
+            session.write_guard()
             current = projects.read(project_id)
             if current.project_revision != workspace.project_revision:
                 raise AgentFailure("AGENT_STALE_READ")
+            if any(action["runId"] == session.control.run_id for action in projects.catalog.actions().values()):
+                raise AgentFailure("AGENT_EDIT_LIMIT")
             result = {"action": request.action, "projectId": project_id, "durable": True}
-            status = "completed"
+            command = {"projectId": project_id, "runId": session.control.run_id, "key": request.key,
+                "action": request.action, "accessRevision": session.run.access_revision,
+                "projectRevision": current.project_revision, "payloadSha256": checksum, "status": "applying", "result": result}
             if extension:
                 checksum_bytes = hashlib.sha256(blob).hexdigest()
                 folder = private_directory(projects.storage._directory(project_id) / "renders")
                 target = folder / (checksum_bytes + ".docx" if extension == "docx" else checksum_bytes + ".foldcv")
-                atomic_write(target, blob)
                 result.update(sha256=checksum_bytes, bytes=len(blob),
                     downloadUrl=f"/v1/rich/projects/{project_id}/assistant/exports/{checksum_bytes}.{extension}")
+                command.update(commitKind="file", fileName=target.name)
+                projects.catalog.reserve_action(key, command)
+                try:
+                    atomic_write(target, blob)
+                except (StorageFailure, OSError):
+                    pass
+                return reconcile_action(projects, key, command)
             elif request.action in {"archive", "restore"}:
-                projects.archive_entry(project_id, request.action == "archive")
+                projects.catalog.archive_action(project_id, request.action == "archive", key, {**command, "status": "completed"})
+                return result
             elif request.action == "delete":
-                status = "pending"
                 result.update(durable=False, durableIntent=True, disposition="after_turn_cleanup")
+                projects.catalog.reserve_action(key, {**command, "status": "pending"})
+                return result
             else:
                 updated = current.model_copy(deep=True)
                 if request.action == "rename":
@@ -110,13 +137,11 @@ async def project_action(session, request):
                     updated.formatting_as_of = partial_date(request.value)
                 elif source is not None:
                     updated.project.sources.append(source)
-                    projects.originals[(project_id, source.id)] = blob
                     result.update(sourceId=source.id)
                 elif asset is not None:
                     updated.project.assets.append(asset)
                     retained_image_bytes(updated.project.assets,
                         ImageReferences(durable=tuple(item.id for item in updated.project.assets)))
-                    projects.images[(project_id, asset.id)] = blob
                     result.update(assetId=asset.id)
                 elif request.action == "remove_source":
                     if not any(item.id == request.target_id for item in updated.project.sources):
@@ -137,14 +162,44 @@ async def project_action(session, request):
                 updated.project_revision += 1
                 updated.project.revision = updated.project_revision
                 updated.updated_at = projects.clock().isoformat()
-                projects.workspaces[project_id] = updated
-                if projects.persist(project_id) != "durable":
-                    raise AgentFailure("AGENT_SAVE_FAILED")
+                proof_id = "catalog_" + key
+                updated.mutation_replay.append(RichMutationReplay(clientMutationId=proof_id,
+                    requestSha256=checksum, resultingRevision=updated.project_revision))
+                _before, before_sha256 = projects.storage.read_committed(project_id)
                 result.update(projectRevision=updated.project_revision)
-            projects.catalog.record_action(key, {"projectId": project_id, "runId": session.control.run_id,
-                "key": request.key, "action": request.action, "accessRevision": session.run.access_revision,
-                "projectRevision": current.project_revision,
-                "payloadSha256": checksum, "status": status, "result": result})
-            return result
+                command.update(commitKind="workspace", proofId=proof_id, beforeSha256=before_sha256)
+                projects.catalog.reserve_action(key, command)
+                originals, images = dict(projects.originals), dict(projects.images)
+                if source is not None:
+                    projects.originals[(project_id, source.id)] = blob
+                if asset is not None:
+                    projects.images[(project_id, asset.id)] = blob
+                projects.workspaces[project_id] = updated
+                try:
+                    projects.persist(project_id)
+                except (ProjectStoreFailure, StorageFailure, OSError):
+                    pass
+                result = reconcile_action(projects, key, command)
+                retained, retained_sha256 = projects.storage.read_committed(project_id)
+                projects.adopt_committed(project_id, retained, retained_sha256)
+                if not result.get("durable"):
+                    projects.originals, projects.images = originals, images
+                return result
     except AccessChanged:
         raise AgentFailure("AGENT_TOOL_DENIED") from None
+    except (ProjectStoreFailure, StorageFailure, OSError):
+        try:
+            retained = projects.catalog.actions(synchronize=True).get(key)
+        except (ProjectStoreFailure, StorageFailure, OSError):
+            retained = None
+            projects.catalog_recovery_fences.add(project_id)
+            raise AgentFailure("AGENT_OUTCOME_UNKNOWN") from None
+        if retained is not None and retained["status"] in {"completed", "failed", "pending"}:
+            return retained["result"]
+        if retained is not None and retained["status"] == "applying":
+            # A reservation may have reached disk before its writer reported failure.
+            return reconcile_action(projects, key, retained)
+        if project_id in projects.catalog_recovery_fences:
+            projects.catalog_recovery_fences.add(project_id)
+            raise AgentFailure("AGENT_OUTCOME_UNKNOWN") from None
+        raise AgentFailure("AGENT_SAVE_FAILED") from None

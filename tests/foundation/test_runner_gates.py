@@ -23,6 +23,45 @@ from spikes.background.corpus import ACTIONS, ORDERS, reached_orders, trace
 ROOT = Path(__file__).resolve().parents[2]
 
 
+def test_portable_background_checks_keep_private_acceptance_separate(monkeypatch):
+    from tools import background_evidence
+    calls = []
+    def unavailable(*_args, **_kwargs):
+        calls.append("manual")
+        raise SystemExit("private screenshot missing")
+    def native(*_args, **_kwargs):
+        calls.append("native")
+        raise AssertionError("portable checks must not accept historical native evidence")
+    monkeypatch.setattr(background_evidence, "assert_manual_bindings", unavailable)
+    monkeypatch.setattr(background_evidence, "assert_native_bindings", native)
+    portable = checks.background_spec(acceptance=False)
+    assert not calls and set(portable["pendingNative"]) == set(portable["nativeBindings"])
+    assert portable["bindings"] and portable["manualBindings"]
+    with pytest.raises(SystemExit, match="private screenshot missing"):
+        checks.background_spec(require_native=True)
+    assert calls == ["manual"]
+
+
+def test_portable_background_checks_still_require_exact_manual_binding_ids(tmp_path, monkeypatch):
+    data = json.loads((ROOT / "tests/requirements.json").read_text())
+    spec = data["backgroundExecution"]
+    spec["manualBindings"].pop(next(iter(spec["manualBindings"])))
+    for name in ["tests/requirements.json", spec["reportSchema"], "docs/gui/handoffs/BACKGROUND-WORK/test-matrix.json"]:
+        path = tmp_path / name; path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_bytes((ROOT / name).read_bytes())
+    (tmp_path / "tests/requirements.json").write_text(json.dumps(data))
+    monkeypatch.setattr(checks, "ROOT", tmp_path)
+    with pytest.raises(SystemExit, match="manual/native variants"):
+        checks.background_spec(acceptance=False)
+
+
+def test_retained_native_acceptance_cannot_be_selected_for_portable_fast(monkeypatch):
+    monkeypatch.setattr(sys, "argv", ["checks.py", "fast", "--retained-native"])
+    with pytest.raises(SystemExit) as error:
+        checks.main()
+    assert error.value.code == 2
+
+
 @pytest.mark.parametrize("fault", ["none", "failed-worker"])
 def test_background_corpus_shards_retain_every_exact_node_and_failed_worker(tmp_path, fault):
     probe = tmp_path / "test_corpus_probe.py"
@@ -145,8 +184,8 @@ def test_requirement_map_does_not_accept_a_test_name_prefix(monkeypatch, scope) 
     data = json.loads((ROOT / "tests/requirements.json").read_text())
     python_nodes = {node for entry in data["entries"] for node in entry["tests"]
                     if not node.startswith("apps/web/")}
-    python_nodes.update(node for name, node in data["foundation"].items()
-                        if name not in {"browserShell", "prototypeRegressions"})
+    python_nodes.update(node for name, nodes in data["foundation"].items() if name != "browserShell"
+                        for node in (nodes if isinstance(nodes, list) else [nodes]))
     python_nodes.update(PROTOTYPE_TESTS)
     node = (next(node for node in data["entries"][0]["tests"] if node.startswith("tests/"))
             if scope == "entry" else data["foundation"]["syntheticSources"])
@@ -290,7 +329,7 @@ def test_background_fast_uses_one_context_and_retains_raw_reports_before_combini
     monkeypatch.setattr(checks, "ROOT", tmp_path)
     monkeypatch.setattr(checks, "require_node", lambda: None)
     monkeypatch.setattr(checks, "require_python", lambda: None)
-    monkeypatch.setattr(checks, "background_spec", lambda: spec)
+    monkeypatch.setattr(checks, "background_spec", lambda **_options: spec)
     monkeypatch.setattr(checks, "background_source_hashes", lambda _names: {"probe.py": source_sha})
     calls = []
     def write_report(context, identity):

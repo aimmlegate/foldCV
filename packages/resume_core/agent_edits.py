@@ -100,7 +100,7 @@ class Scope:
         raise AgentFailure("AGENT_SCOPE_INVALID")
 
     def allowed_bindings(self):
-        result = set()
+        result, outside = set(), set()
         for block in self.workspace.project.document.blocks():
             for container, content in inline_groups(block):
                 offset = 0
@@ -112,9 +112,9 @@ class Scope:
                                 "caption" if container == "caption" else "content", offset, offset + length)
                             result.add(span.binding_root_id or span.binding_id)
                         except AgentFailure:
-                            pass
+                            outside.add(span.binding_root_id or span.binding_id)
                     offset += length
-        return result
+        return result - outside
 
 
 def require_block(book, snapshot_id, identifier, cell_id=None):

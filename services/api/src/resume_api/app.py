@@ -167,7 +167,7 @@ class LocalBoundary:
         if rich is not None and path.startswith(project_prefix) and method in {"POST", "PUT", "PATCH", "DELETE"}:
             parts = path[len(project_prefix):].split("/", 1)
             tail = parts[1] if len(parts) == 2 else ""
-            if parts[0] in rich.agent_recovery_fences and not tail.startswith(("assistant/", "writer/")) and tail not in {"cancel", "cancel-action", "delete", "images/session"}:
+            if parts[0] in rich.agent_recovery_fences | rich.catalog_recovery_fences and not tail.startswith(("assistant/", "writer/")) and tail not in {"cancel", "cancel-action", "delete", "images/session"}:
                 await problem("AGENT_OUTCOME_UNKNOWN", 409)(scope, receive, send)
                 return
 
@@ -297,6 +297,8 @@ def create_app(*, origin: str, secret: str, temp_root: Path, dist: Path, runner:
 
     @asynccontextmanager
     async def lifespan(_app: FastAPI):
+        from .agent.project_action_recovery import recover_actions
+        recover_actions(rich_projects)
         await rich_projects.drain_catalog_actions()
         agent.recover()
         await jobs.start()

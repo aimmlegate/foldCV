@@ -69,6 +69,8 @@ class JobToolSession(ToolSession):
 
     def guard(self):
         control, supervisor = self.control, self.service.jobs.supervisor
+        if not self.service.jobs.settings.load().enabled:
+            raise AgentFailure("AGENT_DISABLED")
         if (not self.active or not supervisor.owns(control)
                 or control.revoked or control.cancel.is_set() or not control.ready.is_set()):
             raise AgentFailure("AGENT_CANCELLED")

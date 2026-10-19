@@ -1666,7 +1666,7 @@
         "tests/recovery/test_technology_focus.py::test_conflicting_durations_and_legacy_serialization_are_retained",
         "tests/recovery/test_technology_focus.py::test_every_catalog_logo_is_local_and_downloaded_assets_match_pinned_sources",
         "tests/recovery/test_technology_focus.py::test_exposure_unions_overlapping_jobs_and_aliases_without_filling_gaps",
-        "tests/recovery/test_technology_focus.py::test_focus_keeps_technical_unknowns_without_a_logo_and_retains_soft_skills_as_facts",
+        "tests/recovery/test_technology_focus.py::test_focus_requires_a_known_icon_and_keeps_unshown_technologies_as_facts",
         "tests/recovery/test_technology_focus.py::test_invalid_and_undated_links_do_not_become_zero_or_inflate_experience",
         "tests/recovery/test_technology_focus.py::test_job_technology_metadata_keeps_its_owner_and_stated_duration_without_catalog_or_image",
         "tests/recovery/test_technology_focus.py::test_panel_experience_edit_refreshes_focus_without_rewriting_source_or_technology_name",
@@ -1885,7 +1885,8 @@
         "tests/recovery/test_agent_native_budget.py::test_profile_monitor_distinguishes_real_service_commands_from_read_only_inline_code",
         "tests/recovery/test_agent_native_budget.py::test_proof_diagnostics_cannot_hide_a_saved_receipt_with_null_error_or_failed_log",
         "tests/recovery/test_agent_runtime.py::test_requested_effort_is_verified_before_start_without_fallback",
-        "tests/recovery/test_agent_runtime.py::test_shared_runtime_does_not_silently_downgrade_an_unsupported_effort"
+        "tests/recovery/test_agent_runtime.py::test_shared_runtime_does_not_silently_downgrade_an_unsupported_effort",
+        "tests/recovery/test_assistant_disable.py::test_settings_disable_cancels_running_and_queued_agents_and_keeps_fixed_work"
       ]
     },
     {
@@ -1948,7 +1949,9 @@
         "tests/recovery/test_agent_publication.py::test_cancel_waiting_for_publication_lock_keeps_the_already_saved_batch",
         "tests/recovery/test_agent_publication.py::test_wrong_ticket_is_rejected_before_save_and_receipt_wait_is_bounded",
         "tests/recovery/test_agent_publication.py::test_failure_before_replace_does_not_enter_memory_or_later_manual_save",
-        "tests/recovery/test_agent_tools.py::test_prepare_schema_errors_explain_shape_without_echoing_values_and_valid_retry_prepares_once"
+        "tests/recovery/test_agent_tools.py::test_prepare_schema_errors_explain_shape_without_echoing_values_and_valid_retry_prepares_once",
+        "tests/recovery/test_project_action_recovery.py::test_project_actions_cannot_expand_a_selection_scope",
+        "tests/recovery/test_agent_edits.py::test_selected_fact_fragment_does_not_authorize_unselected_styled_fragments"
       ]
     },
     {
@@ -2002,7 +2005,11 @@
         "tests/recovery/test_agent_publication.py::test_sidecar_crash_after_canonical_save_recovers_saved_without_reapplying",
         "tests/recovery/test_agent_routes.py::test_latest_pages_keep_their_anchor_while_new_messages_arrive",
         "tests/recovery/test_agent_routes.py::test_routes_page_maximum_escaped_records_without_inference_or_hidden_fetches",
-        "tests/recovery/test_agent_routes.py::test_conversation_pages_open_the_latest_and_keep_older_pages_stable_after_append"
+        "tests/recovery/test_agent_routes.py::test_conversation_pages_open_the_latest_and_keep_older_pages_stable_after_append",
+        "tests/recovery/test_project_action_recovery.py::test_catalog_reserves_capacity_before_changing_the_workspace",
+        "tests/recovery/test_project_action_recovery.py::test_workspace_write_failure_is_resolved_without_repeating_the_mutation",
+        "tests/recovery/test_project_action_recovery.py::test_failed_directory_sync_never_claims_a_durable_result",
+        "tests/recovery/test_project_action_recovery.py::test_receipt_failure_recovers_before_restart_cleanup_even_when_read_only"
       ]
     },
     {
@@ -2012,7 +2019,8 @@
         "apps/web/unit/agent-presentation.test.ts::assistant findings reject changed revisions and unsaved target cells without matching text",
         "apps/web/unit/agent-presentation.test.ts::assistant message markup stays plain text and stored source URLs reject active schemes",
         "apps/web/unit/agent-presentation.test.ts::assistant drawer persistence contains only bounded dimensions and collapse state",
-        "apps/web/unit/agent-presentation.test.ts::assistant Enter sends only outside composition and Shift retains a newline"
+        "apps/web/unit/agent-presentation.test.ts::assistant Enter sends only outside composition and Shift retains a newline",
+        "apps/web/unit/fact-finding.test.ts::fact findings reveal collapsed technologies after the eighth row in their own group"
       ]
     },
     {
@@ -7109,7 +7117,9 @@
       "apps/web/src/rich/caret.ts",
       "apps/web/src/rich/fact-fields.ts",
       "apps/web/src/rich/history.ts",
+      "apps/web/src/rich/pending-edits.ts",
       "apps/web/src/rich/save-queue.ts",
+      "apps/web/src/rich/selection.ts",
       "apps/web/src/rich/styles.ts",
       "apps/web/src/rich/synchronization.ts",
       "apps/web/src/workbench/App.tsx",
@@ -7147,6 +7157,9 @@
       "apps/web/unit/background-python-bridge.test.ts",
       "apps/web/unit/background-tab.test.ts",
       "apps/web/unit/background-writer.test.ts",
+      "apps/web/unit/fact-finding.test.ts",
+      "apps/web/unit/rich-selection.test.ts",
+      "apps/web/unit/rich-synchronization.test.ts",
       "apps/web/unit/support/background-jobs.ts",
       "apps/web/unit/support/background-writer.ts",
       "apps/web/unit/support/python-bridge.ts",
@@ -7361,6 +7374,7 @@
       "packages/resume_core/models/rich_workspace.py",
       "packages/resume_core/normalization.py",
       "packages/resume_core/preferences.py",
+      "packages/resume_core/project_catalog.py",
       "packages/resume_core/project_store.py",
       "packages/resume_core/rendering/__init__.py",
       "packages/resume_core/rendering/docx_errors.py",
@@ -7405,6 +7419,8 @@
       "services/api/src/resume_api/agent/leases.py",
       "services/api/src/resume_api/agent/mcp.py",
       "services/api/src/resume_api/agent/profile.py",
+      "services/api/src/resume_api/agent/project_action_recovery.py",
+      "services/api/src/resume_api/agent/project_actions.py",
       "services/api/src/resume_api/agent/publication.py",
       "services/api/src/resume_api/agent/routes.py",
       "services/api/src/resume_api/agent/runtime.py",
@@ -7497,12 +7513,16 @@
       "spikes/cli/profile.py",
       "spikes/cli/runner.py",
       "tests/contracts/test_contracts.py",
+      "tests/core/test_selection.py",
       "tests/fixtures/rich_workspace.json",
+      "tests/foundation/test_manual_qa_evidence.py",
       "tests/foundation/test_runner_gates.py",
       "tests/recovery/conftest.py",
+      "tests/recovery/test_agent_edits.py",
       "tests/recovery/test_agent_lifecycle.py",
       "tests/recovery/test_agent_runtime.py",
       "tests/recovery/test_agent_tools.py",
+      "tests/recovery/test_assistant_disable.py",
       "tests/recovery/test_background_admission.py",
       "tests/recovery/test_background_agent.py",
       "tests/recovery/test_background_appserver.py",
@@ -7555,7 +7575,9 @@
       "tests/recovery/test_background_writer_save.py",
       "tests/recovery/test_background_writer_sessions.py",
       "tests/recovery/test_background_writers.py",
+      "tests/recovery/test_project_action_recovery.py",
       "tests/recovery/test_recovery_contracts.py",
+      "tests/recovery/test_resume_assessment.py",
       "tests/recovery/test_rich_asset_lifecycle.py",
       "tests/recovery/test_rich_contracts.py",
       "tests/recovery/test_rich_docx.py",

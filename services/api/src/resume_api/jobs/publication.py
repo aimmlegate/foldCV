@@ -23,6 +23,11 @@ class JobPublication:
     def publish(self, project, job_id, proposal_sha256, *, expected_claim=None, approved=False):
         service, projects = self.service, self.service.projects
         with projects.state_lock:
+            if project in projects.catalog_recovery_fences:
+                raise BackgroundFailure("OUTCOME_UNKNOWN")
+            job = service.store.read(project, job_id)
+            if job.submission.kind == "agent" and job.receipt is None and not service.settings.load().enabled:
+                raise BackgroundFailure("JOB_DISABLED")
             from packages.resume_core.background_retention import JobRetention
             JobRetention(service.store).sweep(project)
             job = service.publisher.publish(project, job_id, proposal_sha256, originals=projects.originals,
