@@ -4,6 +4,7 @@ import type { RichProjectResponse } from "../contracts/generated/rich_project_re
 import type { WorkingFacts } from "../contracts/generated/working_facts";
 import { semantic } from "./fact-cells";
 import { normalizedBlock } from "./normalize";
+import { compactMutation } from "./compact-mutation";
 
 export type RichBlock = RichDocumentV1["regions"][number]["blocks"][number];
 type Placement = { block: RichBlock; parentId: string; afterId: string | null };
@@ -163,11 +164,14 @@ export class RichSaveQueue {
       const steps = [...documentSteps(before, this.target), ...factSteps(beforeFacts, this.facts)];
       const [first, ...rest] = steps;
       if (!first && !this.pendingRequest) return;
-      const request: RichMutation | null = this.pendingRequest ?? (first ? { schemaVersion: 1, projectId: this.response.workspace.projectId,
+      let request: RichMutation | null = this.pendingRequest ?? (first ? { schemaVersion: 1, projectId: this.response.workspace.projectId,
         clientMutationId: crypto.randomUUID(), actionId: this.actionId, kind: this.kind,
         capture: { sessionId: this.sessionId, actionId: this.actionId, actionToken: 0, dependencies: [] }, steps: [first, ...rest] } : null);
       if (!request) return;
-      if (new TextEncoder().encode(JSON.stringify(request)).length > 1024 * 1024) throw new Error("RICH_MUTATION_LIMIT");
+      const size = (value: RichMutation) => new TextEncoder().encode(JSON.stringify(value)).length;
+      if (!this.pendingRequest && size(request) > 1024 * 1024) request = compactMutation(request, before);
+      if (size(request) > 1024 * 1024 || request.steps.length > 1000)
+        throw new Error("Изменение слишком большое для сохранения (лимит 1 МБ). Сократите объём изменения.");
       this.pendingRequest = request;
       let response: RichProjectResponse;
       try { response = await this.send(request); }
