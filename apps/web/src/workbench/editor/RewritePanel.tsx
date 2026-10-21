@@ -1,3 +1,4 @@
+import { errorMessage } from "../../errors/messages";
 import { useEffect, useLayoutEffect, useRef } from "react";
 import { Icon } from "../ui/Icon";
 import { rewriteCancellable, rewriteLabels, type RewriteActivity, type RewritePreview } from "../../rich/rewrite-progress";
@@ -45,7 +46,7 @@ export function RewritePanel({ open, close, instruction, change, submit, apply, 
       <section className="rewrite-result" aria-label="Предпросмотр правки"><strong>Новый текст</strong><div tabIndex={0}>{preview.text}</div></section></>
       : fields}
     {preview && <details className="rewrite-adjust"><summary>Изменить инструкцию</summary>{fields}</details>}
-    <div className="rewrite-progress-slot">{error ? <p className="notice warning" role="alert">{error}</p> : busy && activity ? <>
+    <div className="rewrite-progress-slot">{error ? <p className="notice warning" role="alert">{errorMessage(error)}</p> : busy && activity ? <>
       <OperationStatus label={rewriteLabels[activity.stage]} timed startedAt={activity.startedAt} />
       {rewriteCancellable(activity.stage) && <button className="text-button" onClick={() => cancel(activity.actionId)}>Отменить правку</button>}
     </> : null}</div>

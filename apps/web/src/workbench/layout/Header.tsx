@@ -1,3 +1,4 @@
+import { messageText } from "../../errors/messages";
 import { Button } from "../ui/Button";
 import { Icon } from "../ui/Icon";
 import type { ReactNode } from "react";
@@ -12,7 +13,7 @@ export function Header({ title, subtitle, collapsed, expand, status, ready, busy
   return <header className="app-header" aria-busy={busy}>
     <button className="icon show-history" hidden={!collapsed} aria-label="Развернуть историю" onClick={expand}><Icon name="panel" /></button>
     <div className="project-heading"><span>{subtitle}</span><h1>{title}</h1></div>
-    {(ready || activity) && <div className="header-actions">{activity}{ready && <><span className={`session-status${retrySave ? " save-issue" : ""}`} role="status" title={status}>{status === "Изменения сохраняются…" ? <Spinner /> : <span className="dot" />}<span className="save-status-label">{retrySave ? "Не сохранено" : status}</span>
+    {(ready || activity) && <div className="header-actions">{activity}{ready && <><span className={`session-status${retrySave ? " save-issue" : ""}`} role="status" title={messageText(status)}>{status === "Изменения сохраняются…" ? <Spinner /> : <span className="dot" />}<span className="save-status-label">{retrySave ? "Не сохранено" : messageText(status)}</span>
       {retrySave && <button className="text-button retry-save" aria-label="Повторить сохранение" title="Повторить сохранение" disabled={busy} onClick={retrySave}><Icon name="redo" /><span>Повторить</span></button>}</span>
       <Button variant="quiet" disabled={busy} onClick={save} aria-label="Сохранить" aria-keyshortcuts="Control+S Meta+S" title="Сохранить файл проекта (⌘S / Ctrl+S)"><Icon name="download" /><span>Сохранить</span></Button>
       <Button variant="primary" disabled={busy} onClick={exportFile} aria-label="Экспорт DOCX"><span className="export-label">Экспорт</span>DOCX<Icon name="arrow" /></Button>

@@ -1,3 +1,4 @@
+import { errorMessage } from "../../errors/messages";
 import { lazy, Suspense, useEffect, useState } from "react";
 import { loadOriginal, originalKind, originalUrl } from "./original-source";
 import { DocxOriginal } from "./DocxOriginal";
@@ -26,7 +27,7 @@ export function OriginalPreview({ projectId, source }: {
     });
     return () => controller.abort();
   }, [projectId, source.id, source.byteSha256, kind, attempt]);
-  if (error) return <div className="source-viewer-message" role="alert">{error}<button className="text-button" onClick={() => setAttempt(value => value + 1)}>Повторить</button></div>;
+  if (error) return <div className="source-viewer-message" role="alert">{errorMessage(error)}<button className="text-button" onClick={() => setAttempt(value => value + 1)}>Повторить</button></div>;
   if (!loaded) return <div className="source-viewer-message"><OperationStatus label="Открываем оригинал" detail="Загружаем и проверяем файл." timed /></div>;
   if (kind === "pdf") return <Suspense fallback={<div className="source-viewer-message"><OperationStatus label="Открываем PDF" timed /></div>}><PdfOriginal blob={loaded.blob} /></Suspense>;
   if (kind === "docx") return <DocxOriginal blob={loaded.blob} />;

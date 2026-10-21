@@ -1,3 +1,4 @@
+import { errorMessage } from "../../errors/messages";
 import { useEffect, useState } from "react";
 import { ConnectionWorkflow, type ConnectionView } from "../../connection/workflow";
 import { AgentBrowserApi } from "../../assistant/api";
@@ -41,7 +42,7 @@ export function Settings({ close, connectionChanged }: { close: () => void; conn
         {current.loading && <OperationStatus label="Загружаем настройки" detail="Подключение, модели и сохранённые правила." timed />}
         {current.saved.length > 0 && <OperationStatus state="success" label={`Сохранено: ${current.saved.map(part => partNames[part]).join(", ")}.`} />}
         {current.message && <p className="notice" role="status">{current.message}</p>}
-        {Object.entries(current.errors).map(([part, error]) => <p className="notice error" role="alert" key={part}>{partNames[part as SettingsPart]}: {error}</p>)}
+        {Object.entries(current.errors).map(([part, error]) => <p className="notice error" role="alert" key={part}>{partNames[part as SettingsPart]}: {errorMessage(error)}</p>)}
       </div>
       {section === "model" && <><Connection view={view} workflow={workflow} model={current.draft.model} change={value => controller.change("model", value)} disabled={current.saving} selectionDisabled={!current.preferences} />
         <ReasoningSelect value={current.draft.reasoning} metadata={view.snapshot.modelReasoning?.[current.draft.model ?? ""]}

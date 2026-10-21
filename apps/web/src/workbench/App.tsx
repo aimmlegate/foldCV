@@ -1,3 +1,4 @@
+import { errorMessage } from "../errors/messages";
 import { useEffect, useState } from "react";
 import { ConnectionWorkflow, type ConnectionView } from "../connection/workflow";
 import { RichEditor } from "../rich/Editor";
@@ -80,7 +81,7 @@ export function App({ portalHost }: { portalHost: HTMLElement }) {
         activity={<><NotificationCenter />{jobs.view.enabled && <BackgroundJobs registry={jobs.registry} view={jobs.view} openProject={navigate} />}</>} />
       <NotificationSection count={Number(!!error && !fileMode) + Number(!!jobs.view.error)}>
         <section className="notice-group" aria-label="Ошибки"><h3>Ошибки</h3>
-          {error && !fileMode && <div className="notification-error" role="alert"><p>{error}</p>
+          {error && !fileMode && <div className="notification-error" role="alert"><p>{errorMessage(error)}</p>
             <button className="icon" aria-label="Скрыть сообщение" onClick={workspace.dismissError}><Icon name="close" /></button></div>}
           {jobs.view.error && <p className="job-error" role="alert">Не удалось обновить задачи. Последнее известное состояние сохранено.</p>}
         </section>

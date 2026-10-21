@@ -1,3 +1,4 @@
+import { errorMessage } from "../../errors/messages";
 import type { ConnectionView, ConnectionWorkflow } from "../../connection/workflow";
 import { connectionMessages } from "../../connection/messages";
 import { Button } from "../ui/Button";
@@ -33,7 +34,7 @@ export function Connection({ view, workflow, model, change, disabled, selectionD
       {snapshot.state === "login_pending" && <button className="text-button" disabled={disabled} onClick={() => void workflow.cancelLogin()}>Отменить вход</button>}
       <Button variant="quiet" busy={view.detaching} busyLabel="Отключаем…" disabled={disabled} onClick={() => void workflow.detach()}>Отключить модель</Button>
     </div>
-    {view.error && <p className="notice error" role="alert">Не удалось завершить действие подключения. Повторите проверку.</p>}
+    {view.error && <p className="notice error" role="alert">{errorMessage(view.error)}</p>}
     <p className="settings-disclosure">Проверка, вход и отключение выполняются сразу. Отмена черновика настроек их не отменяет.</p>
     {snapshot.experimentalMode ? <p className="settings-disclosure">Текст передаётся через Codex CLI по вашей подписке ChatGPT; действуют правила хранения провайдера.
       CLI может предоставлять встроенные инструменты и сохранять запросы и ответы. Вход остаётся после отключения.</p>

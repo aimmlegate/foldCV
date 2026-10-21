@@ -1,3 +1,4 @@
+import { errorMessage } from "../errors/messages";
 import type { JobSummaryV1 } from "../contracts/generated/background_summary_v1";
 import type { JobSnapshotV1 } from "../contracts/generated/background_snapshot_v1";
 
@@ -60,13 +61,6 @@ export function projectActivity(jobs: readonly JobSummaryV1[]): ReadonlyMap<stri
     .map(([id, value]) => [id, value.attention ? `Требуют проверки: ${String(value.attention)}` : `В фоне: ${String(value.active)}`]));
 }
 export function failureLabel(code: string | null | undefined): string | null {
-  if (!code) return null;
-  if (["DEPENDENCY_CHANGED", "STALE_SYNC", "STALE_SELECTION"].includes(code)) return "Связанные данные изменились. Проверьте результат в резюме.";
-  if (code === "WRITER_UNKNOWN") return "Откройте резюме и завершите восстановление ввода.";
-  if (["AUTH_REQUIRED", "ACCOUNT_CHANGED"].includes(code)) return "Проверьте подключение модели в настройках.";
-  if (code === "RATE_LIMITED") return "Лимит модели исчерпан. Повторите запрос позже.";
-  if (code === "OUTCOME_UNKNOWN") return "Сначала нужно проверить результат сохранения. Повторный запрос не запущен.";
-  if (["CANCELLED", "PROJECT_DELETED"].includes(code)) return null;
-  if (["DEADLINE", "STARTUP_TIMEOUT"].includes(code)) return "Задача не уложилась в отведённое время.";
-  return "Не удалось завершить задачу. Исходные данные сохранены.";
+  if (!code || ["CANCELLED", "PROJECT_DELETED"].includes(code)) return null;
+  return errorMessage(code);
 }

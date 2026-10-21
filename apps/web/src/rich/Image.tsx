@@ -1,3 +1,4 @@
+import { errorMessage } from "../errors/messages";
 import { createContext, useContext, useRef, useState } from "react";
 import { createReactBlockSpec } from "@blocknote/react";
 
@@ -28,7 +29,7 @@ export const image = createReactBlockSpec({ type: "image", content: "inline", pr
           <label>Ширина<input aria-label="Ширина изображения" type="number" min="1" value={block.props.width}
             onChange={event => { const width = Number(event.currentTarget.value); if (width > 0 && Number.isFinite(width))
               editor.updateBlock(block.id, { props: { width, height: width * block.props.height / block.props.width } }); }} /></label></>}
-        {error && <span role="alert">{error}</span>}
+        {error && <span role="alert">{errorMessage(error)}</span>}
       </div>
     </div><figcaption ref={contentRef} />
   </figure>;

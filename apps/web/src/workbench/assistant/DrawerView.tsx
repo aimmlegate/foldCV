@@ -1,3 +1,4 @@
+import { errorMessage } from "../../errors/messages";
 import { useEffect, useRef, useState, type RefObject } from "react";
 import type { AgentFinding } from "../../contracts/generated/agent_finding";
 import { Icon } from "../ui/Icon";
@@ -45,7 +46,7 @@ export function DrawerView(props: ComposerProps & { collapsed: boolean; expanded
         {view.loading && <div className="chat-load-status"><OperationStatus label={view.loading} /></div>}
         {props.operations?.filter(item => item.durable && item.downloadUrl).map(item => <p key={item.id} className="chat-project-file">
           <a href={item.downloadUrl ?? ""} download={item.action === "export_docx" ? "resume.docx" : "resume.foldcv"}>{item.action === "export_docx" ? "Скачать DOCX" : "Скачать .foldcv"}</a></p>)}
-        {props.failure && <p className="chat-error" role="alert">{props.failure}</p>}{props.fence && <p className="chat-error" role="alert">{props.fence}</p>}
+        {props.failure && <p className="chat-error" role="alert">{errorMessage(props.failure)}</p>}{props.fence && <p className="chat-error" role="alert">{errorMessage(props.fence)}</p>}
       </div><Composer {...props} /></div>}
   </section>;
 }

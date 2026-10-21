@@ -1,3 +1,4 @@
+import { errorMessage } from "../../errors/messages";
 import { useRef, useState } from "react";
 import type { TimelineReport } from "../../contracts/generated/timeline_report";
 import { Dialog } from "../ui/Dialog";
@@ -34,7 +35,7 @@ export function FileDialog({ mode, title, subtitle, filename, timeline, error, b
       }} />}
     </>}
     <div className="operation-slot">{busy ? <OperationStatus label={operation ?? (opening ? "Открываем файл" : "Готовим файл")} timed />
-      : error ? <p className="notice error" role="alert">{error}</p> : message ? <OperationStatus state="success" label={message} /> : null}</div>
+      : error ? <p className="notice error" role="alert">{errorMessage(error)}</p> : message ? <OperationStatus state="success" label={message} /> : null}</div>
     <div className="dialog-actions">{exporting ? <><button className="text-button" disabled={busy} onClick={close}>Вернуться к тексту</button>
       <Button variant="primary" busy={busy} busyLabel="Готовим DOCX…" onClick={() => { setMessage(""); void download().then(done => { if (done) setMessage("Документ передан браузеру для сохранения."); }); }}>Скачать DOCX<Icon name="download" /></Button></>
       : <Button disabled={busy} onClick={close}>Закрыть</Button>}

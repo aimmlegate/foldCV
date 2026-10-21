@@ -1,3 +1,4 @@
+import { errorMessage } from "../errors/messages";
 import type { AgentFinding } from "../contracts/generated/agent_finding";
 import type { RichProjectResponse } from "../contracts/generated/rich_project_response";
 import { documentCells } from "../rich/document-cells";
@@ -6,27 +7,7 @@ import type { CellValue } from "../rich/history";
 import type { AssistantView } from "./controller";
 
 export function errorText(code: string | null): string {
-  if (!code) return "";
-  const labels: Record<string, string> = {
-    AGENT_DISABLED: "Включите помощника в Настройках.", AGENT_MODEL_REQUIRED: "Выберите модель помощника.",
-    AGENT_MODEL_UNAVAILABLE: "Сохранённая модель сейчас недоступна. Выберите доступную модель.",
-    AGENT_MODEL_INCOMPATIBLE: "Эта модель не поддерживает нужные инструменты. Выберите другую модель.",
-    AGENT_CONNECTION_UNAVAILABLE: "Проверьте подключение в Настройках.", AGENT_CONNECTION_CHANGED: "Подключение изменилось. Задача прервана.",
-    AGENT_AUTH_REQUIRED: "Войдите через существующее подключение в Настройках.", AGENT_QUOTA: "Лимит подписки исчерпан. Дождитесь его сброса.",
-    AGENT_BUSY: "Дождитесь завершения текущей операции.", AGENT_STALE_READ: "Фрагмент изменён. Выделите его снова и отправьте новую задачу.",
-    AGENT_OWNER_MISMATCH: "Помощник открыт в другом окне. Завершите задачу там.", AGENT_LEASE_EXPIRED: "Связь с редактором потеряна. Задача прервана.",
-    AGENT_NO_OWNER: "Редактор закрыт. Откройте резюме и отправьте новую задачу.",
-    AGENT_SETTINGS_CONFLICT: "Настройки изменились. Проверьте выбор и повторите отправку.",
-    AGENT_OUTCOME_UNKNOWN: "Результат сохранения пока не подтверждён. Откройте резюме заново для проверки сохранения.",
-    AGENT_SAVE_FAILED: "Изменения не сохранены. Проверьте сохранение резюме перед новой задачей.",
-    AGENT_CLEANUP_FAILED: "Остановка не подтверждена. Перезапустите приложение перед новой задачей.",
-    AGENT_CONVERSATION_FULL: "Диалог заполнен. Начните новый диалог.", AGENT_PROJECT_FULL: "Хранилище диалогов заполнено.",
-    AGENT_SOURCE_UNAVAILABLE: "Не удалось открыть страницу.", AGENT_SOURCE_DENIED: "Эту страницу нельзя открыть.",
-    AGENT_WEB_DISABLED: "Интернет выключен для этой задачи.", AGENT_TOOL_DENIED: "Это действие недоступно в выбранном режиме.",
-    AGENT_CANCELLED: "Задача остановлена.", AGENT_INTERRUPTED: "Задача прервана.",
-    AGENT_DEADLINE: "Время задачи истекло. Сохранённые изменения остаются в резюме.",
-  };
-  return labels[code] ?? "Не удалось завершить задачу. Сохранённые результаты доступны в диалоге.";
+  return code ? errorMessage(code, "Не удалось завершить задачу. Сохранённые результаты доступны в диалоге.") : "";
 }
 export function runText(view: AssistantView): string {
   if (view.submitting) return "Отправляем задачу…";

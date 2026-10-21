@@ -1,3 +1,4 @@
+import { knownErrorMessage } from "../../errors/messages";
 import type { Preferences } from "../../contracts/generated/preferences";
 import type { RulesSettings } from "../../contracts/generated/rules_settings";
 import type { AgentSettings } from "../../contracts/generated/agent_settings";
@@ -18,16 +19,10 @@ export type SettingsState = {
   loading: boolean; saving: boolean; staleRules: boolean; comparison: boolean; saved: SettingsPart[];
   errors: Partial<Record<SettingsPart, string>>; message: string;
 };
-const rulesErrors: Record<string, string> = {
-  RULES_PRESETS_REQUIRED: "Нужны оба заголовка: ## Preset: shorten и ## Preset: clarify с непустыми инструкциями.",
-  RULES_STALE: "Правила изменены в другом окне. Загрузите актуальную версию и сравните со своим текстом.",
-  RULES_TOO_LARGE: "Правила превышают 32 КБ. Сократите текст.",
-  RULES_INVALID_TEXT: "Проверьте текст правил и управляющие символы.",
-};
 function message(error: unknown, part: SettingsPart): string {
   const code = error instanceof Error && "code" in error && typeof error.code === "string" ? error.code : "";
-  if (part === "rules" && rulesErrors[code]) return rulesErrors[code];
-  if (code === "AGENT_SETTINGS_CONFLICT") return "Настройки помощника изменились. Загрузите актуальную версию; ваш выбор останется в форме.";
+  const known = knownErrorMessage(code);
+  if (known) return known;
   if (part === "reasoning") return "Не удалось сохранить reasoning. Проверьте, что этот уровень доступен выбранной модели.";
   if (part === "model" || part === "import") return "Не удалось сохранить модель. Проверьте подключение и выберите доступную модель.";
   return "Не удалось сохранить этот раздел. Черновик остался в форме; повторите действие.";
@@ -85,7 +80,7 @@ export class SettingsDrafts {
     this.publish({ draft: { reasoning: preferences ? preferences.rewriteReasoningEffort ?? null : draft.reasoning, model: preferences ? preferences.selectedModel : draft.model, automatic: preferences?.automaticAnalysis ?? draft.automatic,
       importModel: preferences ? preferences.selectedImportModel ?? null : draft.importModel,
       agentEnabled: assistant?.enabled ?? draft.agentEnabled, agentModel: assistant ? assistant.selectedAgentModel : draft.agentModel,
-      markdown: rules?.markdown ?? draft.markdown }, errors: this.state.staleRules ? { rules: rulesErrors["RULES_STALE"] ?? "Обновите правила." } : {},
+      markdown: rules?.markdown ?? draft.markdown }, errors: this.state.staleRules ? { rules: knownErrorMessage("RULES_STALE") ?? "Обновите правила." } : {},
       saved: [], message: "Несохранённые изменения отменены." });
   }
   async reloadRules(): Promise<void> {

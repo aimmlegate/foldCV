@@ -1,3 +1,4 @@
+import { errorMessage } from "../../errors/messages";
 import { useRef, useState } from "react";
 import { fields, names, labels, type RecordValue, type Kind } from "../../rich/fact-fields";
 import type { PanelCommand } from "../../rich/synchronization";
@@ -56,7 +57,7 @@ export function FactDialog({ target, close, submit }: { target: FactTarget; clos
           <button className="text-button" type="button" disabled={busy} onClick={() => { if (form.current) void apply({ operation: "add_period", recordId: record.id, values: changes(form.current) }); }}>Добавить период</button>
         </div>}
       </>}
-      {error && <p className="notice warning" role="alert">{error}</p>}
+      {error && <p className="notice warning" role="alert">{errorMessage(error)}</p>}
       <div className="dialog-actions"><Button disabled={busy} onClick={close}>Отмена</Button>
         <Button type="submit" variant={target.remove ? "danger" : "primary"} busy={busy} busyLabel={target.remove ? "Удаляем…" : "Сохраняем…"}>{target.remove ? "Удалить факт" : "Сохранить факт"}{!target.remove && <Icon name="check" />}</Button></div>
     </form>

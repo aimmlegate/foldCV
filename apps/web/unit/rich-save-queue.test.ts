@@ -181,3 +181,67 @@ test("a definitive rejected patch lets corrected input use a new key and preserv
   assert.notEqual(sent[1]?.clientMutationId, sent[0]?.clientMutationId);
   assert.equal(sent[1]?.kind, "structure");
 });
+
+test("concurrent flushes share one save and drain newer input against its acknowledgment", async () => {
+  const initial = response(), sent: RichMutation[] = [];
+  let release: (() => void) | undefined;
+  const delay = new Promise<void>(resolve => { release = resolve; });
+  let saved = initial;
+  const queue = new RichSaveQueue(initial, "session", async request => {
+    sent.push(request); if (sent.length === 1) await delay;
+    saved = apply(saved, request); return saved;
+  }, () => {});
+  queue.update(changed(initial, "First"), "first");
+  const first = queue.flush(), second = queue.flush();
+  queue.update(changed(initial, "Latest"), "latest"); const third = queue.flush();
+  assert.equal(sent.length, 1); release?.(); await Promise.all([first, second, third]);
+  assert.equal(sent.length, 2);
+  assert.deepEqual(documentSteps(queue.baseline.workspace.project?.document ?? changed(initial, ""), changed(initial, "Latest")), []);
+  await queue.flush(); assert.equal(sent.length, 2);
+});
+
+for (const saveError of ["PROJECT_SAVE_FAILED", null]) {
+  test(`failed durability ${saveError ?? "without a code"} retries the same request before newer input`, async () => {
+    const initial = response(), sent: RichMutation[] = [], acknowledgments: RichProjectResponse[] = [];
+    let saved = initial;
+    const queue = new RichSaveQueue(initial, "session", async request => {
+      sent.push(request);
+      if (sent.length === 1) {
+        saved = apply(initial, request);
+        return { ...saved, durability: "failed", saveError, savedProjectRevision: initial.savedProjectRevision,
+          savedDocumentRevision: initial.savedDocumentRevision };
+      }
+      if (sent.length > 2) saved = apply(saved, request);
+      return saved;
+    }, value => acknowledgments.push(value));
+    queue.update(changed(initial, "Accepted in memory"), "first");
+    await assert.rejects(queue.flush(), /PROJECT_SAVE_FAILED/);
+    assert.equal(queue.baseline.durability, "failed");
+    assert.equal(queue.baseline.savedDocumentRevision, initial.savedDocumentRevision);
+    queue.update(changed(initial, "Newer input"), "second"); await queue.flush();
+    assert.equal(sent.length, 3); assert.deepEqual(sent[1], sent[0]);
+    assert.notEqual(sent[2]?.clientMutationId, sent[0]?.clientMutationId);
+    assert.deepEqual(acknowledgments.map(value => value.durability), ["failed", "durable", "durable"]);
+    assert.equal(queue.baseline.workspace.documentRevision, initial.workspace.documentRevision + 2);
+    assert.deepEqual(documentSteps(queue.baseline.workspace.project?.document ?? changed(initial, ""), changed(initial, "Newer input")), []);
+  });
+}
+
+for (const status of [500, 503]) {
+  test(`HTTP ${status} retains the original idempotent request even if the document was changed back`, async () => {
+    const initial = response(), sent: RichMutation[] = [];
+    let saved = initial;
+    const queue = new RichSaveQueue(initial, "session", async request => {
+      sent.push(request);
+      if (sent.length === 1) { saved = apply(saved, request); throw Object.assign(new Error("Unknown outcome"), { status }); }
+      if (sent.length > 2) saved = apply(saved, request);
+      return saved;
+    }, () => {});
+    queue.update(changed(initial, "Possibly saved"), "first"); await assert.rejects(queue.flush(), /Unknown outcome/);
+    const original = initial.workspace.project?.document; assert.ok(original);
+    queue.update(original, "restore"); await queue.flush();
+    assert.equal(sent.length, 3); assert.deepEqual(sent[1], sent[0]);
+    assert.notEqual(sent[2]?.clientMutationId, sent[0]?.clientMutationId);
+    assert.deepEqual(documentSteps(queue.baseline.workspace.project?.document ?? original, original), []);
+  });
+}

@@ -1,3 +1,4 @@
+import { errorMessage } from "../../errors/messages";
 import { useEffect, useRef, useState } from "react";
 import { getDocument, GlobalWorkerOptions, type PDFDocumentProxy, type RenderTask } from "pdfjs-dist";
 import workerUrl from "pdfjs-dist/build/pdf.worker.min.mjs?url";
@@ -62,7 +63,7 @@ export default function PdfOriginal({ blob }: { blob: Blob }) {
         <option value={1}>По ширине</option><option value={1.5}>150%</option><option value={2}>200%</option>
       </select>
     </div>
-    {error && <p className="source-viewer-message" role="alert">{error}</p>}
+    {error && <p className="source-viewer-message" role="alert">{errorMessage(error)}</p>}
     <div ref={scroll} className="source-pdf-scroll">
       {!error && rendering && <div className="source-render-status"><OperationStatus label={pdf ? `Отрисовываем страницу ${page}` : "Читаем PDF"} /></div>}
       <div ref={host} />

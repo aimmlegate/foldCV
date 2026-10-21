@@ -1,3 +1,4 @@
+import { errorMessage } from "../errors/messages";
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { RichProjectResponse } from "../contracts/generated/rich_project_response";
 import type { GuiProjectListResponse } from "../contracts/generated/gui_project_list_response";
@@ -11,15 +12,7 @@ import { JobsApi } from "../background/api";
 import { warningLabel } from "./import/notices";
 export { warningLabel } from "./import/notices";
 
-function label(error: unknown): string {
-  if (error instanceof RichApiFailure && error.code === "PROJECT_VERSION_UNSUPPORTED") return "Версия проекта не поддерживается. Исходные файлы сохранены.";
-  if (error instanceof RichApiFailure && error.code === "ARCHIVE_VERSION_UNSUPPORTED") return "Версия файла проекта не поддерживается.";
-  if (error instanceof RichApiFailure && error.code === "RICH_EXPORT_UNSUPPORTED") return "Этот блок пока не поддерживает экспорт. Изменения сохранены.";
-  if (error instanceof RichApiFailure && error.code === "CONNECTION_REQUIRED") return "Настройте подключение модели и повторите обработку. Источник сохранён.";
-  if (error instanceof RichApiFailure) return `${warningLabel(error.code)} (${error.code})`;
-  if (error instanceof TypeError) return "Нет связи с локальным сервисом. Проверьте его запуск и повторите попытку.";
-  return error instanceof Error ? error.message : "Не удалось выполнить действие";
-}
+function label(error: unknown): string { return errorMessage(error); }
 export const stageLabels = { assess_resume: "Проверяем, похоже ли содержимое на резюме", normalize_semantics: "Извлекаем факты", draft_prose: "Редактируем текст",
   assemble: "Применяем структуру шаблона", render: "Готовим DOCX" };
 export function useResumeWorkspace() {

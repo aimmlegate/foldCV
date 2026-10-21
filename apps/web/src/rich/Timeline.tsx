@@ -1,3 +1,4 @@
+import { errorMessage } from "../errors/messages";
 import { useEffect, useRef, useState } from "react";
 import type { TimelineReport } from "../contracts/generated/timeline_report";
 import type { DateCascadeProposal } from "../contracts/generated/date_cascade_proposal";
@@ -65,7 +66,7 @@ export function Timeline({ facts, anchors, controls }: { facts: WorkingFacts; an
     </details>}
     {report?.warnings.filter(warning => warning.kind !== "overlap").map(warning => <small key={warning.id}>
       {warning.kind === "future" ? "Дата может быть в будущем" : warning.code === "OPEN_PERIOD" ? "Открытый период" : "Проверьте дату"}: {warning.periodIds.map(period).join(" / ")}</small>)}
-    {error && <p role="status">{error}</p>}
+    {error && <p role="status">{errorMessage(error)}</p>}
     {proposal && <DatePreview proposal={proposal} job={job} reason={reasons[proposal.reason ?? ""] ?? "Сдвиг недоступен. Проверьте периоды вручную."}
       busy={busy} error={error} returnFocus={previewTrigger.current} close={() => setProposal(null)} apply={() => { setBusy(true); setError(""); void controls.apply(proposal).then(() => setProposal(null))
         .catch(error => setError(error instanceof Error ? error.message : "Предпросмотр устарел")).finally(() => setBusy(false)); }} />}

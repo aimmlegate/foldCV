@@ -1,3 +1,4 @@
+import { errorMessage } from "../../errors/messages";
 import { useEffect, useState } from "react";
 import { rewriteActive, rewriteCancellable, rewriteLabels, type RewriteActivity } from "../../rich/rewrite-progress";
 import { elapsedLabel } from "../import/progress-state";
@@ -19,7 +20,7 @@ export function RewriteActivities({ activities, cancel, dismiss }: { activities:
     return <div className="rewrite-activity" key={activity.actionId} data-rewrite-stage={activity.stage}>
       <span className={active ? "rewrite-spinner" : "rewrite-result-icon"} aria-hidden="true">{!active && <Icon name={activity.stage === "saved" ? "check" : "file"} />}</span>
       <div className="rewrite-activity-copy"><strong role="status">{rewriteLabels[activity.stage]}</strong>
-        {activity.detail ? <p>{activity.detail}</p> : activity.stage === "running" && elapsed >= 20000
+        {activity.detail ? <p>{errorMessage(activity.detail)}</p> : activity.stage === "running" && elapsed >= 20000
           ? <p>Ответ ещё не получен. Можно продолжать работу с другими фрагментами или отменить запрос.</p>
           : activity.stage === "queued" ? <p>Начнём, когда освободится модель.</p> : null}</div>
       <span className="rewrite-elapsed" role="timer" aria-live="off" aria-label={`Прошло ${elapsedLabel(elapsed)}`}>{elapsedLabel(elapsed)}</span>

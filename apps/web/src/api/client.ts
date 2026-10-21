@@ -1,3 +1,4 @@
+import { errorMessage } from "../errors/messages";
 import type { GuiProjectResponse } from "../contracts/generated/gui_project_response";
 import type { GuiCreateProjectRequest } from "../contracts/generated/gui_create_project_request";
 import type { GuiStartGenerationRequest } from "../contracts/generated/gui_start_generation_request";
@@ -153,18 +154,4 @@ export async function exchangeSession(): Promise<void> {
     headers: { "Content-Type": "application/json" }, body: JSON.stringify({ secret }) });
   if (!response.ok) throw new ApiFailure("AUTH_REQUIRED");
 }
-export function errorLabel(error: unknown): string {
-  const code = error instanceof ApiFailure ? error.code : "REQUEST_FAILED";
-  const labels: Record<string, string> = { CONNECTION_REQUIRED: "Подключите модель перед созданием резюме.",
-    STALE_GENERATION: "Документ изменён после создания. Используйте «Экспорт DOCX» для текущего текста.",
-    INTERRUPTED: "Создание прервано. Исходник и сохранённый текст доступны для явного повтора.",
-    OPERATION_TIMEOUT: "Операция превысила время ожидания. Сохранённая работа доступна для повтора.",
-    DEADLINE_EXCEEDED: "Операция превысила время ожидания. Сохранённая работа доступна для повтора.",
-    PROCESS_CLEANUP_FAILED: "Не удалось подтвердить остановку процесса. Перезапустите приложение перед новой операцией.",
-    RULES_LOAD_FAILED: "Общие правила недоступны. Откройте Настройки и проверьте их перед новой операцией.",
-    RULES_UNSAFE_STORAGE: "Не удалось безопасно прочитать общие правила. Проверьте их в Настройках.",
-    AUTH_REQUIRED: "Откройте приложение по ссылке из запуска.", NO_USABLE_TEXT: "Доступного текста нет. Выберите другой файл или вставьте текст.",
-    INPUT_TOO_LARGE: "Текст слишком большой для одного запроса.", CANCELLED: "Создание отменено. Исходник сохранён в памяти.",
-    MODEL_DENIED: "Выбранная модель недоступна.", QUOTA_EXHAUSTED: "Лимит модели исчерпан. Повторите позже." };
-  return labels[code] ?? "Не удалось завершить действие. Исходник и выполненные шаги доступны для повтора.";
-}
+export function errorLabel(error: unknown): string { return errorMessage(error); }

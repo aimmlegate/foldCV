@@ -126,8 +126,11 @@ test("pasted tables retain every cell's text as paragraphs without enabling tabl
 
 test("editor notices keep useful messages and replace internal recovery or transport codes", () => {
   assert.equal(noticeText("Выберите PNG, JPEG или WebP"), "Выберите PNG, JPEG или WebP");
-  for (const value of ["JOB_SCOPE_INVALID", "DRAFT_STORAGE_FAILED", "WRITER_UNKNOWN", "OUTCOME_UNKNOWN"])
-    assert.ok(noticeText(value).includes("черновик"));
+  for (const [code, description] of [["JOB_SCOPE_INVALID", /фоновую задачу/u], ["DRAFT_STORAGE_FAILED", /черновик/u],
+    ["WRITER_UNKNOWN", /редактор/u], ["OUTCOME_UNKNOWN", /Сохранение пока не подтверждено/u]] as const) {
+    assert.match(noticeText(code), description);
+    assert.ok(!noticeText(code).includes(code));
+  }
   assert.ok(!noticeText("IMAGE_SESSION_STALE").includes("IMAGE_SESSION_STALE"));
   assert.ok(!noticeText("Failed to fetch").includes("Failed to fetch"));
 });

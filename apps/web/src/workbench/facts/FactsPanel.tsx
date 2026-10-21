@@ -1,3 +1,4 @@
+import { errorMessage } from "../../errors/messages";
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import type { WorkingFacts } from "../../contracts/generated/working_facts";
 import type { RichDocumentV1 } from "../../contracts/generated/rich_document_v1";
@@ -56,7 +57,7 @@ export function FactsPanel({ facts, document, focusEntries = [], focusOptions = 
     onKeyDown={event => { if (event.key === "Escape") { event.preventDefault(); event.stopPropagation(); close(); } }}>
     <div className="panel-heading"><h2>Факты</h2><button className="icon" aria-label="Скрыть факты" onClick={close}><Icon name="close" /></button></div>
     <div className="facts-feedback">
-      {error && <p className="notice warning" role="alert">{error.message}</p>}
+      {error && <p className="notice warning" role="alert">{errorMessage(error.message)}</p>}
       {pending.length > 0 && <OperationStatus state={paused ? "error" : "working"} label={paused ? "Ожидает повторного сохранения" : `Сохраняем изменения: ${pending.length}`} timed={!paused} />}
     </div>
     {facts.extraction && <div className="notice" role="status">

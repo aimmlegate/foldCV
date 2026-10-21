@@ -102,3 +102,157 @@ test("a genuinely oversized structural edit fails before sending and preserves t
   queue.update(after, "large", "structure"); await assert.rejects(queue.flush(), /лимит 1 МБ/);
   assert.equal(calls, 0); assert.equal(queue.baseline, initial);
 });
+
+function byteLength(value: unknown): number { return Buffer.byteLength(JSON.stringify(value)); }
+function sizedEdit(before: RichDocumentV1, bytes: number, character: string): RichDocumentV1 {
+  const after = structuredClone(before), block = after.regions[0].blocks[0];
+  assert.ok(block && Array.isArray(block.content));
+  block.content = [{ type: "text", text: "x", styles: wireMarks({}) }];
+  const probe = { ...compactMutation(mutation(before, after), before), clientMutationId: "00000000-0000-4000-8000-000000000000" };
+  const available = bytes - byteLength(probe) + 1, width = Buffer.byteLength(character);
+  const span = block.content[0]; assert.ok(span?.type === "text");
+  span.text = character.repeat(Math.floor(available / width)) + "x".repeat(available % width);
+  return after;
+}
+
+for (const character of ["x", "я", "🛠"]) for (const offset of [-1, 0, 1]) {
+  test(`compacted ${character} saves enforce the UTF-8 byte boundary at 1 MiB ${offset >= 0 ? "+" : ""}${offset}`, async () => {
+    const initial = baseline(), project = initial.workspace.project; assert.ok(project);
+    const block = project.document.regions[0].blocks[0]; assert.ok(block); large(block);
+    const expectedBytes = 1024 * 1024 + offset, after = sizedEdit(project.document, expectedBytes, character);
+    let calls = 0;
+    const queue = new RichSaveQueue(initial, "session", async request => {
+      calls++;
+      if (offset <= 0) assert.equal(byteLength(request), expectedBytes);
+      else assert.ok(byteLength(request) < 10000);
+      assert.equal(request.steps[0]?.kind, "replace_inline_range"); return apply(initial, request);
+    }, () => {});
+    queue.update(after, "edit", "panel");
+    if (offset <= 0) {
+      await queue.flush(); assert.equal(calls, 1);
+      assert.deepEqual(documentSteps(queue.baseline.workspace.project?.document ?? after, after), []);
+    } else {
+      await assert.rejects(queue.flush(), /лимит 1 МБ/); assert.equal(calls, 0); assert.equal(queue.baseline, initial);
+      const corrected = structuredClone(project.document), target = corrected.regions[0].blocks[0];
+      assert.ok(target && Array.isArray(target.content)); target.content = [{ type: "text", text: "Corrected", styles: wireMarks({}) }];
+      queue.update(corrected, "corrected"); await queue.flush(); assert.equal(calls, 1);
+      assert.deepEqual(documentSteps(queue.baseline.workspace.project?.document ?? corrected, corrected), []);
+    }
+  });
+}
+
+for (const count of [1000, 1001]) {
+  test(`${count} fact removals respect the atomic step ceiling`, async () => {
+    const initial = baseline(), project = initial.workspace.project; assert.ok(project);
+    const education = project.facts.records.find(record => record.kind === "education"); assert.ok(education);
+    const after = structuredClone(project.facts);
+    project.facts.records.push(...Array.from({ length: count }, (_, index) => ({ ...structuredClone(education), id: `extra-${index}` })));
+    let calls = 0;
+    const queue = new RichSaveQueue(initial, "session", async request => {
+      calls++; assert.equal(request.steps.length, count); return apply(initial, request);
+    }, () => {});
+    queue.update(project.document, "remove", "panel", after);
+    if (count === 1000) { await queue.flush(); assert.equal(calls, 1); }
+    else { await assert.rejects(queue.flush(), /слишком большое/); assert.equal(calls, 0); assert.equal(queue.baseline, initial); }
+  });
+}
+
+test("compacted UTF-16 ranges replace links and fact spans without losing children or formatting", () => {
+  const initial = baseline(), project = initial.workspace.project; assert.ok(project);
+  const block = project.document.regions[0].blocks[0]; assert.ok(block?.type === "paragraph");
+  block.content = [{ type: "text", text: "A🛠Б", styles: wireMarks({ bold: true }) },
+    { type: "link", href: "https://example.com/old", content: [{ type: "text", text: "🔗x", styles: wireMarks({ italic: true }) }] },
+    { type: "fact_field", bindingId: "save-binding", bindingRootId: "save-binding", recordId: "candidate-1", fieldKey: "name",
+      syncedFactRevision: 1, text: "😀", styles: wireMarks({ underline: true }) }];
+  block.children = [{ ...structuredClone(block), id: "retained-child", content: [], children: [] }];
+  large(block);
+  const after = structuredClone(project.document), changed = after.regions[0].blocks[0]; assert.ok(changed?.type === "paragraph");
+  changed.content = [{ type: "link", href: "https://example.com/new", content: [{ type: "text", text: "Новый 🛠", styles: wireMarks({ bold: true, textColor: "#112233" }) }] }];
+  const compact = compactMutation(mutation(project.document, after), project.document), step = compact.steps[0];
+  assert.ok(step?.kind === "replace_inline_range"); assert.equal(step.end, 9);
+  const actual = apply(initial, compact).workspace.project; assert.ok(actual);
+  assert.deepEqual(documentSteps(actual.document, after), []);
+  assert.deepEqual(actual.document.regions[0].blocks[0]?.children, block.children);
+  assert.deepEqual(actual.document.regions[0].blocks[0]?.provenance, block.provenance);
+});
+
+for (const change of ["table-layout", "image-properties", "provenance"] as const) {
+  test(`compaction retains whole-block ${change} edits`, () => {
+    const initial = baseline(), project = initial.workspace.project; assert.ok(project);
+    const after = structuredClone(project.document);
+    if (change === "table-layout") {
+      const table = after.regions[2].blocks.find(block => block.type === "table"); assert.ok(table?.type === "table");
+      table.content.columnWidths[0] = 200;
+      const cell = table.content.rows[0].cells[0]; assert.ok(cell);
+      cell.content = [{ type: "text", text: "Layout and content", styles: wireMarks({}) }];
+    } else if (change === "image-properties") {
+      const image = after.regions[2].blocks.find(block => block.type === "image"); assert.ok(image?.type === "image");
+      image.props.alt = "Updated alt"; image.props.caption = [{ type: "text", text: "Updated caption", styles: wireMarks({}) }];
+    } else {
+      const block = after.regions[0].blocks[0]; assert.ok(block && Array.isArray(block.content));
+      block.provenance = [{ kind: "working_owner", id: "new-owner", recordId: "candidate-1" }];
+      block.content = [{ type: "text", text: "New provenance", styles: wireMarks({}) }];
+    }
+    const request = mutation(project.document, after), compact = compactMutation(request, project.document);
+    assert.deepEqual(compact, request);
+    const actual = apply(initial, compact).workspace.project; assert.ok(actual);
+    assert.deepEqual(documentSteps(actual.document, after), []);
+  });
+}
+
+test("one character in a large resume sends one range and never includes the rest of the document", async () => {
+  const initial = baseline(), project = initial.workspace.project; assert.ok(project);
+  const block = project.document.regions[0].blocks[0]; assert.ok(block?.type === "paragraph"); large(block);
+  const untouched = Array.from({ length: 120 }, (_, index) => ({ ...structuredClone(block), id: `untouched-${index}`,
+    provenance: [], children: [], content: [{ type: "text" as const, text: `Unrelated section ${index}: ` + "z".repeat(10000), styles: wireMarks({}) }] }));
+  project.document.regions[2].blocks.push(...untouched);
+  assert.ok(byteLength(project.document) > 2 * 1024 * 1024);
+  const after = structuredClone(project.document), edited = after.regions[0].blocks[0]; assert.ok(edited?.type === "paragraph");
+  const span = edited.content[0]; assert.ok(span?.type === "text"); span.text += "!";
+  let calls = 0;
+  const queue = new RichSaveQueue(initial, "session", async request => {
+    calls++; assert.equal(request.steps.length, 1); assert.ok(byteLength(request) < 2000);
+    const step = request.steps[0]; assert.ok(step?.kind === "replace_inline_range"); assert.equal(step.blockId, block.id);
+    const wire = JSON.stringify(request);
+    for (const forbidden of ["untouched-", "Unrelated section", '"regions"', '"records"', '"provenance"', '"workspace"']) assert.ok(!wire.includes(forbidden), forbidden);
+    return apply(initial, request);
+  }, () => {});
+  await queue.flush(); assert.equal(calls, 0);
+  queue.update(after, "single-character"); await queue.flush(); assert.equal(calls, 1);
+  assert.deepEqual(queue.baseline.workspace.project?.document.regions[2].blocks.slice(-120), untouched);
+  assert.deepEqual(queue.baseline.workspace.project?.facts, project.facts);
+  assert.deepEqual(documentSteps(queue.baseline.workspace.project?.document ?? after, after), []);
+});
+
+test("editing one nested paragraph sends no ancestor or sibling blocks", async () => {
+  const initial = baseline(), project = initial.workspace.project; assert.ok(project);
+  const after = structuredClone(project.document), section = after.regions[2].blocks.find(block => block.id === "job-section"); assert.ok(section);
+  const edited = section.children.find(block => block.id === "narrative"); assert.ok(edited?.type === "paragraph");
+  edited.content.push({ type: "text", text: "!", styles: wireMarks({}) });
+  let calls = 0;
+  const queue = new RichSaveQueue(initial, "session", async request => {
+    calls++; assert.equal(request.steps.length, 1);
+    const step = request.steps[0]; assert.ok(step?.kind === "put_block");
+    assert.equal(step.block.id, "narrative"); assert.deepEqual(step.block.children, []); assert.equal(step.keepChildren, true);
+    assert.ok(!JSON.stringify(request).includes('"regions"')); return apply(initial, request);
+  }, () => {});
+  queue.update(after, "nested"); await queue.flush(); assert.equal(calls, 1);
+  assert.deepEqual(documentSteps(queue.baseline.workspace.project?.document ?? after, after), []);
+});
+
+test("editing one fact sends only that record without document blocks or other facts", async () => {
+  const initial = baseline(), project = initial.workspace.project; assert.ok(project);
+  const after = structuredClone(project.facts), candidate = after.records.find(record => record.kind === "candidate"); assert.ok(candidate);
+  candidate.title.rawText = candidate.title.value = "Senior engineer";
+  let calls = 0;
+  const queue = new RichSaveQueue(initial, "session", async request => {
+    calls++; assert.equal(request.steps.length, 1);
+    const step = request.steps[0]; assert.ok(step?.kind === "put_record"); assert.equal(step.record.id, "candidate-1");
+    const wire = JSON.stringify(request);
+    for (const forbidden of ['"regions"', '"blocks"', '"records"', '"job-1"', '"education-1"']) assert.ok(!wire.includes(forbidden), forbidden);
+    return apply(initial, request);
+  }, () => {});
+  queue.update(project.document, "one-fact", "panel", after); await queue.flush(); assert.equal(calls, 1);
+  assert.deepEqual(factSteps(queue.baseline.workspace.project?.facts ?? after, after), []);
+  assert.deepEqual(documentSteps(queue.baseline.workspace.project?.document ?? project.document, project.document), []);
+});
