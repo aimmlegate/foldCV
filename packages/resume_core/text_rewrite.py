@@ -4,14 +4,14 @@ from dataclasses import dataclass
 from difflib import SequenceMatcher
 import re
 
-from pydantic import Field, field_validator
+from pydantic import Field, field_validator, model_validator
 
 from .models.contracts import Wire
 from .models.rich_document import Hyperlink, StyledText
-from .models.rich_mutations import PutBlock, RemoveBlock
+from .models.rich_mutations import PutBlock, RemoveBlock, RichSelection
 from .rich_dependencies import placements
 from .rich_mutations import cut_inline, inline_text, subtree, utf16_slice
-from .rich_sync import selection_parts
+from .rich_sync import selection_parts, single_rewrite_selection
 
 
 class PlainTextReply(Wire):
@@ -24,6 +24,16 @@ class PlainTextReply(Wire):
             raise ValueError("empty or invalid replacement text")
         value.encode("utf-8", "strict")
         return value.replace("\r\n", "\n").replace("\r", "\n")
+
+
+class RichRewriteEditRequest(PlainTextReply):
+    selection: RichSelection
+
+    @model_validator(mode="after")
+    def scope(self):
+        if not single_rewrite_selection(self.selection):
+            raise ValueError("rewrite preview requires one text block or cell")
+        return self
 
 
 def plain_prompt(instruction, text):

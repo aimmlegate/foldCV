@@ -13,6 +13,7 @@ import { Progress } from "./import/Progress";
 import { Assessment } from "./import/Assessment";
 import { importView, reviewId } from "./import/view";
 import { Settings } from "./settings/Settings";
+import { readPaneOrder, savePaneOrder, type PaneOrder } from "./settings/interface";
 import { FileDialog, type FileMode } from "./files/FileDialog";
 import { projectFilename } from "./files/filename";
 import { useGlobalJobs } from "../background/useGlobalJobs";
@@ -29,6 +30,8 @@ export function App({ portalHost }: { portalHost: HTMLElement }) {
   const { response, writer, background, projects, input, setInput, textDraft, error, status, setStatus, busy, settings, setSettings,
     editor, assistant, acknowledge, action, fresh, open, remove, archive, process, upload, exportFile } = workspace;
   const [collapsed, setCollapsed] = useState(() => innerWidth <= 600);
+  const [paneOrder, setPaneOrder] = useState(readPaneOrder);
+  const changePaneOrder = (order: PaneOrder) => { savePaneOrder(order); setPaneOrder(order); };
   useEffect(() => {
     const narrow = matchMedia("(max-width: 600px)"), collapse = () => { if (narrow.matches) setCollapsed(true); };
     narrow.addEventListener("change", collapse); return () => narrow.removeEventListener("change", collapse);
@@ -102,7 +105,7 @@ export function App({ portalHost }: { portalHost: HTMLElement }) {
           cancel={() => void action(async () => acknowledge(await projectRequest(`/${response.workspace.projectId}/cancel`, "POST", {})), "Останавливаем обработку")} />}
         {view === "assessment" && response && <Assessment response={response} open={() => setReviewed(reviewId(response))} back={() => setSourceOpen(true)} />}
         {view === "editor" && response?.workspace.project && <>
-          <RichEditor key={response.workspace.projectId} initial={response} writer={writer} acknowledge={acknowledge} onStatus={setStatus} ref={editor} portalHost={portalHost}
+          <RichEditor key={response.workspace.projectId} initial={response} writer={writer} acknowledge={acknowledge} onStatus={setStatus} ref={editor} portalHost={portalHost} paneOrder={paneOrder}
             onComparisonOpen={() => setCollapsed(true)} onHistoryNavigation={() => assistant.current?.history()} onAssistantFence={saved => assistant.current?.fence(saved)}
             assistant={<AssistantDrawer key={response.workspace.projectId} projectId={response.workspace.projectId} editor={editor} settingsOpen={settings} ref={assistant} background={writer !== null}
               onProjectLifecycle={kind => workspace.projectLifecycle(response.workspace.projectId, kind)}
@@ -112,7 +115,7 @@ export function App({ portalHost }: { portalHost: HTMLElement }) {
           allowTextRewrite={workspace.allowTextRewrite} changeTextRewrite={workspace.setAllowTextRewrite}
           process={() => { setSourceOpen(false); void process(); }} />}
       </div>
-      {settingsVisited && <div className="screen" hidden={!settings}><Settings close={() => void action(async () => { await editor.current?.resume(); setSettings(false); })} connectionChanged={setConnection} /></div>}
+      {settingsVisited && <div className="screen" hidden={!settings}><Settings close={() => void action(async () => { await editor.current?.resume(); setSettings(false); })} connectionChanged={setConnection} paneOrder={paneOrder} changePaneOrder={changePaneOrder} /></div>}
     </section>
     {fileMode && <FileDialog key={fileMode} mode={fileMode} title={projectTitle} subtitle={response?.identity?.subtitle ?? ""} filename={filename}
       timeline={timeline} error={error} busy={busy} operation={workspace.operation?.label} close={() => setFileMode(null)} download={() => exportFile(fileMode === "export" ? "export" : "archive",

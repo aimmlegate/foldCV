@@ -9,10 +9,11 @@ import { ModelSelect } from "./ModelSelect";
 import { ReasoningSelect } from "./ReasoningSelect";
 import { Button } from "../ui/Button";
 import { OperationStatus } from "../ui/OperationStatus";
+import type { PaneOrder } from "./interface";
 
 const partNames: Record<SettingsPart, string> = { reasoning: "reasoning правки текста", model: "модель обработки", import: "модель импорта", analysis: "проверка изменений", assistant: "помощник", rules: "правила" };
-export function Settings({ close, connectionChanged }: { close: () => void; connectionChanged: (view: ConnectionView) => void }) {
-  const [section, setSection] = useState<"model" | "rules" | "analysis">("model");
+export function Settings({ close, connectionChanged, paneOrder, changePaneOrder }: { close: () => void; connectionChanged: (view: ConnectionView) => void; paneOrder: PaneOrder; changePaneOrder: (order: PaneOrder) => void }) {
+  const [section, setSection] = useState<"model" | "rules" | "analysis" | "interface">("model");
   const [view, setView] = useState<ConnectionView>(() => new ConnectionWorkflow(() => {}).view);
   const [workflow] = useState(() => new ConnectionWorkflow(value => { setView(value); connectionChanged(value); }));
   const [state, setState] = useState<SettingsState | null>(null);
@@ -33,9 +34,9 @@ export function Settings({ close, connectionChanged }: { close: () => void; conn
   return <section className="settings-screen" aria-label="Настройки">
     <div className="settings-title"><button className="text-button" disabled={current.saving} onClick={close}>← Вернуться к резюме</button></div>
     <div className="settings-layout"><nav className="settings-nav" aria-label="Разделы настроек">
-      {(["model", "rules", "analysis"] as const).map(value => <button key={value} data-settings={value} className={section === value ? "active" : ""}
+      {(["model", "rules", "analysis", "interface"] as const).map(value => <button key={value} data-settings={value} className={section === value ? "active" : ""}
         aria-current={section === value ? "page" : undefined} onClick={() => setSection(value)}>
-        {value === "model" ? "Модель и подключение" : value === "rules" ? "Общие правила и команды" : "Проверка изменений"}
+        {value === "model" ? "Модель и подключение" : value === "rules" ? "Общие правила и команды" : value === "interface" ? "Интерфейс" : "Проверка изменений"}
       </button>)}
     </nav><div className="settings-content">
       <div className="settings-feedback">
@@ -74,11 +75,18 @@ export function Settings({ close, connectionChanged }: { close: () => void; conn
           <input className="switch" id="analysis-toggle" aria-label="Автоматически проверять изменения" type="checkbox" role="switch" disabled={!current.preferences} checked={current.draft.automatic}
             onChange={event => controller.change("automatic", event.currentTarget.checked)} /></div>
       </>}
-      {!controller.ready && !current.loading && <Button className="small" onClick={() => void controller.load()}>Повторить загрузку настроек</Button>}
-      <div className="settings-actions"><Button variant="primary" busy={current.saving} busyLabel="Сохраняем…" disabled={!dirty || current.loading || view.pending} onClick={() => void controller.save()}>Сохранить изменения</Button>
+      {section === "interface" && <><h3>Расположение резюме</h3>
+        <label htmlFor="workspace-pane-order">Порядок панелей при сравнении</label>
+        <select id="workspace-pane-order" value={paneOrder} onChange={event => changePaneOrder(event.currentTarget.value === "original-first" ? "original-first" : "layout-first")}>
+          <option value="layout-first">Макет слева, оригинал справа</option>
+          <option value="original-first">Оригинал слева, макет справа</option>
+        </select><p>Настройка сохраняется сразу на этом устройстве.</p>
+      </>}
+      {section !== "interface" && !controller.ready && !current.loading && <Button className="small" onClick={() => void controller.load()}>Повторить загрузку настроек</Button>}
+      {section !== "interface" && <div className="settings-actions"><Button variant="primary" busy={current.saving} busyLabel="Сохраняем…" disabled={!dirty || current.loading || view.pending} onClick={() => void controller.save()}>Сохранить изменения</Button>
         <Button variant="quiet" disabled={!dirty || busy} onClick={() => controller.cancel()}>Отмена</Button>
         <span className="settings-saved" role="status">{current.saving ? "Сохраняем по разделам…" : dirty ? "Есть несохранённые изменения" : current.staleRules ? "Нужно обновить правила" : controller.ready ? "Изменения сохранены" : "Не все настройки доступны"}</span>
-      </div>
+      </div>}
     </div></div>
   </section>;
 }

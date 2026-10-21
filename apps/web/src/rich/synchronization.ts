@@ -1,4 +1,5 @@
 import type { RichCompletionRequest } from "../contracts/generated/rich_completion_request";
+import type { RichRewriteEditRequest } from "../contracts/generated/rich_rewrite_edit_request";
 import type { RichSelection } from "../contracts/generated/rich_selection";
 import type { RichProjectResponse } from "../contracts/generated/rich_project_response";
 import type { RichMutation } from "../contracts/generated/rich_mutation";
@@ -68,6 +69,7 @@ export class RichSynchronization {
   private readonly previews = new Map<string, { value: RewritePreview; sync: Sync; capture: Capture | null; job: JobSnapshotV1 | null }>();
   private readonly loadingPreviews = new Set<string>();
   private readonly applyingPreviews = new Set<string>();
+  private readonly editedApplies = new Map<string, { changed: boolean }>();
   private readonly unsubscribe: (() => void) | null;
   private readonly rewrites = new Map<string, { activity: RewriteActivity; capture: Capture | null; jobId: string | null;
     stamp: { generation: number; cursor: number } | null; cancelled: boolean }>();
@@ -79,6 +81,7 @@ export class RichSynchronization {
   close(): void {
     this.invalidate();
     this.closed = true; this.unsubscribe?.(); this.cascades.clear(); this.invalidate(); this.submitted.clear(); this.rewrites.clear();
+    this.previews.clear(); this.editedApplies.clear();
   }
   private finished(jobs: JobSnapshotV1[]): void {
     if (this.closed) return;
@@ -126,13 +129,59 @@ export class RichSynchronization {
     finally { this.loadingPreviews.delete(id); }
   }
   previewRewrite(id: string): RewritePreview | null { return this.previews.get(id)?.value ?? null; }
+  editRewrite(id: string, text: string): void {
+    const preview = this.previews.get(id);
+    if (!preview || this.applyingPreviews.has(id) || this.editedApplies.has(id)) return;
+    preview.value = { ...preview.value, text };
+    this.adapter.rewritePreview?.(preview.value);
+  }
+  private async applyEditedRewrite(id: string): Promise<void> {
+    const preview = this.previews.get(id), adapter = this.adapter, history = adapter.history;
+    if (!preview || !preview.value.text.trim()) throw new RichApiFailure("INVALID_RESULT");
+    let applied = this.editedApplies.get(id);
+    if (!applied) {
+      const origin = preview.capture;
+      if (origin && [...origin.dependencies].some(([key, revision]) => history.revision(key) !== revision)) throw new RichApiFailure("STALE_SELECTION");
+      await adapter.queue.flush();
+      if (this.closed) throw new RichApiFailure("STALE_SELECTION");
+      const action = history.commit("rewrite", [{ key: `request:${crypto.randomUUID()}`, before: null, after: "apply" }]);
+      const capture = action ? this.capture(action, preview.sync.blockIds) : null;
+      if (!capture) throw new RichApiFailure("STALE_SELECTION");
+      try {
+        const before = adapter.cells(adapter.queue.baseline);
+        const response = await projectRequest(`/${this.projectId}/rewrite/preview`, "POST", {
+          text: preview.value.text, selection: { ...preview.value.selection,
+            capture: { ...this.wireCapture(capture), dependencies: preview.sync.dependencies } },
+        } satisfies RichRewriteEditRequest);
+        const after = adapter.cells(response);
+        const changes = [...new Set([...before.keys(), ...after.keys()])].filter(key => !key.startsWith("request:"))
+          .map(key => ({ key, before: before.get(key) ?? null, after: after.get(key) ?? null })).filter(change => change.before !== change.after);
+        const dependencies = new Map(capture.dependencies);
+        for (const change of changes) if (!dependencies.has(change.key)) dependencies.set(change.key, capture.epochs.get(change.key) ?? 0);
+        if (this.closed || history.attach({ ...capture, dependencies }, changes) !== "applied") throw new RichApiFailure("STALE_SELECTION");
+        applied = { changed: changes.length > 0 };
+        this.editedApplies.set(id, applied);
+        preview.value = { ...preview.value, applied: true };
+        adapter.rewritePreview?.(preview.value);
+        if (changes.length) { adapter.changed(); adapter.applied?.(action ?? id, changes); }
+      } finally { history.discardPending(action ?? ""); }
+    }
+    await adapter.queue.flush();
+    if (this.closed) throw new RichApiFailure("STALE_SELECTION");
+    if (preview.job && this.jobs) await this.jobs.discard(preview.job.id);
+    else adapter.report(await projectRequest(`/${this.projectId}/sync/${preview.sync.id}`, "POST", { status: "applied", errorCode: null }));
+    this.editedApplies.delete(id);
+    this.progress(id, applied.changed ? "saved" : "no_change");
+  }
   async applyRewrite(id: string): Promise<void> {
     const preview = this.previews.get(id);
     if (!preview || this.closed || this.rewrites.get(id)?.cancelled || this.applyingPreviews.has(id)) throw new RichApiFailure("STALE_SELECTION");
     this.applyingPreviews.add(id);
     this.progress(id, "applying");
     try {
-      if (preview.job && this.jobs && this.adapter.approveRewrite) {
+      if (preview.value.text !== preview.sync.rewriteResult || this.editedApplies.has(id)) {
+        await this.applyEditedRewrite(id);
+      } else if (preview.job && this.jobs && this.adapter.approveRewrite) {
         await this.jobs.refresh();
         const job = this.jobs.view.project?.jobs.find(item => item.id === preview.job?.id);
         if (!job || rewriteStage(job) !== "preview") throw new RichApiFailure("STALE_SELECTION");

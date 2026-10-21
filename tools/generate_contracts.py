@@ -27,6 +27,7 @@ from packages.resume_core.models.rich_mutations import RichMutation, RichSelecti
 from packages.resume_core.models.rich_workspace import ProjectV5, WorkspaceV6, ArchiveManifestV6, AssetReservation
 from packages.resume_core.rich_api import RichProjectResponse, ImageSessionRequest, ImageUploadCapture
 from packages.resume_core.rich_sync import RichCompletionRequest, RichRewriteRequest, RichRewriteProposal, RichReconcileProposal, RichSyncDisposition
+from packages.resume_core.text_rewrite import RichRewriteEditRequest
 from packages.resume_core.rich_panel import RichPanelRequest, RichPanelSyncRequest, RichPanelProposal
 from packages.resume_core.rich_timeline import TimelineReport, CascadeRequest, CascadeApplyRequest
 from packages.resume_core.models.agent import AGENT_CONTRACTS
@@ -40,6 +41,7 @@ RICH_CONTRACTS = {
     "rich_completion_request": RichCompletionRequest, "rich_rewrite_request": RichRewriteRequest,
     "rich_rewrite_proposal": RichRewriteProposal, "rich_reconcile_proposal": RichReconcileProposal,
     "rich_sync_disposition": RichSyncDisposition,
+    "rich_rewrite_edit_request": RichRewriteEditRequest,
     "rich_document_v1": RichDocumentV1, "working_facts": WorkingFacts,
     "rich_mutation": RichMutation, "rich_selection": RichSelection,
     "date_cascade_proposal": DateCascadeProposal, "project_v5": ProjectV5,

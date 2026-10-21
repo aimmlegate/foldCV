@@ -20,7 +20,14 @@ from packages.resume_core.models.rich_mutations import RichMutation
 from packages.resume_core.rich_panel import RichPanelRequest,panel_mutation
 from packages.resume_core.rich_mutations import apply_rich_mutation
 x=json.load(open(sys.argv[1]));w=WorkspaceV6.model_validate(x['workspace'])
-r=panel_mutation(w,RichPanelRequest.model_validate(x['body'])) if x['panel'] else RichMutation.model_validate(x['body'])
+if x.get('rewrite'):
+ from packages.resume_core.text_rewrite import RichRewriteEditRequest,PlainTextReply
+ sys.path.insert(0,'services/api/src')
+ from resume_api.rich_synchronization import RichSynchronization
+ q=RichRewriteEditRequest.model_validate(x['body'])
+ steps,_=RichSynchronization.plain_rewrite_proposal(w,q.selection,PlainTextReply(text=q.text))
+ r=RichMutation(schemaVersion=1,projectId=w.project_id,clientMutationId='manual-preview',actionId=q.selection.capture.action_id,kind='rewrite',capture=q.selection.capture,steps=steps) if steps else None
+else: r=panel_mutation(w,RichPanelRequest.model_validate(x['body'])) if x['panel'] else RichMutation.model_validate(x['body'])
 if r is not None: w,_=apply_rich_mutation(w,r)
 print(w.model_dump_json(by_alias=True))`;
 
@@ -48,8 +55,8 @@ export function panelHarness(options: { preview?: (count: number) => Promise<voi
     return { ...baseline.document, regions: [header, sidebar, main] as [typeof header, typeof sidebar, typeof main] };
   }
   const history = new SessionHistory("queue-session", current, changes => { for (const change of changes) current.set(change.key, change.after); });
-  function call(body: unknown, panel: boolean) {
-    const value: unknown = JSON.parse(execFileSync(".venv/bin/python", ["-c", python, file({ workspace: response.workspace, body, panel })],
+  function call(body: unknown, panel: boolean, rewrite = false) {
+    const value: unknown = JSON.parse(execFileSync(".venv/bin/python", ["-c", python, file({ workspace: response.workspace, body, panel, rewrite })],
       { cwd: new URL("../../../", import.meta.url), encoding: "utf8", timeout: 5000 }));
     assert.ok(validateRichWorkspaceShape(value)); return { ...response, workspace: value };
   }
@@ -58,6 +65,7 @@ export function panelHarness(options: { preview?: (count: number) => Promise<voi
   const publish = () => queue.update(document(), history.currentActionId ?? "queue-session", "panel", factsFromCells(current, baseline.facts));
   const originalFetch = globalThis.fetch;
   globalThis.fetch = async (input, init) => {
+    if (String(input).endsWith("/rewrite/preview")) { const count = ++previews; await options.preview?.(count); return Response.json(call(JSON.parse(String(init?.body)) as unknown, false, true)); }
     if (String(input).endsWith("/panel/preview")) { const count = ++previews; await options.preview?.(count); return Response.json(call(JSON.parse(String(init?.body)) as unknown, true)); }
     if (String(input).endsWith("/preview")) { const count = ++previews; await options.preview?.(count); return Response.json(call(JSON.parse(String(init?.body)) as unknown, false)); }
     return Response.json(response);

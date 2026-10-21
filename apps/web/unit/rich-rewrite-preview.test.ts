@@ -43,8 +43,9 @@ test("queued preview contracts enforce the same single-target boundary as the se
   assert.equal(validateContract("background_fixed_request_v1", request), false);
 });
 
-for (const outcome of ["apply", "delete", "cancel"] as const) test(`preview keeps document, facts and history unchanged before ${outcome}`, async context => {
-  const h = panelHarness(), fallback = globalThis.fetch;
+for (const outcome of ["apply", "edit", "edit-save-retry", "delete", "edit-stale", "cancel", "edit-empty"] as const) test(`preview keeps document, facts and history unchanged before ${outcome}`, async context => {
+  let failSave = outcome === "edit-save-retry";
+  const h = panelHarness({ save: async () => { if (failSave) throw new Error("Disk unavailable"); } }), fallback = globalThis.fetch;
   let calls = 0;
   globalThis.fetch = async (input, init) => {
     if (String(input).endsWith("/rewrite")) {
@@ -71,21 +72,44 @@ for (const outcome of ["apply", "delete", "cancel"] as const) test(`preview keep
   const preview = h.sync.previewRewrite("queue-session:1");
   assert.ok(preview, "Preview retains its originating action");
   const action = preview.actionId;
-  if (outcome === "delete") {
+  if (outcome.startsWith("edit")) {
+    h.sync.editRewrite(action, outcome === "edit-empty" ? " \n" : "Manually corrected 🚀");
+    assert.deepEqual(h.document(), document); assert.deepEqual(h.facts(), facts); assert.equal(h.history.length, 0);
+    assert.equal(h.sync.previewRewrite(action)?.text, outcome === "edit-empty" ? " \n" : "Manually corrected 🚀");
+  }
+  if (outcome === "delete" || outcome === "edit-stale") {
     h.history.commit("structure", [{ key: "block:narrative", before: h.history.read("block:narrative"), after: null }]);
     await assert.rejects(h.sync.applyRewrite(action), /STALE_SELECTION/u);
     assert.equal(h.history.read("block:narrative"), null);
+  } else if (outcome === "edit-empty") {
+    await assert.rejects(h.sync.applyRewrite(action), /INVALID_RESULT/u);
+    assert.deepEqual(h.document(), document); assert.equal(h.history.length, 0);
   } else if (outcome === "cancel") {
     await h.sync.cancelRewrite(action);
     await assert.rejects(h.sync.applyRewrite(action), /STALE_SELECTION/u);
     assert.deepEqual(h.document(), document);
   } else {
     h.history.commit("typing", [{ key: "unrelated", before: null, after: "Keep this edit" }]);
+    if (outcome === "edit-save-retry") {
+      await assert.rejects(h.sync.applyRewrite(action), /Disk unavailable/u);
+      assert.equal(h.history.length, 2);
+      assert.equal(h.sync.previewRewrite(action)?.applied, true);
+      failSave = false;
+    }
     await h.sync.applyRewrite(action);
     assert.notDeepEqual(h.document(), document);
     assert.equal(h.history.read("unrelated"), "Keep this edit");
+    if (outcome === "edit" || outcome === "edit-save-retry") {
+      const changed = h.document().regions.flatMap(region => region.blocks.flatMap(block => [block, ...block.children])).find(block => block.id === "narrative");
+      assert.ok(changed && changed.type === "paragraph");
+      assert.ok(JSON.stringify(changed.content).includes("Manually corrected 🚀"));
+      assert.ok(!JSON.stringify(changed.content).includes("Clearer:"));
+      assert.equal(h.history.length, 2);
+    }
+    const after = h.document();
     assert.ok(h.history.undo()); assert.deepEqual(h.document(), document);
     assert.equal(h.history.read("unrelated"), "Keep this edit");
+    assert.ok(h.history.redo()); assert.deepEqual(h.document(), after);
   }
   assert.equal(calls, 1);
 });

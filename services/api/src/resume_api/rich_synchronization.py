@@ -26,6 +26,42 @@ from .providers.content import ContentFailure, ContentInput, GenerationPolicy
 
 
 class RichSynchronization:
+    def rewrite_edit_preview(self, identifier, request):
+        workspace = self.read(identifier)
+        self.require_agent_writable(identifier)
+        if not dependencies_current(workspace, request.selection.capture.dependencies):
+            raise ProjectFailure("STALE_SELECTION", 409)
+        try:
+            if selection_checksum(selection_parts(workspace, request.selection)) != request.selection.text_sha256:
+                raise ValueError("STALE_SELECTION")
+            steps, _conflicts = self.plain_rewrite_proposal(workspace, request.selection, PlainTextReply(text=request.text))
+            if not steps:
+                return self.response(identifier)
+            return self.preview(identifier, RichMutation(schemaVersion=1, projectId=identifier,
+                clientMutationId=identity("preview"), actionId=request.selection.capture.action_id, kind="rewrite",
+                capture=request.selection.capture, steps=steps))
+        except ValueError as error:
+            raise ProjectFailure(str(error), 409) from None
+
+    @staticmethod
+    def plain_rewrite_proposal(workspace, selection, proposal):
+        steps = plain_rewrite_steps(workspace, selection, proposal)
+        candidate = workspace
+        if steps:
+            candidate, _ = apply_rich_mutation(workspace, RichMutation(schemaVersion=1, projectId=workspace.project_id,
+                clientMutationId=identity("preview"), actionId=selection.capture.action_id, kind="rewrite",
+                capture=selection.capture, steps=steps))
+        target_ids = list(dict.fromkeys([*selection.block_ids, *(target.block.id for target in selection_targets(workspace, selection))]))
+        remaining = occurrences(candidate.project.document)
+        removed = [{"recordId": group.record_id, "fieldKey": group.key, "rootId": group.root}
+            for key, group in occurrences(workspace.project.document).items()
+            if key not in remaining and set(group.block_ids) & set(target_ids)]
+        completion = RichCompletionRequest(capture=selection.capture, blockIds=[block.id for block in candidate.project.document.blocks()
+            if block.id not in {old.id for old in workspace.project.document.blocks()} or block.id in target_ids],
+            movedIds=[], removedFields=removed, interpret=False)
+        fact_steps, conflicts = exact_completion(candidate, completion) if steps else ([], [])
+        return [*steps, *fact_steps], conflicts
+
     def panel_preview(self, identifier, request):
         from packages.resume_core.rich_panel import panel_mutation
         try:
@@ -335,21 +371,8 @@ class RichSynchronization:
                     "text": selection_text(targets)}, PlainTextReply)
                 sync.rewrite_source, sync.rewrite_result = selection_text(targets), proposal.text
             with measure("proposal"):
-                steps = plain_rewrite_steps(workspace, request.selection, proposal)
-                candidate = workspace
-                if steps:
-                    preview = RichMutation(schemaVersion=1, projectId=identifier, clientMutationId=identity("preview"),
-                        actionId=sync.action_id, kind="rewrite", capture=request.selection.capture, steps=steps)
-                    candidate, _ = apply_rich_mutation(workspace, preview)
-                remaining = occurrences(candidate.project.document)
-                removed = [{"recordId": group.record_id, "fieldKey": group.key, "rootId": group.root}
-                    for key, group in occurrences(workspace.project.document).items()
-                    if key not in remaining and set(group.block_ids) & set(target_ids)]
-                completion = RichCompletionRequest(capture=request.selection.capture, blockIds=[block.id for block in candidate.project.document.blocks()
-                    if block.id not in {old.id for old in workspace.project.document.blocks()} or block.id in target_ids],
-                    movedIds=[], removedFields=removed, interpret=False)
-                fact_steps, conflicts = exact_completion(candidate, completion) if steps else ([], [])
-                sync.proposed_steps, sync.ready = [*steps, *fact_steps], bool(steps or fact_steps)
+                steps, conflicts = self.plain_rewrite_proposal(workspace, request.selection, proposal)
+                sync.proposed_steps, sync.ready = steps, bool(steps)
                 sync.status = "conflict" if conflicts else "pending" if sync.ready else "applied"
                 if not dependencies_current(self.workspaces[identifier], sync.dependencies):
                     sync.status, sync.ready, sync.error_code = "stale", False, "STALE_SYNC"

@@ -5,11 +5,11 @@ import { rewriteCancellable, rewriteLabels, type RewriteActivity, type RewritePr
 import { Button } from "../ui/Button";
 import { OperationStatus } from "../ui/OperationStatus";
 
-export function RewritePanel({ open, close, instruction, change, submit, apply, preview, busy, source, error, activity, cancel, anchor, focusInstruction }: {
+export function RewritePanel({ open, close, instruction, change, submit, apply, preview, editPreview, busy, source, error, activity, cancel, anchor, focusInstruction }: {
   open: boolean; close: () => void; instruction: string; change: (value: string) => void;
   submit: () => void; busy: boolean; source: string; error: string;
   activity: RewriteActivity | null; cancel: (id: string) => void;
-  preview: RewritePreview | null; apply: () => void;
+  preview: RewritePreview | null; apply: () => void; editPreview: (text: string) => void;
   anchor: { left: number; top: number; bottom: number } | null; focusInstruction: boolean;
 }) {
   const dialog = useRef<HTMLElement>(null), returnFocus = useRef<HTMLElement | null>(null);
@@ -37,20 +37,22 @@ export function RewritePanel({ open, close, instruction, change, submit, apply, 
     onKeyDown={event => {
       if (event.key === "Escape") { event.preventDefault(); event.stopPropagation(); close(); returnFocus.current?.focus(); }
       else if (event.key === "Enter" && (event.metaKey || event.ctrlKey) && !event.nativeEvent.isComposing && !busy) {
-        event.preventDefault(); if (preview && !(event.target instanceof HTMLTextAreaElement)) apply(); else if (instruction.trim() && source.trim()) submit();
+        event.preventDefault(); if (preview && !(event.target instanceof HTMLTextAreaElement && event.target.id === "uir-rewrite-instruction")) { if (preview.text.trim()) apply(); }
+        else if (instruction.trim() && source.trim()) submit();
       }
     }}>
     <div className="dialog-heading"><div><h2 id="uir-rewrite-title">Изменить текст</h2></div><button className="icon" aria-label={busy ? "Скрыть окно изменения текста" : "Закрыть изменение текста"} onClick={close}><Icon name="close" /></button></div>
     {!preview && <details className="rewrite-original"><summary>Выделено: {source.length} знаков</summary><blockquote className="rewrite-source">{source}</blockquote></details>}
     {preview ? <>
-      <section className="rewrite-result" aria-label="Предпросмотр правки"><strong>Новый текст</strong><div tabIndex={0}>{preview.text}</div></section></>
+      <section className="rewrite-result" aria-label="Предпросмотр правки"><label htmlFor="uir-rewrite-result">Новый текст — можно исправить вручную</label>
+        <textarea id="uir-rewrite-result" aria-label="Новый текст" rows={5} maxLength={65536} disabled={busy || preview.applied === true} value={preview.text} onChange={event => editPreview(event.currentTarget.value)} /></section></>
       : fields}
     {preview && <details className="rewrite-adjust"><summary>Изменить инструкцию</summary>{fields}</details>}
     <div className="rewrite-progress-slot">{error ? <p className="notice warning" role="alert">{errorMessage(error)}</p> : busy && activity ? <>
       <OperationStatus label={rewriteLabels[activity.stage]} timed startedAt={activity.startedAt} />
       {rewriteCancellable(activity.stage) && <button className="text-button" onClick={() => cancel(activity.actionId)}>Отменить правку</button>}
     </> : null}</div>
-    <div className="rewrite-actions"><Button variant="primary" busy={busy} busyLabel={preview ? "Применяем…" : "Готовим вариант…"} disabled={!preview && (!instruction.trim() || !source.trim())} onClick={preview ? apply : submit}>{preview ? "Применить" : "Изменить текст"}<Icon name={preview ? "check" : "spark"} /></Button>
+    <div className="rewrite-actions"><Button variant="primary" busy={busy} busyLabel={preview ? "Применяем…" : "Готовим вариант…"} disabled={preview ? !preview.text.trim() : !instruction.trim() || !source.trim()} onClick={preview ? apply : submit}>{preview ? "Применить" : "Изменить текст"}<Icon name={preview ? "check" : "spark"} /></Button>
       {preview && <Button variant="quiet" disabled={busy || !instruction.trim()} onClick={submit}>Ещё вариант</Button>}
     </div>
   </section>;

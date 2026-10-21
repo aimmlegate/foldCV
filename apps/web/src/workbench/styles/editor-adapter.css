@@ -103,8 +103,6 @@
 [data-uir-engine-ui] :is(button,input,select,textarea,[role="menuitem"]):focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 [data-uir-engine-ui] :is([role="menu"],[role="listbox"],[role="dialog"],.bn-toolbar,.bn-suggestion-menu) { color: var(--ink); background: var(--paper); border: 1px solid var(--line); border-radius: 6px; font: 12px/1.5 var(--sans); }
 [data-uir-engine-ui] [role="menuitem"] { padding: 6px 10px; }
-[data-uir-engine-ui] .bn-side-menu { display: flex; gap: 2px; }
-[data-uir-engine-ui] .rich-block-handle { font-size: 20px; }
 [data-uir-engine-ui] .bn-table-cell-handle { min-height: 12px; height: 12px; padding: 0 4px; }
 [data-uir-engine-ui] .bn-table-handle { cursor: grab; }
 [data-uir-engine-ui].cv-image-controls { display: flex; flex-wrap: wrap; gap: 6px; }
@@ -123,7 +121,6 @@
 
 [data-uir-engine-ui] .uir-selection-action { position: static; min-width: 0; min-height: 0; padding: 7px 11px; border: 1px solid #728363; border-radius: 5px; background: var(--accent); color: #fff; font: 10px var(--sans); }
 [data-uir-engine-ui] .uir-selection-action svg { width: 13px; height: 13px; stroke-width: 1.5; }
-[data-uir-engine-ui] .rich-block-handle svg { width: 14px; height: 14px; stroke-width: 1.5; }
 [data-uir-engine-ui] .uir-selection-action:hover { background: var(--accent-hover); }
 .editor-toolbar .tool[aria-pressed="true"] { background: var(--wash); color: var(--accent); }
 .uir-editor-body .facts-panel { order: 1; }

@@ -30,6 +30,12 @@ class RichCompletionRequest(Wire):
     interpret: bool = True
 
 
+def single_rewrite_selection(selection):
+    return (selection.kind != "blocks" and len(selection.block_ids) == 1
+        and selection.block_ids[0] == selection.anchor.block_id == selection.head.block_id
+        and selection.anchor.cell_id == selection.head.cell_id and selection.anchor.offset < selection.head.offset)
+
+
 class RichRewriteRequest(Wire):
     selection: RichSelection
     instruction: str = Field(min_length=1, max_length=4000)
@@ -37,11 +43,7 @@ class RichRewriteRequest(Wire):
 
     @model_validator(mode="after")
     def preview_scope(self):
-        selection = self.selection
-        if self.preview_only and (selection.kind == "blocks" or len(selection.block_ids) != 1
-                or selection.block_ids[0] != selection.anchor.block_id
-                or selection.anchor.block_id != selection.head.block_id or selection.anchor.cell_id != selection.head.cell_id
-                or selection.anchor.offset >= selection.head.offset):
+        if self.preview_only and not single_rewrite_selection(self.selection):
             raise ValueError("rewrite preview requires one text block or cell")
         return self
 

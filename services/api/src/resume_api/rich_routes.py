@@ -15,6 +15,7 @@ from .rich_assets import ImageSessionRequest, ImageUploadCapture
 from .rewrite_timing import rewrite_timing
 from .original_sources import mount_original_sources
 from packages.resume_core.rich_sync import RichCompletionRequest, RichRewriteRequest, RichSyncDisposition
+from packages.resume_core.text_rewrite import RichRewriteEditRequest
 from packages.resume_core.rich_panel import RichPanelRequest, RichPanelSyncRequest
 from packages.resume_core.rich_timeline import CascadeRequest, CascadeApplyRequest, timeline_report, cascade_proposal, cascade_mutation
 
@@ -163,6 +164,11 @@ def mount_rich_projects(app, service, problem):
         except ValueError as error:
             raise ProjectFailure(str(error), 409) from None
         return JSONResponse(service.preview(identifier, mutation).model_dump(mode="json", by_alias=True), headers={"Cache-Control": "no-store"})
+
+    @app.post(prefix + "/{identifier}/rewrite/preview")
+    async def rewrite_edit_preview(identifier: str, payload: RichRewriteEditRequest):
+        return JSONResponse(service.rewrite_edit_preview(identifier, payload).model_dump(mode="json", by_alias=True),
+            headers={"Cache-Control": "no-store"})
 
     @app.post(prefix + "/{identifier}/rewrite")
     async def rewrite(identifier: str, payload: RichRewriteRequest):

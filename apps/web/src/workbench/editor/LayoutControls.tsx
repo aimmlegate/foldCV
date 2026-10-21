@@ -3,7 +3,7 @@ import { Icon } from "../ui/Icon";
 
 export function LayoutControls({ comparing, expand }: { comparing: boolean; expand: () => void }) {
   const controls = useRef<HTMLDivElement>(null);
-  const [zoom, setZoom] = useState("fit");
+  const [zoom, setZoom] = useState("1.25");
   useEffect(() => {
     const workspace = controls.current?.closest<HTMLElement>(".document-workspace");
     const scroll = workspace?.querySelector<HTMLElement>(".paper-scroll"), paper = scroll?.querySelector<HTMLElement>(".resume-paper");

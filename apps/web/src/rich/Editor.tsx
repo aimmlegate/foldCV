@@ -64,6 +64,7 @@ import { projectJobs } from "../background/jobs";
 import { allowRichCodeStyles, allowRichColors } from "./styles";
 import { captureCaret, restoreCaret } from "./caret";
 import { OperationStatus, Spinner } from "../workbench/ui/OperationStatus";
+import type { PaneOrder } from "../workbench/settings/interface";
 
 type FactIntent = { kind: "panel"; command: PanelCommand } | { kind: "cascade"; proposal: DateCascadeProposal };
 
@@ -139,9 +140,9 @@ export type RichEditorHandle = { flush: () => Promise<RichProjectResponse>; undo
     historyOffers: Pick<AgentHistoryOffer, "undo" | "redo"> }>;
   focusFinding: (anchor: AgentFinding["anchors"][number]) => boolean;
   applyAssistant: (batchId: string, api: PreparedApi) => Promise<void> };
-export function RichEditor({ initial, acknowledge, onStatus, ref, onHistoryNavigation, onAssistantFence, onComparisonOpen, portalHost, assistant, writer: writerConnection = null }: { initial: RichProjectResponse;
+export function RichEditor({ initial, acknowledge, onStatus, ref, onHistoryNavigation, onAssistantFence, onComparisonOpen, portalHost, assistant, paneOrder = "layout-first", writer: writerConnection = null }: { initial: RichProjectResponse;
   acknowledge: (response: RichProjectResponse) => void; onStatus: (status: string) => void; ref: Ref<RichEditorHandle>;
-  onComparisonOpen?: () => void; onHistoryNavigation?: () => void; onAssistantFence?: (saved: boolean) => void; portalHost?: HTMLElement; assistant?: ReactNode; writer?: AttachedWriter | null }) {
+  onComparisonOpen?: () => void; onHistoryNavigation?: () => void; onAssistantFence?: (saved: boolean) => void; portalHost?: HTMLElement; assistant?: ReactNode; writer?: AttachedWriter | null; paneOrder?: PaneOrder }) {
   const canonicalProject = initial.workspace.project;
   const project = canonicalProject && writerConnection?.local ? { ...canonicalProject,
     document: writerConnection.local.payload.document, facts: writerConnection.local.payload.facts } : canonicalProject;
@@ -210,7 +211,7 @@ export function RichEditor({ initial, acknowledge, onStatus, ref, onHistoryNavig
     fragments: new Map<string, string>(), projectionError: null as string | null,
     current: new Map<string, CellValue>(), values: new Map<string, Stored>(), original: new Map<string, RichBlock>(),
     undo: () => {}, redo: () => {}, complete: () => {}, panel: async (_command: PanelCommand): Promise<void> => {}, rewrite: async (_instruction: string): Promise<void> => {},
-    previewRewrite: (_id: string): RewritePreview | null => null, applyRewrite: async (_id: string): Promise<void> => {},
+    previewRewrite: (_id: string): RewritePreview | null => null, editRewrite: (_id: string, _text: string): void => {}, applyRewrite: async (_id: string): Promise<void> => {},
     cancelRewrite: async (_id: string): Promise<void> => {}, retry: async (_id: string): Promise<void> => {}, resolve: async (_id: string): Promise<void> => {}, timer: null as ReturnType<typeof setTimeout> | null }), []);
   const assets = useMemo(() => ({ upload: async (_file: File, _block?: string, _after?: string): Promise<void> => {}, cancel: (_block: string) => {},
     paste: (_event: ClipboardEvent | DragEvent): boolean => false, command: (_id: string, _command: string, _target?: string) => {} }), []);
@@ -261,7 +262,7 @@ export function RichEditor({ initial, acknowledge, onStatus, ref, onHistoryNavig
       },
     } },
   })] }), [bridge, assets, presentation]);
-  const editor = useCreateBlockNote({ schema, disableExtensions: ["history", "code-block-keyboard-shortcuts", "check-list-item-shortcuts", "toggle-list-item-shortcuts"], extensions: [extension],
+  const editor = useCreateBlockNote({ schema, disableExtensions: ["history", "sideMenu", "code-block-keyboard-shortcuts", "check-list-item-shortcuts", "toggle-list-item-shortcuts"], extensions: [extension],
     pasteHandler: ({ event, defaultPasteHandler }) => assets.paste(event) || defaultPasteHandler(),
     tables: { splitCells: true, cellBackgroundColor: true, cellTextColor: true, headers: true }, links: {
     onClick: event => {
@@ -636,6 +637,7 @@ export function RichEditor({ initial, acknowledge, onStatus, ref, onHistoryNavig
     };
     bridge.previewRewrite = id => sync.previewRewrite(id);
     bridge.applyRewrite = id => { available(); return sync.applyRewrite(id); };
+    bridge.editRewrite = (id, text) => sync.editRewrite(id, text);
     bridge.cancelRewrite = id => sync.cancelRewrite(id);
     bridge.resolve = id => { available(); return sync.resolve(id); };
     bridge.timeline = async () => { await queue.flush(); return readTimeline(initial.workspace.projectId); };
@@ -1008,7 +1010,7 @@ export function RichEditor({ initial, acknowledge, onStatus, ref, onHistoryNavig
   } }}><ImageActions.Provider value={{ source: asset => imageSource(initial.workspace.projectId, asset), upload: assets.upload, cancel: assets.cancel }}>
     <><RewritePanel open={rewriteOpen} close={() => setRewriteOpen(false)} instruction={instruction} change={setInstruction}
       submit={submitRewrite} busy={rewriting} source={rewriteSource} error={rewriteError}
-      preview={rewritePreview} apply={applyRewrite}
+      preview={rewritePreview} apply={applyRewrite} editPreview={text => { if (rewritePreview) bridge.editRewrite(rewritePreview.actionId, text); }}
       anchor={rewriteAnchor} focusInstruction={rewriteFocus}
       activity={rewriteActivities.find(activity => activity.actionId === rewriteAction.current) ?? null}
       cancel={id => { void bridge.cancelRewrite(id); }} />
@@ -1037,7 +1039,7 @@ export function RichEditor({ initial, acknowledge, onStatus, ref, onHistoryNavig
       {imageUploads > 0 && <OperationStatus label="Загружаем изображение" detail={imageUploads > 1 ? `Файлов в работе: ${imageUploads}` : "Проверяем файл и добавляем его в документ."} timed />}
       </div>
     </aside>
-    <ComparisonWorkspace view={workspaceView} original={sourceVisited && <SourceDialog projectId={initial.workspace.projectId} sources={project.sources}
+    <ComparisonWorkspace view={workspaceView} order={paneOrder} original={sourceVisited && <SourceDialog projectId={initial.workspace.projectId} sources={project.sources}
       expanded={workspaceView === "original"} toggle={() => changeWorkspaceView(workspaceView === "original" ? "compare" : "original")}
       close={() => { changeWorkspaceView("layout"); requestAnimationFrame(() => editor.focus()); }} />} layout={
     <div className="document-workspace">

@@ -11,6 +11,12 @@
 .comparison-workspace { display: grid; flex: 1; min-width: 0; min-height: 0; overflow: hidden; }
 .comparison-workspace[data-view="compare"] { min-width: 460px; }
 .workspace-pane { display: flex; min-width: 0; min-height: 0; overflow: hidden; }
+.comparison-workspace[data-view="compare"] > .workspace-pane { grid-row: 1; }
+.comparison-workspace[data-view="compare"] > .layout-pane { grid-column: 1; }
+.comparison-workspace[data-view="compare"] > .original-pane { grid-column: 3; }
+.comparison-workspace[data-view="compare"] > .workspace-divider { grid-row: 1; grid-column: 2; }
+.comparison-workspace[data-view="compare"][data-order="original-first"] > .layout-pane { grid-column: 3; }
+.comparison-workspace[data-view="compare"][data-order="original-first"] > .original-pane { grid-column: 1; }
 .workspace-pane[hidden], .workspace-divider[hidden] { display: none; }
 .workspace-divider { position: relative; background: var(--desk); border-inline: 1px solid var(--line); cursor: col-resize; touch-action: none; }
 .workspace-divider::after { content: ""; position: absolute; width: 3px; height: 46px; top: calc(50% - 23px); left: 3.5px; border-radius: 3px; background: var(--muted); opacity: .6; }

@@ -4,7 +4,7 @@ import type { RichSelection } from "../contracts/generated/rich_selection";
 export type RewriteStage = "saving" | "queued" | "starting" | "running" | "applying" | "cancelling"
   | "preview" | "saved" | "no_change" | "cancelled" | "failed" | "review";
 export type RewriteActivity = { actionId: string; stage: RewriteStage; startedAt: number; finishedAt: number | null; detail: string | null };
-export type RewritePreview = { actionId: string; source: string; text: string; instruction: string; selection: RichSelection };
+export type RewritePreview = { actionId: string; source: string; text: string; instruction: string; selection: RichSelection; applied?: boolean };
 
 export function rewriteActive(stage: RewriteStage): boolean {
   return ["saving", "queued", "starting", "running", "applying", "cancelling"].includes(stage);
