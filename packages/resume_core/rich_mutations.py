@@ -4,11 +4,15 @@ import hashlib
 import uuid
 
 from .models.rich_document import FactFieldSpan, Hyperlink, ImageBlock, TableBlock
+from .models.template_document import BoundLink, ManualScopeSpan
 from .models.rich_mutations import MoveBlock, PutBlock, PutRecord, RemoveBlock, RemoveRecord, ReplaceInlineRange
 from .models.rich_workspace import RichMutationReplay, WorkspaceV6
 from .rich_fact_mutations import apply_record_mutations
 from .rich_dependencies import dependencies_current
 from .rich_fields import synchronize_binding_revisions
+from .models.template_mutations import RestoreAuthoredBlockPatch, TemplateMutationV1
+from .template_mutations import DOMAIN_STEPS, apply_fact_steps, apply_issue_steps, check_history, check_tree_targets
+from .template_preparation_ids import allocate_id
 
 
 class RichMutationFailure(Exception):
@@ -44,7 +48,7 @@ def parent_items(document, identifier):
 
 
 def inline_text(span):
-    return "".join(child.text for child in span.content) if isinstance(span, Hyperlink) else span.text
+    return "".join(child.text for child in span.content) if isinstance(span, (Hyperlink,BoundLink)) else span.text
 
 
 def utf16_slice(text, start, end):
@@ -54,20 +58,31 @@ def utf16_slice(text, start, end):
         raise RichMutationFailure("RICH_RANGE_INVALID") from None
 
 
-def cut_inline(content, start, end):
-    result, cursor = [], 0
-    for span in content:
+def cut_inline(content, start, end, *, id_factory=None, allocation_path=(), empty_end=False, _origin=0):
+    result, cursor = [], _origin
+    for index, span in enumerate(content):
         length = len(inline_text(span).encode("utf-16-le")) // 2
         lo, hi = max(0, start - cursor), min(length, end - cursor)
-        if hi > lo:
+        empty_selected = start <= cursor < end or empty_end and cursor == end
+        if isinstance(span, (Hyperlink, BoundLink)):
             kept = span.model_copy(deep=True)
-            if isinstance(kept, Hyperlink):
-                kept.content = cut_inline(kept.content, lo, hi)
-            else:
-                kept.text = utf16_slice(kept.text, lo, hi)
-                if isinstance(kept, FactFieldSpan) and (lo != 0 or hi != length):
-                    kept.binding_root_id = kept.binding_root_id or kept.binding_id
-                    kept.binding_id = "binding-" + uuid.uuid4().hex
+            kept.content = cut_inline(kept.content, start, end, id_factory=id_factory,
+                allocation_path=(*allocation_path, index, 'content'), empty_end=empty_end, _origin=cursor)
+            if kept.content or length == 0 and empty_selected:
+                result.append(kept)
+        elif hi > lo or length == 0 and empty_selected:
+            kept = span.model_copy(deep=True)
+            kept.text = utf16_slice(kept.text, lo, hi) if length else ''
+            if isinstance(kept, FactFieldSpan) and (lo != 0 or hi != length):
+                kept.binding_root_id = kept.binding_root_id or kept.binding_id
+                kept.binding_id = allocate_id(id_factory, 'binding',
+                    ['fragment', span.binding_id, lo, hi, list(allocation_path), index]) if id_factory is not None else (
+                        "binding-" + uuid.uuid4().hex)
+            elif isinstance(kept, ManualScopeSpan) and (lo != 0 or hi != length):
+                if id_factory is None:
+                    raise RichMutationFailure('RICH_RANGE_INVALID')
+                kept.fragment_id = allocate_id(id_factory, 'manual-fragment',
+                    ['fragment', span.fragment_id, lo, hi, list(allocation_path), index])
             result.append(kept)
         cursor += length
     return result
@@ -77,7 +92,7 @@ def mutation_sha256(request):
     return hashlib.sha256(request.model_dump_json(by_alias=True).encode()).hexdigest()
 
 
-def apply_rich_mutation(workspace: WorkspaceV6, request):
+def apply_rich_mutation(workspace: WorkspaceV6, request, *, history_authorization=None):
     if request.project_id != workspace.project_id or workspace.project is None:
         raise RichMutationFailure("RICH_PROJECT_MISMATCH")
     checksum = mutation_sha256(request)
@@ -86,12 +101,32 @@ def apply_rich_mutation(workspace: WorkspaceV6, request):
         if replay.request_sha256 != checksum:
             raise RichMutationFailure("MUTATION_ID_REUSED")
         return workspace.model_copy(deep=True), True
+    template = workspace.schema_version == 7
+    replay_authorized = False
+    if template and not isinstance(request, TemplateMutationV1):
+        raise RichMutationFailure('RICH_PATCH_INVALID')
+    if template:
+        try:
+            check_tree_targets(request.steps)
+            from .template_ranges import validate_flank_ids
+            validate_flank_ids(workspace, request)
+            from .template_scope_displays import guard_scope_displays
+            guard_scope_displays(workspace.project, request)
+        except ValueError:
+            raise RichMutationFailure('RICH_PATCH_INVALID') from None
+    if isinstance(request, TemplateMutationV1):
+        if not template:
+            raise RichMutationFailure('RICH_PROJECT_MISMATCH')
+        try:
+            replay_authorized = check_history(workspace, request, history_authorization)
+        except ValueError:
+            raise RichMutationFailure('STALE_MUTATION') from None
     result = workspace.model_copy(deep=True)
     project, document = result.project, result.project.document
     facts = {record.id: record for record in project.facts.records}
     blocks = {block.id: block for block in document.blocks()}
     for step in request.steps:
-        if isinstance(step, (PutRecord, RemoveRecord)):
+        if isinstance(step, DOMAIN_STEPS):
             continue
         identifier = step.block.id if isinstance(step, PutBlock) else step.block_id
         original = blocks.get(identifier)
@@ -101,16 +136,32 @@ def apply_rich_mutation(workspace: WorkspaceV6, request):
         raise RichMutationFailure("STALE_MUTATION")
     record_steps = [step for step in request.steps if isinstance(step, (PutRecord, RemoveRecord))]
     try:
-        project.facts = apply_record_mutations(project.facts, record_steps, request.action_id).facts
+        project.facts = apply_fact_steps(project.facts, request, replay_authorized) if template else (
+            apply_record_mutations(project.facts, record_steps, request.action_id).facts)
     except ValueError:
         raise RichMutationFailure("STALE_MUTATION") from None
     for step in request.steps:
-        if isinstance(step, (PutRecord, RemoveRecord)):
+        if isinstance(step, DOMAIN_STEPS):
             continue
         identifier = step.block.id if isinstance(step, PutBlock) else step.block_id
         found = locate(document, identifier)
         old = found[0][found[1]] if found else None
-        if isinstance(step, (PutBlock, MoveBlock)):
+        if isinstance(step, RestoreAuthoredBlockPatch):
+            if old is None or not replay_authorized:
+                raise RichMutationFailure('STALE_MUTATION')
+            from pydantic import TypeAdapter
+            from .models.template_document import TemplateBlock
+            from .template_block_patches import restore_payload
+            try:
+                payload = restore_payload(old, step.before_semantic_hash, step.after_semantic_hash, step.patch)
+                block = TypeAdapter(TemplateBlock).validate_python({**payload, 'revision': old.revision, 'children': old.children})
+            except ValueError:
+                raise RichMutationFailure('STALE_MUTATION') from None
+            block.revision = max(document.revision, old.revision) + 1
+            update_cell_revisions(block, old, document.revision)
+            found[0][found[1]] = block
+            found[2].revision += 1
+        elif isinstance(step, (PutBlock, MoveBlock)):
             items, parent = parent_items(document, step.parent_id)
             if isinstance(step, MoveBlock) and (old is None or parent.id in {block.id for block in subtree(old)}):
                 raise RichMutationFailure("RICH_MOVE_INVALID")
@@ -160,17 +211,48 @@ def apply_rich_mutation(workspace: WorkspaceV6, request):
             length = sum(len(inline_text(span).encode("utf-16-le")) // 2 for span in content)
             if step.end > length:
                 raise RichMutationFailure("RICH_RANGE_INVALID")
-            setattr(target, key, cut_inline(content, 0, step.start) + step.content + cut_inline(content, step.end, length))
+            if template and step.flank_bindings is not None:
+                from .template_ranges import FlankResolver, splice_inline
+                try:
+                    resolver = FlankResolver(step.flank_bindings)
+                    changed = splice_inline(content, step.start, step.end, step.content, resolver)
+                    resolver.finish()
+                except ValueError:
+                    raise RichMutationFailure('RICH_RANGE_INVALID') from None
+            else:
+                changed = cut_inline(content, 0, step.start) + step.content + cut_inline(content, step.end, length, empty_end=True)
+            setattr(target, key, changed)
             if hasattr(target, "revision"):
                 target.revision = max(target.revision, document.revision) + 1
             old.revision = max(old.revision, document.revision) + 1
+    if template:
+        from .template_scope_displays import apply_scope_displays, guard_retained_scope_ownership
+        try:
+            apply_scope_displays(project, request, replay=replay_authorized)
+            guard_retained_scope_ownership(workspace.project, project, request, replay=replay_authorized)
+        except ValueError:
+            raise RichMutationFailure('STALE_MUTATION') from None
     result.project_revision += 1
     result.document_revision += 1
     project.revision, document.revision = result.project_revision, result.document_revision
     synchronize_binding_revisions(project)
+    if isinstance(request, TemplateMutationV1):
+        try:
+            from .template_anchors import apply_anchor_steps
+            apply_anchor_steps(project, request, workspace.project)
+            apply_issue_steps(project, request, replay_authorized, before=workspace.project)
+            from .template_synchronization import apply_sync_steps
+            apply_sync_steps(workspace, result, request, replay=replay_authorized)
+        except ValueError:
+            raise RichMutationFailure('STALE_MUTATION') from None
     result.mutation_replay.append(RichMutationReplay(clientMutationId=request.client_mutation_id,
         requestSha256=checksum, resultingRevision=result.project_revision))
-    return WorkspaceV6.model_validate(result.model_dump(by_alias=True)), False
+    try:
+        return type(workspace).model_validate(result.model_dump(by_alias=True)), False
+    except ValueError:
+        if not template:
+            raise
+        raise RichMutationFailure('RICH_PATCH_INVALID') from None
 
 
 def subtree(block):

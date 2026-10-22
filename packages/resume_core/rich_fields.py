@@ -5,10 +5,14 @@ from __future__ import annotations
 from dataclasses import dataclass
 import json
 import re
+from typing import Literal
 
 from .dates import partial_date
 from .models.rich_document import FactFieldSpan, ImageBlock, TableBlock
 from .models.rich_facts import WorkingField
+from .models.template_facts import ExtensionRecord
+from .models.template_document import BoundLink, FieldRef
+from .template_facts import extension_cell, set_human_cell
 from .technologies import resolve_technology
 
 
@@ -17,6 +21,7 @@ def field_key(record_id, key):
 
 
 def working_field(record, key):
+    if isinstance(record, ExtensionRecord): return extension_cell(record,key)
     if key.startswith("period:"):
         rest = key.removeprefix("period:")
         identifier, _, name = rest.rpartition(":")
@@ -26,6 +31,21 @@ def working_field(record, key):
         return getattr(period, name, None)
     value = getattr(record, {"canonicalId": "canonical_id"}.get(key, key), None)
     return value if isinstance(value, WorkingField) else None
+
+
+def builtin_cell_values(records):
+    result = {}
+    for record in records:
+        for key in type(record).model_fields:
+            value = getattr(record, key)
+            if isinstance(value, WorkingField):
+                key = 'canonicalId' if key == 'canonical_id' else key
+                result[field_key(record.id, key)] = (record, key, value)
+        for period in getattr(record, 'periods', []):
+            for name in ['start', 'end', 'present']:
+                key = 'period:' + period.id + ':' + name
+                result[field_key(record.id, key)] = (record, key, getattr(period, name))
+    return result
 
 
 def inline_groups(block):
@@ -54,8 +74,9 @@ def occurrences(document):
     for block in document.blocks():
         for container, content in inline_groups(block):
             previous, inherited = None, None
-            for span in content:
-                if not isinstance(span, FactFieldSpan):
+            spans=[child for span in content for child in (span.content if isinstance(span,BoundLink) else [span])]
+            for span in spans:
+                if not isinstance(span, FactFieldSpan) or not getattr(span,"complete",True):
                     previous, inherited = None, None
                     continue
                 pair = (span.record_id, span.field_key)
@@ -72,6 +93,28 @@ def occurrences(document):
     return groups
 
 
+@dataclass(frozen=True)
+class BoundLinkField:
+    block_id: str
+    role: Literal['label', 'url']
+    reference: FieldRef
+    text: str
+
+
+def bound_link_fields(document):
+    result = []
+    for block in document.blocks():
+        for _, content in inline_groups(block):
+            for span in content:
+                if isinstance(span, BoundLink):
+                    if span.label_binding is not None:
+                        result.append(BoundLinkField(block.id, 'label', span.label_binding,
+                            ''.join(child.text for child in span.content)))
+                    if span.url_binding is not None:
+                        result.append(BoundLinkField(block.id, 'url', span.url_binding, span.href))
+    return result
+
+
 def parse_date(text):
     value = text.strip()
     if not value:
@@ -86,6 +129,7 @@ def parse_date(text):
 
 
 def set_text(record, key, text):
+    if isinstance(record, ExtensionRecord): return set_human_cell(record,key,text)
     target = working_field(record, key)
     if target is None:
         raise ValueError("WORKING_FIELD_MISSING")
@@ -111,10 +155,14 @@ def set_text(record, key, text):
 
 
 def synchronize_binding_revisions(project):
-    records = {record.id: record for record in project.facts.records}
+    records = records_by_id(project.facts)
     for group in occurrences(project.document).values():
         record = records.get(group.record_id)
         field = working_field(record, group.key) if record is not None else None
         if field is not None and group.text == field.raw_text:
             for span in group.spans:
                 span.synced_fact_revision = field.revision
+
+
+def records_by_id(facts):
+    return {record.id:record for record in [*facts.records,*[r for r in getattr(facts,"extensions",[]) if r.active]]}

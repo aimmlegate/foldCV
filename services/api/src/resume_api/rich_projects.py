@@ -13,6 +13,7 @@ from packages.resume_core.gui_archive_zip import ArchiveFailure
 from packages.resume_core.gui_normalization import canonical_source
 from packages.resume_core.models.contracts import Source
 from packages.resume_core.models.rich_workspace import RichOperation, RichRenderSnapshot, WorkspaceV6
+from packages.resume_core.models.template_workspace import WorkspaceV7
 from packages.resume_core.project_store import ProjectStoreFailure
 from packages.resume_core.project_catalog import ProjectCatalog
 from packages.resume_core.rich_api import RichGenerationState, RichProjectResponse
@@ -33,9 +34,10 @@ from .gui_rendering import RichDocxRenderer
 from .lifecycle import OperationFiles, SpikeError
 from .rich_assets import RichAssets
 from .rich_synchronization import RichSynchronization
+from .template_exports import TemplateExports
 
 
-class RichProjectService(RichSynchronization, RichAssets, GuiProjectService):
+class RichProjectService(TemplateExports, RichSynchronization, RichAssets, GuiProjectService):
     def __init__(self, temp_root, rules, provider_factory, *, import_runtime=None, import_provider_factory=None, **options):
         options.setdefault("storage", RichProjectStore(rules.root))
         options.setdefault("renderer", RichDocxRenderer())
@@ -54,8 +56,8 @@ class RichProjectService(RichSynchronization, RichAssets, GuiProjectService):
     def require_agent_writable(self, identifier):
         if identifier in self.agent_recovery_fences or identifier in self.catalog_recovery_fences:
             raise ProjectFailure("AGENT_OUTCOME_UNKNOWN", 409)
-        jobs = getattr(self, "background_jobs", None)
-        if jobs is not None and jobs.enabled and (jobs.store.projects / identifier).exists():
+        jobs = self.canonical_jobs(identifier)
+        if jobs is not None and (jobs.store.projects / identifier).exists():
             try:
                 state = jobs.store.load(identifier)
                 jobs.publisher._writable(state)
@@ -82,8 +84,8 @@ class RichProjectService(RichSynchronization, RichAssets, GuiProjectService):
             self.loaded = True
             for identifier, (workspace, originals, artifacts, images) in loaded.items():
                 self.workspaces[identifier] = workspace
-                jobs = getattr(self, "background_jobs", None)
-                baseline = self.storage.read_committed(identifier)[0] if jobs is not None and jobs.enabled else workspace.model_copy(deep=True)
+                jobs = self.canonical_jobs(identifier)
+                baseline = self.storage.read_committed(identifier)[0] if jobs is not None else workspace.model_copy(deep=True)
                 self.saved_baselines[identifier] = baseline
                 self.originals.update(originals); self.artifacts.update(artifacts); self.images.update(images)
                 bound = set()
@@ -106,12 +108,14 @@ class RichProjectService(RichSynchronization, RichAssets, GuiProjectService):
                     self.persist(identifier)
 
     def read_memory(self, identifier):
-        return WorkspaceV6.model_validate(self.workspaces[identifier].model_dump(by_alias=True))
+        value = self.workspaces[identifier]
+        model = WorkspaceV7 if value.schema_version == 7 else WorkspaceV6
+        return model.model_validate(value.model_dump(by_alias=True))
 
     def read(self, identifier):
         super().read(identifier)
-        jobs = getattr(self, "background_jobs", None)
-        if jobs is not None and jobs.enabled:
+        jobs = self.canonical_jobs(identifier)
+        if jobs is not None:
             with self.state_lock:
                 try:
                     if (jobs.store.projects / identifier).exists():
@@ -140,9 +144,9 @@ class RichProjectService(RichSynchronization, RichAssets, GuiProjectService):
                 self.save_errors[identifier] = "PROJECT_DELETED"; return "failed"
             try:
                 snapshot = self.read_memory(identifier)
-                jobs = getattr(self, "background_jobs", None)
+                jobs = self.canonical_jobs(identifier)
                 base = self.saved_baselines.get(identifier)
-                if jobs is not None and jobs.enabled and base is not None:
+                if jobs is not None and base is not None:
                     jobs.store.open(identifier)
                     current, _duplicate = jobs.publisher.snapshot(identifier, digest_bytes(base), snapshot,
                         command_identity("metadata"), originals=self.originals, artifacts=self.artifacts,
@@ -182,11 +186,21 @@ class RichProjectService(RichSynchronization, RichAssets, GuiProjectService):
                 self.save_errors.pop(identifier, None)
 
     def response(self, identifier):
+        return self.response_for_workspace(identifier, self.read(identifier))
+
+    def response_for_workspace(self, identifier, workspace, *, preview=False):
         from packages.resume_core.rich_presentation import presentation
-        workspace = self.read(identifier)
         saved = self.saved_revisions.get(identifier)
         jobs = getattr(self, "background_jobs", None)
         generation = jobs.fixed.generation(identifier) if jobs is not None and jobs.enabled else None
+        if workspace.schema_version == 7:
+            from packages.resume_core.template_api import TemplateProjectResponseV1
+            from packages.resume_core.templates.presentation import project_presentation, snapshot_identity
+            return TemplateProjectResponseV1(schemaVersion=1, workspace=workspace, snapshot=snapshot_identity(workspace),
+                presentation=project_presentation(workspace), durability='pending' if preview else self.durability(identifier),
+                savedProjectRevision=saved[0] if saved else None, savedDocumentRevision=saved[1] if saved else None,
+                saveError=self.save_errors.get(identifier), generation=generation or self.generations.get(identifier),
+                identity=resume_identity(workspace))
         return RichProjectResponse(workspace=workspace, durability=self.durability(identifier),
             savedProjectRevision=saved[0] if saved else None, savedDocumentRevision=saved[1] if saved else None,
             saveError=self.save_errors.get(identifier), generation=generation or self.generations.get(identifier),
@@ -417,6 +431,8 @@ class RichProjectService(RichSynchronization, RichAssets, GuiProjectService):
             return self.response(identifier)
 
     async def export(self, identifier, generation_id=None):
+        if self.read(identifier).schema_version != 6:
+            raise ProjectFailure('IMPORT_PROTOCOL_MISMATCH', 409)
         self.require_agent_writable(identifier)
         jobs = getattr(self, "background_jobs", None)
         if jobs is not None and jobs.enabled:
@@ -485,6 +501,7 @@ class RichProjectService(RichSynchronization, RichAssets, GuiProjectService):
                 self.tasks.pop(key, None); self.cancels.pop(key, None)
 
     async def shutdown(self, *, close_agent=True):
+        self.template_export_stopping = True
         agent = getattr(self, "agent", None)
         if agent is not None:
             if close_agent:
@@ -494,6 +511,7 @@ class RichProjectService(RichSynchronization, RichAssets, GuiProjectService):
         for session in self.image_sessions.values():
             session.closed = True
         await super().shutdown()
+        await self.drain_template_exports()
         if self.image_tasks:
             await asyncio.gather(*list(self.image_tasks), return_exceptions=True)
 
@@ -592,6 +610,7 @@ class RichProjectService(RichSynchronization, RichAssets, GuiProjectService):
 
     async def cancel(self, identifier, generation_id, **_options):
         key = (identifier, generation_id)
+        template_export = key in getattr(self, 'template_export_keys', set())
         task = self.tasks.get(key)
         if task is None or task.done():
             return
@@ -606,5 +625,7 @@ class RichProjectService(RichSynchronization, RichAssets, GuiProjectService):
             self.cleanup_error(SpikeError("PROCESS_CLEANUP_FAILED"))
             raise ProjectFailure("PROCESS_CLEANUP_FAILED", 503) from None
         except (ProjectFailure, RenderFailure, AdmissionCancelled) as error:
-            if getattr(error, "code", None) == "PROCESS_CLEANUP_FAILED" or not cancel.is_set():
+            code = getattr(error, 'code', None)
+            if code == "PROCESS_CLEANUP_FAILED" or not cancel.is_set() or template_export and code in {
+                    'OUTCOME_UNKNOWN', 'PROJECT_SAVE_FAILED', 'SAVE_FAILED', 'CLEANUP_FAILED'}:
                 raise

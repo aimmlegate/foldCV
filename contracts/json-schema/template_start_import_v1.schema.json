@@ -1,0 +1,252 @@
+{
+  "$defs": {
+    "ImportCapture": {
+      "additionalProperties": false,
+      "properties": {
+        "allowTextRewrite": {
+          "title": "Allowtextrewrite",
+          "type": "boolean"
+        },
+        "authorityHash": {
+          "pattern": "^[a-f0-9]{64}$",
+          "title": "Authorityhash",
+          "type": "string"
+        },
+        "dependencyHash": {
+          "pattern": "^[a-f0-9]{64}$",
+          "title": "Dependencyhash",
+          "type": "string"
+        },
+        "factRevisions": {
+          "additionalProperties": {
+            "minimum": 1,
+            "type": "integer"
+          },
+          "title": "Factrevisions",
+          "type": "object"
+        },
+        "fallback": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ModelCapture"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "formattingAsOf": {
+          "$ref": "#/$defs/PartialDate"
+        },
+        "packageHash": {
+          "pattern": "^[a-f0-9]{64}$",
+          "title": "Packagehash",
+          "type": "string"
+        },
+        "policy": {
+          "$ref": "#/$defs/RuntimePolicy"
+        },
+        "primary": {
+          "$ref": "#/$defs/ModelCapture"
+        },
+        "sourceHashes": {
+          "additionalProperties": {
+            "pattern": "^[a-f0-9]{64}$",
+            "type": "string"
+          },
+          "title": "Sourcehashes",
+          "type": "object"
+        }
+      },
+      "required": [
+        "packageHash",
+        "sourceHashes",
+        "factRevisions",
+        "authorityHash",
+        "dependencyHash",
+        "allowTextRewrite",
+        "primary",
+        "fallback",
+        "formattingAsOf",
+        "policy"
+      ],
+      "title": "ImportCapture",
+      "type": "object"
+    },
+    "ModelCapture": {
+      "additionalProperties": false,
+      "properties": {
+        "adapter": {
+          "minLength": 1,
+          "title": "Adapter",
+          "type": "string"
+        },
+        "capabilityProfile": {
+          "minLength": 1,
+          "title": "Capabilityprofile",
+          "type": "string"
+        },
+        "capabilityVersion": {
+          "minLength": 1,
+          "title": "Capabilityversion",
+          "type": "string"
+        },
+        "configurationHash": {
+          "pattern": "^[a-f0-9]{64}$",
+          "title": "Configurationhash",
+          "type": "string"
+        },
+        "effort": {
+          "minLength": 1,
+          "title": "Effort",
+          "type": "string"
+        },
+        "model": {
+          "minLength": 1,
+          "title": "Model",
+          "type": "string"
+        }
+      },
+      "required": [
+        "adapter",
+        "model",
+        "effort",
+        "capabilityProfile",
+        "capabilityVersion",
+        "configurationHash"
+      ],
+      "title": "ModelCapture",
+      "type": "object"
+    },
+    "PartialDate": {
+      "additionalProperties": false,
+      "properties": {
+        "day": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Day"
+        },
+        "month": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Month"
+        },
+        "precision": {
+          "enum": [
+            "year",
+            "month",
+            "day"
+          ],
+          "title": "Precision",
+          "type": "string"
+        },
+        "year": {
+          "maximum": 9999,
+          "minimum": 1,
+          "title": "Year",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "precision",
+        "year",
+        "month",
+        "day"
+      ],
+      "title": "PartialDate",
+      "type": "object"
+    },
+    "RuntimePolicy": {
+      "additionalProperties": false,
+      "properties": {
+        "callCap": {
+          "exclusiveMinimum": 0,
+          "title": "Callcap",
+          "type": "integer"
+        },
+        "cleanupSeconds": {
+          "const": 5,
+          "title": "Cleanupseconds",
+          "type": "integer"
+        },
+        "concurrency": {
+          "const": 1,
+          "title": "Concurrency",
+          "type": "integer"
+        },
+        "fallbackRepairs": {
+          "const": 1,
+          "title": "Fallbackrepairs",
+          "type": "integer"
+        },
+        "finalizationSeconds": {
+          "const": 30,
+          "title": "Finalizationseconds",
+          "type": "integer"
+        },
+        "primaryRepairs": {
+          "const": 1,
+          "title": "Primaryrepairs",
+          "type": "integer"
+        },
+        "processingSeconds": {
+          "const": 300,
+          "title": "Processingseconds",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "callCap",
+        "concurrency",
+        "processingSeconds",
+        "cleanupSeconds",
+        "finalizationSeconds",
+        "primaryRepairs",
+        "fallbackRepairs"
+      ],
+      "title": "RuntimePolicy",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "capture": {
+      "$ref": "#/$defs/ImportCapture"
+    },
+    "clientRequestId": {
+      "minLength": 1,
+      "title": "Clientrequestid",
+      "type": "string"
+    },
+    "kind": {
+      "const": "start_new_import",
+      "title": "Kind",
+      "type": "string"
+    },
+    "protocol": {
+      "const": "template_import_v1",
+      "title": "Protocol",
+      "type": "string"
+    }
+  },
+  "required": [
+    "kind",
+    "protocol",
+    "clientRequestId",
+    "capture"
+  ],
+  "title": "StartTemplateImportV1",
+  "type": "object"
+}

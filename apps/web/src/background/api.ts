@@ -1,9 +1,17 @@
 import { validateContract } from "../contracts/validate";
 import { validateBackgroundWire } from "../contracts/background-validate";
-import { request, rootRequest, RichApiFailure } from "../rich/api";
+import { request, requestWire, rootRequest, RichApiFailure } from "../rich/api";
+import type { JsonWireNode } from "../contracts/lossless-json";
+import type { WriterPrepareEditV2 } from "../contracts/generated/background_writer_prepare_edit_v2";
+import { prepareTemplateTransport, saveTemplateTransport, type BoundTemplatePreparation } from "../contracts/template-transport";
+import type { PreparedSaveOpening } from "../contracts/template-save";
 import type { JobSummaryV1 } from "../contracts/generated/background_summary_v1";
 import type { JobIndexV1 } from "../contracts/generated/background_index_v1";
 import type { WriterViewV1 } from "../contracts/generated/background_writer_view_v1";
+import type { WriterViewV2 } from "../contracts/generated/background_writer_view_v2";
+import type { WriterMutationV2 } from "../contracts/generated/background_writer_mutation_v2";
+import type { WriterLocalHistoryCommandV2 } from "../contracts/generated/background_writer_local_history_command_v2";
+import { templateWriterReply } from "../contracts/template-validate";
 import type { WriterOpenV1 } from "../contracts/generated/background_writer_open_v1";
 import type { WriterProofV1 } from "../contracts/generated/background_writer_proof_v1";
 import type { WriterAdvanceV1 } from "../contracts/generated/background_writer_advance_v1";
@@ -57,9 +65,26 @@ export async function backgroundReply<K extends keyof Replies>(kind: K, value: u
 
 export class WriterApi {
   readonly prefix: string;
-  constructor(readonly project: string, private readonly transport: BackgroundRequest = request) { this.prefix = `/${encodeURIComponent(project)}/writer`; }
+  constructor(readonly project: string, private readonly transport: BackgroundRequest = request,
+    private readonly wireTransport: (path: string, body: JsonWireNode) => Promise<unknown> = requestWire) { this.prefix = `/${encodeURIComponent(project)}/writer`; }
   private async call<K extends keyof Replies>(kind: K, path: string, body?: unknown): Promise<Replies[K]> {
     return backgroundReply(kind, await this.transport(this.prefix + path, body === undefined ? "GET" : "POST", body));
+  }
+  private async templateCall(path: string, body?: unknown): Promise<WriterViewV2> {
+    const response = await templateWriterReply(await this.transport(this.prefix + path, body === undefined ? "GET" : "POST", body));
+    if (!response || response.writer.projectId !== this.project) throw new RichApiFailure("INVALID_RESULT");
+    return response;
+  }
+  templateBootstrap(): Promise<WriterViewV2> { return this.templateCall(""); }
+  templateOpen(body: WriterOpenV1): Promise<WriterViewV2> { return this.templateCall("/open", body); }
+  templateRead(body: WriterProofV1): Promise<WriterViewV2> { return this.templateCall("/read", body); }
+  templateSave(body: WriterMutationV2): Promise<WriterViewV2> { return this.templateCall("/save", body); }
+  templateHistory(body: WriterLocalHistoryCommandV2): Promise<WriterViewV2> { return this.templateCall("/history/local", body); }
+  templatePrepareDelta(base: JsonWireNode, body: WriterPrepareEditV2) {
+    return prepareTemplateTransport(this.project, base, body, request => this.transport(this.prefix + "/prepare-delta", "POST", request));
+  }
+  templateSavePrepared(body: JsonWireNode, preparation: BoundTemplatePreparation, opening: PreparedSaveOpening) {
+    return saveTemplateTransport(this.project, body, preparation, opening, request => this.wireTransport(this.prefix + "/save", request));
   }
   bootstrap(): Promise<WriterViewV1> { return this.call("background_writer_view_v1", ""); }
   open(body: WriterOpenV1): Promise<WriterViewV1> { return this.call("background_writer_view_v1", "/open", body); }

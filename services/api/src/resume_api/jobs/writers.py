@@ -2,13 +2,16 @@
 
 import asyncio
 
-from fastapi.responses import JSONResponse
+from ..template_responses import wire_response
 
 from packages.resume_core.background_store import BackgroundFailure
 from packages.resume_core.models.background import (WriterAbandonV1, WriterAdvanceV1, WriterBarrierAckV1,
     WriterBarrierCommandV1, WriterCheckpointV1, WriterDraftCommandV1, WriterDraftReferenceV1, WriterMutationV1,
     WriterOpenV1, WriterProofV1, WriterPublicationV1, WriterPublishV1, WriterHistoryRequestV1, WriterHistoryCommandV1,
     WriterDraftResolveV1)
+from packages.resume_core.models.template_writer import (WriterAdvanceV2, WriterBarrierAckV2, WriterCheckpointV2,
+    WriterDraftResolveV2, WriterMutationV2, WriterLocalHistoryCommandV2, WriterPrepareEditV2,
+    WriterCaptureClipboardV2, WriterReleaseClipboardV2)
 
 
 def mount_writers(app, service):
@@ -33,7 +36,7 @@ def mount_writers(app, service):
             result = await asyncio.to_thread(function, project, *([] if payload is None else [payload]))
         if method in {"detach", "abandon", "restore_saved_draft", "discard_draft", "reconcile"}:
             service.wake_publication(project)
-        return JSONResponse(result.model_dump(mode="json", by_alias=True), headers={"Cache-Control": "no-store"})
+        return wire_response(result)
 
     @app.get(prefix)
     async def bootstrap(project_id: str):
@@ -51,7 +54,7 @@ def mount_writers(app, service):
                 service.writers.write(directory, state)
                 return service.writers.view(state, workspace, checksum)
         result = await asyncio.to_thread(read)
-        return JSONResponse(result.model_dump(mode="json", by_alias=True), headers={"Cache-Control": "no-store"})
+        return wire_response(result)
 
     @app.post(prefix + "/open")
     async def open_writer(project_id: str, payload: WriterOpenV1):
@@ -70,19 +73,19 @@ def mount_writers(app, service):
         return await call(project_id, "suspend", payload)
 
     @app.post(prefix + "/flush")
-    async def flush(project_id: str, payload: WriterAdvanceV1):
+    async def flush(project_id: str, payload: WriterAdvanceV1 | WriterAdvanceV2):
         return await call(project_id, "flush", payload)
 
     @app.post(prefix + "/reconcile")
-    async def reconcile(project_id: str, payload: WriterAdvanceV1):
+    async def reconcile(project_id: str, payload: WriterAdvanceV1 | WriterAdvanceV2):
         return await call(project_id, "reconcile", payload)
 
     @app.post(prefix + "/detach")
-    async def detach(project_id: str, payload: WriterAdvanceV1):
+    async def detach(project_id: str, payload: WriterAdvanceV1 | WriterAdvanceV2):
         return await call(project_id, "detach", payload)
 
     @app.post(prefix + "/barrier")
-    async def barrier(project_id: str, payload: WriterBarrierAckV1):
+    async def barrier(project_id: str, payload: WriterBarrierAckV1 | WriterBarrierAckV2):
         return await call(project_id, "barrier", payload)
 
     @app.post(prefix + "/revoke")
@@ -90,7 +93,7 @@ def mount_writers(app, service):
         return await call(project_id, "revoke", payload)
 
     @app.post(prefix + "/checkpoint")
-    async def checkpoint(project_id: str, payload: WriterCheckpointV1):
+    async def checkpoint(project_id: str, payload: WriterCheckpointV1 | WriterCheckpointV2):
         return await call(project_id, "checkpoint", payload)
 
     @app.post(prefix + "/draft/read")
@@ -110,7 +113,7 @@ def mount_writers(app, service):
         return await call(project_id, "abandon", payload)
 
     @app.post(prefix + "/draft/use")
-    async def use_draft(project_id: str, payload: WriterDraftResolveV1):
+    async def use_draft(project_id: str, payload: WriterDraftResolveV1 | WriterDraftResolveV2):
         if not service.enabled:
             raise BackgroundFailure("JOB_DISABLED")
         def commit():
@@ -120,7 +123,7 @@ def mount_writers(app, service):
                 service.publication.adopt(project_id, view.workspace, view.workspace_sha256)
             return view
         result = await asyncio.to_thread(commit)
-        return JSONResponse(result.model_dump(mode="json", by_alias=True), headers={"Cache-Control": "no-store"})
+        return wire_response(result)
 
     @app.post(prefix + "/history/offer")
     async def history_offer(project_id: str, payload: WriterHistoryRequestV1):
@@ -147,20 +150,51 @@ def mount_writers(app, service):
         result = await asyncio.to_thread(commit)
         job = service.store.read(project_id, payload.job_id)
         await service.supervisor._emit(job)
-        return JSONResponse(result.model_dump(mode="json", by_alias=True), headers={"Cache-Control": "no-store"})
+        return wire_response(result)
 
     @app.post(prefix + "/save")
-    async def save(project_id: str, payload: WriterMutationV1):
+    async def save(project_id: str, payload: WriterMutationV1 | WriterMutationV2):
         if not service.enabled:
             raise BackgroundFailure("JOB_DISABLED")
         def commit():
             view = service.writers.save(project_id, payload, originals=service.projects.originals,
                 artifacts=service.projects.artifacts, images=service.projects.images)
             with service.projects.state_lock:
+                current = (service.writers.read_snapshot(project_id, payload.proof)
+                    if isinstance(payload, WriterMutationV2) and payload.response_mode == 'prepared_delta' else view)
+                service.publication.adopt(project_id, current.workspace, current.workspace_sha256)
+            return view
+        result = await asyncio.to_thread(commit)
+        return wire_response(result)
+
+    @app.post(prefix + '/prepare')
+    async def prepare_edit(project_id: str, payload: WriterPrepareEditV2):
+        return await call(project_id, 'prepare_edit', payload)
+
+    @app.post(prefix + '/clipboard/capture')
+    async def capture_clipboard(project_id: str, payload: WriterCaptureClipboardV2):
+        return await call(project_id, 'capture_clipboard', payload)
+
+    @app.post(prefix + '/clipboard/release')
+    async def release_clipboard(project_id: str, payload: WriterReleaseClipboardV2):
+        return await call(project_id, 'release_clipboard', payload)
+
+    @app.post(prefix + '/prepare-delta')
+    async def prepare_edit_delta(project_id: str, payload: WriterPrepareEditV2):
+        return await call(project_id, 'prepare_edit_delta', payload)
+
+    @app.post(prefix + '/history/local')
+    async def local_history(project_id: str, payload: WriterLocalHistoryCommandV2):
+        if not service.enabled:
+            raise BackgroundFailure('JOB_DISABLED')
+        def commit():
+            view = service.writers.local_history_command(project_id, payload, originals=service.projects.originals,
+                artifacts=service.projects.artifacts, images=service.projects.images)
+            with service.projects.state_lock:
                 service.publication.adopt(project_id, view.workspace, view.workspace_sha256)
             return view
         result = await asyncio.to_thread(commit)
-        return JSONResponse(result.model_dump(mode="json", by_alias=True), headers={"Cache-Control": "no-store"})
+        return wire_response(result)
 
     @app.post(prefix + "/publish")
     async def publish(project_id: str, payload: WriterPublishV1):
@@ -173,4 +207,4 @@ def mount_writers(app, service):
         await service.supervisor._emit(job)
         view = await asyncio.to_thread(service.writers.read_snapshot, project_id, payload.proof)
         result = WriterPublicationV1(schemaVersion=1, job=job, view=view)
-        return JSONResponse(result.model_dump(mode="json", by_alias=True), headers={"Cache-Control": "no-store"})
+        return wire_response(result)

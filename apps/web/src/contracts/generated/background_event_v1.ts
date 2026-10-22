@@ -263,7 +263,7 @@ export type Projectid9 = string;
 export type Requestepoch = number;
 export type Requestid = string;
 export type Id10 = string;
-export type Kind2 = "agent_journal" | "rich_sync" | "processing";
+export type Kind2 = "agent_journal" | "rich_sync" | "processing" | "template_import";
 export type Sha256 = string;
 export type Kind3 = "agent" | "processing" | "rewrite" | "reconciliation";
 /**
@@ -275,6 +275,7 @@ export type Configsha256 = string;
 export type Model = string;
 export type Stage1 = "agent" | "assessment" | "extraction" | "rewrite" | "reconciliation";
 export type Payloadsha256 = string;
+export type Protocol = ("fixed_v1" | "agent_import_v1" | "template_import_v1") | null;
 export type Schedulingclass = "background" | "interactive" | "reconciliation";
 export type Schemaversion12 = 1;
 export type Scope = WholeResumeScope | SelectionScope;
@@ -302,6 +303,36 @@ export type Sessionid = string;
 export type Kind7 = "text" | "blocks" | "table_cells";
 export type Textsha256 = string;
 export type Submittedat = string;
+export type Templatecommand = (StartTemplateImportV1 | ResumeTemplateImportV1) | null;
+export type Allowtextrewrite = boolean;
+export type Authorityhash = string;
+export type Dependencyhash = string;
+export type Adapter = string;
+export type Capabilityprofile = string;
+export type Capabilityversion = string;
+export type Configurationhash = string;
+export type Effort = string;
+export type Model1 = string;
+export type Day = number | null;
+export type Month = number | null;
+export type Precision = "year" | "month" | "day";
+export type Year = number;
+export type Packagehash = string;
+export type Callcap = number;
+export type Cleanupseconds = 5;
+export type Concurrency = 1;
+export type Fallbackrepairs = 1;
+export type Finalizationseconds = 30;
+export type Primaryrepairs = 1;
+export type Processingseconds = 300;
+export type Clientrequestid = string;
+export type Kind8 = "start_new_import";
+export type Protocol1 = "template_import_v1";
+export type Authorityhash1 = string;
+export type Authorizationid = string;
+export type Kind9 = "resume_import";
+export type Operationid = string;
+export type Protocol2 = "template_import_v1";
 /**
  * @maxItems 32
  */
@@ -323,6 +354,10 @@ export type Tools = (
   | "save_import"
   | "finish_import"
 )[];
+export type Errorcode = string | null;
+export type Intentid = string | null;
+export type State2 = "pending" | "saved" | "failed_before_replacement" | "outcome_unknown" | "cancelled";
+export type Workspacehash = string | null;
 export type Undoexpired = boolean;
 export type Updatedat = string;
 export type Type7 = "job.snapshot" | "cursor.gap";
@@ -354,6 +389,7 @@ export interface JobSnapshotV1 {
   receipt: CanonicalReceiptV1 | null;
   schemaVersion: Schemaversion10;
   submission: JobSubmissionV1;
+  templateOutcome?: PublicationOutcome | null;
   undoExpired?: Undoexpired;
   updatedAt: Updatedat;
 }
@@ -516,10 +552,12 @@ export interface JobSubmissionV1 {
   kind: Kind3;
   models: Models;
   payloadSha256: Payloadsha256;
+  protocol?: Protocol;
   schedulingClass: Schedulingclass;
   schemaVersion: Schemaversion12;
   scope: Scope;
   submittedAt: Submittedat;
+  templateCommand?: Templatecommand;
   tools: Tools;
 }
 export interface ScopeGuardV1 {
@@ -580,4 +618,64 @@ export interface DependencyStamp {
   id: Id11;
   kind: Kind6;
   revision: Revision;
+}
+export interface StartTemplateImportV1 {
+  capture: ImportCapture;
+  clientRequestId: Clientrequestid;
+  kind: Kind8;
+  protocol: Protocol1;
+}
+export interface ImportCapture {
+  allowTextRewrite: Allowtextrewrite;
+  authorityHash: Authorityhash;
+  dependencyHash: Dependencyhash;
+  factRevisions: Factrevisions;
+  fallback: ModelCapture1 | null;
+  formattingAsOf: PartialDate;
+  packageHash: Packagehash;
+  policy: RuntimePolicy;
+  primary: ModelCapture1;
+  sourceHashes: Sourcehashes;
+}
+export interface Factrevisions {
+  [k: string]: number;
+}
+export interface ModelCapture1 {
+  adapter: Adapter;
+  capabilityProfile: Capabilityprofile;
+  capabilityVersion: Capabilityversion;
+  configurationHash: Configurationhash;
+  effort: Effort;
+  model: Model1;
+}
+export interface PartialDate {
+  day: Day;
+  month: Month;
+  precision: Precision;
+  year: Year;
+}
+export interface RuntimePolicy {
+  callCap: Callcap;
+  cleanupSeconds: Cleanupseconds;
+  concurrency: Concurrency;
+  fallbackRepairs: Fallbackrepairs;
+  finalizationSeconds: Finalizationseconds;
+  primaryRepairs: Primaryrepairs;
+  processingSeconds: Processingseconds;
+}
+export interface Sourcehashes {
+  [k: string]: string;
+}
+export interface ResumeTemplateImportV1 {
+  authorityHash: Authorityhash1;
+  authorizationId: Authorizationid;
+  kind: Kind9;
+  operationId: Operationid;
+  protocol: Protocol2;
+}
+export interface PublicationOutcome {
+  errorCode: Errorcode;
+  intentId: Intentid;
+  state: State2;
+  workspaceHash: Workspacehash;
 }

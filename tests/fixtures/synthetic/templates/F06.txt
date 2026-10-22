@@ -1,0 +1,10 @@
+Alex Example
+Business analyst
+Python — 10 months
+SQL — about 2.5 years
+UnknownTool — 7 weeks
+Example University, BSc, Information Systems, 2019
+Course: Example Academy, Queue Design, 2021
+Course: Systems School, Reliability Basics, 2022
+English — working proficiency
+Portfolio: https://example.org/portfolio

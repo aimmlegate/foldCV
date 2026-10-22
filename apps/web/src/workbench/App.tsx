@@ -58,15 +58,20 @@ export function App({ portalHost }: { portalHost: HTMLElement }) {
     };
     window.addEventListener("keydown", save); return () => window.removeEventListener("keydown", save);
   }, [settings, view, busy, workspace.dismissError]);
-  const openSettings = () => void action(async () => {
-    await editor.current?.navigate(); setSettingsVisited(true); setSettings(true); if (innerWidth <= 600) setCollapsed(true);
+  const openSettings = () => void action(async current => {
+    await editor.current?.navigate();
+    if (!current()) return;
+    setSettingsVisited(true); setSettings(true); if (innerWidth <= 600) setCollapsed(true);
   });
   function openFile(mode: FileMode) {
     workspace.dismissError();
     if (mode !== "export") { setFileMode(mode); return; }
-    void action(async () => {
-      const current = editor.current ? await editor.current.flush() : response;
-      setTimeline(current ? await readTimeline(current.workspace.projectId).catch(() => null) : null); setFileMode(mode);
+    void action(async current => {
+      const saved = editor.current ? await editor.current.flush() : response;
+      if (!current()) return;
+      const timeline = saved ? await readTimeline(saved.workspace.projectId).catch(() => null) : null;
+      if (!current()) return;
+      setTimeline(timeline); setFileMode(mode);
     });
   }
   const projectTitle = response?.identity?.title ?? response?.workspace.title ?? "resume";
@@ -80,7 +85,7 @@ export function App({ portalHost }: { portalHost: HTMLElement }) {
       <Header title={settings ? "Настройки" : response?.identity?.title ?? response?.workspace.title ?? (workspace.loading ? "Открываем резюме…" : "Новое резюме")}
         subtitle={settings ? "FoldCV" : response?.identity?.subtitle || "Рабочий документ"} collapsed={collapsed} expand={() => setCollapsed(false)} status={status}
         ready={!settings && view === "editor"} busy={busy} save={() => openFile("save")} exportFile={() => openFile("export")}
-        retrySave={status !== "Сохранено" && status !== "Изменения сохраняются…" && status !== "Требуется восстановление черновика" ? () => void action(async () => { await editor.current?.flush(); setStatus("Сохранено"); }) : undefined}
+        retrySave={status !== "Сохранено" && status !== "Изменения сохраняются…" && status !== "Требуется восстановление черновика" ? () => void action(async current => { await editor.current?.flush(); if (current()) setStatus("Сохранено"); }) : undefined}
         activity={<><NotificationCenter />{jobs.view.enabled && <BackgroundJobs registry={jobs.registry} view={jobs.view} openProject={navigate} />}</>} />
       <NotificationSection count={Number(!!error && !fileMode) + Number(!!jobs.view.error)}>
         <section className="notice-group" aria-label="Ошибки"><h3>Ошибки</h3>
@@ -105,7 +110,7 @@ export function App({ portalHost }: { portalHost: HTMLElement }) {
           cancel={() => void action(async () => acknowledge(await projectRequest(`/${response.workspace.projectId}/cancel`, "POST", {})), "Останавливаем обработку")} />}
         {view === "assessment" && response && <Assessment response={response} open={() => setReviewed(reviewId(response))} back={() => setSourceOpen(true)} />}
         {view === "editor" && response?.workspace.project && <>
-          <RichEditor key={response.workspace.projectId} initial={response} writer={writer} acknowledge={acknowledge} onStatus={setStatus} ref={editor} portalHost={portalHost} paneOrder={paneOrder}
+          <RichEditor key={`${response.workspace.projectId}:${workspace.openingEpoch}`} initial={response} writer={writer} acknowledge={acknowledge} onStatus={setStatus} ref={editor} portalHost={portalHost} paneOrder={paneOrder}
             onComparisonOpen={() => setCollapsed(true)} onHistoryNavigation={() => assistant.current?.history()} onAssistantFence={saved => assistant.current?.fence(saved)}
             assistant={<AssistantDrawer key={response.workspace.projectId} projectId={response.workspace.projectId} editor={editor} settingsOpen={settings} ref={assistant} background={writer !== null}
               onProjectLifecycle={kind => workspace.projectLifecycle(response.workspace.projectId, kind)}
@@ -115,7 +120,7 @@ export function App({ portalHost }: { portalHost: HTMLElement }) {
           allowTextRewrite={workspace.allowTextRewrite} changeTextRewrite={workspace.setAllowTextRewrite}
           process={() => { setSourceOpen(false); void process(); }} />}
       </div>
-      {settingsVisited && <div className="screen" hidden={!settings}><Settings close={() => void action(async () => { await editor.current?.resume(); setSettings(false); })} connectionChanged={setConnection} paneOrder={paneOrder} changePaneOrder={changePaneOrder} /></div>}
+      {settingsVisited && <div className="screen" hidden={!settings}><Settings close={() => void action(async current => { await editor.current?.resume(); if (current()) setSettings(false); })} connectionChanged={setConnection} paneOrder={paneOrder} changePaneOrder={changePaneOrder} /></div>}
     </section>
     {fileMode && <FileDialog key={fileMode} mode={fileMode} title={projectTitle} subtitle={response?.identity?.subtitle ?? ""} filename={filename}
       timeline={timeline} error={error} busy={busy} operation={workspace.operation?.label} close={() => setFileMode(null)} download={() => exportFile(fileMode === "export" ? "export" : "archive",

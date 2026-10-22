@@ -18,12 +18,17 @@ def referenced_assets(project):
 def inert_sync_history(workspace):
     for sync in workspace.sync_records:
         sync.proposed_steps, sync.ready, sync.dependencies, sync.selection = [], False, [], None
+        if workspace.schema_version == 7 and hasattr(sync, 'capture'):
+            sync.capture = None
         if sync.status == "pending":
             sync.status = "stale"
             sync.error_code = sync.error_code or "OPERATION_INTERRUPTED"
 
 
 def archive_payload(workspace, originals, images, current_render=None):
+    if workspace.schema_version == 7:
+        from .template_archive import archive_payload_v7
+        return archive_payload_v7(workspace,originals,images,current_render)
     workspace = WorkspaceV6.model_validate(workspace.model_dump(by_alias=True))
     inert_sync_history(workspace)
     owner = workspace.project or workspace.pre_draft
@@ -84,6 +89,8 @@ def archive_payload(workspace, originals, images, current_render=None):
 
 
 def export_rich_archive(workspace, originals, artifacts, images):
+    if workspace.schema_version == 7:
+        return write_zip(archive_payload(workspace,originals,images))
     from .rendering.rich_docx import current_snapshot
     try:
         current = current_snapshot(workspace, artifacts)
@@ -96,6 +103,9 @@ def open_rich_archive(data, project_id):
     try:
         files = read_zip(data)
         raw = parse_json(files.get("manifest.json")) if "manifest.json" in files else {}
+        if isinstance(raw,dict) and type(raw.get("schemaVersion")) is int and raw["schemaVersion"] == 7:
+            from .template_archive import open_archive_v7
+            return open_archive_v7(data,project_id)
         if not isinstance(raw, dict) or type(raw.get("schemaVersion")) is not int or raw["schemaVersion"] != 6:
             raise ArchiveFailure("ARCHIVE_VERSION_UNSUPPORTED")
         manifest = ArchiveManifestV6.model_validate(raw)

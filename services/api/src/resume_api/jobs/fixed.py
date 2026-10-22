@@ -102,11 +102,15 @@ class FixedJobs:
 
     def generation(self, project):
         from packages.resume_core.rich_api import RichGenerationState
+        if self.service.templates is not None and project in self.service.templates.pending_jobs:
+            return self.service.templates.generation(self.service.templates.pending_jobs[project])
         state = self.service.store.load(project) if (self.service.store.projects / project).exists() else None
         jobs = [j for j in state.jobs if j.submission.kind == "processing"] if state else []
         if not jobs:
             return None
         job = jobs[-1]
+        if job.submission.protocol == 'template_import_v1':
+            return self.service.templates.generation(job) if self.service.templates is not None else None
         stage = "normalize_semantics" if "save_import" in job.submission.tools else (
             "assess_resume" if not job.attempts or job.attempts[-1].stage == "assessment" else "normalize_semantics")
         error = job.error or job.publication_error
@@ -197,7 +201,7 @@ class FixedJobs:
                 accountGeneration=state.account_generation, tools=list(IMPORT_TOOLS) if processing else [], allowEdits=True, allowWeb=False,
                 approvalRequired=command.kind == "rewrite" and command.request.preview_only,
                 scope={"kind": "selection", "selection": record.selection} if record and record.selection else {"kind": "resume"},
-                guards=guards, submittedAt=service.store.clock())
+                guards=guards, submittedAt=service.store.clock(), protocol='agent_import_v1' if processing else None)
             # Retire only queued automatic work; explicit requests and active attempts keep their visible outcome.
             if command.kind in {"completion", "panel"}:
                 for previous in state.jobs:

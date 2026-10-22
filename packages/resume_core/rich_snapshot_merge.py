@@ -5,7 +5,6 @@ from copy import deepcopy
 from pydantic import BaseModel
 
 from .background_store import BackgroundFailure
-from .models.rich_workspace import WorkspaceV6
 
 COLLECTIONS = frozenset({"operations", "sources", "assets", "syncRecords", "warnings", "renders"})
 ATOMIC = frozenset({"document", "facts", "evidenceRecords", "template", "rulesUsed", "mutationReplay", "metadata_record", "importDraft"})
@@ -90,7 +89,7 @@ def merge_snapshot(base, proposed, current):
     result["documentRevision"] = result["project"]["document"]["revision"] if result["project"] else current.document_revision
     if result["project"]:
         result["project"]["revision"] = result["projectRevision"]
-    return WorkspaceV6.model_validate(result)
+    return type(proposed).model_validate(result)
 
 
 def reconcile(target, source):

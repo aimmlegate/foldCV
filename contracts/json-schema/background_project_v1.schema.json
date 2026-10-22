@@ -597,6 +597,79 @@
       "title": "GenerationStamp",
       "type": "object"
     },
+    "ImportCapture": {
+      "additionalProperties": false,
+      "properties": {
+        "allowTextRewrite": {
+          "title": "Allowtextrewrite",
+          "type": "boolean"
+        },
+        "authorityHash": {
+          "pattern": "^[a-f0-9]{64}$",
+          "title": "Authorityhash",
+          "type": "string"
+        },
+        "dependencyHash": {
+          "pattern": "^[a-f0-9]{64}$",
+          "title": "Dependencyhash",
+          "type": "string"
+        },
+        "factRevisions": {
+          "additionalProperties": {
+            "minimum": 1,
+            "type": "integer"
+          },
+          "title": "Factrevisions",
+          "type": "object"
+        },
+        "fallback": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/packages__resume_core__models__template_import__ModelCapture"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "formattingAsOf": {
+          "$ref": "#/$defs/PartialDate"
+        },
+        "packageHash": {
+          "pattern": "^[a-f0-9]{64}$",
+          "title": "Packagehash",
+          "type": "string"
+        },
+        "policy": {
+          "$ref": "#/$defs/RuntimePolicy"
+        },
+        "primary": {
+          "$ref": "#/$defs/packages__resume_core__models__template_import__ModelCapture"
+        },
+        "sourceHashes": {
+          "additionalProperties": {
+            "pattern": "^[a-f0-9]{64}$",
+            "type": "string"
+          },
+          "title": "Sourcehashes",
+          "type": "object"
+        }
+      },
+      "required": [
+        "packageHash",
+        "sourceHashes",
+        "factRevisions",
+        "authorityHash",
+        "dependencyHash",
+        "allowTextRewrite",
+        "primary",
+        "fallback",
+        "formattingAsOf",
+        "policy"
+      ],
+      "title": "ImportCapture",
+      "type": "object"
+    },
     "InputReference": {
       "additionalProperties": false,
       "properties": {
@@ -611,7 +684,8 @@
           "enum": [
             "agent_journal",
             "rich_sync",
-            "processing"
+            "processing",
+            "template_import"
           ],
           "title": "Kind",
           "type": "string"
@@ -982,6 +1056,17 @@
         "submission": {
           "$ref": "#/$defs/JobSubmissionV1"
         },
+        "templateOutcome": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/PublicationOutcome"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
         "undoExpired": {
           "default": false,
           "title": "Undoexpired",
@@ -1060,7 +1145,7 @@
         },
         "models": {
           "items": {
-            "$ref": "#/$defs/ModelCapture"
+            "$ref": "#/$defs/packages__resume_core__models__background__ModelCapture"
           },
           "maxItems": 2,
           "minItems": 1,
@@ -1071,6 +1156,23 @@
           "pattern": "^[a-f0-9]{64}$",
           "title": "Payloadsha256",
           "type": "string"
+        },
+        "protocol": {
+          "anyOf": [
+            {
+              "enum": [
+                "fixed_v1",
+                "agent_import_v1",
+                "template_import_v1"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Protocol"
         },
         "schedulingClass": {
           "enum": [
@@ -1109,6 +1211,32 @@
           "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(?:\\.\\d+)?(?:Z|\\+00:00)$",
           "title": "Submittedat",
           "type": "string"
+        },
+        "templateCommand": {
+          "anyOf": [
+            {
+              "discriminator": {
+                "mapping": {
+                  "resume_import": "#/$defs/ResumeTemplateImportV1",
+                  "start_new_import": "#/$defs/StartTemplateImportV1"
+                },
+                "propertyName": "kind"
+              },
+              "oneOf": [
+                {
+                  "$ref": "#/$defs/StartTemplateImportV1"
+                },
+                {
+                  "$ref": "#/$defs/ResumeTemplateImportV1"
+                }
+              ]
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Templatecommand"
         },
         "tools": {
           "items": {
@@ -1241,37 +1369,114 @@
       "title": "MessageDeltaPayload",
       "type": "object"
     },
-    "ModelCapture": {
+    "PartialDate": {
       "additionalProperties": false,
       "properties": {
-        "configSha256": {
-          "pattern": "^[a-f0-9]{64}$",
-          "title": "Configsha256",
-          "type": "string"
-        },
-        "model": {
-          "pattern": "^[a-zA-Z0-9][a-zA-Z0-9._-]{0,79}$",
-          "title": "Model",
-          "type": "string"
-        },
-        "stage": {
-          "enum": [
-            "agent",
-            "assessment",
-            "extraction",
-            "rewrite",
-            "reconciliation"
+        "day": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
           ],
-          "title": "Stage",
+          "title": "Day"
+        },
+        "month": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Month"
+        },
+        "precision": {
+          "enum": [
+            "year",
+            "month",
+            "day"
+          ],
+          "title": "Precision",
           "type": "string"
+        },
+        "year": {
+          "maximum": 9999,
+          "minimum": 1,
+          "title": "Year",
+          "type": "integer"
         }
       },
       "required": [
-        "stage",
-        "model",
-        "configSha256"
+        "precision",
+        "year",
+        "month",
+        "day"
       ],
-      "title": "ModelCapture",
+      "title": "PartialDate",
+      "type": "object"
+    },
+    "PublicationOutcome": {
+      "additionalProperties": false,
+      "properties": {
+        "errorCode": {
+          "anyOf": [
+            {
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Errorcode"
+        },
+        "intentId": {
+          "anyOf": [
+            {
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Intentid"
+        },
+        "state": {
+          "enum": [
+            "pending",
+            "saved",
+            "failed_before_replacement",
+            "outcome_unknown",
+            "cancelled"
+          ],
+          "title": "State",
+          "type": "string"
+        },
+        "workspaceHash": {
+          "anyOf": [
+            {
+              "pattern": "^[a-f0-9]{64}$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Workspacehash"
+        }
+      },
+      "required": [
+        "state",
+        "intentId",
+        "workspaceHash",
+        "errorCode"
+      ],
+      "title": "PublicationOutcome",
       "type": "object"
     },
     "ResourceEvent": {
@@ -1362,6 +1567,45 @@
         "id"
       ],
       "title": "ResourcePayload",
+      "type": "object"
+    },
+    "ResumeTemplateImportV1": {
+      "additionalProperties": false,
+      "properties": {
+        "authorityHash": {
+          "pattern": "^[a-f0-9]{64}$",
+          "title": "Authorityhash",
+          "type": "string"
+        },
+        "authorizationId": {
+          "minLength": 1,
+          "title": "Authorizationid",
+          "type": "string"
+        },
+        "kind": {
+          "const": "resume_import",
+          "title": "Kind",
+          "type": "string"
+        },
+        "operationId": {
+          "minLength": 1,
+          "title": "Operationid",
+          "type": "string"
+        },
+        "protocol": {
+          "const": "template_import_v1",
+          "title": "Protocol",
+          "type": "string"
+        }
+      },
+      "required": [
+        "kind",
+        "protocol",
+        "operationId",
+        "authorizationId",
+        "authorityHash"
+      ],
+      "title": "ResumeTemplateImportV1",
       "type": "object"
     },
     "RichPosition": {
@@ -1571,6 +1815,57 @@
       "title": "RunStatePayload",
       "type": "object"
     },
+    "RuntimePolicy": {
+      "additionalProperties": false,
+      "properties": {
+        "callCap": {
+          "exclusiveMinimum": 0,
+          "title": "Callcap",
+          "type": "integer"
+        },
+        "cleanupSeconds": {
+          "const": 5,
+          "title": "Cleanupseconds",
+          "type": "integer"
+        },
+        "concurrency": {
+          "const": 1,
+          "title": "Concurrency",
+          "type": "integer"
+        },
+        "fallbackRepairs": {
+          "const": 1,
+          "title": "Fallbackrepairs",
+          "type": "integer"
+        },
+        "finalizationSeconds": {
+          "const": 30,
+          "title": "Finalizationseconds",
+          "type": "integer"
+        },
+        "primaryRepairs": {
+          "const": 1,
+          "title": "Primaryrepairs",
+          "type": "integer"
+        },
+        "processingSeconds": {
+          "const": 300,
+          "title": "Processingseconds",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "callCap",
+        "concurrency",
+        "processingSeconds",
+        "cleanupSeconds",
+        "finalizationSeconds",
+        "primaryRepairs",
+        "fallbackRepairs"
+      ],
+      "title": "RuntimePolicy",
+      "type": "object"
+    },
     "ScopeGuardV1": {
       "additionalProperties": false,
       "properties": {
@@ -1621,6 +1916,37 @@
         "selection"
       ],
       "title": "SelectionScope",
+      "type": "object"
+    },
+    "StartTemplateImportV1": {
+      "additionalProperties": false,
+      "properties": {
+        "capture": {
+          "$ref": "#/$defs/ImportCapture"
+        },
+        "clientRequestId": {
+          "minLength": 1,
+          "title": "Clientrequestid",
+          "type": "string"
+        },
+        "kind": {
+          "const": "start_new_import",
+          "title": "Kind",
+          "type": "string"
+        },
+        "protocol": {
+          "const": "template_import_v1",
+          "title": "Protocol",
+          "type": "string"
+        }
+      },
+      "required": [
+        "kind",
+        "protocol",
+        "clientRequestId",
+        "capture"
+      ],
+      "title": "StartTemplateImportV1",
       "type": "object"
     },
     "ToolEvent": {
@@ -1815,6 +2141,84 @@
         "kind"
       ],
       "title": "WholeResumeScope",
+      "type": "object"
+    },
+    "packages__resume_core__models__background__ModelCapture": {
+      "additionalProperties": false,
+      "properties": {
+        "configSha256": {
+          "pattern": "^[a-f0-9]{64}$",
+          "title": "Configsha256",
+          "type": "string"
+        },
+        "model": {
+          "pattern": "^[a-zA-Z0-9][a-zA-Z0-9._-]{0,79}$",
+          "title": "Model",
+          "type": "string"
+        },
+        "stage": {
+          "enum": [
+            "agent",
+            "assessment",
+            "extraction",
+            "rewrite",
+            "reconciliation"
+          ],
+          "title": "Stage",
+          "type": "string"
+        }
+      },
+      "required": [
+        "stage",
+        "model",
+        "configSha256"
+      ],
+      "title": "ModelCapture",
+      "type": "object"
+    },
+    "packages__resume_core__models__template_import__ModelCapture": {
+      "additionalProperties": false,
+      "properties": {
+        "adapter": {
+          "minLength": 1,
+          "title": "Adapter",
+          "type": "string"
+        },
+        "capabilityProfile": {
+          "minLength": 1,
+          "title": "Capabilityprofile",
+          "type": "string"
+        },
+        "capabilityVersion": {
+          "minLength": 1,
+          "title": "Capabilityversion",
+          "type": "string"
+        },
+        "configurationHash": {
+          "pattern": "^[a-f0-9]{64}$",
+          "title": "Configurationhash",
+          "type": "string"
+        },
+        "effort": {
+          "minLength": 1,
+          "title": "Effort",
+          "type": "string"
+        },
+        "model": {
+          "minLength": 1,
+          "title": "Model",
+          "type": "string"
+        }
+      },
+      "required": [
+        "adapter",
+        "model",
+        "effort",
+        "capabilityProfile",
+        "capabilityVersion",
+        "configurationHash"
+      ],
+      "title": "ModelCapture",
       "type": "object"
     }
   },

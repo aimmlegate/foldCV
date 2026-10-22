@@ -1,0 +1,78 @@
+{
+  "$defs": {
+    "TemplateArchiveEntry": {
+      "additionalProperties": false,
+      "properties": {
+        "path": {
+          "title": "Path",
+          "type": "string"
+        },
+        "role": {
+          "enum": [
+            "workspace",
+            "source_original",
+            "render",
+            "user_image",
+            "template_package",
+            "template_asset"
+          ],
+          "title": "Role",
+          "type": "string"
+        },
+        "sha256": {
+          "pattern": "^[a-f0-9]{64}$",
+          "title": "Sha256",
+          "type": "string"
+        },
+        "size": {
+          "maximum": 33554432,
+          "minimum": 0,
+          "title": "Size",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "path",
+        "role",
+        "sha256",
+        "size"
+      ],
+      "title": "TemplateArchiveEntry",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "appVersion": {
+      "title": "Appversion",
+      "type": "string"
+    },
+    "entries": {
+      "items": {
+        "$ref": "#/$defs/TemplateArchiveEntry"
+      },
+      "maxItems": 47,
+      "minItems": 1,
+      "title": "Entries",
+      "type": "array"
+    },
+    "projectId": {
+      "minLength": 1,
+      "title": "Projectid",
+      "type": "string"
+    },
+    "schemaVersion": {
+      "const": 7,
+      "title": "Schemaversion",
+      "type": "integer"
+    }
+  },
+  "required": [
+    "schemaVersion",
+    "appVersion",
+    "projectId",
+    "entries"
+  ],
+  "title": "ArchiveManifestV7",
+  "type": "object"
+}

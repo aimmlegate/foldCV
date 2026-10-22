@@ -1,0 +1,1587 @@
+{
+  "$defs": {
+    "ActionCapture": {
+      "additionalProperties": false,
+      "properties": {
+        "actionId": {
+          "minLength": 1,
+          "title": "Actionid",
+          "type": "string"
+        },
+        "actionToken": {
+          "minimum": 0,
+          "title": "Actiontoken",
+          "type": "integer"
+        },
+        "dependencies": {
+          "items": {
+            "$ref": "#/$defs/DependencyStamp"
+          },
+          "title": "Dependencies",
+          "type": "array"
+        },
+        "sessionId": {
+          "minLength": 1,
+          "title": "Sessionid",
+          "type": "string"
+        }
+      },
+      "required": [
+        "sessionId",
+        "actionId",
+        "actionToken",
+        "dependencies"
+      ],
+      "title": "ActionCapture",
+      "type": "object"
+    },
+    "AuthoredPlacement": {
+      "additionalProperties": false,
+      "properties": {
+        "afterId": {
+          "anyOf": [
+            {
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Afterid"
+        },
+        "parentId": {
+          "minLength": 1,
+          "title": "Parentid",
+          "type": "string"
+        }
+      },
+      "required": [
+        "parentId",
+        "afterId"
+      ],
+      "title": "AuthoredPlacement",
+      "type": "object"
+    },
+    "AuthoredRange": {
+      "additionalProperties": false,
+      "properties": {
+        "beforeRevision": {
+          "minimum": 1,
+          "title": "Beforerevision",
+          "type": "integer"
+        },
+        "blockId": {
+          "minLength": 1,
+          "title": "Blockid",
+          "type": "string"
+        },
+        "cellId": {
+          "anyOf": [
+            {
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Cellid"
+        },
+        "end": {
+          "minimum": 0,
+          "title": "End",
+          "type": "integer"
+        },
+        "field": {
+          "enum": [
+            "content",
+            "caption"
+          ],
+          "title": "Field",
+          "type": "string"
+        },
+        "insertionTarget": {
+          "anyOf": [
+            {
+              "discriminator": {
+                "mapping": {
+                  "field": "#/$defs/FieldInsertionTarget",
+                  "literal": "#/$defs/LiteralInsertionTarget",
+                  "manual_scope": "#/$defs/ManualScopeInsertionTarget"
+                },
+                "propertyName": "kind"
+              },
+              "oneOf": [
+                {
+                  "$ref": "#/$defs/FieldInsertionTarget"
+                },
+                {
+                  "$ref": "#/$defs/LiteralInsertionTarget"
+                },
+                {
+                  "$ref": "#/$defs/ManualScopeInsertionTarget"
+                }
+              ]
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Insertiontarget"
+        },
+        "start": {
+          "minimum": 0,
+          "title": "Start",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "blockId",
+        "beforeRevision",
+        "cellId",
+        "field",
+        "start",
+        "end"
+      ],
+      "title": "AuthoredRange",
+      "type": "object"
+    },
+    "BlockFormatPatch": {
+      "additionalProperties": false,
+      "anyOf": [
+        {
+          "required": [
+            "blockKind"
+          ]
+        },
+        {
+          "required": [
+            "alignment"
+          ]
+        },
+        {
+          "required": [
+            "textColor"
+          ]
+        },
+        {
+          "required": [
+            "backgroundColor"
+          ]
+        }
+      ],
+      "properties": {
+        "alignment": {
+          "default": null,
+          "enum": [
+            "left",
+            "center",
+            "right",
+            "justify"
+          ],
+          "title": "Alignment",
+          "type": "string"
+        },
+        "backgroundColor": {
+          "default": null,
+          "pattern": "^(default|#[a-fA-F0-9]{6})$",
+          "title": "Backgroundcolor",
+          "type": "string"
+        },
+        "blockKind": {
+          "default": null,
+          "discriminator": {
+            "mapping": {
+              "bullet_list": "#/$defs/BulletKind",
+              "heading": "#/$defs/HeadingKind",
+              "numbered_list": "#/$defs/NumberedKind",
+              "paragraph": "#/$defs/ParagraphKind"
+            },
+            "propertyName": "type"
+          },
+          "oneOf": [
+            {
+              "$ref": "#/$defs/ParagraphKind"
+            },
+            {
+              "$ref": "#/$defs/HeadingKind"
+            },
+            {
+              "$ref": "#/$defs/BulletKind"
+            },
+            {
+              "$ref": "#/$defs/NumberedKind"
+            }
+          ],
+          "title": "Blockkind"
+        },
+        "textColor": {
+          "default": null,
+          "pattern": "^(default|#[a-fA-F0-9]{6})$",
+          "title": "Textcolor",
+          "type": "string"
+        }
+      },
+      "title": "BlockFormatPatch",
+      "type": "object"
+    },
+    "BlockTarget": {
+      "additionalProperties": false,
+      "properties": {
+        "beforeRevision": {
+          "minimum": 1,
+          "title": "Beforerevision",
+          "type": "integer"
+        },
+        "blockId": {
+          "minLength": 1,
+          "title": "Blockid",
+          "type": "string"
+        }
+      },
+      "required": [
+        "blockId",
+        "beforeRevision"
+      ],
+      "title": "BlockTarget",
+      "type": "object"
+    },
+    "BuiltinPanel": {
+      "additionalProperties": false,
+      "properties": {
+        "command": {
+          "$ref": "#/$defs/RichPanelRequest"
+        },
+        "kind": {
+          "const": "builtin_panel",
+          "title": "Kind",
+          "type": "string"
+        },
+        "opId": {
+          "minLength": 1,
+          "title": "Opid",
+          "type": "string"
+        },
+        "placementContext": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/PanelPlacementContext"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        }
+      },
+      "required": [
+        "opId",
+        "kind",
+        "command"
+      ],
+      "title": "BuiltinPanel",
+      "type": "object"
+    },
+    "BulletKind": {
+      "additionalProperties": false,
+      "properties": {
+        "type": {
+          "const": "bullet_list",
+          "title": "Type",
+          "type": "string"
+        }
+      },
+      "required": [
+        "type"
+      ],
+      "title": "BulletKind",
+      "type": "object"
+    },
+    "CopyBlocks": {
+      "additionalProperties": false,
+      "properties": {
+        "kind": {
+          "const": "copy_blocks",
+          "title": "Kind",
+          "type": "string"
+        },
+        "opId": {
+          "minLength": 1,
+          "title": "Opid",
+          "type": "string"
+        },
+        "placement": {
+          "$ref": "#/$defs/AuthoredPlacement"
+        },
+        "sources": {
+          "items": {
+            "$ref": "#/$defs/BlockTarget"
+          },
+          "maxItems": 1000,
+          "minItems": 1,
+          "title": "Sources",
+          "type": "array"
+        }
+      },
+      "required": [
+        "opId",
+        "kind",
+        "sources",
+        "placement"
+      ],
+      "title": "CopyBlocks",
+      "type": "object"
+    },
+    "CopyFragment": {
+      "additionalProperties": false,
+      "properties": {
+        "kind": {
+          "const": "copy_fragment",
+          "title": "Kind",
+          "type": "string"
+        },
+        "opId": {
+          "minLength": 1,
+          "title": "Opid",
+          "type": "string"
+        },
+        "placement": {
+          "$ref": "#/$defs/AuthoredPlacement"
+        },
+        "source": {
+          "$ref": "#/$defs/AuthoredRange"
+        }
+      },
+      "required": [
+        "opId",
+        "kind",
+        "source",
+        "placement"
+      ],
+      "title": "CopyFragment",
+      "type": "object"
+    },
+    "DeleteEntity": {
+      "additionalProperties": false,
+      "properties": {
+        "beforeRevision": {
+          "minimum": 1,
+          "title": "Beforerevision",
+          "type": "integer"
+        },
+        "kind": {
+          "const": "delete_entity",
+          "title": "Kind",
+          "type": "string"
+        },
+        "opId": {
+          "minLength": 1,
+          "title": "Opid",
+          "type": "string"
+        },
+        "recordId": {
+          "minLength": 1,
+          "title": "Recordid",
+          "type": "string"
+        }
+      },
+      "required": [
+        "opId",
+        "kind",
+        "recordId",
+        "beforeRevision"
+      ],
+      "title": "DeleteEntity",
+      "type": "object"
+    },
+    "DependencyStamp": {
+      "additionalProperties": false,
+      "properties": {
+        "fingerprint": {
+          "anyOf": [
+            {
+              "pattern": "^[a-f0-9]{64}$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Fingerprint"
+        },
+        "id": {
+          "minLength": 1,
+          "title": "Id",
+          "type": "string"
+        },
+        "kind": {
+          "enum": [
+            "block",
+            "record",
+            "field",
+            "period",
+            "ownership",
+            "source",
+            "rules",
+            "asset",
+            "timeline_order"
+          ],
+          "title": "Kind",
+          "type": "string"
+        },
+        "revision": {
+          "minimum": 1,
+          "title": "Revision",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "kind",
+        "id",
+        "revision",
+        "fingerprint"
+      ],
+      "title": "DependencyStamp",
+      "type": "object"
+    },
+    "FieldInsertionTarget": {
+      "additionalProperties": false,
+      "properties": {
+        "bindingId": {
+          "minLength": 1,
+          "title": "Bindingid",
+          "type": "string"
+        },
+        "kind": {
+          "const": "field",
+          "title": "Kind",
+          "type": "string"
+        }
+      },
+      "required": [
+        "kind",
+        "bindingId"
+      ],
+      "title": "FieldInsertionTarget",
+      "type": "object"
+    },
+    "FormatBlocks": {
+      "additionalProperties": false,
+      "properties": {
+        "kind": {
+          "const": "format_blocks",
+          "title": "Kind",
+          "type": "string"
+        },
+        "opId": {
+          "minLength": 1,
+          "title": "Opid",
+          "type": "string"
+        },
+        "patch": {
+          "$ref": "#/$defs/BlockFormatPatch"
+        },
+        "targets": {
+          "items": {
+            "$ref": "#/$defs/BlockTarget"
+          },
+          "maxItems": 1000,
+          "minItems": 1,
+          "title": "Targets",
+          "type": "array"
+        }
+      },
+      "required": [
+        "opId",
+        "kind",
+        "targets",
+        "patch"
+      ],
+      "title": "FormatBlocks",
+      "type": "object"
+    },
+    "HeadingKind": {
+      "additionalProperties": false,
+      "properties": {
+        "level": {
+          "enum": [
+            1,
+            2,
+            3
+          ],
+          "title": "Level",
+          "type": "integer"
+        },
+        "type": {
+          "const": "heading",
+          "title": "Type",
+          "type": "string"
+        }
+      },
+      "required": [
+        "type",
+        "level"
+      ],
+      "title": "HeadingKind",
+      "type": "object"
+    },
+    "Hyperlink": {
+      "additionalProperties": false,
+      "properties": {
+        "content": {
+          "items": {
+            "$ref": "#/$defs/StyledText"
+          },
+          "title": "Content",
+          "type": "array"
+        },
+        "href": {
+          "minLength": 1,
+          "title": "Href",
+          "type": "string"
+        },
+        "type": {
+          "const": "link",
+          "title": "Type",
+          "type": "string"
+        }
+      },
+      "required": [
+        "type",
+        "href",
+        "content"
+      ],
+      "title": "Hyperlink",
+      "type": "object"
+    },
+    "InlineStyles": {
+      "additionalProperties": false,
+      "properties": {
+        "backgroundColor": {
+          "default": "default",
+          "pattern": "^(default|#[a-fA-F0-9]{6})$",
+          "title": "Backgroundcolor",
+          "type": "string"
+        },
+        "bold": {
+          "default": false,
+          "title": "Bold",
+          "type": "boolean"
+        },
+        "code": {
+          "default": false,
+          "title": "Code",
+          "type": "boolean"
+        },
+        "italic": {
+          "default": false,
+          "title": "Italic",
+          "type": "boolean"
+        },
+        "strike": {
+          "default": false,
+          "title": "Strike",
+          "type": "boolean"
+        },
+        "textColor": {
+          "default": "default",
+          "pattern": "^(default|#[a-fA-F0-9]{6})$",
+          "title": "Textcolor",
+          "type": "string"
+        },
+        "underline": {
+          "default": false,
+          "title": "Underline",
+          "type": "boolean"
+        }
+      },
+      "title": "InlineStyles",
+      "type": "object"
+    },
+    "InsertParagraph": {
+      "additionalProperties": false,
+      "properties": {
+        "contextBlockId": {
+          "minLength": 1,
+          "title": "Contextblockid",
+          "type": "string"
+        },
+        "contextRevision": {
+          "minimum": 1,
+          "title": "Contextrevision",
+          "type": "integer"
+        },
+        "kind": {
+          "const": "insert_paragraph",
+          "title": "Kind",
+          "type": "string"
+        },
+        "opId": {
+          "minLength": 1,
+          "title": "Opid",
+          "type": "string"
+        },
+        "placement": {
+          "$ref": "#/$defs/AuthoredPlacement"
+        },
+        "text": {
+          "title": "Text",
+          "type": "string"
+        }
+      },
+      "required": [
+        "opId",
+        "kind",
+        "contextBlockId",
+        "contextRevision",
+        "placement",
+        "text"
+      ],
+      "title": "InsertParagraph",
+      "type": "object"
+    },
+    "LiteralInsertionTarget": {
+      "additionalProperties": false,
+      "properties": {
+        "kind": {
+          "const": "literal",
+          "title": "Kind",
+          "type": "string"
+        }
+      },
+      "required": [
+        "kind"
+      ],
+      "title": "LiteralInsertionTarget",
+      "type": "object"
+    },
+    "LiteralPaste": {
+      "additionalProperties": false,
+      "properties": {
+        "content": {
+          "items": {
+            "discriminator": {
+              "mapping": {
+                "link": "#/$defs/Hyperlink",
+                "text": "#/$defs/StyledText"
+              },
+              "propertyName": "type"
+            },
+            "oneOf": [
+              {
+                "$ref": "#/$defs/StyledText"
+              },
+              {
+                "$ref": "#/$defs/Hyperlink"
+              }
+            ]
+          },
+          "title": "Content",
+          "type": "array"
+        },
+        "kind": {
+          "const": "literal",
+          "title": "Kind",
+          "type": "string"
+        }
+      },
+      "required": [
+        "kind",
+        "content"
+      ],
+      "title": "LiteralPaste",
+      "type": "object"
+    },
+    "ManualScopeInsertionTarget": {
+      "additionalProperties": false,
+      "properties": {
+        "fragmentId": {
+          "minLength": 1,
+          "title": "Fragmentid",
+          "type": "string"
+        },
+        "kind": {
+          "const": "manual_scope",
+          "title": "Kind",
+          "type": "string"
+        }
+      },
+      "required": [
+        "kind",
+        "fragmentId"
+      ],
+      "title": "ManualScopeInsertionTarget",
+      "type": "object"
+    },
+    "MergeBlocks": {
+      "additionalProperties": false,
+      "properties": {
+        "kind": {
+          "const": "merge_blocks",
+          "title": "Kind",
+          "type": "string"
+        },
+        "leadingId": {
+          "minLength": 1,
+          "title": "Leadingid",
+          "type": "string"
+        },
+        "leadingRevision": {
+          "minimum": 1,
+          "title": "Leadingrevision",
+          "type": "integer"
+        },
+        "opId": {
+          "minLength": 1,
+          "title": "Opid",
+          "type": "string"
+        },
+        "trailingId": {
+          "minLength": 1,
+          "title": "Trailingid",
+          "type": "string"
+        },
+        "trailingRevision": {
+          "minimum": 1,
+          "title": "Trailingrevision",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "opId",
+        "kind",
+        "leadingId",
+        "leadingRevision",
+        "trailingId",
+        "trailingRevision"
+      ],
+      "title": "MergeBlocks",
+      "type": "object"
+    },
+    "MoveBlock": {
+      "additionalProperties": false,
+      "properties": {
+        "beforeRevision": {
+          "minimum": 1,
+          "title": "Beforerevision",
+          "type": "integer"
+        },
+        "blockId": {
+          "minLength": 1,
+          "title": "Blockid",
+          "type": "string"
+        },
+        "kind": {
+          "const": "move_block",
+          "title": "Kind",
+          "type": "string"
+        },
+        "opId": {
+          "minLength": 1,
+          "title": "Opid",
+          "type": "string"
+        },
+        "placement": {
+          "$ref": "#/$defs/AuthoredPlacement"
+        }
+      },
+      "required": [
+        "opId",
+        "kind",
+        "blockId",
+        "beforeRevision",
+        "placement"
+      ],
+      "title": "MoveBlock",
+      "type": "object"
+    },
+    "NumberedKind": {
+      "additionalProperties": false,
+      "properties": {
+        "start": {
+          "anyOf": [
+            {
+              "minimum": 1,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Start"
+        },
+        "type": {
+          "const": "numbered_list",
+          "title": "Type",
+          "type": "string"
+        }
+      },
+      "required": [
+        "type",
+        "start"
+      ],
+      "title": "NumberedKind",
+      "type": "object"
+    },
+    "PanelPlacementContext": {
+      "additionalProperties": false,
+      "properties": {
+        "contextBlockId": {
+          "minLength": 1,
+          "title": "Contextblockid",
+          "type": "string"
+        },
+        "placement": {
+          "$ref": "#/$defs/AuthoredPlacement"
+        }
+      },
+      "required": [
+        "contextBlockId",
+        "placement"
+      ],
+      "title": "PanelPlacementContext",
+      "type": "object"
+    },
+    "ParagraphKind": {
+      "additionalProperties": false,
+      "properties": {
+        "type": {
+          "const": "paragraph",
+          "title": "Type",
+          "type": "string"
+        }
+      },
+      "required": [
+        "type"
+      ],
+      "title": "ParagraphKind",
+      "type": "object"
+    },
+    "PasteBlocks": {
+      "additionalProperties": false,
+      "properties": {
+        "kind": {
+          "const": "paste_blocks",
+          "title": "Kind",
+          "type": "string"
+        },
+        "opId": {
+          "minLength": 1,
+          "title": "Opid",
+          "type": "string"
+        },
+        "placement": {
+          "$ref": "#/$defs/AuthoredPlacement"
+        },
+        "source": {
+          "$ref": "#/$defs/SameProjectClipboard"
+        }
+      },
+      "required": [
+        "opId",
+        "kind",
+        "source",
+        "placement"
+      ],
+      "title": "PasteBlocks",
+      "type": "object"
+    },
+    "PasteInline": {
+      "additionalProperties": false,
+      "properties": {
+        "destination": {
+          "$ref": "#/$defs/AuthoredRange"
+        },
+        "kind": {
+          "const": "paste_inline",
+          "title": "Kind",
+          "type": "string"
+        },
+        "opId": {
+          "minLength": 1,
+          "title": "Opid",
+          "type": "string"
+        },
+        "source": {
+          "discriminator": {
+            "mapping": {
+              "literal": "#/$defs/LiteralPaste",
+              "same_project": "#/$defs/SameProjectClipboard"
+            },
+            "propertyName": "kind"
+          },
+          "oneOf": [
+            {
+              "$ref": "#/$defs/SameProjectClipboard"
+            },
+            {
+              "$ref": "#/$defs/LiteralPaste"
+            }
+          ],
+          "title": "Source"
+        }
+      },
+      "required": [
+        "opId",
+        "kind",
+        "destination",
+        "source"
+      ],
+      "title": "PasteInline",
+      "type": "object"
+    },
+    "RemoveOccurrences": {
+      "additionalProperties": false,
+      "properties": {
+        "blocks": {
+          "items": {
+            "$ref": "#/$defs/BlockTarget"
+          },
+          "maxItems": 1000,
+          "minItems": 1,
+          "title": "Blocks",
+          "type": "array"
+        },
+        "kind": {
+          "const": "remove_occurrences",
+          "title": "Kind",
+          "type": "string"
+        },
+        "opId": {
+          "minLength": 1,
+          "title": "Opid",
+          "type": "string"
+        }
+      },
+      "required": [
+        "opId",
+        "kind",
+        "blocks"
+      ],
+      "title": "RemoveOccurrences",
+      "type": "object"
+    },
+    "ReplaceText": {
+      "additionalProperties": false,
+      "properties": {
+        "kind": {
+          "const": "replace_text",
+          "title": "Kind",
+          "type": "string"
+        },
+        "opId": {
+          "minLength": 1,
+          "title": "Opid",
+          "type": "string"
+        },
+        "range": {
+          "$ref": "#/$defs/AuthoredRange"
+        },
+        "styles": {
+          "$ref": "#/$defs/InlineStyles"
+        },
+        "text": {
+          "title": "Text",
+          "type": "string"
+        }
+      },
+      "required": [
+        "opId",
+        "kind",
+        "range",
+        "text",
+        "styles"
+      ],
+      "title": "ReplaceText",
+      "type": "object"
+    },
+    "ResolveTemplateSync": {
+      "additionalProperties": false,
+      "properties": {
+        "beforeLifecycleId": {
+          "minLength": 1,
+          "title": "Beforelifecycleid",
+          "type": "string"
+        },
+        "beforeRecordHash": {
+          "pattern": "^[a-f0-9]{64}$",
+          "title": "Beforerecordhash",
+          "type": "string"
+        },
+        "kind": {
+          "const": "resolve_template_sync",
+          "title": "Kind",
+          "type": "string"
+        },
+        "opId": {
+          "minLength": 1,
+          "title": "Opid",
+          "type": "string"
+        },
+        "syncId": {
+          "minLength": 1,
+          "title": "Syncid",
+          "type": "string"
+        }
+      },
+      "required": [
+        "opId",
+        "kind",
+        "syncId",
+        "beforeRecordHash",
+        "beforeLifecycleId"
+      ],
+      "title": "ResolveTemplateSync",
+      "type": "object"
+    },
+    "RichPanelRequest": {
+      "additionalProperties": false,
+      "else": {
+        "if": {
+          "properties": {
+            "operation": {
+              "enum": [
+                "add_to_focus",
+                "remove_from_focus"
+              ]
+            }
+          },
+          "required": [
+            "operation"
+          ]
+        },
+        "then": {
+          "properties": {
+            "jobId": {
+              "type": "null"
+            },
+            "periodId": {
+              "type": "null"
+            },
+            "recordId": {
+              "type": "string"
+            },
+            "recordKind": {
+              "enum": [
+                null,
+                "technology"
+              ]
+            },
+            "values": {
+              "maxProperties": 0
+            }
+          },
+          "required": [
+            "recordId"
+          ]
+        }
+      },
+      "if": {
+        "properties": {
+          "operation": {
+            "const": "clear_technologies"
+          }
+        },
+        "required": [
+          "operation"
+        ]
+      },
+      "properties": {
+        "beforeRecordId": {
+          "anyOf": [
+            {
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Beforerecordid"
+        },
+        "capture": {
+          "$ref": "#/$defs/ActionCapture"
+        },
+        "documentRevision": {
+          "minimum": 1,
+          "title": "Documentrevision",
+          "type": "integer"
+        },
+        "factsRevision": {
+          "minimum": 1,
+          "title": "Factsrevision",
+          "type": "integer"
+        },
+        "jobId": {
+          "anyOf": [
+            {
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Jobid"
+        },
+        "operation": {
+          "enum": [
+            "add",
+            "edit",
+            "remove",
+            "add_period",
+            "remove_period",
+            "clear_technologies",
+            "add_to_focus",
+            "remove_from_focus",
+            "move_technology",
+            "move_focus"
+          ],
+          "title": "Operation",
+          "type": "string"
+        },
+        "periodId": {
+          "anyOf": [
+            {
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Periodid"
+        },
+        "recordId": {
+          "anyOf": [
+            {
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Recordid"
+        },
+        "recordKind": {
+          "anyOf": [
+            {
+              "enum": [
+                "candidate",
+                "employment",
+                "technology",
+                "education",
+                "language",
+                "claim"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Recordkind"
+        },
+        "values": {
+          "additionalProperties": {
+            "type": "string"
+          },
+          "maxProperties": 50,
+          "title": "Values",
+          "type": "object"
+        }
+      },
+      "required": [
+        "operation",
+        "factsRevision",
+        "documentRevision",
+        "capture"
+      ],
+      "then": {
+        "properties": {
+          "periodId": {
+            "type": "null"
+          },
+          "recordId": {
+            "type": "null"
+          },
+          "recordKind": {
+            "const": "technology"
+          },
+          "values": {
+            "maxProperties": 0
+          }
+        },
+        "required": [
+          "recordKind"
+        ]
+      },
+      "title": "RichPanelRequest",
+      "type": "object"
+    },
+    "SameProjectClipboard": {
+      "additionalProperties": false,
+      "properties": {
+        "clipboardCaptureId": {
+          "minLength": 1,
+          "title": "Clipboardcaptureid",
+          "type": "string"
+        },
+        "kind": {
+          "const": "same_project",
+          "title": "Kind",
+          "type": "string"
+        }
+      },
+      "required": [
+        "kind",
+        "clipboardCaptureId"
+      ],
+      "title": "SameProjectClipboard",
+      "type": "object"
+    },
+    "SetMarks": {
+      "additionalProperties": false,
+      "properties": {
+        "kind": {
+          "const": "set_marks",
+          "title": "Kind",
+          "type": "string"
+        },
+        "opId": {
+          "minLength": 1,
+          "title": "Opid",
+          "type": "string"
+        },
+        "range": {
+          "$ref": "#/$defs/AuthoredRange"
+        },
+        "styles": {
+          "$ref": "#/$defs/InlineStyles"
+        }
+      },
+      "required": [
+        "opId",
+        "kind",
+        "range",
+        "styles"
+      ],
+      "title": "SetMarks",
+      "type": "object"
+    },
+    "SplitBlock": {
+      "additionalProperties": false,
+      "properties": {
+        "beforeRevision": {
+          "minimum": 1,
+          "title": "Beforerevision",
+          "type": "integer"
+        },
+        "blockId": {
+          "minLength": 1,
+          "title": "Blockid",
+          "type": "string"
+        },
+        "kind": {
+          "const": "split_block",
+          "title": "Kind",
+          "type": "string"
+        },
+        "offset": {
+          "minimum": 0,
+          "title": "Offset",
+          "type": "integer"
+        },
+        "opId": {
+          "minLength": 1,
+          "title": "Opid",
+          "type": "string"
+        }
+      },
+      "required": [
+        "opId",
+        "kind",
+        "blockId",
+        "beforeRevision",
+        "offset"
+      ],
+      "title": "SplitBlock",
+      "type": "object"
+    },
+    "StyledText": {
+      "additionalProperties": false,
+      "properties": {
+        "styles": {
+          "$ref": "#/$defs/InlineStyles"
+        },
+        "text": {
+          "title": "Text",
+          "type": "string"
+        },
+        "type": {
+          "const": "text",
+          "title": "Type",
+          "type": "string"
+        }
+      },
+      "required": [
+        "type",
+        "text",
+        "styles"
+      ],
+      "title": "StyledText",
+      "type": "object"
+    },
+    "TemplateEditPreparationV1": {
+      "additionalProperties": false,
+      "properties": {
+        "capture": {
+          "$ref": "#/$defs/ActionCapture"
+        },
+        "clientMutationId": {
+          "minLength": 1,
+          "title": "Clientmutationid",
+          "type": "string"
+        },
+        "operations": {
+          "items": {
+            "discriminator": {
+              "mapping": {
+                "builtin_panel": "#/$defs/BuiltinPanel",
+                "copy_blocks": "#/$defs/CopyBlocks",
+                "copy_fragment": "#/$defs/CopyFragment",
+                "delete_entity": "#/$defs/DeleteEntity",
+                "format_blocks": "#/$defs/FormatBlocks",
+                "insert_paragraph": "#/$defs/InsertParagraph",
+                "merge_blocks": "#/$defs/MergeBlocks",
+                "move_block": "#/$defs/MoveBlock",
+                "paste_blocks": "#/$defs/PasteBlocks",
+                "paste_inline": "#/$defs/PasteInline",
+                "remove_occurrences": "#/$defs/RemoveOccurrences",
+                "replace_text": "#/$defs/ReplaceText",
+                "resolve_template_sync": "#/$defs/ResolveTemplateSync",
+                "set_marks": "#/$defs/SetMarks",
+                "split_block": "#/$defs/SplitBlock"
+              },
+              "propertyName": "kind"
+            },
+            "oneOf": [
+              {
+                "$ref": "#/$defs/ReplaceText"
+              },
+              {
+                "$ref": "#/$defs/SetMarks"
+              },
+              {
+                "$ref": "#/$defs/SplitBlock"
+              },
+              {
+                "$ref": "#/$defs/MergeBlocks"
+              },
+              {
+                "$ref": "#/$defs/InsertParagraph"
+              },
+              {
+                "$ref": "#/$defs/CopyBlocks"
+              },
+              {
+                "$ref": "#/$defs/CopyFragment"
+              },
+              {
+                "$ref": "#/$defs/PasteInline"
+              },
+              {
+                "$ref": "#/$defs/PasteBlocks"
+              },
+              {
+                "$ref": "#/$defs/MoveBlock"
+              },
+              {
+                "$ref": "#/$defs/RemoveOccurrences"
+              },
+              {
+                "$ref": "#/$defs/DeleteEntity"
+              },
+              {
+                "$ref": "#/$defs/BuiltinPanel"
+              },
+              {
+                "$ref": "#/$defs/FormatBlocks"
+              },
+              {
+                "$ref": "#/$defs/ResolveTemplateSync"
+              }
+            ]
+          },
+          "maxItems": 1,
+          "minItems": 1,
+          "title": "Operations",
+          "type": "array"
+        },
+        "schemaVersion": {
+          "const": 1,
+          "title": "Schemaversion",
+          "type": "integer"
+        },
+        "snapshot": {
+          "$ref": "#/$defs/TemplateSnapshotIdentity"
+        }
+      },
+      "required": [
+        "schemaVersion",
+        "clientMutationId",
+        "snapshot",
+        "capture",
+        "operations"
+      ],
+      "title": "TemplateEditPreparationV1",
+      "type": "object"
+    },
+    "TemplateSnapshotIdentity": {
+      "additionalProperties": false,
+      "properties": {
+        "documentHash": {
+          "pattern": "^[a-f0-9]{64}$",
+          "title": "Documenthash",
+          "type": "string"
+        },
+        "documentRevision": {
+          "minimum": 1,
+          "title": "Documentrevision",
+          "type": "integer"
+        },
+        "factsHash": {
+          "pattern": "^[a-f0-9]{64}$",
+          "title": "Factshash",
+          "type": "string"
+        },
+        "packageHash": {
+          "pattern": "^[a-f0-9]{64}$",
+          "title": "Packagehash",
+          "type": "string"
+        },
+        "presentationHash": {
+          "pattern": "^[a-f0-9]{64}$",
+          "title": "Presentationhash",
+          "type": "string"
+        },
+        "projectId": {
+          "minLength": 1,
+          "title": "Projectid",
+          "type": "string"
+        },
+        "projectRevision": {
+          "minimum": 1,
+          "title": "Projectrevision",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "projectId",
+        "projectRevision",
+        "documentRevision",
+        "documentHash",
+        "factsHash",
+        "packageHash",
+        "presentationHash"
+      ],
+      "title": "TemplateSnapshotIdentity",
+      "type": "object"
+    },
+    "WriterProofV1": {
+      "additionalProperties": false,
+      "properties": {
+        "credential": {
+          "maxLength": 128,
+          "minLength": 32,
+          "pattern": "^[A-Za-z0-9_-]+$",
+          "title": "Credential",
+          "type": "string"
+        },
+        "epoch": {
+          "minimum": 1,
+          "title": "Epoch",
+          "type": "integer"
+        },
+        "incarnation": {
+          "maxLength": 128,
+          "minLength": 1,
+          "pattern": "^[A-Za-z0-9_-]+$",
+          "title": "Incarnation",
+          "type": "string"
+        },
+        "lineage": {
+          "maxLength": 128,
+          "minLength": 1,
+          "pattern": "^[A-Za-z0-9_-]+$",
+          "title": "Lineage",
+          "type": "string"
+        },
+        "schemaVersion": {
+          "const": 1,
+          "title": "Schemaversion",
+          "type": "integer"
+        },
+        "sessionId": {
+          "maxLength": 128,
+          "minLength": 1,
+          "pattern": "^[A-Za-z0-9_-]+$",
+          "title": "Sessionid",
+          "type": "string"
+        }
+      },
+      "required": [
+        "schemaVersion",
+        "lineage",
+        "epoch",
+        "sessionId",
+        "incarnation",
+        "credential"
+      ],
+      "title": "WriterProofV1",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "preparation": {
+      "$ref": "#/$defs/TemplateEditPreparationV1"
+    },
+    "preparationInputWire": {
+      "anyOf": [
+        {
+          "maxLength": 1048576,
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Preparationinputwire"
+    },
+    "proof": {
+      "$ref": "#/$defs/WriterProofV1"
+    },
+    "schemaVersion": {
+      "const": 2,
+      "title": "Schemaversion",
+      "type": "integer"
+    }
+  },
+  "required": [
+    "schemaVersion",
+    "proof",
+    "preparation"
+  ],
+  "title": "WriterPrepareEditV2",
+  "type": "object"
+}

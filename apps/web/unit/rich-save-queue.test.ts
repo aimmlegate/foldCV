@@ -11,6 +11,7 @@ import { validateRichDocumentShape } from "../src/rich/validate";
 import { copyBlock, mergeBlocks } from "../src/rich/structure";
 import { documentSteps, RichSaveQueue } from "../src/rich/save-queue";
 import { normalizeInline } from "../src/rich/normalize";
+import { SessionHistory } from "../src/rich/history";
 
 function response(): RichProjectResponse {
   const workspace: unknown = structuredClone(fixture);
@@ -137,6 +138,65 @@ test("delayed autosave acknowledgment preserves newer typing and sends it agains
   assert.deepEqual(documentSteps(queue.baseline.workspace.project?.document ?? changed(initial, ""), changed(initial, "Newer edit")), []);
 });
 
+test("distinct unsaved actions keep their own snapshots before the first flush", async () => {
+  const initial = response(), sent: RichMutation[] = [];
+  let baseline = initial;
+  const queue = new RichSaveQueue(initial, "session", async request => {
+    sent.push(request); baseline = apply(baseline, request); return baseline;
+  }, () => {});
+  const mutable = changed(initial, "First action");
+  queue.update(mutable, "action-a");
+  const block = mutable.regions[0].blocks[0]; assert.ok(block?.type === "heading" || block?.type === "paragraph");
+  block.content = [{ type: "text", text: "Second action", styles: {} }];
+  queue.update(mutable, "action-b", "structure");
+  await queue.flush();
+  assert.deepEqual(sent.map(item => [item.actionId, item.kind]), [["action-a", "typing"], ["action-b", "structure"]]);
+  const first = sent[0]?.steps[0]; assert.ok(first?.kind === "put_block" && Array.isArray(first.block.content));
+  assert.equal(first.block.content[0]?.type === "text" ? first.block.content[0].text : null, "First action");
+});
+
+test("pending save keeps later action boundaries while only contiguous unsent typing coalesces", async () => {
+  const initial = response(), sent: RichMutation[] = [];
+  let release: (() => void) | undefined;
+  const delay = new Promise<void>(resolve => { release = resolve; });
+  let baseline = initial;
+  const queue = new RichSaveQueue(initial, "session", async request => {
+    sent.push(request); if (sent.length === 1) await delay;
+    baseline = apply(baseline, request); return baseline;
+  }, () => {});
+  queue.update(changed(initial, "First action"), "action-a");
+  const pending = queue.flush();
+  queue.update(changed(initial, "Typing start"), "action-b");
+  queue.update(changed(initial, "Typing finish"), "action-b");
+  queue.update(changed(initial, "Third action"), "action-c", "structure");
+  release?.(); await pending;
+  assert.deepEqual(sent.map(item => item.actionId), ["action-a", "action-b", "action-c"]);
+  const middle = sent[1]?.steps[0]; assert.ok(middle?.kind === "put_block" && Array.isArray(middle.block.content));
+  assert.equal(middle.block.content[0]?.type === "text" ? middle.block.content[0].text : null, "Typing finish");
+});
+
+test("history effects and editor observation publish the same new action ID and token", async () => {
+  const initial = response(), sent: RichMutation[] = [];
+  let baseline = initial, text = "Initial";
+  const queue = new RichSaveQueue(initial, "session", async request => {
+    sent.push(request); baseline = apply(baseline, request); return baseline;
+  }, () => {});
+  const history = new SessionHistory("session", new Map([["text", text]]), (changes, context) => {
+    text = changes.find(change => change.key === "text")?.after ?? text;
+    assert.ok(context.actionId);
+    queue.update(changed(initial, text), context.actionId, context.kind, undefined, context.actionToken ?? 0);
+  });
+  const first = history.commit("typing", [{ key: "text", before: text, after: "First" }], "group-a");
+  assert.ok(first);
+  queue.update(changed(initial, text), first, "typing", undefined, history.capture(first, [])?.actionToken);
+  history.commit("typing", [{ key: "text", before: text, after: "First continued" }], "group-a");
+  const second = history.commit("structure", [{ key: "text", before: text, after: "Second action" }]);
+  assert.ok(second);
+  queue.update(changed(initial, text), second, "structure", undefined, history.capture(second, [])?.actionToken);
+  await queue.flush();
+  assert.deepEqual(sent.map(item => [item.actionId, item.capture.actionToken]), [[first, 1], [second, 0]]);
+});
+
 test("closing the editor ignores late acknowledgments and never sends its pending next edit", async () => {
   const initial = response();
   let release: (() => void) | undefined;
@@ -181,6 +241,43 @@ test("a definitive rejected patch lets corrected input use a new key and preserv
   assert.notEqual(sent[1]?.clientMutationId, sent[0]?.clientMutationId);
   assert.equal(sent[1]?.kind, "structure");
 });
+
+test("corrected input queued before a definitive rejection replaces the rejected request on retry", async () => {
+  const initial = response(), sent: RichMutation[] = [];
+  let release: (() => void) | undefined;
+  const delay = new Promise<void>(resolve => { release = resolve; });
+  const queue = new RichSaveQueue(initial, "session", async request => {
+    sent.push(request);
+    if (sent.length === 1) { await delay; throw Object.assign(new Error("Invalid patch"), { status: 422 }); }
+    return apply(initial, request);
+  }, () => {});
+  queue.update(changed(initial, "Rejected input"), "rejected");
+  const pending = queue.flush();
+  queue.update(changed(initial, "Corrected while waiting"), "corrected", "structure");
+  release?.(); await assert.rejects(pending, /Invalid patch/);
+  await queue.flush();
+  assert.deepEqual(sent.map(item => [item.actionId, item.kind]), [["rejected", "typing"], ["corrected", "structure"]]);
+});
+
+for (const limit of ["bytes", "steps"] as const) for (const alreadyQueued of [false, true]) {
+  test(`a corrected new action recovers a local ${limit} rejection with correction ${alreadyQueued ? "already queued" : "after failure"}`, async () => {
+    const initial = response(), sent: RichMutation[] = [];
+    const queue = new RichSaveQueue(initial, "session", async request => {
+      sent.push(request); return apply(initial, request);
+    }, () => {});
+    const oversized = changed(initial, limit === "bytes" ? "x".repeat(1_100_000) : "Many steps");
+    if (limit === "steps") for (let index = 0; index < 1010; index++) oversized.regions[0].blocks.push({
+      id: `new-${index}`, revision: 1, type: "paragraph", props: {}, provenance: [], children: [], content: [{ type: "text", text: "x", styles: {} }],
+    });
+    queue.update(oversized, "too-large");
+    if (alreadyQueued) queue.update(changed(initial, "Corrected"), "corrected");
+    await assert.rejects(queue.flush(), /Сократите объём изменения/);
+    assert.equal(sent.length, 0);
+    if (!alreadyQueued) queue.update(changed(initial, "Corrected"), "corrected");
+    await queue.flush();
+    assert.deepEqual(sent.map(item => item.actionId), ["corrected"]);
+  });
+}
 
 test("concurrent flushes share one save and drain newer input against its acknowledgment", async () => {
   const initial = response(), sent: RichMutation[] = [];

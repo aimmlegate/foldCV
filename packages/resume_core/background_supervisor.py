@@ -63,8 +63,9 @@ class JobControl:
 
     @property
     def active_seconds(self):
+        from .template_import import processing_protocol
         return (LIMITS.import_active_seconds if self.job.submission.kind == "processing"
-            and "save_import" in self.job.submission.tools else LIMITS.active_seconds)
+            and processing_protocol(self.job.submission) in {'agent_import_v1', 'template_import_v1'} else LIMITS.active_seconds)
 
     def stop(self, reason="INTERRUPTED", *, revoke_publication=False):
         self.revoked = True

@@ -6,6 +6,7 @@ from fastapi.responses import JSONResponse, StreamingResponse
 from packages.resume_core.background_store import BackgroundFailure
 from packages.resume_core.models.agent import AgentEmptyRequest
 from packages.resume_core.models.background import JobAgentRequestV1, JobReplayRequestV1, JobReplayV1, JobFixedRequestV1
+from packages.resume_core.models.template_import import StartTemplateImportV1, ResumeTemplateImportV1
 
 
 def mount_jobs(app, service):
@@ -37,7 +38,12 @@ def mount_jobs(app, service):
         return response(job, 202 if created else 200)
 
     @app.post(prefix + "/fixed")
-    async def fixed(project_id: str, payload: JobFixedRequestV1):
+    async def fixed(project_id: str, payload: JobFixedRequestV1 | StartTemplateImportV1 | ResumeTemplateImportV1):
+        if isinstance(payload, (StartTemplateImportV1, ResumeTemplateImportV1)):
+            if service.templates is None:
+                raise BackgroundFailure('JOB_DISABLED')
+            value, created = await service.templates.submit(project_id, payload)
+            return response(value, 202 if created else 200)
         value, created = await service.fixed.submit(project_id, payload)
         return response(value, 202 if created else 200)
 
@@ -76,7 +82,7 @@ def mount_jobs(app, service):
     @app.post(prefix + "/{job_id}/cancel")
     async def cancel(project_id: str, job_id: str, payload: AgentEmptyRequest):
         service.project(project_id)
-        return response(await service.supervisor.cancel(project_id, job_id))
+        return response(await service.cancel(project_id, job_id))
 
     @app.post(prefix + "/{job_id}/discard")
     async def discard(project_id: str, job_id: str, payload: AgentEmptyRequest):

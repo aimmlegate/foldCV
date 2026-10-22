@@ -1,0 +1,5 @@
+Alex Example
+Example Labs — backend engineer
+2020–2023
+Python
+Implemented queue processing.

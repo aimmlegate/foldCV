@@ -1,0 +1,672 @@
+{
+  "$defs": {
+    "ActionCapture": {
+      "additionalProperties": false,
+      "properties": {
+        "actionId": {
+          "minLength": 1,
+          "title": "Actionid",
+          "type": "string"
+        },
+        "actionToken": {
+          "minimum": 0,
+          "title": "Actiontoken",
+          "type": "integer"
+        },
+        "dependencies": {
+          "items": {
+            "$ref": "#/$defs/DependencyStamp"
+          },
+          "title": "Dependencies",
+          "type": "array"
+        },
+        "sessionId": {
+          "minLength": 1,
+          "title": "Sessionid",
+          "type": "string"
+        }
+      },
+      "required": [
+        "sessionId",
+        "actionId",
+        "actionToken",
+        "dependencies"
+      ],
+      "title": "ActionCapture",
+      "type": "object"
+    },
+    "AuthoredPresentation": {
+      "additionalProperties": false,
+      "properties": {
+        "itemHandle": {
+          "anyOf": [
+            {
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Itemhandle"
+        },
+        "nodeIndex": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Nodeindex"
+        },
+        "overrides": {
+          "$ref": "#/$defs/StyleOverrides"
+        },
+        "packageHash": {
+          "pattern": "^[a-f0-9]{64}$",
+          "title": "Packagehash",
+          "type": "string"
+        },
+        "styleToken": {
+          "minLength": 1,
+          "title": "Styletoken",
+          "type": "string"
+        },
+        "templateInstanceId": {
+          "anyOf": [
+            {
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Templateinstanceid"
+        },
+        "viewKey": {
+          "minLength": 1,
+          "title": "Viewkey",
+          "type": "string"
+        }
+      },
+      "required": [
+        "packageHash",
+        "viewKey",
+        "styleToken",
+        "templateInstanceId",
+        "itemHandle",
+        "overrides"
+      ],
+      "title": "AuthoredPresentation",
+      "type": "object"
+    },
+    "DependencyStamp": {
+      "additionalProperties": false,
+      "properties": {
+        "fingerprint": {
+          "anyOf": [
+            {
+              "pattern": "^[a-f0-9]{64}$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Fingerprint"
+        },
+        "id": {
+          "minLength": 1,
+          "title": "Id",
+          "type": "string"
+        },
+        "kind": {
+          "enum": [
+            "block",
+            "record",
+            "field",
+            "period",
+            "ownership",
+            "source",
+            "rules",
+            "asset",
+            "timeline_order"
+          ],
+          "title": "Kind",
+          "type": "string"
+        },
+        "revision": {
+          "minimum": 1,
+          "title": "Revision",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "kind",
+        "id",
+        "revision",
+        "fingerprint"
+      ],
+      "title": "DependencyStamp",
+      "type": "object"
+    },
+    "PatchInsert": {
+      "additionalProperties": false,
+      "properties": {
+        "kind": {
+          "const": "insert",
+          "title": "Kind",
+          "type": "string"
+        },
+        "pointer": {
+          "minLength": 1,
+          "title": "Pointer",
+          "type": "string"
+        },
+        "valueWire": {
+          "title": "Valuewire",
+          "type": "string"
+        }
+      },
+      "required": [
+        "kind",
+        "pointer",
+        "valueWire"
+      ],
+      "title": "PatchInsert",
+      "type": "object"
+    },
+    "PatchRemove": {
+      "additionalProperties": false,
+      "properties": {
+        "kind": {
+          "const": "remove",
+          "title": "Kind",
+          "type": "string"
+        },
+        "pointer": {
+          "minLength": 1,
+          "title": "Pointer",
+          "type": "string"
+        }
+      },
+      "required": [
+        "kind",
+        "pointer"
+      ],
+      "title": "PatchRemove",
+      "type": "object"
+    },
+    "PatchSet": {
+      "additionalProperties": false,
+      "properties": {
+        "kind": {
+          "const": "set",
+          "title": "Kind",
+          "type": "string"
+        },
+        "pointer": {
+          "minLength": 1,
+          "title": "Pointer",
+          "type": "string"
+        },
+        "valueWire": {
+          "title": "Valuewire",
+          "type": "string"
+        }
+      },
+      "required": [
+        "kind",
+        "pointer",
+        "valueWire"
+      ],
+      "title": "PatchSet",
+      "type": "object"
+    },
+    "PatchSpliceText": {
+      "additionalProperties": false,
+      "properties": {
+        "beforeTextHash": {
+          "pattern": "^[a-f0-9]{64}$",
+          "title": "Beforetexthash",
+          "type": "string"
+        },
+        "end": {
+          "minimum": 0,
+          "title": "End",
+          "type": "integer"
+        },
+        "kind": {
+          "const": "splice_text",
+          "title": "Kind",
+          "type": "string"
+        },
+        "pointer": {
+          "minLength": 1,
+          "title": "Pointer",
+          "type": "string"
+        },
+        "start": {
+          "minimum": 0,
+          "title": "Start",
+          "type": "integer"
+        },
+        "text": {
+          "title": "Text",
+          "type": "string"
+        }
+      },
+      "required": [
+        "kind",
+        "pointer",
+        "beforeTextHash",
+        "start",
+        "end",
+        "text"
+      ],
+      "title": "PatchSpliceText",
+      "type": "object"
+    },
+    "PresentationPatchV1": {
+      "additionalProperties": false,
+      "properties": {
+        "afterHash": {
+          "pattern": "^[a-f0-9]{64}$",
+          "title": "Afterhash",
+          "type": "string"
+        },
+        "beforeHash": {
+          "pattern": "^[a-f0-9]{64}$",
+          "title": "Beforehash",
+          "type": "string"
+        },
+        "remove": {
+          "items": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "title": "Remove",
+          "type": "array"
+        },
+        "set": {
+          "additionalProperties": {
+            "$ref": "#/$defs/AuthoredPresentation"
+          },
+          "propertyNames": {
+            "minLength": 1
+          },
+          "title": "Set",
+          "type": "object"
+        }
+      },
+      "required": [
+        "beforeHash",
+        "afterHash",
+        "set",
+        "remove"
+      ],
+      "title": "PresentationPatchV1",
+      "type": "object"
+    },
+    "ResumeIdentity": {
+      "additionalProperties": false,
+      "properties": {
+        "subtitle": {
+          "title": "Subtitle",
+          "type": "string"
+        },
+        "title": {
+          "title": "Title",
+          "type": "string"
+        }
+      },
+      "required": [
+        "title",
+        "subtitle"
+      ],
+      "title": "ResumeIdentity",
+      "type": "object"
+    },
+    "RichGenerationState": {
+      "additionalProperties": false,
+      "properties": {
+        "errorCode": {
+          "anyOf": [
+            {
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Errorcode"
+        },
+        "id": {
+          "minLength": 1,
+          "title": "Id",
+          "type": "string"
+        },
+        "stage": {
+          "enum": [
+            "assess_resume",
+            "normalize_semantics",
+            "draft_prose",
+            "assemble",
+            "render"
+          ],
+          "title": "Stage",
+          "type": "string"
+        },
+        "startedAt": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Startedat"
+        },
+        "status": {
+          "enum": [
+            "queued",
+            "running",
+            "completed",
+            "failed",
+            "cancelled",
+            "interrupted"
+          ],
+          "title": "Status",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "status",
+        "stage",
+        "errorCode"
+      ],
+      "title": "RichGenerationState",
+      "type": "object"
+    },
+    "StyleOverrides": {
+      "additionalProperties": false,
+      "properties": {
+        "alignment": {
+          "anyOf": [
+            {
+              "enum": [
+                "left",
+                "center",
+                "right",
+                "justify"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Alignment"
+        },
+        "bold": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Bold"
+        },
+        "color": {
+          "anyOf": [
+            {
+              "pattern": "^#[a-fA-F0-9]{6}$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Color"
+        },
+        "font": {
+          "anyOf": [
+            {
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Font"
+        },
+        "italic": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Italic"
+        },
+        "size": {
+          "anyOf": [
+            {
+              "exclusiveMinimum": 0,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Size"
+        }
+      },
+      "required": [
+        "font",
+        "size",
+        "color",
+        "alignment",
+        "bold",
+        "italic"
+      ],
+      "title": "StyleOverrides",
+      "type": "object"
+    },
+    "TemplateSnapshotIdentity": {
+      "additionalProperties": false,
+      "properties": {
+        "documentHash": {
+          "pattern": "^[a-f0-9]{64}$",
+          "title": "Documenthash",
+          "type": "string"
+        },
+        "documentRevision": {
+          "minimum": 1,
+          "title": "Documentrevision",
+          "type": "integer"
+        },
+        "factsHash": {
+          "pattern": "^[a-f0-9]{64}$",
+          "title": "Factshash",
+          "type": "string"
+        },
+        "packageHash": {
+          "pattern": "^[a-f0-9]{64}$",
+          "title": "Packagehash",
+          "type": "string"
+        },
+        "presentationHash": {
+          "pattern": "^[a-f0-9]{64}$",
+          "title": "Presentationhash",
+          "type": "string"
+        },
+        "projectId": {
+          "minLength": 1,
+          "title": "Projectid",
+          "type": "string"
+        },
+        "projectRevision": {
+          "minimum": 1,
+          "title": "Projectrevision",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "projectId",
+        "projectRevision",
+        "documentRevision",
+        "documentHash",
+        "factsHash",
+        "packageHash",
+        "presentationHash"
+      ],
+      "title": "TemplateSnapshotIdentity",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "baseSnapshot": {
+      "$ref": "#/$defs/TemplateSnapshotIdentity"
+    },
+    "baseWorkspaceSha256": {
+      "pattern": "^[a-f0-9]{64}$",
+      "title": "Baseworkspacesha256",
+      "type": "string"
+    },
+    "capture": {
+      "$ref": "#/$defs/ActionCapture"
+    },
+    "clientMutationId": {
+      "minLength": 1,
+      "title": "Clientmutationid",
+      "type": "string"
+    },
+    "createdIds": {
+      "additionalProperties": {
+        "additionalProperties": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "type": "object"
+      },
+      "title": "Createdids",
+      "type": "object"
+    },
+    "mutationWire": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "title": "Mutationwire"
+    },
+    "presentationPatch": {
+      "$ref": "#/$defs/PresentationPatchV1"
+    },
+    "requestHash": {
+      "pattern": "^[a-f0-9]{64}$",
+      "title": "Requesthash",
+      "type": "string"
+    },
+    "resultGeneration": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/RichGenerationState"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "resultIdentity": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/ResumeIdentity"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "resultSnapshot": {
+      "$ref": "#/$defs/TemplateSnapshotIdentity"
+    },
+    "resultWorkspaceSha256": {
+      "pattern": "^[a-f0-9]{64}$",
+      "title": "Resultworkspacesha256",
+      "type": "string"
+    },
+    "schemaVersion": {
+      "const": 1,
+      "title": "Schemaversion",
+      "type": "integer"
+    },
+    "workspacePatch": {
+      "items": {
+        "discriminator": {
+          "mapping": {
+            "insert": "#/$defs/PatchInsert",
+            "remove": "#/$defs/PatchRemove",
+            "set": "#/$defs/PatchSet",
+            "splice_text": "#/$defs/PatchSpliceText"
+          },
+          "propertyName": "kind"
+        },
+        "oneOf": [
+          {
+            "$ref": "#/$defs/PatchSet"
+          },
+          {
+            "$ref": "#/$defs/PatchInsert"
+          },
+          {
+            "$ref": "#/$defs/PatchRemove"
+          },
+          {
+            "$ref": "#/$defs/PatchSpliceText"
+          }
+        ]
+      },
+      "maxItems": 1000,
+      "title": "Workspacepatch",
+      "type": "array"
+    }
+  },
+  "required": [
+    "schemaVersion",
+    "clientMutationId",
+    "baseSnapshot",
+    "baseWorkspaceSha256",
+    "resultSnapshot",
+    "resultWorkspaceSha256",
+    "capture",
+    "requestHash",
+    "createdIds",
+    "mutationWire",
+    "workspacePatch",
+    "presentationPatch",
+    "resultIdentity",
+    "resultGeneration"
+  ],
+  "title": "TemplatePreparedEditDeltaV1",
+  "type": "object"
+}

@@ -24,9 +24,10 @@ from resume_api.rewrite_timing import add_phase, measure
 from packages.resume_core.text_rewrite import PlainTextReply
 from packages.resume_core.reasoning import ModelReasoning, model_reasoning
 from packages.resume_core.storage import StorageFailure
-from resume_api.providers.content import (ContentFailure, ContentInput, ContentResult,
+from resume_api.providers.content import (ContentFailure, ContentInput, ContentResult, ContentTransportReturn, outcome_state,
                                           ReportedUsage, ResultT)
 from resume_api.providers.structured_schema import StructuredSchema
+from resume_api.providers.dynamic_result import DynamicResultSpec
 from resume_api.providers.preflight import PreflightCache, preflight_key
 from spikes.cli.profile import FIXTURE_VERSION, GAPS, REQUIRED_FLAGS, VERSION, exec_arguments, overrides
 
@@ -178,6 +179,8 @@ class Events:
             value = strict_json(self.text, max_bytes=self.max_bytes)
             if not isinstance(value, dict):
                 raise InvalidFinal()
+            if isinstance(model, DynamicResultSpec):
+                return model.decode_value(value)
             restored = schema.restore(value, model)
             return model.model_validate(decoder(restored) if decoder else restored, strict=True)
         except (ContentFailure, ValidationError, ValueError):
@@ -410,12 +413,17 @@ class CodexCliProvider:
             raise ContentFailure("INVALID_INPUT") from None
         if len(original) > policy.max_input_bytes:
             raise ContentFailure("INPUT_TOO_LARGE")
-        if (not isinstance(request.result_type, type) or not issubclass(request.result_type, BaseModel)
+        dynamic = isinstance(request.result_type, DynamicResultSpec)
+        if dynamic and (policy.allow_repair or request.transport is not None):
+            raise ContentFailure("INVALID_INPUT")
+        if request.on_return is not None and policy.allow_repair:
+            raise ContentFailure('INVALID_INPUT')
+        if not dynamic and (not isinstance(request.result_type, type) or not issubclass(request.result_type, BaseModel)
                 or request.result_type.model_config.get("extra") != "forbid"):
             raise ContentFailure("INVALID_SCHEMA")
         try:
             plain = request.result_type is PlainTextReply
-            result_schema = request.result_type.model_json_schema()
+            result_schema = request.result_type.provider_schema if dynamic else request.result_type.model_json_schema()
             if request.transport is not None and hasattr(request.transport, "output_schema"):
                 result_schema = request.transport.output_schema(result_schema)
             output_schema = StructuredSchema(result_schema)
@@ -432,9 +440,23 @@ class CodexCliProvider:
         usages: list[ReportedUsage] = []
         consumed_input = 0
         consumed_output = 0
+        dispatch_witness = None
+        effective_effort = policy.reasoning_effort
+        raw_return, return_sent = None, False
+        def observed(outcome, code=None):
+            nonlocal return_sent
+            if request.on_return is not None and not return_sent:
+                return_sent = True
+                request.on_return(ContentTransportReturn(raw_return, outcome, code, attempts, _combine(usages),
+                    not files.cleanup_failed and files.process is None, dispatch_witness, effective_effort))
         try:
             with measure("preflight"):
                 probe = self.preflight(files, cancel, policy.model, deadline=deadline, effort=policy.reasoning_effort)
+            if dynamic and effective_effort is None:
+                metadata = probe.reasoning.get(policy.model)
+                if metadata is None or metadata.default not in metadata.supported:
+                    raise ContentFailure("MODEL_DENIED")
+                effective_effort = metadata.default
             if files.path is None:
                 raise ContentFailure("TEMP_FAILED")
             if not plain:
@@ -457,9 +479,14 @@ class CodexCliProvider:
                         if plain:
                             at = args.index("--output-schema")
                             args = args[:at] + args[at + 2:]
-                        if policy.reasoning_effort is not None:
-                            args = (*args[:-1], "--config", "model_reasoning_effort=" + json.dumps(policy.reasoning_effort), args[-1])
+                        if effective_effort is not None:
+                            args = (*args[:-1], "--config", "model_reasoning_effort=" + json.dumps(effective_effort), args[-1])
                         began, active = time.perf_counter(), None
+                        def spawned():
+                            nonlocal dispatch_witness
+                            dispatch_witness = {"transport":"exec", "dispatched":True,
+                                "pid":files.process.pid if files.process is not None else None}
+                            if self.model_started is not None: self.model_started()
                         def accept(raw):
                             nonlocal active
                             events.accept(raw)
@@ -472,12 +499,14 @@ class CodexCliProvider:
                         with measure("cli_process"):
                             output, errors = self._run(files, args, deadline, cancel,
                                                        data=prompt, on_line=accept,
-                                                       on_spawn=self.model_started,
+                                                       on_spawn=spawned,
                                                        max_line=policy.max_total_output_bytes - consumed_output,
                                                        max_output=policy.max_total_output_bytes - consumed_output)
                     finally:
                         usages.append(events.usage)
+                        raw_return = events.text
                     consumed_output += len(output) + len(errors)
+                    observed('completed' if events.complete else 'incomplete')
                     with measure("decode"):
                         value = events.result(request.result_type, output_schema, getattr(request.transport, "decode", None))
                     if request.transport:
@@ -487,17 +516,28 @@ class CodexCliProvider:
                             raise InvalidFinal() from None
                     self.process._check(deadline, cancel)
                     return ContentResult(value, _combine(usages), probe.version, policy.model,
-                                         self.clock() - start, attempts)
+                                         self.clock() - start, attempts, cleanup_verified=not files.cleanup_failed and files.process is None,
+                                         dispatch_witness=dispatch_witness, reasoning_effort=effective_effort, raw_return=raw_return)
                 except InvalidFinal:
                     if index == attempt_limit - 1:
                         raise
             raise ContentFailure("INVALID_RESULT")
         except SpikeError as error:
-            raise ContentFailure(error.code, logical_attempts=attempts, usage=_combine(usages)) from None
+            observed(outcome_state(error.code), error.code)
+            raise ContentFailure(error.code, logical_attempts=attempts, usage=_combine(usages),
+                cleanup_verified=not files.cleanup_failed and files.process is None, dispatch_witness=dispatch_witness, raw_return=raw_return) from None
         except OSError:
-            raise ContentFailure("TEMP_FAILED", logical_attempts=attempts, usage=_combine(usages)) from None
+            observed('transport_failure', 'TEMP_FAILED')
+            raise ContentFailure("TEMP_FAILED", logical_attempts=attempts, usage=_combine(usages),
+                cleanup_verified=not files.cleanup_failed and files.process is None, dispatch_witness=dispatch_witness, raw_return=raw_return) from None
         except ContentFailure as error:
+            observed(outcome_state(error.code), error.code)
             if error.code in {"AUTH_REQUIRED", "AUTH_MODE_MISMATCH", "MODEL_DENIED", "CLI_UNSUPPORTED",
                     "CLI_PROFILE_UNSAFE", "CLI_FAILED", "METADATA_FAILED", "PROCESS_CLEANUP_FAILED"}:
                 self.invalidate_preflight()
-            raise ContentFailure(error.code, logical_attempts=attempts, usage=_combine(usages)) from None
+            raise ContentFailure(error.code, logical_attempts=attempts, usage=_combine(usages),
+                cleanup_verified=not files.cleanup_failed and files.process is None, dispatch_witness=dispatch_witness, raw_return=raw_return) from None
+        except Exception:
+            observed('transport_failure', 'CLI_FAILED')
+            raise ContentFailure("CLI_FAILED", logical_attempts=attempts, usage=_combine(usages),
+                cleanup_verified=not files.cleanup_failed and files.process is None, dispatch_witness=dispatch_witness, raw_return=raw_return) from None

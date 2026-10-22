@@ -3,11 +3,13 @@
 from __future__ import annotations
 
 import hashlib
+import json
 from dataclasses import dataclass
 import os
 import re
 
 from .models.rich_workspace import WorkspaceV6
+from .models.template_workspace import WorkspaceV7
 from .project_store import ProjectStore, ProjectStoreFailure, owned_file, strict_json
 from .rich_limits import DOCX_BYTES, WORKSPACE_BYTES
 from .rich_limits import ImageReferences, retained_image_bytes
@@ -16,7 +18,11 @@ from .storage import StorageFailure, atomic_write, locked_root, private_director
 
 
 def rich_snapshot_bytes(workspace: WorkspaceV6) -> bytes:
-    raw = workspace.model_dump_json(by_alias=True).encode("utf-8")
+    if workspace.schema_version == 7:
+        raw = json.dumps(workspace.model_dump(mode='json', by_alias=True), sort_keys=True,
+            ensure_ascii=False, allow_nan=False, separators=(',', ':')).encode('utf-8')
+    else:
+        raw = workspace.model_dump_json(by_alias=True).encode("utf-8")
     if len(raw) > WORKSPACE_BYTES:
         raise ProjectStoreFailure("PROJECT_TOO_LARGE")
     return raw
@@ -26,9 +32,9 @@ def decode_rich_snapshot(raw: bytes) -> WorkspaceV6:
     data = strict_json(raw)
     if not isinstance(data, dict) or type(data.get("schemaVersion")) is not int:
         raise ProjectStoreFailure("PROJECT_LOAD_FAILED")
-    if data["schemaVersion"] != 6:
-        raise ProjectStoreFailure("PROJECT_VERSION_UNSUPPORTED")
-    return WorkspaceV6.model_validate(data)
+    if data["schemaVersion"] == 6: return WorkspaceV6.model_validate(data)
+    if data["schemaVersion"] == 7: return WorkspaceV7.model_validate(data)
+    raise ProjectStoreFailure("PROJECT_VERSION_UNSUPPORTED")
 
 
 @dataclass(frozen=True)
@@ -37,6 +43,62 @@ class PreparedRichSave:
     raw: bytes
     blobs: tuple
     images: tuple
+
+
+def retain_template_state(previous, candidate):
+    if previous.schema_version != 7:
+        if candidate.schema_version == 7:
+            raise ProjectStoreFailure('PROJECT_VERSION_UNSUPPORTED')
+        return
+    if candidate.schema_version != 7:
+        raise ProjectStoreFailure('PROJECT_VERSION_UNSUPPORTED')
+    if previous.project is not None and candidate.project is None:
+        raise ProjectStoreFailure('PROJECT_SAVE_FAILED')
+    before, after = previous.project or previous.pre_draft, candidate.project or candidate.pre_draft
+    if before.template_package is not None and before.template_package != after.template_package:
+        raise ProjectStoreFailure('PROJECT_SAVE_FAILED')
+    retained = {(source.id, source.revision): source for source in after.sources}
+    for source in before.sources:
+        current = retained.get((source.id, source.revision))
+        if current is None or (source.byte_sha256, source.byte_ref, source.original_name) != (
+                current.byte_sha256, current.byte_ref, current.original_name):
+            raise ProjectStoreFailure('SOURCE_BYTES_MISMATCH')
+        old_units = [unit.model_dump(exclude={'disposition', 'represented_fact_ids'}) for unit in source.units]
+        new_units = [unit.model_dump(exclude={'disposition', 'represented_fact_ids'}) for unit in current.units]
+        if source.parser != 'pending' and (source.parser, source.parser_version, old_units) != (
+                current.parser, current.parser_version, new_units):
+            raise ProjectStoreFailure('SOURCE_BYTES_MISMATCH')
+    if previous.project is not None:
+        evidence = {value.id: value for value in candidate.project.evidence_records}
+        if any(evidence.get(value.id) != value for value in previous.project.evidence_records):
+            raise ProjectStoreFailure('PROJECT_SAVE_FAILED')
+        if previous.project.export_inputs != candidate.project.export_inputs[:len(previous.project.export_inputs)]:
+            raise ProjectStoreFailure('PROJECT_SAVE_FAILED')
+        from .template_retention import retain_exports
+        retain_exports(previous.project.exports, candidate.project.exports)
+    observations = {value.id: value for value in after.facts.observations}
+    identities = {value.record_id: value for value in after.facts.builtin_identities}
+    scopes = {value.id: value for value in after.facts.manual_scopes}
+    if (any(identities.get(value.record_id) != value for value in before.facts.builtin_identities)
+            or any(scopes.get(value.id) != value for value in before.facts.manual_scopes)):
+        raise ProjectStoreFailure('PROJECT_SAVE_FAILED')
+    for observation in before.facts.observations:
+        current = observations.get(observation.id)
+        if current is None or observation.model_dump(exclude={'admission', 'receipt_ids'}) != current.model_dump(
+                exclude={'admission', 'receipt_ids'}) or not set(observation.receipt_ids) <= set(current.receipt_ids):
+            raise ProjectStoreFailure('PROJECT_SAVE_FAILED')
+    operations = {value.id: value for value in after.template_operations}
+    for operation in before.template_operations:
+        current = operations.get(operation.id)
+        if current is None or operation.capture != current.capture or any(
+                getattr(operation, key) is not None and getattr(operation, key) != getattr(current, key)
+                for key in ('admitted_at', 'expires_at')):
+            raise ProjectStoreFailure('PROJECT_SAVE_FAILED')
+        allocations = {(value.task_id, value.discovery_attempt_id, value.key): value for value in current.allocations}
+        if any(allocations.get((value.task_id, value.discovery_attempt_id, value.key)) != value for value in operation.allocations):
+            raise ProjectStoreFailure('PROJECT_SAVE_FAILED')
+        from .template_retention import retain_operation
+        retain_operation(operation, current)
 
 
 class RichProjectStore(ProjectStore):
@@ -101,7 +163,7 @@ class RichProjectStore(ProjectStore):
     def prepare_save(self, workspace, originals, artifacts, images=None):
         images = images or {}
         try:
-            workspace = WorkspaceV6.model_validate(workspace.model_dump(by_alias=True))
+            workspace = decode_rich_snapshot(rich_snapshot_bytes(workspace))
             raw = rich_snapshot_bytes(workspace)
             owner = workspace.project or workspace.pre_draft
             from .rich_archive import archive_payload
@@ -162,6 +224,7 @@ class RichProjectStore(ProjectStore):
                     existing.project_revision > workspace.project_revision or existing.document_revision > workspace.document_revision
                 ):
                     raise ProjectStoreFailure("PROJECT_REVISION_CHANGED")
+                retain_template_state(existing, workspace)
             self._observe("before_assets_staged", workspace.project_id)
             for kind, identifier, blob, checksum in prepared.blobs:
                 path = self._blob(directory, kind, identifier)
@@ -212,6 +275,28 @@ class RichProjectStore(ProjectStore):
             entry = next((entry for entry in self._registry().entries if entry.project_id == identifier), None)
             if entry is None or entry.tombstoned:
                 raise ProjectStoreFailure("PROJECT_DELETED")
+            return self._read_owned_snapshot_unlocked(identifier, synchronize=synchronize)
+        except ProjectStoreFailure:
+            raise
+        except (StorageFailure, OSError, ValueError):
+            raise ProjectStoreFailure("PROJECT_LOAD_FAILED") from None
+
+    def _read_template_cleanup_unlocked(self, identifier, operation_id):
+        """Read only durable owner evidence while the caller holds the deleted guard."""
+        entry = next((item for item in self._registry().entries if item.project_id == identifier), None)
+        if entry is None or not entry.tombstoned:
+            raise ProjectStoreFailure('PROJECT_NOT_DELETED')
+        workspace, _checksum = self._read_owned_snapshot_unlocked(identifier)
+        if workspace.schema_version != 7:
+            raise ProjectStoreFailure('PROJECT_VERSION_UNSUPPORTED')
+        operation = next((item for item in (workspace.project or workspace.pre_draft).template_operations
+            if item.id == operation_id), None)
+        if operation is None:
+            raise ProjectStoreFailure('PROJECT_LOAD_FAILED')
+        return operation
+
+    def _read_owned_snapshot_unlocked(self, identifier, *, synchronize=False):
+        try:
             directory = self._directory(identifier)
             path = directory / "workspace.json"
             owned_file(path, WORKSPACE_BYTES)
@@ -300,6 +385,17 @@ class RichProjectStore(ProjectStore):
             if entry is None or not entry.tombstoned:
                 raise ProjectStoreFailure("PROJECT_NOT_DELETED")
             directory = self.projects / id
+            sidecar = self.root / 'background' / 'projects' / id / 'state.json'
+            if sidecar.exists() or sidecar.is_symlink():
+                from .background_limits import LIMITS
+                from .models.background import BackgroundSidecarV1
+                with locked_root(self.root / 'background', '.jobs.lock'):
+                    owned_file(sidecar, LIMITS.sidecar_project_bytes)
+                    state = BackgroundSidecarV1.model_validate(strict_json(sidecar.read_bytes()))
+                    latest = {value.operation_id: value for value in state.template_authorizations}
+                    if state.project_id != id or any(value.deleted_cleanup is None or not value.deleted_cleanup.complete
+                            for value in latest.values()):
+                        raise ProjectStoreFailure('PROJECT_DELETE_FAILED')
             try:
                 self._observe("before_tombstone_cleanup", id)
                 if not directory.exists() and not directory.is_symlink():

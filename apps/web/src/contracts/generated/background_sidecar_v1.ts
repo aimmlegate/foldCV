@@ -646,7 +646,7 @@ export type Projectid11 = string;
 export type Requestepoch1 = number;
 export type Requestid = string;
 export type Id14 = string;
-export type Kind8 = "agent_journal" | "rich_sync" | "processing";
+export type Kind8 = "agent_journal" | "rich_sync" | "processing" | "template_import";
 export type Sha2561 = string;
 export type Kind9 = "agent" | "processing" | "rewrite" | "reconciliation";
 /**
@@ -658,6 +658,7 @@ export type Configsha256 = string;
 export type Model = string;
 export type Stage1 = "agent" | "assessment" | "extraction" | "rewrite" | "reconciliation";
 export type Payloadsha2561 = string;
+export type Protocol = ("fixed_v1" | "agent_import_v1" | "template_import_v1") | null;
 export type Schedulingclass = "background" | "interactive" | "reconciliation";
 export type Schemaversion16 = 1;
 export type Scope = WholeResumeScope | SelectionScope;
@@ -680,6 +681,36 @@ export type Sessionid1 = string;
 export type Kind12 = "text" | "blocks" | "table_cells";
 export type Textsha256 = string;
 export type Submittedat = string;
+export type Templatecommand = (StartTemplateImportV1 | ResumeTemplateImportV1) | null;
+export type Allowtextrewrite = boolean;
+export type Authorityhash = string;
+export type Dependencyhash = string;
+export type Adapter = string;
+export type Capabilityprofile = string;
+export type Capabilityversion = string;
+export type Configurationhash = string;
+export type Effort = string;
+export type Model1 = string;
+export type Day = number | null;
+export type Month = number | null;
+export type Precision = "year" | "month" | "day";
+export type Year = number;
+export type Packagehash = string;
+export type Callcap = number;
+export type Cleanupseconds = 5;
+export type Concurrency = 1;
+export type Fallbackrepairs = 1;
+export type Finalizationseconds = 30;
+export type Primaryrepairs = 1;
+export type Processingseconds = 300;
+export type Clientrequestid = string;
+export type Kind13 = "start_new_import";
+export type Protocol1 = "template_import_v1";
+export type Authorityhash1 = string;
+export type Authorizationid = string;
+export type Kind14 = "resume_import";
+export type Operationid = string;
+export type Protocol2 = "template_import_v1";
 /**
  * @maxItems 32
  */
@@ -701,6 +732,10 @@ export type Tools = (
   | "save_import"
   | "finish_import"
 )[];
+export type Errorcode = string | null;
+export type Intentid = string | null;
+export type State3 = "pending" | "saved" | "failed_before_replacement" | "outcome_unknown" | "cancelled";
+export type Workspacehash = string | null;
 export type Undoexpired = boolean;
 export type Updatedat = string;
 /**
@@ -741,6 +776,9 @@ export type Requestsha2563 = string;
 export type Resolvedat1 = string | null;
 export type Schemaversion17 = 1;
 export type Stepssha256 = string | null;
+export type Authorizationid1 = string;
+export type Finalizationid = string;
+export type Operationid1 = string;
 export type Writerepoch4 = number | null;
 /**
  * @maxItems 4096
@@ -764,12 +802,12 @@ export type Lineage7 = string;
 export type Payload = AgentPayloadReference | FixedPayloadReference | ProcessingPayloadReference;
 export type Batchid1 = string;
 export type Conversationid7 = string;
-export type Kind13 = "agent_journal";
+export type Kind15 = "agent_journal";
 export type Runid7 = string;
-export type Kind14 = "rich_sync";
+export type Kind16 = "rich_sync";
 export type Syncid = string;
 export type Candidateid = string;
-export type Kind15 = "processing";
+export type Kind17 = "processing";
 export type Payloadbytes1 = number;
 export type Payloadsha2562 = string;
 export type Projectid14 = string;
@@ -790,6 +828,33 @@ export type Payloadsha2563 = string;
  */
 export type Requests = RequestReplayV1[];
 export type Schemaversion19 = 1;
+export type Accountgeneration3 = number;
+export type Authorityhash2 = string;
+export type Authorizationid2 = string;
+export type Capturehash = string;
+export type Generation2 = number;
+export type Incarnationid = string;
+export type Leaseid = string;
+export type Pid = number | null;
+export type Processstartwitness = string | null;
+export type Reservationid = string;
+export type Transportsessionid = string | null;
+export type Transportturnid = string | null;
+export type Attemptid = string;
+export type Evidencehash = string;
+export type Neverdispatched = boolean;
+export type Ownerhash = string;
+export type Verifiedat = string;
+export type Witness = string;
+export type Records = AttemptCleanupRecord[];
+export type Dependencyhash1 = string;
+export type Operationid2 = string;
+export type Schemaversion20 = 1;
+export type State4 = "active" | "cancelled";
+/**
+ * @maxItems 4096
+ */
+export type Templateauthorizations = TemplatePublicationAuthorizationV1[];
 export type Tombstoned = boolean;
 export type Abandonedepoch = number | null;
 export type Acknowledgedcursor = number;
@@ -804,7 +869,7 @@ export type Leaseexpiresat = string;
 export type Lineage8 = string;
 export type Projectid15 = string;
 export type Resumecredentialsha256 = string;
-export type Schemaversion20 = 1;
+export type Schemaversion21 = 1;
 export type Sessionid2 = string;
 export type Status = "attached" | "recovering" | "clean_detached" | "fenced";
 export type Touchfloor = number;
@@ -841,6 +906,7 @@ export interface BackgroundSidecarV1 {
   requestEpochExpiresAt: Requestepochexpiresat;
   requests: Requests;
   schemaVersion: Schemaversion19;
+  templateAuthorizations?: Templateauthorizations;
   tombstoned: Tombstoned;
   writer: WriterSessionV1 | null;
   writerEpoch?: Writerepoch5;
@@ -1014,6 +1080,7 @@ export interface JobSnapshotV1 {
   receipt: CanonicalReceiptV1 | null;
   schemaVersion: Schemaversion15;
   submission: JobSubmissionV1;
+  templateOutcome?: PublicationOutcome | null;
   undoExpired?: Undoexpired;
   updatedAt: Updatedat;
 }
@@ -1173,10 +1240,12 @@ export interface JobSubmissionV1 {
   kind: Kind9;
   models: Models;
   payloadSha256: Payloadsha2561;
+  protocol?: Protocol;
   schedulingClass: Schedulingclass;
   schemaVersion: Schemaversion16;
   scope: Scope;
   submittedAt: Submittedat;
+  templateCommand?: Templatecommand;
   tools: Tools;
 }
 export interface JobIdentity {
@@ -1221,6 +1290,66 @@ export interface ActionCapture {
   dependencies: Dependencies;
   sessionId: Sessionid1;
 }
+export interface StartTemplateImportV1 {
+  capture: ImportCapture;
+  clientRequestId: Clientrequestid;
+  kind: Kind13;
+  protocol: Protocol1;
+}
+export interface ImportCapture {
+  allowTextRewrite: Allowtextrewrite;
+  authorityHash: Authorityhash;
+  dependencyHash: Dependencyhash;
+  factRevisions: Factrevisions;
+  fallback: ModelCapture1 | null;
+  formattingAsOf: PartialDate;
+  packageHash: Packagehash;
+  policy: RuntimePolicy;
+  primary: ModelCapture1;
+  sourceHashes: Sourcehashes;
+}
+export interface Factrevisions {
+  [k: string]: number;
+}
+export interface ModelCapture1 {
+  adapter: Adapter;
+  capabilityProfile: Capabilityprofile;
+  capabilityVersion: Capabilityversion;
+  configurationHash: Configurationhash;
+  effort: Effort;
+  model: Model1;
+}
+export interface PartialDate {
+  day: Day;
+  month: Month;
+  precision: Precision;
+  year: Year;
+}
+export interface RuntimePolicy {
+  callCap: Callcap;
+  cleanupSeconds: Cleanupseconds;
+  concurrency: Concurrency;
+  fallbackRepairs: Fallbackrepairs;
+  finalizationSeconds: Finalizationseconds;
+  primaryRepairs: Primaryrepairs;
+  processingSeconds: Processingseconds;
+}
+export interface Sourcehashes {
+  [k: string]: string;
+}
+export interface ResumeTemplateImportV1 {
+  authorityHash: Authorityhash1;
+  authorizationId: Authorizationid;
+  kind: Kind14;
+  operationId: Operationid;
+  protocol: Protocol2;
+}
+export interface PublicationOutcome {
+  errorCode: Errorcode;
+  intentId: Intentid;
+  state: State3;
+  workspaceHash: Workspacehash;
+}
 export interface ManualIntentV1 {
   actionId?: Actionid2;
   afterGenerationsSha256: Aftergenerationssha2561;
@@ -1245,7 +1374,13 @@ export interface ManualIntentV1 {
   resolvedAt?: Resolvedat1;
   schemaVersion: Schemaversion17;
   stepsSha256?: Stepssha256;
+  templateFinalization?: TemplateFinalizationBinding | null;
   writerEpoch: Writerepoch4;
+}
+export interface TemplateFinalizationBinding {
+  authorizationId: Authorizationid1;
+  finalizationId: Finalizationid;
+  operationId: Operationid1;
 }
 export interface OrphanAssetV1 {
   orphanedAt: Orphanedat;
@@ -1273,16 +1408,16 @@ export interface ProposalBindingV1 {
 export interface AgentPayloadReference {
   batchId: Batchid1;
   conversationId: Conversationid7;
-  kind: Kind13;
+  kind: Kind15;
   runId: Runid7;
 }
 export interface FixedPayloadReference {
-  kind: Kind14;
+  kind: Kind16;
   syncId: Syncid;
 }
 export interface ProcessingPayloadReference {
   candidateId: Candidateid;
-  kind: Kind15;
+  kind: Kind17;
 }
 export interface RequestReplayV1 {
   archivedResult: JobSnapshotV1 | null;
@@ -1290,6 +1425,42 @@ export interface RequestReplayV1 {
   identity: JobIdentity;
   jobId: Jobid5;
   payloadSha256: Payloadsha2563;
+}
+export interface TemplatePublicationAuthorizationV1 {
+  accountGeneration: Accountgeneration3;
+  authorityHash: Authorityhash2;
+  authorizationId: Authorizationid2;
+  deletedCleanup?: DeletedTemplateCleanupV1 | null;
+  dependencyHash: Dependencyhash1;
+  operationId: Operationid2;
+  schemaVersion: Schemaversion20;
+  state: State4;
+}
+export interface DeletedTemplateCleanupV1 {
+  captureHash: Capturehash;
+  owners: Owners;
+  records: Records;
+}
+export interface Owners {
+  [k: string]: LaunchOwner;
+}
+export interface LaunchOwner {
+  generation: Generation2;
+  incarnationId: Incarnationid;
+  leaseId: Leaseid;
+  pid: Pid;
+  processStartWitness: Processstartwitness;
+  reservationId: Reservationid;
+  transportSessionId: Transportsessionid;
+  transportTurnId: Transportturnid;
+}
+export interface AttemptCleanupRecord {
+  attemptId: Attemptid;
+  evidenceHash: Evidencehash;
+  neverDispatched: Neverdispatched;
+  ownerHash: Ownerhash;
+  verifiedAt: Verifiedat;
+  witness: Witness;
 }
 export interface WriterSessionV1 {
   abandonedEpoch?: Abandonedepoch;
@@ -1305,7 +1476,7 @@ export interface WriterSessionV1 {
   lineage: Lineage8;
   projectId: Projectid15;
   resumeCredentialSha256: Resumecredentialsha256;
-  schemaVersion: Schemaversion20;
+  schemaVersion: Schemaversion21;
   sessionId: Sessionid2;
   status: Status;
   touchFloor?: Touchfloor;

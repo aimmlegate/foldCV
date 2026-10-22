@@ -5,9 +5,11 @@ from __future__ import annotations
 from dataclasses import dataclass
 import math
 import threading
-from typing import Generic, Protocol, TypeVar
+from typing import Callable, Generic, Protocol, TypeVar
 
-from pydantic import BaseModel
+from pydantic import BaseModel, JsonValue
+
+from .dynamic_result import DynamicResultSpec
 
 from packages.resume_core.reasoning import EFFORTS, ReasoningEffort
 from packages.resume_core.gui_prompts import CONTENT_INPUT_BYTES
@@ -46,9 +48,10 @@ class GenerationPolicy:
 @dataclass(frozen=True)
 class ContentInput(Generic[ResultT]):
     text: str
-    result_type: type[ResultT]
+    result_type: type[ResultT] | DynamicResultSpec
     policy: GenerationPolicy
     transport: ContentTransport[ResultT] | None = None
+    on_return: Callable[[ContentTransportReturn], None] | None = None
 
 
 @dataclass(frozen=True)
@@ -68,17 +71,48 @@ class ContentResult(Generic[ResultT]):
     elapsed_seconds: float
     logical_attempts: int
     internal_inference_count: int | None = None
+    cleanup_verified: bool | None = None
+    dispatch_witness: dict[str, JsonValue] | None = None
+    reasoning_effort: str | None = None
+    raw_return: str | None = None
+
+
+@dataclass(frozen=True)
+class ContentTransportReturn:
+    raw_return: str | None
+    outcome: str
+    original_code: str | None
+    logical_attempts: int
+    usage: ReportedUsage
+    cleanup_verified: bool | None
+    dispatch_witness: dict[str, JsonValue] | None
+    reasoning_effort: str | None
 
 
 class ContentFailure(Exception):
     def __init__(self, code: str, *, logical_attempts: int = 0,
-                 usage: ReportedUsage = ReportedUsage()):
+                 usage: ReportedUsage = ReportedUsage(),
+                 cleanup_verified: bool | None = None,
+                 dispatch_witness: dict[str, JsonValue] | None = None, raw_return: str | None = None):
         self.code = code
         self.logical_attempts = logical_attempts
         self.usage = usage
+        self.cleanup_verified = cleanup_verified
+        self.dispatch_witness = dispatch_witness
+        self.raw_return = raw_return
         super().__init__(code)
 
 
 class ContentProvider(Protocol):
     def generate(self, request: ContentInput[ResultT], files: OperationFiles,
                  cancel: threading.Event) -> ContentResult[ResultT]: ...
+
+
+def outcome_state(code: str) -> str:
+    if code in {"INVALID_RESULT", "INVALID_PAYLOAD"}: return "invalid_payload"
+    if code in {"REFUSED", "REFUSAL"}: return "refused"
+    if code in {"INCOMPLETE_STREAM", "INCOMPLETE"}: return "incomplete"
+    if code in {"DEADLINE", "DEADLINE_EXCEEDED", "TIMEOUT"}: return "timed_out"
+    if code == "CANCELLED": return "cancelled"
+    if code in {"CLEANUP_FAILED", "PROCESS_CLEANUP_FAILED"}: return "cleanup_failure"
+    return "transport_failure"

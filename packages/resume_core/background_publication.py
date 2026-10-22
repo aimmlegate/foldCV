@@ -20,6 +20,8 @@ from .models.background import (CanonicalCandidateV1, CanonicalReceiptV1, Histor
 from .project_store import encoded, owned_file, strict_json
 from .rich_mutations import apply_rich_mutation, mutation_sha256
 from .storage import atomic_write, locked_root, private_directory
+from .models.template_publication import TemplateCanonicalCandidateV2, decode_canonical_candidate
+from .models.template_authority import TemplatePublicationAuthorizationV1
 
 RESOLVED = frozenset({"receipt_stored", "reconciled"})
 
@@ -50,6 +52,12 @@ class CanonicalCoordinator:
         self.jobs, self.history, self.canonical, self.payload_loader = jobs, history, canonical, payload_loader
         self.authority, self.observer, self.validate = authority or PublicationAuthority(), observer, validate
         self.mutexes = {}
+        self.template_checkpoint_locks = {}
+        self.template_checkpoint_tasks = {}
+        self.template_checkpoint_async_locks = {}
+        self.template_checkpoint_fences = {}
+        self.template_checkpoint_owners = {}
+        self.template_export_tasks = {}
         self.canonical.background_observer = lambda phase, project: self.observer(phase, project)
 
     def _mutex(self, project):
@@ -80,11 +88,61 @@ class CanonicalCoordinator:
         job.event_cursor += 1
         job.updated_at = self.jobs.clock()
 
+    def authorize_template(self, project, operation):
+        from .template_import import authorization
+        captured = authorization(operation)
+        with self.jobs.guard(project) as directory:
+            state = self.jobs._read(project, directory)
+            self._writable(state)
+            workspace, _checksum = self.canonical._read_committed_unlocked(project)
+            retained = next((item for item in (workspace.project or workspace.pre_draft).template_operations if item.id == operation.id), None)
+            if retained is None or retained != operation or operation.project_id != project:
+                raise BackgroundFailure('DEPENDENCY_CHANGED')
+            value = TemplatePublicationAuthorizationV1(schemaVersion=1, operationId=operation.id,
+                authorizationId=captured.id, state='active', authorityHash=captured.authority_hash,
+                dependencyHash=captured.dependency_hash, accountGeneration=state.account_generation)
+            old = next((item for item in state.template_authorizations
+                if item.operation_id == operation.id and item.authorization_id == captured.id), None)
+            if old is not None:
+                if old != value:
+                    raise BackgroundFailure('CANCELLED' if old.state == 'cancelled' else 'DEPENDENCY_CHANGED')
+                return old
+            state.template_authorizations.append(value)
+            self._persist(directory, state)
+            return value
+
+    def cancel_template(self, project, operation_id):
+        with self.jobs.guard(project) as directory:
+            state = self.jobs._read(project, directory)
+            intents = [intent for intent in state.manual_intents if intent.template_finalization is not None
+                and intent.template_finalization.operation_id == operation_id]
+            if any(intent.phase == 'fenced' for intent in intents):
+                raise BackgroundFailure('OUTCOME_UNKNOWN')
+            claimed = any(intent.phase not in {'intent_stored', 'reconciled'} for intent in intents)
+            if claimed:
+                return False
+            if not any(value.operation_id == operation_id for value in state.template_authorizations):
+                workspace, _checksum = self.canonical._read_committed_unlocked(project)
+                operation = next((item for item in (workspace.project or workspace.pre_draft).template_operations if item.id == operation_id), None)
+                if operation is None or not operation.authorizations:
+                    raise BackgroundFailure('JOB_NOT_FOUND')
+                captured = operation.authorizations[-1]
+                state.template_authorizations.append(TemplatePublicationAuthorizationV1(schemaVersion=1,
+                    operationId=operation_id, authorizationId=captured.id, state='cancelled', authorityHash=captured.authority_hash,
+                    dependencyHash=captured.dependency_hash, accountGeneration=state.account_generation))
+            for value in state.template_authorizations:
+                if value.operation_id == operation_id:
+                    value.state = 'cancelled'
+            self._persist(directory, state)
+            return True
+
     @staticmethod
     def _intents(state):
         return [*state.intents, *state.manual_intents]
 
     def _writable(self, state, *, own=None):
+        if state.project_id in self.template_checkpoint_fences:
+            raise BackgroundFailure('OUTCOME_UNKNOWN')
         if state.tombstoned:
             raise BackgroundFailure("PROJECT_DELETED")
         if any(intent.id != own and intent.phase not in RESOLVED for intent in self._intents(state)):
@@ -156,8 +214,8 @@ class CanonicalCoordinator:
         value.capture.action_id, value.capture.action_token = value.action_id, 0
         return type(original).model_validate(value.model_dump(by_alias=True))
 
-    def _apply(self, workspace, mutation, *, validate):
-        candidate, duplicate = apply_rich_mutation(workspace, mutation)
+    def _apply(self, workspace, mutation, *, validate, history_authorization=None):
+        candidate, duplicate = apply_rich_mutation(workspace, mutation, history_authorization=history_authorization)
         if duplicate:
             raise BackgroundFailure("OUTCOME_UNKNOWN")
         if validate:
@@ -168,11 +226,19 @@ class CanonicalCoordinator:
         candidate.updated_at = self.jobs.clock()
         return candidate
 
-    def _candidate(self, state, directory, before, after, mutation, job, proposal, *, snapshot_id=None, writer_binding=None, history_binding=None):
+    def _candidate(self, state, directory, before, after, mutation, job, proposal, *, snapshot_id=None, writer_binding=None, history_binding=None,
+                   template_finalization=None):
+        if template_finalization is not None and after.schema_version != 7:
+            raise BackgroundFailure('JOB_SCOPE_INVALID')
         from .background_assets import guard_removal
         guard_removal(state, before, after)
-        inverse = inverse_mutation(before, after, mutation_id="inverse_" + mutation.client_mutation_id,
-            session_id=mutation.capture.session_id) if mutation is not None else None
+        if mutation is not None and after.schema_version == 7:
+            from .template_inverse import inverse_template_mutation
+            inverse = inverse_template_mutation(before, after, mutation_id='inverse_' + mutation.client_mutation_id,
+                session_id=mutation.capture.session_id, origin_action_id=mutation.action_id, action_token=0)
+        else:
+            inverse = inverse_mutation(before, after, mutation_id="inverse_" + mutation.client_mutation_id,
+                session_id=mutation.capture.session_id) if mutation is not None else None
         if inverse is not None:
             self.history.register(state, before, mutation_selectors(before, inverse), write=True)
             from .models.agent import AgentEntityDependency
@@ -206,7 +272,9 @@ class CanonicalCoordinator:
         for selector in linked:
             selector = selector.model_copy(update={"fingerprint": self.history.fingerprint(after, selector, missing=True)})
             inverse_guards.reads = self.history.register(following, after, [selector], write=True).writes
-        return CanonicalCandidateV1(schemaVersion=1, id=identity("candidate"), projectId=state.project_id,
+        candidate_type = TemplateCanonicalCandidateV2 if after.schema_version == 7 else CanonicalCandidateV1
+        extra = {'templateFinalization': template_finalization} if after.schema_version == 7 else {}
+        return candidate_type(schemaVersion=2 if after.schema_version == 7 else 1, id=identity("candidate"), projectId=state.project_id,
             lineage=state.lineage, jobId=job.id if job else None, proposalId=proposal.id if proposal else None,
             proposalSha256=proposal.payload_sha256 if proposal else None, payload=proposal.payload if proposal else None,
             manualMutation=None if job else mutation, clientMutationId=mutation.client_mutation_id if mutation else snapshot_id,
@@ -216,7 +284,7 @@ class CanonicalCoordinator:
             beforeHistory=previous, afterHistory=checkpoint(following), workspace=after, inverse=inverse,
             inverseGuards=inverse_guards, persistedAt=self.jobs.clock(), snapshotWrite=mutation is None,
             writerBinding=writer_binding,
-            historyBinding=history_binding,
+            historyBinding=history_binding, **extra,
             syncPayloads=[{"syncId": record.id, "stepsSha256": digest([step.model_dump(mode="json", by_alias=True) for step in record.proposed_steps])}
                 for record in after.sync_records if record.proposed_steps and any(item.payload.kind == "rich_sync"
                     and item.payload.sync_id == record.id for item in state.proposals)])
@@ -242,6 +310,7 @@ class CanonicalCoordinator:
             intent = PublicationIntentV1(**fields, jobId=candidate.job_id, proposalId=candidate.proposal_id)
         else:
             intent = ManualIntentV1(**fields, actionId=candidate.action_id,
+                templateFinalization=getattr(candidate, 'template_finalization', None),
                 historyJobId=candidate.history_binding.job_id if candidate.history_binding else None,
                 stepsSha256=digest([step.model_dump(mode="json", by_alias=True) for step in candidate.manual_mutation.steps])
                     if candidate.manual_mutation else None)
@@ -291,7 +360,7 @@ class CanonicalCoordinator:
         path = directory / "canonical-candidates" / (intent.candidate_ref + ".json")
         owned_file(path, LIMITS.sidecar_project_bytes)
         raw = path.read_bytes()
-        value = CanonicalCandidateV1.model_validate(strict_json(raw))
+        value = decode_canonical_candidate(strict_json(raw))
         if value.sync_payloads:
             workspace, _checksum = self.canonical._read_committed_unlocked(state.project_id)
             for ref in value.sync_payloads:
@@ -332,6 +401,8 @@ class CanonicalCoordinator:
                 if value.snapshot_write else mutation_sha256(value.manual_mutation))
             if value.job_id is not None or expected != value.request_sha256:
                 raise BackgroundFailure("OUTCOME_UNKNOWN")
+            if getattr(value, 'template_finalization', None) != intent.template_finalization:
+                raise BackgroundFailure('OUTCOME_UNKNOWN')
         for history in (value.before_history, value.after_history):
             proof = state.model_copy(deep=True)
             proof.history, proof.generations = history.history, history.generations
@@ -458,7 +529,8 @@ class CanonicalCoordinator:
                 intent = self._store_intent(state, directory, candidate, claim)
             return self._commit(project, intent.id, candidate, prepared)
 
-    def manual(self, project, request, *, originals=None, artifacts=None, images=None, authorize=None, history_binding=None):
+    def manual(self, project, request, *, originals=None, artifacts=None, images=None, authorize=None, history_binding=None,
+               history_authority=None, prepared=None):
         with self._writer(project):
             from .background_retention import JobRetention
             JobRetention(self.jobs).compact_manual(project, self.history)
@@ -489,8 +561,9 @@ class CanonicalCoordinator:
                         for record in before.sync_records) and not any(record.action_id == request.action_id and record.ready
                             and record.proposed_steps == request.steps for record in before.sync_records)):
                     raise BackgroundFailure("JOB_SCOPE_INVALID")
-                after = self._apply(before, request, validate=False)
-            prepared = self.canonical.prepare_save(after, originals or {}, artifacts or {}, images)
+                authorization = history_authority(state, before, directory) if history_authority else None
+                after = self._apply(before, request, validate=False, history_authorization=authorization)
+            prepared_save = self.canonical.prepare_save(after, originals or {}, artifacts or {}, images)
             with self.jobs.guard(project) as directory:
                 state = self.jobs._read(project, directory)
                 _latest, checksum = self.canonical._read_committed_unlocked(project)
@@ -500,8 +573,10 @@ class CanonicalCoordinator:
                 self.history._ready(state, directory, checksum)
                 candidate = self._candidate(state, directory, before, after, request, None, None,
                     writer_binding=binding, history_binding=history_binding)
+                if prepared is not None:
+                    prepared(before, after, candidate, state)
                 intent = self._store_intent(state, directory, candidate, None)
-            self._commit(project, intent.id, candidate, prepared)
+            self._commit(project, intent.id, candidate, prepared_save)
             with self.jobs.guard(project) as directory:
                 state = self.jobs._read(project, directory)
                 known = next(item for item in state.manual_intents if item.id == intent.id)
@@ -550,7 +625,8 @@ class CanonicalCoordinator:
                         and item.request_sha256 == intent.request_sha256 for item in current.mutation_replay)
             return False
 
-    def snapshot(self, project, before_sha256, after, command_id, *, originals=None, artifacts=None, images=None, base=None):
+    def snapshot(self, project, before_sha256, after, command_id, *, originals=None, artifacts=None, images=None, base=None,
+                 template_finalization=None):
         """A whole-snapshot writer must prove its exact base; it cannot overwrite a newer save."""
         with self._writer(project):
             from .background_retention import JobRetention
@@ -592,12 +668,16 @@ class CanonicalCoordinator:
                 if checksum != before_sha256:
                     raise BackgroundFailure("DEPENDENCY_CHANGED")
                 self.history._ready(state, directory, checksum)
-                candidate = self._candidate(state, directory, before, after, None, None, None, snapshot_id=command_id)
+                candidate = self._candidate(state, directory, before, after, None, None, None, snapshot_id=command_id,
+                    template_finalization=template_finalization)
                 intent = self._store_intent(state, directory, candidate, None)
             self._commit(project, intent.id, candidate, prepared)
             with self.jobs.guard(project) as directory:
                 state = self.jobs._read(project, directory)
-                if next(item for item in state.manual_intents if item.id == intent.id).phase != "receipt_stored":
+                final_intent = next(item for item in state.manual_intents if item.id == intent.id)
+                if template_finalization is not None and final_intent.phase == 'reconciled' and final_intent.reconciled_reason:
+                    raise BackgroundFailure(final_intent.reconciled_reason.code)
+                if final_intent.phase != "receipt_stored":
                     raise BackgroundFailure("OUTCOME_UNKNOWN")
             return after, False
 
@@ -617,6 +697,23 @@ class CanonicalCoordinator:
                 def claim_commit():
                     from .background_assets import guard_removal
                     guard_removal(state, before, candidate.workspace)
+                    binding = getattr(candidate, 'template_finalization', None)
+                    if binding is not None:
+                        from .template_finalization import validate_finalization
+                        validate_finalization(binding, before, candidate.workspace, self.jobs.clock())
+                        current = [item for item in state.template_authorizations if item.operation_id == binding.operation_id]
+                        if not current or current[-1].authorization_id != binding.authorization_id or current[-1].state != 'active':
+                            raise BackgroundFailure('CANCELLED')
+                        captured = next(operation.capture for operation in (before.project or before.pre_draft).template_operations
+                            if operation.id == binding.operation_id)
+                        if (current[-1].authority_hash, current[-1].dependency_hash) != (captured.authority_hash, captured.dependency_hash):
+                            raise BackgroundFailure('DEPENDENCY_CHANGED')
+                        if current[-1].account_generation != self.jobs._read_dispatch(self.jobs.background / 'dispatch.json').account_generation:
+                            raise BackgroundFailure('ACCOUNT_CHANGED')
+                        gate = getattr(self, 'template_authority', None)
+                        if gate is None:
+                            raise BackgroundFailure('WRITER_UNKNOWN')
+                        gate(binding, before, candidate.workspace)
                     if candidate.writer_binding is not None:
                         validator = getattr(self, "writer_validator", None)
                         if validator is None:
@@ -662,7 +759,7 @@ class CanonicalCoordinator:
                 state = self.jobs._read(project, directory)
                 intent = next(intent for intent in self._intents(state) if intent.id == intent_id)
                 if (intent.phase == "intent_stored" and isinstance(error, BackgroundFailure)
-                        and error.code in {"CANCELLED", "ACCOUNT_CHANGED", "WRITER_UNKNOWN", "DEPENDENCY_CHANGED", "REQUEST_EXPIRED"}):
+                        and error.code in {"CANCELLED", "ACCOUNT_CHANGED", "WRITER_UNKNOWN", "DEPENDENCY_CHANGED", "REQUEST_EXPIRED", "CLEANUP_FAILED"}):
                     if candidate.job_id:
                         job = job_in(state, candidate.job_id)
                         if job.publication not in {"cancelled", "discarded"}:
@@ -740,7 +837,7 @@ class CanonicalCoordinator:
             inverseRef=candidate.id, inverseSha256=hashlib.sha256(raw).hexdigest(), inverseBytes=len(raw),
             expiresAt=expiration(completed_at or candidate.persisted_at, LIMITS.inverse_seconds), guards=candidate.inverse_guards)
 
-    def recover(self, project):
+    def recover(self, project, *, clear_fence=True):
         with self._writer(project), self.jobs.guard(project) as directory:
             state = self.jobs._read(project, directory)
             for intent in self._intents(state):
@@ -781,6 +878,6 @@ class CanonicalCoordinator:
             if state.history is not None or state.generations or (directory / "history-activation.json").exists():
                 _current, checksum = self.canonical._read_committed_unlocked(project)
                 self.history._ready(state, directory, checksum)
-            if self.jobs.fences.get(project) == "OUTCOME_UNKNOWN":
+            if clear_fence and self.jobs.fences.get(project) == "OUTCOME_UNKNOWN":
                 self.jobs.fences.pop(project, None)
             return state

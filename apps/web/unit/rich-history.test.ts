@@ -7,6 +7,40 @@ import { factCells, factsFromCells, factFieldCell } from "../src/rich/fact-cells
 import { documentCells, type StoredBlock } from "../src/rich/document-cells";
 import { historyMutation } from "../src/rich/history-offer";
 
+test("effects receive their actual action and reconciliation origin before publication", () => {
+  const effects: { actionId: string | null; token: number | undefined; kind: string }[] = [];
+  const h = new SessionHistory("session", new Map([["first", "A"], ["other", "B"]]), (_changes, context) => {
+    effects.push({ actionId: context.actionId, token: context.actionToken, kind: context.kind });
+  });
+  const first = h.commit("typing", [{ key: "first", before: "A", after: "AA" }], "group");
+  assert.ok(first);
+  assert.equal(h.commit("typing", [{ key: "first", before: "AA", after: "AAA" }], "group"), first);
+  const capture = h.capture(first, ["first"]); assert.ok(capture);
+  const second = h.commit("panel", [{ key: "other", before: "B", after: "BB" }]); assert.ok(second);
+  assert.equal(h.attach(capture, [{ key: "first", before: "AAA", after: "Reconciled" }]), "applied");
+  assert.deepEqual(effects, [
+    { actionId: first, token: 0, kind: "typing" }, { actionId: first, token: 1, kind: "typing" },
+    { actionId: second, token: 0, kind: "panel" }, { actionId: first, token: 2, kind: "reconciliation" },
+  ]);
+  assert.equal(h.currentActionId, second);
+});
+
+test("a net-empty typing group leaves no Undo barrier or reusable delayed capture", () => {
+  const h = history();
+  const first = h.commit("typing", [edit(h, "block:other", "Changed")], "same-group"); assert.ok(first);
+  const pending = capture(h, first, ["block:other"]);
+  assert.equal(h.commit("typing", [edit(h, "block:other", "Other job")], "same-group"), null);
+  assert.equal(h.position, 0);
+  assert.equal(h.length, 0);
+  assert.equal(h.navigation("undo"), null);
+  assert.equal(h.current(pending), false);
+  const next = h.commit("typing", [edit(h, "block:other", "Continued")], "same-group"); assert.ok(next);
+  assert.notEqual(next, first);
+  assert.equal(h.attach(pending, [edit(h, "block:other", "Late response")]), "stale");
+  assert.equal(h.undo(), true);
+  assert.equal(h.read("block:other"), "Other job");
+});
+
 test("prepared Undo and Redo use the same history cursor and preserve request cancellation", () => {
   const h = history();
   h.commit("typing", [edit(h, "block:other", "Edited"), { key: "request:pending", before: null, after: "pending" }]);

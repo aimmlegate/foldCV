@@ -471,6 +471,7 @@ def create_app(*, origin: str, secret: str, temp_root: Path, dist: Path, runner:
     jobs = JobService(rich_projects, resolved_agent_runtime, agent_connection, enabled=background_enabled,
         factory=background_factory, parallel=background_parallel, server_factory=background_server_factory,
         shared_native=experimental_profile is not None,
+        template_cleanup_verified=lambda: not unsafe_cleanup,
         **({"authorize_native": background_native_authority} if background_native_authority else {}))
     app.state.jobs = jobs
     mount_jobs(app, jobs)

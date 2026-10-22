@@ -133,6 +133,8 @@ class RichSynchronization:
             result, _ = apply_rich_mutation(workspace, request)
         except (ValueError, ValidationError) as error:
             raise ProjectFailure(getattr(error, "code", "RICH_CONTENT_INVALID"), 409) from None
+        if result.schema_version == 7:
+            return self.response_for_workspace(identifier, result, preview=True)
         response = self.response(identifier)
         response.workspace = result
         return response

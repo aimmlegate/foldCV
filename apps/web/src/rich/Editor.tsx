@@ -1,11 +1,11 @@
-import { BlockNoteSchema, createExtension, defaultBlockSpecs, defaultInlineContentSpecs, parseDefaultProps, type Block, type PartialBlock } from "@blocknote/core";
-import { createReactBlockSpec, createReactInlineContentSpec, useCreateBlockNote, FormattingToolbarController } from "@blocknote/react";
+import { createExtension, type Block, type PartialBlock } from "@blocknote/core";
+import { useCreateBlockNote, FormattingToolbarController } from "@blocknote/react";
 import { BlockNoteView } from "@blocknote/shadcn";
 import { AllSelection, TextSelection, Plugin, PluginKey } from "@tiptap/pm/state";
 import type { SelectionBookmark } from "@tiptap/pm/state";
 import type { Node as ProseMirrorNode } from "@tiptap/pm/model";
 import { Extension } from "@tiptap/core";
-import { createContext, useCallback, useContext, useEffect, useImperativeHandle, useMemo, useRef, useState, type ReactNode, type Ref } from "react";
+import { useCallback, useEffect, useImperativeHandle, useMemo, useRef, useState, type ReactNode, type Ref } from "react";
 import type { RichDocumentV1 } from "../contracts/generated/rich_document_v1";
 import type { RichProjectResponse } from "../contracts/generated/rich_project_response";
 import type { RichMutation } from "../contracts/generated/rich_mutation";
@@ -37,7 +37,7 @@ import { bindingIdentityPlugin } from "./binding-identity";
 import { authoredPasteTransaction } from "./paste-links";
 import { tableIdentityAttributes, tableIdentityPlugin, readTableIdentities, restoreTableIdentities, type TableRowIdentity } from "./table-identity";
 import { toTable, fromTable } from "./table";
-import { image, ImageActions } from "./Image";
+import { ImageActions } from "./Image";
 import { structureIdentityAttributes, structureIdentityPlugin, readBlockSources } from "./structure-identity";
 import { copyBlock, moveBlock, mergeBlocks } from "./structure";
 import { deleteAcrossRegions, pastedRegionsPlugin, flattenPastedRegions } from "./regions";
@@ -61,53 +61,13 @@ import { FactsPanel } from "../workbench/facts/FactsPanel";
 import { BackgroundWriter, type WriterMode } from "../background/writer";
 import type { AttachedWriter } from "../background/connection";
 import { projectJobs } from "../background/jobs";
-import { allowRichCodeStyles, allowRichColors } from "./styles";
+import { EditorActions, schema } from "./editor-schema";
 import { captureCaret, restoreCaret } from "./caret";
 import { OperationStatus, Spinner } from "../workbench/ui/OperationStatus";
 import type { PaneOrder } from "../workbench/settings/interface";
 
 type FactIntent = { kind: "panel"; command: PanelCommand } | { kind: "cascade"; proposal: DateCascadeProposal };
 
-const EditorActions = createContext<{ addText: (id: string) => void }>({ addText: () => {} });
-const region = createReactBlockSpec({ type: "region", content: "none", propSchema: {
-  role: { default: "main", values: ["header", "sidebar", "main"] },
-} }, { render: function RegionMarker({ block }) {
-  const { addText } = useContext(EditorActions);
-  const label = block.props.role === "header" ? "шапку" : block.props.role === "sidebar" ? "левую колонку" : "основной текст";
-  return <div className="cv-region-marker" contentEditable={false}>{!block.children.length &&
-    <button type="button" className="uir-empty-region" aria-label={`Добавить текст в ${label}`} onClick={() => addText(block.id)}>Добавить текст</button>}</div>;
-} });
-const section = createReactBlockSpec({ type: "section", content: "inline", propSchema: {
-  recordId: { default: "" }, presentation: { default: "standard", values: ["standard", "focus"] }, manualOrder: { default: false },
-  textAlignment: { default: "left", values: ["left", "center", "right", "justify"] }, textColor: { default: "default" }, backgroundColor: { default: "default" },
-} }, { render: ({ contentRef }) => <h2 className="cv-section-title" ref={contentRef} /> });
-const factField = createReactInlineContentSpec({ type: "factField", content: "styled", propSchema: {
-  bindingId: { default: "" }, recordId: { default: "" }, fieldKey: { default: "" }, syncedFactRevision: { default: 1 },
-  bindingRootId: { default: "" },
-} }, { render: ({ inlineContent, contentRef }) => <span data-binding-id={inlineContent.props.bindingId}
-  data-record-id={inlineContent.props.recordId} data-field-key={inlineContent.props.fieldKey} ref={contentRef} /> });
-const heading = createReactBlockSpec({ type: "heading", content: "inline", propSchema: {
-  level: { default: 1, values: [1, 2, 3] }, textAlignment: { default: "left", values: ["left", "center", "right", "justify"] },
-  textColor: { default: "default" }, backgroundColor: { default: "default" },
-} }, { parse: element => element.tagName === "H1" ? { ...parseDefaultProps(element), level: 1 }
-  : element.tagName === "H2" ? { ...parseDefaultProps(element), level: 2 }
-    : element.tagName === "H3" ? { ...parseDefaultProps(element), level: 3 } : undefined,
-  render: ({ block, contentRef }) => block.props.level === 1 ? <h1 ref={contentRef} />
-  : block.props.level === 2 ? <h2 ref={contentRef} /> : <h3 ref={contentRef} /> });
-const quote = createReactBlockSpec({ type: "quote", content: "inline", propSchema: {
-  textAlignment: { default: "left", values: ["left", "center", "right", "justify"] }, textColor: { default: "default" }, backgroundColor: { default: "default" },
-} }, { parse: element => element.tagName === "BLOCKQUOTE" ? parseDefaultProps(element) : undefined,
-  render: ({ contentRef }) => <blockquote ref={contentRef} /> });
-const code = { ...defaultBlockSpecs.codeBlock, config: { ...defaultBlockSpecs.codeBlock.config,
-  propSchema: { ...defaultBlockSpecs.codeBlock.config.propSchema, backgroundColor: { default: "default" } } } };
-const schema = BlockNoteSchema.create({ blockSpecs: { paragraph: defaultBlockSpecs.paragraph, heading: heading(),
-  bulletListItem: defaultBlockSpecs.bulletListItem, numberedListItem: defaultBlockSpecs.numberedListItem,
-  checkListItem: defaultBlockSpecs.checkListItem, toggleListItem: defaultBlockSpecs.toggleListItem,
-  quote: quote(), codeBlock: code, divider: defaultBlockSpecs.divider,
-  table: defaultBlockSpecs.table, image: image(), region: region(), section: section() },
-  inlineContentSpecs: { ...defaultInlineContentSpecs, factField } });
-allowRichCodeStyles(schema);
-allowRichColors(schema);
 type EditorBlock = Block<typeof schema.blockSchema, typeof schema.inlineContentSchema, typeof schema.styleSchema>;
 type InputBlock = PartialBlock<typeof schema.blockSchema, typeof schema.inlineContentSchema, typeof schema.styleSchema>;
 type Stored = StoredBlock;
@@ -509,10 +469,10 @@ export function RichEditor({ initial, acknowledge, onStatus, ref, onHistoryNavig
       const nextFacts = factsFromCells(bridge.current, queue.baseline.workspace.project?.facts ?? initialFacts);
       setFacts(nextFacts);
       if (context.mode !== "prepared" && !bridge.backgroundHistory) {
-        if (changes.some(change => !change.key.startsWith("request:"))) bridge.writer?.input(context.kind === "undo" || context.kind === "redo" ? context.kind : bridge.kind);
+        if (changes.some(change => !change.key.startsWith("request:"))) bridge.writer?.input(context.kind);
         if (!bridge.writer || bridge.writer.mode === "normal") {
-        queue.update(document(), context.mode === "assistant_history" ? context.actionId ?? bridge.session : history.currentActionId ?? `${bridge.session}:typing`,
-          context.mode === "assistant_history" ? context.kind : bridge.kind, nextFacts);
+        queue.update(document(), context.actionId ?? history.currentActionId ?? `${bridge.session}:typing`,
+          context.kind, nextFacts, context.actionToken ?? 0);
         schedule();
         }
       }
@@ -536,8 +496,8 @@ export function RichEditor({ initial, acknowledge, onStatus, ref, onHistoryNavig
       cells: response => {
         const current = response.workspace.project; if (!current) throw new Error("Document missing");
         return withFacts(current.document, current.facts);
-      }, changed: () => { queue.update(document(), history.currentActionId ?? bridge.session, bridge.kind,
-        factsFromCells(bridge.current, queue.baseline.workspace.project?.facts ?? initialFacts)); schedule(); },
+      }, changed: actionId => { queue.update(document(), actionId, "reconciliation",
+        factsFromCells(bridge.current, queue.baseline.workspace.project?.facts ?? initialFacts), history.capture(actionId, [])?.actionToken ?? 0); schedule(); },
       report: response => { setSyncRecords(response.workspace.syncRecords); },
       failed: error => setEditorWarning(error instanceof Error ? error.message : "Синхронизация не завершена"),
       rewriteProgress: activity => {
@@ -823,7 +783,8 @@ export function RichEditor({ initial, acknowledge, onStatus, ref, onHistoryNavig
         bridge.kind = kind;
         const id = history.commit(kind, changes, kind === "typing" || kind === "composition" ? `typing:${bridge.group}` : null);
         if (id) {
-          if (!bridge.writer || bridge.writer.mode === "normal") queue.update(document(), id, kind, factsFromCells(bridge.current, queue.baseline.workspace.project?.facts ?? initialFacts));
+          if (!bridge.writer || bridge.writer.mode === "normal") queue.update(document(), id, kind,
+            factsFromCells(bridge.current, queue.baseline.workspace.project?.facts ?? initialFacts), history.capture(id, [])?.actionToken ?? 0);
           const { blocks: pendingBlocks, moved: movedBlocks, removedFields, removedRecords } = pendingEdits.forAction(id);
           for (const change of changes) {
             if (change.key.startsWith("block:")) {

@@ -1,12 +1,15 @@
 """Authenticated new-format endpoints, separate from retained legacy wire types."""
 
 import asyncio
+import json
 
 from fastapi import Request
 from fastapi.responses import JSONResponse, Response
 
 from packages.resume_core.gui_projects import GuiCreateProjectRequest, GuiStartGenerationRequest, GuiArchiveRequest, GuiRenameProjectRequest, GuiDeleteProjectRequest
 from packages.resume_core.models.rich_mutations import RichMutation, ActionCapture
+from packages.resume_core.models.template_mutations import TemplateMutationV1
+from packages.resume_core.models.template_render import TemplateExportRequestV1
 from packages.resume_core.rendering.template import RenderFailure
 from .contracts import EmptyRequest
 from .extracting import UploadFailure, parse_one_part
@@ -14,6 +17,7 @@ from .gui_projects import ProjectFailure
 from .rich_assets import ImageSessionRequest, ImageUploadCapture
 from .rewrite_timing import rewrite_timing
 from .original_sources import mount_original_sources
+from .template_responses import wire_response
 from packages.resume_core.rich_sync import RichCompletionRequest, RichRewriteRequest, RichSyncDisposition
 from packages.resume_core.text_rewrite import RichRewriteEditRequest
 from packages.resume_core.rich_panel import RichPanelRequest, RichPanelSyncRequest
@@ -24,8 +28,7 @@ def mount_rich_projects(app, service, problem):
     mount_original_sources(app, service)
     prefix = "/v1/rich/projects"
     def response(identifier, status=200):
-        return JSONResponse(service.response(identifier).model_dump(mode="json", by_alias=True),
-            status_code=status, headers={"Cache-Control": "no-store"})
+        return wire_response(service.response(identifier), status=status)
 
     def legacy_fixed():
         jobs = getattr(service, "background_jobs", None)
@@ -70,7 +73,7 @@ def mount_rich_projects(app, service, problem):
 
     @app.post(prefix + "/{identifier}/activate")
     async def activate(identifier: str, _payload: EmptyRequest):
-        return JSONResponse(service.activate(identifier).model_dump(mode="json", by_alias=True), headers={"Cache-Control": "no-store"})
+        return wire_response(service.activate(identifier))
 
     @app.post(prefix + "/{identifier}/catalog/archive")
     async def archive_entry(identifier: str, _payload: EmptyRequest):
@@ -103,10 +106,15 @@ def mount_rich_projects(app, service, problem):
 
     @app.post(prefix + "/{identifier}/cancel")
     async def cancel(identifier: str, _payload: EmptyRequest):
+        exports = [key for key in getattr(service, 'template_export_keys', ()) if key[0] == identifier]
+        if exports:
+            for key in exports:
+                await service.cancel(*key)
+            return response(identifier)
         jobs = getattr(service, "background_jobs", None)
         generation = jobs.fixed.generation(identifier) if jobs is not None and jobs.enabled else None
         if generation is not None:
-            await jobs.supervisor.cancel(identifier, generation.id)
+            await jobs.cancel(identifier, generation.id)
             control = jobs.supervisor.controls.get(generation.id)
             if control is not None and control.task is not None:
                 await asyncio.shield(control.task)
@@ -117,13 +125,12 @@ def mount_rich_projects(app, service, problem):
         return response(identifier)
 
     @app.post(prefix + "/{identifier}/mutations")
-    async def mutate(identifier: str, payload: RichMutation):
-        return JSONResponse(service.mutate(identifier, payload).model_dump(mode="json", by_alias=True),
-            headers={"Cache-Control": "no-store"})
+    async def mutate(identifier: str, payload: RichMutation | TemplateMutationV1):
+        return wire_response(service.mutate(identifier, payload))
 
     @app.post(prefix + "/{identifier}/preview")
-    async def preview(identifier: str, payload: RichMutation):
-        return JSONResponse(service.preview(identifier, payload).model_dump(mode="json", by_alias=True), headers={"Cache-Control": "no-store"})
+    async def preview(identifier: str, payload: RichMutation | TemplateMutationV1):
+        return wire_response(service.preview(identifier, payload))
 
     @app.post(prefix + "/{identifier}/completion")
     async def completion(identifier: str, payload: RichCompletionRequest):
@@ -133,7 +140,7 @@ def mount_rich_projects(app, service, problem):
 
     @app.post(prefix + "/{identifier}/panel/preview")
     async def panel_preview(identifier: str, payload: RichPanelRequest):
-        return JSONResponse(service.panel_preview(identifier, payload).model_dump(mode="json", by_alias=True), headers={"Cache-Control": "no-store"})
+        return wire_response(service.panel_preview(identifier, payload))
 
     @app.post(prefix + "/{identifier}/panel/sync")
     async def panel_sync(identifier: str, payload: RichPanelSyncRequest):
@@ -163,12 +170,11 @@ def mount_rich_projects(app, service, problem):
             mutation = cascade_mutation(service.read(identifier), payload)
         except ValueError as error:
             raise ProjectFailure(str(error), 409) from None
-        return JSONResponse(service.preview(identifier, mutation).model_dump(mode="json", by_alias=True), headers={"Cache-Control": "no-store"})
+        return wire_response(service.preview(identifier, mutation))
 
     @app.post(prefix + "/{identifier}/rewrite/preview")
     async def rewrite_edit_preview(identifier: str, payload: RichRewriteEditRequest):
-        return JSONResponse(service.rewrite_edit_preview(identifier, payload).model_dump(mode="json", by_alias=True),
-            headers={"Cache-Control": "no-store"})
+        return wire_response(service.rewrite_edit_preview(identifier, payload))
 
     @app.post(prefix + "/{identifier}/rewrite")
     async def rewrite(identifier: str, payload: RichRewriteRequest):
@@ -177,7 +183,7 @@ def mount_rich_projects(app, service, problem):
             result = await service.rewrite_rich(identifier, payload)
             timing.outcome = next(item.status for item in reversed(result.workspace.sync_records)
                 if item.action_id == payload.selection.capture.action_id)
-            return JSONResponse(result.model_dump(mode="json", by_alias=True), headers={"Cache-Control": "no-store"})
+            return wire_response(result)
 
     @app.post(prefix + "/{identifier}/sync/{sync_id}")
     async def disposition(identifier: str, sync_id: str, payload: RichSyncDisposition):
@@ -233,14 +239,30 @@ def mount_rich_projects(app, service, problem):
         return Response(blob, media_type=asset.mime_type, headers={"Cache-Control": "no-store", "X-Content-Type-Options": "nosniff"})
 
     @app.post(prefix + "/{identifier}/export")
-    async def export(identifier: str, _payload: EmptyRequest):
+    async def export(identifier: str, payload: EmptyRequest | TemplateExportRequestV1):
+        template = service.read(identifier).schema_version == 7
+        if template != isinstance(payload, TemplateExportRequestV1):
+            raise ProjectFailure('IMPORT_PROTOCOL_MISMATCH', 409)
         try:
+            if template:
+                return template_response(await service.export_template(identifier, payload.snapshot))
             snapshot, blob = await service.export(identifier)
         except RenderFailure as error:
             return problem(error.code, 422, "export")
         return Response(blob, media_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
             headers={"Cache-Control": "no-store", "Content-Disposition": 'attachment; filename="resume.docx"',
                 "X-FoldCV-Sha256": snapshot.docx_sha256})
+
+    def template_response(result):
+        return Response(result.artifact, media_type='application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+            headers={'Cache-Control': 'no-store', 'Content-Disposition': 'attachment; filename="resume.docx"',
+                'X-FoldCV-Sha256': result.attempt.artifact_hash, 'X-FoldCV-Export-Attempt': result.attempt.id,
+                'X-FoldCV-Snapshot': json.dumps(result.snapshot.model_dump(mode='json', by_alias=True),
+                    ensure_ascii=True, sort_keys=True, separators=(',', ':'))})
+
+    @app.post(prefix + '/{identifier}/exports/{attempt_id}/retry')
+    async def retry_export(identifier: str, attempt_id: str, _payload: EmptyRequest):
+        return template_response(await service.export_template(identifier, None, retry_attempt_id=attempt_id))
 
     @app.post(prefix + "/{identifier}/archive")
     async def portable(identifier: str, payload: GuiArchiveRequest):

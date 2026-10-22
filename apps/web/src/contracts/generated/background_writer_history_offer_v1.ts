@@ -258,7 +258,7 @@ export type Projectid8 = string;
 export type Requestepoch = number;
 export type Requestid = string;
 export type Id10 = string;
-export type Kind2 = "agent_journal" | "rich_sync" | "processing";
+export type Kind2 = "agent_journal" | "rich_sync" | "processing" | "template_import";
 export type Sha256 = string;
 export type Kind3 = "agent" | "processing" | "rewrite" | "reconciliation";
 /**
@@ -270,6 +270,7 @@ export type Configsha256 = string;
 export type Model = string;
 export type Stage1 = "agent" | "assessment" | "extraction" | "rewrite" | "reconciliation";
 export type Payloadsha256 = string;
+export type Protocol = ("fixed_v1" | "agent_import_v1" | "template_import_v1") | null;
 export type Schedulingclass = "background" | "interactive" | "reconciliation";
 export type Schemaversion11 = 1;
 export type Scope = WholeResumeScope | SelectionScope;
@@ -297,6 +298,36 @@ export type Sessionid = string;
 export type Kind7 = "text" | "blocks" | "table_cells";
 export type Textsha256 = string;
 export type Submittedat = string;
+export type Templatecommand = (StartTemplateImportV1 | ResumeTemplateImportV1) | null;
+export type Allowtextrewrite = boolean;
+export type Authorityhash = string;
+export type Dependencyhash = string;
+export type Adapter = string;
+export type Capabilityprofile = string;
+export type Capabilityversion = string;
+export type Configurationhash = string;
+export type Effort = string;
+export type Model1 = string;
+export type Day = number | null;
+export type Month = number | null;
+export type Precision = "year" | "month" | "day";
+export type Year = number;
+export type Packagehash = string;
+export type Callcap = number;
+export type Cleanupseconds = 5;
+export type Concurrency = 1;
+export type Fallbackrepairs = 1;
+export type Finalizationseconds = 30;
+export type Primaryrepairs = 1;
+export type Processingseconds = 300;
+export type Clientrequestid = string;
+export type Kind8 = "start_new_import";
+export type Protocol1 = "template_import_v1";
+export type Authorityhash1 = string;
+export type Authorizationid = string;
+export type Kind9 = "resume_import";
+export type Operationid = string;
+export type Protocol2 = "template_import_v1";
 /**
  * @maxItems 32
  */
@@ -318,6 +349,10 @@ export type Tools = (
   | "save_import"
   | "finish_import"
 )[];
+export type Errorcode = string | null;
+export type Intentid = string | null;
+export type State2 = "pending" | "saved" | "failed_before_replacement" | "outcome_unknown" | "cancelled";
+export type Workspacehash = string | null;
 export type Undoexpired = boolean;
 export type Updatedat = string;
 export type Mutationwire = string;
@@ -338,7 +373,7 @@ export type Schemaversion12 = 1;
 export type Transferid = string;
 export type Writerepoch = number | null;
 export type Durability = "pending" | "durable" | "failed";
-export type Errorcode = string | null;
+export type Errorcode1 = string | null;
 export type Id12 = string;
 export type Stage2 = "assess_resume" | "normalize_semantics" | "draft_prose" | "assemble" | "render";
 export type Startedat = string | null;
@@ -371,10 +406,6 @@ export type Saveddocumentrevision = number | null;
 export type Savedprojectrevision = number | null;
 export type Createdat1 = string;
 export type Documentrevision1 = number;
-export type Day = number | null;
-export type Month = number | null;
-export type Precision = "year" | "month" | "day";
-export type Year = number;
 export type Clientmutationid1 = string;
 export type Requestsha2561 = string;
 export type Resultingrevision = number;
@@ -400,7 +431,7 @@ export type Unitid1 = string;
 export type Unitrevision = number;
 export type Evidence = EvidenceSpan[];
 export type Id13 = string;
-export type Kind8 = "candidate";
+export type Kind10 = "candidate";
 export type Pendingrawtext = string | null;
 export type Rawtext = string;
 export type Revision1 = number;
@@ -413,14 +444,14 @@ export type Usercorrected1 = boolean;
 export type Detailtype = "phone" | "email" | "url" | "messenger" | "age" | "birth_date" | "metadata" | "other";
 export type Evidence1 = EvidenceSpan[];
 export type Id14 = string;
-export type Kind9 = "detail";
+export type Kind11 = "detail";
 export type Label = string;
 export type Origin1 = "source" | "user";
 export type Revision3 = number;
 export type Usercorrected2 = boolean;
 export type Evidence2 = EvidenceSpan[];
 export type Id15 = string;
-export type Kind10 = "employment";
+export type Kind12 = "employment";
 export type Origin2 = "source" | "user";
 export type Pendingrawtext1 = string | null;
 export type Rawtext1 = string;
@@ -442,7 +473,7 @@ export type Usercorrected5 = boolean;
 export type Evidence4 = EvidenceSpan[];
 export type Id17 = string;
 export type Jobid2 = string;
-export type Kind11 = "subproject";
+export type Kind13 = "subproject";
 export type Origin3 = "source" | "user";
 export type Periods1 = WorkingPeriod[];
 export type Revision8 = number;
@@ -450,7 +481,7 @@ export type Usercorrected6 = boolean;
 export type Evidence5 = EvidenceSpan[];
 export type Id18 = string;
 export type Jobid3 = string | null;
-export type Kind12 = "technology";
+export type Kind14 = "technology";
 export type Origin4 = "source" | "user";
 export type Revision9 = number;
 export type Subprojectid = string | null;
@@ -458,26 +489,26 @@ export type Technical = boolean | null;
 export type Usercorrected7 = boolean;
 export type Evidence6 = EvidenceSpan[];
 export type Id19 = string;
-export type Kind13 = "education";
+export type Kind15 = "education";
 export type Origin5 = "source" | "user";
 export type Revision10 = number;
 export type Usercorrected8 = boolean;
 export type Evidence7 = EvidenceSpan[];
 export type Id20 = string;
-export type Kind14 = "language";
+export type Kind16 = "language";
 export type Origin6 = "source" | "user";
 export type Revision11 = number;
 export type Usercorrected9 = boolean;
 export type Evidence8 = EvidenceSpan[];
 export type Id21 = string;
-export type Kind15 = "certification";
+export type Kind17 = "certification";
 export type Origin7 = "source" | "user";
 export type Revision12 = number;
 export type Usercorrected10 = boolean;
 export type Evidence9 = EvidenceSpan[];
 export type Id22 = string;
 export type Jobid4 = string | null;
-export type Kind16 = "claim";
+export type Kind18 = "claim";
 export type Origin8 = "source" | "user";
 export type Revision13 = number;
 export type Subprojectid1 = string | null;
@@ -485,7 +516,7 @@ export type Usercorrected11 = boolean;
 export type Evidence10 = EvidenceSpan[];
 export type Id23 = string;
 export type Jobid5 = string | null;
-export type Kind17 = "metric";
+export type Kind19 = "metric";
 export type Origin9 = "source" | "user";
 export type Revision14 = number;
 export type Subprojectid2 = string | null;
@@ -508,7 +539,7 @@ export type Uppernumber = number | null;
 export type Evidence11 = EvidenceSpan[];
 export type Id24 = string;
 export type Jobid6 = string | null;
-export type Kind18 = "leadership";
+export type Kind20 = "leadership";
 export type Origin10 = "source" | "user";
 export type Revision16 = number;
 export type Subprojectid3 = string | null;
@@ -523,7 +554,7 @@ export type Attribution1 = "personal" | "team" | "organization" | "unknown";
 export type Category = "education" | "certification" | "language" | "employment" | "detail" | "other";
 export type Evidence12 = EvidenceSpan[];
 export type Id25 = string;
-export type Kind19 = "unresolved";
+export type Kind21 = "unresolved";
 export type Origin11 = "source" | "user";
 export type Revision18 = number;
 export type Status7 = "unresolved" | "pending" | "conflict";
@@ -548,7 +579,7 @@ export type Orderindex = number;
 export type Recordid1 = string;
 export type Revision20 = number;
 export type Tombstones = RecordTombstone[];
-export type Allowtextrewrite = boolean;
+export type Allowtextrewrite1 = boolean;
 export type Category1 =
   ("identity" | "contacts" | "summary" | "experience" | "education" | "skills" | "languages" | "other") | null;
 /**
@@ -556,7 +587,7 @@ export type Category1 =
  */
 export type Duplicateof = string[];
 export type Id26 = string;
-export type Kind20 = "paragraph" | "heading" | "section" | "bullet_list" | "duplicate" | "source_only";
+export type Kind22 = "paragraph" | "heading" | "section" | "bullet_list" | "duplicate" | "source_only";
 export type Listitem = boolean;
 export type Modelblock = boolean;
 export type Reason = string | null;
@@ -574,7 +605,7 @@ export type Blocks1 = ImportBlock[];
 export type Id27 = string;
 export type Record = (ImportEmployment | ImportEducation | ImportTechnology | ImportLanguage) | null;
 export type Employer = string;
-export type Kind21 = "employment";
+export type Kind23 = "employment";
 export type End = string;
 export type Present = boolean;
 export type Start = string;
@@ -592,14 +623,14 @@ export type Technical1 = boolean | null;
 export type Technologies = (string | ImportSkill)[];
 export type Completion = string;
 export type Institution = string;
-export type Kind22 = "education";
+export type Kind24 = "education";
 export type Qualification = string;
 export type Specialty = string;
 export type Display2 = string;
 export type Experience2 = string;
-export type Kind23 = "technology";
+export type Kind25 = "technology";
 export type Technical2 = boolean | null;
-export type Kind24 = "language";
+export type Kind26 = "language";
 export type Language = string;
 export type Level = string;
 /**
@@ -652,9 +683,9 @@ export type Technologygroups = ImportTechnologyGroup[];
 export type Version = 1;
 export type Actionid2 = string | null;
 export type Dependencies1 = DependencyStamp[];
-export type Errorcode1 = string | null;
+export type Errorcode2 = string | null;
 export type Id28 = string;
-export type Kind25 =
+export type Kind27 =
   | "extract"
   | "assess_resume"
   | "normalize_semantics"
@@ -685,7 +716,7 @@ export type Disposition1 = "shown" | "condensed" | "archived" | "duplicate" | "u
 export type Id31 = string;
 export type Column = number | null;
 export type Index = number;
-export type Kind26 = "page" | "paragraph" | "table_cell" | "pasted";
+export type Kind28 = "page" | "paragraph" | "table_cell" | "pasted";
 export type Row = number | null;
 export type Order = number;
 export type Representedfactids = string[];
@@ -771,21 +802,21 @@ export type Textcolor1 = string;
 export type Evidence13 = EvidenceSpan[];
 export type Fieldkeys = string[];
 export type Id34 = string;
-export type Kind27 = "citation";
+export type Kind29 = "citation";
 export type Recordid4 = string;
 export type Fieldkey1 = string;
 export type Id35 = string;
-export type Kind28 = "field_binding";
+export type Kind30 = "field_binding";
 export type Recordid5 = string;
 export type Id36 = string;
-export type Kind29 = "working_owner";
+export type Kind31 = "working_owner";
 export type Recordid6 = string;
 /**
  * @minItems 1
  */
 export type Evidence14 = [EvidenceSpan, ...EvidenceSpan[]];
 export type Id37 = string;
-export type Kind30 = "source";
+export type Kind32 = "source";
 export type Provenance = (NarrativeCitation | FieldBinding | WorkingOwnership | SourceWitness)[];
 export type Revision24 = number;
 export type Type10 = "section";
@@ -1100,12 +1131,12 @@ export type Schemaversion15 = 6;
 export type Actionid3 = string;
 export type Blockids2 = string[];
 export type Dependencies2 = DependencyStamp[];
-export type Errorcode2 = string | null;
+export type Errorcode3 = string | null;
 export type Factids = string[];
 export type Fieldkeys1 = string[];
 export type Id55 = string;
 export type Instruction = string | null;
-export type Kind31 = "completion" | "rewrite" | "reconciliation" | "conflict" | "panel";
+export type Kind33 = "completion" | "rewrite" | "reconciliation" | "conflict" | "panel";
 export type Afterid = string | null;
 export type Beforerevision = number | null;
 export type Block =
@@ -1122,15 +1153,15 @@ export type Block =
   | ImageBlock
   | SectionBlock;
 export type Keepchildren = boolean;
-export type Kind32 = "put_block";
+export type Kind34 = "put_block";
 export type Parentid = string;
 export type Beforerevision1 = number;
 export type Blockid1 = string;
-export type Kind33 = "remove_block";
+export type Kind35 = "remove_block";
 export type Afterid1 = string | null;
 export type Beforerevision2 = number;
 export type Blockid2 = string;
-export type Kind34 = "move_block";
+export type Kind36 = "move_block";
 export type Parentid1 = string;
 export type Beforerevision3 = number;
 export type Blockid3 = string;
@@ -1141,13 +1172,13 @@ export type Content13 = (StyledText | Hyperlink | FactFieldSpan)[];
  */
 export type End1 = number;
 export type Field = "content" | "caption";
-export type Kind35 = "replace_inline_range";
+export type Kind37 = "replace_inline_range";
 /**
  * UTF-16 code units within the selected inline field.
  */
 export type Start2 = number;
 export type Beforerevision4 = number | null;
-export type Kind36 = "put_record";
+export type Kind38 = "put_record";
 export type Record1 =
   | CandidateRecord
   | DetailRecord
@@ -1162,7 +1193,7 @@ export type Record1 =
   | LeadershipRecord
   | UnresolvedRecord;
 export type Beforerevision5 = number;
-export type Kind37 = "remove_record";
+export type Kind39 = "remove_record";
 export type Recordid7 = string;
 /**
  * @maxItems 1000
@@ -1201,12 +1232,12 @@ export type Lineage2 = string;
 export type Payload = AgentPayloadReference | FixedPayloadReference | ProcessingPayloadReference;
 export type Batchid3 = string;
 export type Conversationid7 = string;
-export type Kind38 = "agent_journal";
+export type Kind40 = "agent_journal";
 export type Runid8 = string;
-export type Kind39 = "rich_sync";
+export type Kind41 = "rich_sync";
 export type Syncid = string;
 export type Candidateid = string;
-export type Kind40 = "processing";
+export type Kind42 = "processing";
 export type Payloadbytes = number;
 export type Payloadsha2561 = string;
 export type Projectid11 = string;
@@ -1291,6 +1322,7 @@ export interface JobSnapshotV1 {
   receipt: CanonicalReceiptV1 | null;
   schemaVersion: Schemaversion9;
   submission: JobSubmissionV1;
+  templateOutcome?: PublicationOutcome | null;
   undoExpired?: Undoexpired;
   updatedAt: Updatedat;
 }
@@ -1453,10 +1485,12 @@ export interface JobSubmissionV1 {
   kind: Kind3;
   models: Models;
   payloadSha256: Payloadsha256;
+  protocol?: Protocol;
   schedulingClass: Schedulingclass;
   schemaVersion: Schemaversion11;
   scope: Scope;
   submittedAt: Submittedat;
+  templateCommand?: Templatecommand;
   tools: Tools;
 }
 export interface ScopeGuardV1 {
@@ -1518,6 +1552,66 @@ export interface DependencyStamp {
   kind: Kind6;
   revision: Revision;
 }
+export interface StartTemplateImportV1 {
+  capture: ImportCapture;
+  clientRequestId: Clientrequestid;
+  kind: Kind8;
+  protocol: Protocol1;
+}
+export interface ImportCapture {
+  allowTextRewrite: Allowtextrewrite;
+  authorityHash: Authorityhash;
+  dependencyHash: Dependencyhash;
+  factRevisions: Factrevisions;
+  fallback: ModelCapture1 | null;
+  formattingAsOf: PartialDate;
+  packageHash: Packagehash;
+  policy: RuntimePolicy;
+  primary: ModelCapture1;
+  sourceHashes: Sourcehashes;
+}
+export interface Factrevisions {
+  [k: string]: number;
+}
+export interface ModelCapture1 {
+  adapter: Adapter;
+  capabilityProfile: Capabilityprofile;
+  capabilityVersion: Capabilityversion;
+  configurationHash: Configurationhash;
+  effort: Effort;
+  model: Model1;
+}
+export interface PartialDate {
+  day: Day;
+  month: Month;
+  precision: Precision;
+  year: Year;
+}
+export interface RuntimePolicy {
+  callCap: Callcap;
+  cleanupSeconds: Cleanupseconds;
+  concurrency: Concurrency;
+  fallbackRepairs: Fallbackrepairs;
+  finalizationSeconds: Finalizationseconds;
+  primaryRepairs: Primaryrepairs;
+  processingSeconds: Processingseconds;
+}
+export interface Sourcehashes {
+  [k: string]: string;
+}
+export interface ResumeTemplateImportV1 {
+  authorityHash: Authorityhash1;
+  authorizationId: Authorizationid;
+  kind: Kind9;
+  operationId: Operationid;
+  protocol: Protocol2;
+}
+export interface PublicationOutcome {
+  errorCode: Errorcode;
+  intentId: Intentid;
+  state: State2;
+  workspaceHash: Workspacehash;
+}
 export interface UndoOwnershipV1 {
   assetPinsSha256?: Assetpinssha2561;
   commandInverseBytes?: Commandinversebytes;
@@ -1548,7 +1642,7 @@ export interface RichProjectResponse {
   workspace: WorkspaceV6;
 }
 export interface RichGenerationState {
-  errorCode: Errorcode;
+  errorCode: Errorcode1;
   id: Id12;
   stage: Stage2;
   startedAt?: Startedat;
@@ -1596,12 +1690,6 @@ export interface WorkspaceV6 {
   updatedAt: Updatedat1;
   warnings: Warnings2;
 }
-export interface PartialDate {
-  day: Day;
-  month: Month;
-  precision: Precision;
-  year: Year;
-}
 export interface RichMutationReplay {
   clientMutationId: Clientmutationid1;
   requestSha256: Requestsha2561;
@@ -1644,7 +1732,7 @@ export interface ExtractionIssue {
 export interface CandidateRecord {
   evidence: Evidence;
   id: Id13;
-  kind: Kind8;
+  kind: Kind10;
   location: WorkingFieldStr;
   name: WorkingFieldStr;
   origin: Origin;
@@ -1671,7 +1759,7 @@ export interface DetailRecord {
   detailType: Detailtype;
   evidence: Evidence1;
   id: Id14;
-  kind: Kind9;
+  kind: Kind11;
   label: Label;
   origin: Origin1;
   revision: Revision3;
@@ -1682,7 +1770,7 @@ export interface EmploymentRecord {
   employer: WorkingFieldStr;
   evidence: Evidence2;
   id: Id15;
-  kind: Kind10;
+  kind: Kind12;
   origin: Origin2;
   periods: Periods;
   revision: Revision7;
@@ -1717,7 +1805,7 @@ export interface SubprojectRecord {
   evidence: Evidence4;
   id: Id17;
   jobId: Jobid2;
-  kind: Kind11;
+  kind: Kind13;
   name: WorkingFieldStr;
   origin: Origin3;
   periods: Periods1;
@@ -1732,7 +1820,7 @@ export interface TechnologyRecord {
   experience?: WorkingFieldStr;
   id: Id18;
   jobId: Jobid3;
-  kind: Kind12;
+  kind: Kind14;
   origin: Origin4;
   revision: Revision9;
   subprojectId: Subprojectid;
@@ -1744,7 +1832,7 @@ export interface EducationRecord {
   evidence: Evidence6;
   id: Id19;
   institution: WorkingFieldStr;
-  kind: Kind13;
+  kind: Kind15;
   origin: Origin5;
   qualification: WorkingFieldStr;
   revision: Revision10;
@@ -1754,7 +1842,7 @@ export interface EducationRecord {
 export interface LanguageRecord {
   evidence: Evidence7;
   id: Id20;
-  kind: Kind14;
+  kind: Kind16;
   language: WorkingFieldStr;
   level: WorkingFieldStr;
   origin: Origin6;
@@ -1766,7 +1854,7 @@ export interface CertificationRecord {
   evidence: Evidence8;
   id: Id21;
   issuer: WorkingFieldStr;
-  kind: Kind15;
+  kind: Kind17;
   name: WorkingFieldStr;
   origin: Origin7;
   revision: Revision12;
@@ -1776,7 +1864,7 @@ export interface ClaimRecord {
   evidence: Evidence9;
   id: Id22;
   jobId: Jobid4;
-  kind: Kind16;
+  kind: Kind18;
   origin: Origin8;
   revision: Revision13;
   subprojectId: Subprojectid1;
@@ -1787,7 +1875,7 @@ export interface MetricRecord {
   evidence: Evidence10;
   id: Id23;
   jobId: Jobid5;
-  kind: Kind17;
+  kind: Kind19;
   origin: Origin9;
   revision: Revision14;
   subprojectId: Subprojectid2;
@@ -1818,7 +1906,7 @@ export interface LeadershipRecord {
   evidence: Evidence11;
   id: Id24;
   jobId: Jobid6;
-  kind: Kind18;
+  kind: Kind20;
   origin: Origin10;
   revision: Revision16;
   subprojectId: Subprojectid3;
@@ -1842,7 +1930,7 @@ export interface UnresolvedRecord {
   category: Category;
   evidence: Evidence12;
   id: Id25;
-  kind: Kind19;
+  kind: Kind21;
   origin: Origin11;
   revision: Revision18;
   status: Status7;
@@ -1855,7 +1943,7 @@ export interface RecordTombstone {
   revision: Revision20;
 }
 export interface ImportDraft {
-  allowTextRewrite?: Allowtextrewrite;
+  allowTextRewrite?: Allowtextrewrite1;
   blocks?: Blocks1;
   facts?: Facts;
   finished?: Finished;
@@ -1873,7 +1961,7 @@ export interface ImportBlock {
   category?: Category1;
   duplicateOf?: Duplicateof;
   id: Id26;
-  kind?: Kind20;
+  kind?: Kind22;
   listItem?: Listitem;
   modelBlock?: Modelblock;
   reason?: Reason;
@@ -1890,7 +1978,7 @@ export interface ImportFact {
 }
 export interface ImportEmployment {
   employer?: Employer;
-  kind: Kind21;
+  kind: Kind23;
   periods?: Periods2;
   role?: Role1;
   technologies?: Technologies;
@@ -1908,18 +1996,18 @@ export interface ImportSkill {
 export interface ImportEducation {
   completion?: Completion;
   institution?: Institution;
-  kind: Kind22;
+  kind: Kind24;
   qualification?: Qualification;
   specialty?: Specialty;
 }
 export interface ImportTechnology {
   display: Display2;
   experience?: Experience2;
-  kind: Kind23;
+  kind: Kind25;
   technical?: Technical2;
 }
 export interface ImportLanguage {
-  kind: Kind24;
+  kind: Kind26;
   language?: Language;
   level?: Level;
 }
@@ -1943,9 +2031,9 @@ export interface ImportTechnologyGroup {
 export interface RichOperation {
   actionId: Actionid2;
   dependencies: Dependencies1;
-  errorCode: Errorcode1;
+  errorCode: Errorcode2;
   id: Id28;
-  kind: Kind25;
+  kind: Kind27;
   status: Status8;
 }
 export interface Source {
@@ -1982,7 +2070,7 @@ export interface SourceUnit {
 export interface SourceLocation {
   column: Column;
   index: Index;
-  kind: Kind26;
+  kind: Kind28;
   row: Row;
 }
 /**
@@ -2193,24 +2281,24 @@ export interface NarrativeCitation {
   evidence: Evidence13;
   fieldKeys: Fieldkeys;
   id: Id34;
-  kind: Kind27;
+  kind: Kind29;
   recordId: Recordid4;
 }
 export interface FieldBinding {
   fieldKey: Fieldkey1;
   id: Id35;
-  kind: Kind28;
+  kind: Kind30;
   recordId: Recordid5;
 }
 export interface WorkingOwnership {
   id: Id36;
-  kind: Kind29;
+  kind: Kind31;
   recordId: Recordid6;
 }
 export interface SourceWitness {
   evidence: Evidence14;
   id: Id37;
-  kind: Kind30;
+  kind: Kind32;
 }
 export interface ImageProps {
   alignment: Alignment1;
@@ -2311,12 +2399,12 @@ export interface RichSyncRecord {
   actionId: Actionid3;
   blockIds: Blockids2;
   dependencies: Dependencies2;
-  errorCode: Errorcode2;
+  errorCode: Errorcode3;
   factIds: Factids;
   fieldKeys: Fieldkeys1;
   id: Id55;
   instruction?: Instruction;
-  kind?: Kind31;
+  kind?: Kind33;
   proposedSteps?: Proposedsteps;
   ready?: Ready;
   rewriteResult?: Rewriteresult;
@@ -2329,19 +2417,19 @@ export interface PutBlock {
   beforeRevision: Beforerevision;
   block: Block;
   keepChildren?: Keepchildren;
-  kind: Kind32;
+  kind: Kind34;
   parentId: Parentid;
 }
 export interface RemoveBlock {
   beforeRevision: Beforerevision1;
   blockId: Blockid1;
-  kind: Kind33;
+  kind: Kind35;
 }
 export interface MoveBlock {
   afterId: Afterid1;
   beforeRevision: Beforerevision2;
   blockId: Blockid2;
-  kind: Kind34;
+  kind: Kind36;
   parentId: Parentid1;
 }
 export interface ReplaceInlineRange {
@@ -2351,17 +2439,17 @@ export interface ReplaceInlineRange {
   content: Content13;
   end: End1;
   field: Field;
-  kind: Kind35;
+  kind: Kind37;
   start: Start2;
 }
 export interface PutRecord {
   beforeRevision: Beforerevision4;
-  kind: Kind36;
+  kind: Kind38;
   record: Record1;
 }
 export interface RemoveRecord {
   beforeRevision: Beforerevision5;
-  kind: Kind37;
+  kind: Kind39;
   recordId: Recordid7;
 }
 export interface RichWarning {
@@ -2405,16 +2493,16 @@ export interface ProposalBindingV1 {
 export interface AgentPayloadReference {
   batchId: Batchid3;
   conversationId: Conversationid7;
-  kind: Kind38;
+  kind: Kind40;
   runId: Runid8;
 }
 export interface FixedPayloadReference {
-  kind: Kind39;
+  kind: Kind41;
   syncId: Syncid;
 }
 export interface ProcessingPayloadReference {
   candidateId: Candidateid;
-  kind: Kind40;
+  kind: Kind42;
 }
 export interface WriterViewV1 {
   canonicalReady: Canonicalready;

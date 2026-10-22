@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from contextlib import contextmanager
+from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 import os
 from pathlib import Path
@@ -17,6 +18,13 @@ from .storage import StorageFailure, atomic_write, locked_root, private_director
 
 TERMINAL_EXECUTION = frozenset({"completed", "failed", "cancelled", "interrupted"})
 RESOLVED_PUBLICATION = frozenset({"none", "saved", "no_change", "discarded", "cancelled"})
+
+
+@dataclass(frozen=True)
+class RetainedUsage:
+    draft_bytes: int = 0
+    owned_bytes: int = 0
+    records: int = 0
 
 
 class BackgroundFailure(Exception):
@@ -49,7 +57,7 @@ def job_in(state: BackgroundSidecarV1, job_id: str) -> JobSnapshotV1:
 
 def records(state: BackgroundSidecarV1) -> int:
     return (sum(len(getattr(state, key)) for key in ("jobs", "requests", "proposals", "drafts", "generations", "intents", "inverses", "manual_intents", "asset_pins", "orphan_assets", "cleanup_refs", "writer_touches", "history_commands", "fixed_invalidations"))
-        + int(state.writer is not None) + int(state.barrier is not None)
+        + len(state.template_authorizations) + int(state.writer is not None) + int(state.barrier is not None)
         + (1 + len(state.history.definitions) if state.history is not None else 0))
 
 
@@ -68,6 +76,8 @@ class JobStore:
         self.fences: dict[str, str] = {}
         self.fixed_sizes = {}
         self.fixed_unknown = set()
+        self.usage_providers = {}
+        self.state_observers = {}
 
     @contextmanager
     def guard(self, project_id: str, *, deleted=False):
@@ -102,6 +112,8 @@ class JobStore:
             if state.project_id != project_id:
                 raise ValueError("foreign job namespace")
             self._validate_bindings(state)
+            for observe in self.state_observers.values():
+                observe(state)
             return state
         except (OSError, StorageFailure, ValueError, RecursionError):
             self.fences[project_id] = "JOB_STORE_CORRUPT"
@@ -140,7 +152,19 @@ class JobStore:
                     or job.receipt is not None and job.receipt.proposal_sha256 != proposal.payload_sha256):
                 raise ValueError("proposal authority does not match its Job")
         for job in state.jobs:
-            if job.publication not in RESOLVED_PUBLICATION and job.proposal_id not in proposals:
+            if job.submission.protocol == 'template_import_v1':
+                if job.proposal_id is not None:
+                    raise ValueError('template application publication has no worker proposal authority')
+                if job.template_outcome is not None and job.template_outcome.state == 'saved':
+                    proof = next((intent for intent in state.manual_intents if intent.id == job.template_outcome.intent_id), None)
+                    if (proof is None or proof.phase != 'receipt_stored' or proof.project_id != job.submission.identity.project_id
+                            or proof.template_finalization is None or proof.template_finalization.operation_id != job.submission.input.id
+                            or proof.after_workspace_sha256 != job.template_outcome.workspace_hash
+                            or not any(value.operation_id == proof.template_finalization.operation_id
+                                and value.authorization_id == proof.template_finalization.authorization_id
+                                for value in state.template_authorizations)):
+                        raise ValueError('template saved outcome lacks its exact typed publication intent')
+            elif job.publication not in RESOLVED_PUBLICATION and job.proposal_id not in proposals:
                 raise ValueError("unresolved publication has no proposal authority")
         intents = [*state.intents, *state.manual_intents]
         if (len({intent.id for intent in intents}) != len(intents)
@@ -209,8 +233,16 @@ class JobStore:
                 total += path.stat().st_size
         return total
 
-    def _capacity(self, state: BackgroundSidecarV1, states: dict[str, BackgroundSidecarV1], *, replacing=None, canonical_fixed_bytes=None):
+    def _capacity(self, state: BackgroundSidecarV1, states: dict[str, BackgroundSidecarV1], *, replacing=None,
+            canonical_fixed_bytes=None, retained_usage=None):
         states = {**states, state.project_id: state}
+        retained = {}
+        overrides = retained_usage or {}
+        for key, provider in self.usage_providers.items():
+            for project, usage in (overrides[key] if key in overrides else provider(states=states)).items():
+                previous = retained.get(project, RetainedUsage())
+                retained[project] = RetainedUsage(previous.draft_bytes + usage.draft_bytes,
+                    previous.owned_bytes + usage.owned_bytes, previous.records + usage.records)
         sizes = {}
         for project, value in states.items():
             replacement = replacing if replacing is not None and replacing[0].is_relative_to(self.projects / project) else None
@@ -220,18 +252,23 @@ class JobStore:
                 + (replacement[1] if replacement else 0))
             if project in self.fixed_unknown:
                 sizes[project] = max(sizes[project], LIMITS.sidecar_project_bytes)
+        for project, usage in retained.items():
+            sizes[project] = sizes.get(project, 0) + usage.owned_bytes
         unknown = set(self.fences) - states.keys()
         draft_sizes = {project: sum(item.payload_bytes for item in value.drafts) for project, value in states.items()}
+        for project, usage in retained.items():
+            draft_sizes[project] = draft_sizes.get(project, 0) + usage.draft_bytes
         resolved = {project: sum(job.execution in TERMINAL_EXECUTION and job.publication in RESOLVED_PUBLICATION
             for job in value.jobs) for project, value in states.items()}
-        if (records(state) > LIMITS.metadata_project_records or
+        if (records(state) + retained.get(state.project_id, RetainedUsage()).records > LIMITS.metadata_project_records or
                 resolved[state.project_id] > LIMITS.resolved_project_records or
                 sum(resolved.values()) > LIMITS.resolved_global_records or
                 draft_sizes[state.project_id] > LIMITS.draft_project_bytes or
                 sum(draft_sizes.values()) + len(unknown) * LIMITS.draft_project_bytes > LIMITS.draft_global_bytes or
                 sizes[state.project_id] > LIMITS.sidecar_project_bytes or
                 sum(sizes.values()) + len(unknown) * LIMITS.sidecar_project_bytes > LIMITS.sidecar_global_bytes or
-                sum(records(value) for value in states.values()) + len(unknown) * LIMITS.metadata_project_records > LIMITS.metadata_global_records):
+                sum(records(value) for value in states.values()) + sum(value.records for value in retained.values())
+                    + len(unknown) * LIMITS.metadata_project_records > LIMITS.metadata_global_records):
             raise BackgroundFailure("JOB_STORAGE_FULL")
 
     def _fixed_bytes(self, state):
@@ -276,6 +313,8 @@ class JobStore:
         except (StorageFailure, OSError):
             # Confirm a lost atomic-write reply without applying the transition again.
             self._confirm(directory, raw)
+        for observe in self.state_observers.values():
+            observe(value)
 
     def _confirm(self, directory: Path, raw: bytes):
         self._confirm_file(directory / "state.json", raw)

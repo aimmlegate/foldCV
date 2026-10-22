@@ -1,0 +1,43 @@
+{
+  "upstream": "https://github.com/adobe-fonts/source-sans",
+  "commit": "ce77773581f4d454f0fa985c073bb25c721bfcf5",
+  "release": "https://github.com/adobe-fonts/source-sans/releases/tag/2.045R-ro%2F1.095R-it",
+  "files": {
+    "SourceSansPro-BlackIt.ttf": {
+      "source": "TTF/SourceSansPro-BlackIt.ttf",
+      "sha256": "9ed6ca5d09d1651aa2d0d4526d952c73a0aa345ea408cd8b5682712ea4c5ff7c",
+      "size": 113980,
+      "version": "1.095"
+    },
+    "SourceSansPro-BoldIt.ttf": {
+      "source": "TTF/SourceSansPro-BoldIt.ttf",
+      "sha256": "9cbd037fd721a3eea395675ecabaf10961d76198589a3e71a99a9c73e72ce384",
+      "size": 114696,
+      "version": "1.095"
+    },
+    "SourceSansPro-It.ttf": {
+      "source": "TTF/SourceSansPro-It.ttf",
+      "sha256": "8fa3fe523cb385c2184e6691821c0431a5189a2a01a708a7b047847e15536b03",
+      "size": 114976,
+      "version": "1.095"
+    },
+    "SourceSansPro-LightIt.ttf": {
+      "source": "TTF/SourceSansPro-LightIt.ttf",
+      "sha256": "8358a9a3bc57435de6c4310528c7e244c64de6a1cf2a302de7cd83d2099e81d3",
+      "size": 115688,
+      "version": "1.095"
+    },
+    "SourceSansPro-SemiboldIt.ttf": {
+      "source": "TTF/SourceSansPro-SemiboldIt.ttf",
+      "sha256": "10adf27bee9b4fe8374fb4d2056fa46a81d6914b652f7a3cd9fe843c5a8279c7",
+      "size": 114800,
+      "version": "1.095"
+    }
+  },
+  "license": {
+    "path": "SourceSansPro-LICENSE.txt",
+    "source": "LICENSE.txt",
+    "sha256": "e1d1fdcefb57985226c06fa9500d29caacfa2b1f8b8c74db911f13c6cad186a1"
+  },
+  "qualification": "Unmodified upstream Italic1.095 faces from the combined Roman2.045/Italic1.095 release. Metadata matching does not prove Word or visual compatibility. Existing captured packages are unchanged."
+}

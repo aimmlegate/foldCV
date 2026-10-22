@@ -4,7 +4,7 @@ import hashlib
 import json
 
 from .models.rich_mutations import DependencyStamp
-from .rich_fields import working_field
+from .rich_fields import records_by_id, working_field
 
 
 def fingerprint(value):
@@ -32,7 +32,7 @@ def dependency(workspace, kind, identifier):
     if project is None:
         raise ValueError("DEPENDENCY_MISSING")
     blocks = {block.id: block for block in project.document.blocks()}
-    records = {record.id: record for record in project.facts.records}
+    records = records_by_id(project.facts)
     target = None
     if kind in {"block", "record"}:
         target = (blocks if kind == "block" else records).get(identifier)
@@ -44,6 +44,9 @@ def dependency(workspace, kind, identifier):
             elif namespace == "cell" and owner in blocks:
                 block = blocks[owner]
                 target = next((cell for row in block.content.rows for cell in row.cells if cell.id == key), None)
+            elif namespace == 'template':
+                from .template_dependencies import target as template_target
+                target = template_target(workspace, owner, key)
         except (ValueError, TypeError, AttributeError):
             pass
     elif kind == "period":

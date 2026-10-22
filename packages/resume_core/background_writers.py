@@ -19,6 +19,11 @@ from .rich_api import RichProjectResponse
 from .rich_identity import resume_identity
 from .rich_presentation import presentation
 from .rich_project_store import rich_snapshot_bytes
+from .template_local_history import TemplateLocalHistory
+from .template_preparation_store import TemplatePreparations
+from .template_clipboard_store import TemplateClipboards
+from .template_writer_preparation import TemplateWriterPreparation
+from .template_writer_history import TemplateWriterHistory
 
 
 def secret_hash(secret):
@@ -29,11 +34,18 @@ def at_or_after(now, deadline):
     return datetime.fromisoformat(now.replace("Z", "+00:00")) >= datetime.fromisoformat(deadline.replace("Z", "+00:00"))
 
 
-class WriterSessions(WriterDrafts, WriterHistory):
+class WriterSessions(TemplateWriterPreparation, TemplateWriterHistory, WriterDrafts, WriterHistory):
     def __init__(self, coordinator, *, clock=None, observer=lambda _name, _project: None, blocked=lambda _project: False):
         self.coordinator, self.jobs, self.history = coordinator, coordinator.jobs, coordinator.history
         self.clock, self.observer = clock or coordinator.authority.clock, observer
         self.live = {}
+        self.local_history = TemplateLocalHistory(self.jobs)
+        if not hasattr(self.jobs, 'template_preparations'):
+            self.jobs.template_preparations = TemplatePreparations(self.jobs)
+        self.preparations = self.jobs.template_preparations
+        if not hasattr(self.jobs, 'template_clipboards'):
+            self.jobs.template_clipboards = TemplateClipboards(self.jobs)
+        self.clipboards = self.jobs.template_clipboards
         self.blocked = blocked
         coordinator.writer_validator = self.validate_binding
         coordinator.history_validator = self.validate_history_binding
@@ -99,14 +111,26 @@ class WriterSessions(WriterDrafts, WriterHistory):
         self.live[writer.project_id] = (writer.epoch, writer.incarnation, self.clock.now() + LIMITS.writer_lease_seconds)
 
     def view(self, state, workspace, checksum):
+        self.local_history.opening(state)
+        self.preparations.opening(state)
         ready = not self.blocked(state.project_id) and state.project_id not in self.jobs.fences and all(intent.phase in {"receipt_stored", "reconciled"}
             for intent in [*state.intents, *state.manual_intents])
-        response = RichProjectResponse(workspace=workspace, durability="durable" if ready else "failed",
+        fields = dict(workspace=workspace, durability='durable' if ready else 'failed',
             savedProjectRevision=workspace.project_revision if ready else None,
             savedDocumentRevision=workspace.document_revision if ready else None,
-            saveError=None if ready else "OUTCOME_UNKNOWN", generation=None, identity=resume_identity(workspace),
-            presentation=presentation(workspace.project.document, workspace.project.facts) if workspace.project else None)
-        return WriterViewV1(schemaVersion=1, writer=state.writer.model_copy(deep=True), response=response,
+            saveError=None if ready else 'OUTCOME_UNKNOWN', generation=None, identity=resume_identity(workspace))
+        if workspace.schema_version == 7:
+            from .template_api import TemplateProjectResponseV1
+            from .models.template_writer import WriterViewV2
+            from .templates.presentation import project_presentation, snapshot_identity
+            response = TemplateProjectResponseV1(schemaVersion=1, **fields, snapshot=snapshot_identity(workspace),
+                presentation=project_presentation(workspace))
+            view_type, version = WriterViewV2, 2
+        else:
+            response = RichProjectResponse(**fields,
+                presentation=presentation(workspace.project.document, workspace.project.facts) if workspace.project else None)
+            view_type, version = WriterViewV1, 1
+        return view_type(schemaVersion=version, writer=state.writer.model_copy(deep=True), response=response,
             workspaceSha256=checksum, workspaceWire=rich_snapshot_bytes(workspace).decode(), canonicalReady=ready,
             drafts=state.drafts, inverses=state.inverses)
 
@@ -122,6 +146,8 @@ class WriterSessions(WriterDrafts, WriterHistory):
             raise BackgroundFailure("WRITER_UNKNOWN")
 
     def save(self, project, request, *, originals=None, artifacts=None, images=None):
+        if request.schema_version == 2:
+            return self.save_template(project, request, originals=originals, artifacts=artifacts, images=images)
         def authorize(state, workspace, directory):
             writer = self.require(state, request.proof)
             if ((request.canonical_revision, request.canonical_sha256) !=
@@ -145,7 +171,7 @@ class WriterSessions(WriterDrafts, WriterHistory):
                 for item in workspace.mutation_replay):
             raise BackgroundFailure("REQUEST_EXPIRED")
         view = self.view(state, workspace, checksum)
-        return WriterViewV1.model_validate({**view.model_dump(by_alias=True), "replayed": replayed,
+        return type(view).model_validate({**view.model_dump(by_alias=True), "replayed": replayed,
             "mutationWire": mutation.model_dump_json(by_alias=True)})
 
     def open(self, project, request):
@@ -218,11 +244,13 @@ class WriterSessions(WriterDrafts, WriterHistory):
             return claim
 
     def reconcile(self, project, request):
-        with self.guard(project) as (directory, state, workspace, checksum):
+        with self.local_history.guard(project), self.guard(project) as (directory, state, workspace, checksum):
             writer = self.require(state, request.proof, recovery=True)
             if writer.draft_id is not None:
                 raise BackgroundFailure("WRITER_UNKNOWN")
             writer.status = "attached"
+            if workspace.schema_version == 7:
+                self.local_history.reconcile(self, state, workspace, directory)
             self.advance(state, workspace, checksum, request)
             self.renew(writer)
             self.write(directory, state)
@@ -241,7 +269,12 @@ class WriterSessions(WriterDrafts, WriterHistory):
             return self.view(state, workspace, checksum)
 
     def advance(self, state, workspace, checksum, request):
+        if (request.schema_version == 2) != (workspace.schema_version == 7):
+            raise BackgroundFailure('JOB_SCOPE_INVALID')
         writer = self.require(state, request.proof)
+        opening = self.local_history.opening(state)
+        if opening is not None:
+            self.local_history.observe(opening, state)
         if (request.canonical_revision != workspace.project_revision or request.canonical_sha256 != checksum
                 or writer.draft_id is not None or state.barrier is not None and state.barrier.state in {"acked", "commit_claimed"}):
             raise BackgroundFailure("WRITER_UNKNOWN")
@@ -274,6 +307,8 @@ class WriterSessions(WriterDrafts, WriterHistory):
         if touched:
             self.history.advance(state, workspace, workspace, touches=touched)
             writer.touch_generation += 1
+        if opening is not None:
+            opening.generations = {stamp.key: stamp.generation for stamp in state.generations}
         writer.acknowledged_revision = workspace.project_revision
         writer.acknowledged_sha256 = checksum
         overflow = max(0, records(state) - LIMITS.metadata_project_records)
@@ -297,9 +332,11 @@ class WriterSessions(WriterDrafts, WriterHistory):
             writer = self.advance(state, workspace, checksum, request)
             self.return_history(state, writer)
             writer.status = "clean_detached"
+            self.write(directory, state)
             self.live.pop(project, None)
             self.coordinator.authority.acks.pop(project, None)
-            self.write(directory, state)
+            self.local_history.discard(project)
+            self.preparations.discard(project)
             self.observer("clean_detach_acked", project)
             return self.view(state, workspace, checksum)
 
@@ -344,6 +381,9 @@ class WriterSessions(WriterDrafts, WriterHistory):
 
     def recover_all(self):
         self.live.clear()
+        self.local_history.openings.clear()
+        self.preparations.openings.clear()
+        self.clipboards.openings.clear()
         self.coordinator.authority.acks.clear()
         for project, state in self.jobs.snapshots().items():
             if state.writer is None or state.writer.status == "clean_detached":
@@ -388,6 +428,8 @@ class WriterSessions(WriterDrafts, WriterHistory):
             self.coordinator.authority.acks.pop(project, None)
             self.renew(state.writer)
             self.write(directory, state)
+            self.local_history.discard(project)
+            self.preparations.discard(project)
             return self.view(state, workspace, checksum)
 
     @staticmethod

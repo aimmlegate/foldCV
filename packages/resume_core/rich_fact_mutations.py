@@ -80,8 +80,9 @@ def apply_record_mutations(facts: WorkingFacts, steps: list[PutRecord | RemoveRe
     order = [record_id for record_id in order if record_id in records]
     for record_id, position in sorted(restored_positions.items(), key=lambda item: (item[1], item[0])):
         order.insert(min(position, len(order)), record_id)
-    result = WorkingFacts(revision=facts.revision + (1 if steps else 0),
+    retained = facts.model_dump(by_alias=True, exclude={"revision", "records", "tombstones"})
+    result = type(facts)(revision=facts.revision + (1 if steps else 0),
                           records=[records[record_id] for record_id in order if record_id in records],
                           tombstones=list(tombstones.values()),
-                          extraction=facts.extraction.model_copy(deep=True) if facts.extraction else None, mode=facts.mode)
+                          **retained)
     return FactMutationResult(result, tuple(reversed(inverse)))

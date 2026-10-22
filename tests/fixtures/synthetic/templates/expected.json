@@ -1,0 +1,65 @@
+{
+  "formattingAsOf": "2026-10-21",
+  "F01": {
+    "candidate": "Alex Example",
+    "employer": "Example Labs",
+    "period": "03.2020\u201311.2023",
+    "task": "Implemented queue processing.",
+    "result": "Our team reduced median latency from 800 ms to 500 ms.",
+    "attribution": "team"
+  },
+  "F02": {
+    "datePrecision": "year",
+    "results": [],
+    "education": [],
+    "portfolio": [],
+    "location": null
+  },
+  "F03": {
+    "unassigned": "Improved release reliability."
+  },
+  "F04": {
+    "compact": [
+      "Early Systems"
+    ],
+    "detailed": [
+      "Year Boundary",
+      "Month Boundary",
+      "Current Systems"
+    ],
+    "allSkills": [
+      "Perl",
+      "Python"
+    ]
+  },
+  "F05": {
+    "publications": [
+      {
+        "title": "Reliable Queues",
+        "journal": "Systems Notes",
+        "year": 2024,
+        "url": "https://example.org/paper-a"
+      },
+      {
+        "title": "Reliable Queues",
+        "journal": "Queue Review",
+        "year": 2025,
+        "url": "https://example.org/paper-b"
+      }
+    ]
+  },
+  "F06": {
+    "experience": [
+      "10 months",
+      "about 2.5 years",
+      "7 weeks"
+    ],
+    "degrees": 1,
+    "courses": 2,
+    "languageLevel": "working proficiency"
+  },
+  "F07": {
+    "projectMarkers": 250,
+    "sidebarMarkers": 100
+  }
+}

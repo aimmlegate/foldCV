@@ -33,6 +33,18 @@ from packages.resume_core.rich_timeline import TimelineReport, CascadeRequest, C
 from packages.resume_core.models.agent import AGENT_CONTRACTS
 from packages.resume_core.models.background import BACKGROUND_CONTRACTS
 from packages.resume_core.models.connection import CliInstallationPayload
+from packages.resume_core.templates.models import TemplateDefinition, TemplatePackage
+from packages.resume_core.models.template_document import RichDocumentV2
+from packages.resume_core.models.template_facts import WorkingFactsV2
+from packages.resume_core.models.template_import import ImportOperation, StartTemplateImportV1, ResumeTemplateImportV1
+from packages.resume_core.models.template_render import TemplateRenderRequestV1, TemplateExportRequestV1, TemplateSnapshotIdentity
+from packages.resume_core.models.template_mutations import TemplateMutationV1
+from packages.resume_core.models.template_workspace import ProjectV6, WorkspaceV7, ArchiveManifestV7
+from packages.resume_core.template_api import TemplateProjectResponseV1, TemplatePresentationV1
+from packages.resume_core.models.template_writer import TEMPLATE_WRITER_CONTRACTS
+from packages.resume_core.models.template_authoring import TEMPLATE_AUTHORING_CONTRACTS
+from packages.resume_core.models.canonical_patch import CanonicalPatchV1
+from packages.resume_core.models.template_delta import TemplatePreparedEditDeltaV1
 
 OUT = ROOT / "contracts" / "json-schema"
 RICH_CONTRACTS = {
@@ -50,7 +62,22 @@ RICH_CONTRACTS = {
     "rich_project_response": RichProjectResponse,
     "image_session_request": ImageSessionRequest, "image_upload_capture": ImageUploadCapture,
 }
-RECOVERY_MODELS = {**RECOVERY_CONTRACTS, **GUI_NORMALIZATION_CONTRACTS, **GUI_DRAFT_CONTRACTS, **GUI_PROJECT_CONTRACTS, **GUI_REWRITE_CONTRACTS, **GUI_EXPORT_CONTRACTS, **GUI_RECONCILE_CONTRACTS, **RICH_CONTRACTS, **AGENT_CONTRACTS, **BACKGROUND_CONTRACTS, "cli_installation_payload": CliInstallationPayload}
+TEMPLATE_CONTRACTS = {
+    "canonical_patch_v1": CanonicalPatchV1,
+    "template_prepared_edit_delta_v1": TemplatePreparedEditDeltaV1,
+    **TEMPLATE_AUTHORING_CONTRACTS,
+    **TEMPLATE_WRITER_CONTRACTS,
+    'template_project_response_v1': TemplateProjectResponseV1, 'template_presentation_v1': TemplatePresentationV1,
+    "template_definition": TemplateDefinition, "template_package": TemplatePackage,
+    "working_facts_v2": WorkingFactsV2, "rich_document_v2": RichDocumentV2,
+    "template_import_v1": ImportOperation,
+    "template_start_import_v1": StartTemplateImportV1, "template_resume_import_v1": ResumeTemplateImportV1,
+    "template_render_request_v1": TemplateRenderRequestV1, "template_export_request_v1": TemplateExportRequestV1,
+    "template_snapshot_identity": TemplateSnapshotIdentity,
+    "template_mutation_v1": TemplateMutationV1,
+    "project_v6": ProjectV6, "workspace_v7": WorkspaceV7, "archive_manifest_v7": ArchiveManifestV7,
+}
+RECOVERY_MODELS = {**RECOVERY_CONTRACTS, **GUI_NORMALIZATION_CONTRACTS, **GUI_DRAFT_CONTRACTS, **GUI_PROJECT_CONTRACTS, **GUI_REWRITE_CONTRACTS, **GUI_EXPORT_CONTRACTS, **GUI_RECONCILE_CONTRACTS, **RICH_CONTRACTS, **AGENT_CONTRACTS, **BACKGROUND_CONTRACTS, "cli_installation_payload": CliInstallationPayload, **TEMPLATE_CONTRACTS}
 
 
 def main() -> None:

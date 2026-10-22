@@ -246,7 +246,19 @@ def render_docx_only(workspace: Path) -> None:
 def main() -> int:
     workspace = Path.cwd()
     try:
-        if (workspace / "rich-docx-input.json").is_file():
+        inputs = [name for name in ('template-docx-input.json', 'rich-docx-input.json', 'docx-input.json', 'render-input.json')
+            if (workspace / name).exists()]
+        if len(inputs) != 1:
+            raise RenderFailure('RICH_EXPORT_UNSUPPORTED')
+        if inputs[0] == 'template-docx-input.json':
+            from packages.resume_core.models.template_render import TemplateRenderRequestV1
+            from packages.resume_core.rendering.captured_docx import render_captured_docx
+            request = TemplateRenderRequestV1.model_validate_json((workspace / inputs[0]).read_bytes())
+            content = render_captured_docx(request, workspace)
+            if len(content) > MAX_RICH_DOCX:
+                raise RenderFailure('RENDER_OUTPUT_LIMIT')
+            (workspace / 'resume.docx').write_bytes(content)
+        elif inputs[0] == 'rich-docx-input.json':
             from packages.resume_core.models.rich_document import RichDocumentV1
             from packages.resume_core.rendering.rich_docx import render_rich_docx, renderer_sha256 as rich_renderer_sha256
             payload = json.loads((workspace / "rich-docx-input.json").read_bytes())

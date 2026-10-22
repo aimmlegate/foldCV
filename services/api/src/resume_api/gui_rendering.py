@@ -73,6 +73,19 @@ class RichDocxRenderer:
             (workspace / (checksum + ".image")).write_bytes(data)
             payload["images"][identifier] = checksum
         (workspace / "rich-docx-input.json").write_text(json.dumps(payload, ensure_ascii=False), encoding="utf-8")
+        return await self._run(files)
+
+    async def render_template(self, request, files: OperationFiles) -> bytes:
+        from packages.resume_core.models.template_render import TemplateRenderRequestV1
+        if files.path is None:
+            raise RenderFailure('RICH_RENDER_FAILED')
+        captured = TemplateRenderRequestV1.model_validate(request.model_dump(mode='json', by_alias=True))
+        (files.path / 'template-docx-input.json').write_text(captured.model_dump_json(by_alias=True), encoding='utf-8')
+        return await self._run(files)
+
+    async def _run(self, files: OperationFiles) -> bytes:
+        from packages.resume_core.rich_limits import DOCX_BYTES
+        workspace = files.path
         process = files.spawn(Path(sys.executable), (str(WORKER),), capture=False)
         try:
             code = await asyncio.wait_for(asyncio.get_running_loop().run_in_executor(self.executor, process.wait), timeout=30)
@@ -84,7 +97,8 @@ class RichDocxRenderer:
             except (OSError, ValueError, KeyError, TypeError):
                 error = "RICH_RENDER_FAILED"
             allowed = {"RICH_EXPORT_UNSUPPORTED", "RICH_TEMPLATE_MISMATCH", "RICH_TEMPLATE_ASSET_MISMATCH",
-                "RICH_TEMPLATE_UNAVAILABLE", "RENDER_OUTPUT_LIMIT", "RENDERER_MISMATCH", "RICH_IMAGE_MISSING", "RICH_TABLE_INVALID"}
+                "RICH_TEMPLATE_UNAVAILABLE", "RENDER_OUTPUT_LIMIT", "RENDERER_MISMATCH", "RICH_IMAGE_MISSING", "RICH_TABLE_INVALID",
+                'FONT_UNAVAILABLE', 'FONT_MISMATCH', 'ASSET_UNAVAILABLE'}
             raise RenderFailure(error if error in allowed else "RICH_RENDER_FAILED")
         result = workspace / "resume.docx"
         try:

@@ -95,11 +95,13 @@ export function documentSteps(before: RichDocumentV1, after: RichDocumentV1, exa
 }
 
 /** Replies update the save baseline; the mounted typing buffer always stays current. */
+type SaveTarget = { document: RichDocumentV1; facts: WorkingFacts; actionId: string; actionToken: number; kind: RichMutation["kind"] };
 export class RichSaveQueue {
   private target: RichDocumentV1;
   private facts: WorkingFacts;
-  private actionId: string;
-  private kind: RichMutation["kind"] = "typing";
+  private readonly targets: SaveTarget[] = [];
+  private sendingTarget: SaveTarget | null = null;
+  private rejectedTarget: SaveTarget | null = null;
   private running: Promise<void> | null = null;
   private closed = false;
   private pendingRequest: RichMutation | null = null;
@@ -111,11 +113,19 @@ export class RichSaveQueue {
     if (!response.workspace.project) throw new Error("Document not created");
     this.target = response.workspace.project.document;
     this.facts = response.workspace.project.facts;
-    this.actionId = `${sessionId}:initial`;
   }
-  update(document: RichDocumentV1, actionId: string, kind: RichMutation["kind"] = "typing", facts?: WorkingFacts): void {
+  update(document: RichDocumentV1, actionId: string, kind: RichMutation["kind"] = "typing", facts?: WorkingFacts, actionToken = 0): void {
     if (this.prepared !== null || this.fenced) throw new Error("AGENT_OUTCOME_UNKNOWN");
-    this.target = document; this.actionId = actionId; this.kind = kind; if (facts) this.facts = facts;
+    if (this.rejectedTarget) {
+      const index = this.targets.indexOf(this.rejectedTarget);
+      if (index >= 0) this.targets.splice(index, 1);
+      this.rejectedTarget = null;
+    }
+    this.target = document; if (facts) this.facts = facts;
+    const target = { document: structuredClone(document), facts: structuredClone(this.facts), actionId, actionToken, kind };
+    const last = this.targets.at(-1);
+    if (last?.actionId === actionId && last !== this.sendingTarget) this.targets[this.targets.length - 1] = target;
+    else this.targets.push(target);
   }
   get baseline(): RichProjectResponse { return this.response; }
   refreshMetadata(response: RichProjectResponse): void {
@@ -135,7 +145,7 @@ export class RichSaveQueue {
   }
   beginPrepared(key: string): void {
     const project = this.response.workspace.project;
-    if (this.closed || this.fenced || this.prepared !== null || this.running || this.pendingRequest || !project
+    if (this.closed || this.fenced || this.prepared !== null || this.running || this.pendingRequest || this.targets.length || !project
       || documentSteps(project.document, this.target).length || factSteps(project.facts, this.facts).length) throw new Error("AGENT_STALE_READ");
     this.prepared = key;
   }
@@ -147,6 +157,8 @@ export class RichSaveQueue {
     this.target = project.document;
     this.facts = project.facts;
     this.pendingRequest = null;
+    this.targets.length = 0;
+    this.sendingTarget = this.rejectedTarget = null;
     this.acknowledged(response);
   }
   endPrepared(key: string): void { if (this.prepared === key && !this.fenced) this.prepared = null; }
@@ -155,29 +167,45 @@ export class RichSaveQueue {
     if (this.closed || this.running) throw new Error("AGENT_OUTCOME_UNKNOWN");
     this.fenced = false; this.prepared = key;
   }
+  private rejectTarget(target: SaveTarget): void {
+    this.pendingRequest = null;
+    this.sendingTarget = null;
+    if (this.targets.length > 1 && this.targets[0] === target) {
+      this.targets.shift();
+      this.rejectedTarget = null;
+    } else this.rejectedTarget = target;
+  }
   private async drain(): Promise<void> {
     while (!this.closed) {
+      const target = this.sendingTarget ?? this.targets[0];
+      if (!target) return;
       const before = this.response.workspace.project?.document;
       if (!before) throw new Error("Document not created");
       const beforeFacts = this.response.workspace.project?.facts;
       if (!beforeFacts) throw new Error("Facts not created");
-      const steps = [...documentSteps(before, this.target), ...factSteps(beforeFacts, this.facts)];
+      const steps = [...documentSteps(before, target.document), ...factSteps(beforeFacts, target.facts)];
       const [first, ...rest] = steps;
-      if (!first && !this.pendingRequest) return;
+      if (!first && !this.pendingRequest) { this.targets.shift(); continue; }
       let request: RichMutation | null = this.pendingRequest ?? (first ? { schemaVersion: 1, projectId: this.response.workspace.projectId,
-        clientMutationId: crypto.randomUUID(), actionId: this.actionId, kind: this.kind,
-        capture: { sessionId: this.sessionId, actionId: this.actionId, actionToken: 0, dependencies: [] }, steps: [first, ...rest] } : null);
+        clientMutationId: crypto.randomUUID(), actionId: target.actionId, kind: target.kind,
+        capture: { sessionId: this.sessionId, actionId: target.actionId, actionToken: target.actionToken, dependencies: [] }, steps: [first, ...rest] } : null);
       if (!request) return;
       const size = (value: RichMutation) => new TextEncoder().encode(JSON.stringify(value)).length;
       if (!this.pendingRequest && size(request) > 1024 * 1024) request = compactMutation(request, before);
-      if (size(request) > 1024 * 1024 || request.steps.length > 1000)
+      if (size(request) > 1024 * 1024 || request.steps.length > 1000) {
+        this.rejectTarget(target);
         throw new Error("Изменение слишком большое для сохранения (лимит 1 МБ). Сократите объём изменения.");
+      }
       this.pendingRequest = request;
+      this.sendingTarget = target;
+      this.rejectedTarget = null;
       let response: RichProjectResponse;
       try { response = await this.send(request); }
       catch (error) {
         if (typeof error === "object" && error !== null && "status" in error && typeof error.status === "number"
-          && error.status >= 400 && error.status < 500) this.pendingRequest = null;
+          && error.status >= 400 && error.status < 500) {
+          this.rejectTarget(target);
+        }
         throw error;
       }
       if (this.closed) return;
@@ -185,6 +213,8 @@ export class RichSaveQueue {
       this.acknowledged(response);
       if (response.durability === "failed") throw new Error(response.saveError ?? "PROJECT_SAVE_FAILED");
       this.pendingRequest = null;
+      this.targets.shift();
+      this.sendingTarget = null;
     }
   }
 }

@@ -23,7 +23,7 @@ class JobRetention:
             step.model_dump(mode="json", by_alias=True) for step in record.proposed_steps]) for record in workspace.sync_records)
 
     def compact_manual(self, project, history):
-        from .models.background import CanonicalCandidateV1
+        from .models.template_publication import decode_canonical_candidate
         from .rich_project_store import RichProjectStore
         import hashlib
         with self.jobs.guard(project) as directory:
@@ -47,7 +47,7 @@ class JobRetention:
                         raw = path.read_bytes()
                         if hashlib.sha256(raw).hexdigest() != intent.candidate_sha256:
                             continue
-                        candidate = CanonicalCandidateV1.model_validate(strict_json(raw))
+                        candidate = decode_canonical_candidate(strict_json(raw))
                         if candidate.manual_mutation is not None:
                             intent.action_id = candidate.manual_mutation.action_id
                             intent.steps_sha256 = digest([step.model_dump(mode="json", by_alias=True) for step in candidate.manual_mutation.steps])

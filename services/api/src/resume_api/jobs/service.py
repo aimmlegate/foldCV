@@ -34,7 +34,7 @@ async def deny_native(_control):
 class JobService:
     def __init__(self, projects, runtime, connection, *, enabled=False, factory=None, clock=None,
                  admission=INFERENCE, authorize_native=deny_native, observer=None, fetcher=None,
-                 parallel=False, server_factory=None, shared_native=False):
+                 parallel=False, server_factory=None, shared_native=False, template_factory=None, template_cleanup_verified=None):
         if parallel and (not enabled or factory is None and server_factory is None):
             raise ValueError("Parallel jobs require an enabled isolated transport")
         self.projects, self.runtime, self.connection = projects, runtime, connection
@@ -49,6 +49,9 @@ class JobService:
         self.artifacts = JobArtifacts(self.store)
         self.history = ScopeHistory(self.store, query_fingerprint)
         self.publisher = CanonicalCoordinator(self.store, self.history, projects.storage, self.load_payload)
+        configure_exports = getattr(projects, 'configure_template_exports', None)
+        if configure_exports is not None:
+            configure_exports(self, cleanup_verified=template_cleanup_verified or (lambda: False))
         self.publication = JobPublication(self)
         self.writers = WriterSessions(self.publisher, blocked=lambda project: project in self.projects.agent_recovery_fences | self.projects.catalog_recovery_fences)
         self.artifacts.prepare_capture = self.capture_preparation
@@ -59,11 +62,18 @@ class JobService:
         from .fixed_runtime import FixedRuntime
         self.fixed = FixedJobs(self)
         self.publisher.processing_validator = self.fixed.validate_processing
+        from .templates import TemplateJobs, TemplateJobRuntime
+        self.templates = TemplateJobs(self, template_factory(self)) if template_factory is not None else None
         agent_factory = factory or (lambda job, model: JobRuntime(self, job, model))
         def runtime_factory(job, model):
+            from packages.resume_core.template_import import processing_protocol
+            if job.submission.protocol == 'template_import_v1':
+                if self.templates is None:
+                    raise BackgroundFailure('JOB_DISABLED')
+                return TemplateJobRuntime(self, job)
             if job.submission.kind == "agent":
                 return agent_factory(job, model)
-            if job.submission.kind == "processing" and "save_import" in job.submission.tools:
+            if processing_protocol(job.submission) == 'agent_import_v1':
                 from ..importer.job import ImportJobRuntime
                 return ImportJobRuntime(self, job, model)
             return FixedRuntime(self, job, model)
@@ -71,6 +81,11 @@ class JobService:
             if observer is not None:
                 await observer(name, identifier)
             if name == "slot_released":
+                if self.templates is not None:
+                    for project, state in self.store.snapshots().items():
+                        job = next((value for value in state.jobs if value.id == identifier), None)
+                        if job is not None and job.submission.protocol == 'template_import_v1':
+                            await self.templates.complete(project, identifier)
                 await self.projects.drain_catalog_actions(run_id=identifier)
         self.supervisor = JobSupervisor(self.store,
             runtime_factory,
@@ -98,8 +113,13 @@ class JobService:
             from packages.resume_core.background_retention import JobRetention
             self.writers.recover_all()
             JobRetention(self.store).sweep_all()
+        if hasattr(self.projects, 'recover_template_exports'):
+            await self.projects.recover_template_exports()
+        if self.enabled:
             self.supervisor.dispatch_enabled = self.accepting
             await self.supervisor.start()
+            if self.templates is not None:
+                await self.templates.recover()
 
     def capture_preparation(self, directory, state, record, batch):
         workspace, checksum = self.projects.storage._read_committed_unlocked(state.project_id)
@@ -123,6 +143,8 @@ class JobService:
     def project(self, project):
         if not self.enabled:
             raise BackgroundFailure("JOB_DISABLED")
+        if self.templates is not None and project in self.templates.pending_jobs:
+            raise BackgroundFailure('OUTCOME_UNKNOWN')
         state = self.store.open(project)
         return JobProjectV1(schemaVersion=1, projectId=project, lineage=state.lineage,
             requestEpoch=state.active_request_epoch, jobs=state.jobs)
@@ -130,6 +152,8 @@ class JobService:
     def index(self):
         if not self.enabled:
             raise BackgroundFailure("JOB_DISABLED")
+        if self.templates is not None and self.templates.pending_jobs:
+            raise BackgroundFailure('OUTCOME_UNKNOWN')
         titles = {entry["projectId"]: entry["title"] for entry in self.projects.listing()["entries"]}
         rows = []
         for project, state in self.store.snapshots().items():
@@ -141,13 +165,18 @@ class JobService:
                     publication=job.publication, executionGeneration=job.execution_generation,
                     eventCursor=job.event_cursor, allowEdits=job.submission.allow_edits,
                     approvalRequired=job.submission.approval_required,
-                    saved=job.receipt is not None, error=job.error, publicationError=job.publication_error,
+                    saved=job.receipt is not None or job.template_outcome is not None and job.template_outcome.state == 'saved',
+                    error=job.error, publicationError=job.publication_error,
                     updatedAt=job.updated_at))
         return JobIndexV1(schemaVersion=1, jobs=rows)
 
     async def discard(self, project, identifier):
         self.project(project)
         job = self.store.read(project, identifier)
+        if job.submission.protocol == 'template_import_v1':
+            if self.templates is None:
+                raise BackgroundFailure('JOB_DISABLED')
+            return await self.templates.cancel(project, identifier)
         if job.publication == "outcome_unknown":
             raise BackgroundFailure("OUTCOME_UNKNOWN")
         await self.supervisor.cancel(project, identifier)
@@ -155,6 +184,14 @@ class JobService:
         await self.supervisor._emit(job)
         self.supervisor.changed.set()
         return job
+
+    async def cancel(self, project, identifier):
+        job = self.store.read(project, identifier)
+        if job.submission.protocol == 'template_import_v1':
+            if self.templates is None:
+                raise BackgroundFailure('JOB_DISABLED')
+            return await self.templates.cancel(project, identifier)
+        return await self.supervisor.cancel(project, identifier)
 
     def proposals_for(self, project):
         if project not in self.proposals:
@@ -171,6 +208,8 @@ class JobService:
         return self.artifacts.payload_unlocked(state, directory, reference)
 
     def preflight(self, job):
+        if job.submission.protocol == 'template_import_v1':
+            return self.templates.preflight(job) if self.templates is not None else 'JOB_DISABLED'
         connection = self.connection()
         if not connection.ready:
             return "RATE_LIMITED" if connection.reason == "AGENT_QUOTA" else "AUTH_REQUIRED"
@@ -366,6 +405,8 @@ class JobService:
             self.store.mark_deleted(project)
         if controls:
             await asyncio.gather(*(control.task for control in controls), return_exceptions=True)
+        if self.templates is not None and (self.store.projects / project).exists():
+            await self.templates.cleanup_deleted(project)
         if project in self.proposals:
             await self.proposals[project].shutdown()
         if (self.store.projects / project).exists():

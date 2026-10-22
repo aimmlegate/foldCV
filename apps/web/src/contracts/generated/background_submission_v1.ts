@@ -21,7 +21,7 @@ export type Projectid = string;
 export type Requestepoch = number;
 export type Requestid = string;
 export type Id = string;
-export type Kind1 = "agent_journal" | "rich_sync" | "processing";
+export type Kind1 = "agent_journal" | "rich_sync" | "processing" | "template_import";
 export type Sha256 = string;
 export type Kind2 = "agent" | "processing" | "rewrite" | "reconciliation";
 /**
@@ -33,6 +33,7 @@ export type Configsha256 = string;
 export type Model = string;
 export type Stage = "agent" | "assessment" | "extraction" | "rewrite" | "reconciliation";
 export type Payloadsha256 = string;
+export type Protocol = ("fixed_v1" | "agent_import_v1" | "template_import_v1") | null;
 export type Schedulingclass = "background" | "interactive" | "reconciliation";
 export type Schemaversion1 = 1;
 export type Scope = WholeResumeScope | SelectionScope;
@@ -60,6 +61,36 @@ export type Sessionid = string;
 export type Kind6 = "text" | "blocks" | "table_cells";
 export type Textsha256 = string;
 export type Submittedat = string;
+export type Templatecommand = (StartTemplateImportV1 | ResumeTemplateImportV1) | null;
+export type Allowtextrewrite = boolean;
+export type Authorityhash = string;
+export type Dependencyhash = string;
+export type Adapter = string;
+export type Capabilityprofile = string;
+export type Capabilityversion = string;
+export type Configurationhash = string;
+export type Effort = string;
+export type Model1 = string;
+export type Day = number | null;
+export type Month = number | null;
+export type Precision = "year" | "month" | "day";
+export type Year = number;
+export type Packagehash = string;
+export type Callcap = number;
+export type Cleanupseconds = 5;
+export type Concurrency = 1;
+export type Fallbackrepairs = 1;
+export type Finalizationseconds = 30;
+export type Primaryrepairs = 1;
+export type Processingseconds = 300;
+export type Clientrequestid = string;
+export type Kind7 = "start_new_import";
+export type Protocol1 = "template_import_v1";
+export type Authorityhash1 = string;
+export type Authorizationid = string;
+export type Kind8 = "resume_import";
+export type Operationid = string;
+export type Protocol2 = "template_import_v1";
 /**
  * @maxItems 32
  */
@@ -94,10 +125,12 @@ export interface JobSubmissionV1 {
   kind: Kind2;
   models: Models;
   payloadSha256: Payloadsha256;
+  protocol?: Protocol;
   schedulingClass: Schedulingclass;
   schemaVersion: Schemaversion1;
   scope: Scope;
   submittedAt: Submittedat;
+  templateCommand?: Templatecommand;
   tools: Tools;
 }
 export interface ScopeGuardV1 {
@@ -158,4 +191,58 @@ export interface DependencyStamp {
   id: Id1;
   kind: Kind5;
   revision: Revision;
+}
+export interface StartTemplateImportV1 {
+  capture: ImportCapture;
+  clientRequestId: Clientrequestid;
+  kind: Kind7;
+  protocol: Protocol1;
+}
+export interface ImportCapture {
+  allowTextRewrite: Allowtextrewrite;
+  authorityHash: Authorityhash;
+  dependencyHash: Dependencyhash;
+  factRevisions: Factrevisions;
+  fallback: ModelCapture1 | null;
+  formattingAsOf: PartialDate;
+  packageHash: Packagehash;
+  policy: RuntimePolicy;
+  primary: ModelCapture1;
+  sourceHashes: Sourcehashes;
+}
+export interface Factrevisions {
+  [k: string]: number;
+}
+export interface ModelCapture1 {
+  adapter: Adapter;
+  capabilityProfile: Capabilityprofile;
+  capabilityVersion: Capabilityversion;
+  configurationHash: Configurationhash;
+  effort: Effort;
+  model: Model1;
+}
+export interface PartialDate {
+  day: Day;
+  month: Month;
+  precision: Precision;
+  year: Year;
+}
+export interface RuntimePolicy {
+  callCap: Callcap;
+  cleanupSeconds: Cleanupseconds;
+  concurrency: Concurrency;
+  fallbackRepairs: Fallbackrepairs;
+  finalizationSeconds: Finalizationseconds;
+  primaryRepairs: Primaryrepairs;
+  processingSeconds: Processingseconds;
+}
+export interface Sourcehashes {
+  [k: string]: string;
+}
+export interface ResumeTemplateImportV1 {
+  authorityHash: Authorityhash1;
+  authorizationId: Authorizationid;
+  kind: Kind8;
+  operationId: Operationid;
+  protocol: Protocol2;
 }

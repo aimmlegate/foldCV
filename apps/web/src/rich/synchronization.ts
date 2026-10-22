@@ -49,7 +49,7 @@ export type SyncAdapter = {
   history: SessionHistory; queue: RichSaveQueue;
   current: () => ReadonlyMap<string, CellValue>;
   cells: (response: RichProjectResponse) => Map<string, CellValue>;
-  changed: () => void; report: (response: RichProjectResponse) => void;
+  changed: (actionId: string) => void; report: (response: RichProjectResponse) => void;
   failed?: (error: unknown) => void;
   applied?: (actionId: string, changes: CellChange[]) => void;
   rewriteProgress?: (activity: RewriteActivity) => void;
@@ -163,7 +163,7 @@ export class RichSynchronization {
         this.editedApplies.set(id, applied);
         preview.value = { ...preview.value, applied: true };
         adapter.rewritePreview?.(preview.value);
-        if (changes.length) { adapter.changed(); adapter.applied?.(action ?? id, changes); }
+        if (changes.length) { adapter.changed(capture.actionId); adapter.applied?.(action ?? id, changes); }
       } finally { history.discardPending(action ?? ""); }
     }
     await adapter.queue.flush();
@@ -390,7 +390,7 @@ export class RichSynchronization {
     const dependencies = new Map(changes.map(change => [change.key, epochs.get(change.key) ?? 0]));
     const disposition = this.closed ? "stale" : history.attach({ ...initial, dependencies }, changes);
     if (disposition !== "applied") throw new Error("Изменения уже обновились. Повторите правку.");
-    adapter.changed();
+    adapter.changed(initial.actionId);
     const saved = () => { if (!this.closed) { adapter.applied?.(initial.actionId, changes); this.synchronizePanelAction(initial.actionId, changes); } };
     try { await adapter.queue.flush(); }
     catch (error) { throw new AppliedIntentFailure(async () => { await adapter.queue.flush(); saved(); }, error); }
@@ -449,7 +449,7 @@ export class RichSynchronization {
       .filter(change => change.before !== change.after);
     const dependencies = new Map(changes.map(change => [change.key, epochs.get(change.key) ?? 0]));
     if (history.attach({ ...capture, dependencies }, changes) !== "applied") throw new Error("Предпросмотр устарел. Обновите его.");
-    adapter.changed();
+    adapter.changed(capture.actionId);
     const saved = () => { this.cascades.delete(proposal.id); if (!this.closed) this.synchronizePanelAction(capture.actionId, changes); };
     try { await adapter.queue.flush(); }
     catch (error) { throw new AppliedIntentFailure(async () => { await adapter.queue.flush(); saved(); }, error); }
@@ -488,7 +488,7 @@ export class RichSynchronization {
         for (const change of changes) if (!deps.has(change.key)) deps.set(change.key, original.epochs.get(change.key) ?? 0);
         disposition = this.closed ? "stale" : adapter.history.attach({ ...original, dependencies: deps }, changes);
         errorCode = disposition === "applied" ? null : disposition === "conflict" ? "SYNC_HISTORY_CONFLICT" : "STALE_SYNC";
-        if (disposition === "applied") { adapter.changed(); await adapter.queue.flush(); adapter.applied?.(original.actionId, changes); }
+        if (disposition === "applied") { adapter.changed(original.actionId); await adapter.queue.flush(); adapter.applied?.(original.actionId, changes); }
       } catch (error) { disposition = "conflict"; errorCode = error instanceof RichApiFailure ? error.code : "SYNC_PREVIEW_FAILED"; }
     }
     if (!this.closed) {

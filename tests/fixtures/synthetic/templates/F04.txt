@@ -1,0 +1,5 @@
+Alex Example
+Early Systems — engineer, 2013–2015; Perl
+Year Boundary — engineer, 2014–2016
+Month Boundary — engineer, 2015–2016-10
+Current Systems — engineer, 2020–present; Python

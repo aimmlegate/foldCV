@@ -61,7 +61,11 @@ def inverse_mutation(before, after, *, mutation_id, session_id):
                 current = found[0][found[1]]
                 actual_previous = next((sibling.id for sibling in reversed(found[0][:found[1]]) if sibling.id not in added), None)
                 moved = found[2].id != parent_id or actual_previous != previous
-                changed = block_value(old) != block_value(current)
+                if before.schema_version == 7:
+                    from .template_block_patches import block_hash
+                    changed = block_hash(old) != block_hash(current)
+                else:
+                    changed = block_value(old) != block_value(current)
                 if moved:
                     if old.id not in resulting:
                         raise BackgroundFailure("PROTOCOL")
@@ -73,9 +77,16 @@ def inverse_mutation(before, after, *, mutation_id, session_id):
                     value.children = []
                     position = placements(shadow)[old.id]
                     anchor = previous if moved else position[1]
-                    steps.append({"kind": "put_block", "parentId": parent_id, "afterId": anchor,
-                        "beforeRevision": resulting[old.id].revision, "block": value.model_dump(mode="json", by_alias=True),
-                        "keepChildren": True})
+                    if before.schema_version == 7:
+                        from .canonical_patch import build_patch
+                        from .template_block_patches import block_payload
+                        steps.append({'kind': 'restore_authored_block_patch', 'blockId': old.id,
+                            'beforeRevision': resulting[old.id].revision, 'beforeSemanticHash': block_hash(current),
+                            'afterSemanticHash': block_hash(old), 'patch': build_patch(block_payload(current), block_payload(old))})
+                    else:
+                        steps.append({"kind": "put_block", "parentId": parent_id, "afterId": anchor,
+                            "beforeRevision": resulting[old.id].revision, "block": value.model_dump(mode="json", by_alias=True),
+                            "keepChildren": True})
                     value.children = current.children
                     place(value, parent_id, anchor)
             visit(old.children, old.id)
@@ -94,7 +105,9 @@ def inverse_mutation(before, after, *, mutation_id, session_id):
         found[0].pop(found[1])
     if not steps:
         return None
-    result = RichMutation(schemaVersion=1, projectId=before.project_id, clientMutationId=mutation_id,
+    from .models.template_mutations import TemplateTreeMutation
+    mutation_type = TemplateTreeMutation if before.schema_version == 7 else RichMutation
+    result = mutation_type(schemaVersion=1, projectId=before.project_id, clientMutationId=mutation_id,
         actionId=mutation_id, kind="undo", capture={"sessionId": session_id, "actionId": mutation_id,
             "actionToken": 0, "dependencies": []}, steps=steps)
     if len(encoded(result.model_dump(mode="json", by_alias=True))) > LIMITS.inverse_bytes:

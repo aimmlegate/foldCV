@@ -18,6 +18,8 @@ from .rich_document import RichDocumentV1
 from .rich_facts import WorkingFacts
 from .rich_mutations import RichMutation
 from .rich_workspace import WorkspaceV6, RichSyncRecord
+from .template_authority import TemplateFinalizationBinding, TemplatePublicationAuthorizationV1
+from .template_import import PublicationOutcome, StartTemplateImportV1, ResumeTemplateImportV1
 from ..rich_sync import RichCompletionRequest, RichRewriteRequest
 from ..rich_panel import RichPanelSyncRequest
 from .rich_mutations import ActionCapture
@@ -77,7 +79,7 @@ class JobIdentity(BackgroundWire):
 
 
 class InputReference(BackgroundWire):
-    kind: Literal["agent_journal", "rich_sync", "processing"]
+    kind: Literal["agent_journal", "rich_sync", "processing", "template_import"]
     id: AgentId
     sha256: Sha256
 
@@ -162,6 +164,10 @@ class JobSubmissionV1(BackgroundWire):
     scope: AgentScope
     guards: ScopeGuardV1
     submitted_at: Timestamp
+    protocol: Literal['fixed_v1', 'agent_import_v1', 'template_import_v1'] | None = Field(default=None,
+        exclude_if=lambda value: value is None)
+    template_command: Annotated[StartTemplateImportV1 | ResumeTemplateImportV1, Field(discriminator='kind')] | None = Field(
+        default=None, exclude_if=lambda value: value is None)
 
     @model_validator(mode="after")
     def server_capture(self):
@@ -174,6 +180,16 @@ class JobSubmissionV1(BackgroundWire):
         expected_input = {"agent": "agent_journal", "processing": "processing",
             "rewrite": "rich_sync", "reconciliation": "rich_sync"}[self.kind]
         importer = self.kind == "processing" and set(self.tools) == set(IMPORT_TOOLS)
+        template = self.protocol == 'template_import_v1'
+        if template:
+            if self.kind != 'processing' or self.tools or self.template_command is None:
+                raise ValueError('template processing requires its captured tool-free command')
+            expected_stages, expected_input = ['extraction'], 'template_import'
+        elif self.template_command is not None or self.input.kind == 'template_import':
+            raise ValueError('template input requires its versioned protocol')
+        if self.protocol in {'fixed_v1', 'agent_import_v1'} and (self.kind != 'processing'
+                or importer != (self.protocol == 'agent_import_v1')):
+            raise ValueError('legacy processing protocol disagrees with captured input')
         if importer:
             expected_stages = ["extraction"]
         if (self.scheduling_class != expected_class or [m.stage for m in self.models] != expected_stages
@@ -614,6 +630,7 @@ class JobSnapshotV1(BackgroundWire):
     asset_pins_sha256: Sha256 | None = None
     capture_invalidated: bool = False
     activity: list[AgentEvent] = Field(default_factory=list, max_length=40, exclude_if=lambda value: not value)
+    template_outcome: PublicationOutcome | None = Field(default=None, exclude_if=lambda value: value is None)
 
     @model_validator(mode="after")
     def exact_saved(self):
@@ -632,13 +649,17 @@ class JobSnapshotV1(BackgroundWire):
         for index, attempt in enumerate(self.attempts):
             if attempt.stage != self.submission.models[index].stage or attempt.execution_generation != self.execution_generation:
                 raise ValueError("attempt must match its captured stage and execution generation")
-        if (self.publication == "saved") != (self.receipt is not None):
+        template = self.submission.protocol == 'template_import_v1'
+        if self.template_outcome is not None and not template or template and self.receipt is not None:
+            raise ValueError('template outcome has separate typed publication proof')
+        saved = self.receipt is not None or template and self.template_outcome is not None and self.template_outcome.state == 'saved'
+        if (self.publication == "saved") != saved:
             raise ValueError("only saved has a canonical receipt")
         if self.receipt is not None and (self.receipt.job_id != self.id or
                 self.receipt.project_id != self.submission.identity.project_id or
                 self.receipt.lineage != self.submission.identity.lineage or self.receipt.proposal_id != self.proposal_id):
             raise ValueError("receipt must belong to this job and proposal")
-        if self.publication not in {"none", "no_change", "cancelled"} and self.proposal_id is None:
+        if not template and self.publication not in {"none", "no_change", "cancelled"} and self.proposal_id is None:
             raise ValueError("publication state needs a bound proposal")
         if not self.submission.allow_edits and self.publication != "none":
             raise ValueError("check-only job has no publication")
@@ -791,6 +812,7 @@ class ManualIntentV1(CanonicalIntentV1):
     steps_sha256: Sha256 | None = None
     candidate_pruned: bool = False
     history_job_id: AgentId | None = None
+    template_finalization: TemplateFinalizationBinding | None = Field(default=None, exclude_if=lambda value: value is None)
 
     @model_validator(mode="after")
     def compact_proof(self):
@@ -982,6 +1004,8 @@ class BackgroundSidecarV1(BackgroundWire):
     model_config = ConfigDict(json_schema_extra={"x-maxSerializedBytes": LIMITS.sidecar_project_bytes,
         "x-maxMetadataRecords": LIMITS.metadata_project_records})
     schema_version: Literal[1]
+    template_authorizations: list[TemplatePublicationAuthorizationV1] = Field(default_factory=list,
+        max_length=LIMITS.metadata_project_records, exclude_if=lambda value: not value)
     project_id: AgentId
     lineage: AgentId
     account_generation: Revision
@@ -1013,7 +1037,9 @@ class BackgroundSidecarV1(BackgroundWire):
     def bounded_authority(self):
         groups = (self.jobs, self.requests, self.proposals, self.drafts, self.generations, self.intents, self.inverses,
             self.manual_intents, self.asset_pins, self.orphan_assets, self.cleanup_refs, self.writer_touches, self.history_commands,
-            self.fixed_invalidations)
+            self.fixed_invalidations, self.template_authorizations)
+        if len({(item.operation_id, item.authorization_id) for item in self.template_authorizations}) != len(self.template_authorizations):
+            raise ValueError('duplicate template publication authorization')
         keys = [(item.request_epoch, item.session_id, item.action_id, item.action_token) for item in self.fixed_invalidations]
         if len(set(keys)) != len(keys) or any(item.request_epoch > self.active_request_epoch for item in self.fixed_invalidations):
             raise ValueError("invalid fixed action invalidation identity")

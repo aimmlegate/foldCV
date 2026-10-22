@@ -19,5 +19,6 @@ def generate_admitted(provider: ContentProvider, request: ContentInput[ResultT],
         if error.code == "BUSY":
             raise
         raise ContentFailure(error.code, logical_attempts=max(1, error.logical_attempts),
-                             usage=error.usage) from None
+                             usage=error.usage, cleanup_verified=error.cleanup_verified,
+                             dispatch_witness=error.dispatch_witness, raw_return=error.raw_return) from None
     return replace(result, logical_attempts=max(1, result.logical_attempts))

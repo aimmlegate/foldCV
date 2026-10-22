@@ -13,8 +13,9 @@ from packages.resume_core.text_rewrite import PlainTextReply
 from ..agent.runtime import RuntimeResult
 from ..cli.experimental_profile import VERSION
 from ..providers.codex_cli import Events, MAX_SCHEMA, strict_json
-from ..providers.content import ContentFailure, ContentResult, ReportedUsage
+from ..providers.content import ContentFailure, ContentResult, ContentTransportReturn, ReportedUsage, outcome_state
 from ..providers.structured_schema import StructuredSchema
+from ..providers.dynamic_result import DynamicResultSpec
 from spikes.background.appserver_driver import TurnInput, invoke
 from spikes.background.appserver_protocol import TransportFailure
 
@@ -159,25 +160,47 @@ class SharedContentProvider:
 
     async def execute(self, request, cancel):
         policy, result_type = request.policy, request.result_type
-        if policy.allow_repair:
+        dynamic = isinstance(result_type, DynamicResultSpec)
+        if policy.allow_repair or dynamic and request.transport is not None:
             raise ContentFailure("INVALID_INPUT")
-        if (not isinstance(result_type, type) or not issubclass(result_type, BaseModel)
+        if not dynamic and (not isinstance(result_type, type) or not issubclass(result_type, BaseModel)
                 or result_type.model_config.get("extra") != "forbid"):
             raise ContentFailure("INVALID_SCHEMA")
         plain = result_type is PlainTextReply
         began, attempts = self.server.clock.now(), 0
+        reported, witness = ReportedUsage(), None
+        effective_effort = policy.reasoning_effort
+        raw_return, return_sent = None, False
+        async def observed(outcome, code=None):
+            nonlocal return_sent
+            if request.on_return is not None and not return_sent:
+                return_sent = True
+                await asyncio.to_thread(request.on_return, ContentTransportReturn(raw_return, outcome, code,
+                    attempts, reported, self.cleanup_verified, witness, effective_effort))
         def guard():
             if cancel.is_set(): raise ContentFailure("CANCELLED")
             if self.server.clock.now() >= began + policy.timeout_seconds:
                 raise ContentFailure("DEADLINE")
+        def failed(code):
+            return ContentFailure(code,logical_attempts=attempts,usage=reported,
+                cleanup_verified=self.cleanup_verified,dispatch_witness=witness,raw_return=raw_return)
         try:
             guard()
+            if not plain and effective_effort is not None and effective_effort != "medium":
+                raise ContentFailure("MODEL_DENIED")
+            await self.server.prepare()
+            metadata = self.server.reasoning.get(policy.model)
+            if metadata is None: raise ContentFailure("MODEL_DENIED")
+            if effective_effort is None:
+                effective_effort = metadata.default
+            if (effective_effort not in metadata.supported or not plain and effective_effort != "medium"):
+                raise ContentFailure("MODEL_DENIED")
             if request.transport and hasattr(request.transport, "bind_guard"):
                 request.transport.bind_guard(guard)
             text = request.transport.encode(request.text) if request.transport else request.text
             if not isinstance(text, str) or not text or len(text.encode()) > min(policy.max_input_bytes, policy.max_total_input_bytes):
                 raise ContentFailure("INPUT_TOO_LARGE")
-            result_schema = result_type.model_json_schema()
+            result_schema = result_type.provider_schema if dynamic else result_type.model_json_schema()
             if request.transport is not None and hasattr(request.transport, "output_schema"):
                 result_schema = request.transport.output_schema(result_schema)
             schema = StructuredSchema(result_schema)
@@ -195,31 +218,50 @@ class SharedContentProvider:
                 text, "Return only the replacement text. Use no tools." if plain else
                     "Return only the captured structured result. Use no tools or invented facts.", self.cancelled,
                 before_turn=ready, started=self.model_started, output_schema=None if plain else schema.wire,
-                plain_text=plain, reasoning_effort=policy.reasoning_effort if plain else "medium",
+                plain_text=plain, reasoning_effort=effective_effort,
                 text_limit=policy.max_total_output_bytes, active_seconds=policy.timeout_seconds))
+            # Preserve observed accounting before any content decoder can fail.
+            witness = response["witness"]
+            usage = response["usage"]
+            reported = ReportedUsage(usage["inputTokens"], usage["cachedInputTokens"], usage["outputTokens"], True) if usage else ReportedUsage()
             self.cleanup_verified = response["cleanupVerified"] and not self.server.cleanup_failed
-            if response["state"] != "completed" or response["error"] or not response["cleanupVerified"]:
-                self.audit({**response["witness"], "transport": "shared_appserver_v1", "structured": not plain,
+            raw_return = response["text"]
+            if response["state"] != "completed" or response["error"] or not self.cleanup_verified:
+                code = "CLEANUP_FAILED" if not self.cleanup_verified else response["error"] or ("CANCELLED" if response["state"] == "cancelled" else "CLI_FAILED")
+                await observed(outcome_state(code), code)
+                self.audit({**witness, "transport": "shared_appserver_v1", "structured": not plain,
                     "state": response["state"], "schemaValidated": False, "cleanupVerified": self.cleanup_verified})
-                code = response["error"] or ("CANCELLED" if response["state"] == "cancelled" else "CLI_FAILED")
-                raise ContentFailure(code, logical_attempts=attempts)
+                raise failed(code)
+            await observed('completed')
             guard()
-            events = Events()
+            events = Events(max_bytes=policy.max_total_output_bytes)
             events.complete, events.text = True, response["text"]
             value = events.result(result_type, schema, getattr(request.transport, "decode", None))
             if request.transport:
                 value = result_type.model_validate(request.transport.restore(value), strict=True)
             guard()
-            self.audit({**response["witness"], "transport": "shared_appserver_v1", "structured": not plain,
+            self.audit({**witness, "transport": "shared_appserver_v1", "structured": not plain,
                 "nativeStarted": self.native and response["nativeStarted"], "state": response["state"],
                 "schemaValidated": not plain, "textValidated": plain, "logicalAttempts": 1, "repairTurns": 0, "toolCalls": 0,
                 "cleanupVerified": self.cleanup_verified})
-            usage = response["usage"]
-            reported = ReportedUsage(usage["inputTokens"], usage["cachedInputTokens"], usage["outputTokens"], True) if usage else ReportedUsage()
-            return ContentResult(value, reported, VERSION, policy.model, self.server.clock.now() - began, 1)
+            return ContentResult(value,reported,VERSION,policy.model,self.server.clock.now()-began,1,
+                cleanup_verified=self.cleanup_verified,dispatch_witness=witness,reasoning_effort=effective_effort,
+                raw_return=raw_return)
         except TransportFailure as error:
             self.cleanup_verified = not self.server.cleanup_failed and not any(
                 key == self.job_id or key.startswith(self.job_id + "_") for key in self.server.live)
-            raise ContentFailure(error.code, logical_attempts=attempts) from None
+            await observed(outcome_state(error.code), error.code)
+            raise failed(error.code) from None
+        except ContentFailure as error:
+            await observed(outcome_state(error.code), error.code)
+            raise failed(error.code) from None
         except (ValidationError, ValueError, TypeError, UnicodeError):
-            raise ContentFailure("INVALID_RESULT", logical_attempts=attempts) from None
+            await observed('invalid_payload', 'INVALID_RESULT')
+            raise failed("INVALID_RESULT") from None
+        except OSError:
+            await observed('transport_failure', 'TEMP_FAILED')
+            raise failed("TEMP_FAILED") from None
+        except Exception:
+            # Interface failures must retain already observed charging evidence.
+            await observed('transport_failure', 'CLI_FAILED')
+            raise failed("CLI_FAILED") from None

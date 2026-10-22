@@ -1,5 +1,11 @@
 import Ajv2020 from "ajv/dist/2020.js";
 import { taggedSchema } from "../contracts/tagged-schema";
+import { decodeJsonResponse } from "../contracts/json-response";
+import { parseJsonWire, type JsonWireNode } from "../contracts/lossless-json";
+import { templateProjectReply } from "../contracts/template-validate";
+import type { TemplateProjectResponseV1 } from "../contracts/generated/template_project_response_v1";
+import type { TemplateSnapshotIdentity } from "../contracts/generated/template_snapshot_identity";
+import { templateExportArtifact } from "../contracts/template-export";
 import schema from "../../../../contracts/json-schema/rich_project_response.schema.json" with { type: "json" };
 import type { RichProjectResponse } from "../contracts/generated/rich_project_response";
 import type { RichMutation } from "../contracts/generated/rich_mutation";
@@ -24,12 +30,9 @@ const prefix = "/v1/rich/projects";
 export class RichApiFailure extends Error {
   constructor(readonly code: string, readonly status = 0) { super(code); }
 }
-export async function rootRequest(path: string, method = "GET", body?: unknown): Promise<unknown> {
-  const init: RequestInit = { method, credentials: "same-origin", cache: "no-store" };
-  if (body instanceof FormData) init.body = body;
-  else if (body !== undefined) { init.body = JSON.stringify(body); init.headers = { "Content-Type": "application/json" }; }
+async function jsonRequest(path: string, init: RequestInit): Promise<unknown> {
   const response = await fetch(path, init);
-  const value: unknown = await response.json();
+  const value = decodeJsonResponse(await response.text());
   if (!response.ok) {
     const code = typeof value === "object" && value !== null && "error" in value && typeof value.error === "object"
       && value.error !== null && "code" in value.error && typeof value.error.code === "string" ? value.error.code : "REQUEST_FAILED";
@@ -37,10 +40,25 @@ export async function rootRequest(path: string, method = "GET", body?: unknown):
   }
   return value;
 }
+export function rootRequest(path: string, method = "GET", body?: unknown): Promise<unknown> {
+  const init: RequestInit = { method, credentials: "same-origin", cache: "no-store" };
+  if (body instanceof FormData) init.body = body;
+  else if (body !== undefined) { init.body = JSON.stringify(body); init.headers = { "Content-Type": "application/json" }; }
+  return jsonRequest(path, init);
+}
 export function request(path: string, method = "GET", body?: unknown): Promise<unknown> { return rootRequest(prefix + path, method, body); }
+export function requestWire(path: string, body: JsonWireNode): Promise<unknown> {
+  return jsonRequest(prefix + path, { method: "POST", credentials: "same-origin", cache: "no-store",
+    headers: { "Content-Type": "application/json" }, body: parseJsonWire(body.wire).wire });
+}
 export async function projectRequest(path: string, method = "GET", body?: unknown): Promise<RichProjectResponse> {
   const response = await request(path, method, body);
   if (!responseShape(response)) throw new RichApiFailure("INVALID_RESULT");
+  return response;
+}
+export async function templateProjectRequest(path: string, method = "GET", body?: unknown): Promise<TemplateProjectResponseV1> {
+  const response = await templateProjectReply(await request(path, method, body));
+  if (!response) throw new RichApiFailure("INVALID_RESULT");
   return response;
 }
 export async function listProjects(): Promise<GuiProjectListResponse> {
@@ -106,4 +124,23 @@ export async function download(id: string, kind: "export" | "archive", revision:
     if (sha256 !== response.headers.get("X-FoldCV-Sha256")) throw new RichApiFailure("ARTIFACT_BYTES_MISMATCH");
   }
   return blob;
+}
+
+export async function downloadTemplate(id: string, snapshot: TemplateSnapshotIdentity, options: { retryAttemptId?: string; signal?: AbortSignal } = {}) {
+  const captured = structuredClone(snapshot);
+  if (id !== captured.projectId) throw new RichApiFailure("INVALID_RESULT");
+  const path = options.retryAttemptId === undefined ? `/${encodeURIComponent(id)}/export`
+    : `/${encodeURIComponent(id)}/exports/${encodeURIComponent(options.retryAttemptId)}/retry`;
+  const init: RequestInit = { method: "POST", credentials: "same-origin", cache: "no-store",
+    headers: { "Content-Type": "application/json" }, body: JSON.stringify(options.retryAttemptId === undefined ? { schemaVersion: 1, snapshot: captured } : {}) };
+  if (options.signal !== undefined) init.signal = options.signal;
+  const response = await fetch(prefix + path, init);
+  if (!response.ok) {
+    const value = decodeJsonResponse(await response.text());
+    const code = typeof value === "object" && value !== null && "error" in value && typeof value.error === "object"
+      && value.error !== null && "code" in value.error && typeof value.error.code === "string" ? value.error.code : "EXPORT_FAILED";
+    throw new RichApiFailure(code, response.status);
+  }
+  try { return await templateExportArtifact(response, captured); }
+  catch (error) { throw new RichApiFailure(error instanceof Error && error.message === "ARTIFACT_BYTES_MISMATCH" ? error.message : "INVALID_RESULT"); }
 }

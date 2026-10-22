@@ -9,6 +9,12 @@ from .rich_mutations import locate, subtree
 def mutation_selectors(workspace, mutation):
     targets = set()
     for step in mutation.steps:
+        if workspace.schema_version == 7:
+            from .template_dependencies import step_targets
+            template = step_targets(workspace, step)
+            if template is not None:
+                targets.update(template)
+                continue
         if step.kind in {"put_record", "remove_record"}:
             targets.add(("record", step.record.id if step.kind == "put_record" else step.record_id))
             continue
@@ -44,7 +50,13 @@ def query_touches(state, before, after, mutation):
         if kind == "block":
             found = locate(workspace.project.document, identifier)
             return semantic(found[0][found[1]]) if found else None
-        return semantic(next((record for record in workspace.project.facts.records if record.id == identifier), None))
+        if kind == 'field':
+            try:
+                return dependency(workspace, kind, identifier).fingerprint
+            except ValueError:
+                return None
+        from .rich_fields import records_by_id
+        return semantic(records_by_id(workspace.project.facts).get(identifier))
     unchanged = {(selector.stamp.kind, selector.stamp.id) for selector in selectors
         if value(before, selector) == value(after, selector)}
     blocks = {identifier for kind, identifier in unchanged if kind == "block"}

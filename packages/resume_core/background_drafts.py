@@ -48,6 +48,8 @@ class WriterDrafts:
         self.observer("before_draft_checkpoint", project)
         with self.guard(project, uncertain=True) as (directory, state, workspace, _checksum):
             writer = self.require(state, request.proof, recovery=True, expired=True)
+            if (request.schema_version == 2) != (workspace.schema_version == 7):
+                raise BackgroundFailure('JOB_SCOPE_INVALID')
             previous = next((item for item in state.drafts if item.id == request.id), None)
             if previous is None and request.sequence <= writer.draft_sequence_floor:
                 raise BackgroundFailure("REQUEST_EXPIRED")
@@ -116,7 +118,11 @@ class WriterDrafts:
             raw = path.read_bytes()
             if len(raw) != record.payload_bytes or hashlib.sha256(raw).hexdigest() != record.payload_sha256:
                 raise ValueError("changed draft payload")
-            return DraftPayloadV1.model_validate(strict_json(raw))
+            value = strict_json(raw)
+            if value.get('schemaVersion') == 2:
+                from .models.template_writer import DraftPayloadV2
+                return DraftPayloadV2.model_validate(value)
+            return DraftPayloadV1.model_validate(value)
         except (OSError, ValueError, StorageFailure, ValidationError):
             raise BackgroundFailure("JOB_STORE_CORRUPT") from None
 
@@ -127,6 +133,9 @@ class WriterDrafts:
             if record is None:
                 raise BackgroundFailure("JOB_NOT_FOUND")
             payload = self.owned_draft(state, directory, record)
+            if payload.schema_version == 2:
+                from .models.template_writer import WriterDraftReadV2
+                return WriterDraftReadV2(schemaVersion=2, checkpoint=record, payload=payload)
             return WriterDraftReadV1(schemaVersion=1, checkpoint=record, payload=payload)
 
     def owned_draft(self, state, directory, record):
@@ -161,10 +170,14 @@ class WriterDrafts:
 
     def use_draft(self, project, request, *, originals=None, artifacts=None, images=None):
         from .models.background import WriterCommitBindingV1
+        with self.guard(project) as (_directory, state, _workspace, _checksum):
+            self.require(state, request.proof, recovery=True, expired=True)
+            self.preparations.reject_registered(state, request.mutation.client_mutation_id)
         def authorize(state, workspace, directory):
             from .rich_mutations import apply_rich_mutation
             from .background_history import digest_bytes
             writer = self.require(state, request.proof, recovery=True)
+            self.preparations.reject_registered(state, request.mutation.client_mutation_id)
             record = next((item for item in state.drafts if item.id == request.id), None)
             if (record is None or record.writer_epoch != writer.epoch or writer.draft_id != record.id
                     or (record.sequence, record.payload_sha256) != (request.sequence, request.payload_sha256)
@@ -174,11 +187,15 @@ class WriterDrafts:
             payload = self.owned_draft(state, directory, record)
             proposed, _replayed = apply_rich_mutation(workspace, request.mutation)
             if (proposed.project is None or semantic(proposed.project.document) != semantic(payload.document)
-                    or semantic(proposed.project.facts) != semantic(payload.facts)):
+                    or semantic(proposed.project.facts) != semantic(payload.facts)
+                    or payload.schema_version == 2 and (proposed.project.import_issues != payload.import_issues
+                        or proposed.project.import_coverage != payload.import_coverage)):
                 raise BackgroundFailure("JOB_SCOPE_INVALID")
             writer.status, writer.draft_id = "attached", None
             try:
-                self.advance(state, workspace, digest_bytes(workspace), WriterAdvanceV1(schemaVersion=1, proof=request.proof,
+                from .models.template_writer import WriterAdvanceV2
+                advance_type = WriterAdvanceV2 if workspace.schema_version == 7 else WriterAdvanceV1
+                self.advance(state, workspace, digest_bytes(workspace), advance_type(schemaVersion=request.schema_version, proof=request.proof,
                     canonicalRevision=workspace.project_revision, canonicalSha256=digest_bytes(workspace),
                     actionCursor=max(record.action_cursor, writer.acknowledged_cursor), touches=payload.touches))
             finally:
@@ -206,12 +223,16 @@ class WriterDrafts:
                 replay = {item.client_mutation_id: item.request_sha256 for item in workspace.mutation_replay}
                 if (workspace.project is None or semantic(payload.document) != semantic(workspace.project.document)
                         or semantic(payload.facts) != semantic(workspace.project.facts)
+                        or payload.schema_version == 2 and (payload.import_issues != workspace.project.import_issues
+                            or payload.import_coverage != workspace.project.import_coverage)
                         or any(replay.get(item.client_mutation_id) != mutation_sha256(item) for item in payload.outbox)
                         or not self.history_resolved(state, payload)):
                     raise BackgroundFailure("DEPENDENCY_CHANGED")
             if record.writer_epoch == writer.epoch:
                 writer.draft_id, writer.status = None, "attached"
-                advance = WriterAdvanceV1(schemaVersion=1, proof=request.proof,
+                from .models.template_writer import WriterAdvanceV2
+                advance_type = WriterAdvanceV2 if workspace.schema_version == 7 else WriterAdvanceV1
+                advance = advance_type(schemaVersion=payload.schema_version, proof=request.proof,
                     canonicalRevision=workspace.project_revision, canonicalSha256=checksum,
                     actionCursor=max(record.action_cursor, writer.acknowledged_cursor), touches=payload.touches)
                 self.advance(state, workspace, checksum, advance)

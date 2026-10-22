@@ -1,0 +1,2933 @@
+{
+  "$defs": {
+    "AttemptCleanupRecord": {
+      "additionalProperties": false,
+      "properties": {
+        "attemptId": {
+          "minLength": 1,
+          "title": "Attemptid",
+          "type": "string"
+        },
+        "evidenceHash": {
+          "pattern": "^[a-f0-9]{64}$",
+          "title": "Evidencehash",
+          "type": "string"
+        },
+        "neverDispatched": {
+          "title": "Neverdispatched",
+          "type": "boolean"
+        },
+        "ownerHash": {
+          "pattern": "^[a-f0-9]{64}$",
+          "title": "Ownerhash",
+          "type": "string"
+        },
+        "verifiedAt": {
+          "title": "Verifiedat",
+          "type": "string"
+        },
+        "witness": {
+          "title": "Witness",
+          "type": "string"
+        }
+      },
+      "required": [
+        "attemptId",
+        "ownerHash",
+        "evidenceHash",
+        "witness",
+        "neverDispatched",
+        "verifiedAt"
+      ],
+      "title": "AttemptCleanupRecord",
+      "type": "object"
+    },
+    "CanonicalFieldBinding": {
+      "additionalProperties": false,
+      "properties": {
+        "cellId": {
+          "minLength": 1,
+          "title": "Cellid",
+          "type": "string"
+        },
+        "fieldKey": {
+          "minLength": 1,
+          "title": "Fieldkey",
+          "type": "string"
+        },
+        "periodId": {
+          "anyOf": [
+            {
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Periodid"
+        }
+      },
+      "required": [
+        "fieldKey",
+        "cellId",
+        "periodId"
+      ],
+      "title": "CanonicalFieldBinding",
+      "type": "object"
+    },
+    "CapturedItemIdentity": {
+      "additionalProperties": false,
+      "properties": {
+        "canonicalFields": {
+          "additionalProperties": {
+            "$ref": "#/$defs/CanonicalFieldBinding"
+          },
+          "title": "Canonicalfields",
+          "type": "object"
+        },
+        "cellIds": {
+          "additionalProperties": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "title": "Cellids",
+          "type": "object"
+        },
+        "itemHandle": {
+          "minLength": 1,
+          "title": "Itemhandle",
+          "type": "string"
+        },
+        "periodIds": {
+          "additionalProperties": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "title": "Periodids",
+          "type": "object"
+        },
+        "recordId": {
+          "minLength": 1,
+          "title": "Recordid",
+          "type": "string"
+        },
+        "recordRevision": {
+          "minimum": 1,
+          "title": "Recordrevision",
+          "type": "integer"
+        },
+        "semanticSchemaHash": {
+          "pattern": "^[a-f0-9]{64}$",
+          "title": "Semanticschemahash",
+          "type": "string"
+        },
+        "semanticType": {
+          "minLength": 1,
+          "title": "Semantictype",
+          "type": "string"
+        }
+      },
+      "required": [
+        "semanticType",
+        "itemHandle",
+        "recordId",
+        "cellIds",
+        "semanticSchemaHash",
+        "recordRevision"
+      ],
+      "title": "CapturedItemIdentity",
+      "type": "object"
+    },
+    "Check": {
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "minLength": 1,
+          "title": "Id",
+          "type": "string"
+        },
+        "kind": {
+          "enum": [
+            "content_schema",
+            "evidence_identity",
+            "protected_values",
+            "claim_ownership",
+            "complete_assignment",
+            "semantic_support",
+            "task_result_separation",
+            "attribution"
+          ],
+          "title": "Kind",
+          "type": "string"
+        },
+        "parameters": {
+          "$ref": "#/$defs/CheckParameters"
+        },
+        "version": {
+          "const": 1,
+          "title": "Version",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "id",
+        "kind",
+        "version",
+        "parameters"
+      ],
+      "title": "Check",
+      "type": "object"
+    },
+    "CheckParameters": {
+      "additionalProperties": false,
+      "properties": {
+        "fields": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Fields",
+          "type": "array"
+        },
+        "instructions": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Instructions",
+          "type": "array"
+        }
+      },
+      "required": [
+        "fields",
+        "instructions"
+      ],
+      "title": "CheckParameters",
+      "type": "object"
+    },
+    "CheckTarget": {
+      "additionalProperties": false,
+      "properties": {
+        "ruleId": {
+          "minLength": 1,
+          "title": "Ruleid",
+          "type": "string"
+        },
+        "targetId": {
+          "minLength": 1,
+          "title": "Targetid",
+          "type": "string"
+        }
+      },
+      "required": [
+        "ruleId",
+        "targetId"
+      ],
+      "title": "CheckTarget",
+      "type": "object"
+    },
+    "CleanupOutcome": {
+      "additionalProperties": false,
+      "properties": {
+        "evidenceHash": {
+          "anyOf": [
+            {
+              "pattern": "^[a-f0-9]{64}$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Evidencehash"
+        },
+        "state": {
+          "enum": [
+            "pending",
+            "verified",
+            "unknown"
+          ],
+          "title": "State",
+          "type": "string"
+        },
+        "witness": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Witness"
+        }
+      },
+      "required": [
+        "state",
+        "evidenceHash",
+        "witness"
+      ],
+      "title": "CleanupOutcome",
+      "type": "object"
+    },
+    "Discovery": {
+      "additionalProperties": false,
+      "properties": {
+        "key": {
+          "minLength": 1,
+          "title": "Key",
+          "type": "string"
+        },
+        "pointer": {
+          "title": "Pointer",
+          "type": "string"
+        },
+        "semanticType": {
+          "minLength": 1,
+          "title": "Semantictype",
+          "type": "string"
+        }
+      },
+      "required": [
+        "key",
+        "semanticType",
+        "pointer"
+      ],
+      "title": "Discovery",
+      "type": "object"
+    },
+    "DiscoverySelector": {
+      "additionalProperties": false,
+      "properties": {
+        "key": {
+          "minLength": 1,
+          "title": "Key",
+          "type": "string"
+        },
+        "kind": {
+          "const": "discovery_key",
+          "title": "Kind",
+          "type": "string"
+        }
+      },
+      "required": [
+        "kind",
+        "key"
+      ],
+      "title": "DiscoverySelector",
+      "type": "object"
+    },
+    "ExistingRelationSelector": {
+      "additionalProperties": false,
+      "properties": {
+        "kind": {
+          "const": "relation_id",
+          "title": "Kind",
+          "type": "string"
+        },
+        "relationId": {
+          "minLength": 1,
+          "title": "Relationid",
+          "type": "string"
+        }
+      },
+      "required": [
+        "kind",
+        "relationId"
+      ],
+      "title": "ExistingRelationSelector",
+      "type": "object"
+    },
+    "ExportAttempt": {
+      "additionalProperties": false,
+      "properties": {
+        "artifactHash": {
+          "anyOf": [
+            {
+              "pattern": "^[a-f0-9]{64}$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Artifacthash"
+        },
+        "assetsHash": {
+          "pattern": "^[a-f0-9]{64}$",
+          "title": "Assetshash",
+          "type": "string"
+        },
+        "documentHash": {
+          "pattern": "^[a-f0-9]{64}$",
+          "title": "Documenthash",
+          "type": "string"
+        },
+        "errorCode": {
+          "anyOf": [
+            {
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Errorcode"
+        },
+        "factsHash": {
+          "pattern": "^[a-f0-9]{64}$",
+          "title": "Factshash",
+          "type": "string"
+        },
+        "id": {
+          "minLength": 1,
+          "title": "Id",
+          "type": "string"
+        },
+        "packageHash": {
+          "pattern": "^[a-f0-9]{64}$",
+          "title": "Packagehash",
+          "type": "string"
+        },
+        "presentationHash": {
+          "pattern": "^[a-f0-9]{64}$",
+          "title": "Presentationhash",
+          "type": "string"
+        },
+        "publicationIntentId": {
+          "anyOf": [
+            {
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Publicationintentid"
+        },
+        "rendererHash": {
+          "pattern": "^[a-f0-9]{64}$",
+          "title": "Rendererhash",
+          "type": "string"
+        },
+        "state": {
+          "enum": [
+            "pending",
+            "running",
+            "completed",
+            "failed"
+          ],
+          "title": "State",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "state",
+        "documentHash",
+        "factsHash",
+        "presentationHash",
+        "packageHash",
+        "assetsHash",
+        "rendererHash",
+        "artifactHash",
+        "errorCode",
+        "publicationIntentId"
+      ],
+      "title": "ExportAttempt",
+      "type": "object"
+    },
+    "ExtensionCell": {
+      "additionalProperties": false,
+      "properties": {
+        "admissionReceiptIds": {
+          "items": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "title": "Admissionreceiptids",
+          "type": "array"
+        },
+        "evidence": {
+          "items": {
+            "$ref": "#/$defs/SourceSpan"
+          },
+          "title": "Evidence",
+          "type": "array"
+        },
+        "fieldKey": {
+          "minLength": 1,
+          "title": "Fieldkey",
+          "type": "string"
+        },
+        "id": {
+          "minLength": 1,
+          "title": "Id",
+          "type": "string"
+        },
+        "manualScopeId": {
+          "anyOf": [
+            {
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Manualscopeid"
+        },
+        "observationIds": {
+          "items": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "title": "Observationids",
+          "type": "array"
+        },
+        "origin": {
+          "enum": [
+            "model",
+            "source",
+            "human"
+          ],
+          "title": "Origin",
+          "type": "string"
+        },
+        "rawInput": {
+          "title": "Rawinput",
+          "type": "string"
+        },
+        "revision": {
+          "minimum": 1,
+          "title": "Revision",
+          "type": "integer"
+        },
+        "state": {
+          "enum": [
+            "admitted",
+            "human_raw",
+            "pending_manual",
+            "uncertain"
+          ],
+          "title": "State",
+          "type": "string"
+        },
+        "typedValue": {
+          "$ref": "#/$defs/JsonValue"
+        },
+        "userCorrected": {
+          "title": "Usercorrected",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "id",
+        "fieldKey",
+        "revision",
+        "rawInput",
+        "typedValue",
+        "state",
+        "origin",
+        "userCorrected",
+        "evidence",
+        "observationIds",
+        "admissionReceiptIds",
+        "manualScopeId"
+      ],
+      "title": "ExtensionCell",
+      "type": "object"
+    },
+    "FieldSidecar": {
+      "additionalProperties": false,
+      "properties": {
+        "effectiveCellIds": {
+          "items": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "title": "Effectivecellids",
+          "type": "array"
+        },
+        "evidence": {
+          "items": {
+            "$ref": "#/$defs/SourceSpan"
+          },
+          "title": "Evidence",
+          "type": "array"
+        },
+        "fieldKey": {
+          "minLength": 1,
+          "title": "Fieldkey",
+          "type": "string"
+        },
+        "itemHandle": {
+          "minLength": 1,
+          "title": "Itemhandle",
+          "type": "string"
+        },
+        "pointer": {
+          "title": "Pointer",
+          "type": "string"
+        }
+      },
+      "required": [
+        "itemHandle",
+        "fieldKey",
+        "pointer",
+        "evidence",
+        "effectiveCellIds"
+      ],
+      "title": "FieldSidecar",
+      "type": "object"
+    },
+    "FinalizationCandidate": {
+      "additionalProperties": false,
+      "properties": {
+        "authorityHash": {
+          "pattern": "^[a-f0-9]{64}$",
+          "title": "Authorityhash",
+          "type": "string"
+        },
+        "authorizationId": {
+          "minLength": 1,
+          "title": "Authorizationid",
+          "type": "string"
+        },
+        "candidateHash": {
+          "pattern": "^[a-f0-9]{64}$",
+          "title": "Candidatehash",
+          "type": "string"
+        },
+        "coverageHash": {
+          "pattern": "^[a-f0-9]{64}$",
+          "title": "Coveragehash",
+          "type": "string"
+        },
+        "dependencyHash": {
+          "pattern": "^[a-f0-9]{64}$",
+          "title": "Dependencyhash",
+          "type": "string"
+        },
+        "documentHash": {
+          "pattern": "^[a-f0-9]{64}$",
+          "title": "Documenthash",
+          "type": "string"
+        },
+        "expiresAt": {
+          "title": "Expiresat",
+          "type": "string"
+        },
+        "factsHash": {
+          "pattern": "^[a-f0-9]{64}$",
+          "title": "Factshash",
+          "type": "string"
+        },
+        "id": {
+          "minLength": 1,
+          "title": "Id",
+          "type": "string"
+        },
+        "issuesHash": {
+          "pattern": "^[a-f0-9]{64}$",
+          "title": "Issueshash",
+          "type": "string"
+        },
+        "operationId": {
+          "minLength": 1,
+          "title": "Operationid",
+          "type": "string"
+        },
+        "packageHash": {
+          "pattern": "^[a-f0-9]{64}$",
+          "title": "Packagehash",
+          "type": "string"
+        },
+        "sourceHash": {
+          "pattern": "^[a-f0-9]{64}$",
+          "title": "Sourcehash",
+          "type": "string"
+        },
+        "startedAt": {
+          "title": "Startedat",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "operationId",
+        "authorizationId",
+        "sourceHash",
+        "dependencyHash",
+        "authorityHash",
+        "packageHash",
+        "documentHash",
+        "factsHash",
+        "issuesHash",
+        "coverageHash",
+        "candidateHash",
+        "startedAt",
+        "expiresAt"
+      ],
+      "title": "FinalizationCandidate",
+      "type": "object"
+    },
+    "HandleAllocation": {
+      "additionalProperties": false,
+      "properties": {
+        "canonicalFields": {
+          "additionalProperties": {
+            "$ref": "#/$defs/CanonicalFieldBinding"
+          },
+          "title": "Canonicalfields",
+          "type": "object"
+        },
+        "cellIds": {
+          "additionalProperties": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "title": "Cellids",
+          "type": "object"
+        },
+        "discoveryAttemptId": {
+          "minLength": 1,
+          "title": "Discoveryattemptid",
+          "type": "string"
+        },
+        "discoveryHash": {
+          "pattern": "^[a-f0-9]{64}$",
+          "title": "Discoveryhash",
+          "type": "string"
+        },
+        "itemHandle": {
+          "minLength": 1,
+          "title": "Itemhandle",
+          "type": "string"
+        },
+        "key": {
+          "minLength": 1,
+          "title": "Key",
+          "type": "string"
+        },
+        "operationId": {
+          "minLength": 1,
+          "title": "Operationid",
+          "type": "string"
+        },
+        "periodIds": {
+          "additionalProperties": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "title": "Periodids",
+          "type": "object"
+        },
+        "recordId": {
+          "minLength": 1,
+          "title": "Recordid",
+          "type": "string"
+        },
+        "semanticType": {
+          "minLength": 1,
+          "title": "Semantictype",
+          "type": "string"
+        },
+        "taskId": {
+          "minLength": 1,
+          "title": "Taskid",
+          "type": "string"
+        }
+      },
+      "required": [
+        "semanticType",
+        "itemHandle",
+        "recordId",
+        "cellIds",
+        "operationId",
+        "taskId",
+        "discoveryAttemptId",
+        "key",
+        "discoveryHash"
+      ],
+      "title": "HandleAllocation",
+      "type": "object"
+    },
+    "HandleSelector": {
+      "additionalProperties": false,
+      "properties": {
+        "itemHandle": {
+          "minLength": 1,
+          "title": "Itemhandle",
+          "type": "string"
+        },
+        "kind": {
+          "const": "handle",
+          "title": "Kind",
+          "type": "string"
+        }
+      },
+      "required": [
+        "kind",
+        "itemHandle"
+      ],
+      "title": "HandleSelector",
+      "type": "object"
+    },
+    "ImportAttempt": {
+      "additionalProperties": false,
+      "properties": {
+        "authorizationId": {
+          "anyOf": [
+            {
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Authorizationid"
+        },
+        "cleanup": {
+          "$ref": "#/$defs/CleanupOutcome"
+        },
+        "dispatchedAt": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Dispatchedat"
+        },
+        "errorCode": {
+          "anyOf": [
+            {
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Errorcode"
+        },
+        "id": {
+          "minLength": 1,
+          "title": "Id",
+          "type": "string"
+        },
+        "inputHash": {
+          "pattern": "^[a-f0-9]{64}$",
+          "title": "Inputhash",
+          "type": "string"
+        },
+        "model": {
+          "$ref": "#/$defs/ModelCapture"
+        },
+        "operationId": {
+          "minLength": 1,
+          "title": "Operationid",
+          "type": "string"
+        },
+        "outcome": {
+          "anyOf": [
+            {
+              "enum": [
+                "completed",
+                "invalid_payload",
+                "refused",
+                "incomplete",
+                "timed_out",
+                "cancelled",
+                "transport_failure",
+                "cleanup_failure"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Outcome"
+        },
+        "owner": {
+          "$ref": "#/$defs/LaunchOwner"
+        },
+        "proposalRecordId": {
+          "anyOf": [
+            {
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Proposalrecordid"
+        },
+        "rawReturn": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Rawreturn"
+        },
+        "rawReturnHash": {
+          "anyOf": [
+            {
+              "pattern": "^[a-f0-9]{64}$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Rawreturnhash"
+        },
+        "requestValue": {
+          "anyOf": [
+            {
+              "additionalProperties": {
+                "$ref": "#/$defs/JsonValue"
+              },
+              "type": "object"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Requestvalue"
+        },
+        "reservedAt": {
+          "title": "Reservedat",
+          "type": "string"
+        },
+        "returnHash": {
+          "anyOf": [
+            {
+              "pattern": "^[a-f0-9]{64}$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Returnhash"
+        },
+        "returnedAt": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Returnedat"
+        },
+        "reviewInputRecordId": {
+          "anyOf": [
+            {
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Reviewinputrecordid"
+        },
+        "reviewReceiptId": {
+          "anyOf": [
+            {
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Reviewreceiptid"
+        },
+        "slot": {
+          "enum": [
+            "initial",
+            "review",
+            "primary_repair",
+            "fallback_repair",
+            "replacement_review"
+          ],
+          "title": "Slot",
+          "type": "string"
+        },
+        "state": {
+          "enum": [
+            "reserved",
+            "dispatch_started",
+            "returned",
+            "outcome_unknown",
+            "reconciled",
+            "released"
+          ],
+          "title": "State",
+          "type": "string"
+        },
+        "taskId": {
+          "minLength": 1,
+          "title": "Taskid",
+          "type": "string"
+        },
+        "usage": {
+          "$ref": "#/$defs/ObservedUsage"
+        }
+      },
+      "required": [
+        "id",
+        "operationId",
+        "taskId",
+        "slot",
+        "inputHash",
+        "model",
+        "state",
+        "owner",
+        "reservedAt",
+        "dispatchedAt",
+        "returnHash",
+        "usage",
+        "cleanup",
+        "proposalRecordId",
+        "reviewInputRecordId",
+        "reviewReceiptId",
+        "rawReturn",
+        "rawReturnHash"
+      ],
+      "title": "ImportAttempt",
+      "type": "object"
+    },
+    "ImportAuthorization": {
+      "additionalProperties": false,
+      "properties": {
+        "authorityHash": {
+          "pattern": "^[a-f0-9]{64}$",
+          "title": "Authorityhash",
+          "type": "string"
+        },
+        "authorizedAt": {
+          "title": "Authorizedat",
+          "type": "string"
+        },
+        "dependencyHash": {
+          "pattern": "^[a-f0-9]{64}$",
+          "title": "Dependencyhash",
+          "type": "string"
+        },
+        "id": {
+          "minLength": 1,
+          "title": "Id",
+          "type": "string"
+        },
+        "kind": {
+          "enum": [
+            "start",
+            "resume"
+          ],
+          "title": "Kind",
+          "type": "string"
+        },
+        "state": {
+          "enum": [
+            "active",
+            "cancelled"
+          ],
+          "title": "State",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "kind",
+        "state",
+        "authorizedAt",
+        "authorityHash",
+        "dependencyHash"
+      ],
+      "title": "ImportAuthorization",
+      "type": "object"
+    },
+    "ImportCapture": {
+      "additionalProperties": false,
+      "properties": {
+        "allowTextRewrite": {
+          "title": "Allowtextrewrite",
+          "type": "boolean"
+        },
+        "authorityHash": {
+          "pattern": "^[a-f0-9]{64}$",
+          "title": "Authorityhash",
+          "type": "string"
+        },
+        "dependencyHash": {
+          "pattern": "^[a-f0-9]{64}$",
+          "title": "Dependencyhash",
+          "type": "string"
+        },
+        "factRevisions": {
+          "additionalProperties": {
+            "minimum": 1,
+            "type": "integer"
+          },
+          "title": "Factrevisions",
+          "type": "object"
+        },
+        "fallback": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ModelCapture"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "formattingAsOf": {
+          "$ref": "#/$defs/PartialDate"
+        },
+        "packageHash": {
+          "pattern": "^[a-f0-9]{64}$",
+          "title": "Packagehash",
+          "type": "string"
+        },
+        "policy": {
+          "$ref": "#/$defs/RuntimePolicy"
+        },
+        "primary": {
+          "$ref": "#/$defs/ModelCapture"
+        },
+        "sourceHashes": {
+          "additionalProperties": {
+            "pattern": "^[a-f0-9]{64}$",
+            "type": "string"
+          },
+          "title": "Sourcehashes",
+          "type": "object"
+        }
+      },
+      "required": [
+        "packageHash",
+        "sourceHashes",
+        "factRevisions",
+        "authorityHash",
+        "dependencyHash",
+        "allowTextRewrite",
+        "primary",
+        "fallback",
+        "formattingAsOf",
+        "policy"
+      ],
+      "title": "ImportCapture",
+      "type": "object"
+    },
+    "ImportIssue": {
+      "additionalProperties": false,
+      "properties": {
+        "blockIds": {
+          "items": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "title": "Blockids",
+          "type": "array"
+        },
+        "category": {
+          "enum": [
+            "content_violation",
+            "uncertain_interpretation",
+            "check_not_completed"
+          ],
+          "title": "Category",
+          "type": "string"
+        },
+        "code": {
+          "minLength": 1,
+          "title": "Code",
+          "type": "string"
+        },
+        "id": {
+          "minLength": 1,
+          "title": "Id",
+          "type": "string"
+        },
+        "importedFingerprint": {
+          "pattern": "^[a-f0-9]{64}$",
+          "title": "Importedfingerprint",
+          "type": "string"
+        },
+        "lifecycleId": {
+          "minLength": 1,
+          "title": "Lifecycleid",
+          "type": "string"
+        },
+        "message": {
+          "title": "Message",
+          "type": "string"
+        },
+        "retiredByAction": {
+          "anyOf": [
+            {
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Retiredbyaction"
+        },
+        "reviewInputHash": {
+          "anyOf": [
+            {
+              "pattern": "^[a-f0-9]{64}$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Reviewinputhash"
+        },
+        "ruleId": {
+          "anyOf": [
+            {
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Ruleid"
+        },
+        "state": {
+          "enum": [
+            "active",
+            "retired"
+          ],
+          "title": "State",
+          "type": "string"
+        },
+        "targetIds": {
+          "items": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "title": "Targetids",
+          "type": "array"
+        },
+        "taskId": {
+          "minLength": 1,
+          "title": "Taskid",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "ruleId",
+        "taskId",
+        "targetIds",
+        "blockIds",
+        "category",
+        "code",
+        "message",
+        "importedFingerprint",
+        "reviewInputHash",
+        "lifecycleId",
+        "state",
+        "retiredByAction"
+      ],
+      "title": "ImportIssue",
+      "type": "object"
+    },
+    "ImportTask": {
+      "additionalProperties": false,
+      "properties": {
+        "allowedHandles": {
+          "items": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "title": "Allowedhandles",
+          "type": "array"
+        },
+        "attemptIds": {
+          "items": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "title": "Attemptids",
+          "type": "array"
+        },
+        "blockId": {
+          "minLength": 1,
+          "title": "Blockid",
+          "type": "string"
+        },
+        "dependencies": {
+          "items": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "title": "Dependencies",
+          "type": "array"
+        },
+        "expectedChecks": {
+          "items": {
+            "$ref": "#/$defs/CheckTarget"
+          },
+          "title": "Expectedchecks",
+          "type": "array"
+        },
+        "id": {
+          "minLength": 1,
+          "title": "Id",
+          "type": "string"
+        },
+        "inputHash": {
+          "pattern": "^[a-f0-9]{64}$",
+          "title": "Inputhash",
+          "type": "string"
+        },
+        "issueIds": {
+          "items": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "title": "Issueids",
+          "type": "array"
+        },
+        "kind": {
+          "enum": [
+            "extract",
+            "rewrite",
+            "derive",
+            "source_copy"
+          ],
+          "title": "Kind",
+          "type": "string"
+        },
+        "operationId": {
+          "minLength": 1,
+          "title": "Operationid",
+          "type": "string"
+        },
+        "proposalHash": {
+          "anyOf": [
+            {
+              "pattern": "^[a-f0-9]{64}$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Proposalhash"
+        },
+        "receiptIds": {
+          "items": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "title": "Receiptids",
+          "type": "array"
+        },
+        "state": {
+          "enum": [
+            "pending",
+            "running",
+            "proposed",
+            "checking",
+            "repairing",
+            "accepted",
+            "empty",
+            "source_fallback",
+            "cancelled",
+            "technical_failure"
+          ],
+          "title": "State",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "operationId",
+        "blockId",
+        "kind",
+        "dependencies",
+        "inputHash",
+        "allowedHandles",
+        "expectedChecks",
+        "state",
+        "attemptIds",
+        "proposalHash",
+        "receiptIds",
+        "issueIds"
+      ],
+      "title": "ImportTask",
+      "type": "object"
+    },
+    "JsonValue": {},
+    "LaunchOwner": {
+      "additionalProperties": false,
+      "properties": {
+        "generation": {
+          "exclusiveMinimum": 0,
+          "title": "Generation",
+          "type": "integer"
+        },
+        "incarnationId": {
+          "minLength": 1,
+          "title": "Incarnationid",
+          "type": "string"
+        },
+        "leaseId": {
+          "minLength": 1,
+          "title": "Leaseid",
+          "type": "string"
+        },
+        "pid": {
+          "anyOf": [
+            {
+              "exclusiveMinimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Pid"
+        },
+        "processStartWitness": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Processstartwitness"
+        },
+        "reservationId": {
+          "minLength": 1,
+          "title": "Reservationid",
+          "type": "string"
+        },
+        "transportSessionId": {
+          "anyOf": [
+            {
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Transportsessionid"
+        },
+        "transportTurnId": {
+          "anyOf": [
+            {
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Transportturnid"
+        }
+      },
+      "required": [
+        "reservationId",
+        "incarnationId",
+        "generation",
+        "leaseId",
+        "processStartWitness",
+        "transportSessionId",
+        "transportTurnId",
+        "pid"
+      ],
+      "title": "LaunchOwner",
+      "type": "object"
+    },
+    "Lineage": {
+      "additionalProperties": false,
+      "properties": {
+        "attemptId": {
+          "minLength": 1,
+          "title": "Attemptid",
+          "type": "string"
+        },
+        "children": {
+          "items": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "title": "Children",
+          "type": "array"
+        },
+        "kind": {
+          "enum": [
+            "add",
+            "split",
+            "merge"
+          ],
+          "title": "Kind",
+          "type": "string"
+        },
+        "parents": {
+          "items": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "title": "Parents",
+          "type": "array"
+        }
+      },
+      "required": [
+        "kind",
+        "parents",
+        "children",
+        "attemptId"
+      ],
+      "title": "Lineage",
+      "type": "object"
+    },
+    "ModelCapture": {
+      "additionalProperties": false,
+      "properties": {
+        "adapter": {
+          "minLength": 1,
+          "title": "Adapter",
+          "type": "string"
+        },
+        "capabilityProfile": {
+          "minLength": 1,
+          "title": "Capabilityprofile",
+          "type": "string"
+        },
+        "capabilityVersion": {
+          "minLength": 1,
+          "title": "Capabilityversion",
+          "type": "string"
+        },
+        "configurationHash": {
+          "pattern": "^[a-f0-9]{64}$",
+          "title": "Configurationhash",
+          "type": "string"
+        },
+        "effort": {
+          "minLength": 1,
+          "title": "Effort",
+          "type": "string"
+        },
+        "model": {
+          "minLength": 1,
+          "title": "Model",
+          "type": "string"
+        }
+      },
+      "required": [
+        "adapter",
+        "model",
+        "effort",
+        "capabilityProfile",
+        "capabilityVersion",
+        "configurationHash"
+      ],
+      "title": "ModelCapture",
+      "type": "object"
+    },
+    "ObservedUsage": {
+      "additionalProperties": false,
+      "properties": {
+        "cachedInputTokens": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Cachedinputtokens"
+        },
+        "complete": {
+          "title": "Complete",
+          "type": "boolean"
+        },
+        "inputTokens": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Inputtokens"
+        },
+        "outputTokens": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Outputtokens"
+        }
+      },
+      "required": [
+        "inputTokens",
+        "cachedInputTokens",
+        "outputTokens",
+        "complete"
+      ],
+      "title": "ObservedUsage",
+      "type": "object"
+    },
+    "PartialDate": {
+      "additionalProperties": false,
+      "properties": {
+        "day": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Day"
+        },
+        "month": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Month"
+        },
+        "precision": {
+          "enum": [
+            "year",
+            "month",
+            "day"
+          ],
+          "title": "Precision",
+          "type": "string"
+        },
+        "year": {
+          "maximum": 9999,
+          "minimum": 1,
+          "title": "Year",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "precision",
+        "year",
+        "month",
+        "day"
+      ],
+      "title": "PartialDate",
+      "type": "object"
+    },
+    "ProposalField": {
+      "additionalProperties": false,
+      "properties": {
+        "effectiveCellIds": {
+          "items": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "title": "Effectivecellids",
+          "type": "array"
+        },
+        "evidence": {
+          "items": {
+            "$ref": "#/$defs/SourceSpan"
+          },
+          "title": "Evidence",
+          "type": "array"
+        },
+        "fieldKey": {
+          "minLength": 1,
+          "title": "Fieldkey",
+          "type": "string"
+        },
+        "item": {
+          "discriminator": {
+            "mapping": {
+              "discovery_key": "#/$defs/DiscoverySelector",
+              "handle": "#/$defs/HandleSelector"
+            },
+            "propertyName": "kind"
+          },
+          "oneOf": [
+            {
+              "$ref": "#/$defs/DiscoverySelector"
+            },
+            {
+              "$ref": "#/$defs/HandleSelector"
+            }
+          ],
+          "title": "Item"
+        },
+        "pointer": {
+          "title": "Pointer",
+          "type": "string"
+        }
+      },
+      "required": [
+        "item",
+        "fieldKey",
+        "pointer",
+        "evidence",
+        "effectiveCellIds"
+      ],
+      "title": "ProposalField",
+      "type": "object"
+    },
+    "ProposalLineage": {
+      "additionalProperties": false,
+      "properties": {
+        "children": {
+          "items": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "title": "Children",
+          "type": "array"
+        },
+        "kind": {
+          "enum": [
+            "add",
+            "split",
+            "merge"
+          ],
+          "title": "Kind",
+          "type": "string"
+        },
+        "parents": {
+          "items": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "title": "Parents",
+          "type": "array"
+        }
+      },
+      "required": [
+        "kind",
+        "parents",
+        "children"
+      ],
+      "title": "ProposalLineage",
+      "type": "object"
+    },
+    "ProposalRecord": {
+      "additionalProperties": false,
+      "properties": {
+        "admittedCellIds": {
+          "items": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "title": "Admittedcellids",
+          "type": "array"
+        },
+        "admittedRecordRevisions": {
+          "additionalProperties": {
+            "minimum": 1,
+            "type": "integer"
+          },
+          "title": "Admittedrecordrevisions",
+          "type": "object"
+        },
+        "admittedRelationIds": {
+          "items": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "title": "Admittedrelationids",
+          "type": "array"
+        },
+        "admittedRelationRevisions": {
+          "additionalProperties": {
+            "minimum": 1,
+            "type": "integer"
+          },
+          "title": "Admittedrelationrevisions",
+          "type": "object"
+        },
+        "appliedReceiptId": {
+          "anyOf": [
+            {
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Appliedreceiptid"
+        },
+        "attemptId": {
+          "minLength": 1,
+          "title": "Attemptid",
+          "type": "string"
+        },
+        "errors": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Errors",
+          "type": "array"
+        },
+        "id": {
+          "minLength": 1,
+          "title": "Id",
+          "type": "string"
+        },
+        "inputHash": {
+          "pattern": "^[a-f0-9]{64}$",
+          "title": "Inputhash",
+          "type": "string"
+        },
+        "lineage": {
+          "items": {
+            "$ref": "#/$defs/Lineage"
+          },
+          "title": "Lineage",
+          "type": "array"
+        },
+        "proposalHash": {
+          "pattern": "^[a-f0-9]{64}$",
+          "title": "Proposalhash",
+          "type": "string"
+        },
+        "rawReturn": {
+          "title": "Rawreturn",
+          "type": "string"
+        },
+        "rawReturnHash": {
+          "pattern": "^[a-f0-9]{64}$",
+          "title": "Rawreturnhash",
+          "type": "string"
+        },
+        "reply": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ProposalReply"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "resolvedFields": {
+          "items": {
+            "$ref": "#/$defs/FieldSidecar"
+          },
+          "title": "Resolvedfields",
+          "type": "array"
+        },
+        "resolvedRelations": {
+          "items": {
+            "$ref": "#/$defs/Relation"
+          },
+          "title": "Resolvedrelations",
+          "type": "array"
+        },
+        "state": {
+          "enum": [
+            "invalid",
+            "provisional",
+            "accepted",
+            "rejected"
+          ],
+          "title": "State",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "attemptId",
+        "inputHash",
+        "rawReturn",
+        "rawReturnHash",
+        "reply",
+        "resolvedFields",
+        "lineage",
+        "state",
+        "errors",
+        "proposalHash"
+      ],
+      "title": "ProposalRecord",
+      "type": "object"
+    },
+    "ProposalRelation": {
+      "additionalProperties": false,
+      "properties": {
+        "evidence": {
+          "items": {
+            "$ref": "#/$defs/SourceSpan"
+          },
+          "title": "Evidence",
+          "type": "array"
+        },
+        "kind": {
+          "enum": [
+            "owned_by",
+            "extension_of",
+            "related_to"
+          ],
+          "title": "Kind",
+          "type": "string"
+        },
+        "relation": {
+          "discriminator": {
+            "mapping": {
+              "discovery_key": "#/$defs/RelationDiscoverySelector",
+              "relation_id": "#/$defs/ExistingRelationSelector"
+            },
+            "propertyName": "kind"
+          },
+          "oneOf": [
+            {
+              "$ref": "#/$defs/RelationDiscoverySelector"
+            },
+            {
+              "$ref": "#/$defs/ExistingRelationSelector"
+            }
+          ],
+          "title": "Relation"
+        },
+        "subject": {
+          "discriminator": {
+            "mapping": {
+              "discovery_key": "#/$defs/DiscoverySelector",
+              "handle": "#/$defs/HandleSelector"
+            },
+            "propertyName": "kind"
+          },
+          "oneOf": [
+            {
+              "$ref": "#/$defs/DiscoverySelector"
+            },
+            {
+              "$ref": "#/$defs/HandleSelector"
+            }
+          ],
+          "title": "Subject"
+        },
+        "target": {
+          "discriminator": {
+            "mapping": {
+              "discovery_key": "#/$defs/DiscoverySelector",
+              "handle": "#/$defs/HandleSelector"
+            },
+            "propertyName": "kind"
+          },
+          "oneOf": [
+            {
+              "$ref": "#/$defs/DiscoverySelector"
+            },
+            {
+              "$ref": "#/$defs/HandleSelector"
+            }
+          ],
+          "title": "Target"
+        }
+      },
+      "required": [
+        "relation",
+        "kind",
+        "subject",
+        "target",
+        "evidence"
+      ],
+      "title": "ProposalRelation",
+      "type": "object"
+    },
+    "ProposalReply": {
+      "additionalProperties": false,
+      "properties": {
+        "discoveries": {
+          "items": {
+            "$ref": "#/$defs/Discovery"
+          },
+          "title": "Discoveries",
+          "type": "array"
+        },
+        "fields": {
+          "items": {
+            "$ref": "#/$defs/ProposalField"
+          },
+          "title": "Fields",
+          "type": "array"
+        },
+        "lineage": {
+          "items": {
+            "$ref": "#/$defs/ProposalLineage"
+          },
+          "title": "Lineage",
+          "type": "array"
+        },
+        "payload": {
+          "$ref": "#/$defs/JsonValue"
+        },
+        "relations": {
+          "items": {
+            "$ref": "#/$defs/ProposalRelation"
+          },
+          "title": "Relations",
+          "type": "array"
+        },
+        "schemaVersion": {
+          "const": 1,
+          "title": "Schemaversion",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "schemaVersion",
+        "payload",
+        "discoveries",
+        "fields",
+        "lineage"
+      ],
+      "title": "ProposalReply",
+      "type": "object"
+    },
+    "PublicationOutcome": {
+      "additionalProperties": false,
+      "properties": {
+        "errorCode": {
+          "anyOf": [
+            {
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Errorcode"
+        },
+        "intentId": {
+          "anyOf": [
+            {
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Intentid"
+        },
+        "state": {
+          "enum": [
+            "pending",
+            "saved",
+            "failed_before_replacement",
+            "outcome_unknown",
+            "cancelled"
+          ],
+          "title": "State",
+          "type": "string"
+        },
+        "workspaceHash": {
+          "anyOf": [
+            {
+              "pattern": "^[a-f0-9]{64}$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Workspacehash"
+        }
+      },
+      "required": [
+        "state",
+        "intentId",
+        "workspaceHash",
+        "errorCode"
+      ],
+      "title": "PublicationOutcome",
+      "type": "object"
+    },
+    "Relation": {
+      "additionalProperties": false,
+      "properties": {
+        "active": {
+          "title": "Active",
+          "type": "boolean"
+        },
+        "id": {
+          "minLength": 1,
+          "title": "Id",
+          "type": "string"
+        },
+        "kind": {
+          "enum": [
+            "owned_by",
+            "extension_of",
+            "related_to"
+          ],
+          "title": "Kind",
+          "type": "string"
+        },
+        "revision": {
+          "minimum": 1,
+          "title": "Revision",
+          "type": "integer"
+        },
+        "subjectId": {
+          "minLength": 1,
+          "title": "Subjectid",
+          "type": "string"
+        },
+        "targetId": {
+          "minLength": 1,
+          "title": "Targetid",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "kind",
+        "subjectId",
+        "targetId",
+        "revision",
+        "active"
+      ],
+      "title": "Relation",
+      "type": "object"
+    },
+    "RelationAllocation": {
+      "additionalProperties": false,
+      "properties": {
+        "discoveryAttemptId": {
+          "minLength": 1,
+          "title": "Discoveryattemptid",
+          "type": "string"
+        },
+        "key": {
+          "minLength": 1,
+          "title": "Key",
+          "type": "string"
+        },
+        "kind": {
+          "enum": [
+            "owned_by",
+            "extension_of",
+            "related_to"
+          ],
+          "title": "Kind",
+          "type": "string"
+        },
+        "operationId": {
+          "minLength": 1,
+          "title": "Operationid",
+          "type": "string"
+        },
+        "relationId": {
+          "minLength": 1,
+          "title": "Relationid",
+          "type": "string"
+        },
+        "subjectId": {
+          "minLength": 1,
+          "title": "Subjectid",
+          "type": "string"
+        },
+        "targetId": {
+          "minLength": 1,
+          "title": "Targetid",
+          "type": "string"
+        },
+        "taskId": {
+          "minLength": 1,
+          "title": "Taskid",
+          "type": "string"
+        }
+      },
+      "required": [
+        "operationId",
+        "taskId",
+        "discoveryAttemptId",
+        "key",
+        "relationId",
+        "kind",
+        "subjectId",
+        "targetId"
+      ],
+      "title": "RelationAllocation",
+      "type": "object"
+    },
+    "RelationDiscoverySelector": {
+      "additionalProperties": false,
+      "properties": {
+        "key": {
+          "minLength": 1,
+          "title": "Key",
+          "type": "string"
+        },
+        "kind": {
+          "const": "discovery_key",
+          "title": "Kind",
+          "type": "string"
+        }
+      },
+      "required": [
+        "kind",
+        "key"
+      ],
+      "title": "RelationDiscoverySelector",
+      "type": "object"
+    },
+    "ReviewDisposition": {
+      "additionalProperties": false,
+      "properties": {
+        "actionable": {
+          "title": "Actionable",
+          "type": "boolean"
+        },
+        "disposition": {
+          "enum": [
+            "satisfied",
+            "violation",
+            "uncertain"
+          ],
+          "title": "Disposition",
+          "type": "string"
+        },
+        "evidence": {
+          "items": {
+            "$ref": "#/$defs/SourceSpan"
+          },
+          "title": "Evidence",
+          "type": "array"
+        },
+        "reason": {
+          "title": "Reason",
+          "type": "string"
+        },
+        "ruleId": {
+          "minLength": 1,
+          "title": "Ruleid",
+          "type": "string"
+        },
+        "targetId": {
+          "minLength": 1,
+          "title": "Targetid",
+          "type": "string"
+        }
+      },
+      "required": [
+        "ruleId",
+        "targetId",
+        "disposition",
+        "reason",
+        "evidence",
+        "actionable"
+      ],
+      "title": "ReviewDisposition",
+      "type": "object"
+    },
+    "ReviewInput": {
+      "additionalProperties": false,
+      "properties": {
+        "allowTextRewrite": {
+          "title": "Allowtextrewrite",
+          "type": "boolean"
+        },
+        "effectiveCells": {
+          "items": {
+            "$ref": "#/$defs/ExtensionCell"
+          },
+          "title": "Effectivecells",
+          "type": "array"
+        },
+        "handleMap": {
+          "items": {
+            "anyOf": [
+              {
+                "$ref": "#/$defs/HandleAllocation"
+              },
+              {
+                "$ref": "#/$defs/CapturedItemIdentity"
+              }
+            ]
+          },
+          "title": "Handlemap",
+          "type": "array"
+        },
+        "occurrenceContext": {
+          "$ref": "#/$defs/JsonValue"
+        },
+        "occurrenceIndependent": {
+          "title": "Occurrenceindependent",
+          "type": "boolean"
+        },
+        "packageHash": {
+          "pattern": "^[a-f0-9]{64}$",
+          "title": "Packagehash",
+          "type": "string"
+        },
+        "policy": {
+          "$ref": "#/$defs/ModelCapture"
+        },
+        "proposalHash": {
+          "pattern": "^[a-f0-9]{64}$",
+          "title": "Proposalhash",
+          "type": "string"
+        },
+        "protocol": {
+          "const": "template_import_v1",
+          "title": "Protocol",
+          "type": "string"
+        },
+        "relations": {
+          "items": {
+            "$ref": "#/$defs/Relation"
+          },
+          "title": "Relations",
+          "type": "array"
+        },
+        "rules": {
+          "items": {
+            "$ref": "#/$defs/Check"
+          },
+          "title": "Rules",
+          "type": "array"
+        },
+        "schemaVersion": {
+          "const": 1,
+          "title": "Schemaversion",
+          "type": "integer"
+        },
+        "semanticContext": {
+          "additionalProperties": {
+            "$ref": "#/$defs/JsonValue"
+          },
+          "title": "Semanticcontext",
+          "type": "object"
+        },
+        "sourceSpans": {
+          "items": {
+            "$ref": "#/$defs/SourceSpan"
+          },
+          "title": "Sourcespans",
+          "type": "array"
+        },
+        "sourceTexts": {
+          "additionalProperties": {
+            "type": "string"
+          },
+          "title": "Sourcetexts",
+          "type": "object"
+        },
+        "targets": {
+          "items": {
+            "$ref": "#/$defs/CheckTarget"
+          },
+          "title": "Targets",
+          "type": "array"
+        }
+      },
+      "required": [
+        "schemaVersion",
+        "protocol",
+        "proposalHash",
+        "targets",
+        "handleMap",
+        "rules",
+        "sourceSpans",
+        "sourceTexts",
+        "effectiveCells",
+        "relations",
+        "packageHash",
+        "allowTextRewrite",
+        "semanticContext",
+        "policy",
+        "occurrenceContext",
+        "occurrenceIndependent"
+      ],
+      "title": "ReviewInput",
+      "type": "object"
+    },
+    "ReviewInputRecord": {
+      "additionalProperties": false,
+      "properties": {
+        "attemptId": {
+          "minLength": 1,
+          "title": "Attemptid",
+          "type": "string"
+        },
+        "id": {
+          "minLength": 1,
+          "title": "Id",
+          "type": "string"
+        },
+        "inputHash": {
+          "pattern": "^[a-f0-9]{64}$",
+          "title": "Inputhash",
+          "type": "string"
+        },
+        "value": {
+          "$ref": "#/$defs/ReviewInput"
+        }
+      },
+      "required": [
+        "id",
+        "attemptId",
+        "inputHash",
+        "value"
+      ],
+      "title": "ReviewInputRecord",
+      "type": "object"
+    },
+    "ReviewReceipt": {
+      "additionalProperties": false,
+      "properties": {
+        "attemptId": {
+          "minLength": 1,
+          "title": "Attemptid",
+          "type": "string"
+        },
+        "completedAt": {
+          "title": "Completedat",
+          "type": "string"
+        },
+        "expectedChecks": {
+          "items": {
+            "$ref": "#/$defs/CheckTarget"
+          },
+          "title": "Expectedchecks",
+          "type": "array"
+        },
+        "id": {
+          "minLength": 1,
+          "title": "Id",
+          "type": "string"
+        },
+        "reply": {
+          "$ref": "#/$defs/ReviewReply"
+        },
+        "reviewInputHash": {
+          "pattern": "^[a-f0-9]{64}$",
+          "title": "Reviewinputhash",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "reviewInputHash",
+        "expectedChecks",
+        "reply",
+        "attemptId",
+        "completedAt"
+      ],
+      "title": "ReviewReceipt",
+      "type": "object"
+    },
+    "ReviewReply": {
+      "additionalProperties": false,
+      "properties": {
+        "results": {
+          "items": {
+            "$ref": "#/$defs/ReviewDisposition"
+          },
+          "title": "Results",
+          "type": "array"
+        }
+      },
+      "required": [
+        "results"
+      ],
+      "title": "ReviewReply",
+      "type": "object"
+    },
+    "RuntimePolicy": {
+      "additionalProperties": false,
+      "properties": {
+        "callCap": {
+          "exclusiveMinimum": 0,
+          "title": "Callcap",
+          "type": "integer"
+        },
+        "cleanupSeconds": {
+          "const": 5,
+          "title": "Cleanupseconds",
+          "type": "integer"
+        },
+        "concurrency": {
+          "const": 1,
+          "title": "Concurrency",
+          "type": "integer"
+        },
+        "fallbackRepairs": {
+          "const": 1,
+          "title": "Fallbackrepairs",
+          "type": "integer"
+        },
+        "finalizationSeconds": {
+          "const": 30,
+          "title": "Finalizationseconds",
+          "type": "integer"
+        },
+        "primaryRepairs": {
+          "const": 1,
+          "title": "Primaryrepairs",
+          "type": "integer"
+        },
+        "processingSeconds": {
+          "const": 300,
+          "title": "Processingseconds",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "callCap",
+        "concurrency",
+        "processingSeconds",
+        "cleanupSeconds",
+        "finalizationSeconds",
+        "primaryRepairs",
+        "fallbackRepairs"
+      ],
+      "title": "RuntimePolicy",
+      "type": "object"
+    },
+    "SourceSpan": {
+      "additionalProperties": false,
+      "properties": {
+        "end": {
+          "minimum": 0,
+          "title": "End",
+          "type": "integer"
+        },
+        "sliceHash": {
+          "pattern": "^[a-f0-9]{64}$",
+          "title": "Slicehash",
+          "type": "string"
+        },
+        "sourceId": {
+          "minLength": 1,
+          "title": "Sourceid",
+          "type": "string"
+        },
+        "sourceRevision": {
+          "minimum": 1,
+          "title": "Sourcerevision",
+          "type": "integer"
+        },
+        "start": {
+          "minimum": 0,
+          "title": "Start",
+          "type": "integer"
+        },
+        "unitId": {
+          "minLength": 1,
+          "title": "Unitid",
+          "type": "string"
+        },
+        "unitRevision": {
+          "minimum": 1,
+          "title": "Unitrevision",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "sourceId",
+        "sourceRevision",
+        "unitId",
+        "unitRevision",
+        "start",
+        "end",
+        "sliceHash"
+      ],
+      "title": "SourceSpan",
+      "type": "object"
+    },
+    "TaskInputRecord": {
+      "additionalProperties": false,
+      "properties": {
+        "capturedAt": {
+          "title": "Capturedat",
+          "type": "string"
+        },
+        "id": {
+          "minLength": 1,
+          "title": "Id",
+          "type": "string"
+        },
+        "inputHash": {
+          "pattern": "^[a-f0-9]{64}$",
+          "title": "Inputhash",
+          "type": "string"
+        },
+        "taskId": {
+          "minLength": 1,
+          "title": "Taskid",
+          "type": "string"
+        },
+        "value": {
+          "additionalProperties": {
+            "$ref": "#/$defs/JsonValue"
+          },
+          "title": "Value",
+          "type": "object"
+        }
+      },
+      "required": [
+        "id",
+        "taskId",
+        "inputHash",
+        "value",
+        "capturedAt"
+      ],
+      "title": "TaskInputRecord",
+      "type": "object"
+    },
+    "TaskResultRecord": {
+      "additionalProperties": false,
+      "properties": {
+        "disposition": {
+          "enum": [
+            "admitted",
+            "derived",
+            "source_fallback",
+            "empty"
+          ],
+          "title": "Disposition",
+          "type": "string"
+        },
+        "id": {
+          "minLength": 1,
+          "title": "Id",
+          "type": "string"
+        },
+        "inputHash": {
+          "pattern": "^[a-f0-9]{64}$",
+          "title": "Inputhash",
+          "type": "string"
+        },
+        "issueIds": {
+          "items": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "title": "Issueids",
+          "type": "array"
+        },
+        "itemHandles": {
+          "items": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "title": "Itemhandles",
+          "type": "array"
+        },
+        "sourceSpans": {
+          "items": {
+            "$ref": "#/$defs/SourceSpan"
+          },
+          "title": "Sourcespans",
+          "type": "array"
+        },
+        "taskId": {
+          "minLength": 1,
+          "title": "Taskid",
+          "type": "string"
+        },
+        "value": {
+          "$ref": "#/$defs/JsonValue"
+        }
+      },
+      "required": [
+        "id",
+        "taskId",
+        "inputHash",
+        "value",
+        "sourceSpans",
+        "itemHandles",
+        "issueIds",
+        "disposition"
+      ],
+      "title": "TaskResultRecord",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "admittedAt": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "title": "Admittedat"
+    },
+    "allocations": {
+      "items": {
+        "$ref": "#/$defs/HandleAllocation"
+      },
+      "title": "Allocations",
+      "type": "array"
+    },
+    "attempts": {
+      "items": {
+        "$ref": "#/$defs/ImportAttempt"
+      },
+      "title": "Attempts",
+      "type": "array"
+    },
+    "authorizations": {
+      "items": {
+        "$ref": "#/$defs/ImportAuthorization"
+      },
+      "title": "Authorizations",
+      "type": "array"
+    },
+    "capture": {
+      "$ref": "#/$defs/ImportCapture"
+    },
+    "capturedItems": {
+      "items": {
+        "$ref": "#/$defs/CapturedItemIdentity"
+      },
+      "title": "Captureditems",
+      "type": "array"
+    },
+    "capturedRelationRevisions": {
+      "additionalProperties": {
+        "minimum": 1,
+        "type": "integer"
+      },
+      "title": "Capturedrelationrevisions",
+      "type": "object"
+    },
+    "cleanupRecords": {
+      "items": {
+        "$ref": "#/$defs/AttemptCleanupRecord"
+      },
+      "title": "Cleanuprecords",
+      "type": "array"
+    },
+    "clientRequestId": {
+      "anyOf": [
+        {
+          "minLength": 1,
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Clientrequestid"
+    },
+    "expiresAt": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "title": "Expiresat"
+    },
+    "exportAttempts": {
+      "items": {
+        "$ref": "#/$defs/ExportAttempt"
+      },
+      "title": "Exportattempts",
+      "type": "array"
+    },
+    "finalization": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/FinalizationCandidate"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "finalizationHistory": {
+      "items": {
+        "$ref": "#/$defs/FinalizationCandidate"
+      },
+      "title": "Finalizationhistory",
+      "type": "array"
+    },
+    "id": {
+      "minLength": 1,
+      "title": "Id",
+      "type": "string"
+    },
+    "inferenceClosed": {
+      "default": false,
+      "title": "Inferenceclosed",
+      "type": "boolean"
+    },
+    "issues": {
+      "items": {
+        "$ref": "#/$defs/ImportIssue"
+      },
+      "title": "Issues",
+      "type": "array"
+    },
+    "lastObservedAt": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "title": "Lastobservedat"
+    },
+    "projectId": {
+      "minLength": 1,
+      "title": "Projectid",
+      "type": "string"
+    },
+    "proposals": {
+      "items": {
+        "$ref": "#/$defs/ProposalRecord"
+      },
+      "title": "Proposals",
+      "type": "array"
+    },
+    "publication": {
+      "$ref": "#/$defs/PublicationOutcome"
+    },
+    "receipts": {
+      "items": {
+        "$ref": "#/$defs/ReviewReceipt"
+      },
+      "title": "Receipts",
+      "type": "array"
+    },
+    "relationAllocations": {
+      "items": {
+        "$ref": "#/$defs/RelationAllocation"
+      },
+      "title": "Relationallocations",
+      "type": "array"
+    },
+    "reviewInputs": {
+      "items": {
+        "$ref": "#/$defs/ReviewInputRecord"
+      },
+      "title": "Reviewinputs",
+      "type": "array"
+    },
+    "schemaVersion": {
+      "const": 1,
+      "title": "Schemaversion",
+      "type": "integer"
+    },
+    "state": {
+      "enum": [
+        "captured",
+        "processing",
+        "cleanup_pending",
+        "finalizing",
+        "published",
+        "cancelled",
+        "failed",
+        "fenced"
+      ],
+      "title": "State",
+      "type": "string"
+    },
+    "taskInputs": {
+      "items": {
+        "$ref": "#/$defs/TaskInputRecord"
+      },
+      "title": "Taskinputs",
+      "type": "array"
+    },
+    "taskResults": {
+      "items": {
+        "$ref": "#/$defs/TaskResultRecord"
+      },
+      "title": "Taskresults",
+      "type": "array"
+    },
+    "tasks": {
+      "items": {
+        "$ref": "#/$defs/ImportTask"
+      },
+      "title": "Tasks",
+      "type": "array"
+    }
+  },
+  "required": [
+    "schemaVersion",
+    "id",
+    "projectId",
+    "capture",
+    "state",
+    "admittedAt",
+    "expiresAt",
+    "lastObservedAt",
+    "tasks",
+    "allocations",
+    "attempts",
+    "proposals",
+    "reviewInputs",
+    "receipts",
+    "finalization",
+    "publication",
+    "exportAttempts"
+  ],
+  "title": "ImportOperation",
+  "type": "object"
+}
