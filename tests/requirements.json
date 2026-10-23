@@ -3568,6 +3568,140 @@
         "tests/recovery/test_gui_exports.py::test_export_while_editing_rejects_late_worker_result_without_losing_text_or_pointer[rename]",
         "tests/recovery/test_gui_exports.py::test_export_while_editing_rejects_late_worker_result_without_losing_text_or_pointer[text]"
       ]
+    },
+    {
+      "id": "CAP-A01",
+      "status": "partial",
+      "tests": [
+        "tests/recovery/test_assistant_capabilities.py::test_read_only_catalog_separates_generation_preparation_and_apply",
+        "tests/recovery/test_assistant_capabilities.py::test_ambiguous_prose_needs_planning_and_task_checks_are_precise",
+        "tests/recovery/test_assistant_capabilities.py::test_catalog_routes_require_cookie_protocol_and_strict_flags_without_inference"
+      ]
+    },
+    {
+      "id": "CAP-A02",
+      "status": "partial",
+      "tests": [
+        "tests/recovery/test_assistant_capabilities.py::test_read_only_catalog_separates_generation_preparation_and_apply",
+        "tests/recovery/test_assistant_capabilities.py::test_raw_invocation_cannot_bypass_catalog_or_supply_approval"
+      ]
+    },
+    {
+      "id": "CAP-A03",
+      "status": "partial",
+      "tests": [
+        "tests/recovery/test_assistant_capabilities.py::test_unambiguous_unsupported_request_is_rejected_before_runtime",
+        "tests/recovery/test_assistant_capabilities.py::test_catalog_routes_require_cookie_protocol_and_strict_flags_without_inference"
+      ]
+    },
+    {
+      "id": "CAP-A04",
+      "status": "unimplemented",
+      "tests": []
+    },
+    {
+      "id": "CAP-A05",
+      "status": "unimplemented",
+      "tests": []
+    },
+    {
+      "id": "CAP-A06",
+      "status": "unimplemented",
+      "tests": []
+    },
+    {
+      "id": "CAP-A07",
+      "status": "unimplemented",
+      "tests": []
+    },
+    {
+      "id": "CAP-A08",
+      "status": "unimplemented",
+      "tests": []
+    },
+    {
+      "id": "CAP-A09",
+      "status": "unimplemented",
+      "tests": []
+    },
+    {
+      "id": "CAP-A10",
+      "status": "unimplemented",
+      "tests": []
+    },
+    {
+      "id": "CAP-A11",
+      "status": "unimplemented",
+      "tests": []
+    },
+    {
+      "id": "CAP-A12",
+      "status": "unimplemented",
+      "tests": []
+    },
+    {
+      "id": "CAP-A13",
+      "status": "unimplemented",
+      "tests": []
+    },
+    {
+      "id": "CAP-A14",
+      "status": "unimplemented",
+      "tests": []
+    },
+    {
+      "id": "CAP-A15",
+      "status": "unimplemented",
+      "tests": []
+    },
+    {
+      "id": "CAP-A16",
+      "status": "unimplemented",
+      "tests": []
+    },
+    {
+      "id": "CAP-A17",
+      "status": "unimplemented",
+      "tests": []
+    },
+    {
+      "id": "CAP-A18",
+      "status": "unimplemented",
+      "tests": []
+    },
+    {
+      "id": "CAP-A19",
+      "status": "partial",
+      "tests": [
+        "tests/recovery/test_assistant_capabilities.py::test_provider_unavailable_does_not_disable_local_review_or_preparation"
+      ]
+    },
+    {
+      "id": "CAP-A20",
+      "status": "unimplemented",
+      "tests": []
+    },
+    {
+      "id": "CAP-A21",
+      "status": "unimplemented",
+      "tests": []
+    },
+    {
+      "id": "CAP-A22",
+      "status": "unimplemented",
+      "tests": []
+    },
+    {
+      "id": "CAP-A23",
+      "status": "unimplemented",
+      "tests": []
+    },
+    {
+      "id": "CAP-A24",
+      "status": "partial",
+      "tests": [
+        "apps/web/unit/assistant-capabilities.test.ts::capability display follows server readiness and hides behind the rollout gate"
+      ]
     }
   ],
   "foundation": {
@@ -3666,6 +3800,31 @@
       "unproved": "All rich OOXML and 17 all-page converter/T3 inspections pass; actual Word fonts/layout/edit/save/reopen remain manual.",
       "owner": "Manual Word",
       "check": "Follow manual-macos-checklist.md on the five exact hashed files."
+    },
+    "CAP-A01": {
+      "unproved": "Public rollout and later-slice integration obligations remain pending; current evidence covers CAP01 catalog/readiness only.",
+      "owner": "CAP04/CAP05/CAP08; CAP07 for V7",
+      "check": "Run the case against the completed ordinary review/Apply boundary and retain synthetic T3 evidence; preserve native/manual gaps."
+    },
+    "CAP-A02": {
+      "unproved": "Public rollout and later-slice integration obligations remain pending; current evidence covers CAP01 catalog/readiness only.",
+      "owner": "CAP04/CAP05/CAP08; CAP07 for V7",
+      "check": "Run the case against the completed ordinary review/Apply boundary and retain synthetic T3 evidence; preserve native/manual gaps."
+    },
+    "CAP-A03": {
+      "unproved": "Public rollout and later-slice integration obligations remain pending; current evidence covers CAP01 catalog/readiness only.",
+      "owner": "CAP04/CAP05/CAP08; CAP07 for V7",
+      "check": "Run the case against the completed ordinary review/Apply boundary and retain synthetic T3 evidence; preserve native/manual gaps."
+    },
+    "CAP-A19": {
+      "unproved": "Public rollout and later-slice integration obligations remain pending; current evidence covers CAP01 catalog/readiness only.",
+      "owner": "CAP04/CAP05/CAP08; CAP07 for V7",
+      "check": "Run the case against the completed ordinary review/Apply boundary and retain synthetic T3 evidence; preserve native/manual gaps."
+    },
+    "CAP-A24": {
+      "unproved": "Public rollout and later-slice integration obligations remain pending; current evidence covers CAP01 catalog/readiness only.",
+      "owner": "CAP04/CAP05/CAP08; CAP07 for V7",
+      "check": "Run the case against the completed ordinary review/Apply boundary and retain synthetic T3 evidence; preserve native/manual gaps."
     }
   },
   "recovery": {

@@ -1,4 +1,5 @@
 import type { AgentCapabilities } from "../contracts/generated/agent_capabilities";
+import type { AssistantTaskCatalogV1 } from "../contracts/generated/assistant_task_catalog_v1";
 import type { AgentSettings } from "../contracts/generated/agent_settings";
 import type { AgentConversationPage } from "../contracts/generated/agent_conversation_page";
 import type { AgentMessage } from "../contracts/generated/agent_message";
@@ -19,6 +20,8 @@ import { RichApiFailure } from "../rich/api";
 
 export const terminal = (run: AgentRun | null): boolean => run !== null && ["completed", "failed", "cancelled", "interrupted"].includes(run.state);
 export type AssistantView = {
+  taskCatalog?: AssistantTaskCatalogV1 | null;
+  taskReason?: string | null;
   settings: AgentSettings | null; capabilities: AgentCapabilities | null; flags: AgentFlags;
   conversations: AgentConversationPage["items"][number][]; conversationCursor: string | null; conversationId: string | null; messages: AgentMessage[];
   messageCursor: string | null; sources: AgentWebSource[]; findings: AgentFinding[]; run: AgentRun | null;
@@ -30,7 +33,7 @@ export type TurnBaseline = () => Promise<{ response: RichProjectResponse; scope:
   historyOffers?: Pick<AgentHistoryOffer, "undo" | "redo"> }>;
 export type AssistantApi = Pick<AgentBrowserApi, "projectId" | "settings" | "saveSettings" | "capabilities" | "conversations" | "conversation" |
   "messages" | "resources" | "open" | "renew" | "close" | "submit" | "read" | "cancel" | "events" | "prepared">
-  & Partial<Pick<AgentBrowserApi, "access" | "setAccess" | "offerHistory">>;
+  & Partial<Pick<AgentBrowserApi, "access" | "setAccess" | "offerHistory" | "tasks" | "checkMessage">>;
 const pause = (milliseconds: number) => new Promise<void>(resolve => { setTimeout(resolve, milliseconds); });
 function code(error: unknown): string { return error instanceof AgentApiFailure || error instanceof RichApiFailure ? error.code : error instanceof Error && error.message.startsWith("AGENT_") ? error.message : "REQUEST_FAILED"; }
 
@@ -46,6 +49,7 @@ export class AssistantController {
   private sendEpoch = 0;
   private sequence = 0;
   private metadataEpoch = 0;
+  private catalogEpoch = 0;
   private accessRevision = 1;
   private pending: AgentRunRequest | null = null;
   private readonly applying = new Set<string>();
@@ -70,7 +74,7 @@ export class AssistantController {
     try { return await work(); }
     finally { this.waiting.delete(key); this.publish({ loading: [...this.waiting.values()].at(-1) ?? null }); }
   }
-  draft(value: string): void { this.publish({ draft: value }); }
+  draft(value: string): void { this.publish({ draft: value, taskReason: null, ...(this.view.taskReason ? { error: null } : {}) }); }
   flags(value: AgentFlags): void {
     if (!this.api.setAccess) { this.publish({ flags: { ...value } }); return; }
     this.publish({ submitting: true, loading: "Обновляем разрешение на правки" });
@@ -82,6 +86,26 @@ export class AssistantController {
   }
 
   async refresh(): Promise<void> { return this.wait("Обновляем подключение и диалоги", () => this.refreshWork()); }
+  async refreshCatalog(): Promise<void> {
+    if (!this.api.tasks || this.closed) return;
+    const epoch = ++this.catalogEpoch, flags = { ...this.view.flags };
+    try {
+      const taskCatalog = await this.api.tasks(flags);
+      if (epoch === this.catalogEpoch && flags.allowEdits === this.view.flags.allowEdits && flags.allowWeb === this.view.flags.allowWeb)
+        this.publish({ taskCatalog });
+    } catch (error) {
+      if (epoch === this.catalogEpoch) this.publish({ taskCatalog: null, error: code(error) });
+    }
+  }
+  private async checkMessage(message: string): Promise<void> {
+    if (!this.view.taskCatalog?.protocolEnabled) return;
+    if (!this.api.checkMessage) throw new AgentApiFailure("AGENT_PROTOCOL");
+    const result = await this.api.checkMessage(message, this.view.flags);
+    if (result.availability.state !== "available") {
+      this.publish({ taskReason: [result.availability.reason, result.availability.remedy].filter(Boolean).join(" ") });
+      throw new AgentApiFailure(result.availability.reasonCode ?? "AGENT_TOOL_DENIED");
+    }
+  }
   private async refreshWork(): Promise<void> {
     const epoch = ++this.metadataEpoch;
     const access = await this.api.access?.();
@@ -89,8 +113,10 @@ export class AssistantController {
       this.accessRevision = access.revision;
       this.publish({ flags: { ...this.view.flags, allowEdits: !access.readOnly } });
     }
-    const [settings, capabilities, conversations] = await Promise.all([this.api.settings(), this.api.capabilities(this.view.flags), this.api.conversations()]);
+    const catalogEpoch = ++this.catalogEpoch;
+    const [settings, capabilities, conversations, taskCatalog] = await Promise.all([this.api.settings(), this.api.capabilities(this.view.flags), this.api.conversations(), this.api.tasks?.(this.view.flags) ?? null]);
     if (epoch === this.metadataEpoch) this.publish({ settings, capabilities, conversations: conversations.items, conversationCursor: conversations.nextCursor });
+    if (catalogEpoch === this.catalogEpoch) this.publish({ taskCatalog });
   }
   async init(): Promise<void> { return this.wait("Открываем помощника", () => this.initialize()); }
   private async initialize(): Promise<void> {
@@ -217,6 +243,7 @@ export class AssistantController {
       if (!request) {
         await this.refresh();
         currentSend();
+        await this.checkMessage(message); currentSend();
         flags = { ...this.view.flags };
         if (!this.view.capabilities?.ready || !this.view.settings) throw new AgentApiFailure(this.view.capabilities?.unavailable?.code ?? "AGENT_CONNECTION_UNAVAILABLE");
         const settingsRevision = this.view.settings.revision;
@@ -271,6 +298,7 @@ export class AssistantController {
       if (pending && pending.request.message !== this.view.draft) throw new AgentApiFailure("AGENT_IDEMPOTENCY_CONFLICT");
       if (!pending) {
         await this.refresh(); currentSend(); await jobs.refresh(); currentSend();
+        await this.checkMessage(this.view.draft); currentSend();
         const project = jobs.view.project, settings = this.view.settings;
         if (!project || !settings || !this.view.capabilities?.ready) throw new AgentApiFailure(this.view.capabilities?.unavailable?.code ?? "AGENT_CONNECTION_UNAVAILABLE");
         const conversationId = await this.ensureConversation(); currentSend();

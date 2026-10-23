@@ -14,9 +14,44 @@ import { AgentApiFailure } from "../src/assistant/api";
 import { AssistantController, type AssistantApi } from "../src/assistant/controller";
 import { deferred } from "./support/background-writer";
 import { validateRichWorkspaceShape } from "../src/rich/validate";
+import { taskCatalog } from "./support/assistant-capabilities";
 
 const now = "2026-10-15T12:00:00Z";
 const wait = () => new Promise<void>(resolve => { setImmediate(resolve); });
+
+test("unsupported task preflight retains the draft and never captures or submits an action", async () => {
+  const h = harness();
+  let captured = false;
+  h.api.tasks = () => Promise.resolve(taskCatalog());
+  h.api.checkMessage = () => Promise.resolve({ schemaVersion: 1, protocolVersion: 1, projectId: "project_1",
+    catalogRevision: "b".repeat(64), taskId: "export_pdf", needsPlanning: false,
+    availability: { state: "unsupported", reasonCode: "ASSISTANT_UNSUPPORTED_TASK", reason: "PDF недоступен.", remedy: "Экспортируйте DOCX." } });
+  try {
+    await h.controller.init();
+    h.controller.draft("Экспортируй PDF");
+    await h.controller.send(() => { captured = true; return baseline(); });
+    assert.equal(captured, false);
+    assert.equal(h.requests.length, 0);
+    assert.equal(h.controller.view.draft, "Экспортируй PDF");
+    assert.equal(h.controller.view.taskReason, "PDF недоступен. Экспортируйте DOCX.");
+    h.controller.draft("Проверь текст");
+    assert.equal(h.controller.view.taskReason, null);
+    assert.equal(h.controller.view.error, null);
+  } finally { h.controller.close(); }
+});
+
+test("a delayed catalog reply cannot restore readiness after a newer invalidation", async () => {
+  const h = harness(), older = deferred<ReturnType<typeof taskCatalog>>();
+  let calls = 0;
+  const newer = taskCatalog(); newer.catalogRevision = "c".repeat(64);
+  h.api.tasks = () => ++calls === 1 ? older.promise : Promise.resolve(newer);
+  try {
+    const pending = h.controller.refreshCatalog();
+    await h.controller.refreshCatalog();
+    older.resolve(taskCatalog()); await pending;
+    assert.equal(h.controller.view.taskCatalog?.catalogRevision, newer.catalogRevision);
+  } finally { h.controller.close(); }
+});
 
 test("foreground send binds editor history to its owner before submission and skips it in read-only", async () => {
   for (const readOnly of [false, true]) {

@@ -103,10 +103,12 @@ class JobToolSession(ToolSession):
         try:
             async with self.gate:
                 self.guard()
+                from ..agent.capabilities import guard_tool
                 from packages.resume_core import agent_limits as limits
                 if self.calls >= limits.TOOL_CALLS or self.result_bytes > limits.TOOL_TOTAL_BYTES - 4096:
                     raise AgentFailure("AGENT_TOOL_LIMIT")
                 self.calls += 1
+                guard_tool(self, name, arguments)
                 job = self.control.job
                 if not job.submission.allow_edits or name not in job.submission.tools:
                     raise AgentFailure("AGENT_TOOL_DENIED")
@@ -173,6 +175,7 @@ class JobTools:
     def session(self, control):
         from types import SimpleNamespace
         service = SimpleNamespace(projects=CanonicalProjects(self.jobs.projects), jobs=self.jobs,
+            catalog_service=getattr(self.jobs.projects, "agent", None),
             store=self.jobs.artifacts.bound(control.project_id, control.run_id),
             event=lambda *_args, **_kwargs: None,
             revoke=lambda bound, _reason=None: bound.stop(), cleanup_error=lambda _code: None)

@@ -1,5 +1,12 @@
 # Test strategy
 
+`CAP-A01`–`CAP-A24` map the assistant capability plan. CAP01 supplies partial
+catalog/readiness evidence for A01/A02/A03/A19 and capability display for A24.
+The remaining cases are unimplemented until their slices retain actual evidence.
+The rollout gate stays off through CAP04. Generated assistant contracts use new
+names; existing model-compatibility and CT schemas remain byte-identical.
+Review/Apply, V7, native quality and manual Word are separate gates.
+
 The approved NB00b alternative uses one pinned App Server. `NB-PARALLEL`
 maps the bounded shared protocol, real synthetic pipes, exact routed capabilities,
 strict fixed validators, targeted cancellation, individual limits, idle rotation,

@@ -32,6 +32,7 @@ export function AssistantDrawer({ projectId, editor, settingsOpen, settings, ref
         const value = await api.operations();
         if (!alive) return;
         setOperations(value.items);
+        await controller.current?.refreshCatalog();
         if (!initialized) { value.items.forEach(item => handled.add(item.id)); initialized = true; }
         for (const item of value.items) {
           if (!alive) break;
@@ -95,7 +96,7 @@ export function AssistantDrawer({ projectId, editor, settingsOpen, settings, ref
     toggle={() => setSize(value => ({ ...value, collapsed: !value.collapsed }))} expand={() => setSize(value => ({ ...value, height: value.height >= 500 ? 320 : 520 }))}
     log={log} captured={captured ? `${String(captured.selection.blockIds.length)} ${captured.selection.blockIds.length === 1 ? "блок" : "блоков"}` : null}
     applying={active && !view.pendingSend && (!view.run || ["completed", "failed", "cancelled", "interrupted"].includes(view.run.state))}
-    failure={failure || view.error ? errorText(failure || view.error) : null} fence={fence}
+    failure={failure ? errorText(failure) : view.taskReason ?? (view.error ? errorText(view.error) : null)} fence={fence}
     draft={value => controller.current?.draft(value)} flags={(allowEdits, allowWeb) => controller.current?.flags({ allowEdits, allowWeb })}
     model={model => report(controller.current?.chooseModel(model))} send={send} stop={() => report(controller.current?.stop())} clear={() => setCaptured(null)} settings={settings}
     select={id => report(controller.current?.select(id))} fresh={() => report(controller.current?.newConversation())}

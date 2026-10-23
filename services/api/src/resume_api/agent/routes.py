@@ -11,6 +11,7 @@ from packages.resume_core.models.agent import (
     AgentHistoryOffer,
     AgentProjectOperation, AgentProjectOperations,
 )
+from packages.resume_core.models.assistant_capabilities import AssistantMessageCheckV1
 
 
 def mount_agent(app, service):
@@ -29,6 +30,33 @@ def mount_agent(app, service):
         if value.project is None:
             raise AgentFailure("AGENT_NOT_FOUND")
         return value
+
+    def protocol(request):
+        versions = [value for key, value in request.headers.raw if key.lower() == b"x-foldcv-assistant-protocol"]
+        if versions != [b"1"]:
+            raise AgentFailure("AGENT_PROTOCOL")
+
+    def flags(request):
+        result = {}
+        for header, name in ((b"x-foldcv-agent-edits", "allow_edits"), (b"x-foldcv-agent-web", "allow_web")):
+            values = [value for key, value in request.headers.raw if key.lower() == header]
+            if len(values) > 1 or values and values[0] not in {b"0", b"1"}:
+                raise AgentFailure("AGENT_TOOL_DENIED")
+            result[name] = not values or values[0] == b"1"
+        return result
+
+    @app.get(prefix + "/tasks")
+    async def tasks(project_id: str, request: Request):
+        from .capabilities import catalog
+        protocol(request)
+        return response(catalog(service, project_id, **flags(request)))
+
+    @app.post(prefix + "/tasks/check-message")
+    async def task_message(project_id: str, request: Request, payload: AssistantMessageCheckV1):
+        from .capabilities import catalog, check_message
+        protocol(request)
+        return response(check_message(catalog(service, project_id,
+            allow_edits=payload.allow_edits, allow_web=payload.allow_web), payload))
 
     def owned_run(project_id, run_id):
         project(project_id)

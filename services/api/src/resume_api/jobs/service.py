@@ -246,6 +246,10 @@ class JobService:
         if not self.enabled or not self.accepting or self.supervisor.closed or self.supervisor.dispatcher is None:
             raise BackgroundFailure("JOB_DISABLED")
         logical = payload.request
+        if getattr(getattr(self.projects, "agent", None), "assistant_protocol_enabled", False):
+            from ..agent.capabilities import known_intent
+            if known_intent(logical.message) is not None:
+                raise AgentFailure("AGENT_TOOL_DENIED")
         identity = JobIdentity(projectId=project, lineage=payload.lineage, requestEpoch=payload.request_epoch,
             requestId=logical.client_request_id)
         logical_hash = digest({"identity": identity.model_dump(by_alias=True), "request": logical.model_dump(by_alias=True)})

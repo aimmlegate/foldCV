@@ -1,5 +1,6 @@
 import { validateRecoveryShape } from "./recovery-validate.js";
 import { validateAgentShape } from "./agent-validate.js";
+import { validateAssistantShape } from "./assistant-validate.js";
 import { validateBackgroundShape } from "./background-validate.js";
 import Ajv2020 from "ajv/dist/2020.js";
 import addFormats from "ajv-formats";
@@ -467,6 +468,7 @@ function safePrepare(data: unknown): boolean {
 }
 
 export function validateContract(kind: string, data: unknown): boolean {
+  if (kind.startsWith("assistant_")) return wellFormedUnicode(data) && validateAssistantShape(kind, data);
   if (!finiteJson(data)) return false;
   if (kind.startsWith("background_")) return wellFormedUnicode(data) && validateBackgroundShape(kind, data) && recoveryDatesOk(data);
   if (kind.startsWith("agent_")) return wellFormedUnicode(data) && validateAgentShape(kind, data) && recoveryDatesOk(data);

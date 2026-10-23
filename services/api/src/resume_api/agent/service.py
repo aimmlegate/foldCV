@@ -61,6 +61,7 @@ class AgentService:
         self.cleanup_error = cleanup_error
         self.controls = {}
         self.closed = False
+        self.assistant_protocol_enabled = False
         self.capability_states = {}
         self.startup_errors = {}
         self.unresolved = {}
@@ -118,6 +119,10 @@ class AgentService:
     def validate_new(self, project_id, request):
         if self.closed:
             raise AgentFailure("AGENT_CONNECTION_UNAVAILABLE")
+        if self.assistant_protocol_enabled:
+            from .capabilities import known_intent
+            if known_intent(request.message) is not None:
+                raise AgentFailure("AGENT_TOOL_DENIED")
         self.leases.require(project_id, request.owner)
         settings = self.settings.load()
         if settings.revision != request.settings_revision:
@@ -294,9 +299,14 @@ class AgentService:
                 def close_tools(timeout):
                     future = asyncio.run_coroutine_threadsafe(close_session(), loop)
                     future.result(timeout=min(3, timeout))
+                instructions = DEVELOPER_INSTRUCTIONS
+                if self.assistant_protocol_enabled:
+                    from .capabilities import PLANNING_INSTRUCTIONS
+                    instructions += PLANNING_INSTRUCTIONS
                 value = RuntimeInput(model=run.model, prompt=session.prompt, url=session.url, token=session.token,
                     tools=tuple(session.names), allow_web=run.allow_web, before_start=lambda: self.before_start(control),
-                    revoke=lambda: self.revoke(control), close_tools=close_tools, queued_at=control.queued_at)
+                    revoke=lambda: self.revoke(control), close_tools=close_tools, queued_at=control.queued_at,
+                    developer_instructions=instructions)
                 result = await self.runtime.run(value, control.cancel, lambda kind, payload: self.event(control, kind, payload))
         except (AdmissionCancelled, asyncio.CancelledError):
             self.revoke(control, "AGENT_CANCELLED")

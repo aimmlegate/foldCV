@@ -1,6 +1,12 @@
 {
   "version": 1,
   "messages": {
+    "assistantUnsupported": "Помощник пока не выполняет это действие.",
+    "assistantOwner": "Применение требует проверки доступа к текущему редактору.",
+    "assistantTemplate": "Помощник ещё не подключён к этому редактору шаблонов.",
+    "assistantInput": "Для задачи не хватает исходных данных или точной цели действия.",
+    "assistantScope": "Эта область не поддерживается для выбранной задачи.",
+    "assistantNoApply": "Эта задача не меняет документ и не требует применения.",
     "generic": "Не удалось выполнить действие. Повторите попытку.",
     "connection": "Нет связи с локальным сервисом. Проверьте, запущено ли приложение, и повторите попытку.",
     "save": "Не удалось сохранить изменения. Проверьте свободное место и права доступа к папке проекта, затем повторите сохранение.",
@@ -286,6 +292,12 @@
     "inputUnsupported": "Такое изменение пока недоступно в этом шаблоне. Текст в редакторе не изменён."
   },
   "codes": {
+    "ASSISTANT_UNSUPPORTED_TASK": "assistantUnsupported",
+    "ASSISTANT_OWNER_REQUIRED": "assistantOwner",
+    "ASSISTANT_TEMPLATE_UNAVAILABLE": "assistantTemplate",
+    "ASSISTANT_INPUT_REQUIRED": "assistantInput",
+    "ASSISTANT_SCOPE_UNSUPPORTED": "assistantScope",
+    "ASSISTANT_NO_APPLY": "assistantNoApply",
     "ACCOUNT_CHANGED": "stale",
     "ACTIVITY_UNCONFIRMED": "uncertainSave",
     "AGENT_ARGUMENT_INVALID": "agentEdit",

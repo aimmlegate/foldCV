@@ -14,6 +14,7 @@ from mcp.types import CallToolResult, TextContent
 from packages.resume_core import agent_limits as limits
 from packages.resume_core.agent_store import AgentFailure, digest, identity, run_in
 from packages.resume_core.models.agent import AgentAnchor, AgentApplyRequest, AgentFetchRequest, AgentFinding, AgentPrepareRequest, AgentProjectAction, AgentPublishFindings, AgentQuery, TERMINAL_RUNS
+from packages.resume_core.models.assistant_capabilities import AssistantTaskRequestV1
 from packages.resume_core.rich_dependencies import dependency
 from packages.resume_core.rich_fields import inline_groups, working_field
 from packages.resume_core.rich_mutations import inline_text, utf16_slice
@@ -86,6 +87,7 @@ class ToolSession(PrivateMcp):
         self.calls, self.fetches, self.result_bytes = 0, 0, 0
         self.cache = {}
         self.argument_issues = []
+        self.planned_task = None
         self.fetch_cancel = threading.Event()
         self.fetch_tasks = set()
         self.gate = asyncio.Lock()
@@ -178,10 +180,14 @@ class ToolSession(PrivateMcp):
             """Read conversation history. IDs load full stored sources, findings or messages without network. Use nextCursor with the same query for later pages."""
             return self.wire(await self.call("get_conversation_context", query or HistoryQuery()))
 
-        @self.sdk.tool(structured_output=False)
-        async def get_project_resources(query: ResourcesQuery | None = None) -> CallToolResult:
-            """Read retained assets and their uses, sources, local dates, template specification, captured rules and operation history. Follow nextCursor with the same query until null."""
-            return self.wire(await self.call("get_project_resources", query or ResourcesQuery()))
+        async def get_project_resources(query: ResourcesQuery | None = None, task: AssistantTaskRequestV1 | None = None) -> CallToolResult:
+            """Read retained assets, sources, dates, template, rules and history. Follow nextCursor with the same query until null. In assistant protocol 1, check a typed task first with task:{protocolVersion:1,taskId,stage,scope,inputAvailable}; omit query when checking a task. This returns availability, never approval."""
+            if query is not None and task is not None:
+                return self.wire({"error": {"code": "AGENT_ARGUMENT_INVALID"}})
+            return self.wire(await self.call("get_project_resources", task or query or ResourcesQuery()))
+        from .capabilities import TASKS
+        get_project_resources.__doc__ += " Catalog task IDs: " + ", ".join(task.id for task in TASKS) + "."
+        self.sdk.tool(structured_output=False)(get_project_resources)
 
         @self.sdk.tool(structured_output=False)
         async def get_application_skills(query: ApplicationSkillQuery | None = None) -> CallToolResult:
@@ -240,6 +246,11 @@ class ToolSession(PrivateMcp):
             if not isinstance(arguments, dict):
                 raise ValueError("invalid tool arguments")
             if name in READ_TOOLS:
+                if name == "get_project_resources" and "task" in arguments:
+                    if set(arguments) != {"task"}:
+                        raise ValueError("task check cannot include a read query")
+                    AssistantTaskRequestV1.model_validate(arguments["task"])
+                    return None
                 if arguments.keys() - {"query"}:
                     raise ValueError("invalid read envelope")
                 query = arguments.get("query")
@@ -312,12 +323,23 @@ class ToolSession(PrivateMcp):
         try:
             async with self.gate:
                 self.guard()
+                from .capabilities import catalog, check_task, guard_tool
+                task_check = name == "get_project_resources" and isinstance(arguments, AssistantTaskRequestV1)
                 if self.calls >= limits.TOOL_CALLS:
                     raise AgentFailure("AGENT_TOOL_LIMIT")
                 self.calls += 1
+                if not task_check:
+                    guard_tool(self, name, arguments)
                 if self.result_bytes >= limits.TOOL_TOTAL_BYTES:
                     raise AgentFailure("AGENT_TOOL_LIMIT")
-                if name in READ_TOOLS:
+                if task_check:
+                    service = getattr(self.service, "catalog_service", self.service)
+                    if not getattr(service, "assistant_protocol_enabled", False):
+                        raise AgentFailure("AGENT_TOOL_DENIED")
+                    result = check_task(catalog(service, self.control.project_id,
+                        allow_edits=self.run.allow_edits, allow_web=self.run.allow_web), arguments)
+                    self.planned_task = arguments.task_id if arguments.stage == "generation" and result.availability.state == "available" else None
+                elif name in READ_TOOLS:
                     if name == "get_resume_context" and arguments.kind == "context" and arguments.ids:
                         arguments = arguments.model_copy(update={"kind": "document"})
                     expected = READ_TOOLS[name]

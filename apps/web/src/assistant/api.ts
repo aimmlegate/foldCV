@@ -22,9 +22,13 @@ import type { AgentPageRequest } from "../contracts/generated/agent_page_request
 import type { RichProjectResponse } from "../contracts/generated/rich_project_response";
 import { validateContract } from "../contracts/validate";
 import type { PreparedApi } from "./editor-bridge";
+import type { AssistantTaskCatalogV1 } from "../contracts/generated/assistant_task_catalog_v1";
+import type { AssistantTaskCheckV1 } from "../contracts/generated/assistant_task_check_v1";
+import { knownErrorMessage } from "../errors/messages";
 
 type MessagePage = Omit<AgentMessagePage, "items"> & { items: AgentMessage[] };
 type Replies = { agent_project_operations: AgentProjectOperations; agent_access: AgentAccess; agent_capabilities: AgentCapabilities; agent_settings: AgentSettings; agent_conversation: AgentConversation;
+  assistant_task_catalog_v1: AssistantTaskCatalogV1; assistant_task_check_v1: AssistantTaskCheckV1;
   agent_conversation_page: AgentConversationPage; agent_message_page: MessagePage; agent_resource_page: AgentResourcePage;
   agent_lease: AgentLease; agent_run: AgentRun; agent_run_read: AgentRunRead; agent_claim_result: AgentClaimResult;
   agent_commit_result: AgentCommitResult; agent_edit_receipt: AgentEditReceipt; agent_empty_request: Record<string, never>;
@@ -47,7 +51,7 @@ async function successful(response: Response): Promise<Response> {
   let value: unknown;
   try { value = await response.json(); } catch { throw new AgentApiFailure("REQUEST_FAILED", response.status); }
   const supplied = object(value) && object(value.error) && typeof value.error.code === "string" ? value.error.code : "REQUEST_FAILED";
-  const code = validateContract("agent_error", { code: supplied }) || ["AUTH_REQUIRED", "ORIGIN_DENIED", "HOST_DENIED", "INVALID_REQUEST", "INPUT_TOO_LARGE", "REQUEST_TIMEOUT", "INTERNAL_ERROR", "NOT_FOUND", "METHOD_NOT_ALLOWED"].includes(supplied) ? supplied : "REQUEST_FAILED";
+  const code = validateContract("agent_error", { code: supplied }) || knownErrorMessage(supplied) !== null || ["AUTH_REQUIRED", "ORIGIN_DENIED", "HOST_DENIED", "INVALID_REQUEST", "INPUT_TOO_LARGE", "REQUEST_TIMEOUT", "INTERNAL_ERROR", "NOT_FOUND", "METHOD_NOT_ALLOWED"].includes(supplied) ? supplied : "REQUEST_FAILED";
   throw new AgentApiFailure(code, response.status);
 }
 function pageShape(value: unknown): value is AgentPageRequest { return validateContract("agent_page_request", value); }
@@ -83,6 +87,15 @@ export class AgentBrowserApi {
   capabilities(flags: AgentFlags): Promise<AgentCapabilities> {
     return this.request("agent_capabilities", this.prefix + "/capabilities", "GET", {}, {
       "X-FoldCV-Agent-Edits": flags.allowEdits ? "1" : "0", "X-FoldCV-Agent-Web": flags.allowWeb ? "1" : "0" });
+  }
+  tasks(flags: AgentFlags): Promise<AssistantTaskCatalogV1> {
+    return this.request("assistant_task_catalog_v1", this.prefix + "/tasks", "GET", {}, {
+      "X-FoldCV-Assistant-Protocol": "1", "X-FoldCV-Agent-Edits": flags.allowEdits ? "1" : "0",
+      "X-FoldCV-Agent-Web": flags.allowWeb ? "1" : "0" });
+  }
+  checkMessage(message: string, flags: AgentFlags): Promise<AssistantTaskCheckV1> {
+    return this.request("assistant_task_check_v1", this.prefix + "/tasks/check-message", "POST",
+      { schemaVersion: 1, protocolVersion: 1, message, scope: "resume", ...flags }, { "X-FoldCV-Assistant-Protocol": "1" });
   }
   conversations(cursor: string | null = null): Promise<AgentConversationPage> { return this.request("agent_conversation_page", this.prefix + "/conversations/read", "POST", page(cursor)); }
   conversation(): Promise<AgentConversation> { return this.request("agent_conversation", this.prefix + "/conversations"); }

@@ -7,6 +7,7 @@ import type { AgentProjectOperations } from "../../contracts/generated/agent_pro
 import { Transcript } from "./Transcript";
 import { currentActivity } from "./activity";
 import { Elapsed, OperationStatus, Spinner } from "../ui/OperationStatus";
+import { Capabilities } from "../../assistant/Capabilities";
 
 export function DrawerView(props: ComposerProps & { collapsed: boolean; expanded: boolean; toggle: () => void; expand: () => void;
   log: RefObject<HTMLDivElement | null>; failure: string | null; fence: string | null;
@@ -40,6 +41,7 @@ export function DrawerView(props: ComposerProps & { collapsed: boolean; expanded
         {view.conversations.map(item => <button key={item.id} disabled={view.submitting} aria-current={view.conversationId === item.id ? "true" : undefined}
           onClick={() => { props.select(item.id); setThreads(false); }}><Icon name="chat" /><span>{item.title || "Пустой диалог"}</span></button>)}
         {view.conversationCursor && <button onClick={props.more}>Ещё диалоги</button>}</div>}
+      {view.taskCatalog && <Capabilities catalog={view.taskCatalog} busy={active} choose={props.draft} />}
       <div ref={props.log} className="chat-messages" role="log" aria-live="polite" aria-relevant="additions text" aria-busy={active}>
         {view.messageCursor && <button className="text-button" onClick={props.older}>Ранее в диалоге</button>}
         <Transcript view={view} active={active} resource={props.resource} focus={props.focus} draft={props.draft} />
