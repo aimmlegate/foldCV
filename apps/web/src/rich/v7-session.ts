@@ -15,7 +15,7 @@ import { RichSaveQueue, type TemplateAdoption, type TemplateQueueState } from ".
 import { restoreTableIdentities } from "./table-identity";
 import type { templateSchema } from "./template-schema";
 import { blockAt, containerText, copySource, correctionOperation, extractOperations, foldComposition, insertionAt, mergeAt, placementOf,
-  replacementAt, selectedBlocks, showText, splitAt, textPoint, textPosition, type ExtractedOperation, type TextPoint } from "./v7-extraction";
+  itemOf, replacementAt, selectedBlocks, showText, splitAt, textPoint, textPosition, type ExtractedOperation, type TextPoint } from "./v7-extraction";
 import { wireMarks } from "./inline";
 import type { PanelCommand } from "./synchronization";
 import { employmentPanelCommands } from "./v7-panel";
@@ -240,7 +240,16 @@ export class TemplateEditorSession {
     const editor = this.editor;
     if (!editor || this.closed || this.composing || this.panelBusy || !this.writer.writable) return;
     const blocks = editor.getSelection()?.blocks ?? [];
-    if (blocks.length > 1) { this.refuse("only one block moves at a time"); return; }
+    if (blocks.length > 1) {
+      // A whole selected item (every line of one section) moves among its sibling items.
+      const item = itemOf(editor._tiptapEditor.state.doc, blocks.map(block => block.id));
+      if (!item) { this.refuse("only one block or one whole item moves at a time"); return; }
+      const index = item.siblings.indexOf(item.id), rest = item.siblings.filter(id => id !== item.id);
+      if (direction === "up" ? index < 1 : index >= rest.length) return;
+      const afterId = (direction === "up" ? rest[index - 2] : rest[index]) ?? null;
+      await this.structure([{ operation: { kind: "move_block", blockId: item.id, placement: { parentId: item.parentId, afterId } } }]);
+      return;
+    }
     const blockId = editor.getTextCursorPosition().block.id, before = placementOf(editor._tiptapEditor.state.doc, blockId);
     const probe: { blockId: string; placement: Placement | null } = { blockId, placement: null };
     this.probe = probe;
@@ -249,6 +258,23 @@ export class TemplateEditorSession {
     const placement = probe.placement;
     if (!before || !placement || placement.parentId === before.parentId && placement.afterId === before.afterId) return;
     await this.structure([{ operation: { kind: "move_block", blockId, placement } }]);
+  }
+
+  /** The bound link at the caret; Python changes its URL cell and target together. */
+  linkAtCaret(): { blockId: string; occurrenceId: string; href: string } | null {
+    const editor = this.editor;
+    if (!editor || this.closed) return null;
+    const { $from, $to } = editor._tiptapEditor.state.selection, node = $from.parent;
+    const occurrenceId: unknown = node.attrs["occurrenceId"], href: unknown = node.attrs["href"];
+    if (node.type.name !== "boundLink" || $to.parent !== node || typeof occurrenceId !== "string" || !occurrenceId
+      || typeof href !== "string") return null;
+    return { blockId: editor.getTextCursorPosition().block.id, occurrenceId, href };
+  }
+
+  /** A new URL for one bound link, as one server-first action with its own Undo. */
+  async linkTarget(target: { blockId: string; occurrenceId: string }, href: string): Promise<void> {
+    await this.command([{ operation: { kind: "set_link_target", blockId: target.blockId, occurrenceId: target.occurrenceId, href },
+      prior: new Map() }], "panel");
   }
 
   /** Remove whole selected blocks; their facts stay, as in Python's occurrence removal. */

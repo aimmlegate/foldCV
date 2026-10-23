@@ -838,6 +838,24 @@ export type Startedat = string | null;
 export type Status7 = "queued" | "running" | "completed" | "failed" | "cancelled" | "interrupted";
 export type Subtitle = string;
 export type Title = string;
+export type Band = true | null;
+/**
+ * @minItems 1
+ */
+export type Blocks2 = [string, ...string[]];
+export type Icon = string | null;
+export type Links = string[];
+export type Style = string;
+export type Fonts = string[];
+export type Icons = string[];
+export type Alignment8 = ("left" | "center" | "right" | "justify") | null;
+export type Color1 = string;
+export type Bold2 = string | null;
+export type Bolditalic = string | null;
+export type Italic2 = string | null;
+export type Regular = string | null;
+export type Lineheight = number;
+export type Size1 = number;
 export type Capabilities = string[];
 export type AllowMorePages = true;
 export type AllowProjectSplit = true;
@@ -868,9 +886,9 @@ export type TextX = number;
 export type BaselineY = number;
 export type CenterX = number;
 export type Repeat = "every_page";
-export type Style1 = string;
+export type Style2 = string;
 export type Text5 = string;
-export type Color1 = string;
+export type Color2 = string;
 export type FollowHeader = true;
 export type Width2 = number;
 export type X1 = number;
@@ -894,10 +912,10 @@ export type Background = string;
 export type HeadingStyle = string;
 export type Height3 = number;
 export type TextInset = number;
-export type Color2 = string;
+export type Color3 = string;
 export type Font1 = string;
 export type LineHeight = number;
-export type Size1 = number;
+export type Size2 = number;
 export type FallbackStyle = string | null;
 export type Heading = "none" | "plain" | "band";
 export type Inset = number;
@@ -912,7 +930,7 @@ export type HeaderSlot = ("name" | "profession") | null;
 export type ItemField = string | null;
 export type NameField = string | null;
 export type Separator = string;
-export type Style2 = string;
+export type Style3 = string;
 export type Type17 = "text" | "join_fields" | "join_items" | "bullets" | "tags" | "period" | "link" | "focus_entry";
 export type UrlField = string | null;
 export type Nodes = ViewNode[];
@@ -1005,7 +1023,7 @@ export type Title2 = string | null;
 /**
  * @maxItems 5000
  */
-export type Blocks1 = ImportBlock[];
+export type Blocks3 = ImportBlock[];
 export type Id41 = string;
 export type Record1 = (ImportEmployment | ImportEducation | ImportTechnology | ImportLanguage) | null;
 export type Employer = string;
@@ -1126,7 +1144,7 @@ export type Order1 = number;
 export type Representedfactids = string[];
 export type Revision39 = number;
 export type Blankbefore = number | null;
-export type Bold2 = boolean | null;
+export type Bold3 = boolean | null;
 export type Bounds = [number, number, number, number] | null;
 export type Column1 = number | null;
 export type Columnspan = number | null;
@@ -1139,7 +1157,7 @@ export type Layoutuncertain = boolean;
 export type Listlevel = number | null;
 export type Part = string | null;
 export type Rowmerge = ("start" | "continue") | null;
-export type Style3 = string | null;
+export type Style4 = string | null;
 export type Text10 = string;
 export type Units = SourceUnit[];
 export type Code2 = string;
@@ -1449,12 +1467,12 @@ export type Mimetype1 = string;
 export type Path = string;
 export type Role2 = "font" | "logo" | "icon" | "catalog";
 export type Sha256 = string;
-export type Size2 = number;
+export type Size3 = number;
 export type Assets = CapturedAsset[];
 export type Dependencyorder = number;
 export type Id60 = string;
 export type Serveronly = string[];
-export type Blocks2 = CompiledBlock[];
+export type Blocks4 = CompiledBlock[];
 export type Compilerversion = string;
 export type Confighash = string;
 export type Embedding = "allowed" | "not_applicable";
@@ -1483,7 +1501,7 @@ export type Kind69 = "source" | "fact_type" | "block" | "operation";
 export type Selectors = InputRef[];
 export type Equals = string;
 export type Operation1 = string;
-export type Blocks3 = Block1[];
+export type Blocks5 = Block1[];
 export type Field5 = string;
 export type Period1 = string | null;
 export type BuiltinKind =
@@ -1576,7 +1594,7 @@ export type Id72 = string;
 export type Mimetype2 = "image/png" | "image/jpeg";
 export type Path2 = string;
 export type Sha2561 = string;
-export type Size3 = number;
+export type Size4 = number;
 export type Width5 = number;
 export type Assets2 = LocalImageAsset[];
 export type Createdat1 = string;
@@ -1585,7 +1603,7 @@ export type Createdat1 = string;
  * @maxItems 3
  */
 export type Regions1 = [TemplateRegion, TemplateRegion, TemplateRegion];
-export type Blocks4 = (
+export type Blocks6 = (
   | TemplateParagraphBlock
   | TemplateHeadingBlock
   | TemplateBulletBlock
@@ -1612,7 +1630,7 @@ export type Attemptid5 = string;
 export type Id75 = string;
 export type Path3 = string;
 export type Sha2562 = string;
-export type Size4 = number;
+export type Size5 = number;
 export type Assets3 = TemplateRenderAsset[];
 export type Documenthash3 = string;
 export type Factshash3 = string;
@@ -1760,7 +1778,7 @@ export type Children24 = (
 )[];
 export type Content17 = null;
 export type Id81 = string;
-export type Alignment8 = "left" | "center" | "right";
+export type Alignment9 = "left" | "center" | "right";
 export type Alt1 = string;
 export type Assetid1 = string;
 export type Caption1 = (StyledText | Hyperlink | FactFieldSpan)[];
@@ -1793,7 +1811,7 @@ export type Headerrows1 = number;
  * @minItems 1
  */
 export type Rows1 = [TableRow, ...TableRow[]];
-export type Alignment9 = "left" | "center" | "right" | "justify";
+export type Alignment10 = "left" | "center" | "right" | "justify";
 export type Backgroundcolor8 = string;
 export type Colspan1 = number;
 export type Content18 = (StyledText | Hyperlink | FactFieldSpan)[];
@@ -2901,6 +2919,7 @@ export interface ResumeIdentity {
 }
 export interface TemplatePresentationV1 {
   blocks: Blocks;
+  editor?: EditorPlanV1 | null;
   recipe: CompiledRecipe;
   schemaVersion: Schemaversion4;
   snapshot: TemplateSnapshotIdentity;
@@ -2908,13 +2927,55 @@ export interface TemplatePresentationV1 {
 export interface Blocks {
   [k: string]: AuthoredPresentation;
 }
+/**
+ * Python's presentation decisions for the mounted editor; the editor only applies them.
+ */
+export interface EditorPlanV1 {
+  blocks: Blocks1;
+  fonts: Fonts;
+  icons: Icons;
+  styles: Styles;
+}
+export interface Blocks1 {
+  [k: string]: EditorBlock;
+}
+export interface EditorBlock {
+  band?: Band;
+  focus?: EditorFocus | null;
+  inline?: Inline;
+  links?: Links;
+  style: Style;
+}
+export interface EditorFocus {
+  blocks: Blocks2;
+  icon: Icon;
+}
+export interface Inline {
+  [k: string]: string;
+}
+export interface Styles {
+  [k: string]: EditorStyle;
+}
+export interface EditorStyle {
+  alignment: Alignment8;
+  color: Color1;
+  faces: EditorFaces;
+  lineHeight: Lineheight;
+  size: Size1;
+}
+export interface EditorFaces {
+  bold: Bold2;
+  boldItalic: Bolditalic;
+  italic: Italic2;
+  regular: Regular;
+}
 export interface CompiledRecipe {
   capabilities: Capabilities;
   layout: Layout;
   placements: Placements;
   renderInputVersion: Renderinputversion;
   schemaVersion: Schemaversion3;
-  style: Style;
+  style: Style1;
   views: Views;
 }
 export interface Layout {
@@ -2941,15 +3002,15 @@ export interface Placement {
   order: Order;
   region: Region1;
 }
-export interface Style {
+export interface Style1 {
   bullets: Bullets;
   colors: Colors;
   focus: Focus;
-  fonts: Fonts;
+  fonts: Fonts1;
   footer: Footer;
   header: Header;
   page: Page;
-  section_band: Band;
+  section_band: Band1;
   text: Text6;
 }
 export interface Bullets {
@@ -2971,14 +3032,14 @@ export interface Focus {
   missing_icon: MissingIcon;
   text_x: TextX;
 }
-export interface Fonts {
+export interface Fonts1 {
   [k: string]: string;
 }
 export interface Footer {
   baseline_y: BaselineY;
   center_x: CenterX;
   repeat: Repeat;
-  style: Style1;
+  style: Style2;
   text: Text5;
 }
 export interface Header {
@@ -2989,7 +3050,7 @@ export interface Header {
   profession_top: ProfessionTop;
 }
 export interface Divider {
-  color: Color1;
+  color: Color2;
   follow_header: FollowHeader;
   width: Width2;
   x1: X1;
@@ -3011,7 +3072,7 @@ export interface Page {
   height: Height2;
   width: Width4;
 }
-export interface Band {
+export interface Band1 {
   background: Background;
   heading_style: HeadingStyle;
   height: Height3;
@@ -3021,10 +3082,10 @@ export interface Text6 {
   [k: string]: TextStyle;
 }
 export interface TextStyle {
-  color: Color2;
+  color: Color3;
   font: Font1;
   line_height: LineHeight;
-  size: Size1;
+  size: Size2;
 }
 export interface Views {
   [k: string]: View;
@@ -3050,7 +3111,7 @@ export interface ViewNode {
   name_field?: NameField;
   prefix?: Prefix;
   separator?: Separator;
-  style: Style2;
+  style: Style3;
   type: Type17;
   url_field?: UrlField;
 }
@@ -3175,7 +3236,7 @@ export interface RecordTombstone {
 }
 export interface ImportDraft {
   allowTextRewrite?: Allowtextrewrite;
-  blocks?: Blocks1;
+  blocks?: Blocks3;
   facts?: Facts;
   finished?: Finished;
   issues?: Issues;
@@ -3309,7 +3370,7 @@ export interface SourceLocation {
  */
 export interface SourceStructure {
   blankBefore?: Blankbefore;
-  bold?: Bold2;
+  bold?: Bold3;
   bounds?: Bounds;
   column?: Column1;
   columnSpan?: Columnspan;
@@ -3322,7 +3383,7 @@ export interface SourceStructure {
   listLevel?: Listlevel;
   part?: Part;
   rowMerge?: Rowmerge;
-  style?: Style3;
+  style?: Style4;
 }
 export interface SourceWarning {
   code: Code2;
@@ -3751,7 +3812,7 @@ export interface ImportTask {
 }
 export interface TemplatePackage {
   assets: Assets;
-  blocks: Blocks2;
+  blocks: Blocks4;
   compilerVersion: Compilerversion;
   configHash: Confighash;
   definition: TemplateDefinition;
@@ -3774,7 +3835,7 @@ export interface CapturedAsset {
   path: Path;
   role: Role2;
   sha256: Sha256;
-  size: Size2;
+  size: Size3;
 }
 export interface CompiledBlock {
   dependencyOrder: Dependencyorder;
@@ -3791,7 +3852,7 @@ export interface Providerschema {
 }
 export interface TemplateDefinition {
   assets: Assets1;
-  blocks: Blocks3;
+  blocks: Blocks5;
   content_definitions: ContentDefinitions;
   fact_types: FactTypes;
   layout: Layout;
@@ -3800,7 +3861,7 @@ export interface TemplateDefinition {
   provenance: Provenance12;
   schema_version: SchemaVersion1;
   source: SourcePolicy;
-  style: Style;
+  style: Style1;
   template: TemplateIdentity;
 }
 export interface AssetDeclaration {
@@ -3998,7 +4059,7 @@ export interface LocalImageAsset {
   mimeType: Mimetype2;
   path: Path2;
   sha256: Sha2561;
-  size: Size3;
+  size: Size4;
   width: Width5;
 }
 export interface RichDocumentV2 {
@@ -4007,7 +4068,7 @@ export interface RichDocumentV2 {
   schemaVersion: Schemaversion11;
 }
 export interface TemplateRegion {
-  blocks: Blocks4;
+  blocks: Blocks6;
   id: Id73;
   revision: Revision42;
   role: Role4;
@@ -4038,7 +4099,7 @@ export interface TemplateRenderAsset {
   id: Id75;
   path: Path3;
   sha256: Sha2562;
-  size: Size4;
+  size: Size5;
 }
 export interface TemplateRendererIdentity {
   id: Id76;
@@ -4244,7 +4305,7 @@ export interface FactFieldSpan {
   type: Type20;
 }
 export interface ImageProps {
-  alignment: Alignment8;
+  alignment: Alignment9;
   alt: Alt1;
   assetId: Assetid1;
   caption: Caption1;
@@ -4262,7 +4323,7 @@ export interface TableRow {
   id: Id83;
 }
 export interface TableCell {
-  alignment?: Alignment9;
+  alignment?: Alignment10;
   backgroundColor?: Backgroundcolor8;
   colspan?: Colspan1;
   content: Content18;

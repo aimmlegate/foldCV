@@ -59,7 +59,9 @@ def application(root, scenario):
         from tests.templates.e04_fixtures import e04_workspace
         value, sources = e04_workspace()
     else:
-        value, sources = {'joined': joined, 'linked': lambda: joined(linked), 'papers': lambda: workspace()[0]}[scenario](), workspace()[1]
+        from tests.templates.test_bound_links import linked_workspace
+        value, sources = {'joined': joined, 'linked': lambda: joined(linked), 'papers': lambda: workspace()[0],
+            'bound': lambda: linked_workspace()[0]}[scenario](), workspace()[1]
     fixture = TemplateWriterFixture(root, value, sources)
     rewrites = ScriptedRewrite()
     service = SimpleNamespace(enabled=True, writers=fixture.writers, store=fixture.jobs, publisher=fixture.publisher,

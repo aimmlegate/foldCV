@@ -10,6 +10,24 @@ export type Packagehash = string;
 export type Styletoken = string;
 export type Templateinstanceid = string | null;
 export type Viewkey = string;
+export type Band = true | null;
+/**
+ * @minItems 1
+ */
+export type Blocks2 = [string, ...string[]];
+export type Icon = string | null;
+export type Links = string[];
+export type Style = string;
+export type Fonts = string[];
+export type Icons = string[];
+export type Alignment1 = ("left" | "center" | "right" | "justify") | null;
+export type Color1 = string;
+export type Bold1 = string | null;
+export type Bolditalic = string | null;
+export type Italic1 = string | null;
+export type Regular = string | null;
+export type Lineheight = number;
+export type Size1 = number;
 export type Capabilities = string[];
 export type AllowMorePages = true;
 export type AllowProjectSplit = true;
@@ -40,9 +58,9 @@ export type TextX = number;
 export type BaselineY = number;
 export type CenterX = number;
 export type Repeat = "every_page";
-export type Style1 = string;
+export type Style2 = string;
 export type Text = string;
-export type Color1 = string;
+export type Color2 = string;
 export type FollowHeader = true;
 export type Width1 = number;
 export type X1 = number;
@@ -66,10 +84,10 @@ export type Background = string;
 export type HeadingStyle = string;
 export type Height2 = number;
 export type TextInset = number;
-export type Color2 = string;
+export type Color3 = string;
 export type Font1 = string;
 export type LineHeight = number;
-export type Size1 = number;
+export type Size2 = number;
 export type FallbackStyle = string | null;
 export type Heading = "none" | "plain" | "band";
 export type Inset = number;
@@ -84,7 +102,7 @@ export type HeaderSlot = ("name" | "profession") | null;
 export type ItemField = string | null;
 export type NameField = string | null;
 export type Separator = string;
-export type Style2 = string;
+export type Style3 = string;
 export type Type = "text" | "join_fields" | "join_items" | "bullets" | "tags" | "period" | "link" | "focus_entry";
 export type UrlField = string | null;
 export type Nodes = ViewNode[];
@@ -99,6 +117,7 @@ export type Projectrevision = number;
 
 export interface TemplatePresentationV1 {
   blocks: Blocks;
+  editor?: EditorPlanV1 | null;
   recipe: CompiledRecipe;
   schemaVersion: Schemaversion1;
   snapshot: TemplateSnapshotIdentity;
@@ -123,13 +142,55 @@ export interface StyleOverrides {
   italic: Italic;
   size: Size;
 }
+/**
+ * Python's presentation decisions for the mounted editor; the editor only applies them.
+ */
+export interface EditorPlanV1 {
+  blocks: Blocks1;
+  fonts: Fonts;
+  icons: Icons;
+  styles: Styles;
+}
+export interface Blocks1 {
+  [k: string]: EditorBlock;
+}
+export interface EditorBlock {
+  band?: Band;
+  focus?: EditorFocus | null;
+  inline?: Inline;
+  links?: Links;
+  style: Style;
+}
+export interface EditorFocus {
+  blocks: Blocks2;
+  icon: Icon;
+}
+export interface Inline {
+  [k: string]: string;
+}
+export interface Styles {
+  [k: string]: EditorStyle;
+}
+export interface EditorStyle {
+  alignment: Alignment1;
+  color: Color1;
+  faces: EditorFaces;
+  lineHeight: Lineheight;
+  size: Size1;
+}
+export interface EditorFaces {
+  bold: Bold1;
+  boldItalic: Bolditalic;
+  italic: Italic1;
+  regular: Regular;
+}
 export interface CompiledRecipe {
   capabilities: Capabilities;
   layout: Layout;
   placements: Placements;
   renderInputVersion: Renderinputversion;
   schemaVersion: Schemaversion;
-  style: Style;
+  style: Style1;
   views: Views;
 }
 export interface Layout {
@@ -156,15 +217,15 @@ export interface Placement {
   order: Order;
   region: Region1;
 }
-export interface Style {
+export interface Style1 {
   bullets: Bullets;
   colors: Colors;
   focus: Focus;
-  fonts: Fonts;
+  fonts: Fonts1;
   footer: Footer;
   header: Header;
   page: Page;
-  section_band: Band;
+  section_band: Band1;
   text: Text1;
 }
 export interface Bullets {
@@ -186,14 +247,14 @@ export interface Focus {
   missing_icon: MissingIcon;
   text_x: TextX;
 }
-export interface Fonts {
+export interface Fonts1 {
   [k: string]: string;
 }
 export interface Footer {
   baseline_y: BaselineY;
   center_x: CenterX;
   repeat: Repeat;
-  style: Style1;
+  style: Style2;
   text: Text;
 }
 export interface Header {
@@ -204,7 +265,7 @@ export interface Header {
   profession_top: ProfessionTop;
 }
 export interface Divider {
-  color: Color1;
+  color: Color2;
   follow_header: FollowHeader;
   width: Width1;
   x1: X1;
@@ -226,7 +287,7 @@ export interface Page {
   height: Height1;
   width: Width3;
 }
-export interface Band {
+export interface Band1 {
   background: Background;
   heading_style: HeadingStyle;
   height: Height2;
@@ -236,10 +297,10 @@ export interface Text1 {
   [k: string]: TextStyle;
 }
 export interface TextStyle {
-  color: Color2;
+  color: Color3;
   font: Font1;
   line_height: LineHeight;
-  size: Size1;
+  size: Size2;
 }
 export interface Views {
   [k: string]: View;
@@ -265,7 +326,7 @@ export interface ViewNode {
   name_field?: NameField;
   prefix?: Prefix;
   separator?: Separator;
-  style: Style2;
+  style: Style3;
   type: Type;
   url_field?: UrlField;
 }

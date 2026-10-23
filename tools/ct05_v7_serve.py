@@ -75,13 +75,26 @@ def renamed(workspace, identifier, title):
     return WorkspaceV7.model_validate(value)
 
 
-def projects(employment_shape='issues'):
+async def views_workspace(root):
+    """CT06 S3: the published F06 import with Focus entries, a band heading and a bound portfolio link."""
+    from tests.templates.test_template_view_adapters import published
+    work = root / 'fixture'
+    work.mkdir(mode=0o700)
+    _fixture, value, originals = await published(work)
+    return value, originals
+
+
+async def projects(root, employment_shape='issues'):
     """A: joined papers; B: plain papers; C: synthetic employment, either with two import issues (the E03 shape)
-    or with two identical tasks and a second employer (the E04 shape). Both keep the pipeline project identity."""
+    or with two identical tasks and a second employer (the E04 shape), or the CT06 views import. All keep the
+    pipeline project identity."""
     from tests.templates.test_materialize import issue_workspace
     from tests.templates.e04_fixtures import e04_workspace
     _workspace, sources = papers()
-    employment, employment_sources = {'issues': issue_workspace, 'e04': e04_workspace}[employment_shape]()
+    if employment_shape == 'views':
+        employment, employment_sources = await views_workspace(root)
+    else:
+        employment, employment_sources = {'issues': issue_workspace, 'e04': e04_workspace}[employment_shape]()
     return [(joined(), sources), (renamed(papers()[0], 'template-project-b', 'Synthetic papers B'), sources),
         # Its captured operation is bound to its own distinct project identity, which is kept.
         (employment, employment_sources)]
@@ -121,7 +134,7 @@ async def main(args):
         from tests.templates.employment_fixtures import employment_package
         TemplateStore(service.storage.root).activate(employment_package())
     identifiers = []
-    for value, sources in projects(args.employment):
+    for value, sources in await projects(root, args.employment):
         RichProjectStore(service.storage.root).save(value, {(value.project_id, key): raw for key, raw in sources.items()}, {})
         identifiers.append(value.project_id)
     service.ensure_loaded()
@@ -132,7 +145,7 @@ async def main(args):
         'nativeConstructorGuard': 'all three native factory branches guarded; zero calls', 'serviceState': 'running',
         'sourceSha256': {str(path.relative_to(ROOT)): digest(path) for path in [Path(__file__), ROOT / 'spikes/uir/providers.py',
             ROOT / 'tests/templates/address_map_fixtures.py', ROOT / 'tests/templates/storage_fixtures.py',
-            ROOT / 'tests/templates/e04_fixtures.py',
+            ROOT / 'tests/templates/e04_fixtures.py', ROOT / 'tests/templates/test_template_view_adapters.py',
             ROOT / 'services/api/src/resume_api/app.py']}}
 
     def diagnostics():
@@ -161,7 +174,7 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--root', type=Path, required=True); parser.add_argument('--dist', type=Path, required=True)
     parser.add_argument('--port', type=int, default=0)
-    parser.add_argument('--employment', choices=['issues', 'e04'], default='issues')
+    parser.add_argument('--employment', choices=['issues', 'e04', 'views'], default='issues')
     # Explicit test allowance for template imports; without it the import stays unavailable, as in production.
     parser.add_argument('--template-call-cap', type=int, default=None)
     asyncio.run(main(parser.parse_args()))

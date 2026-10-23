@@ -409,6 +409,25 @@ export function placementOf(doc: Node, blockId: string): Placement | null {
   return found;
 }
 
+/** The item section whose children are exactly these blocks, in order, with its sibling order. */
+export function itemOf(doc: Node, ids: readonly string[]): { id: string; parentId: string; siblings: string[] } | null {
+  let found: { id: string; parentId: string; siblings: string[] } | null = null;
+  doc.descendants((node, pos) => {
+    if (found) return false;
+    const group = node.lastChild;
+    if (node.type.name !== "blockContainer" || node.firstChild?.type.name !== "section" || node.childCount < 2 || !group) return true;
+    const children: unknown[] = [];
+    group.forEach(child => children.push(child.attrs["id"]));
+    if (children.length !== ids.length || children.some((id, index) => id !== ids[index])) return true;
+    const position = doc.resolve(pos), owner = position.depth >= 2 ? position.node(position.depth - 1) : null;
+    const id: unknown = node.attrs["id"], parentId: unknown = owner?.attrs["id"], siblings: string[] = [];
+    position.parent.forEach(child => siblings.push(String(child.attrs["id"])));
+    if (owner?.type.name === "blockContainer" && typeof id === "string" && typeof parentId === "string") found = { id, parentId, siblings };
+    return false;
+  });
+  return found;
+}
+
 /** The innermost block holding the caret. */
 export function blockAt(state: EditorState): string | null {
   const position = state.selection.$head;

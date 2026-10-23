@@ -371,3 +371,80 @@ test("plain text from outside the project pastes into one block as typing", asyn
     assert.equal(warnings.length, 0);
   } finally { session.close(); await value.close(); }
 });
+
+test("E08: a bound link's URL edit changes only its URL cell and target, with its own Undo and Redo", async () => {
+  const value = await harness("bound");
+  const { session, editor, warnings } = await opened(value);
+  try {
+    const state = async () => {
+      const { response, blocks } = await shown(session);
+      const block = blocks.find(item => item.parts.some(part => part["type"] === "bound_link"));
+      assert.ok(block);
+      const link = block.parts.find(part => part["type"] === "bound_link") ?? {};
+      const label = (link["content"] as Part[]).map(part => String(part["text"])).join("");
+      const cells = response.workspace.project?.facts.extensions.find(record => record.id === "paper-a")?.cells ?? [];
+      // The compact save keeps Python's editor plan: the link is live only for a web or mail address.
+      const plan = response.presentation?.editor?.blocks[block.id];
+      assert.ok(plan, "the editor plan follows each compact save");
+      return { block, href: link["href"], label, live: (plan.links ?? []).length === 1,
+        cells: new Map(cells.map(cell => [cell.fieldKey, cell.rawInput])) };
+    };
+    const before = await state();
+    assert.deepEqual([before.href, before.label], ["https://example.test/a", "Shared title"]);
+    select(editor, textStart(editor, "block-paper-b"));
+    assert.equal(session.linkAtCaret(), null, "no link outside a bound link");
+    select(editor, at(editor, before.block.id, 3));
+    const target = session.linkAtCaret();
+    assert.ok(target);
+    assert.deepEqual([target.blockId, target.href], [before.block.id, "https://example.test/a"]);
+    await session.linkTarget(target, "example.test/no-scheme");
+    const plain = await state();
+    assert.deepEqual([plain.href, plain.live], ["example.test/no-scheme", false]);
+    const again = session.linkAtCaret() ?? target;
+    await session.linkTarget(again, "https://example.test/revised");
+    const after = await state();
+    assert.deepEqual([after.href, after.label, after.live], ["https://example.test/revised", "Shared title", true]);
+    assert.equal(after.cells.get("url"), "https://example.test/revised");
+    assert.deepEqual([...after.cells].filter(([key]) => key !== "url"), [...before.cells].filter(([key]) => key !== "url"));
+    await session.navigate("undo");
+    assert.equal((await state()).href, "example.test/no-scheme");
+    await session.navigate("undo");
+    const undone = await state();
+    assert.deepEqual([undone.href, undone.label, undone.cells.get("url"), undone.live],
+      ["https://example.test/a", "Shared title", "https://example.test/a", true]);
+    await session.navigate("redo");
+    assert.equal((await state()).href, "example.test/no-scheme");
+    assert.deepEqual(warnings, []);
+  } finally { session.close(); await value.close(); }
+});
+
+test("B07/G02: a whole selected item moves among its sibling items; a partial selection is refused", async () => {
+  const value = await harness("e04");
+  const { session, editor, warnings } = await opened(value);
+  try {
+    let blocks = (await shown(session)).blocks;
+    const children = (id: string) => blocks.filter(block => block.parent === id);
+    const order = (ids: string[]) => blocks.filter(block => ids.includes(block.id)).map(block => block.id);
+    const [first, second] = blocks.filter(block => block.type === "section" && children(block.id).length > 1);
+    assert.ok(first && second);
+    const lines = children(second.id), last = lines[lines.length - 1];
+    assert.ok(lines[0] && last);
+    // Every line of the second job, as Shift+Down or Shift+click selects them.
+    select(editor, at(editor, lines[0].id, 0), at(editor, last.id, last.text.length));
+    await session.move("up");
+    blocks = (await shown(session)).blocks;
+    assert.deepEqual(order([first.id, second.id]), [second.id, first.id]);
+    assert.deepEqual(children(second.id).map(block => block.id), lines.map(block => block.id), "the item keeps its lines");
+    await session.navigate("undo");
+    blocks = (await shown(session)).blocks;
+    assert.deepEqual(order([first.id, second.id]), [first.id, second.id]);
+    assert.deepEqual(warnings, []);
+    // Two lines that are not one whole item are refused with a notice, as before.
+    const partial = children(first.id);
+    assert.ok(partial[0] && partial[1]);
+    select(editor, at(editor, partial[0].id, 0), at(editor, partial[1].id, partial[1].text.length));
+    await session.move("down");
+    assert.deepEqual((await shown(session)).blocks.map(block => block.id), blocks.map(block => block.id));
+    assert.equal(warnings.length, 1);
+  } finally { session.close(); await value.close(); }
+});

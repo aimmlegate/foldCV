@@ -3,11 +3,21 @@
 from .background_limits import LIMITS
 from .background_store import BackgroundFailure
 from .canonical_patch import apply_patch, build_patch
+from .models.canonical_patch import CanonicalPatchV1
 from .models.template_delta import TemplatePreparedEditDeltaV1
 from .rich_identity import resume_identity
 from .template_preparation import prepare_edit
 from .templates.compiler import canonical, sha256
-from .templates.presentation import project_presentation, snapshot_identity
+from .templates.presentation import presentation_matches, snapshot_identity
+
+
+def plan_patch(old, new, limit=1000):
+    """The editor plan patch; past the step bound the changed top-level parts go whole."""
+    steps = build_patch(old, new)
+    if len(steps) > limit:
+        steps = CanonicalPatchV1(schemaVersion=1, steps=[{'kind': 'set', 'pointer': '/' + key,
+            'valueWire': canonical(new[key]).decode()} for key in sorted(new) if canonical(new[key]) != canonical(old.get(key))]).steps
+    return {'beforeHash': sha256(canonical(old)), 'afterHash': sha256(canonical(new)), 'steps': steps}
 
 
 def prepared_delta(base, prepared):
@@ -16,8 +26,8 @@ def prepared_delta(base, prepared):
             or snapshot_identity(after) != prepared.preview.snapshot or base.presentation is None
             or prepared.preview.presentation is None or before.project is None or after.project is None
             or canonical(before.project.template_package) != canonical(after.project.template_package)
-            or canonical(base.presentation) != canonical(project_presentation(before))
-            or canonical(prepared.preview.presentation) != canonical(project_presentation(after))):
+            or not presentation_matches(base.presentation.model_dump(mode='json', by_alias=True), before)
+            or not presentation_matches(prepared.preview.presentation.model_dump(mode='json', by_alias=True), after)):
         raise ValueError('compact preparation needs its exact captured base and result')
     if prepared.mutation is None:
         if (canonical(before) != canonical(after) or base.identity != prepared.preview.identity
@@ -32,6 +42,10 @@ def prepared_delta(base, prepared):
     patch = build_patch(old, new)
     if canonical(apply_patch(old, patch)) != canonical(new):
         raise ValueError('compact preparation patch differs from preview')
+    editor = None
+    if base.presentation.editor is not None and prepared.preview.presentation.editor is not None:
+        editor = plan_patch(base.presentation.editor.model_dump(mode='json', by_alias=True),
+            prepared.preview.presentation.editor.model_dump(mode='json', by_alias=True))
     result = TemplatePreparedEditDeltaV1(schemaVersion=1, clientMutationId=prepared.client_mutation_id,
         baseSnapshot=prepared.base_snapshot, baseWorkspaceSha256=sha256(canonical(old)),
         resultSnapshot=prepared.preview.snapshot, resultWorkspaceSha256=sha256(canonical(new)),
@@ -39,7 +53,7 @@ def prepared_delta(base, prepared):
         mutationWire=prepared.mutation.model_dump_json(by_alias=True) if prepared.mutation is not None else None,
         workspacePatch=patch, presentationPatch={'beforeHash': sha256(old_wire), 'afterHash': sha256(new_wire),
             'set': {key: value for key, value in new_refs.items() if key not in old_refs or value != old_refs[key]},
-            'remove': sorted(old_refs.keys() - new_refs.keys())},
+            'remove': sorted(old_refs.keys() - new_refs.keys()), **({'editor': editor} if editor is not None else {})},
         resultIdentity=prepared.preview.identity, resultGeneration=prepared.preview.generation)
     if len(canonical(result)) > LIMITS.proposal_bytes:
         raise BackgroundFailure('JOB_STORAGE_FULL')

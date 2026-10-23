@@ -269,5 +269,9 @@ def prepare_edit(response, request, proof, *, clipboard=None):
     if isinstance(request.operations[0], ResolveTemplateSync):
         from .template_preparation_sync import prepare_sync_resolution
         return prepare_sync_resolution(response, request, proof)
+    from .models.template_authoring import SetLinkTarget
+    if isinstance(request.operations[0], SetLinkTarget):
+        from .template_preparation_link import prepare_link_target
+        return prepare_link_target(response, request, proof)
     from .template_preparation_structure import prepare_structure_edit
     return prepare_structure_edit(response, request, proof, clipboard=clipboard)

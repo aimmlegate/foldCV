@@ -13,6 +13,7 @@ import { EditorNotices } from "../workbench/editor/EditorNotices";
 import { FactsPanel } from "../workbench/facts/FactsPanel";
 import { NotificationSection } from "../workbench/ui/NotificationCenter";
 import { RewritePanel } from "../workbench/editor/RewritePanel";
+import { LinkTargetDialog } from "../workbench/editor/LinkTargetDialog";
 import type { RewriteActivity } from "./rewrite-progress";
 import type { PanelCommand } from "./synchronization";
 import { Toolbar, type ToolbarCommand } from "../workbench/editor/Toolbar";
@@ -20,6 +21,7 @@ import { selectionLocation } from "./selection";
 import { tableIdentityAttributes } from "./table-identity";
 import { templateSchema } from "./template-schema";
 import { projectTemplateDocument } from "./v7-projection";
+import { presentationMeta, templatePresentationPlugin, templateSheet, type TemplateSheet } from "./v7-presentation";
 import { TemplateEditorSession, type TemplateRewrite } from "./v7-session";
 
 export type TemplateEditorHandle = { background: boolean; flush: () => Promise<TemplateProjectResponseV1>;
@@ -49,8 +51,14 @@ export function TemplateEditor({ initial, connection, onStatus, onShown, ref, po
   const [rewriteError, setRewriteError] = useState("");
   const [rewriteActivity, setRewriteActivity] = useState<RewriteActivity | null>(null);
   const [rewriteAnchor, setRewriteAnchor] = useState<{ left: number; top: number; bottom: number } | null>(null);
+  // A bound link's URL is edited through Python, which changes its URL cell and target together.
+  const [linkTarget, setLinkTarget] = useState<{ blockId: string; occurrenceId: string; href: string } | null>(null);
   const callbacks = useRef({ onStatus, onShown });
   callbacks.current = { onStatus, onShown };
+  // The compiled presentation of the verified state; decorations read the latest one.
+  const sheet = useMemo(() => templateSheet(shown), [shown]);
+  const presented = useRef<TemplateSheet | null>(sheet);
+  const presentation = useMemo(() => templatePresentationPlugin(() => presented.current), []);
   const session = useMemo(() => new TemplateEditorSession(connection, {
     status: text => { callbacks.current.onStatus(text); refresh(value => value + 1); },
     warning: text => setWarning(text),
@@ -60,7 +68,7 @@ export function TemplateEditor({ initial, connection, onStatus, onShown, ref, po
   // Copy, cut and paste must run before BlockNote's own clipboard handlers, which would otherwise end the event.
   const extension = useMemo(() => createExtension({ key: "foldcv-v7-session", runsBefore: ["link"], tiptapExtensions: [tableIdentityAttributes,
     Extension.create({ name: "foldcv-v7-clipboard", priority: 1000, addProseMirrorPlugins: () => [session.clipboard] })],
-    prosemirrorPlugins: [session.plugin] }), [session]);
+    prosemirrorPlugins: [session.plugin, presentation] }), [session, presentation]);
   const editor = useCreateBlockNote({ schema: templateSchema, extensions: [extension],
     disableExtensions: ["history", "sideMenu", "code-block-keyboard-shortcuts", "check-list-item-shortcuts", "toggle-list-item-shortcuts"],
     tables: { splitCells: true, cellBackgroundColor: true, cellTextColor: true, headers: true },
@@ -78,6 +86,10 @@ export function TemplateEditor({ initial, connection, onStatus, onShown, ref, po
     window.addEventListener("pagehide", suspend, { capture: true });
     return () => { stop(); clearInterval(heartbeat); window.removeEventListener("pagehide", suspend, { capture: true }); session.close(); };
   }, [editor, session]);
+  useEffect(() => {
+    presented.current = sheet;
+    editor.transact(tr => { tr.setMeta(presentationMeta, true); });
+  }, [editor, sheet]);
   useImperativeHandle(ref, () => ({ background: true,
     flush: async () => {
       await session.flush(); await session.writer.flushTouches();
@@ -125,8 +137,13 @@ export function TemplateEditor({ initial, connection, onStatus, onShown, ref, po
     if (value === "rewrite") { openRewrite(); return; }
     if (value === "bold" || value === "italic" || value === "underline") { editor.toggleStyles({ [value]: true }); editor.focus(); return; }
     if (value === "facts") { setFactsVisible(visible => !visible); return; }
+    if (value === "link") { const link = session.linkAtCaret(); if (link) { setLinkTarget(link); return; } }
     unsupported();
   };
+  async function applyLinkTarget(target: { blockId: string; occurrenceId: string }, href: string) {
+    try { await session.linkTarget(target, href); }
+    catch (error) { setWarning(errorMessage(error)); }
+  }
   async function submitPanel(value: PanelCommand) {
     setPanelPending([value]);
     try { await session.panel(value); }
@@ -149,6 +166,8 @@ export function TemplateEditor({ initial, connection, onStatus, onShown, ref, po
       submit={() => void submitRewrite()} busy={rewriteActivity !== null} source={rewriteSource} error={rewriteError}
       preview={rewritePreview ? { text: rewriteText } : null} apply={() => void applyRewrite()} editPreview={setRewriteText}
       anchor={rewriteAnchor} focusInstruction activity={rewriteActivity} cancel={id => { void session.cancelRewrite(id); }} />
+    {linkTarget && <LinkTargetDialog href={linkTarget.href} close={() => { setLinkTarget(null); editor.focus(); }}
+      apply={href => void applyLinkTarget(linkTarget, href)} />}
     <div className="editor-body uir-editor-body">
       <aside className="editor-notifications" aria-label="Уведомления редактора">
         {/* V1 draft choices do not apply; V7 recovery reads the durable record and continues from it. */}
@@ -192,7 +211,9 @@ export function TemplateEditor({ initial, connection, onStatus, onShown, ref, po
         <div className="paper-scroll">
           <div className="cv-document resume-paper" data-project-id={initial.workspace.projectId} data-template="v7"
             data-history-position={session.history.position} data-history-length={session.history.length}>
-            <div className="uir-engine-sheet">
+            {sheet && <style>{sheet.css}</style>}
+            <div className={sheet ? "uir-engine-sheet fcv-sheet" : "uir-engine-sheet"} style={sheet?.variables}>
+              {sheet?.logo && <img className="fcv-logo" src={sheet.logo.url} alt="" style={sheet.logo.style} />}
               <BlockNoteView editor={editor} theme="light" filePanel={false} slashMenu={false} formattingToolbar={false} sideMenu={false} tableHandles={false}
                 {...(portalHost ? { portalElements: { default: portalHost } } : {})} />
             </div>

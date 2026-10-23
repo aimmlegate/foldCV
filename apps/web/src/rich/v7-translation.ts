@@ -27,6 +27,7 @@ export type V7Operation =
   // Structure commands are not optimistic: they name editor blocks and run after typing drains.
   | { kind: "move_block"; blockId: string; placement: Placement }
   | { kind: "remove_occurrences"; blockIds: string[] }
+  | { kind: "set_link_target"; blockId: string; occurrenceId: string; href: string }
   | { kind: "paste_blocks"; clipboardCaptureId: string; placement: Placement }
   | { kind: "paste_inline"; container: LocalContainer; start: number; end: number; side: Side | null; source: PasteInline["source"] };
 export type Placement = { parentId: string; afterId: string | null };
@@ -206,6 +207,8 @@ export function translateIntent(intent: V7Intent, basis: Basis, capture: Capture
       ...blockTarget(basis, value.blockId), placement: placement(basis, value.placement) } };
     if (value.kind === "remove_occurrences") return { kind: "operation", operation: { kind: "remove_occurrences", opId,
       blocks: blockTargets(basis, value.blockIds) } };
+    if (value.kind === "set_link_target") return { kind: "operation", operation: { kind: "set_link_target", opId,
+      ...blockTarget(basis, value.blockId), occurrenceId: value.occurrenceId, href: value.href } };
     if (value.kind === "paste_blocks") return { kind: "operation", operation: { kind: "paste_blocks", opId,
       source: { kind: "same_project", clipboardCaptureId: value.clipboardCaptureId }, placement: placement(basis, value.placement) } };
     if (value.kind === "paste_inline") {

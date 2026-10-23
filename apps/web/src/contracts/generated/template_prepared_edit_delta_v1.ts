@@ -19,6 +19,26 @@ export type Clientmutationid = string;
 export type Mutationwire = string | null;
 export type Afterhash = string;
 export type Beforehash = string;
+export type Afterhash1 = string;
+export type Beforehash1 = string;
+export type Kind1 = "set";
+export type Pointer = string;
+export type Valuewire = string;
+export type Kind2 = "insert";
+export type Pointer1 = string;
+export type Valuewire1 = string;
+export type Kind3 = "remove";
+export type Pointer2 = string;
+export type Beforetexthash = string;
+export type End = number;
+export type Kind4 = "splice_text";
+export type Pointer3 = string;
+export type Start = number;
+export type Text = string;
+/**
+ * @maxItems 1000
+ */
+export type Steps = (PatchSet | PatchInsert | PatchRemove | PatchSpliceText)[];
 export type Remove = string[];
 export type Itemhandle = string | null;
 export type Nodeindex = number | null;
@@ -42,20 +62,6 @@ export type Subtitle = string;
 export type Title = string;
 export type Resultworkspacesha256 = string;
 export type Schemaversion = 1;
-export type Kind1 = "set";
-export type Pointer = string;
-export type Valuewire = string;
-export type Kind2 = "insert";
-export type Pointer1 = string;
-export type Valuewire1 = string;
-export type Kind3 = "remove";
-export type Pointer2 = string;
-export type Beforetexthash = string;
-export type End = number;
-export type Kind4 = "splice_text";
-export type Pointer3 = string;
-export type Start = number;
-export type Text = string;
 /**
  * @maxItems 1000
  */
@@ -106,8 +112,39 @@ export interface Createdids {
 export interface PresentationPatchV1 {
   afterHash: Afterhash;
   beforeHash: Beforehash;
+  editor?: EditorPlanPatchV1 | null;
   remove: Remove;
   set: Set;
+}
+/**
+ * The editor plan changes with the document; its patch is checked by hashes of the exact plans.
+ */
+export interface EditorPlanPatchV1 {
+  afterHash: Afterhash1;
+  beforeHash: Beforehash1;
+  steps: Steps;
+}
+export interface PatchSet {
+  kind: Kind1;
+  pointer: Pointer;
+  valueWire: Valuewire;
+}
+export interface PatchInsert {
+  kind: Kind2;
+  pointer: Pointer1;
+  valueWire: Valuewire1;
+}
+export interface PatchRemove {
+  kind: Kind3;
+  pointer: Pointer2;
+}
+export interface PatchSpliceText {
+  beforeTextHash: Beforetexthash;
+  end: End;
+  kind: Kind4;
+  pointer: Pointer3;
+  start: Start;
+  text: Text;
 }
 export interface Set {
   [k: string]: AuthoredPresentation;
@@ -139,26 +176,4 @@ export interface RichGenerationState {
 export interface ResumeIdentity {
   subtitle: Subtitle;
   title: Title;
-}
-export interface PatchSet {
-  kind: Kind1;
-  pointer: Pointer;
-  valueWire: Valuewire;
-}
-export interface PatchInsert {
-  kind: Kind2;
-  pointer: Pointer1;
-  valueWire: Valuewire1;
-}
-export interface PatchRemove {
-  kind: Kind3;
-  pointer: Pointer2;
-}
-export interface PatchSpliceText {
-  beforeTextHash: Beforetexthash;
-  end: End;
-  kind: Kind4;
-  pointer: Pointer3;
-  start: Start;
-  text: Text;
 }

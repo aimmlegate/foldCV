@@ -28,6 +28,7 @@ export type Operations = [
   | BuiltinPanel
   | FormatBlocks
   | ResolveTemplateSync
+  | SetLinkTarget
 ];
 export type Kind1 = "replace_text";
 export type Opid = string;
@@ -157,6 +158,12 @@ export type Beforerecordhash = string;
 export type Kind20 = "resolve_template_sync";
 export type Opid14 = string;
 export type Syncid = string;
+export type Beforerevision5 = number;
+export type Blockid4 = string;
+export type Href1 = string;
+export type Kind21 = "set_link_target";
+export type Occurrenceid = string;
+export type Opid15 = string;
 export type Schemaversion = 1;
 export type Documenthash = string;
 export type Documentrevision1 = number;
@@ -355,6 +362,17 @@ export interface ResolveTemplateSync {
   kind: Kind20;
   opId: Opid14;
   syncId: Syncid;
+}
+/**
+ * A bound link's URL: its URL cell and target change together; the label stays its own cell.
+ */
+export interface SetLinkTarget {
+  beforeRevision: Beforerevision5;
+  blockId: Blockid4;
+  href: Href1;
+  kind: Kind21;
+  occurrenceId: Occurrenceid;
+  opId: Opid15;
 }
 export interface TemplateSnapshotIdentity {
   documentHash: Documenthash;

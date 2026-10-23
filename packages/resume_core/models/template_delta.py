@@ -14,11 +14,19 @@ from ..rich_identity import ResumeIdentity
 from ..templates.models import AuthoredPresentation
 
 
+class EditorPlanPatchV1(Wire):
+    """The editor plan changes with the document; its patch is checked by hashes of the exact plans."""
+    before_hash: Sha256
+    after_hash: Sha256
+    steps: list[CanonicalPatchStep] = Field(max_length=1000)
+
+
 class PresentationPatchV1(Wire):
     before_hash: Sha256
     after_hash: Sha256
     set: dict[Id, AuthoredPresentation]
     remove: list[Id]
+    editor: EditorPlanPatchV1 | None = Field(default=None, exclude_if=lambda value: value is None)
 
     @model_validator(mode='after')
     def distinct(self):
@@ -51,8 +59,10 @@ class TemplatePreparedEditDeltaV1(Wire):
             raise ValueError('prepared delta changes project or captured package')
         _unique([identifier for slots in self.created_ids.values() for identifier in slots.values()], 'allocated ID')
         if self.mutation_wire is None:
+            editor = self.presentation_patch.editor
             if (self.workspace_patch or self.presentation_patch.set or self.presentation_patch.remove
                     or self.presentation_patch.before_hash != self.presentation_patch.after_hash
+                    or editor is not None and (editor.steps or editor.before_hash != editor.after_hash)
                     or self.base_snapshot != self.result_snapshot
                     or self.base_workspace_sha256 != self.result_workspace_sha256 or any(self.created_ids.values())):
                 raise ValueError('no-op delta changes authored state or allocates identities')

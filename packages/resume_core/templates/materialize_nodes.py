@@ -3,7 +3,7 @@
 from dataclasses import dataclass
 
 from ..models.template_facts import ExtensionCell
-from ..models.template_document import FieldOccurrence, ManualScopeSpan, PresentedText
+from ..models.template_document import BoundLink, FieldOccurrence, FieldRef, ManualScopeSpan, PresentedText
 from .models import AuthoredPresentation
 from .projection import pointer_tokens
 from .compiler import canonical, sha256
@@ -64,6 +64,25 @@ def field_span(field, ref, instance, position, scopes, shown_scopes):
         complete=True, presentation=ref, text=cell.raw_input, styles={}, syncedFactRevision=cell.revision)
 
 
+def bound_ref(field, occurrence):
+    return FieldRef(recordId=field.record_id, fieldKey=field.cell.field_key, cellId=field.cell.id, occurrenceId=occurrence)
+
+
+def link_part(ref, instance, label, url, scopes, shown_scopes):
+    """The label links to the exact URL; a URL-only record shows its URL, and a label without a URL stays a plain field."""
+    if any(field.cell.manual_scope_id is not None for field in [*label, *url]):
+        raise ValueError('a bound link cannot show a manual edit scope')
+    shown = (label or url)[0]
+    part = field_span(shown, ref.model_copy(update={'item_handle': shown.item_handle}, deep=True), instance, 0, scopes, shown_scopes)
+    if not url:
+        return part
+    target = url[0]
+    root = stable_id(instance, 'occurrence', ref.node_index, 'url', target.cell.id) if label else part.occurrence_id
+    return BoundLink(type='bound_link', href=target.cell.raw_input, content=[part],
+        labelBinding=bound_ref(shown, part.occurrence_id) if label else None, urlBinding=bound_ref(target, root),
+        presentation=ref.model_copy(update={'item_handle': target.item_handle}, deep=True))
+
+
 def render_plain_fields(package, declaration, instance, fields, scopes, shown_scopes):
     blocks, displayed = [], {}
     if not fields:
@@ -103,8 +122,39 @@ def render_nodes(package, declaration, instance, fields, scopes, shown_scopes, p
             'children': [], 'provenance': [], 'presentation': ref})
         for field in selected:
             displayed.setdefault(field.cell.id, []).append(identifier)
+    def shown(path):
+        return [field for field in scalar(path) if field.cell.raw_input or field.cell.manual_scope_id is not None]
+    def parts(selected, base):
+        result = []
+        for position, field in enumerate(selected):
+            part = field_span(field, base.model_copy(update={'item_handle': field.item_handle}, deep=True),
+                instance, position, scopes, shown_scopes)
+            if part is not None:
+                result.append((field, part))
+        return result
     for index, node in enumerate(declaration.view.nodes):
         ref = reference(package, declaration.id, node.style, instance, node_index=index)
+        label, prefix = locale_text(node.label, locale), locale_text(node.prefix, locale)
+        def lead():
+            return [literal(prefix, ref)] if prefix else []
+        if node.type == 'link':
+            name, url = shown(node.name_field), shown(node.url_field)
+            if name or url:
+                if label:
+                    block([literal(label, ref)], ref, suffix='label')
+                block([*lead(), link_part(ref, instance, name, url, scopes, shown_scopes)], ref, [*name, *url])
+            continue
+        if node.type == 'focus_entry':
+            # The stated experience is its own line in the detail style; nothing is recomputed from years.
+            detail = reference(package, declaration.id, node.detail_style or node.style, instance, node_index=index)
+            name, experience = parts(scalar(node.name_field), ref), parts(scalar(node.experience_field), detail)
+            if name or experience:
+                if label:
+                    block([literal(label, ref)], ref, suffix='label')
+                if name:
+                    block([*lead(), *(part for _field, part in name)], ref, [field for field, _part in name])
+                block([part for _field, part in experience], detail, [field for field, _part in experience], suffix='detail')
+            continue
         if node.type == 'text':
             selected = scalar(node.field)
         elif node.type == 'join_fields':
@@ -118,25 +168,18 @@ def render_nodes(package, declaration, instance, fields, scopes, shown_scopes, p
             selected = [*start, *(([] if period_format else ongoing) if current else end)]
         else:
             raise ValueError('template materializer primitive is not implemented: ' + node.type)
-        visible = []
-        for position, field in enumerate(selected):
-            field_ref = ref.model_copy(update={'item_handle': field.item_handle}, deep=True)
-            part = field_span(field, field_ref, instance, position, scopes, shown_scopes)
-            if part is not None:
-                visible.append((field, part))
+        visible = parts(selected, ref)
         if not visible:
             continue
-        label = locale_text(node.label, locale)
         if label:
             block([literal(label, ref)], ref, suffix='label')
-        prefix = locale_text(node.prefix, locale)
         if node.type == 'bullets':
             for field, part in visible:
-                block(([literal(prefix, ref)] if prefix else []) + [part], ref, [field], kind='bullet_list', suffix=field.cell.id)
+                block(lead() + [part], ref, [field], kind='bullet_list', suffix=field.cell.id)
             continue
         separator = ((period_format['separator'] if period_format else '–') if node.type == 'period'
             else node.separator if node.type in {'join_fields', 'join_items'} else ', ' if node.type == 'tags' else '')
-        content = [literal(prefix, ref)] if prefix else []
+        content = lead()
         for position, (_field, part) in enumerate(visible):
             if position:
                 content.append(literal(separator, ref))

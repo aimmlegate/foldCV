@@ -34,11 +34,22 @@ def snapshot_identity(workspace):
     return authored_snapshot_identity(workspace)
 
 
+def presentation_matches(value, workspace):
+    """The exact captured presentation; a response stored before the editor plan existed may omit only the plan."""
+    expected = project_presentation(workspace)
+    if value is None or expected is None:
+        return value is None and expected is None
+    if 'editor' not in value:
+        expected.pop('editor', None)
+    return value == expected
+
+
 def project_presentation(workspace):
     snapshot = snapshot_identity(workspace)
     if snapshot is None:
         return None
     project = workspace.project
     validate_presentation(project.document, project.template_package)
+    from .presentation_plan import editor_plan
     return {'schemaVersion': 1, 'snapshot': snapshot.model_dump(mode='json', by_alias=True),
-        **presentation_value(project.document, project.template_package)}
+        **presentation_value(project.document, project.template_package), 'editor': editor_plan(project)}

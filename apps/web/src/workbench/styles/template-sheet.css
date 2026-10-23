@@ -1,0 +1,44 @@
+/* The mounted V7 page: geometry from the captured recipe, faces and sizes from Python's plan. */
+.fcv-sheet { position: relative; width: var(--fcv-page-width); min-width: var(--fcv-page-width); padding: var(--fcv-top) 0 42pt;
+  background: #fff; color: #000; }
+.fcv-sheet .bn-container, .fcv-sheet .bn-editor { background: transparent; color: inherit; font: inherit; }
+.fcv-sheet .bn-editor { padding: 0 0 0 var(--fcv-left); overflow: visible; }
+.fcv-sheet .bn-trailing-block { height: 0; min-height: 0; }
+.fcv-sheet .bn-block-group, .fcv-sheet .bn-block-group .bn-block-group { margin: 0; padding: 0; }
+.fcv-sheet .bn-block-outer, .fcv-sheet .bn-block { margin: 0; padding: 0; }
+.fcv-sheet .bn-block-group .bn-block:not(:has(.bn-toggle-wrapper)) .bn-block-group .bn-block-outer:not([data-prev-depth-changed])::before { border-left: 0; }
+.fcv-sheet .bn-block-content { padding: 0; min-height: 0; font: inherit; color: inherit; background: transparent; }
+.fcv-sheet .bn-block-content h1, .fcv-sheet .bn-block-content h2, .fcv-sheet .bn-block-content h3,
+.fcv-sheet .bn-block-content p { font: inherit; letter-spacing: inherit; color: inherit; margin: 0; padding: 0; }
+.fcv-sheet .bn-inline-content { white-space: pre-wrap; overflow-wrap: anywhere; }
+.fcv-sheet [data-fcv-item] > .bn-block > :is(.bn-block-content, .bn-react-node-view-renderer) { display: none; }
+.fcv-sheet .fcv-regions { display: grid; grid-template-columns: var(--fcv-sidebar) var(--fcv-main); column-gap: var(--fcv-gap); }
+.fcv-sheet .fcv-region-header { grid-column: 1 / -1; grid-row: 1; position: relative; width: var(--fcv-header-width);
+  min-height: var(--fcv-header-height); margin: 0 0 var(--fcv-body-gap) var(--fcv-header-left); }
+.fcv-sheet .fcv-region-header::after { content: ""; position: absolute; left: var(--fcv-divider-left); bottom: 0;
+  width: var(--fcv-divider-width); border-bottom: var(--fcv-divider); }
+.fcv-sheet .fcv-region-sidebar { grid-column: 1; grid-row: 2; min-width: 0; }
+.fcv-sheet .fcv-region-main { grid-column: 2; grid-row: 2; min-width: 0; }
+.fcv-sheet .node-region { display: none; }
+.fcv-sheet .node-region:has(.uir-empty-region) { display: block; }
+.fcv-sheet .uir-empty-region { display: block; width: 100%; min-height: 18px; border: 0; padding: 0; opacity: 0; background: var(--surface);
+  color: var(--muted); font: 10px var(--sans); }
+.fcv-sheet .uir-empty-region:hover, .fcv-sheet .uir-empty-region:focus-visible { opacity: 1; }
+.fcv-sheet [data-fcv-style] strong { font-family: var(--fcv-bold), sans-serif; font-weight: normal; }
+.fcv-sheet [data-fcv-style] em { font-family: var(--fcv-italic), sans-serif; font-style: normal; }
+.fcv-sheet [data-fcv-style] strong em, .fcv-sheet [data-fcv-style] em strong { font-family: var(--fcv-bold-italic), sans-serif; }
+/* Custom blocks render their content inside a React node view wrapper. */
+.fcv-sheet [data-fcv-inset] > .bn-block > .bn-block-content,
+.fcv-sheet [data-fcv-inset] > .bn-block > .bn-react-node-view-renderer > .bn-block-content { padding-left: var(--fcv-inset); }
+.fcv-sheet [data-fcv-gap] { margin-bottom: var(--fcv-item-gap); }
+.fcv-sheet [data-fcv-band] > .bn-block > .bn-block-content,
+.fcv-sheet [data-fcv-band] > .bn-block > .bn-react-node-view-renderer > .bn-block-content { display: flex; align-items: center; min-height: var(--fcv-band-height);
+  padding-left: var(--fcv-band-inset); background: var(--fcv-band-color); }
+/* A Focus row centers its text in the minimum row height; the icon is decorative and never text. */
+.fcv-sheet [data-fcv-focus] > .bn-block { position: relative; display: flex; flex-direction: column; justify-content: center;
+  min-height: var(--fcv-focus-row); }
+.fcv-sheet [data-fcv-focus] > .bn-block::before { content: ""; position: absolute; left: var(--fcv-focus-icon-x); top: 50%;
+  width: var(--fcv-focus-icon-width); height: var(--fcv-focus-icon-height); transform: translateY(-50%);
+  background: var(--fcv-icon, none) center / contain no-repeat; pointer-events: none; }
+.fcv-sheet .fcv-link { text-decoration: underline dotted; text-underline-offset: 2px; }
+.fcv-logo { position: absolute; object-fit: contain; pointer-events: none; }

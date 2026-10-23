@@ -78,11 +78,10 @@ def inverse_mutation(before, after, *, mutation_id, session_id):
                     position = placements(shadow)[old.id]
                     anchor = previous if moved else position[1]
                     if before.schema_version == 7:
-                        from .canonical_patch import build_patch
-                        from .template_block_patches import block_payload
+                        from .template_block_patches import block_patch
                         steps.append({'kind': 'restore_authored_block_patch', 'blockId': old.id,
                             'beforeRevision': resulting[old.id].revision, 'beforeSemanticHash': block_hash(current),
-                            'afterSemanticHash': block_hash(old), 'patch': build_patch(block_payload(current), block_payload(old))})
+                            'afterSemanticHash': block_hash(old), 'patch': block_patch(current, old)})
                     else:
                         steps.append({"kind": "put_block", "parentId": parent_id, "afterId": anchor,
                             "beforeRevision": resulting[old.id].revision, "block": value.model_dump(mode="json", by_alias=True),

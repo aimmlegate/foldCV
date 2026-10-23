@@ -78,8 +78,11 @@ export async function applyPreparedTemplateDelta(baseInput: JsonWireNode, deltaI
     || jsonWireAt(mutation, ["capture"]).wire !== jsonWireAt(root, ["capture"]).wire
     || delta.resultSnapshot.projectRevision <= delta.baseSnapshot.projectRevision
     || delta.resultSnapshot.documentRevision <= delta.baseSnapshot.documentRevision) return invalid();
+  // The editor plan follows by its own verified patch; without one the editor shows the unstyled document.
+  const plan = original.presentation.editor && patch.editor ? await applyVerifiedCanonicalPatch(jsonWireAt(base, ["presentation", "editor"]),
+    patch.editor.steps, patch.editor.beforeHash, patch.editor.afterHash) : null;
   const presentation = jsonObjectWire([["schemaVersion", "1"], ["snapshot", jsonWireAt(root, ["resultSnapshot"]).wire],
-    ["recipe", jsonWireAt(base, ["presentation", "recipe"]).wire], ["blocks", blocksWire]]);
+    ["recipe", jsonWireAt(base, ["presentation", "recipe"]).wire], ["blocks", blocksWire], ...(plan ? [["editor", plan.wire] as const] : [])]);
   const responseWire = parseJsonWire(jsonObjectWire([
     ["schemaVersion", "1"], ["workspace", workspace.wire], ["snapshot", jsonWireAt(root, ["resultSnapshot"]).wire],
     ["presentation", presentation], ["durability", '"pending"'], ["saveError", "null"],

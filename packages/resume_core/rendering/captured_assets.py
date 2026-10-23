@@ -44,6 +44,7 @@ class CapturedLogo:
 class CapturedAssets:
     fonts: Mapping[str,CapturedFont]
     logo: CapturedLogo | None
+    icons: Mapping[str,CapturedLogo] = MappingProxyType({})
 
     def materialize(self,worker_directory):
         directory=Path(worker_directory)
@@ -56,9 +57,11 @@ class CapturedAssets:
                 path=root/(font.sha256+'.ttf')
                 if path not in paths.values():path.write_bytes(font.content);path.chmod(0o600)
                 paths[font.asset_id]=path
-            if self.logo is not None:
-                path=root/(self.logo.sha256+'.png');path.write_bytes(self.logo.content);path.chmod(0o600)
-                paths[self.logo.asset_id]=path
+            for image in [self.logo,*self.icons.values()]:
+                if image is None:continue
+                path=root/(image.sha256+'.png')
+                if path not in paths.values():path.write_bytes(image.content);path.chmod(0o600)
+                paths[image.asset_id]=path
             return paths
         except OSError:
             raise RenderFailure('ASSET_UNAVAILABLE') from None
@@ -132,11 +135,15 @@ def decode_font(asset,declaration):
 
 
 def decode_logo(asset):
-    if asset.role!='logo' or asset.mime_type!='image/png':raise RenderFailure('ASSET_MISMATCH')
+    return decode_png(asset,'logo')
+
+
+def decode_png(asset,role):
+    if asset.role!=role or asset.mime_type!='image/png':raise RenderFailure('ASSET_MISMATCH')
     content=base64.b64decode(asset.bytes_base64,validate=True)
     try:
         with Image.open(BytesIO(content)) as image:
-            if image.format!='PNG' or image.width*image.height>IMAGE_PIXELS:raise ValueError('invalid logo')
+            if image.format!='PNG' or image.width*image.height>IMAGE_PIXELS:raise ValueError('invalid image')
             image.verify()
         with Image.open(BytesIO(content)) as image:
             image.load();width,height=image.size

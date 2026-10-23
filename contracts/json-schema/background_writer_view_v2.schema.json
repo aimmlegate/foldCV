@@ -2293,6 +2293,245 @@
       "title": "DraftCheckpointV1",
       "type": "object"
     },
+    "EditorBlock": {
+      "additionalProperties": false,
+      "properties": {
+        "band": {
+          "anyOf": [
+            {
+              "const": true,
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Band"
+        },
+        "focus": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/EditorFocus"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "inline": {
+          "additionalProperties": {
+            "type": "string"
+          },
+          "title": "Inline",
+          "type": "object"
+        },
+        "links": {
+          "items": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "title": "Links",
+          "type": "array"
+        },
+        "style": {
+          "title": "Style",
+          "type": "string"
+        }
+      },
+      "required": [
+        "style"
+      ],
+      "title": "EditorBlock",
+      "type": "object"
+    },
+    "EditorFaces": {
+      "additionalProperties": false,
+      "properties": {
+        "bold": {
+          "anyOf": [
+            {
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Bold"
+        },
+        "boldItalic": {
+          "anyOf": [
+            {
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Bolditalic"
+        },
+        "italic": {
+          "anyOf": [
+            {
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Italic"
+        },
+        "regular": {
+          "anyOf": [
+            {
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Regular"
+        }
+      },
+      "required": [
+        "regular",
+        "bold",
+        "italic",
+        "boldItalic"
+      ],
+      "title": "EditorFaces",
+      "type": "object"
+    },
+    "EditorFocus": {
+      "additionalProperties": false,
+      "properties": {
+        "blocks": {
+          "items": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "minItems": 1,
+          "title": "Blocks",
+          "type": "array"
+        },
+        "icon": {
+          "anyOf": [
+            {
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Icon"
+        }
+      },
+      "required": [
+        "blocks",
+        "icon"
+      ],
+      "title": "EditorFocus",
+      "type": "object"
+    },
+    "EditorPlanV1": {
+      "additionalProperties": false,
+      "description": "Python's presentation decisions for the mounted editor; the editor only applies them.",
+      "properties": {
+        "blocks": {
+          "additionalProperties": {
+            "$ref": "#/$defs/EditorBlock"
+          },
+          "title": "Blocks",
+          "type": "object"
+        },
+        "fonts": {
+          "items": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "title": "Fonts",
+          "type": "array"
+        },
+        "icons": {
+          "items": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "title": "Icons",
+          "type": "array"
+        },
+        "styles": {
+          "additionalProperties": {
+            "$ref": "#/$defs/EditorStyle"
+          },
+          "title": "Styles",
+          "type": "object"
+        }
+      },
+      "required": [
+        "styles",
+        "blocks",
+        "fonts",
+        "icons"
+      ],
+      "title": "EditorPlanV1",
+      "type": "object"
+    },
+    "EditorStyle": {
+      "additionalProperties": false,
+      "properties": {
+        "alignment": {
+          "anyOf": [
+            {
+              "enum": [
+                "left",
+                "center",
+                "right",
+                "justify"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Alignment"
+        },
+        "color": {
+          "pattern": "^#[a-fA-F0-9]{6}$",
+          "title": "Color",
+          "type": "string"
+        },
+        "faces": {
+          "$ref": "#/$defs/EditorFaces"
+        },
+        "lineHeight": {
+          "exclusiveMinimum": 0,
+          "title": "Lineheight",
+          "type": "number"
+        },
+        "size": {
+          "exclusiveMinimum": 0,
+          "title": "Size",
+          "type": "number"
+        }
+      },
+      "required": [
+        "faces",
+        "size",
+        "lineHeight",
+        "color",
+        "alignment"
+      ],
+      "title": "EditorStyle",
+      "type": "object"
+    },
     "EducationRecord": {
       "additionalProperties": false,
       "properties": {
@@ -14177,6 +14416,17 @@
           },
           "title": "Blocks",
           "type": "object"
+        },
+        "editor": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/EditorPlanV1"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
         },
         "recipe": {
           "$ref": "#/$defs/CompiledRecipe"

@@ -146,7 +146,10 @@ def test_unsupported_reference_or_inline_font_capability_fails_explicitly(captur
     elif damage=='package':block.presentation.package_hash='f'*64
     elif damage=='node':block.presentation.node_index=9999
     elif damage=='code':span.styles.code=True
-    else:block.content=[PresentedHyperlink(type='link',href='https://example.invalid',content=[span])]
+    else:
+        # A link child is read with the link's presentation, which here names an unknown style.
+        link=block.presentation.model_copy(update={'style_token':'unknown-style'})
+        block.content=[PresentedHyperlink(type='link',href='https://example.invalid',content=[span],presentation=link)]
     with pytest.raises(RenderFailure):resolver.paragraph(block)
 
 

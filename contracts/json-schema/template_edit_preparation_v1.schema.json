@@ -1248,6 +1248,51 @@
       "title": "SameProjectClipboard",
       "type": "object"
     },
+    "SetLinkTarget": {
+      "additionalProperties": false,
+      "description": "A bound link's URL: its URL cell and target change together; the label stays its own cell.",
+      "properties": {
+        "beforeRevision": {
+          "minimum": 1,
+          "title": "Beforerevision",
+          "type": "integer"
+        },
+        "blockId": {
+          "minLength": 1,
+          "title": "Blockid",
+          "type": "string"
+        },
+        "href": {
+          "title": "Href",
+          "type": "string"
+        },
+        "kind": {
+          "const": "set_link_target",
+          "title": "Kind",
+          "type": "string"
+        },
+        "occurrenceId": {
+          "minLength": 1,
+          "title": "Occurrenceid",
+          "type": "string"
+        },
+        "opId": {
+          "minLength": 1,
+          "title": "Opid",
+          "type": "string"
+        }
+      },
+      "required": [
+        "opId",
+        "kind",
+        "blockId",
+        "beforeRevision",
+        "occurrenceId",
+        "href"
+      ],
+      "title": "SetLinkTarget",
+      "type": "object"
+    },
     "SetMarks": {
       "additionalProperties": false,
       "properties": {
@@ -1419,6 +1464,7 @@
             "remove_occurrences": "#/$defs/RemoveOccurrences",
             "replace_text": "#/$defs/ReplaceText",
             "resolve_template_sync": "#/$defs/ResolveTemplateSync",
+            "set_link_target": "#/$defs/SetLinkTarget",
             "set_marks": "#/$defs/SetMarks",
             "split_block": "#/$defs/SplitBlock"
           },
@@ -1469,6 +1515,9 @@
           },
           {
             "$ref": "#/$defs/ResolveTemplateSync"
+          },
+          {
+            "$ref": "#/$defs/SetLinkTarget"
           }
         ]
       },

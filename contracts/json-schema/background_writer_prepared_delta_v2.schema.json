@@ -624,6 +624,59 @@
       "title": "DependencyStamp",
       "type": "object"
     },
+    "EditorPlanPatchV1": {
+      "additionalProperties": false,
+      "description": "The editor plan changes with the document; its patch is checked by hashes of the exact plans.",
+      "properties": {
+        "afterHash": {
+          "pattern": "^[a-f0-9]{64}$",
+          "title": "Afterhash",
+          "type": "string"
+        },
+        "beforeHash": {
+          "pattern": "^[a-f0-9]{64}$",
+          "title": "Beforehash",
+          "type": "string"
+        },
+        "steps": {
+          "items": {
+            "discriminator": {
+              "mapping": {
+                "insert": "#/$defs/PatchInsert",
+                "remove": "#/$defs/PatchRemove",
+                "set": "#/$defs/PatchSet",
+                "splice_text": "#/$defs/PatchSpliceText"
+              },
+              "propertyName": "kind"
+            },
+            "oneOf": [
+              {
+                "$ref": "#/$defs/PatchSet"
+              },
+              {
+                "$ref": "#/$defs/PatchInsert"
+              },
+              {
+                "$ref": "#/$defs/PatchRemove"
+              },
+              {
+                "$ref": "#/$defs/PatchSpliceText"
+              }
+            ]
+          },
+          "maxItems": 1000,
+          "title": "Steps",
+          "type": "array"
+        }
+      },
+      "required": [
+        "beforeHash",
+        "afterHash",
+        "steps"
+      ],
+      "title": "EditorPlanPatchV1",
+      "type": "object"
+    },
     "FieldInsertionTarget": {
       "additionalProperties": false,
       "properties": {
@@ -932,6 +985,17 @@
           "pattern": "^[a-f0-9]{64}$",
           "title": "Beforehash",
           "type": "string"
+        },
+        "editor": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/EditorPlanPatchV1"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
         },
         "remove": {
           "items": {

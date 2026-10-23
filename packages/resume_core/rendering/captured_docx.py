@@ -9,6 +9,7 @@ import platform
 import re
 
 from docx import Document
+from docx.opc.constants import RELATIONSHIP_TYPE
 from docx.oxml.ns import qn
 from docx.shared import Twips
 
@@ -16,18 +17,20 @@ from ..models.template_document import PresentedText, TemplateParagraphBlock
 from ..models.template_render import TemplateRendererIdentity, TemplateRenderRequestV1
 from ..rich_limits import DOCX_BYTES
 from ..templates.compiler import ADDED_CAPABILITIES, CAPABILITIES, canonical
+from ..templates.focus import focus_icon, icon_catalog
+from ..templates.presentation_plan import focus_row, hyperlink_target
 from ..templates.materialize_nodes import reference
-from .captured_assets import CapturedAssets, decode_logo
+from .captured_assets import CapturedAssets, decode_logo, decode_png
 from .captured_embedding import embed_captured_fonts
 from .captured_layout import BodyGeometry, CapturedMetrics, half_points, native_units
-from .captured_styles import CapturedStyleResolver, resize_run
+from .captured_styles import CapturedStyleResolver, authored_spans, resize_run
 from .rich_docx import Writer, element, fill
 from .template import RenderFailure
 
 ROOT = Path(__file__).resolve().parents[3]
 RENDERER_VERSION = '1.0.0'
 BLOCKS = {'section', 'paragraph', 'heading', 'bullet_list', 'numbered_list'}
-NODES = {'text', 'join_fields', 'period', 'tags', 'bullets'}
+NODES = {'text', 'join_fields', 'join_items', 'period', 'tags', 'bullets', 'link', 'focus_entry'}
 
 
 def renderer_identity():
@@ -80,12 +83,13 @@ def run_properties(style):
 class CapturedWriter:
     compact = Writer.compact
 
-    def floating_image(self, paragraph, path, width, height, x, y, *, label):
+    def floating_image(self, paragraph, path, width, height, x, y, *, label, horizontal='page', vertical='page', right=None):
         x, y, width, height = [native_units(value, 12700, positive=index > 1)
             for index, value in enumerate((x, y, width, height))]
-        if x + width > self.geometry.width * 635 or y + height > self.geometry.height * 635:
+        if x + width > (right or self.geometry.width) * 635 or y + height > self.geometry.height * 635:
             raise RenderFailure('RICH_EXPORT_UNSUPPORTED')
-        Writer.floating_image(self, paragraph, path, width / 12700, height / 12700, x / 12700, y / 12700, label=label)
+        Writer.floating_image(self, paragraph, path, width / 12700, height / 12700, x / 12700, y / 12700,
+            horizontal, vertical, label=label)
         anchor = paragraph._p.xpath('.//wp:anchor')[-1]
         anchor.find(qn('wp:positionH')).find(qn('wp:posOffset')).text = str(x)
         anchor.find(qn('wp:positionV')).find(qn('wp:posOffset')).text = str(y)
@@ -122,6 +126,7 @@ class CapturedWriter:
         for region, captured in zip(request.document.regions, self.recipe.layout.regions, strict=True):
             assign_width(region.blocks, captured.width, region.role)
         self.runs = {}
+        self.links = {}
         self.paragraphs = {}
         self.logo = None
         for block in request.document.blocks():
@@ -130,10 +135,13 @@ class CapturedWriter:
             resolved_node(self.resolver, block.presentation)
             if not isinstance(block.content, list):
                 raise RenderFailure('RICH_EXPORT_UNSUPPORTED')
-            actual = []
             for span in block.content:
-                if span.type not in {'text', 'fact_field', 'manual_scope'}:
+                if span.type not in {'text', 'fact_field', 'manual_scope', 'bound_link', 'link'}:
                     raise RenderFailure('RICH_EXPORT_UNSUPPORTED')
+                if span.type in {'bound_link', 'link'} and span.presentation is not None:
+                    resolved_node(self.resolver, span.presentation)
+            actual, links = [], []
+            for span, link in authored_spans(block):
                 node = resolved_node(self.resolver, span.presentation or block.presentation)
                 if not span.text:
                     continue
@@ -142,7 +150,9 @@ class CapturedWriter:
                     style = replace(style, background=self.recipe.style.colors[node.background])
                 self.remember(style)
                 actual.append((span.text, style))
+                links.append(link)
             self.runs[block.id] = actual
+            self.links[block.id] = links
             emitted = (block.type != 'section' or block.content) and (self.regions[block.id] != 'header' or actual)
             self.paragraphs[block.id] = self.resolver.paragraph(block) if emitted else None
             if (self.paragraphs[block.id] is not None and self.regions[block.id] != 'header' and
@@ -150,6 +160,22 @@ class CapturedWriter:
                 raise RenderFailure('RICH_EXPORT_UNSUPPORTED')
             if not actual and emitted:
                 self.remember(self.generated(block, ''))
+        self.rows, self.icons, self.placed = {}, {}, []
+        catalog = None
+        for block in request.document.blocks():
+            row = focus_row(block, self.recipe)
+            if not row:
+                continue
+            if self.regions[block.id] == 'header':
+                raise RenderFailure('RICH_EXPORT_UNSUPPORTED')
+            try:
+                catalog = icon_catalog(request.package) if catalog is None else catalog
+            except ValueError:
+                raise RenderFailure('ASSET_MISMATCH') from None
+            icon = focus_icon(request.package, request.facts, row, catalog)
+            if icon is not None and icon not in self.icons:
+                self.icons[icon] = decode_png(next(asset for asset in request.package.assets if asset.id == icon), 'icon')
+            self.rows[block.id] = (row, icon)
         self.configure_page()
 
     def remember(self, style):
@@ -179,6 +205,7 @@ class CapturedWriter:
         run = paragraph.add_run()
         run._r.append(run_properties(style))
         native_text(run, text)
+        return run
 
     def paragraph(self, container, block, *, header=False, depth=0, sequence=None):
         paragraph = container.add_paragraph()
@@ -192,7 +219,9 @@ class CapturedWriter:
         props.append(element('w:keepNext', val=int(is_heading and self.recipe.layout.pagination.keep_heading_with_next)))
         view = self.resolver.views[block.presentation.view_key]
         band = is_heading and block.presentation.node_index is None and view.heading == 'band'
-        inset = 0 if header or band else view.inset
+        node = resolved_node(self.resolver, block.presentation)
+        focus = node is not None and node.type == 'focus_entry'
+        inset = 0 if header or band else view.inset + (self.recipe.style.focus.text_x if focus else 0)
         left = native_units(inset)
         if left >= self.widths[block.id]:
             raise RenderFailure('RICH_EXPORT_UNSUPPORTED')
@@ -221,10 +250,20 @@ class CapturedWriter:
             props.find(qn('w:spacing')).set(qn('w:line'), str(line))
         if not self.runs[block.id]:
             props.append(run_properties(self.generated(block, '')))
-        previous_cr = False
-        for text, style in self.runs[block.id]:
-            self.emit_run(paragraph, text[1:] if previous_cr and text.startswith('\n') else text, style)
+        previous_cr, current, hyperlink = False, None, None
+        for (text, style), link in zip(self.runs[block.id], self.links[block.id], strict=True):
+            run = self.emit_run(paragraph, text[1:] if previous_cr and text.startswith('\n') else text, style)
             previous_cr = text.endswith('\r')
+            target = hyperlink_target(link.href) if link is not None else None
+            if target is None:
+                current = None
+                continue
+            # Consecutive runs of one link share its element; equal targets share one relationship.
+            if link is not current:
+                current, hyperlink = link, element('w:hyperlink')
+                hyperlink.set(qn('r:id'), paragraph.part.relate_to(target, RELATIONSHIP_TYPE.HYPERLINK, is_external=True))
+                paragraph._p.append(hyperlink)
+            hyperlink.append(run._r)
         return paragraph
 
     def list_marker(self, paragraph, block, inset, depth, sequence):
@@ -292,11 +331,36 @@ class CapturedWriter:
                 sequence.clear()
             if block.type != 'section' or block.content:
                 self.paragraph(container, block, depth=depth, sequence=sequence)
-            self.blocks(container, block.children, depth + (block.type in {'bullet_list', 'numbered_list'}))
+            row, icon = self.rows.get(block.id, ([], None))
+            if row:
+                self.focus(container, block, row, icon, depth)
+            self.blocks(container, block.children[len(row):], depth + (block.type in {'bullet_list', 'numbered_list'}))
             if block.type == 'section' and block.children:
                 gap = self.resolver.views[block.presentation.view_key].item_gap
                 if gap:
                     self.spacer(container, native_units(gap, positive=True))
+
+    def focus(self, container, section, row, icon, depth):
+        """Focus text centered in at least the minimum row height; the decorative icon centered in its box."""
+        style = self.recipe.style.focus
+        view = self.resolver.views[row[0].presentation.view_key]
+        text = sum(native_units(self.metrics.paragraph_height(self.runs[block.id],
+            self.widths[block.id] / 20 - view.inset - style.text_x, self.paragraphs[block.id][0]), positive=True) for block in row)
+        height = max(native_units(style.minimum_row_height, positive=True), text)
+        before = (height - text) // 2
+        anchor = self.spacer(container, before) if before else None
+        paragraphs = [self.paragraph(container, block, depth=depth, sequence={}) for block in row]
+        # One entry stays on one page: its leading spacer and lines keep with what follows.
+        for paragraph in [*([anchor] if anchor is not None else []), *paragraphs[:-1]]:
+            paragraph.paragraph_format.keep_with_next = True
+        if height - text - before:
+            self.spacer(container, height - text - before)
+        if icon is not None:
+            image = self.icons[icon]
+            scale = min(style.icon_width / image.width, style.icon_height / image.height)
+            width, image_height = image.width * scale, image.height * scale
+            self.placed.append((anchor if anchor is not None else paragraphs[0], icon, width, image_height,
+                view.inset + style.icon_x + (style.icon_width - width) / 2, (height / 20 - image_height) / 2, self.widths[section.id]))
 
     def spacer(self, container, height):
         paragraph = container.add_paragraph()
@@ -325,7 +389,7 @@ class CapturedWriter:
             for child in self.header_blocks(block):
                 if not self.runs[child.id]:
                     continue
-                refs = [span.presentation or child.presentation for span in child.content if span.text]
+                refs = [span.presentation or child.presentation for span, _link in authored_spans(child) if span.text]
                 slots = {getattr(resolved_node(self.resolver, ref), 'header_slot', None) for ref in refs}
                 if len(slots) != 1 or None in slots:
                     raise RenderFailure('RICH_EXPORT_UNSUPPORTED')
@@ -435,7 +499,11 @@ class CapturedWriter:
         if logo is not None:
             asset = next(asset for asset in self.request.package.assets if asset.id == logo.asset)
             self.logo = decode_logo(asset)
-        paths = CapturedAssets({selection.font.asset_id: selection.font for selection in self.selections.values()}, self.logo).materialize(workspace)
+        paths = CapturedAssets({selection.font.asset_id: selection.font for selection in self.selections.values()}, self.logo,
+            self.icons).materialize(workspace)
+        for paragraph, icon, width, height, x, y, right in self.placed:
+            self.floating_image(paragraph, paths[icon], width, height, x, y, label='', horizontal='column',
+                vertical='paragraph', right=right)
         if logo is not None:
             ratio = min(logo.width / self.logo.width, logo.height / self.logo.height)
             width, height = self.logo.width * ratio, self.logo.height * ratio

@@ -302,14 +302,25 @@ def test_native_numbering_keeps_start_sequence_and_marker_style(captured_request
     assert abstract.xpath('string(.//w:b/@w:val)', namespaces=NS) == '0'
 
 
-@pytest.mark.parametrize('damage', ['link', 'code', 'focus', 'missing_glyph', 'quote'])
+@pytest.mark.parametrize('href', ['https://example.invalid/a', 'example.invalid/a'])
+def test_a_technical_link_exports_its_exact_target_only_when_it_is_a_web_address(captured_request, tmp_path, href):
+    document = captured_request.document.model_copy(deep=True)
+    block = next(block for block in document.blocks() if block.type == 'paragraph' and block.content)
+    block.content = [PresentedHyperlink(type='link', href=href,
+        content=[PresentedText(type='text', text='Authored link', styles={})])]
+    content = render_captured_docx(recapture(captured_request, document=document), tmp_path)
+    links = xml(content).xpath('//w:hyperlink', namespaces=NS)
+    rels = etree.fromstring(parts(content)['word/_rels/document.xml.rels'])
+    assert [next(rel.get('Target') for rel in rels if rel.get('Id') == link.get(qn('r:id'))) for link in links] == (
+        [href] if href.startswith('https://') else [])
+    assert 'Authored link' in emitted(xml(content))
+
+
+@pytest.mark.parametrize('damage', ['code', 'focus', 'missing_glyph', 'quote'])
 def test_used_unsupported_capabilities_fail_without_rewriting(captured_request, tmp_path, damage):
     document = captured_request.document.model_copy(deep=True)
     block = next(block for block in document.blocks() if block.type == 'paragraph' and block.content)
-    if damage == 'link':
-        block.content = [PresentedHyperlink(type='link', href='https://example.invalid',
-            content=[PresentedText(type='text', text='Authored link', styles={})])]
-    elif damage == 'code':
+    if damage == 'code':
         block.content[0].styles.code = True
     elif damage == 'focus':
         next(block for block in document.blocks() if block.type == 'section').props.presentation = 'focus'

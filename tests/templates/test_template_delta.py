@@ -90,3 +90,16 @@ def test_delta_payload_enforces_existing_budget_before_any_retention(monkeypatch
     monkeypatch.setattr(template_delta, 'LIMITS', replace(template_delta.LIMITS, proposal_bytes=1))
     with pytest.raises(BackgroundFailure, match='JOB_STORAGE_FULL'):
         prepare_text_delta(response(before), command(before), proof())
+
+
+def test_editor_plan_patch_is_exact_and_sends_changed_parts_whole_past_its_bound():
+    old = {'blocks': {'a': {'style': 'body'}, 'b': {'style': 'body', 'band': True}}, 'fonts': ['light'], 'icons': [],
+        'styles': {'body': {'size': 10}}}
+    new = {'blocks': {'a': {'style': 'emphasis'}, 'c': {'style': 'body'}}, 'fonts': ['light'], 'icons': ['python'],
+        'styles': {'body': {'size': 10}, 'emphasis': {'size': 10}}}
+    for limit, pointers in [(1000, None), (1, ['/blocks', '/icons', '/styles'])]:
+        patch = template_delta.plan_patch(old, new, limit)
+        assert canonical(apply_patch(old, patch['steps'])) == canonical(new)
+        assert (patch['beforeHash'], patch['afterHash']) == (sha256(canonical(old)), sha256(canonical(new)))
+        if pointers is not None:
+            assert [step.pointer for step in patch['steps']] == pointers

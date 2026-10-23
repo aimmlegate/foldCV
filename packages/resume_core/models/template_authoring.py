@@ -153,6 +153,15 @@ class MoveBlock(AuthoredOperationBase):
     placement: AuthoredPlacement
 
 
+class SetLinkTarget(AuthoredOperationBase):
+    """A bound link's URL: its URL cell and target change together; the label stays its own cell."""
+    kind: Literal['set_link_target']
+    block_id: Id
+    before_revision: Revision
+    occurrence_id: Id
+    href: str
+
+
 class ResolveTemplateSync(AuthoredOperationBase):
     kind: Literal['resolve_template_sync']
     sync_id: Id
@@ -234,7 +243,7 @@ class FormatBlocks(AuthoredOperationBase):
 
 AuthoredOperation = Annotated[ReplaceText | SetMarks | SplitBlock | MergeBlocks | InsertParagraph |
     CopyBlocks | CopyFragment | PasteInline | PasteBlocks | MoveBlock | RemoveOccurrences | DeleteEntity |
-    BuiltinPanel | FormatBlocks | ResolveTemplateSync, Field(discriminator='kind')]
+    BuiltinPanel | FormatBlocks | ResolveTemplateSync | SetLinkTarget, Field(discriminator='kind')]
 
 
 class TemplateEditPreparationV1(Wire):

@@ -35,6 +35,17 @@ def resize_run(style, size):
     return replace(style, size=size, line_height=scaled_line_height(style.line_height, size, style.size))
 
 
+def authored_spans(block):
+    """Each text span with its link; a link child without its own presentation inherits the link's."""
+    for span in block.content:
+        if span.type not in {'bound_link', 'link'}:
+            yield span, None
+            continue
+        for child in span.content:
+            inherited = child.presentation is None and span.presentation is not None
+            yield (child.model_copy(update={'presentation': span.presentation}) if inherited else child), span
+
+
 class CapturedStyleResolver:
     def __init__(self,package):
         self.fonts=CapturedFontResolver(package)
@@ -78,10 +89,11 @@ class CapturedStyleResolver:
         return result
 
     def paragraph(self,block):
-        if not isinstance(block.content,list) or any(span.type not in {'text','fact_field','manual_scope'} for span in block.content):
+        if not isinstance(block.content,list) or any(span.type not in {'text','fact_field','manual_scope','bound_link','link'}
+                for span in block.content):
             raise RenderFailure('RICH_EXPORT_UNSUPPORTED')
         self._reference(block.presentation)
-        runs=[self.run(block,span) for span in block.content if span.text]
+        runs=[self.run(block,span) for span,_link in authored_spans(block) if span.text]
         height=max(run.line_height for run in runs) if runs else self._run(block,block.presentation).line_height
         alignment=(block.presentation.overrides.alignment if block.presentation.overrides.alignment is not None
             else block.props.alignment)

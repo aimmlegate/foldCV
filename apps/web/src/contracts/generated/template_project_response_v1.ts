@@ -18,6 +18,24 @@ export type Packagehash = string;
 export type Styletoken = string;
 export type Templateinstanceid = string | null;
 export type Viewkey = string;
+export type Band = true | null;
+/**
+ * @minItems 1
+ */
+export type Blocks2 = [string, ...string[]];
+export type Icon = string | null;
+export type Links = string[];
+export type Style = string;
+export type Fonts = string[];
+export type Icons = string[];
+export type Alignment1 = ("left" | "center" | "right" | "justify") | null;
+export type Color1 = string;
+export type Bold1 = string | null;
+export type Bolditalic = string | null;
+export type Italic1 = string | null;
+export type Regular = string | null;
+export type Lineheight = number;
+export type Size1 = number;
 export type Capabilities = string[];
 export type AllowMorePages = true;
 export type AllowProjectSplit = true;
@@ -48,9 +66,9 @@ export type TextX = number;
 export type BaselineY = number;
 export type CenterX = number;
 export type Repeat = "every_page";
-export type Style1 = string;
+export type Style2 = string;
 export type Text = string;
-export type Color1 = string;
+export type Color2 = string;
 export type FollowHeader = true;
 export type Width1 = number;
 export type X1 = number;
@@ -74,10 +92,10 @@ export type Background = string;
 export type HeadingStyle = string;
 export type Height2 = number;
 export type TextInset = number;
-export type Color2 = string;
+export type Color3 = string;
 export type Font1 = string;
 export type LineHeight = number;
-export type Size1 = number;
+export type Size2 = number;
 export type FallbackStyle = string | null;
 export type Heading = "none" | "plain" | "band";
 export type Inset = number;
@@ -92,7 +110,7 @@ export type HeaderSlot = ("name" | "profession") | null;
 export type ItemField = string | null;
 export type NameField = string | null;
 export type Separator = string;
-export type Style2 = string;
+export type Style3 = string;
 export type Type = "text" | "join_fields" | "join_items" | "bullets" | "tags" | "period" | "link" | "focus_entry";
 export type UrlField = string | null;
 export type Nodes = ViewNode[];
@@ -372,7 +390,7 @@ export type Title2 = string | null;
 /**
  * @maxItems 5000
  */
-export type Blocks1 = ImportBlock[];
+export type Blocks3 = ImportBlock[];
 export type Id21 = string;
 export type Record = (ImportEmployment | ImportEducation | ImportTechnology | ImportLanguage) | null;
 export type Employer = string;
@@ -498,7 +516,7 @@ export type Order1 = number;
 export type Representedfactids = string[];
 export type Revision26 = number;
 export type Blankbefore = number | null;
-export type Bold1 = boolean | null;
+export type Bold2 = boolean | null;
 export type Bounds = [number, number, number, number] | null;
 export type Column1 = number | null;
 export type Columnspan = number | null;
@@ -511,7 +529,7 @@ export type Layoutuncertain = boolean;
 export type Listlevel = number | null;
 export type Part = string | null;
 export type Rowmerge = ("start" | "continue") | null;
-export type Style3 = string | null;
+export type Style4 = string | null;
 export type Text6 = string;
 export type Units = SourceUnit[];
 export type Code1 = string;
@@ -821,12 +839,12 @@ export type Mimetype1 = string;
 export type Path = string;
 export type Role1 = "font" | "logo" | "icon" | "catalog";
 export type Sha256 = string;
-export type Size2 = number;
+export type Size3 = number;
 export type Assets = CapturedAsset[];
 export type Dependencyorder = number;
 export type Id41 = string;
 export type Serveronly = string[];
-export type Blocks2 = CompiledBlock[];
+export type Blocks4 = CompiledBlock[];
 export type Compilerversion = string;
 export type Confighash = string;
 export type Embedding = "allowed" | "not_applicable";
@@ -855,7 +873,7 @@ export type Kind33 = "source" | "fact_type" | "block" | "operation";
 export type Selectors = InputRef[];
 export type Equals = string;
 export type Operation1 = string;
-export type Blocks3 = Block[];
+export type Blocks5 = Block[];
 export type Field2 = string;
 export type Period1 = string | null;
 export type BuiltinKind =
@@ -948,7 +966,7 @@ export type Id53 = string;
 export type Mimetype2 = "image/png" | "image/jpeg";
 export type Path2 = string;
 export type Sha2561 = string;
-export type Size3 = number;
+export type Size4 = number;
 export type Width4 = number;
 export type Assets2 = LocalImageAsset[];
 export type Createdat1 = string;
@@ -973,9 +991,9 @@ export type Children13 = (
 )[];
 export type Citations = SourceSpan[];
 export type Backgroundcolor = string;
-export type Bold2 = boolean;
+export type Bold3 = boolean;
 export type Code3 = boolean;
-export type Italic1 = boolean;
+export type Italic2 = boolean;
 export type Strike = boolean;
 export type Textcolor = string;
 export type Underline = boolean;
@@ -1010,7 +1028,7 @@ export type Text10 = string;
 export type Type5 = "manual_scope";
 export type Content = (PresentedText | PresentedHyperlink | FieldOccurrence | BoundLink | ManualScopeSpan)[];
 export type Id54 = string;
-export type Alignment1 = "left" | "center" | "right" | "justify";
+export type Alignment2 = "left" | "center" | "right" | "justify";
 export type Backgroundcolor1 = string;
 export type Manualorder = boolean;
 export type Presentation = "standard" | "focus";
@@ -1053,7 +1071,7 @@ export type Children12 = (
 )[];
 export type Content3 = null;
 export type Id59 = string;
-export type Alignment2 = "left" | "center" | "right";
+export type Alignment3 = "left" | "center" | "right";
 export type Alt = string;
 export type Assetid = string;
 export type Caption = (PresentedText | PresentedHyperlink | FieldOccurrence | BoundLink | ManualScopeSpan)[];
@@ -1082,7 +1100,7 @@ export type Children11 = (
 export type Columnwidths = [number | null, ...(number | null)[]];
 export type Headercols = number;
 export type Headerrows = number;
-export type Alignment3 = "left" | "center" | "right" | "justify";
+export type Alignment4 = "left" | "center" | "right" | "justify";
 export type Backgroundcolor2 = string;
 export type Colspan = number;
 export type Content4 = (PresentedText | PresentedHyperlink | FieldOccurrence | BoundLink | ManualScopeSpan)[];
@@ -1093,7 +1111,7 @@ export type Cells1 = TemplateTableCell[];
 export type Id61 = string;
 export type Rows = TemplateTableRow[];
 export type Id62 = string;
-export type Alignment4 = "left" | "center" | "right" | "justify";
+export type Alignment5 = "left" | "center" | "right" | "justify";
 export type Backgroundcolor3 = string;
 export type Textcolor2 = string;
 export type Provenance3 = (NarrativeCitation | FieldBinding | WorkingOwnership | SourceWitness)[];
@@ -1193,7 +1211,7 @@ export type Children6 = (
 )[];
 export type Content9 = (PresentedText | PresentedHyperlink | FieldOccurrence | BoundLink | ManualScopeSpan)[];
 export type Id67 = string;
-export type Alignment5 = "left" | "center" | "right" | "justify";
+export type Alignment6 = "left" | "center" | "right" | "justify";
 export type Backgroundcolor5 = string;
 export type Checked = boolean;
 export type Textcolor3 = string;
@@ -1216,7 +1234,7 @@ export type Children5 = (
 )[];
 export type Content10 = (PresentedText | PresentedHyperlink | FieldOccurrence | BoundLink | ManualScopeSpan)[];
 export type Id68 = string;
-export type Alignment6 = "left" | "center" | "right" | "justify";
+export type Alignment7 = "left" | "center" | "right" | "justify";
 export type Backgroundcolor6 = string;
 export type Start2 = number | null;
 export type Textcolor4 = string;
@@ -1258,7 +1276,7 @@ export type Children3 = (
 )[];
 export type Content12 = (PresentedText | PresentedHyperlink | FieldOccurrence | BoundLink | ManualScopeSpan)[];
 export type Id70 = string;
-export type Alignment7 = "left" | "center" | "right" | "justify";
+export type Alignment8 = "left" | "center" | "right" | "justify";
 export type Backgroundcolor7 = string;
 export type Level1 = 1 | 2 | 3;
 export type Textcolor5 = string;
@@ -1284,7 +1302,7 @@ export type Id71 = string;
 export type Provenance12 = (NarrativeCitation | FieldBinding | WorkingOwnership | SourceWitness)[];
 export type Revision41 = number;
 export type Type17 = "paragraph";
-export type Blocks4 = (
+export type Blocks6 = (
   | TemplateParagraphBlock
   | TemplateHeadingBlock
   | TemplateBulletBlock
@@ -1311,7 +1329,7 @@ export type Attemptid5 = string;
 export type Id74 = string;
 export type Path3 = string;
 export type Sha2562 = string;
-export type Size4 = number;
+export type Size5 = number;
 export type Assets3 = TemplateRenderAsset[];
 export type Documenthash3 = string;
 export type Factshash3 = string;
@@ -1661,7 +1679,7 @@ export type Children24 = (
 )[];
 export type Content17 = null;
 export type Id80 = string;
-export type Alignment8 = "left" | "center" | "right";
+export type Alignment9 = "left" | "center" | "right";
 export type Alt1 = string;
 export type Assetid1 = string;
 export type Caption1 = (StyledText | Hyperlink | FactFieldSpan)[];
@@ -1694,7 +1712,7 @@ export type Headerrows1 = number;
  * @minItems 1
  */
 export type Rows1 = [TableRow, ...TableRow[]];
-export type Alignment9 = "left" | "center" | "right" | "justify";
+export type Alignment10 = "left" | "center" | "right" | "justify";
 export type Backgroundcolor8 = string;
 export type Colspan1 = number;
 export type Content18 = (StyledText | Hyperlink | FactFieldSpan)[];
@@ -1947,6 +1965,7 @@ export interface ResumeIdentity {
 }
 export interface TemplatePresentationV1 {
   blocks: Blocks;
+  editor?: EditorPlanV1 | null;
   recipe: CompiledRecipe;
   schemaVersion: Schemaversion1;
   snapshot: TemplateSnapshotIdentity;
@@ -1971,13 +1990,55 @@ export interface StyleOverrides {
   italic: Italic;
   size: Size;
 }
+/**
+ * Python's presentation decisions for the mounted editor; the editor only applies them.
+ */
+export interface EditorPlanV1 {
+  blocks: Blocks1;
+  fonts: Fonts;
+  icons: Icons;
+  styles: Styles;
+}
+export interface Blocks1 {
+  [k: string]: EditorBlock;
+}
+export interface EditorBlock {
+  band?: Band;
+  focus?: EditorFocus | null;
+  inline?: Inline;
+  links?: Links;
+  style: Style;
+}
+export interface EditorFocus {
+  blocks: Blocks2;
+  icon: Icon;
+}
+export interface Inline {
+  [k: string]: string;
+}
+export interface Styles {
+  [k: string]: EditorStyle;
+}
+export interface EditorStyle {
+  alignment: Alignment1;
+  color: Color1;
+  faces: EditorFaces;
+  lineHeight: Lineheight;
+  size: Size1;
+}
+export interface EditorFaces {
+  bold: Bold1;
+  boldItalic: Bolditalic;
+  italic: Italic1;
+  regular: Regular;
+}
 export interface CompiledRecipe {
   capabilities: Capabilities;
   layout: Layout;
   placements: Placements;
   renderInputVersion: Renderinputversion;
   schemaVersion: Schemaversion;
-  style: Style;
+  style: Style1;
   views: Views;
 }
 export interface Layout {
@@ -2004,15 +2065,15 @@ export interface Placement {
   order: Order;
   region: Region1;
 }
-export interface Style {
+export interface Style1 {
   bullets: Bullets;
   colors: Colors;
   focus: Focus;
-  fonts: Fonts;
+  fonts: Fonts1;
   footer: Footer;
   header: Header;
   page: Page;
-  section_band: Band;
+  section_band: Band1;
   text: Text1;
 }
 export interface Bullets {
@@ -2034,14 +2095,14 @@ export interface Focus {
   missing_icon: MissingIcon;
   text_x: TextX;
 }
-export interface Fonts {
+export interface Fonts1 {
   [k: string]: string;
 }
 export interface Footer {
   baseline_y: BaselineY;
   center_x: CenterX;
   repeat: Repeat;
-  style: Style1;
+  style: Style2;
   text: Text;
 }
 export interface Header {
@@ -2052,7 +2113,7 @@ export interface Header {
   profession_top: ProfessionTop;
 }
 export interface Divider {
-  color: Color1;
+  color: Color2;
   follow_header: FollowHeader;
   width: Width1;
   x1: X1;
@@ -2074,7 +2135,7 @@ export interface Page {
   height: Height1;
   width: Width3;
 }
-export interface Band {
+export interface Band1 {
   background: Background;
   heading_style: HeadingStyle;
   height: Height2;
@@ -2084,10 +2145,10 @@ export interface Text1 {
   [k: string]: TextStyle;
 }
 export interface TextStyle {
-  color: Color2;
+  color: Color3;
   font: Font1;
   line_height: LineHeight;
-  size: Size1;
+  size: Size2;
 }
 export interface Views {
   [k: string]: View;
@@ -2113,7 +2174,7 @@ export interface ViewNode {
   name_field?: NameField;
   prefix?: Prefix;
   separator?: Separator;
-  style: Style2;
+  style: Style3;
   type: Type;
   url_field?: UrlField;
 }
@@ -2515,7 +2576,7 @@ export interface RecordTombstone {
 }
 export interface ImportDraft {
   allowTextRewrite?: Allowtextrewrite;
-  blocks?: Blocks1;
+  blocks?: Blocks3;
   facts?: Facts;
   finished?: Finished;
   issues?: Issues;
@@ -2655,7 +2716,7 @@ export interface SourceLocation {
  */
 export interface SourceStructure {
   blankBefore?: Blankbefore;
-  bold?: Bold1;
+  bold?: Bold2;
   bounds?: Bounds;
   column?: Column1;
   columnSpan?: Columnspan;
@@ -2668,7 +2729,7 @@ export interface SourceStructure {
   listLevel?: Listlevel;
   part?: Part;
   rowMerge?: Rowmerge;
-  style?: Style3;
+  style?: Style4;
 }
 export interface SourceWarning {
   code: Code1;
@@ -3097,7 +3158,7 @@ export interface ImportTask {
 }
 export interface TemplatePackage {
   assets: Assets;
-  blocks: Blocks2;
+  blocks: Blocks4;
   compilerVersion: Compilerversion;
   configHash: Confighash;
   definition: TemplateDefinition;
@@ -3120,7 +3181,7 @@ export interface CapturedAsset {
   path: Path;
   role: Role1;
   sha256: Sha256;
-  size: Size2;
+  size: Size3;
 }
 export interface CompiledBlock {
   dependencyOrder: Dependencyorder;
@@ -3137,7 +3198,7 @@ export interface Providerschema {
 }
 export interface TemplateDefinition {
   assets: Assets1;
-  blocks: Blocks3;
+  blocks: Blocks5;
   content_definitions: ContentDefinitions;
   fact_types: FactTypes;
   layout: Layout;
@@ -3146,7 +3207,7 @@ export interface TemplateDefinition {
   provenance: Provenance;
   schema_version: SchemaVersion1;
   source: SourcePolicy;
-  style: Style;
+  style: Style1;
   template: TemplateIdentity;
 }
 export interface AssetDeclaration {
@@ -3344,7 +3405,7 @@ export interface LocalImageAsset {
   mimeType: Mimetype2;
   path: Path2;
   sha256: Sha2561;
-  size: Size3;
+  size: Size4;
   width: Width4;
 }
 export interface RichDocumentV2 {
@@ -3353,7 +3414,7 @@ export interface RichDocumentV2 {
   schemaVersion: Schemaversion9;
 }
 export interface TemplateRegion {
-  blocks: Blocks4;
+  blocks: Blocks6;
   id: Id72;
   revision: Revision42;
   role: Role3;
@@ -3487,9 +3548,9 @@ export interface PresentedText {
 }
 export interface InlineStyles {
   backgroundColor?: Backgroundcolor;
-  bold?: Bold2;
+  bold?: Bold3;
   code?: Code3;
-  italic?: Italic1;
+  italic?: Italic2;
   strike?: Strike;
   textColor?: Textcolor;
   underline?: Underline;
@@ -3540,7 +3601,7 @@ export interface ManualScopeSpan {
   type: Type5;
 }
 export interface SectionProps {
-  alignment?: Alignment1;
+  alignment?: Alignment2;
   backgroundColor?: Backgroundcolor1;
   manualOrder?: Manualorder;
   presentation?: Presentation;
@@ -3571,7 +3632,7 @@ export interface SourceWitness {
   kind: Kind43;
 }
 export interface TemplateImageProps {
-  alignment: Alignment2;
+  alignment: Alignment3;
   alt: Alt;
   assetId: Assetid;
   caption: Caption;
@@ -3589,7 +3650,7 @@ export interface TemplateTableRow {
   id: Id61;
 }
 export interface TemplateTableCell {
-  alignment?: Alignment3;
+  alignment?: Alignment4;
   backgroundColor?: Backgroundcolor2;
   colspan?: Colspan;
   content: Content4;
@@ -3598,7 +3659,7 @@ export interface TemplateTableCell {
   rowspan?: Rowspan;
 }
 export interface ParagraphProps {
-  alignment?: Alignment4;
+  alignment?: Alignment5;
   backgroundColor?: Backgroundcolor3;
   textColor?: Textcolor2;
 }
@@ -3608,19 +3669,19 @@ export interface CodeProps {
   language: Language1;
 }
 export interface ChecklistProps {
-  alignment?: Alignment5;
+  alignment?: Alignment6;
   backgroundColor?: Backgroundcolor5;
   checked: Checked;
   textColor?: Textcolor3;
 }
 export interface NumberedProps {
-  alignment?: Alignment6;
+  alignment?: Alignment7;
   backgroundColor?: Backgroundcolor6;
   start?: Start2;
   textColor?: Textcolor4;
 }
 export interface HeadingProps {
-  alignment?: Alignment7;
+  alignment?: Alignment8;
   backgroundColor?: Backgroundcolor7;
   level: Level1;
   textColor?: Textcolor5;
@@ -3651,7 +3712,7 @@ export interface TemplateRenderAsset {
   id: Id74;
   path: Path3;
   sha256: Sha2562;
-  size: Size4;
+  size: Size5;
 }
 export interface TemplateRendererIdentity {
   id: Id75;
@@ -4073,7 +4134,7 @@ export interface FactFieldSpan {
   type: Type20;
 }
 export interface ImageProps {
-  alignment: Alignment8;
+  alignment: Alignment9;
   alt: Alt1;
   assetId: Assetid1;
   caption: Caption1;
@@ -4091,7 +4152,7 @@ export interface TableRow {
   id: Id82;
 }
 export interface TableCell {
-  alignment?: Alignment9;
+  alignment?: Alignment10;
   backgroundColor?: Backgroundcolor8;
   colspan?: Colspan1;
   content: Content18;
