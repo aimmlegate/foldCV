@@ -489,16 +489,14 @@ def create_app(*, origin: str, secret: str, temp_root: Path, dist: Path, runner:
     if template_import_call_cap is not None:
         def template_factory(owner):
             from packages.resume_core.template_assembly import assemble_template
-            from packages.resume_core.template_import import TemplateImportFailure
+            from packages.resume_core.templates.operations import derive_task
             from .importer.template_pipeline import TemplatePipeline
             from .importer.template_transport import ProviderTemplateTransport
             def authority(operation, current):
                 rich_projects.validate_template_capture(operation, current)
-            def derive(_operation, _task, _data):
-                # Deterministic template operations arrive with the full Generic template (CT06).
-                raise TemplateImportFailure("IMPORT_OPERATION_UNSUPPORTED")
+            # Registered deterministic operations over admitted facts; unimplemented kinds stay refused.
             return TemplatePipeline(owner.publisher, ProviderTemplateTransport(import_selected_provider, temp_root),
-                originals=rich_projects.originals, authority=authority, assemble=assemble_template, derive=derive,
+                originals=rich_projects.originals, authority=authority, assemble=assemble_template, derive=derive_task,
                 # One clock for jobs, request epochs and publication: the job store's.
                 wall=lambda: owner.store.clock())
     rich_projects.configure_template_imports(call_cap=template_import_call_cap,

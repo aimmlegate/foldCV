@@ -6,8 +6,8 @@ import threading
 import time
 
 from packages.resume_core.background_store import BackgroundFailure
-from packages.resume_core.models.template_import import (CleanupOutcome, ImportIssue, ObservedUsage, ReviewInputRecord,
-    TaskResultRecord)
+from packages.resume_core.models.template_import import (CleanupOutcome, ImportIssue, ObservedUsage, ReferenceTable,
+    ReviewInputRecord, TaskResultRecord)
 from packages.resume_core.models.template_workspace import WorkspaceV7
 from packages.resume_core.models.template_authority import DeletedTemplateCleanupV1, TemplateFinalizationBinding
 from packages.resume_core.template_admission import admit_proposal
@@ -24,6 +24,7 @@ from packages.resume_core.template_import import (CleanupProof, ProcessingDeadli
 from packages.resume_core.template_proposals import parse_proposal
 from packages.resume_core.template_review import decide_review, make_review_input, record_review
 from packages.resume_core.templates.compiler import canonical
+from packages.resume_core.templates.operations import operation_value
 from packages.resume_core.templates.replies import proposal_schema, review_schema, PROPOSAL_PROTOCOL
 
 from ..providers.content import ContentFailure, ContentInput, ContentTransportReturn, GenerationPolicy, outcome_state
@@ -37,10 +38,35 @@ class DerivedTask:
     value: object
     source_spans: tuple
     item_handles: tuple
+    issues: tuple = ()
+
+
+def reference_table(captured, cells, relations):
+    """Request-local references for captured items, effective cells and existing relations (H, E and R refs)."""
+    items = [{'ref': 'H' + str(index), 'itemHandle': value.item_handle, 'semanticType': value.semantic_type,
+        'key': getattr(value, 'key', None)} for index, value in enumerate(captured, 1)]
+    records = {value.record_id: item['ref'] for value, item in zip(captured, items, strict=True)}
+    return ReferenceTable.model_validate({'items': items,
+        'cells': [{'ref': 'E' + str(index), 'cellId': value['id'], 'fieldKey': value['fieldKey'], 'text': value['rawInput']}
+            for index, value in enumerate(cells, 1)],
+        'relations': [{'ref': 'R' + str(index), 'relationId': value.id, 'kind': value.kind,
+            'subject': records.get(value.subject_id, value.subject_id), 'target': records.get(value.target_id, value.target_id)}
+            for index, value in enumerate(relations, 1)]})
 
 
 def owner(workspace):
     return workspace.project or workspace.pre_draft
+
+
+def gated_branch(operation, task, data):
+    """The selected branch when a block's declared condition does not hold; None when the block runs."""
+    block = next((value for value in data.template_package.definition.blocks if value.id == task.block_id), None)
+    if block is None or block.when is None:
+        return None
+    selected = operation_value([operation], block.when.operation)
+    if selected is None:
+        raise ValueError('conditional block runs before its condition')
+    return None if selected['branch'] == block.when.equals else selected['branch']
 
 
 def operation_in(workspace, identifier):
@@ -281,6 +307,11 @@ class TemplatePipeline(TemplateCheckpoints):
         task = task_in(operation, task_id)
         if any(result.task_id == task_id for result in operation.task_results):
             return
+        branch = gated_branch(operation, task, data)
+        if branch is not None:
+            # A block for another declared branch ends empty without a model call.
+            await self.finish_task(project, operation_id, task_id, {'branch': branch}, [], [], 'empty', [])
+            return
         if task.state == 'pending' and not any(value.task_id == task_id for value in operation.task_inputs):
             value, handles = self.task_input(operation, task, data)
             workspace = await asyncio.to_thread(self.update, project, operation_id,
@@ -288,8 +319,14 @@ class TemplatePipeline(TemplateCheckpoints):
             operation = operation_in(workspace, operation_id)
         if task.kind in {'derive', 'source_copy'}:
             derived = self.derive(operation, task_in(operation, task_id), owner(workspace))
+            stored = next(value for value in operation.task_inputs if value.task_id == task_id)
+            issues = [ImportIssue(id=self.id_factory('issue'), ruleId=None, taskId=task_id,
+                targetIds=list(issue.target_ids) or ['scope-' + task_id], blockIds=[], category='uncertain_interpretation',
+                code=issue.code, message=issue.message, importedFingerprint=digest(stored.value), reviewInputHash=None,
+                lifecycleId=self.id_factory('issue-lifecycle'), state='active', retiredByAction=None)
+                for issue in derived.issues]
             await self.finish_task(project, operation_id, task_id, derived.value, derived.source_spans,
-                derived.item_handles, 'empty' if empty_value(derived.value) else 'derived', [])
+                derived.item_handles, 'empty' if empty_value(derived.value) else 'derived', issues)
             return
         feedback, unresolved = (), []
         for slot in ['initial', 'primary_repair', 'fallback_repair']:
@@ -314,16 +351,21 @@ class TemplatePipeline(TemplateCheckpoints):
                 for retained in operation.proposals:
                     if attempt_in(operation, retained.attempt_id).task_id == task_id:
                         known_relations.update({value.id: value for value in retained.resolved_relations})
+                captured = [allocation for allocation in item_identities(operation) if allocation.item_handle in allowed]
+                relations = [value for value in known_relations.values()
+                    if value.subject_id in {allocation.record_id for allocation in captured}]
                 request = {**stored.value, 'slot': slot, 'feedback': list(feedback),
-                    'capturedHandles': [allocation.model_dump(mode='json', by_alias=True) for allocation in item_identities(operation)
-                        if allocation.item_handle in allowed],
-                    'capturedRelations': [value.model_dump(mode='json', by_alias=True) for value in known_relations.values()
-                        if value.subject_id in {allocation.record_id for allocation in item_identities(operation) if allocation.item_handle in allowed}]}
+                    'capturedHandles': [allocation.model_dump(mode='json', by_alias=True) for allocation in captured],
+                    'capturedRelations': [value.model_dump(mode='json', by_alias=True) for value in relations]}
                 offered = offered_evidence(stored.value)
+                references = None
+                if offered is not None:
+                    references = reference_table(captured, stored.value.get('effectiveCells', []), relations)
+                    request['references'] = references.model_dump(mode='json', by_alias=True)
                 try:
                     attempt_id = await self.call(project, operation_id, task_id, slot, request,
                         proposal_schema(next(value.full_schema for value in data.template_package.blocks
-                            if value.id == task.block_id), None if offered is None else list(offered)), deadline, cancel)
+                            if value.id == task.block_id), None if offered is None else list(offered), references), deadline, cancel)
                 except TemplateImportFailure as error:
                     unresolved.append(error.code)
                     break

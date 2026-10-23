@@ -6,7 +6,7 @@ import uuid
 
 from .models.contracts import _unique
 from .models.template_facts import HandleAllocation, Lineage, SourceSpan
-from .models.template_import import EvidenceOption, FieldSidecar, ProposalReply
+from .models.template_import import EvidenceOption, FieldSidecar, ProposalReply, ReferenceTable
 from .template_import import digest
 from .templates.compiler import canonical, sha256
 from .templates.projection import SchemaFailure, pointer_tokens, schema_at, validate_payload
@@ -64,6 +64,12 @@ def offered_evidence(request):
     options = [EvidenceOption.model_validate(value) for value in request['evidence']]
     _unique([option.ref for option in options], 'offered evidence reference')
     return {option.ref: option for option in options}
+
+
+def offered_references(request):
+    """The captured items, cells and relations a request offered by reference; none when it offered no table."""
+    value = (request or {}).get('references')
+    return ReferenceTable.model_validate(value if value is not None else {'items': [], 'cells': [], 'relations': []})
 
 
 def restore_evidence(refs, table, sources):

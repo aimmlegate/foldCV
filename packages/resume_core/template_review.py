@@ -2,8 +2,7 @@
 
 from dataclasses import dataclass
 
-from .models.template_import import (CheckTarget, ReferencedProposalReply, ReferencedReviewReply, ReviewInput,
-    ReviewReceipt, ReviewReply)
+from .models.template_import import CheckTarget, ReferencedReviewReply, ReviewInput, ReviewReceipt, ReviewReply
 from .project_store import strict_json
 from .template_identity import capture_span, evidence_options, offered_evidence, payload_value, restore_evidence, source_slice
 from .template_import import TemplateImportFailure, attempt_in, checked, digest, identity, task_in
@@ -112,9 +111,8 @@ def make_review_input(operation, proposal, package, sources, policy, *, effectiv
         dumped['evidence'] = [refs[digest(span)] for span in field.evidence]
     shown['relations'] = [{**relation.model_dump(mode='json', by_alias=True),
         'evidence': [refs[digest(span)] for span in relation.evidence]} for relation in proposal.reply.relations]
-    context = {**semantic_context, 'replyProtocol': REVIEW_PROTOCOL,
-        'proposal': ReferencedProposalReply.model_validate({**shown, 'schemaVersion': 2}, strict=True).model_dump(
-            mode='json', by_alias=True),
+    # The proposal is shown in its resolved form with evidence named by the review's references.
+    context = {**semantic_context, 'replyProtocol': REVIEW_PROTOCOL, 'proposal': shown,
         'checks': review_checks(task, proposal, allocations, targets, refs)}
     if not operation.capture.allow_text_rewrite:
         context['sourceWordingPointers'] = sorted({field.pointer for field in proposal.resolved_fields

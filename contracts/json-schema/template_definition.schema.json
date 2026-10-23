@@ -457,6 +457,27 @@
       "title": "EmptyParameters",
       "type": "object"
     },
+    "FactField": {
+      "additionalProperties": false,
+      "properties": {
+        "field": {
+          "minLength": 1,
+          "title": "Field",
+          "type": "string"
+        },
+        "semantic_type": {
+          "minLength": 1,
+          "title": "Semantic Type",
+          "type": "string"
+        }
+      },
+      "required": [
+        "semantic_type",
+        "field"
+      ],
+      "title": "FactField",
+      "type": "object"
+    },
     "FactType": {
       "additionalProperties": false,
       "properties": {
@@ -1247,6 +1268,17 @@
     "RoleParameters": {
       "additionalProperties": false,
       "properties": {
+        "classification": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/FactField"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
         "matched": {
           "title": "Matched",
           "type": "string"

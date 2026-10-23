@@ -815,6 +815,8 @@ export type DependsOn2 = string[];
 export type Id46 = string;
 export type Inputs1 = InputRef[];
 export type Kind36 = "select_role_branch";
+export type Field3 = string;
+export type SemanticType1 = string;
 export type Matched = string;
 export type Otherwise = string;
 export type RoleFamilies = string[];
@@ -1399,7 +1401,7 @@ export type Content14 = (PresentedText | PresentedHyperlink | FieldOccurrence | 
  * UTF-16 code units within the selected inline field.
  */
 export type End2 = number;
-export type Field3 = "content" | "caption";
+export type Field4 = "content" | "caption";
 export type Flankbindings = FlankBinding[] | null;
 export type Fragmentid1 = string;
 export type Role4 = "prefix" | "suffix";
@@ -1498,7 +1500,7 @@ export type Start4 = number;
 export type Text11 = string;
 export type Blockid5 = string;
 export type Cellid5 = string | null;
-export type Field4 = "content" | "caption";
+export type Field5 = "content" | "caption";
 export type Inlineindex = number;
 export type After = ScopeDisplayBinding | LiteralDisplayBinding;
 export type Fragmentid3 = string;
@@ -1524,7 +1526,7 @@ export type Activecellids = [string, ...string[]];
 export type Fragments = [ScopeDisplayFragment, ...ScopeDisplayFragment[]];
 export type Blockid6 = string;
 export type Cellid6 = string | null;
-export type Field5 = "content" | "caption";
+export type Field6 = "content" | "caption";
 export type Fragmenthash = string;
 export type Fragmentid4 = string;
 export type Occurrenceid4 = string;
@@ -1874,7 +1876,7 @@ export type Content28 = (StyledText | Hyperlink | FactFieldSpan)[];
  * UTF-16 code units within the selected inline field.
  */
 export type End4 = number;
-export type Field6 = "content" | "caption";
+export type Field7 = "content" | "caption";
 export type Kind74 = "replace_inline_range";
 /**
  * UTF-16 code units within the selected inline field.
@@ -3078,9 +3080,14 @@ export interface RoleOperation {
   version: Version3;
 }
 export interface RoleParameters {
+  classification?: FactField | null;
   matched: Matched;
   otherwise: Otherwise;
   role_families: RoleFamilies;
+}
+export interface FactField {
+  field: Field3;
+  semantic_type: SemanticType1;
 }
 export interface SkillsOperation {
   depends_on: DependsOn3;
@@ -3691,7 +3698,7 @@ export interface TemplateReplaceInlineRange {
   cellId: Cellid3;
   content: Content14;
   end: End2;
-  field: Field3;
+  field: Field4;
   flankBindings?: Flankbindings;
   kind: Kind50;
   start: Start3;
@@ -3823,7 +3830,7 @@ export interface ScopeDisplayAssignment {
 export interface ScopeDisplayAddress {
   blockId: Blockid5;
   cellId: Cellid5;
-  field: Field4;
+  field: Field5;
   inlineIndex: Inlineindex;
 }
 export interface ScopeDisplayBinding {
@@ -3845,7 +3852,7 @@ export interface ScopeDisplaySource {
 export interface ScopeDisplayFragment {
   blockId: Blockid6;
   cellId: Cellid6;
-  field: Field5;
+  field: Field6;
   fragmentHash: Fragmenthash;
   fragmentId: Fragmentid4;
 }
@@ -4053,7 +4060,7 @@ export interface ReplaceInlineRange {
   cellId: Cellid8;
   content: Content28;
   end: End4;
-  field: Field6;
+  field: Field7;
   kind: Kind74;
   start: Start5;
 }

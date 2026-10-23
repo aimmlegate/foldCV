@@ -67,7 +67,8 @@ def test_nested_definition_dependencies_survive_compilation_and_activation(confi
     schema['required'].append('extra')
     package = compile_config(config)
     TemplateStore(tmp_path).activate(package)
-    validate_payload(package.blocks[0].full_schema, {'name': 'Synthetic', 'profession': None, 'extra': 'Retained'})
+    validate_payload(package.blocks[0].full_schema, {'name': 'Synthetic', 'profession': None, 'role_family': {'family': None},
+        'extra': 'Retained'})
     assert {'leaf', 'other', 'outer'} <= package.blocks[0].full_schema['$defs'].keys()
 
 
@@ -129,6 +130,7 @@ def test_empty_optional_blocks_need_no_generic_operation(config):
     config['blocks'] = config['blocks'][:1]
     config['blocks'][0]['content_schema'] = {'type':'object','additionalProperties':False,
         'required':['name','profession'],'properties':{'name':{'type':['string','null']},'profession':{'type':['string','null']}}}
+    config['blocks'][0]['bindings'] = [value for value in config['blocks'][0]['bindings'] if value['pointer'] in {'/name','/profession'}]
     package = compile_config(config)
     validate_payload(package.blocks[0].full_schema, {'name':None,'profession':None})
     assert package.definition.operations == []
@@ -238,7 +240,8 @@ def test_schema_field_names_do_not_get_interpreted_as_schema_keywords(config):
 @pytest.mark.parametrize('reference',[{'operation':'focus'}, {'when':{'operation':'focus','equals':'impossible'}},
     {'when':{'operation':'role-branch','equals':'impossible'}}])
 def test_operation_references_and_conditions_use_declared_outputs(config,reference):
-    config['blocks'][0].update(reference)
+    # The summary block feeds no operation, so a condition on it cannot form a dependency cycle.
+    next(block for block in config['blocks'] if block['id']=='summary').update(reference)
     with pytest.raises(SchemaFailure,match='unknown reference|condition output'): compile_config(config)
 
 

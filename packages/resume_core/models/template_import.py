@@ -94,6 +94,9 @@ class ProposalReply(Wire):
 # A provider reply selects request-local choices; the coordinator restores the captured identities (plan 3.3).
 EvidenceRef = Annotated[str, Field(min_length=1, json_schema_extra={'x-reference': 'EvidenceRef'})]
 CheckRef = Annotated[str, Field(min_length=1, json_schema_extra={'x-reference': 'CheckRef'})]
+ItemRef = Annotated[str, Field(min_length=1, json_schema_extra={'x-reference': 'ItemRef'})]
+CellRef = Annotated[str, Field(min_length=1, json_schema_extra={'x-reference': 'CellRef'})]
+RelationRef = Annotated[str, Field(min_length=1, json_schema_extra={'x-reference': 'RelationRef'})]
 
 
 class EvidenceOption(Wire):
@@ -102,28 +105,91 @@ class EvidenceOption(Wire):
     text: str
 
 
+class ItemReference(Wire):
+    ref: Id
+    item_handle: Id
+    semantic_type: Id
+    key: Id | None
+
+
+class CellReference(Wire):
+    ref: Id
+    cell_id: Id
+    field_key: Id
+    text: str
+
+
+class RelationReference(Wire):
+    ref: Id
+    relation_id: Id
+    kind: Literal["owned_by", "extension_of", "related_to"]
+    subject: str
+    target: str
+
+
+class ReferenceTable(Wire):
+    items: list[ItemReference]
+    cells: list[CellReference]
+    relations: list[RelationReference]
+
+    @model_validator(mode="after")
+    def distinct(self):
+        _unique([value.ref for value in [*self.items, *self.cells, *self.relations]], "offered reference")
+        _unique([value.item_handle for value in self.items], "offered item")
+        _unique([value.cell_id for value in self.cells], "offered cell")
+        _unique([value.relation_id for value in self.relations], "offered relation")
+        return self
+
+
+class HandleChoice(Wire):
+    kind: Literal["handle"]
+    ref: ItemRef
+
+
+ItemChoice = Annotated[DiscoverySelector | HandleChoice, Field(discriminator="kind")]
+
+
+class NewRelationKey(Wire):
+    kind: Literal["new"]
+    key: Id
+
+
+class RelationChoice(Wire):
+    kind: Literal["relation"]
+    ref: RelationRef
+
+
+RelationChoiceSelector = Annotated[NewRelationKey | RelationChoice, Field(discriminator="kind")]
+
+
 class ReferencedField(Wire):
-    item: ItemSelector
+    item: ItemChoice
     field_key: Id
     pointer: str
     evidence: list[EvidenceRef]
-    effective_cell_ids: list[Id]
+    effective_cells: list[CellRef]
 
 
 class ReferencedRelation(Wire):
-    relation: RelationSelector
+    relation: RelationChoiceSelector
     kind: Literal["owned_by", "extension_of", "related_to"]
-    subject: ItemSelector
-    target: ItemSelector
+    subject: ItemChoice
+    target: ItemChoice
     evidence: list[EvidenceRef]
 
 
+class ReferencedLineage(Wire):
+    kind: Literal["add", "split", "merge"]
+    parents: list[ItemRef]
+    children: list[Id]
+
+
 class ReferencedProposalReply(Wire):
-    schema_version: Literal[2]
+    schema_version: Literal[3]
     payload: JsonValue
     discoveries: list[Discovery]
     fields: list[ReferencedField]
-    lineage: list[ProposalLineage]
+    lineage: list[ReferencedLineage]
     relations: list[ReferencedRelation]
 
 

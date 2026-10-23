@@ -727,6 +727,8 @@ export type DependsOn2 = string[];
 export type Id47 = string;
 export type Inputs1 = InputRef[];
 export type Kind22 = "select_role_branch";
+export type Field3 = string;
+export type SemanticType1 = string;
 export type Matched = string;
 export type Otherwise = string;
 export type RoleFamilies = string[];
@@ -1705,9 +1707,14 @@ export interface RoleOperation {
   version: Version2;
 }
 export interface RoleParameters {
+  classification?: FactField | null;
   matched: Matched;
   otherwise: Otherwise;
   role_families: RoleFamilies;
+}
+export interface FactField {
+  field: Field3;
+  semantic_type: SemanticType1;
 }
 export interface SkillsOperation {
   depends_on: DependsOn3;

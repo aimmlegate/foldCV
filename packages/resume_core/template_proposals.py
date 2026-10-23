@@ -4,8 +4,8 @@ from .models.template_facts import Observation, Relation
 from .models.template_import import ProposalRecord, ProposalReply, ReferencedProposalReply, RelationAllocation
 from .project_store import strict_json
 from .rich_fields import field_key
-from .template_identity import (_bound_root, allocate_discoveries, offered_evidence, payload_value, resolve_fields,
-    resolve_lineage, restore_evidence, source_slice)
+from .template_identity import (_bound_root, allocate_discoveries, offered_evidence, offered_references, payload_value,
+    resolve_fields, resolve_lineage, restore_evidence, source_slice)
 from .template_import import TemplateImportFailure, attempt_in, checked, digest, identity, task_in
 from .templates.compiler import canonical, sha256
 from .templates.projection import pointer_tokens, reachable_schema, validate_payload
@@ -13,16 +13,31 @@ from .templates.replies import proposal_schema
 from .template_capture import item_identities
 
 
-def restore_reply(reply, table, sources):
-    """Fill each selected reference with its captured span; the result is the resolved reply form."""
-    value = reply.model_dump(mode='json', by_alias=True)
-    for dumped, field in zip(value['fields'], reply.fields, strict=True):
-        dumped['evidence'] = [span.model_dump(mode='json', by_alias=True)
-            for span in restore_evidence(field.evidence, table, sources)]
-    for dumped, relation in zip(value['relations'], reply.relations, strict=True):
-        dumped['evidence'] = [span.model_dump(mode='json', by_alias=True)
-            for span in restore_evidence(relation.evidence, table, sources)]
-    return ProposalReply.model_validate({**value, 'schemaVersion': 1}, strict=True)
+def restore_reply(reply, table, references, sources):
+    """Fill each selected reference with its captured identity or span; the result is the resolved reply form."""
+    offered = {'item': {value.ref: value.item_handle for value in references.items},
+        'cell': {value.ref: value.cell_id for value in references.cells},
+        'relation': {value.ref: value.relation_id for value in references.relations}}
+    def identity(kind, ref):
+        if ref not in offered[kind]:
+            raise ValueError(kind + ' reference was not offered')
+        return offered[kind][ref]
+    def item(selector):
+        if selector.kind == 'discovery_key':
+            return {'kind': 'discovery_key', 'key': selector.key}
+        return {'kind': 'handle', 'itemHandle': identity('item', selector.ref)}
+    def spans(refs):
+        return [span.model_dump(mode='json', by_alias=True) for span in restore_evidence(refs, table, sources)]
+    return ProposalReply.model_validate({'schemaVersion': 1, 'payload': reply.payload,
+        'discoveries': [value.model_dump(mode='json', by_alias=True) for value in reply.discoveries],
+        'fields': [{'item': item(field.item), 'fieldKey': field.field_key, 'pointer': field.pointer, 'evidence': spans(field.evidence),
+            'effectiveCellIds': [identity('cell', ref) for ref in field.effective_cells]} for field in reply.fields],
+        'lineage': [{'kind': value.kind, 'parents': [identity('item', ref) for ref in value.parents], 'children': value.children}
+            for value in reply.lineage],
+        'relations': [{'relation': {'kind': 'discovery_key', 'key': relation.relation.key} if relation.relation.kind == 'new'
+                else {'kind': 'relation_id', 'relationId': identity('relation', relation.relation.ref)},
+            'kind': relation.kind, 'subject': item(relation.subject), 'target': item(relation.target),
+            'evidence': spans(relation.evidence)} for relation in reply.relations]}, strict=True)
 
 
 def relation_evidence(operation, proposal):
@@ -154,11 +169,12 @@ def parse_proposal(operation, attempt_id, package, sources, facts, *, captured_r
             raise ValueError('proposal needs its exact payload envelope')
         # The raw reply is checked against the schema of its own captured request before decoding.
         table = offered_evidence(attempt.request_value)
-        validate_payload(proposal_schema(compiled.full_schema, None if table is None else list(table)), outer['payload'])
+        references = offered_references(attempt.request_value) if table is not None else None
+        validate_payload(proposal_schema(compiled.full_schema, None if table is None else list(table), references), outer['payload'])
         if table is None:
             reply = ProposalReply.model_validate(outer['payload'], strict=True)
         else:
-            reply = restore_reply(ReferencedProposalReply.model_validate(outer['payload'], strict=True), table, sources)
+            reply = restore_reply(ReferencedProposalReply.model_validate(outer['payload'], strict=True), table, references, sources)
         declarations = {declaration.id: declaration for declaration in package.definition.fact_types}
         schemas = {key: reachable_schema(declaration.data_schema, package.definition.content_definitions)
             for key, declaration in declarations.items()}

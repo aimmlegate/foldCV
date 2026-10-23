@@ -22,7 +22,9 @@ def _closed_schema(model, payload_schema=None, choices=None):
             select(child)
     select(root)
     for name in sorted(selections):
-        root.setdefault('$defs', {})[name] = {'type': 'string', 'enum': list(choices[name])}
+        # An empty offer admits no value; the server-only "not" keeps the provider shape a plain string.
+        root.setdefault('$defs', {})[name] = ({'type': 'string', 'enum': list(choices[name])} if choices[name]
+            else {'type': 'string', 'not': {}})
     if payload_schema is not None:
         content = deepcopy(payload_schema)
         definitions = content.pop('$defs', {})
@@ -76,13 +78,15 @@ def _closed_schema(model, payload_schema=None, choices=None):
 
 
 # Application-owned reply rules sent with every extraction task; generic for any template declaration.
-PROPOSAL_PROTOCOL = {'version': 'template-proposal-protocol-3', 'rules': [
+PROPOSAL_PROTOCOL = {'version': 'template-proposal-protocol-4', 'rules': [
     'Return payload, discoveries, fields, relations and lineage. payload follows the block content schema; use null or [] for data the source does not state.',
     'Each declaration binding names a pointer (with * for array elements), a semantic_type, a field and an item_pointer. Every concrete item matched by an item_pointer is its own discovery: {key: unique string, semanticType: the binding semantic_type, pointer: the concrete JSON pointer of that item, for example /0/tasks/1}. Two array elements are two discoveries even when their text is identical. Only these items are discoveries; a relation is never a discovery.',
-    'For every binding whose concrete pointer exists in the payload (a null leaf counts; a field under a null or missing parent does not), add one fields entry: {item: {kind: discovery_key, key: the discovery of that item}, fieldKey: the binding field, pointer: the concrete pointer, evidence: refs, effectiveCellIds: []}. A discovery never has two entries for the same fieldKey.',
-    'Evidence is selected by reference: each evidence entry {ref, text, span} offers one exact source text, and a reply lists only refs. Every non-null value needs the refs of the entries that state it for this item or from which it is read, including dates, booleans, numbers and classifications. A null value has evidence [].',
-    'For every binding with a relation, add one relations entry per concrete item: {relation: {kind: discovery_key, key: a new unique relation key, not a discovery key}, kind: the relation kind, subject: {kind: discovery_key, key: the discovery of the binding item}, target: {kind: discovery_key, key: the discovery at the relation subject_pointer}, evidence: the refs of the item entry and of the target entry it belongs to, at least one}. One relation per subject and kind.',
-    'lineage is [{kind: add, parents: [], children: every discovery key and nothing else}].']}
+    'An item is selected as {kind: discovery_key, key: a discovery of this reply} or, for an item listed in references.items, as {kind: handle, ref: its H ref}.',
+    'For every binding whose concrete pointer exists in the payload (a null leaf counts; a field under a null or missing parent does not), add one fields entry: {item: the item, fieldKey: the binding field, pointer: the concrete pointer, evidence: refs, effectiveCells: refs}. A selected item never has two entries for the same fieldKey.',
+    'Evidence is selected by reference: each evidence entry {ref, text, span} offers one exact source text, and a reply lists only refs. Every non-null value needs the refs of the entries that state it for this item or from which it is read, including dates, booleans, numbers and classifications. A null value has evidence []. effectiveCells lists the E refs of references.cells a value is read from, otherwise [].',
+    'For every binding with a relation, add one relations entry per concrete item: {relation: {kind: new, key: a new unique relation key} or, to keep a relation listed in references.relations, {kind: relation, ref: its R ref}; kind: the relation kind, subject: the binding item, target: the item at the relation subject_pointer, evidence: the refs of the item entry and of the target entry it belongs to, at least one}. One relation per subject and kind.',
+    'lineage is [{kind: add, parents: [], children: every discovery key and nothing else}]; split and merge name their parents by H ref.',
+    'Never copy an id: every selection is a key of this reply or a ref offered by this request.']}
 
 # Application-owned reply rules sent with every review; the checks and rules come from the coordinator.
 REVIEW_PROTOCOL = {'version': 'template-review-protocol-2', 'rules': [
@@ -98,11 +102,14 @@ def check_references(review):
     return {'C' + str(index): target for index, target in enumerate(review.targets, 1)}
 
 
-def proposal_schema(content_schema, refs=None):
-    """The closed reply schema; refs select the request's evidence, None keeps the copied-span form of older requests."""
+def proposal_schema(content_schema, refs=None, references=None):
+    """The closed reply schema; refs and references select the request's offers, None keeps the copied-id form of older requests."""
     if refs is None:
         return _closed_schema(ProposalReply, content_schema)
-    return _closed_schema(ReferencedProposalReply, content_schema, {'EvidenceRef': refs})
+    return _closed_schema(ReferencedProposalReply, content_schema, {'EvidenceRef': refs,
+        'ItemRef': [value.ref for value in references.items] if references else [],
+        'CellRef': [value.ref for value in references.cells] if references else [],
+        'RelationRef': [value.ref for value in references.relations] if references else []})
 
 
 def review_schema(review=None):

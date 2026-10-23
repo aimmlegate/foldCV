@@ -8,6 +8,8 @@ from ..template_identity import _bound_root, capture_span, source_slice
 from ..template_import import digest
 from .captured_fields import capture_fields, ownership_parents, visible_path
 from .materialize_nodes import DisplayField, fallback_style, literal, locale_text, reference, render_nodes, render_plain_fields, stable_id
+from .operations import display_pointer, operation_value
+from ..rich_fields import field_key
 from .projection import pointer_tokens
 from .span_coverage import fallback_plan, overlaps, union_spans, unit_key
 from .store import verify_package
@@ -21,6 +23,23 @@ def materialize(package, facts, operations, sources, *, operation_id, revision=1
     active_records = {record.id for record in [*facts.records, *facts.extensions] if getattr(record, 'active', True)}
     record_order = {record.id: index for index, record in enumerate([*facts.records, *facts.extensions]) if record.id in active_records}
     fields, roots, unassigned = capture_fields(declarations, operations, current, record_order)
+    # One declared period format applies to every period view.
+    period_format = next(({'separator': value.parameters.separator, 'ongoingLabel': dict(value.parameters.ongoing_label)}
+        for value in package.definition.operations if value.kind == 'format_period'), None)
+    # Stored operation results hide records in some views and list records of other blocks in others.
+    hidden, compact, assigned = {}, {}, {}
+    for value in package.definition.operations:
+        stored = operation_value(operations, value.id)
+        if stored is None:
+            continue
+        if value.kind == 'partition_employment':
+            hidden.setdefault(stored['detailedBlock'], set()).update(stored['compact'])
+            compact[stored['compactBlock']] = list(stored['compact'])
+        elif value.kind == 'assign_skills':
+            for group, records in stored['hidden'].items():
+                hidden.setdefault(group, set()).update(records)
+            if stored['added']:
+                assigned.setdefault(stored['uncertainGroup'], []).extend(stored['added'])
     fallbacks_by_view, human_scopes = {}, []
     for operation in operations:
         tasks = {task.id: task for task in operation.tasks}
@@ -47,7 +66,9 @@ def materialize(package, facts, operations, sources, *, operation_id, revision=1
                     human_scopes.extend(field.evidence)
                 fields[(declaration.id, identifier)] = DisplayField(relative, identity.record_id, identity.item_handle, cell)
                 unassigned.pop((declaration.id, identifier), None)
-                if cell.state == 'uncertain' or cell.origin != 'human' and cell.typed_value is True and relative[-1:] == ('ongoing',):
+                # Without a declared period format an ongoing period has no readable label, so it shows source wording.
+                if cell.state == 'uncertain' or (period_format is None and cell.origin != 'human' and cell.typed_value is True
+                        and relative[-1:] == ('ongoing',)):
                     fallbacks_by_view.setdefault(declaration.id, []).extend(cell.evidence)
         for result in operation.task_results:
             if result.disposition == 'source_fallback':
@@ -74,6 +95,7 @@ def materialize(package, facts, operations, sources, *, operation_id, revision=1
         if len(owners) != 1:
             raise ValueError('captured human field needs one reachable configured owner section')
     by_record = {record.id: record for record in [*facts.records, *facts.extensions] if getattr(record, 'active', True)}
+    handle_of = {identity.record_id: identity.item_handle for value in operations for identity in item_identities(value)}
     cell_owners = {cell.id: (record.id, record.item_handle) for record in facts.extensions if record.active for cell in record.cells}
     for operation in operations:
         for identity in item_identities(operation):
@@ -81,10 +103,20 @@ def materialize(package, facts, operations, sources, *, operation_id, revision=1
                 if identity.record_id in by_record})
     def add_coverage(span, handle, blocks, disposition, reason):
         coverage.append(SpanCoverage(span=span, itemHandle=handle, blockIds=blocks, disposition=disposition, reason=reason))
+    def listed(declaration, sections, instance, selected, handle=None):
+        """One section of records another block owns, rendered through this view's own nodes."""
+        children, mounted = render_nodes(package, declaration, instance, selected, scopes, shown_scopes, period_format)
+        if children:
+            sections.append({'type': 'section', 'id': stable_id(instance, 'item'), 'revision': 1, 'props': {'recordId': None},
+                'content': [], 'children': children, 'provenance': [],
+                'presentation': reference(package, declaration.id, fallback_style(declaration), instance, handle)})
+            for identifier, blocks in mounted.items():
+                displayed.setdefault(identifier, []).extend(blocks)
     ordered = sorted(declarations.values(), key=lambda value: (['header', 'sidebar', 'main'].index(value.placement.region), value.placement.order, value.id))
     for declaration in ordered:
         sections = []
-        selected_roots = [value for (view, _record), value in roots.items() if view == declaration.id]
+        selected_roots = [value for (view, record), value in roots.items() if view == declaration.id
+            and record not in hidden.get(view, ())]
         selected_roots.sort(key=lambda pair: (tuple(int(token) if token.isdecimal() else token for token in pair[0]), pair[1].item_handle))
         for root, primary in selected_roots:
             selected = []
@@ -97,7 +129,7 @@ def materialize(package, facts, operations, sources, *, operation_id, revision=1
                 if primary.record_id in owners:
                     selected.append(field)
             instance = stable_id(operation_id, declaration.id, primary.item_handle)
-            children, mounted = render_nodes(package, declaration, instance, selected, scopes, shown_scopes)
+            children, mounted = render_nodes(package, declaration, instance, selected, scopes, shown_scopes, period_format)
             plain_fields = []
             for (view, identifier), field in unassigned.items():
                 if view != declaration.id or identifier in suppressed:
@@ -122,6 +154,26 @@ def materialize(package, facts, operations, sources, *, operation_id, revision=1
                 'presentation': reference(package, declaration.id, fallback_style(declaration), instance, primary.item_handle)})
             for identifier, blocks in mounted.items():
                 displayed.setdefault(identifier, []).extend(blocks)
+        if declaration.id in compact:
+            # The compact view names each old employment record by its current employer cell.
+            listed(declaration, sections, stable_id(operation_id, declaration.id, 'compact'), [DisplayField(('items', str(index)), record,
+                handle_of.get(record), current[field_key(record, 'employer')]) for index, record in enumerate(record
+                    for record in compact[declaration.id] if record in active_records and field_key(record, 'employer') in current)])
+        records = [record for record in assigned.get(declaration.id, ())
+            if record in active_records and field_key(record, 'display') in current]
+        if records:
+            # Technologies no group admitted appear once in the fallback group, through its own display binding.
+            tokens = display_pointer(package.definition, declaration)
+            names = [(record, handle_of.get(record), current[field_key(record, 'display')]) for record in records]
+            if declaration.view.mode == 'items':
+                for record, handle, cell in names:
+                    listed(declaration, sections, stable_id(operation_id, declaration.id, 'assigned', handle),
+                        [DisplayField(tuple(tokens[1:]), record, handle, cell)], handle)
+            else:
+                at = tokens.index('*')
+                listed(declaration, sections, stable_id(operation_id, declaration.id, 'assigned'),
+                    [DisplayField((*tokens[:at], str(index), *tokens[at + 1:]), record, handle, cell)
+                        for index, (record, handle, cell) in enumerate(names)])
         output = regions[declaration.placement.region]['blocks']
         if sections:
             title = locale_text(declaration.view.title, package.definition.template.default_locale)

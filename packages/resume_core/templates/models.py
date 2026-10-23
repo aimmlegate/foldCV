@@ -187,10 +187,17 @@ class PartitionParameters(Definition):
     compact: Id
 
 
+class FactField(Definition):
+    semantic_type: Id
+    field: Id
+
+
 class RoleParameters(Definition):
     role_families: list[str]
     matched: str
     otherwise: str
+    # The admitted fact that names the role family; retained packages without it keep their exact bytes.
+    classification: FactField | None = Field(default=None, exclude_if=lambda value: value is None)
 
 
 class SkillsParameters(Definition):

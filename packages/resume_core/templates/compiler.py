@@ -198,6 +198,18 @@ def compile_definition(definition: TemplateDefinition, version):
         if operation.kind == "assign_skills":
             for target in operation.parameters.groups: require(target, blocks, "/operations/" + operation.id)
             require(operation.parameters.uncertain_group, operation.parameters.groups, "/operations/" + operation.id)
+        if operation.kind == "select_role_branch" and operation.parameters.classification is not None:
+            source = operation.parameters.classification
+            location = "/operations/" + operation.id + "/parameters/classification"
+            require(source.semantic_type, types, location)
+            pointer = "/" + source.field.replace(".", "/")
+            if not set(operation.parameters.role_families) <= set(binding_shape(fact_schemas[source.semantic_type], pointer).get("enum", [])):
+                raise SchemaFailure(location, "classification must enumerate every role family")
+            # The branch reads an admitted value, so a block that binds it must run first.
+            producers = {ref.id for ref in operation.inputs if ref.kind == "block"}
+            if not any(binding.semantic_type == source.semantic_type and binding.field == source.field
+                    for block in definition.blocks if block.id in producers for binding in block.bindings):
+                raise SchemaFailure(location, "classification needs an input block that binds it")
     for block in definition.blocks:
         full = reachable_schema(block.content_schema, definition.content_definitions)
         projected, server_only = project_payload(full)

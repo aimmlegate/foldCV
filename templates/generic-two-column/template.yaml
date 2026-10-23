@@ -2,7 +2,7 @@
 schema_version: 3
 template:
   id: generic-two-column
-  revision: 1.0.2
+  revision: 1.1.0
   name: Две колонки
   default_locale: ru
 assets:
@@ -264,6 +264,17 @@ source:
   retain_original: true
   retain_unmapped_facts: true
 content_definitions:
+  role_family:
+    type:
+    - string
+    - 'null'
+    enum:
+    - system_analyst
+    - business_analyst
+    - tester
+    - designer
+    - other
+    - null
   text:
     type:
     - string
@@ -366,6 +377,18 @@ fact_types:
       profession:
         $ref: '#/$defs/text'
   builtin_kind: candidate
+  relations: []
+- id: foldcv:role_family
+  schema_version: '1'
+  schema:
+    type: object
+    additionalProperties: false
+    required:
+    - family
+    properties:
+      family:
+        $ref: '#/$defs/role_family'
+  builtin_kind: null
   relations: []
 - id: foldcv:focus
   schema_version: '1'
@@ -638,8 +661,8 @@ operations:
   kind: partition_employment
   version: 1
   inputs:
-  - kind: source
-    id: all
+  - kind: block
+    id: projects
   depends_on: []
   parameters:
     years: 10
@@ -649,8 +672,8 @@ operations:
   kind: select_role_branch
   version: 1
   inputs:
-  - kind: source
-    id: all
+  - kind: block
+    id: identity
   depends_on: []
   parameters:
     role_families:
@@ -660,12 +683,21 @@ operations:
     - designer
     matched: skills_and_tools
     otherwise: technical
-- id: skill-assignment
+    classification:
+      semantic_type: foldcv:role_family
+      field: family
+- id: technical-skills
   kind: assign_skills
   version: 1
   inputs:
-  - kind: source
-    id: all
+  - kind: block
+    id: projects
+  - kind: block
+    id: programming
+  - kind: block
+    id: data_and_tools
+  - kind: block
+    id: infrastructure
   depends_on:
   - role-branch
   parameters:
@@ -673,9 +705,24 @@ operations:
     - programming
     - data_and_tools
     - infrastructure
+    uncertain_group: data_and_tools
+- id: role-skills
+  kind: assign_skills
+  version: 1
+  inputs:
+  - kind: block
+    id: projects
+  - kind: block
+    id: key_skills
+  - kind: block
+    id: role_tools
+  depends_on:
+  - role-branch
+  parameters:
+    groups:
     - key_skills
     - role_tools
-    uncertain_group: data_and_tools
+    uncertain_group: role_tools
 - id: source-periods
   kind: format_period
   version: 1
@@ -699,15 +746,26 @@ blocks:
     required:
     - name
     - profession
+    - role_family
     properties:
       name:
         $ref: '#/$defs/text'
       profession:
         $ref: '#/$defs/text'
+      role_family:
+        type: object
+        additionalProperties: false
+        required:
+        - family
+        properties:
+          family:
+            $ref: '#/$defs/role_family'
   extract:
   - Extract the stated first and last name.
   - Select the main specialization from supported primary work roles; do not invent a grade.
   - With rewriting disabled, select an existing role phrase without changing its wording.
+  - Set role_family.family to the family of the stated primary work (system_analyst, business_analyst, tester or designer),
+    other for any other role, and null when the source states no role.
   rewrite:
     fields: []
     instructions: []
@@ -741,6 +799,10 @@ blocks:
   - pointer: /profession
     semantic_type: foldcv:identity
     field: profession
+    relation: null
+  - pointer: /role_family/family
+    semantic_type: foldcv:role_family
+    field: family
     relation: null
   checks:
   - id: identity-evidence
@@ -1456,8 +1518,6 @@ blocks:
   selectors:
   - kind: source
     id: all
-  - kind: operation
-    id: project-window
   bindings:
   - pointer: /*/company
     semantic_type: foldcv:projects
@@ -1702,8 +1762,6 @@ blocks:
   selectors:
   - kind: source
     id: all
-  - kind: operation
-    id: skill-assignment
   bindings:
   - pointer: /items/*
     semantic_type: foldcv:programming
@@ -1758,8 +1816,6 @@ blocks:
   selectors:
   - kind: source
     id: all
-  - kind: operation
-    id: skill-assignment
   bindings:
   - pointer: /items/*
     semantic_type: foldcv:data_and_tools
@@ -1814,8 +1870,6 @@ blocks:
   selectors:
   - kind: source
     id: all
-  - kind: operation
-    id: skill-assignment
   bindings:
   - pointer: /items/*
     semantic_type: foldcv:infrastructure
@@ -1870,8 +1924,6 @@ blocks:
   selectors:
   - kind: source
     id: all
-  - kind: operation
-    id: skill-assignment
   bindings:
   - pointer: /items/*
     semantic_type: foldcv:key_skills
@@ -1926,8 +1978,6 @@ blocks:
   selectors:
   - kind: source
     id: all
-  - kind: operation
-    id: skill-assignment
   bindings:
   - pointer: /items/*
     semantic_type: foldcv:role_tools

@@ -1,4 +1,4 @@
-"""Test providers answer as the reference protocols ask: offered evidence and review checks are named by reference."""
+"""Test providers answer as the reference protocols ask: offered evidence, items, cells, relations and checks by reference."""
 
 from copy import deepcopy
 
@@ -31,8 +31,41 @@ def review_entry(entry, value, table):
     return converted
 
 
+def proposal_entries(result, value, table):
+    """Copied ids become the request's H/E/R references; an id the request did not offer stays copied."""
+    references = value.get('references') or {'items': [], 'cells': [], 'relations': []}
+    items = {entry['itemHandle']: entry['ref'] for entry in references['items']}
+    cells = {entry['cellId']: entry['ref'] for entry in references['cells']}
+    relations = {entry['relationId']: entry['ref'] for entry in references['relations']}
+    def item(selector):
+        if isinstance(selector, dict) and selector.get('kind') == 'handle' and 'itemHandle' in selector:
+            return {'kind': 'handle', 'ref': items.get(selector['itemHandle'], selector['itemHandle'])}
+        return selector
+    def spans(entry):
+        if isinstance(entry.get('evidence'), list):
+            entry['evidence'] = [evidence_ref(span, table) for span in entry['evidence']]
+    for field in result.get('fields', []):
+        if isinstance(field, dict):
+            field['item'] = item(field.get('item'))
+            spans(field)
+            if 'effectiveCellIds' in field:
+                field['effectiveCells'] = [cells.get(cell, cell) for cell in field.pop('effectiveCellIds')]
+    for relation in result['relations']:
+        if isinstance(relation, dict):
+            selector = relation.get('relation') or {}
+            if selector.get('kind') == 'discovery_key':
+                relation['relation'] = {'kind': 'new', 'key': selector['key']}
+            elif selector.get('kind') == 'relation_id':
+                relation['relation'] = {'kind': 'relation', 'ref': relations.get(selector['relationId'], selector['relationId'])}
+            relation['subject'], relation['target'] = item(relation.get('subject')), item(relation.get('target'))
+            spans(relation)
+    for lineage in result.get('lineage', []):
+        if isinstance(lineage, dict):
+            lineage['parents'] = [items.get(parent, parent) for parent in lineage.get('parents', [])]
+
+
 def by_reference(answer, value):
-    """Convert a copied-span proposal or review answer for a request that offers an evidence table."""
+    """Convert a copied-id proposal or review answer for a request that offers reference tables."""
     if hasattr(value, 'model_dump'):
         value = value.model_dump(mode='json', by_alias=True)
     table = value.get('evidence') if isinstance(value, dict) else None
@@ -42,11 +75,9 @@ def by_reference(answer, value):
     if 'discoveries' in result:
         if result.get('schemaVersion') != 1:
             return answer
-        result['schemaVersion'] = 2
+        result['schemaVersion'] = 3
         result.setdefault('relations', [])
-        for entry in [*result.get('fields', []), *result['relations']]:
-            if isinstance(entry, dict) and isinstance(entry.get('evidence'), list):
-                entry['evidence'] = [evidence_ref(span, table) for span in entry['evidence']]
+        proposal_entries(result, value, table)
     elif 'targets' in value and isinstance(result.get('results'), list):
         result['results'] = [review_entry(entry, value, table) for entry in result['results']]
     return result

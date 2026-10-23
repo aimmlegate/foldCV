@@ -81,7 +81,7 @@ def render_plain_fields(package, declaration, instance, fields, scopes, shown_sc
     return blocks, displayed
 
 
-def render_nodes(package, declaration, instance, fields, scopes, shown_scopes):
+def render_nodes(package, declaration, instance, fields, scopes, shown_scopes, period_format=None):
     blocks, displayed = [], {}
     locale = package.definition.template.default_locale
     def scalar(path):
@@ -113,7 +113,9 @@ def render_nodes(package, declaration, instance, fields, scopes, shown_scopes):
             selected = collection(node)
         elif node.type == 'period':
             start, end, ongoing = [scalar(node.field + '/' + name) for name in ['start', 'end', 'ongoing']]
-            selected = [*start, *(ongoing if ongoing and ongoing[0].cell.typed_value is True else end)]
+            current = bool(ongoing) and ongoing[0].cell.typed_value is True
+            # A declared period format shows its localized ongoing label instead of the boolean cell.
+            selected = [*start, *(([] if period_format else ongoing) if current else end)]
         else:
             raise ValueError('template materializer primitive is not implemented: ' + node.type)
         visible = []
@@ -132,11 +134,14 @@ def render_nodes(package, declaration, instance, fields, scopes, shown_scopes):
             for field, part in visible:
                 block(([literal(prefix, ref)] if prefix else []) + [part], ref, [field], kind='bullet_list', suffix=field.cell.id)
             continue
-        separator = '–' if node.type == 'period' else node.separator if node.type in {'join_fields', 'join_items'} else ', ' if node.type == 'tags' else ''
+        separator = ((period_format['separator'] if period_format else '–') if node.type == 'period'
+            else node.separator if node.type in {'join_fields', 'join_items'} else ', ' if node.type == 'tags' else '')
         content = [literal(prefix, ref)] if prefix else []
         for position, (_field, part) in enumerate(visible):
             if position:
                 content.append(literal(separator, ref))
             content.append(part)
+        if node.type == 'period' and period_format and current:
+            content += [literal(separator, ref), literal(locale_text(period_format['ongoingLabel'], locale), ref)]
         block(content, ref, [field for field, _part in visible])
     return blocks, displayed
