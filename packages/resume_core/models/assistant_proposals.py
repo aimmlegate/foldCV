@@ -4,8 +4,8 @@ from typing import Literal
 
 from pydantic import Field, model_validator
 
-from .agent import AgentEditBatch, AgentEditOperation, AgentId, AgentScope, AgentSnapshotDependency, Timestamp
-from .assistant_capabilities import AssistantProtocolV1, TaskId
+from .agent import AgentClaimResult, AgentCommitResult, AgentEditBatch, AgentEditOperation, AgentEditReceipt, AgentId, AgentOwner, AgentScope, AgentSnapshotDependency, Timestamp
+from .assistant_capabilities import AssistantAvailabilityV1, AssistantProtocolV1, TaskId
 from .contracts import Sha256
 from .rich_workspace import WorkspaceV6
 
@@ -76,6 +76,40 @@ class AssistantProposalListV1(AssistantProtocolV1):
     proposals: list[AssistantProposalV1] = Field(max_length=20)
 
 
+class AssistantProposalAcceptV1(AssistantProposalRequestV1):
+    owner: AgentOwner
+
+
+class AssistantProposalClaimV1(AssistantProtocolV1):
+    accepted: AssistantProposalRequestV1
+    claim: AgentClaimResult
+
+
+class AssistantProposalCommitV1(AssistantProposalAcceptV1):
+    ticket: AgentId
+    request_sha256: Sha256
+
+
+class AssistantProposalReportV1(AssistantProposalAcceptV1):
+    receipt: AgentEditReceipt
+
+
+class AssistantProposalRecoveryV1(AssistantProtocolV1):
+    proposal: AssistantProposalV1
+    result: AgentCommitResult | None
+
+
+class AssistantReviewV1(AssistantProtocolV1):
+    proposal: AssistantProposalV1
+    apply: AssistantAvailabilityV1
+    generation_finished: bool = Field(strict=True)
+
+
+class AssistantReviewListV1(AssistantProtocolV1):
+    project_id: AgentId
+    reviews: list[AssistantReviewV1] = Field(max_length=20)
+
+
 class AssistantProposalResultV1(AssistantProtocolV1):
     disposition: Literal["building", "draft_ready", "incomplete", "no_change"]
     proposal_id: AgentId | None
@@ -135,4 +169,11 @@ ASSISTANT_PROPOSAL_CONTRACTS = {
     "assistant_proposal_request_v1": AssistantProposalRequestV1,
     "assistant_proposal_list_v1": AssistantProposalListV1,
     "assistant_proposal_result_v1": AssistantProposalResultV1,
+    "assistant_proposal_accept_v1": AssistantProposalAcceptV1,
+    "assistant_proposal_claim_v1": AssistantProposalClaimV1,
+    "assistant_proposal_commit_v1": AssistantProposalCommitV1,
+    "assistant_proposal_report_v1": AssistantProposalReportV1,
+    "assistant_proposal_recovery_v1": AssistantProposalRecoveryV1,
+    "assistant_review_v1": AssistantReviewV1,
+    "assistant_review_list_v1": AssistantReviewListV1,
 }

@@ -17,23 +17,28 @@ import type { JobAgentRequestV1 } from "../contracts/generated/background_agent_
 import type { BackgroundConversation } from "../background/api";
 import type { ProjectJobs } from "../background/jobs";
 import { RichApiFailure } from "../rich/api";
+import type { AssistantProposalV1 } from "../contracts/generated/assistant_proposal_v1";
+import type { AssistantReviewV1 } from "../contracts/generated/assistant_review_v1";
+import { proposalKey, proposalRequest } from "./proposal";
 
 export const terminal = (run: AgentRun | null): boolean => run !== null && ["completed", "failed", "cancelled", "interrupted"].includes(run.state);
 export type AssistantView = {
   taskCatalog?: AssistantTaskCatalogV1 | null;
   taskReason?: string | null;
+  proposals?: AssistantProposalV1[]; proposalBusy?: string | null; reviewInvalidated?: string[];
+  reviewAvailability?: Record<string, AssistantReviewV1["apply"]>;
   settings: AgentSettings | null; capabilities: AgentCapabilities | null; flags: AgentFlags;
   conversations: AgentConversationPage["items"][number][]; conversationCursor: string | null; conversationId: string | null; messages: AgentMessage[];
   messageCursor: string | null; sources: AgentWebSource[]; findings: AgentFinding[]; run: AgentRun | null;
   receipts: AgentEditReceipt[]; activity: AgentEvent[]; partial: string; partialTruncated: boolean;
   draft: string; submitting: boolean; pendingSend: boolean; error: string | null; loading?: string | null;
 };
-export type AssistantEditor = { sessionId: string; apply: (batchId: string, api: PreparedApi) => Promise<void> };
+export type AssistantEditor = { sessionId: string; reviewStamp?: () => number; apply: (batchId: string, api: PreparedApi) => Promise<void> };
 export type TurnBaseline = () => Promise<{ response: RichProjectResponse; scope: AgentRunRequest["scope"]; selectionContext?: AgentRunRequest["selectionContext"];
   historyOffers?: Pick<AgentHistoryOffer, "undo" | "redo"> }>;
 export type AssistantApi = Pick<AgentBrowserApi, "projectId" | "settings" | "saveSettings" | "capabilities" | "conversations" | "conversation" |
   "messages" | "resources" | "open" | "renew" | "close" | "submit" | "read" | "cancel" | "events" | "prepared">
-  & Partial<Pick<AgentBrowserApi, "access" | "setAccess" | "offerHistory" | "tasks" | "checkMessage">>;
+  & Partial<Pick<AgentBrowserApi, "access" | "setAccess" | "offerHistory" | "tasks" | "checkMessage" | "proposals" | "proposal" | "discardProposal" | "reviewed">>;
 const pause = (milliseconds: number) => new Promise<void>(resolve => { setTimeout(resolve, milliseconds); });
 function code(error: unknown): string { return error instanceof AgentApiFailure || error instanceof RichApiFailure ? error.code : error instanceof Error && error.message.startsWith("AGENT_") ? error.message : "REQUEST_FAILED"; }
 
@@ -50,6 +55,9 @@ export class AssistantController {
   private sequence = 0;
   private metadataEpoch = 0;
   private catalogEpoch = 0;
+  private proposalEpoch = 0;
+  private reviewIntentEpoch = 0;
+  private readonly reviewStamps = new Map<string, number>();
   private accessRevision = 1;
   private pending: AgentRunRequest | null = null;
   private readonly applying = new Set<string>();
@@ -97,6 +105,55 @@ export class AssistantController {
       if (epoch === this.catalogEpoch) this.publish({ taskCatalog: null, error: code(error) });
     }
   }
+  reviewChanged(): void {
+    const stamp = this.editor.reviewStamp?.();
+    if (stamp === undefined) return;
+    const previous = this.view.reviewInvalidated ?? [], invalidated = new Set(previous);
+    for (const [key, captured] of this.reviewStamps) if (captured !== stamp) invalidated.add(key);
+    if (invalidated.size !== previous.length) this.publish({ reviewInvalidated: [...invalidated] });
+  }
+  async refreshProposals(): Promise<void> {
+    if (!this.api.proposals || !this.view.taskCatalog?.protocolEnabled || this.closed) return;
+    const epoch = ++this.proposalEpoch, stamp = this.editor.reviewStamp?.();
+    const reply = await this.api.proposals();
+    if (this.closed || epoch !== this.proposalEpoch) return;
+    if (reply.projectId !== this.api.projectId) throw new AgentApiFailure("INVALID_RESULT");
+    const proposals = reply.reviews.map(item => item.proposal);
+    for (const proposal of proposals) if (!this.reviewStamps.has(proposalKey(proposal)) && stamp !== undefined)
+      this.reviewStamps.set(proposalKey(proposal), stamp);
+    this.publish({ proposals, reviewAvailability: Object.fromEntries(reply.reviews.map(item => [proposalKey(item.proposal), item.apply])) }); this.reviewChanged();
+    if (!this.owner && this.view.flags.allowEdits && proposals.some(item => item.state === "ready")) {
+      await this.ensureOwner(); await this.refreshCatalog();
+      await this.refreshProposals();
+    }
+  }
+  async applyProposal(displayed: AssistantProposalV1): Promise<void> {
+    const key = proposalKey(displayed);
+    this.reviewChanged();
+    if (this.active || this.view.proposalBusy || !this.api.reviewed || !this.api.proposal
+      || !this.view.taskCatalog?.protocolEnabled || !this.view.flags.allowEdits || displayed.state !== "ready"
+      || this.view.reviewInvalidated?.includes(key) || !this.view.proposals?.some(item => proposalKey(item) === key && item.state === "ready")) return;
+    const epoch = ++this.reviewIntentEpoch;
+    this.applying.add(key); this.publish({ proposalBusy: key, error: null });
+    try {
+      const owner = await this.ensureOwner(); await this.refreshCatalog();
+      const current = await this.api.proposal(proposalRequest(displayed));
+      this.reviewChanged();
+      if (this.closed || epoch !== this.reviewIntentEpoch) return;
+      if (proposalKey(current.proposal) !== key || current.proposal.state !== "ready" || this.view.reviewInvalidated?.includes(key))
+        throw new AgentApiFailure("AGENT_STALE_READ");
+      if (!this.view.flags.allowEdits || current.apply.state !== "available") throw new AgentApiFailure(current.apply.reasonCode ?? "AGENT_TOOL_DENIED");
+      await this.editor.apply(key, this.api.reviewed({ ...proposalRequest(displayed), owner }));
+    } catch (error) { this.publish({ error: code(error) }); }
+    finally { this.applying.delete(key); this.publish({ proposalBusy: null }); await this.refreshProposals().catch(error => this.publish({ error: code(error) })); }
+  }
+  async discardProposal(displayed: AssistantProposalV1): Promise<void> {
+    if (this.active || this.view.proposalBusy || !this.api.discardProposal || !this.view.taskCatalog?.protocolEnabled) return;
+    const key = proposalKey(displayed); this.publish({ proposalBusy: key, error: null });
+    try { await this.api.discardProposal(proposalRequest(displayed)); await this.refreshProposals(); }
+    catch (error) { this.publish({ error: code(error) }); }
+    finally { this.publish({ proposalBusy: null }); }
+  }
   private async checkMessage(message: string): Promise<void> {
     if (!this.view.taskCatalog?.protocolEnabled) return;
     if (!this.api.checkMessage) throw new AgentApiFailure("AGENT_PROTOCOL");
@@ -117,6 +174,7 @@ export class AssistantController {
     const [settings, capabilities, conversations, taskCatalog] = await Promise.all([this.api.settings(), this.api.capabilities(this.view.flags), this.api.conversations(), this.api.tasks?.(this.view.flags) ?? null]);
     if (epoch === this.metadataEpoch) this.publish({ settings, capabilities, conversations: conversations.items, conversationCursor: conversations.nextCursor });
     if (catalogEpoch === this.catalogEpoch) this.publish({ taskCatalog });
+    await this.refreshProposals();
   }
   async init(): Promise<void> { return this.wait("Открываем помощника", () => this.initialize()); }
   private async initialize(): Promise<void> {
@@ -287,6 +345,7 @@ export class AssistantController {
     if (!id) return;
     const page = await this.api.messages(id);
     if (!this.closed && epoch === this.epoch) this.publish({ messages: page.items, messageCursor: page.nextCursor });
+    await this.refreshProposals();
   }
   private async sendBackground(baseline: TurnBaseline): Promise<void> {
     const jobs = this.jobs; if (!jobs) return;
@@ -360,6 +419,7 @@ export class AssistantController {
     this.publish({ conversations: [...summaries.values()].sort((a, b) => b.updatedAt.localeCompare(a.updatedAt)),
       messages: [...messages.values()].sort((a, b) => a.timestamp.localeCompare(b.timestamp)), sources: [...sources.values()], findings: [...findings.values()],
       activity: project.jobs.find(job => job.id === latest?.id)?.activity ?? [], run: latest ?? null, error: jobs.view.error });
+    await this.refreshProposals();
   }
   private startStream(run: AgentRun, owner: AgentOwner): void {
     this.stream?.abort(); const stream = new AbortController(); this.stream = stream;
@@ -376,7 +436,7 @@ export class AssistantController {
           if (event.sequence <= this.sequence) continue;
           if (event.sequence !== this.sequence + 1) throw new AgentApiFailure("AGENT_RESYNC_REQUIRED");
           this.sequence = event.sequence; failures = 0;
-          this.accept(event, owner);
+          this.accept(event);
         }
         if (stream.signal.aborted || this.closed || epoch !== this.epoch) return;
         const read = await this.api.read(runId);
@@ -395,7 +455,7 @@ export class AssistantController {
       await pause(250 * Math.max(1, failures));
     }
   }
-  private accept(event: AgentEvent, owner: AgentOwner): void {
+  private accept(event: AgentEvent): void {
     const activity = event.type === "activity.updated" ? this.view.activity.filter(item => item.type !== "activity.updated" || item.payload.itemId !== event.payload.itemId) : this.view.activity;
     const update: Partial<AssistantView> = { activity: event.type === "message.delta" ? activity : [...activity, event].slice(-40) };
     if (event.type === "message.delta") {
@@ -411,19 +471,15 @@ export class AssistantController {
     } else if (event.type === "edit.result") {
       const epoch = this.epoch;
       void this.api.read(event.runId).then(read => { if (epoch === this.epoch) this.publish({ receipts: read.receipts }); }).catch(error => this.publish({ error: code(error) }));
-    } else if (event.type === "edit.offered" && !terminal(this.view.run) && !this.applying.has(event.payload.batchId)
-      && !this.view.receipts.some(receipt => receipt.batchId === event.payload.batchId)) {
-      const id = event.payload.batchId, epoch = this.epoch;
-      this.applying.add(id);
-      void this.editor.apply(id, this.api.prepared(event.runId, owner)).catch(error => {
-        if (epoch === this.epoch) this.publish({ error: code(error) });
-      }).finally(() => { this.applying.delete(id); this.publish({}); });
+    } else if (event.type === "edit.offered") {
+      void this.refreshProposals().catch(error => this.publish({ error: code(error) }));
     }
     this.publish(update);
   }
   async stop(): Promise<void> { return this.wait("Останавливаем задачу", () => this.stopWork()); }
   private async stopWork(): Promise<void> {
     ++this.sendEpoch;
+    ++this.reviewIntentEpoch;
     if (this.jobs) {
       if (this.view.run && !terminal(this.view.run)) await this.jobs.stop(this.view.run.id);
       this.pendingBackground = null; this.publish({ pendingSend: false }); await this.reloadBackground(); return;
@@ -446,7 +502,7 @@ export class AssistantController {
     this.pending = null; this.publish({ pendingSend: false });
   }
   close(): void {
-    this.closed = true; ++this.epoch; ++this.sendEpoch; this.stream?.abort();
+    this.closed = true; ++this.epoch; ++this.sendEpoch; ++this.reviewIntentEpoch; ++this.proposalEpoch; this.stream?.abort();
     if (this.beat) clearTimeout(this.beat);
     this.unsubscribeBackground?.(); this.unsubscribeBackground = null;
     const owner = this.owner; this.owner = null;

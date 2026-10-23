@@ -8,6 +8,12 @@ CAP03 adds complete authored-scope coverage, Cyrillic/emoji/table/image/link
 preservation, supported fact corrections and separate formatting for
 A05/A06/A14/A15/A20. Comparison exposes precision and metadata effects.
 These are offline contracts; native meaning/quality remains unproved.
+CAP04 adds inline comparison, exact acceptance intent, discard and stale/permission
+controls. It maps display portions of A04/A08/A09/A12/A16/A24; canonical Apply,
+project/history action preparation and recovery remain CAP05. T3 checks cover
+keyboard acceptance intent, Settings return, permission controls and360px card
+geometry. Full-window visual/narrow proof is pending because snapshot/resize
+did not work; broader computer inspection was refused and was not retried.
 The remaining cases are unimplemented until their slices retain actual evidence.
 The rollout gate stays off through CAP04. Generated assistant contracts use new
 names; existing model-compatibility and CT schemas remain byte-identical.

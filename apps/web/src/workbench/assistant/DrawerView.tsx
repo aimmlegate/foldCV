@@ -8,12 +8,15 @@ import { Transcript } from "./Transcript";
 import { currentActivity } from "./activity";
 import { Elapsed, OperationStatus, Spinner } from "../ui/OperationStatus";
 import { Capabilities } from "../../assistant/Capabilities";
+import { ProposalPreview, proposalKey } from "../../assistant/proposal";
+import type { AssistantProposalV1 } from "../../contracts/generated/assistant_proposal_v1";
 
 export function DrawerView(props: ComposerProps & { collapsed: boolean; expanded: boolean; toggle: () => void; expand: () => void;
   log: RefObject<HTMLDivElement | null>; failure: string | null; fence: string | null;
   select: (id: string) => void; fresh: () => void; more: () => void; older: () => void;
   resource: (kind: "sources" | "findings", id: string) => void; focus: (anchor: AgentFinding["anchors"][number]) => boolean;
-  operations?: AgentProjectOperations["items"] }) {
+  operations?: AgentProjectOperations["items"]; applyProposal?: (value: AssistantProposalV1) => void;
+  discardProposal?: (value: AssistantProposalV1) => void }) {
   const { view, active, collapsed, expanded, toggle, expand } = props;
   const [threads, setThreads] = useState(false), menu = useRef<HTMLDivElement>(null), trigger = useRef<HTMLButtonElement>(null);
   const wasCollapsed = useRef(collapsed);
@@ -45,6 +48,10 @@ export function DrawerView(props: ComposerProps & { collapsed: boolean; expanded
       <div ref={props.log} className="chat-messages" role="log" aria-live="polite" aria-relevant="additions text" aria-busy={active}>
         {view.messageCursor && <button className="text-button" onClick={props.older}>Ранее в диалоге</button>}
         <Transcript view={view} active={active} resource={props.resource} focus={props.focus} draft={props.draft} />
+        {view.taskCatalog?.protocolEnabled && view.proposals?.map(value => <ProposalPreview key={proposalKey(value)} value={value}
+          catalog={view.taskCatalog} busy={active || !!view.proposalBusy} invalidated={view.reviewInvalidated?.includes(proposalKey(value)) ?? false}
+          stage={view.reviewAvailability?.[proposalKey(value)]}
+          allowEdits={view.flags.allowEdits} apply={() => props.applyProposal?.(value)} discard={() => props.discardProposal?.(value)} />)}
         {view.loading && <div className="chat-load-status"><OperationStatus label={view.loading} /></div>}
         {props.operations?.filter(item => item.durable && item.downloadUrl).map(item => <p key={item.id} className="chat-project-file">
           <a href={item.downloadUrl ?? ""} download={item.action === "export_docx" ? "resume.docx" : "resume.foldcv"}>{item.action === "export_docx" ? "Скачать DOCX" : "Скачать .foldcv"}</a></p>)}

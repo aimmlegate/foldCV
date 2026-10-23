@@ -15,6 +15,9 @@ import { AssistantController, type AssistantApi } from "../src/assistant/control
 import { deferred } from "./support/background-writer";
 import { validateRichWorkspaceShape } from "../src/rich/validate";
 import { taskCatalog } from "./support/assistant-capabilities";
+import { proposal, reviewedProposal } from "./support/assistant-proposal";
+import { proposalKey } from "../src/assistant/proposal";
+import type { AssistantProposalAcceptV1 } from "../src/contracts/generated/assistant_proposal_accept_v1";
 
 const now = "2026-10-15T12:00:00Z";
 const wait = () => new Promise<void>(resolve => { setImmediate(resolve); });
@@ -110,6 +113,7 @@ function baseline(): Promise<{ response: RichProjectResponse; scope: { kind: "re
   return Promise.resolve({ response: { workspace, durability: "durable", savedProjectRevision: 1, savedDocumentRevision: 1, saveError: null, generation: null }, scope: { kind: "resume" } });
 }
 function harness(heartbeatMs = 5000) {
+  let reviewStamp = 0;
   let settings: AgentSettings = { schemaVersion: 1, revision: 2, enabled: true, selectedAgentModel: "model_a" };
   const owner = { token: "synthetic_owner_capability_0123456789", epoch: 1 };
   const requests: AgentRunRequest[] = [], runs = new Map<string, AgentRun>(), applied: string[] = [], sequences: number[] = [];
@@ -147,7 +151,7 @@ function harness(heartbeatMs = 5000) {
     events: async function* (_run, _owner, after, signal) { sequences.push(after); yield* eventScript(after, signal); },
     prepared: () => ({ claim: () => Promise.reject<AgentClaimResult>(new Error("No claim expected")), commit: () => Promise.reject<AgentCommitResult>(new Error("No commit expected")), recover: () => Promise.resolve(null), report: () => Promise.resolve() }),
   };
-  const controller = new AssistantController(api, { sessionId: "history_1", apply: id => { applied.push(id); return Promise.resolve(); } }, () => {}, heartbeatMs);
+  const controller = new AssistantController(api, { sessionId: "history_1", reviewStamp: () => reviewStamp, apply: id => { applied.push(id); return Promise.resolve(); } }, () => {}, heartbeatMs);
   const event = (sequence: number, type: "message.delta" | "edit.offered" | "run.state_changed"): AgentEvent => {
     const common = { schemaVersion: 1 as const, id: "event_" + String(sequence), sequence, projectId: "project-1", conversationId: "conversation_1", runId: "run_1", timestamp: now };
     if (type === "message.delta") return { ...common, type, payload: { text: "Привет 😀" } };
@@ -155,6 +159,7 @@ function harness(heartbeatMs = 5000) {
     return { ...common, type, payload: { state: "completed", error: null, savedBatchId: null, outcomeUnknown: false } };
   };
   return { controller, api, requests, applied, sequences, event,
+    typing: () => { reviewStamp++; },
     script: (script: typeof eventScript) => { eventScript = script; }, lose: () => { lostReply = true; },
     expire: () => { renewFails = true; }, finish: () => { assert.ok(current); current = { ...current, state: "completed", finishedAt: now }; },
     counts: () => ({ submitted, closes, cancelled }) };
@@ -212,7 +217,7 @@ test("assistant reconnect deduplicates deltas and offers without submitting anot
     await h.controller.init(); h.controller.draft("Check and edit"); await h.controller.send(baseline);
     for (let i = 0; i < 100 && h.sequences.length < 2; i++) await new Promise<void>(resolve => { setTimeout(resolve, 5); });
     await wait();
-    assert.deepEqual(h.sequences.slice(0, 2), [0, 2]); assert.deepEqual(h.applied, ["batch_1"]);
+    assert.deepEqual(h.sequences.slice(0, 2), [0, 2]); assert.deepEqual(h.applied, []);
     assert.equal(h.counts().submitted, 1); assert.equal(h.controller.view.run?.state, "completed");
   } finally { h.controller.close(); }
 });
@@ -242,5 +247,65 @@ test("assistant heartbeat loss closes the owner lease and never retries inferenc
     assert.equal(h.counts().closes, 1); assert.equal(h.counts().submitted, 1);
     await wait(); assert.equal(h.controller.view.run?.state, "interrupted");
     assert.equal(h.controller.view.error, "AGENT_LEASE_EXPIRED");
+  } finally { h.controller.close(); }
+});
+
+function reviewedHarness() {
+  const h = harness(), value = proposal(), accepted: AssistantProposalAcceptV1[] = [];
+  const catalog = taskCatalog(); catalog.projectId = value.projectId;
+  assert.ok(catalog.tasks[0]); catalog.tasks[0].apply = { state: "available", reasonCode: null, reason: null, remedy: null };
+  h.api.tasks = () => Promise.resolve(catalog);
+  h.api.proposals = () => Promise.resolve({ schemaVersion: 1, protocolVersion: 1, projectId: value.projectId, reviews: [reviewedProposal(structuredClone(value))] });
+  h.api.proposal = () => Promise.resolve(reviewedProposal(structuredClone(value)));
+  h.api.reviewed = request => { accepted.push(structuredClone(request)); return h.api.prepared("run_1", request.owner); };
+  return { ...h, value, accepted };
+}
+
+test("review and reload never apply; one explicit click freezes exact version/digest and duplicate clicks coalesce", async () => {
+  const h = reviewedHarness();
+  try {
+    await h.controller.init(); await h.controller.refreshProposals();
+    assert.equal(h.applied.length, 0); assert.equal(h.requests.length, 0);
+    await Promise.all([h.controller.applyProposal(h.value), h.controller.applyProposal(h.value)]);
+    assert.equal(h.accepted.length, 1); assert.deepEqual(h.applied, [proposalKey(h.value)]);
+    assert.equal(h.accepted[0]?.proposalId, h.value.id); assert.equal(h.accepted[0]?.version, h.value.version);
+    assert.equal(h.accepted[0]?.contentSha256, h.value.contentSha256); assert.equal(h.accepted[0]?.owner.epoch, 1);
+    assert.equal(h.requests.length, 0); assert.equal(h.controller.view.proposals?.[0]?.state, "ready");
+  } finally { h.controller.close(); }
+});
+
+test("typing or a different displayed version blocks old acceptance while retaining manual edits", async () => {
+  const h = reviewedHarness();
+  try {
+    await h.controller.init();
+    await h.controller.applyProposal({ ...h.value, version: 2 }); assert.equal(h.accepted.length, 0);
+    h.typing(); h.controller.reviewChanged();
+    await h.controller.applyProposal(h.value);
+    assert.equal(h.accepted.length, 0); assert.ok(h.controller.view.reviewInvalidated?.includes(proposalKey(h.value)));
+  } finally { h.controller.close(); }
+});
+
+test("permissions and Stop revoke the pending review intent without implicit apply on re-enable", async () => {
+  const h = reviewedHarness(), read = deferred<ReturnType<typeof reviewedProposal>>();
+  try {
+    await h.controller.init(); h.controller.flags({ allowEdits: false, allowWeb: false });
+    await h.controller.applyProposal(h.value); assert.equal(h.accepted.length, 0);
+    h.controller.flags({ allowEdits: true, allowWeb: false }); await wait(); assert.equal(h.accepted.length, 0);
+    h.api.proposal = () => read.promise;
+    const applying = h.controller.applyProposal(h.value); await wait();
+    await h.controller.stop(); read.resolve(reviewedProposal(h.value)); await applying;
+    assert.equal(h.accepted.length, 0); assert.equal(h.requests.length, 0);
+  } finally { read.resolve(reviewedProposal(h.value)); h.controller.close(); }
+});
+
+test("delayed proposal refresh cannot revive a stale response or replace the newer review", async () => {
+  const h = reviewedHarness(), old = deferred<Awaited<ReturnType<NonNullable<AssistantApi["proposals"]>>>>();
+  try {
+    await h.controller.init(); let count = 0;
+    h.api.proposals = () => ++count === 1 ? old.promise : Promise.resolve({ schemaVersion: 1, protocolVersion: 1, projectId: h.value.projectId,
+      reviews: [reviewedProposal({ ...h.value, state: "stale" })] });
+    const pending = h.controller.refreshProposals(); await h.controller.refreshProposals();
+    old.resolve({ schemaVersion: 1, protocolVersion: 1, projectId: h.value.projectId, reviews: [reviewedProposal(h.value)] }); await pending;
+    assert.equal(h.controller.view.proposals?.[0]?.state, "stale"); assert.equal(h.accepted.length, 0);
   } finally { h.controller.close(); }
 });

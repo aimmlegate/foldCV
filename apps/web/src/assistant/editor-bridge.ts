@@ -18,6 +18,7 @@ export type PreparedEditorPort = {
   fence: (receipt: AgentEditReceipt | null) => void;
 };
 export type PreparedApi = {
+  resolve?: (reviewKey: string) => Promise<string>;
   claim: (batchId: string) => Promise<AgentClaimResult>;
   commit: (claim: AgentClaimResult) => Promise<AgentCommitResult>;
   recover: (batchId: string) => Promise<AgentCommitResult | null>;
@@ -59,13 +60,14 @@ export class PreparedEditorBridge {
     return operation;
   }
 
-  private async perform(batchId: string, api: PreparedApi): Promise<void> {
+  private async perform(reviewKey: string, api: PreparedApi): Promise<void> {
     const editor = this.editor;
     let claim: AgentClaimResult | null = null, reservation: HistoryReservation | null = null;
     let commitStarted = false, saved: AgentEditReceipt | null = null, fenced = false;
     try {
       await editor.flush();
       if (this.closed) return;
+      const batchId = api.resolve ? await api.resolve(reviewKey) : reviewKey;
       claim = await api.claim(batchId);
       const batch = claim.batch;
       if (batch.id !== batchId || batch.mutation.capture.sessionId !== editor.history.session
@@ -91,7 +93,7 @@ export class PreparedEditorBridge {
       catch { result = await api.recover(batch.id).catch(() => null); }
       if (!result || !matches(result.receipt, batch) || result.receipt.disposition === "outcome_unknown") throw new Error("AGENT_OUTCOME_UNKNOWN");
       if (!result.receipt.durable) {
-        this.completed.add(batch.id);
+        this.completed.add(reviewKey);
         return;
       }
       saved = result.receipt;
@@ -104,7 +106,7 @@ export class PreparedEditorBridge {
       if (!(direction ? editor.history.publishNavigation(reservation, direction, changes) : editor.history.publish(reservation, changes))) throw new Error("AGENT_OUTCOME_UNKNOWN");
       reservation = null;
       await editor.retainImages();
-      this.completed.add(batch.id);
+      this.completed.add(reviewKey);
       await api.report(saved).catch(() => {});
     } catch (error) {
       if (commitStarted) {
@@ -114,7 +116,7 @@ export class PreparedEditorBridge {
         editor.fence(saved);
       } else if (claim) {
         await api.report(rejected(claim.batch)).catch(() => {});
-        this.completed.add(claim.batch.id);
+        this.completed.add(reviewKey);
       }
       throw error;
     } finally {

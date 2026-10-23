@@ -83,6 +83,67 @@ def result(value):
         reason=proposal.reason or "Черновик сохранён для просмотра. Документ не изменён.")
 
 
+def review(service, project_id):
+    with service.projects.state_lock:
+        values = service.proposals.list(project_id)
+        workspace = service.projects.storage.read_committed(project_id)[0]
+        for value in values:
+            if value.proposal.state != "ready" or (content_digest(workspace) == value.proposal.before_sha256
+                    and current_dependencies(workspace, value.dependencies)):
+                continue
+            def check(items):
+                current = next(item for item in items if item.proposal.id == value.proposal.id and item.proposal.version == value.proposal.version)
+                workspace = service.projects.storage._read_committed_unlocked(project_id)[0]
+                if current.proposal.state == "ready" and (content_digest(workspace) != current.proposal.before_sha256
+                        or not current_dependencies(workspace, current.dependencies)):
+                    current.proposal.state = "stale"
+                    current.proposal.reason = "Документ или его источники изменились. Текущие правки сохранены; подготовьте новый вариант для просмотра."
+                return current
+            service.proposals.update(project_id, check)
+        return service.proposals.list(project_id)
+
+
+def origin_status(service, value):
+    from packages.resume_core.background_store import BackgroundFailure, TERMINAL_EXECUTION
+    try:
+        _, run, _ = run_in(service.store.load(value.proposal.project_id), value.proposal.origin_run_id)
+        return (run.state in {"completed", "failed", "cancelled", "interrupted"} and (run.error is None or run.error.code != "AGENT_CLEANUP_FAILED"),
+            run.state == "cancelled" or run.error is not None and run.error.code == "AGENT_CANCELLED")
+    except AgentFailure as error:
+        if error.code != "AGENT_NOT_FOUND":
+            raise
+    jobs = getattr(service.projects, "background_jobs", None)
+    if jobs is not None:
+        try:
+            state = jobs.store.load(value.proposal.project_id)
+            job = next((item for item in state.jobs if item.id == value.proposal.origin_run_id and item.submission.kind == "agent"), None)
+            return (job is not None and job.execution in TERMINAL_EXECUTION and (job.error is None or job.error.code != "CLEANUP_FAILED"),
+                job is not None and (job.execution == "cancelled" or job.error is not None and job.error.code == "CANCELLED"))
+        except BackgroundFailure:
+            return False, True
+    return False, True
+
+
+def generation_finished(service, value):
+    return origin_status(service, value)[0]
+
+
+def review_view(service, value, tasks):
+    from packages.resume_core.models.assistant_proposals import AssistantReviewV1
+    from .capabilities import availability
+    stage = next(task.apply for task in tasks.tasks if task.id == value.proposal.task_id)
+    finished, revoked = origin_status(service, value)
+    if value.proposal.state != "ready":
+        stage = availability("temporarily_unavailable", "AGENT_STALE_READ", value.proposal.reason)
+    elif revoked:
+        stage = availability("permission_disabled", "AGENT_CANCELLED", "Задача была остановлена. Подготовьте новый вариант.")
+    elif not finished:
+        stage = availability("temporarily_unavailable", "AGENT_BUSY", "Дождитесь завершения подготовки. Документ не изменён.")
+    elif value.account_epoch != service.connection().epoch:
+        stage = availability("permission_disabled", "AGENT_CONNECTION_CHANGED", "Вернитесь к исходной учётной записи и подготовьте новый вариант.")
+    return AssistantReviewV1(proposal=value.proposal, apply=stage, generationFinished=finished)
+
+
 def compile_candidate(baseline, run, journal, command, book, task_id):
     try:
         policy = {"rewrite_resume": "wording", "restructure": "structure", "correct_facts": "facts", "format_document": "format"}[task_id]

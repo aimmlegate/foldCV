@@ -96,6 +96,7 @@ export type CapturedEditorSelection = { selection: Omit<RichSelection, "capture"
 export type RichEditorHandle = { flush: () => Promise<RichProjectResponse>; undo: () => void; redo: () => void;
   background: boolean; navigate: () => Promise<void>; resume: () => Promise<void>;
   sessionId: string; captureSelection: () => CapturedEditorSelection | null;
+  reviewStamp: () => number;
   assistantBaseline: (captured: CapturedEditorSelection | null) => Promise<{ response: RichProjectResponse; selection: RichSelection | null;
     historyOffers: Pick<AgentHistoryOffer, "undo" | "redo"> }>;
   focusFinding: (anchor: AgentFinding["anchors"][number]) => boolean;
@@ -860,6 +861,7 @@ export function RichEditor({ initial, acknowledge, onStatus, ref, onHistoryNavig
     if (bridge.writer) await bridge.writer.navigate(); else { await bridge.intents?.drain(); await bridge.queue?.flush(); }
   }, resume: async () => { await bridge.writer?.resume(); },
   undo: () => bridge.undo(), redo: () => bridge.redo(), sessionId: bridge.session,
+  reviewStamp: () => bridge.history?.revisionClock ?? -1,
   focusFinding: anchor => {
     if (bridge.applying || !bridge.queue || !anchorCurrent(anchor, bridge.queue.baseline, bridge.current)) return false;
     if (anchor.blockId) {

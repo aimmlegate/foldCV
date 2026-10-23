@@ -1,0 +1,65 @@
+import { useEffect, useRef } from "react";
+import type { AssistantProposalV1 } from "../contracts/generated/assistant_proposal_v1";
+import type { AssistantProposalRequestV1 } from "../contracts/generated/assistant_proposal_request_v1";
+import type { AssistantTaskCatalogV1 } from "../contracts/generated/assistant_task_catalog_v1";
+import type { AssistantReviewV1 } from "../contracts/generated/assistant_review_v1";
+
+export const proposalKey = (value: AssistantProposalV1): string => `${value.id}:${String(value.version)}:${value.contentSha256}`;
+export const proposalRequest = (value: AssistantProposalV1): AssistantProposalRequestV1 => ({ schemaVersion: 1,
+  protocolVersion: 1, proposalId: value.id, version: value.version, contentSha256: value.contentSha256 });
+
+const states = { building: "Подготовка варианта", ready: "Вариант готов к просмотру", incomplete: "Черновик не завершён",
+  invalid: "Вариант недоступен", cancelled: "Подготовка остановлена", applying: "Сохраняем принятый вариант", applied: "Вариант сохранён",
+  stale: "Вариант устарел", discarded: "Вариант отклонён", expired: "Срок хранения истёк",
+  failed_before_commit: "Вариант не сохранён", outcome_unknown: "Проверяем результат сохранения" };
+const effects = { wording: "Текст", structure: "Структура", fact: "Факты и поддержка", format: "Оформление" };
+export function proposalControls(value: AssistantProposalV1, catalog: AssistantTaskCatalogV1 | null | undefined,
+  busy: boolean, invalidated: boolean, allowEdits: boolean, stage?: AssistantReviewV1["apply"]): { apply: boolean; discard: boolean; reason: string | null } {
+  const task = catalog?.tasks.find(item => item.id === value.taskId);
+  const readiness = stage ?? task?.apply;
+  const available = catalog?.protocolEnabled === true && readiness?.state === "available" && allowEdits;
+  return { apply: !busy && !invalidated && value.state === "ready" && available,
+    discard: !busy && ["ready", "incomplete", "stale", "failed_before_commit"].includes(value.state),
+    reason: invalidated ? "После открытия варианта документ изменился. Подготовьте новый вариант; текущие правки сохранены."
+      : value.state !== "ready" ? null : !allowEdits ? "Разрешите правки, затем отдельно нажмите «Применить»."
+      : !available ? [readiness?.reason, readiness?.remedy].filter(Boolean).join(" ") || "Применение сейчас недоступно." : null };
+}
+
+export function ProposalPreview({ value, catalog, busy, invalidated, allowEdits, stage, apply, discard }: {
+  value: AssistantProposalV1; catalog: AssistantTaskCatalogV1 | null | undefined; busy: boolean; invalidated: boolean; allowEdits: boolean;
+  apply: () => void; discard: () => void;
+  stage?: AssistantReviewV1["apply"] | undefined;
+}) {
+  const task = catalog?.tasks.find(item => item.id === value.taskId), controls = proposalControls(value, catalog, busy, invalidated, allowEdits, stage);
+  const button = useRef<HTMLButtonElement>(null), heading = useRef<HTMLHeadingElement>(null);
+  const wasBusy = useRef(busy), restoreFocus = useRef(false);
+  useEffect(() => {
+    if (wasBusy.current && !busy && restoreFocus.current) {
+      (button.current?.disabled ? heading.current : button.current)?.focus();
+      restoreFocus.current = false;
+    }
+    wasBusy.current = busy;
+  }, [busy]);
+  const changed = value.coverage.filter(unit => unit.state === "changed").length;
+  const unresolved = value.coverage.filter(unit => !unit.read || unit.state === "unresolved").length;
+  return <article className="chat-proposal" aria-label={`Вариант ${String(value.version)}: ${task?.label ?? "Изменения"}`}>
+    <h3 ref={heading} tabIndex={-1}>{states[value.state]} · версия {value.version}</h3>
+    <p>{task?.label ?? "Подготовленные изменения"}</p>
+    {value.reason && <p>{value.reason}</p>}
+    <p className="chat-proposal-coverage">Охват: {value.coverage.length}. Изменено: {changed}. Не завершено: {unresolved}.</p>
+    {!["applied", "applying", "outcome_unknown"].includes(value.state) && <p>Документ пока не изменён этим вариантом.</p>}
+    {["applying", "outcome_unknown"].includes(value.state) && <p>Проверяем исходное сохранение. Повторное применение недоступно.</p>}
+    {value.changes.map((change, index) => <details key={change.unitId} open className="chat-proposal-change">
+      <summary>{effects[change.effect]} · {index + 1}</summary>
+      <div className="chat-proposal-comparison"><div><h4>Сейчас</h4><pre>{change.before || "Нет"}</pre></div>
+        <div><h4>После применения</h4><pre>{change.after || "Нет"}</pre></div></div>
+    </details>)}
+    {unresolved > 0 && <details><summary>Что осталось проверить</summary><ul>{value.coverage.filter(unit => !unit.read || unit.state === "unresolved")
+      .map(unit => <li key={unit.unitId}>{unit.reason}</li>)}</ul></details>}
+    {task?.reversibility === "shared_undo" && <p>После сохранения — одна отмена в истории редактора.</p>}
+    {controls.reason && <p role="status">{controls.reason}</p>}
+    <div className="chat-proposal-actions"><button ref={button} type="button" className="primary" disabled={!controls.apply}
+      onClick={event => { restoreFocus.current = event.detail === 0; apply(); }}>Применить</button>
+      <button type="button" className="text-button" disabled={!controls.discard} onClick={discard}>Отклонить</button></div>
+  </article>;
+}

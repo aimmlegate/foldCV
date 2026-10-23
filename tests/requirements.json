@@ -3599,7 +3599,8 @@
       "id": "CAP-A04",
       "status": "partial",
       "tests": [
-        "tests/recovery/test_assistant_proposals.py::test_read_only_multicall_draft_is_durable_without_document_history_or_apply"
+        "tests/recovery/test_assistant_proposals.py::test_read_only_multicall_draft_is_durable_without_document_history_or_apply",
+        "apps/web/unit/agent-controller.test.ts::review and reload never apply; one explicit click freezes exact version/digest and duplicate clicks coalesce"
       ]
     },
     {
@@ -3628,13 +3629,19 @@
     },
     {
       "id": "CAP-A08",
-      "status": "unimplemented",
-      "tests": []
+      "status": "partial",
+      "tests": [
+        "tests/recovery/test_assistant_review.py::test_review_marks_changed_authored_scope_stale_and_preserves_both_versions",
+        "apps/web/unit/agent-controller.test.ts::typing or a different displayed version blocks old acceptance while retaining manual edits"
+      ]
     },
     {
       "id": "CAP-A09",
-      "status": "unimplemented",
-      "tests": []
+      "status": "partial",
+      "tests": [
+        "apps/web/unit/agent-controller.test.ts::permissions and Stop revoke the pending review intent without implicit apply on re-enable",
+        "tests/recovery/test_assistant_review.py::test_local_review_availability_requires_origin_generation_to_finish_and_current_identity"
+      ]
     },
     {
       "id": "CAP-A10",
@@ -3651,8 +3658,11 @@
     },
     {
       "id": "CAP-A12",
-      "status": "unimplemented",
-      "tests": []
+      "status": "partial",
+      "tests": [
+        "apps/web/unit/agent-controller.test.ts::review and reload never apply; one explicit click freezes exact version/digest and duplicate clicks coalesce",
+        "apps/web/unit/agent-controller.test.ts::delayed proposal refresh cannot revive a stale response or replace the newer review"
+      ]
     },
     {
       "id": "CAP-A13",
@@ -3675,8 +3685,10 @@
     },
     {
       "id": "CAP-A16",
-      "status": "unimplemented",
-      "tests": []
+      "status": "partial",
+      "tests": [
+        "apps/web/unit/assistant-proposals.test.ts::action preview displays the server's exact target and irreversible consequence without promising editor Undo"
+      ]
     },
     {
       "id": "CAP-A17",
@@ -3724,7 +3736,8 @@
       "id": "CAP-A24",
       "status": "partial",
       "tests": [
-        "apps/web/unit/assistant-capabilities.test.ts::capability display follows server readiness and hides behind the rollout gate"
+        "apps/web/unit/assistant-capabilities.test.ts::capability display follows server readiness and hides behind the rollout gate",
+        "apps/web/unit/assistant-proposals.test.ts::preview renders exact server comparison as plain text and native keyboard controls without a modal"
       ]
     }
   ],
@@ -3869,6 +3882,51 @@
       "unproved": "CAP02 covers durable non-mutating preparation only. Scope/fidelity and the full explicit Apply/publication/history/recovery boundary remain unproved.",
       "owner": "CAP03–CAP06/CAP08; CAP07 for V7",
       "check": "Run completed review/Apply flows and every legacy/background bypass against the final retained source; preserve native/manual gaps."
+    },
+    "CAP-A05": {
+      "unproved": "Integrated Apply/recovery and other plan/native/manual obligations remain open; current evidence covers only the retained offline slice scope.",
+      "owner": "CAP05-CAP08",
+      "check": "Complete the named CAP plan cases and retain exact synthetic/native/manual evidence before full acceptance."
+    },
+    "CAP-A06": {
+      "unproved": "Integrated Apply/recovery and other plan/native/manual obligations remain open; current evidence covers only the retained offline slice scope.",
+      "owner": "CAP05-CAP08",
+      "check": "Complete the named CAP plan cases and retain exact synthetic/native/manual evidence before full acceptance."
+    },
+    "CAP-A08": {
+      "unproved": "Integrated Apply/recovery and other plan/native/manual obligations remain open; current evidence covers only the retained offline slice scope.",
+      "owner": "CAP05-CAP08",
+      "check": "Complete the named CAP plan cases and retain exact synthetic/native/manual evidence before full acceptance."
+    },
+    "CAP-A09": {
+      "unproved": "Integrated Apply/recovery and other plan/native/manual obligations remain open; current evidence covers only the retained offline slice scope.",
+      "owner": "CAP05-CAP08",
+      "check": "Complete the named CAP plan cases and retain exact synthetic/native/manual evidence before full acceptance."
+    },
+    "CAP-A12": {
+      "unproved": "Integrated Apply/recovery and other plan/native/manual obligations remain open; current evidence covers only the retained offline slice scope.",
+      "owner": "CAP05-CAP08",
+      "check": "Complete the named CAP plan cases and retain exact synthetic/native/manual evidence before full acceptance."
+    },
+    "CAP-A14": {
+      "unproved": "Integrated Apply/recovery and other plan/native/manual obligations remain open; current evidence covers only the retained offline slice scope.",
+      "owner": "CAP05-CAP08",
+      "check": "Complete the named CAP plan cases and retain exact synthetic/native/manual evidence before full acceptance."
+    },
+    "CAP-A15": {
+      "unproved": "Integrated Apply/recovery and other plan/native/manual obligations remain open; current evidence covers only the retained offline slice scope.",
+      "owner": "CAP05-CAP08",
+      "check": "Complete the named CAP plan cases and retain exact synthetic/native/manual evidence before full acceptance."
+    },
+    "CAP-A16": {
+      "unproved": "Integrated Apply/recovery and other plan/native/manual obligations remain open; current evidence covers only the retained offline slice scope.",
+      "owner": "CAP05-CAP08",
+      "check": "Complete the named CAP plan cases and retain exact synthetic/native/manual evidence before full acceptance."
+    },
+    "CAP-A20": {
+      "unproved": "Integrated Apply/recovery and other plan/native/manual obligations remain open; current evidence covers only the retained offline slice scope.",
+      "owner": "CAP05-CAP08",
+      "check": "Complete the named CAP plan cases and retain exact synthetic/native/manual evidence before full acceptance."
     }
   },
   "recovery": {

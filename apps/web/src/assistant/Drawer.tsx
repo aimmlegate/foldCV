@@ -33,6 +33,7 @@ export function AssistantDrawer({ projectId, editor, settingsOpen, settings, ref
         if (!alive) return;
         setOperations(value.items);
         await controller.current?.refreshCatalog();
+        await controller.current?.refreshProposals();
         if (!initialized) { value.items.forEach(item => handled.add(item.id)); initialized = true; }
         for (const item of value.items) {
           if (!alive) break;
@@ -51,6 +52,7 @@ export function AssistantDrawer({ projectId, editor, settingsOpen, settings, ref
     if (!mounted) return;
     const api = new AgentBrowserApi(projectId), connection = new ConnectionWorkflow(() => {});
     const current = new AssistantController(api, { sessionId: mounted.sessionId,
+      reviewStamp: () => editor.current?.reviewStamp() ?? -1,
       apply: (id, api) => { if (editor.current?.sessionId !== mounted.sessionId) return Promise.reject(new AgentApiFailure("AGENT_NO_OWNER")); return editor.current.applyAssistant(id, api); } }, setView, 5000, background ? projectJobs(projectId) : null);
     controller.current = current; setView(current.view);
     void (async () => {
@@ -65,6 +67,7 @@ export function AssistantDrawer({ projectId, editor, settingsOpen, settings, ref
   useEffect(() => { try { localStorage.setItem(key, JSON.stringify(size)); } catch { /* Size is optional when browser storage is unavailable. */ } }, [size]);
   useEffect(() => {
     const timer = setInterval(() => {
+      controller.current?.reviewChanged();
       if (!document.activeElement?.closest(".cv-document")) return;
       const next = editor.current?.captureSelection() ?? null;
       const id = JSON.stringify(next ? [next.selection, [...next.epochs]] : null);
@@ -102,6 +105,8 @@ export function AssistantDrawer({ projectId, editor, settingsOpen, settings, ref
     select={id => report(controller.current?.select(id))} fresh={() => report(controller.current?.newConversation())}
     more={() => report(controller.current?.moreConversations())} older={() => report(controller.current?.older())}
     operations={operations}
+    applyProposal={value => report(controller.current?.applyProposal(value))}
+    discardProposal={value => report(controller.current?.discardProposal(value))}
     resource={(kind, id) => report(controller.current?.resource(kind, id))} focus={anchor => editor.current?.focusFinding(anchor) ?? false} />
     : null;
 }

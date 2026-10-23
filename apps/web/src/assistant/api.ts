@@ -25,10 +25,19 @@ import type { PreparedApi } from "./editor-bridge";
 import type { AssistantTaskCatalogV1 } from "../contracts/generated/assistant_task_catalog_v1";
 import type { AssistantTaskCheckV1 } from "../contracts/generated/assistant_task_check_v1";
 import { knownErrorMessage } from "../errors/messages";
+import type { AssistantProposalV1 } from "../contracts/generated/assistant_proposal_v1";
+import type { AssistantReviewListV1 } from "../contracts/generated/assistant_review_list_v1";
+import type { AssistantReviewV1 } from "../contracts/generated/assistant_review_v1";
+import type { AssistantProposalRequestV1 } from "../contracts/generated/assistant_proposal_request_v1";
+import type { AssistantProposalAcceptV1 } from "../contracts/generated/assistant_proposal_accept_v1";
+import type { AssistantProposalClaimV1 } from "../contracts/generated/assistant_proposal_claim_v1";
+import type { AssistantProposalRecoveryV1 } from "../contracts/generated/assistant_proposal_recovery_v1";
 
 type MessagePage = Omit<AgentMessagePage, "items"> & { items: AgentMessage[] };
 type Replies = { agent_project_operations: AgentProjectOperations; agent_access: AgentAccess; agent_capabilities: AgentCapabilities; agent_settings: AgentSettings; agent_conversation: AgentConversation;
   assistant_task_catalog_v1: AssistantTaskCatalogV1; assistant_task_check_v1: AssistantTaskCheckV1;
+  assistant_proposal_v1: AssistantProposalV1; assistant_review_list_v1: AssistantReviewListV1; assistant_review_v1: AssistantReviewV1;
+  assistant_proposal_claim_v1: AssistantProposalClaimV1; assistant_proposal_recovery_v1: AssistantProposalRecoveryV1;
   agent_conversation_page: AgentConversationPage; agent_message_page: MessagePage; agent_resource_page: AgentResourcePage;
   agent_lease: AgentLease; agent_run: AgentRun; agent_run_read: AgentRunRead; agent_claim_result: AgentClaimResult;
   agent_commit_result: AgentCommitResult; agent_edit_receipt: AgentEditReceipt; agent_empty_request: Record<string, never>;
@@ -96,6 +105,30 @@ export class AgentBrowserApi {
   checkMessage(message: string, flags: AgentFlags): Promise<AssistantTaskCheckV1> {
     return this.request("assistant_task_check_v1", this.prefix + "/tasks/check-message", "POST",
       { schemaVersion: 1, protocolVersion: 1, message, scope: "resume", ...flags }, { "X-FoldCV-Assistant-Protocol": "1" });
+  }
+  proposals(): Promise<AssistantReviewListV1> {
+    return this.request("assistant_review_list_v1", this.prefix + "/reviews", "GET", {}, { "X-FoldCV-Assistant-Protocol": "1" });
+  }
+  proposal(value: AssistantProposalRequestV1): Promise<AssistantReviewV1> {
+    return this.request("assistant_review_v1", `${this.prefix}/reviews/${encodeURIComponent(value.proposalId)}/versions/${String(value.version)}`,
+      "GET", {}, { "X-FoldCV-Assistant-Protocol": "1" });
+  }
+  discardProposal(value: AssistantProposalRequestV1): Promise<AssistantProposalV1> {
+    return this.request("assistant_proposal_v1", this.prefix + "/proposals/discard", "POST", value, { "X-FoldCV-Assistant-Protocol": "1" });
+  }
+  reviewed(value: AssistantProposalAcceptV1): PreparedApi {
+    const accepted = structuredClone(value), headers = { "X-FoldCV-Assistant-Protocol": "1" };
+    let claim: AgentClaimResult | null = null;
+    return { resolve: async () => {
+      const reply = await this.request("assistant_proposal_claim_v1", this.prefix + "/proposals/claim", "POST", accepted, headers);
+      if (reply.accepted.proposalId !== accepted.proposalId || reply.accepted.version !== accepted.version
+        || reply.accepted.contentSha256 !== accepted.contentSha256) throw new AgentApiFailure("AGENT_IDEMPOTENCY_CONFLICT");
+      claim = reply.claim; return claim.batch.id;
+    }, claim: id => claim?.batch.id === id ? Promise.resolve(claim) : Promise.reject(new AgentApiFailure("AGENT_PROTOCOL")),
+    commit: current => this.request("agent_commit_result", this.prefix + "/proposals/commit", "POST",
+      { ...accepted, ticket: current.ticket, requestSha256: current.batch.requestSha256 }, headers),
+    recover: async () => (await this.request("assistant_proposal_recovery_v1", this.prefix + "/proposals/recover", "POST", accepted, headers)).result,
+    report: async receipt => { await this.request("assistant_proposal_v1", this.prefix + "/proposals/result", "POST", { ...accepted, receipt }, headers); } };
   }
   conversations(cursor: string | null = null): Promise<AgentConversationPage> { return this.request("agent_conversation_page", this.prefix + "/conversations/read", "POST", page(cursor)); }
   conversation(): Promise<AgentConversation> { return this.request("agent_conversation", this.prefix + "/conversations"); }

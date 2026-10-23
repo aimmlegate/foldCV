@@ -12,7 +12,7 @@ from packages.resume_core.models.agent import (
     AgentProjectOperation, AgentProjectOperations,
 )
 from packages.resume_core.models.assistant_capabilities import AssistantMessageCheckV1
-from packages.resume_core.models.assistant_proposals import AssistantProposalListV1, AssistantProposalRequestV1
+from packages.resume_core.models.assistant_proposals import AssistantProposalListV1, AssistantProposalRequestV1, AssistantReviewListV1
 
 
 def mount_agent(app, service):
@@ -66,15 +66,18 @@ def mount_agent(app, service):
 
     @app.get(prefix + "/proposals")
     async def proposals(project_id: str, request: Request):
+        from .proposals import review
         proposal_protocol(request)
         project(project_id)
         return response(AssistantProposalListV1(projectId=project_id,
-            proposals=[item.proposal for item in service.proposals.list(project_id) if not item.no_change]))
+            proposals=[item.proposal for item in review(service, project_id) if not item.no_change]))
 
     @app.get(prefix + "/proposals/{proposal_id}/versions/{version}")
     async def proposal(project_id: str, proposal_id: str, version: int, request: Request):
+        from .proposals import review
         proposal_protocol(request)
         project(project_id)
+        review(service, project_id)
         return response(service.proposals.get(project_id, proposal_id, version).proposal)
 
     @app.post(prefix + "/proposals/discard")
@@ -92,6 +95,29 @@ def mount_agent(app, service):
             value.proposal.state = "discarded"
             return value
         return response(service.proposals.update(project_id, discard).proposal)
+
+    @app.get(prefix + "/reviews")
+    async def reviews(project_id: str, request: Request):
+        from .proposals import review, review_view
+        from .capabilities import catalog
+        proposal_protocol(request)
+        project(project_id)
+        tasks = catalog(service, project_id, **flags(request))
+        return response(AssistantReviewListV1(projectId=project_id,
+            reviews=[review_view(service, item, tasks) for item in review(service, project_id) if not item.no_change]))
+
+    @app.get(prefix + "/reviews/{proposal_id}/versions/{version}")
+    async def review_one(project_id: str, proposal_id: str, version: int, request: Request):
+        from .proposals import review, review_view
+        from .capabilities import catalog
+        proposal_protocol(request)
+        project(project_id)
+        tasks = catalog(service, project_id, **flags(request))
+        values = review(service, project_id)
+        item = next((item for item in values if item.proposal.id == proposal_id and item.proposal.version == version), None)
+        if item is None:
+            raise AgentFailure("ASSISTANT_PROPOSAL_MISSING")
+        return response(review_view(service, item, tasks))
 
     def owned_run(project_id, run_id):
         project(project_id)

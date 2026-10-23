@@ -1,0 +1,14 @@
+.chat-proposal { container-type: inline-size; min-width: 0; margin-block: 12px; padding: 12px; border: 1px solid var(--line); border-radius: 8px; background: var(--paper); color: var(--ink); }
+.chat-proposal h3, .chat-proposal h4 { margin: 0; font-size: var(--ui-body); }
+.chat-proposal p { margin-block: 8px; overflow-wrap: anywhere; }
+.chat-proposal-coverage { color: var(--muted); }
+.chat-proposal-change { margin-block: 10px; }
+.chat-proposal summary { cursor: pointer; }
+.chat-proposal-comparison { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; margin-top: 6px; }
+.chat-proposal-comparison > div { min-width: 0; padding: 8px; background: var(--wash); border-radius: 4px; }
+.chat-proposal pre { margin: 6px 0 0; font: inherit; white-space: pre-wrap; overflow-wrap: anywhere; }
+.chat-proposal-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; }
+.chat-proposal-actions button { min-height: 34px; }
+.chat-proposal button:focus-visible, .chat-proposal summary:focus-visible { outline: 2px solid var(--ink); outline-offset: 3px; }
+@container (max-width: 480px) { .chat-proposal-comparison { grid-template-columns: minmax(0, 1fr); } }
+@media (max-width: 600px) { .chat-proposal-comparison { grid-template-columns: minmax(0, 1fr); } }
