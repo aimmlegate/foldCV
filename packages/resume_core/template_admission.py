@@ -6,7 +6,7 @@ from .template_import import TemplateImportFailure, authorization, checked, dige
 from .template_replacements import apply_accepted_records
 from .template_builtin_admission import apply_builtin_records, current_handles, human_authority, make_builtin_candidate
 from .template_mutations import _set_builtin_owner
-from .template_review import decide_review, validate_review_reply
+from .template_review import check_review_reply, decide_review
 from .templates.compiler import canonical, sha256
 from .templates.projection import reachable_schema
 from .template_capture import item_identities, retain_builtin_identity
@@ -22,7 +22,7 @@ def admit_proposal(operation, proposal_id, receipt_id, package, sources, facts, 
     if (proposal is None or receipt is None or review is None or review.value.proposal_hash != proposal.proposal_hash
             or review.input_hash != digest(review.value) or receipt.review_input_hash != review.input_hash):
         raise TemplateImportFailure('IMPORT_ADMISSION_RECEIPT_INVALID')
-    validate_review_reply(receipt.reply.model_dump(mode='json', by_alias=True), review.value, sources)
+    check_review_reply(receipt.reply, review.value, sources)
     if proposal.applied_receipt_id is not None:
         if proposal.applied_receipt_id != receipt_id:
             raise TemplateImportFailure('IMPORT_ADMISSION_ALREADY_APPLIED')

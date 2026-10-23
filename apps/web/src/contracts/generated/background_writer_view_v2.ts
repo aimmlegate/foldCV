@@ -802,6 +802,9 @@ export type Id36 = string;
 export type Inputhash2 = string;
 export type Allowtextrewrite2 = boolean;
 export type Effectivecells = ExtensionCell[];
+export type Ref = string;
+export type Text7 = string;
+export type Evidence19 = EvidenceOption[];
 export type Handlemap = (HandleAllocation | CapturedItemIdentity)[];
 export type Occurrenceindependent = boolean;
 export type Packagehash5 = string;
@@ -822,7 +825,7 @@ export type Fields2 = string[];
 export type Instructions = string[];
 export type Version1 = 1;
 export type Rules = Check[];
-export type Schemaversion9 = 1;
+export type Schemaversion9 = 1 | 2;
 export type Sourcespans = SourceSpan[];
 export type Targets = CheckTarget[];
 export type Reviewinputs = ReviewInputRecord[];
@@ -1029,7 +1032,7 @@ export type Italic1 = boolean;
 export type Strike = boolean;
 export type Textcolor = string;
 export type Underline = boolean;
-export type Text7 = string;
+export type Text8 = string;
 export type Type1 = "text";
 export type Content1 = PresentedText[];
 export type Href = string;
@@ -1043,7 +1046,7 @@ export type Fieldkey5 = string;
 export type Occurrenceid = string;
 export type Recordid4 = string;
 export type Syncedfactrevision = number;
-export type Text8 = string;
+export type Text9 = string;
 export type Type3 = "fact_field";
 export type Content2 = (PresentedText | FieldOccurrence)[];
 export type Href1 = string;
@@ -1056,7 +1059,7 @@ export type Citations2 = SourceSpan[];
 export type Fragmentid = string;
 export type Occurrenceid2 = string;
 export type Scopeid = string;
-export type Text9 = string;
+export type Text10 = string;
 export type Type5 = "manual_scope";
 export type Content = (PresentedText | PresentedHyperlink | FieldOccurrence | BoundLink | ManualScopeSpan)[];
 export type Id55 = string;
@@ -1066,7 +1069,7 @@ export type Manualorder = boolean;
 export type Presentation = "standard" | "focus";
 export type Recordid6 = string | null;
 export type Textcolor1 = string;
-export type Evidence19 = EvidenceSpan[];
+export type Evidence20 = EvidenceSpan[];
 export type Fieldkeys = string[];
 export type Id56 = string;
 export type Kind41 = "citation";
@@ -1081,7 +1084,7 @@ export type Recordid9 = string;
 /**
  * @minItems 1
  */
-export type Evidence20 = [EvidenceSpan, ...EvidenceSpan[]];
+export type Evidence21 = [EvidenceSpan, ...EvidenceSpan[]];
 export type Id59 = string;
 export type Kind44 = "source";
 export type Provenance1 = (NarrativeCitation | FieldBinding | WorkingOwnership | SourceWitness)[];
@@ -1353,7 +1356,7 @@ export type Revision42 = number;
 export type Role3 = "header" | "sidebar" | "main";
 export type Revision43 = number;
 export type Schemaversion12 = 2;
-export type Evidence21 = EvidenceSpan[];
+export type Evidence22 = EvidenceSpan[];
 export type Id74 = string;
 export type Rawtext5 = string;
 export type Evidencerecords = ImmutableFactEvidence[];
@@ -1560,7 +1563,7 @@ export type End3 = number;
 export type Kind68 = "splice_text";
 export type Pointer7 = string;
 export type Start4 = number;
-export type Text10 = string;
+export type Text11 = string;
 export type Blockid5 = string;
 export type Cellid5 = string | null;
 export type Field4 = "content" | "caption";
@@ -1678,7 +1681,7 @@ export type Children25 = (
   | ImageBlock
   | SectionBlock
 )[];
-export type Text11 = string;
+export type Text12 = string;
 export type Type18 = "text";
 export type Content16 = StyledText[];
 export type Href2 = string;
@@ -1688,7 +1691,7 @@ export type Bindingrootid1 = string | null;
 export type Fieldkey8 = string;
 export type Recordid13 = string;
 export type Syncedfactrevision1 = number;
-export type Text12 = string;
+export type Text13 = string;
 export type Type20 = "fact_field";
 export type Content15 = (StyledText | Hyperlink | FactFieldSpan)[];
 export type Id80 = string;
@@ -1964,7 +1967,7 @@ export type Sourceid3 = string;
 export type Sourcerevision2 = number;
 export type Unitid4 = string;
 export type Unitrevision2 = number;
-export type Evidence22 = Evidence23[];
+export type Evidence23 = Evidence24[];
 export type Id94 = string;
 export type Page3 = number | null;
 export type Sourceid4 = string;
@@ -3159,6 +3162,7 @@ export interface ReviewInputRecord {
 export interface ReviewInput {
   allowTextRewrite: Allowtextrewrite2;
   effectiveCells: Effectivecells;
+  evidence?: Evidence19;
   handleMap: Handlemap;
   occurrenceContext: JsonValue;
   occurrenceIndependent: Occurrenceindependent;
@@ -3173,6 +3177,11 @@ export interface ReviewInput {
   sourceSpans: Sourcespans;
   sourceTexts: Sourcetexts;
   targets: Targets;
+}
+export interface EvidenceOption {
+  ref: Ref;
+  span: SourceSpan;
+  text: Text7;
 }
 export interface Check {
   id: Id37;
@@ -3607,7 +3616,7 @@ export interface PresentedText {
   citations?: Citations;
   presentation?: AuthoredPresentation | null;
   styles: InlineStyles;
-  text: Text7;
+  text: Text8;
   type: Type1;
 }
 export interface InlineStyles {
@@ -3637,7 +3646,7 @@ export interface FieldOccurrence {
   recordId: Recordid4;
   styles: InlineStyles;
   syncedFactRevision: Syncedfactrevision;
-  text: Text8;
+  text: Text9;
   type: Type3;
 }
 export interface BoundLink {
@@ -3661,7 +3670,7 @@ export interface ManualScopeSpan {
   presentation: AuthoredPresentation | null;
   scopeId: Scopeid;
   styles: InlineStyles;
-  text: Text9;
+  text: Text10;
   type: Type5;
 }
 export interface SectionProps {
@@ -3673,7 +3682,7 @@ export interface SectionProps {
   textColor?: Textcolor1;
 }
 export interface NarrativeCitation {
-  evidence: Evidence19;
+  evidence: Evidence20;
   fieldKeys: Fieldkeys;
   id: Id56;
   kind: Kind41;
@@ -3691,7 +3700,7 @@ export interface WorkingOwnership {
   recordId: Recordid9;
 }
 export interface SourceWitness {
-  evidence: Evidence20;
+  evidence: Evidence21;
   id: Id59;
   kind: Kind44;
 }
@@ -3751,7 +3760,7 @@ export interface HeadingProps {
   textColor?: Textcolor5;
 }
 export interface ImmutableFactEvidence {
-  evidence: Evidence21;
+  evidence: Evidence22;
   id: Id74;
   rawText: Rawtext5;
 }
@@ -3985,7 +3994,7 @@ export interface PatchSpliceText {
   kind: Kind68;
   pointer: Pointer7;
   start: Start4;
-  text: Text10;
+  text: Text11;
 }
 export interface SetManualScopeDisplays {
   assignments: Assignments;
@@ -4179,7 +4188,7 @@ export interface SectionBlock {
 }
 export interface StyledText {
   styles: InlineStyles;
-  text: Text11;
+  text: Text12;
   type: Type18;
 }
 export interface Hyperlink {
@@ -4194,7 +4203,7 @@ export interface FactFieldSpan {
   recordId: Recordid13;
   styles: InlineStyles;
   syncedFactRevision: Syncedfactrevision1;
-  text: Text12;
+  text: Text13;
   type: Type20;
 }
 export interface ImageProps {
@@ -4238,12 +4247,12 @@ export interface RichWarning {
   blockIds: Blockids6;
   code: Code4;
   count?: Count;
-  evidence: Evidence22;
+  evidence: Evidence23;
   id: Id94;
   locations?: Locations;
   recordIds: Recordids;
 }
-export interface Evidence23 {
+export interface Evidence24 {
   sourceId: Sourceid3;
   sourceRevision: Sourcerevision2;
   unitId: Unitid4;

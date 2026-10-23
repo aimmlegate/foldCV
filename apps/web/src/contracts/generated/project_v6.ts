@@ -946,6 +946,9 @@ export type Id55 = string;
 export type Inputhash2 = string;
 export type Allowtextrewrite1 = boolean;
 export type Effectivecells = ExtensionCell[];
+export type Ref = string;
+export type Text6 = string;
+export type Evidence22 = EvidenceOption[];
 export type Handlemap = (HandleAllocation | CapturedItemIdentity)[];
 export type Occurrenceindependent = boolean;
 export type Packagehash6 = string;
@@ -966,7 +969,7 @@ export type Fields1 = string[];
 export type Instructions = string[];
 export type Version1 = 1;
 export type Rules = Check[];
-export type Schemaversion6 = 1;
+export type Schemaversion6 = 1 | 2;
 export type Sourcespans = SourceSpan[];
 export type Targets = CheckTarget[];
 export type Reviewinputs = ReviewInputRecord[];
@@ -1165,7 +1168,7 @@ export type BaselineY = number;
 export type CenterX = number;
 export type Repeat = "every_page";
 export type Style3 = string;
-export type Text6 = string;
+export type Text7 = string;
 export type Color1 = string;
 export type FollowHeader = true;
 export type Width3 = number;
@@ -2366,6 +2369,7 @@ export interface ReviewInputRecord {
 export interface ReviewInput {
   allowTextRewrite: Allowtextrewrite1;
   effectiveCells: Effectivecells;
+  evidence?: Evidence22;
   handleMap: Handlemap;
   occurrenceContext: JsonValue;
   occurrenceIndependent: Occurrenceindependent;
@@ -2380,6 +2384,11 @@ export interface ReviewInput {
   sourceSpans: Sourcespans;
   sourceTexts: Sourcetexts;
   targets: Targets;
+}
+export interface EvidenceOption {
+  ref: Ref;
+  span: SourceSpan;
+  text: Text6;
 }
 export interface Check {
   id: Id56;
@@ -2699,7 +2708,7 @@ export interface Style2 {
   header: Header;
   page: Page2;
   section_band: Band;
-  text: Text7;
+  text: Text8;
 }
 export interface Bullets {
   marker: Marker;
@@ -2728,7 +2737,7 @@ export interface Footer {
   center_x: CenterX;
   repeat: Repeat;
   style: Style3;
-  text: Text6;
+  text: Text7;
 }
 export interface Header {
   divider: Divider | null;
@@ -2766,7 +2775,7 @@ export interface Band {
   height: Height4;
   text_inset: TextInset;
 }
-export interface Text7 {
+export interface Text8 {
   [k: string]: TextStyle;
 }
 export interface TextStyle {

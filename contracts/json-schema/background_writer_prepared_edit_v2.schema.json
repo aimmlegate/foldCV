@@ -2809,6 +2809,30 @@
       "title": "Evidence",
       "type": "object"
     },
+    "EvidenceOption": {
+      "additionalProperties": false,
+      "properties": {
+        "ref": {
+          "minLength": 1,
+          "title": "Ref",
+          "type": "string"
+        },
+        "span": {
+          "$ref": "#/$defs/SourceSpan"
+        },
+        "text": {
+          "title": "Text",
+          "type": "string"
+        }
+      },
+      "required": [
+        "ref",
+        "span",
+        "text"
+      ],
+      "title": "EvidenceOption",
+      "type": "object"
+    },
     "EvidenceSpan": {
       "additionalProperties": false,
       "properties": {
@@ -9880,6 +9904,13 @@
           "title": "Effectivecells",
           "type": "array"
         },
+        "evidence": {
+          "items": {
+            "$ref": "#/$defs/EvidenceOption"
+          },
+          "title": "Evidence",
+          "type": "array"
+        },
         "handleMap": {
           "items": {
             "anyOf": [
@@ -9934,7 +9965,10 @@
           "type": "array"
         },
         "schemaVersion": {
-          "const": 1,
+          "enum": [
+            1,
+            2
+          ],
           "title": "Schemaversion",
           "type": "integer"
         },

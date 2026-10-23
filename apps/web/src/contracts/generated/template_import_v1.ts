@@ -258,6 +258,9 @@ export type Revision1 = number;
 export type State7 = "admitted" | "human_raw" | "pending_manual" | "uncertain";
 export type Usercorrected = boolean;
 export type Effectivecells = ExtensionCell[];
+export type Ref = string;
+export type Text = string;
+export type Evidence5 = EvidenceOption[];
 export type Handlemap = (HandleAllocation | CapturedItemIdentity)[];
 export type Occurrenceindependent = boolean;
 export type Packagehash3 = string;
@@ -278,7 +281,7 @@ export type Fields1 = string[];
 export type Instructions = string[];
 export type Version = 1;
 export type Rules = Check[];
-export type Schemaversion1 = 1;
+export type Schemaversion1 = 1 | 2;
 export type Sourcespans = SourceSpan[];
 export type Targets = CheckTarget[];
 export type Reviewinputs = ReviewInputRecord[];
@@ -700,6 +703,7 @@ export interface ReviewInputRecord {
 export interface ReviewInput {
   allowTextRewrite: Allowtextrewrite1;
   effectiveCells: Effectivecells;
+  evidence?: Evidence5;
   handleMap: Handlemap;
   occurrenceContext: JsonValue;
   occurrenceIndependent: Occurrenceindependent;
@@ -728,6 +732,11 @@ export interface ExtensionCell {
   state: State7;
   typedValue: JsonValue;
   userCorrected: Usercorrected;
+}
+export interface EvidenceOption {
+  ref: Ref;
+  span: SourceSpan;
+  text: Text;
 }
 export interface Check {
   id: Id11;

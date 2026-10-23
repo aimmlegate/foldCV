@@ -5,25 +5,19 @@ import json
 from packages.resume_core.models.contracts import Source
 from resume_api.providers.content import ContentResult, ContentTransportReturn, ContentFailure, ReportedUsage
 from resume_api.providers.dynamic_result import DynamicResultSpec
-from packages.resume_core.models.template_facts import SourceSpan
-from packages.resume_core.template_import import digest
 from tests.templates.employment_fixtures import employment_proposal
-
-
-def digest_span(span):
-    return digest(SourceSpan.model_validate(span))
+from tests.templates.evidence_references import by_reference
 
 
 def scripted_template_answer(value):
     """Extraction answers with the F01 employment proposal over the task's own source unit; review accepts every target."""
     if 'targets' in value:
-        return {'results': [{'ruleId': target['ruleId'], 'targetId': target['targetId'], 'disposition': 'satisfied',
-            'reason': '', 'evidence': [], 'actionable': False} for target in value['targets']]}
-    # Whole-unit spans name every unit the task may cite; their texts come with the task input.
+        return by_reference({'results': [{'ruleId': target['ruleId'], 'targetId': target['targetId'], 'disposition': 'satisfied',
+            'reason': '', 'evidence': [], 'actionable': False} for target in value['targets']]}, value)
+    # Whole-unit evidence entries name every unit the task may cite, with their texts.
     units = {}
-    for span in value['sourceSpans']:
-        text = next(text for key, text in value['sourceTexts'].items() if len(text) == span['end'] - span['start']
-            and key == digest_span(span))
+    for option in value['evidence']:
+        span, text = option['span'], option['text']
         key = (span['unitId'], span['unitRevision'])
         if span['start'] == 0 and len(text) >= len(units.get(key, ('', 0))[0]):
             units[key] = (text, span)
@@ -34,14 +28,14 @@ def scripted_template_answer(value):
             'location': {'kind': 'pasted', 'index': index, 'row': None, 'column': None}, 'disposition': 'shown', 'representedFactIds': []}
             for index, ((unit_id, revision), (text, _span)) in enumerate(units.items())],
         'overlays': [], 'warnings': []})
-    return employment_proposal(src)
+    return by_reference(employment_proposal(src), value)
 
 
-def scripted_template_result(provider, request):
+def scripted_template_result(provider, request, answer=scripted_template_answer):
     """Answer one template task as a provider would, reporting the return before the result."""
     value = json.loads(request.text)
     provider.calls.append({'kind': 'template_review' if 'targets' in value else 'template_extraction'})
-    raw = json.dumps({'payload': scripted_template_answer(value)})
+    raw = json.dumps({'payload': answer(value)})
     usage, witness = ReportedUsage(10, 0, 4, True), {'transport': 'scripted', 'turnId': str(len(provider.calls))}
     if request.on_return is not None:
         request.on_return(ContentTransportReturn(raw, 'completed', None, 1, usage, True, witness, request.policy.reasoning_effort))

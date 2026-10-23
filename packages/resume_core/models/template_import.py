@@ -91,6 +91,42 @@ class ProposalReply(Wire):
     relations: list[ProposalRelation] = Field(default_factory=list, exclude_if=lambda value: not value)
 
 
+# A provider reply selects request-local choices; the coordinator restores the captured identities (plan 3.3).
+EvidenceRef = Annotated[str, Field(min_length=1, json_schema_extra={'x-reference': 'EvidenceRef'})]
+CheckRef = Annotated[str, Field(min_length=1, json_schema_extra={'x-reference': 'CheckRef'})]
+
+
+class EvidenceOption(Wire):
+    ref: Id
+    span: SourceSpan
+    text: str
+
+
+class ReferencedField(Wire):
+    item: ItemSelector
+    field_key: Id
+    pointer: str
+    evidence: list[EvidenceRef]
+    effective_cell_ids: list[Id]
+
+
+class ReferencedRelation(Wire):
+    relation: RelationSelector
+    kind: Literal["owned_by", "extension_of", "related_to"]
+    subject: ItemSelector
+    target: ItemSelector
+    evidence: list[EvidenceRef]
+
+
+class ReferencedProposalReply(Wire):
+    schema_version: Literal[2]
+    payload: JsonValue
+    discoveries: list[Discovery]
+    fields: list[ReferencedField]
+    lineage: list[ProposalLineage]
+    relations: list[ReferencedRelation]
+
+
 class CheckTarget(Wire):
     rule_id: Id
     target_id: Id
@@ -106,7 +142,7 @@ class ModelCapture(Wire):
 
 
 class ReviewInput(Wire):
-    schema_version: Literal[1]
+    schema_version: Literal[1, 2]
     protocol: Literal["template_import_v1"]
     proposal_hash: Sha256
     targets: list[CheckTarget]
@@ -122,6 +158,16 @@ class ReviewInput(Wire):
     policy: ModelCapture
     occurrence_context: JsonValue
     occurrence_independent: bool
+    # Version 2 offers evidence by reference; version 1 keeps its digest-keyed spans and texts.
+    evidence: list[EvidenceOption] = Field(default_factory=list, exclude_if=lambda value: not value)
+
+    @model_validator(mode="after")
+    def evidence_form(self):
+        if self.schema_version == 1 and self.evidence or self.schema_version == 2 and (self.source_spans or self.source_texts):
+            raise ValueError("review evidence form differs from its schema version")
+        _unique([value.ref for value in self.evidence], "review evidence reference")
+        _unique([value.span.model_dump_json() for value in self.evidence], "review evidence span")
+        return self
 
 
 class ReviewDisposition(Wire):
@@ -135,6 +181,18 @@ class ReviewDisposition(Wire):
 
 class ReviewReply(Wire):
     results: list[ReviewDisposition]
+
+
+class ReferencedDisposition(Wire):
+    check: CheckRef
+    disposition: Literal["satisfied", "violation", "uncertain"]
+    reason: str
+    evidence: list[EvidenceRef]
+    actionable: bool
+
+
+class ReferencedReviewReply(Wire):
+    results: list[ReferencedDisposition]
 
 
 class ReviewReceipt(Wire):

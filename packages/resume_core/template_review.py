@@ -2,14 +2,15 @@
 
 from dataclasses import dataclass
 
-from .models.template_import import CheckTarget, ReviewInput, ReviewReceipt, ReviewReply
+from .models.template_import import (CheckTarget, ReferencedProposalReply, ReferencedReviewReply, ReviewInput,
+    ReviewReceipt, ReviewReply)
 from .project_store import strict_json
-from .template_identity import capture_span, source_slice
+from .template_identity import capture_span, evidence_options, offered_evidence, payload_value, restore_evidence, source_slice
 from .template_import import TemplateImportFailure, attempt_in, checked, digest, identity, task_in
 from .templates.models import Check
 from .templates.compiler import sha256
 from .templates.projection import pointer_tokens, validate_payload
-from .templates.replies import review_schema
+from .templates.replies import REVIEW_PROTOCOL, check_references, review_schema
 from .template_capture import item_identities
 
 
@@ -53,6 +54,42 @@ def expected_checks(task, proposal, allocations, rules):
     return [CheckTarget(ruleId=rule, targetId=target) for rule, target in sorted(pairs)]
 
 
+def review_texts(review):
+    """Every evidence span a review input offers, with its captured text, in either input version."""
+    if review.schema_version == 1:
+        return [(span, review.source_texts.get(digest(span))) for span in review.source_spans]
+    return [(option.span, option.text) for option in review.evidence]
+
+
+def review_checks(task, proposal, allocations, targets, refs):
+    """One entry per check ref: its rule and target, with the payload value and evidence refs the target cites."""
+    by_handle = {allocation.item_handle: allocation for allocation in allocations}
+    # Discovery keys are reply-local: only this attempt's allocations map to the reply's item pointers.
+    pointers = {discovery.key: discovery.pointer for discovery in proposal.reply.discoveries}
+    records = {allocation.record_id: pointers[allocation.key] if getattr(allocation, 'discovery_attempt_id', None)
+        == proposal.attempt_id and allocation.key in pointers else allocation.item_handle for allocation in allocations}
+    fields = {by_handle[field.item_handle].cell_ids[field.field_key]: field for field in proposal.resolved_fields}
+    relations = {resolved.id: (resolved, proposed)
+        for resolved, proposed in zip(proposal.resolved_relations, proposal.reply.relations, strict=True)}
+    checks = []
+    for index, target in enumerate(targets, 1):
+        entry = {'check': 'C' + str(index), 'ruleId': target.rule_id, 'targetId': target.target_id}
+        if target.target_id in fields:
+            field = fields[target.target_id]
+            entry.update(kind='field', semanticType=by_handle[field.item_handle].semantic_type, fieldKey=field.field_key,
+                pointer=field.pointer, value=payload_value(proposal.reply.payload, field.pointer),
+                evidence=[refs[digest(span)] for span in field.evidence])
+        elif target.target_id in relations:
+            resolved, proposed = relations[target.target_id]
+            entry.update(kind='relation', relation=resolved.kind, subject=records.get(resolved.subject_id, resolved.subject_id),
+                target=records.get(resolved.target_id, resolved.target_id),
+                evidence=[refs[digest(span)] for span in proposed.evidence])
+        else:
+            entry.update(kind='scope', block=task.block_id)
+        checks.append(entry)
+    return checks
+
+
 def make_review_input(operation, proposal, package, sources, policy, *, effective_cells, semantic_context,
                       occurrence_context=None, occurrence_independent=True):
     if proposal.state != 'provisional' or proposal.reply is None:
@@ -67,30 +104,38 @@ def make_review_input(operation, proposal, package, sources, policy, *, effectiv
     spans = [capture_span(source, unit) for source in sources for unit in source.units]
     spans += [span for field in proposal.resolved_fields for span in field.evidence]
     spans += [span for relation in proposal.reply.relations for span in relation.evidence]
-    spans = list({digest(span): span for span in spans}.values())
-    texts = {digest(span): source_slice(sources, span) for span in spans}
-    context = dict(semantic_context)
+    # References the proposal request offered keep their names, so the proposal reads the same in review.
+    evidence = evidence_options(spans, sources, base=list((offered_evidence(attempt.request_value) or {}).values()))
+    refs = {digest(option.span): option.ref for option in evidence}
+    shown = proposal.reply.model_dump(mode='json', by_alias=True)
+    for dumped, field in zip(shown['fields'], proposal.reply.fields, strict=True):
+        dumped['evidence'] = [refs[digest(span)] for span in field.evidence]
+    shown['relations'] = [{**relation.model_dump(mode='json', by_alias=True),
+        'evidence': [refs[digest(span)] for span in relation.evidence]} for relation in proposal.reply.relations]
+    context = {**semantic_context, 'replyProtocol': REVIEW_PROTOCOL,
+        'proposal': ReferencedProposalReply.model_validate({**shown, 'schemaVersion': 2}, strict=True).model_dump(
+            mode='json', by_alias=True),
+        'checks': review_checks(task, proposal, allocations, targets, refs)}
     if not operation.capture.allow_text_rewrite:
         context['sourceWordingPointers'] = sorted({field.pointer for field in proposal.resolved_fields
             if any(_matches(pattern, field.pointer) for pattern in block.rewrite.fields)})
-    return ReviewInput(schemaVersion=1, protocol='template_import_v1', proposalHash=proposal.proposal_hash,
-        targets=targets, handleMap=allocations, rules=rules, sourceSpans=spans, sourceTexts=texts,
+    return ReviewInput(schemaVersion=2, protocol='template_import_v1', proposalHash=proposal.proposal_hash,
+        targets=targets, handleMap=allocations, rules=rules, sourceSpans=[], sourceTexts={}, evidence=evidence,
         effectiveCells=effective_cells, relations=proposal.resolved_relations, packageHash=package.package_hash,
         allowTextRewrite=operation.capture.allow_text_rewrite, semanticContext=context, policy=policy,
         occurrenceContext=occurrence_context, occurrenceIndependent=occurrence_independent)
 
 
-def validate_review_reply(value, expected, sources):
-    validate_payload(review_schema(), value)
-    reply = ReviewReply.model_validate(value, strict=True)
+def check_review_reply(reply, expected, sources):
+    """Coverage, rule and evidence checks of a resolved reply; shared by new replies and receipt reuse."""
     pairs = [(result.rule_id, result.target_id) for result in reply.results]
     wanted = [(target.rule_id, target.target_id) for target in expected.targets]
     if len(set(wanted)) != len(wanted) or len(set(pairs)) != len(pairs) or set(pairs) != set(wanted):
         raise TemplateImportFailure('IMPORT_REVIEW_INCOMPLETE')
     if not set(target.rule_id for target in expected.targets) <= {rule.id for rule in expected.rules}:
         raise TemplateImportFailure('IMPORT_REVIEW_TARGET_INVALID')
-    for span in expected.source_spans:
-        if expected.source_texts.get(digest(span)) != source_slice(sources, span):
+    for span, text in review_texts(expected):
+        if text != source_slice(sources, span):
             raise TemplateImportFailure('IMPORT_REVIEW_EVIDENCE_CHANGED')
     for result in reply.results:
         for span in result.evidence:
@@ -98,11 +143,25 @@ def validate_review_reply(value, expected, sources):
     return reply
 
 
+def validate_review_reply(value, expected, sources):
+    """Raw-before-decode validation of a provider review; version 2 replies select checks and evidence by reference."""
+    validate_payload(review_schema(expected), value)
+    if expected.schema_version == 1:
+        return check_review_reply(ReviewReply.model_validate(value, strict=True), expected, sources)
+    referenced = ReferencedReviewReply.model_validate(value, strict=True)
+    checks, table = check_references(expected), {option.ref: option for option in expected.evidence}
+    reply = ReviewReply.model_validate({'results': [{'ruleId': checks[result.check].rule_id,
+        'targetId': checks[result.check].target_id, 'disposition': result.disposition, 'reason': result.reason,
+        'evidence': [span.model_dump(mode='json', by_alias=True) for span in restore_evidence(result.evidence, table, sources)],
+        'actionable': result.actionable} for result in referenced.results]}, strict=True)
+    return check_review_reply(reply, expected, sources)
+
+
 def reusable_receipt(operation, value, sources):
     checksum = digest(value)
     for receipt in operation.receipts:
         if receipt.review_input_hash == checksum and receipt.expected_checks == value.targets:
-            validate_review_reply(receipt.reply.model_dump(mode='json', by_alias=True), value, sources)
+            check_review_reply(receipt.reply, value, sources)
             return receipt
     return None
 

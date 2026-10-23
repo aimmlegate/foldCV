@@ -72,3 +72,37 @@ async def test_repairs_keep_siblings_and_use_only_configured_slots(tmp_path, ent
         if repair == 'fallback_unavailable':
             assert operation.attempts[-1].state == 'released' and operation.cleanup_records[-1].never_dispatched
     assert ('synthetic-fallback' in models) == (repair in {'fallback', 'fallback_failure', 'fallback_unavailable'})
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize('cap', [3, 4])
+async def test_a_repair_starts_only_when_its_replacement_review_fits_the_cap(tmp_path, cap):
+    fixture = RuntimeFixture(tmp_path, cap=cap, fallback=False)
+    reviews = []
+    def script(_request, value):
+        if 'targets' in value:
+            reviews.append(value)
+            rejected = {allocation['cellIds']['journal'] for allocation in value['handleMap'] if allocation['key'] == 'b'}
+            fail = len(reviews) == 1
+            return {'results': [{'ruleId': target['ruleId'], 'targetId': target['targetId'],
+                'disposition': 'violation' if fail and target['targetId'] in rejected else 'satisfied',
+                'reason': 'Journal is not supported by source' if fail and target['targetId'] in rejected else '',
+                'actionable': fail and target['targetId'] in rejected, 'evidence': []} for target in value['targets']]}
+        result = raw_proposal(fixture.source)
+        if value['slot'] == 'initial':
+            result['payload'][1]['journal'] = 'Invented journal'
+            return result
+        handles = {allocation['key']: allocation['itemHandle'] for allocation in value['capturedHandles']}
+        result['discoveries'], result['lineage'] = [], []
+        for field in result['fields']:
+            field['item'] = {'kind': 'handle', 'itemHandle': handles[field['item']['key']]}
+        return result
+    fixture.transport.scripted = script
+    operation = await fixture.pipeline.run(fixture.project, fixture.command, admitted=fixture.admitted)
+    assert operation.state == 'published'
+    if cap == 3:
+        # The third call could not be reviewed, so it is not spent.
+        assert spent_calls(operation) == 2 and [attempt.slot for attempt in operation.attempts] == ['initial', 'review']
+        assert operation.tasks[0].state == 'source_fallback' and 'IMPORT_CALL_CAP' in operation.task_results[0].value['diagnostics']
+    else:
+        assert spent_calls(operation) == 4 and operation.tasks[0].state == 'accepted' and not operation.issues

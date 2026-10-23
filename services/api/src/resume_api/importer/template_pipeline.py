@@ -15,10 +15,12 @@ from packages.resume_core.template_builtin_admission import current_handles
 from packages.resume_core.template_effective import effective_cells
 from packages.resume_core.template_capture import item_identities, prepare_builtin_identities
 from packages.resume_core.template_finalization import capture_finalization
-from packages.resume_core.template_identity import capture_span, empty_value, source_slice
+from packages.resume_core.template_identity import (capture_span, empty_value, evidence_options, line_spans,
+    offered_evidence, source_slice)
 from packages.resume_core.template_import import (CleanupProof, ProcessingDeadline, TemplateImportFailure, admit_operation, attempt_in,
     authorization, cancel_operation, capture_task_input, checked, digest, dispatch_attempt, identity, observe_time,
-    record_return, reconcile_cleanup, recover_operation, reserve_attempt, resume_operation, start_operation, task_in)
+    record_return, reconcile_cleanup, recover_operation, reserve_attempt, resume_operation, spent_calls, start_operation,
+    task_in)
 from packages.resume_core.template_proposals import parse_proposal
 from packages.resume_core.template_review import decide_review, make_review_input, record_review
 from packages.resume_core.templates.compiler import canonical
@@ -244,7 +246,9 @@ class TemplatePipeline(TemplateCheckpoints):
             value.cell_id for value in allocation.canonical_fields.values()}]
             for allocation, record in builtins for identifier in [record.id]}
         source_requested = any(value.kind == 'source' for value in selectors)
-        spans = [capture_span(source, unit) for source in data.sources for unit in source.units] if source_requested else []
+        # Whole units, and each line of a multi-line unit, so a reply can cite one claim without its neighbours.
+        spans = [span for source in data.sources for unit in source.units
+            for span in [capture_span(source, unit), *line_spans(source, unit)]] if source_requested else []
         spans += [span for cell in cells for span in cell.evidence]
         spans += [span for result in dependencies for span in result.source_spans]
         spans = list({digest(span): span for span in spans}.values())
@@ -254,8 +258,7 @@ class TemplatePipeline(TemplateCheckpoints):
             'formattingAsOf': operation.capture.formatting_as_of.model_dump(mode='json', by_alias=True),
             'modelInstructions': data.template_package.definition.model.model_dump(mode='json', by_alias=True),
             'declaration': declaration.model_dump(mode='json', by_alias=True),
-            'sourceSpans': [span.model_dump(mode='json', by_alias=True) for span in spans],
-            'sourceTexts': {digest(span): source_slice(data.sources, span) for span in spans},
+            'evidence': [option.model_dump(mode='json', by_alias=True) for option in evidence_options(spans, data.sources)],
             'effectiveCells': [cell.model_dump(mode='json', by_alias=True) for cell in cells],
             'manualScopes': [scope.model_dump(mode='json', by_alias=True) for scope in data.facts.manual_scopes
                 if scope.id in {cell.manual_scope_id for cell in cells}],
@@ -300,6 +303,10 @@ class TemplatePipeline(TemplateCheckpoints):
                 break
             if existing is not None and existing.state == 'outcome_unknown':
                 break
+            # A repair counts only after its own review, so it starts only when both calls fit the cap.
+            if existing is None and slot != 'initial' and operation.capture.policy.call_cap - spent_calls(operation) < 2:
+                unresolved.append('IMPORT_CALL_CAP')
+                break
             if existing is None:
                 stored = next(value for value in operation.task_inputs if value.task_id == task_id)
                 allowed = set(task_in(operation, task_id).allowed_handles)
@@ -312,10 +319,11 @@ class TemplatePipeline(TemplateCheckpoints):
                         if allocation.item_handle in allowed],
                     'capturedRelations': [value.model_dump(mode='json', by_alias=True) for value in known_relations.values()
                         if value.subject_id in {allocation.record_id for allocation in item_identities(operation) if allocation.item_handle in allowed}]}
+                offered = offered_evidence(stored.value)
                 try:
                     attempt_id = await self.call(project, operation_id, task_id, slot, request,
                         proposal_schema(next(value.full_schema for value in data.template_package.blocks
-                            if value.id == task.block_id)), deadline, cancel)
+                            if value.id == task.block_id), None if offered is None else list(offered)), deadline, cancel)
                 except TemplateImportFailure as error:
                     unresolved.append(error.code)
                     break
@@ -351,17 +359,19 @@ class TemplatePipeline(TemplateCheckpoints):
             policy = attempt.model
             prior_review = next((value.value for value in operation.review_inputs
                 if value.value.proposal_hash == proposal.proposal_hash and value.value.policy == policy), None)
+            # The review offers its own evidence table under the same references, so the task input omits its copy.
+            task_input = next(value.value for value in operation.task_inputs if value.task_id == task_id)
             review = prior_review or make_review_input(operation, proposal, data.template_package, data.sources, policy,
                 effective_cells=effective_cells(data.facts, data.template_operations),
-                semantic_context={'taskInput': next(value.value for value in operation.task_inputs if value.task_id == task_id),
-                    'effectiveFactsHash': digest(data.facts), 'proposal': proposal.reply.model_dump(mode='json', by_alias=True)})
+                semantic_context={'taskInput': {key: value for key, value in task_input.items() if key != 'evidence'},
+                    'effectiveFactsHash': digest(data.facts)})
             review_attempt = next((value for value in operation.attempts if value.task_id == task_id
                 and value.slot in {'review', 'replacement_review'} and value.input_hash == digest(review)), None)
             try:
                 if review_attempt is None:
                     review_id = await self.call(project, operation_id, task_id,
                         'review' if slot == 'initial' else 'replacement_review', review.model_dump(mode='json', by_alias=True),
-                        review_schema(), deadline, cancel, review=review)
+                        review_schema(review), deadline, cancel, review=review)
                 else:
                     review_id = review_attempt.id
                 self.guard(project, operation_in(self.read(project), operation_id))
@@ -508,7 +518,9 @@ class TemplatePipeline(TemplateCheckpoints):
         task = task_in(operation, task_id)
         stored = next(value for value in operation.task_inputs if value.task_id == task_id)
         from packages.resume_core.models.template_facts import SourceSpan
-        spans = [SourceSpan.model_validate(value) for value in stored.value['sourceSpans']]
+        offered = offered_evidence(stored.value)
+        spans = ([SourceSpan.model_validate(value) for value in stored.value['sourceSpans']] if offered is None
+            else [option.span for option in offered.values()])
         receipt = next((value for value in reversed(operation.receipts) if value.id in task.receipt_ids), None)
         failures = [result for result in receipt.reply.results if result.disposition != 'satisfied'] if receipt else []
         if failures and not any(result.target_id.startswith('scope-') for result in failures):

@@ -1457,6 +1457,9 @@ export type Id54 = string;
 export type Inputhash2 = string;
 export type Allowtextrewrite2 = boolean;
 export type Effectivecells = ExtensionCell[];
+export type Ref = string;
+export type Text11 = string;
+export type Evidence21 = EvidenceOption[];
 export type Handlemap = (HandleAllocation | CapturedItemIdentity)[];
 export type Occurrenceindependent = boolean;
 export type Packagehash5 = string;
@@ -1477,7 +1480,7 @@ export type Fields2 = string[];
 export type Instructions = string[];
 export type Version1 = 1;
 export type Rules = Check[];
-export type Schemaversion9 = 1;
+export type Schemaversion9 = 1 | 2;
 export type Sourcespans = SourceSpan[];
 export type Targets = CheckTarget[];
 export type Reviewinputs = ReviewInputRecord[];
@@ -1681,7 +1684,7 @@ export type Revision44 = number;
 export type Role6 = "header" | "sidebar" | "main";
 export type Revision45 = number;
 export type Schemaversion12 = 2;
-export type Evidence21 = EvidenceSpan[];
+export type Evidence22 = EvidenceSpan[];
 export type Id74 = string;
 export type Rawtext5 = string;
 export type Evidencerecords = ImmutableFactEvidence[];
@@ -1804,7 +1807,7 @@ export type Children25 = (
   | ImageBlock
   | SectionBlock
 )[];
-export type Text11 = string;
+export type Text12 = string;
 export type Type18 = "text";
 export type Content16 = StyledText[];
 export type Href2 = string;
@@ -1814,7 +1817,7 @@ export type Bindingrootid1 = string | null;
 export type Fieldkey10 = string;
 export type Recordid15 = string;
 export type Syncedfactrevision1 = number;
-export type Text12 = string;
+export type Text13 = string;
 export type Type20 = "fact_field";
 export type Content15 = (StyledText | Hyperlink | FactFieldSpan)[];
 export type Id80 = string;
@@ -2090,7 +2093,7 @@ export type Sourceid3 = string;
 export type Sourcerevision2 = number;
 export type Unitid4 = string;
 export type Unitrevision2 = number;
-export type Evidence22 = Evidence23[];
+export type Evidence23 = Evidence24[];
 export type Id94 = string;
 export type Page3 = number | null;
 export type Sourceid4 = string;
@@ -3865,6 +3868,7 @@ export interface ReviewInputRecord {
 export interface ReviewInput {
   allowTextRewrite: Allowtextrewrite2;
   effectiveCells: Effectivecells;
+  evidence?: Evidence21;
   handleMap: Handlemap;
   occurrenceContext: JsonValue;
   occurrenceIndependent: Occurrenceindependent;
@@ -3879,6 +3883,11 @@ export interface ReviewInput {
   sourceSpans: Sourcespans;
   sourceTexts: Sourcetexts;
   targets: Targets;
+}
+export interface EvidenceOption {
+  ref: Ref;
+  span: SourceSpan;
+  text: Text11;
 }
 export interface Check {
   id: Id55;
@@ -4190,7 +4199,7 @@ export interface TemplateRegion {
   role: Role6;
 }
 export interface ImmutableFactEvidence {
-  evidence: Evidence21;
+  evidence: Evidence22;
   id: Id74;
   rawText: Rawtext5;
 }
@@ -4402,7 +4411,7 @@ export interface SectionBlock {
 }
 export interface StyledText {
   styles: InlineStyles;
-  text: Text11;
+  text: Text12;
   type: Type18;
 }
 export interface Hyperlink {
@@ -4417,7 +4426,7 @@ export interface FactFieldSpan {
   recordId: Recordid15;
   styles: InlineStyles;
   syncedFactRevision: Syncedfactrevision1;
-  text: Text12;
+  text: Text13;
   type: Type20;
 }
 export interface ImageProps {
@@ -4461,12 +4470,12 @@ export interface RichWarning {
   blockIds: Blockids7;
   code: Code4;
   count?: Count;
-  evidence: Evidence22;
+  evidence: Evidence23;
   id: Id94;
   locations?: Locations;
   recordIds: Recordids;
 }
-export interface Evidence23 {
+export interface Evidence24 {
   sourceId: Sourceid3;
   sourceRevision: Sourcerevision2;
   unitId: Unitid4;

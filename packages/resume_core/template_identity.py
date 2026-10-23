@@ -4,8 +4,10 @@ from __future__ import annotations
 
 import uuid
 
+from .models.contracts import _unique
 from .models.template_facts import HandleAllocation, Lineage, SourceSpan
-from .models.template_import import FieldSidecar, ProposalReply
+from .models.template_import import EvidenceOption, FieldSidecar, ProposalReply
+from .template_import import digest
 from .templates.compiler import canonical, sha256
 from .templates.projection import SchemaFailure, pointer_tokens, schema_at, validate_payload
 
@@ -28,6 +30,53 @@ def capture_span(source,unit,start=0,end=None):
         start=start,end=end,sliceHash=sha256(unit.text[start:end].encode('utf-8')))
     source_slice([source],span)
     return span
+
+
+def line_spans(source, unit):
+    """Each non-blank line of a multi-line unit, with its line break, as one exact span."""
+    spans, start = [], 0
+    for line in unit.text.splitlines(keepends=True):
+        if line.strip():
+            spans.append(capture_span(source, unit, start, start + len(line)))
+        start += len(line)
+    return spans if len(spans) > 1 else []
+
+
+def evidence_options(spans, sources, *, base=()):
+    """Offer each exact span once under a short request-local reference; base options keep theirs."""
+    options = list(base)
+    seen, refs = {digest(option.span) for option in options}, {option.ref for option in options}
+    for span in spans:
+        if digest(span) in seen:
+            continue
+        number = len(refs) + 1
+        while 'S' + str(number) in refs:
+            number += 1
+        seen.add(digest(span)); refs.add('S' + str(number))
+        options.append(EvidenceOption(ref='S' + str(number), span=span, text=source_slice(sources, span)))
+    return options
+
+
+def offered_evidence(request):
+    """The reference table a captured request offered, or None when the request predates references."""
+    if request is None or 'evidence' not in request:
+        return None
+    options = [EvidenceOption.model_validate(value) for value in request['evidence']]
+    _unique([option.ref for option in options], 'offered evidence reference')
+    return {option.ref: option for option in options}
+
+
+def restore_evidence(refs, table, sources):
+    """The captured spans a reply selected; an unknown reference or changed source text refuses the reply."""
+    spans = []
+    for ref in refs:
+        option = table.get(ref)
+        if option is None:
+            raise ValueError('evidence reference was not offered')
+        if source_slice(sources, option.span) != option.text:
+            raise ValueError('offered evidence text changed')
+        spans.append(option.span)
+    return spans
 
 
 def codepoint_offset(text,utf16_offset):

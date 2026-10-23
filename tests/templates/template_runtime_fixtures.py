@@ -10,6 +10,7 @@ from tests.templates.test_template_publication import TemplatePublicationFixture
 from tests.templates.pipeline_fixtures import NOW, owner, setup_operation, source_draft
 from tests.templates.storage_fixtures import presentation, workspace
 from tests.templates.test_semantic_admission import raw_proposal
+from tests.templates.evidence_references import by_reference
 from resume_api.importer.template_pipeline import TemplatePipeline
 from resume_api.providers.content import ContentFailure, ContentResult, ContentTransportReturn, ReportedUsage
 
@@ -35,7 +36,7 @@ class ControlledTransport:
                 'disposition': 'satisfied', 'reason': '', 'evidence': [], 'actionable': False} for target in value['targets']]}
         else:
             answer = raw_proposal(self.fixture.source)
-        raw = answer if isinstance(answer, str) else json.dumps({'payload': answer})
+        raw = answer if isinstance(answer, str) else json.dumps({'payload': by_reference(answer, value)})
         usage = ReportedUsage(10, 0, 4, True)
         request.on_return(ContentTransportReturn(raw, 'completed', None, 1, usage,
             not self.cleanup_unknown, {'transport': 'controlled', 'turnId': str(len(self.calls))}, 'medium'))

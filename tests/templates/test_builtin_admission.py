@@ -11,6 +11,7 @@ from packages.resume_core.template_proposals import parse_proposal
 from packages.resume_core.template_review import record_review
 from packages.resume_core.templates.compiler import sha256
 from tests.templates.employment_fixtures import employment_package, employment_proposal, employment_source
+from tests.templates.evidence_references import by_reference
 from tests.templates.pipeline_fixtures import NOW, cleaned, owner, ready_operation, usage
 from tests.templates.storage_fixtures import papers
 from tests.templates.test_builtin_bindings import mapped_reply
@@ -44,7 +45,7 @@ def accept(operation, facts, proposed, package, src, rejected=()):
         if value['targetId'] in rejected:
             value.update(disposition='violation', reason='Unsupported by the retained source', actionable=False)
     attempt = operation.attempts[-1]
-    attempt.raw_return = json.dumps({'payload': {'results': results}})
+    attempt.raw_return = json.dumps({'payload': by_reference({'results': results}, operation.review_inputs[-1].value)})
     attempt.return_hash = attempt.raw_return_hash = sha256(attempt.raw_return.encode())
     operation, receipt = record_review(operation, review_id, [src], NOW)
     return admit_proposal(operation, proposed.id, receipt.id, package, [src], facts,

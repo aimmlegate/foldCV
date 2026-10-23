@@ -9,9 +9,12 @@ def display_raw_input(review, field, raw):
             or field.pointer not in review.semantic_context.get('sourceWordingPointers', [])):
         return raw if isinstance(raw, str) else canonical(raw).decode()
     if field.evidence:
-        units = {}
-        for span in review.source_spans:
+        offered = ([(option.span, option.text) for option in review.evidence] if review.schema_version == 2
+            else [(span, review.source_texts[digest(span)]) for span in review.source_spans])
+        units, captured = {}, {}
+        for span, text in offered:
             key = (span.source_id, span.source_revision, span.unit_id, span.unit_revision)
+            captured[digest(span)] = text
             current = units.get(key)
             if current is None or span.start <= current.start and span.end >= current.end:
                 units[key] = span
@@ -28,7 +31,7 @@ def display_raw_input(review, field, raw):
                     merged[-1] = (merged[-1][0], max(end, merged[-1][1]))
                 else:
                     merged.append((start, end))
-            text = review.source_texts[digest(unit)]
+            text = captured[digest(unit)]
             if any(start < unit.start or end > unit.end for start, end in merged):
                 raise ValueError('source wording exceeds captured context')
             texts.extend(text[start - unit.start:end - unit.start] for start, end in merged)

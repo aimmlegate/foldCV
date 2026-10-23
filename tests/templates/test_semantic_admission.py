@@ -15,6 +15,7 @@ from packages.resume_core.template_review import (decide_review, make_review_inp
 from packages.resume_core.templates.projection import SchemaFailure, project_payload, validate_payload
 from packages.resume_core.templates.replies import proposal_schema, review_schema
 from packages.resume_core.templates.compiler import sha256
+from tests.templates.evidence_references import by_reference
 from tests.templates.pipeline_fixtures import NOW, cleaned, owner, ready_operation, setup_operation, usage
 
 
@@ -60,7 +61,7 @@ def review_attempt(operation, proposal, package, source, *, fail_target=None):
         inputHash=digest(value), value=value))
     operation.attempts[-1].review_input_record_id = 'captured-review-input'
     operation = dispatch_attempt(operation, attempt, NOW)
-    operation = record_return(operation, attempt, json.dumps({'payload': {'results': results}}),
+    operation = record_return(operation, attempt, json.dumps({'payload': by_reference({'results': results}, value)}),
         'completed', usage(), cleaned(), returned_at=NOW)
     return operation, attempt, value, results
 
@@ -94,10 +95,8 @@ def test_incomplete_review_has_no_receipt_or_effective_promotion(failure):
     elif failure == 'conflict':
         results.append({**results[0], 'disposition': 'violation'})
     else:
-        span = capture_span(source, source.units[0]).model_dump(by_alias=True)
-        span['sliceHash'] = digest('wrong-evidence')
-        results[0]['evidence'] = [span]
-    operation.attempts[-1].raw_return = json.dumps({'payload': {'results': results}})
+        results[0]['evidence'] = ['S99']
+    operation.attempts[-1].raw_return = json.dumps({'payload': by_reference({'results': results}, operation.review_inputs[-1].value)})
     operation.attempts[-1].raw_return_hash = operation.attempts[-1].return_hash = sha256(operation.attempts[-1].raw_return.encode())
     with pytest.raises((TemplateImportFailure, ValueError)):
         record_review(operation, attempt, [source], NOW)
@@ -159,7 +158,7 @@ def test_uncertainty_needs_a_concrete_actionable_reason_to_enter_repair():
     operation, attempt, value, results = review_attempt(operation, proposal, package, source)
     target = next(result for result in results if not result['targetId'].startswith('scope-'))
     target.update({'disposition': 'uncertain', 'reason': 'Unclear attribution', 'actionable': False})
-    operation.attempts[-1].raw_return = json.dumps({'payload': {'results': results}})
+    operation.attempts[-1].raw_return = json.dumps({'payload': by_reference({'results': results}, operation.review_inputs[-1].value)})
     operation.attempts[-1].raw_return_hash = operation.attempts[-1].return_hash = sha256(operation.attempts[-1].raw_return.encode())
     operation, receipt = record_review(operation, attempt, [source], NOW)
     assert not decide_review(value, receipt, proposal).feedback
