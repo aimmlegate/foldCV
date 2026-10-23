@@ -34,6 +34,9 @@ class JobRuntime:
 
     async def finish_result(self, control):
         self.service.artifacts.finish(control.project_id, control.run_id, self.result)
+        agent = getattr(self.service.projects, "agent", None)
+        if getattr(agent, "assistant_protocol_enabled", False):
+            agent.proposals.finish(control.project_id, control.run_id, cancelled=self.result.state == "cancelled")
 
     async def run(self, control):
         if self.closed or self.driver is not None:
@@ -99,8 +102,8 @@ class JobRuntime:
                 self.service.store.update(control.project_id, control.run_id, progress)
             instructions = self.instructions
             if getattr(getattr(self.service.projects, "agent", None), "assistant_protocol_enabled", False):
-                from ..agent.capabilities import PLANNING_INSTRUCTIONS
-                instructions += PLANNING_INSTRUCTIONS
+                from ..agent.capabilities import PROPOSAL_INSTRUCTIONS
+                instructions = PROPOSAL_INSTRUCTIONS
             value = RuntimeInput(model=self.model.model, prompt=self.session.prompt, url=self.session.url,
                 token=self.session.token, tools=tuple(control.job.submission.tools), allow_web=control.job.submission.allow_web,
                 queued_at=time.monotonic(), before_start=ready_shared if multiplexed else

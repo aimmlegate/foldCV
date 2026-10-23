@@ -3583,7 +3583,8 @@
       "status": "partial",
       "tests": [
         "tests/recovery/test_assistant_capabilities.py::test_read_only_catalog_separates_generation_preparation_and_apply",
-        "tests/recovery/test_assistant_capabilities.py::test_raw_invocation_cannot_bypass_catalog_or_supply_approval"
+        "tests/recovery/test_assistant_capabilities.py::test_raw_invocation_cannot_bypass_catalog_or_supply_approval",
+        "tests/recovery/test_assistant_proposals.py::test_read_only_multicall_draft_is_durable_without_document_history_or_apply"
       ]
     },
     {
@@ -3596,8 +3597,10 @@
     },
     {
       "id": "CAP-A04",
-      "status": "unimplemented",
-      "tests": []
+      "status": "partial",
+      "tests": [
+        "tests/recovery/test_assistant_proposals.py::test_read_only_multicall_draft_is_durable_without_document_history_or_apply"
+      ]
     },
     {
       "id": "CAP-A05",
@@ -3611,8 +3614,10 @@
     },
     {
       "id": "CAP-A07",
-      "status": "unimplemented",
-      "tests": []
+      "status": "partial",
+      "tests": [
+        "tests/recovery/test_assistant_proposals.py::test_generation_finishes_with_a_ready_draft_and_releases_the_permit"
+      ]
     },
     {
       "id": "CAP-A08",
@@ -3631,8 +3636,11 @@
     },
     {
       "id": "CAP-A11",
-      "status": "unimplemented",
-      "tests": []
+      "status": "partial",
+      "tests": [
+        "tests/recovery/test_assistant_proposals.py::test_interrupted_build_survives_reopen_and_never_becomes_ready_implicitly",
+        "tests/recovery/test_assistant_proposals.py::test_expiry_corruption_and_cancelled_authority_preserve_canonical_bytes"
+      ]
     },
     {
       "id": "CAP-A12",
@@ -3666,8 +3674,10 @@
     },
     {
       "id": "CAP-A18",
-      "status": "unimplemented",
-      "tests": []
+      "status": "partial",
+      "tests": [
+        "tests/recovery/test_assistant_proposals.py::test_queued_check_only_completion_never_enters_background_publication"
+      ]
     },
     {
       "id": "CAP-A19",
@@ -3807,9 +3817,9 @@
       "check": "Run the case against the completed ordinary review/Apply boundary and retain synthetic T3 evidence; preserve native/manual gaps."
     },
     "CAP-A02": {
-      "unproved": "Public rollout and later-slice integration obligations remain pending; current evidence covers CAP01 catalog/readiness only.",
-      "owner": "CAP04/CAP05/CAP08; CAP07 for V7",
-      "check": "Run the case against the completed ordinary review/Apply boundary and retain synthetic T3 evidence; preserve native/manual gaps."
+      "unproved": "CAP02 covers durable non-mutating preparation only. Scope/fidelity and the full explicit Apply/publication/history/recovery boundary remain unproved.",
+      "owner": "CAP03–CAP06/CAP08; CAP07 for V7",
+      "check": "Run completed review/Apply flows and every legacy/background bypass against the final retained source; preserve native/manual gaps."
     },
     "CAP-A03": {
       "unproved": "Public rollout and later-slice integration obligations remain pending; current evidence covers CAP01 catalog/readiness only.",
@@ -3825,6 +3835,26 @@
       "unproved": "Public rollout and later-slice integration obligations remain pending; current evidence covers CAP01 catalog/readiness only.",
       "owner": "CAP04/CAP05/CAP08; CAP07 for V7",
       "check": "Run the case against the completed ordinary review/Apply boundary and retain synthetic T3 evidence; preserve native/manual gaps."
+    },
+    "CAP-A04": {
+      "unproved": "CAP02 covers durable non-mutating preparation only. Scope/fidelity and the full explicit Apply/publication/history/recovery boundary remain unproved.",
+      "owner": "CAP03–CAP06/CAP08; CAP07 for V7",
+      "check": "Run completed review/Apply flows and every legacy/background bypass against the final retained source; preserve native/manual gaps."
+    },
+    "CAP-A07": {
+      "unproved": "CAP02 covers durable non-mutating preparation only. Scope/fidelity and the full explicit Apply/publication/history/recovery boundary remain unproved.",
+      "owner": "CAP03–CAP06/CAP08; CAP07 for V7",
+      "check": "Run completed review/Apply flows and every legacy/background bypass against the final retained source; preserve native/manual gaps."
+    },
+    "CAP-A11": {
+      "unproved": "CAP02 covers durable non-mutating preparation only. Scope/fidelity and the full explicit Apply/publication/history/recovery boundary remain unproved.",
+      "owner": "CAP03–CAP06/CAP08; CAP07 for V7",
+      "check": "Run completed review/Apply flows and every legacy/background bypass against the final retained source; preserve native/manual gaps."
+    },
+    "CAP-A18": {
+      "unproved": "CAP02 covers durable non-mutating preparation only. Scope/fidelity and the full explicit Apply/publication/history/recovery boundary remain unproved.",
+      "owner": "CAP03–CAP06/CAP08; CAP07 for V7",
+      "check": "Run completed review/Apply flows and every legacy/background bypass against the final retained source; preserve native/manual gaps."
     }
   },
   "recovery": {

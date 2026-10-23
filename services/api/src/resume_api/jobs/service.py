@@ -283,9 +283,12 @@ class JobService:
             if logical.allow_edits and access.read_only:
                 raise AgentFailure("AGENT_TOOL_DENIED")
             record = self.artifacts.prepare_input(identity, logical, connection.epoch, digest(workspace.rules_used))
-            names = [name for name in TOOL_NAMES if (logical.allow_edits or name not in {"prepare_edit_batch", "apply_edit_batch", "project_action"})
+            cap_mode = getattr(getattr(self.projects, "agent", None), "assistant_protocol_enabled", False)
+            names = [name for name in TOOL_NAMES if (not cap_mode or name != "apply_edit_batch")
+                and (logical.allow_edits or name not in {"prepare_edit_batch", "apply_edit_batch", "project_action"} or cap_mode and name == "prepare_edit_batch")
                 and (logical.allow_web or name != "read_public_page")]
-            config = digest({"base": CONFIG_SHA256, "protocol": PROTOCOL_V2_SHA256,
+            protocol = self.projects.agent.protocol_sha256 if cap_mode else PROTOCOL_V2_SHA256
+            config = digest({"base": CONFIG_SHA256, "protocol": protocol,
                 "tools": names, "allowEdits": logical.allow_edits, "allowWeb": logical.allow_web})
             captured = JobSubmissionV1(schemaVersion=1, identity=identity, payloadSha256=logical_hash,
                 kind="agent", schedulingClass="background", input={"kind": "agent_journal", "id": record.id,

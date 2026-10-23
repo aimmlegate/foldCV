@@ -15,6 +15,7 @@ from packages.resume_core import agent_limits as limits
 from packages.resume_core.agent_store import AgentFailure, digest, identity, run_in
 from packages.resume_core.models.agent import AgentAnchor, AgentApplyRequest, AgentFetchRequest, AgentFinding, AgentPrepareRequest, AgentProjectAction, AgentPublishFindings, AgentQuery, TERMINAL_RUNS
 from packages.resume_core.models.assistant_capabilities import AssistantTaskRequestV1
+from packages.resume_core.models.assistant_proposals import AssistantAssemblyRequestV1
 from packages.resume_core.rich_dependencies import dependency
 from packages.resume_core.rich_fields import inline_groups, working_field
 from packages.resume_core.rich_mutations import inline_text, utf16_slice
@@ -63,7 +64,9 @@ READ_QUERIES = {"get_resume_context": ContextQuery, "find_resume_content": FindQ
 
 
 class AgentTools:
-    names = TOOL_NAMES
+    @property
+    def names(self):
+        return tuple(name for name in TOOL_NAMES if not getattr(self.service, "assistant_protocol_enabled", False) or name != "apply_edit_batch")
 
     def __init__(self, service, *, fetcher=None):
         self.service = service
@@ -88,6 +91,9 @@ class ToolSession(PrivateMcp):
         self.cache = {}
         self.argument_issues = []
         self.planned_task = None
+        self.capability_service = getattr(service, "catalog_service", service)
+        self.cap_mode = getattr(self.capability_service, "assistant_protocol_enabled", False)
+        self.names = tuple(name for name in TOOL_NAMES if not self.cap_mode or name != "apply_edit_batch")
         self.fetch_cancel = threading.Event()
         self.fetch_tasks = set()
         self.gate = asyncio.Lock()
@@ -209,20 +215,42 @@ class ToolSession(PrivateMcp):
             """Store observations without editing. Use targets from a full document read, not the initial outline snapshot. A prose target has snapshotId, blockId, cellId:null, recordId:null, fieldKey:null, start:null, end:null. sourceIds are stored IDs returned by read_public_page, never URLs. findings use targets, not anchors."""
             return self.wire(await self.call("publish_findings", request))
 
-        @self.sdk.tool(structured_output=False)
         async def prepare_edit_batch(request: AgentPrepareRequest) -> CallToolResult:
             """Compile edits without saving. For template formatting, first read the entire document through nextCursor:null, then operations:[{kind:"format_template",snapshotId:"completed_read_id"}]. This preserves current wording and creates one shared undo action. Text edits use replace_text with target:{snapshotId,blockId,cellId:null,field:"content",start,end}, content:[{text:"..."}]. Copy exact UTF-16 offsets from find_resume_content. Insert headings/sections/lists with insert_blocks, tables with insert_table, retained images with insert_asset. Facts support create_fact/update_fact/delete_fact with evidence. Read real targets first. One saved batch per turn."""
             return self.wire(await self.call("prepare_edit_batch", request))
+        if self.cap_mode:
+            prepare_edit_batch.__annotations__["request"] = AssistantAssemblyRequestV1
+            prepare_edit_batch.__doc__ = (
+                "Build a durable private draft, never a canonical save. Use protocolVersion:1, taskId, "
+                "key and phase:append/finalize. Omit proposalId for the first call, then reuse returned "
+                "proposalId/version. Each key is idempotent and each call extends the same baseline. "
+                "Use operations and snapshotIds from complete paged reads. unchanged lists unitId/reason "
+                "for preserved units; never infer coverage from an outline or search. An empty append "
+                "starts the scope ledger. Results expose up to 20 unresolved unit IDs; read and account "
+                "for those, append unchanged reasons and repeat within the same bounded turn. Finalize only after "
+                "all scope units are read and accounted for. draft_ready ends generation and awaits UI "
+                "review/Apply. incomplete retains useful work with Apply disabled. No operation publishes. "
+                "Maximum 100 aggregate operations and current transport/call/time limits. Wording, "
+                "facts/structure and formatting are separate tasks."
+            )
+        self.sdk.tool(structured_output=False)(prepare_edit_batch)
 
         async def apply_edit_batch(request: AgentApplyRequest) -> CallToolResult:
             return self.wire(await self.call("apply_edit_batch", request))
         apply_edit_batch.__doc__ = self.apply_description
-        self.sdk.tool(structured_output=False)(apply_edit_batch)
+        if not self.cap_mode:
+            self.sdk.tool(structured_output=False)(apply_edit_batch)
 
-        @self.sdk.tool(structured_output=False)
         async def project_action(request: AgentProjectAction) -> CallToolResult:
             """Perform one explicit bound-project operation after a complete get_project_resources read. Use its snapshotId and a unique key. Actions: rename (value:title), formatting_date (value:ISO date), add_source_text (value:literal text), remove_source (targetId; only unreferenced), import_asset (value:base64 PNG/JPEG/WebP), remove_asset (targetId; only unreferenced), export_docx/export_project (returns durable download), archive/restore/delete, undo/redo. Destructive actions require the user's explicit command. Editing permission is checked again at commit. Finish the turn after a project operation."""
             return self.wire(await self.call("project_action", request))
+        if self.cap_mode:
+            project_action.__doc__ = (
+                "Explicit export_docx/export_project only, under current export readiness. "
+                "Other project operations require a separate reviewed action and cannot run through "
+                "this direct tool. Read full project resources first; use its snapshotId and a unique key."
+            )
+        self.sdk.tool(structured_output=False)(project_action)
 
     def wire(self, value):
         text = json_text(value)
@@ -268,7 +296,7 @@ class ToolSession(PrivateMcp):
             elif name in {"prepare_edit_batch", "apply_edit_batch", "publish_findings", "project_action"}:
                 if set(arguments) != {"request"}:
                     raise ValueError("invalid request envelope")
-                {"prepare_edit_batch": AgentPrepareRequest, "apply_edit_batch": AgentApplyRequest,
+                {"prepare_edit_batch": AssistantAssemblyRequestV1 if self.cap_mode else AgentPrepareRequest, "apply_edit_batch": AgentApplyRequest,
                     "project_action": AgentProjectAction,
                     "publish_findings": AgentPublishFindings}[name].model_validate(arguments["request"])
             else:
@@ -286,6 +314,8 @@ class ToolSession(PrivateMcp):
                 return "AGENT_ARGUMENT_INVALID"
             if name == "prepare_edit_batch":
                 safe = {"operations", "target", "content", "text", "marks", "snapshotId", "blockId", "cellId", "field", "start", "end", "key", "snapshotIds", "kind", "replace_text"}
+                if self.cap_mode:
+                    safe |= {"protocolVersion", "proposalId", "version", "taskId", "phase", "unchanged", "unitId", "reason"}
                 self.argument_issues = [{"path": ".".join(str(part) if type(part) is int and 0 <= part <= 100 else part if part in safe else "*" for part in issue["loc"])[:160],
                     "issue": issue["type"] if issue["type"] in {"missing", "extra_forbidden", "string_type", "list_type", "int_type", "literal_error", "union_tag_invalid", "union_tag_not_found", "too_long", "value_error", "greater_than_equal", "string_too_long"} else "invalid"}
                     for issue in error.errors(include_input=False, include_context=False, include_url=False)[:3]]
@@ -312,6 +342,9 @@ class ToolSession(PrivateMcp):
         result = {"error": {"code": code}}
         if self.argument_issues:
             result["argumentIssues"] = self.argument_issues
+            if self.cap_mode and code == "AGENT_EDIT_INVALID":
+                result["format"] = "Use request:{protocolVersion:1,taskId,key,phase:'append'|'finalize',proposalId?,version:1,operations:[],snapshotIds:[],unchanged:[]}. Correct shape errors only; no field grants Apply authority."
+                return result
             if self.argument_issues[0]["path"] == "skillQuery":
                 result["format"] = "Use {} for the catalog, or {query:{skillId:'import-resume',resource:'SKILL.md',cursor:null}}. Follow top-level nextCursor with the same skillId/resource."
                 return result
@@ -378,10 +411,16 @@ class ToolSession(PrivateMcp):
                 elif name == "publish_findings":
                     result = self.findings(arguments)
                 elif name == "prepare_edit_batch":
-                    if not self.run.allow_edits:
+                    if self.cap_mode:
+                        if not isinstance(arguments, AssistantAssemblyRequestV1):
+                            raise AgentFailure("AGENT_PROTOCOL")
+                        from .proposals import assemble
+                        result = assemble(self, arguments)
+                    elif not self.run.allow_edits:
                         raise AgentFailure("AGENT_TOOL_DENIED")
-                    from .edits import prepare
-                    result = prepare(self, arguments)
+                    else:
+                        from .edits import prepare
+                        result = prepare(self, arguments)
                 elif name == "apply_edit_batch":
                     if not self.run.allow_edits:
                         raise AgentFailure("AGENT_TOOL_DENIED")

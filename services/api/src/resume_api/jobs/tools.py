@@ -64,7 +64,7 @@ class JobToolSession(ToolSession):
 
     def register(self):
         super().register()
-        for name in TOOL_NAMES:
+        for name in self.names:
             if name not in self.control.job.submission.tools:
                 self.sdk.remove_tool(name)
 

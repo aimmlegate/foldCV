@@ -3,6 +3,7 @@
   "messages": {
     "assistantUnsupported": "Помощник пока не выполняет это действие.",
     "assistantOwner": "Применение требует проверки доступа к текущему редактору.",
+    "assistantProposalMissing": "Вариант отсутствует или срок его хранения истёк. Подготовьте новый вариант; документ не изменён.",
     "assistantTemplate": "Помощник ещё не подключён к этому редактору шаблонов.",
     "assistantInput": "Для задачи не хватает исходных данных или точной цели действия.",
     "assistantScope": "Эта область не поддерживается для выбранной задачи.",
@@ -294,6 +295,7 @@
   "codes": {
     "ASSISTANT_UNSUPPORTED_TASK": "assistantUnsupported",
     "ASSISTANT_OWNER_REQUIRED": "assistantOwner",
+    "ASSISTANT_PROPOSAL_MISSING": "assistantProposalMissing",
     "ASSISTANT_TEMPLATE_UNAVAILABLE": "assistantTemplate",
     "ASSISTANT_INPUT_REQUIRED": "assistantInput",
     "ASSISTANT_SCOPE_UNSUPPORTED": "assistantScope",

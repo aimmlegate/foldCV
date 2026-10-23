@@ -57,6 +57,8 @@ class AgentService:
                  lease_clock=time.monotonic):
         self.projects, self.runtime, self.connection, self.tools = projects, runtime, connection, tools
         self.store = AgentStore(projects.storage.root)
+        from packages.resume_core.assistant_proposals import AssistantProposals
+        self.proposals = AssistantProposals(self.store)
         self.settings = AgentSettingsStore(projects.storage.root)
         self.cleanup_error = cleanup_error
         self.controls = {}
@@ -64,6 +66,7 @@ class AgentService:
         self.assistant_protocol_enabled = False
         self.capability_states = {}
         self.startup_errors = {}
+        self.proposal_recovery_error = None
         self.unresolved = {}
         self.leases = AgentLeases(self.store, projects.state_lock, clock=lease_clock, active=self.active)
         from .publication import AgentPublication
@@ -75,26 +78,42 @@ class AgentService:
         self.unresolved, self.startup_errors = self.store.recover_all()
         self.leases.invalidate()
         self.publication.recover_all()
+        try:
+            self.startup_errors.update(self.proposals.recover())
+            self.proposal_recovery_error = None
+        except AgentFailure as error:
+            self.proposal_recovery_error = error.code
 
     def active(self, project_id):
         return any(control.project_id == project_id and control.task is not None and not control.task.done()
             for control in self.controls.values())
 
     def config_digest(self, allow_edits, allow_web):
-        return digest({"base": CONFIG_SHA256, "allowEdits": allow_edits, "allowWeb": allow_web,
-            "binary": self.binary_sha256, "tools": sorted(getattr(self.tools, "names", ()))})
+        value = {"base": CONFIG_SHA256, "allowEdits": allow_edits, "allowWeb": allow_web,
+            "binary": self.binary_sha256, "tools": sorted(getattr(self.tools, "names", ()))}
+        if self.assistant_protocol_enabled:
+            value["assistantProtocol"] = self.protocol_sha256
+        return digest(value)
+
+    @property
+    def protocol_sha256(self):
+        if self.assistant_protocol_enabled:
+            from .capabilities import proposal_protocol_fingerprint
+            return proposal_protocol_fingerprint(PROTOCOL_SHA256)
+        return PROTOCOL_SHA256
 
     @property
     def binary_sha256(self):
         return getattr(getattr(self.runtime, "profile", None), "binary_sha256", BINARY_SHA256)
 
     def capability_key(self, epoch, model, allow_edits, allow_web):
-        return (self.binary_sha256, PROTOCOL_SHA256, self.config_digest(allow_edits, allow_web), epoch, model)
+        return (self.binary_sha256, self.protocol_sha256, self.config_digest(allow_edits, allow_web), epoch, model)
 
     def capabilities(self, project_id=None, *, allow_edits=True, allow_web=True):
         connection = self.connection()
         settings = self.settings.load()
         reason = ("AGENT_DISABLED" if not settings.enabled else "AGENT_CLEANUP_FAILED" if INFERENCE.blocked else
+            self.proposal_recovery_error if self.assistant_protocol_enabled and self.proposal_recovery_error else
             "AGENT_OUTCOME_UNKNOWN" if self.unresolved.get(project_id) else
             self.startup_errors.get(project_id) if project_id in self.startup_errors else
             "AGENT_RUNTIME_UNSUPPORTED" if self.runtime is None or self.tools is None else
@@ -105,13 +124,13 @@ class AgentService:
         for model in connection.models:
             state, error = self.capability_states.get(self.capability_key(connection.epoch, model, allow_edits, allow_web), ("unverified", None))
             models.append(AgentModelCapability(model=model, state=state, binarySha256=self.binary_sha256,
-                protocolSha256=PROTOCOL_SHA256, configSha256=self.config_digest(allow_edits, allow_web), accountEpoch=connection.epoch,
+                protocolSha256=self.protocol_sha256, configSha256=self.config_digest(allow_edits, allow_web), accountEpoch=connection.epoch,
                 reason=AgentError(code=error) if error else None))
         selected = next((model for model in models if model.model == settings.selected_agent_model), None)
         if reason is None and selected is not None and selected.state == "incompatible":
             reason = "AGENT_MODEL_INCOMPATIBLE"
         return AgentCapabilities(schemaVersion=1, ready=reason is None, binaryVersion=getattr(getattr(self.runtime, "profile", None), "version", VERSION),
-            binarySha256=self.binary_sha256, protocolSha256=PROTOCOL_SHA256, configSha256=self.config_digest(allow_edits, allow_web),
+            binarySha256=self.binary_sha256, protocolSha256=self.protocol_sha256, configSha256=self.config_digest(allow_edits, allow_web),
             connectionEpoch=connection.epoch, modes=["edit", "check_only"],
             tools=list(getattr(self.tools, "names", ())), webAvailable=self.runtime is not None,
             models=models, unavailable=AgentError(code=reason) if reason else None)
@@ -301,8 +320,8 @@ class AgentService:
                     future.result(timeout=min(3, timeout))
                 instructions = DEVELOPER_INSTRUCTIONS
                 if self.assistant_protocol_enabled:
-                    from .capabilities import PLANNING_INSTRUCTIONS
-                    instructions += PLANNING_INSTRUCTIONS
+                    from .capabilities import PROPOSAL_INSTRUCTIONS
+                    instructions = PROPOSAL_INSTRUCTIONS
                 value = RuntimeInput(model=run.model, prompt=session.prompt, url=session.url, token=session.token,
                     tools=tuple(session.names), allow_web=run.allow_web, before_start=lambda: self.before_start(control),
                     revoke=lambda: self.revoke(control), close_tools=close_tools, queued_at=control.queued_at,
@@ -338,6 +357,8 @@ class AgentService:
                 self.cleanup_error(result.error)
             control.result = result
             try:
+                if self.assistant_protocol_enabled:
+                    self.proposals.finish(control.project_id, control.run_id, cancelled=control.reason == "AGENT_CANCELLED")
                 state = self.store.load(control.project_id)
                 conversation, run, _ = run_in(state, control.run_id)
                 if result.error == "AGENT_MODEL_INCOMPATIBLE":

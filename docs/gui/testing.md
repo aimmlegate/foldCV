@@ -2,6 +2,8 @@
 
 `CAP-A01`–`CAP-A24` map the assistant capability plan. CAP01 supplies partial
 catalog/readiness evidence for A01/A02/A03/A19 and capability display for A24.
+CAP02 adds private read-only preparation and draft/storage evidence for
+A02/A04/A07/A11/A18, including generation cleanup, reopen, corruption and bounds.
 The remaining cases are unimplemented until their slices retain actual evidence.
 The rollout gate stays off through CAP04. Generated assistant contracts use new
 names; existing model-compatibility and CT schemas remain byte-identical.

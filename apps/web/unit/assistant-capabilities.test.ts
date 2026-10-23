@@ -17,6 +17,18 @@ test("assistant wire validation rejects unknown versions, tasks and extra approv
     assert.equal(validateContract("assistant_task_request_v1", request), false);
 });
 
+test("draft assembly carries no approval and a draft result cannot certify a save", () => {
+  const request = { protocolVersion: 1, key: "call_1", taskId: "rewrite_resume", phase: "append", operations: [], snapshotIds: [], unchanged: [] };
+  assert.ok(validateContract("assistant_assembly_request_v1", request));
+  assert.equal(validateContract("assistant_assembly_request_v1", { ...request, approved: true }), false);
+  assert.equal(validateContract("assistant_assembly_request_v1", { ...request, protocolVersion: 2 }), false);
+  const result = { schemaVersion: 1, protocolVersion: 1, disposition: "draft_ready", proposalId: "proposal_1", version: 1,
+    contentSha256: "a".repeat(64), changedUnits: 1, unresolvedUnits: 0, coverage: [], coverageTruncated: false, unitCount: 1,
+    durable: false, reason: "Вариант готов к просмотру. Документ не изменён." };
+  assert.ok(validateContract("assistant_proposal_result_v1", result));
+  assert.equal(validateContract("assistant_proposal_result_v1", { ...result, durable: true }), false);
+});
+
 test("task metadata and message preflight use authenticated versioned requests without model submission", async () => {
   const requests: { path: string; body: unknown }[] = [], value = taskCatalog();
   const api = new AgentBrowserApi("project_1", (input, init) => {

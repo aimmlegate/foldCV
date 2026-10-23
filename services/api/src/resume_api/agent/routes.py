@@ -12,6 +12,7 @@ from packages.resume_core.models.agent import (
     AgentProjectOperation, AgentProjectOperations,
 )
 from packages.resume_core.models.assistant_capabilities import AssistantMessageCheckV1
+from packages.resume_core.models.assistant_proposals import AssistantProposalListV1, AssistantProposalRequestV1
 
 
 def mount_agent(app, service):
@@ -57,6 +58,40 @@ def mount_agent(app, service):
         protocol(request)
         return response(check_message(catalog(service, project_id,
             allow_edits=payload.allow_edits, allow_web=payload.allow_web), payload))
+
+    def proposal_protocol(request):
+        protocol(request)
+        if not service.assistant_protocol_enabled:
+            raise AgentFailure("AGENT_PROTOCOL")
+
+    @app.get(prefix + "/proposals")
+    async def proposals(project_id: str, request: Request):
+        proposal_protocol(request)
+        project(project_id)
+        return response(AssistantProposalListV1(projectId=project_id,
+            proposals=[item.proposal for item in service.proposals.list(project_id) if not item.no_change]))
+
+    @app.get(prefix + "/proposals/{proposal_id}/versions/{version}")
+    async def proposal(project_id: str, proposal_id: str, version: int, request: Request):
+        proposal_protocol(request)
+        project(project_id)
+        return response(service.proposals.get(project_id, proposal_id, version).proposal)
+
+    @app.post(prefix + "/proposals/discard")
+    async def discard_proposal(project_id: str, request: Request, payload: AssistantProposalRequestV1):
+        proposal_protocol(request)
+        project(project_id)
+        def discard(values):
+            value = next((item for item in values if item.proposal.id == payload.proposal_id and item.proposal.version == payload.version), None)
+            if value is None:
+                raise AgentFailure("AGENT_NOT_FOUND")
+            if value.proposal.content_sha256 != payload.content_sha256:
+                raise AgentFailure("AGENT_IDEMPOTENCY_CONFLICT")
+            if value.proposal.state not in {"ready", "incomplete", "stale", "failed_before_commit", "discarded"}:
+                raise AgentFailure("AGENT_TOOL_DENIED")
+            value.proposal.state = "discarded"
+            return value
+        return response(service.proposals.update(project_id, discard).proposal)
 
     def owned_run(project_id, run_id):
         project(project_id)
