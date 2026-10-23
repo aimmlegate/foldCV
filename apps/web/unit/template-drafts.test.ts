@@ -7,6 +7,7 @@ import { DraftRepository, type LocalDraft } from "../src/background/drafts";
 import { sha256 } from "../src/background/wire";
 import { contentText, responseBlocks } from "../src/contracts/template-address";
 import { templateProjectWire } from "../src/contracts/template-validate";
+import { isTemplateDraftPayload } from "../src/contracts/template-drafts";
 import { templateSchema } from "../src/rich/template-schema";
 import { projectTemplateDocument } from "../src/rich/v7-projection";
 import { TemplateEditorSession, type TemplateEditor } from "../src/rich/v7-session";
@@ -82,6 +83,66 @@ test("crash before prepare: the retained input is saved once as a correction on 
     assert.equal(b.session.writer.mode, "normal");
     await settle();
     assert.equal(local.rows.length, 0, "a clean draft is removed");
+    b.session.close();
+  } finally { await value.close(); }
+});
+
+for (const legacy of [false, true]) test(`an unsaved split preserves its draft behind a recovery conflict (legacy=${String(legacy)})`, async () => {
+  const value = await harness(), local = browser();
+  try {
+    const a = await first(value, local), tiptap = a.editor._tiptapEditor;
+    tiptap.view.dispatch(tiptap.state.tr.setSelection(TextSelection.create(tiptap.state.doc, start(a.editor, "block-paper-a") + 10)));
+    a.session.enter();
+    await settle();
+    let retained = local.rows[0]; assert.ok(retained);
+    assert.match(retained.payloadWire, /"text":"By Shared"/);
+    assert.match(retained.payloadWire, /"text":" title \/ Journal North\."/);
+    if (legacy) {
+      const payload: unknown = JSON.parse(retained.payloadWire);
+      assert.ok(isTemplateDraftPayload(payload) && payload.templateQueue);
+      payload.templateQueue.editorTexts = payload.templateQueue.editorTexts.filter(item => !item.container.blockId.startsWith("local-"));
+      const payloadWire = JSON.stringify(payload);
+      retained = { ...retained, payloadWire, payloadSha256: await sha256(payloadWire) };
+      local.rows = [retained];
+    }
+    crash(a);
+    const b = await open(value, local);
+    assert.deepEqual(await b.session.recoverDraft(), { conflicts: 1 });
+    assert.deepEqual(await b.session.recoverDraft("keep"), { conflicts: 1 });
+    assert.equal(b.session.writer.mode, "recovering");
+    assert.equal(saved(b.session), "By Shared title / Journal North.");
+    assert.equal(local.rows[0]?.payloadWire, retained.payloadWire, "no partial correction or draft removal");
+    await b.session.recoverDraft("saved");
+    assert.equal(local.rows.length, 0);
+    assert.equal(saved(b.session), "By Shared title / Journal North.");
+    b.session.close();
+  } finally { await value.close(); }
+});
+
+test("an unsaved merge retains both texts until a recovery conflict is resolved", async () => {
+  const value = await harness(), local = browser();
+  try {
+    const a = await first(value, local), tiptap = a.editor._tiptapEditor;
+    const leading = saved(a.session), trailing = responseBlocks(a.session.queue.template.durable).get("block-paper-b")?.groups[0];
+    assert.ok(trailing);
+    const trailingText = contentText(trailing.content);
+    tiptap.view.dispatch(tiptap.state.tr.setSelection(TextSelection.create(tiptap.state.doc, start(a.editor, "block-paper-b"))));
+    assert.equal(a.session.join("backward"), true);
+    await settle();
+    const retained = local.rows[0]; assert.ok(retained);
+    const payload: unknown = JSON.parse(retained.payloadWire);
+    assert.ok(isTemplateDraftPayload(payload) && payload.templateQueue);
+    assert.equal(payload.templateQueue.editorTexts.find(item => item.container.blockId === "block-paper-a")?.text, leading + trailingText);
+    assert.equal(payload.templateQueue.intents[0]?.operation.kind, "merge_blocks");
+    crash(a);
+    const b = await open(value, local);
+    assert.deepEqual(await b.session.recoverDraft(), { conflicts: 1 });
+    assert.deepEqual(await b.session.recoverDraft("keep"), { conflicts: 1 });
+    assert.equal(b.session.writer.mode, "recovering");
+    assert.equal(saved(b.session), leading);
+    const unchanged = responseBlocks(b.session.queue.template.durable).get("block-paper-b")?.groups[0];
+    assert.ok(unchanged); assert.equal(contentText(unchanged.content), trailingText);
+    assert.equal(local.rows[0]?.payloadWire, retained.payloadWire);
     b.session.close();
   } finally { await value.close(); }
 });

@@ -87,6 +87,7 @@ class ProjectV6(Wire):
             if schema is None or record.semantic_schema_hash!=sha256(canonical(schema)):
                 raise ValueError('extension semantic schema identity mismatch')
             for cell in record.cells: schema_at(schema,'/'+cell.field_key.replace('.','/'))
+            for key in record.retired_cell_ids: schema_at(schema, '/'+key.replace('.', '/'))
         for relation in self.facts.relations:
             if not relation.active:
                 continue
@@ -238,6 +239,8 @@ class RichPreDraftV2(RichPreDraft):
             schema = schemas.get(record.semantic_type)
             if schema is None or record.semantic_schema_hash != sha256(canonical(schema)):
                 raise ValueError('pre-draft semantic schema identity mismatch')
+            for field in record.retired_cell_ids:
+                schema_at(schema, '/' + field.replace('.', '/'))
             for cell in record.cells:
                 schema_at(schema, '/' + cell.field_key.replace('.', '/'))
                 if not set(cell.admission_receipt_ids) <= set(receipts):

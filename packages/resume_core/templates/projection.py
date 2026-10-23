@@ -8,6 +8,8 @@ import re
 from jsonschema import Draft202012Validator, FormatChecker
 from jsonschema.exceptions import SchemaError
 from pydantic import JsonValue
+from referencing import Registry
+from referencing.exceptions import NoSuchResource, Unresolvable
 
 from .models import JsonObject
 
@@ -15,6 +17,13 @@ PROFILE_ID = "closed-json-v1"
 PROFILE_VERSION = "1"
 FORMATS = ("date", "email")
 FORMAT_CHECKER = FormatChecker(formats=FORMATS)
+
+
+def offline_resource(uri):
+    raise NoSuchResource(ref=uri)
+
+
+OFFLINE_REGISTRY = Registry(retrieve=offline_resource)
 SHAPE_KEYS = {"type", "properties", "required", "additionalProperties", "items", "enum", "const", "anyOf", "$ref", "$defs"}
 ANNOTATIONS = {"description", "title", "default", "readOnly", "writeOnly", "examples", "$schema", "$comment"}
 SERVER_KEYS = {"minLength", "maxLength", "pattern", "format", "minimum", "maximum", "exclusiveMinimum",
@@ -76,6 +85,9 @@ def validate_schema(schema: JsonObject) -> None:
         nonlocal count
         count += 1
         if count > 50_000: raise SchemaFailure(path, "schema exceeds technical traversal limit")
+        if "$schema" in node and node["$schema"] not in {
+                "https://json-schema.org/draft/2020-12/schema", "https://json-schema.org/draft/2020-12/schema#"}:
+            raise SchemaFailure(path, "unsupported schema dialect")
         if any(key in node for key in ("$id", "$anchor", "$dynamicRef", "$recursiveRef", "$dynamicAnchor", "$recursiveAnchor")):
             raise SchemaFailure(path, "resource IDs, anchors and dynamic/recursive references are unsupported")
         if "$ref" in node:
@@ -102,19 +114,20 @@ def reachable_schema(payload: JsonObject, definitions: dict[str, JsonObject]) ->
     validate_schema(root)
     used: set[str] = set()
 
-    def visit(value: JsonObject) -> None:
+    def visit(value: JsonObject, include_definitions=False) -> None:
         ref = value.get("$ref")
         if ref is not None:
             if not isinstance(ref, str): raise SchemaFailure("$ref", "reference must be a string")
             resolve(root, ref)
             name = pointer_tokens(ref[1:])[1]
             if name not in used:
-                used.add(name); visit(merged[name])
+                used.add(name); visit(merged[name], True)
         for key, child in schema_children(value):
-            if not key.startswith("$defs/"): visit(child)
+            if include_definitions or not key.startswith("$defs/"): visit(child, include_definitions)
     visit(payload)
     root.pop("$defs", None)
     if used: root["$defs"] = {key: merged[key] for key in sorted(used)}
+    validate_schema(root)
     return root
 
 
@@ -187,7 +200,11 @@ def schema_at(root: JsonObject, pointer: str) -> JsonObject:
 
 
 def validate_payload(schema: JsonObject, value: JsonValue) -> None:
-    error = next(Draft202012Validator(schema, format_checker=FORMAT_CHECKER).iter_errors(value), None)
+    try:
+        error = next(Draft202012Validator(schema, format_checker=FORMAT_CHECKER,
+            registry=OFFLINE_REGISTRY).iter_errors(value), None)
+    except Unresolvable:
+        raise SchemaFailure("/payload", "unresolvable offline schema reference") from None
     if error:
         raise SchemaFailure("/payload/" + "/".join(map(str, error.absolute_path)), error.message)
 

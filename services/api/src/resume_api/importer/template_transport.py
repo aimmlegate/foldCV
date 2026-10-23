@@ -32,12 +32,13 @@ class ProviderTemplateTransport:
         try:
             selected = self.provider_factory()
         except Exception as error:
-            raise ContentFailure(getattr(error, 'code', 'CONNECTION_REQUIRED')) from None
+            raise ContentFailure(getattr(error, 'code', 'CONNECTION_REQUIRED'), cleanup_verified=True,
+                dispatch_witness={'neverDispatched': True}) from None
         if selected is None:
-            raise ContentFailure('CONNECTION_REQUIRED')
+            raise ContentFailure('CONNECTION_REQUIRED', cleanup_verified=True, dispatch_witness={'neverDispatched': True})
         provider, model = selected
         if model != request.policy.model:
-            raise ContentFailure('MODEL_DENIED')
+            raise ContentFailure('MODEL_DENIED', cleanup_verified=True, dispatch_witness={'neverDispatched': True})
         files = OperationFiles(self.temp_root)
         permit, owned = JOB_PERMIT.get(), getattr(provider, 'generate_owned', None)
         try:

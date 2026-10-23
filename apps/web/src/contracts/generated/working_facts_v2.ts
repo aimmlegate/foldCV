@@ -283,6 +283,7 @@ export interface ExtensionRecord {
   itemHandle: Itemhandle1;
   observationIds: Observationids1;
   relations: Relations;
+  retiredCellIds?: Retiredcellids;
   revision: Revision2;
   schemaVersion: Schemaversion;
   semanticSchemaHash: Semanticschemahash1;
@@ -318,6 +319,9 @@ export interface Relation {
   revision: Revision1;
   subjectId: Subjectid;
   targetId: Targetid;
+}
+export interface Retiredcellids {
+  [k: string]: string;
 }
 export interface ExtractionReport {
   counts: Counts;

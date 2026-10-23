@@ -2,11 +2,14 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { attachTemplateWriter } from "../src/background/connection";
 import { TemplateBackgroundWriter } from "../src/background/template-writer";
+import { WriterApi } from "../src/background/api";
+import type { WriterViewV2 } from "../src/contracts/generated/background_writer_view_v2";
+import type { WriterCaptureClipboardV2 } from "../src/contracts/generated/background_writer_capture_clipboard_v2";
 import type { WriterMode } from "../src/background/writer-lifecycle";
 import { jsonWireAt, type JsonWireNode } from "../src/contracts/lossless-json";
 import { contentText, responseBlocks } from "../src/contracts/template-address";
 import { DraftRepository, type LocalDraft } from "../src/background/drafts";
-import { RichSaveQueue, type TemplateAdoption } from "../src/rich/save-queue";
+import { RichSaveQueue, snapshotIdentity, type TemplateAdoption } from "../src/rich/save-queue";
 import { containerKey, type LocalContainer, type Side, type V7Intent } from "../src/rich/v7-translation";
 import { client, harness, record, type Harness, type Traffic } from "./support/template-harness";
 
@@ -143,5 +146,114 @@ test("one hundred unacknowledged touches lock input until the writer acknowledge
     await writer.flushTouches();
     assert.equal(writer.writable, true); assert.equal(locks.at(-1), false);
     assert.equal(record(jsonWireAt(writer.connection.viewWire, ["writer"]).value)["acknowledgedCursor"], 100);
+  } finally { await value.close(); }
+});
+
+test("an older read cannot replace a newer saved and refreshed baseline", async () => {
+  const value = await harness();
+  try {
+    const { writer, queue } = await opened(value, []), api = writer.connection.api, read = api.templateRead.bind(api);
+    const old = await read(writer.proof);
+    let deliver: (view: WriterViewV2) => void = () => {};
+    const delayed = new Promise<WriterViewV2>(resolve => { deliver = resolve; });
+    let first = true;
+    api.templateRead = proof => { if (first) { first = false; return delayed; } return read(proof); };
+    const stale = writer.refresh();
+    writer.input(); queue.template.enqueue(typing(15, "before", "!", textOf(writer.durable)), "newer", 0);
+    await queue.flush();
+    assert.equal(await writer.refresh(), true);
+    const latest = queue.template.durable.wire, connection = writer.connection.viewWire.wire;
+    deliver(old);
+    assert.equal(await stale, false);
+    assert.equal(queue.template.durable.wire, latest);
+    assert.equal(writer.connection.viewWire.wire, connection);
+  } finally { await value.close(); }
+});
+
+test("a read that arrives after close cannot adopt a newer server revision", async () => {
+  const value = await harness();
+  try {
+    const { writer, queue } = await opened(value, []), api = writer.connection.api;
+    const before = queue.template.durable.wire, view = writer.connection.viewWire.wire;
+    assert.equal((await fetch(value.origin + "/harness/advance", { method: "POST" })).ok, true);
+    const newer = await api.templateRead(writer.proof);
+    let deliver: (result: WriterViewV2) => void = () => {};
+    api.templateRead = () => new Promise(resolve => { deliver = resolve; });
+    const pending = writer.refresh();
+    writer.close();
+    deliver(newer);
+    assert.equal(await pending, false);
+    assert.equal(writer.mode, "closed");
+    assert.equal(queue.template.durable.wire, before);
+    assert.equal(writer.connection.viewWire.wire, view);
+  } finally { await value.close(); }
+});
+
+for (const pending of [false, true]) test(`heartbeat recovery preserves known input without a fenced mutation (pending=${String(pending)})`, async () => {
+  const value = await harness();
+  try {
+    const traffic: Traffic[] = [], { writer, queue } = await opened(value, traffic);
+    if (pending) {
+      writer.input(); queue.template.enqueue(typing(15, "before", "!", textOf(writer.durable)), "before-recovery", 0);
+    }
+    writer.connection.api.templateHeartbeat = () => Promise.reject(new TypeError("fetch failed"));
+    await writer.heartbeat();
+    assert.equal(writer.mode, "recovering"); assert.equal(queue.template.state.kind, "ready");
+    await writer.recover();
+    assert.equal(writer.mode, "normal");
+    assert.equal(queue.template.pending.length, pending ? 1 : 0);
+    if (!pending) {
+      writer.input(); queue.template.enqueue(typing(15, "before", "!", textOf(writer.durable)), "after-recovery", 0);
+    }
+    await queue.flush();
+    assert.equal(textOf(queue.template.durable), "By Shared title! / Journal North.");
+    assert.equal(traffic.filter(item => item.path.endsWith("/save")).length, 1);
+  } finally { await value.close(); }
+});
+
+test("a save retry keeps its header after later typing advances the cursor", async () => {
+  const value = await harness();
+  try {
+    const traffic: Traffic[] = [], { writer, queue } = await opened(value, traffic);
+    const api = writer.connection.api, save = api.templateSavePrepared.bind(api);
+    let lose = true;
+    api.templateSavePrepared = async (...args) => {
+      const result = await save(...args);
+      if (lose) { lose = false; throw new TypeError("fetch failed"); }
+      return result;
+    };
+    writer.input(); queue.template.enqueue(typing(15, "before", "!", textOf(writer.durable)), "first", 0);
+    await assert.rejects(queue.flush(), /fetch failed/);
+    writer.input(); queue.template.enqueue(typing(16, "before", "?", "By Shared title! / Journal North."), "second", 0);
+    await queue.flush();
+    const saves = traffic.filter(item => item.path.endsWith("/save"));
+    assert.equal(saves.length, 3);
+    assert.equal(saves[0]?.wire, saves[1]?.wire, "the committed head is retried with identical bytes");
+    assert.equal(textOf(queue.template.durable), "By Shared title!? / Journal North.");
+  } finally { await value.close(); }
+});
+
+test("clipboard replies must match the requested selection and snapshot", async () => {
+  const value = await harness();
+  try {
+    const api = client(value, []), view = await api.templateRead(value.proof);
+    const body: WriterCaptureClipboardV2 = { schemaVersion: 2, proof: value.proof, clientCaptureId: "capture-a",
+      snapshot: snapshotIdentity(view.response.snapshot),
+      selection: { kind: "blocks", blocks: [{ blockId: "block-paper-a", beforeRevision: 1 }] } };
+    const captured = await api.templateCaptureClipboard(body);
+    const delayed = new WriterApi(value.project, () => Promise.resolve(captured));
+    assert.deepEqual(await delayed.templateCaptureClipboard(body), captured);
+    await assert.rejects(delayed.templateCaptureClipboard({ ...body, clientCaptureId: "capture-b",
+      selection: { kind: "blocks", blocks: [{ blockId: "block-paper-b", beforeRevision: 1 }] } }), /INVALID_RESULT/);
+    const snapshot = snapshotIdentity({ ...body.snapshot, projectRevision: body.snapshot.projectRevision + 1 });
+    await assert.rejects(delayed.templateCaptureClipboard({ ...body, snapshot }), /INVALID_RESULT/);
+    const mutable = structuredClone(body);
+    let deliver: (reply: unknown) => void = () => {};
+    const held = new WriterApi(value.project, () => new Promise(resolve => { deliver = resolve; }));
+    const pending = held.templateCaptureClipboard(mutable);
+    mutable.selection = { kind: "blocks", blocks: [{ blockId: "block-paper-b", beforeRevision: 1 }] };
+    mutable.snapshot = snapshot;
+    deliver(captured);
+    assert.deepEqual(await pending, captured, "later changes to the request object cannot change the captured identity");
   } finally { await value.close(); }
 });

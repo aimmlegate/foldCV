@@ -61,7 +61,16 @@ class Allowance:
 def guard_dispatch(allowance, evidence):
     from resume_api.providers.codex_cli import CodexCliProvider
     from resume_api.providers.content import ContentFailure
+    from resume_api.agent.runtime import NativeSession
+    from packages.resume_core.agent_store import AgentFailure
     original = CodexCliProvider._run
+    original_request = NativeSession.request
+
+    def request(session, method, *args, **kwargs):
+        # This proof authorizes structured exec only; assistant turns cannot bypass its allowance.
+        if method == 'turn/start':
+            raise AgentFailure('AGENT_RUNTIME_UNSUPPORTED')
+        return original_request(session, method, *args, **kwargs)
 
     def run(provider, files, args, deadline, cancel, **kwargs):
         if not args or args[0] != 'exec' or '--help' in args:
@@ -81,6 +90,7 @@ def guard_dispatch(allowance, evidence):
         return result
 
     CodexCliProvider._run = run
+    NativeSession.request = request
 
 
 async def main(args):

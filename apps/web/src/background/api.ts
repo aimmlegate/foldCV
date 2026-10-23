@@ -109,8 +109,10 @@ export class WriterApi {
   templateDiscardDraft(body: WriterDraftCommandV1): Promise<WriterViewV2> { return this.templateCall("/draft/discard", body); }
   /** A copy is captured by Python against the current snapshot; paste later names only its ID. */
   async templateCaptureClipboard(body: WriterCaptureClipboardV2): Promise<TemplateClipboardCaptureV1> {
+    const { snapshot, selection } = structuredClone(body);
     const value = await this.transport(this.prefix + "/clipboard/capture", "POST", body);
-    if (!isClipboardCapture(value) || value.projectId !== this.project) throw new RichApiFailure("INVALID_RESULT");
+    if (!isClipboardCapture(value) || value.projectId !== this.project || !sameValue(value.sourceSnapshot, snapshot)
+      || !sameValue(value.selection, selection)) throw new RichApiFailure("INVALID_RESULT");
     return value;
   }
   async templateReleaseClipboard(body: WriterReleaseClipboardV2): Promise<void> {

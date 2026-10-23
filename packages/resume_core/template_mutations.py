@@ -77,6 +77,9 @@ def _cell_identity(cell):
 def _put_extension(facts, incoming, replay):
     records = {record.id: record for record in facts.extensions}
     old = records.get(incoming.id)
+    retired = dict(old.retired_cell_ids) if old is not None else {}
+    if not replay and incoming.retired_cell_ids != retired:
+        raise ValueError('retired cell identity requires retained history')
     if old is not None:
         immutable = ('id', 'item_handle', 'semantic_type', 'semantic_schema_hash', 'observation_ids', 'copy_of_record_id')
         if any(getattr(old, key) != getattr(incoming, key) for key in immutable):
@@ -102,6 +105,13 @@ def _put_extension(facts, incoming, replay):
             if copied.origin != 'human' or not copied.user_corrected:
                 raise ValueError('entity copy requires human authority')
     updated = incoming.model_copy(deep=True)
+    supplied = {cell.field_key: cell.id for cell in incoming.cells}
+    for key, identifier in retired.items():
+        if key in supplied and (not replay or supplied[key] != identifier):
+            raise ValueError('extension edit replaces retired cell identity')
+    if old is not None:
+        retired.update({cell.field_key: cell.id for cell in old.cells if cell.field_key not in supplied})
+    updated.retired_cell_ids = {key: identifier for key, identifier in retired.items() if key not in supplied}
     updated.revision = max(getattr(old, 'revision', 0), incoming.revision) + 1
     for index, cell in enumerate(updated.cells):
         previous = next((value for value in old.cells if value.field_key == cell.field_key), None) if old is not None else None
@@ -178,9 +188,10 @@ def apply_fact_steps(original, request, replay=False):
             raise ValueError('duplicate fact/relation mutation target')
         touched.add(target)
     result = original.model_copy(deep=True)
+    order = {record.id: index for index, record in enumerate([*original.records, *original.extensions])}
     for step in steps:
         if isinstance(step, (RemoveRecord, RemoveExtension)):
-            result = delete_subject(result, step.record_id, request.action_id)
+            result = delete_subject(result, step.record_id, request.action_id, order=order)
     builtin_steps = [step for step in steps if isinstance(step, PutRecord)]
     if builtin_steps:
         base = WorkingFacts(revision=result.revision, records=result.records, tombstones=result.tombstones,

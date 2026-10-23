@@ -1545,6 +1545,17 @@
           "title": "Relations",
           "type": "array"
         },
+        "retiredCellIds": {
+          "additionalProperties": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "propertyNames": {
+            "minLength": 1
+          },
+          "title": "Retiredcellids",
+          "type": "object"
+        },
         "revision": {
           "minimum": 1,
           "title": "Revision",

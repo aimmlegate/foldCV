@@ -315,6 +315,7 @@ def duplicate_entity(facts, record_id, action_id, *, id_factory=identity):
     if original is None:
         raise ValueError('entity copy target missing')
     record = original.model_copy(deep=True)
+    record.retired_cell_ids = {}
     record.copy_of_record_id, record.id, record.item_handle, record.revision = original.id, allocate_id(
         id_factory, 'record', ['copy-entity', original.id]), allocate_id(id_factory, 'item', ['copy-item', original.id]), 1
     cells = {}

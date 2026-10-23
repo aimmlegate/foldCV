@@ -23,6 +23,7 @@ import uvicorn
 
 from packages.resume_core.models.template_workspace import WorkspaceV7
 from packages.resume_core.rich_project_store import RichProjectStore
+from packages.resume_core.storage import atomic_write
 from resume_api.agent.runtime import ScriptedAgentRuntime
 from resume_api.app import create_app
 from spikes.uir.fixtures import NOW
@@ -64,7 +65,7 @@ def digest(path):
 
 
 def write_json(path, value):
-    path.write_text(json.dumps(value, ensure_ascii=False, indent=1) + '\n')
+    atomic_write(path, (json.dumps(value, ensure_ascii=False, indent=1) + '\n').encode())
 
 
 def renamed(workspace, identifier, title):
@@ -97,7 +98,7 @@ async def main(args):
     dist = args.dist.resolve()
     if not (dist / 'index.html').is_file():
         raise ValueError('A built frontend directory is required')
-    root.mkdir()
+    root.mkdir(mode=0o700)
     data, operations = root / 'data', root / 'operations'
     listener = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     listener.bind(('127.0.0.1', args.port)); listener.listen(128)

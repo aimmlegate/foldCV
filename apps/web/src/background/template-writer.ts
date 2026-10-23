@@ -57,6 +57,7 @@ export class TemplateBackgroundWriter extends WriterLifecycle {
   private sequence: number;
   private readonly writes = new Set<Promise<void>>();
   private draftSource: () => TemplateDraftQueue | null = () => null;
+  private readonly saves = new WeakMap<BoundTemplatePreparation, { header: JsonWireNode; opening: PreparedSaveOpening; proof: WriterProofV1 }>();
   constructor(readonly connection: AttachedTemplateWriter, private readonly port: TemplateWriterPort, time = timers,
     observe: WriterObserver = () => Promise.resolve()) {
     super(time, observe);
@@ -140,8 +141,8 @@ export class TemplateBackgroundWriter extends WriterLifecycle {
   /** Leave recovery: a server draft ends with pending_input, otherwise the writer reconciles; the queue starts from the read state. */
   async reattach(): Promise<void> {
     if (this.mode !== "recovering") return;
-    const proof = this.proof, read = await this.connection.api.templateRead(proof);
-    this.adoptView(read);
+    const proof = this.proof, ticket = this.operation, read = await this.connection.api.templateRead(proof);
+    if (this.connection.proof !== proof || this.operation !== ticket || !this.adoptView(read)) throw new Error("WRITER_STALE_CALLBACK");
     this.touches = this.touches.filter(touch => touch.cursor > read.writer.acknowledgedCursor);
     const record = read.drafts.find(item => item.id === read.writer.draftId);
     let view = read;
@@ -156,8 +157,7 @@ export class TemplateBackgroundWriter extends WriterLifecycle {
         view = await this.connection.api.templateReconcile(this.headerValue(this.latest));
       }
     }
-    if (this.connection.proof !== proof) throw new Error("WRITER_STALE_CALLBACK");
-    this.adoptView(view);
+    if (this.connection.proof !== proof || this.operation !== ticket || !this.adoptView(view)) throw new Error("WRITER_STALE_CALLBACK");
     this.cursor = Math.max(this.cursor, view.writer.acknowledgedCursor);
     const template = this.requireQueue().template;
     if (!template.pending.length) template.adoptDurable(jsonWireAt(this.connection.viewWire, ["response"]));
@@ -197,7 +197,7 @@ export class TemplateBackgroundWriter extends WriterLifecycle {
   private acknowledge(writer: WriterSessionV1, fallback: string): void {
     const proof = this.proof;
     if (writer.lineage !== proof.lineage || writer.epoch !== proof.epoch || writer.incarnation !== proof.incarnation
-      || writer.projectId !== this.connection.api.project) throw new Error("WRITER_UNKNOWN");
+      || writer.sessionId !== proof.sessionId || writer.projectId !== this.connection.api.project) throw new Error("WRITER_UNKNOWN");
     const next = acknowledgedOf(writer, fallback);
     if (next.cursor < this.acknowledged.cursor || next.touchGeneration < this.acknowledged.touchGeneration) return;
     this.acknowledged = next;
@@ -207,23 +207,26 @@ export class TemplateBackgroundWriter extends WriterLifecycle {
     retainResume(this.connection.api.project, proof, { response: { workspace: { projectRevision: next.revision } }, workspaceSha256: next.sha256 },
       this.cursor, 0);
   }
-  private adoptView(view: WriterViewV2): void {
-    this.connection.view = view; this.connection.viewWire = jsonResponseWire(view);
-    this.acknowledge(view.writer, view.workspaceSha256);
+  private adoptView(view: WriterViewV2): boolean {
     const revision = view.response.workspace.projectRevision;
-    if (revision >= this.latest.revision) this.latest = { revision, sha256: view.workspaceSha256 };
+    if (revision < this.latest.revision || view.writer.acknowledgedCursor < this.acknowledged.cursor
+      || view.writer.touchGeneration < this.acknowledged.touchGeneration || view.writer.acknowledgedRevision < this.acknowledged.revision) return false;
+    if (revision === this.latest.revision && view.workspaceSha256 !== this.latest.sha256) throw new Error("INVALID_RESULT");
+    const wire = jsonResponseWire(view);
+    this.acknowledge(view.writer, view.workspaceSha256);
+    this.connection.view = view; this.connection.viewWire = wire;
+    this.latest = { revision, sha256: view.workspaceSha256 };
+    return true;
   }
   /** Adopt a canonical advance made outside this writer (export records): flush names it, so the writer acknowledges it;
    * the queue takes it as base only while idle. */
   async refresh(): Promise<boolean> {
     if (!["normal", "protected"].includes(this.mode)) return false;
-    const proof = this.proof, view = await this.connection.api.templateRead(proof);
-    if (this.connection.proof !== proof) return false;
-    this.adoptView(view);
+    const proof = this.proof, ticket = this.operation, view = await this.connection.api.templateRead(proof);
+    if (this.connection.proof !== proof || this.operation !== ticket || !this.adoptView(view)) return false;
     if (this.latest.revision !== this.acknowledged.revision || this.latest.sha256 !== this.acknowledged.sha256) {
       const flushed = await this.connection.api.templateFlush(this.headerValue(this.latest));
-      if (this.connection.proof !== proof) return false;
-      this.adoptView(flushed);
+      if (this.connection.proof !== proof || this.operation !== ticket || !this.adoptView(flushed)) return false;
     }
     const template = this.requireQueue().template;
     if (template.pending.length || template.state.kind !== "ready") return false;
@@ -254,10 +257,14 @@ export class TemplateBackgroundWriter extends WriterLifecycle {
   }
   private async save(preparation: BoundTemplatePreparation): Promise<TemplateSaveVerification> {
     if (!["normal", "protected"].includes(this.mode)) throw new Error("WRITER_RECOVERY_REQUIRED");
-    const proof = this.proof;
-    const result = await this.connection.api.templateSavePrepared(this.header(), preparation, this.opening());
+    const retained = this.saves.get(preparation) ?? { header: this.header(), opening: this.opening(), proof: this.proof };
+    this.saves.set(preparation, retained);
+    const { proof, header, opening } = retained;
+    if (this.proof !== proof) throw new Error("WRITER_STALE_CALLBACK");
+    const result = await this.connection.api.templateSavePrepared(header, preparation, opening);
     if (this.connection.proof !== proof) throw new Error("WRITER_STALE_CALLBACK");
     this.acknowledge(result.acknowledgment.writer, this.acknowledged.sha256);
+    this.saves.delete(preparation);
     return result;
   }
   async flushTouches(): Promise<void> {
@@ -317,15 +324,18 @@ export class TemplateBackgroundWriter extends WriterLifecycle {
   }
   /** Resolve a fenced head from the durable replay record before any later input moves. */
   async recover(): Promise<void> {
-    const queue = this.requireQueue(), head = queue.template.headIdentity();
-    const view = await this.connection.api.templateRead(this.proof);
-    this.adoptView(view);
+    const queue = this.requireQueue();
+    if (queue.template.state.kind !== "fenced") { await this.reattach(); return; }
+    const head = queue.template.headIdentity(), proof = this.proof, ticket = this.operation;
+    const view = await this.connection.api.templateRead(proof);
+    if (this.connection.proof !== proof || this.operation !== ticket || !this.adoptView(view)) throw new Error("WRITER_STALE_CALLBACK");
     const replay = view.response.workspace.mutationReplay;
     const checksum = head?.mutationWire ? await sha256(head.mutationWire) : null;
+    if (this.connection.proof !== proof || this.operation !== ticket) throw new Error("WRITER_STALE_CALLBACK");
     const committed = head !== null && checksum !== null && replay.some(item => item.clientMutationId === head.clientMutationId
       && item.requestSha256 === checksum);
     queue.resolveTemplateOutcome(jsonWireAt(this.connection.viewWire, ["response"]), head !== null && committed);
-    if (this.mode === "recovering") { this.setMode("normal"); this.port.lock(false); }
+    await this.reattach();
   }
   /** Leaving the project drains input and detaches cleanly; a failure leaves input retained and the writer recovering. */
   async navigate(): Promise<void> {

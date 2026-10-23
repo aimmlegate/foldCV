@@ -40,6 +40,37 @@ def test_equivalent_yaml_json_keeps_originals_and_compiled_assets(config):
     assert verify_package(yaml_package) == yaml_package
 
 
+def test_nested_dialect_is_rejected_and_payload_resolution_never_fetches(config, monkeypatch):
+    import urllib.request
+    attempted = []
+    def forbidden(*args, **kwargs):
+        attempted.append(args)
+        raise AssertionError('network retrieval')
+    monkeypatch.setattr(urllib.request, 'urlopen', forbidden)
+    hidden = {'$schema': 'http://json-schema.org/draft-07/schema#',
+        'dependencies': {'name': {'$ref': 'https://example.invalid/forbidden-schema'}}}
+    config['blocks'][0]['content_schema']['allOf'] = [hidden]
+    with pytest.raises(SchemaFailure, match='dialect'):
+        compile_config(config)
+    with pytest.raises(SchemaFailure, match='offline'):
+        validate_payload({'allOf': [hidden]}, {'name': 'Synthetic'})
+    assert attempted == []
+
+
+def test_nested_definition_dependencies_survive_compilation_and_activation(config, tmp_path):
+    config['content_definitions']['outer'] = {'type': 'string', '$defs': {
+        'inner': {'$ref': '#/$defs/leaf'}, 'sibling': {'$ref': '#/$defs/other'}}}
+    config['content_definitions']['leaf'] = {'type': 'string'}
+    config['content_definitions']['other'] = {'type': 'integer'}
+    schema = config['blocks'][0]['content_schema']
+    schema['properties']['extra'] = {'$ref': '#/$defs/outer/$defs/inner'}
+    schema['required'].append('extra')
+    package = compile_config(config)
+    TemplateStore(tmp_path).activate(package)
+    validate_payload(package.blocks[0].full_schema, {'name': 'Synthetic', 'profession': None, 'extra': 'Retained'})
+    assert {'leaf', 'other', 'outer'} <= package.blocks[0].full_schema['$defs'].keys()
+
+
 @pytest.mark.parametrize("raw", [b'a: 1\na: 2', b'1: value', b'x: .nan', b'x: .inf', b'x: 2026-10-21',
     b'x: !!set {a: null}', b'x: yes', b'x: 0xFF', b'x: &x [*x]', b'x: !unknown value', b'[]', b''])
 def test_non_json_yaml_rejected_with_location(raw):

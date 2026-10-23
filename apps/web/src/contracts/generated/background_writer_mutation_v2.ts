@@ -1452,6 +1452,7 @@ export interface ExtensionRecord {
   itemHandle: Itemhandle1;
   observationIds: Observationids1;
   relations: Relations;
+  retiredCellIds?: Retiredcellids;
   revision: Revision34;
   schemaVersion: Schemaversion1;
   semanticSchemaHash: Semanticschemahash;
@@ -1478,6 +1479,9 @@ export interface Relation {
   revision: Revision33;
   subjectId: Subjectid;
   targetId: Targetid;
+}
+export interface Retiredcellids {
+  [k: string]: string;
 }
 export interface RemoveExtension {
   beforeRevision: Beforerevision7;

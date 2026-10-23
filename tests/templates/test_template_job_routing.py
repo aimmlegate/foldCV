@@ -32,6 +32,59 @@ async def service_for(fixture):
 
 
 @pytest.mark.asyncio
+async def test_queued_cancellation_stays_cancelled_after_recovery(tmp_path):
+    fixture = RuntimeFixture(tmp_path)
+    service = await service_for(fixture)
+    service.supervisor.pause('AUTH_REQUIRED')
+    try:
+        job, _ = await service.templates.submit(fixture.project, fixture.command)
+        cancelled = await service.templates.cancel(fixture.project, job.id)
+        assert cancelled.execution == 'cancelled' and not cancelled.attempts
+        await service.templates.recover()
+        result = service.store.read(fixture.project, job.id)
+        assert result.template_outcome.state == 'cancelled'
+        assert result.publication == 'cancelled' and result.publication_error is None
+    finally:
+        await service.shutdown()
+        service.supervisor.clock.verify()
+
+
+@pytest.mark.asyncio
+async def test_queued_preprovider_refusal_releases_admission_and_survives_recovery(tmp_path):
+    from resume_api.importer.template_transport import JOB_PERMIT, ProviderTemplateTransport
+    fixture = RuntimeFixture(tmp_path)
+    service = await service_for(fixture)
+    admitted = []
+    def disconnected():
+        admitted.append((service.admission.locked(), JOB_PERMIT.get() is not None))
+        return None
+    service.templates.pipeline.transport = ProviderTemplateTransport(disconnected, tmp_path / 'transport')
+    try:
+        job, _ = await service.templates.submit(fixture.project, fixture.command)
+        async def finish():
+            while True:
+                current = service.store.read(fixture.project, job.id)
+                if current.template_outcome is not None:
+                    return current
+                await asyncio.sleep(0.02)
+        current = await asyncio.wait_for(finish(), 60)
+        assert current.publication == 'saved' and current.template_outcome.state == 'saved'
+        operation = fixture.current().project.template_operations[0]
+        assert admitted and all(held and owned for held, owned in admitted)
+        assert operation.attempts and spent_calls(operation) == 0
+        assert all(attempt.state == 'released' and attempt.cleanup.state == 'verified' for attempt in operation.attempts)
+        assert fixture.transport.calls == [] and service.supervisor.fenced is None
+        assert service.admission.acquire(blocking=False), 'the next operation can take the released slot'
+        service.admission.release()
+        await service.templates.recover()
+        recovered = service.store.read(fixture.project, job.id)
+        assert recovered.publication == 'saved' and recovered.template_outcome.state == 'saved'
+    finally:
+        await service.shutdown()
+        service.supervisor.clock.verify()
+
+
+@pytest.mark.asyncio
 async def test_queue_and_direct_share_attempt_review_and_publication_owners(tmp_path):
     fixture = RuntimeFixture(tmp_path)
     service = await service_for(fixture)

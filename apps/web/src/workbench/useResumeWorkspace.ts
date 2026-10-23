@@ -269,9 +269,11 @@ export function useResumeWorkspace() {
     let job = await startTemplateImport(id, { clientRequestId: crypto.randomUUID(), allowTextRewrite });
     const deadline = Date.now() + 15 * 60_000;
     while (!job.templateOutcome) {
-      if (!current() || Date.now() > deadline) return;
+      if (!current()) return;
+      if (Date.now() > deadline) throw new RichApiFailure("PROCESS_TIMEOUT");
       // An execution that ended in failure without a typed outcome stays unresolved on the server; report it.
-      if (["failed", "cancelled", "interrupted"].includes(job.execution) && job.error) throw new RichApiFailure(job.error.code);
+      if (["failed", "cancelled", "interrupted"].includes(job.execution))
+        throw new RichApiFailure(job.error?.code ?? (job.execution === "cancelled" ? "CANCELLED" : "PROCESS_FAILED"));
       await new Promise(resolve => setTimeout(resolve, 1000));
       job = await jobs.read(job.id);
     }

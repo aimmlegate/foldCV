@@ -253,17 +253,21 @@ export function foldComposition(operations: readonly ExtractedOperation[]): Extr
   if (!first || first.operation.kind !== "replace_text") return { reason: "composition without text input" };
   const container = first.operation.container, key = containerKey(container), prior = first.prior.get(key);
   if (prior === undefined) return { reason: "composition without prior text" };
-  let current = prior;
+  let current = prior, start = first.operation.start, end = first.operation.end;
   for (const { operation, prior: expected } of operations) {
     if (operation.kind !== "replace_text" || containerKey(operation.container) !== key || expected.get(key) !== current)
       return { reason: "composition left its container" };
+    if (JSON.stringify(operation.styles) !== JSON.stringify(first.operation.styles)) return { reason: "composition changed styles" };
+    // Keep the addressed range: a text diff can move an insertion past repeated characters.
+    end += Math.max(0, operation.end - (end + current.length - prior.length));
+    start = Math.min(start, operation.start);
     current = current.slice(0, operation.start) + operation.text + current.slice(operation.end);
   }
-  const net = correctionRange(prior, current);
-  if (!net) return { reason: "composition made no change" };
-  const collapsed = net.start === net.end;
-  if (collapsed && (first.operation.start !== net.start || first.operation.side === null)) return { reason: "composition moved its insertion point" };
-  return { operation: { ...first.operation, start: net.start, end: net.end, text: net.text, side: collapsed ? first.operation.side : null },
+  if (prior === current) return { reason: "composition made no change" };
+  const collapsed = start === end;
+  if (collapsed && first.operation.side === null) return { reason: "composition without insertion side" };
+  const text = current.slice(start, current.length - (prior.length - end));
+  return { operation: { ...first.operation, start, end, text, side: collapsed ? first.operation.side : null },
     prior: first.prior };
 }
 
@@ -352,7 +356,7 @@ export function selectedBlocks(state: EditorState): string[] | null {
     const group = $from.node(groupDepth), first = $from.index(groupDepth), end = offset(to, selection.to);
     let last = $to.index(groupDepth);
     if (end === 0 && last > first) last--;
-    else if (end !== textOf(to.node).length || last === first) return null;
+    else if (end !== textOf(to.node).length || last === first || group.child(last).childCount > 1) return null;
     const ids: string[] = [];
     for (let index = first; index <= last; index++) {
       const id: unknown = group.child(index).attrs["id"];

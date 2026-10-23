@@ -91,11 +91,13 @@ class ExtensionRecord(Wire):
     observation_ids: list[Id]
     active: bool
     copy_of_record_id: Id | None = Field(default=None, exclude_if=lambda value: value is None)
+    # Removed cells keep their identities for historical scopes and Redo, without current values.
+    retired_cell_ids: dict[Id, Id] = Field(default_factory=dict, exclude_if=lambda value: not value)
 
     @model_validator(mode="after")
     def identity(self):
-        _unique([cell.id for cell in self.cells], "extension cell")
-        _unique([cell.field_key for cell in self.cells], "extension field")
+        _unique([cell.id for cell in self.cells] + list(self.retired_cell_ids.values()), "extension cell")
+        _unique([cell.field_key for cell in self.cells] + list(self.retired_cell_ids), "extension field")
         _unique([relation.id for relation in self.relations], "extension relation")
         if any(cell.revision > self.revision for cell in self.cells):
             raise ValueError("cell revision exceeds record")
@@ -193,7 +195,8 @@ class WorkingFactsV2(WorkingFacts):
         builtin_cells = builtin_cell_values(self.records)
         _unique([r.id for r in self.extensions], "extension record")
         _unique([r.item_handle for r in self.extensions], "extension item handle")
-        _unique([c.id for r in self.extensions for c in r.cells], "extension cell")
+        retained_cells = [identifier for record in self.extensions for identifier in record.retired_cell_ids.values()]
+        _unique([c.id for r in self.extensions for c in r.cells] + retained_cells, "extension cell")
         _unique([o.id for o in self.observations], "observation")
         _unique([r.id for r in self.relations], "effective relation")
         _unique([s.id for s in self.manual_scopes], "manual scope")
@@ -203,7 +206,7 @@ class WorkingFactsV2(WorkingFacts):
         _unique(reserved_periods, 'builtin allocated period')
         _unique([r.id for r in self.records] + [r.id for r in self.extensions]
                 + [r.item_handle for r in self.extensions] + [c.id for r in self.extensions for c in r.cells]
-                + list(builtin_cells) + [value.item_handle for value in self.builtin_identities]
+                + retained_cells + list(builtin_cells) + [value.item_handle for value in self.builtin_identities]
                 + sorted(set(reserved_periods) | {period.id for record in self.records for period in getattr(record, 'periods', [])}),
                 "persistent semantic identity")
         removed = {t.record_id for t in self.tombstones}
@@ -217,7 +220,7 @@ class WorkingFactsV2(WorkingFacts):
         scopes = {s.id:s for s in self.manual_scopes}
         relations = {r.id:r for r in self.relations}
         extension_records = {record.id: record for record in self.extensions}
-        cells = {c.id for r in self.extensions for c in r.cells}
+        cells = {c.id for r in self.extensions for c in r.cells} | set(retained_cells)
         builtin_records = {record.id: record for record in self.records}
         period_owners = {period.id: record.id for record in self.records for period in getattr(record, 'periods', [])}
         for identity in self.builtin_identities:

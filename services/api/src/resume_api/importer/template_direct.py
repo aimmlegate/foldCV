@@ -6,6 +6,7 @@ import threading
 from packages.resume_core.template_import import TemplateImportFailure
 from packages.resume_core.project_store import ProjectStoreFailure
 from ..inference_admission import AdmissionBlocked, AdmissionCancelled
+from .template_transport import JOB_PERMIT
 
 
 class TemplateDirect:
@@ -26,7 +27,9 @@ class TemplateDirect:
                     self.permits.pop(project)[0].release()
         stop, cancelled = threading.Event(), asyncio.Event()
         self.stops[project] = stop, cancelled
+        permit_token = None
         async def admitted():
+            nonlocal permit_token
             workspace = self.pipeline.read(project)
             operations = (workspace.project or workspace.pre_draft).template_operations
             operation = next(value for value in operations if value.id == command.operation_id) if command.kind == 'resume_import' else next(
@@ -36,13 +39,13 @@ class TemplateDirect:
             except (AdmissionBlocked, AdmissionCancelled):
                 raise TemplateImportFailure('IMPORT_CLEANUP_UNKNOWN' if self.admission.blocked else 'CANCELLED') from None
             self.permits[project] = permit, operation.id
-            bind = getattr(self.pipeline.transport, 'bind_permit', None)
-            if bind is not None:
-                bind(project, permit)
+            permit_token = JOB_PERMIT.set(permit)
         result = None
         try:
             result = await self.pipeline.run(project, command, admitted=admitted, finalize=False, cancel_event=stop)
         finally:
+            if permit_token is not None:
+                JOB_PERMIT.reset(permit_token)
             retained = self.permits.get(project)
             if retained is not None:
                 try:

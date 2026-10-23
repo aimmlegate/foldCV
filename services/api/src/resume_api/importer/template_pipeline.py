@@ -150,6 +150,7 @@ class TemplatePipeline(TemplateCheckpoints):
                     raise TemplateImportFailure('IMPORT_IDENTITY_PREPARATION_REQUIRED') from None
             operation, created = start_operation(project, command, data.template_package, data.sources, data.facts,
                 data.template_operations, self.wall(), id_factory=self.id_factory)
+            self.authority(operation, workspace)
             if created:
                 if workspace.project is not None:
                     raise TemplateImportFailure('IMPORT_PROJECT_ALREADY_AUTHORED')

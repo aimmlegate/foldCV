@@ -8,6 +8,9 @@ function deferred() {
   return { promise, resolve, reject };
 }
 const effects: (() => void | (() => void))[] = [], cleanups: (() => void)[] = [], events: string[] = [];
+const scenario = process.argv[2] ?? "", importing = scenario.startsWith("import-");
+const stateWrites = new Map<number, unknown[]>();
+let stateIndex = 0, importReads = 0;
 let mounted = true, staleState = 0;
 Object.defineProperty(globalThis, "location", { value: { search: "?project=A", href: "http://foldcv.test/?project=A", pathname: "/" } });
 Object.defineProperty(globalThis, "history", { value: { replaceState: (_data: unknown, _unused: string, url: string) => events.push(`url:${url}`) } });
@@ -15,14 +18,15 @@ mock.module("react", { namedExports: {
   useCallback: (callback: unknown) => callback,
   useEffect: (effect: () => void | (() => void)) => { effects.push(effect); const cleanup = effect(); if (cleanup) cleanups.push(cleanup); },
   useRef: (current: unknown) => ({ current }),
-  useState: (value: unknown): [unknown, () => void] => {
-    const initial: unknown = typeof value === "function" ? Reflect.apply(value, null, []) : value;
-    return [initial, () => { if (!mounted) staleState++; }];
+  useState: (value: unknown): [unknown, (next: unknown) => void] => {
+    const index = stateIndex++, initial: unknown = typeof value === "function" ? Reflect.apply(value, null, []) : value;
+    return [importing && index === 8 ? { id: "synthetic" } : importing && index === 9 ? true : initial,
+      (next: unknown) => { if (!mounted) staleState++; stateWrites.set(index, [...stateWrites.get(index) ?? [], next]); }];
   },
 } });
 const file = (path: string) => new URL(path, import.meta.url).href;
 mock.module(file("../src/errors/messages.ts"), { namedExports: { errorMessage: (error: unknown) => String(error) } });
-mock.module(file("../src/rich/import-source.ts"), { namedExports: { hasInput: () => false, importBody: () => ({}) } });
+mock.module(file("../src/rich/import-source.ts"), { namedExports: { hasInput: () => importing, importBody: () => ({}) } });
 const pendingRequest = deferred();
 let holdRequest = false;
 mock.module(file("../src/rich/api.ts"), { namedExports: {
@@ -31,7 +35,7 @@ mock.module(file("../src/rich/api.ts"), { namedExports: {
   downloadTemplate: async () => ({ blob: new Blob() }),
   openedProject: async (path: string) => {
     events.push(`request:${path}`);
-    if (path === "/T" || path === "/archive" && process.argv[2] === "template-upload")
+    if (path === "/T" || path === "/template-input" || path === "/archive" && scenario === "template-upload")
       return { kind: "template", response: { workspace: { projectId: "T", project: {} }, identity: null } };
     return { kind: "rich", response: { workspace: { projectId: path === "/A" ? "A" : "B", project: {}, preDraft: null } } };
   },
@@ -47,13 +51,18 @@ mock.module(file("../src/rich/api.ts"), { namedExports: {
 mock.module(file("../src/background/connection.ts"), { namedExports: { attachExclusiveWriter: async () => null,
   attachExclusiveTemplateWriter: async (id: string) => { events.push(`attach-template:${id}`); return null; } } });
 mock.module(file("../src/background/fixed.ts"), { namedExports: { FixedOperations: class {} } });
-mock.module(file("../src/background/api.ts"), { namedExports: { JobsApi: class {}, startTemplateImport: async () => { throw new Error("unused"); } } });
+const importJob = () => ({ id: "synthetic-job", execution: scenario === "import-timeout" ? "running" : scenario.slice("import-".length),
+  publication: scenario === "import-cancelled" ? "cancelled" : "none", error: null, templateOutcome: null });
+mock.module(file("../src/background/api.ts"), { namedExports: {
+  JobsApi: class { async read() { importReads++; return importJob(); } },
+  startTemplateImport: async () => { if (!importing) throw new Error("unused"); return importJob(); },
+} });
 mock.module(file("../src/workbench/import/notices.ts"), { namedExports: { warningLabel: (value: unknown) => value } });
 const { useResumeWorkspace } = await import("../src/workbench/useResumeWorkspace");
 const hook = useResumeWorkspace();
 await new Promise<void>(resolve => setImmediate(resolve));
 events.length = 0;
-const gate = deferred(), scenario = process.argv[2] ?? "";
+const gate = deferred();
 const editor: RichEditorHandle = {
   background: true, sessionId: "session", navigate: () => gate.promise,
   resume: async () => { events.push("resume"); }, undo: () => {}, redo: () => {}, captureSelection: () => null,
@@ -87,7 +96,19 @@ function invoke(): Promise<unknown> {
     default: throw new Error(`Unknown action ${action}`);
   }
 }
-if (wait) {
+if (importing) {
+  let now = Date.now();
+  mock.method(Date, "now", () => now);
+  const schedule = globalThis.setTimeout;
+  mock.method(globalThis, "setTimeout", (callback: () => void) => { now += 60_000; return schedule(callback, 0); });
+  await hook.process();
+  assert.equal(importReads, scenario === "import-timeout" ? 16 : 0);
+  const expected = scenario === "import-timeout" ? "PROCESS_TIMEOUT" : scenario === "import-cancelled" ? "CANCELLED" : "PROCESS_FAILED";
+  assert.ok(stateWrites.get(10)?.some(value => String(value).includes(expected)), "terminal imports report an error without an optional server error");
+  assert.equal(stateWrites.get(12)?.at(-1), false, "the busy state is released");
+  assert.equal(await hook.action(async () => {}), true, "another action is admitted after failure");
+  mock.restoreAll();
+} else if (wait) {
   const pending = invoke();
   await Promise.resolve(); unmount();
   if (wait === "remount") { remount(); await new Promise<void>(resolve => setImmediate(resolve)); }

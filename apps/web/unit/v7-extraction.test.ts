@@ -11,7 +11,7 @@ import type { RichDocumentV2 } from "../src/contracts/generated/rich_document_v2
 import { parseJsonWire, type JsonWireNode } from "../src/contracts/lossless-json";
 import { taggedSchema } from "../src/contracts/tagged-schema";
 import { templateSchema } from "../src/rich/template-schema";
-import { extractOperations, foldComposition, mergeAt, splitAt, type ExtractedOperation } from "../src/rich/v7-extraction";
+import { extractOperations, foldComposition, mergeAt, selectedBlocks, splitAt, type ExtractedOperation } from "../src/rich/v7-extraction";
 import { projectTemplateDocument, type TemplateEditorBlock } from "../src/rich/v7-projection";
 import { translateIntent, type V7Operation } from "../src/rich/v7-translation";
 
@@ -214,4 +214,35 @@ test("a composition becomes one replacement at composition end", () => {
   assert.ok("operation" in folded);
   assert.deepEqual(folded.operation, { ...first.operation, text: "カ" });
   assert.deepEqual(foldComposition([first, last]), { reason: "composition left its container" });
+});
+
+test("composition beside repeated text keeps the actual insertion range", () => {
+  const doc = docOf([{ id: "repeated", type: "paragraph", content: "ああ" }]), pos = start(doc, "repeated") + 1;
+  const update = only(caret(doc, pos).tr.insertText("あ", pos)), folded = foldComposition([update]);
+  assert.ok("operation" in folded);
+  assert.deepEqual(folded.operation, update.operation);
+  assert.equal(replace(folded.operation).start, 1);
+});
+
+for (const text of ["あ", "😀"]) test(`repeated composition updates retain the addressed UTF-16 range (${text})`, () => {
+  const doc = docOf([{ id: "repeated", type: "paragraph", content: text + text }]);
+  const pos = start(doc, "repeated") + text.length;
+  const first = caret(doc, pos).tr.insertText(text, pos);
+  const second = caret(first.doc, pos).tr.insertText("candidate", pos, pos + text.length);
+  const last = caret(second.doc, pos).tr.insertText(text, pos, pos + "candidate".length);
+  const updates = [only(first), only(second), only(last)], folded = foldComposition(updates);
+  assert.ok("operation" in folded);
+  const operation = replace(folded.operation);
+  assert.deepEqual([operation.start, operation.end, operation.text], [text.length, text.length, text]);
+  const prior = [...folded.prior.values()][0]; assert.ok(prior);
+  assert.equal(prior.slice(0, operation.start) + operation.text + prior.slice(operation.end), text.repeat(3));
+});
+
+test("whole sibling selection excludes an unselected final subtree", () => {
+  const doc = docOf([{ id: "a", type: "paragraph", content: "First" },
+    { id: "b", type: "paragraph", content: "Second", children: [{ id: "c", type: "paragraph", content: "Unselected detail" }] },
+    { id: "d", type: "paragraph", content: "Next" }]);
+  const selection = (end: number) => EditorState.create({ doc, selection: TextSelection.create(doc, start(doc, "a"), end) });
+  assert.equal(selectedBlocks(selection(start(doc, "b") + "Second".length)), null);
+  assert.deepEqual(selectedBlocks(selection(start(doc, "d"))), ["a", "b"], "the next sibling start covers the whole subtree");
 });

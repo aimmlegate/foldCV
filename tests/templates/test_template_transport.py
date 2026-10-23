@@ -60,3 +60,50 @@ def test_model_mismatch_and_unexpected_errors_are_content_failures(tmp_path):
         ProviderTemplateTransport(lambda: (Broken(), 'model-a'), tmp_path).generate(request(), threading.Event())
     assert failed.value.code == 'PROCESS_FAILED' and failed.value.cleanup_verified is True
     assert ProviderTemplateTransport(lambda: (provider, 'model-a'), tmp_path).reconcile(object()) is None
+
+
+@pytest.mark.parametrize('failure', ['connection', 'model', 'factory'])
+def test_preprovider_refusals_prove_no_dispatch(tmp_path, failure):
+    provider = Provider()
+    def selected():
+        if failure == 'factory':
+            raise ContentFailure('CONNECTION_REQUIRED')
+        return None if failure == 'connection' else (provider, 'other-model')
+    transport = ProviderTemplateTransport(selected, tmp_path)
+    with pytest.raises(ContentFailure) as caught:
+        transport.generate(request(), threading.Event())
+    assert caught.value.cleanup_verified
+    assert caught.value.dispatch_witness == {'neverDispatched': True}
+    assert provider.calls == []
+    proof = transport.prove_return(SimpleNamespace(id='reserved', owner={'leaseId': 'lease'}), caught.value)
+    assert proof.attempt_id == 'reserved' and proof.never_dispatched
+
+
+@pytest.mark.asyncio
+async def test_direct_import_passes_and_resets_its_shared_permit(tmp_path):
+    from tests.templates.template_runtime_fixtures import RuntimeFixture
+    from resume_api.importer.template_direct import TemplateDirect
+    from resume_api.inference_admission import InferenceAdmission
+    fixture, admission, calls = RuntimeFixture(tmp_path), InferenceAdmission(), []
+    class OwnedProvider:
+        def generate_owned(self, request, files, cancel, permit):
+            calls.append('owned')
+            with permit.hold(cancel):
+                return fixture.transport.generate(request, cancel)
+        def generate(self, *args):
+            raise AssertionError('direct import lost its permit')
+    fixture.pipeline.transport = ProviderTemplateTransport(
+        lambda: (OwnedProvider(), fixture.command.capture.primary.model), tmp_path / 'transport')
+    result = await TemplateDirect(fixture.pipeline, admission).run(fixture.project, fixture.command)
+    assert result.state == 'published' and calls == ['owned', 'owned']
+    assert JOB_PERMIT.get() is None and not admission.locked()
+
+
+@pytest.mark.asyncio
+async def test_missing_connection_can_finalize_fallback_without_unknown_cleanup(tmp_path):
+    from tests.templates.template_runtime_fixtures import RuntimeFixture
+    fixture = RuntimeFixture(tmp_path)
+    fixture.pipeline.transport = ProviderTemplateTransport(lambda: None, tmp_path / 'transport')
+    result = await fixture.pipeline.run(fixture.project, fixture.command, admitted=fixture.admitted)
+    assert result.state == 'published'
+    assert result.attempts[0].cleanup.state == 'verified'

@@ -101,3 +101,27 @@ async def test_without_an_explicit_call_cap_strict_import_is_unavailable(tmp_pat
         refused = await upload(client)
         assert refused.status_code == 409 and refused.json()['error']['code'] == 'JOB_DISABLED'
         assert provider.calls == []
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize('field,value', [('callCap', 99), ('configurationHash', '1' * 64),
+    ('authorityHash', '2' * 64), ('dependencyHash', '3' * 64), ('effort', 'high'), ('processingSeconds', 200)])
+async def test_generic_route_refuses_forged_capture_before_persistence(tmp_path, field, value):
+    from tests.templates.employment_fixtures import employment_source
+    provider = ScriptedTemplateProvider()
+    async with app_client(tmp_path, call_cap=1, provider=provider) as (client, service, jobs):
+        source, raw = employment_source('F01')
+        project = service.allocate_template('Synthetic', service.template_import_package())
+        service.workspaces[project].pre_draft.sources = [source]
+        service.workspaces[project].pre_draft.selected_source_id = source.id
+        service.originals[(project, source.id)] = raw
+        service.persist(project)
+        jobs.store.open(project)
+        command = service.template_import_command(project, 'forged', True).model_dump(mode='json', by_alias=True)
+        target = command['capture']['policy'] if field in {'callCap', 'processingSeconds'} else (
+            command['capture']['primary'] if field in {'configurationHash', 'effort'} else command['capture'])
+        target[field] = value
+        reply = await client.post(f'/v1/rich/projects/{project}/jobs/fixed', json=command)
+        assert reply.status_code == (422 if field == 'processingSeconds' else 409), reply.text
+        assert provider.calls == []
+        assert service.read(project).pre_draft.template_operations == []

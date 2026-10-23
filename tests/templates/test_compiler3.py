@@ -88,6 +88,18 @@ def test_json_keeps_real_strings_and_negative_zero_without_yaml_scalar_inference
     assert load_declared_definition(b'{"zero":0e-9999}','json')=={'zero':0.0}
 
 
+@pytest.mark.parametrize('value', ['1.0e-999', '-1.0e-999', '1.0e+999'])
+@pytest.mark.parametrize('format', ['yaml', 'json'])
+def test_numeric_range_is_the_same_for_yaml_and_json(value, format):
+    raw = ('minimum: ' + value if format == 'yaml' else '{"minimum":' + value + '}').encode()
+    with pytest.raises(SchemaFailure):
+        load_declared_definition(raw, format)
+
+
+def test_yaml_keeps_representable_subnormals_and_real_zero():
+    assert load_declared_definition(b'tiny: 5.0e-324\nzero: 0.0e-999\n', 'yaml') == {'tiny': 5e-324, 'zero': 0.0}
+
+
 def test_json_retains_existing_byte_depth_and_node_limits(monkeypatch):
     monkeypatch.setattr('packages.resume_core.templates.loading.CONFIG_BYTES',10)
     with pytest.raises(SchemaFailure,match='byte limit'):load_declared_definition(b'{"long":"123456"}','json')

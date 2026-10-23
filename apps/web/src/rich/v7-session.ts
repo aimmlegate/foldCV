@@ -434,7 +434,13 @@ export class TemplateEditorSession {
     const unqueued = [...this.deferred.map(item => item.value), ...this.composed];
     if (!pending.length && !unqueued.length) return null;
     const containers = new Map<string, LocalContainer>();
-    for (const value of [...pending.map(item => item.intent), ...unqueued]) for (const key of value.prior.keys()) containers.set(key, parseContainer(key));
+    for (const value of [...pending.map(item => item.intent), ...unqueued]) {
+      for (const key of value.prior.keys()) containers.set(key, parseContainer(key));
+      if (value.operation.kind === "split_block") {
+        const created: LocalContainer = { blockId: value.operation.created, kind: "content", cellId: null };
+        containers.set(containerKey(created), created);
+      }
+    }
     const doc = this.editor?._tiptapEditor.state.doc;
     const editorTexts = [...containers.values()].flatMap(container => {
       const text = doc ? containerText(doc, container) : null;
@@ -455,6 +461,13 @@ export class TemplateEditorSession {
     const editor = this.editor, record = this.writer.connection.local?.payload.templateQueue;
     if (!editor || this.writer.mode !== "recovering") return { conflicts: 0 };
     if (!record) { await this.writer.reattach(); await this.reproject(); await this.writer.clearCleanDraft(); return { conflicts: 0 }; }
+    const structural = record.intents.filter(item => item.operation.kind === "split_block" || item.operation.kind === "merge_blocks");
+    if (structural.length) {
+      // Text corrections cannot prove where an unacknowledged split or merge ended up.
+      if (choice !== "saved") return { conflicts: structural.length };
+      await this.writer.discardDraft(); await this.reproject();
+      return { conflicts: 0 };
+    }
     const locals = new Map(record.locals.map(item => [item.local, item.canonical]));
     const canonical = (container: LocalContainer): LocalContainer => ({ ...container, blockId: locals.get(container.blockId) ?? container.blockId });
     const blocks = responseBlocks(this.writer.durable), states = new Map<string, Set<string>>();
@@ -473,6 +486,7 @@ export class TemplateEditorSession {
       return current === null || current !== item.text && !states.get(containerKey(item.container))?.has(current);
     });
     if (conflicts.length && choice === null) return { conflicts: conflicts.length };
+    if (choice === "keep" && texts.some(item => saved(item.container) === null)) return { conflicts: conflicts.length };
     const shown = texts.filter(item => saved(item.container) !== null && (choice === "keep" || !conflicts.includes(item)));
     this.projecting = true;
     try { editor.transact(tr => { tr.setMeta(projectionMeta, true); for (const item of shown) showText(tr, item.container, item.text); }); }
@@ -623,7 +637,10 @@ export class TemplateEditorSession {
     if (updates.length) {
       const folded = foldComposition(updates);
       if ("operation" in folded) this.enqueue(folded, "composition");
-      else if (folded.reason !== "composition made no change") this.refuse(folded.reason);
+      else if (folded.reason !== "composition made no change") {
+        // These updates are already visible; keep them when they cannot share one replacement.
+        for (const update of updates) this.enqueue(update, "composition");
+      }
     }
     this.boundary();
     for (const resolve of this.waiters) resolve();

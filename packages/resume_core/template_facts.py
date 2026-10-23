@@ -109,7 +109,7 @@ def move_owned(facts: WorkingFactsV2,record_id,new_owner,*,supported_owner_ids):
     return WorkingFactsV2.model_validate(result.model_dump(by_alias=True))
 
 
-def delete_subject(facts: WorkingFactsV2,record_id,action_id):
+def delete_subject(facts: WorkingFactsV2,record_id,action_id,*,order=None):
     result=facts.model_copy(deep=True)
     current={r.id for r in result.records}|{r.id for r in result.extensions if r.active}
     if record_id not in current: raise ValueError('fact deletion target missing')
@@ -120,7 +120,8 @@ def delete_subject(facts: WorkingFactsV2,record_id,action_id):
         extra=descendants-removed
         if not extra: break
         removed.update(extra)
-    order={r.id:i for i,r in enumerate([*result.records,*result.extensions])}
+    if order is None:
+        order={r.id:i for i,r in enumerate([*result.records,*result.extensions])}
     revisions={r.id:r.revision for r in [*result.records,*result.extensions]}
     result.records=[r for r in result.records if r.id not in removed]
     if result.builtin_manual_scopes:

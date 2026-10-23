@@ -155,6 +155,40 @@ test("a composition is saved once, as its final text, at composition end", async
   } finally { session.close(); await value.close(); }
 });
 
+test("IME input beside repeated characters survives save, projection and reopen", async () => {
+  const value = await harness();
+  const { session, editor, warnings } = await opened(value);
+  try {
+    dispatch(editor, tr => { tr.insertText("ああ", start(editor, "block-paper-a")); });
+    await session.flush(); await session.reproject();
+    session.compositionStart();
+    dispatch(editor, tr => { tr.insertText("あ", start(editor, "block-paper-a") + 1); });
+    session.compositionEnd();
+    await session.flush(); await session.reproject();
+    const expected = `block-paper-a=あああ${paperText}`;
+    assert.ok(canonicalTexts(session).includes(expected));
+    assert.ok(editorTexts(editor).includes(expected));
+    await session.writer.navigate(); await session.resume();
+    assert.ok(canonicalTexts(session).includes(expected));
+    assert.equal(warnings.length, 0, warnings.join("\n"));
+  } finally { session.close(); await value.close(); }
+});
+
+test("composition updates that cannot fold retain every already-applied change", async () => {
+  const value = await harness();
+  const { session, editor } = await opened(value);
+  try {
+    session.compositionStart();
+    dispatch(editor, tr => { tr.insertText("あ", start(editor, "block-paper-a")); });
+    dispatch(editor, tr => { tr.insertText("い", start(editor, "block-paper-b") + 2); });
+    session.compositionEnd();
+    assert.equal(session.queue.template.pending.length, 2);
+    const visible = editorTexts(editor).filter(text => text.startsWith("block-paper"));
+    await session.flush(); await session.reproject();
+    assert.deepEqual(editorTexts(editor).filter(text => text.startsWith("block-paper")), visible);
+  } finally { session.close(); await value.close(); }
+});
+
 test("a definitive rejection keeps all input; retry re-expresses it from canonical text and saves", async () => {
   const value = await harness();
   const { session, editor, warnings } = await opened(value);

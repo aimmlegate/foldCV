@@ -18,6 +18,7 @@ from packages.resume_core.templates.presentation import snapshot_identity
 from tests.templates.address_map_fixtures import (ADDRESS, TRANSPORT, block_of, cases, encoded, field, joined, literal,
     operation_request, text_request, transport)
 from tests.templates.storage_fixtures import workspace
+from tests.templates.test_panel_preparation import period_workspace, panel, prepared
 from tests.templates.test_preparation_store import request as writer_request, save_request, setup
 from tests.templates.test_scope_displays import copied_workspace
 from tests.templates.test_template_preparation import proof, response
@@ -515,3 +516,15 @@ def test_review_r1_unexpected_builder_failure_degrades_one_output(monkeypatch):
     monkeypatch.setattr(builder, 'exact', broken)
     _prepared, address = mapped(before, text_request(before, 8, 8, target={'kind': 'field', 'bindingId': 'fragment-paper-a'}))
     assert [value['correspondence'] for value in entries(address)] == ['none']
+
+
+def test_panel_switch_to_equal_text_has_no_address_correspondence():
+    before, _ = period_workspace()
+    request = panel(before, values={'period:exact-period:present': '2023'})
+    result = prepared(before, request)
+    address = build_address_map(response(before), request, result)
+    entries = [entry for entry in address.containers if entry.output.block_id == 'period-block']
+    assert len(entries) == 1
+    entry = entries[0]
+    assert entry.correspondence == 'none'
+    assert entry.segments == entry.regions == entry.boundaries == []

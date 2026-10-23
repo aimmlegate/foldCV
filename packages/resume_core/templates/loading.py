@@ -17,6 +17,14 @@ CONFIG_DEPTH = 64
 CONFIG_NODES = 50_000
 
 
+def finite_number(value):
+    parsed = float(value)
+    if not math.isfinite(parsed): raise SchemaFailure('/', 'non-finite number')
+    if parsed == 0.0 and any(character in '123456789' for character in value.lower().split('e')[0]):
+        raise SchemaFailure('/', 'number outside the supported range')
+    return parsed
+
+
 def load_declared_definition(raw: bytes, original_format: str) -> dict:
     if original_format=='yaml':return load_definition(raw)
     if original_format!='json':raise SchemaFailure('/', 'unsupported configuration format')
@@ -27,15 +35,9 @@ def load_declared_definition(raw: bytes, original_format: str) -> dict:
             if key in result:raise SchemaFailure('/', 'duplicate key: '+key)
             result[key]=value
         return result
-    def number(value):
-        parsed=float(value)
-        if not math.isfinite(parsed):raise SchemaFailure('/', 'non-finite number')
-        if parsed==0.0 and any(character in '123456789' for character in value.lower().split('e')[0]):
-            raise SchemaFailure('/', 'number outside the supported range')
-        return parsed
     def constant(_value):raise SchemaFailure('/', 'non-JSON numeric constant')
     try:
-        value=json.loads(raw.decode('utf-8'),object_pairs_hook=pairs,parse_float=number,parse_constant=constant)
+        value=json.loads(raw.decode('utf-8'),object_pairs_hook=pairs,parse_float=finite_number,parse_constant=constant)
         count=0
         def check(value,path,depth):
             nonlocal count
@@ -88,10 +90,7 @@ def load_definition(raw: bytes) -> dict:
             if kind == "null" and value.value.lower() in {"null", "~", ""}: return None
             if kind == "bool" and value.value.lower() in {"true", "false"}: return value.value.lower() == "true"
             if kind in {"int", "float"} and re.fullmatch(r"-?(?:0|[1-9]\d*)(?:\.\d+)?(?:[eE][+-]?\d+)?", value.value):
-                parsed = json.loads(value.value)
-                if isinstance(parsed, float) and not math.isfinite(parsed):
-                    raise SchemaFailure(path, "non-finite number")
-                return parsed
+                return json.loads(value.value, parse_float=finite_number)
             raise SchemaFailure(path, "implicit non-JSON scalar or unsupported tag")
 
         result = read(node, "", 0)

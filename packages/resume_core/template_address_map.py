@@ -8,7 +8,7 @@ from pydantic import ValidationError
 from .models.template_address import AddressContainerV1, PreparedAddressMapV1
 from .models.template_authoring import AuthoredRange, InsertParagraph, MergeBlocks, ReplaceText, SplitBlock
 from .models.template_document import BoundLink, FieldOccurrence, ManualScopeSpan
-from .models.template_mutations import TemplateReplaceInlineRange
+from .models.template_mutations import SetManualScopeDisplays, TemplateReplaceInlineRange
 from .rich_fields import inline_groups
 from .rich_mutations import RichMutationFailure, inline_text, utf16_slice
 from .templates.compiler import canonical, sha256
@@ -155,10 +155,21 @@ def container_ref(block, key):
         'cellRevision': cell.revision}
 
 
-def same_structure(before, after):
+def same_structure(before, after, block_id, key, steps):
     old, new = content_leaves(before), content_leaves(after)
+    assignments = {value.address.inline_index: value for step in steps if isinstance(step, SetManualScopeDisplays)
+        for value in step.assignments if value.address.block_id == block_id
+        and (value.address.cell_id or value.address.field) == key}
+    def retained(a, b):
+        if span_ref(a) == span_ref(b):
+            return True
+        assignment = assignments.get(a.path[0]) if len(a.path) == 1 else None
+        target = span_ref(b)
+        target.pop('path', None)
+        return (assignment is not None and assignment.before_hash == sha256(canonical(a.span))
+            and assignment.after.model_dump(by_alias=True) == target)
     return content_text(before) == content_text(after) and len(old) == len(new) and all(
-        (a.path, a.start, a.end) == (b.path, b.start, b.end) for a, b in zip(old, new))
+        (a.path, a.start, a.end) == (b.path, b.start, b.end) and retained(a, b) for a, b in zip(old, new))
 
 
 class Spec:
@@ -258,6 +269,9 @@ def none(output, input_block, input_key, input_content, slot):
 
 
 def output_entries(output, old, previous, base_blocks, steps, operation, created, middle):
+    if operation.kind in {'builtin_panel', 'resolve_template_sync', 'delete_entity', 'copy_blocks',
+            'copy_fragment', 'paste_inline', 'paste_blocks'}:
+        raise NoCorrespondence
     allocated = created.get(output.block.id) if old is None else None
     slot = None if allocated is None else {'opId': allocated[0], 'slot': allocated[1]}
     specs = None
@@ -301,7 +315,7 @@ def output_entries(output, old, previous, base_blocks, steps, operation, created
                 regions.append(('inserted', None, (step.start, step.start + added)))
             regions.append(('retained_suffix', (step.end, length), (step.start + added, step.start + added + length - step.end)))
             specs = [Spec(old, output.key, previous, regions)]
-        elif not replaced and same_structure(previous, output.content):
+        elif not replaced and same_structure(previous, output.content, old.id, output.key, steps):
             specs = [Spec(old, output.key, previous, [('retained', (0, output.length), (0, output.length))])]
     if specs is None:
         raise NoCorrespondence

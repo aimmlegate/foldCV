@@ -5,7 +5,7 @@ The runtime call cap has no default: without an explicit configured value the im
 
 from packages.resume_core.models.template_import import ImportCapture, RuntimePolicy, StartTemplateImportV1
 from packages.resume_core.models.template_workspace import WorkspaceV7
-from packages.resume_core.template_import import digest
+from packages.resume_core.template_import import TemplateImportFailure, digest
 from packages.resume_core.templates.store import TemplateStore
 from packages.resume_core.dates import partial_date
 from packages.resume_core.rich_assembly import identity
@@ -62,16 +62,34 @@ class TemplateImports:
             raise ProjectFailure('IMPORT_PROTOCOL_MISMATCH', 409)
         if not pre.sources or not any(unit.text.strip() for source in pre.sources for unit in source.units):
             raise ProjectFailure('NO_USABLE_TEXT', 409)
-        package, sources = pre.template_package, {source.id: source.byte_sha256 for source in pre.sources}
+        capture = self.template_import_capture(workspace, allow_text_rewrite)
+        return StartTemplateImportV1(kind='start_new_import', protocol='template_import_v1', clientRequestId=client_request_id,
+            capture=capture)
+
+    def template_import_capture(self, workspace, allow_text_rewrite):
+        data = workspace.project or workspace.pre_draft
+        package, sources = data.template_package, {source.id: source.byte_sha256 for source in data.sources}
         primary = self.template_import_model()
-        capture = ImportCapture(packageHash=package.package_hash, sourceHashes=sources, factRevisions={},
-            authorityHash=digest({'project': identifier, 'model': primary.model_dump(mode='json', by_alias=True)}),
+        return ImportCapture(packageHash=package.package_hash, sourceHashes=sources,
+            factRevisions={record.id: record.revision for record in [*data.facts.records, *data.facts.extensions]
+                if getattr(record, 'active', True)},
+            authorityHash=digest({'project': workspace.project_id, 'model': primary.model_dump(mode='json', by_alias=True)}),
             dependencyHash=digest({'package': package.package_hash, 'sources': sources}), allowTextRewrite=allow_text_rewrite,
             primary=primary, fallback=None, formattingAsOf=workspace.formatting_as_of,
             policy=RuntimePolicy(callCap=self.template_import_call_cap, concurrency=1, processingSeconds=300, cleanupSeconds=5,
                 finalizationSeconds=30, primaryRepairs=1, fallbackRepairs=1))
-        return StartTemplateImportV1(kind='start_new_import', protocol='template_import_v1', clientRequestId=client_request_id,
-            capture=capture)
+
+    def validate_template_capture(self, operation, workspace):
+        data = workspace.project or workspace.pre_draft
+        if data is None or data.template_package is None or self.template_import_call_cap is None:
+            raise TemplateImportFailure('IMPORT_CAPTURE_STALE')
+        try:
+            expected = self.template_import_capture(workspace, operation.capture.allow_text_rewrite)
+        except ProjectFailure:
+            raise TemplateImportFailure('IMPORT_CAPTURE_STALE') from None
+        # Facts advance through admitted proposals; the pipeline checks their captured revisions separately.
+        if expected.model_dump(exclude={'fact_revisions'}) != operation.capture.model_dump(exclude={'fact_revisions'}):
+            raise TemplateImportFailure('IMPORT_CAPTURE_STALE')
 
     async def start_template_import(self, identifier, client_request_id, allow_text_rewrite):
         if not self.template_import_status()['available']:

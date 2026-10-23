@@ -493,9 +493,7 @@ def create_app(*, origin: str, secret: str, temp_root: Path, dist: Path, runner:
             from .importer.template_pipeline import TemplatePipeline
             from .importer.template_transport import ProviderTemplateTransport
             def authority(operation, current):
-                data = current.project or current.pre_draft
-                if data is None or data.template_package is None or data.template_package.package_hash != operation.capture.package_hash:
-                    raise TemplateImportFailure("IMPORT_CAPTURE_STALE")
+                rich_projects.validate_template_capture(operation, current)
             def derive(_operation, _task, _data):
                 # Deterministic template operations arrive with the full Generic template (CT06).
                 raise TemplateImportFailure("IMPORT_OPERATION_UNSUPPORTED")

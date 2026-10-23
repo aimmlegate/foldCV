@@ -52,9 +52,12 @@ class TemplateJobs:
         service = self.service
         if not service.accepting or service.supervisor.closed or service.supervisor.dispatcher is None:
             raise BackgroundFailure('JOB_DISABLED')
-        operation = await self.pipeline.start(project, command) if command.kind == 'start_new_import' else operation_in(
-            self.pipeline.read(project), command.operation_id)
-        self.pipeline.authority(operation, self.pipeline.read(project))
+        try:
+            operation = await self.pipeline.start(project, command) if command.kind == 'start_new_import' else operation_in(
+                self.pipeline.read(project), command.operation_id)
+            self.pipeline.authority(operation, self.pipeline.read(project))
+        except TemplateImportFailure as error:
+            raise BackgroundFailure(job_code(error.code)) from None
         state = service.store.load(project)
         request_id = command.client_request_id if command.kind == 'start_new_import' else command.authorization_id
         identity = JobIdentity(projectId=project, lineage=state.lineage, requestEpoch=state.active_request_epoch, requestId=request_id)
@@ -76,7 +79,9 @@ class TemplateJobs:
             return job
         try:
             operation = self.operation(job)
-            if not job.attempts or any(not attempt.cleanup_verified for attempt in job.attempts) or any(
+            if operation.state == 'cancelled' and not job.attempts and not operation.attempts:
+                outcome = operation.publication
+            elif not job.attempts or any(not attempt.cleanup_verified for attempt in job.attempts) or any(
                     attempt.cleanup.state != 'verified' for attempt in operation.attempts):
                 outcome = PublicationOutcome(state='outcome_unknown', intentId=None, workspaceHash=None, errorCode='CLEANUP_FAILED')
             elif operation.state == 'cancelled':
@@ -188,13 +193,15 @@ class TemplateJobRuntime:
         self.control = control
         async def process():
             from ..importer.template_transport import JOB_PERMIT
-            JOB_PERMIT.set(control.permit)
+            token = JOB_PERMIT.set(control.permit)
             try:
                 await self.service.templates.pipeline.run(control.project_id, self.job.submission.template_command,
                     admitted=control.execution_ready, finalize=False, cancel_event=control.cancel)
                 return ExecutionOutcome('completed', None, self.service.supervisor.clock.now())
             except (TemplateImportFailure, BackgroundFailure, ProjectStoreFailure) as error:
                 return ExecutionOutcome('cancelled' if error.code == 'CANCELLED' else 'failed', job_code(error.code))
+            finally:
+                JOB_PERMIT.reset(token)
         self.driver = asyncio.create_task(process())
         return await asyncio.shield(self.driver)
 
