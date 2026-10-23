@@ -57,3 +57,16 @@ test("action preview displays the server's exact target and irreversible consequ
   assert.ok(html.includes("Синтетический проект") && html.includes("удалены окончательно"));
   assert.equal(html.includes("одна отмена в истории"), false);
 });
+
+test("incomplete preview displays server continuation budgets without offering partial Apply", () => {
+  const value = { ...proposal(), state: "incomplete" as const };
+  const html = renderToStaticMarkup(createElement(ProposalPreview, { value, catalog: taskCatalog(), busy: false,
+    invalidated: false, allowEdits: true, apply: () => {}, discard: () => {}, continueDraft: () => {},
+    continuation: { schemaVersion: 1, protocolVersion: 1, proposal: { schemaVersion: 1, protocolVersion: 1,
+      proposalId: value.id, version: value.version, contentSha256: value.contentSha256 }, request: null,
+    availability: { state: "available", reason: null, reasonCode: null, remedy: null }, operationsRemaining: 3,
+    versionsRemaining: 2, toolCalls: 64, toolBytes: 65536 } }));
+  assert.ok(html.includes("Продолжить черновик") && html.includes("Осталось операций: 3") && html.includes("65536"));
+  assert.match(html, /disabled="">Применить/);
+  assert.ok(html.includes("Документ пока не изменён"));
+});

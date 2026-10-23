@@ -30,8 +30,15 @@ import assistant_proposal_recovery_v1 from "../../../../contracts/json-schema/as
 import assistant_review_v1 from "../../../../contracts/json-schema/assistant_review_v1.schema.json" with { type: "json" };
 import assistant_review_list_v1 from "../../../../contracts/json-schema/assistant_review_list_v1.schema.json" with { type: "json" };
 
+import assistant_continue_run_v1 from "../../../../contracts/json-schema/assistant_continue_run_v1.schema.json" with { type: "json" };
+import assistant_continue_job_v1 from "../../../../contracts/json-schema/assistant_continue_job_v1.schema.json" with { type: "json" };
+import assistant_continuation_options_v1 from "../../../../contracts/json-schema/assistant_continuation_options_v1.schema.json" with { type: "json" };
+import assistant_draft_read_v1 from "../../../../contracts/json-schema/assistant_draft_read_v1.schema.json" with { type: "json" };
+import assistant_draft_page_v1 from "../../../../contracts/json-schema/assistant_draft_page_v1.schema.json" with { type: "json" };
+import assistant_run_outcome_v1 from "../../../../contracts/json-schema/assistant_run_outcome_v1.schema.json" with { type: "json" };
+
 const ajv = new Ajv2020({ strict: false });
-const schemas = new Map<string, object>(Object.entries({ assistant_task_catalog_v1, assistant_task_request_v1,
+const schemas = new Map<string, object>(Object.entries({ assistant_continue_run_v1, assistant_continue_job_v1, assistant_continuation_options_v1, assistant_draft_read_v1, assistant_draft_page_v1, assistant_run_outcome_v1, assistant_task_catalog_v1, assistant_task_request_v1,
   assistant_project_action_prepare_v1, assistant_capability_review_v1, assistant_capability_reviews_v1,
   assistant_project_action_claim_v1, assistant_project_action_result_v1,
   assistant_history_offer_v1,

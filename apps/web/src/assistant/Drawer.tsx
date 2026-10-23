@@ -110,6 +110,11 @@ export function AssistantDrawer({ projectId, editor, settingsOpen, settings, ref
     operations={operations}
     applyProposal={value => report(controller.current?.applyProposal(value))}
     discardProposal={value => report(controller.current?.discardProposal(value))}
+    continueProposal={value => { const mounted = editor.current; if (!mounted) return;
+      report(controller.current?.continueProposal(value, async () => {
+        const current = await mounted.assistantBaseline(null);
+        return { response: current.response, scope: { kind: "resume" } };
+      })); }}
     resource={(kind, id) => report(controller.current?.resource(kind, id))} focus={anchor => editor.current?.focusFinding(anchor) ?? false} />
     : null;
 }

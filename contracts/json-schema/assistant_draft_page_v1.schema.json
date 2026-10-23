@@ -1,0 +1,71 @@
+{
+  "additionalProperties": false,
+  "properties": {
+    "complete": {
+      "title": "Complete",
+      "type": "boolean"
+    },
+    "content": {
+      "maxLength": 16384,
+      "title": "Content",
+      "type": "string"
+    },
+    "contentSha256": {
+      "pattern": "^[a-f0-9]{64}$",
+      "title": "Contentsha256",
+      "type": "string"
+    },
+    "nextCursor": {
+      "anyOf": [
+        {
+          "maxLength": 128,
+          "minLength": 1,
+          "pattern": "^[A-Za-z0-9_-]+$",
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "title": "Nextcursor"
+    },
+    "offset": {
+      "minimum": 0,
+      "title": "Offset",
+      "type": "integer"
+    },
+    "protocolVersion": {
+      "const": 1,
+      "default": 1,
+      "title": "Protocolversion",
+      "type": "integer"
+    },
+    "readCredit": {
+      "const": false,
+      "default": false,
+      "title": "Readcredit",
+      "type": "boolean"
+    },
+    "schemaVersion": {
+      "const": 1,
+      "default": 1,
+      "title": "Schemaversion",
+      "type": "integer"
+    },
+    "totalCharacters": {
+      "minimum": 0,
+      "title": "Totalcharacters",
+      "type": "integer"
+    }
+  },
+  "required": [
+    "content",
+    "contentSha256",
+    "offset",
+    "totalCharacters",
+    "nextCursor",
+    "complete"
+  ],
+  "title": "AssistantDraftPageV1",
+  "type": "object"
+}

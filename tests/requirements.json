@@ -3627,7 +3627,8 @@
         "tests/recovery/test_assistant_proposals.py::test_generation_finishes_with_a_ready_draft_and_releases_the_permit",
         "tests/recovery/test_assistant_approval.py::test_local_commit_after_generation_deadline_saves_exact_displayed_content_once_without_inference",
         "tests/recovery/test_assistant_approval.py::test_post_run_native_undo_redo_reuses_the_saved_action_and_original_receipt",
-        "tests/recovery/test_assistant_approval.py::test_post_run_apply_uses_the_existing_attached_canonical_writer_and_history"
+        "tests/recovery/test_assistant_approval.py::test_post_run_apply_uses_the_existing_attached_canonical_writer_and_history",
+        "tests/recovery/test_assistant_continuation.py::test_continue_is_idempotent_new_version_with_complete_proof_and_no_canonical_change"
       ]
     },
     {
@@ -3656,7 +3657,8 @@
         "tests/recovery/test_assistant_approval.py::test_stop_before_delayed_claim_revokes_only_that_click_durably",
         "tests/recovery/test_assistant_approval.py::test_cancelled_preparation_cannot_commit_and_retry_requires_a_new_explicit_click",
         "apps/web/unit/agent-controller.test.ts::Stop sends the original acceptance nonce while an explicit Apply waits for its reply",
-        "tests/recovery/test_assistant_approval.py::test_saved_receipt_outlives_private_preview_and_current_replay_retention"
+        "tests/recovery/test_assistant_approval.py::test_saved_receipt_outlives_private_preview_and_current_replay_retention",
+        "apps/web/unit/agent-controller.test.ts::Stop during a lost Continue reply revokes the foreground lease without restoring the run"
       ]
     },
     {
@@ -3667,7 +3669,9 @@
         "tests/recovery/test_assistant_proposals.py::test_expiry_corruption_and_cancelled_authority_preserve_canonical_bytes",
         "tests/recovery/test_assistant_approval.py::test_applied_payload_compacts_and_expiry_preserves_the_original_journal_receipt",
         "tests/recovery/test_assistant_approval.py::test_lost_claim_reply_can_resume_only_in_memory_and_restart_cannot_apply_it",
-        "tests/recovery/test_assistant_approval.py::test_saved_receipt_outlives_private_preview_and_current_replay_retention"
+        "tests/recovery/test_assistant_approval.py::test_saved_receipt_outlives_private_preview_and_current_replay_retention",
+        "tests/recovery/test_assistant_continuation.py::test_http_continue_requires_protocol_dispatches_one_scripted_turn_and_retains_useful_quota_draft",
+        "tests/recovery/test_assistant_continuation.py::test_continue_rejects_stale_or_expired_proof_without_dispatch"
       ]
     },
     {
@@ -3679,7 +3683,9 @@
         "tests/recovery/test_assistant_approval.py::test_post_run_ui_ticket_keeps_reviewed_content_and_deduplicates_the_original_click",
         "tests/recovery/test_assistant_approval.py::test_new_application_routes_require_protocol_exact_owner_and_nonce_and_fence_legacy_mutation",
         "tests/recovery/test_assistant_approval.py::test_delayed_recovery_and_stop_for_an_old_click_never_settle_a_new_acceptance",
-        "tests/recovery/test_assistant_actions.py::test_old_action_recovery_and_stop_cannot_cancel_the_new_explicit_retry"
+        "tests/recovery/test_assistant_actions.py::test_old_action_recovery_and_stop_cannot_cancel_the_new_explicit_retry",
+        "apps/web/unit/agent-controller.test.ts::a lost Continue reply reuses its request identity only after another explicit click",
+        "tests/recovery/test_assistant_continuation.py::test_queued_continue_uses_one_new_job_same_artifact_journal_and_never_publishes"
       ]
     },
     {
@@ -3691,7 +3697,9 @@
         "apps/web/unit/agent-api.test.ts::lost UI claim reply resumes the same nonce over the versioned local API without generation",
         "tests/recovery/test_assistant_actions.py::test_project_action_reconciles_original_catalog_intent_without_repeating_the_save",
         "tests/recovery/test_assistant_approval.py::test_missing_private_payload_and_lost_ui_receipt_recover_only_exact_canonical_save_proof",
-        "tests/recovery/test_assistant_actions.py::test_restart_cleanup_finishes_the_original_reviewed_delete_without_a_second_apply"
+        "tests/recovery/test_assistant_actions.py::test_restart_cleanup_finishes_the_original_reviewed_delete_without_a_second_apply",
+        "tests/recovery/test_assistant_continuation.py::test_terminal_origin_reserves_exact_receipt_headroom_before_apply",
+        "tests/recovery/test_assistant_continuation.py::test_exact_encoded_control_capacity_allows_max_nonce_metadata_and_one_saved_compaction"
       ]
     },
     {
@@ -3754,13 +3762,23 @@
       "status": "partial",
       "tests": [
         "tests/recovery/test_assistant_fidelity.py::test_one_character_wording_change_keeps_a_small_range_mutation_for_a_large_document",
-        "tests/recovery/test_assistant_fidelity.py::test_compound_format_and_rewrite_is_not_staged_or_applied_in_parts"
+        "tests/recovery/test_assistant_fidelity.py::test_compound_format_and_rewrite_is_not_staged_or_applied_in_parts",
+        "tests/recovery/test_assistant_continuation.py::test_continued_draft_pages_are_exact_bounded_and_grant_no_read_credit",
+        "tests/recovery/test_assistant_continuation.py::test_large_authored_field_has_exact_comparison_chunks_and_a_small_edit_request",
+        "apps/web/unit/assistant-proposals.test.ts::incomplete preview displays server continuation budgets without offering partial Apply",
+        "apps/web/unit/agent-controller.test.ts::Continue starts one bounded draft request, preserves user text and never applies",
+        "tests/recovery/test_assistant_continuation.py::test_utf8_message_and_call_limits_keep_useful_draft_and_an_exact_remedy",
+        "tests/recovery/test_assistant_continuation.py::test_aggregate_101st_operation_never_replaces_or_publishes_the_saved_100_operation_draft",
+        "tests/recovery/test_assistant_continuation.py::test_twenty_retained_versions_keep_the_same_work_and_refuse_another_dispatch",
+        "tests/recovery/test_assistant_continuation.py::test_known_oversize_resources_disable_generation_with_an_alternative_that_fits"
       ]
     },
     {
       "id": "CAP-A21",
-      "status": "unimplemented",
-      "tests": []
+      "status": "partial",
+      "tests": [
+        "tests/recovery/test_assistant_continuation.py::test_noop_result_survives_payload_reclamation_and_does_not_fill_version_slots"
+      ]
     },
     {
       "id": "CAP-A22",
@@ -3879,109 +3897,114 @@
       "check": "Follow manual-macos-checklist.md on the five exact hashed files."
     },
     "CAP-A01": {
-      "unproved": "Public rollout and later-slice integration obligations remain pending; current evidence covers CAP01 catalog/readiness only.",
-      "owner": "CAP04/CAP05/CAP08; CAP07 for V7",
-      "check": "Run the case against the completed ordinary review/Apply boundary and retain synthetic T3 evidence; preserve native/manual gaps."
+      "unproved": "CAP00–CAP05 have accepted offline evidence. CAP06 checks are in progress. CAP08 integration, V7, live native quality, manual Word and true narrow-viewport screenshot remain open.",
+      "owner": "CAP06/CAP08; CAP07 for V7",
+      "check": "Complete the affected final scoped checks and retained synthetic journeys; keep each family/native/manual gap explicit."
     },
     "CAP-A02": {
-      "unproved": "CAP02 covers durable non-mutating preparation only. Scope/fidelity and the full explicit Apply/publication/history/recovery boundary remain unproved.",
-      "owner": "CAP03–CAP06/CAP08; CAP07 for V7",
-      "check": "Run completed review/Apply flows and every legacy/background bypass against the final retained source; preserve native/manual gaps."
+      "unproved": "CAP00–CAP05 have accepted offline evidence. CAP06 checks are in progress. CAP08 integration, V7, live native quality, manual Word and true narrow-viewport screenshot remain open.",
+      "owner": "CAP06/CAP08; CAP07 for V7",
+      "check": "Complete the affected final scoped checks and retained synthetic journeys; keep each family/native/manual gap explicit."
     },
     "CAP-A03": {
-      "unproved": "Public rollout and later-slice integration obligations remain pending; current evidence covers CAP01 catalog/readiness only.",
-      "owner": "CAP04/CAP05/CAP08; CAP07 for V7",
-      "check": "Run the case against the completed ordinary review/Apply boundary and retain synthetic T3 evidence; preserve native/manual gaps."
+      "unproved": "CAP00–CAP05 have accepted offline evidence. CAP06 checks are in progress. CAP08 integration, V7, live native quality, manual Word and true narrow-viewport screenshot remain open.",
+      "owner": "CAP06/CAP08; CAP07 for V7",
+      "check": "Complete the affected final scoped checks and retained synthetic journeys; keep each family/native/manual gap explicit."
     },
     "CAP-A19": {
-      "unproved": "Public rollout and later-slice integration obligations remain pending; current evidence covers CAP01 catalog/readiness only.",
-      "owner": "CAP04/CAP05/CAP08; CAP07 for V7",
-      "check": "Run the case against the completed ordinary review/Apply boundary and retain synthetic T3 evidence; preserve native/manual gaps."
+      "unproved": "CAP00–CAP05 have accepted offline evidence. CAP06 checks are in progress. CAP08 integration, V7, live native quality, manual Word and true narrow-viewport screenshot remain open.",
+      "owner": "CAP06/CAP08; CAP07 for V7",
+      "check": "Complete the affected final scoped checks and retained synthetic journeys; keep each family/native/manual gap explicit."
     },
     "CAP-A24": {
-      "unproved": "Public rollout and later-slice integration obligations remain pending; current evidence covers CAP01 catalog/readiness only.",
-      "owner": "CAP04/CAP05/CAP08; CAP07 for V7",
-      "check": "Run the case against the completed ordinary review/Apply boundary and retain synthetic T3 evidence; preserve native/manual gaps."
+      "unproved": "CAP00–CAP05 have accepted offline evidence. CAP06 checks are in progress. CAP08 integration, V7, live native quality, manual Word and true narrow-viewport screenshot remain open.",
+      "owner": "CAP06/CAP08; CAP07 for V7",
+      "check": "Complete the affected final scoped checks and retained synthetic journeys; keep each family/native/manual gap explicit."
     },
     "CAP-A04": {
-      "unproved": "CAP02 covers durable non-mutating preparation only. Scope/fidelity and the full explicit Apply/publication/history/recovery boundary remain unproved.",
-      "owner": "CAP03–CAP06/CAP08; CAP07 for V7",
-      "check": "Run completed review/Apply flows and every legacy/background bypass against the final retained source; preserve native/manual gaps."
+      "unproved": "CAP00–CAP05 have accepted offline evidence. CAP06 checks are in progress. CAP08 integration, V7, live native quality, manual Word and true narrow-viewport screenshot remain open.",
+      "owner": "CAP06/CAP08; CAP07 for V7",
+      "check": "Complete the affected final scoped checks and retained synthetic journeys; keep each family/native/manual gap explicit."
     },
     "CAP-A07": {
-      "unproved": "CAP05 is in progress. Project/history actions, complete queued restart/fencing, full fast/render, mounted T3 Apply/export and later/native/manual obligations remain unproved.",
-      "owner": "CAP05-CAP08; CAP07 for V7",
-      "check": "Complete the retained CAP05 gates and named plan cases against the final scoped revision before acceptance."
+      "unproved": "CAP00–CAP05 have accepted offline evidence. CAP06 checks are in progress. CAP08 integration, V7, live native quality, manual Word and true narrow-viewport screenshot remain open.",
+      "owner": "CAP06/CAP08; CAP07 for V7",
+      "check": "Complete the affected final scoped checks and retained synthetic journeys; keep each family/native/manual gap explicit."
     },
     "CAP-A11": {
-      "unproved": "CAP05 implementation is not accepted. Final full checks, all resource/action races, mounted T3 Apply/Undo/export and later native/manual obligations remain open.",
-      "owner": "CAP05-CAP08; CAP07 for V7",
-      "check": "Finish current CAP05 gates against the retained scoped source before acceptance."
+      "unproved": "CAP00–CAP05 have accepted offline evidence. CAP06 checks are in progress. CAP08 integration, V7, live native quality, manual Word and true narrow-viewport screenshot remain open.",
+      "owner": "CAP06/CAP08; CAP07 for V7",
+      "check": "Complete the affected final scoped checks and retained synthetic journeys; keep each family/native/manual gap explicit."
     },
     "CAP-A18": {
-      "unproved": "CAP05 is in progress. Project/history actions, complete queued restart/fencing, full fast/render, mounted T3 Apply/export and later/native/manual obligations remain unproved.",
-      "owner": "CAP05-CAP08; CAP07 for V7",
-      "check": "Complete the retained CAP05 gates and named plan cases against the final scoped revision before acceptance."
+      "unproved": "CAP00–CAP05 have accepted offline evidence. CAP06 checks are in progress. CAP08 integration, V7, live native quality, manual Word and true narrow-viewport screenshot remain open.",
+      "owner": "CAP06/CAP08; CAP07 for V7",
+      "check": "Complete the affected final scoped checks and retained synthetic journeys; keep each family/native/manual gap explicit."
     },
     "CAP-A05": {
-      "unproved": "Integrated Apply/recovery and other plan/native/manual obligations remain open; current evidence covers only the retained offline slice scope.",
-      "owner": "CAP05-CAP08",
-      "check": "Complete the named CAP plan cases and retain exact synthetic/native/manual evidence before full acceptance."
+      "unproved": "CAP00–CAP05 have accepted offline evidence. CAP06 checks are in progress. CAP08 integration, V7, live native quality, manual Word and true narrow-viewport screenshot remain open.",
+      "owner": "CAP06/CAP08; CAP07 for V7",
+      "check": "Complete the affected final scoped checks and retained synthetic journeys; keep each family/native/manual gap explicit."
     },
     "CAP-A06": {
-      "unproved": "Integrated Apply/recovery and other plan/native/manual obligations remain open; current evidence covers only the retained offline slice scope.",
-      "owner": "CAP05-CAP08",
-      "check": "Complete the named CAP plan cases and retain exact synthetic/native/manual evidence before full acceptance."
+      "unproved": "CAP00–CAP05 have accepted offline evidence. CAP06 checks are in progress. CAP08 integration, V7, live native quality, manual Word and true narrow-viewport screenshot remain open.",
+      "owner": "CAP06/CAP08; CAP07 for V7",
+      "check": "Complete the affected final scoped checks and retained synthetic journeys; keep each family/native/manual gap explicit."
     },
     "CAP-A08": {
-      "unproved": "CAP05 is in progress. Project/history actions, complete queued restart/fencing, full fast/render, mounted T3 Apply/export and later/native/manual obligations remain unproved.",
-      "owner": "CAP05-CAP08; CAP07 for V7",
-      "check": "Complete the retained CAP05 gates and named plan cases against the final scoped revision before acceptance."
+      "unproved": "CAP00–CAP05 have accepted offline evidence. CAP06 checks are in progress. CAP08 integration, V7, live native quality, manual Word and true narrow-viewport screenshot remain open.",
+      "owner": "CAP06/CAP08; CAP07 for V7",
+      "check": "Complete the affected final scoped checks and retained synthetic journeys; keep each family/native/manual gap explicit."
     },
     "CAP-A09": {
-      "unproved": "CAP05 is in progress. Project/history actions, complete queued restart/fencing, full fast/render, mounted T3 Apply/export and later/native/manual obligations remain unproved.",
-      "owner": "CAP05-CAP08; CAP07 for V7",
-      "check": "Complete the retained CAP05 gates and named plan cases against the final scoped revision before acceptance."
+      "unproved": "CAP00–CAP05 have accepted offline evidence. CAP06 checks are in progress. CAP08 integration, V7, live native quality, manual Word and true narrow-viewport screenshot remain open.",
+      "owner": "CAP06/CAP08; CAP07 for V7",
+      "check": "Complete the affected final scoped checks and retained synthetic journeys; keep each family/native/manual gap explicit."
     },
     "CAP-A12": {
-      "unproved": "CAP05 is in progress. Project/history actions, complete queued restart/fencing, full fast/render, mounted T3 Apply/export and later/native/manual obligations remain unproved.",
-      "owner": "CAP05-CAP08; CAP07 for V7",
-      "check": "Complete the retained CAP05 gates and named plan cases against the final scoped revision before acceptance."
+      "unproved": "CAP00–CAP05 have accepted offline evidence. CAP06 checks are in progress. CAP08 integration, V7, live native quality, manual Word and true narrow-viewport screenshot remain open.",
+      "owner": "CAP06/CAP08; CAP07 for V7",
+      "check": "Complete the affected final scoped checks and retained synthetic journeys; keep each family/native/manual gap explicit."
     },
     "CAP-A14": {
-      "unproved": "Integrated Apply/recovery and other plan/native/manual obligations remain open; current evidence covers only the retained offline slice scope.",
-      "owner": "CAP05-CAP08",
-      "check": "Complete the named CAP plan cases and retain exact synthetic/native/manual evidence before full acceptance."
+      "unproved": "CAP00–CAP05 have accepted offline evidence. CAP06 checks are in progress. CAP08 integration, V7, live native quality, manual Word and true narrow-viewport screenshot remain open.",
+      "owner": "CAP06/CAP08; CAP07 for V7",
+      "check": "Complete the affected final scoped checks and retained synthetic journeys; keep each family/native/manual gap explicit."
     },
     "CAP-A15": {
-      "unproved": "Integrated Apply/recovery and other plan/native/manual obligations remain open; current evidence covers only the retained offline slice scope.",
-      "owner": "CAP05-CAP08",
-      "check": "Complete the named CAP plan cases and retain exact synthetic/native/manual evidence before full acceptance."
+      "unproved": "CAP00–CAP05 have accepted offline evidence. CAP06 checks are in progress. CAP08 integration, V7, live native quality, manual Word and true narrow-viewport screenshot remain open.",
+      "owner": "CAP06/CAP08; CAP07 for V7",
+      "check": "Complete the affected final scoped checks and retained synthetic journeys; keep each family/native/manual gap explicit."
     },
     "CAP-A16": {
-      "unproved": "CAP05 implementation is not accepted. Final full checks, all resource/action races, mounted T3 Apply/Undo/export and later native/manual obligations remain open.",
-      "owner": "CAP05-CAP08; CAP07 for V7",
-      "check": "Finish current CAP05 gates against the retained scoped source before acceptance."
+      "unproved": "CAP00–CAP05 have accepted offline evidence. CAP06 checks are in progress. CAP08 integration, V7, live native quality, manual Word and true narrow-viewport screenshot remain open.",
+      "owner": "CAP06/CAP08; CAP07 for V7",
+      "check": "Complete the affected final scoped checks and retained synthetic journeys; keep each family/native/manual gap explicit."
     },
     "CAP-A20": {
-      "unproved": "Integrated Apply/recovery and other plan/native/manual obligations remain open; current evidence covers only the retained offline slice scope.",
-      "owner": "CAP05-CAP08",
-      "check": "Complete the named CAP plan cases and retain exact synthetic/native/manual evidence before full acceptance."
+      "unproved": "CAP00–CAP05 have accepted offline evidence. CAP06 checks are in progress. CAP08 integration, V7, live native quality, manual Word and true narrow-viewport screenshot remain open.",
+      "owner": "CAP06/CAP08; CAP07 for V7",
+      "check": "Complete the affected final scoped checks and retained synthetic journeys; keep each family/native/manual gap explicit."
     },
     "CAP-A10": {
-      "unproved": "CAP05 implementation is not accepted. Final full checks, all resource/action races, mounted T3 Apply/Undo/export and later native/manual obligations remain open.",
-      "owner": "CAP05-CAP08; CAP07 for V7",
-      "check": "Finish current CAP05 gates against the retained scoped source before acceptance."
+      "unproved": "CAP00–CAP05 have accepted offline evidence. CAP06 checks are in progress. CAP08 integration, V7, live native quality, manual Word and true narrow-viewport screenshot remain open.",
+      "owner": "CAP06/CAP08; CAP07 for V7",
+      "check": "Complete the affected final scoped checks and retained synthetic journeys; keep each family/native/manual gap explicit."
     },
     "CAP-A13": {
-      "unproved": "CAP05 implementation is not accepted. Final full checks, all resource/action races, mounted T3 Apply/Undo/export and later native/manual obligations remain open.",
-      "owner": "CAP05-CAP08; CAP07 for V7",
-      "check": "Finish current CAP05 gates against the retained scoped source before acceptance."
+      "unproved": "CAP00–CAP05 have accepted offline evidence. CAP06 checks are in progress. CAP08 integration, V7, live native quality, manual Word and true narrow-viewport screenshot remain open.",
+      "owner": "CAP06/CAP08; CAP07 for V7",
+      "check": "Complete the affected final scoped checks and retained synthetic journeys; keep each family/native/manual gap explicit."
     },
     "CAP-A17": {
-      "unproved": "CAP05 implementation is not accepted. Final full checks, all resource/action races, mounted T3 Apply/Undo/export and later native/manual obligations remain open.",
-      "owner": "CAP05-CAP08; CAP07 for V7",
-      "check": "Finish current CAP05 gates against the retained scoped source before acceptance."
+      "unproved": "CAP00–CAP05 have accepted offline evidence. CAP06 checks are in progress. CAP08 integration, V7, live native quality, manual Word and true narrow-viewport screenshot remain open.",
+      "owner": "CAP06/CAP08; CAP07 for V7",
+      "check": "Complete the affected final scoped checks and retained synthetic journeys; keep each family/native/manual gap explicit."
+    },
+    "CAP-A21": {
+      "unproved": "Server-derived no-change and retained incomplete outcomes have offline checks. CAP06 final checks and CAP08 integration of all recovery states, V7/native/manual gates remain open.",
+      "owner": "CAP06/CAP08; CAP07 for V7",
+      "check": "Verify distinct durable, unknown, stale, failed and draft outcomes in the final scoped gates and synthetic UI; never infer save from model prose."
     }
   },
   "recovery": {

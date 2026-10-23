@@ -187,6 +187,8 @@ def assemble(session, request):
         if workspace.schema_version != 6 or not session.book.validate(workspace):
             raise AgentFailure("AGENT_STALE_READ")
         _, run, journal = run_in(session.service.store.load(project), session.control.run_id)
+        from .outcomes import retire_noops
+        retire_noops(service, project)
         request_hash = digest(request)
         def extend(values):
             current = next((value for value in values if value.proposal.id == request.proposal_id and value.proposal.version == request.version), None) if request.proposal_id else next(
@@ -237,6 +239,8 @@ def assemble(session, request):
             current.proposal.coverage, current.proposal.changes = coverage(session, current.baseline, candidate, current.scope, current.unchanged, current.operations)
             if batch:
                 current.dependencies = list({digest(item): item for item in [*current.dependencies, *batch.dependencies]}.values())
+            from .continuation import capture_groups
+            current.read_groups = capture_groups(session.book, journal)
             if request.phase == "finalize":
                 complete = all(unit.read and unit.state != "unresolved" for unit in current.proposal.coverage)
                 current.no_change = batch is None and complete
@@ -248,4 +252,8 @@ def assemble(session, request):
                 if gaps:
                     current.proposal.reason += f" В {gaps} исходниках есть пропуски извлечения. Вариант охватывает текущий документ и не заполняет эти пропуски."
             return current
-        return result(service.proposals.update(project, extend))
+        stored = service.proposals.update(project, extend)
+        if stored.no_change:
+            from .outcomes import record_noop
+            record_noop(service, stored)
+        return result(stored)

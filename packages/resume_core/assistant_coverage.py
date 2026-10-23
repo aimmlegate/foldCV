@@ -180,6 +180,15 @@ def summary(unit):
     return json.dumps(unit.value, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
 
 
+
+def change_rows(key, previous, following, effect):
+    maximum = 256000
+    count = max(1, (max(len(previous), len(following)) + maximum - 1) // maximum)
+    return [AssistantChangeV1(unitId=key if count == 1 else unit_id(f"{key}:part:{index + 1}"),
+        before=previous[index * maximum:(index + 1) * maximum],
+        after=following[index * maximum:(index + 1) * maximum], effect=effect) for index in range(count)]
+
+
 def comparison(before, after):
     changes = []
     for key in sorted(before.keys() | after.keys()):
@@ -192,15 +201,15 @@ def comparison(before, after):
         if kind == "field":
             old_value, new_value = old.value if old else [], new.value if new else []
             if plain(old_value) != plain(new_value):
-                changes.append(AssistantChangeV1(unitId=key, before=plain(old_value), after=plain(new_value), effect="wording"))
+                changes.extend(change_rows(key, plain(old_value), plain(new_value), "wording"))
             if metadata(old_value) != metadata(new_value):
-                changes.append(AssistantChangeV1(unitId=unit_id(key + ":format"), before=metadata_text(metadata(old_value)),
-                    after=metadata_text(metadata(new_value)), effect="format"))
+                changes.extend(change_rows(unit_id(key + ":format"), metadata_text(metadata(old_value)),
+                    metadata_text(metadata(new_value)), "format"))
         else:
             previous, following = summary(old), summary(new)
             # Equal display text must not conceal changed precision, provenance or membership.
             if previous == following:
                 previous += "\nСвойства: " + json.dumps(old.value if old else None, ensure_ascii=False, sort_keys=True)
                 following += "\nСвойства: " + json.dumps(new.value if new else None, ensure_ascii=False, sort_keys=True)
-            changes.append(AssistantChangeV1(unitId=key, before=previous, after=following, effect=kind))
+            changes.extend(change_rows(key, previous, following, kind))
     return changes

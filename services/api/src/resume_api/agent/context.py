@@ -179,6 +179,7 @@ class ReadCapture:
     dependencies: list
     snapshots: list[str] = field(default_factory=list)
     complete: bool = False
+    carried: object = None
 
 
 def page_entries(payload):
@@ -349,6 +350,8 @@ class ReadBook:
 
     def initial(self, run, journal):
         with self.service.projects.state_lock:
+            from .continuation import restore_book
+            continued = restore_book(self, run, journal)
             result = self.read(AgentQuery(kind="context"))
             current = self.by_snapshot[result.snapshot.id].workspace
             conversation, _, _ = run_in(self.service.store.load(run.project_id), run.id)
@@ -374,7 +377,7 @@ class ReadBook:
                     "document": current.document_revision, "facts": current.project.facts.revision},
                 "outline": result, "recentOriginalMessages": recent, "olderMessagesOmitted": max(0, len(conversation.messages) - 8),
                 "derivedOutcomeDigest": summary, "digestTruncated": clipped,
-                "message": journal.request.message}
+                "message": journal.request.message, "continuedDraft": continued}
             root = getattr(self.service, "catalog_service", self.service)
             if getattr(root, "assistant_protocol_enabled", False):
                 offer = root.publication.assistant_history.get((run.project_id, run.client_request_id))

@@ -77,6 +77,15 @@ def budget_parts(state: AgentProjectState, journal: AgentRunJournal):
     return size(private), size(public)
 
 
+def reviewed_headroom(journal):
+    # A terminal origin has no tool writer; reserve its later UI receipt before claim.
+    return sum(max(0, 32768 - (len(wire_bytes(item.receipt)) if item.receipt is not None else 4)
+        - (len(wire_bytes(item.publication)) if item.publication is not None else 4)
+        - len(json.dumps(item.batch.state)))
+        for item in journal.batches if item.key.startswith("accepted_") and item.batch is not None
+        and item.batch.state not in TERMINAL_EDITS)
+
+
 def verify_journals(state: AgentProjectState):
     for journal in state.journals:
         if digest(journal.request) != journal.request_sha256:
@@ -156,7 +165,7 @@ class AgentStore:
         for journal in state.journals:
             private, public = budget_parts(state, journal)
             _, run, _ = run_in(state, journal.run_id)
-            if private > limits.JOURNAL_BYTES:
+            if private + reviewed_headroom(journal) > limits.JOURNAL_BYTES:
                 raise AgentFailure("AGENT_EDIT_LIMIT")
             if public > limits.RUN_BYTES - (0 if terminal or run.state in TERMINAL_RUNS else limits.TERMINAL_BYTES):
                 raise AgentFailure("AGENT_OUTPUT_LIMIT")

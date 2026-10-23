@@ -1,3 +1,4 @@
+import type { AssistantContinueJobV1 } from "../contracts/generated/assistant_continue_job_v1";
 import { validateContract } from "../contracts/validate";
 import { validateBackgroundWire } from "../contracts/background-validate";
 import { request, requestWire, rootRequest, RichApiFailure } from "../rich/api";
@@ -178,6 +179,10 @@ export class JobsApi {
     if (!protocol) return this.call("background_snapshot_v1", "/agent", body);
     return backgroundReply("background_snapshot_v1", await this.transport(this.prefix + "/assistant-v1", "POST",
       { protocolVersion: 1, request: body }, { "X-FoldCV-Assistant-Protocol": "1" }));
+  }
+  async continueAgent(body: AssistantContinueJobV1): Promise<JobSnapshotV1> {
+    return backgroundReply("background_snapshot_v1", await this.transport(this.prefix + "/assistant-continue-v1", "POST", body,
+      { "X-FoldCV-Assistant-Protocol": "1" }));
   }
   fixed(body: JobFixedRequestV1): Promise<JobFixedReplyV1> { return this.call("background_fixed_reply_v1", "/fixed", body); }
   read(id: string): Promise<JobSnapshotV1> { return this.call("background_snapshot_v1", `/${encodeURIComponent(id)}/read`, {}); }

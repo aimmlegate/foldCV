@@ -85,6 +85,31 @@ def mount_agent(app, service):
         review(service, project_id)
         return response(service.proposals.get(project_id, proposal_id, version).proposal)
 
+    from packages.resume_core.models.assistant_continuation import AssistantContinueRunV1
+
+    @app.get(prefix + "/continuations")
+    async def continuation_options(project_id: str, request: Request):
+        from .continuation import options
+        proposal_protocol(request)
+        project(project_id)
+        return response(options(service, project_id, **flags(request)))
+
+    @app.get(prefix + "/outcomes/{run_id}")
+    async def draft_outcome(project_id: str, run_id: str, request: Request):
+        from .outcomes import outcome
+        proposal_protocol(request)
+        project(project_id)
+        return response(outcome(service, project_id, run_id))
+
+    @app.post(prefix + "/continuations/run")
+    async def continue_draft(project_id: str, request: Request, payload: AssistantContinueRunV1):
+        from .continuation import submit_run
+        proposal_protocol(request)
+        run, created = submit_run(service, project_id, payload)
+        if created:
+            service.start(project_id, run.id)
+        return response(run, 202 if created else 200)
+
     @app.post(prefix + "/proposals/discard")
     async def discard_proposal(project_id: str, request: Request, payload: AssistantProposalRequestV1):
         proposal_protocol(request)
@@ -108,8 +133,12 @@ def mount_agent(app, service):
         proposal_protocol(request)
         project(project_id)
         tasks = catalog(service, project_id, **flags(request))
+        values = review(service, project_id)
+        latest = {item.proposal.id: max(value.proposal.version for value in values if value.proposal.id == item.proposal.id)
+            for item in values}
         return response(AssistantCapabilityReviewsV1(projectId=project_id,
-            reviews=[review_view(service, item, tasks) for item in review(service, project_id) if not item.no_change]))
+            reviews=[review_view(service, item, tasks) for item in values
+                if not item.no_change and item.proposal.version == latest[item.proposal.id]]))
 
     @app.get(prefix + "/reviews/{proposal_id}/versions/{version}")
     async def review_one(project_id: str, proposal_id: str, version: int, request: Request):

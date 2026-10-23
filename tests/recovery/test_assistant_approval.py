@@ -548,6 +548,10 @@ async def test_queued_read_only_origin_uses_its_existing_artifact_journal_and_th
         payload = AssistantAcceptanceV1(protocolVersion=1, proposalId=observed[0]["proposalId"], version=1,
             contentSha256=observed[0]["contentSha256"], acceptanceId="queued_click_1", owner=owner)
         claimed = service.approval.claim(workspace.project_id, payload)
+        _, reserved = jobs.artifacts.record(workspace.project_id, job.id)
+        reserved_path = jobs.artifacts._path(jobs.store.projects / workspace.project_id, job.submission.input.id)
+        assert reserved_path.stat().st_size == reserved.application_control_capacity
+        assert len(reserved.application_control_padding) > 32000
         current = jobs.projects.storage.read_committed(workspace.project_id)[0]
         header = WriterAdvanceV1(schemaVersion=1, proof=proof, canonicalRevision=current.project_revision,
             canonicalSha256=digest_bytes(current), actionCursor=0)

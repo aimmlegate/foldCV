@@ -58,6 +58,21 @@ class JobArtifacts(AgentStore):
 
     def _save(self, directory, state, artifact):
         value = decode_assistant_artifact(artifact.model_dump(by_alias=True))
+        if isinstance(value, AssistantJobArtifactV1):
+            from .models.agent import TERMINAL_EDITS
+            value.application_control_padding = ""
+            active = any(item.batch.state not in TERMINAL_EDITS for item in value.applications)
+            if active:
+                size = lambda: len(encoded(value.model_dump(mode="json", by_alias=True)))
+                if value.application_control_capacity == 0:
+                    value.application_control_capacity = size() + 32768
+                    value.application_control_capacity = size() + 32768
+                remaining = value.application_control_capacity - size()
+                if not 0 <= remaining <= value.application_control_capacity:
+                    raise AgentFailure("AGENT_PROJECT_FULL")
+                value.application_control_padding = "_" * remaining
+            else:
+                value.application_control_capacity = 0
         path = self._path(directory, value.id)
         raw = encoded(value.model_dump(mode="json", by_alias=True))
         accepted = next((item for item in state.proposals if item.job_id == value.job_id), None)

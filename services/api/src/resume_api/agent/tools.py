@@ -17,6 +17,7 @@ from packages.resume_core.models.agent import AgentAnchor, AgentApplyRequest, Ag
 from packages.resume_core.models.assistant_capabilities import AssistantTaskRequestV1
 from packages.resume_core.models.assistant_proposals import AssistantAssemblyRequestV1
 from packages.resume_core.models.assistant_actions import AssistantProjectActionPrepareV1
+from packages.resume_core.models.assistant_continuation import AssistantDraftReadV1
 from packages.resume_core.rich_dependencies import dependency
 from packages.resume_core.rich_fields import inline_groups, working_field
 from packages.resume_core.rich_mutations import inline_text, utf16_slice
@@ -95,6 +96,12 @@ class ToolSession(PrivateMcp):
         self.planning_revoked = False
         self.capability_service = getattr(service, "catalog_service", service)
         self.cap_mode = getattr(self.capability_service, "assistant_protocol_enabled", False)
+        self.draft_cursors = {}
+        if self.cap_mode:
+            from .continuation import current_draft
+            continued = current_draft(self.capability_service, control.project_id, control.run_id)
+            if continued is not None:
+                self.planned_task = continued.proposal.task_id
         self.names = tuple(name for name in TOOL_NAMES if not self.cap_mode or name != "apply_edit_batch")
         self.fetch_cancel = threading.Event()
         self.fetch_tasks = set()
@@ -127,6 +134,7 @@ class ToolSession(PrivateMcp):
             self.book.by_snapshot.clear()
             self.book.cursors.clear()
             self.cache.clear()
+            self.draft_cursors.clear()
             self.skills.clear()
 
     def guard(self):
@@ -188,13 +196,13 @@ class ToolSession(PrivateMcp):
             """Read conversation history. IDs load full stored sources, findings or messages without network. Use nextCursor with the same query for later pages."""
             return self.wire(await self.call("get_conversation_context", query or HistoryQuery()))
 
-        async def get_project_resources(query: ResourcesQuery | None = None, task: AssistantTaskRequestV1 | None = None) -> CallToolResult:
+        async def get_project_resources(query: ResourcesQuery | None = None, task: AssistantTaskRequestV1 | None = None, draft: AssistantDraftReadV1 | None = None) -> CallToolResult:
             """Read retained assets, sources, dates, template, rules and history. Follow nextCursor with the same query until null. In assistant protocol 1, check a typed task first with task:{protocolVersion:1,taskId,stage,scope,inputAvailable}; omit query when checking a task. This returns availability, never approval."""
-            if query is not None and task is not None:
+            if sum(value is not None for value in (query, task, draft)) > 1:
                 return self.wire({"error": {"code": "AGENT_ARGUMENT_INVALID"}})
-            return self.wire(await self.call("get_project_resources", task or query or ResourcesQuery()))
+            return self.wire(await self.call("get_project_resources", draft or task or query or ResourcesQuery()))
         from .capabilities import TASKS
-        get_project_resources.__doc__ += " Catalog task IDs: " + ", ".join(task.id for task in TASKS) + "."
+        get_project_resources.__doc__ += " During explicit continuation, draft:{protocolVersion:1,proposalId,version,cursor:null} pages the saved candidate. Follow nextCursor in order; these JSON fragments grant no canonical read or write authority. Catalog task IDs: " + ", ".join(task.id for task in TASKS) + "."
         self.sdk.tool(structured_output=False)(get_project_resources)
 
         @self.sdk.tool(structured_output=False)
@@ -283,6 +291,11 @@ class ToolSession(PrivateMcp):
             if not isinstance(arguments, dict):
                 raise ValueError("invalid tool arguments")
             if name in READ_TOOLS:
+                if name == "get_project_resources" and "draft" in arguments:
+                    if set(arguments) != {"draft"}:
+                        raise ValueError("draft read cannot include another query")
+                    AssistantDraftReadV1.model_validate(arguments["draft"])
+                    return None
                 if name == "get_project_resources" and "task" in arguments:
                     if set(arguments) != {"task"}:
                         raise ValueError("task check cannot include a read query")
@@ -315,6 +328,7 @@ class ToolSession(PrivateMcp):
                 raise ValueError("unknown tool")
             return None
         except AgentFailure as error:
+            self.note_limit(error)
             return error.code
         except ValidationError as error:
             self.calls += 1
@@ -392,6 +406,9 @@ class ToolSession(PrivateMcp):
                             raise AgentPolicyFailure("ASSISTANT_TASK_LOCKED", code="AGENT_TOOL_DENIED")
                         else:
                             self.planned_task = arguments.task_id
+                elif name == "get_project_resources" and isinstance(arguments, AssistantDraftReadV1):
+                    from .continuation import draft_page
+                    result = draft_page(self, arguments)
                 elif name in READ_TOOLS:
                     if name == "get_resume_context" and arguments.kind == "context" and arguments.ids:
                         arguments = arguments.model_copy(update={"kind": "document"})
@@ -484,6 +501,9 @@ class ToolSession(PrivateMcp):
                 self.service.revoke(self.control, error.code)
                 self.service.cleanup_error(error.code)
             failure = {"error": {"code": error.code}}
+            reason = self.note_limit(error)
+            if reason:
+                failure["reason"] = reason
             if getattr(error, "reason_code", None):
                 from .capabilities import availability
                 failure["reason"] = availability("unsupported", error.reason_code).reason
@@ -496,6 +516,22 @@ class ToolSession(PrivateMcp):
             return {"error": {"code": "AGENT_ARGUMENT_INVALID"}, "format": "Correct the declared argument shape; access has not been denied."}
         except Exception:
             return {"error": {"code": "AGENT_PROTOCOL"}}
+
+    def note_limit(self, error):
+        if not self.cap_mode or error.code not in {"AGENT_EDIT_LIMIT", "AGENT_TOOL_LIMIT", "AGENT_PROJECT_FULL", "AGENT_CONTEXT_LIMIT"}:
+            return None
+        reason = getattr(error, "capacity_reason", None) or (
+            "Достигнут лимит подготовки:100 операций в итоговом варианте,64 вызова в шаге,64 КиБ на сообщение и текущие лимиты контекста. Сохранённый черновик доступен; продолжите новым ограниченным шагом или выберите меньшую задачу.")
+        try:
+            def limited(values):
+                current = next(value for value in values if value.proposal.origin_run_id == self.control.run_id
+                    and value.proposal.state == "building")
+                current.proposal.reason = "Лимит: " + reason
+                return current
+            self.capability_service.proposals.update(self.control.project_id, limited)
+        except (AgentFailure, StopIteration):
+            pass
+        return reason
 
     def check(self):
         with self.service.projects.state_lock:

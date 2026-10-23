@@ -48,6 +48,18 @@ def mount_jobs(app, service):
         job, created = await service.submit(project_id, payload.request)
         return response(job, 202 if created else 200)
 
+    from packages.resume_core.models.assistant_continuation import AssistantContinueJobV1
+
+    @app.post(prefix + "/assistant-continue-v1")
+    async def continue_assistant(project_id: str, request: Request, payload: AssistantContinueJobV1):
+        from ..agent.continuation import submit_job
+        versions = [value for key, value in request.headers.raw if key.lower() == b"x-foldcv-assistant-protocol"]
+        agent = getattr(service.projects, "agent", None)
+        if versions != [b"1"] or not getattr(agent, "assistant_protocol_enabled", False):
+            raise BackgroundFailure("JOB_SCOPE_INVALID")
+        job, created = await submit_job(agent, service, project_id, payload)
+        return response(job, 202 if created else 200)
+
     @app.post(prefix + "/fixed")
     async def fixed(project_id: str, payload: JobFixedRequestV1 | StartTemplateImportV1 | ResumeTemplateImportV1):
         if isinstance(payload, (StartTemplateImportV1, ResumeTemplateImportV1)):

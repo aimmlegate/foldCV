@@ -282,7 +282,10 @@ async def test_ready_version_is_immutable_and_capacity_failure_keeps_the_prior_d
         assert await session.call("prepare_edit_batch", original) == initial
         denied, _ = await append(session, "new_call", proposal=initial["proposalId"])
         assert denied["error"]["code"] == "AGENT_EDIT_LIMIT"
-        assert path.read_bytes() == before
+        retained = service.proposals.get(workspace.project_id, initial["proposalId"], 1)
+        unchanged = {"proposal": {"reason"}, "control_padding": True}
+        assert retained.model_dump(exclude=unchanged) == stored.model_dump(exclude=unchanged)
+        assert path.stat().st_size == len(before) and retained.proposal.reason.startswith("Лимит:")
         monkeypatch.setattr(persistence, "VERSION_BYTES", 2 * 1024 * 1024)
         ready = await complete(session, initial)
         def forge(values):

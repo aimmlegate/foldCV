@@ -19,13 +19,15 @@ The rollout gate stays off through CAP04. Generated assistant contracts use new
 names; existing model-compatibility and CT schemas remain byte-identical.
 Review/Apply, V7, native quality and manual Word are separate gates.
 
-CAP05 is in progress. Its partial offline checks cover local post-run Apply,
-stable UI click identity, Stop, permission/owner/account revocation, exact receipts,
-restart/no-save proof, applied-payload compaction and native Undo/Redo. Queued
-read-only proposals reuse their origin artifact and the existing canonical writer.
-New wrappers keep generation outcomes separate from later UI receipts. These
-checks do not accept CAP05: reviewed project/history actions, complete recovery,
-full fast/render and mounted T3 Apply/export journeys remain required.
+CAP05 is accepted_with_self_review for ordinary guarded application and recovery.
+It covers current UI authority, exact click identity, Stop/revocation, foreground/queued
+and attached-writer receipts, all nine mutating project actions and native chat history.
+Final fast passed3615 main Python and288 production-corpus cases,726 Node cases and all
+web gates, validating507 variants and304 traces. Render passed199. Real synthetic T3
+Apply/native Undo/Redo/reopen/DOCX passed with zero generation. See the CAP05 handoff.
+CAP06 adds bounded continuation and exact capacity/outcome boundaries. CAP08 integration,
+V7 committed dependencies, full-window/narrow proof, native rewrite quality and manual
+Word remain separate unproved gates. The rollout flag stays off at this checkpoint.
 
 The approved NB00b alternative uses one pinned App Server. `NB-PARALLEL`
 maps the bounded shared protocol, real synthetic pipes, exact routed capabilities,

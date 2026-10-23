@@ -13,6 +13,7 @@ PROJECT_BYTES = 10 * 1024 * 1024
 APPLICATION_BYTES = 100 * 1024 * 1024
 VERSION_COUNT = 20
 RETENTION_DAYS = 7
+CONTROL_RESERVE_BYTES = 32 * 1024
 POLICY_REVISION = 1
 PROTECTED = {"applying", "outcome_unknown"}
 TRANSITIONS = {
@@ -37,6 +38,45 @@ def stored_proposal(payload):
 def encoded(value):
     payload = value.model_dump(mode="json", by_alias=True)
     return json.dumps({"payload": payload, "sha256": digest(payload)}, ensure_ascii=False, separators=(",", ":"), allow_nan=False).encode()
+
+
+
+def capacity_failure(code, reason):
+    error = AgentFailure(code)
+    error.capacity_reason = reason
+    return error
+
+
+def minimum_storage_reason(workspace):
+    # Even an empty rewritten document must retain the authored baseline and its resources.
+    if workspace.project is None:
+        return None
+    baseline = len(json.dumps(workspace.model_dump(mode="json", by_alias=True), ensure_ascii=False, separators=(",", ":")).encode())
+    resources = len(json.dumps({"sources": [source.model_dump(mode="json", by_alias=True) for source in workspace.project.sources],
+        "assets": [asset.model_dump(mode="json", by_alias=True) for asset in workspace.project.assets],
+        "template": workspace.project.template.model_dump(mode="json", by_alias=True)}, ensure_ascii=False, separators=(",", ":")).encode())
+    if baseline + resources + CONTROL_RESERVE_BYTES > VERSION_BYTES:
+        return "Текущий документ и обязательные ресурсы не помещаются в лимит хранения варианта. Доступны проверки, текстовый черновик в чате и существующая правка выделенного текста. Меньшая область не убирает размер тех же ресурсов."
+    return None
+
+
+def fit_control_capacity(value, *, allocate=False):
+    value.control_padding = ""
+    active = value.proposal.state in {"building", "ready", "incomplete", "applying", "outcome_unknown", "failed_before_commit"}
+    if active and not value.compacted:
+        if allocate or value.control_capacity == 0:
+            # Physical padding reserves exact encoded space for approval, revocation and outcomes.
+            value.control_capacity = len(encoded(value)) + CONTROL_RESERVE_BYTES
+            value.control_capacity = len(encoded(value)) + CONTROL_RESERVE_BYTES
+        remaining = value.control_capacity - len(encoded(value))
+        if not 0 <= remaining <= value.control_capacity:
+            raise capacity_failure("AGENT_EDIT_LIMIT", "Не осталось зарезервированного места для результата. Черновик сохранён; подготовьте меньший вариант.")
+        value.control_padding = "_" * remaining
+    else:
+        value.control_capacity = 0
+    if len(encoded(value)) > VERSION_BYTES:
+        raise capacity_failure("AGENT_EDIT_LIMIT", "Вариант вместе с резервом результата превышает 2 МиБ. Предыдущий черновик сохранён; выберите меньшую задачу или существующую правку выделенного текста.")
+    return value
 
 
 def at(value):
@@ -123,6 +163,8 @@ class AssistantProposals:
                 proposal.state, proposal.reason = "expired", "Срок хранения варианта истёк. Подготовьте новый вариант."
                 value.baseline = value.candidate = value.batch = None
                 value.history = None
+                value.read_groups = []
+                fit_control_capacity(value)
                 value.operations, value.snapshot_ids, value.dependencies, value.unchanged = [], [], [], []
                 if hasattr(value, "action"):
                     value.action = None
@@ -141,12 +183,13 @@ class AssistantProposals:
             raise AgentFailure("ASSISTANT_PROPOSAL_MISSING")
         return value
 
-    def compact_applied(self, project, proposal_id, version, *, receipt=None):
+    def compact_applied(self, project, proposal_id, version, *, receipt=None, settle=False):
         with self.agent._guard(project) as directory:
             value = next((item for item in self._items(project) if (item.proposal.id, item.proposal.version) == (proposal_id, version)), None)
             if value is None or value.compacted:
                 return
-            if value.proposal.state != "applied" or value.approval is None or value.approval.phase != "receipt_stored":
+            if value.approval is None or (value.proposal.state != "applied"
+                    and not (settle and value.proposal.state in PROTECTED)):
                 raise AgentFailure("AGENT_TOOL_DENIED")
             if receipt is None:
                 state = self.agent._read(project, directory)
@@ -156,11 +199,15 @@ class AssistantProposals:
             if (receipt is None or not receipt.durable or (receipt.run_id, receipt.batch_id, receipt.request_sha256) !=
                     (value.proposal.origin_run_id, value.approval.batch_id, value.approval.request_sha256)):
                 raise AgentFailure("AGENT_OUTCOME_UNKNOWN")
+            value.proposal.state, value.proposal.reason = "applied", "Показанные изменения сохранены."
+            value.approval.phase = "receipt_stored"
             value.baseline = value.candidate = value.batch = None
             value.history = None
+            value.read_groups = []
             value.operations, value.snapshot_ids, value.dependencies, value.unchanged = [], [], [], []
             value.compacted = True
             AssistantStoredProposalV1.model_validate(value.model_dump(by_alias=True))
+            fit_control_capacity(value)
             atomic_write(self.directory(project) / self.filename(value), encoded(value))
 
     def update(self, project, transform):
@@ -185,22 +232,24 @@ class AssistantProposals:
             prior = previous.get(path.name)
             if checked.proposal.project_id != project:
                 raise AgentFailure("AGENT_SCOPE_INVALID")
+            def frozen(item):
+                return item.model_dump(mode="json", by_alias=True,
+                    exclude={"proposal": {"state", "reason"}, "approval": True, "revoked_acceptances": True,
+                        "control_capacity": True, "control_padding": True})
             if prior is not None:
                 old_state, new_state = prior.proposal.state, checked.proposal.state
                 if new_state != old_state and new_state not in TRANSITIONS.get(old_state, set()):
                     raise AgentFailure("AGENT_TOOL_DENIED")
-                if old_state != "building":
-                    def frozen(item):
-                        return item.model_dump(mode="json", by_alias=True,
-                            exclude={"proposal": {"state", "reason"}, "approval": True, "revoked_acceptances": True})
-                    if frozen(prior) != frozen(checked):
-                        raise AgentFailure("AGENT_IDEMPOTENCY_CONFLICT")
+                if old_state != "building" and frozen(prior) != frozen(checked):
+                    raise AgentFailure("AGENT_IDEMPOTENCY_CONFLICT")
+            allocate = prior is None or prior.proposal.state == "building" and frozen(prior) != frozen(checked)
+            fit_control_capacity(checked, allocate=allocate)
             raw = encoded(checked)
             if len(raw) > VERSION_BYTES:
-                raise AgentFailure("AGENT_EDIT_LIMIT")
+                raise capacity_failure("AGENT_EDIT_LIMIT", "Вариант превышает 2 МиБ; предыдущий черновик сохранён.")
             existing = path.exists()
             if not existing and len(values) >= VERSION_COUNT:
-                raise AgentFailure("AGENT_PROJECT_FULL")
+                raise capacity_failure("AGENT_PROJECT_FULL", "Сохранено 20 версий. Предыдущие варианты доступны; освободите место перед новой подготовкой.")
             if self.root.is_symlink():
                 raise AgentFailure("AGENT_STORE_CORRUPT")
             total = project_bytes = 0
@@ -214,10 +263,37 @@ class AssistantProposals:
                     if directory == self.directory(project):
                         project_bytes += size
             if total + len(raw) > APPLICATION_BYTES or project_bytes + len(raw) > PROJECT_BYTES:
-                raise AgentFailure("AGENT_PROJECT_FULL")
+                raise capacity_failure("AGENT_PROJECT_FULL", "Достигнут лимит хранения: 10 МиБ на проект или 100 МиБ на приложение. Предыдущий черновик сохранён; освободите место перед новой подготовкой.")
             private_directory(path.parent)
             atomic_write(path, raw)
             return checked
+
+    def compact_action(self, project, proposal_id, version, operation):
+        with self.agent._guard(project):
+            value = self._read(self.directory(project) / f"{proposal_id}-{version}.json")
+            if value.compacted:
+                return
+            if (getattr(value, "record_kind", None) != "action_v1" or value.approval is None
+                    or not operation.durable or operation.status != "completed"
+                    or (operation.id, operation.project_id, operation.run_id) !=
+                        (value.approval.batch_id, project, value.proposal.origin_run_id)):
+                raise AgentFailure("AGENT_OUTCOME_UNKNOWN")
+            value.proposal.state, value.proposal.reason = "applied", "Показанное действие выполнено."
+            value.approval.phase = "receipt_stored"
+            value.action = value.baseline = value.candidate = value.batch = value.history = None
+            value.operations, value.snapshot_ids, value.dependencies, value.unchanged, value.read_groups = [], [], [], [], []
+            value.compacted = True
+            fit_control_capacity(value)
+            stored_proposal(value.model_dump(by_alias=True))
+            atomic_write(self.directory(project) / self.filename(value), encoded(value))
+
+    def remove_noop(self, project, proposal_id, version, checksum):
+        with self.agent._guard(project):
+            value = self._read(self.directory(project) / f"{proposal_id}-{version}.json")
+            expected = digest([proposal_id, version, value.proposal.content_sha256, "no_change"])
+            if not value.no_change or value.proposal.state != "invalid" or expected != checksum:
+                raise AgentFailure("AGENT_IDEMPOTENCY_CONFLICT")
+            (self.directory(project) / self.filename(value)).unlink()
 
     def recover(self):
         errors = {}
@@ -245,6 +321,7 @@ class AssistantProposals:
                     current.proposal.state = "discarded" if current.proposal.state == "ready" else "cancelled"
                     current.proposal.reason = "Задача остановлена. Этот вариант нельзя применить."
                 elif current.proposal.state == "building":
-                    current.proposal.state, current.proposal.reason = "incomplete", "Черновик сохранён. Подготовка не завершена; применение недоступно."
+                    current.proposal.state = "incomplete"
+                    current.proposal.reason = current.proposal.reason if current.proposal.reason and current.proposal.reason.startswith("Лимит:") else "Черновик сохранён. Подготовка не завершена; применение недоступно."
                 return current
             self.update(project, end)

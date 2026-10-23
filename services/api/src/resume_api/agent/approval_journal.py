@@ -1,6 +1,7 @@
 """Use the origin's existing journal for later UI receipts, including queued work."""
 
 from packages.resume_core.agent_store import AgentFailure, run_in
+from packages.resume_core.background_store import BackgroundFailure
 
 from .publication import AgentPublication
 
@@ -29,7 +30,12 @@ def journal_for_run(service, project, origin):
     if jobs is None:
         raise AgentFailure("AGENT_NOT_FOUND")
     journal = jobs.artifacts.bound(project, origin)
-    run_in(journal.load(project), origin)
+    try:
+        run_in(journal.load(project), origin)
+    except BackgroundFailure as error:
+        if error.code == "JOB_NOT_FOUND":
+            raise AgentFailure("AGENT_NOT_FOUND") from None
+        raise
     return journal
 
 

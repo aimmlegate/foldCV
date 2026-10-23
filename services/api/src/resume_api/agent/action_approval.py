@@ -147,6 +147,8 @@ class AssistantActionApproval(AssistantApproval):
                 raise AgentFailure("AGENT_STALE_READ")
             self.rebuild(project_id, value, workspace)
             value.approval.phase = "commit_claimed"
+            from packages.resume_core.assistant_proposals import fit_control_capacity
+            fit_control_capacity(value)
             raw = encoded(value)
             if len(raw) > VERSION_BYTES:
                 raise AgentFailure("AGENT_EDIT_LIMIT")
@@ -331,6 +333,11 @@ class AssistantActionApproval(AssistantApproval):
                 operation = AgentProjectOperation(id=key, projectId=project_id, runId=command["runId"], action=command["action"],
                     status=command["status"], durable=command["status"] in {"completed", "deleted"} and bool(result.get("durable")), downloadUrl=None,
                     errorCode=result.get("errorCode") or result.get("error", {}).get("code"))
+                if operation.durable and not deleted:
+                    try:
+                        self.service.proposals.compact_action(project_id, payload.proposal_id, payload.version, operation)
+                    except Exception:
+                        self.compaction_errors[project_id] = "AGENT_STORE_UNAVAILABLE"
                 self.tickets.pop((project_id, key), None)
                 return AssistantProjectActionResultV1(proposal=proposal, operation=operation, project=None if deleted else projects.response(project_id))
             value = self.value(project_id, payload)

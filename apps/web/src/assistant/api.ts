@@ -1,3 +1,6 @@
+import type { AssistantContinuationOptionsV1 } from "../contracts/generated/assistant_continuation_options_v1";
+import type { AssistantRunOutcomeV1 } from "../contracts/generated/assistant_run_outcome_v1";
+import type { AssistantContinueRunV1 } from "../contracts/generated/assistant_continue_run_v1";
 import type { AgentCapabilities } from "../contracts/generated/agent_capabilities";
 import type { AgentAccess } from "../contracts/generated/agent_access";
 import type { AgentHistoryOffer } from "../contracts/generated/agent_history_offer";
@@ -37,7 +40,7 @@ import type { AssistantApplicationClaimV1 } from "../contracts/generated/assista
 import type { AssistantApplicationRecoveryV1 } from "../contracts/generated/assistant_application_recovery_v1";
 
 type MessagePage = Omit<AgentMessagePage, "items"> & { items: AgentMessage[] };
-type Replies = { agent_project_operations: AgentProjectOperations; agent_access: AgentAccess; agent_capabilities: AgentCapabilities; agent_settings: AgentSettings; agent_conversation: AgentConversation;
+type Replies = { assistant_continuation_options_v1: AssistantContinuationOptionsV1; assistant_run_outcome_v1: AssistantRunOutcomeV1; agent_project_operations: AgentProjectOperations; agent_access: AgentAccess; agent_capabilities: AgentCapabilities; agent_settings: AgentSettings; agent_conversation: AgentConversation;
   assistant_task_catalog_v1: AssistantTaskCatalogV1; assistant_task_check_v1: AssistantTaskCheckV1;
   assistant_proposal_v1: AssistantProposalV1; assistant_capability_reviews_v1: AssistantCapabilityReviewsV1; assistant_capability_review_v1: AssistantCapabilityReviewV1;
   assistant_project_action_claim_v1: AssistantProjectActionClaimV1; assistant_project_action_result_v1: AssistantProjectActionResultV1;
@@ -116,6 +119,16 @@ export class AgentBrowserApi {
   }
   proposals(): Promise<AssistantCapabilityReviewsV1> {
     return this.request("assistant_capability_reviews_v1", this.prefix + "/reviews", "GET", {}, { "X-FoldCV-Assistant-Protocol": "1" });
+  }
+  continuations(flags: AgentFlags): Promise<AssistantContinuationOptionsV1> {
+    return this.request("assistant_continuation_options_v1", this.prefix + "/continuations", "GET", {}, {
+      "X-FoldCV-Assistant-Protocol": "1", "X-FoldCV-Agent-Edits": flags.allowEdits ? "1" : "0", "X-FoldCV-Agent-Web": flags.allowWeb ? "1" : "0" });
+  }
+  continueRun(value: AssistantContinueRunV1): Promise<AgentRun> {
+    return this.request("agent_run", this.prefix + "/continuations/run", "POST", value, { "X-FoldCV-Assistant-Protocol": "1" });
+  }
+  outcome(runId: string): Promise<AssistantRunOutcomeV1> {
+    return this.request("assistant_run_outcome_v1", this.prefix + `/outcomes/${encodeURIComponent(runId)}`, "GET", {}, { "X-FoldCV-Assistant-Protocol": "1" });
   }
   proposal(value: AssistantProposalRequestV1): Promise<AssistantCapabilityReviewV1> {
     return this.request("assistant_capability_review_v1", `${this.prefix}/reviews/${encodeURIComponent(value.proposalId)}/versions/${String(value.version)}`,

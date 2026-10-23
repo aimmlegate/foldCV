@@ -86,7 +86,11 @@ def proposal_instructions():
         "boundaries. A compound format-and-rewrite request needs separate tasks, never partial Apply. "
         "Project actions prepare separate exact reviews. Undo/Redo use the native action captured for this "
         "request, complete document/fact reads and the versioned project-action preparation wrapper. "
-        "They navigate the existing history only after explicit UI Apply, never create an inverse action."
+        "They navigate the existing history only after explicit UI Apply, never create an inverse action. "
+        "Explicit Continue carries useful operations and actual complete-read proof into a new bounded draft version. "
+        "Use continuedDraft context and page its saved operations/coverage before extending it. "
+        "Retain its task/scope/baseline, do not repeat carried operations, and finalize the aggregate only after full coverage. "
+        "The same100-operation,64-call and current byte/time limits still apply. Do not retry a failed turn or publish pieces."
     )
 
 
@@ -95,7 +99,8 @@ def proposal_protocol_fingerprint(legacy):
     from packages.resume_core.models.assistant_capabilities import AssistantTaskRequestV1
     from packages.resume_core.models.assistant_proposals import AssistantAssemblyRequestV1
     from packages.resume_core.models.assistant_actions import AssistantProjectActionPrepareV1
-    return digest({"legacy": legacy, "instructions": proposal_instructions(),
+    from packages.resume_core.models.assistant_continuation import AssistantDraftReadV1
+    return digest({"legacy": legacy, "draftRead": AssistantDraftReadV1.model_json_schema(), "instructions": proposal_instructions(),
         "task": AssistantTaskRequestV1.model_json_schema(), "assembly": AssistantAssemblyRequestV1.model_json_schema(),
         "projectAction": AssistantProjectActionPrepareV1.model_json_schema()})
 
@@ -176,6 +181,11 @@ def catalog(service, project_id, *, allow_edits=True, allow_web=True):
                 denied = availability("unsupported", "ASSISTANT_TEMPLATE_UNAVAILABLE", "Используйте доступную правку выделенного текста или кнопки редактора.")
             supported = task.supported and family == "ordinary"
             ready_generation, preparation = generation, local
+            if supported and task.id in {"rewrite_resume", "restructure", "correct_facts", "format_document"} and getattr(service, "assistant_protocol_enabled", False):
+                from packages.resume_core.assistant_proposals import minimum_storage_reason
+                capacity_reason = minimum_storage_reason(workspace)
+                if capacity_reason and ready_generation.state == "available":
+                    ready_generation = availability("temporarily_unavailable", "AGENT_EDIT_LIMIT", capacity_reason)
             if task.id == "read_public_page" and not allow_web:
                 ready_generation = preparation = availability("permission_disabled", "AGENT_WEB_DISABLED", "Вставьте текст страницы или используйте уже сохранённый источник.")
             mutating = task.effect in {"proposal", "project_action"}

@@ -1,3 +1,4 @@
+import type { AssistantContinuationOptionsV1 } from "../contracts/generated/assistant_continuation_options_v1";
 import { useEffect, useRef } from "react";
 import type { AssistantProposalV1 } from "../contracts/generated/assistant_proposal_v1";
 import type { AssistantProposalRequestV1 } from "../contracts/generated/assistant_proposal_request_v1";
@@ -27,11 +28,13 @@ export function proposalControls(value: AssistantProposalV1, catalog: AssistantT
       : !available ? [readiness?.reason, readiness?.remedy].filter(Boolean).join(" ") || "Применение сейчас недоступно." : null };
 }
 
-export function ProposalPreview({ value, catalog, busy, invalidated, allowEdits, stage, action, apply, discard }: {
+export function ProposalPreview({ value, catalog, busy, invalidated, allowEdits, stage, action, continuation, continueDraft, apply, discard }: {
   value: AssistantProposalV1; catalog: AssistantTaskCatalogV1 | null | undefined; busy: boolean; invalidated: boolean; allowEdits: boolean;
   apply: () => void; discard: () => void;
   stage?: AssistantReviewV1["apply"] | undefined;
   action?: AssistantCapabilityReviewV1["action"];
+  continuation?: AssistantContinuationOptionsV1["options"][number] | undefined;
+  continueDraft?: () => void;
 }) {
   const task = catalog?.tasks.find(item => item.id === value.taskId), controls = proposalControls(value, catalog, busy, invalidated, allowEdits, stage);
   const button = useRef<HTMLButtonElement>(null), heading = useRef<HTMLHeadingElement>(null);
@@ -63,8 +66,14 @@ export function ProposalPreview({ value, catalog, busy, invalidated, allowEdits,
       .map(unit => <li key={unit.unitId}>{unit.reason}</li>)}</ul></details>}
     {value.taskId === "undo" || value.taskId === "redo" ? <p>Навигация по показанному действию. Новая запись в истории не создаётся.</p>
       : task?.reversibility === "shared_undo" && <p>После сохранения — одна отмена в истории редактора.</p>}
+    {continuation && <p>Осталось операций: {continuation.operationsRemaining}. Версий: {continuation.versionsRemaining}.
+      Новый шаг: до {continuation.toolCalls} вызовов, до {continuation.toolBytes} байт на сообщение. Документ не меняется.</p>}
+    {continuation && continuation.availability.state !== "available" && <p role="status">
+      {[continuation.availability.reason, continuation.availability.remedy].filter(Boolean).join(" ")}</p>}
     {controls.reason && <p role="status">{controls.reason}</p>}
-    <div className="chat-proposal-actions"><button ref={button} type="button" className="primary" disabled={!controls.apply}
+    <div className="chat-proposal-actions">{continuation && <button type="button" className="text-button"
+      disabled={busy || invalidated || continuation.availability.state !== "available" || !continueDraft}
+      onClick={continueDraft}>Продолжить черновик</button>}<button ref={button} type="button" className="primary" disabled={!controls.apply}
       onClick={event => { restoreFocus.current = event.detail === 0; apply(); }}>Применить</button>
       <button type="button" className="text-button" disabled={!controls.discard} onClick={discard}>Отклонить</button></div>
   </article>;

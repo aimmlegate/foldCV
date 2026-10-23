@@ -87,6 +87,9 @@ class AgentService:
         try:
             self.startup_errors.update(self.proposals.recover())
             self.proposal_recovery_error = None
+            from .outcomes import retire_noops
+            for directory in self.proposals.root.iterdir() if self.proposals.root.exists() else []:
+                retire_noops(self, directory.name)
         except AgentFailure as error:
             self.proposal_recovery_error = error.code
 
@@ -385,6 +388,9 @@ class AgentService:
                 finished = self.store.finish(control.project_id, control.run_id, result.state, text=result.text,
                     error=result.error, sources=sources, findings=findings, truncated=result.truncated,
                     native_completed=result.state == "completed")
+                if self.assistant_protocol_enabled:
+                    from .outcomes import retire_noops
+                    retire_noops(self, control.project_id, run_id=control.run_id)
                 self.event(control, "run.state_changed", {"state": finished.state,
                     "error": finished.error.model_dump(by_alias=True) if finished.error else None,
                     "savedBatchId": finished.saved_batch_id, "outcomeUnknown": finished.outcome_unknown}, terminal=True)

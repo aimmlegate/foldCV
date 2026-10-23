@@ -12,6 +12,9 @@ class AssistantJobArtifactV1(JobArtifactV1):
     assistant_protocol_version: Literal[1]
     applications: list[AgentBatchJournal] = Field(default_factory=list, max_length=100)
 
+    application_control_capacity: int = Field(default=0, ge=0, le=20971520, strict=True)
+    application_control_padding: str = Field(default="", max_length=20971520)
+
     @model_validator(mode="after")
     def owns_ui_applications(self):
         if self.job_id is None:

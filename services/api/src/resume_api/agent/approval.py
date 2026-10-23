@@ -327,6 +327,8 @@ class AssistantApproval:
                         or not current_dependencies(workspace, current.dependencies)):
                     raise AgentFailure("AGENT_STALE_READ")
                 current.approval.phase = "commit_claimed"
+                from packages.resume_core.assistant_proposals import fit_control_capacity
+                fit_control_capacity(current)
                 raw = encoded(current)
                 if len(raw) > VERSION_BYTES:
                     raise AgentFailure("AGENT_EDIT_LIMIT")
@@ -650,6 +652,14 @@ class AssistantApproval:
                 self.compact(project_id, identifier, payload.version, receipt)
             self.tickets.pop((project_id, receipt.batch_id), None)
             return
+        if receipt.durable:
+            try:
+                self.service.proposals.compact_applied(project_id, identifier, payload.version, receipt=receipt, settle=True)
+                self.compaction_errors.pop(project_id, None)
+                self.tickets.pop((project_id, receipt.batch_id), None)
+                return
+            except Exception:
+                self.compaction_errors[project_id] = "AGENT_STORE_UNAVAILABLE"
         def settled(values):
             current = next(value for value in values if value.proposal.id == identifier and value.proposal.version == payload.version)
             approval = current.approval

@@ -246,7 +246,7 @@ class JobService:
         except AdmissionBlocked:
             raise BackgroundFailure("CLEANUP_FAILED") from None
 
-    async def submit(self, project, payload):
+    async def submit(self, project, payload, *, prepare=None):
         if not self.enabled or not self.accepting or self.supervisor.closed or self.supervisor.dispatcher is None:
             raise BackgroundFailure("JOB_DISABLED")
         logical = payload.request
@@ -303,6 +303,12 @@ class JobService:
                 guards={"schemaVersion": 1, "reads": [], "writes": []}, submittedAt=self.store.clock())
             job, created = self.store.submit(captured)
             self.artifacts.bind(job)
+            if created and prepare is not None:
+                try:
+                    prepare(job)
+                except BaseException:
+                    self.store.cancel(project, job.id)
+                    raise
         try:
             if created:
                 await self.supervisor.observer("accepted_durable", job.id)

@@ -365,3 +365,66 @@ test("delayed proposal refresh cannot revive a stale response or replace the new
     assert.equal(h.controller.view.proposals?.[0]?.state, "stale"); assert.equal(h.accepted.length, 0);
   } finally { h.controller.close(); }
 });
+
+function continuationHarness() {
+  const h = reviewedHarness();
+  h.value.state = "incomplete";
+  const original = { clientRequestId: "original_request", conversationId: "conversation_1", message: "Rewrite the authored resume.",
+    allowEdits: false, allowWeb: false, scope: { kind: "resume" as const }, settingsRevision: 1,
+    projectRevision: 1, documentRevision: 1, factsRevision: 1 };
+  h.api.continuations = () => Promise.resolve({ schemaVersion: 1, protocolVersion: 1, projectId: h.value.projectId,
+    options: [{ schemaVersion: 1, protocolVersion: 1, proposal: { schemaVersion: 1, protocolVersion: 1,
+      proposalId: h.value.id, version: h.value.version, contentSha256: h.value.contentSha256 },
+    availability: { state: "available", reason: null, reasonCode: null, remedy: null }, request: original,
+    operationsRemaining: 99, versionsRemaining: 19, toolCalls: 64, toolBytes: 65536 }] });
+  return { ...h, original };
+}
+
+test("Continue starts one bounded draft request, preserves user text and never applies", async () => {
+  const h = continuationHarness(), pending = deferred<AgentRun>(), targets: string[] = [];
+  h.api.continueRun = async value => { targets.push(value.proposal.proposalId); const run = await h.api.submit(value.request); h.finish();
+    pending.resolve({ ...run, state: "completed", finishedAt: now }); return pending.promise; };
+  try {
+    await h.controller.init(); h.controller.draft("Keep my unsent text.");
+    await Promise.all([h.controller.continueProposal(h.value, baseline), h.controller.continueProposal(h.value, baseline)]);
+    assert.deepEqual(targets, [h.value.id]);
+    assert.equal(h.requests[0]?.message, h.original.message);
+    assert.deepEqual(h.requests[0]?.scope, h.original.scope);
+    assert.notEqual(h.requests[0]?.clientRequestId, h.original.clientRequestId);
+    assert.equal(h.controller.view.draft, "Keep my unsent text.");
+    assert.equal(h.applied.length, 0); assert.equal(h.accepted.length, 0); assert.equal(h.counts().submitted, 1);
+  } finally { h.controller.close(); }
+});
+
+test("a lost Continue reply reuses its request identity only after another explicit click", async () => {
+  const h = continuationHarness(); let first = true;
+  h.api.continueRun = async value => { const run = await h.api.submit(value.request); h.finish();
+    if (first) { first = false; throw new AgentApiFailure("REQUEST_FAILED"); }
+    return { ...run, state: "completed", finishedAt: now }; };
+  try {
+    await h.controller.init();
+    await h.controller.continueProposal(h.value, baseline);
+    assert.equal(h.requests.length, 1);
+    await wait(); assert.equal(h.requests.length, 1);
+    await h.controller.continueProposal(h.value, baseline);
+    assert.equal(h.requests.length, 2); assert.equal(h.requests[0]?.clientRequestId, h.requests[1]?.clientRequestId);
+    assert.equal(h.counts().submitted, 1); assert.equal(h.applied.length, 0);
+  } finally { h.controller.close(); }
+});
+
+test("Stop during a lost Continue reply revokes the foreground lease without restoring the run", async () => {
+  const h = continuationHarness(), reply = deferred<AgentRun>(), entered = deferred<void>();
+  h.api.continueRun = async value => { await h.api.submit(value.request); entered.resolve(); return reply.promise; };
+  try {
+    await h.controller.init();
+    const work = h.controller.continueProposal(h.value, baseline);
+    await entered.promise;
+    await h.controller.stop();
+    assert.equal(h.counts().closes, 1);
+    reply.reject(new AgentApiFailure("REQUEST_FAILED"));
+    await work;
+    assert.equal(h.requests.length, 1);
+    assert.equal(h.controller.view.run, null);
+    assert.equal(h.accepted.length, 0); assert.equal(h.applied.length, 0);
+  } finally { h.controller.close(); }
+});

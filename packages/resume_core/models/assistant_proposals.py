@@ -7,6 +7,7 @@ from pydantic import Field, model_validator
 from .agent import AgentClaimResult, AgentCommitResult, AgentEditBatch, AgentEditOperation, AgentEditReceipt, AgentId, AgentOwner, AgentScope, AgentSnapshotDependency, Timestamp
 from .assistant_capabilities import AssistantAvailabilityV1, AssistantProtocolV1, TaskId
 from .assistant_history import AssistantHistoryCaptureV1
+from .assistant_read_proof import AssistantReadGroupV1, AssistantContinuationOriginV1
 from .contracts import Sha256
 from .rich_workspace import WorkspaceV6
 
@@ -140,6 +141,10 @@ class AssistantApprovalRecordV1(AssistantProtocolV1):
 
 
 class AssistantStoredProposalV1(AssistantProtocolV1):
+    control_capacity: int = Field(default=0, ge=0, le=2097152, strict=True)
+    control_padding: str = Field(default="", max_length=2097152)
+    read_groups: list[AssistantReadGroupV1] = Field(default_factory=list, max_length=64)
+    continuation: AssistantContinuationOriginV1 | None = None
     history: AssistantHistoryCaptureV1 | None = None
     policy_revision: Literal[1] | None = None
     approval: AssistantApprovalRecordV1 | None = None
