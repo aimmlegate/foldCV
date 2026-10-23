@@ -1027,6 +1027,8 @@
     "IMPORT_TASK_UNKNOWN": "import",
     "IMPORT_ATTEMPT_UNKNOWN": "import",
     "IMPORT_OPERATION_ACTIVE": "busy",
+    "IMPORT_OPERATION_UNSUPPORTED": "unsupported",
+    "REQUEST_IN_PROGRESS": "busy",
     "IMPORT_PROPOSAL_RECORD_INVALID": "importResult",
     "IMPORT_PROPOSAL_ATTEMPT_INVALID": "importResult",
     "IMPORT_PROPOSAL_INVALID": "importResult",

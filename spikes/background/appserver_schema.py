@@ -7,6 +7,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
 EVIDENCE = ROOT / "docs/gui/handoffs/BACKGROUND-WORK/nb00b-evidence"
+RETAINED_MANIFEST_SHA256 = "d50e282e4037181758769f84ba2018c5a8151d84beb7ebd4392c8b9b2436ddd8"
 SCHEMAS = {
     "initialize": "v1/InitializeParams.json",
     "thread": "v2/ThreadStartParams.json",
@@ -21,12 +22,17 @@ class ProtocolUnsupported(ValueError):
     pass
 
 
-def load_pinned():
-    manifest = json.loads((EVIDENCE / "pinned-schema-export.json").read_bytes())
-    from resume_api.cli.experimental_profile import BINARY_SHA256
-    from spikes.agent.profile import HOST_SHA256, MANIFEST_SHA256
-    if (manifest["binarySha256"] != BINARY_SHA256 or manifest["hostSha256"] != HOST_SHA256
-            or manifest["manifestSha256"] != MANIFEST_SHA256 or manifest["experimental"] is not True
+def load_pinned(*, runtime_identity=None):
+    """Read the retained export; a different runtime needs its own evidence."""
+    path = EVIDENCE / "pinned-schema-export.json"
+    raw = path.read_bytes()
+    if path.is_symlink() or hashlib.sha256(raw).hexdigest() != RETAINED_MANIFEST_SHA256:
+        raise ProtocolUnsupported("Pinned export provenance is invalid")
+    manifest = json.loads(raw)
+    identity = {key: manifest[key] for key in ("binarySha256", "hostSha256", "manifestSha256")}
+    if runtime_identity is not None and runtime_identity != identity:
+        raise ProtocolUnsupported("Retained schema does not prove this runtime")
+    if (manifest["experimental"] is not True
             or manifest["nativeModelStarts"] != 0 or manifest["emptyProfile"] is not True):
         raise ProtocolUnsupported("Pinned export provenance is invalid")
     result = {}
