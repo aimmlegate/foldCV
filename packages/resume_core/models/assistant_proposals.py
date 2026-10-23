@@ -6,6 +6,7 @@ from pydantic import Field, model_validator
 
 from .agent import AgentClaimResult, AgentCommitResult, AgentEditBatch, AgentEditOperation, AgentEditReceipt, AgentId, AgentOwner, AgentScope, AgentSnapshotDependency, Timestamp
 from .assistant_capabilities import AssistantAvailabilityV1, AssistantProtocolV1, TaskId
+from .assistant_history import AssistantHistoryCaptureV1
 from .contracts import Sha256
 from .rich_workspace import WorkspaceV6
 
@@ -124,8 +125,26 @@ class AssistantProposalResultV1(AssistantProtocolV1):
     reason: str
 
 
+class AssistantApprovalRecordV1(AssistantProtocolV1):
+    acceptance_id: AgentId
+    owner_sha256: Sha256
+    owner_epoch: int = Field(ge=1, strict=True)
+    session_id: AgentId
+    access_revision: int = Field(ge=1, strict=True)
+    account_epoch: AgentId
+    batch_id: AgentId
+    request_sha256: Sha256
+    before_workspace_sha256: Sha256
+    expires_at: Timestamp
+    phase: Literal["accepted", "commit_claimed", "receipt_stored", "cancelled"]
+
+
 class AssistantStoredProposalV1(AssistantProtocolV1):
+    history: AssistantHistoryCaptureV1 | None = None
     policy_revision: Literal[1] | None = None
+    approval: AssistantApprovalRecordV1 | None = None
+    revoked_acceptances: list[AgentId] = Field(default_factory=list, max_length=100)
+    compacted: bool = Field(default=False, strict=True)
     proposal: AssistantProposalV1
     account_epoch: AgentId
     access_revision: int = Field(ge=1, strict=True)
@@ -144,7 +163,12 @@ class AssistantStoredProposalV1(AssistantProtocolV1):
     def exact_content(self):
         from ..assistant_proposals import content_digest
         from ..rich_mutations import apply_rich_mutation, mutation_sha256
-        if len(self.calls) > 64 or self.proposal.operation_count != len(self.operations):
+        if self.compacted:
+            if (self.proposal.state not in {"applied", "expired"} or self.approval is None or self.approval.phase != "receipt_stored"
+                    or any(part is not None for part in (self.baseline, self.candidate, self.batch))
+                    or any((self.operations, self.snapshot_ids, self.dependencies, self.unchanged))):
+                raise ValueError("compacted proposal needs its saved receipt identity and no authority payload")
+        if len(self.calls) > 64 or not self.compacted and self.proposal.operation_count != len(self.operations):
             raise ValueError("proposal exceeds its frozen assembly")
         if self.baseline is not None and self.proposal.before_sha256 != content_digest(self.baseline):
             raise ValueError("changed baseline")
@@ -157,6 +181,9 @@ class AssistantStoredProposalV1(AssistantProtocolV1):
             if (mutation_sha256(self.batch.mutation) != self.batch.request_sha256
                     or content_digest(rebuilt) != self.proposal.content_sha256):
                 raise ValueError("candidate differs from the canonical compiler")
+            if self.history is not None and (self.history.direction != self.proposal.task_id
+                    or self.batch.mutation.kind != self.history.direction or self.batch.mutation.action_id != self.history.action_id):
+                raise ValueError("history must retain the captured native action")
         if self.proposal.state == "ready" and (self.candidate is None or self.batch is None or self.no_change
                 or any(unit.state == "unresolved" or not unit.read for unit in self.proposal.coverage)):
             raise ValueError("ready requires a complete immutable candidate")

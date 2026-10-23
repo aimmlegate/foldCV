@@ -375,6 +375,11 @@ class ReadBook:
                 "outline": result, "recentOriginalMessages": recent, "olderMessagesOmitted": max(0, len(conversation.messages) - 8),
                 "derivedOutcomeDigest": summary, "digestTruncated": clipped,
                 "message": journal.request.message}
+            root = getattr(self.service, "catalog_service", self.service)
+            if getattr(root, "assistant_protocol_enabled", False):
+                offer = root.publication.assistant_history.get((run.project_id, run.client_request_id))
+                context["capturedNativeHistory"] = {direction: bool(offer is not None and offer[0] > root.leases.clock()
+                    and getattr(offer[1].offer, direction) is not None) for direction in ("undo", "redo")}
             assembled = json_text(context)
             if len(assembled.encode()) > limits.CONTEXT_BYTES:
                 raise AgentFailure("AGENT_CONTEXT_LIMIT")

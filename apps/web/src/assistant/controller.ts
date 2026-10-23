@@ -12,13 +12,16 @@ import type { AgentEditReceipt } from "../contracts/generated/agent_edit_receipt
 import type { AgentEvent } from "../contracts/generated/agent_event";
 import type { RichProjectResponse } from "../contracts/generated/rich_project_response";
 import { AgentApiFailure, type AgentBrowserApi, type AgentFlags, type AgentOwner } from "./api";
-import type { PreparedApi } from "./editor-bridge";
+import type { PreparedApi, PreparedActionApi } from "./editor-bridge";
+import type { AssistantCapabilityReviewV1 } from "../contracts/generated/assistant_capability_review_v1";
+import type { AssistantHistoryOfferV1 } from "../contracts/generated/assistant_history_offer_v1";
 import type { JobAgentRequestV1 } from "../contracts/generated/background_agent_request_v1";
 import type { BackgroundConversation } from "../background/api";
 import type { ProjectJobs } from "../background/jobs";
 import { RichApiFailure } from "../rich/api";
 import type { AssistantProposalV1 } from "../contracts/generated/assistant_proposal_v1";
 import type { AssistantReviewV1 } from "../contracts/generated/assistant_review_v1";
+import type { AssistantAcceptanceV1 } from "../contracts/generated/assistant_acceptance_v1";
 import { proposalKey, proposalRequest } from "./proposal";
 
 export const terminal = (run: AgentRun | null): boolean => run !== null && ["completed", "failed", "cancelled", "interrupted"].includes(run.state);
@@ -27,18 +30,21 @@ export type AssistantView = {
   taskReason?: string | null;
   proposals?: AssistantProposalV1[]; proposalBusy?: string | null; reviewInvalidated?: string[];
   reviewAvailability?: Record<string, AssistantReviewV1["apply"]>;
+  reviewActions?: Record<string, AssistantCapabilityReviewV1["action"]>;
   settings: AgentSettings | null; capabilities: AgentCapabilities | null; flags: AgentFlags;
   conversations: AgentConversationPage["items"][number][]; conversationCursor: string | null; conversationId: string | null; messages: AgentMessage[];
   messageCursor: string | null; sources: AgentWebSource[]; findings: AgentFinding[]; run: AgentRun | null;
   receipts: AgentEditReceipt[]; activity: AgentEvent[]; partial: string; partialTruncated: boolean;
   draft: string; submitting: boolean; pendingSend: boolean; error: string | null; loading?: string | null;
 };
-export type AssistantEditor = { sessionId: string; reviewStamp?: () => number; apply: (batchId: string, api: PreparedApi) => Promise<void> };
+export type AssistantEditor = { sessionId: string; reviewStamp?: () => number; apply: (batchId: string, api: PreparedApi) => Promise<void>;
+  applyAction?: (key: string, api: PreparedActionApi) => Promise<void> };
 export type TurnBaseline = () => Promise<{ response: RichProjectResponse; scope: AgentRunRequest["scope"]; selectionContext?: AgentRunRequest["selectionContext"];
-  historyOffers?: Pick<AgentHistoryOffer, "undo" | "redo"> }>;
+  historyOffers?: Pick<AgentHistoryOffer, "undo" | "redo">;
+  historyTargets?: Pick<AssistantHistoryOfferV1, "undoBackend" | "redoBackend"> }>;
 export type AssistantApi = Pick<AgentBrowserApi, "projectId" | "settings" | "saveSettings" | "capabilities" | "conversations" | "conversation" |
   "messages" | "resources" | "open" | "renew" | "close" | "submit" | "read" | "cancel" | "events" | "prepared">
-  & Partial<Pick<AgentBrowserApi, "access" | "setAccess" | "offerHistory" | "tasks" | "checkMessage" | "proposals" | "proposal" | "discardProposal" | "reviewed">>;
+  & Partial<Pick<AgentBrowserApi, "access" | "setAccess" | "offerHistory" | "offerReviewedHistory" | "tasks" | "checkMessage" | "proposals" | "proposal" | "discardProposal" | "reviewed" | "cancelApplication" | "retryApplication" | "reviewedAction" | "cancelAction" | "retryAction">>;
 const pause = (milliseconds: number) => new Promise<void>(resolve => { setTimeout(resolve, milliseconds); });
 function code(error: unknown): string { return error instanceof AgentApiFailure || error instanceof RichApiFailure ? error.code : error instanceof Error && error.message.startsWith("AGENT_") ? error.message : "REQUEST_FAILED"; }
 
@@ -57,6 +63,8 @@ export class AssistantController {
   private catalogEpoch = 0;
   private proposalEpoch = 0;
   private reviewIntentEpoch = 0;
+  private reviewAcceptance: AssistantAcceptanceV1 | null = null;
+  private reviewAction = false;
   private readonly reviewStamps = new Map<string, number>();
   private accessRevision = 1;
   private pending: AgentRunRequest | null = null;
@@ -121,8 +129,9 @@ export class AssistantController {
     const proposals = reply.reviews.map(item => item.proposal);
     for (const proposal of proposals) if (!this.reviewStamps.has(proposalKey(proposal)) && stamp !== undefined)
       this.reviewStamps.set(proposalKey(proposal), stamp);
-    this.publish({ proposals, reviewAvailability: Object.fromEntries(reply.reviews.map(item => [proposalKey(item.proposal), item.apply])) }); this.reviewChanged();
-    if (!this.owner && this.view.flags.allowEdits && proposals.some(item => item.state === "ready")) {
+    this.publish({ proposals, reviewAvailability: Object.fromEntries(reply.reviews.map(item => [proposalKey(item.proposal), item.apply])),
+      reviewActions: Object.fromEntries(reply.reviews.map(item => [proposalKey(item.proposal), item.action])) }); this.reviewChanged();
+    if (!this.owner && this.view.flags.allowEdits && proposals.some(item => item.state === "ready" || item.state === "failed_before_commit")) {
       await this.ensureOwner(); await this.refreshCatalog();
       await this.refreshProposals();
     }
@@ -131,21 +140,35 @@ export class AssistantController {
     const key = proposalKey(displayed);
     this.reviewChanged();
     if (this.active || this.view.proposalBusy || !this.api.reviewed || !this.api.proposal
-      || !this.view.taskCatalog?.protocolEnabled || !this.view.flags.allowEdits || displayed.state !== "ready"
-      || this.view.reviewInvalidated?.includes(key) || !this.view.proposals?.some(item => proposalKey(item) === key && item.state === "ready")) return;
+      || !this.view.taskCatalog?.protocolEnabled || !this.view.flags.allowEdits || !["ready", "failed_before_commit"].includes(displayed.state)
+      || this.view.reviewInvalidated?.includes(key) || !this.view.proposals?.some(item => proposalKey(item) === key && ["ready", "failed_before_commit"].includes(item.state))) return;
     const epoch = ++this.reviewIntentEpoch;
+    const acceptanceId = crypto.randomUUID();
     this.applying.add(key); this.publish({ proposalBusy: key, error: null });
     try {
       const owner = await this.ensureOwner(); await this.refreshCatalog();
       const current = await this.api.proposal(proposalRequest(displayed));
       this.reviewChanged();
       if (this.closed || epoch !== this.reviewIntentEpoch) return;
-      if (proposalKey(current.proposal) !== key || current.proposal.state !== "ready" || this.view.reviewInvalidated?.includes(key))
+      if (proposalKey(current.proposal) !== key || !["ready", "failed_before_commit"].includes(current.proposal.state) || this.view.reviewInvalidated?.includes(key))
         throw new AgentApiFailure("AGENT_STALE_READ");
       if (!this.view.flags.allowEdits || current.apply.state !== "available") throw new AgentApiFailure(current.apply.reasonCode ?? "AGENT_TOOL_DENIED");
-      await this.editor.apply(key, this.api.reviewed({ ...proposalRequest(displayed), owner }));
+      const accepted = { ...proposalRequest(displayed), owner, acceptanceId };
+      this.reviewAcceptance = accepted;
+      this.reviewAction = !!current.action;
+      if (current.proposal.state === "failed_before_commit") {
+        const retryPort = current.action ? this.api.retryAction?.bind(this.api) : this.api.retryApplication?.bind(this.api);
+        if (!retryPort) throw new AgentApiFailure("AGENT_PROTOCOL");
+        const retry = await retryPort(accepted);
+        if (proposalKey(retry) !== key || retry.state !== "ready") throw new AgentApiFailure("AGENT_STALE_READ");
+        if (this.closed || epoch !== this.reviewIntentEpoch || !this.view.flags.allowEdits) return;
+      }
+      if (current.action) {
+        if (!this.editor.applyAction || !this.api.reviewedAction) throw new AgentApiFailure("AGENT_PROTOCOL");
+        await this.editor.applyAction(`${key}:${acceptanceId}`, this.api.reviewedAction(accepted));
+      } else await this.editor.apply(`${key}:${acceptanceId}`, this.api.reviewed(accepted));
     } catch (error) { this.publish({ error: code(error) }); }
-    finally { this.applying.delete(key); this.publish({ proposalBusy: null }); await this.refreshProposals().catch(error => this.publish({ error: code(error) })); }
+    finally { this.reviewAcceptance = null; this.reviewAction = false; this.applying.delete(key); this.publish({ proposalBusy: null }); await this.refreshProposals().catch(error => this.publish({ error: code(error) })); }
   }
   async discardProposal(displayed: AssistantProposalV1): Promise<void> {
     if (this.active || this.view.proposalBusy || !this.api.discardProposal || !this.view.taskCatalog?.protocolEnabled) return;
@@ -310,18 +333,23 @@ export class AssistantController {
         const current = await baseline(), workspace = current.response.workspace;
         currentSend();
         if (!workspace.project) throw new AgentApiFailure("AGENT_NOT_FOUND");
-        if (flags.allowEdits && current.historyOffers && this.api.offerHistory) await this.api.offerHistory({ owner,
+        const clientRequestId = crypto.randomUUID();
+        if (this.view.taskCatalog?.protocolEnabled && this.api.offerReviewedHistory && current.historyOffers) await this.api.offerReviewedHistory({
+          schemaVersion: 1, protocolVersion: 1, requestId: clientRequestId, ...current.historyTargets, offer: { owner,
+            projectRevision: workspace.projectRevision, documentRevision: workspace.documentRevision,
+            factsRevision: workspace.project.facts.revision, ...current.historyOffers } });
+        else if (flags.allowEdits && current.historyOffers && this.api.offerHistory) await this.api.offerHistory({ owner,
           projectRevision: workspace.projectRevision, documentRevision: workspace.documentRevision,
           factsRevision: workspace.project.facts.revision, ...current.historyOffers });
         currentSend();
-        request = { clientRequestId: crypto.randomUUID(), conversationId, owner, message, ...flags, scope: current.scope,
+        request = { clientRequestId, conversationId, owner, message, ...flags, scope: current.scope,
           selectionContext: current.selectionContext ?? null,
           settingsRevision, projectRevision: workspace.projectRevision,
           documentRevision: workspace.documentRevision, factsRevision: workspace.project.facts.revision };
         this.pending = request;
       }
       currentSend();
-      const run = await this.api.submit(request);
+      const run = await this.api.submit(request, this.view.taskCatalog?.protocolEnabled ?? false);
       if (this.closed || epoch !== this.sendEpoch) {
         if (!terminal(run)) await this.api.cancel(run.id, request.owner).catch(() => {});
         return;
@@ -363,14 +391,22 @@ export class AssistantController {
         const conversationId = await this.ensureConversation(); currentSend();
         const current = await baseline(), workspace = current.response.workspace; currentSend();
         if (!workspace.project || this.closed) throw new AgentApiFailure("AGENT_STALE_READ");
+        const clientRequestId = crypto.randomUUID();
+        if (this.view.taskCatalog?.protocolEnabled && this.api.offerReviewedHistory && current.historyOffers) {
+          const owner = await this.ensureOwner(); currentSend();
+          await this.api.offerReviewedHistory({ schemaVersion: 1, protocolVersion: 1, requestId: clientRequestId,
+            ...current.historyTargets, offer: { owner, projectRevision: workspace.projectRevision,
+              documentRevision: workspace.documentRevision, factsRevision: workspace.project.facts.revision, ...current.historyOffers } });
+          currentSend();
+        }
         pending = { schemaVersion: 1, lineage: project.lineage, requestEpoch: project.requestEpoch,
-          request: { clientRequestId: crypto.randomUUID(), conversationId, message: this.view.draft, ...this.view.flags,
+          request: { clientRequestId, conversationId, message: this.view.draft, ...this.view.flags,
             scope: current.scope, selectionContext: current.selectionContext ?? null, settingsRevision: settings.revision, projectRevision: workspace.projectRevision,
             documentRevision: workspace.documentRevision, factsRevision: workspace.project.facts.revision } };
         this.pendingBackground = pending;
       }
       currentSend();
-      const job = await jobs.submit(pending);
+      const job = await jobs.submit(pending, this.view.taskCatalog?.protocolEnabled ?? false);
       if (this.closed || epoch !== this.sendEpoch) { await jobs.stop(job.id); return; }
       this.pendingBackground = null;
       this.publish({ draft: "", pendingSend: false }); await this.reloadBackground();
@@ -480,6 +516,16 @@ export class AssistantController {
   private async stopWork(): Promise<void> {
     ++this.sendEpoch;
     ++this.reviewIntentEpoch;
+    const acceptance = this.reviewAcceptance;
+    if (acceptance) {
+      if (this.reviewAction) {
+        if (!this.api.cancelAction) throw new AgentApiFailure("AGENT_PROTOCOL");
+        await this.api.cancelAction(acceptance);
+      } else {
+        if (!this.api.cancelApplication) throw new AgentApiFailure("AGENT_PROTOCOL");
+        await this.api.cancelApplication(acceptance);
+      }
+    }
     if (this.jobs) {
       if (this.view.run && !terminal(this.view.run)) await this.jobs.stop(this.view.run.id);
       this.pendingBackground = null; this.publish({ pendingSend: false }); await this.reloadBackground(); return;

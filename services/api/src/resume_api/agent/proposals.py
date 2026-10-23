@@ -3,7 +3,7 @@
 from packages.resume_core import agent_limits as limits
 from packages.resume_core.agent_edits import Scope, compile_batch
 from packages.resume_core.agent_store import AgentFailure, digest, identity, run_in
-from packages.resume_core.assistant_proposals import POLICY_REVISION, content_digest, expiry
+from packages.resume_core.assistant_proposals import POLICY_REVISION, content_digest, expiry, proposal_before_digest
 from packages.resume_core.assistant_coverage import comparison, units
 from packages.resume_core.models.agent import AgentPrepareRequest, AgentQuery, AgentQueryDependency, WholeResumeScope
 from packages.resume_core.models.assistant_proposals import (
@@ -85,16 +85,22 @@ def result(value):
 
 def review(service, project_id):
     with service.projects.state_lock:
+        service.approval.reconcile_reviews(project_id)
+        service.action_approval.reconcile_reviews(project_id)
         values = service.proposals.list(project_id)
+        if (not any(value.proposal.state == "ready" for value in values)
+                or project_id in service.projects.agent_recovery_fences | service.projects.catalog_recovery_fences):
+            return values
         workspace = service.projects.storage.read_committed(project_id)[0]
+        archived = service.projects.catalog.get(project_id).archived
         for value in values:
-            if value.proposal.state != "ready" or (content_digest(workspace) == value.proposal.before_sha256
+            if value.proposal.state != "ready" or (proposal_before_digest(value, workspace, archived=archived) == value.proposal.before_sha256
                     and current_dependencies(workspace, value.dependencies)):
                 continue
             def check(items):
                 current = next(item for item in items if item.proposal.id == value.proposal.id and item.proposal.version == value.proposal.version)
                 workspace = service.projects.storage._read_committed_unlocked(project_id)[0]
-                if current.proposal.state == "ready" and (content_digest(workspace) != current.proposal.before_sha256
+                if current.proposal.state == "ready" and (proposal_before_digest(current, workspace, archived=archived) != current.proposal.before_sha256
                         or not current_dependencies(workspace, current.dependencies)):
                     current.proposal.state = "stale"
                     current.proposal.reason = "Документ или его источники изменились. Текущие правки сохранены; подготовьте новый вариант для просмотра."
@@ -129,19 +135,29 @@ def generation_finished(service, value):
 
 
 def review_view(service, value, tasks):
-    from packages.resume_core.models.assistant_proposals import AssistantReviewV1
+    from packages.resume_core.models.assistant_actions import AssistantCapabilityReviewV1
     from .capabilities import availability
     stage = next(task.apply for task in tasks.tasks if task.id == value.proposal.task_id)
     finished, revoked = origin_status(service, value)
-    if value.proposal.state != "ready":
+    if value.proposal.state not in {"ready", "failed_before_commit"}:
         stage = availability("temporarily_unavailable", "AGENT_STALE_READ", value.proposal.reason)
+    elif value.proposal.state == "failed_before_commit" and (value.approval is None or value.approval.phase != "cancelled"
+            or value.baseline is None or value.candidate is None and getattr(value, "record_kind", None) != "action_v1"
+            or proposal_before_digest(value, service.projects.read(value.proposal.project_id),
+                archived=service.projects.catalog.get(value.proposal.project_id).archived) != value.proposal.before_sha256
+            or not current_dependencies(service.projects.read(value.proposal.project_id), value.dependencies)):
+        stage = availability("temporarily_unavailable", "AGENT_STALE_READ", "Документ изменился. Подготовьте новый вариант для просмотра.")
     elif revoked:
         stage = availability("permission_disabled", "AGENT_CANCELLED", "Задача была остановлена. Подготовьте новый вариант.")
     elif not finished:
         stage = availability("temporarily_unavailable", "AGENT_BUSY", "Дождитесь завершения подготовки. Документ не изменён.")
     elif value.account_epoch != service.connection().epoch:
         stage = availability("permission_disabled", "AGENT_CONNECTION_CHANGED", "Вернитесь к исходной учётной записи и подготовьте новый вариант.")
-    return AssistantReviewV1(proposal=value.proposal, apply=stage, generationFinished=finished)
+    elif value.history is not None and (service.leases.leases.get(value.proposal.project_id) is None
+            or service.leases.leases[value.proposal.project_id].session_id != value.history.session_id):
+        stage = availability("temporarily_unavailable", "AGENT_NO_OWNER", "Откройте окно с исходным действием истории или подготовьте новый вариант.")
+    return AssistantCapabilityReviewV1(proposal=value.proposal, apply=stage, generationFinished=finished,
+        action=value.action.preview if getattr(value, "action", None) is not None else None)
 
 
 def compile_candidate(baseline, run, journal, command, book, task_id):

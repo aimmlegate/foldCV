@@ -33,6 +33,9 @@ from packages.resume_core.rich_timeline import TimelineReport, CascadeRequest, C
 from packages.resume_core.models.agent import AGENT_CONTRACTS
 from packages.resume_core.models.assistant_capabilities import ASSISTANT_CAPABILITY_CONTRACTS
 from packages.resume_core.models.assistant_proposals import ASSISTANT_PROPOSAL_CONTRACTS
+from packages.resume_core.models.assistant_approval import ASSISTANT_APPROVAL_CONTRACTS
+from packages.resume_core.models.assistant_actions import ASSISTANT_ACTION_CONTRACTS
+from packages.resume_core.models.assistant_history import ASSISTANT_HISTORY_CONTRACTS
 from packages.resume_core.models.background import BACKGROUND_CONTRACTS
 from packages.resume_core.models.connection import CliInstallationPayload
 from packages.resume_core.templates.models import TemplateDefinition, TemplatePackage
@@ -79,7 +82,8 @@ TEMPLATE_CONTRACTS = {
     "template_mutation_v1": TemplateMutationV1,
     "project_v6": ProjectV6, "workspace_v7": WorkspaceV7, "archive_manifest_v7": ArchiveManifestV7,
 }
-RECOVERY_MODELS = {**RECOVERY_CONTRACTS, **GUI_NORMALIZATION_CONTRACTS, **GUI_DRAFT_CONTRACTS, **GUI_PROJECT_CONTRACTS, **GUI_REWRITE_CONTRACTS, **GUI_EXPORT_CONTRACTS, **GUI_RECONCILE_CONTRACTS, **RICH_CONTRACTS, **AGENT_CONTRACTS, **ASSISTANT_CAPABILITY_CONTRACTS, **ASSISTANT_PROPOSAL_CONTRACTS, **BACKGROUND_CONTRACTS, "cli_installation_payload": CliInstallationPayload, **TEMPLATE_CONTRACTS}
+RECOVERY_MODELS = {**RECOVERY_CONTRACTS, **GUI_NORMALIZATION_CONTRACTS, **GUI_DRAFT_CONTRACTS, **GUI_PROJECT_CONTRACTS, **GUI_REWRITE_CONTRACTS, **GUI_EXPORT_CONTRACTS, **GUI_RECONCILE_CONTRACTS, **RICH_CONTRACTS, **AGENT_CONTRACTS, **ASSISTANT_CAPABILITY_CONTRACTS, **ASSISTANT_PROPOSAL_CONTRACTS, **ASSISTANT_APPROVAL_CONTRACTS, **ASSISTANT_ACTION_CONTRACTS, **BACKGROUND_CONTRACTS, "cli_installation_payload": CliInstallationPayload, **TEMPLATE_CONTRACTS}
+RECOVERY_MODELS.update(ASSISTANT_HISTORY_CONTRACTS)
 
 
 def main() -> None:

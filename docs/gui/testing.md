@@ -19,6 +19,14 @@ The rollout gate stays off through CAP04. Generated assistant contracts use new
 names; existing model-compatibility and CT schemas remain byte-identical.
 Review/Apply, V7, native quality and manual Word are separate gates.
 
+CAP05 is in progress. Its partial offline checks cover local post-run Apply,
+stable UI click identity, Stop, permission/owner/account revocation, exact receipts,
+restart/no-save proof, applied-payload compaction and native Undo/Redo. Queued
+read-only proposals reuse their origin artifact and the existing canonical writer.
+New wrappers keep generation outcomes separate from later UI receipts. These
+checks do not accept CAP05: reviewed project/history actions, complete recovery,
+full fast/render and mounted T3 Apply/export journeys remain required.
+
 The approved NB00b alternative uses one pinned App Server. `NB-PARALLEL`
 maps the bounded shared protocol, real synthetic pipes, exact routed capabilities,
 strict fixed validators, targeted cancellation, individual limits, idle rotation,

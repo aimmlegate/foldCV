@@ -95,10 +95,10 @@ export class ProjectJobs {
       throw error;
     }
   }
-  async submit(request: JobAgentRequestV1): Promise<JobSnapshotV1> {
+  async submit(request: JobAgentRequestV1, protocol = false): Promise<JobSnapshotV1> {
     if (!this.view.project) await this.refresh();
     this.epoch++;
-    const job = await this.api.submit(request); this.epoch++; this.accept(job); this.plan(); return job;
+    const job = await this.api.submit(request, protocol); this.epoch++; this.accept(job); this.plan(); return job;
   }
   async stop(id: string): Promise<JobSnapshotV1> {
     if (!this.view.project) await this.refresh();

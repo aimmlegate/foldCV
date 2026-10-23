@@ -3,7 +3,7 @@
 from datetime import datetime, timedelta
 import json
 
-from .agent_store import AgentFailure, digest
+from .agent_store import AgentFailure, digest, run_in
 from .models.assistant_proposals import AssistantStoredProposalV1
 from .project_store import owned_file, strict_json
 from .storage import StorageFailure, atomic_write, private_directory
@@ -23,6 +23,15 @@ TRANSITIONS = {
     "failed_before_commit": {"ready", "discarded"},
     "outcome_unknown": {"applied", "failed_before_commit"},
 }
+
+
+def stored_proposal(payload):
+    if not isinstance(payload, dict):
+        raise ValueError("proposal payload must be an object")
+    if payload.get("recordKind") == "action_v1":
+        from .models.assistant_actions import AssistantStoredActionV1
+        return AssistantStoredActionV1.model_validate(payload)
+    return AssistantStoredProposalV1.model_validate(payload)
 
 
 def encoded(value):
@@ -54,6 +63,13 @@ def content_digest(workspace):
         "facts": project.facts, "assets": project.assets, "template": project.template, "sources": project.sources}))
 
 
+def proposal_before_digest(value, workspace, *, archived=False):
+    if getattr(value, "record_kind", None) == "action_v1":
+        from .assistant_actions import action_baseline_digest
+        return action_baseline_digest(workspace, archived)
+    return content_digest(workspace)
+
+
 class AssistantProposals:
     def __init__(self, agent_store):
         self.agent = agent_store
@@ -68,7 +84,7 @@ class AssistantProposals:
             envelope = strict_json(path.read_bytes())
             if set(envelope) != {"payload", "sha256"} or digest(envelope["payload"]) != envelope["sha256"]:
                 raise ValueError("changed proposal payload")
-            value = AssistantStoredProposalV1.model_validate(envelope["payload"])
+            value = stored_proposal(envelope["payload"])
             if value.proposal.state == "ready" and value.policy_revision != POLICY_REVISION:
                 value.proposal.state = "stale"
                 value.proposal.reason = "Вариант подготовлен до текущих проверок охвата и сохранности. Подготовьте новую версию для просмотра."
@@ -103,10 +119,13 @@ class AssistantProposals:
         values = self._items(project)
         for value in values:
             proposal = value.proposal
-            if at(self.agent.clock()) >= at(proposal.expires_at) and proposal.state not in PROTECTED | {"applied", "expired"}:
+            if at(self.agent.clock()) >= at(proposal.expires_at) and proposal.state not in PROTECTED | {"expired"}:
                 proposal.state, proposal.reason = "expired", "Срок хранения варианта истёк. Подготовьте новый вариант."
                 value.baseline = value.candidate = value.batch = None
+                value.history = None
                 value.operations, value.snapshot_ids, value.dependencies, value.unchanged = [], [], [], []
+                if hasattr(value, "action"):
+                    value.action = None
                 proposal.operation_count, proposal.coverage, proposal.changes = 0, [], []
                 atomic_write(self.directory(project) / self.filename(value), encoded(value))
         return values
@@ -121,6 +140,28 @@ class AssistantProposals:
         if value is None:
             raise AgentFailure("ASSISTANT_PROPOSAL_MISSING")
         return value
+
+    def compact_applied(self, project, proposal_id, version, *, receipt=None):
+        with self.agent._guard(project) as directory:
+            value = next((item for item in self._items(project) if (item.proposal.id, item.proposal.version) == (proposal_id, version)), None)
+            if value is None or value.compacted:
+                return
+            if value.proposal.state != "applied" or value.approval is None or value.approval.phase != "receipt_stored":
+                raise AgentFailure("AGENT_TOOL_DENIED")
+            if receipt is None:
+                state = self.agent._read(project, directory)
+                _, _, journal = run_in(state, value.proposal.origin_run_id)
+                proof = next((part for part in journal.batches if part.key == value.approval.batch_id), None)
+                receipt = proof.receipt if proof else None
+            if (receipt is None or not receipt.durable or (receipt.run_id, receipt.batch_id, receipt.request_sha256) !=
+                    (value.proposal.origin_run_id, value.approval.batch_id, value.approval.request_sha256)):
+                raise AgentFailure("AGENT_OUTCOME_UNKNOWN")
+            value.baseline = value.candidate = value.batch = None
+            value.history = None
+            value.operations, value.snapshot_ids, value.dependencies, value.unchanged = [], [], [], []
+            value.compacted = True
+            AssistantStoredProposalV1.model_validate(value.model_dump(by_alias=True))
+            atomic_write(self.directory(project) / self.filename(value), encoded(value))
 
     def update(self, project, transform):
         with self.agent._guard(project):
@@ -139,7 +180,7 @@ class AssistantProposals:
                     if old.proposal.state == "expired":
                         (directory / self.filename(old)).unlink()
             value = transform(values)
-            checked = AssistantStoredProposalV1.model_validate(value.model_dump(by_alias=True))
+            checked = stored_proposal(value.model_dump(by_alias=True))
             path = self.directory(project) / self.filename(checked)
             prior = previous.get(path.name)
             if checked.proposal.project_id != project:
@@ -151,7 +192,7 @@ class AssistantProposals:
                 if old_state != "building":
                     def frozen(item):
                         return item.model_dump(mode="json", by_alias=True,
-                            exclude={"proposal": {"state", "reason"}})
+                            exclude={"proposal": {"state", "reason"}, "approval": True, "revoked_acceptances": True})
                     if frozen(prior) != frozen(checked):
                         raise AgentFailure("AGENT_IDEMPOTENCY_CONFLICT")
             raw = encoded(checked)

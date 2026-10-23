@@ -17,7 +17,7 @@ test("preview renders exact server comparison as plain text and native keyboard 
   assert.ok(html.includes("Документ пока не изменён"));
 });
 
-test("ready-only explicit controls follow server stages and stay disabled while stale, busy, read-only or unknown", () => {
+test("explicit controls follow server stages and stay disabled while stale, busy, read-only or unknown", () => {
   const value = proposal(), catalog = taskCatalog();
   assert.ok(catalog.tasks[0]); catalog.tasks[0].apply = { state: "available", reason: null, reasonCode: null, remedy: null };
   assert.ok(proposalControls(value, catalog, false, false, true).apply);
@@ -26,10 +26,17 @@ test("ready-only explicit controls follow server stages and stay disabled while 
   assert.equal(proposalControls(value, catalog, true, false, true).apply, false);
   assert.equal(proposalControls(value, catalog, false, true, true).apply, false);
   assert.equal(proposalControls(value, catalog, false, false, false).apply, false);
+  const failed = { ...value, state: "failed_before_commit" as const };
+  assert.equal(proposalControls(failed, catalog, false, false, true).apply, false);
+  assert.ok(proposalControls(failed, catalog, false, false, true, catalog.tasks[0].apply).apply);
   const html = renderToStaticMarkup(createElement(ProposalPreview, { value: { ...value, state: "outcome_unknown" }, catalog,
     busy: false, invalidated: false, allowEdits: true, apply: () => {}, discard: () => {} }));
   assert.equal(html.includes("Документ пока не изменён"), false);
   assert.ok(html.includes("Проверяем исходное сохранение"));
+  const saved = renderToStaticMarkup(createElement(ProposalPreview, { value: { ...value, state: "applied" }, catalog,
+    busy: false, invalidated: true, allowEdits: true, apply: () => {}, discard: () => {} }));
+  assert.ok(saved.includes("Вариант сохранён"));
+  assert.equal(saved.includes("Подготовьте новый вариант; текущие правки сохранены"), false);
 });
 
 test("acceptance wire requires protocol, exact content identity and UI-only owner; model booleans cannot approve", () => {

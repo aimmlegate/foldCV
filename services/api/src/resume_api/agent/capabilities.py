@@ -83,7 +83,10 @@ def proposal_instructions():
         "Copy UTF-16 offsets from find_resume_content and pair them with a full document read, "
         "never a search snapshot. Coverage IDs are opaque; reuse returned IDs and account for "
         "all unresolved units before finalization. Split wording edits at rich-style/link/binding "
-        "boundaries. A compound format-and-rewrite request needs separate tasks, never partial Apply."
+        "boundaries. A compound format-and-rewrite request needs separate tasks, never partial Apply. "
+        "Project actions prepare separate exact reviews. Undo/Redo use the native action captured for this "
+        "request, complete document/fact reads and the versioned project-action preparation wrapper. "
+        "They navigate the existing history only after explicit UI Apply, never create an inverse action."
     )
 
 
@@ -91,8 +94,10 @@ def proposal_instructions():
 def proposal_protocol_fingerprint(legacy):
     from packages.resume_core.models.assistant_capabilities import AssistantTaskRequestV1
     from packages.resume_core.models.assistant_proposals import AssistantAssemblyRequestV1
+    from packages.resume_core.models.assistant_actions import AssistantProjectActionPrepareV1
     return digest({"legacy": legacy, "instructions": proposal_instructions(),
-        "task": AssistantTaskRequestV1.model_json_schema(), "assembly": AssistantAssemblyRequestV1.model_json_schema()})
+        "task": AssistantTaskRequestV1.model_json_schema(), "assembly": AssistantAssemblyRequestV1.model_json_schema(),
+        "projectAction": AssistantProjectActionPrepareV1.model_json_schema()})
 
 
 @lru_cache(maxsize=1)
@@ -188,7 +193,7 @@ def catalog(service, project_id, *, allow_edits=True, allow_web=True):
                 "editors": ["ordinary"] if task.supported else [], "effect": task.effect, "scopes": list(task.scopes),
                 "requiredInputs": list(task.inputs), "requiredPermissions": permissions,
                 "reversibility": "shared_undo" if task.effect == "proposal" else "artifact" if task.effect == "export" else "action_specific" if task.effect == "project_action" else "none",
-                "limits": {"operations": limits.EDIT_OPERATIONS, "toolMessageBytes": limits.TOOL_BYTES,
+                "limits": {"operations": 1 if task.effect == "project_action" or task.id in {"undo", "redo", "format_document"} else limits.EDIT_OPERATIONS, "toolMessageBytes": limits.TOOL_BYTES,
                     "toolCalls": limits.TOOL_CALLS, "activeSeconds": limits.ACTIVE_SECONDS},
                 "generation": (ready_generation if supported else denied).model_dump(by_alias=True),
                 "preparation": (preparation if supported else denied).model_dump(by_alias=True),
@@ -246,9 +251,13 @@ def guard_tool(session, name, arguments):
     if name == "prepare_edit_batch":
         task_id = session.planned_task
     if name == "project_action":
-        if arguments.action not in {"export_docx", "export_project"}:
+        from packages.resume_core.models.assistant_actions import AssistantProjectActionPrepareV1
+        from .action_proposals import ACTION_TASKS
+        if not isinstance(arguments, AssistantProjectActionPrepareV1):
             raise AgentFailure("AGENT_TOOL_DENIED")
-        task_id = {"export_docx": "export_docx", "export_project": "export_project", "undo": "undo", "redo": "redo"}.get(arguments.action, "project_metadata")
+        task_id = ACTION_TASKS.get(arguments.request.action, arguments.request.action)
+        if task_id != session.planned_task:
+            raise AgentFailure("AGENT_TOOL_DENIED")
     if task_id is None:
         raise AgentFailure("AGENT_TOOL_DENIED")
     value = catalog(service, session.control.project_id, allow_edits=session.run.allow_edits, allow_web=session.run.allow_web)

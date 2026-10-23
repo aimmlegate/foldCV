@@ -7,7 +7,8 @@ import type { AgentEditBatch } from "../src/contracts/generated/agent_edit_batch
 import type { AgentEditReceipt } from "../src/contracts/generated/agent_edit_receipt";
 import type { RichProjectResponse } from "../src/contracts/generated/rich_project_response";
 import type { RichMutation } from "../src/contracts/generated/rich_mutation";
-import { PreparedEditorBridge, type PreparedApi } from "../src/assistant/editor-bridge";
+import { PreparedEditorBridge, type PreparedApi, type PreparedEditorPort, type PreparedActionApi } from "../src/assistant/editor-bridge";
+import { proposal } from "./support/assistant-proposal";
 import { documentCells, type StoredBlock } from "../src/rich/document-cells";
 import { factCells } from "../src/rich/fact-cells";
 import { SessionHistory, type HistoryEffectContext } from "../src/rich/history";
@@ -61,14 +62,15 @@ function harness() {
   let ordinarySaves = 0, commits = 0, claims = 0, fences = 0;
   let sendManual: (request: RichMutation) => Promise<RichProjectResponse> = () => Promise.reject(new Error("Unexpected second save"));
   const queue = new RichSaveQueue(before, history.session, request => { ordinarySaves++; return sendManual(request); }, () => { order.push("acknowledged"); });
-  const editor = new PreparedEditorBridge({ history, queue, flush: async () => { await queue.flush(); return queue.baseline; }, cells,
+  const port: PreparedEditorPort = { history, queue, flush: async () => { await queue.flush(); return queue.baseline; }, cells,
     preview: () => Promise.resolve(after), enter: () => { order.push("enter"); }, leave: () => { order.push("leave"); },
     retainImages: () => { assert.equal(history.length, 1); order.push("images"); return Promise.resolve(); },
-    fence: () => { fences++; order.push("fence"); } });
+    fence: () => { fences++; order.push("fence"); } };
+  const editor = new PreparedEditorBridge(port);
   const api: PreparedApi = { claim: () => { claims++; return Promise.resolve(claim); },
     commit: () => { commits++; return Promise.resolve(reply); }, recover: () => Promise.resolve(reply),
     report: () => { order.push("reported"); return Promise.resolve(); } };
-  return { before, after, batch, receipt, claim, reply, cells, mounted, history, queue, editor, api, effects, order,
+  return { before, after, batch, receipt, claim, reply, cells, mounted, history, queue, editor, port, api, effects, order,
     counts: () => ({ ordinarySaves, commits, claims, fences }),
     effect: (callback: (context: HistoryEffectContext) => void) => { onEffect = callback; },
     sender: (callback: (request: RichMutation) => Promise<RichProjectResponse>) => { sendManual = callback; } };
@@ -125,6 +127,63 @@ test("assistant baseline refresh accepts operation metadata without replacing co
   assert.equal(h.queue.baseline.workspace.projectRevision, 3);
   assert.deepEqual(h.mounted, h.cells(h.before)); assert.equal(h.history.length, 0);
   assert.throws(() => h.queue.refreshMetadata(h.after), /AGENT_STALE_READ/);
+  await h.queue.flush(); assert.equal(h.counts().ordinarySaves, 0);
+});
+
+test("reviewed metadata uses one guarded action port and refreshes the existing baseline without text history", async () => {
+  const h = harness(), value = proposal(), metadata = structuredClone(h.before);
+  metadata.workspace.title = "Reviewed project";
+  metadata.workspace.projectRevision = metadata.savedProjectRevision = 2;
+  assert.ok(metadata.workspace.project); metadata.workspace.project.revision = 2;
+  let claims = 0, commits = 0, adopted = 0;
+  const api: PreparedActionApi = { claim: async () => { claims++; return { schemaVersion: 1, protocolVersion: 1,
+    accepted: { schemaVersion: 1, protocolVersion: 1, proposalId: value.id, version: 1, contentSha256: value.contentSha256, acceptanceId: "click_1" },
+    ticket: "synthetic_action_ticket_0123456789", expiresAt: "2026-10-23T00:00:15Z", requestSha256: "c".repeat(64) }; },
+    commit: async () => { commits++; return { schemaVersion: 1, protocolVersion: 1, proposal: { ...value, state: "applied" }, project: metadata,
+      operation: { id: "action_1", projectId: metadata.workspace.projectId, runId: value.originRunId, action: "rename", status: "completed", durable: true, downloadUrl: null, errorCode: null } }; },
+    recover: async () => { throw new Error("Unexpected recovery"); } };
+  const editor = new PreparedEditorBridge({ ...h.port, retainImages: async () => {}, reviewedSaved: async () => { adopted++; } });
+  const first = editor.applyAction("reviewed_action_1", api);
+  assert.equal(editor.applyAction("reviewed_action_1", api), first);
+  await first;
+  assert.equal(claims, 1); assert.equal(commits, 1); assert.equal(adopted, 1);
+  assert.equal(h.history.length, 0); assert.deepEqual(h.effects, []);
+  assert.equal(h.queue.baseline.workspace.title, "Reviewed project");
+  await h.queue.flush(); assert.equal(h.counts().ordinarySaves, 0);
+});
+
+test("a historical saved receipt fences adoption with its saved label when current replay is unavailable", async () => {
+  const h = harness(); let saved: boolean | undefined;
+  const editor = new PreparedEditorBridge({ ...h.port, fence: receipt => { saved = receipt?.durable; } });
+  h.api.commit = async () => { throw new Error("Lost result"); };
+  h.api.recover = () => Promise.resolve({ receipt: h.receipt, project: null });
+  await assert.rejects(editor.apply(h.batch.id, h.api), /AGENT_OUTCOME_UNKNOWN/);
+  assert.equal(saved, true); assert.equal(h.history.length, 0);
+  assert.equal(h.counts().ordinarySaves, 0);
+});
+
+test("reviewed chat Undo moves the captured native action without adding a compensating history entry", async () => {
+  const h = harness(); await h.editor.apply(h.batch.id, h.api);
+  const undo = structuredClone(h.before);
+  assert.ok(undo.workspace.project);
+  undo.workspace.projectRevision = undo.savedProjectRevision = undo.workspace.project.revision = 3;
+  undo.workspace.documentRevision = undo.savedDocumentRevision = undo.workspace.project.document.revision = 3;
+  const batch = structuredClone(h.batch);
+  batch.id = batch.toolKey = "undo_batch_2";
+  batch.mutation.clientMutationId = "agent_history_2"; batch.mutation.kind = "undo";
+  batch.requestSha256 = "e".repeat(64);
+  undo.workspace.mutationReplay.push({ clientMutationId: batch.mutation.clientMutationId, requestSha256: batch.requestSha256, resultingRevision: 3 });
+  const receipt: AgentEditReceipt = { ...h.receipt, batchId: batch.id, toolKey: batch.toolKey,
+    clientMutationId: batch.mutation.clientMutationId, requestSha256: batch.requestSha256, projectRevision: 3, documentRevision: 3 };
+  const reply = { receipt, project: undo };
+  const api: PreparedApi = { claim: () => Promise.resolve({ ...h.claim, batch }), commit: () => Promise.resolve(reply),
+    recover: () => Promise.resolve(reply), report: async () => {} };
+  const editor = new PreparedEditorBridge({ ...h.port, preview: () => Promise.resolve(undo) });
+  await editor.apply(batch.id, api);
+  assert.equal(h.history.length, 1); assert.equal(h.history.navigation("undo"), null);
+  assert.ok(h.history.navigation("redo"));
+  assert.equal(h.history.navigation("redo")?.actionId, h.batch.mutation.actionId);
+  assert.equal(h.effects.at(-1)?.kind, "undo");
   await h.queue.flush(); assert.equal(h.counts().ordinarySaves, 0);
 });
 

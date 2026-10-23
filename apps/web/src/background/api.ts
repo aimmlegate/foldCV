@@ -64,7 +64,7 @@ type Replies = { background_writer_view_v1: WriterViewV1; background_barrier_v1:
   background_proposal_v1: ProposalBindingV1; background_legacy_run_v2: JobLegacyRunV2;
   background_fixed_reply_v1: JobFixedReplyV1; background_summary_v1: JobSummaryV1; background_index_v1: JobIndexV1 };
 export type BackgroundConversation = Omit<AgentConversation, "messages"> & { messages: AgentMessage[] };
-export type BackgroundRequest = (path: string, method?: string, body?: unknown) => Promise<unknown>;
+export type BackgroundRequest = (path: string, method?: string, body?: unknown, headers?: Record<string, string>) => Promise<unknown>;
 
 export class GlobalJobsApi {
   constructor(private readonly transport: () => Promise<unknown> = () => rootRequest("/v1/background/jobs")) {}
@@ -174,7 +174,11 @@ export class JobsApi {
     return backgroundReply(kind, await this.transport(this.prefix + path, body === undefined ? "GET" : "POST", body));
   }
   projectJobs(): Promise<JobProjectV1> { return this.call("background_project_v1", ""); }
-  submit(body: JobAgentRequestV1): Promise<JobSnapshotV1> { return this.call("background_snapshot_v1", "/agent", body); }
+  async submit(body: JobAgentRequestV1, protocol = false): Promise<JobSnapshotV1> {
+    if (!protocol) return this.call("background_snapshot_v1", "/agent", body);
+    return backgroundReply("background_snapshot_v1", await this.transport(this.prefix + "/assistant-v1", "POST",
+      { protocolVersion: 1, request: body }, { "X-FoldCV-Assistant-Protocol": "1" }));
+  }
   fixed(body: JobFixedRequestV1): Promise<JobFixedReplyV1> { return this.call("background_fixed_reply_v1", "/fixed", body); }
   read(id: string): Promise<JobSnapshotV1> { return this.call("background_snapshot_v1", `/${encodeURIComponent(id)}/read`, {}); }
   cancel(id: string): Promise<JobSnapshotV1> { return this.call("background_snapshot_v1", `/${encodeURIComponent(id)}/cancel`, {}); }

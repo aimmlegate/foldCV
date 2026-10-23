@@ -8,7 +8,7 @@ import json
 import threading
 from typing import Literal
 
-from pydantic import Field, ValidationError
+from pydantic import Field, ValidationError, TypeAdapter
 from mcp.types import CallToolResult, TextContent
 
 from packages.resume_core import agent_limits as limits
@@ -16,6 +16,7 @@ from packages.resume_core.agent_store import AgentFailure, digest, identity, run
 from packages.resume_core.models.agent import AgentAnchor, AgentApplyRequest, AgentFetchRequest, AgentFinding, AgentPrepareRequest, AgentProjectAction, AgentPublishFindings, AgentQuery, TERMINAL_RUNS
 from packages.resume_core.models.assistant_capabilities import AssistantTaskRequestV1
 from packages.resume_core.models.assistant_proposals import AssistantAssemblyRequestV1
+from packages.resume_core.models.assistant_actions import AssistantProjectActionPrepareV1
 from packages.resume_core.rich_dependencies import dependency
 from packages.resume_core.rich_fields import inline_groups, working_field
 from packages.resume_core.rich_mutations import inline_text, utf16_slice
@@ -220,7 +221,7 @@ class ToolSession(PrivateMcp):
             """Compile edits without saving. For template formatting, first read the entire document through nextCursor:null, then operations:[{kind:"format_template",snapshotId:"completed_read_id"}]. This preserves current wording and creates one shared undo action. Text edits use replace_text with target:{snapshotId,blockId,cellId:null,field:"content",start,end}, content:[{text:"..."}]. Copy exact UTF-16 offsets from find_resume_content. Insert headings/sections/lists with insert_blocks, tables with insert_table, retained images with insert_asset. Facts support create_fact/update_fact/delete_fact with evidence. Read real targets first. One saved batch per turn."""
             return self.wire(await self.call("prepare_edit_batch", request))
         if self.cap_mode:
-            prepare_edit_batch.__annotations__["request"] = AssistantAssemblyRequestV1
+            prepare_edit_batch.__annotations__["request"] = AssistantAssemblyRequestV1 | AssistantProjectActionPrepareV1
             prepare_edit_batch.__doc__ = (
                 "Build a durable private draft, never a canonical save. Use protocolVersion:1, taskId, "
                 "key and phase:append/finalize. Omit proposalId for the first call, then reuse returned "
@@ -232,7 +233,10 @@ class ToolSession(PrivateMcp):
                 "all scope units are read and accounted for. draft_ready ends generation and awaits UI "
                 "review/Apply. incomplete retains useful work with Apply disabled. No operation publishes. "
                 "Maximum 100 aggregate operations and current transport/call/time limits. Wording, "
-                "facts/structure and formatting are separate tasks."
+                "facts/structure and formatting are separate tasks. Project action drafts, including in check-only "
+                "mode, instead use request:{protocolVersion:1,request:{key,snapshotId,action,value?,targetId?}} "
+                "after complete resources and typed task planning. This is the same non-mutating action preparation "
+                "as project_action; the queued check-only tool set deliberately excludes direct project_action."
             )
         self.sdk.tool(structured_output=False)(prepare_edit_batch)
 
@@ -246,10 +250,14 @@ class ToolSession(PrivateMcp):
             """Perform one explicit bound-project operation after a complete get_project_resources read. Use its snapshotId and a unique key. Actions: rename (value:title), formatting_date (value:ISO date), add_source_text (value:literal text), remove_source (targetId; only unreferenced), import_asset (value:base64 PNG/JPEG/WebP), remove_asset (targetId; only unreferenced), export_docx/export_project (returns durable download), archive/restore/delete, undo/redo. Destructive actions require the user's explicit command. Editing permission is checked again at commit. Finish the turn after a project operation."""
             return self.wire(await self.call("project_action", request))
         if self.cap_mode:
+            project_action.__annotations__["request"] = AssistantProjectActionPrepareV1
             project_action.__doc__ = (
-                "Explicit export_docx/export_project only, under current export readiness. "
-                "Other project operations require a separate reviewed action and cannot run through "
-                "this direct tool. Read full project resources first; use its snapshotId and a unique key."
+                "Use request:{protocolVersion:1,request:{key,snapshotId,action,value?,targetId?}} after a typed task check "
+                "and complete get_project_resources read. Rename, formatting_date, add_source_text, remove_source, "
+                "import_asset, remove_asset, archive, restore and delete prepare an exact private review only. "
+                "They never save. Delete needs targetId equal to this project ID. Source text/image base64 must be "
+                "literal user input, never generated evidence. export_docx/export_project return a durable download "
+                "under current export readiness. UI review and explicit Apply are the only mutation authority."
             )
         self.sdk.tool(structured_output=False)(project_action)
 
@@ -297,9 +305,12 @@ class ToolSession(PrivateMcp):
             elif name in {"prepare_edit_batch", "apply_edit_batch", "publish_findings", "project_action"}:
                 if set(arguments) != {"request"}:
                     raise ValueError("invalid request envelope")
-                {"prepare_edit_batch": AssistantAssemblyRequestV1 if self.cap_mode else AgentPrepareRequest, "apply_edit_batch": AgentApplyRequest,
-                    "project_action": AgentProjectAction,
-                    "publish_findings": AgentPublishFindings}[name].model_validate(arguments["request"])
+                if name == "prepare_edit_batch" and self.cap_mode:
+                    TypeAdapter(AssistantAssemblyRequestV1 | AssistantProjectActionPrepareV1).validate_python(arguments["request"])
+                else:
+                    {"prepare_edit_batch": AgentPrepareRequest, "apply_edit_batch": AgentApplyRequest,
+                        "project_action": AssistantProjectActionPrepareV1 if self.cap_mode else AgentProjectAction,
+                        "publish_findings": AgentPublishFindings}[name].model_validate(arguments["request"])
             else:
                 raise ValueError("unknown tool")
             return None
@@ -421,10 +432,18 @@ class ToolSession(PrivateMcp):
                     result = self.findings(arguments)
                 elif name == "prepare_edit_batch":
                     if self.cap_mode:
-                        if not isinstance(arguments, AssistantAssemblyRequestV1):
+                        if isinstance(arguments, AssistantProjectActionPrepareV1):
+                            if arguments.request.action in {"undo", "redo"}:
+                                from .history_proposals import prepare_history
+                                result = prepare_history(self, arguments)
+                            else:
+                                from .action_proposals import prepare_action
+                                result = await prepare_action(self, arguments)
+                        elif isinstance(arguments, AssistantAssemblyRequestV1):
+                            from .proposals import assemble
+                            result = assemble(self, arguments)
+                        else:
                             raise AgentFailure("AGENT_PROTOCOL")
-                        from .proposals import assemble
-                        result = assemble(self, arguments)
                     elif not self.run.allow_edits:
                         raise AgentFailure("AGENT_TOOL_DENIED")
                     else:
@@ -435,8 +454,22 @@ class ToolSession(PrivateMcp):
                         raise AgentFailure("AGENT_TOOL_DENIED")
                     result = await self.service.publication.offer(self, arguments.batch_id)
                 elif name == "project_action":
-                    from .project_actions import project_action
-                    result = await project_action(self, arguments)
+                    if self.cap_mode:
+                        if not isinstance(arguments, AssistantProjectActionPrepareV1):
+                            raise AgentFailure("AGENT_PROTOCOL")
+                        if arguments.request.action not in {"export_docx", "export_project"}:
+                            if arguments.request.action in {"undo", "redo"}:
+                                from .history_proposals import prepare_history
+                                result = prepare_history(self, arguments)
+                            else:
+                                from .action_proposals import prepare_action
+                                result = await prepare_action(self, arguments)
+                        else:
+                            from .project_actions import project_action
+                            result = await project_action(self, arguments.request)
+                    else:
+                        from .project_actions import project_action
+                        result = await project_action(self, arguments)
                 else:
                     raise AgentFailure("AGENT_TOOL_DENIED")
                 self.guard()

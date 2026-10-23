@@ -18,10 +18,12 @@ from resume_api.agent.service import RunControl
 from resume_api.agent.tools import ToolSession
 
 
-def environment(tmp_path, *, edits=False, selected=False):
+def environment(tmp_path, *, edits=False, selected=False, message=None):
     service, runtime, projects, workspace, _, request, _ = setup(tmp_path, None)
     service.assistant_protocol_enabled = True
     changes = {"allow_edits": edits}
+    if message is not None:
+        changes["message"] = message
     if selected:
         from tests.recovery.test_agent_edits import selection
         changes["scope"] = selection(workspace, "narrative", 0, 6)

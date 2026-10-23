@@ -8,7 +8,7 @@ import { documentSteps, factSteps, type RichBlock } from "./save-queue";
 
 export function historyMutation(project: NonNullable<RichProjectResponse["workspace"]["project"]>, sessionId: string,
   direction: "undo" | "redo", changes: readonly CellChange[], current: ReadonlyMap<string, CellValue>,
-  cache: ReadonlyMap<string, StoredBlock>): RichMutation | null {
+  cache: ReadonlyMap<string, StoredBlock>, actionId?: string): RichMutation | null {
   const next = new Map(current);
   changes.forEach(change => next.set(change.key, change.after));
   function rebuild(id: string): RichBlock {
@@ -27,6 +27,6 @@ export function historyMutation(project: NonNullable<RichProjectResponse["worksp
   const [first, ...rest] = steps;
   if (!first) return null;
   const id = `history-offer-${crypto.randomUUID()}`;
-  return { schemaVersion: 1, projectId: project.projectId, clientMutationId: id, actionId: id, kind: direction,
-    capture: { sessionId, actionId: id, actionToken: 0, dependencies: [] }, steps: [first, ...rest] };
+  return { schemaVersion: 1, projectId: project.projectId, clientMutationId: id, actionId: actionId ?? id, kind: direction,
+    capture: { sessionId, actionId: actionId ?? id, actionToken: 0, dependencies: [] }, steps: [first, ...rest] };
 }

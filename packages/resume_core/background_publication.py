@@ -151,6 +151,8 @@ class CanonicalCoordinator:
             raise BackgroundFailure(self.jobs.fences[state.project_id])
 
     def _gate(self, state, job, proposal):
+        if proposal.payload.kind == "agent_journal" and getattr(self, "assistant_review_required", lambda: False)():
+            raise BackgroundFailure("JOB_SCOPE_INVALID")
         account = self.jobs._read_dispatch(self.jobs.background / "dispatch.json").account_generation
         if state.tombstoned or state.account_generation != account or proposal.account_generation != account:
             raise BackgroundFailure("ACCOUNT_CHANGED")
@@ -531,6 +533,19 @@ class CanonicalCoordinator:
 
     def manual(self, project, request, *, originals=None, artifacts=None, images=None, authorize=None, history_binding=None,
                history_authority=None, prepared=None):
+        return self._manual(project, request, originals=originals, artifacts=artifacts, images=images, authorize=authorize,
+            history_binding=history_binding, history_authority=history_authority, prepared=prepared)
+
+    def apply_reviewed(self, project, request, grant, *, originals=None, artifacts=None, images=None):
+        from .assistant_publication import AssistantMutationGrant
+        if not isinstance(grant, AssistantMutationGrant):
+            raise BackgroundFailure("JOB_SCOPE_INVALID")
+        grant.require(project, request)
+        return self._manual(project, request, originals=originals, artifacts=artifacts, images=images,
+            authorize=grant.authorize, history_binding=grant.history_binding, reviewed=grant)
+
+    def _manual(self, project, request, *, originals=None, artifacts=None, images=None, authorize=None, history_binding=None,
+                history_authority=None, prepared=None, reviewed=None):
         with self._writer(project):
             from .background_retention import JobRetention
             JobRetention(self.jobs).compact_manual(project, self.history)
@@ -546,7 +561,9 @@ class CanonicalCoordinator:
                         return before, True
                     raise BackgroundFailure("OUTCOME_UNKNOWN" if known.phase != "reconciled" else
                         known.reconciled_reason.code if known.reconciled_reason else "SAVE_FAILED")
-                if request.client_mutation_id.startswith(("background_", "agent_", "inverse_")) or request.client_mutation_id.startswith("history_") and history_binding is None:
+                if reviewed is not None:
+                    reviewed.require(project, request)
+                elif request.client_mutation_id.startswith(("background_", "agent_", "inverse_")) or request.client_mutation_id.startswith("history_") and history_binding is None:
                     raise BackgroundFailure("JOB_SCOPE_INVALID")
                 self._writable(state)
                 self.history._ready(state, directory, digest_bytes(before))
@@ -575,8 +592,10 @@ class CanonicalCoordinator:
                     writer_binding=binding, history_binding=history_binding)
                 if prepared is not None:
                     prepared(before, after, candidate, state)
+                if reviewed is not None:
+                    reviewed.prepared(after)
                 intent = self._store_intent(state, directory, candidate, None)
-            self._commit(project, intent.id, candidate, prepared_save)
+            self._commit(project, intent.id, candidate, prepared_save, reviewed=reviewed)
             with self.jobs.guard(project) as directory:
                 state = self.jobs._read(project, directory)
                 known = next(item for item in state.manual_intents if item.id == intent.id)
@@ -627,6 +646,19 @@ class CanonicalCoordinator:
 
     def snapshot(self, project, before_sha256, after, command_id, *, originals=None, artifacts=None, images=None, base=None,
                  template_finalization=None):
+        return self._snapshot(project, before_sha256, after, command_id, originals=originals, artifacts=artifacts,
+            images=images, base=base, template_finalization=template_finalization)
+
+    def reviewed_snapshot(self, project, before_sha256, after, grant, *, originals=None, artifacts=None, images=None):
+        from .assistant_publication import AssistantSnapshotGrant
+        if not isinstance(grant, AssistantSnapshotGrant):
+            raise BackgroundFailure("JOB_SCOPE_INVALID")
+        grant.require(project, after)
+        return self._snapshot(project, before_sha256, after, grant.command_id, originals=originals,
+            artifacts=artifacts, images=images, reviewed=grant)
+
+    def _snapshot(self, project, before_sha256, after, command_id, *, originals=None, artifacts=None, images=None, base=None,
+                  template_finalization=None, reviewed=None):
         """A whole-snapshot writer must prove its exact base; it cannot overwrite a newer save."""
         with self._writer(project):
             from .background_retention import JobRetention
@@ -653,6 +685,7 @@ class CanonicalCoordinator:
                 if checksum != before_sha256:
                     raise BackgroundFailure("DEPENDENCY_CHANGED")
                 self.history._ready(state, directory, checksum)
+                binding = reviewed.authorize(state, before, directory) if reviewed else None
                 from .background_fixed import guard_fixed_records
                 guard_fixed_records(state, before, after)
                 if digest_bytes(after) == checksum:
@@ -669,9 +702,9 @@ class CanonicalCoordinator:
                     raise BackgroundFailure("DEPENDENCY_CHANGED")
                 self.history._ready(state, directory, checksum)
                 candidate = self._candidate(state, directory, before, after, None, None, None, snapshot_id=command_id,
-                    template_finalization=template_finalization)
+                    template_finalization=template_finalization, writer_binding=binding)
                 intent = self._store_intent(state, directory, candidate, None)
-            self._commit(project, intent.id, candidate, prepared)
+            self._commit(project, intent.id, candidate, prepared, reviewed=reviewed)
             with self.jobs.guard(project) as directory:
                 state = self.jobs._read(project, directory)
                 final_intent = next(item for item in state.manual_intents if item.id == intent.id)
@@ -681,7 +714,7 @@ class CanonicalCoordinator:
                     raise BackgroundFailure("OUTCOME_UNKNOWN")
             return after, False
 
-    def _commit(self, project, intent_id, candidate, prepared):
+    def _commit(self, project, intent_id, candidate, prepared, *, reviewed=None):
         result = None
         self.observer("before_commit_claim", project)
         try:
@@ -695,6 +728,9 @@ class CanonicalCoordinator:
                 self._load_candidate(state, directory, intent)
                 self.canonical.expected[project] = checksum
                 def claim_commit():
+                    if reviewed is not None:
+                        from .assistant_publication import AssistantSnapshotGrant
+                        reviewed.require(project, candidate if isinstance(reviewed, AssistantSnapshotGrant) else candidate.manual_mutation)
                     from .background_assets import guard_removal
                     guard_removal(state, before, candidate.workspace)
                     binding = getattr(candidate, 'template_finalization', None)
@@ -736,6 +772,8 @@ class CanonicalCoordinator:
                         self._publication(job, "committing")
                         if state.barrier is not None and claim.epoch is not None:
                             state.barrier.state = "commit_claimed"
+                    if reviewed is not None:
+                        reviewed.claim()
                     self._stage(state, directory, intent, "commit_claimed")
                     self.observer("before_workspace_replaced", project)
                 def replaced():

@@ -77,6 +77,18 @@ class JobRetention:
             active = {intent.job_id for intent in state.intents if intent.phase not in {"receipt_stored", "reconciled"}}
             active.update(intent.history_job_id for intent in state.manual_intents if intent.history_job_id is not None
                 and intent.phase not in {"receipt_stored", "reconciled"})
+            from .models.assistant_artifacts import decode_assistant_artifact
+            from .models.agent import TERMINAL_EDITS
+            for job in state.jobs:
+                if job.submission.input.kind != "agent_journal":
+                    continue
+                path = directory / "agent-artifacts" / (job.submission.input.id + ".json")
+                if not path.exists():
+                    continue
+                owned_file(path, LIMITS.sidecar_project_bytes)
+                artifact = decode_assistant_artifact(strict_json(path.read_bytes()))
+                if any(item.batch.state not in TERMINAL_EDITS for item in getattr(artifact, "applications", [])):
+                    active.add(job.id)
             folder = directory / "proposal-intents"
             if folder.exists():
                 from .models.background import ProposalBindingV1

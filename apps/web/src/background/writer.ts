@@ -3,6 +3,8 @@ import type { WorkingFacts } from "../contracts/generated/working_facts";
 import type { RichMutation } from "../contracts/generated/rich_mutation";
 import type { RichProjectResponse } from "../contracts/generated/rich_project_response";
 import type { WriterAdvanceV1 } from "../contracts/generated/background_writer_advance_v1";
+import type { AgentEditBatch } from "../contracts/generated/agent_edit_batch";
+import type { AssistantHistoryOfferV1 } from "../contracts/generated/assistant_history_offer_v1";
 import type { WriterViewV1 } from "../contracts/generated/background_writer_view_v1";
 import type { WriterProofV1 } from "../contracts/generated/background_writer_proof_v1";
 import { validateBackgroundShape } from "../contracts/background-validate";
@@ -77,6 +79,34 @@ export class BackgroundWriter extends WriterLifecycle {
   private header(): WriterAdvanceV1 {
     return { schemaVersion: 1, proof: this.proof, canonicalRevision: this.view.response.workspace.projectRevision,
       canonicalSha256: this.view.workspaceSha256, actionCursor: this.cursor, touches: structuredClone(this.touches) };
+  }
+  historyTarget(direction: "undo" | "redo"): AssistantHistoryOfferV1["undoBackend"] {
+    const action = this.editor.history.actionFor(direction), owned = action ? this.actions.get(action) : null;
+    if (!owned) return null;
+    const inverse = this.view.inverses?.find(item => item.jobId === owned.job && item.proposalId === owned.proposal);
+    return inverse?.direction === direction ? { schemaVersion: 1, protocolVersion: 1, jobId: owned.job,
+      proposalId: owned.proposal, transferId: inverse.transferId } : null;
+  }
+  async reviewedAuthority(batch?: AgentEditBatch): Promise<WriterAdvanceV1> {
+    if (!this.writable || this.mode !== "normal") throw new Error("WRITER_RECOVERY_REQUIRED");
+    await this.flushTouches();
+    if (batch?.mutation.kind === "undo" || batch?.mutation.kind === "redo") {
+      if (this.editor.history.actionFor(batch.mutation.kind) !== batch.mutation.actionId) throw new Error("DEPENDENCY_CHANGED");
+      const target = this.historyTarget(batch.mutation.kind);
+      if (target) {
+        const request = { ...this.header(), jobId: target.jobId, proposalId: target.proposalId, transferId: target.transferId };
+        await this.connection.api.begin(request);
+        await this.connection.api.acknowledge(request);
+      }
+    }
+    return this.header();
+  }
+  async adoptReviewed(revision: number): Promise<void> {
+    const view = await this.connection.api.read(this.proof);
+    if (view.response.workspace.projectRevision !== revision) throw new Error("OUTCOME_UNKNOWN");
+    this.acknowledge(view);
+    this.last = structuredClone(this.editor.snapshot());
+    await this.clearCleanDraft();
   }
   // Kept in this file: NB-G03 mutation evidence removes exactly this guard from the V1 writer source.
   protected override current(ticket: number): void { if (ticket !== this.operation || this.mode !== "protected") throw new Error("WRITER_STALE_CALLBACK"); }

@@ -49,6 +49,7 @@ class JobService:
         self.artifacts = JobArtifacts(self.store)
         self.history = ScopeHistory(self.store, query_fingerprint)
         self.publisher = CanonicalCoordinator(self.store, self.history, projects.storage, self.load_payload)
+        self.publisher.assistant_review_required = lambda: getattr(getattr(projects, "agent", None), "assistant_protocol_enabled", False)
         configure_exports = getattr(projects, 'configure_template_exports', None)
         if configure_exports is not None:
             configure_exports(self, cleanup_verified=template_cleanup_verified or (lambda: False))
@@ -112,6 +113,9 @@ class JobService:
                         self.store.fences.setdefault(project, "OUTCOME_UNKNOWN")
             from packages.resume_core.background_retention import JobRetention
             self.writers.recover_all()
+            agent = getattr(self.projects, "agent", None)
+            if agent is not None:
+                agent.approval.recover_all()
             JobRetention(self.store).sweep_all()
         if hasattr(self.projects, 'recover_template_exports'):
             await self.projects.recover_template_exports()
@@ -285,7 +289,8 @@ class JobService:
             record = self.artifacts.prepare_input(identity, logical, connection.epoch, digest(workspace.rules_used))
             cap_mode = getattr(getattr(self.projects, "agent", None), "assistant_protocol_enabled", False)
             names = [name for name in TOOL_NAMES if (not cap_mode or name != "apply_edit_batch")
-                and (logical.allow_edits or name not in {"prepare_edit_batch", "apply_edit_batch", "project_action"} or cap_mode and name == "prepare_edit_batch")
+                and (logical.allow_edits or name not in {"prepare_edit_batch", "apply_edit_batch", "project_action"}
+                    or cap_mode and name == "prepare_edit_batch")
                 and (logical.allow_web or name != "read_public_page")]
             protocol = self.projects.agent.protocol_sha256 if cap_mode else PROTOCOL_V2_SHA256
             config = digest({"base": CONFIG_SHA256, "protocol": protocol,
@@ -378,6 +383,8 @@ class JobService:
         try:
             state = self.store.load(project)
             for job in state.jobs:
+                if job.submission.kind == "agent" and getattr(getattr(self.projects, "agent", None), "assistant_protocol_enabled", False):
+                    continue
                 if job.submission.kind == "agent" and not self.settings.load().enabled:
                     continue
                 if job.submission.approval_required or job.publication not in {"ready", "waiting_for_sync", "save_failed"} or job.proposal_id is None:

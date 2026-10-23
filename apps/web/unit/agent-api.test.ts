@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import type { AgentEvent } from "../src/contracts/generated/agent_event";
 import { AgentBrowserApi } from "../src/assistant/api";
+import { proposal } from "./support/assistant-proposal";
 
 const owner = { token: "synthetic_owner_capability_0123456789", epoch: 1 };
 const event: AgentEvent = { schemaVersion: 1, id: "event_1", sequence: 1, projectId: "project_1", conversationId: "conversation_1",
@@ -29,4 +30,26 @@ test("assistant API rejects malformed or oversized event frames without exposing
     const api = new AgentBrowserApi("project_1", transport);
     await assert.rejects(async () => { for await (const _event of api.events("run_1", owner, 0, new AbortController().signal)) { /* Consume validated events only. */ } });
   }
+});
+
+test("lost UI claim reply resumes the same nonce over the versioned local API without generation", async () => {
+  const value = proposal(), accepted = { protocolVersion: 1 as const, proposalId: value.id, version: value.version,
+    contentSha256: value.contentSha256, acceptanceId: "click_1", owner }, requests: { path: string; body: unknown }[] = [];
+  const transport: typeof fetch = (input, options) => {
+    const path = String(input);
+    assert.equal(options?.credentials, "same-origin");
+    assert.equal(new Headers(options?.headers).get("X-FoldCV-Assistant-Protocol"), "1");
+    const body: unknown = JSON.parse(typeof options?.body === "string" ? options.body : "null");
+    requests.push({ path, body });
+    if (path.endsWith("/claim")) return Promise.reject(new Error("Lost local reply"));
+    assert.ok(path.endsWith("/resume"));
+    return Promise.resolve(new Response(JSON.stringify({ schemaVersion: 1, protocolVersion: 1,
+      proposal: value, result: null, claim: null })));
+  };
+  const api = new AgentBrowserApi(value.projectId, transport).reviewed(accepted);
+  assert.ok(api.resolve);
+  await assert.rejects(api.resolve("review_1"), /AGENT_SAVE_FAILED/);
+  assert.equal(requests.length, 2);
+  assert.deepEqual(requests.map(item => item.body), [accepted, accepted]);
+  assert.ok(requests.every(item => item.path.includes("/applications/") && !item.path.includes(owner.token)));
 });

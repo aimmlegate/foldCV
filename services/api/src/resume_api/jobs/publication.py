@@ -26,6 +26,9 @@ class JobPublication:
             if project in projects.catalog_recovery_fences:
                 raise BackgroundFailure("OUTCOME_UNKNOWN")
             job = service.store.read(project, job_id)
+            if (job.submission.kind == "agent" and job.receipt is None
+                    and getattr(getattr(projects, "agent", None), "assistant_protocol_enabled", False)):
+                raise BackgroundFailure("JOB_SCOPE_INVALID")
             if job.submission.kind == "agent" and job.receipt is None and not service.settings.load().enabled:
                 raise BackgroundFailure("JOB_DISABLED")
             from packages.resume_core.background_retention import JobRetention

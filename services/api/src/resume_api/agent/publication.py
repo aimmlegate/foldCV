@@ -45,6 +45,7 @@ class AgentPublication:
         self.service, self.clock = service, clock
         self.tickets = {}
         self.editor_history = {}
+        self.assistant_history = {}
 
     def _prune_editor_history(self):
         leases = self.service.leases
@@ -52,11 +53,11 @@ class AgentPublication:
             if project in leases.leases and leases.leases[project].epoch == offer[0]
             and leases.leases[project].expires > leases.clock()}
 
-    def offer_editor_history(self, project_id, request):
+    def offer_editor_history(self, project_id, request, *, preview_only=False):
         with self.service.projects.state_lock:
             self._prune_editor_history()
             lease = self.service.leases.require(project_id, request.owner)
-            if self.service.projects.catalog.get(project_id).read_only:
+            if not preview_only and self.service.projects.catalog.get(project_id).read_only:
                 raise AgentFailure("AGENT_TOOL_DENIED")
             current = self.service.projects.read(project_id)
             if current.project is None or (current.project_revision, current.document_revision, current.project.facts.revision) != (
@@ -163,14 +164,12 @@ class AgentPublication:
 
     def _adopt(self, project_id, workspace, checksum):
         projects = self.service.projects
-        projects.workspaces[project_id] = workspace
-        projects.storage.expected[project_id] = checksum
-        projects.saved_hashes[project_id] = digest(workspace.model_dump(mode="json", by_alias=True))
-        projects.saved_revisions[project_id] = (workspace.project_revision, workspace.document_revision)
-        projects.save_errors.pop(project_id, None)
+        projects.adopt_committed(project_id, workspace, checksum, preserve=False)
 
     async def offer(self, session, batch_id):
         service, control = self.service, session.control
+        if service.assistant_protocol_enabled:
+            raise AgentFailure("AGENT_PROTOCOL")
         project_id, run_id = control.project_id, control.run_id
         with service.projects.state_lock:
             session.guard()
@@ -197,6 +196,8 @@ class AgentPublication:
             await asyncio.sleep(0.05)
 
     def claim(self, project_id, run_id, batch_id, owner):
+        if self.service.assistant_protocol_enabled:
+            raise AgentFailure("AGENT_PROTOCOL")
         with self.service.projects.state_lock:
             run, item, lease = self._gate(project_id, run_id, batch_id, owner=owner)
             if item.receipt is not None or item.batch.state != "offered":
@@ -222,6 +223,8 @@ class AgentPublication:
 
     def commit(self, project_id, run_id, batch_id, request):
         from packages.resume_core.project_catalog import AccessChanged
+        if self.service.assistant_protocol_enabled:
+            raise AgentFailure("AGENT_PROTOCOL")
         with self.service.projects.state_lock:
             _, run, _, item = self._load(project_id, run_id, batch_id)[1]
             if item.receipt is not None:
@@ -247,63 +250,88 @@ class AgentPublication:
             self._ticket(project_id, run_id, batch_id, request)
             run, item, _ = self._gate(project_id, run_id, batch_id, owner=request.owner)
             batch = item.batch
-            current = projects.read(project_id)
-            if projects.durability(project_id) != "durable":
-                raise AgentFailure("AGENT_SAVE_FAILED")
-            if not current_dependencies(current, batch.dependencies):
-                receipt = self._record(project_id, self._receipt(batch, "stale", error="AGENT_STALE_READ"))
-                return AgentCommitResult(receipt=receipt, project=projects.response(project_id))
-            candidate, duplicate = apply_rich_mutation(current, batch.mutation)
-            if duplicate:
-                raise AgentFailure("AGENT_OUTCOME_UNKNOWN")
-            candidate.updated_at = projects.clock().isoformat()
-            publication = AgentPublicationStamp(workspaceSha256=hashlib.sha256(rich_snapshot_bytes(candidate)).hexdigest(),
-                projectRevision=candidate.project_revision, documentRevision=candidate.document_revision,
-                factsRevision=candidate.project.facts.revision)
-            old_hash = projects.storage.expected.get(project_id)
-            phase = {"durable": False}
-            def applying(state):
-                _, _, _, item = item_in(state, run_id, batch_id)
-                if item.batch.state != "offered" or item.receipt is not None:
+            def authorize(state):
+                _, current_item, _ = self._gate(project_id, run_id, batch_id, owner=request.owner, state=state)
+                self._ticket(project_id, run_id, batch_id, request)
+                return current_item
+            return self.publish_candidate(project_id, run_id, batch, authorize)
+
+    def publish_candidate(self, project_id, run_id, batch, authorize, *, verify=None, record_receipt=None, write=None):
+        # Callers hold state/access authority; the canonical writer stays shared.
+        service, projects = self.service, self.service.projects
+        record = record_receipt or (lambda receipt: self._record(project_id, receipt))
+        batch_id = batch.id
+        current = projects.read(project_id)
+        if projects.durability(project_id) != "durable":
+            raise AgentFailure("AGENT_SAVE_FAILED")
+        if not current_dependencies(current, batch.dependencies):
+            receipt = record(self._receipt(batch, "stale", error="AGENT_STALE_READ"))
+            return AgentCommitResult(receipt=receipt, project=projects.response(project_id))
+        candidate, duplicate = apply_rich_mutation(current, batch.mutation)
+        if duplicate:
+            raise AgentFailure("AGENT_OUTCOME_UNKNOWN")
+        if verify is not None:
+            verify(candidate)
+        candidate.updated_at = projects.clock().isoformat()
+        publication = AgentPublicationStamp(workspaceSha256=hashlib.sha256(rich_snapshot_bytes(candidate)).hexdigest(),
+            projectRevision=candidate.project_revision, documentRevision=candidate.document_revision,
+            factsRevision=candidate.project.facts.revision)
+        old_hash = projects.storage.expected.get(project_id)
+        phase = {"durable": False}
+        def applying(state):
+            _, _, _, item = item_in(state, run_id, batch_id)
+            if item.batch.state != "offered" or item.receipt is not None:
+                raise AgentFailure("AGENT_TICKET_INVALID")
+            item.batch.state = "applying"
+            item.publication = publication
+        service.store.update_reviewed(project_id, applying)
+        def publication_gate():
+            # RichProjectStore already owns the canonical lifecycle lock here.
+            def check(state):
+                current_item = authorize(state)
+                if current_item.batch.state != "applying" or current_item.batch.mutation != batch.mutation:
                     raise AgentFailure("AGENT_TICKET_INVALID")
-                item.batch.state = "applying"
-                item.publication = publication
-            service.store.update(project_id, applying)
-            def publication_gate():
-                # RichProjectStore already owns the canonical lifecycle lock here.
-                with locked_root(service.store.assistant, ".assistant.lock"):
-                    state = service.store._read(project_id, service.store.projects / project_id)
-                    _, current_item, _ = self._gate(project_id, run_id, batch_id, owner=request.owner, state=state)
-                    self._ticket(project_id, run_id, batch_id, request)
-                    if current_item.batch.state != "applying" or current_item.batch.mutation != batch.mutation:
-                        raise AgentFailure("AGENT_TICKET_INVALID")
-            failure = None
-            try:
+            service.store.update_under_canonical_lock(project_id, check)
+        failure = None
+        try:
+            if write is None:
                 projects.storage.save(candidate, projects.originals, projects.artifacts, projects.images,
                     before_workspace=publication_gate, after_workspace=lambda _checksum: phase.update(durable=True))
-            except Exception as error:
-                failure = error
-            try:
-                persisted, checksum = projects.storage.read_committed(project_id)
-                proof = next((item for item in persisted.mutation_replay if item.client_mutation_id == batch.mutation.client_mutation_id), None)
-                exact = proof is not None and proof.request_sha256 == batch.request_sha256 and proof.resulting_revision == publication.project_revision
-                if persisted.project_revision == publication.project_revision and checksum != publication.workspace_sha256:
-                    exact = False
-            except Exception:
-                persisted, checksum, exact = None, None, False
-            if persisted is not None and exact and phase["durable"]:
-                self._adopt(project_id, persisted, checksum)
-                receipt = self._receipt(batch, "saved", publication=publication)
-            elif persisted is not None and checksum == old_hash and not exact:
-                code = failure.code if isinstance(failure, AgentFailure) else "AGENT_SAVE_FAILED"
-                disposition = "stale" if code == "AGENT_STALE_READ" else "cancelled" if code in {
-                    "AGENT_CANCELLED", "AGENT_CONNECTION_CHANGED", "AGENT_OWNER_MISMATCH", "AGENT_LEASE_EXPIRED"} else "save_failed"
-                receipt = self._receipt(batch, disposition, error=code)
             else:
-                self._fence(project_id, batch_id)
-                receipt = self._receipt(batch, "outcome_unknown", error="AGENT_OUTCOME_UNKNOWN")
-            receipt = self._record(project_id, receipt)
-            return AgentCommitResult(receipt=receipt, project=projects.response(project_id))
+                def prepared(actual):
+                    if verify is not None:
+                        verify(actual)
+                    publication.workspace_sha256 = hashlib.sha256(rich_snapshot_bytes(actual)).hexdigest()
+                    publication.project_revision, publication.document_revision = actual.project_revision, actual.document_revision
+                    publication.facts_revision = actual.project.facts.revision
+                    def stamped(state):
+                        item_in(state, run_id, batch_id)[3].publication = publication
+                    service.store.update_under_canonical_lock(project_id, stamped)
+                write(batch.mutation, publication_gate, prepared)
+                phase["durable"] = True
+        except Exception as error:
+            failure = error
+        try:
+            persisted, checksum = projects.storage.read_committed(project_id)
+            proof = next((item for item in persisted.mutation_replay if item.client_mutation_id == batch.mutation.client_mutation_id), None)
+            exact = proof is not None and proof.request_sha256 == batch.request_sha256 and proof.resulting_revision == publication.project_revision
+            if persisted.project_revision == publication.project_revision and checksum != publication.workspace_sha256:
+                exact = False
+        except Exception:
+            persisted, checksum, exact = None, None, False
+        if persisted is not None and exact and phase["durable"]:
+            self._adopt(project_id, persisted, checksum)
+            receipt = self._receipt(batch, "saved", publication=publication)
+        elif persisted is not None and checksum == old_hash and not exact:
+            code = failure.code if isinstance(failure, AgentFailure) else "AGENT_SAVE_FAILED"
+            disposition = "stale" if code == "AGENT_STALE_READ" else "cancelled" if code in {
+                "AGENT_CANCELLED", "AGENT_CONNECTION_CHANGED", "AGENT_OWNER_MISMATCH", "AGENT_LEASE_EXPIRED"} else "save_failed"
+            receipt = self._receipt(batch, disposition, error=code)
+        else:
+            self._fence(project_id, batch_id)
+            receipt = self._receipt(batch, "outcome_unknown", error="AGENT_OUTCOME_UNKNOWN")
+        receipt = record(receipt)
+        return AgentCommitResult(receipt=receipt, project=projects.response(project_id))
 
     def report(self, project_id, run_id, batch_id, request):
         with self.service.projects.state_lock:
@@ -327,6 +355,15 @@ class AgentPublication:
             _, (_, _, _, item) = self._load(project_id, run_id, batch_id)
             if item.receipt is not None and item.receipt.disposition != "outcome_unknown" and batch_id not in self.service.unresolved.get(project_id, []):
                 return item.receipt
+            if item.key.startswith("accepted_") and item.publication is not None:
+                try:
+                    return self.service.approval.recover_saved_journal(project_id, self.service.store, item)
+                except AgentFailure as error:
+                    if error.code != "AGENT_OUTCOME_UNKNOWN":
+                        raise
+            reviewed = self.service.approval.recover_batch(project_id, run_id, batch_id)
+            if reviewed is not None:
+                return reviewed
             if item.batch.state not in {"applying", "outcome_unknown"}:
                 raise AgentFailure("AGENT_OUTCOME_UNKNOWN")
             try:

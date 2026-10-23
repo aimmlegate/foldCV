@@ -32,13 +32,15 @@ export function AssistantDrawer({ projectId, editor, settingsOpen, settings, ref
         const value = await api.operations();
         if (!alive) return;
         setOperations(value.items);
-        await controller.current?.refreshCatalog();
-        await controller.current?.refreshProposals();
         if (!initialized) { value.items.forEach(item => handled.add(item.id)); initialized = true; }
         for (const item of value.items) {
           if (!alive) break;
           const kind = item.action === "archive" && item.status === "completed" ? "archive" : item.action === "delete" && item.status === "deleted" ? "delete" : null;
           if (kind && !handled.has(item.id) && await lifecycle.current?.(kind)) handled.add(item.id);
+        }
+        if (alive) {
+          await controller.current?.refreshCatalog();
+          await controller.current?.refreshProposals();
         }
       } catch (error) { if (alive) setFailure(error instanceof AgentApiFailure ? error.code : "REQUEST_FAILED"); }
       finally { if (alive) timer = setTimeout(() => { void refreshOperations(); }, 2000); }
@@ -53,6 +55,7 @@ export function AssistantDrawer({ projectId, editor, settingsOpen, settings, ref
     const api = new AgentBrowserApi(projectId), connection = new ConnectionWorkflow(() => {});
     const current = new AssistantController(api, { sessionId: mounted.sessionId,
       reviewStamp: () => editor.current?.reviewStamp() ?? -1,
+      applyAction: (id, api) => { if (editor.current?.sessionId !== mounted.sessionId) return Promise.reject(new AgentApiFailure("AGENT_NO_OWNER")); return editor.current.applyAssistantAction(id, api); },
       apply: (id, api) => { if (editor.current?.sessionId !== mounted.sessionId) return Promise.reject(new AgentApiFailure("AGENT_NO_OWNER")); return editor.current.applyAssistant(id, api); } }, setView, 5000, background ? projectJobs(projectId) : null);
     controller.current = current; setView(current.view);
     void (async () => {
@@ -91,7 +94,7 @@ export function AssistantDrawer({ projectId, editor, settingsOpen, settings, ref
       const value = await mounted.assistantBaseline(scope);
       const onlySelection = limitsEditToSelection(current.view.draft);
       return { response: value.response, scope: onlySelection && value.selection ? { kind: "selection", selection: value.selection } : { kind: "resume" },
-        selectionContext: value.selection, historyOffers: value.historyOffers };
+        selectionContext: value.selection, historyOffers: value.historyOffers, ...(value.historyTargets ? { historyTargets: value.historyTargets } : {}) };
     }));
   }
   const active = controller.current?.active ?? false;

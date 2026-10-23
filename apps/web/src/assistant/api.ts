@@ -21,23 +21,27 @@ import type { AgentOwnerRequest } from "../contracts/generated/agent_owner_reque
 import type { AgentPageRequest } from "../contracts/generated/agent_page_request";
 import type { RichProjectResponse } from "../contracts/generated/rich_project_response";
 import { validateContract } from "../contracts/validate";
-import type { PreparedApi } from "./editor-bridge";
+import type { PreparedApi, PreparedActionApi } from "./editor-bridge";
 import type { AssistantTaskCatalogV1 } from "../contracts/generated/assistant_task_catalog_v1";
 import type { AssistantTaskCheckV1 } from "../contracts/generated/assistant_task_check_v1";
 import { knownErrorMessage } from "../errors/messages";
 import type { AssistantProposalV1 } from "../contracts/generated/assistant_proposal_v1";
-import type { AssistantReviewListV1 } from "../contracts/generated/assistant_review_list_v1";
-import type { AssistantReviewV1 } from "../contracts/generated/assistant_review_v1";
+import type { AssistantCapabilityReviewsV1 } from "../contracts/generated/assistant_capability_reviews_v1";
+import type { AssistantCapabilityReviewV1 } from "../contracts/generated/assistant_capability_review_v1";
+import type { AssistantProjectActionClaimV1 } from "../contracts/generated/assistant_project_action_claim_v1";
+import type { AssistantProjectActionResultV1 } from "../contracts/generated/assistant_project_action_result_v1";
+import type { AssistantHistoryOfferV1 } from "../contracts/generated/assistant_history_offer_v1";
 import type { AssistantProposalRequestV1 } from "../contracts/generated/assistant_proposal_request_v1";
-import type { AssistantProposalAcceptV1 } from "../contracts/generated/assistant_proposal_accept_v1";
-import type { AssistantProposalClaimV1 } from "../contracts/generated/assistant_proposal_claim_v1";
-import type { AssistantProposalRecoveryV1 } from "../contracts/generated/assistant_proposal_recovery_v1";
+import type { AssistantAcceptanceV1 } from "../contracts/generated/assistant_acceptance_v1";
+import type { AssistantApplicationClaimV1 } from "../contracts/generated/assistant_application_claim_v1";
+import type { AssistantApplicationRecoveryV1 } from "../contracts/generated/assistant_application_recovery_v1";
 
 type MessagePage = Omit<AgentMessagePage, "items"> & { items: AgentMessage[] };
 type Replies = { agent_project_operations: AgentProjectOperations; agent_access: AgentAccess; agent_capabilities: AgentCapabilities; agent_settings: AgentSettings; agent_conversation: AgentConversation;
   assistant_task_catalog_v1: AssistantTaskCatalogV1; assistant_task_check_v1: AssistantTaskCheckV1;
-  assistant_proposal_v1: AssistantProposalV1; assistant_review_list_v1: AssistantReviewListV1; assistant_review_v1: AssistantReviewV1;
-  assistant_proposal_claim_v1: AssistantProposalClaimV1; assistant_proposal_recovery_v1: AssistantProposalRecoveryV1;
+  assistant_proposal_v1: AssistantProposalV1; assistant_capability_reviews_v1: AssistantCapabilityReviewsV1; assistant_capability_review_v1: AssistantCapabilityReviewV1;
+  assistant_project_action_claim_v1: AssistantProjectActionClaimV1; assistant_project_action_result_v1: AssistantProjectActionResultV1;
+  assistant_application_claim_v1: AssistantApplicationClaimV1; assistant_application_recovery_v1: AssistantApplicationRecoveryV1;
   agent_conversation_page: AgentConversationPage; agent_message_page: MessagePage; agent_resource_page: AgentResourcePage;
   agent_lease: AgentLease; agent_run: AgentRun; agent_run_read: AgentRunRead; agent_claim_result: AgentClaimResult;
   agent_commit_result: AgentCommitResult; agent_edit_receipt: AgentEditReceipt; agent_empty_request: Record<string, never>;
@@ -89,6 +93,10 @@ export class AgentBrowserApi {
   offerHistory(value: AgentHistoryOffer): Promise<Record<string, never>> {
     return this.request("agent_empty_request", this.prefix + "/history/offer", "POST", value);
   }
+  offerReviewedHistory(value: AssistantHistoryOfferV1): Promise<Record<string, never>> {
+    return this.request("agent_empty_request", this.prefix + "/history/offer-v1", "POST", value,
+      { "X-FoldCV-Assistant-Protocol": "1" });
+  }
   setAccess(expectedRevision: number, readOnly: boolean): Promise<AgentAccess> {
     return this.request("agent_access", this.prefix + "/access", "PUT", { expectedRevision, readOnly });
   }
@@ -106,29 +114,84 @@ export class AgentBrowserApi {
     return this.request("assistant_task_check_v1", this.prefix + "/tasks/check-message", "POST",
       { schemaVersion: 1, protocolVersion: 1, message, scope: "resume", ...flags }, { "X-FoldCV-Assistant-Protocol": "1" });
   }
-  proposals(): Promise<AssistantReviewListV1> {
-    return this.request("assistant_review_list_v1", this.prefix + "/reviews", "GET", {}, { "X-FoldCV-Assistant-Protocol": "1" });
+  proposals(): Promise<AssistantCapabilityReviewsV1> {
+    return this.request("assistant_capability_reviews_v1", this.prefix + "/reviews", "GET", {}, { "X-FoldCV-Assistant-Protocol": "1" });
   }
-  proposal(value: AssistantProposalRequestV1): Promise<AssistantReviewV1> {
-    return this.request("assistant_review_v1", `${this.prefix}/reviews/${encodeURIComponent(value.proposalId)}/versions/${String(value.version)}`,
+  proposal(value: AssistantProposalRequestV1): Promise<AssistantCapabilityReviewV1> {
+    return this.request("assistant_capability_review_v1", `${this.prefix}/reviews/${encodeURIComponent(value.proposalId)}/versions/${String(value.version)}`,
       "GET", {}, { "X-FoldCV-Assistant-Protocol": "1" });
   }
   discardProposal(value: AssistantProposalRequestV1): Promise<AssistantProposalV1> {
     return this.request("assistant_proposal_v1", this.prefix + "/proposals/discard", "POST", value, { "X-FoldCV-Assistant-Protocol": "1" });
   }
-  reviewed(value: AssistantProposalAcceptV1): PreparedApi {
+  cancelApplication(value: AssistantAcceptanceV1): Promise<AssistantApplicationRecoveryV1> {
+    return this.request("assistant_application_recovery_v1", this.prefix + "/applications/cancel", "POST", value,
+      { "X-FoldCV-Assistant-Protocol": "1" });
+  }
+  retryApplication(value: AssistantAcceptanceV1): Promise<AssistantProposalV1> {
+    return this.request("assistant_proposal_v1", this.prefix + "/applications/retry", "POST", value,
+      { "X-FoldCV-Assistant-Protocol": "1" });
+  }
+  reviewed(value: AssistantAcceptanceV1): PreparedApi {
     const accepted = structuredClone(value), headers = { "X-FoldCV-Assistant-Protocol": "1" };
     let claim: AgentClaimResult | null = null;
     return { resolve: async () => {
-      const reply = await this.request("assistant_proposal_claim_v1", this.prefix + "/proposals/claim", "POST", accepted, headers);
+      let reply: AssistantApplicationClaimV1;
+      try { reply = await this.request("assistant_application_claim_v1", this.prefix + "/applications/claim", "POST", accepted, headers); }
+      catch (error) {
+        if (error instanceof AgentApiFailure && error.status !== 0) throw error;
+        const recovered = await this.request("assistant_application_recovery_v1", this.prefix + "/applications/resume", "POST", accepted, headers);
+        if (!recovered.claim) throw new AgentApiFailure(recovered.result?.receipt.durable ? "AGENT_OUTCOME_UNKNOWN" : "AGENT_SAVE_FAILED");
+        reply = recovered.claim;
+      }
       if (reply.accepted.proposalId !== accepted.proposalId || reply.accepted.version !== accepted.version
-        || reply.accepted.contentSha256 !== accepted.contentSha256) throw new AgentApiFailure("AGENT_IDEMPOTENCY_CONFLICT");
+        || reply.accepted.contentSha256 !== accepted.contentSha256 || reply.accepted.acceptanceId !== accepted.acceptanceId)
+        throw new AgentApiFailure("AGENT_IDEMPOTENCY_CONFLICT");
       claim = reply.claim; return claim.batch.id;
     }, claim: id => claim?.batch.id === id ? Promise.resolve(claim) : Promise.reject(new AgentApiFailure("AGENT_PROTOCOL")),
-    commit: current => this.request("agent_commit_result", this.prefix + "/proposals/commit", "POST",
-      { ...accepted, ticket: current.ticket, requestSha256: current.batch.requestSha256 }, headers),
-    recover: async () => (await this.request("assistant_proposal_recovery_v1", this.prefix + "/proposals/recover", "POST", accepted, headers)).result,
-    report: async receipt => { await this.request("assistant_proposal_v1", this.prefix + "/proposals/result", "POST", { ...accepted, receipt }, headers); } };
+    commit: (current, writer) => this.request("agent_commit_result", this.prefix + "/applications/commit", "POST",
+      { ...accepted, ticket: current.ticket, requestSha256: current.batch.requestSha256, writer: writer ?? null }, headers),
+    recover: async () => {
+      const value = await this.request("assistant_application_recovery_v1", this.prefix + "/applications/recover", "POST", accepted, headers);
+      if (value.reloadRequired && value.savedReceipt) return { receipt: value.savedReceipt, project: null };
+      return value.result ?? (value.savedReceipt ? { receipt: value.savedReceipt, project: null } : null);
+    },
+    report: async receipt => { await this.request("assistant_proposal_v1", this.prefix + "/applications/result", "POST", { ...accepted, receipt }, headers); } };
+  }
+  cancelAction(value: AssistantAcceptanceV1): Promise<AssistantProjectActionResultV1> {
+    return this.request("assistant_project_action_result_v1", this.prefix + "/actions/cancel", "POST", value,
+      { "X-FoldCV-Assistant-Protocol": "1" });
+  }
+  retryAction(value: AssistantAcceptanceV1): Promise<AssistantProposalV1> {
+    return this.request("assistant_proposal_v1", this.prefix + "/actions/retry", "POST", value,
+      { "X-FoldCV-Assistant-Protocol": "1" });
+  }
+  reviewedAction(value: AssistantAcceptanceV1): PreparedActionApi {
+    const accepted = structuredClone(value), headers = { "X-FoldCV-Assistant-Protocol": "1" };
+    const checked = (reply: AssistantProjectActionResultV1): AssistantProjectActionResultV1 => {
+      if (reply.proposal.id !== accepted.proposalId || reply.proposal.version !== accepted.version
+        || reply.proposal.contentSha256 !== accepted.contentSha256 || reply.proposal.projectId !== this.projectId
+        || reply.operation && (reply.operation.projectId !== this.projectId || reply.operation.runId !== reply.proposal.originRunId)
+        || reply.project && reply.project.workspace.projectId !== this.projectId) throw new AgentApiFailure("AGENT_IDEMPOTENCY_CONFLICT");
+      return reply;
+    };
+    return { claim: async () => {
+      let reply: AssistantProjectActionClaimV1;
+      try { reply = await this.request("assistant_project_action_claim_v1", this.prefix + "/actions/claim", "POST", accepted, headers); }
+      catch (error) {
+        if (error instanceof AgentApiFailure && error.status !== 0) throw error;
+        const recovered = await this.request("assistant_project_action_result_v1", this.prefix + "/actions/resume", "POST", accepted, headers);
+        if (!recovered.claim) throw new AgentApiFailure("AGENT_SAVE_FAILED");
+        reply = recovered.claim;
+      }
+      if (reply.accepted.proposalId !== accepted.proposalId || reply.accepted.version !== accepted.version
+        || reply.accepted.contentSha256 !== accepted.contentSha256 || reply.accepted.acceptanceId !== accepted.acceptanceId)
+        throw new AgentApiFailure("AGENT_IDEMPOTENCY_CONFLICT");
+      return reply;
+    }, commit: async (claim, writer) => checked(await this.request("assistant_project_action_result_v1", this.prefix + "/actions/commit", "POST",
+      { ...accepted, ticket: claim.ticket, requestSha256: claim.requestSha256, writer }, headers)),
+    recover: async () => checked(await this.request("assistant_project_action_result_v1", this.prefix + "/actions/recover", "POST", accepted, headers)),
+    cancel: async () => { await this.cancelAction(accepted); } };
   }
   conversations(cursor: string | null = null): Promise<AgentConversationPage> { return this.request("agent_conversation_page", this.prefix + "/conversations/read", "POST", page(cursor)); }
   conversation(): Promise<AgentConversation> { return this.request("agent_conversation", this.prefix + "/conversations"); }
@@ -139,7 +202,10 @@ export class AgentBrowserApi {
   open(sessionId: string): Promise<AgentLease> { return this.request("agent_lease", this.prefix + "/lease/open", "POST", { sessionId }); }
   renew(owner: AgentOwner): Promise<AgentLease> { return this.request("agent_lease", this.prefix + "/lease/renew", "POST", { owner }); }
   close(owner: AgentOwner): Promise<Record<string, never>> { return this.request("agent_empty_request", this.prefix + "/lease/close", "POST", { owner }, {}, true); }
-  submit(request: AgentRunRequest): Promise<AgentRun> { return this.request("agent_run", `${this.prefix}/conversations/${encodeURIComponent(request.conversationId)}/runs`, "POST", request); }
+  submit(request: AgentRunRequest, protocol = false): Promise<AgentRun> {
+    return this.request("agent_run", `${this.prefix}/conversations/${encodeURIComponent(request.conversationId)}/${protocol ? "requests" : "runs"}`,
+      "POST", protocol ? { protocolVersion: 1, request } : request, protocol ? { "X-FoldCV-Assistant-Protocol": "1" } : {});
+  }
   read(runId: string): Promise<AgentRunRead> { return this.request("agent_run_read", `${this.prefix}/runs/${encodeURIComponent(runId)}/read`); }
   cancel(runId: string, owner: AgentOwner): Promise<AgentRun> { return this.request("agent_run", `${this.prefix}/runs/${encodeURIComponent(runId)}/cancel`, "POST", { owner }); }
   claim(runId: string, batchId: string, owner: AgentOwner): Promise<AgentClaimResult> {

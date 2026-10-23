@@ -3,6 +3,7 @@ import type { AssistantProposalV1 } from "../contracts/generated/assistant_propo
 import type { AssistantProposalRequestV1 } from "../contracts/generated/assistant_proposal_request_v1";
 import type { AssistantTaskCatalogV1 } from "../contracts/generated/assistant_task_catalog_v1";
 import type { AssistantReviewV1 } from "../contracts/generated/assistant_review_v1";
+import type { AssistantCapabilityReviewV1 } from "../contracts/generated/assistant_capability_review_v1";
 
 export const proposalKey = (value: AssistantProposalV1): string => `${value.id}:${String(value.version)}:${value.contentSha256}`;
 export const proposalRequest = (value: AssistantProposalV1): AssistantProposalRequestV1 => ({ schemaVersion: 1,
@@ -18,17 +19,19 @@ export function proposalControls(value: AssistantProposalV1, catalog: AssistantT
   const task = catalog?.tasks.find(item => item.id === value.taskId);
   const readiness = stage ?? task?.apply;
   const available = catalog?.protocolEnabled === true && readiness?.state === "available" && allowEdits;
-  return { apply: !busy && !invalidated && value.state === "ready" && available,
+  const applicable = value.state === "ready" || value.state === "failed_before_commit" && stage?.state === "available";
+  return { apply: !busy && !invalidated && applicable && available,
     discard: !busy && ["ready", "incomplete", "stale", "failed_before_commit"].includes(value.state),
-    reason: invalidated ? "После открытия варианта документ изменился. Подготовьте новый вариант; текущие правки сохранены."
-      : value.state !== "ready" ? null : !allowEdits ? "Разрешите правки, затем отдельно нажмите «Применить»."
+    reason: invalidated && ["ready", "failed_before_commit"].includes(value.state) ? "После открытия варианта документ изменился. Подготовьте новый вариант; текущие правки сохранены."
+      : !["ready", "failed_before_commit"].includes(value.state) ? null : !allowEdits ? "Разрешите правки, затем отдельно нажмите «Применить»."
       : !available ? [readiness?.reason, readiness?.remedy].filter(Boolean).join(" ") || "Применение сейчас недоступно." : null };
 }
 
-export function ProposalPreview({ value, catalog, busy, invalidated, allowEdits, stage, apply, discard }: {
+export function ProposalPreview({ value, catalog, busy, invalidated, allowEdits, stage, action, apply, discard }: {
   value: AssistantProposalV1; catalog: AssistantTaskCatalogV1 | null | undefined; busy: boolean; invalidated: boolean; allowEdits: boolean;
   apply: () => void; discard: () => void;
   stage?: AssistantReviewV1["apply"] | undefined;
+  action?: AssistantCapabilityReviewV1["action"];
 }) {
   const task = catalog?.tasks.find(item => item.id === value.taskId), controls = proposalControls(value, catalog, busy, invalidated, allowEdits, stage);
   const button = useRef<HTMLButtonElement>(null), heading = useRef<HTMLHeadingElement>(null);
@@ -46,6 +49,8 @@ export function ProposalPreview({ value, catalog, busy, invalidated, allowEdits,
     <h3 ref={heading} tabIndex={-1}>{states[value.state]} · версия {value.version}</h3>
     <p>{task?.label ?? "Подготовленные изменения"}</p>
     {value.reason && <p>{value.reason}</p>}
+    {action && <><p>Проект: «{action.targetLabel}» ({action.targetId}).</p><p>{action.consequence}</p>
+      {action.imagePreviewUrl && <img className="max-h-48 max-w-full object-contain" src={action.imagePreviewUrl} alt="Изображение в предлагаемом действии" />}</>}
     <p className="chat-proposal-coverage">Охват: {value.coverage.length}. Изменено: {changed}. Не завершено: {unresolved}.</p>
     {!["applied", "applying", "outcome_unknown"].includes(value.state) && <p>Документ пока не изменён этим вариантом.</p>}
     {["applying", "outcome_unknown"].includes(value.state) && <p>Проверяем исходное сохранение. Повторное применение недоступно.</p>}
@@ -56,7 +61,8 @@ export function ProposalPreview({ value, catalog, busy, invalidated, allowEdits,
     </details>)}
     {unresolved > 0 && <details><summary>Что осталось проверить</summary><ul>{value.coverage.filter(unit => !unit.read || unit.state === "unresolved")
       .map(unit => <li key={unit.unitId}>{unit.reason}</li>)}</ul></details>}
-    {task?.reversibility === "shared_undo" && <p>После сохранения — одна отмена в истории редактора.</p>}
+    {value.taskId === "undo" || value.taskId === "redo" ? <p>Навигация по показанному действию. Новая запись в истории не создаётся.</p>
+      : task?.reversibility === "shared_undo" && <p>После сохранения — одна отмена в истории редактора.</p>}
     {controls.reason && <p role="status">{controls.reason}</p>}
     <div className="chat-proposal-actions"><button ref={button} type="button" className="primary" disabled={!controls.apply}
       onClick={event => { restoreFocus.current = event.detail === 0; apply(); }}>Применить</button>

@@ -71,12 +71,18 @@ class AgentService:
         self.leases = AgentLeases(self.store, projects.state_lock, clock=lease_clock, active=self.active)
         from .publication import AgentPublication
         self.publication = AgentPublication(self)
+        from .approval import AssistantApproval
+        self.approval = AssistantApproval(self)
+        from .action_approval import AssistantActionApproval
+        self.action_approval = AssistantActionApproval(self)
         from .events import AgentEvents
         self.events = AgentEvents()
 
     def recover(self):
-        self.unresolved, self.startup_errors = self.store.recover_all()
+        self.unresolved, self.startup_errors = self.store.recover_all(reviewed=self.approval.is_reviewed)
         self.leases.invalidate()
+        self.approval.recover_all()
+        self.action_approval.recover_all()
         self.publication.recover_all()
         try:
             self.startup_errors.update(self.proposals.recover())
@@ -217,13 +223,20 @@ class AgentService:
                 if control.project_id == project_id:
                     self.revoke(control, reason)
 
+    def request_owner_stop(self, project_id, owner_epoch, *, reason="AGENT_INTERRUPTED"):
+        with self.projects.state_lock:
+            for control in self.controls.values():
+                if control.project_id == project_id and control.owner_epoch == owner_epoch:
+                    self.revoke(control, reason)
+
     def request_stop(self, *, reason="AGENT_CONNECTION_CHANGED"):
         self.leases.invalidate()
         for control in self.controls.values():
             self.revoke(control, reason)
 
-    async def stop_project(self, project_id):
+    async def stop_project(self, project_id, *, owner_epoch=None):
         tasks = [control.task for control in self.controls.values() if control.project_id == project_id
+            and (owner_epoch is None or control.owner_epoch == owner_epoch)
             and control.task is not None and control.task is not asyncio.current_task() and not control.task.done()]
         if tasks:
             await self._wait(tasks)

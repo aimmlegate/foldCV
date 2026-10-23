@@ -51,6 +51,7 @@ export function DrawerView(props: ComposerProps & { collapsed: boolean; expanded
         {view.taskCatalog?.protocolEnabled && view.proposals?.map(value => <ProposalPreview key={proposalKey(value)} value={value}
           catalog={view.taskCatalog} busy={active || !!view.proposalBusy} invalidated={view.reviewInvalidated?.includes(proposalKey(value)) ?? false}
           stage={view.reviewAvailability?.[proposalKey(value)]}
+          action={view.reviewActions?.[proposalKey(value)]}
           allowEdits={view.flags.allowEdits} apply={() => props.applyProposal?.(value)} discard={() => props.discardProposal?.(value)} />)}
         {view.loading && <div className="chat-load-status"><OperationStatus label={view.loading} /></div>}
         {props.operations?.filter(item => item.durable && item.downloadUrl).map(item => <p key={item.id} className="chat-project-file">

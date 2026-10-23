@@ -63,13 +63,14 @@ class AgentLeases:
             return self.public(lease)
 
     def close(self, project_id, owner):
-        with self.state_lock:
-            lease = self.leases.get(project_id)
-            if lease is None:
-                return
-            if lease.epoch != owner.epoch or not hmac.compare_digest(lease.token, owner.token):
-                raise AgentFailure("AGENT_OWNER_MISMATCH")
-            lease.expires = 0
+        lease = self.leases.get(project_id)
+        if lease is None:
+            return None
+        if lease.epoch != owner.epoch or not hmac.compare_digest(lease.token, owner.token):
+            raise AgentFailure("AGENT_OWNER_MISMATCH")
+        # Revoke the captured lease before waiting for a publishing thread's state lock.
+        lease.expires = 0
+        return lease
 
     def invalidate(self):
         with self.state_lock:

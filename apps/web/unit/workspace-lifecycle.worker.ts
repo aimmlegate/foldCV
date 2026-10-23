@@ -68,6 +68,7 @@ const editor: RichEditorHandle = {
   reviewStamp: () => 0,
   resume: async () => { events.push("resume"); }, undo: () => {}, redo: () => {}, captureSelection: () => null,
   focusFinding: () => false, applyAssistant: async () => {},
+  applyAssistantAction: async () => { throw new Error("Unexpected action"); },
   flush: async () => { throw new Error("Unexpected flush"); },
   assistantBaseline: async () => { throw new Error("Unexpected assistant baseline"); },
 };

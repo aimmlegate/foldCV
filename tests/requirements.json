@@ -3624,7 +3624,10 @@
       "id": "CAP-A07",
       "status": "partial",
       "tests": [
-        "tests/recovery/test_assistant_proposals.py::test_generation_finishes_with_a_ready_draft_and_releases_the_permit"
+        "tests/recovery/test_assistant_proposals.py::test_generation_finishes_with_a_ready_draft_and_releases_the_permit",
+        "tests/recovery/test_assistant_approval.py::test_local_commit_after_generation_deadline_saves_exact_displayed_content_once_without_inference",
+        "tests/recovery/test_assistant_approval.py::test_post_run_native_undo_redo_reuses_the_saved_action_and_original_receipt",
+        "tests/recovery/test_assistant_approval.py::test_post_run_apply_uses_the_existing_attached_canonical_writer_and_history"
       ]
     },
     {
@@ -3632,7 +3635,8 @@
       "status": "partial",
       "tests": [
         "tests/recovery/test_assistant_review.py::test_review_marks_changed_authored_scope_stale_and_preserves_both_versions",
-        "apps/web/unit/agent-controller.test.ts::typing or a different displayed version blocks old acceptance while retaining manual edits"
+        "apps/web/unit/agent-controller.test.ts::typing or a different displayed version blocks old acceptance while retaining manual edits",
+        "tests/recovery/test_assistant_approval.py::test_revocation_after_acceptance_never_saves_or_rebases_the_reviewed_draft"
       ]
     },
     {
@@ -3640,20 +3644,30 @@
       "status": "partial",
       "tests": [
         "apps/web/unit/agent-controller.test.ts::permissions and Stop revoke the pending review intent without implicit apply on re-enable",
-        "tests/recovery/test_assistant_review.py::test_local_review_availability_requires_origin_generation_to_finish_and_current_identity"
+        "tests/recovery/test_assistant_review.py::test_local_review_availability_requires_origin_generation_to_finish_and_current_identity",
+        "tests/recovery/test_assistant_approval.py::test_revocation_after_acceptance_never_saves_or_rebases_the_reviewed_draft",
+        "tests/recovery/test_assistant_approval.py::test_model_bearer_and_changed_digest_cannot_obtain_a_ui_ticket"
       ]
     },
     {
       "id": "CAP-A10",
-      "status": "unimplemented",
-      "tests": []
+      "status": "partial",
+      "tests": [
+        "tests/recovery/test_assistant_approval.py::test_stop_before_delayed_claim_revokes_only_that_click_durably",
+        "tests/recovery/test_assistant_approval.py::test_cancelled_preparation_cannot_commit_and_retry_requires_a_new_explicit_click",
+        "apps/web/unit/agent-controller.test.ts::Stop sends the original acceptance nonce while an explicit Apply waits for its reply",
+        "tests/recovery/test_assistant_approval.py::test_saved_receipt_outlives_private_preview_and_current_replay_retention"
+      ]
     },
     {
       "id": "CAP-A11",
       "status": "partial",
       "tests": [
         "tests/recovery/test_assistant_proposals.py::test_interrupted_build_survives_reopen_and_never_becomes_ready_implicitly",
-        "tests/recovery/test_assistant_proposals.py::test_expiry_corruption_and_cancelled_authority_preserve_canonical_bytes"
+        "tests/recovery/test_assistant_proposals.py::test_expiry_corruption_and_cancelled_authority_preserve_canonical_bytes",
+        "tests/recovery/test_assistant_approval.py::test_applied_payload_compacts_and_expiry_preserves_the_original_journal_receipt",
+        "tests/recovery/test_assistant_approval.py::test_lost_claim_reply_can_resume_only_in_memory_and_restart_cannot_apply_it",
+        "tests/recovery/test_assistant_approval.py::test_saved_receipt_outlives_private_preview_and_current_replay_retention"
       ]
     },
     {
@@ -3661,13 +3675,24 @@
       "status": "partial",
       "tests": [
         "apps/web/unit/agent-controller.test.ts::review and reload never apply; one explicit click freezes exact version/digest and duplicate clicks coalesce",
-        "apps/web/unit/agent-controller.test.ts::delayed proposal refresh cannot revive a stale response or replace the newer review"
+        "apps/web/unit/agent-controller.test.ts::delayed proposal refresh cannot revive a stale response or replace the newer review",
+        "tests/recovery/test_assistant_approval.py::test_post_run_ui_ticket_keeps_reviewed_content_and_deduplicates_the_original_click",
+        "tests/recovery/test_assistant_approval.py::test_new_application_routes_require_protocol_exact_owner_and_nonce_and_fence_legacy_mutation",
+        "tests/recovery/test_assistant_approval.py::test_delayed_recovery_and_stop_for_an_old_click_never_settle_a_new_acceptance",
+        "tests/recovery/test_assistant_actions.py::test_old_action_recovery_and_stop_cannot_cancel_the_new_explicit_retry"
       ]
     },
     {
       "id": "CAP-A13",
-      "status": "unimplemented",
-      "tests": []
+      "status": "partial",
+      "tests": [
+        "tests/recovery/test_assistant_approval.py::test_restart_recovers_the_original_write_or_proves_no_save_without_generation",
+        "tests/recovery/test_assistant_approval.py::test_interrupted_claim_persistence_aborts_its_orphan_journal_without_a_save",
+        "apps/web/unit/agent-api.test.ts::lost UI claim reply resumes the same nonce over the versioned local API without generation",
+        "tests/recovery/test_assistant_actions.py::test_project_action_reconciles_original_catalog_intent_without_repeating_the_save",
+        "tests/recovery/test_assistant_approval.py::test_missing_private_payload_and_lost_ui_receipt_recover_only_exact_canonical_save_proof",
+        "tests/recovery/test_assistant_actions.py::test_restart_cleanup_finishes_the_original_reviewed_delete_without_a_second_apply"
+      ]
     },
     {
       "id": "CAP-A14",
@@ -3687,19 +3712,34 @@
       "id": "CAP-A16",
       "status": "partial",
       "tests": [
-        "apps/web/unit/assistant-proposals.test.ts::action preview displays the server's exact target and irreversible consequence without promising editor Undo"
+        "apps/web/unit/assistant-proposals.test.ts::action preview displays the server's exact target and irreversible consequence without promising editor Undo",
+        "tests/recovery/test_assistant_actions.py::test_metadata_candidates_change_the_review_digest_without_saving_document_or_facts",
+        "tests/recovery/test_assistant_actions.py::test_delete_preview_requires_the_exact_project_and_names_its_irreversible_target",
+        "tests/recovery/test_assistant_actions.py::test_image_removal_requires_current_live_history_and_inflight_reference_proof",
+        "tests/recovery/test_assistant_actions.py::test_read_only_project_action_draft_survives_review_with_exact_metadata_and_no_write",
+        "tests/recovery/test_assistant_actions.py::test_explicit_action_after_generation_uses_one_catalog_receipt_and_preserves_text_history",
+        "tests/recovery/test_assistant_actions.py::test_reviewed_delete_uses_exact_target_and_recovers_receipt_after_private_project_cleanup",
+        "tests/recovery/test_assistant_actions.py::test_reviewed_action_rechecks_current_authority_and_baseline_before_commit",
+        "apps/web/unit/agent-editor-bridge.test.ts::reviewed metadata uses one guarded action port and refreshes the existing baseline without text history",
+        "tests/recovery/test_assistant_actions.py::test_project_cleanup_never_follows_a_private_draft_symlink_and_reports_incomplete_until_repaired"
       ]
     },
     {
       "id": "CAP-A17",
-      "status": "unimplemented",
-      "tests": []
+      "status": "partial",
+      "tests": [
+        "tests/recovery/test_assistant_history.py::test_read_only_generation_reviews_the_captured_native_action_then_apply_navigates_it",
+        "tests/recovery/test_assistant_history.py::test_a_new_history_offer_cannot_replace_the_action_captured_for_the_same_request",
+        "tests/recovery/test_assistant_history.py::test_chat_undo_reuses_the_existing_backend_inverse_owner_and_native_redo_receipt",
+        "apps/web/unit/agent-editor-bridge.test.ts::reviewed chat Undo moves the captured native action without adding a compensating history entry"
+      ]
     },
     {
       "id": "CAP-A18",
       "status": "partial",
       "tests": [
-        "tests/recovery/test_assistant_proposals.py::test_queued_check_only_completion_never_enters_background_publication"
+        "tests/recovery/test_assistant_proposals.py::test_queued_check_only_completion_never_enters_background_publication",
+        "tests/recovery/test_assistant_approval.py::test_queued_read_only_origin_uses_its_existing_artifact_journal_and_the_current_ui_writer"
       ]
     },
     {
@@ -3869,19 +3909,19 @@
       "check": "Run completed review/Apply flows and every legacy/background bypass against the final retained source; preserve native/manual gaps."
     },
     "CAP-A07": {
-      "unproved": "CAP02 covers durable non-mutating preparation only. Scope/fidelity and the full explicit Apply/publication/history/recovery boundary remain unproved.",
-      "owner": "CAP03–CAP06/CAP08; CAP07 for V7",
-      "check": "Run completed review/Apply flows and every legacy/background bypass against the final retained source; preserve native/manual gaps."
+      "unproved": "CAP05 is in progress. Project/history actions, complete queued restart/fencing, full fast/render, mounted T3 Apply/export and later/native/manual obligations remain unproved.",
+      "owner": "CAP05-CAP08; CAP07 for V7",
+      "check": "Complete the retained CAP05 gates and named plan cases against the final scoped revision before acceptance."
     },
     "CAP-A11": {
-      "unproved": "CAP02 covers durable non-mutating preparation only. Scope/fidelity and the full explicit Apply/publication/history/recovery boundary remain unproved.",
-      "owner": "CAP03–CAP06/CAP08; CAP07 for V7",
-      "check": "Run completed review/Apply flows and every legacy/background bypass against the final retained source; preserve native/manual gaps."
+      "unproved": "CAP05 implementation is not accepted. Final full checks, all resource/action races, mounted T3 Apply/Undo/export and later native/manual obligations remain open.",
+      "owner": "CAP05-CAP08; CAP07 for V7",
+      "check": "Finish current CAP05 gates against the retained scoped source before acceptance."
     },
     "CAP-A18": {
-      "unproved": "CAP02 covers durable non-mutating preparation only. Scope/fidelity and the full explicit Apply/publication/history/recovery boundary remain unproved.",
-      "owner": "CAP03–CAP06/CAP08; CAP07 for V7",
-      "check": "Run completed review/Apply flows and every legacy/background bypass against the final retained source; preserve native/manual gaps."
+      "unproved": "CAP05 is in progress. Project/history actions, complete queued restart/fencing, full fast/render, mounted T3 Apply/export and later/native/manual obligations remain unproved.",
+      "owner": "CAP05-CAP08; CAP07 for V7",
+      "check": "Complete the retained CAP05 gates and named plan cases against the final scoped revision before acceptance."
     },
     "CAP-A05": {
       "unproved": "Integrated Apply/recovery and other plan/native/manual obligations remain open; current evidence covers only the retained offline slice scope.",
@@ -3894,19 +3934,19 @@
       "check": "Complete the named CAP plan cases and retain exact synthetic/native/manual evidence before full acceptance."
     },
     "CAP-A08": {
-      "unproved": "Integrated Apply/recovery and other plan/native/manual obligations remain open; current evidence covers only the retained offline slice scope.",
-      "owner": "CAP05-CAP08",
-      "check": "Complete the named CAP plan cases and retain exact synthetic/native/manual evidence before full acceptance."
+      "unproved": "CAP05 is in progress. Project/history actions, complete queued restart/fencing, full fast/render, mounted T3 Apply/export and later/native/manual obligations remain unproved.",
+      "owner": "CAP05-CAP08; CAP07 for V7",
+      "check": "Complete the retained CAP05 gates and named plan cases against the final scoped revision before acceptance."
     },
     "CAP-A09": {
-      "unproved": "Integrated Apply/recovery and other plan/native/manual obligations remain open; current evidence covers only the retained offline slice scope.",
-      "owner": "CAP05-CAP08",
-      "check": "Complete the named CAP plan cases and retain exact synthetic/native/manual evidence before full acceptance."
+      "unproved": "CAP05 is in progress. Project/history actions, complete queued restart/fencing, full fast/render, mounted T3 Apply/export and later/native/manual obligations remain unproved.",
+      "owner": "CAP05-CAP08; CAP07 for V7",
+      "check": "Complete the retained CAP05 gates and named plan cases against the final scoped revision before acceptance."
     },
     "CAP-A12": {
-      "unproved": "Integrated Apply/recovery and other plan/native/manual obligations remain open; current evidence covers only the retained offline slice scope.",
-      "owner": "CAP05-CAP08",
-      "check": "Complete the named CAP plan cases and retain exact synthetic/native/manual evidence before full acceptance."
+      "unproved": "CAP05 is in progress. Project/history actions, complete queued restart/fencing, full fast/render, mounted T3 Apply/export and later/native/manual obligations remain unproved.",
+      "owner": "CAP05-CAP08; CAP07 for V7",
+      "check": "Complete the retained CAP05 gates and named plan cases against the final scoped revision before acceptance."
     },
     "CAP-A14": {
       "unproved": "Integrated Apply/recovery and other plan/native/manual obligations remain open; current evidence covers only the retained offline slice scope.",
@@ -3919,14 +3959,29 @@
       "check": "Complete the named CAP plan cases and retain exact synthetic/native/manual evidence before full acceptance."
     },
     "CAP-A16": {
-      "unproved": "Integrated Apply/recovery and other plan/native/manual obligations remain open; current evidence covers only the retained offline slice scope.",
-      "owner": "CAP05-CAP08",
-      "check": "Complete the named CAP plan cases and retain exact synthetic/native/manual evidence before full acceptance."
+      "unproved": "CAP05 implementation is not accepted. Final full checks, all resource/action races, mounted T3 Apply/Undo/export and later native/manual obligations remain open.",
+      "owner": "CAP05-CAP08; CAP07 for V7",
+      "check": "Finish current CAP05 gates against the retained scoped source before acceptance."
     },
     "CAP-A20": {
       "unproved": "Integrated Apply/recovery and other plan/native/manual obligations remain open; current evidence covers only the retained offline slice scope.",
       "owner": "CAP05-CAP08",
       "check": "Complete the named CAP plan cases and retain exact synthetic/native/manual evidence before full acceptance."
+    },
+    "CAP-A10": {
+      "unproved": "CAP05 implementation is not accepted. Final full checks, all resource/action races, mounted T3 Apply/Undo/export and later native/manual obligations remain open.",
+      "owner": "CAP05-CAP08; CAP07 for V7",
+      "check": "Finish current CAP05 gates against the retained scoped source before acceptance."
+    },
+    "CAP-A13": {
+      "unproved": "CAP05 implementation is not accepted. Final full checks, all resource/action races, mounted T3 Apply/Undo/export and later native/manual obligations remain open.",
+      "owner": "CAP05-CAP08; CAP07 for V7",
+      "check": "Finish current CAP05 gates against the retained scoped source before acceptance."
+    },
+    "CAP-A17": {
+      "unproved": "CAP05 implementation is not accepted. Final full checks, all resource/action races, mounted T3 Apply/Undo/export and later native/manual obligations remain open.",
+      "owner": "CAP05-CAP08; CAP07 for V7",
+      "check": "Finish current CAP05 gates against the retained scoped source before acceptance."
     }
   },
   "recovery": {
