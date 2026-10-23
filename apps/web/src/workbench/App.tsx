@@ -2,6 +2,7 @@ import { errorMessage } from "../errors/messages";
 import { useEffect, useState } from "react";
 import { ConnectionWorkflow, type ConnectionView } from "../connection/workflow";
 import { RichEditor } from "../rich/Editor";
+import { TemplateEditor } from "../rich/TemplateEditor";
 import { AssistantDrawer } from "../assistant/Drawer";
 import { projectRequest, readTimeline } from "../rich/api";
 import type { TimelineReport } from "../contracts/generated/timeline_report";
@@ -27,8 +28,10 @@ import { NotificationCenter, NotificationProvider, NotificationSection } from ".
 export function App({ portalHost }: { portalHost: HTMLElement }) {
   const workspace = useResumeWorkspace();
   const jobs = useGlobalJobs();
-  const { response, writer, background, projects, input, setInput, textDraft, error, status, setStatus, busy, settings, setSettings,
-    editor, assistant, acknowledge, action, fresh, open, remove, archive, process, upload, exportFile } = workspace;
+  const { response, template, writer, background, projects, input, setInput, textDraft, error, status, setStatus, busy, settings, setSettings,
+    editor, templateEditor, assistant, acknowledge, action, fresh, open, remove, archive, process, upload, exportFile } = workspace;
+  // The shown opening is V1 or V7; only the editor and file paths differ.
+  const shown = response ?? template?.response ?? null, mounted = () => editor.current ?? templateEditor.current;
   const [collapsed, setCollapsed] = useState(() => innerWidth <= 600);
   const [paneOrder, setPaneOrder] = useState(readPaneOrder);
   const changePaneOrder = (order: PaneOrder) => { savePaneOrder(order); setPaneOrder(order); };
@@ -44,7 +47,7 @@ export function App({ portalHost }: { portalHost: HTMLElement }) {
   const generation = response?.generation;
   const creating = generation !== null && generation !== undefined && ["queued", "running"].includes(generation.status);
   const source = response?.workspace.preDraft?.sources.find(item => item.id === response.workspace.preDraft?.selectedSourceId);
-  const view = importView(response, reviewed, sourceOpen);
+  const view = template ? "editor" : importView(response, reviewed, sourceOpen);
   const sourceWarnings = response?.workspace.warnings ?? [];
   const draftWarnings = sourceWarnings.length ? [] : groupedWarnings(response?.workspace.preDraft?.warnings ?? [], response?.workspace.preDraft?.sources);
   const failure = processingFailure(generation);
@@ -59,7 +62,7 @@ export function App({ portalHost }: { portalHost: HTMLElement }) {
     window.addEventListener("keydown", save); return () => window.removeEventListener("keydown", save);
   }, [settings, view, busy, workspace.dismissError]);
   const openSettings = () => void action(async current => {
-    await editor.current?.navigate();
+    await mounted()?.navigate();
     if (!current()) return;
     setSettingsVisited(true); setSettings(true); if (innerWidth <= 600) setCollapsed(true);
   });
@@ -67,6 +70,7 @@ export function App({ portalHost }: { portalHost: HTMLElement }) {
     workspace.dismissError();
     if (mode !== "export") { setFileMode(mode); return; }
     void action(async current => {
+      if (template) { await templateEditor.current?.flush(); if (current()) { setTimeline(null); setFileMode(mode); } return; }
       const saved = editor.current ? await editor.current.flush() : response;
       if (!current()) return;
       const timeline = saved ? await readTimeline(saved.workspace.projectId).catch(() => null) : null;
@@ -74,18 +78,18 @@ export function App({ portalHost }: { portalHost: HTMLElement }) {
       setTimeline(timeline); setFileMode(mode);
     });
   }
-  const projectTitle = response?.identity?.title ?? response?.workspace.title ?? "resume";
+  const projectTitle = shown?.identity?.title ?? shown?.workspace.title ?? "resume";
   const filename = projectFilename(projectTitle, fileMode === "export" ? "docx" : "foldcv");
   const navigate = (id: string) => open(id).then(done => { if (done) { setSourceOpen(false); if (innerWidth <= 600) setCollapsed(true); } return done; });
   return <NotificationProvider><main className={`app-shell${collapsed ? " history-collapsed" : ""}`} data-app="foldcv" data-busy={busy}>
-    <History projects={projects} activeId={response?.workspace.projectId ?? null} activity={projectActivity(jobs.view.jobs)} busy={busy || creating && !background} collapse={() => setCollapsed(true)}
+    <History projects={projects} activeId={shown?.workspace.projectId ?? null} activity={projectActivity(jobs.view.jobs)} busy={busy || creating && !background} collapse={() => setCollapsed(true)}
       fresh={() => { void fresh(); setSourceOpen(false); if (innerWidth <= 600) setCollapsed(true); }} open={navigate} remove={remove} archive={archive} openFile={() => openFile("open")} settings={openSettings}
       connection={connection?.snapshot.state === "connected" ? "Codex · подписка" : connection?.snapshot.state === "unchecked" ? "Подключение не проверено" : "Модель отключена"} />
     <section className="main-area">
-      <Header title={settings ? "Настройки" : response?.identity?.title ?? response?.workspace.title ?? (workspace.loading ? "Открываем резюме…" : "Новое резюме")}
-        subtitle={settings ? "FoldCV" : response?.identity?.subtitle || "Рабочий документ"} collapsed={collapsed} expand={() => setCollapsed(false)} status={status}
+      <Header title={settings ? "Настройки" : shown?.identity?.title ?? shown?.workspace.title ?? (workspace.loading ? "Открываем резюме…" : "Новое резюме")}
+        subtitle={settings ? "FoldCV" : shown?.identity?.subtitle || "Рабочий документ"} collapsed={collapsed} expand={() => setCollapsed(false)} status={status}
         ready={!settings && view === "editor"} busy={busy} save={() => openFile("save")} exportFile={() => openFile("export")}
-        retrySave={status !== "Сохранено" && status !== "Изменения сохраняются…" && status !== "Требуется восстановление черновика" ? () => void action(async current => { await editor.current?.flush(); if (current()) setStatus("Сохранено"); }) : undefined}
+        retrySave={status !== "Сохранено" && status !== "Изменения сохраняются…" && status !== "Требуется восстановление черновика" ? () => void action(async current => { await mounted()?.flush(); if (current()) setStatus("Сохранено"); }) : undefined}
         activity={<><NotificationCenter />{jobs.view.enabled && <BackgroundJobs registry={jobs.registry} view={jobs.view} openProject={navigate} />}</>} />
       <NotificationSection count={Number(!!error && !fileMode) + Number(!!jobs.view.error)}>
         <section className="notice-group" aria-label="Ошибки"><h3>Ошибки</h3>
@@ -116,13 +120,19 @@ export function App({ portalHost }: { portalHost: HTMLElement }) {
               onProjectLifecycle={kind => workspace.projectLifecycle(response.workspace.projectId, kind)}
               title={projectTitle} settings={openSettings} />} />
         </>}
+        {view === "editor" && template?.response.workspace.project && (template.connection
+          ? <TemplateEditor key={`${template.response.workspace.projectId}:${workspace.openingEpoch}`} initial={template.response} connection={template.connection}
+            onStatus={setStatus} onShown={workspace.acknowledgeTemplate} ref={templateEditor} portalHost={portalHost} />
+          : <p className="notice warning" role="alert">{errorMessage("JOB_DISABLED")}</p>)}
         {view === "source" && !workspace.loading && <SourceForm input={input} change={setInput} textDraft={textDraft} busy={busy || creating} sourceName={source?.originalName ?? null}
           allowTextRewrite={workspace.allowTextRewrite} changeTextRewrite={workspace.setAllowTextRewrite}
+          strictTemplate={workspace.templateImport} strict={workspace.strictImport} changeStrict={workspace.setStrictImport}
           process={() => { setSourceOpen(false); void process(); }} />}
       </div>
-      {settingsVisited && <div className="screen" hidden={!settings}><Settings close={() => void action(async current => { await editor.current?.resume(); if (current()) setSettings(false); })} connectionChanged={setConnection} paneOrder={paneOrder} changePaneOrder={changePaneOrder} /></div>}
+      {settingsVisited && <div className="screen" hidden={!settings}><Settings close={() => void action(async current => { await mounted()?.resume(); if (current()) setSettings(false); })} connectionChanged={setConnection} paneOrder={paneOrder} changePaneOrder={changePaneOrder} /></div>}
     </section>
-    {fileMode && <FileDialog key={fileMode} mode={fileMode} title={projectTitle} subtitle={response?.identity?.subtitle ?? ""} filename={filename}
+    {fileMode && <FileDialog key={fileMode} mode={fileMode} title={projectTitle} subtitle={shown?.identity?.subtitle ?? ""} filename={filename}
+      templateName={template?.response.workspace.project ? `${template.response.workspace.project.templatePackage.definition.template.name} · ${template.response.workspace.project.templatePackage.definition.template.revision}` : undefined}
       timeline={timeline} error={error} busy={busy} operation={workspace.operation?.label} close={() => setFileMode(null)} download={() => exportFile(fileMode === "export" ? "export" : "archive",
         current => projectFilename(current.identity?.title ?? current.workspace.title, fileMode === "export" ? "docx" : "foldcv"))}
       upload={async file => { const done = await upload(file); if (done) { setSourceOpen(false); setSettings(false); if (innerWidth <= 600) setCollapsed(true); } return done; }} />}

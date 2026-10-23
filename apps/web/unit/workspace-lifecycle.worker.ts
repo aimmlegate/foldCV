@@ -28,7 +28,15 @@ let holdRequest = false;
 mock.module(file("../src/rich/api.ts"), { namedExports: {
   deleteProject: async (id: string) => { events.push(`delete:${id}`); if (holdRequest) await pendingRequest.promise; return {}; },
   download: async () => new Blob(),
+  downloadTemplate: async () => ({ blob: new Blob() }),
+  openedProject: async (path: string) => {
+    events.push(`request:${path}`);
+    if (path === "/T" || path === "/archive" && process.argv[2] === "template-upload")
+      return { kind: "template", response: { workspace: { projectId: "T", project: {} }, identity: null } };
+    return { kind: "rich", response: { workspace: { projectId: path === "/A" ? "A" : "B", project: {}, preDraft: null } } };
+  },
   listProjects: async () => { events.push("catalog"); return { entries: [] }; },
+  templateImportStatus: async () => null,
   request: async (path: string) => { events.push(`request:${path}`); return {}; },
   RichApiFailure: class extends Error {},
   projectRequest: async (path: string) => {
@@ -36,9 +44,10 @@ mock.module(file("../src/rich/api.ts"), { namedExports: {
     return { workspace: { projectId: path === "/A" || path === "/A/activate" ? "A" : "B", project: {}, preDraft: null } };
   },
 } });
-mock.module(file("../src/background/connection.ts"), { namedExports: { attachExclusiveWriter: async () => null } });
+mock.module(file("../src/background/connection.ts"), { namedExports: { attachExclusiveWriter: async () => null,
+  attachExclusiveTemplateWriter: async (id: string) => { events.push(`attach-template:${id}`); return null; } } });
 mock.module(file("../src/background/fixed.ts"), { namedExports: { FixedOperations: class {} } });
-mock.module(file("../src/background/api.ts"), { namedExports: { JobsApi: class {} } });
+mock.module(file("../src/background/api.ts"), { namedExports: { JobsApi: class {}, startTemplateImport: async () => { throw new Error("unused"); } } });
 mock.module(file("../src/workbench/import/notices.ts"), { namedExports: { warningLabel: (value: unknown) => value } });
 const { useResumeWorkspace } = await import("../src/workbench/useResumeWorkspace");
 const hook = useResumeWorkspace();
@@ -109,6 +118,22 @@ if (wait) {
   gate.resolve(); await hook.fresh(); events.length = 0;
   assert.equal(await hook.open("B"), true);
   assert.deepEqual(events, ["request:/B", "request:/B/activate", "catalog", "url:/?project=B"]);
+} else if (scenario === "template-open") {
+  gate.resolve(); await hook.fresh(); events.length = 0;
+  assert.equal(await hook.open("T"), true);
+  assert.deepEqual(events, ["request:/T", "attach-template:T", "request:/T/activate", "catalog", "url:/?project=T"]);
+  // Leaving a V7 opening drains and detaches its own editor, exactly like V1.
+  hook.editor.current = null;
+  hook.templateEditor.current = { background: true, navigate: async () => { events.push("template-navigate"); }, resume: async () => {}, refresh: async () => {},
+    flush: async () => { throw new Error("Unexpected flush"); }, undo: () => {}, redo: () => {} };
+  events.length = 0;
+  assert.equal(await hook.open("B"), true);
+  assert.deepEqual(events, ["template-navigate", "request:/B", "request:/B/activate", "catalog", "url:/?project=B"]);
+} else if (scenario === "template-upload") {
+  // A V7 .foldcv opens in the template editor with its own writer, like a V7 project from the list.
+  gate.resolve(); await hook.fresh(); events.length = 0;
+  assert.equal(await hook.upload(new File(["synthetic"], "project.foldcv")), true);
+  assert.deepEqual(events, ["request:/archive", "attach-template:T", "url:/?project=T", "catalog"]);
 } else throw new Error(`Unknown scenario ${scenario}`);
 assert.equal(staleState, 0);
 unmount();

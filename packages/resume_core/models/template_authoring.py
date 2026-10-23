@@ -2,7 +2,7 @@
 
 from typing import Annotated, Literal
 
-from pydantic import ConfigDict, Field, model_validator
+from pydantic import ConfigDict, Field, PrivateAttr, model_validator
 
 from .contracts import Id, Revision, Sha256, Wire, _unique
 from .rich_document import Alignment, Color, Hyperlink, InlineStyles, StyledText
@@ -273,6 +273,12 @@ class TemplatePreparedEditV1(Wire):
     created_ids: dict[str, dict[str, Id]]
     mutation: TemplateMutationV1 | None
     preview: TemplateProjectResponseV1
+    # Set only by the preparer; the address map needs typed versus restyled text.
+    _address_middle: Literal['inserted', 'restyled'] | None = PrivateAttr(default=None)
+
+    @property
+    def address_middle(self):
+        return self._address_middle
 
     @model_validator(mode='after')
     def identity(self):

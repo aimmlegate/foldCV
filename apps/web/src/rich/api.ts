@@ -51,10 +51,34 @@ export function requestWire(path: string, body: JsonWireNode): Promise<unknown> 
   return jsonRequest(prefix + path, { method: "POST", credentials: "same-origin", cache: "no-store",
     headers: { "Content-Type": "application/json" }, body: parseJsonWire(body.wire).wire });
 }
+export type TemplateImportPackage = { id: string; name: string; revision: string; packageHash: string };
+/** Strict template import is offered only when the service has it configured; it names the store's active package. */
+export async function templateImportStatus(): Promise<TemplateImportPackage | null> {
+  const value = await rootRequest("/v1/rich/template-import");
+  if (typeof value !== "object" || value === null || Reflect.get(value, "schemaVersion") !== 1) throw new RichApiFailure("INVALID_RESULT");
+  const available: unknown = Reflect.get(value, "available"), item: unknown = Reflect.get(value, "package");
+  if (available !== true) return null;
+  const text = (key: string) => { const field: unknown = typeof item === "object" && item !== null ? Reflect.get(item, key) : null;
+    if (typeof field !== "string" || !field) throw new RichApiFailure("INVALID_RESULT"); return field; };
+  return { id: text("id"), name: text("name"), revision: text("revision"), packageHash: text("packageHash") };
+}
 export async function projectRequest(path: string, method = "GET", body?: unknown): Promise<RichProjectResponse> {
   const response = await request(path, method, body);
   if (!responseShape(response)) throw new RichApiFailure("INVALID_RESULT");
   return response;
+}
+export type OpenedProject = { kind: "rich"; response: RichProjectResponse } | { kind: "template"; response: TemplateProjectResponseV1 };
+/** One read decides the family: a V7 workspace answers with the verified template response. */
+export async function openedProject(path: string, method = "GET", body?: unknown): Promise<OpenedProject> {
+  const value = await request(path, method, body);
+  const workspace = typeof value === "object" && value !== null && "workspace" in value ? value.workspace : null;
+  if (typeof workspace === "object" && workspace !== null && "schemaVersion" in workspace && workspace.schemaVersion === 7) {
+    const response = await templateProjectReply(value);
+    if (!response) throw new RichApiFailure("INVALID_RESULT");
+    return { kind: "template", response };
+  }
+  if (!responseShape(value)) throw new RichApiFailure("INVALID_RESULT");
+  return { kind: "rich", response: value };
 }
 export async function templateProjectRequest(path: string, method = "GET", body?: unknown): Promise<TemplateProjectResponseV1> {
   const response = await templateProjectReply(await request(path, method, body));

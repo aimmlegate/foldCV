@@ -11,7 +11,8 @@ from packages.resume_core.models.background import (WriterAbandonV1, WriterAdvan
     WriterDraftResolveV1)
 from packages.resume_core.models.template_writer import (WriterAdvanceV2, WriterBarrierAckV2, WriterCheckpointV2,
     WriterDraftResolveV2, WriterMutationV2, WriterLocalHistoryCommandV2, WriterPrepareEditV2,
-    WriterCaptureClipboardV2, WriterReleaseClipboardV2)
+    WriterCaptureClipboardV2, WriterReleaseClipboardV2, WriterRewritePreviewV2, WriterRewriteCancelV2,
+    TemplateRewritePreviewV1, WriterRewriteCancelResultV2)
 
 
 def mount_writers(app, service):
@@ -34,7 +35,7 @@ def mount_writers(app, service):
             result = await asyncio.to_thread(abandon)
         else:
             result = await asyncio.to_thread(function, project, *([] if payload is None else [payload]))
-        if method in {"detach", "abandon", "restore_saved_draft", "discard_draft", "reconcile"}:
+        if method in {"detach", "abandon", "restore_saved_draft", "discard_draft", "pending_input_draft", "reconcile"}:
             service.wake_publication(project)
         return wire_response(result)
 
@@ -108,6 +109,10 @@ def mount_writers(app, service):
     async def recover(project_id: str, payload: WriterDraftCommandV1):
         return await call(project_id, "restore_saved_draft", payload)
 
+    @app.post(prefix + "/draft/pending-input")
+    async def pending_input(project_id: str, payload: WriterDraftCommandV1):
+        return await call(project_id, "pending_input_draft", payload)
+
     @app.post(prefix + "/abandon")
     async def abandon(project_id: str, payload: WriterAbandonV1):
         return await call(project_id, "abandon", payload)
@@ -178,6 +183,26 @@ def mount_writers(app, service):
     @app.post(prefix + '/clipboard/release')
     async def release_clipboard(project_id: str, payload: WriterReleaseClipboardV2):
         return await call(project_id, 'release_clipboard', payload)
+
+    @app.post(prefix + '/rewrite/preview')
+    async def rewrite_preview(project_id: str, payload: WriterRewritePreviewV2):
+        # Generation reads verified text and changes nothing; Apply is an ordinary prepared edit.
+        generate = getattr(service.projects, 'template_rewrite_text', None)
+        if not service.enabled or generate is None:
+            raise BackgroundFailure('JOB_DISABLED')
+        source = await asyncio.to_thread(service.writers.rewrite_source, project_id, payload)
+        text = await generate(project_id, payload.request_id, payload.instruction, source)
+        return wire_response(TemplateRewritePreviewV1(schemaVersion=1, requestId=payload.request_id,
+            snapshot=payload.snapshot, range=payload.range, source=source, text=text))
+
+    @app.post(prefix + '/rewrite/cancel')
+    async def rewrite_cancel(project_id: str, payload: WriterRewriteCancelV2):
+        cancel = getattr(service.projects, 'template_rewrite_cancel', None)
+        if not service.enabled or cancel is None:
+            raise BackgroundFailure('JOB_DISABLED')
+        await asyncio.to_thread(service.writers.read_snapshot, project_id, payload.proof)
+        return wire_response(WriterRewriteCancelResultV2(schemaVersion=2, requestId=payload.request_id,
+            cancelled=cancel(project_id, payload.request_id)))
 
     @app.post(prefix + '/prepare-delta')
     async def prepare_edit_delta(project_id: str, payload: WriterPrepareEditV2):

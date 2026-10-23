@@ -1,7 +1,7 @@
 import { errorMessage } from "../../errors/messages";
 import { useEffect, useLayoutEffect, useRef } from "react";
 import { Icon } from "../ui/Icon";
-import { rewriteCancellable, rewriteLabels, type RewriteActivity, type RewritePreview } from "../../rich/rewrite-progress";
+import { rewriteCancellable, rewriteLabels, type RewriteActivity } from "../../rich/rewrite-progress";
 import { Button } from "../ui/Button";
 import { OperationStatus } from "../ui/OperationStatus";
 
@@ -9,7 +9,7 @@ export function RewritePanel({ open, close, instruction, change, submit, apply, 
   open: boolean; close: () => void; instruction: string; change: (value: string) => void;
   submit: () => void; busy: boolean; source: string; error: string;
   activity: RewriteActivity | null; cancel: (id: string) => void;
-  preview: RewritePreview | null; apply: () => void; editPreview: (text: string) => void;
+  preview: { text: string; applied?: boolean } | null; apply: () => void; editPreview: (text: string) => void;
   anchor: { left: number; top: number; bottom: number } | null; focusInstruction: boolean;
 }) {
   const dialog = useRef<HTMLElement>(null), returnFocus = useRef<HTMLElement | null>(null);

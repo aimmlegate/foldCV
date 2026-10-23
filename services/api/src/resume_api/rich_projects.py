@@ -35,9 +35,11 @@ from .lifecycle import OperationFiles, SpikeError
 from .rich_assets import RichAssets
 from .rich_synchronization import RichSynchronization
 from .template_exports import TemplateExports
+from .template_rewrite import TemplateRewrite
+from .template_imports import TemplateImports
 
 
-class RichProjectService(TemplateExports, RichSynchronization, RichAssets, GuiProjectService):
+class RichProjectService(TemplateExports, TemplateRewrite, TemplateImports, RichSynchronization, RichAssets, GuiProjectService):
     def __init__(self, temp_root, rules, provider_factory, *, import_runtime=None, import_provider_factory=None, **options):
         options.setdefault("storage", RichProjectStore(rules.root))
         options.setdefault("renderer", RichDocxRenderer())

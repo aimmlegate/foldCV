@@ -109,7 +109,7 @@ class AgentService:
         selected = next((model for model in models if model.model == settings.selected_agent_model), None)
         if reason is None and selected is not None and selected.state == "incompatible":
             reason = "AGENT_MODEL_INCOMPATIBLE"
-        return AgentCapabilities(schemaVersion=1, ready=reason is None, binaryVersion=VERSION,
+        return AgentCapabilities(schemaVersion=1, ready=reason is None, binaryVersion=getattr(getattr(self.runtime, "profile", None), "version", VERSION),
             binarySha256=self.binary_sha256, protocolSha256=PROTOCOL_SHA256, configSha256=self.config_digest(allow_edits, allow_web),
             connectionEpoch=connection.epoch, modes=["edit", "check_only"],
             tools=list(getattr(self.tools, "names", ())), webAvailable=self.runtime is not None,

@@ -1,5 +1,5 @@
+import type { OrderDocument } from "../../rich/technology-order";
 import type { WorkingFacts } from "../../contracts/generated/working_facts";
-import type { RichDocumentV1 } from "../../contracts/generated/rich_document_v1";
 import { technologyKey } from "../../rich/panel-intents";
 
 const groups = [
@@ -44,7 +44,7 @@ function rawText(value: unknown): string {
   return Object.values(value).map(rawText).join(" ");
 }
 
-function description(document: RichDocumentV1 | undefined, jobId: string | null): string {
+function description(document: OrderDocument | undefined, jobId: string | null): string {
   const text: string[] = [];
   const inline = (value: unknown): string => {
     if (typeof value === "string") return value;
@@ -53,8 +53,9 @@ function description(document: RichDocumentV1 | undefined, jobId: string | null)
     if ("text" in value && typeof value.text === "string") return value.text;
     return ["content", "rows", "cells"].map(key => key in value ? inline(Reflect.get(value, key)) : "").join(" ");
   };
-  const visit = (block: RichDocumentV1["regions"][number]["blocks"][number], parent: string | null) => {
-    const owner = block.type === "section" ? block.props.recordId || parent : parent;
+  const visit = (block: OrderDocument["regions"][number]["blocks"][number], parent: string | null) => {
+    const recordId: unknown = typeof block.props === "object" && block.props !== null ? Reflect.get(block.props, "recordId") : null;
+    const owner = block.type === "section" ? (typeof recordId === "string" && recordId) || parent : parent;
     if (jobId === null || owner === jobId) text.push(inline(block.content));
     block.children.forEach(child => visit(child, owner));
   };
@@ -62,7 +63,7 @@ function description(document: RichDocumentV1 | undefined, jobId: string | null)
   return text.join(" ");
 }
 
-export function technologySuggestions(facts: WorkingFacts, jobId: string | null, query: string, document?: RichDocumentV1): string[] {
+export function technologySuggestions(facts: WorkingFacts, jobId: string | null, query: string, document?: OrderDocument): string[] {
   const context = technologyKey(facts.records.filter(record => record.kind !== "technology" && (jobId === null || record.id === jobId || "jobId" in record && record.jobId === jobId))
     .map(rawText).join(" ") + " " + description(document, jobId));
   const existing = facts.records.filter(record => record.kind === "technology").map(record => record.display.rawText);

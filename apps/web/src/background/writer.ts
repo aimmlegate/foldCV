@@ -18,22 +18,19 @@ import type { CellValue, HistoryReservation, SessionHistory } from "../rich/hist
 import { retainResume, type AttachedWriter } from "./connection";
 import { sha256, sameValue, containsSubmitted } from "./wire";
 import type { LocalDraft } from "./drafts";
+import { timers, WriterLifecycle, type WriterMode, type WriterObserver, type WriterTimers } from "./writer-lifecycle";
 
-export type WriterMode = "normal" | "protected" | "recovering" | "read_only" | "detached" | "closed";
+export type { WriterMode, WriterObserver, WriterTimers };
+
 export type EditorSnapshot = { document: RichDocumentV1; facts: WorkingFacts; assets: { id: string; sha256: string }[] };
 export type WriterEditorPort = { queue: RichSaveQueue; history: SessionHistory; snapshot: () => EditorSnapshot;
   cells: (response: RichProjectResponse) => ReadonlyMap<string, CellValue>; flushLocal: () => Promise<void>;
   compositionEnd: () => Promise<void>; lock: (locked: boolean) => void; changed: (mode: WriterMode, error: string | null) => void;
   saved: (job: JobSnapshotV1) => void; applyHistory: (direction: "undo" | "redo") => boolean };
-export type WriterTimers = { alarm: (callback: () => void, ms: number) => () => void };
-export type WriterObserver = (name: "composition_end" | "local_barrier_acquired" | "final_flush_started" | "touch_watermark_durable"
-  | "barrier_acked" | "adoption_started" | "draft_checkpointed" | "clean_detach_acked" | "writer_resumed") => Promise<void>;
-const timers: WriterTimers = { alarm: (callback, ms) => { const timer = setTimeout(callback, ms); return () => clearTimeout(timer); } };
 type Touch = NonNullable<WriterAdvanceV1["touches"]>[number];
 
 /** Canonical replies only advance proof; accepted local input has its own durable buffer. */
-export class BackgroundWriter {
-  mode: WriterMode;
+export class BackgroundWriter extends WriterLifecycle {
   cursor: number;
   private sequence: number;
   private touches: Touch[] = [];
@@ -41,8 +38,6 @@ export class BackgroundWriter {
   private historyOutbox: NonNullable<DraftPayloadV1["historyOutbox"]> = [];
   private local: LocalDraft | null;
   private last: EditorSnapshot;
-  private operation = 0;
-  private active: Promise<void> | null = null;
   private durableCursor = -1;
   private readonly completed = new Set<string>();
   private readonly expiredHistory = new Set<string>();
@@ -55,8 +50,9 @@ export class BackgroundWriter {
   private heartbeatProof: WriterProofV1 | null = null;
   private recoveryJob: { job: JobSnapshotV1; proposal: ProposalBindingV1; cursor: number } | null = null;
 
-  constructor(readonly connection: AttachedWriter, private readonly editor: WriterEditorPort, private readonly time = timers,
-    private readonly observe: WriterObserver = () => Promise.resolve()) {
+  constructor(readonly connection: AttachedWriter, private readonly editor: WriterEditorPort, time = timers,
+    observe: WriterObserver = () => Promise.resolve()) {
+    super(time, observe);
     this.local = connection.local?.record ?? null;
     this.cursor = this.local?.cursor ?? connection.view.writer.acknowledgedCursor;
     this.sequence = Math.max(this.local?.sequence ?? 0, connection.view.writer.draftSequenceFloor ?? 0);
@@ -82,8 +78,11 @@ export class BackgroundWriter {
     return { schemaVersion: 1, proof: this.proof, canonicalRevision: this.view.response.workspace.projectRevision,
       canonicalSha256: this.view.workspaceSha256, actionCursor: this.cursor, touches: structuredClone(this.touches) };
   }
-  private current(ticket: number): void { if (ticket !== this.operation || this.mode !== "protected") throw new Error("WRITER_STALE_CALLBACK"); }
-  private setMode(mode: WriterMode, error: string | null = null): void { this.mode = mode; this.editor.changed(mode, error); }
+  // Kept in this file: NB-G03 mutation evidence removes exactly this guard from the V1 writer source.
+  protected override current(ticket: number): void { if (ticket !== this.operation || this.mode !== "protected") throw new Error("WRITER_STALE_CALLBACK"); }
+  protected notify(mode: WriterMode, error: string | null): void { this.editor.changed(mode, error); }
+  protected lockInput(locked: boolean): void { this.editor.lock(locked); }
+  protected compositionDone(): Promise<void> { return this.editor.compositionEnd(); }
   private acknowledge(view: WriterViewV1): void {
     const proof = this.proof;
     if (view.writer.lineage !== proof.lineage || view.writer.epoch !== proof.epoch || view.writer.incarnation !== proof.incarnation
@@ -212,7 +211,7 @@ export class BackgroundWriter {
     if (!["normal", "protected"].includes(this.mode)) return;
     this.acknowledge(result); await this.observe("touch_watermark_durable"); await this.clearCleanDraft();
   }
-  private enterRecovery(error: unknown): void {
+  protected enterRecovery(error: unknown): void {
     if (["closed", "detached", "read_only"].includes(this.mode)) return;
     ++this.operation; this.editor.queue.fencePrepared();
     for (const reservation of this.reservations) this.editor.history.discard(reservation);
@@ -282,27 +281,6 @@ export class BackgroundWriter {
       retainResume(this.connection.api.project, this.proof, next, this.cursor, 0);
       await this.observe("writer_resumed"); this.current(ticket);
     });
-  }
-  private bounded(work: (ticket: number) => Promise<void>): Promise<void> {
-    if (this.active) return this.active;
-    const task = (async () => {
-      await this.editor.compositionEnd();
-      await this.observe("composition_end");
-      if (this.mode !== "normal") return;
-      this.setMode("protected"); this.editor.lock(true);
-      const ticket = ++this.operation;
-      let cancel = () => {};
-      const expiry = new Promise<never>((_resolve, reject) => { cancel = this.time.alarm(() => reject(new Error("WRITER_BARRIER_TIMEOUT")), 750); });
-      try { await Promise.race([work(ticket), expiry]); }
-      catch (error) { this.enterRecovery(error); throw error; }
-      finally {
-        cancel();
-        if (["protected"].includes(this.mode) && ticket === this.operation) { this.setMode("normal"); this.editor.lock(false); }
-      }
-    })();
-    this.active = task;
-    void task.finally(() => { if (this.active === task) this.active = null; }).catch(() => {});
-    return task;
   }
   private historyRequest(job: JobSnapshotV1, owner: UndoOwnershipV1): WriterHistoryRequestV1 {
     if (!job.proposalId) throw new Error("INVALID_RESULT");

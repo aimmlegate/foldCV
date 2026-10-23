@@ -1,18 +1,24 @@
 import type { WorkingFacts } from "../contracts/generated/working_facts";
-import type { RichDocumentV1 } from "../contracts/generated/rich_document_v1";
-import type { RichBlock } from "./save-queue";
 
 type Technology = Extract<WorkingFacts["records"][number], { kind: "technology" }>;
+type OrderBlock = { id: string; type: string; props?: unknown; content?: unknown; children: readonly OrderBlock[] };
+/** The fields technology order reads; V1 and V7 documents both provide them. */
+export type OrderDocument = { regions: readonly { role: string; blocks: readonly OrderBlock[] }[] };
 
-export function documentTechnologies(facts: WorkingFacts, document: RichDocumentV1, jobId: string | null): Technology[] {
+function field(value: unknown, key: string): unknown { return typeof value === "object" && value !== null ? Reflect.get(value, key) : undefined; }
+
+export function documentTechnologies(facts: Pick<WorkingFacts, "records">, document: OrderDocument, jobId: string | null): Technology[] {
   const records = facts.records.filter((record): record is Technology => record.kind === "technology" && record.jobId === jobId);
   const order = new Map<string, number>();
-  function visit(blocks: readonly RichBlock[], focus = false, grouped = false, groupsOnly = false) {
+  function visit(blocks: readonly OrderBlock[], focus = false, grouped = false, groupsOnly = false) {
     for (const block of blocks) {
-      const insideFocus = focus || block.type === "section" && block.props.presentation === "focus";
+      const insideFocus = focus || block.type === "section" && field(block.props, "presentation") === "focus";
       const insideGroup = grouped || block.id.startsWith("technology_group_");
-      if (!insideFocus && (!groupsOnly || insideGroup) && Array.isArray(block.content)) for (const span of block.content)
-        if (span.type === "fact_field" && span.fieldKey === "display" && !order.has(span.recordId)) order.set(span.recordId, order.size);
+      if (!insideFocus && (!groupsOnly || insideGroup) && Array.isArray(block.content)) for (const span of block.content) {
+        const recordId = field(span, "recordId");
+        if (field(span, "type") === "fact_field" && field(span, "fieldKey") === "display" && typeof recordId === "string" && !order.has(recordId))
+          order.set(recordId, order.size);
+      }
       visit(block.children, insideFocus, insideGroup, groupsOnly);
     }
   }

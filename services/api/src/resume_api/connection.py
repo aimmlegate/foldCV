@@ -14,7 +14,7 @@ import time
 
 from packages.resume_core.reasoning import ModelReasoning, model_reasoning
 from resume_api.cli.process_runner import ProcessExit, ProcessRunner
-from resume_api.cli.experimental_profile import ExperimentalCliProfile, ExperimentalProfileError, VERSION as EXPERIMENTAL_VERSION
+from resume_api.cli.experimental_profile import ExperimentalCliProfile, ExperimentalProfileError
 from resume_api.lifecycle import OperationFiles, SpikeError
 from resume_api.providers.codex_cli import MODEL, strict_json
 from spikes.cli.profile import VERSION, overrides
@@ -144,7 +144,7 @@ class ConnectionAdapter:
             version = raw.decode("utf-8", "strict").strip()
         except UnicodeError:
             raise ConnectionFailure("UNSUPPORTED_VERSION") from None
-        expected = EXPERIMENTAL_VERSION if self.experimental_profile is not None else VERSION
+        expected = self.experimental_profile.version if self.experimental_profile is not None else VERSION
         if len(version) > 80 or version != expected and not (self.allow_fixture and version == VERSION + "-fixture"):
             raise ConnectionFailure("UNSUPPORTED_VERSION", version if len(version) <= 80 else None)
         return version

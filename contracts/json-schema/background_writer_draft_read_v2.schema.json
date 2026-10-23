@@ -806,6 +806,133 @@
       "title": "DraftCheckpointV1",
       "type": "object"
     },
+    "DraftHeadV1": {
+      "additionalProperties": false,
+      "properties": {
+        "clientMutationId": {
+          "maxLength": 256,
+          "minLength": 1,
+          "title": "Clientmutationid",
+          "type": "string"
+        },
+        "preparationWire": {
+          "title": "Preparationwire",
+          "type": "string"
+        },
+        "stage": {
+          "enum": [
+            "frozen",
+            "prepared",
+            "saving"
+          ],
+          "title": "Stage",
+          "type": "string"
+        }
+      },
+      "required": [
+        "clientMutationId",
+        "preparationWire",
+        "stage"
+      ],
+      "title": "DraftHeadV1",
+      "type": "object"
+    },
+    "DraftIntentV1": {
+      "additionalProperties": false,
+      "properties": {
+        "actionId": {
+          "maxLength": 256,
+          "minLength": 1,
+          "title": "Actionid",
+          "type": "string"
+        },
+        "actionToken": {
+          "minimum": 0,
+          "title": "Actiontoken",
+          "type": "integer"
+        },
+        "clientMutationId": {
+          "maxLength": 256,
+          "minLength": 1,
+          "title": "Clientmutationid",
+          "type": "string"
+        },
+        "localId": {
+          "maxLength": 256,
+          "minLength": 1,
+          "title": "Localid",
+          "type": "string"
+        },
+        "operation": {
+          "discriminator": {
+            "mapping": {
+              "merge_blocks": "#/$defs/LocalMergeBlocksV1",
+              "replace_text": "#/$defs/LocalReplaceTextV1",
+              "set_marks": "#/$defs/LocalSetMarksV1",
+              "split_block": "#/$defs/LocalSplitBlockV1"
+            },
+            "propertyName": "kind"
+          },
+          "oneOf": [
+            {
+              "$ref": "#/$defs/LocalReplaceTextV1"
+            },
+            {
+              "$ref": "#/$defs/LocalSetMarksV1"
+            },
+            {
+              "$ref": "#/$defs/LocalSplitBlockV1"
+            },
+            {
+              "$ref": "#/$defs/LocalMergeBlocksV1"
+            }
+          ],
+          "title": "Operation"
+        },
+        "prior": {
+          "items": {
+            "$ref": "#/$defs/DraftTextV1"
+          },
+          "maxItems": 2,
+          "minItems": 1,
+          "title": "Prior",
+          "type": "array"
+        }
+      },
+      "required": [
+        "localId",
+        "actionId",
+        "actionToken",
+        "clientMutationId",
+        "operation",
+        "prior"
+      ],
+      "title": "DraftIntentV1",
+      "type": "object"
+    },
+    "DraftLocalBlockV1": {
+      "additionalProperties": false,
+      "properties": {
+        "canonical": {
+          "maxLength": 256,
+          "minLength": 1,
+          "title": "Canonical",
+          "type": "string"
+        },
+        "local": {
+          "maxLength": 256,
+          "minLength": 1,
+          "title": "Local",
+          "type": "string"
+        }
+      },
+      "required": [
+        "local",
+        "canonical"
+      ],
+      "title": "DraftLocalBlockV1",
+      "type": "object"
+    },
     "DraftPayloadV2": {
       "additionalProperties": false,
       "properties": {
@@ -861,6 +988,17 @@
           "title": "Schemaversion",
           "type": "integer"
         },
+        "templateQueue": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/TemplateQueueDraftV1"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
         "touches": {
           "items": {
             "$ref": "#/$defs/WriterTouchV2"
@@ -882,6 +1020,24 @@
       "title": "DraftPayloadV2",
       "type": "object",
       "x-maxSerializedBytes": 2097152
+    },
+    "DraftTextV1": {
+      "additionalProperties": false,
+      "properties": {
+        "container": {
+          "$ref": "#/$defs/LocalContainerV1"
+        },
+        "text": {
+          "title": "Text",
+          "type": "string"
+        }
+      },
+      "required": [
+        "container",
+        "text"
+      ],
+      "title": "DraftTextV1",
+      "type": "object"
     },
     "EducationRecord": {
       "additionalProperties": false,
@@ -2165,6 +2321,194 @@
         "kind"
       ],
       "title": "LiteralDisplayBinding",
+      "type": "object"
+    },
+    "LocalContainerV1": {
+      "additionalProperties": false,
+      "properties": {
+        "blockId": {
+          "maxLength": 256,
+          "minLength": 1,
+          "title": "Blockid",
+          "type": "string"
+        },
+        "cellId": {
+          "anyOf": [
+            {
+              "maxLength": 256,
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Cellid"
+        },
+        "kind": {
+          "enum": [
+            "content",
+            "caption",
+            "cell"
+          ],
+          "title": "Kind",
+          "type": "string"
+        }
+      },
+      "required": [
+        "blockId",
+        "kind",
+        "cellId"
+      ],
+      "title": "LocalContainerV1",
+      "type": "object"
+    },
+    "LocalMergeBlocksV1": {
+      "additionalProperties": false,
+      "properties": {
+        "kind": {
+          "const": "merge_blocks",
+          "title": "Kind",
+          "type": "string"
+        },
+        "leading": {
+          "$ref": "#/$defs/LocalContainerV1"
+        },
+        "trailing": {
+          "$ref": "#/$defs/LocalContainerV1"
+        }
+      },
+      "required": [
+        "kind",
+        "leading",
+        "trailing"
+      ],
+      "title": "LocalMergeBlocksV1",
+      "type": "object"
+    },
+    "LocalReplaceTextV1": {
+      "additionalProperties": false,
+      "properties": {
+        "container": {
+          "$ref": "#/$defs/LocalContainerV1"
+        },
+        "end": {
+          "minimum": 0,
+          "title": "End",
+          "type": "integer"
+        },
+        "kind": {
+          "const": "replace_text",
+          "title": "Kind",
+          "type": "string"
+        },
+        "side": {
+          "anyOf": [
+            {
+              "enum": [
+                "before",
+                "after",
+                "interior",
+                "anchor"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Side"
+        },
+        "start": {
+          "minimum": 0,
+          "title": "Start",
+          "type": "integer"
+        },
+        "styles": {
+          "$ref": "#/$defs/InlineStyles"
+        },
+        "text": {
+          "title": "Text",
+          "type": "string"
+        }
+      },
+      "required": [
+        "kind",
+        "container",
+        "start",
+        "end",
+        "text",
+        "styles",
+        "side"
+      ],
+      "title": "LocalReplaceTextV1",
+      "type": "object"
+    },
+    "LocalSetMarksV1": {
+      "additionalProperties": false,
+      "properties": {
+        "container": {
+          "$ref": "#/$defs/LocalContainerV1"
+        },
+        "end": {
+          "minimum": 0,
+          "title": "End",
+          "type": "integer"
+        },
+        "kind": {
+          "const": "set_marks",
+          "title": "Kind",
+          "type": "string"
+        },
+        "start": {
+          "minimum": 0,
+          "title": "Start",
+          "type": "integer"
+        },
+        "styles": {
+          "$ref": "#/$defs/InlineStyles"
+        }
+      },
+      "required": [
+        "kind",
+        "container",
+        "start",
+        "end",
+        "styles"
+      ],
+      "title": "LocalSetMarksV1",
+      "type": "object"
+    },
+    "LocalSplitBlockV1": {
+      "additionalProperties": false,
+      "properties": {
+        "container": {
+          "$ref": "#/$defs/LocalContainerV1"
+        },
+        "created": {
+          "maxLength": 256,
+          "minLength": 1,
+          "title": "Created",
+          "type": "string"
+        },
+        "kind": {
+          "const": "split_block",
+          "title": "Kind",
+          "type": "string"
+        },
+        "offset": {
+          "minimum": 0,
+          "title": "Offset",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "kind",
+        "container",
+        "offset",
+        "created"
+      ],
+      "title": "LocalSplitBlockV1",
       "type": "object"
     },
     "ManualEditScope": {
@@ -6107,6 +6451,60 @@
         "block"
       ],
       "title": "TemplatePutBlock",
+      "type": "object"
+    },
+    "TemplateQueueDraftV1": {
+      "additionalProperties": false,
+      "description": "Pending V7 input for recovery; Python checks shape and bounds and never interprets local operations.",
+      "properties": {
+        "editorTexts": {
+          "items": {
+            "$ref": "#/$defs/DraftTextV1"
+          },
+          "maxItems": 1000,
+          "title": "Editortexts",
+          "type": "array"
+        },
+        "head": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/DraftHeadV1"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "intents": {
+          "items": {
+            "$ref": "#/$defs/DraftIntentV1"
+          },
+          "maxItems": 100,
+          "title": "Intents",
+          "type": "array"
+        },
+        "locals": {
+          "items": {
+            "$ref": "#/$defs/DraftLocalBlockV1"
+          },
+          "maxItems": 1000,
+          "title": "Locals",
+          "type": "array"
+        },
+        "schemaVersion": {
+          "const": 1,
+          "title": "Schemaversion",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "schemaVersion",
+        "intents",
+        "head",
+        "locals",
+        "editorTexts"
+      ],
+      "title": "TemplateQueueDraftV1",
       "type": "object"
     },
     "TemplateQuoteBlock": {

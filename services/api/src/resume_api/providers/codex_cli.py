@@ -16,7 +16,7 @@ from contextlib import contextmanager
 from pydantic import BaseModel, ValidationError
 
 from resume_api.cli.process_runner import ProcessExit, ProcessRunner
-from resume_api.cli.experimental_profile import ExperimentalCliProfile, ExperimentalProfileError, VERSION as EXPERIMENTAL_VERSION
+from resume_api.cli.experimental_profile import ExperimentalCliProfile, ExperimentalProfileError
 from resume_api.lifecycle import OperationFiles, SpikeError
 from resume_api.inference_admission import INFERENCE, AdmissionTimeout, AdmissionBlocked
 from resume_api.profile_ownership import native_profile
@@ -268,7 +268,7 @@ class CodexCliProvider:
             version = version_raw.decode("utf-8", "strict").strip()
         except UnicodeError:
             raise ContentFailure("CLI_UNSUPPORTED") from None
-        expected = {EXPERIMENTAL_VERSION} if self.experimental_profile else {VERSION, FIXTURE_VERSION}
+        expected = {self.experimental_profile.version} if self.experimental_profile else {VERSION, FIXTURE_VERSION}
         if version not in expected:
             raise ContentFailure("CLI_UNSUPPORTED")
         help_raw, _ = self._run(files, ("exec", "--help"), end, cancel)
@@ -283,7 +283,7 @@ class CodexCliProvider:
         fixture_ready = (self.fixture_transport is not None
                          and self.fixture_transport.executable.absolute() == self.executable
                          and version == FIXTURE_VERSION)
-        experimental_ready = self.experimental_profile is not None and version == EXPERIMENTAL_VERSION
+        experimental_ready = self.experimental_profile is not None and version == self.experimental_profile.version
         return Probe(version, "chatgpt", fixture_ready or experimental_ready,
                      () if fixture_ready or experimental_ready else GAPS)
 

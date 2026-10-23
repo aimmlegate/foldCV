@@ -9,6 +9,7 @@ import type { WriterAdvanceV2 } from "./generated/background_writer_advance_v2";
 import { sha256 } from "../background/wire";
 import { jsonResponseWire } from "./json-response";
 import { jsonObjectWire, jsonWireAt, parseJsonWire, type JsonWireNode } from "./lossless-json";
+import { verifyAddressMap, type VerifiedAddressMap } from "./template-address";
 import { applyPreparedTemplateDelta, type TemplateDeltaAdoption } from "./template-delta";
 import { verifyPreparedTemplateSave, type PreparedSaveOpening, type TemplateSaveVerification } from "./template-save";
 import { taggedSchema } from "./tagged-schema";
@@ -22,6 +23,7 @@ export type BoundTemplatePreparation = {
   requestWire: string;
   replyWire: string;
   prepared: TemplateDeltaAdoption;
+  address: VerifiedAddressMap;
 };
 function invalid(): never { throw new Error("INVALID_RESULT"); }
 
@@ -44,7 +46,10 @@ export async function prepareTemplateTransport(project: string, baseInput: JsonW
     clientMutationId: expected.clientMutationId, requestHash: value.requestHash, capture: expected.capture,
     baseSnapshot: expected.snapshot,
   });
-  return { requestWire, replyWire: reply.wire, prepared };
+  const address = await verifyAddressMap(jsonWireAt(reply, ["addressMap"]), value.addressMapSha256, base,
+    prepared.responseWire, { clientMutationId: expected.clientMutationId, requestHash: value.requestHash,
+      createdIds: prepared.delta.createdIds });
+  return { requestWire, replyWire: reply.wire, prepared, address };
 }
 
 export async function saveTemplateTransport(project: string, advanceInput: JsonWireNode, preparation: BoundTemplatePreparation,

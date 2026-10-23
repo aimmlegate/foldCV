@@ -16,9 +16,10 @@ TOKEN_ENV = "FOLDCV_AGENT_MCP_CAPABILITY"
 TOOLS = ("get_resume_context", "check_resume", "read_public_page")
 PACKAGE = BINARY.parents[3]
 CODE_MODE_HOST = PACKAGE / "bin/codex-code-mode-host"
-HOST_SHA256 = "2e3871dba48d4a782d6acd209684536c0f4e7761c6792ed76d061d6da31048f0"
+HOST_SHA256 = "d5d746d540258822c3b0ef3b5e3d18e715741d2972540c886a4a96f290d441bb"
 PACKAGE_MANIFEST = PACKAGE / "codex-package.json"
-MANIFEST_SHA256 = "95ea87bed0ff10cb2cbd9b0541b0e332b4c87f74efd961924029beb33bebb407"
+# Installed plugin CLI 0.163.0-alpha.11.1 (D092); the managed runtime keeps its own release pins.
+MANIFEST_SHA256 = "1547027f3ba8d82a62e9ced7b32a67737037342477262c28d5e3822ef740ce19"
 APP_SERVER_PREFIX = ("app-server", "--strict-config", "--listen", "stdio://")
 
 
@@ -26,7 +27,7 @@ def check_host(package: Path | None = None) -> None:
     host = CODE_MODE_HOST if package is None else package / "bin/codex-code-mode-host"
     manifest = PACKAGE_MANIFEST if package is None else package / "codex-package.json"
     for path, digest in ((host, HOST_SHA256 if package is None else distribution.HOST_SHA256),
-                         (manifest, MANIFEST_SHA256)):
+                         (manifest, MANIFEST_SHA256 if package is None else distribution.MANIFEST_SHA256)):
         try:
             if any(part.is_symlink() for part in (path, *path.parents)) or not stat.S_ISREG(path.stat().st_mode):
                 raise ExperimentalProfileError("AGENT_CODE_MODE_HOST_UNSUPPORTED")

@@ -2,11 +2,12 @@
 
 from .background_store import BackgroundFailure
 from .rich_mutations import RichMutationFailure
+from .template_address_map import address_map_sha256, build_address_map
 from .template_preparation import prepare_edit
-from .template_delta import prepare_text_delta
+from .template_delta import prepared_delta
 from .templates.presentation import snapshot_identity
 from .models.template_authoring import TemplateEditPreparationV1
-from .models.template_writer import WriterPreparedDeltaV2
+from .models.template_writer import WriterPreparedDeltaV2, WriterPreparedEditV2
 from .project_store import strict_json
 from .templates.compiler import canonical, sha256
 
@@ -35,17 +36,37 @@ class TemplateWriterPreparation:
             self.clipboards.release(state, request.clipboard_capture_id)
             return WriterClipboardReleaseResultV2(schemaVersion=2, clipboardCaptureId=request.clipboard_capture_id, released=True)
 
+    def rewrite_source(self, project, request):
+        """Read the selected text for a rewrite preview; the active writer and exact snapshot are required."""
+        from .template_rewrite import rewrite_source
+        with self.local_history.guard(project), self.guard(project) as (_directory, state, workspace, _checksum):
+            self.require(state, request.proof)
+            if request.snapshot != snapshot_identity(workspace):
+                raise BackgroundFailure('DEPENDENCY_CHANGED')
+            try:
+                return rewrite_source(workspace, request)
+            except (ValueError, RichMutationFailure):
+                raise BackgroundFailure('JOB_SCOPE_INVALID') from None
+
     def prepare_edit(self, project, request):
-        return self._prepare_edit(project, self._bound_preparation(request), 'full')
+        bound = self._bound_preparation(request)
+        result, address = self._prepare_edit(project, bound, 'full')
+        if bound.preparation_input_wire is None:
+            return result
+        return WriterPreparedEditV2(schemaVersion=2,
+            preparationInputSha256=sha256(bound.preparation_input_wire.encode('utf-8')),
+            requestHash=result.request_hash, prepared=result, addressMap=address,
+            addressMapSha256=address_map_sha256(address))
 
     def prepare_edit_delta(self, project, request):
         bound = self._bound_preparation(request)
-        result = self._prepare_edit(project, bound, 'delta')
+        result, address = self._prepare_edit(project, bound, 'delta')
         if bound.preparation_input_wire is None:
             return result
         return WriterPreparedDeltaV2(schemaVersion=2,
             preparationInputSha256=sha256(bound.preparation_input_wire.encode('utf-8')),
-            requestHash=result.request_hash, delta=result)
+            requestHash=result.request_hash, delta=result, addressMap=address,
+            addressMapSha256=address_map_sha256(address))
 
     @staticmethod
     def _bound_preparation(request):
@@ -74,7 +95,10 @@ class TemplateWriterPreparation:
                     raise BackgroundFailure('JOB_SCOPE_INVALID')
                 entry = self.preparations.find(state, request.preparation, response_form=response_form)
                 if entry is not None:
-                    return self.preparations.read(state, workspace, entry)
+                    prepared = self.preparations.read(state, workspace, entry)
+                    address = (self.preparations.read_address(state, entry)
+                        if request.preparation_input_wire is not None else None)
+                    return prepared, address
                 self.require(state, request.proof)
                 identifier = request.preparation.client_mutation_id
                 if (any(value.client_mutation_id == identifier for value in workspace.mutation_replay)
@@ -89,9 +113,12 @@ class TemplateWriterPreparation:
                 clipboard = (self.clipboards.read_for_paste(state, workspace, operation.source.clipboard_capture_id)
                     if isinstance(operation, (PasteInline, PasteBlocks)) and operation.source.kind == 'same_project' else None)
                 try:
-                    factory = prepare_text_delta if response_form == 'delta' else prepare_edit
-                    prepared = factory(self.view(state, workspace, checksum).response,
-                        request.preparation, request.proof, clipboard=clipboard)
+                    response = self.view(state, workspace, checksum).response
+                    prepared = prepare_edit(response, request.preparation, request.proof, clipboard=clipboard)
+                    # One preparation builds the map from its own exact result; retries reuse it.
+                    address = build_address_map(response, request.preparation, prepared)
+                    if response_form == 'delta':
+                        prepared = prepared_delta(response, prepared)
                 except (ValueError, RichMutationFailure):
                     raise BackgroundFailure('JOB_SCOPE_INVALID') from None
-                return self.preparations.admit(state, workspace, prepared)
+                return self.preparations.admit(state, workspace, prepared, address), address

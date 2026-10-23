@@ -197,7 +197,7 @@ class LocalBoundary:
                 image_upload = path.startswith("/v1/rich/projects/") and path.endswith("/images/upload")
                 writer_payload = path.startswith("/v1/rich/projects/") and any(path.endswith("/writer/" + command)
                     for command in ("checkpoint", "save", "flush", "barrier", "reconcile", "detach", "draft/use"))
-                project_upload = image_upload or path in {"/v1/projects/input", "/v1/projects/archive", "/v1/rich/projects/input", "/v1/rich/projects/archive"} or (path.startswith("/v1/projects/") and path.endswith("/input"))
+                project_upload = image_upload or path in {"/v1/projects/input", "/v1/projects/archive", "/v1/rich/projects/input", "/v1/rich/projects/template-input", "/v1/rich/projects/archive"} or (path.startswith("/v1/projects/") and path.endswith("/input"))
                 body_limit = 10 * 1024 * 1024 + 64 * 1024 if image_upload else 64 * 1024 * 1024 + 4096 if path in {"/v1/projects/archive", "/v1/rich/projects/archive"} else MAX_EXTRACT_BODY if path == "/v1/extract" or project_upload else MAX_BODY
                 if writer_payload:
                     from packages.resume_core.background_limits import LIMITS
@@ -265,7 +265,7 @@ def create_app(*, origin: str, secret: str, temp_root: Path, dist: Path, runner:
                experimental_profile: ExperimentalCliProfile | None = None, data_root: Path | None = None,
                gui_provider=None, gui_clock=None, gui_renderer=None, agent_runtime=None, agent_tools=None,
                background_enabled=False, background_factory=None, background_native_authority=None,
-               background_parallel=False, background_server_factory=None):
+               background_parallel=False, background_server_factory=None, template_import_call_cap: int | None = None):
     if not origin.startswith("http://127.0.0.1:") or not origin.rsplit(":", 1)[-1].isdigit():
         raise ValueError("A concrete IPv4 loopback origin is required")
     if len(secret) < 32:
@@ -468,7 +468,45 @@ def create_app(*, origin: str, secret: str, temp_root: Path, dist: Path, runner:
     mount_agent(app, agent)
     from .jobs.service import JobService
     from .jobs.routes import mount_jobs
+
+    def template_import_model():
+        # The capture records the selected import model with its catalog default effort; nothing is chosen here.
+        from packages.resume_core.models.template_import import ModelCapture
+        from packages.resume_core.template_import import digest as capture_digest
+        selected = import_selected_provider()
+        if selected is None:
+            raise ProjectFailure("CONNECTION_REQUIRED", 409)
+        provider, model = selected
+        reasoning = connection_state.modelReasoning.get(model)
+        effort = reasoning.default if reasoning is not None else None
+        if effort is None:
+            raise ProjectFailure("MODEL_DENIED", 409)
+        adapter = getattr(provider, "template_adapter", "codex_cli")
+        return ModelCapture(adapter=adapter, model=model, effort=effort, capabilityProfile="closed-json-v1", capabilityVersion="1",
+            configurationHash=capture_digest({"adapter": adapter, "model": model, "effort": effort}))
+
+    template_factory = None
+    if template_import_call_cap is not None:
+        def template_factory(owner):
+            from packages.resume_core.template_assembly import assemble_template
+            from packages.resume_core.template_import import TemplateImportFailure
+            from .importer.template_pipeline import TemplatePipeline
+            from .importer.template_transport import ProviderTemplateTransport
+            def authority(operation, current):
+                data = current.project or current.pre_draft
+                if data is None or data.template_package is None or data.template_package.package_hash != operation.capture.package_hash:
+                    raise TemplateImportFailure("IMPORT_CAPTURE_STALE")
+            def derive(_operation, _task, _data):
+                # Deterministic template operations arrive with the full Generic template (CT06).
+                raise TemplateImportFailure("IMPORT_OPERATION_UNSUPPORTED")
+            return TemplatePipeline(owner.publisher, ProviderTemplateTransport(import_selected_provider, temp_root),
+                originals=rich_projects.originals, authority=authority, assemble=assemble_template, derive=derive,
+                # One clock for jobs, request epochs and publication: the job store's.
+                wall=lambda: owner.store.clock())
+    rich_projects.configure_template_imports(call_cap=template_import_call_cap,
+        model=template_import_model if template_import_call_cap is not None else None)
     jobs = JobService(rich_projects, resolved_agent_runtime, agent_connection, enabled=background_enabled,
+        template_factory=template_factory,
         factory=background_factory, parallel=background_parallel, server_factory=background_server_factory,
         shared_native=experimental_profile is not None,
         template_cleanup_verified=lambda: not unsafe_cleanup,

@@ -157,6 +157,12 @@ function semantics(value: unknown): boolean {
     const tools = list(value.tools), importTools = ["read_import", "save_import", "finish_import"];
     const importer = value.kind === "processing" && tools.length === importTools.length && importTools.every(tool => tools.includes(tool));
     if (importer) stages.processing = ["extraction"];
+    // A strict template import is processing with one tool-free extraction stage and its captured command (as Python checks).
+    const template = value.protocol === "template_import_v1";
+    if (template) {
+      if (value.kind !== "processing" || tools.length > 0 || !record(value.templateCommand)) return false;
+      stages.processing = ["extraction"]; inputs.processing = "template_import";
+    } else if (value.templateCommand !== undefined && value.templateCommand !== null || record(value.input) && value.input.kind === "template_import") return false;
     if (typeof value.kind !== "string" || value.schedulingClass !== classes[value.kind] || !record(value.input) || value.input.kind !== inputs[value.kind] ||
         JSON.stringify(list(value.models).map((model: unknown) => record(model) ? model.stage : null)) !== JSON.stringify(stages[value.kind])) return false;
     if (new Set(tools).size !== tools.length || !record(value.guards)) return false;
@@ -203,7 +209,12 @@ function semantics(value: unknown): boolean {
   if ("execution" in value && "publication" in value && "submission" in value) {
     if (value.undoExpired === true && value.receipt === null) return false;
     if (["saved", "no_change", "none"].includes(String(value.publication)) && value.publicationError !== null && value.publicationError !== undefined) return false;
-    if ((value.publication === "saved") !== (value.receipt !== null) || !record(value.submission) || !record(value.submission.identity)) return false;
+    if (!record(value.submission) || !record(value.submission.identity)) return false;
+    // A template job proves publication with its typed outcome, not a receipt or proposal.
+    const template = value.submission.protocol === "template_import_v1", outcome = value.templateOutcome;
+    if (outcome !== undefined && outcome !== null && !template || template && value.receipt !== null) return false;
+    const saved = value.receipt !== null || template && record(outcome) && outcome.state === "saved";
+    if ((value.publication === "saved") !== saved) return false;
     const attempts = list(value.attempts), models = list(value.submission.models);
     if (new Set(attempts.map((attempt) => record(attempt) ? attempt.id : null)).size !== attempts.length || attempts.length > models.length) return false;
     for (const [index, attempt] of attempts.entries()) {
@@ -212,7 +223,7 @@ function semantics(value: unknown): boolean {
     }
     if (record(value.receipt) && (value.receipt.jobId !== value.id || value.receipt.projectId !== value.submission.identity.projectId ||
         value.receipt.lineage !== value.submission.identity.lineage || value.receipt.proposalId !== value.proposalId)) return false;
-    if (!["none", "no_change", "cancelled"].includes(String(value.publication)) && value.proposalId === null) return false;
+    if (!template && !["none", "no_change", "cancelled"].includes(String(value.publication)) && value.proposalId === null) return false;
     if (value.submission.allowEdits === false && value.publication !== "none") return false;
   }
   if ("requestSha256" in value && "snapshots" in value && "identity" in value) {

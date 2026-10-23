@@ -7,8 +7,10 @@ import { Icon } from "../ui/Icon";
 import { OperationStatus } from "../ui/OperationStatus";
 
 export type FileMode = "open" | "save" | "export";
-export function FileDialog({ mode, title, subtitle, filename, timeline, error, busy, operation, close, download, upload }: {
+export function FileDialog({ mode, title, subtitle, filename, timeline, error, busy, operation, close, download, upload, templateName }: {
   mode: FileMode; title: string; subtitle: string; filename: string; timeline: TimelineReport | null; error: string; busy: boolean;
+  /** The project's own captured template; V1 projects use the built-in one. */
+  templateName?: string | undefined;
   operation?: string | undefined;
   close: () => void; download: () => Promise<boolean>; upload: (file: File) => Promise<boolean>;
 }) {
@@ -17,7 +19,7 @@ export function FileDialog({ mode, title, subtitle, filename, timeline, error, b
   return <Dialog open close={() => { if (!busy) close(); }} title={exporting ? "Экспорт документа" : opening ? "Открыть проект" : "Сохранить проект"}>
     {exporting ? <><p className="dialog-copy">{title}<br />{subtitle}</p>
       <div className="export-format"><span className="format-icon">W</span><div><strong>Документ Word</strong><small>DOCX · редактируемый текст и таблицы</small></div><Icon name="check" /></div>
-      <div className="export-summary"><span>Шаблон</span><strong>FoldCV / две колонки</strong></div>
+      <div className="export-summary"><span>Шаблон</span><strong>{templateName ?? "FoldCV / две колонки"}</strong></div>
       {(timeline?.warnings.some(warning => warning.kind === "overlap") ?? false) && <p className="notice warning">Проверьте пересекающиеся периоды работы.</p>}
       {timeline === null && <p className="notice">Проверка дат сейчас недоступна. Экспорт доступен.</p>}
     </> : <><p className="dialog-copy">Файл .foldcv хранит исходник, факты и документ.</p>

@@ -10,6 +10,7 @@ from packages.resume_core.gui_projects import GuiCreateProjectRequest, GuiStartG
 from packages.resume_core.models.rich_mutations import RichMutation, ActionCapture
 from packages.resume_core.models.template_mutations import TemplateMutationV1
 from packages.resume_core.models.template_render import TemplateExportRequestV1
+from packages.resume_core.models.contracts import Id, Wire
 from packages.resume_core.rendering.template import RenderFailure
 from .contracts import EmptyRequest
 from .extracting import UploadFailure, parse_one_part
@@ -22,6 +23,11 @@ from packages.resume_core.rich_sync import RichCompletionRequest, RichRewriteReq
 from packages.resume_core.text_rewrite import RichRewriteEditRequest
 from packages.resume_core.rich_panel import RichPanelRequest, RichPanelSyncRequest
 from packages.resume_core.rich_timeline import CascadeRequest, CascadeApplyRequest, timeline_report, cascade_proposal, cascade_mutation
+
+
+class TemplateImportRequest(Wire):
+    client_request_id: Id
+    allow_text_rewrite: bool
 
 
 def mount_rich_projects(app, service, problem):
@@ -56,6 +62,26 @@ def mount_rich_projects(app, service, problem):
             return problem(error.code, 422, "input")
         workspace = await service.select(data, name, pasted)
         return response(workspace.project_id, 201)
+
+    @app.get("/v1/rich/template-import")
+    async def template_import_status():
+        return JSONResponse(service.template_import_status(), headers={"Cache-Control": "no-store"})
+
+    @app.post(prefix + "/template-input")
+    async def template_source(request: Request):
+        # Strict template import: the upload becomes a V7 pre-draft with the store's active package.
+        try:
+            data, name, pasted = parse_one_part(await request.body(), request.headers.get("content-type", ""))
+        except UploadFailure as error:
+            return problem(error.code, 422, "input")
+        workspace = await service.select_template(data, name, pasted)
+        return response(workspace.project_id, 201)
+
+    @app.post(prefix + "/{identifier}/template-import")
+    async def template_import(identifier: str, payload: TemplateImportRequest):
+        job, created = await service.start_template_import(identifier, payload.client_request_id, payload.allow_text_rewrite)
+        return JSONResponse(job.model_dump(mode="json", by_alias=True), status_code=202 if created else 200,
+            headers={"Cache-Control": "no-store"})
 
     @app.post(prefix + "/archive")
     async def portable_input(request: Request):

@@ -79,12 +79,14 @@ def employment_source(name='F01'):
 
 
 def employment_proposal(src, *, unsupported=False):
-    unit = src.units[0]
-    detailed = '03.2020' in unit.text
+    # Evidence comes from whichever source unit holds each phrase; a parsed upload has one unit per line.
+    text_all = '\n'.join(unit.text for unit in src.units)
+    detailed = '03.2020' in text_all
     start, end = ('03.2020', '11.2023') if detailed else ('2020', '2023')
     result = 'Our team reduced median latency from 800 ms to 500 ms.'
-    has_result = result in unit.text
+    has_result = result in text_all
     def span(text):
+        unit = next(unit for unit in src.units if text in unit.text)
         offset = unit.text.index(text)
         return capture_span(src, unit, offset, offset + len(text)).model_dump(by_alias=True)
     payload = [{'company': 'Example Labs', 'role': 'backend engineer',

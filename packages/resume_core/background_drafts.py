@@ -161,6 +161,19 @@ class WriterDrafts:
     def restore_saved_draft(self, project, request):
         return self.resolve_draft(project, request, discard=False)
 
+    def pending_input_draft(self, project, request):
+        """V7 recovery: the server draft ends and the writer reattaches while the local draft keeps the queue record,
+        whose corrections then save one by one through the normal prepared path."""
+        with self.guard(project, uncertain=True) as (directory, state, _workspace, _checksum):
+            self.require(state, request.proof, recovery=True)
+            record = next((item for item in state.drafts if item.id == request.id), None)
+            if record is None or (record.sequence, record.payload_sha256) != (request.sequence, request.payload_sha256):
+                raise BackgroundFailure("DEPENDENCY_CHANGED")
+            payload = self._draft(directory, record)
+            if payload.schema_version != 2 or payload.template_queue is None:
+                raise BackgroundFailure("JOB_SCOPE_INVALID")
+        return self.resolve_draft(project, request, discard=True)
+
     @staticmethod
     def history_resolved(state, payload):
         from .background_history_commands import command_hash

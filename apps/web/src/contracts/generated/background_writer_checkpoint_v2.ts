@@ -944,6 +944,50 @@ export type Syncid1 = string;
  */
 export type Outbox = TemplateMutationV1[];
 export type Schemaversion5 = 2;
+export type Blockid7 = string;
+export type Cellid8 = string | null;
+export type Kind50 = "content" | "caption" | "cell";
+export type Text5 = string;
+/**
+ * @maxItems 1000
+ */
+export type Editortexts = DraftTextV1[];
+export type Clientmutationid1 = string;
+export type Preparationwire = string;
+export type Stage = "frozen" | "prepared" | "saving";
+export type Actionid6 = string;
+export type Actiontoken1 = number;
+export type Clientmutationid2 = string;
+export type Localid = string;
+export type Operation = LocalReplaceTextV1 | LocalSetMarksV1 | LocalSplitBlockV1 | LocalMergeBlocksV1;
+export type End3 = number;
+export type Kind51 = "replace_text";
+export type Side = ("before" | "after" | "interior" | "anchor") | null;
+export type Start4 = number;
+export type Text6 = string;
+export type End4 = number;
+export type Kind52 = "set_marks";
+export type Start5 = number;
+export type Created = string;
+export type Kind53 = "split_block";
+export type Offset1 = number;
+export type Kind54 = "merge_blocks";
+/**
+ * @minItems 1
+ * @maxItems 2
+ */
+export type Prior = [DraftTextV1] | [DraftTextV1, DraftTextV1];
+/**
+ * @maxItems 100
+ */
+export type Intents = DraftIntentV1[];
+export type Canonical = string;
+export type Local = string;
+/**
+ * @maxItems 1000
+ */
+export type Locals = DraftLocalBlockV1[];
+export type Schemaversion6 = 1;
 export type Cursor = number;
 /**
  * @maxItems 100
@@ -953,9 +997,9 @@ export type Credential = string;
 export type Epoch = number;
 export type Incarnation = string;
 export type Lineage = string;
-export type Schemaversion6 = 1;
+export type Schemaversion7 = 1;
 export type Sessionid1 = string;
-export type Schemaversion7 = 2;
+export type Schemaversion8 = 2;
 export type Sequence = number;
 
 export interface WriterCheckpointV2 {
@@ -965,7 +1009,7 @@ export interface WriterCheckpointV2 {
   id: Id;
   payload: DraftPayloadV2;
   proof: WriterProofV1;
-  schemaVersion: Schemaversion7;
+  schemaVersion: Schemaversion8;
   sequence: Sequence;
 }
 export interface DraftPayloadV2 {
@@ -977,6 +1021,7 @@ export interface DraftPayloadV2 {
   importIssues: Importissues;
   outbox: Outbox;
   schemaVersion: Schemaversion5;
+  templateQueue?: TemplateQueueDraftV1 | null;
   touches?: Touches;
 }
 export interface RichDocumentV2 {
@@ -1921,6 +1966,69 @@ export interface RemoveTemplateSync {
   kind: Kind49;
   syncId: Syncid1;
 }
+/**
+ * Pending V7 input for recovery; Python checks shape and bounds and never interprets local operations.
+ */
+export interface TemplateQueueDraftV1 {
+  editorTexts: Editortexts;
+  head: DraftHeadV1 | null;
+  intents: Intents;
+  locals: Locals;
+  schemaVersion: Schemaversion6;
+}
+export interface DraftTextV1 {
+  container: LocalContainerV1;
+  text: Text5;
+}
+export interface LocalContainerV1 {
+  blockId: Blockid7;
+  cellId: Cellid8;
+  kind: Kind50;
+}
+export interface DraftHeadV1 {
+  clientMutationId: Clientmutationid1;
+  preparationWire: Preparationwire;
+  stage: Stage;
+}
+export interface DraftIntentV1 {
+  actionId: Actionid6;
+  actionToken: Actiontoken1;
+  clientMutationId: Clientmutationid2;
+  localId: Localid;
+  operation: Operation;
+  prior: Prior;
+}
+export interface LocalReplaceTextV1 {
+  container: LocalContainerV1;
+  end: End3;
+  kind: Kind51;
+  side: Side;
+  start: Start4;
+  styles: InlineStyles;
+  text: Text6;
+}
+export interface LocalSetMarksV1 {
+  container: LocalContainerV1;
+  end: End4;
+  kind: Kind52;
+  start: Start5;
+  styles: InlineStyles;
+}
+export interface LocalSplitBlockV1 {
+  container: LocalContainerV1;
+  created: Created;
+  kind: Kind53;
+  offset: Offset1;
+}
+export interface LocalMergeBlocksV1 {
+  kind: Kind54;
+  leading: LocalContainerV1;
+  trailing: LocalContainerV1;
+}
+export interface DraftLocalBlockV1 {
+  canonical: Canonical;
+  local: Local;
+}
 export interface WriterTouchV2 {
   cursor: Cursor;
   mutation: TemplateMutationV1 | null;
@@ -1930,6 +2038,6 @@ export interface WriterProofV1 {
   epoch: Epoch;
   incarnation: Incarnation;
   lineage: Lineage;
-  schemaVersion: Schemaversion6;
+  schemaVersion: Schemaversion7;
   sessionId: Sessionid1;
 }

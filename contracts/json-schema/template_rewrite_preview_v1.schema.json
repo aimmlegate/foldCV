@@ -1,0 +1,236 @@
+{
+  "$defs": {
+    "AuthoredRange": {
+      "additionalProperties": false,
+      "properties": {
+        "beforeRevision": {
+          "minimum": 1,
+          "title": "Beforerevision",
+          "type": "integer"
+        },
+        "blockId": {
+          "minLength": 1,
+          "title": "Blockid",
+          "type": "string"
+        },
+        "cellId": {
+          "anyOf": [
+            {
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Cellid"
+        },
+        "end": {
+          "minimum": 0,
+          "title": "End",
+          "type": "integer"
+        },
+        "field": {
+          "enum": [
+            "content",
+            "caption"
+          ],
+          "title": "Field",
+          "type": "string"
+        },
+        "insertionTarget": {
+          "anyOf": [
+            {
+              "discriminator": {
+                "mapping": {
+                  "field": "#/$defs/FieldInsertionTarget",
+                  "literal": "#/$defs/LiteralInsertionTarget",
+                  "manual_scope": "#/$defs/ManualScopeInsertionTarget"
+                },
+                "propertyName": "kind"
+              },
+              "oneOf": [
+                {
+                  "$ref": "#/$defs/FieldInsertionTarget"
+                },
+                {
+                  "$ref": "#/$defs/LiteralInsertionTarget"
+                },
+                {
+                  "$ref": "#/$defs/ManualScopeInsertionTarget"
+                }
+              ]
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Insertiontarget"
+        },
+        "start": {
+          "minimum": 0,
+          "title": "Start",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "blockId",
+        "beforeRevision",
+        "cellId",
+        "field",
+        "start",
+        "end"
+      ],
+      "title": "AuthoredRange",
+      "type": "object"
+    },
+    "FieldInsertionTarget": {
+      "additionalProperties": false,
+      "properties": {
+        "bindingId": {
+          "minLength": 1,
+          "title": "Bindingid",
+          "type": "string"
+        },
+        "kind": {
+          "const": "field",
+          "title": "Kind",
+          "type": "string"
+        }
+      },
+      "required": [
+        "kind",
+        "bindingId"
+      ],
+      "title": "FieldInsertionTarget",
+      "type": "object"
+    },
+    "LiteralInsertionTarget": {
+      "additionalProperties": false,
+      "properties": {
+        "kind": {
+          "const": "literal",
+          "title": "Kind",
+          "type": "string"
+        }
+      },
+      "required": [
+        "kind"
+      ],
+      "title": "LiteralInsertionTarget",
+      "type": "object"
+    },
+    "ManualScopeInsertionTarget": {
+      "additionalProperties": false,
+      "properties": {
+        "fragmentId": {
+          "minLength": 1,
+          "title": "Fragmentid",
+          "type": "string"
+        },
+        "kind": {
+          "const": "manual_scope",
+          "title": "Kind",
+          "type": "string"
+        }
+      },
+      "required": [
+        "kind",
+        "fragmentId"
+      ],
+      "title": "ManualScopeInsertionTarget",
+      "type": "object"
+    },
+    "TemplateSnapshotIdentity": {
+      "additionalProperties": false,
+      "properties": {
+        "documentHash": {
+          "pattern": "^[a-f0-9]{64}$",
+          "title": "Documenthash",
+          "type": "string"
+        },
+        "documentRevision": {
+          "minimum": 1,
+          "title": "Documentrevision",
+          "type": "integer"
+        },
+        "factsHash": {
+          "pattern": "^[a-f0-9]{64}$",
+          "title": "Factshash",
+          "type": "string"
+        },
+        "packageHash": {
+          "pattern": "^[a-f0-9]{64}$",
+          "title": "Packagehash",
+          "type": "string"
+        },
+        "presentationHash": {
+          "pattern": "^[a-f0-9]{64}$",
+          "title": "Presentationhash",
+          "type": "string"
+        },
+        "projectId": {
+          "minLength": 1,
+          "title": "Projectid",
+          "type": "string"
+        },
+        "projectRevision": {
+          "minimum": 1,
+          "title": "Projectrevision",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "projectId",
+        "projectRevision",
+        "documentRevision",
+        "documentHash",
+        "factsHash",
+        "packageHash",
+        "presentationHash"
+      ],
+      "title": "TemplateSnapshotIdentity",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "range": {
+      "$ref": "#/$defs/AuthoredRange"
+    },
+    "requestId": {
+      "minLength": 1,
+      "title": "Requestid",
+      "type": "string"
+    },
+    "schemaVersion": {
+      "const": 1,
+      "title": "Schemaversion",
+      "type": "integer"
+    },
+    "snapshot": {
+      "$ref": "#/$defs/TemplateSnapshotIdentity"
+    },
+    "source": {
+      "title": "Source",
+      "type": "string"
+    },
+    "text": {
+      "maxLength": 65536,
+      "minLength": 1,
+      "title": "Text",
+      "type": "string"
+    }
+  },
+  "required": [
+    "schemaVersion",
+    "requestId",
+    "snapshot",
+    "range",
+    "source",
+    "text"
+  ],
+  "title": "TemplateRewritePreviewV1",
+  "type": "object"
+}

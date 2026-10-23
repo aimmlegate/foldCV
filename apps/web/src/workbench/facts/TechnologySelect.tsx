@@ -1,6 +1,6 @@
+import type { OrderDocument } from "../../rich/technology-order";
 import { useEffect, useId, useMemo, useRef, useState } from "react";
 import type { WorkingFacts } from "../../contracts/generated/working_facts";
-import type { RichDocumentV1 } from "../../contracts/generated/rich_document_v1";
 import type { PanelCommand } from "../../rich/synchronization";
 import { technologyKey, technologyName } from "../../rich/panel-intents";
 import { Icon } from "../ui/Icon";
@@ -11,7 +11,7 @@ import { documentTechnologies } from "../../rich/technology-order";
 import { useTechnologyDrag } from "./useTechnologyDrag";
 
 export function TechnologySelect({ facts, document: resumeDocument, jobId, label, pending, paused, submit, focusRecordId }: {
-  facts: WorkingFacts; document: RichDocumentV1; jobId: string | null; label: string; pending: readonly PanelCommand[]; paused: boolean;
+  facts: WorkingFacts; document: OrderDocument; jobId: string | null; label: string; pending: readonly PanelCommand[]; paused: boolean;
   submit: (command: PanelCommand) => Promise<void>;
   focusRecordId?: string | undefined;
 }) {

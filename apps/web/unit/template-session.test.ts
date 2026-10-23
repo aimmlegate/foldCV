@@ -1,0 +1,240 @@
+import assert from "node:assert/strict";
+import test from "node:test";
+import { BlockNoteEditor } from "@blocknote/core";
+import type { Node } from "@tiptap/pm/model";
+import { TextSelection } from "@tiptap/pm/state";
+import { attachTemplateWriter } from "../src/background/connection";
+import { DraftRepository, type LocalDraft } from "../src/background/drafts";
+import { contentText, responseBlocks } from "../src/contracts/template-address";
+import { templateProjectWire } from "../src/contracts/template-validate";
+import { knownErrorMessage } from "../src/errors/messages";
+import { RichApiFailure } from "../src/rich/api";
+import { templateSchema } from "../src/rich/template-schema";
+import { projectTemplateDocument } from "../src/rich/v7-projection";
+import { TemplateEditorSession, type TemplateEditor } from "../src/rich/v7-session";
+import { client, harness, type Harness, type Traffic } from "./support/template-harness";
+
+function storage(): Storage {
+  const values = new Map<string, string>();
+  return { get length() { return values.size; }, clear: () => values.clear(), getItem: key => values.get(key) ?? null,
+    key: index => [...values.keys()][index] ?? null, removeItem: key => { values.delete(key); },
+    setItem: (key, value) => { values.set(key, value); } };
+}
+Object.assign(globalThis, { sessionStorage: storage(), localStorage: storage() });
+
+const paperText = "By Shared title / Journal North.";
+type Opened = { session: TemplateEditorSession; editor: TemplateEditor; warnings: string[]; traffic: Traffic[] };
+
+async function opened(value: Harness): Promise<Opened> {
+  const traffic: Traffic[] = [], api = client(value, traffic), warnings: string[] = [];
+  let rows: LocalDraft[] = [];
+  const repository = new DraftRepository({ transact: work => { const next = work(rows); rows = next.rows; return Promise.resolve(next.result); },
+    discardProject: () => { rows = []; return Promise.resolve(); } }, () => Promise.reject(new Error("unused")));
+  const fixture = await api.templateRead(value.proof);
+  await api.templateDetach({ schemaVersion: 2, proof: value.proof, canonicalRevision: fixture.writer.acknowledgedRevision,
+    canonicalSha256: fixture.writer.acknowledgedSha256 ?? fixture.workspaceSha256, actionCursor: fixture.writer.acknowledgedCursor, touches: [] });
+  const connection = await attachTemplateWriter(value.project, api, repository);
+  assert.ok(connection?.proof, connection?.error ?? "attach failed");
+  const session = new TemplateEditorSession(connection, { status: () => {}, warning: text => warnings.push(text), mode: () => {}, shown: () => {} }, 60_000);
+  const response = await templateProjectWire(session.writer.durable);
+  assert.ok(response?.workspace.project);
+  const editor: TemplateEditor = BlockNoteEditor.create({ schema: templateSchema, initialContent: projectTemplateDocument(response.workspace.project.document) });
+  // Headless editors install extension plugins only on mount; the session plugin is registered directly.
+  editor._tiptapEditor.registerPlugin(session.plugin);
+  session.bind(editor);
+  return { session, editor, warnings, traffic };
+}
+function doc(editor: TemplateEditor): Node { return editor._tiptapEditor.state.doc; }
+function start(editor: TemplateEditor, id: string): number {
+  let found = -1;
+  doc(editor).descendants((node, pos) => { if (node.type.name === "blockContainer" && node.attrs["id"] === id) found = pos + 2; return found < 0; });
+  assert.ok(found >= 0, id); return found;
+}
+function dispatch(editor: TemplateEditor, build: (tr: ReturnType<typeof editor._tiptapEditor.state.tr.insertText>) => void): void {
+  const tr = editor._tiptapEditor.state.tr; build(tr); editor._tiptapEditor.view.dispatch(tr);
+}
+function caret(editor: TemplateEditor, pos: number): void { dispatch(editor, tr => { tr.setSelection(TextSelection.create(tr.doc, pos)); }); }
+function editorTexts(editor: TemplateEditor): string[] {
+  const result: string[] = [];
+  doc(editor).descendants(node => {
+    if (node.type.name === "blockContainer" && node.firstChild?.type.name === "paragraph") result.push(`${String(node.attrs["id"])}=${node.firstChild.textContent}`);
+  });
+  return result;
+}
+function canonicalTexts(session: TemplateEditorSession): string[] {
+  const result: string[] = [];
+  for (const [id, block] of responseBlocks(session.queue.template.durable)) {
+    const group = block.groups[0];
+    if (group?.kind === "content" && responseBlocks(session.queue.template.durable).get(id)) result.push(`${id}=${contentText(group.content)}`);
+  }
+  return result;
+}
+
+test("typing becomes one queued intent, saves, and re-projects canonical content after drain", async () => {
+  const value = await harness();
+  const { session, editor } = await opened(value);
+  try {
+    const a = start(editor, "block-paper-a");
+    dispatch(editor, tr => { tr.insertText("!", a + 16); });
+    dispatch(editor, tr => { tr.insertText("?", a + 17); });
+    assert.equal(session.queue.template.pending.length, 2);
+    assert.equal(session.history.length, 1, "contiguous typing is one SessionHistory action");
+    await session.flush();
+    assert.ok(await session.reproject());
+    assert.deepEqual(editorTexts(editor).filter(text => text.startsWith("block-paper")), canonicalTexts(session).filter(text => text.startsWith("block-paper")));
+    assert.ok(canonicalTexts(session).includes("block-paper-a=By Shared title!? / Journal North."));
+  } finally { session.close(); await value.close(); }
+});
+
+test("Undo and Redo run as server commands and re-project the editor", async () => {
+  const value = await harness();
+  const { session, editor } = await opened(value);
+  try {
+    dispatch(editor, tr => { tr.insertText("!", start(editor, "block-paper-a") + 16); });
+    await session.flush();
+    await session.navigate("undo");
+    assert.ok(canonicalTexts(session).includes(`block-paper-a=${paperText}`));
+    assert.ok(editorTexts(editor).includes(`block-paper-a=${paperText}`));
+    assert.equal(session.history.position, 0);
+    await session.navigate("redo");
+    assert.ok(editorTexts(editor).includes("block-paper-a=By Shared title! / Journal North."));
+    assert.equal(session.history.position, 1);
+    assert.equal(session.writer.mode, "normal");
+  } finally { session.close(); await value.close(); }
+});
+
+test("Enter splits through Python and local block IDs end at re-projection", async () => {
+  const value = await harness();
+  const { session, editor } = await opened(value);
+  try {
+    caret(editor, start(editor, "block-paper-a") + 10);
+    assert.equal(session.enter(), true);
+    const local = editorTexts(editor).find(text => text.startsWith("local-"));
+    assert.equal(local?.split("=")[1], " title / Journal North.");
+    // Typing into the new local block is expressed before the split is saved.
+    dispatch(editor, tr => { tr.insertText("X", editor._tiptapEditor.state.selection.from); });
+    await session.flush();
+    assert.ok(await session.reproject());
+    const texts = editorTexts(editor);
+    assert.ok(!texts.some(text => text.startsWith("local-")), "re-projection uses canonical block IDs");
+    assert.ok(texts.includes("block-paper-a=By Shared"));
+    assert.ok(texts.some(text => text.endsWith("=X title / Journal North.")));
+    assert.deepEqual(texts.filter(text => !text.startsWith("block-paper-b")), canonicalTexts(session).filter(text => !text.startsWith("block-paper-b")));
+    const selection = editor._tiptapEditor.state.selection.$from;
+    assert.equal(selection.parent.textContent, "X title / Journal North.", "the caret follows its re-keyed block");
+  } finally { session.close(); await value.close(); }
+});
+
+test("input the server cannot address is refused without touching the editor or the queue", async () => {
+  const value = await harness();
+  const { session, editor, warnings } = await opened(value);
+  try {
+    const before = doc(editor), a = start(editor, "block-paper-a");
+    dispatch(editor, tr => { tr.setNodeMarkup(a - 1, undefined, { textAlignment: "center" }); });
+    dispatch(editor, tr => { tr.delete(a + 5, start(editor, "block-paper-b") + 3); });
+    assert.equal(doc(editor), before);
+    assert.equal(session.queue.template.pending.length, 0);
+    assert.equal(session.history.length, 0);
+    assert.deepEqual(warnings, [knownErrorMessage("V7_INPUT_UNSUPPORTED"), knownErrorMessage("V7_INPUT_UNSUPPORTED")]);
+  } finally { session.close(); await value.close(); }
+});
+
+test("a composition is saved once, as its final text, at composition end", async () => {
+  const value = await harness();
+  const { session, editor } = await opened(value);
+  try {
+    const a = start(editor, "block-paper-a");
+    session.compositionStart();
+    dispatch(editor, tr => { tr.insertText("k", a + 16); });
+    dispatch(editor, tr => { tr.insertText("カ", a + 16, a + 17); });
+    assert.equal(session.queue.template.pending.length, 0, "composition updates stay in the editor");
+    session.compositionEnd();
+    assert.equal(session.queue.template.pending.length, 1);
+    await session.flush();
+    assert.ok(canonicalTexts(session).includes("block-paper-a=By Shared titleカ / Journal North."));
+  } finally { session.close(); await value.close(); }
+});
+
+test("a definitive rejection keeps all input; retry re-expresses it from canonical text and saves", async () => {
+  const value = await harness();
+  const { session, editor, warnings } = await opened(value);
+  try {
+    const api = session.writer.connection.api, prepare = api.templatePrepareDelta.bind(api);
+    let reject = true;
+    api.templatePrepareDelta = (...args) => {
+      if (reject) { reject = false; return Promise.reject(new RichApiFailure("PREPARATION_RESPONSE_FORM_CONFLICT", 409)); }
+      return prepare(...args);
+    };
+    const a = start(editor, "block-paper-a");
+    dispatch(editor, tr => { tr.insertText("!", a + 16); });
+    await assert.rejects(session.flush(), /V7_INPUT_REJECTED/);
+    assert.equal(session.queue.template.state.kind, "rejected");
+    // Later input buffers behind the block; nothing is lost or resent.
+    dispatch(editor, tr => { tr.insertText("?", a + 17); });
+    assert.equal(session.queue.template.pending.length, 2);
+    assert.ok(warnings.includes(knownErrorMessage("V7_INPUT_REJECTED") ?? ""));
+    session.retry();
+    assert.equal(session.queue.template.state.kind, "ready");
+    assert.equal(session.queue.template.pending.length, 1, "one correction per affected container");
+    await session.flush();
+    assert.ok(canonicalTexts(session).includes("block-paper-a=By Shared title!? / Journal North."));
+    assert.ok(await session.reproject());
+    assert.ok(editorTexts(editor).includes("block-paper-a=By Shared title!? / Journal North."));
+  } finally { session.close(); await value.close(); }
+});
+
+test("a composition ending while input is locked is queued once the writer unlocks", async () => {
+  const value = await harness();
+  const { session, editor } = await opened(value);
+  try {
+    session.compositionStart();
+    dispatch(editor, tr => { tr.insertText("ü", start(editor, "block-paper-a") + 16); });
+    for (let index = 0; index < 100; index++) session.writer.input();
+    assert.equal(session.writer.writable, false);
+    session.compositionEnd();
+    assert.equal(session.queue.template.pending.length, 0, "deferred while the writer is locked");
+    await session.writer.flushTouches();
+    assert.equal(session.queue.template.pending.length, 1);
+    await session.flush();
+    assert.ok(canonicalTexts(session).includes("block-paper-a=By Shared titleü / Journal North."));
+  } finally { session.close(); await value.close(); }
+});
+
+test("leaving drains and detaches; resume reattaches the same session and input saves again", async () => {
+  const value = await harness();
+  const { session, editor } = await opened(value);
+  try {
+    dispatch(editor, tr => { tr.insertText("!", start(editor, "block-paper-a") + 16); });
+    // The caret follows typed text; re-projections keep it after "!" although "!" becomes its own field fragment.
+    caret(editor, start(editor, "block-paper-a") + 17);
+    await session.writer.navigate();
+    assert.equal(session.writer.mode, "detached");
+    assert.ok(canonicalTexts(session).includes("block-paper-a=By Shared title! / Journal North."), "navigation drained pending input");
+    await session.resume();
+    assert.equal(session.writer.mode, "normal");
+    dispatch(editor, tr => { tr.insertText("?", tr.selection.from); });
+    await session.flush();
+    assert.ok(canonicalTexts(session).includes("block-paper-a=By Shared title!? / Journal North."));
+  } finally { session.close(); await value.close(); }
+});
+
+test("an outside canonical advance (export record) is adopted; later saves and detach still succeed", async () => {
+  const value = await harness();
+  const { session, editor } = await opened(value);
+  const advance = async () => { const reply = await fetch(`${value.origin}/harness/advance`, { method: "POST" }); assert.equal(reply.status, 200); };
+  try {
+    dispatch(editor, tr => { tr.insertText("!", start(editor, "block-paper-a") + 16); });
+    caret(editor, start(editor, "block-paper-a") + 17);
+    await session.flush();
+    await advance();
+    // The export path refreshes explicitly; the queue takes the advance as its base while idle.
+    await session.refresh();
+    dispatch(editor, tr => { tr.insertText("?", tr.selection.from); });
+    await session.flush();
+    assert.ok(canonicalTexts(session).includes("block-paper-a=By Shared title!? / Journal North."));
+    // Without a refresh, a stale detach header is re-read once while this writer still owns the session.
+    await advance();
+    await session.writer.navigate();
+    assert.equal(session.writer.mode, "detached");
+  } finally { session.close(); await value.close(); }
+});

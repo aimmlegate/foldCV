@@ -1,7 +1,7 @@
+import type { OrderDocument } from "../../rich/technology-order";
 import { errorMessage } from "../../errors/messages";
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import type { WorkingFacts } from "../../contracts/generated/working_facts";
-import type { RichDocumentV1 } from "../../contracts/generated/rich_document_v1";
 import type { PanelCommand } from "../../rich/synchronization";
 import { labels, needsCheck, type Kind, type RecordValue } from "../../rich/fact-fields";
 import { TechnologySelect } from "./TechnologySelect";
@@ -25,7 +25,7 @@ function summary(record: RecordValue): [string, string] {
 }
 export function FactsPanel({ facts, document, focusEntries = [], focusOptions = [], submit, pending, paused, timeline, hidden, close,
   focusRequest = null, onFocused }: {
-  facts: WorkingFacts; document: RichDocumentV1; submit: (command: PanelCommand) => Promise<void>; pending: readonly PanelCommand[]; paused: boolean;
+  facts: WorkingFacts; document: OrderDocument; submit: (command: PanelCommand) => Promise<void>; pending: readonly PanelCommand[]; paused: boolean;
   focusEntries?: NonNullable<RichProjectResponse["presentation"]>["focusEntries"];
   focusOptions?: NonNullable<RichProjectResponse["presentation"]>["focusOptions"];
   timeline: ReactNode; hidden: boolean; close: () => void;

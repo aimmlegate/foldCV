@@ -1,20 +1,22 @@
 """Explicit writer v2 content envelopes retain the existing opening authority."""
 
 import hashlib
-from typing import Annotated, Literal
+from typing import Annotated, Literal, Union
 
-from pydantic import Field, RootModel, model_validator
+from pydantic import Field, RootModel, ValidationError, model_validator
 
 from . import background
 from .background import (BackgroundWire, DraftPayloadV1, WriterAdvanceV1, WriterBarrierAckV1,
     WriterCheckpointV1, WriterDraftReadV1, WriterDraftResolveV1, WriterViewV1)
 from .contracts import Id, Revision
-from .template_authoring import ClipboardSelection, TemplateEditPreparationV1
+from .template_address import PreparedAddressMapV1
+from .template_authoring import AuthoredRange, ClipboardSelection, TemplateEditPreparationV1, TemplatePreparedEditV1
 from .template_delta import TemplatePreparedEditDeltaV1
 from .template_render import TemplateSnapshotIdentity
 from .contracts import Sha256
 from .canonical_patch import CanonicalPatchStep
 from .rich_workspace import RichMutationReplay
+from .rich_document import InlineStyles
 from .template_document import RichDocumentV2
 from .template_facts import WorkingFactsV2
 from .template_import import ImportIssue
@@ -64,16 +66,48 @@ class WriterPrepareEditV2(BackgroundWire):
         exclude_if=lambda value: value is None)
 
 
+def _bound_address(value, client_mutation_id, base, result, unchanged):
+    import json
+    wire = json.dumps(value.address_map.model_dump(mode='json', by_alias=True), ensure_ascii=False,
+        sort_keys=True, separators=(',', ':'), allow_nan=False).encode('utf-8')
+    address = value.address_map
+    if (hashlib.sha256(wire).hexdigest() != value.address_map_sha256
+            or address.client_mutation_id != client_mutation_id or address.request_hash != value.request_hash
+            or address.base_snapshot != base or address.result_snapshot != result or unchanged and address.containers):
+        raise ValueError('address map differs from its prepared request')
+
+
 class WriterPreparedDeltaV2(BackgroundWire):
     schema_version: Literal[2]
     preparation_input_sha256: Sha256
     request_hash: Sha256
     delta: TemplatePreparedEditDeltaV1
+    address_map: PreparedAddressMapV1
+    address_map_sha256: Sha256
 
     @model_validator(mode='after')
     def exact_preparation(self):
         if self.request_hash != self.delta.request_hash:
             raise ValueError('transport binding differs from prepared request')
+        _bound_address(self, self.delta.client_mutation_id, self.delta.base_snapshot, self.delta.result_snapshot,
+            self.delta.mutation_wire is None)
+        return self
+
+
+class WriterPreparedEditV2(BackgroundWire):
+    schema_version: Literal[2]
+    preparation_input_sha256: Sha256
+    request_hash: Sha256
+    prepared: TemplatePreparedEditV1
+    address_map: PreparedAddressMapV1
+    address_map_sha256: Sha256
+
+    @model_validator(mode='after')
+    def exact_preparation(self):
+        if self.request_hash != self.prepared.request_hash:
+            raise ValueError('transport binding differs from prepared request')
+        _bound_address(self, self.prepared.client_mutation_id, self.prepared.base_snapshot,
+            self.prepared.preview.snapshot, self.prepared.mutation is None)
         return self
 
 
@@ -97,6 +131,163 @@ class WriterClipboardReleaseResultV2(BackgroundWire):
     released: Literal[True]
 
 
+class WriterRewritePreviewV2(BackgroundWire):
+    """Selected-text rewrite in one text block or cell; generation never changes the document."""
+    schema_version: Literal[2]
+    proof: background.WriterProofV1
+    request_id: Id
+    snapshot: TemplateSnapshotIdentity
+    range: AuthoredRange
+    instruction: str = Field(min_length=1, max_length=4000)
+
+    @model_validator(mode='after')
+    def selected(self):
+        if self.range.start >= self.range.end or self.range.insertion_target is not None:
+            raise ValueError('rewrite needs a selected range')
+        return self
+
+
+class TemplateRewritePreviewV1(BackgroundWire):
+    schema_version: Literal[1]
+    request_id: Id
+    snapshot: TemplateSnapshotIdentity
+    range: AuthoredRange
+    source: str
+    text: str = Field(min_length=1, max_length=65536)
+
+
+class WriterRewriteCancelV2(BackgroundWire):
+    schema_version: Literal[2]
+    proof: background.WriterProofV1
+    request_id: Id
+
+
+class WriterRewriteCancelResultV2(BackgroundWire):
+    schema_version: Literal[2]
+    request_id: Id
+    cancelled: bool
+
+
+DraftId = Annotated[str, Field(min_length=1, max_length=256)]
+
+
+class LocalContainerV1(BackgroundWire):
+    block_id: DraftId
+    kind: Literal['content', 'caption', 'cell']
+    cell_id: DraftId | None
+
+    @model_validator(mode='after')
+    def cell(self):
+        if (self.kind == 'cell') != (self.cell_id is not None):
+            raise ValueError('only a cell container names a cell')
+        return self
+
+
+class LocalReplaceTextV1(BackgroundWire):
+    kind: Literal['replace_text']
+    container: LocalContainerV1
+    start: int = Field(ge=0)
+    end: int = Field(ge=0)
+    text: str
+    styles: InlineStyles
+    side: Literal['before', 'after', 'interior', 'anchor'] | None
+
+    @model_validator(mode='after')
+    def ordered(self):
+        if self.end < self.start or (self.side is None) == (self.start == self.end):
+            raise ValueError('a collapsed replacement needs exactly one side')
+        return self
+
+
+class LocalSetMarksV1(BackgroundWire):
+    kind: Literal['set_marks']
+    container: LocalContainerV1
+    start: int = Field(ge=0)
+    end: int = Field(ge=0)
+    styles: InlineStyles
+
+    @model_validator(mode='after')
+    def ordered(self):
+        if self.end <= self.start:
+            raise ValueError('marks need a range')
+        return self
+
+
+class LocalSplitBlockV1(BackgroundWire):
+    kind: Literal['split_block']
+    container: LocalContainerV1
+    offset: int = Field(ge=0)
+    created: DraftId
+
+
+class LocalMergeBlocksV1(BackgroundWire):
+    kind: Literal['merge_blocks']
+    leading: LocalContainerV1
+    trailing: LocalContainerV1
+
+
+LocalOperationV1 = Annotated[Union[LocalReplaceTextV1, LocalSetMarksV1, LocalSplitBlockV1, LocalMergeBlocksV1],
+    Field(discriminator='kind')]
+
+
+class DraftTextV1(BackgroundWire):
+    container: LocalContainerV1
+    text: str
+
+
+class DraftIntentV1(BackgroundWire):
+    local_id: DraftId
+    action_id: DraftId
+    action_token: int = Field(ge=0)
+    client_mutation_id: DraftId
+    operation: LocalOperationV1
+    prior: list[DraftTextV1] = Field(min_length=1, max_length=2)
+
+
+class DraftHeadV1(BackgroundWire):
+    client_mutation_id: DraftId
+    # The exact frozen preparation without the writer proof; no credential enters a draft.
+    preparation_wire: str
+    stage: Literal['frozen', 'prepared', 'saving']
+
+    @model_validator(mode='after')
+    def preparation(self):
+        try:
+            value = TemplateEditPreparationV1.model_validate_json(self.preparation_wire)
+        except ValidationError:
+            raise ValueError('head preparation is not a template edit preparation') from None
+        if value.client_mutation_id != self.client_mutation_id:
+            raise ValueError('head preparation names another mutation')
+        return self
+
+
+class DraftLocalBlockV1(BackgroundWire):
+    local: DraftId
+    canonical: DraftId
+
+
+class TemplateQueueDraftV1(BackgroundWire):
+    """Pending V7 input for recovery; Python checks shape and bounds and never interprets local operations."""
+    schema_version: Literal[1]
+    intents: list[DraftIntentV1] = Field(max_length=100)
+    head: DraftHeadV1 | None
+    locals: list[DraftLocalBlockV1] = Field(max_length=1000)
+    editor_texts: list[DraftTextV1] = Field(max_length=1000)
+
+    @model_validator(mode='after')
+    def coherent(self):
+        def key(container):
+            return (container.block_id, container.kind, container.cell_id)
+        if (len({item.local_id for item in self.intents}) != len(self.intents)
+                or len({item.client_mutation_id for item in self.intents}) != len(self.intents)
+                or len({item.local for item in self.locals}) != len(self.locals)
+                or len({key(item.container) for item in self.editor_texts}) != len(self.editor_texts)):
+            raise ValueError('duplicate queue draft identity')
+        if self.head is not None and (not self.intents or self.intents[0].client_mutation_id != self.head.client_mutation_id):
+            raise ValueError('the frozen head must be the first intent')
+        return self
+
+
 class DraftPayloadV2(DraftPayloadV1):
     schema_version: Literal[2]
     document: RichDocumentV2
@@ -105,6 +296,8 @@ class DraftPayloadV2(DraftPayloadV1):
     touches: list[WriterTouchV2] = Field(default_factory=list, max_length=100)
     import_issues: list[ImportIssue]
     import_coverage: list[SpanCoverage]
+    # Omitted when absent so existing V2 drafts keep their bytes.
+    template_queue: TemplateQueueDraftV1 | None = Field(default=None, exclude_if=lambda value: value is None)
 
 
 class WriterCheckpointV2(WriterCheckpointV1):
@@ -242,9 +435,15 @@ TEMPLATE_WRITER_CONTRACTS = {
     'background_writer_mutation_v2': WriterMutationV2,
     'background_writer_prepare_edit_v2': WriterPrepareEditV2,
     'background_writer_prepared_delta_v2': WriterPreparedDeltaV2,
+    'background_writer_prepared_edit_v2': WriterPreparedEditV2,
+    'template_address_map_v1': PreparedAddressMapV1,
     'background_writer_capture_clipboard_v2': WriterCaptureClipboardV2,
     'background_writer_release_clipboard_v2': WriterReleaseClipboardV2,
     'background_writer_clipboard_release_result_v2': WriterClipboardReleaseResultV2,
+    'background_writer_rewrite_preview_v2': WriterRewritePreviewV2,
+    'template_rewrite_preview_v1': TemplateRewritePreviewV1,
+    'background_writer_rewrite_cancel_v2': WriterRewriteCancelV2,
+    'background_writer_rewrite_cancel_result_v2': WriterRewriteCancelResultV2,
     'background_writer_draft_payload_v2': DraftPayloadV2,
     'background_writer_checkpoint_v2': WriterCheckpointV2,
     'background_writer_draft_read_v2': WriterDraftReadV2,

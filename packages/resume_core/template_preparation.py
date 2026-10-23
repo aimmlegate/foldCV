@@ -247,8 +247,11 @@ def prepare_text_edit(response, request, proof, *, operation=None, replacement=N
             raw = _raw_occurrence(candidate.document, bound)
             steps += human_cell_steps(workspace, sorted({_identity(span)[0] for span in fields}), raw,
                 request.capture.action_id, [original.id], allocator)
-    return finish_preparation(response, request, allocator, steps, candidate,
+    result = finish_preparation(response, request, allocator, steps, candidate,
         kind='typing' if isinstance(operation, ReplaceText) and replacement is None else 'structure')
+    # Clipboard content is never optimistic, so a paste offers no address correspondence.
+    result._address_middle = None if replacement is not None else 'restyled' if isinstance(operation, SetMarks) else 'inserted'
+    return result
 
 
 def prepare_edit(response, request, proof, *, clipboard=None):

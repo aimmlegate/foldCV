@@ -1,0 +1,204 @@
+import { createExtension } from "@blocknote/core";
+import { Extension } from "@tiptap/core";
+import { useCreateBlockNote } from "@blocknote/react";
+import { BlockNoteView } from "@blocknote/shadcn";
+import { useEffect, useImperativeHandle, useMemo, useRef, useState, type Ref } from "react";
+import type { AttachedTemplateWriter } from "../background/connection";
+import type { WriterMode } from "../background/writer-lifecycle";
+import type { TemplateProjectResponseV1 } from "../contracts/generated/template_project_response_v1";
+import { templateProjectWire } from "../contracts/template-validate";
+import { errorMessage, knownErrorMessage } from "../errors/messages";
+import { ComparisonWorkspace } from "../workbench/editor/ComparisonWorkspace";
+import { EditorNotices } from "../workbench/editor/EditorNotices";
+import { FactsPanel } from "../workbench/facts/FactsPanel";
+import { NotificationSection } from "../workbench/ui/NotificationCenter";
+import { RewritePanel } from "../workbench/editor/RewritePanel";
+import type { RewriteActivity } from "./rewrite-progress";
+import type { PanelCommand } from "./synchronization";
+import { Toolbar, type ToolbarCommand } from "../workbench/editor/Toolbar";
+import { selectionLocation } from "./selection";
+import { tableIdentityAttributes } from "./table-identity";
+import { templateSchema } from "./template-schema";
+import { projectTemplateDocument } from "./v7-projection";
+import { TemplateEditorSession, type TemplateRewrite } from "./v7-session";
+
+export type TemplateEditorHandle = { background: boolean; flush: () => Promise<TemplateProjectResponseV1>;
+  navigate: () => Promise<void>; resume: () => Promise<void>; refresh: () => Promise<void>; undo: () => void; redo: () => void };
+
+/** The V7 editor: the same BlockNote view and controls, bound to one TemplateEditorSession. */
+export function TemplateEditor({ initial, connection, onStatus, onShown, ref, portalHost }: {
+  initial: TemplateProjectResponseV1; connection: AttachedTemplateWriter; onStatus: (status: string) => void;
+  onShown: (response: TemplateProjectResponseV1) => void; ref: Ref<TemplateEditorHandle>; portalHost?: HTMLElement }) {
+  const project = initial.workspace.project;
+  if (!project) throw new Error("Document is missing");
+  const [warning, setWarning] = useState("");
+  const [mode, setMode] = useState<WriterMode | null>(null);
+  const [conflicts, setConflicts] = useState(0);
+  const [recovering, setRecovering] = useState(false);
+  // The verified state shown in the editor: facts and issues are read from it, never from editor content.
+  const [shown, setShown] = useState(initial);
+  const [factsVisible, setFactsVisible] = useState(false);
+  const [panelPending, setPanelPending] = useState<PanelCommand[]>([]);
+  const [, refresh] = useState(0);
+  // Selected-text rewrite: one preview at a time; nothing changes until Apply.
+  const [rewriteOpen, setRewriteOpen] = useState(false);
+  const [instruction, setInstruction] = useState("");
+  const [rewriteSource, setRewriteSource] = useState("");
+  const [rewritePreview, setRewritePreview] = useState<TemplateRewrite | null>(null);
+  const [rewriteText, setRewriteText] = useState("");
+  const [rewriteError, setRewriteError] = useState("");
+  const [rewriteActivity, setRewriteActivity] = useState<RewriteActivity | null>(null);
+  const [rewriteAnchor, setRewriteAnchor] = useState<{ left: number; top: number; bottom: number } | null>(null);
+  const callbacks = useRef({ onStatus, onShown });
+  callbacks.current = { onStatus, onShown };
+  const session = useMemo(() => new TemplateEditorSession(connection, {
+    status: text => { callbacks.current.onStatus(text); refresh(value => value + 1); },
+    warning: text => setWarning(text),
+    mode: value => setMode(value),
+    shown: response => { setShown(response); callbacks.current.onShown(response); refresh(value => value + 1); },
+  }), [connection]);
+  // Copy, cut and paste must run before BlockNote's own clipboard handlers, which would otherwise end the event.
+  const extension = useMemo(() => createExtension({ key: "foldcv-v7-session", runsBefore: ["link"], tiptapExtensions: [tableIdentityAttributes,
+    Extension.create({ name: "foldcv-v7-clipboard", priority: 1000, addProseMirrorPlugins: () => [session.clipboard] })],
+    prosemirrorPlugins: [session.plugin] }), [session]);
+  const editor = useCreateBlockNote({ schema: templateSchema, extensions: [extension],
+    disableExtensions: ["history", "sideMenu", "code-block-keyboard-shortcuts", "check-list-item-shortcuts", "toggle-list-item-shortcuts"],
+    tables: { splitCells: true, cellBackgroundColor: true, cellTextColor: true, headers: true },
+    initialContent: projectTemplateDocument(project.document) }, []);
+  useEffect(() => {
+    session.bind(editor, project.document);
+    if (session.writer.mode === "recovering") void recover(null);
+    const stop = editor.onSelectionChange(() => { session.selected(editor.transact(tr => selectionLocation(tr))); refresh(value => value + 1); });
+    const heartbeat = setInterval(() => { void session.writer.heartbeat(); }, 5000);
+    const suspend = () => {
+      const proof = session.writer.connection.proof;
+      if (proof && !["detached", "closed", "read_only"].includes(session.writer.mode)) navigator.sendBeacon(
+        `/v1/rich/projects/${encodeURIComponent(initial.workspace.projectId)}/writer/suspend`, new Blob([JSON.stringify(proof)], { type: "application/json" }));
+    };
+    window.addEventListener("pagehide", suspend, { capture: true });
+    return () => { stop(); clearInterval(heartbeat); window.removeEventListener("pagehide", suspend, { capture: true }); session.close(); };
+  }, [editor, session]);
+  useImperativeHandle(ref, () => ({ background: true,
+    flush: async () => {
+      await session.flush(); await session.writer.flushTouches();
+      const response = await templateProjectWire(session.queue.template.durable);
+      if (!response) throw new Error("INVALID_RESULT");
+      return response;
+    },
+    navigate: () => session.writer.navigate(), resume: () => session.resume(), refresh: () => session.refresh(),
+    undo: () => void session.navigate("undo"), redo: () => void session.navigate("redo") }), [session]);
+  async function recover(choice: "keep" | "saved" | null) {
+    setRecovering(true);
+    try {
+      // The writer's own recovery first resolves any fenced head; a retained draft is then saved as corrections.
+      if (!session.writer.connection.local) await session.recoverWriter();
+      else setConflicts((await session.recoverDraft(choice)).conflicts);
+    } catch (error) { setWarning(errorMessage(error)); }
+    finally { setRecovering(false); }
+  }
+  const unsupported = () => setWarning(knownErrorMessage("V7_INPUT_UNSUPPORTED") ?? "");
+  function openRewrite() {
+    const source = session.rewriteSource();
+    if (!source) { unsupported(); return; }
+    const view = editor._tiptapEditor.view, coords = view.coordsAtPos(view.state.selection.from);
+    setRewriteAnchor({ left: coords.left, top: coords.top, bottom: coords.bottom });
+    setRewriteSource(source.text); setRewritePreview(null); setRewriteText(""); setRewriteError(""); setRewriteOpen(true);
+  }
+  async function submitRewrite() {
+    const requestId = crypto.randomUUID();
+    setRewriteError(""); setRewriteActivity({ actionId: requestId, stage: "running", startedAt: Date.now(), finishedAt: null, detail: null });
+    try {
+      const preview = await session.rewritePreview(instruction, requestId);
+      setRewritePreview(preview); setRewriteText(preview.text); setRewriteSource(preview.source);
+    } catch (error) { setRewriteError(error instanceof Error ? error.message : "INVALID_RESULT"); }
+    finally { setRewriteActivity(null); }
+  }
+  async function applyRewrite() {
+    if (!rewritePreview) return;
+    setRewriteActivity({ actionId: rewritePreview.requestId, stage: "applying", startedAt: Date.now(), finishedAt: null, detail: null });
+    try { await session.applyRewrite(rewritePreview, rewriteText); setRewriteOpen(false); setRewritePreview(null); editor.focus(); }
+    catch (error) { setRewriteError(error instanceof Error ? error.message : "INVALID_RESULT"); }
+    finally { setRewriteActivity(null); }
+  }
+  const command = (value: ToolbarCommand) => {
+    if (value === "undo" || value === "redo") { void session.navigate(value); return; }
+    if (value === "rewrite") { openRewrite(); return; }
+    if (value === "bold" || value === "italic" || value === "underline") { editor.toggleStyles({ [value]: true }); editor.focus(); return; }
+    if (value === "facts") { setFactsVisible(visible => !visible); return; }
+    unsupported();
+  };
+  async function submitPanel(value: PanelCommand) {
+    setPanelPending([value]);
+    try { await session.panel(value); }
+    catch (error) { if (!(error instanceof Error && error.message === "V7_INPUT_UNSUPPORTED")) setWarning(errorMessage(error)); throw error; }
+    finally { setPanelPending([]); }
+  }
+  const facts = shown.workspace.project?.facts ?? project.facts, documentShown = shown.workspace.project?.document ?? project.document;
+  const activeIssues = (shown.workspace.project?.importIssues ?? []).filter(issue => issue.state === "active");
+  // An issue names its scope by the text it covers, so identical messages stay distinguishable.
+  const scopeText = (blockId: string | undefined): string => {
+    const block = blockId ? editor.getBlock(blockId) : undefined, content = block?.content;
+    const text = Array.isArray(content) ? content.map(span => "text" in span ? span.text : "content" in span && Array.isArray(span.content)
+      ? span.content.map(part => "text" in part ? part.text : "").join("") : "").join("") : "";
+    return text.length > 60 ? `${text.slice(0, 59)}…` : text;
+  };
+  const state = session.queue.template.state, styles = editor.getActiveStyles();
+  const locked = mode === "read_only" || mode === "detached" || mode === "recovering";
+  return <div className="contents uir-editor-session">
+    <RewritePanel open={rewriteOpen} close={() => setRewriteOpen(false)} instruction={instruction} change={setInstruction}
+      submit={() => void submitRewrite()} busy={rewriteActivity !== null} source={rewriteSource} error={rewriteError}
+      preview={rewritePreview ? { text: rewriteText } : null} apply={() => void applyRewrite()} editPreview={setRewriteText}
+      anchor={rewriteAnchor} focusInstruction activity={rewriteActivity} cancel={id => { void session.cancelRewrite(id); }} />
+    <div className="editor-body uir-editor-body">
+      <aside className="editor-notifications" aria-label="Уведомления редактора">
+        {/* V1 draft choices do not apply; V7 recovery reads the durable record and continues from it. */}
+        {mode === "recovering" && (conflicts > 0 ? <div className="notice warning" role="alert">
+          <p>Сохранённый текст изменился после вашего ввода во фрагментах: {conflicts}. Выберите, какой текст оставить.</p>
+          <button type="button" disabled={recovering} onClick={() => void recover("keep")}>Сохранить текст из редактора</button>
+          <button type="button" disabled={recovering} onClick={() => void recover("saved")}>Оставить сохранённый текст</button>
+        </div> : <div className="notice warning" role="alert">
+          <p>{recovering ? "Восстанавливаем введённый текст…" : errorMessage("WRITER_RECOVERY_REQUIRED")}</p>
+          {!recovering && <button type="button" onClick={() => void recover(null)}>Продолжить с сохранённого состояния</button>}
+        </div>)}
+        <EditorNotices mode={mode === "recovering" ? null : mode} localDraft={false} warning={warning} clearWarning={() => setWarning("")} onOpen={() => {}}
+          resolveDraft={() => Promise.reject(new Error("DRAFT_RECOVERY_REQUIRED"))} syncRecords={[]}
+          resolve={() => Promise.resolve()} retry={() => Promise.resolve()} dismiss={() => Promise.resolve()} report={setWarning} />
+        {/* Concise scoped issues: no blocking dialog; editing the scoped text retires them in Python. */}
+        <NotificationSection count={activeIssues.length}>
+          <section className="notice-group" aria-label="Замечания импорта"><h3>Замечания импорта</h3>
+            {activeIssues.map(issue => <p className="notice warning" key={issue.id} data-issue-id={issue.id}>{issue.message}
+              {scopeText(issue.blockIds[0]) && <> — «{scopeText(issue.blockIds[0])}»</>}
+              {issue.blockIds[0] && <button type="button" className="text-button" onClick={() => {
+                const block = editor.getBlock(issue.blockIds[0] ?? ""); if (block) { editor.setTextCursorPosition(block, "end"); editor.focus(); }
+              }}>Показать</button>}</p>)}
+          </section>
+        </NotificationSection>
+        {(state.kind === "conflict" || state.kind === "rejected") && <div className="notice warning" role="alert">
+          <p>{errorMessage(state.kind === "conflict" ? "V7_INPUT_CONFLICT" : "V7_INPUT_REJECTED")}</p>
+          <button type="button" onClick={() => session.retry()}>Сохранить текст из редактора</button>
+        </div>}
+      </aside>
+      {/* The shared layout host: the facts panel floats over the document exactly as in the V1 editor. */}
+      <ComparisonWorkspace view="layout" original={null} layout={<div className="document-workspace">
+        <fieldset className="contents uir-editor-controls" disabled={locked}>
+          <Toolbar command={command} textStyle={unsupported} factsVisible={factsVisible} selecting={session.rewriteSource() !== null} style="p"
+            canUndo={session.history.position > 0} canRedo={session.history.position < session.history.length}
+            active={{ bold: styles.bold === true, italic: styles.italic === true, underline: styles.underline === true }} />
+        </fieldset>
+        <fieldset className="contents uir-editor-controls" disabled={locked}>
+          <FactsPanel facts={facts} document={documentShown} submit={submitPanel} pending={panelPending} paused={false}
+            timeline={null} hidden={!factsVisible} close={() => { setFactsVisible(false); editor.focus(); }} />
+        </fieldset>
+        <div className="paper-scroll">
+          <div className="cv-document resume-paper" data-project-id={initial.workspace.projectId} data-template="v7"
+            data-history-position={session.history.position} data-history-length={session.history.length}>
+            <div className="uir-engine-sheet">
+              <BlockNoteView editor={editor} theme="light" filePanel={false} slashMenu={false} formattingToolbar={false} sideMenu={false} tableHandles={false}
+                {...(portalHost ? { portalElements: { default: portalHost } } : {})} />
+            </div>
+          </div>
+        </div>
+      </div>} />
+    </div>
+  </div>;
+}

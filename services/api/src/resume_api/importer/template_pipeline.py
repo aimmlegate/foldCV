@@ -22,7 +22,7 @@ from packages.resume_core.template_import import (CleanupProof, ProcessingDeadli
 from packages.resume_core.template_proposals import parse_proposal
 from packages.resume_core.template_review import decide_review, make_review_input, record_review
 from packages.resume_core.templates.compiler import canonical
-from packages.resume_core.templates.replies import proposal_schema, review_schema
+from packages.resume_core.templates.replies import proposal_schema, review_schema, PROPOSAL_PROTOCOL
 
 from ..providers.content import ContentFailure, ContentInput, ContentTransportReturn, GenerationPolicy, outcome_state
 from ..providers.dynamic_result import dynamic_result
@@ -247,7 +247,8 @@ class TemplatePipeline(TemplateCheckpoints):
         spans += [span for cell in cells for span in cell.evidence]
         spans += [span for result in dependencies for span in result.source_spans]
         spans = list({digest(span): span for span in spans}.values())
-        value = {'protocol': 'template_import_v1', 'tools': [], 'packageHash': data.template_package.package_hash,
+        value = {'protocol': 'template_import_v1', 'tools': [], 'replyProtocol': PROPOSAL_PROTOCOL,
+            'packageHash': data.template_package.package_hash,
             'allowTextRewrite': operation.capture.allow_text_rewrite,
             'formattingAsOf': operation.capture.formatting_as_of.model_dump(mode='json', by_alias=True),
             'modelInstructions': data.template_package.definition.model.model_dump(mode='json', by_alias=True),

@@ -13,8 +13,10 @@ from spikes.cli.profile import overrides
 from . import distribution
 
 
+# The managed runtime release; the installed plugin CLI has its own pin (D092).
 VERSION = "codex-cli 0.162.0-alpha.17.2"
-BINARY_SHA256 = "0d5ac7aae20c4eda6242428d5e218c55ba96d8763fda2a271088ff37104b9d28"
+PLUGIN_VERSION = "codex-cli 0.163.0-alpha.11.1"
+BINARY_SHA256 = "9394a943e3fce54f998ecc150eb0b7d6e22ce0da48e5063c59b4883e80aeaecd"
 BINARY = Path("/Users/fostral/.codex/plugins/.plugin-appserver/codex-cli/CodexCLI.app/Contents/MacOS/codex")
 SYSTEM_SKILLS = ("imagegen", "openai-docs", "skill-creator", "skill-installer")
 MARKER = ".foldcv-cli-experiment-v1"
@@ -46,6 +48,10 @@ class ExperimentalCliProfile:
 
     root: Path
     executable: Path = BINARY
+
+    @property
+    def version(self) -> str:
+        return PLUGIN_VERSION if self.executable == BINARY else VERSION
 
     @property
     def binary_sha256(self) -> str:

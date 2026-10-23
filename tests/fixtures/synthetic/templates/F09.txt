@@ -1,0 +1,10 @@
+Alex Example
+Backend Engineer
+Example Labs — Backend Engineer
+03.2020–11.2023
+Python
+Implemented queue processing.
+Implemented queue processing.
+Our team reduced median latency from 800 ms to 500 ms.
+Second Works — engineer
+2024–present

@@ -4,6 +4,7 @@ from dataclasses import dataclass, field, replace
 import json
 
 from .background_store import BackgroundFailure, RetainedUsage
+from .models.template_address import PreparedAddressMapV1
 from .models.template_authoring import TemplatePreparedEditV1
 from .models.template_delta import TemplatePreparedEditDeltaV1
 from .rich_mutations import mutation_sha256
@@ -23,6 +24,7 @@ class PreparedEntry:
     commit_proof: bytes | None = None
     proof_expires_at: str | None = None
     committed: bool = False
+    address_map: bytes | None = None
 
 
 @dataclass
@@ -78,9 +80,11 @@ class TemplatePreparations(TemplateCommitProofs):
             entries = {key: {'requestHash': entry.request_hash, 'mutationHash': entry.mutation_hash,
                 'responseForm': entry.response_form, 'payload': entry.payload.decode() if entry.payload is not None else None,
                 'commitProof': entry.commit_proof.decode() if entry.commit_proof is not None else None,
-                'proofExpiresAt': entry.proof_expires_at, 'committed': entry.committed}
+                'proofExpiresAt': entry.proof_expires_at, 'committed': entry.committed,
+                'addressMap': entry.address_map.decode() if entry.address_map is not None else None}
                 for key, entry in value.entries.items()}
             draft = sum(len(entry.payload) for entry in value.entries.values() if entry.payload is not None)
+            draft += sum(len(entry.address_map) for entry in value.entries.values() if entry.address_map is not None)
             owned = len(canonical({'key': list(value.key), 'backing': value.backing, 'entries': entries}))
             result[project] = RetainedUsage(draft, owned, 1 + len(entries) + sum(entry.commit_proof is not None for entry in value.entries.values()))
         return result
@@ -117,7 +121,21 @@ class TemplatePreparations(TemplateCommitProofs):
         except (ValueError, KeyError, TypeError, RecursionError):
             raise BackgroundFailure('REQUEST_EXPIRED') from None
 
-    def admit(self, state, workspace, prepared):
+    def read_address(self, state, entry):
+        opening = self.opening(state)
+        if opening is None or entry.payload is None or entry.address_map is None:
+            raise BackgroundFailure('REQUEST_EXPIRED')
+        try:
+            result = PreparedAddressMapV1.model_validate_json(entry.address_map)
+            if (canonical(result) != entry.address_map or result.request_hash != entry.request_hash
+                    or opening.entries.get(result.client_mutation_id) is not entry
+                    or result.base_snapshot.project_id != state.project_id):
+                raise ValueError('retained address map differs from its entry binding')
+            return result
+        except (ValueError, TypeError, RecursionError):
+            raise BackgroundFailure('REQUEST_EXPIRED') from None
+
+    def admit(self, state, workspace, prepared, address_map=None):
         current = self.opening(state)
         response_form = 'delta' if isinstance(prepared, TemplatePreparedEditDeltaV1) else 'full'
         backing = current.backing if current is not None else None
@@ -136,7 +154,11 @@ class TemplatePreparations(TemplateCommitProofs):
             fingerprint = mutation_sha256(prepared.mutation) if prepared.mutation is not None else None
         else:
             fingerprint = sha256(prepared.mutation_wire.encode()) if prepared.mutation_wire is not None else None
-        entry = PreparedEntry(prepared.request_hash, fingerprint, canonical(compact), response_form)
+        if address_map is not None and (address_map.client_mutation_id != identifier
+                or address_map.request_hash != prepared.request_hash):
+            raise BackgroundFailure('JOB_SCOPE_INVALID')
+        entry = PreparedEntry(prepared.request_hash, fingerprint, canonical(compact), response_form,
+            address_map=canonical(address_map) if address_map is not None else None)
         candidate = PreparationOpening(TemplateLocalHistory.key(state), backing,
             {**(current.entries if current is not None else {}), identifier: entry})
         self.jobs._capacity(state, self.jobs._all(), retained_usage={self.usage_key: self.usage(replacing=candidate)})
@@ -181,4 +203,4 @@ class TemplatePreparations(TemplateCommitProofs):
                 and item.request_sha256 == fingerprint for item in workspace.mutation_replay):
             raise BackgroundFailure('OUTCOME_UNKNOWN')
         self.verify_commit(entry, workspace, mutation)
-        opening.entries[mutation.client_mutation_id] = replace(entry, payload=None, committed=True)
+        opening.entries[mutation.client_mutation_id] = replace(entry, payload=None, committed=True, address_map=None)

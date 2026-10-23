@@ -187,6 +187,8 @@ class TemplateJobRuntime:
     async def run(self, control):
         self.control = control
         async def process():
+            from ..importer.template_transport import JOB_PERMIT
+            JOB_PERMIT.set(control.permit)
             try:
                 await self.service.templates.pipeline.run(control.project_id, self.job.submission.template_command,
                     admitted=control.execution_ready, finalize=False, cancel_event=control.cancel)

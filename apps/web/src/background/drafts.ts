@@ -1,5 +1,7 @@
 import type { DraftPayloadV1 } from "../contracts/generated/background_draft_payload_v1";
+import type { DraftPayloadV2 } from "../contracts/generated/background_writer_draft_payload_v2";
 import { validateBackgroundShape } from "../contracts/background-validate";
+import { isTemplateDraftPayload } from "../contracts/template-drafts";
 import { sha256 } from "./wire";
 
 export type LocalDraft = { schemaVersion: 1; project: string; lineage: string; epoch: number; incarnation: string; id: string; sequence: number;
@@ -93,7 +95,21 @@ export class DraftRepository {
       const candidates = rows.filter(item => item.project === project).sort((a, b) => b.epoch - a.epoch || b.sequence - a.sequence);
       return { rows, result: candidates.find(item => item.epoch === owner?.epoch && item.incarnation === owner.incarnation) ?? candidates[0] ?? null };
     });
-    return row ? { record: row, payload: await this.verify(row, project, lineage) } : null;
+    if (!row) return null;
+    const payload = await this.verify(row, project, lineage);
+    if (payload.schemaVersion !== 1) throw new Error("DRAFT_CORRUPT");
+    return { record: row, payload };
+  }
+  /** The V7 family of the same store: V2 payloads with an optional queue record. */
+  async readTemplate(project: string, lineage: string, owner?: { epoch: number; incarnation: string }): Promise<{ record: LocalDraft; payload: DraftPayloadV2 } | null> {
+    const row = await this.database.transact(rows => {
+      const candidates = rows.filter(item => item.project === project).sort((a, b) => b.epoch - a.epoch || b.sequence - a.sequence);
+      return { rows, result: candidates.find(item => item.epoch === owner?.epoch && item.incarnation === owner.incarnation) ?? candidates[0] ?? null };
+    });
+    if (!row) return null;
+    const payload = await this.verify(row, project, lineage);
+    if (payload.schemaVersion !== 2) throw new Error("DRAFT_CORRUPT");
+    return { record: row, payload };
   }
   async remove(row: LocalDraft): Promise<void> {
     await this.database.transact(rows => {
@@ -120,10 +136,10 @@ export class DraftRepository {
       return { rows: result, result: undefined };
     });
   }
-  private async verify(row: LocalDraft, project: string, lineage: string): Promise<DraftPayloadV1> {
+  private async verify(row: LocalDraft, project: string, lineage: string): Promise<DraftPayloadV1 | DraftPayloadV2> {
     if (!valid(row) || row.project !== project || row.lineage !== lineage || await sha256(row.payloadWire) !== row.payloadSha256) throw new Error("DRAFT_CORRUPT");
     const payload: unknown = JSON.parse(row.payloadWire);
-    if (!isPayload(payload)) throw new Error("DRAFT_CORRUPT");
+    if (!isPayload(payload) && !isTemplateDraftPayload(payload)) throw new Error("DRAFT_CORRUPT");
     if (new Set(row.assets.map(item => item.id)).size !== row.assets.length || payload.assetPins.some(id => !row.assets.some(item => item.id === id))) throw new Error("DRAFT_ASSET_MISSING");
     await Promise.all(row.assets.map(async asset => { if (await sha256(await this.assets(asset.id)) !== asset.sha256) throw new Error("DRAFT_ASSET_MISSING"); }));
     return payload;

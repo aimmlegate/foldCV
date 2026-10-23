@@ -60,6 +60,16 @@ def _closed_schema(model, payload_schema=None):
     return root
 
 
+# Application-owned reply rules sent with every extraction task; generic for any template declaration.
+PROPOSAL_PROTOCOL = {'version': 'template-proposal-protocol-1', 'rules': [
+    'Return payload, discoveries, fields, relations and lineage. payload follows the block content schema; use null or [] for data the source does not state.',
+    'Each declaration binding names a pointer (with * for array elements), a semantic_type, a field and an item_pointer. Every concrete item matched by an item_pointer is its own discovery: {key: unique string, semanticType: the binding semantic_type, pointer: the concrete JSON pointer of that item, for example /0/tasks/1}. Two array elements are two discoveries even when their text is identical.',
+    'For every binding whose concrete pointer exists in the payload (a null leaf counts; a field under a null or missing parent does not), add one fields entry: {item: {kind: discovery_key, key: the discovery of that item}, fieldKey: the binding field, pointer: the concrete pointer, evidence: spans, effectiveCellIds: []}. A discovery never has two entries for the same fieldKey.',
+    'Evidence spans are copied exactly, with all their properties, from sourceSpans; choose the spans whose text contains the value. A null value has evidence []. Never invent or edit a span.',
+    'For every binding with a relation, add one relations entry per concrete item: {relation: {kind: discovery_key, key: unique string}, kind: the relation kind, subject: {kind: discovery_key, key: the discovery of the binding item}, target: {kind: discovery_key, key: the discovery at the relation subject_pointer}, evidence: the spans of the bound value}. One relation per subject and kind.',
+    'lineage is [{kind: add, parents: [], children: all discovery keys}].']}
+
+
 def proposal_schema(content_schema):
     return _closed_schema(ProposalReply, content_schema)
 

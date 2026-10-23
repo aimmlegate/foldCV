@@ -1,0 +1,26 @@
+{
+  "additionalProperties": false,
+  "properties": {
+    "cancelled": {
+      "title": "Cancelled",
+      "type": "boolean"
+    },
+    "requestId": {
+      "minLength": 1,
+      "title": "Requestid",
+      "type": "string"
+    },
+    "schemaVersion": {
+      "const": 2,
+      "title": "Schemaversion",
+      "type": "integer"
+    }
+  },
+  "required": [
+    "schemaVersion",
+    "requestId",
+    "cancelled"
+  ],
+  "title": "WriterRewriteCancelResultV2",
+  "type": "object"
+}
