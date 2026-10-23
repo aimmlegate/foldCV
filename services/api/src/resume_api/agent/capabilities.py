@@ -76,11 +76,22 @@ PROPOSAL_INSTRUCTIONS = (
 )
 
 
+def proposal_instructions():
+    from .skills import SKILL_INSTRUCTIONS
+    return PROPOSAL_INSTRUCTIONS + SKILL_INSTRUCTIONS + (
+        " Read complete context, document and working-facts pages for the frozen scope. "
+        "Copy UTF-16 offsets from find_resume_content and pair them with a full document read, "
+        "never a search snapshot. Coverage IDs are opaque; reuse returned IDs and account for "
+        "all unresolved units before finalization. Split wording edits at rich-style/link/binding "
+        "boundaries. A compound format-and-rewrite request needs separate tasks, never partial Apply."
+    )
+
+
 @lru_cache(maxsize=1)
 def proposal_protocol_fingerprint(legacy):
     from packages.resume_core.models.assistant_capabilities import AssistantTaskRequestV1
     from packages.resume_core.models.assistant_proposals import AssistantAssemblyRequestV1
-    return digest({"legacy": legacy, "instructions": PROPOSAL_INSTRUCTIONS,
+    return digest({"legacy": legacy, "instructions": proposal_instructions(),
         "task": AssistantTaskRequestV1.model_json_schema(), "assembly": AssistantAssemblyRequestV1.model_json_schema()})
 
 

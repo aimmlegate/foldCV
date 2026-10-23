@@ -13,6 +13,7 @@ PROJECT_BYTES = 10 * 1024 * 1024
 APPLICATION_BYTES = 100 * 1024 * 1024
 VERSION_COUNT = 20
 RETENTION_DAYS = 7
+POLICY_REVISION = 1
 PROTECTED = {"applying", "outcome_unknown"}
 TRANSITIONS = {
     "building": {"ready", "incomplete", "invalid", "cancelled"},
@@ -37,17 +38,19 @@ def expiry(created):
     return (at(created) + timedelta(days=RETENTION_DAYS)).isoformat()
 
 
+def reviewed_value(value):
+    if hasattr(value, "model_dump"):
+        value = value.model_dump(mode="json", by_alias=True)
+    if isinstance(value, dict):
+        return {key: reviewed_value(part) for key, part in value.items() if key != "revision"}
+    if isinstance(value, list):
+        return [reviewed_value(part) for part in value]
+    return value
+
+
 def content_digest(workspace):
-    def content(value):
-        if hasattr(value, "model_dump"):
-            value = value.model_dump(mode="json", by_alias=True)
-        if isinstance(value, dict):
-            return {key: content(part) for key, part in value.items() if key != "revision"}
-        if isinstance(value, list):
-            return [content(part) for part in value]
-        return value
     project = workspace.project
-    return digest(content({"format": "assistant-content-v1", "document": project.document,
+    return digest(reviewed_value({"format": "assistant-content-v1", "document": project.document,
         "facts": project.facts, "assets": project.assets, "template": project.template, "sources": project.sources}))
 
 
@@ -65,7 +68,12 @@ class AssistantProposals:
             envelope = strict_json(path.read_bytes())
             if set(envelope) != {"payload", "sha256"} or digest(envelope["payload"]) != envelope["sha256"]:
                 raise ValueError("changed proposal payload")
-            return AssistantStoredProposalV1.model_validate(envelope["payload"])
+            value = AssistantStoredProposalV1.model_validate(envelope["payload"])
+            if value.proposal.state == "ready" and value.policy_revision != POLICY_REVISION:
+                value.proposal.state = "stale"
+                value.proposal.reason = "Вариант подготовлен до текущих проверок охвата и сохранности. Подготовьте новую версию для просмотра."
+                atomic_write(path, encoded(value))
+            return value
         except (StorageFailure, OSError, ValueError, RecursionError):
             raise AgentFailure("AGENT_STORE_CORRUPT") from None
 

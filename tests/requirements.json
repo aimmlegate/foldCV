@@ -3604,13 +3604,20 @@
     },
     {
       "id": "CAP-A05",
-      "status": "unimplemented",
-      "tests": []
+      "status": "partial",
+      "tests": [
+        "tests/recovery/test_assistant_fidelity.py::test_whole_cyrillic_rewrite_accounts_for_tables_images_captions_contacts_and_human_facts",
+        "tests/recovery/test_assistant_fidelity.py::test_mixed_rich_or_fact_replacement_is_rejected_without_dropping_the_draft"
+      ]
     },
     {
       "id": "CAP-A06",
-      "status": "unimplemented",
-      "tests": []
+      "status": "partial",
+      "tests": [
+        "tests/recovery/test_assistant_fidelity.py::test_explicit_fact_correction_shows_support_and_all_linked_mentions",
+        "tests/recovery/test_assistant_fidelity.py::test_source_reference_requires_a_full_read_and_remains_visible_as_support_not_truth",
+        "tests/recovery/test_assistant_fidelity.py::test_comparison_cannot_hide_precision_or_metadata_behind_identical_display_text"
+      ]
     },
     {
       "id": "CAP-A07",
@@ -3654,13 +3661,17 @@
     },
     {
       "id": "CAP-A14",
-      "status": "unimplemented",
-      "tests": []
+      "status": "partial",
+      "tests": [
+        "tests/recovery/test_assistant_fidelity.py::test_source_instructions_cannot_switch_the_frozen_task_or_grant_model_apply"
+      ]
     },
     {
       "id": "CAP-A15",
-      "status": "unimplemented",
-      "tests": []
+      "status": "partial",
+      "tests": [
+        "tests/recovery/test_assistant_fidelity.py::test_format_changes_existing_heading_roles_without_rebuilding_authored_content"
+      ]
     },
     {
       "id": "CAP-A16",
@@ -3688,8 +3699,11 @@
     },
     {
       "id": "CAP-A20",
-      "status": "unimplemented",
-      "tests": []
+      "status": "partial",
+      "tests": [
+        "tests/recovery/test_assistant_fidelity.py::test_one_character_wording_change_keeps_a_small_range_mutation_for_a_large_document",
+        "tests/recovery/test_assistant_fidelity.py::test_compound_format_and_rewrite_is_not_staged_or_applied_in_parts"
+      ]
     },
     {
       "id": "CAP-A21",

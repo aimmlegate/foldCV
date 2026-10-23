@@ -91,6 +91,7 @@ class ToolSession(PrivateMcp):
         self.cache = {}
         self.argument_issues = []
         self.planned_task = None
+        self.planning_revoked = False
         self.capability_service = getattr(service, "catalog_service", service)
         self.cap_mode = getattr(self.capability_service, "assistant_protocol_enabled", False)
         self.names = tuple(name for name in TOOL_NAMES if not self.cap_mode or name != "apply_edit_batch")
@@ -371,7 +372,15 @@ class ToolSession(PrivateMcp):
                         raise AgentFailure("AGENT_TOOL_DENIED")
                     result = check_task(catalog(service, self.control.project_id,
                         allow_edits=self.run.allow_edits, allow_web=self.run.allow_web), arguments)
-                    self.planned_task = arguments.task_id if arguments.stage == "generation" and result.availability.state == "available" else None
+                    if arguments.stage == "generation":
+                        if result.availability.state != "available":
+                            self.planning_revoked, self.planned_task = True, None
+                        elif self.planning_revoked or self.planned_task is not None and arguments.task_id != self.planned_task:
+                            from packages.resume_core.agent_edits import AgentPolicyFailure
+                            self.planning_revoked, self.planned_task = True, None
+                            raise AgentPolicyFailure("ASSISTANT_TASK_LOCKED", code="AGENT_TOOL_DENIED")
+                        else:
+                            self.planned_task = arguments.task_id
                 elif name in READ_TOOLS:
                     if name == "get_resume_context" and arguments.kind == "context" and arguments.ids:
                         arguments = arguments.model_copy(update={"kind": "document"})
@@ -442,6 +451,9 @@ class ToolSession(PrivateMcp):
                 self.service.revoke(self.control, error.code)
                 self.service.cleanup_error(error.code)
             failure = {"error": {"code": error.code}}
+            if getattr(error, "reason_code", None):
+                from .capabilities import availability
+                failure["reason"] = availability("unsupported", error.reason_code).reason
             if name in READ_TOOLS and error.code in {"AGENT_SCOPE_INVALID", "AGENT_STALE_READ"}:
                 failure["format"] = "The cursor is invalid, expired, or belongs to a changed snapshot. Restart this read with cursor:null; do not edit from the incomplete read."
             if name == "publish_findings" and error.code == "AGENT_EVIDENCE_INVALID":

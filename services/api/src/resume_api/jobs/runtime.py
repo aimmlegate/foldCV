@@ -102,8 +102,8 @@ class JobRuntime:
                 self.service.store.update(control.project_id, control.run_id, progress)
             instructions = self.instructions
             if getattr(getattr(self.service.projects, "agent", None), "assistant_protocol_enabled", False):
-                from ..agent.capabilities import PROPOSAL_INSTRUCTIONS
-                instructions = PROPOSAL_INSTRUCTIONS
+                from ..agent.capabilities import proposal_instructions
+                instructions = proposal_instructions()
             value = RuntimeInput(model=self.model.model, prompt=self.session.prompt, url=self.session.url,
                 token=self.session.token, tools=tuple(control.job.submission.tools), allow_web=control.job.submission.allow_web,
                 queued_at=time.monotonic(), before_start=ready_shared if multiplexed else

@@ -3,64 +3,71 @@
 from packages.resume_core import agent_limits as limits
 from packages.resume_core.agent_edits import Scope, compile_batch
 from packages.resume_core.agent_store import AgentFailure, digest, identity, run_in
-from packages.resume_core.assistant_proposals import content_digest, expiry
-from packages.resume_core.models.agent import AgentPrepareRequest, AgentQuery, AgentQueryDependency
+from packages.resume_core.assistant_proposals import POLICY_REVISION, content_digest, expiry
+from packages.resume_core.assistant_coverage import comparison, units
+from packages.resume_core.models.agent import AgentPrepareRequest, AgentQuery, AgentQueryDependency, WholeResumeScope
 from packages.resume_core.models.assistant_proposals import (
     AssistantChangeV1, AssistantCoverageV1, AssistantProposalResultV1, AssistantProposalV1, AssistantStoredProposalV1,
 )
-from packages.resume_core.rich_fields import inline_groups
 from packages.resume_core.rich_mutations import RichMutationFailure, apply_rich_mutation
 
 from .capabilities import BY_ID
 from .context import current_dependencies, query_fingerprint
 
 
-def units(workspace, scope, *, allowed=None):
-    allowed = allowed or Scope(workspace, scope)
-    result = {}
-    for block in workspace.project.document.blocks():
-        if not allowed.whole and block.id not in allowed.complete and not any(key[0] == block.id for key in allowed.ranges):
-            continue
-        result["block:" + block.id] = (block.id, block.model_dump(mode="json", by_alias=True, exclude={"children"}))
-        for container, spans in inline_groups(block):
-            result[f"field:{block.id}:{container}"] = (block.id, [span.model_dump(mode="json", by_alias=True) for span in spans])
-    return result
-
-
-def coverage(session, baseline, candidate, scope, unchanged):
+def coverage(session, baseline, candidate, scope, unchanged, operations=()):
     allowed = Scope(baseline, scope)
-    before, after = units(baseline, scope, allowed=allowed), units(candidate, scope, allowed=allowed)
+    new_ids = {block.id for block in candidate.project.document.blocks()} - {block.id for block in baseline.project.document.blocks()}
+    before, after = units(baseline, scope, allowed=allowed), units(candidate, scope, allowed=allowed, new_ids=new_ids)
     declared = {item.unit_id: item.reason for item in unchanged}
     if len(declared) != len(unchanged) or declared.keys() - before.keys():
         raise AgentFailure("AGENT_SCOPE_INVALID")
-    read, cells = set(), set()
+    read, cells, facts, context, facts_collection = set(), set(), set(), False, False
     for snapshot in session.book.by_snapshot:
         try:
-            capture = session.book.require(snapshot, kind="document")
-            read.update(block["id"] for block in capture.payload["blocks"])
-            cells.update(part["cell"].id for part in capture.payload["cells"])
+            capture = session.book.require(snapshot)
+            if capture.query.kind == "context":
+                context = True
+            elif capture.query.kind == "facts":
+                facts.update(record.id for record in capture.payload["records"])
+                facts_collection |= not capture.query.ids
+            elif capture.query.kind == "document":
+                read.update(block["id"] for block in capture.payload["blocks"])
+                cells.update(part["cell"].id for part in capture.payload["cells"])
+                cells.update(cell["id"] for block in capture.payload["blocks"] if block["type"] == "table"
+                    for row in block["content"]["rows"] for cell in row["cells"])
         except AgentFailure:
             continue
-    result, changes = [], []
+    result = []
     for key in sorted(before.keys() | after.keys()):
         old, new = before.get(key), after.get(key)
-        changed = digest(old[1] if old else None) != digest(new[1] if new else None)
-        was_read = old is None or old[0] in read or key.startswith("field:") and key.rsplit(":", 1)[-1] in cells
+        unit = old or new
+        changed = digest(old.value if old else None) != digest(new.value if new else None)
+        was_read = old is None or (context if unit.reader == "context" else facts_collection if unit.reader == "facts_collection" else
+            unit.reader in facts if unit.kind == "fact" else unit.reader in read | cells)
         state = "changed" if changed and was_read else "unchanged" if not changed and was_read and key in declared else "unresolved"
         reason = "Изменение вычислено из подготовленного документа." if state == "changed" else declared.get(key, "Нужно полное чтение и явный учёт этой части.")
         result.append(AssistantCoverageV1(unitId=key, state=state, reason=reason, read=was_read))
-        if changed:
-            changes.append(AssistantChangeV1(unitId=key, before=display(old[1]) if old else "",
-                after=display(new[1]) if new else "", effect="wording" if key.startswith("field:") else "structure"))
+    whole = WholeResumeScope(kind="resume")
+    changes = comparison(units(baseline, whole), units(candidate, whole))
+    if any(change.effect == "fact" for change in changes):
+        for operation in operations:
+            if operation.kind not in {"update_fact", "create_fact", "delete_fact"}:
+                continue
+            evidence = operation.evidence if operation.kind == "update_fact" else [operation.correction]
+            descriptions = []
+            for item in evidence:
+                if item.kind == "user_correction":
+                    descriptions.append("Сообщение пользователя: «" + item.quote + "».")
+                elif item.kind == "source":
+                    source = next(source for source in baseline.project.sources if source.id == item.source_id)
+                    unit = next(unit for unit in source.units if unit.id == item.unit_id)
+                    descriptions.append("Исходник «" + source.original_name + "», фрагмент " + item.unit_id + ":\n" + unit.text)
+                else:
+                    descriptions.append("Ссылка на текущую запись фактов " + item.record_id + ".")
+            descriptions.append("Ссылки указывают поддержку коррекции; сами по себе они не подтверждают достоверность.")
+            changes.append(AssistantChangeV1(unitId="support:" + digest(operation), before="", after="\n".join(descriptions), effect="fact"))
     return result, changes
-
-
-def display(value):
-    if isinstance(value, list):
-        return "".join(part.get("text", "") for part in value)
-    if isinstance(value, dict):
-        return str(value.get("type", "")) + ": " + str(value.get("id", ""))
-    return str(value)
 
 
 def result(value):
@@ -76,9 +83,10 @@ def result(value):
         reason=proposal.reason or "Черновик сохранён для просмотра. Документ не изменён.")
 
 
-def compile_candidate(baseline, run, journal, command, book):
+def compile_candidate(baseline, run, journal, command, book, task_id):
     try:
-        _, batch = compile_batch(baseline, run, journal, command, book, "assistant_draft")
+        policy = {"rewrite_resume": "wording", "restructure": "structure", "correct_facts": "facts", "format_document": "format"}[task_id]
+        _, batch = compile_batch(baseline, run, journal, command, book, "assistant_draft", assistant_policy=policy)
         candidate = apply_rich_mutation(baseline, batch.mutation)[0] if batch else baseline.model_copy(deep=True)
         return batch, candidate
     except AgentFailure:
@@ -116,7 +124,7 @@ def assemble(session, request):
                     createdAt=service.store.clock(), expiresAt=expiry(service.store.clock()), contentSha256=before,
                     beforeSha256=before, coverage=[], changes=[], operationCount=0, reason=None)
                 query = AgentQuery(kind="resources")
-                current = AssistantStoredProposalV1(proposal=proposal, accountEpoch=run.connection_epoch,
+                current = AssistantStoredProposalV1(policyRevision=POLICY_REVISION, proposal=proposal, accountEpoch=run.connection_epoch,
                     accessRevision=run.access_revision, scope=run.scope, dependencies=[AgentQueryDependency(kind="query",
                         query=query, fingerprint=query_fingerprint(workspace, query))], baseline=workspace.model_copy(deep=True),
                     candidate=workspace.model_copy(deep=True), batch=None, operations=[], snapshotIds=[], calls={}, unchanged=[], noChange=False)
@@ -144,12 +152,12 @@ def assemble(session, request):
             if len(current.unchanged) > 2000:
                 raise AgentFailure("AGENT_EDIT_LIMIT")
             command = AgentPrepareRequest(key=current.proposal.id, snapshotIds=current.snapshot_ids, operations=current.operations)
-            batch, candidate = compile_candidate(current.baseline, run, journal, command, session.book)
+            batch, candidate = compile_candidate(current.baseline, run, journal, command, session.book, request.task_id)
             current.batch, current.candidate = batch, candidate
             current.calls[request.key] = request_hash
             current.proposal.operation_count = len(current.operations)
             current.proposal.content_sha256 = content_digest(candidate)
-            current.proposal.coverage, current.proposal.changes = coverage(session, current.baseline, candidate, current.scope, current.unchanged)
+            current.proposal.coverage, current.proposal.changes = coverage(session, current.baseline, candidate, current.scope, current.unchanged, current.operations)
             if batch:
                 current.dependencies = list({digest(item): item for item in [*current.dependencies, *batch.dependencies]}.values())
             if request.phase == "finalize":
@@ -159,5 +167,8 @@ def assemble(session, request):
                 current.proposal.reason = "Изменений нет. Документ и история не изменены." if current.no_change else (
                     "Вариант готов к просмотру. Применение требует отдельного действия пользователя." if current.proposal.state == "ready" else
                     "Полный вариант не завершён. Черновик сохранён; применение недоступно.")
+                gaps = sum(not source.units or bool(source.warnings or source.warning_details) for source in current.baseline.project.sources)
+                if gaps:
+                    current.proposal.reason += f" В {gaps} исходниках есть пропуски извлечения. Вариант охватывает текущий документ и не заполняет эти пропуски."
             return current
         return result(service.proposals.update(project, extend))

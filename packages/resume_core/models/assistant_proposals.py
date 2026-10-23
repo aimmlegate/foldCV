@@ -91,6 +91,7 @@ class AssistantProposalResultV1(AssistantProtocolV1):
 
 
 class AssistantStoredProposalV1(AssistantProtocolV1):
+    policy_revision: Literal[1] | None = None
     proposal: AssistantProposalV1
     account_epoch: AgentId
     access_revision: int = Field(ge=1, strict=True)

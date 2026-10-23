@@ -42,7 +42,9 @@ async def test_read_only_assistant_discovers_both_skills_and_reads_every_resourc
         service.projects.catalog.update(workspace.project_id, read_only=True)
         catalog = await session.call("get_application_skills", None)
         assert {skill["skillId"] for skill in catalog["skills"]} == {"import-resume", "format-resume"}
-        assert catalog["skills"][1]["usage"].startswith("legacy_reference")
+        assert catalog["skills"][1]["usage"].startswith("chat_format")
+        assert catalog["skills"][1]["tasks"][0]["taskId"] == "format_document"
+        assert all("archive-contract" not in name and "data-contract" not in name for skill in catalog["skills"] for name in skill["resources"])
         for skill in SKILLS:
             for resource, path in skill.resources.items():
                 result, _ = await read_skill(session, skill.id, resource)

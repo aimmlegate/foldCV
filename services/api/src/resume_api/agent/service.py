@@ -320,8 +320,8 @@ class AgentService:
                     future.result(timeout=min(3, timeout))
                 instructions = DEVELOPER_INSTRUCTIONS
                 if self.assistant_protocol_enabled:
-                    from .capabilities import PROPOSAL_INSTRUCTIONS
-                    instructions = PROPOSAL_INSTRUCTIONS
+                    from .capabilities import proposal_instructions
+                    instructions = proposal_instructions()
                 value = RuntimeInput(model=run.model, prompt=session.prompt, url=session.url, token=session.token,
                     tools=tuple(session.names), allow_web=run.allow_web, before_start=lambda: self.before_start(control),
                     revoke=lambda: self.revoke(control), close_tools=close_tools, queued_at=control.queued_at,

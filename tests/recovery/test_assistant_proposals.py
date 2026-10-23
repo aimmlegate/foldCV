@@ -71,9 +71,14 @@ def test_corrupt_proposal_namespace_disables_assistant_recovery_without_blocking
     assert list(outside.iterdir()) == [] and not runtime.calls
 
 
-async def read_document(session):
-    task = await session.call("get_project_resources", AssistantTaskRequestV1(protocolVersion=1, taskId="rewrite_resume"))
+async def read_document(session, task_id="rewrite_resume"):
+    task = await session.call("get_project_resources", AssistantTaskRequestV1(protocolVersion=1, taskId=task_id))
     assert task["availability"]["state"] == "available"
+    for tool, kind in (("get_resume_context", "context"), ("get_working_facts", "facts")):
+        query = AgentQuery(kind=kind)
+        page = await session.call(tool, query)
+        while page["snapshot"]["nextCursor"]:
+            page = await session.call(tool, query.model_copy(update={"cursor": page["snapshot"]["nextCursor"]}))
     query = AgentQuery(kind="document")
     page = await session.call("get_resume_context", query)
     first = AgentReadSnapshot.model_validate(page["snapshot"])
@@ -82,23 +87,23 @@ async def read_document(session):
     return first
 
 
-async def append(session, key, *, snapshot=None, text="Clear", proposal=None, phase="append", unchanged=()):
+async def append(session, key, *, snapshot=None, text="Clear", proposal=None, phase="append", unchanged=(), task_id="rewrite_resume"):
     operations = [replace(snapshot, "narrative", 0, 6, text)] if snapshot else []
-    request = AssistantAssemblyRequestV1(protocolVersion=1, key=key, taskId="rewrite_resume", phase=phase,
+    request = AssistantAssemblyRequestV1(protocolVersion=1, key=key, taskId=task_id, phase=phase,
         proposalId=proposal, operations=operations, snapshotIds=[snapshot.id] if snapshot else [], unchanged=list(unchanged))
     return await session.call("prepare_edit_batch", request), request
 
 
-async def complete(session, initial):
+async def complete(session, initial, task_id="rewrite_resume"):
     current, index = initial, 0
     while current["unresolvedUnits"]:
         declarations = [{"unitId": unit["unitId"], "reason": "Сохранить текущую часть без изменений."} for unit in current["coverage"] if unit["state"] == "unresolved"]
         assert declarations
-        current, _ = await append(session, "coverage_" + str(index), proposal=current["proposalId"], unchanged=declarations)
+        current, _ = await append(session, "coverage_" + str(index), proposal=current["proposalId"], unchanged=declarations, task_id=task_id)
         assert "error" not in current, current
         index += 1
         assert index < 10
-    final, _ = await append(session, "finalize", proposal=current["proposalId"], phase="finalize")
+    final, _ = await append(session, "finalize", proposal=current["proposalId"], phase="finalize", task_id=task_id)
     return final
 
 
@@ -332,7 +337,9 @@ async def test_selected_draft_uses_frozen_scope_and_partial_whole_draft_cannot_f
         ready = await complete(session, initial)
         assert ready["disposition"] == "draft_ready"
         value = service.proposals.get(workspace.project_id, ready["proposalId"], 1)
-        assert {unit.unit_id for unit in value.proposal.coverage} == {"block:narrative", "field:narrative:content"}
+        ids = {unit.unit_id for unit in value.proposal.coverage}
+        assert {"block:narrative", "field:narrative:content", "scope:selection"} <= ids
+        assert not any(key.startswith("block:") and key != "block:narrative" for key in ids)
         assert not projects.storage.read_committed(workspace.project_id)[0].mutation_replay
     finally:
         await session.close()
