@@ -9,6 +9,7 @@ from .models.template_facts import HandleAllocation, Lineage, SourceSpan
 from .models.template_import import EvidenceOption, FieldSidecar, ProposalReply, ReferenceTable
 from .template_import import digest
 from .templates.compiler import canonical, sha256
+from .templates.builtin_mapping import item_root
 from .templates.projection import SchemaFailure, pointer_tokens, schema_at, validate_payload
 
 
@@ -181,17 +182,7 @@ def _bound_root(pointer, semantic_type, field_key, bindings):
         and all(pattern == '*' or pattern == token for pattern, token in zip(pointer_tokens(binding.pointer), actual, strict=True))]
     if len(candidates) != 1:
         raise ValueError('field has no unique compiled item binding')
-    pattern = pointer_tokens(candidates[0].pointer)
-    if candidates[0].item_pointer is not None:
-        return actual[:len(pointer_tokens(candidates[0].item_pointer))]
-    wildcards = [index for index, token in enumerate(pattern) if token == '*']
-    if wildcards:
-        return actual[:wildcards[-1] + 1]
-    paths = [pointer_tokens(binding.pointer)[:-1] for binding in bindings if binding.semantic_type == semantic_type]
-    prefix = paths[0]
-    for path in paths[1:]:
-        prefix = prefix[:next((index for index, pair in enumerate(zip(prefix, path)) if pair[0] != pair[1]), min(len(prefix), len(path)))]
-    return actual[:len(prefix)]
+    return actual[:len(item_root(candidates[0], bindings))]
 
 
 def allocate_discoveries(reply: ProposalReply,*,operation_id,task_id,attempt_id,existing,type_schemas,id_factory=None,bindings=None,cell_id_factory=None,type_declarations=None,reserved=()):

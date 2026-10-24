@@ -33,6 +33,14 @@ def union_spans(sources, spans):
     return result
 
 
+def without_line_break(sources, span):
+    """The span without its closing line break, which a paragraph cannot show; None when nothing else remains."""
+    source = next(source for source in sources if (source.id, source.revision) == (span.source_id, span.source_revision))
+    unit = next(unit for unit in source.units if (unit.id, unit.revision) == (span.unit_id, span.unit_revision))
+    end = span.start + len(unit.text[span.start:span.end].rstrip('\r\n'))
+    return None if end == span.start else span if end == span.end else capture_span(source, unit, span.start, end)
+
+
 def subtract_spans(sources, spans, exclusions):
     protected = union_spans(sources, exclusions)
     remaining = []

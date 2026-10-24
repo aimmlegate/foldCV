@@ -7,6 +7,7 @@ import pytest
 from packages.resume_core.template_admission import admit_proposal
 from packages.resume_core.template_builtin_admission import apply_builtin_records, make_builtin_candidate
 from packages.resume_core.template_import import dispatch_attempt, record_return, reserve_attempt
+from packages.resume_core.template_identity import capture_span
 from packages.resume_core.template_proposals import parse_proposal
 from packages.resume_core.template_review import record_review
 from packages.resume_core.templates.compiler import sha256
@@ -196,3 +197,21 @@ def test_rejected_owner_withholds_its_entire_nested_dependency_chain():
     _admitted, after = accept(operation, facts, proposed, package, src, set(job.cell_ids.values()))
     assert not after.records and not after.extensions and not after.relations
     assert after.observations and all(value.admission in {'rejected', 'uncertain'} for value in after.observations)
+
+
+def test_disabled_rewriting_shows_a_cited_line_without_its_line_break():
+    # Reference replies cite whole lines; the closing line break is not part of the source wording.
+    package = employment_package()
+    src, _raw = employment_source()
+    reply = employment_proposal(src)
+    unit = src.units[0]
+    start = unit.text.index('Implemented queue processing.')
+    line = capture_span(src, unit, start, unit.text.index('\n', start) + 1).model_dump(by_alias=True)
+    field = next(value for value in reply['fields'] if value['pointer'] == '/0/tasks/0/value')
+    field['evidence'] = [line]
+    reply['payload'][0]['tasks'][0]['value'] = 'Built asynchronous queue processing.'
+    operation, facts, proposed, _package, _src = proposed_from(package, src, reply, allow_text_rewrite=False)
+    admitted, after = accept(operation, facts, proposed, package, src)
+    allocation = next(value for value in admitted.allocations if value.key == 'tasks-entry')
+    claim = next(record for record in after.records if record.id == allocation.record_id)
+    assert claim.value.raw_text == 'Implemented queue processing.'

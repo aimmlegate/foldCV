@@ -2,7 +2,7 @@
 schema_version: 3
 template:
   id: generic-two-column
-  revision: 1.1.0
+  revision: 2.0.0
   name: Две колонки
   default_locale: ru
 assets:
@@ -340,20 +340,6 @@ content_definitions:
         type:
         - boolean
         - 'null'
-  role:
-    type: object
-    additionalProperties: false
-    required:
-    - title
-    - scope
-    - involvement
-    properties:
-      title:
-        $ref: '#/$defs/text'
-      scope:
-        $ref: '#/$defs/text'
-      involvement:
-        $ref: '#/$defs/text'
   terms:
     type: object
     additionalProperties: false
@@ -378,6 +364,13 @@ fact_types:
         $ref: '#/$defs/text'
   builtin_kind: candidate
   relations: []
+  builtin_fields:
+    name:
+      field: name
+      period: null
+    profession:
+      field: title
+      period: null
 - id: foldcv:role_family
   schema_version: '1'
   schema:
@@ -406,6 +399,13 @@ fact_types:
         $ref: '#/$defs/text'
   builtin_kind: technology
   relations: []
+  builtin_fields:
+    technology:
+      field: display
+      period: null
+    experience:
+      field: experience
+      period: null
 - id: foldcv:education
   schema_version: '1'
   schema:
@@ -414,22 +414,47 @@ fact_types:
     required:
     - institution
     - graduation_year
-    - city
     - specialization
     - degree
     properties:
       institution:
         $ref: '#/$defs/text'
       graduation_year:
-        $ref: '#/$defs/text'
-      city:
-        $ref: '#/$defs/text'
+        $ref: '#/$defs/date'
       specialization:
         $ref: '#/$defs/text'
       degree:
         $ref: '#/$defs/text'
   builtin_kind: education
   relations: []
+  builtin_fields:
+    institution:
+      field: institution
+      period: null
+    graduation_year:
+      field: completion
+      period: null
+    specialization:
+      field: specialty
+      period: null
+    degree:
+      field: qualification
+      period: null
+- id: foldcv:education_place
+  schema_version: '1'
+  schema:
+    type: object
+    additionalProperties: false
+    required:
+    - city
+    properties:
+      city:
+        $ref: '#/$defs/text'
+  builtin_kind: null
+  relations:
+  - kind: extension_of
+    target_types:
+    - foldcv:education
 - id: foldcv:courses
   schema_version: '1'
   schema:
@@ -445,9 +470,19 @@ fact_types:
       title:
         $ref: '#/$defs/text'
       year:
-        $ref: '#/$defs/text'
+        $ref: '#/$defs/date'
   builtin_kind: certification
   relations: []
+  builtin_fields:
+    school:
+      field: issuer
+      period: null
+    title:
+      field: name
+      period: null
+    year:
+      field: date
+      period: null
 - id: foldcv:location
   schema_version: '1'
   schema:
@@ -464,7 +499,7 @@ fact_types:
         $ref: '#/$defs/text'
       timezone:
         $ref: '#/$defs/text'
-  builtin_kind: candidate
+  builtin_kind: null
   relations: []
 - id: foldcv:languages
   schema_version: '1'
@@ -474,16 +509,35 @@ fact_types:
     required:
     - name
     - level
-    - comment
     properties:
       name:
         $ref: '#/$defs/text'
       level:
         $ref: '#/$defs/text'
-      comment:
-        $ref: '#/$defs/text'
   builtin_kind: language
   relations: []
+  builtin_fields:
+    name:
+      field: language
+      period: null
+    level:
+      field: level
+      period: null
+- id: foldcv:language_note
+  schema_version: '1'
+  schema:
+    type: object
+    additionalProperties: false
+    required:
+    - comment
+    properties:
+      comment:
+        $ref: '#/$defs/text'
+  builtin_kind: null
+  relations:
+  - kind: extension_of
+    target_types:
+    - foldcv:languages
 - id: foldcv:opensource
   schema_version: '1'
   schema:
@@ -533,32 +587,117 @@ fact_types:
     additionalProperties: false
     required:
     - company
-    - project
-    - period
-    - technologies
-    - description
     - role
-    - tasks
-    - results
+    - start
+    - end
+    - present
     properties:
       company:
         $ref: '#/$defs/text'
-      project:
-        $ref: '#/$defs/text'
-      period:
-        $ref: '#/$defs/period'
-      technologies:
-        $ref: '#/$defs/texts'
-      description:
-        $ref: '#/$defs/text'
       role:
-        $ref: '#/$defs/role'
-      tasks:
-        $ref: '#/$defs/texts'
-      results:
-        $ref: '#/$defs/texts'
+        $ref: '#/$defs/text'
+      start:
+        $ref: '#/$defs/date'
+      end:
+        $ref: '#/$defs/date'
+      present:
+        type:
+        - boolean
+        - 'null'
   builtin_kind: employment
   relations: []
+  builtin_fields:
+    company:
+      field: employer
+      period: null
+    role:
+      field: role
+      period: null
+    start:
+      field: start
+      period: project-period
+    end:
+      field: end
+      period: project-period
+    present:
+      field: present
+      period: project-period
+- id: foldcv:project
+  schema_version: '1'
+  schema:
+    type: object
+    additionalProperties: false
+    required:
+    - name
+    - description
+    properties:
+      name:
+        $ref: '#/$defs/text'
+      description:
+        $ref: '#/$defs/text'
+  builtin_kind: null
+  relations:
+  - kind: extension_of
+    target_types:
+    - foldcv:projects
+- id: foldcv:project_role
+  schema_version: '1'
+  schema:
+    type: object
+    additionalProperties: false
+    required:
+    - scope
+    - involvement
+    properties:
+      scope:
+        $ref: '#/$defs/text'
+      involvement:
+        $ref: '#/$defs/text'
+  builtin_kind: null
+  relations:
+  - kind: extension_of
+    target_types:
+    - foldcv:projects
+- id: foldcv:project_technology
+  schema_version: '1'
+  schema:
+    type: object
+    additionalProperties: false
+    required:
+    - display
+    properties:
+      display:
+        type: string
+        minLength: 1
+  builtin_kind: technology
+  relations:
+  - kind: owned_by
+    target_types:
+    - foldcv:projects
+  builtin_fields:
+    display:
+      field: display
+      period: null
+- id: foldcv:project_claim
+  schema_version: '1'
+  schema:
+    type: object
+    additionalProperties: false
+    required:
+    - value
+    properties:
+      value:
+        type: string
+        minLength: 1
+  builtin_kind: claim
+  relations:
+  - kind: owned_by
+    target_types:
+    - foldcv:projects
+  builtin_fields:
+    value:
+      field: value
+      period: null
 - id: foldcv:other_projects
   schema_version: '1'
   schema:
@@ -577,10 +716,11 @@ fact_types:
     type: object
     additionalProperties: false
     required:
-    - items
+    - text
     properties:
-      items:
-        $ref: '#/$defs/texts'
+      text:
+        type: string
+        minLength: 1
   builtin_kind: null
   relations: []
 - id: foldcv:programming
@@ -589,46 +729,62 @@ fact_types:
     type: object
     additionalProperties: false
     required:
-    - items
+    - display
     properties:
-      items:
-        $ref: '#/$defs/texts'
+      display:
+        type: string
+        minLength: 1
   builtin_kind: technology
   relations: []
+  builtin_fields:
+    display:
+      field: display
+      period: null
 - id: foldcv:data_and_tools
   schema_version: '1'
   schema:
     type: object
     additionalProperties: false
     required:
-    - items
+    - display
     properties:
-      items:
-        $ref: '#/$defs/texts'
+      display:
+        type: string
+        minLength: 1
   builtin_kind: technology
   relations: []
+  builtin_fields:
+    display:
+      field: display
+      period: null
 - id: foldcv:infrastructure
   schema_version: '1'
   schema:
     type: object
     additionalProperties: false
     required:
-    - items
+    - display
     properties:
-      items:
-        $ref: '#/$defs/texts'
+      display:
+        type: string
+        minLength: 1
   builtin_kind: technology
   relations: []
+  builtin_fields:
+    display:
+      field: display
+      period: null
 - id: foldcv:key_skills
   schema_version: '1'
   schema:
     type: object
     additionalProperties: false
     required:
-    - items
+    - name
     properties:
-      items:
-        $ref: '#/$defs/texts'
+      name:
+        type: string
+        minLength: 1
   builtin_kind: null
   relations: []
 - id: foldcv:role_tools
@@ -637,12 +793,17 @@ fact_types:
     type: object
     additionalProperties: false
     required:
-    - items
+    - display
     properties:
-      items:
-        $ref: '#/$defs/texts'
+      display:
+        type: string
+        minLength: 1
   builtin_kind: technology
   relations: []
+  builtin_fields:
+    display:
+      field: display
+      period: null
 model:
   extract:
   - Read the complete source and preserve all canonical facts before selecting presentation content.
@@ -764,8 +925,8 @@ blocks:
   - Extract the stated first and last name.
   - Select the main specialization from supported primary work roles; do not invent a grade.
   - With rewriting disabled, select an existing role phrase without changing its wording.
-  - Set role_family.family to the family of the stated primary work (system_analyst, business_analyst, tester or designer),
-    other for any other role, and null when the source states no role.
+  - Set role_family.family to the family of the stated primary work (system_analyst, business_analyst, tester or
+    designer), other for any other role, and null when the source states no role.
   rewrite:
     fields: []
     instructions: []
@@ -784,6 +945,7 @@ blocks:
       style: profession
       header_slot: profession
     title: {}
+    fallback_style: body
   mode: model
   depends_on: []
   operation: null
@@ -858,6 +1020,7 @@ blocks:
       experience_field: /experience
       style: emphasis
       detail_style: body
+    fallback_style: body
   mode: model
   depends_on: []
   operation: null
@@ -901,22 +1064,32 @@ blocks:
       required:
       - institution
       - graduation_year
-      - city
+      - place
       - specialization
       - degree
       properties:
         institution:
           $ref: '#/$defs/text'
         graduation_year:
-          $ref: '#/$defs/text'
-        city:
-          $ref: '#/$defs/text'
+          $ref: '#/$defs/date'
+        place:
+          type:
+          - object
+          - 'null'
+          additionalProperties: false
+          required:
+          - city
+          properties:
+            city:
+              $ref: '#/$defs/text'
         specialization:
           $ref: '#/$defs/text'
         degree:
           $ref: '#/$defs/text'
   extract:
   - Extract the institution, stated graduation year, city, specialization and degree when present.
+  - Give the graduation year as a date with its exact source text; a sole year keeps year precision.
+  - Put the stated city in place.city; leave place null when no city is stated.
   - Keep unfinished education and uncertainty explicit; do not invent a degree or completion year.
   - Exclude short courses from this block; place them in courses.
   rewrite:
@@ -937,7 +1110,7 @@ blocks:
     - type: join_fields
       fields:
       - /graduation_year
-      - /city
+      - /place/city
       separator: ', '
       style: body
     - type: text
@@ -958,22 +1131,29 @@ blocks:
     semantic_type: foldcv:education
     field: institution
     relation: null
+    item_pointer: /*
   - pointer: /*/graduation_year
     semantic_type: foldcv:education
     field: graduation_year
     relation: null
-  - pointer: /*/city
-    semantic_type: foldcv:education
-    field: city
-    relation: null
+    item_pointer: /*
   - pointer: /*/specialization
     semantic_type: foldcv:education
     field: specialization
     relation: null
+    item_pointer: /*
   - pointer: /*/degree
     semantic_type: foldcv:education
     field: degree
     relation: null
+    item_pointer: /*
+  - pointer: /*/place/city
+    semantic_type: foldcv:education_place
+    field: city
+    relation:
+      kind: extension_of
+      subject_pointer: /*
+    item_pointer: /*/place
   checks:
   - id: education-evidence
     kind: evidence_identity
@@ -1008,9 +1188,10 @@ blocks:
         title:
           $ref: '#/$defs/text'
         year:
-          $ref: '#/$defs/text'
+          $ref: '#/$defs/date'
   extract:
   - Extract each completed course or certificate as a separate entry with school, title and stated year.
+  - Give the year as a date with its exact source text; a sole year keeps year precision.
   - Preserve course codes and qualifications in the title; do not present courses as university degrees.
   rewrite:
     fields: []
@@ -1152,17 +1333,26 @@ blocks:
       required:
       - name
       - level
-      - comment
+      - note
       properties:
         name:
           $ref: '#/$defs/text'
         level:
           $ref: '#/$defs/text'
-        comment:
-          $ref: '#/$defs/text'
+        note:
+          type:
+          - object
+          - 'null'
+          additionalProperties: false
+          required:
+          - comment
+          properties:
+            comment:
+              $ref: '#/$defs/text'
   extract:
   - Extract each language, stated level and any comment about speaking or writing ability.
   - Preserve original level wording; do not infer a CEFR level or native proficiency.
+  - Put a stated comment in note.comment; leave note null when there is none.
   rewrite:
     fields: []
     instructions: []
@@ -1179,7 +1369,7 @@ blocks:
       fields:
       - /name
       - /level
-      - /comment
+      - /note/comment
       separator: ' '
       style: support
   mode: model
@@ -1194,14 +1384,19 @@ blocks:
     semantic_type: foldcv:languages
     field: name
     relation: null
+    item_pointer: /*
   - pointer: /*/level
     semantic_type: foldcv:languages
     field: level
     relation: null
-  - pointer: /*/comment
-    semantic_type: foldcv:languages
+    item_pointer: /*
+  - pointer: /*/note/comment
+    semantic_type: foldcv:language_note
     field: comment
-    relation: null
+    relation:
+      kind: extension_of
+      subject_pointer: /*
+    item_pointer: /*/note
   checks:
   - id: languages-evidence
     kind: evidence_identity
@@ -1424,38 +1619,90 @@ blocks:
       - project
       - period
       - technologies
-      - description
       - role
+      - role_details
       - tasks
       - results
       properties:
         company:
           $ref: '#/$defs/text'
         project:
-          $ref: '#/$defs/text'
+          type:
+          - object
+          - 'null'
+          additionalProperties: false
+          required:
+          - name
+          - description
+          properties:
+            name:
+              $ref: '#/$defs/text'
+            description:
+              $ref: '#/$defs/text'
         period:
           $ref: '#/$defs/period'
         technologies:
-          $ref: '#/$defs/texts'
-        description:
-          $ref: '#/$defs/text'
+          type: array
+          items:
+            type: object
+            additionalProperties: false
+            required:
+            - display
+            properties:
+              display:
+                type: string
+                minLength: 1
         role:
-          $ref: '#/$defs/role'
+          $ref: '#/$defs/text'
+        role_details:
+          type:
+          - object
+          - 'null'
+          additionalProperties: false
+          required:
+          - scope
+          - involvement
+          properties:
+            scope:
+              $ref: '#/$defs/text'
+            involvement:
+              $ref: '#/$defs/text'
         tasks:
-          $ref: '#/$defs/texts'
+          type: array
+          items:
+            type: object
+            additionalProperties: false
+            required:
+            - value
+            properties:
+              value:
+                type: string
+                minLength: 1
         results:
-          $ref: '#/$defs/texts'
+          type: array
+          items:
+            type: object
+            additionalProperties: false
+            required:
+            - value
+            properties:
+              value:
+                type: string
+                minLength: 1
   extract:
-  - Keep source-backed company and project boundaries and use the existing canonical source entry ID.
-  - Extract the period, local technology stack, product purpose and business problem.
-  - Extract the job title, responsibility scope, functions and level of involvement when stated.
+  - Keep source-backed company and project boundaries; one entry per stated project or employment.
+  - Extract the period, local technology stack, project name, product purpose and business problem.
+  - Extract the job title, and in role_details the responsibility scope, functions and level of involvement when
+    stated.
+  - Leave project or role_details null when the source states none of their fields.
   - Separate specific duties and performed work from achieved changes and effects.
+  - Link each technology, task and result to the entry it belongs to; leave out a claim whose entry is unknown.
   - Do not invent outcomes or reassign company-wide or career-wide achievements to this entry.
   rewrite:
     fields:
-    - /*/description
-    - /*/role/scope
-    - /*/role/involvement
+    - /*/project/description
+    - /*/role_details/scope
+    - /*/role_details/involvement
     - /*/tasks
     - /*/results
     instructions:
@@ -1476,7 +1723,7 @@ blocks:
     - type: join_fields
       fields:
       - /company
-      - /project
+      - /project/name
       separator: ' — '
       style: project
     - type: period
@@ -1486,14 +1733,15 @@ blocks:
       field: /technologies
       style: support
       background: band
+      item_field: /display
     - type: text
-      field: /description
+      field: /project/description
       style: body
     - type: join_fields
       fields:
-      - /role/title
-      - /role/scope
-      - /role/involvement
+      - /role
+      - /role_details/scope
+      - /role_details/involvement
       separator: '; '
       prefix:
         ru: 'Роль: '
@@ -1505,12 +1753,15 @@ blocks:
       label:
         ru: 'Задачи:'
         en: 'Tasks:'
+      item_field: /value
     - type: bullets
       field: /results
       style: body
       label:
         ru: 'Результаты:'
         en: 'Results:'
+      item_field: /value
+    fallback_style: body
   mode: model
   depends_on: []
   operation: null
@@ -1523,70 +1774,76 @@ blocks:
     semantic_type: foldcv:projects
     field: company
     relation: null
-  - pointer: /*/project
+    item_pointer: /*
+  - pointer: /*/role
     semantic_type: foldcv:projects
-    field: project
+    field: role
     relation: null
-  - pointer: /*/period/raw
+    item_pointer: /*
+  - pointer: /*/period/start
     semantic_type: foldcv:projects
-    field: period.raw
+    field: start
     relation: null
-  - pointer: /*/period/start/raw
+    item_pointer: /*
+  - pointer: /*/period/end
     semantic_type: foldcv:projects
-    field: period.start.raw
+    field: end
     relation: null
-  - pointer: /*/period/start/year
-    semantic_type: foldcv:projects
-    field: period.start.year
-    relation: null
-  - pointer: /*/period/start/month
-    semantic_type: foldcv:projects
-    field: period.start.month
-    relation: null
-  - pointer: /*/period/end/raw
-    semantic_type: foldcv:projects
-    field: period.end.raw
-    relation: null
-  - pointer: /*/period/end/year
-    semantic_type: foldcv:projects
-    field: period.end.year
-    relation: null
-  - pointer: /*/period/end/month
-    semantic_type: foldcv:projects
-    field: period.end.month
-    relation: null
+    item_pointer: /*
   - pointer: /*/period/ongoing
     semantic_type: foldcv:projects
-    field: period.ongoing
+    field: present
     relation: null
-  - pointer: /*/technologies/*
-    semantic_type: foldcv:projects
-    field: technologies.*
-    relation: null
-  - pointer: /*/description
-    semantic_type: foldcv:projects
+    item_pointer: /*
+  - pointer: /*/project/name
+    semantic_type: foldcv:project
+    field: name
+    relation:
+      kind: extension_of
+      subject_pointer: /*
+    item_pointer: /*/project
+  - pointer: /*/project/description
+    semantic_type: foldcv:project
     field: description
-    relation: null
-  - pointer: /*/role/title
-    semantic_type: foldcv:projects
-    field: role.title
-    relation: null
-  - pointer: /*/role/scope
-    semantic_type: foldcv:projects
-    field: role.scope
-    relation: null
-  - pointer: /*/role/involvement
-    semantic_type: foldcv:projects
-    field: role.involvement
-    relation: null
-  - pointer: /*/tasks/*
-    semantic_type: foldcv:projects
-    field: tasks.*
-    relation: null
-  - pointer: /*/results/*
-    semantic_type: foldcv:projects
-    field: results.*
-    relation: null
+    relation:
+      kind: extension_of
+      subject_pointer: /*
+    item_pointer: /*/project
+  - pointer: /*/role_details/scope
+    semantic_type: foldcv:project_role
+    field: scope
+    relation:
+      kind: extension_of
+      subject_pointer: /*
+    item_pointer: /*/role_details
+  - pointer: /*/role_details/involvement
+    semantic_type: foldcv:project_role
+    field: involvement
+    relation:
+      kind: extension_of
+      subject_pointer: /*
+    item_pointer: /*/role_details
+  - pointer: /*/technologies/*/display
+    semantic_type: foldcv:project_technology
+    field: display
+    relation:
+      kind: owned_by
+      subject_pointer: /*
+    item_pointer: /*/technologies/*
+  - pointer: /*/tasks/*/value
+    semantic_type: foldcv:project_claim
+    field: value
+    relation:
+      kind: owned_by
+      subject_pointer: /*
+    item_pointer: /*/tasks/*
+  - pointer: /*/results/*/value
+    semantic_type: foldcv:project_claim
+    field: value
+    relation:
+      kind: owned_by
+      subject_pointer: /*
+    item_pointer: /*/results/*
   checks:
   - id: projects-evidence
     kind: evidence_identity
@@ -1711,7 +1968,7 @@ blocks:
   bindings:
   - pointer: /items/*
     semantic_type: foldcv:career_highlights
-    field: items.*
+    field: text
     relation: null
   checks:
   - id: career_highlights-evidence
@@ -1765,7 +2022,7 @@ blocks:
   bindings:
   - pointer: /items/*
     semantic_type: foldcv:programming
-    field: items.*
+    field: display
     relation: null
   checks:
   - id: programming-evidence
@@ -1819,7 +2076,7 @@ blocks:
   bindings:
   - pointer: /items/*
     semantic_type: foldcv:data_and_tools
-    field: items.*
+    field: display
     relation: null
   checks:
   - id: data_and_tools-evidence
@@ -1873,7 +2130,7 @@ blocks:
   bindings:
   - pointer: /items/*
     semantic_type: foldcv:infrastructure
-    field: items.*
+    field: display
     relation: null
   checks:
   - id: infrastructure-evidence
@@ -1927,7 +2184,7 @@ blocks:
   bindings:
   - pointer: /items/*
     semantic_type: foldcv:key_skills
-    field: items.*
+    field: name
     relation: null
   checks:
   - id: key_skills-evidence
@@ -1981,7 +2238,7 @@ blocks:
   bindings:
   - pointer: /items/*
     semantic_type: foldcv:role_tools
-    field: items.*
+    field: display
     relation: null
   checks:
   - id: role_tools-evidence

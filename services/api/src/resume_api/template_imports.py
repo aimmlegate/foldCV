@@ -3,6 +3,8 @@
 The runtime call cap has no default: without an explicit configured value the import is unavailable.
 """
 
+from packages.resume_core.background_limits import import_seconds
+from packages.resume_core.project_limits import finalization_seconds
 from packages.resume_core.models.template_import import ImportCapture, RuntimePolicy, StartTemplateImportV1
 from packages.resume_core.models.template_workspace import WorkspaceV7
 from packages.resume_core.template_import import TemplateImportFailure, digest
@@ -76,8 +78,8 @@ class TemplateImports:
             authorityHash=digest({'project': workspace.project_id, 'model': primary.model_dump(mode='json', by_alias=True)}),
             dependencyHash=digest({'package': package.package_hash, 'sources': sources}), allowTextRewrite=allow_text_rewrite,
             primary=primary, fallback=None, formattingAsOf=workspace.formatting_as_of,
-            policy=RuntimePolicy(callCap=self.template_import_call_cap, concurrency=1, processingSeconds=300, cleanupSeconds=5,
-                finalizationSeconds=30, primaryRepairs=1, fallbackRepairs=1))
+            policy=RuntimePolicy(callCap=self.template_import_call_cap, concurrency=1, processingSeconds=import_seconds(), cleanupSeconds=5,
+                finalizationSeconds=finalization_seconds(), primaryRepairs=1, fallbackRepairs=1))
 
     def validate_template_capture(self, operation, workspace):
         data = workspace.project or workspace.pre_draft
@@ -88,7 +90,10 @@ class TemplateImports:
         except ProjectFailure:
             raise TemplateImportFailure('IMPORT_CAPTURE_STALE') from None
         # Facts advance through admitted proposals; the pipeline checks their captured revisions separately.
-        if expected.model_dump(exclude={'fact_revisions'}) != operation.capture.model_dump(exclude={'fact_revisions'}):
+        # A stored import keeps the time limits captured at its start when Settings change; a new one must match.
+        stored = any(value.id == operation.id for value in data.template_operations)
+        ignored = {'fact_revisions': True, **({'policy': {'processing_seconds', 'finalization_seconds'}} if stored else {})}
+        if expected.model_dump(exclude=ignored) != operation.capture.model_dump(exclude=ignored):
             raise TemplateImportFailure('IMPORT_CAPTURE_STALE')
 
     async def start_template_import(self, identifier, client_request_id, allow_text_rewrite):

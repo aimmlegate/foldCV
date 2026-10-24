@@ -9,6 +9,7 @@ from packages.resume_core.background_clock import ControlledDeadlines
 from packages.resume_core.background_store import JobStore
 from packages.resume_core.background_store import BackgroundFailure
 from packages.resume_core.background_supervisor import JobSupervisor
+from packages.resume_core.background_limits import import_seconds
 from spikes.background.fixtures import TIME
 from tests.recovery.test_background_store import capture
 from tests.support.agent import isolated_project
@@ -94,7 +95,8 @@ async def test_import_has_five_minutes_and_other_jobs_keep_three(tmp_path, proce
         job, _ = await supervisor.submit(capture(state, "duration", **changes))
         actor = await factory.actor(job)
         await asyncio.wait_for(actor.started.wait(), 10)
-        expected = 300 if processing else 180
+        # Import jobs take the Settings import time (D096); other jobs keep three minutes.
+        expected = import_seconds() if processing else 180
         attempt = store.read(state.project_id, job.id).attempts[-1]
         assert (datetime.fromisoformat(attempt.active_deadline) - datetime.fromisoformat(attempt.dispatched_at)).total_seconds() == expected
         clock.advance(expected + offset)

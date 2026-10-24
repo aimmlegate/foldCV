@@ -16,6 +16,7 @@
 .uir-rewrite .rewrite-source, .uir-rewrite .rewrite-original, .uir-rewrite .rewrite-adjust { color: var(--muted); font-size: var(--ui-small); }
 .uir-rewrite .rewrite-result textarea { min-height: 100px; max-height: 240px; resize: vertical; margin: 0; }
 .settings-content > #workspace-pane-order { display: block; width: 100%; max-width: 420px; margin-top: 8px; padding: 10px 12px; }
+.settings-content > .limit-input { display: block; max-width: 160px; }
 .settings-screen .settings-nav { flex-shrink: 0; }
 .app-shell :is(.chat-title h2, .chat-message, .chat-empty p, .chat-findings strong, .chat-receipt strong), .app-shell #chat-input { font-size: var(--ui-body); color: var(--ink); }
 .app-shell :is(.chat-launcher, .chat-message-heading, .chat-message-heading small, .chat-access, .chat-context, .chat-scope, .chat-mode, .chat-composer-footer, .chat-source, .chat-activity, .chat-activity ol, .chat-activity-log li small, .chat-activity-note, .chat-findings small, .chat-message-actions > span, .chat-message-attachment, .chat-receipt small, .chat-thread-menu > span, .chat-command-caption, .operation-copy small, .operation-elapsed) { font-size: var(--ui-small); color: var(--muted); }

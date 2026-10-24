@@ -12,6 +12,8 @@ TEXT_FIELDS = {
     'claim': {'value'},
 }
 DATE_FIELDS = {'education': {'completion'}, 'certification': {'date'}}
+# No kind uses these names for text, so a canonical key alone marks a date outside periods.
+DATE_KEYS = set().union(*DATE_FIELDS.values())
 PERIOD_FIELDS = {'start', 'end', 'present'}
 
 
@@ -57,6 +59,36 @@ def validate_builtin_mapping(declaration, schema):
                 member_types = types_at(schema, pointer + '/' + member)
                 if not member_types or not member_types <= allowed:
                     raise SchemaFailure(pointer, 'incompatible canonical date component')
+
+
+def item_root(binding, bindings):
+    """Root tokens of the item a binding fills: its item_pointer, else through its last wildcard,
+    else the common parent of its type's bindings."""
+    pattern = pointer_tokens(binding.pointer)
+    if binding.item_pointer is not None:
+        return pointer_tokens(binding.item_pointer)
+    wildcards = [index for index, token in enumerate(pattern) if token == '*']
+    if wildcards:
+        return pattern[:wildcards[-1] + 1]
+    paths = [pointer_tokens(value.pointer)[:-1] for value in bindings if value.semantic_type == binding.semantic_type]
+    prefix = paths[0]
+    for path in paths[1:]:
+        prefix = prefix[:next((index for index, pair in enumerate(zip(prefix, path)) if pair[0] != pair[1]), min(len(prefix), len(path)))]
+    return pattern[:len(prefix)]
+
+
+def check_item_roots(definition):
+    """One payload object maps to one item, so two semantic types cannot fill the same item root; a related item
+    names its root, because the runtime requires a configured relation only for explicit roots."""
+    for block in definition.blocks:
+        owners = {}
+        for binding in block.bindings:
+            location = '/blocks/' + block.id + '/bindings' + binding.pointer
+            if binding.relation is not None and binding.item_pointer is None:
+                raise SchemaFailure(location, 'a related item needs an explicit item_pointer')
+            owner = owners.setdefault(tuple(item_root(binding, block.bindings)), binding.semantic_type)
+            if owner != binding.semantic_type:
+                raise SchemaFailure(location, 'two semantic types share one item root')
 
 
 def validate_item_pointer(schema, binding):

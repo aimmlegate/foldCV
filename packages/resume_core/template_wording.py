@@ -34,7 +34,8 @@ def display_raw_input(review, field, raw):
             text = captured[digest(unit)]
             if any(start < unit.start or end > unit.end for start, end in merged):
                 raise ValueError('source wording exceeds captured context')
-            texts.extend(text[start - unit.start:end - unit.start] for start, end in merged)
+            # Cited lines end with their line break; it ends the line, it is not part of the wording.
+            texts.extend(value.rstrip('\r\n') or value for value in (text[start - unit.start:end - unit.start] for start, end in merged))
         if grouped:
             raise ValueError('source wording lacks captured context')
         return '\n'.join(texts)

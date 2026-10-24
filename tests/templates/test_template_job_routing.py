@@ -9,6 +9,7 @@ import httpx
 from fastapi import FastAPI
 
 from packages.resume_core.background_clock import ControlledDeadlines
+from packages.resume_core.background_limits import import_seconds
 from packages.resume_core.background_supervisor import JobControl
 from packages.resume_core.models.background import JobSubmissionV1, JobSnapshotV1
 from packages.resume_core.template_import import processing_protocol, spent_calls
@@ -111,7 +112,8 @@ async def test_queue_and_direct_share_attempt_review_and_publication_owners(tmp_
         assert response.status_code == 202
         job = JobSnapshotV1.model_validate(response.json())
         assert job.submission.protocol == 'template_import_v1' and job.submission.tools == []
-        assert JobControl(service.supervisor, job).active_seconds == 300
+        # The import time from Settings (D096), not the ordinary job deadline.
+        assert JobControl(service.supervisor, job).active_seconds == import_seconds() == 3600
         async def finish():
             while True:
                 current = service.store.read(fixture.project, job.id)

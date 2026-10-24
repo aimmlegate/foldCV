@@ -2,8 +2,12 @@
 
 from __future__ import annotations
 
+from collections import OrderedDict
 from copy import deepcopy
+import hashlib
+import json
 import re
+import threading
 
 from jsonschema import Draft202012Validator, FormatChecker
 from jsonschema.exceptions import SchemaError
@@ -101,7 +105,28 @@ def validate_schema(schema: JsonObject) -> None:
     visit(schema, "", frozenset())
 
 
+_REACHABLE: OrderedDict[str, JsonObject] = OrderedDict()
+_REACHABLE_LOCK = threading.Lock()
+
+
 def reachable_schema(payload: JsonObject, definitions: dict[str, JsonObject]) -> JsonObject:
+    # Workspace validation derives every fact type's schema on each read; the meta-schema checks dominate import time.
+    key = hashlib.sha256(json.dumps([payload, definitions], sort_keys=True, ensure_ascii=False,
+        separators=(",", ":"), allow_nan=False).encode()).hexdigest()
+    with _REACHABLE_LOCK:
+        found = _REACHABLE.get(key)
+        if found is not None:
+            _REACHABLE.move_to_end(key)
+            return deepcopy(found)
+    result = _reachable_schema(payload, definitions)
+    with _REACHABLE_LOCK:
+        _REACHABLE[key] = deepcopy(result)
+        while len(_REACHABLE) > 512:
+            _REACHABLE.popitem(last=False)
+    return result
+
+
+def _reachable_schema(payload: JsonObject, definitions: dict[str, JsonObject]) -> JsonObject:
     root = deepcopy(payload)
     local = root.get("$defs", {})
     if not isinstance(local, dict): raise SchemaFailure("/$defs", "definitions must be an object")

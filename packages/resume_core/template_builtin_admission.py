@@ -10,10 +10,15 @@ from .rich_fields import working_field
 from .template_identity import empty_value, payload_value, source_slice
 from .template_import import TemplateImportFailure
 from .template_mutations import content
-from .templates.builtin_mapping import bind_builtin_allocation
+from .templates.builtin_mapping import DATE_KEYS, bind_builtin_allocation
 
 
-SUPPORTED = {'employment', 'subproject', 'claim', 'technology'}
+# The fields a new record of each supported kind starts with, all unknown.
+FIELDS = {'employment': ['employer', 'role'], 'subproject': ['name', 'role'], 'claim': ['value'],
+    'technology': ['display', 'canonicalId', 'experience'], 'candidate': ['name', 'title', 'location'],
+    'education': ['institution', 'qualification', 'specialty', 'completion'], 'language': ['language', 'level'],
+    'certification': ['name', 'issuer', 'date']}
+SUPPORTED = set(FIELDS)
 RECORD = TypeAdapter(RichFact)
 
 
@@ -41,7 +46,8 @@ def unknown():
 
 def admitted_field(raw, destination):
     value, text = raw, str(raw).lower() if isinstance(raw, bool) else raw
-    if destination.period_id is not None and not destination.field_key.endswith(':present'):
+    if (destination.period_id is not None and not destination.field_key.endswith(':present')
+            or destination.period_id is None and destination.field_key in DATE_KEYS):
         if not isinstance(raw, dict):
             raise ValueError('admitted date must contain its exact raw object')
         text, year, month = raw.get('raw'), raw.get('year'), raw.get('month')
@@ -95,9 +101,7 @@ def make_builtin_candidate(operation, allocation, declaration, fields, payload, 
     if previous is None:
         data = {'id': allocation.record_id, 'revision': 1, 'origin': 'source', 'evidence': [],
             'userCorrected': False, 'kind': kind}
-        names = {'employment': ['employer', 'role'], 'subproject': ['name', 'role'],
-            'claim': ['value'], 'technology': ['display', 'canonicalId', 'experience']}[kind]
-        data.update({name: unknown() for name in names})
+        data.update({name: unknown() for name in FIELDS[kind]})
         if kind in {'employment', 'subproject'}:
             data['periods'] = []
         if kind in {'claim', 'technology', 'subproject'}:

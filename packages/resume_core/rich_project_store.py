@@ -11,6 +11,7 @@ import re
 from .models.rich_workspace import WorkspaceV6
 from .models.template_workspace import WorkspaceV7
 from .project_store import ProjectStore, ProjectStoreFailure, owned_file, strict_json
+from .project_limits import project_file_bytes
 from .rich_limits import DOCX_BYTES, WORKSPACE_BYTES
 from .rich_limits import ImageReferences, retained_image_bytes
 from .rich_images import ImageFailure, verify_image_bytes
@@ -165,6 +166,8 @@ class RichProjectStore(ProjectStore):
         try:
             workspace = decode_rich_snapshot(rich_snapshot_bytes(workspace))
             raw = rich_snapshot_bytes(workspace)
+            if len(raw) > project_file_bytes():
+                raise ProjectStoreFailure("PROJECT_TOO_LARGE")
             owner = workspace.project or workspace.pre_draft
             from .rich_archive import archive_payload
             from .gui_archive_zip import ArchiveFailure

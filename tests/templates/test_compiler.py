@@ -113,7 +113,7 @@ def test_provider_envelope_uses_only_reachable_definitions_and_keeps_server_cons
     block = next(b for b in package.blocks if b.id == 'projects')
     assert block.provider_schema['type'] == 'object'
     assert block.provider_schema['required'] == ['payload']
-    assert set(block.provider_schema['$defs']) == {'date','period','role','text','texts'}
+    assert set(block.provider_schema['$defs']) == {'date','period','text'}
     assert 'unused_incompatible' not in block.full_schema['$defs']
     assert any(p.endswith('/if') for p in block.server_only)
     date = block.full_schema['$defs']['date']
@@ -246,7 +246,8 @@ def test_operation_references_and_conditions_use_declared_outputs(config,referen
 
 
 def test_binding_payload_and_semantic_cell_shapes_are_compatible(config):
-    config['fact_types'][0]['schema']['properties']['name']={'type':'integer'}
+    location=next(value for value in config['fact_types'] if value['id']=='foldcv:location')
+    location['schema']['properties']['city']={'type':'integer'}
     with pytest.raises(SchemaFailure,match='incompatible semantic binding type'): compile_config(config)
 
 

@@ -94,6 +94,38 @@ async def test_upload_import_job_publishes_a_v7_employment_project_with_two_call
 
 
 @pytest.mark.asyncio
+async def test_import_captures_the_settings_time_limit_and_keeps_it_when_settings_change(tmp_path):
+    from datetime import datetime
+    provider = ScriptedTemplateProvider()
+    async with app_client(tmp_path, call_cap=4, provider=provider) as (client, service, _jobs):
+        assert (await client.put('/v1/settings/limits', json={'importMinutes': 90, 'projectMegabytes': 64})).status_code == 200
+        project = (await upload(client)).json()['workspace']['projectId']
+        job = (await client.post(f'/v1/rich/projects/{project}/template-import', json={'clientRequestId': 'import-1', 'allowTextRewrite': True})).json()
+        policy = job['submission']['templateCommand']['capture']['policy']
+        assert (policy['processingSeconds'], policy['finalizationSeconds']) == (90 * 60, 30 + 2 * 64)
+        async def finished():
+            while True:
+                current = (await client.post(f'/v1/rich/projects/{project}/jobs/{job["id"]}/read', json={})).json()
+                if current.get('templateOutcome') is not None:
+                    return current
+                await asyncio.sleep(0.05)
+        current = await asyncio.wait_for(finished(), 60)
+        assert current['templateOutcome']['state'] == 'saved', current
+        attempt = current['attempts'][-1]
+        window = datetime.fromisoformat(attempt['activeDeadline']) - datetime.fromisoformat(attempt['dispatchedAt'])
+        assert 90 * 60 <= window.total_seconds() < 90 * 60 + 30
+        assert (await client.put('/v1/settings/limits', json={'importMinutes': 30, 'projectMegabytes': 64})).status_code == 200
+        workspace = service.read(project)
+        [operation] = workspace.project.template_operations
+        service.validate_template_capture(operation, workspace)
+        assert operation.capture.policy.processing_seconds == 90 * 60
+        assert service.template_import_capture(workspace, True).policy.processing_seconds == 30 * 60
+        assert (await client.put('/v1/settings/limits', json={'importMinutes': 30, 'projectMegabytes': 10})).status_code == 200
+        service.validate_template_capture(operation, service.read(project))
+        assert service.template_import_capture(workspace, True).policy.finalization_seconds == 30 + 2 * 10
+
+
+@pytest.mark.asyncio
 async def test_without_an_explicit_call_cap_strict_import_is_unavailable(tmp_path):
     provider = ScriptedTemplateProvider()
     async with app_client(tmp_path, call_cap=None, provider=provider) as (client, _service, _jobs):
@@ -105,7 +137,8 @@ async def test_without_an_explicit_call_cap_strict_import_is_unavailable(tmp_pat
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize('field,value', [('callCap', 99), ('configurationHash', '1' * 64),
-    ('authorityHash', '2' * 64), ('dependencyHash', '3' * 64), ('effort', 'high'), ('processingSeconds', 200)])
+    ('authorityHash', '2' * 64), ('dependencyHash', '3' * 64), ('effort', 'high'), ('processingSeconds', 200),
+    ('processingSeconds', 600), ('finalizationSeconds', 20), ('finalizationSeconds', 60)])
 async def test_generic_route_refuses_forged_capture_before_persistence(tmp_path, field, value):
     from tests.templates.employment_fixtures import employment_source
     provider = ScriptedTemplateProvider()
@@ -118,10 +151,12 @@ async def test_generic_route_refuses_forged_capture_before_persistence(tmp_path,
         service.persist(project)
         jobs.store.open(project)
         command = service.template_import_command(project, 'forged', True).model_dump(mode='json', by_alias=True)
-        target = command['capture']['policy'] if field in {'callCap', 'processingSeconds'} else (
+        target = command['capture']['policy'] if field in {'callCap', 'processingSeconds', 'finalizationSeconds'} else (
             command['capture']['primary'] if field in {'configurationHash', 'effort'} else command['capture'])
         target[field] = value
         reply = await client.post(f'/v1/rich/projects/{project}/jobs/fixed', json=command)
-        assert reply.status_code == (422 if field == 'processingSeconds' else 409), reply.text
+        # Below the contract range is malformed; an in-range value other than the Settings limit is a stale capture.
+        malformed = field == 'processingSeconds' and value < 300 or field == 'finalizationSeconds' and value < 30
+        assert reply.status_code == (422 if malformed else 409), reply.text
         assert provider.calls == []
         assert service.read(project).pre_draft.template_operations == []

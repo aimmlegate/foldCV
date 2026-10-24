@@ -6,7 +6,7 @@ from dataclasses import dataclass, field
 import threading
 
 from .agent_edits import semantic
-from .background_limits import LIMITS
+from .background_limits import LIMITS, background_project_bytes
 from .background_store import BackgroundFailure, RetainedUsage
 from .rich_dependencies import placements
 from .rich_mutations import mutation_sha256
@@ -459,7 +459,7 @@ class TemplateLocalHistory:
         pending['reserved_bytes'] = max(0, final_usage.owned_bytes - current_usage.owned_bytes)
         pending['reserved_records'] = max(0, final_usage.records - current_usage.records)
         usage = self.retained(prospective)
-        if usage.owned_bytes > LIMITS.sidecar_project_bytes or usage.records > LIMITS.metadata_project_records:
+        if usage.owned_bytes > background_project_bytes(LIMITS) or usage.records > LIMITS.metadata_project_records:
             raise BackgroundFailure('JOB_STORAGE_FULL')
         if self.jobs is not None:
             self.jobs._capacity(state, self.jobs._all(), retained_usage={self.usage_key: self.usage(replacing=prospective)})

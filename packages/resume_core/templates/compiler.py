@@ -14,7 +14,7 @@ from .models import (CapturedAsset, CompilationManifest, CompiledBlock, Compiled
                      TemplateDefinition, TemplatePackage)
 from .projection import (FORMATS, PROFILE_ID, PROFILE_VERSION, SchemaFailure,
                          binding_shape, project_payload, reachable_schema, schema_at, validate_schema)
-from .builtin_mapping import types_at, validate_builtin_mapping, validate_item_pointer
+from .builtin_mapping import check_item_roots, types_at, validate_builtin_mapping, validate_item_pointer
 
 COMPILER_VERSION = "template-compiler-1"
 COMPILER_VERSION_2 = "template-compiler-2"
@@ -24,7 +24,29 @@ PROJECTION_VERSION = "closed-json-1"
 ASSET_BYTES = 20 * 1024 * 1024
 PACKAGE_BYTES = 40 * 1024 * 1024
 CAPABILITIES = ["text", "join_fields", "join_items", "bullets", "tags", "period", "link", "focus_entry"]
-ADDED_CAPABILITIES = ['object_items', 'builtin_mapping', 'explicit_item_roots', 'fallback_style', 'header_slots']
+ADDED_CAPABILITIES = ['object_items', 'builtin_mapping', 'explicit_item_roots', 'fallback_style', 'header_slots', 'date_text']
+
+
+def is_date(shape):
+    """A partial date object; text and join nodes show its stated raw text."""
+    kind = shape.get("type")
+    kinds = set(kind if isinstance(kind, list) else [kind])
+    return 'object' in kinds and kinds <= {'object', 'null'} and {'raw', 'year', 'month'} <= set(shape.get('properties', {}))
+
+
+def date_text(definition):
+    for block in definition.blocks:
+        full = reachable_schema(block.content_schema, definition.content_definitions)
+        try:
+            base = schema_at(full, "/*") if block.view.mode == "items" else full
+            view = {**base, "$defs": full.get("$defs", {})}
+            if any(is_date(schema_at(view, pointer)) for node in block.view.nodes if node.type in {'text', 'join_fields'}
+                    for pointer in [*node.fields, *([node.field] if node.field else [])]):
+                return True
+        except SchemaFailure:
+            # compile_definition reports the invalid pointer with its location.
+            continue
+    return False
 
 
 def added_capabilities(definition):
@@ -34,6 +56,7 @@ def added_capabilities(definition):
         ('explicit_item_roots', any(binding.item_pointer is not None for block in definition.blocks for binding in block.bindings)),
         ('fallback_style', any(block.view.fallback_style is not None for block in definition.blocks)),
         ('header_slots', any(node.header_slot is not None for block in definition.blocks for node in block.view.nodes)),
+        ('date_text', date_text(definition)),
     ] if used]
 
 
@@ -112,6 +135,8 @@ def compile_bytes(raw: bytes, root: Path, *, original_format="yaml") -> Template
         raise SchemaFailure("/" + "/".join(map(str, first["loc"])), first["msg"]) from None
     version = compiler_version(definition)
     compiled, recipe, manifest = compile_definition(definition, version)
+    # New packages only: stored packages re-verify without it and keep opening; their runtime refuses such replies.
+    check_item_roots(definition)
     captured = []
     total = 0
     for asset in definition.assets:
@@ -273,6 +298,8 @@ def compile_definition(definition: TemplateDefinition, version):
                 kind = shape.get("type")
                 kinds = set(kind if isinstance(kind,list) else [kind])
                 expected = {"array"} if node.type in {"join_items","bullets","tags"} else {"object","null"} if node.type == "period" else {"string","number","integer","boolean","null"}
+                if node.type in {"text", "join_fields"} and is_date(shape):
+                    continue
                 if not kinds or not kinds <= expected:
                     raise SchemaFailure("/view/" + block.id + pointer, "incompatible view field type")
                 if node.type in {"join_items","bullets","tags"}:

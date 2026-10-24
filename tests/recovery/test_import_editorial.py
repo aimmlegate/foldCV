@@ -17,6 +17,7 @@ from packages.resume_core.models.background import FixedProcessingCommand
 from packages.resume_core.models.importing import ContentBlock, ImportContent, ImportDraft, ImportFinish
 from packages.resume_core.rich_archive import open_rich_archive
 from packages.resume_core.rich_presentation import authored_text
+from packages.resume_core.background_limits import import_seconds
 from resume_api.agent.runtime import RuntimeResult
 from resume_api.importer.session import ImportCoordinator, ImportSession
 from tests.recovery.test_agent_import import draft_fixture, selected_service
@@ -161,7 +162,7 @@ async def test_processing_routes_capture_permission_and_publish_portable_wording
     edited_text = "A clearer professional profile."
     async def turn(session, value, cancel):
         prompt = json.loads(value.prompt)
-        assert value.active_seconds == 300
+        assert value.active_seconds == import_seconds()  # the Settings import time (D096)
         assert prompt["allowTextRewrite"] is expected
         assert ("formattingAsOf" in prompt) is expected
         assert session.coordinator.load().allow_text_rewrite is expected

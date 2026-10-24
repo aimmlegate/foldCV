@@ -11,7 +11,7 @@ import secrets
 import re
 
 from . import agent_limits
-from .background_limits import LIMITS
+from .background_limits import LIMITS, background_global_bytes, background_project_bytes
 from .models.background import BackgroundSidecarV1, DispatchStateV1, JobFailure, JobSnapshotV1, JobSubmissionV1, RequestReplayV1
 from .project_store import ProjectStore, ProjectStoreFailure, SAFE_ID, encoded, owned_file, strict_json
 from .storage import StorageFailure, atomic_write, locked_root, private_directory
@@ -243,7 +243,7 @@ class JobStore:
                 previous = retained.get(project, RetainedUsage())
                 retained[project] = RetainedUsage(previous.draft_bytes + usage.draft_bytes,
                     previous.owned_bytes + usage.owned_bytes, previous.records + usage.records)
-        sizes = {}
+        sizes, budget, total = {}, background_project_bytes(LIMITS), background_global_bytes(LIMITS)
         for project, value in states.items():
             replacement = replacing if replacing is not None and replacing[0].is_relative_to(self.projects / project) else None
             sizes[project] = (len(encoded(value.model_dump(mode="json", by_alias=True))) + self._reserved_bytes(value)
@@ -251,7 +251,7 @@ class JobStore:
                 + (canonical_fixed_bytes if project == state.project_id and canonical_fixed_bytes is not None else self._fixed_bytes(value))
                 + (replacement[1] if replacement else 0))
             if project in self.fixed_unknown:
-                sizes[project] = max(sizes[project], LIMITS.sidecar_project_bytes)
+                sizes[project] = max(sizes[project], budget)
         for project, usage in retained.items():
             sizes[project] = sizes.get(project, 0) + usage.owned_bytes
         unknown = set(self.fences) - states.keys()
@@ -265,8 +265,8 @@ class JobStore:
                 sum(resolved.values()) > LIMITS.resolved_global_records or
                 draft_sizes[state.project_id] > LIMITS.draft_project_bytes or
                 sum(draft_sizes.values()) + len(unknown) * LIMITS.draft_project_bytes > LIMITS.draft_global_bytes or
-                sizes[state.project_id] > LIMITS.sidecar_project_bytes or
-                sum(sizes.values()) + len(unknown) * LIMITS.sidecar_project_bytes > LIMITS.sidecar_global_bytes or
+                sizes[state.project_id] > budget or
+                sum(sizes.values()) + len(unknown) * budget > total or
                 sum(records(value) for value in states.values()) + sum(value.records for value in retained.values())
                     + len(unknown) * LIMITS.metadata_project_records > LIMITS.metadata_global_records):
             raise BackgroundFailure("JOB_STORAGE_FULL")

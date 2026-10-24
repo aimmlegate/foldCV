@@ -5,6 +5,8 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from .models.rich_workspace import LocalImageAsset
+# Ceilings for reading and validating saved projects; Settings bound new saves (project_limits).
+from .project_limits import ARCHIVE_BYTES as ZIP_BYTES, ARCHIVE_EXPANDED_BYTES, PROJECT_CEILING_BYTES as WORKSPACE_BYTES
 
 MIB = 1024 * 1024
 MUTATION_BYTES = MIB
@@ -13,10 +15,7 @@ UPLOAD_OVERHEAD_BYTES = 64 * 1024
 IMAGE_PIXELS = 25_000_000
 LIVE_IMAGES = 20
 RETAINED_IMAGE_BYTES = 20 * MIB
-WORKSPACE_BYTES = 16 * MIB
 DOCX_BYTES = 32 * MIB
-ZIP_BYTES = 64 * MIB
-ARCHIVE_EXPANDED_BYTES = 60 * MIB
 ARCHIVE_ENTRY_BYTES = 32 * MIB
 ARCHIVE_PAYLOAD_COUNT = 47
 

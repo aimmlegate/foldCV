@@ -155,3 +155,28 @@ async def test_budget_expiry_retains_accepted_scopes_before_finalizing_remaining
     assert [task.state for task in result.tasks] == ['accepted', 'source_fallback']
     assert len(fixture.current().project.facts.extensions) == 2 and len(result.receipts) == 1
     assert fixture.source.units[0].text in fixture.text()
+
+
+@pytest.mark.asyncio
+async def test_identical_replies_of_two_blocks_are_each_reviewed_against_their_own_scope(tmp_path):
+    # Equal replies share a proposal hash; a reused review input would check the other block's scope and old facts.
+    import json
+    from packages.resume_core.templates.compiler import compile_bytes
+    from packages.resume_core.templates.store import BUNDLED_TEMPLATE
+    from tests.templates.storage_fixtures import package
+    config = package().definition.model_dump(mode='json', by_alias=True)
+    config['blocks'].append({**config['blocks'][0], 'id': 'second-view', 'placement': {'region': 'main', 'order': 2}})
+    fixture = RuntimeFixture(tmp_path, captured=compile_bytes(json.dumps(config).encode(), BUNDLED_TEMPLATE.parent,
+        original_format='json'))
+    def script(_request, value):
+        if 'targets' in value:
+            return {'results': [{'ruleId': target['ruleId'], 'targetId': target['targetId'], 'disposition': 'satisfied',
+                'reason': '', 'evidence': [], 'actionable': False} for target in value['targets']]}
+        return raw_proposal(fixture.source, empty=True)
+    fixture.transport.scripted = script
+    result = await fixture.pipeline.run(fixture.project, fixture.command, admitted=fixture.admitted)
+    assert result.state == 'published' and [task.state for task in result.tasks] == ['empty', 'empty']
+    tasks = {attempt.id: attempt.task_id for attempt in result.attempts}
+    assert sorted((tasks[record.attempt_id], sorted({target.target_id for target in record.value.targets
+        if target.target_id.startswith('scope-')})) for record in result.review_inputs) == sorted(
+        (task.id, ['scope-' + task.id]) for task in result.tasks)

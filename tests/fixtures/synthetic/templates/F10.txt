@@ -1,0 +1,16 @@
+Alex Example
+Backend engineer
+Location: Example City, Example Country, UTC+1
+Summary: Backend engineer focused on reliable queue systems.
+Focus: Python — 3 years
+Example Institute
+English
+Open source: Queue Tools https://example.org/queue-tools
+Course: Example Academy, Queue Design, 2021
+Old Systems — engineer, 2010–2012; Perl
+Example Labs — Queue Platform — backend engineer, 03.2020–11.2023
+Product: message queue platform for internal services.
+Python, PostgreSQL, Docker
+Implemented queue processing.
+Reduced median latency by 80%.
+Career: Mentored five engineers across teams.

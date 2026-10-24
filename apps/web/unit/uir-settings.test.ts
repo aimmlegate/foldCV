@@ -24,6 +24,10 @@ function setup() {
       server.preferences.selectedImportModel = model; return structuredClone(server.preferences); },
     analysis: async automatic => { calls.push({ part: "analysis", value: automatic }); if (fail.has("analysis")) throw new Error("disk full");
       server.preferences.automaticAnalysis = automatic; return structuredClone(server.preferences); },
+    saveLimits: async value => { calls.push({ part: "limits", value });
+      if (fail.has("limits") || !Number.isInteger(value.importMinutes) || !Number.isInteger(value.projectMegabytes))
+        throw Object.assign(new Error("invalid"), { code: "INVALID_REQUEST" });
+      server.preferences = { ...server.preferences, ...value }; return structuredClone(server.preferences); },
     saveAssistant: async request => { calls.push({ part: "assistant", value: request });
       if (fail.has("assistant") || request.expectedRevision !== server.assistant.revision) throw Object.assign(new Error("conflict"), { code: "AGENT_SETTINGS_CONFLICT" });
       server.assistant = { schemaVersion: 1, revision: server.assistant.revision + 1, enabled: request.enabled, selectedAgentModel: request.selectedAgentModel }; return structuredClone(server.assistant); },
@@ -46,6 +50,19 @@ test("partial Save retains failed drafts and Cancel keeps successful writes", as
   const calls = h.calls.length; h.controller.cancel(); assert.equal(h.calls.length, calls);
   assert.deepEqual(h.controller.dirty, []); assert.equal(h.controller.state.draft.model, "model-b"); assert.equal(h.controller.state.draft.automatic, false);
   assert.equal(h.controller.state.draft.agentEnabled, false); assert.equal(h.controller.state.draft.markdown, originalRules);
+});
+
+test("limits show contract defaults, send numbers and keep a rejected draft for correction", async () => {
+  const h = setup(); await h.controller.load();
+  assert.equal(h.controller.state.draft.importMinutes, "60"); assert.equal(h.controller.state.draft.projectMegabytes, "64"); assert.deepEqual(h.controller.dirty, []);
+  h.controller.change("importMinutes", "12.5"); await h.controller.save();
+  assert.equal(h.controller.state.errors.limits, "Не удалось сохранить лимиты. Укажите целые числа в допустимых пределах.");
+  assert.equal(h.controller.state.draft.importMinutes, "12.5"); assert.deepEqual(h.controller.dirty, ["limits"]);
+  h.controller.change("importMinutes", "90"); h.controller.change("projectMegabytes", "128"); await h.controller.save();
+  assert.deepEqual(h.calls.at(-1), { part: "limits", value: { importMinutes: 90, projectMegabytes: 128 } });
+  assert.deepEqual(h.controller.state.saved, ["limits"]); assert.equal(h.controller.state.errors.limits, undefined); assert.deepEqual(h.controller.dirty, []);
+  assert.equal(h.controller.state.preferences?.importMinutes, 90);
+  h.controller.change("projectMegabytes", "20"); h.controller.cancel(); assert.equal(h.controller.state.draft.projectMegabytes, "128");
 });
 
 test("explicit retries reload conflict bases without replacing local choices or resaving accepted sections", async () => {

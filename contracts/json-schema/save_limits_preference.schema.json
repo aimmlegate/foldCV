@@ -1,0 +1,23 @@
+{
+  "additionalProperties": false,
+  "properties": {
+    "importMinutes": {
+      "maximum": 240,
+      "minimum": 5,
+      "title": "Importminutes",
+      "type": "integer"
+    },
+    "projectMegabytes": {
+      "maximum": 256,
+      "minimum": 10,
+      "title": "Projectmegabytes",
+      "type": "integer"
+    }
+  },
+  "required": [
+    "importMinutes",
+    "projectMegabytes"
+  ],
+  "title": "SaveLimitsPreference",
+  "type": "object"
+}

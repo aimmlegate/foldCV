@@ -51,8 +51,13 @@ mock.module(file("../src/rich/api.ts"), { namedExports: {
 mock.module(file("../src/background/connection.ts"), { namedExports: { attachExclusiveWriter: async () => null,
   attachExclusiveTemplateWriter: async (id: string) => { events.push(`attach-template:${id}`); return null; } } });
 mock.module(file("../src/background/fixed.ts"), { namedExports: { FixedOperations: class {} } });
+// The running attempt carries the server deadline from the default Settings import time (60 minutes),
+// fixed on the test clock when the import starts.
+let importDeadline: string | null = null;
 const importJob = () => ({ id: "synthetic-job", execution: scenario === "import-timeout" ? "running" : scenario.slice("import-".length),
-  publication: scenario === "import-cancelled" ? "cancelled" : "none", error: null, templateOutcome: null });
+  publication: scenario === "import-cancelled" ? "cancelled" : "none", error: null, templateOutcome: null,
+  attempts: [{ activeDeadline: importDeadline ??= new Date(Date.now() + 60 * 60_000).toISOString() }],
+  submission: { templateCommand: { kind: "start_new_import", capture: { policy: { cleanupSeconds: 5, finalizationSeconds: 158 } } } } });
 mock.module(file("../src/background/api.ts"), { namedExports: {
   JobsApi: class { async read() { importReads++; return importJob(); } },
   startTemplateImport: async () => { if (!importing) throw new Error("unused"); return importJob(); },
@@ -102,7 +107,8 @@ if (importing) {
   const schedule = globalThis.setTimeout;
   mock.method(globalThis, "setTimeout", (callback: () => void) => { now += 60_000; return schedule(callback, 0); });
   await hook.process();
-  assert.equal(importReads, scenario === "import-timeout" ? 16 : 0);
+  // One read per minute until the attempt deadline plus cleanup (5 s), publication (158 s) and a minute.
+  assert.equal(importReads, scenario === "import-timeout" ? 64 : 0);
   const expected = scenario === "import-timeout" ? "PROCESS_TIMEOUT" : scenario === "import-cancelled" ? "CANCELLED" : "PROCESS_FAILED";
   assert.ok(stateWrites.get(10)?.some(value => String(value).includes(expected)), "terminal imports report an error without an optional server error");
   assert.equal(stateWrites.get(12)?.at(-1), false, "the busy state is released");

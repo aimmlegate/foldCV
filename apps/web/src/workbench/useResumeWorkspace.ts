@@ -267,10 +267,14 @@ export function useResumeWorkspace() {
     stage("Импортируем по шаблону");
     const jobs = new JobsApi(id);
     let job = await startTemplateImport(id, { clientRequestId: crypto.randomUUID(), allowTextRewrite });
-    const deadline = Date.now() + 15 * 60_000;
     while (!job.templateOutcome) {
       if (!current()) return;
-      if (Date.now() > deadline) throw new RichApiFailure("PROCESS_TIMEOUT");
+      // The server owns the limits from Settings: wait past its deadline for the captured cleanup and
+      // publication windows, plus a minute for the outcome.
+      const attempt = job.attempts.at(-1), command = job.submission.templateCommand;
+      const policy = command && "capture" in command ? command.capture.policy : null;
+      const grace = ((policy?.cleanupSeconds ?? 0) + (policy?.finalizationSeconds ?? 0) + 60) * 1000;
+      if (attempt && Date.now() > Date.parse(attempt.activeDeadline) + grace) throw new RichApiFailure("PROCESS_TIMEOUT");
       // An execution that ended in failure without a typed outcome stays unresolved on the server; report it.
       if (["failed", "cancelled", "interrupted"].includes(job.execution))
         throw new RichApiFailure(job.error?.code ?? (job.execution === "cancelled" ? "CANCELLED" : "PROCESS_FAILED"));

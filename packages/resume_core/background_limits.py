@@ -3,11 +3,12 @@
 from dataclasses import asdict, dataclass
 
 from . import agent_limits
+from .project_limits import BACKGROUND_FACTOR, GLOBAL_PROJECTS, IMPORT_CEILING_SECONDS, MIB, PROJECT_CEILING_BYTES, USER_LIMITS
 
 
 @dataclass(frozen=True)
 class BackgroundLimits:
-    policy_version: int = 3
+    policy_version: int = 4
     executions: int = 3
     noninteractive_executions: int = 2
     serial_executions: int = 1
@@ -19,14 +20,15 @@ class BackgroundLimits:
     reconciliation_dispatch_bound: int = 3
     startup_seconds: int = agent_limits.STARTUP_SECONDS
     active_seconds: int = agent_limits.ACTIVE_SECONDS
-    import_active_seconds: int = agent_limits.IMPORT_ACTIVE_SECONDS
+    # Ceilings: Settings choose the budgets below them; stored records are read under them.
+    import_active_seconds: int = IMPORT_CEILING_SECONDS
     cleanup_seconds: int = agent_limits.CLEANUP_SECONDS
     writer_lease_seconds: int = agent_limits.LEASE_SECONDS
     writer_heartbeat_seconds: int = 5
     receipt_seconds: int = agent_limits.RECEIPT_SECONDS
     local_barrier_ms: int = 750
-    sidecar_global_bytes: int = 64 * 1024 * 1024
-    sidecar_project_bytes: int = agent_limits.PROJECT_BYTES
+    sidecar_global_bytes: int = GLOBAL_PROJECTS * BACKGROUND_FACTOR * PROJECT_CEILING_BYTES
+    sidecar_project_bytes: int = BACKGROUND_FACTOR * PROJECT_CEILING_BYTES
     metadata_global_records: int = 32768
     metadata_project_records: int = 4096
     proposal_bytes: int = agent_limits.RUN_BYTES
@@ -45,6 +47,21 @@ class BackgroundLimits:
 
 
 LIMITS = BackgroundLimits()
+
+
+# Settings budgets; callers pass their module's LIMITS so a lowered ceiling still bounds them.
+def import_seconds(limits=LIMITS):
+    return min(limits.import_active_seconds, USER_LIMITS.import_minutes * 60)
+
+
+def background_project_bytes(limits=LIMITS):
+    return min(limits.sidecar_project_bytes, BACKGROUND_FACTOR * USER_LIMITS.project_megabytes * MIB)
+
+
+def background_global_bytes(limits=LIMITS):
+    return min(limits.sidecar_global_bytes, GLOBAL_PROJECTS * BACKGROUND_FACTOR * USER_LIMITS.project_megabytes * MIB)
+
+
 OVERFLOW = {
     "pending": "JOB_QUEUE_FULL before dispatch; never evict an explicit request",
     "storage": "JOB_STORAGE_FULL before acceptance; preserve unresolved authority and drafts",

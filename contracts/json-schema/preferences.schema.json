@@ -5,6 +5,20 @@
       "title": "Automaticanalysis",
       "type": "boolean"
     },
+    "importMinutes": {
+      "default": 60,
+      "maximum": 240,
+      "minimum": 5,
+      "title": "Importminutes",
+      "type": "integer"
+    },
+    "projectMegabytes": {
+      "default": 64,
+      "maximum": 256,
+      "minimum": 10,
+      "title": "Projectmegabytes",
+      "type": "integer"
+    },
     "rewriteReasoningEffort": {
       "anyOf": [
         {

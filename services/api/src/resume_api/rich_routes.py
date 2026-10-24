@@ -11,6 +11,7 @@ from packages.resume_core.models.rich_mutations import RichMutation, ActionCaptu
 from packages.resume_core.models.template_mutations import TemplateMutationV1
 from packages.resume_core.models.template_render import TemplateExportRequestV1
 from packages.resume_core.models.contracts import Id, Wire
+from packages.resume_core.project_limits import ARCHIVE_BYTES
 from packages.resume_core.rendering.template import RenderFailure
 from .contracts import EmptyRequest
 from .extracting import UploadFailure, parse_one_part
@@ -86,7 +87,7 @@ def mount_rich_projects(app, service, problem):
     @app.post(prefix + "/archive")
     async def portable_input(request: Request):
         try:
-            data, name, pasted = parse_one_part(await request.body(), request.headers.get("content-type", ""), maximum=64 * 1024 * 1024)
+            data, name, pasted = parse_one_part(await request.body(), request.headers.get("content-type", ""), maximum=ARCHIVE_BYTES)
             if pasted or not name.lower().endswith((".foldcv", ".zip")):
                 return problem("ARCHIVE_FILE_UNSUPPORTED", 422, "archive")
         except UploadFailure as error:

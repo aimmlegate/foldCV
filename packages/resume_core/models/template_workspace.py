@@ -5,8 +5,9 @@ from __future__ import annotations
 from math import isclose
 from typing import Literal
 
-from pydantic import Field, model_validator
+from pydantic import ConfigDict, Field, model_validator
 
+from ..project_limits import ARCHIVE_BYTES, ARCHIVE_EXPANDED_BYTES, PROJECT_CEILING_BYTES
 from .contracts import Id, Revision, Sha256, Source, Wire, _safe_path, _unique
 from .rich_document import FieldBinding, ImageBlock, NarrativeCitation, SectionBlock, SourceWitness, WorkingOwnership
 from .rich_workspace import (WorkspaceV6, RichPreDraft, LocalImageAsset, ImmutableFactEvidence,
@@ -280,11 +281,13 @@ class TemplateArchiveEntry(Wire):
     path: str
     role: Literal['workspace','source_original','render','user_image','template_package','template_asset']
     sha256: Sha256
-    size: int = Field(ge=0,le=32*1024*1024)
+    size: int = Field(ge=0,le=PROJECT_CEILING_BYTES)
 
     @model_validator(mode="after")
     def path_role(self):
         if not _safe_path(self.path): raise ValueError('unsafe archive path')
+        # Only the project file grows with the project size setting.
+        if self.role!='workspace' and self.size>32*1024*1024: raise ValueError('archive entry exceeds 32 MiB')
         required={'workspace':'workspace.json','template_package':'template/package.json'}
         if self.role in required and self.path!=required[self.role]: raise ValueError('invalid archive role path')
         prefix={'source_original':'sources/','render':'renders/','user_image':'images/','template_asset':'template/assets/'}
@@ -293,6 +296,8 @@ class TemplateArchiveEntry(Wire):
 
 
 class ArchiveManifestV7(Wire):
+    # The client reads the ZIP ceiling from the generated schema instead of restating it.
+    model_config = ConfigDict(json_schema_extra={'x-maxArchiveBytes': ARCHIVE_BYTES})
     schema_version: Literal[7]
     app_version: str
     project_id: Id
@@ -304,5 +309,5 @@ class ArchiveManifestV7(Wire):
         if sum(entry.role=='workspace' for entry in self.entries)!=1: raise ValueError('one workspace required')
         if sum(entry.role=='template_package' for entry in self.entries)>1: raise ValueError('one captured package allowed')
         if sum(entry.role=='render' for entry in self.entries)>1: raise ValueError('one optional render allowed')
-        if sum(entry.size for entry in self.entries)>60*1024*1024: raise ValueError('expanded archive exceeds limit')
+        if sum(entry.size for entry in self.entries)>ARCHIVE_EXPANDED_BYTES: raise ValueError('expanded archive exceeds limit')
         return self

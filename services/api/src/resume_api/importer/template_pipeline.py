@@ -399,8 +399,10 @@ class TemplatePipeline(TemplateCheckpoints):
                     continue
                 break
             policy = attempt.model
+            # Identical replies of different blocks share a proposal hash; only this task's own review input is reusable.
             prior_review = next((value.value for value in operation.review_inputs
-                if value.value.proposal_hash == proposal.proposal_hash and value.value.policy == policy), None)
+                if value.value.proposal_hash == proposal.proposal_hash and value.value.policy == policy
+                and attempt_in(operation, value.attempt_id).task_id == task_id), None)
             # The review offers its own evidence table under the same references, so the task input omits its copy.
             task_input = next(value.value for value in operation.task_inputs if value.task_id == task_id)
             review = prior_review or make_review_input(operation, proposal, data.template_package, data.sources, policy,

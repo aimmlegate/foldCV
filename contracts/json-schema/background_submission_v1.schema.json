@@ -467,7 +467,8 @@
           "type": "integer"
         },
         "finalizationSeconds": {
-          "const": 30,
+          "maximum": 542,
+          "minimum": 30,
           "title": "Finalizationseconds",
           "type": "integer"
         },
@@ -477,7 +478,8 @@
           "type": "integer"
         },
         "processingSeconds": {
-          "const": 300,
+          "maximum": 14400,
+          "minimum": 300,
           "title": "Processingseconds",
           "type": "integer"
         }

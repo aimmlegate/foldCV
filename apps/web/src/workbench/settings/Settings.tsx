@@ -2,8 +2,8 @@ import { errorMessage } from "../../errors/messages";
 import { useEffect, useState } from "react";
 import { ConnectionWorkflow, type ConnectionView } from "../../connection/workflow";
 import { AgentBrowserApi } from "../../assistant/api";
-import { preferencesRequest, rulesRequest, saveRulesRequest, saveImportModelRequest, saveRewriteReasoningRequest } from "../../api/client";
-import { SettingsDrafts, type SettingsPart, type SettingsState } from "./drafts";
+import { preferencesRequest, rulesRequest, saveRulesRequest, saveImportModelRequest, saveLimitsRequest, saveRewriteReasoningRequest } from "../../api/client";
+import { SettingsDrafts, limitRanges, type SettingsPart, type SettingsState } from "./drafts";
 import { Connection } from "./Connection";
 import { ModelSelect } from "./ModelSelect";
 import { ReasoningSelect } from "./ReasoningSelect";
@@ -11,9 +11,9 @@ import { Button } from "../ui/Button";
 import { OperationStatus } from "../ui/OperationStatus";
 import type { PaneOrder } from "./interface";
 
-const partNames: Record<SettingsPart, string> = { reasoning: "reasoning правки текста", model: "модель обработки", import: "модель импорта", analysis: "проверка изменений", assistant: "помощник", rules: "правила" };
+const partNames: Record<SettingsPart, string> = { reasoning: "reasoning правки текста", model: "модель обработки", import: "модель импорта", analysis: "проверка изменений", limits: "лимиты", assistant: "помощник", rules: "правила" };
 export function Settings({ close, connectionChanged, paneOrder, changePaneOrder }: { close: () => void; connectionChanged: (view: ConnectionView) => void; paneOrder: PaneOrder; changePaneOrder: (order: PaneOrder) => void }) {
-  const [section, setSection] = useState<"model" | "rules" | "analysis" | "interface">("model");
+  const [section, setSection] = useState<"model" | "rules" | "analysis" | "limits" | "interface">("model");
   const [view, setView] = useState<ConnectionView>(() => new ConnectionWorkflow(() => {}).view);
   const [workflow] = useState(() => new ConnectionWorkflow(value => { setView(value); connectionChanged(value); }));
   const [state, setState] = useState<SettingsState | null>(null);
@@ -21,7 +21,7 @@ export function Settings({ close, connectionChanged, paneOrder, changePaneOrder 
     const api = new AgentBrowserApi("");
     return new SettingsDrafts({ preferences: () => preferencesRequest(), rules: rulesRequest, assistant: () => api.settings(),
       analysis: enabled => preferencesRequest(enabled), saveRules: saveRulesRequest, saveAssistant: value => api.saveSettings(value),
-      selectImport: saveImportModelRequest, saveReasoning: saveRewriteReasoningRequest,
+      selectImport: saveImportModelRequest, saveReasoning: saveRewriteReasoningRequest, saveLimits: saveLimitsRequest,
       select: async model => {
         if (!model || !workflow.view.snapshot.metadataReady || !workflow.view.snapshot.models.includes(model)) throw new Error("MODEL_UNAVAILABLE");
         await workflow.select(model);
@@ -34,9 +34,9 @@ export function Settings({ close, connectionChanged, paneOrder, changePaneOrder 
   return <section className="settings-screen" aria-label="Настройки">
     <div className="settings-title"><button className="text-button" disabled={current.saving} onClick={close}>← Вернуться к резюме</button></div>
     <div className="settings-layout"><nav className="settings-nav" aria-label="Разделы настроек">
-      {(["model", "rules", "analysis", "interface"] as const).map(value => <button key={value} data-settings={value} className={section === value ? "active" : ""}
+      {(["model", "rules", "analysis", "limits", "interface"] as const).map(value => <button key={value} data-settings={value} className={section === value ? "active" : ""}
         aria-current={section === value ? "page" : undefined} onClick={() => setSection(value)}>
-        {value === "model" ? "Модель и подключение" : value === "rules" ? "Общие правила и команды" : value === "interface" ? "Интерфейс" : "Проверка изменений"}
+        {value === "model" ? "Модель и подключение" : value === "rules" ? "Общие правила и команды" : value === "interface" ? "Интерфейс" : value === "limits" ? "Лимиты" : "Проверка изменений"}
       </button>)}
     </nav><div className="settings-content">
       <div className="settings-feedback">
@@ -74,6 +74,17 @@ export function Settings({ close, connectionChanged, paneOrder, changePaneOrder 
         <div className="switch-line"><label htmlFor="analysis-toggle">Автоматически проверять изменения<small>Другие упоминания меняются только с вашего согласия.</small></label>
           <input className="switch" id="analysis-toggle" aria-label="Автоматически проверять изменения" type="checkbox" role="switch" disabled={!current.preferences} checked={current.draft.automatic}
             onChange={event => controller.change("automatic", event.currentTarget.checked)} /></div>
+      </>}
+      {section === "limits" && <><h3>Лимиты</h3>
+        <p>Действуют для всех резюме. Время применяется к следующему импорту: импорт, который уже идёт, сохраняет свой лимит.</p>
+        <label htmlFor="limit-import-minutes">Время на импорт резюме, минут</label>
+        <input className="limit-input" id="limit-import-minutes" type="number" inputMode="numeric" step={1} min={limitRanges.importMinutes.minimum} max={limitRanges.importMinutes.maximum}
+          disabled={!current.preferences || current.saving} value={current.draft.importMinutes} onChange={event => controller.change("importMinutes", event.currentTarget.value)} />
+        <p className="small muted">От {limitRanges.importMinutes.minimum} до {limitRanges.importMinutes.maximum} минут.</p>
+        <label htmlFor="limit-project-megabytes">Размер проекта, МБ</label>
+        <input className="limit-input" id="limit-project-megabytes" type="number" inputMode="numeric" step={1} min={limitRanges.projectMegabytes.minimum} max={limitRanges.projectMegabytes.maximum}
+          disabled={!current.preferences || current.saving} value={current.draft.projectMegabytes} onChange={event => controller.change("projectMegabytes", event.currentTarget.value)} />
+        <p className="small muted">От {limitRanges.projectMegabytes.minimum} до {limitRanges.projectMegabytes.maximum} МБ: копия проекта при сохранении, история правок и записи импорта.</p>
       </>}
       {section === "interface" && <><h3>Расположение резюме</h3>
         <label htmlFor="workspace-pane-order">Порядок панелей при сравнении</label>

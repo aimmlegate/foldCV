@@ -84,6 +84,15 @@ async def views_workspace(root):
     return value, originals
 
 
+async def generic_workspace(root, name):
+    """CT06 S4: a published scripted import of one synthetic fixture with the bundled Generic template."""
+    from tests.templates.generic_fixtures import generic_import
+    work = root / 'fixture'
+    work.mkdir(mode=0o700)
+    _fixture, _result, value, originals = await generic_import(work, name)
+    return value, originals
+
+
 async def projects(root, employment_shape='issues'):
     """A: joined papers; B: plain papers; C: synthetic employment, either with two import issues (the E03 shape)
     or with two identical tasks and a second employer (the E04 shape), or the CT06 views import. All keep the
@@ -93,6 +102,8 @@ async def projects(root, employment_shape='issues'):
     _workspace, sources = papers()
     if employment_shape == 'views':
         employment, employment_sources = await views_workspace(root)
+    elif employment_shape.startswith('generic-'):
+        employment, employment_sources = await generic_workspace(root, employment_shape.removeprefix('generic-').upper())
     else:
         employment, employment_sources = {'issues': issue_workspace, 'e04': e04_workspace}[employment_shape]()
     return [(joined(), sources), (renamed(papers()[0], 'template-project-b', 'Synthetic papers B'), sources),
@@ -146,6 +157,7 @@ async def main(args):
         'sourceSha256': {str(path.relative_to(ROOT)): digest(path) for path in [Path(__file__), ROOT / 'spikes/uir/providers.py',
             ROOT / 'tests/templates/address_map_fixtures.py', ROOT / 'tests/templates/storage_fixtures.py',
             ROOT / 'tests/templates/e04_fixtures.py', ROOT / 'tests/templates/test_template_view_adapters.py',
+            ROOT / 'tests/templates/generic_fixtures.py',
             ROOT / 'services/api/src/resume_api/app.py']}}
 
     def diagnostics():
@@ -174,7 +186,7 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--root', type=Path, required=True); parser.add_argument('--dist', type=Path, required=True)
     parser.add_argument('--port', type=int, default=0)
-    parser.add_argument('--employment', choices=['issues', 'e04', 'views'], default='issues')
+    parser.add_argument('--employment', choices=['issues', 'e04', 'views', 'generic-f06', 'generic-f10'], default='issues')
     # Explicit test allowance for template imports; without it the import stays unavailable, as in production.
     parser.add_argument('--template-call-cap', type=int, default=None)
     asyncio.run(main(parser.parse_args()))

@@ -4,5 +4,7 @@
   "theme": "system",
   "selectedModel": null,
   "selectedImportModel": null,
-  "rewriteReasoningEffort": null
+  "rewriteReasoningEffort": null,
+  "importMinutes": 60,
+  "projectMegabytes": 64
 }

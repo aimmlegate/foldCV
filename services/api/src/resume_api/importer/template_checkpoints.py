@@ -7,6 +7,7 @@ from packages.resume_core.background_history import digest_bytes
 from packages.resume_core.background_store import BackgroundFailure
 from packages.resume_core.background_limits import LIMITS
 from packages.resume_core.models.template_workspace import WorkspaceV7
+from packages.resume_core.project_limits import save_allowance_seconds
 from packages.resume_core.template_import import TemplateImportFailure, identity
 
 
@@ -65,9 +66,14 @@ def export_scope(before, after):
         raise BackgroundFailure('JOB_SCOPE_INVALID')
 
 
+def save_seconds():
+    # A save rewrites and re-validates the whole project file, so a larger project size setting allows longer saves.
+    return LIMITS.receipt_seconds + save_allowance_seconds()
+
+
 class TemplateCheckpoints:
     def __init__(self, publisher, *, originals, artifacts=None, images=None, wall, id_factory=identity, export_only=False,
-                 checkpoint_seconds=LIMITS.receipt_seconds, cleanup_seconds=LIMITS.cleanup_seconds):
+                 checkpoint_seconds=None, cleanup_seconds=LIMITS.cleanup_seconds):
         self.publisher, self.originals = publisher, originals
         self.artifacts = artifacts if artifacts is not None else {}
         self.images = images if images is not None else {}
@@ -77,7 +83,11 @@ class TemplateCheckpoints:
         self.async_locks = publisher.template_checkpoint_async_locks
         self.checkpoint_fences = publisher.template_checkpoint_fences
         self.checkpoint_owners = publisher.template_checkpoint_owners
-        self.checkpoint_seconds, self.cleanup_seconds = checkpoint_seconds, cleanup_seconds
+        self.fixed_checkpoint_seconds, self.cleanup_seconds = checkpoint_seconds, cleanup_seconds
+
+    @property
+    def checkpoint_seconds(self):
+        return self.fixed_checkpoint_seconds if self.fixed_checkpoint_seconds is not None else save_seconds()
 
     def read(self, project):
         workspace, _checksum = self.publisher.canonical.read_committed(project)

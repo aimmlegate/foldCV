@@ -6570,5 +6570,108 @@
         "value": "model-b"
       }
     ]
+  },
+  {
+    "name": "preferences_limits_bounds",
+    "contract": "preferences",
+    "base": "preferences",
+    "valid": true,
+    "edits": [
+      {
+        "op": "set",
+        "path": [
+          "importMinutes"
+        ],
+        "value": 240
+      },
+      {
+        "op": "set",
+        "path": [
+          "projectMegabytes"
+        ],
+        "value": 10
+      }
+    ]
+  },
+  {
+    "name": "preferences_project_size_below_range",
+    "contract": "preferences",
+    "base": "preferences",
+    "valid": false,
+    "edits": [
+      {
+        "op": "set",
+        "path": [
+          "projectMegabytes"
+        ],
+        "value": 9
+      }
+    ]
+  },
+  {
+    "name": "limits_saved",
+    "contract": "save_limits_preference",
+    "base": "save_limits_preference",
+    "valid": true,
+    "edits": []
+  },
+  {
+    "name": "limits_import_time_below_range",
+    "contract": "save_limits_preference",
+    "base": "save_limits_preference",
+    "valid": false,
+    "edits": [
+      {
+        "op": "set",
+        "path": [
+          "importMinutes"
+        ],
+        "value": 4
+      }
+    ]
+  },
+  {
+    "name": "limits_project_size_above_range",
+    "contract": "save_limits_preference",
+    "base": "save_limits_preference",
+    "valid": false,
+    "edits": [
+      {
+        "op": "set",
+        "path": [
+          "projectMegabytes"
+        ],
+        "value": 257
+      }
+    ]
+  },
+  {
+    "name": "limits_fractional_minutes",
+    "contract": "save_limits_preference",
+    "base": "save_limits_preference",
+    "valid": false,
+    "edits": [
+      {
+        "op": "set",
+        "path": [
+          "importMinutes"
+        ],
+        "value": 12.5
+      }
+    ]
+  },
+  {
+    "name": "limits_missing_project_size",
+    "contract": "save_limits_preference",
+    "base": "save_limits_preference",
+    "valid": false,
+    "edits": [
+      {
+        "op": "remove",
+        "path": [
+          "projectMegabytes"
+        ]
+      }
+    ]
   }
 ]

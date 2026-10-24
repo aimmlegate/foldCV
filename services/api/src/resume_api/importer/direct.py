@@ -5,7 +5,7 @@ import copy
 import time
 
 from packages.resume_core.agent_store import AgentFailure
-from packages.resume_core import agent_limits
+from packages.resume_core.background_limits import import_seconds
 from packages.resume_core.background_history import digest_bytes
 from packages.resume_core.import_agent import ImportFailure
 from packages.resume_core.models.importing import IMPORT_TOOLS
@@ -54,7 +54,7 @@ async def run_import(projects, identifier, generation, rules, selected, *, allow
             if projects.persist(identifier) == "failed":
                 raise ProjectFailure("PROJECT_SAVE_FAILED", 503)
         value = RuntimeInput(model=selected[1], prompt=session.prompt, url=session.url, token=session.token,
-            tools=IMPORT_TOOLS, allow_web=False, active_seconds=agent_limits.IMPORT_ACTIVE_SECONDS,
+            tools=IMPORT_TOOLS, allow_web=False, active_seconds=import_seconds(),
             before_start=ready, revoke=session.revoke,
             close_tools=close_tools, developer_instructions=SKILL, queued_at=time.monotonic())
         result = await runtime.run(value, cancel, lambda _kind, _payload: None)

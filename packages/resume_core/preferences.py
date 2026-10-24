@@ -83,6 +83,19 @@ class PreferencesStore:
         except StorageFailure:
             raise PreferencesFailure('PREFERENCES_SAVE_FAILED') from None
 
+    def save_limits(self, import_minutes, project_megabytes):
+        try:
+            with locked_root(self.root, '.preferences.lock'):
+                value = self._read()
+                value.import_minutes, value.project_megabytes = import_minutes, project_megabytes
+                value = Preferences.model_validate(value.model_dump(by_alias=True))
+                self._write(value)
+                return value
+        except ValidationError:
+            raise PreferencesFailure('INVALID_REQUEST') from None
+        except StorageFailure:
+            raise PreferencesFailure('PREFERENCES_SAVE_FAILED') from None
+
     def select_import_model(self, model):
         if model is not None and not MODEL.fullmatch(model):
             raise PreferencesFailure('MODEL_DENIED')

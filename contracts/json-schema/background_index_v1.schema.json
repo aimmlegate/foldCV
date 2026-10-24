@@ -245,5 +245,5 @@
   ],
   "title": "JobIndexV1",
   "type": "object",
-  "x-maxSerializedBytes": 67108864
+  "x-maxSerializedBytes": 4294967296
 }

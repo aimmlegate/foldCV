@@ -5,7 +5,7 @@ from pathlib import Path
 import pytest
 from pydantic import ValidationError
 
-from packages.resume_core.background_limits import LIMITS
+from packages.resume_core.background_limits import LIMITS, background_global_bytes, background_project_bytes
 from packages.resume_core.background_proposals import JobProposals
 from packages.resume_core.background_retention import JobRetention
 from packages.resume_core.background_store import BackgroundFailure, JobStore, records
@@ -38,8 +38,10 @@ def namespaces(fixture, count):
 def test_real_private_storage_enforces_the_frozen_exact_boundary(tmp_path, variant, kind, scope, offset):
     fixture = PublicationFixture(tmp_path)
     jobs = fixture.jobs
-    limit = getattr(LIMITS, ("sidecar_" if kind == "bytes" else "metadata_") + scope + ("_bytes" if kind == "bytes" else "_records"))
-    count = 1 if scope == "project" else 7 if kind == "bytes" else 17
+    # Byte budgets follow Settings under the LIMITS ceilings; the global one is eight project budgets.
+    limit = ((background_global_bytes() if scope == "global" else background_project_bytes()) if kind == "bytes"
+        else getattr(LIMITS, "metadata_" + scope + "_records"))
+    count = 1 if scope == "project" else 9 if kind == "bytes" else 17
     states = namespaces(fixture, count)
     target = limit + offset
     if kind == "bytes":
@@ -47,7 +49,7 @@ def test_real_private_storage_enforces_the_frozen_exact_boundary(tmp_path, varia
             for state in states}
         remaining = target - sum(existing.values())
         for state in states:
-            length = min(LIMITS.sidecar_project_bytes - existing[state.project_id], remaining)
+            length = min(background_project_bytes() - existing[state.project_id], remaining)
             path = jobs.projects / state.project_id / "capacity-padding.bin"
             with path.open("wb") as stream:
                 stream.truncate(length)

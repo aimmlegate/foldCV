@@ -5,7 +5,7 @@ import pytest
 from packages.resume_core.models.template_document import FieldOccurrence
 from packages.resume_core.models.template_import import TaskResultRecord
 from packages.resume_core.template_assembly import assemble_template
-from packages.resume_core.template_identity import capture_span
+from packages.resume_core.template_identity import capture_span, source_slice
 from packages.resume_core.templates.compiler import canonical
 from packages.resume_core.templates.materialize import materialize
 from packages.resume_core.templates.presentation import project_presentation, snapshot_identity
@@ -89,7 +89,10 @@ def test_shared_unit_fallback_replaces_overlapping_rewrites_with_one_source_copy
     fallback(operation, [capture_span(src, src.units[0])])
     document, coverage = materialize(package, facts, [operation], [src], operation_id=operation.id)
     assert len(document.blocks()) == 1
-    assert document.blocks()[0].content[0].text == src.units[0].text
+    # The paragraph shows the unit without its closing line break; only that whitespace stays source-only.
+    shown = document.blocks()[0].content[0]
+    assert shown.text == src.units[0].text.rstrip('\n') and source_slice([src], shown.citations[0]) == shown.text
+    assert all(not source_slice([src], value.span).strip() for value in coverage if value.disposition == 'source_only')
     assert not any(value.disposition in {'accepted', 'multiple_views'} for value in coverage)
     assert canonical(facts) == before
     assert not any(block.type == 'heading' for block in document.blocks())
@@ -182,7 +185,7 @@ def test_source_fallback_with_no_nodes_needs_an_explicit_captured_style(explicit
             materialize(package, facts, [operation], [src], operation_id=operation.id)
         return
     document, _coverage = materialize(package, facts, [operation], [src], operation_id=operation.id)
-    assert text(document) == src.units[0].text
+    assert text(document) == src.units[0].text.rstrip('\n')
     assert document.blocks()[0].presentation.style_token == 'body'
 
 

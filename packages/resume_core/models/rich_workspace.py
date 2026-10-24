@@ -7,6 +7,7 @@ from typing import Literal
 
 from pydantic import Field, model_validator
 
+from ..project_limits import ARCHIVE_EXPANDED_BYTES, PROJECT_CEILING_BYTES
 from .contracts import Evidence, Id, PartialDate, Revision, Sha256, Source, TemplateManifest, Wire, _safe_path, _unique
 from .recovery import EvidenceSpan, Rules
 from .rich_document import ImageBlock, RichDocumentV1, SectionBlock
@@ -205,8 +206,9 @@ class WorkspaceV6(Wire):
             raise ValueError("rich workspace identity/revision mismatch")
         _unique([item.client_mutation_id for item in self.mutation_replay], "mutation replay")
         _unique([item.id for item in self.sync_records], "sync record")
-        if len(self.model_dump_json(by_alias=True).encode("utf-8")) > 16 * 1024 * 1024:
-            raise ValueError("rich workspace exceeds 16 MiB")
+        # Settings bound new saves; validation keeps the ceiling so saved projects stay readable.
+        if len(self.model_dump_json(by_alias=True).encode("utf-8")) > PROJECT_CEILING_BYTES:
+            raise ValueError("rich workspace exceeds the project size ceiling")
         return self
 
 
@@ -214,14 +216,16 @@ class RichArchiveEntry(Wire):
     path: str
     role: Literal["workspace", "source_original", "render", "user_image"]
     sha256: Sha256
-    size: int = Field(ge=0, le=32 * 1024 * 1024)
+    size: int = Field(ge=0, le=PROJECT_CEILING_BYTES)
 
     @model_validator(mode="after")
     def owned_path(self) -> RichArchiveEntry:
         if not _safe_path(self.path):
             raise ValueError("unsafe archive path")
-        if self.role == "workspace" and (self.path != "workspace.json" or self.size > 16 * 1024 * 1024):
+        if self.role == "workspace" and self.path != "workspace.json":
             raise ValueError("invalid workspace entry")
+        if self.role != "workspace" and self.size > 32 * 1024 * 1024:
+            raise ValueError("archive entry exceeds 32 MiB")
         if self.role == "source_original" and not self.path.startswith("sources/"):
             raise ValueError("invalid source entry")
         if self.role == "render" and (not self.path.startswith("renders/") or not self.path.endswith(".docx")):
@@ -245,6 +249,6 @@ class ArchiveManifestV6(Wire):
             raise ValueError("one workspace required")
         if sum(entry.role == "render" for entry in self.entries) > 1:
             raise ValueError("only current optional render allowed")
-        if sum(entry.size for entry in self.entries) + len(self.model_dump_json(by_alias=True).encode("utf-8")) > 60 * 1024 * 1024:
-            raise ValueError("expanded archive exceeds 60 MiB")
+        if sum(entry.size for entry in self.entries) + len(self.model_dump_json(by_alias=True).encode("utf-8")) > ARCHIVE_EXPANDED_BYTES:
+            raise ValueError("expanded archive exceeds its ceiling")
         return self

@@ -25,7 +25,7 @@
           "type": "string"
         },
         "size": {
-          "maximum": 33554432,
+          "maximum": 268435456,
           "minimum": 0,
           "title": "Size",
           "type": "integer"
@@ -74,5 +74,6 @@
     "entries"
   ],
   "title": "ArchiveManifestV7",
-  "type": "object"
+  "type": "object",
+  "x-maxArchiveBytes": 318767104
 }

@@ -493,6 +493,11 @@ class CapturedWriter:
             region = self.request.document.regions[1] if index == 0 else self.request.document.regions[2] if index == len(widths) - 1 else None
             if region is not None:
                 self.blocks(cell, region.blocks)
+                # A column's first paragraph opens the body; keeping it with the next one adds nothing there,
+                # but converters then move the whole column row to the next page and leave page one empty.
+                keep = cell.paragraphs[0]._p.pPr.find(qn('w:keepNext')) if cell.paragraphs and cell.paragraphs[0]._p.pPr is not None else None
+                if keep is not None:
+                    keep.set(qn('w:val'), '0')
             if not cell.paragraphs:
                 self.spacer(cell, 1)
         logo = self.recipe.style.header.logo

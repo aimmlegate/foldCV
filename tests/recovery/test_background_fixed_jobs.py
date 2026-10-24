@@ -13,6 +13,7 @@ from packages.resume_core.background_store import BackgroundFailure
 from packages.resume_core.background_history import digest_bytes
 from packages.resume_core.models.background import WriterAdvanceV1
 from packages.resume_core.models.rich_document import NarrativeCitation
+from packages.resume_core.background_limits import import_seconds
 from resume_api.providers.content import ContentFailure
 from resume_api.gui_projects import ProjectFailure
 from tests.recovery.generation_fixtures import CreationProvider
@@ -253,7 +254,8 @@ async def test_processing_stage_boundaries_keep_captured_input_and_stop_authorit
         if variant == "NB-F03:v08":
             await asyncio.wait_for(entered.wait(), 10)
             control = service.supervisor.controls[reply.job.id]
-            service.supervisor.clock.advance(300)
+            # The import deadline comes from the Settings import time (D096).
+            service.supervisor.clock.advance(import_seconds())
             await asyncio.wait_for(control.cancelled.wait(), 10)
             release.set()
         elif variant != "NB-F03:v05":

@@ -49,7 +49,8 @@ from packages.resume_core.rules import PRESET_HEADINGS, RulesFailure, RulesStore
 from packages.resume_core.models.recovery import SaveRulesRequest, RulesSettingsError, RulesSettings
 from .gui_projects import GuiProjectService, ProjectFailure
 from packages.resume_core.preferences import PreferencesStore, PreferencesFailure
-from packages.resume_core.models.recovery import SaveImportModelPreference
+from packages.resume_core.project_limits import ARCHIVE_BYTES, apply_preferences as apply_limits
+from packages.resume_core.models.recovery import SaveImportModelPreference, SaveLimitsPreference
 from packages.resume_core.project_store import ProjectStore
 from .gui_routes import mount_projects
 from .inference_admission import INFERENCE, AdmissionBlocked, AdmissionTimeout, AdmissionCancelled
@@ -198,7 +199,7 @@ class LocalBoundary:
                 writer_payload = path.startswith("/v1/rich/projects/") and any(path.endswith("/writer/" + command)
                     for command in ("checkpoint", "save", "flush", "barrier", "reconcile", "detach", "draft/use"))
                 project_upload = image_upload or path in {"/v1/projects/input", "/v1/projects/archive", "/v1/rich/projects/input", "/v1/rich/projects/template-input", "/v1/rich/projects/archive"} or (path.startswith("/v1/projects/") and path.endswith("/input"))
-                body_limit = 10 * 1024 * 1024 + 64 * 1024 if image_upload else 64 * 1024 * 1024 + 4096 if path in {"/v1/projects/archive", "/v1/rich/projects/archive"} else MAX_EXTRACT_BODY if path == "/v1/extract" or project_upload else MAX_BODY
+                body_limit = 10 * 1024 * 1024 + 64 * 1024 if image_upload else ARCHIVE_BYTES + 4096 if path in {"/v1/projects/archive", "/v1/rich/projects/archive"} else MAX_EXTRACT_BODY if path == "/v1/extract" or project_upload else MAX_BODY
                 if writer_payload:
                     from packages.resume_core.background_limits import LIMITS
                     body_limit = LIMITS.draft_project_bytes + MAX_BODY
@@ -411,6 +412,10 @@ def create_app(*, origin: str, secret: str, temp_root: Path, dist: Path, runner:
 
     gui_options = {"clock": gui_clock} if gui_clock is not None else {}
     preferences_store = PreferencesStore(rules_store.root)
+    try:
+        apply_limits(preferences_store.load() if preferences_store.path.exists() else None)
+    except PreferencesFailure:
+        apply_limits(None)
     def import_selected_provider():
         try:
             model = preferences_store.load().selected_import_model
@@ -1103,6 +1108,16 @@ def create_app(*, origin: str, secret: str, temp_root: Path, dist: Path, runner:
             await gui_projects.set_analysis_preference(value.automatic_analysis)
             return JSONResponse(value.model_dump(mode="json", by_alias=True), headers={"Cache-Control": "no-store"})
         except (PreferencesFailure, RulesFailure, ProjectFailure) as error:
+            return problem(error.code, 409, "settings")
+
+    @app.put("/v1/settings/limits")
+    async def save_limits(payload: SaveLimitsPreference):
+        try:
+            rules_store.load()
+            value = preferences_store.save_limits(payload.import_minutes, payload.project_megabytes)
+            apply_limits(value)
+            return JSONResponse(value.model_dump(mode="json", by_alias=True), headers={"Cache-Control": "no-store"})
+        except (PreferencesFailure, RulesFailure) as error:
             return problem(error.code, 409, "settings")
 
     @app.put("/v1/settings/import-model")

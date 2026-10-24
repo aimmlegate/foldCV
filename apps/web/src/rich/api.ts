@@ -20,6 +20,7 @@ import type { DateCascadeProposal } from "../contracts/generated/date_cascade_pr
 import type { CascadeRequest } from "../contracts/generated/cascade_request";
 import timelineSchema from "../../../../contracts/json-schema/timeline_report.schema.json" with { type: "json" };
 import cascadeSchema from "../../../../contracts/json-schema/date_cascade_proposal.schema.json" with { type: "json" };
+import archiveSchema from "../../../../contracts/json-schema/archive_manifest_v7.schema.json" with { type: "json" };
 
 const ajv = new Ajv2020({ strict: false, allErrors: true, discriminator: true });
 const responseShape = ajv.compile<RichProjectResponse>(taggedSchema(schema));
@@ -139,7 +140,7 @@ export async function download(id: string, kind: "export" | "archive", revision:
     throw new RichApiFailure(code, response.status);
   }
   const blob = await response.blob();
-  const maximum = (kind === "export" ? 32 : 64) * 1024 * 1024;
+  const maximum = kind === "export" ? 32 * 1024 * 1024 : archiveSchema["x-maxArchiveBytes"];
   const mime = kind === "export" ? "application/vnd.openxmlformats-officedocument.wordprocessingml.document" : "application/vnd.foldcv.project+zip";
   if (!blob.size || blob.size > maximum || blob.type !== mime) throw new RichApiFailure("INVALID_RESULT");
   if (kind === "export") {

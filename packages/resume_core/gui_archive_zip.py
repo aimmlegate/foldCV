@@ -8,10 +8,13 @@ import zlib
 from io import BytesIO
 from zipfile import ZipFile, ZIP_STORED
 
-MAX_ARCHIVE = 64 * 1024 * 1024
-MAX_TOTAL = 60 * 1024 * 1024
-MAX_ENTRY = 32 * 1024 * 1024
-MAX_JSON = 16 * 1024 * 1024
+from .project_limits import ARCHIVE_BYTES, ARCHIVE_EXPANDED_BYTES, PROJECT_CEILING_BYTES
+
+# Ceilings sized for the largest project file; Settings bound new saves.
+MAX_ARCHIVE = ARCHIVE_BYTES
+MAX_TOTAL = ARCHIVE_EXPANDED_BYTES
+MAX_ENTRY = PROJECT_CEILING_BYTES
+MAX_JSON = PROJECT_CEILING_BYTES
 MAX_ENTRIES = 48
 
 

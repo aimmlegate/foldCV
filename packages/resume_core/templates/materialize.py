@@ -11,7 +11,7 @@ from .materialize_nodes import DisplayField, fallback_style, literal, locale_tex
 from .operations import display_pointer, operation_value
 from ..rich_fields import field_key
 from .projection import pointer_tokens
-from .span_coverage import fallback_plan, overlaps, union_spans, unit_key
+from .span_coverage import fallback_plan, overlaps, union_spans, unit_key, without_line_break
 from .store import verify_package
 
 
@@ -159,6 +159,10 @@ def materialize(package, facts, operations, sources, *, operation_id, revision=1
             listed(declaration, sections, stable_id(operation_id, declaration.id, 'compact'), [DisplayField(('items', str(index)), record,
                 handle_of.get(record), current[field_key(record, 'employer')]) for index, record in enumerate(record
                     for record in compact[declaration.id] if record in active_records and field_key(record, 'employer') in current)])
+        # An object view's list of independent records: the records below its root that no record of this view owns.
+        listing = [field for (view, identifier), field in fields.items() if declaration.view.mode == 'object'
+            and view == declaration.id and identifier not in suppressed and field.record_id not in hidden.get(view, ())
+            and visible_path(declaration, field.relative) and not primary_owner(field.record_id, view)]
         records = [record for record in assigned.get(declaration.id, ())
             if record in active_records and field_key(record, 'display') in current]
         if records:
@@ -170,10 +174,14 @@ def materialize(package, facts, operations, sources, *, operation_id, revision=1
                     listed(declaration, sections, stable_id(operation_id, declaration.id, 'assigned', handle),
                         [DisplayField(tuple(tokens[1:]), record, handle, cell)], handle)
             else:
+                # They continue the group's own list after its last item.
                 at = tokens.index('*')
-                listed(declaration, sections, stable_id(operation_id, declaration.id, 'assigned'),
-                    [DisplayField((*tokens[:at], str(index), *tokens[at + 1:]), record, handle, cell)
-                        for index, (record, handle, cell) in enumerate(names)])
+                start = 1 + max((int(field.relative[at]) for field in listing if len(field.relative) > at
+                    and field.relative[:at] == tuple(tokens[:at]) and field.relative[at].isdecimal()), default=-1)
+                listing += [DisplayField((*tokens[:at], str(start + index), *tokens[at + 1:]), record, handle, cell)
+                    for index, (record, handle, cell) in enumerate(names)]
+        if listing:
+            listed(declaration, sections, stable_id(operation_id, declaration.id, 'list'), listing)
         output = regions[declaration.placement.region]['blocks']
         if sections:
             title = locale_text(declaration.view.title, package.definition.template.default_locale)
@@ -188,14 +196,17 @@ def materialize(package, facts, operations, sources, *, operation_id, revision=1
             if key in shown_fallback or not any(overlaps(span, raw) for raw in fallbacks_by_view.get(declaration.id, [])):
                 continue
             shown_fallback.add(key)
+            shown = without_line_break(sources, span)
+            if shown is None:
+                continue
             identifier = stable_id(operation_id, 'fallback', key)
             ref = reference(package, declaration.id, fallback_style(declaration),
                 stable_id(operation_id, declaration.id, 'fallback'))
-            text = literal(source_slice(sources, span), ref)
-            text.citations = [span]
+            text = literal(source_slice(sources, shown), ref)
+            text.citations = [shown]
             output.append({'type': 'paragraph', 'id': identifier, 'revision': 1, 'props': {}, 'content': [text],
                 'children': [], 'provenance': [], 'presentation': ref})
-            add_coverage(span, None, [identifier], 'fallback', 'exact source scope')
+            add_coverage(shown, None, [identifier], 'fallback', 'exact source scope')
     if len(shown_fallback) != len(fallback):
         raise ValueError('source fallback has no materialized placement')
     for identifier, blocks in displayed.items():

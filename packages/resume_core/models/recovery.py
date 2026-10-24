@@ -6,6 +6,7 @@ from typing import Annotated, Literal, Union
 
 from pydantic import ConfigDict, Field, RootModel, model_validator
 
+from ..project_limits import IMPORT_MINUTES, PROJECT_MEGABYTES
 from ..reasoning import ReasoningEffort
 
 from .contracts import (
@@ -786,10 +787,17 @@ class Preferences(Wire):
     selected_model: str | None
     selected_import_model: str | None = None
     rewrite_reasoning_effort: ReasoningEffort | None = None
+    import_minutes: int = Field(default=IMPORT_MINUTES[0], ge=IMPORT_MINUTES[1], le=IMPORT_MINUTES[2])
+    project_megabytes: int = Field(default=PROJECT_MEGABYTES[0], ge=PROJECT_MEGABYTES[1], le=PROJECT_MEGABYTES[2])
 
 
 class SaveImportModelPreference(Wire):
     model: str | None = Field(max_length=80, pattern=r"^[a-zA-Z0-9][a-zA-Z0-9._-]{0,79}$")
+
+
+class SaveLimitsPreference(Wire):
+    import_minutes: int = Field(ge=IMPORT_MINUTES[1], le=IMPORT_MINUTES[2])
+    project_megabytes: int = Field(ge=PROJECT_MEGABYTES[1], le=PROJECT_MEGABYTES[2])
 
 
 class ArchiveManifestV5(Wire):
@@ -846,7 +854,7 @@ RECOVERY_CONTRACTS = {
     "project_v4": ProjectV4, "workspace_v5": WorkspaceV5, "archive_manifest_v5": ArchiveManifestV5,
     "document": Document, "docx_error": DocxError, "editorial_plan": EditorialPlan,
     "mutation": Mutation, "mutation_result": MutationResult, "preferences": Preferences,
-    "save_import_model_preference": SaveImportModelPreference,
+    "save_import_model_preference": SaveImportModelPreference, "save_limits_preference": SaveLimitsPreference,
     "registry": Registry, "render_snapshot_v4": RenderSnapshotV4, "rules": Rules,
     "selection": Selection, "source_context": SourceContext, "source_context_request": SourceContextRequest,
     "save_rules_request": SaveRulesRequest, "rules_settings_error": RulesSettingsError,

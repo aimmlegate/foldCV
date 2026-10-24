@@ -196,11 +196,13 @@ def test_corrupt_image_isolated_on_restart_preserves_other_projects_and_original
     assert path.read_bytes() == before
 
 
-def test_portable_capacity_counts_required_bytes_and_omits_cache_before_rejecting(tmp_path):
+def test_portable_capacity_counts_required_bytes_and_omits_cache_before_rejecting(tmp_path, monkeypatch):
     from packages.resume_core.models.contracts import Source
     from packages.resume_core.models.rich_workspace import RichRenderSnapshot
     from packages.resume_core.rendering.rich_docx import renderer_sha256
     from packages.resume_core.rendering.rich_template import PACKAGE_SHA256
+    # The boundary logic, at the earlier 60 MiB total; the real ceiling follows the project size ceiling (D096).
+    monkeypatch.setattr("packages.resume_core.models.rich_workspace.ARCHIVE_EXPANDED_BYTES", 60 * 1024 * 1024)
     workspace = without_sources()
     blob = b"x" * (30 * 1024 * 1024)
     checksum = hashlib.sha256(blob).hexdigest()

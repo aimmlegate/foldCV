@@ -11,7 +11,7 @@ from packages.resume_core.models.rich_document import RichDocumentV1
 from packages.resume_core.models.rich_facts import WorkingFacts
 from packages.resume_core.models.rich_mutations import DateCascadeProposal, RichMutation
 from packages.resume_core.models.rich_workspace import ArchiveManifestV6, LocalImageAsset, WorkspaceV6
-from packages.resume_core.rich_limits import ImageReferences, MIB, portable_payload, retained_image_bytes
+from packages.resume_core.rich_limits import ARCHIVE_EXPANDED_BYTES, ImageReferences, MIB, portable_payload, retained_image_bytes
 
 FIXTURE = Path(__file__).parents[1] / "fixtures" / "rich_workspace.json"
 
@@ -134,11 +134,11 @@ def test_rich_image_metadata_requires_bounded_normalized_owned_bytes(patch):
 
 
 def test_rich_archive_omits_only_optional_cache_and_retains_entry_boundaries():
-    required = [32 * MIB, 28 * MIB - 100]
+    required = [32 * MIB] * 9 + [ARCHIVE_EXPANDED_BYTES - 9 * 32 * MIB - 100]
     assert portable_payload(required, MIB, manifest_size=100, render_manifest_size=200) == required
     assert portable_payload([MIB] * 47, MIB, manifest_size=100, render_manifest_size=200) == [MIB] * 47
     assert portable_payload([MIB], 32 * MIB, manifest_size=100, render_manifest_size=200) == [MIB, 32 * MIB]
-    for required in ([32 * MIB + 1], [30 * MIB, 30 * MIB], [1] * 48):
+    for required in ([32 * MIB + 1], [32 * MIB] * 9 + [ARCHIVE_EXPANDED_BYTES - 9 * 32 * MIB], [1] * 48):
         with pytest.raises(ValueError, match="required portable"):
             portable_payload(required, None, manifest_size=1)
     manifest = {"schema_version": 6, "app_version": "test", "project_id": "project-1", "entries": [

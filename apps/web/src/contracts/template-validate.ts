@@ -19,7 +19,7 @@ const writerShape = ajv.compile<WriterViewV2>(taggedSchema(writerSchema));
 const mutationShape = ajv.compile<TemplateMutationV1>(taggedSchema(mutationSchema));
 const verifiedPackages = new Set<string>();
 const packageCapabilities = new Set(["text", "join_fields", "join_items", "bullets", "tags", "period", "link",
-  "focus_entry", "object_items", "builtin_mapping", "explicit_item_roots", "fallback_style", "header_slots"]);
+  "focus_entry", "object_items", "builtin_mapping", "explicit_item_roots", "fallback_style", "header_slots", "date_text"]);
 
 function base64Bytes(value: string): Uint8Array<ArrayBuffer> {
   const decoded = atob(value);

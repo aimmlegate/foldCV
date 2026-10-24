@@ -6,6 +6,7 @@ from typing import Annotated, Literal
 
 from pydantic import Field, JsonValue, model_validator
 
+from ..project_limits import FINALIZATION_BASE_SECONDS, FINALIZATION_CEILING_SECONDS, IMPORT_MINUTES
 from .contracts import Id, PartialDate, Revision, Sha256, Wire, _unique
 from .template_facts import CapturedItemIdentity, ExtensionCell, HandleAllocation, Lineage, Relation, SourceSpan
 from ..templates.models import Check, JsonObject
@@ -295,9 +296,10 @@ class ImportIssue(Wire):
 class RuntimePolicy(Wire):
     call_cap: int = Field(gt=0)
     concurrency: Literal[1]
-    processing_seconds: Literal[300]
+    # Captured from Settings at the start; operations captured at 300 s and 30 s stay valid.
+    processing_seconds: int = Field(ge=IMPORT_MINUTES[1] * 60, le=IMPORT_MINUTES[2] * 60)
     cleanup_seconds: Literal[5]
-    finalization_seconds: Literal[30]
+    finalization_seconds: int = Field(ge=FINALIZATION_BASE_SECONDS, le=FINALIZATION_CEILING_SECONDS)
     primary_repairs: Literal[1]
     fallback_repairs: Literal[1]
 

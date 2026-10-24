@@ -9,7 +9,7 @@ import math
 
 from .background_clock import Deadlines
 from .background_events import JobEvents
-from .background_limits import LIMITS
+from .background_limits import LIMITS, import_seconds
 from .background_scheduler import SerialOrder
 from .background_store import BackgroundFailure, JobStore, TERMINAL_EXECUTION, expiration, identity
 from .models.background import JobAttemptV1, JobFailure, JobSnapshotV1
@@ -64,7 +64,7 @@ class JobControl:
     @property
     def active_seconds(self):
         from .template_import import processing_protocol
-        return (LIMITS.import_active_seconds if self.job.submission.kind == "processing"
+        return (import_seconds(LIMITS) if self.job.submission.kind == "processing"
             and processing_protocol(self.job.submission) in {'agent_import_v1', 'template_import_v1'} else LIMITS.active_seconds)
 
     def stop(self, reason="INTERRUPTED", *, revoke_publication=False):
