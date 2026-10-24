@@ -3647,7 +3647,8 @@
         "apps/web/unit/agent-controller.test.ts::permissions and Stop revoke the pending review intent without implicit apply on re-enable",
         "tests/recovery/test_assistant_review.py::test_local_review_availability_requires_origin_generation_to_finish_and_current_identity",
         "tests/recovery/test_assistant_approval.py::test_revocation_after_acceptance_never_saves_or_rebases_the_reviewed_draft",
-        "tests/recovery/test_assistant_approval.py::test_model_bearer_and_changed_digest_cannot_obtain_a_ui_ticket"
+        "tests/recovery/test_assistant_approval.py::test_model_bearer_and_changed_digest_cannot_obtain_a_ui_ticket",
+        "tests/recovery/test_assistant_rollout.py::test_queued_continue_refuses_a_different_captured_account_before_dispatch"
       ]
     },
     {
@@ -3671,7 +3672,8 @@
         "tests/recovery/test_assistant_approval.py::test_lost_claim_reply_can_resume_only_in_memory_and_restart_cannot_apply_it",
         "tests/recovery/test_assistant_approval.py::test_saved_receipt_outlives_private_preview_and_current_replay_retention",
         "tests/recovery/test_assistant_continuation.py::test_http_continue_requires_protocol_dispatches_one_scripted_turn_and_retains_useful_quota_draft",
-        "tests/recovery/test_assistant_continuation.py::test_continue_rejects_stale_or_expired_proof_without_dispatch"
+        "tests/recovery/test_assistant_continuation.py::test_continue_rejects_stale_or_expired_proof_without_dispatch",
+        "tests/recovery/test_assistant_rollout.py::test_unexpected_queued_runtime_failure_seals_the_useful_continued_draft"
       ]
     },
     {
@@ -3713,7 +3715,8 @@
       "id": "CAP-A15",
       "status": "partial",
       "tests": [
-        "tests/recovery/test_assistant_fidelity.py::test_format_changes_existing_heading_roles_without_rebuilding_authored_content"
+        "tests/recovery/test_assistant_fidelity.py::test_format_changes_existing_heading_roles_without_rebuilding_authored_content",
+        "tests/recovery/test_assistant_skills.py::test_protocol_mode_uses_chat_skill_adapters_and_reads_every_resource_exactly"
       ]
     },
     {
@@ -3747,7 +3750,9 @@
       "status": "partial",
       "tests": [
         "tests/recovery/test_assistant_proposals.py::test_queued_check_only_completion_never_enters_background_publication",
-        "tests/recovery/test_assistant_approval.py::test_queued_read_only_origin_uses_its_existing_artifact_journal_and_the_current_ui_writer"
+        "tests/recovery/test_assistant_approval.py::test_queued_read_only_origin_uses_its_existing_artifact_journal_and_the_current_ui_writer",
+        "tests/recovery/test_assistant_rollout.py::test_old_queued_configuration_is_rejected_before_owned_runtime_dispatch",
+        "tests/recovery/test_assistant_rollout.py::test_old_pending_publication_and_reconnect_stay_unapproved_after_restart"
       ]
     },
     {
@@ -3787,8 +3792,11 @@
     },
     {
       "id": "CAP-A23",
-      "status": "unimplemented",
-      "tests": []
+      "status": "partial",
+      "tests": [
+        "tests/recovery/test_assistant_rollout.py::test_already_claimed_old_job_reconciles_its_original_canonical_proof",
+        "tests/recovery/test_assistant_skills.py::test_protocol_off_keeps_the_pre_cap_model_surface"
+      ]
     },
     {
       "id": "CAP-A24",
@@ -4005,6 +4013,11 @@
       "unproved": "Server-derived no-change and retained incomplete outcomes have offline checks. CAP06 final checks and CAP08 integration of all recovery states, V7/native/manual gates remain open.",
       "owner": "CAP06/CAP08; CAP07 for V7",
       "check": "Verify distinct durable, unknown, stale, failed and draft outcomes in the final scoped gates and synthetic UI; never infer save from model prose."
+    },
+    "CAP-A23": {
+      "unproved": "CAP08 integration proof is in progress; V7/native/manual/visual gaps remain.",
+      "owner": "CAP08;CAP07 for V7",
+      "check": "Complete the final ordinary integration checks and preserve all family/native/manual gates."
     }
   },
   "recovery": {

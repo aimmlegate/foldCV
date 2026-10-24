@@ -88,7 +88,6 @@ class ToolSession(PrivateMcp):
     def __init__(self, service, control, run, fetcher):
         self.service, self.control, self.run, self.fetcher = service, control, run, fetcher
         self.book = ReadBook(service, control)
-        self.skills = SkillBook()
         self.calls, self.fetches, self.result_bytes = 0, 0, 0
         self.cache = {}
         self.argument_issues = []
@@ -96,6 +95,7 @@ class ToolSession(PrivateMcp):
         self.planning_revoked = False
         self.capability_service = getattr(service, "catalog_service", service)
         self.cap_mode = getattr(self.capability_service, "assistant_protocol_enabled", False)
+        self.skills = SkillBook(self.cap_mode)
         self.draft_cursors = {}
         if self.cap_mode:
             from .continuation import current_draft
@@ -196,13 +196,18 @@ class ToolSession(PrivateMcp):
             """Read conversation history. IDs load full stored sources, findings or messages without network. Use nextCursor with the same query for later pages."""
             return self.wire(await self.call("get_conversation_context", query or HistoryQuery()))
 
-        async def get_project_resources(query: ResourcesQuery | None = None, task: AssistantTaskRequestV1 | None = None, draft: AssistantDraftReadV1 | None = None) -> CallToolResult:
-            """Read retained assets, sources, dates, template, rules and history. Follow nextCursor with the same query until null. In assistant protocol 1, check a typed task first with task:{protocolVersion:1,taskId,stage,scope,inputAvailable}; omit query when checking a task. This returns availability, never approval."""
-            if sum(value is not None for value in (query, task, draft)) > 1:
-                return self.wire({"error": {"code": "AGENT_ARGUMENT_INVALID"}})
-            return self.wire(await self.call("get_project_resources", draft or task or query or ResourcesQuery()))
-        from .capabilities import TASKS
-        get_project_resources.__doc__ += " During explicit continuation, draft:{protocolVersion:1,proposalId,version,cursor:null} pages the saved candidate. Follow nextCursor in order; these JSON fragments grant no canonical read or write authority. Catalog task IDs: " + ", ".join(task.id for task in TASKS) + "."
+        if self.cap_mode:
+            async def get_project_resources(query: ResourcesQuery | None = None, task: AssistantTaskRequestV1 | None = None, draft: AssistantDraftReadV1 | None = None) -> CallToolResult:
+                """Read retained assets, sources, dates, template, rules and history. Follow nextCursor with the same query until null. In assistant protocol 1, check a typed task first with task:{protocolVersion:1,taskId,stage,scope,inputAvailable}; omit query when checking a task. This returns availability, never approval."""
+                if sum(value is not None for value in (query, task, draft)) > 1:
+                    return self.wire({"error": {"code": "AGENT_ARGUMENT_INVALID"}})
+                return self.wire(await self.call("get_project_resources", draft or task or query or ResourcesQuery()))
+            from .capabilities import TASKS
+            get_project_resources.__doc__ += " During explicit continuation, draft:{protocolVersion:1,proposalId,version,cursor:null} pages the saved candidate. Follow nextCursor in order; these JSON fragments grant no canonical read or write authority. Catalog task IDs: " + ", ".join(task.id for task in TASKS) + "."
+        else:
+            async def get_project_resources(query: ResourcesQuery | None = None) -> CallToolResult:
+                """Read retained assets and their uses, sources, local dates, template specification, captured rules and operation history. Follow nextCursor with the same query until null."""
+                return self.wire(await self.call("get_project_resources", query or ResourcesQuery()))
         self.sdk.tool(structured_output=False)(get_project_resources)
 
         @self.sdk.tool(structured_output=False)
@@ -291,12 +296,12 @@ class ToolSession(PrivateMcp):
             if not isinstance(arguments, dict):
                 raise ValueError("invalid tool arguments")
             if name in READ_TOOLS:
-                if name == "get_project_resources" and "draft" in arguments:
+                if self.cap_mode and name == "get_project_resources" and "draft" in arguments:
                     if set(arguments) != {"draft"}:
                         raise ValueError("draft read cannot include another query")
                     AssistantDraftReadV1.model_validate(arguments["draft"])
                     return None
-                if name == "get_project_resources" and "task" in arguments:
+                if self.cap_mode and name == "get_project_resources" and "task" in arguments:
                     if set(arguments) != {"task"}:
                         raise ValueError("task check cannot include a read query")
                     AssistantTaskRequestV1.model_validate(arguments["task"])
@@ -396,7 +401,7 @@ class ToolSession(PrivateMcp):
                     if not getattr(service, "assistant_protocol_enabled", False):
                         raise AgentFailure("AGENT_TOOL_DENIED")
                     result = check_task(catalog(service, self.control.project_id,
-                        allow_edits=self.run.allow_edits, allow_web=self.run.allow_web), arguments)
+                        allow_edits=self.run.allow_edits, allow_web=self.run.allow_web, draft_run_id=self.control.run_id), arguments)
                     if arguments.stage == "generation":
                         if result.availability.state != "available":
                             self.planning_revoked, self.planned_task = True, None

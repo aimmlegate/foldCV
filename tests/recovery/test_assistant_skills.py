@@ -11,7 +11,7 @@ import pytest
 from packages.resume_core import agent_limits as limits
 from packages.resume_core.agent_store import AgentFailure, run_in
 from tests.recovery.test_agent_tools import tools_setup
-from resume_api.agent.skills import ApplicationSkillQuery, SKILLS, SkillBook, skill_command
+from resume_api.agent.skills import ApplicationSkillQuery, CHAT_SKILLS, SKILLS, SkillBook, skill_catalog, skill_command
 
 
 async def read_skill(session, skill_id, resource="SKILL.md"):
@@ -42,9 +42,7 @@ async def test_read_only_assistant_discovers_both_skills_and_reads_every_resourc
         service.projects.catalog.update(workspace.project_id, read_only=True)
         catalog = await session.call("get_application_skills", None)
         assert {skill["skillId"] for skill in catalog["skills"]} == {"import-resume", "format-resume"}
-        assert catalog["skills"][1]["usage"].startswith("chat_format")
-        assert catalog["skills"][1]["tasks"][0]["taskId"] == "format_document"
-        assert all("archive-contract" not in name and "data-contract" not in name for skill in catalog["skills"] for name in skill["resources"])
+        assert catalog["skills"][1]["usage"].startswith("legacy_reference")
         for skill in SKILLS:
             for resource, path in skill.resources.items():
                 result, _ = await read_skill(session, skill.id, resource)
@@ -59,6 +57,61 @@ async def test_read_only_assistant_discovers_both_skills_and_reads_every_resourc
     finally:
         await session.close()
         assert not session.skills.documents and not session.skills.cursors
+
+
+@pytest.mark.asyncio
+async def test_protocol_off_keeps_the_pre_cap_model_surface(tmp_path):
+    from resume_api.agent.runtime import BASE_INSTRUCTIONS, DEVELOPER_INSTRUCTIONS
+    from resume_api.jobs.tools import PROTOCOL_V2_SHA256
+    # Values from main before CAP: the rollout flag must leave the legacy assistant unchanged.
+    assert hashlib.sha256((BASE_INSTRUCTIONS + DEVELOPER_INSTRUCTIONS).encode()).hexdigest() == (
+        "49db726a4ceb575b530f3ed00849a428a77820a392aec1c82f1c487cd9c436ef")
+    assert PROTOCOL_V2_SHA256 == "4cac457979542e1b7a6a310c327a06333861bc63c26e127082ab13127ab1cbdb"
+    session, service, workspace, _ = tools_setup(tmp_path, allow_edits=True, allow_web=False, message="/format-resume")
+    try:
+        assert not service.assistant_protocol_enabled and "apply_edit_batch" in session.names
+        tools = {tool.name: tool for tool in await session.sdk.list_tools()}
+        assert set(tools["get_project_resources"].inputSchema["properties"]) == {"query"}
+        assert "protocolVersion" not in json.dumps([tool.inputSchema for tool in tools.values()])
+        task = {"protocolVersion": 1, "taskId": "rewrite_resume", "stage": "generation", "scope": "document"}
+        for arguments in ({"task": task}, {"draft": {"protocolVersion": 1, "proposalId": "p", "version": 1, "cursor": None}}):
+            assert session.preflight({"name": "get_project_resources", "arguments": arguments}) == "AGENT_ARGUMENT_INVALID"
+        catalog = await session.call("get_application_skills", None)
+        assert catalog["skills"] == skill_catalog() and all("tasks" not in skill for skill in catalog["skills"])
+        _, run, journal = run_in(service.store.load(workspace.project_id), session.run.id)
+        prompt = json.loads(session.book.initial(run, journal).split("\n", 1)[1])
+        assert prompt["applicationSkills"]["skills"] == catalog["skills"]
+        assert "continuedDraft" not in prompt and "capturedNativeHistory" not in prompt
+    finally:
+        await session.close()
+
+
+@pytest.mark.asyncio
+async def test_protocol_mode_uses_chat_skill_adapters_and_reads_every_resource_exactly(tmp_path):
+    from resume_api.agent.capabilities import proposal_instructions
+    from resume_api.agent.skills import CHAT_SKILL_INSTRUCTIONS, SKILL_INSTRUCTIONS
+    from tests.recovery.test_assistant_proposals import environment
+    from packages.resume_core.models.assistant_capabilities import AssistantTaskRequestV1
+    service, _, _, workspace, session = environment(tmp_path, message="/format-resume")
+    try:
+        await session.call("get_project_resources", AssistantTaskRequestV1(protocolVersion=1, taskId="format_document"))
+        catalog = await session.call("get_application_skills", None)
+        assert catalog["skills"] == skill_catalog(True)
+        assert catalog["skills"][1]["usage"].startswith("chat_format")
+        assert catalog["skills"][1]["tasks"][0]["taskId"] == "format_document"
+        assert all("archive-contract" not in name and "data-contract" not in name for skill in catalog["skills"] for name in skill["resources"])
+        for skill in CHAT_SKILLS:
+            for resource, path in skill.resources.items():
+                result, _ = await read_skill(session, skill.id, resource)
+                assert result == path.read_bytes()
+        tools = {tool.name: tool for tool in await session.sdk.list_tools()}
+        assert {"query", "task", "draft"} <= set(tools["get_project_resources"].inputSchema["properties"])
+        _, run, journal = run_in(service.store.load(workspace.project_id), session.run.id)
+        prompt = json.loads(session.book.initial(run, journal).split("\n", 1)[1])
+        assert prompt["applicationSkills"]["skills"] == catalog["skills"] and "continuedDraft" in prompt
+        assert CHAT_SKILL_INSTRUCTIONS in proposal_instructions() and SKILL_INSTRUCTIONS not in proposal_instructions()
+    finally:
+        await session.close()
 
 
 @pytest.mark.asyncio

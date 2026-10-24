@@ -6,7 +6,7 @@ import time
 import pytest
 
 from packages.resume_core.agent_store import AgentFailure, run_in
-from packages.resume_core.models.agent import AgentRunRequest
+from packages.resume_core.models.agent import AgentOwner, AgentRunRequest
 from packages.resume_core.models.assistant_continuation import AssistantContinueRunV1, AssistantDraftReadV1
 from packages.resume_core.models.assistant_proposals import AssistantAssemblyRequestV1
 from tests.recovery.test_assistant_proposals import environment, read_document, append, complete
@@ -145,6 +145,8 @@ async def test_noop_result_survives_payload_reclamation_and_does_not_fill_versio
     service, runtime, projects, workspace, session = environment(tmp_path)
     before = projects.storage.read_committed(workspace.project_id)[1]
     for index in range(22):
+        lease = service.leases.leases[workspace.project_id]
+        service.leases.renew(workspace.project_id, AgentOwner(epoch=lease.epoch, token=lease.token))
         if index:
             old = run_in(service.store.load(workspace.project_id), session.run.id)[2].request
             lease = service.leases.leases[workspace.project_id]
@@ -472,11 +474,20 @@ async def test_twenty_retained_versions_keep_the_same_work_and_refuse_another_di
     before = projects.storage.read_committed(workspace.project_id)[1]
     expected = value.proposal.content_sha256
     for version in range(2, 21):
+        service.leases.renew(workspace.project_id, payload.request.owner)
         payload = payload.model_copy(deep=True)
         payload.proposal = identity_request(value)
         payload.request.client_request_id = f'explicit_step_{version}'
         run, created = submit_run(service, workspace.project_id, payload)
         assert created
+        if version == 20:
+            from resume_api.agent.capabilities import catalog
+            fresh = {task.id: task for task in catalog(service, workspace.project_id).tasks}
+            active = {task.id: task for task in catalog(service, workspace.project_id, draft_run_id=run.id).tasks}
+            assert fresh['rewrite_resume'].generation.reason_code == 'AGENT_PROJECT_FULL'
+            assert 'до 7 дней' in fresh['rewrite_resume'].generation.remedy
+            assert fresh['check_resume'].generation.state == fresh['draft_text'].generation.state == 'available'
+            assert active['rewrite_resume'].generation.state == 'available'
         service.proposals.finish(workspace.project_id, run.id)
         service.store.finish(workspace.project_id, run.id, 'interrupted', error='AGENT_INTERRUPTED')
         value = service.proposals.get(workspace.project_id, value.proposal.id, version)

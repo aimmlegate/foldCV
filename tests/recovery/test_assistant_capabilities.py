@@ -143,8 +143,7 @@ async def test_background_admission_and_raw_apply_share_the_catalog_fence(tmp_pa
 
 @pytest.mark.asyncio
 async def test_raw_invocation_cannot_bypass_catalog_or_supply_approval(tmp_path):
-    session, service, workspace, fetcher = tools_setup(tmp_path, allow_edits=False, allow_web=False)
-    service.assistant_protocol_enabled = True
+    session, service, workspace, fetcher = tools_setup(tmp_path, allow_edits=False, allow_web=False, protocol=True)
     try:
         assert (await session.call("check_resume", None))["error"]["code"] == "AGENT_TOOL_DENIED"
         task = await session.call("get_project_resources", AssistantTaskRequestV1(protocolVersion=1, taskId="rewrite_resume"))

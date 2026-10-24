@@ -211,9 +211,24 @@ class JobService:
             return self.fixed.inputs.payload(state, directory, reference)
         return self.artifacts.payload_unlocked(state, directory, reference)
 
+    def agent_configuration(self, allow_edits, allow_web):
+        agent = getattr(self.projects, "agent", None)
+        cap_mode = getattr(agent, "assistant_protocol_enabled", False)
+        names = [name for name in TOOL_NAMES if (not cap_mode or name != "apply_edit_batch")
+            and (allow_edits or name not in {"prepare_edit_batch", "apply_edit_batch", "project_action"}
+                or cap_mode and name == "prepare_edit_batch")
+            and (allow_web or name != "read_public_page")]
+        protocol = agent.protocol_sha256 if cap_mode else PROTOCOL_V2_SHA256
+        return names, digest({"base": CONFIG_SHA256, "protocol": protocol,
+            "tools": names, "allowEdits": allow_edits, "allowWeb": allow_web})
+
     def preflight(self, job):
         if job.submission.protocol == 'template_import_v1':
             return self.templates.preflight(job) if self.templates is not None else 'JOB_DISABLED'
+        if job.submission.kind == "agent" and getattr(getattr(self.projects, "agent", None), "assistant_protocol_enabled", False):
+            names, config = self.agent_configuration(job.submission.allow_edits, job.submission.allow_web)
+            if job.submission.tools != names or any(model.config_sha256 != config for model in job.submission.models):
+                return "JOB_SCOPE_INVALID"
         connection = self.connection()
         if not connection.ready:
             return "RATE_LIMITED" if connection.reason == "AGENT_QUOTA" else "AUTH_REQUIRED"
@@ -287,14 +302,7 @@ class JobService:
             if logical.allow_edits and access.read_only:
                 raise AgentFailure("AGENT_TOOL_DENIED")
             record = self.artifacts.prepare_input(identity, logical, connection.epoch, digest(workspace.rules_used))
-            cap_mode = getattr(getattr(self.projects, "agent", None), "assistant_protocol_enabled", False)
-            names = [name for name in TOOL_NAMES if (not cap_mode or name != "apply_edit_batch")
-                and (logical.allow_edits or name not in {"prepare_edit_batch", "apply_edit_batch", "project_action"}
-                    or cap_mode and name == "prepare_edit_batch")
-                and (logical.allow_web or name != "read_public_page")]
-            protocol = self.projects.agent.protocol_sha256 if cap_mode else PROTOCOL_V2_SHA256
-            config = digest({"base": CONFIG_SHA256, "protocol": protocol,
-                "tools": names, "allowEdits": logical.allow_edits, "allowWeb": logical.allow_web})
+            names, config = self.agent_configuration(logical.allow_edits, logical.allow_web)
             captured = JobSubmissionV1(schemaVersion=1, identity=identity, payloadSha256=logical_hash,
                 kind="agent", schedulingClass="background", input={"kind": "agent_journal", "id": record.id,
                     "sha256": record.request_sha256}, models=[{"stage": "agent", "model": settings.selected_agent_model,

@@ -126,6 +126,10 @@ class JobRuntime:
         finally:
             if self.session is not None:
                 await self.session.close()
+            agent = getattr(self.service.projects, "agent", None)
+            if getattr(agent, "assistant_protocol_enabled", False):
+                agent.proposals.finish(control.project_id, control.run_id,
+                    cancelled=control.stop_reason == "CANCELLED")
             self.closed = True
 
     async def close(self):

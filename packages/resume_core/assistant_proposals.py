@@ -249,7 +249,7 @@ class AssistantProposals:
                 raise capacity_failure("AGENT_EDIT_LIMIT", "Вариант превышает 2 МиБ; предыдущий черновик сохранён.")
             existing = path.exists()
             if not existing and len(values) >= VERSION_COUNT:
-                raise capacity_failure("AGENT_PROJECT_FULL", "Сохранено 20 версий. Предыдущие варианты доступны; освободите место перед новой подготовкой.")
+                raise capacity_failure("AGENT_PROJECT_FULL", "Сохранено 20 версий. Предыдущие варианты доступны; дождитесь истечения срока хранения вариантов (до 7 дней). Проверки, текстовый черновик и правка выделенного текста остаются доступны.")
             if self.root.is_symlink():
                 raise AgentFailure("AGENT_STORE_CORRUPT")
             total = project_bytes = 0

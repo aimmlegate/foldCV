@@ -38,10 +38,11 @@ export function ProposalPreview({ value, catalog, busy, invalidated, allowEdits,
 }) {
   const task = catalog?.tasks.find(item => item.id === value.taskId), controls = proposalControls(value, catalog, busy, invalidated, allowEdits, stage);
   const button = useRef<HTMLButtonElement>(null), heading = useRef<HTMLHeadingElement>(null);
-  const wasBusy = useRef(busy), restoreFocus = useRef(false);
+  const wasBusy = useRef(busy), restoreFocus = useRef(false), focusHeading = useRef(false);
   useEffect(() => {
     if (wasBusy.current && !busy && restoreFocus.current) {
-      (button.current?.disabled ? heading.current : button.current)?.focus();
+      (focusHeading.current || button.current?.disabled ? heading.current : button.current)?.focus();
+      focusHeading.current = false;
       restoreFocus.current = false;
     }
     wasBusy.current = busy;
@@ -73,7 +74,7 @@ export function ProposalPreview({ value, catalog, busy, invalidated, allowEdits,
     {controls.reason && <p role="status">{controls.reason}</p>}
     <div className="chat-proposal-actions">{continuation && <button type="button" className="text-button"
       disabled={busy || invalidated || continuation.availability.state !== "available" || !continueDraft}
-      onClick={continueDraft}>Продолжить черновик</button>}<button ref={button} type="button" className="primary" disabled={!controls.apply}
+      onClick={event => { restoreFocus.current = event.detail === 0; focusHeading.current = true; continueDraft?.(); }}>Продолжить черновик</button>}<button ref={button} type="button" className="primary" disabled={!controls.apply}
       onClick={event => { restoreFocus.current = event.detail === 0; apply(); }}>Применить</button>
       <button type="button" className="text-button" disabled={!controls.discard} onClick={discard}>Отклонить</button></div>
   </article>;

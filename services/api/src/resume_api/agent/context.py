@@ -364,9 +364,11 @@ class ReadBook:
             prior = [{"id": old.id, "state": old.state, "savedBatchId": old.saved_batch_id,
                 "outcomeUnknown": old.outcome_unknown, "error": old.error} for old in conversation.runs if old.id != run.id]
             summary, clipped = clip(json_text(prior), 4096)
+            root = getattr(self.service, "catalog_service", self.service)
+            protocol = getattr(root, "assistant_protocol_enabled", False)
             context = {"scope": run.scope, "selectionContext": run.selection_context,
                 "allowEdits": run.allow_edits, "allowWeb": run.allow_web,
-                "applicationSkills": {"tool": "get_application_skills", "skills": skill_catalog(),
+                "applicationSkills": {"tool": "get_application_skills", "skills": skill_catalog(protocol),
                     "catalogCommand": "/skills", "command": skill_command(journal.request.message)},
                 "originalSourceAccess": original_source_access(current.project.sources),
                 "projectIndex": {"id": current.project_id, "name": current.title,
@@ -377,9 +379,9 @@ class ReadBook:
                     "document": current.document_revision, "facts": current.project.facts.revision},
                 "outline": result, "recentOriginalMessages": recent, "olderMessagesOmitted": max(0, len(conversation.messages) - 8),
                 "derivedOutcomeDigest": summary, "digestTruncated": clipped,
-                "message": journal.request.message, "continuedDraft": continued}
-            root = getattr(self.service, "catalog_service", self.service)
-            if getattr(root, "assistant_protocol_enabled", False):
+                "message": journal.request.message}
+            if protocol:
+                context["continuedDraft"] = continued
                 offer = root.publication.assistant_history.get((run.project_id, run.client_request_id))
                 context["capturedNativeHistory"] = {direction: bool(offer is not None and offer[0] > root.leases.clock()
                     and getattr(offer[1].offer, direction) is not None) for direction in ("undo", "redo")}

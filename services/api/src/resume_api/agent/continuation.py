@@ -177,6 +177,8 @@ def existing(service, project, target, request):
 
 
 def clone(service, value, store, run, journal, *, client_request=None):
+    if run.connection_epoch != value.account_epoch:
+        raise AgentFailure('AGENT_CONNECTION_CHANGED')
     current = value.model_copy(deep=True)
     p = current.proposal
     p.version += 1

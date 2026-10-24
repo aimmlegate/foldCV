@@ -77,8 +77,8 @@ PROPOSAL_INSTRUCTIONS = (
 
 
 def proposal_instructions():
-    from .skills import SKILL_INSTRUCTIONS
-    return PROPOSAL_INSTRUCTIONS + SKILL_INSTRUCTIONS + (
+    from .skills import CHAT_SKILL_INSTRUCTIONS
+    return PROPOSAL_INSTRUCTIONS + CHAT_SKILL_INSTRUCTIONS + (
         " Read complete context, document and working-facts pages for the frozen scope. "
         "Copy UTF-16 offsets from find_resume_content and pair them with a full document read, "
         "never a search snapshot. Coverage IDs are opaque; reuse returned IDs and account for "
@@ -136,7 +136,7 @@ def writer_readiness(service, project_id, lease):
         return False, error.code
 
 
-def catalog(service, project_id, *, allow_edits=True, allow_web=True):
+def catalog(service, project_id, *, allow_edits=True, allow_web=True, draft_run_id=None):
     with service.projects.state_lock:
         workspace = service.projects.read(project_id)
         if workspace.project is None:
@@ -172,6 +172,13 @@ def catalog(service, project_id, *, allow_edits=True, allow_web=True):
                 apply = availability("temporarily_unavailable", "ASSISTANT_OWNER_REQUIRED", "При применении подтвердите доступ к текущему редактору.")
             elif not writer_ready:
                 apply = availability("temporarily_unavailable", "AGENT_SAVE_FAILED", "Дождитесь готовности редактора и завершения сохранения или восстановления.")
+        retained_full = False
+        if family == "ordinary" and local.state == "available" and getattr(service, "assistant_protocol_enabled", False):
+            from packages.resume_core.assistant_proposals import VERSION_COUNT
+            retained = [value for value in service.proposals.list(project_id) if value.proposal.state != "expired"]
+            extending = draft_run_id is not None and any(value.proposal.origin_run_id == draft_run_id
+                and value.proposal.state == "building" for value in retained)
+            retained_full = len(retained) >= VERSION_COUNT and not extending
         tasks = []
         for task in TASKS:
             denied = availability("unsupported", "ASSISTANT_UNSUPPORTED_TASK", (
@@ -189,6 +196,9 @@ def catalog(service, project_id, *, allow_edits=True, allow_web=True):
             if task.id == "read_public_page" and not allow_web:
                 ready_generation = preparation = availability("permission_disabled", "AGENT_WEB_DISABLED", "Вставьте текст страницы или используйте уже сохранённый источник.")
             mutating = task.effect in {"proposal", "project_action"}
+            if supported and mutating and retained_full and ready_generation.state == "available":
+                ready_generation = availability("temporarily_unavailable", "AGENT_PROJECT_FULL",
+                    "Сохранено 20 версий. Новая подготовка станет доступна после истечения срока хранения вариантов (до 7 дней). Проверки, текстовый черновик и правка выделенного текста доступны сейчас; меньшая область не освобождает место для новой версии.")
             task_apply = apply if mutating else availability("unsupported", "ASSISTANT_NO_APPLY", "Результат доступен в чате; документ не меняется.")
             if task.effect == "export":
                 task_apply = local
@@ -270,7 +280,8 @@ def guard_tool(session, name, arguments):
             raise AgentFailure("AGENT_TOOL_DENIED")
     if task_id is None:
         raise AgentFailure("AGENT_TOOL_DENIED")
-    value = catalog(service, session.control.project_id, allow_edits=session.run.allow_edits, allow_web=session.run.allow_web)
+    value = catalog(service, session.control.project_id, allow_edits=session.run.allow_edits, allow_web=session.run.allow_web,
+        draft_run_id=session.control.run_id)
     task = next(task for task in value.tasks if task.id == task_id)
     stage = "apply" if task.effect == "export" else "preparation"
     status = getattr(task, stage)
