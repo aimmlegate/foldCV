@@ -78,15 +78,13 @@ def _closed_schema(model, payload_schema=None, choices=None):
 
 
 # Application-owned reply rules sent with every extraction task; generic for any template declaration.
-PROPOSAL_PROTOCOL = {'version': 'template-proposal-protocol-4', 'rules': [
-    'Return payload, discoveries, fields, relations and lineage. payload follows the block content schema; use null or [] for data the source does not state.',
-    'Each declaration binding names a pointer (with * for array elements), a semantic_type, a field and an item_pointer. Every concrete item matched by an item_pointer is its own discovery: {key: unique string, semanticType: the binding semantic_type, pointer: the concrete JSON pointer of that item, for example /0/tasks/1}. Two array elements are two discoveries even when their text is identical. Only these items are discoveries; a relation is never a discovery.',
-    'An item is selected as {kind: discovery_key, key: a discovery of this reply} or, for an item listed in references.items, as {kind: handle, ref: its H ref}.',
-    'For every binding whose concrete pointer exists in the payload (a null leaf counts; a field under a null or missing parent does not), add one fields entry: {item: the item, fieldKey: the binding field, pointer: the concrete pointer, evidence: refs, effectiveCells: refs}. A selected item never has two entries for the same fieldKey.',
-    'Evidence is selected by reference: each evidence entry {ref, text, span} offers one exact source text, and a reply lists only refs. Every non-null value needs the refs of the entries that state it for this item or from which it is read, including dates, booleans, numbers and classifications. A null value has evidence []. effectiveCells lists the E refs of references.cells a value is read from, otherwise [].',
-    'For every binding with a relation, add one relations entry per concrete item: {relation: {kind: new, key: a new unique relation key} or, to keep a relation listed in references.relations, {kind: relation, ref: its R ref}; kind: the relation kind, subject: the binding item, target: the item at the relation subject_pointer, evidence: the refs of the item entry and of the target entry it belongs to, at least one}. One relation per subject and kind.',
-    'lineage is [{kind: add, parents: [], children: every discovery key and nothing else}]; split and merge name their parents by H ref.',
-    'Never copy an id: every selection is a key of this reply or a ref offered by this request.']}
+PROPOSAL_PROTOCOL = {'version': 'template-proposal-protocol-5', 'rules': [
+    'Return payload and fields; send null for discoveries, lineage and relations unless a rule below needs them. payload follows the block content schema; use null or [] for data the source does not state.',
+    'Evidence is selected by reference: each evidence entry {ref, text} offers one exact source text, and a reply lists only refs. A value copied word for word from an offered text needs no fields entry: the coordinator cites the entries that contain it.',
+    'Every other non-null value (reworded, inferred, classified or normalized) needs one fields entry {pointer: its concrete payload pointer, for example /0/role or /items/2, evidence: the refs of the entries that state it, item: null, fieldKey: null, effectiveCells: null}. One entry at a list pointer, for example /items, may give the evidence of every value in that list. A value read from references.cells lists their E refs in effectiveCells.',
+    'The coordinator derives one new item per concrete item pointer of the declaration bindings, its add lineage and the relations the bindings configure. To update an item listed in references.items, give at least one fields entry of that item with item {kind: handle, ref: its H ref}; its other values join it. To split or merge listed items, give discoveries {key, semanticType, pointer} for the new items and lineage {kind: split or merge, parents: H refs, children: discovery keys}.',
+    'Never copy an id: every selection is a key of this reply or a ref offered by this request.',
+    'A request with feedback repairs this block: each entry names a rule, its target and the defect of the previous reply. Return the whole corrected reply.']}
 
 # Application-owned reply rules sent with every review; the checks and rules come from the coordinator.
 REVIEW_PROTOCOL = {'version': 'template-review-protocol-2', 'rules': [

@@ -52,6 +52,8 @@ class ContentInput(Generic[ResultT]):
     policy: GenerationPolicy
     transport: ContentTransport[ResultT] | None = None
     on_return: Callable[[ContentTransportReturn], None] | None = None
+    # The captured request the text was projected from; only transports that do not send text read it.
+    request_value: dict | None = None
 
 
 @dataclass(frozen=True)

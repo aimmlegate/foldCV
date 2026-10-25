@@ -30,15 +30,17 @@ async def test_elapsed_expiry_during_durable_launch_never_enters_transport(tmp_p
     direct = TemplateDirect(pipeline, admission)
     pipeline.elapsed = lambda: elapsed[0]
     pipeline.persistence.elapsed = pipeline.elapsed
-    original = pipeline.update
-    def update(*args, **kwargs):
-        workspace = original(*args, **kwargs)
-        operation = (workspace.project or workspace.pre_draft).template_operations[0]
-        if not observed and operation.attempts and operation.attempts[-1].state == phase:
-            observed.append(phase)
-            elapsed[0] = 301.0
-        return workspace
-    pipeline.update = update
+    # Launch steps save to the sidecar (S7e); both save paths are observed.
+    def observing(original):
+        def update(*args, **kwargs):
+            workspace = original(*args, **kwargs)
+            operation = (workspace.project or workspace.pre_draft).template_operations[0]
+            if not observed and operation.attempts and operation.attempts[-1].state == phase:
+                observed.append(phase)
+                elapsed[0] = 301.0
+            return workspace
+        return update
+    pipeline.update, pipeline.update_operation = observing(pipeline.update), observing(pipeline.update_operation)
     if verified:
         fixture.transport.reconcile = never_dispatched
     try:
@@ -93,17 +95,21 @@ async def test_transport_timeout_is_refreshed_after_durable_dispatch(tmp_path, e
     pipeline = service.templates.pipeline if service else fixture.pipeline
     pipeline.elapsed = lambda: elapsed[0]
     pipeline.persistence.elapsed = pipeline.elapsed
-    original_update, original_generate = pipeline.update, fixture.transport.generate
-    def update(*args, **kwargs):
-        workspace = original_update(*args, **kwargs)
-        operation = (workspace.project or workspace.pre_draft).template_operations[0]
-        if operation.attempts and operation.attempts[-1].state == 'dispatch_started':
-            elapsed[0] = 299.0
-        return workspace
+    original_generate = fixture.transport.generate
+    # Launch steps save to the sidecar (S7e); both save paths are observed.
+    def observing(original):
+        def update(*args, **kwargs):
+            workspace = original(*args, **kwargs)
+            operation = (workspace.project or workspace.pre_draft).template_operations[0]
+            if operation.attempts and operation.attempts[-1].state == 'dispatch_started':
+                elapsed[0] = 299.0
+            return workspace
+        return update
     def generate(request, cancel):
         timeouts.append(request.policy.timeout_seconds)
         return original_generate(request, cancel)
-    pipeline.update, fixture.transport.generate = update, generate
+    pipeline.update, pipeline.update_operation = observing(pipeline.update), observing(pipeline.update_operation)
+    fixture.transport.generate = generate
     try:
         if service:
             await queued(service, fixture, fixture.command)

@@ -2,6 +2,7 @@
 
 import asyncio
 from dataclasses import dataclass, replace
+import json
 import threading
 import time
 
@@ -21,9 +22,9 @@ from packages.resume_core.template_import import (CleanupProof, ProcessingDeadli
     authorization, cancel_operation, capture_task_input, checked, digest, dispatch_attempt, identity, observe_time,
     record_return, reconcile_cleanup, recover_operation, reserve_attempt, resume_operation, spent_calls, start_operation,
     task_in)
-from packages.resume_core.template_proposals import parse_proposal
+from packages.resume_core.template_proposals import parse_proposal, transport_refusal
 from packages.resume_core.template_review import decide_review, make_review_input, record_review
-from packages.resume_core.templates.compiler import canonical
+from packages.resume_core.template_prompt import model_prompt
 from packages.resume_core.templates.operations import operation_value
 from packages.resume_core.templates.replies import proposal_schema, review_schema, PROPOSAL_PROTOCOL
 
@@ -56,6 +57,54 @@ def reference_table(captured, cells, relations):
 
 def owner(workspace):
     return workspace.project or workspace.pre_draft
+
+
+def reply_refs(raw):
+    """Evidence refs a refused reply named, read without trusting the rest of it."""
+    try:
+        payload = json.loads(raw)['payload']
+    except (ValueError, TypeError, KeyError, RecursionError):
+        return []
+    refs = []
+    for key in ('fields', 'relations'):
+        entries = payload.get(key) if isinstance(payload, dict) else None
+        for entry in entries if isinstance(entries, list) else []:
+            evidence = entry.get('evidence') if isinstance(entry, dict) else None
+            refs += [ref for ref in evidence if isinstance(ref, str)] if isinstance(evidence, list) else []
+    return refs
+
+
+def reply_feedback(task_id, errors):
+    """The repair note for a refused reply: the first refusal, which names paths and rules but no reply values."""
+    return {'ruleId': 'reply-format', 'targetId': 'scope-' + task_id, 'reason': (errors[0] if errors else 'invalid reply')[:300]}
+
+
+def repair_feedback(feedback, task_id, errors):
+    """Review findings a refused repair was fixing stay; the latest refusal replaces an earlier one."""
+    return (*[value for value in feedback if value['ruleId'] != 'reply-format'], reply_feedback(task_id, errors))
+
+
+def scope_units(offered, sources):
+    """A block's whole source scope: the offered units, or the offered spans when it was offered no unit."""
+    lengths = {(source.id, source.revision, unit.id, unit.revision): len(unit.text) for source in sources for unit in source.units}
+    units = [option.span for option in offered.values() if option.span.start == 0 and option.span.end == lengths[(
+        option.span.source_id, option.span.source_revision, option.span.unit_id, option.span.unit_revision)]]
+    return units or [option.span for option in offered.values()]
+
+
+def cited_spans(operation, task_id, offered):
+    """The source lines the task's latest citing reply selected; a failed block shows only these (R05)."""
+    for proposal in reversed(operation.proposals):
+        if attempt_in(operation, proposal.attempt_id).task_id != task_id:
+            continue
+        if proposal.reply is not None:
+            spans = [span for field in proposal.resolved_fields for span in field.evidence]
+            spans += [span for relation in proposal.reply.relations for span in relation.evidence]
+        else:
+            spans = [offered[ref].span for ref in reply_refs(proposal.raw_return) if ref in offered]
+        if spans:
+            return list({digest(span): span for span in spans}.values())
+    return []
 
 
 def gated_branch(operation, task, data):
@@ -106,7 +155,10 @@ class TemplatePipeline(TemplateCheckpoints):
                     continue
                 if authority.deleted_cleanup is not None and authority.deleted_cleanup.complete:
                     continue
-                operation = self.publisher.canonical._read_template_cleanup_unlocked(project, operation_id)
+                operation, revision = self.publisher.canonical._read_template_cleanup_unlocked(project, operation_id,
+                    with_revision=True)
+                # Attempts of the running step may be saved only in the sidecar (S7e).
+                operation, _facts = self.sidecar.overlay(project, revision, operation)
                 owners = {attempt.id: attempt.owner for attempt in operation.attempts}
                 retained = authority.deleted_cleanup
                 if retained is not None:
@@ -314,7 +366,7 @@ class TemplatePipeline(TemplateCheckpoints):
             return
         if task.state == 'pending' and not any(value.task_id == task_id for value in operation.task_inputs):
             value, handles = self.task_input(operation, task, data)
-            workspace = await asyncio.to_thread(self.update, project, operation_id,
+            workspace = await asyncio.to_thread(self.update_operation, project, operation_id,
                 lambda value_op, _data, _workspace: capture_task_input(value_op, task_id, value, handles, self.wall(), id_factory=self.id_factory))
             operation = operation_in(workspace, operation_id)
         if task.kind in {'derive', 'source_copy'}:
@@ -379,6 +431,12 @@ class TemplatePipeline(TemplateCheckpoints):
             self.guard(project, operation)
             if attempt.outcome != 'completed' and attempt.proposal_record_id is None:
                 unresolved.append(attempt.error_code or attempt.outcome or 'IMPORT_RETURN_UNKNOWN')
+                refusal = transport_refusal(attempt, data.template_package, task.block_id) if (slot != 'fallback_repair'
+                    and attempt.outcome == 'invalid_payload') else None
+                if refusal is not None:
+                    # A reply the transport refused by schema is repaired like a refused proposal.
+                    feedback = repair_feedback(feedback, task_id, [refusal])
+                    continue
                 if slot == 'primary_repair' and feedback:
                     continue
                 break
@@ -390,12 +448,14 @@ class TemplatePipeline(TemplateCheckpoints):
                     current.sources, current.facts, captured_relations=captured, id_factory=self.id_factory)
                 current.facts = facts
                 return updated
-            workspace = await asyncio.to_thread(self.update, project, operation_id, parse)
+            workspace = await asyncio.to_thread(self.update_operation, project, operation_id, parse, copy_on_write=True)
             operation, data = operation_in(workspace, operation_id), owner(workspace)
             proposal = next(value for value in operation.proposals if value.attempt_id == attempt_id)
             if proposal.state == 'invalid':
                 unresolved.extend(proposal.errors)
-                if slot == 'primary_repair' and feedback:
+                if slot != 'fallback_repair':
+                    # The next repair names this refusal; it still needs room for itself and its review.
+                    feedback = repair_feedback(feedback, task_id, proposal.errors)
                     continue
                 break
             policy = attempt.model
@@ -428,7 +488,7 @@ class TemplatePipeline(TemplateCheckpoints):
                         expected_relation_revisions={relation.id: relation.revision for relation in current.facts.relations})
                     current.facts = facts
                     return updated
-                workspace = await asyncio.to_thread(self.update, project, operation_id, accept)
+                workspace = await asyncio.to_thread(self.update_operation, project, operation_id, accept, copy_on_write=True)
                 operation = operation_in(workspace, operation_id)
                 receipt = next(value for value in operation.receipts if value.attempt_id == review_id)
                 decision = decide_review(review, receipt, proposal)
@@ -454,13 +514,16 @@ class TemplatePipeline(TemplateCheckpoints):
         operation = operation_in(workspace, operation_id)
         self.guard(project, operation)
         remaining = deadline.remaining(operation, self.wall(), self.elapsed())
-        workspace = await asyncio.to_thread(self.update, project, operation_id, lambda result, _data, _workspace:
-            observe_time(result, self.wall(), elapsed_remaining=remaining))
-        operation = operation_in(workspace, operation_id)
         policy = review.policy if review is not None else operation.capture.fallback if slot == 'fallback_repair' else operation.capture.primary
         launch_owner = self.transport.reserve_owner(operation, task_in(operation, task_id), policy)
         reserved = []
         def reserve(result, _data, _workspace):
+            # The time observation shares this write: reserve_attempt observes the clock; a passed deadline is still
+            # persisted, without a reservation.
+            if remaining <= 0:
+                observed = observe_time(result, self.wall(), elapsed_remaining=remaining)
+                if observed.inference_closed:
+                    return observed
             result, identifier = reserve_attempt(result, task_id, slot, digest(value), policy, launch_owner, self.wall(),
                 request_value=value, id_factory=self.id_factory)
             if review is not None:
@@ -469,7 +532,9 @@ class TemplatePipeline(TemplateCheckpoints):
                 attempt_in(result, identifier).review_input_record_id = record.id
             reserved.append(identifier)
             return result
-        await asyncio.to_thread(self.update, project, operation_id, reserve)
+        await asyncio.to_thread(self.update_operation, project, operation_id, reserve, copy_on_write=True)
+        if not reserved:
+            raise TemplateImportFailure('IMPORT_PROCESSING_EXHAUSTED')
         attempt_id = reserved[0]
         self.guard(project, operation_in(self.read(project), operation_id))
         def dispatch(result, _data, _workspace):
@@ -479,7 +544,7 @@ class TemplatePipeline(TemplateCheckpoints):
             if remaining <= 0:
                 return self.reconcile_unlaunched(result, attempt_id, now)
             return dispatch_attempt(result, attempt_id, now)
-        dispatched = await asyncio.to_thread(self.update, project, operation_id, dispatch)
+        dispatched = await asyncio.to_thread(self.update_operation, project, operation_id, dispatch, copy_on_write=True)
         if attempt_in(operation_in(dispatched, operation_id), attempt_id).state != 'dispatch_started':
             return attempt_id
         def returned(frame):
@@ -497,16 +562,16 @@ class TemplatePipeline(TemplateCheckpoints):
                         outputTokens=frame.usage.output_tokens, complete=frame.usage.complete), cleanup,
                     error_code=frame.original_code or ('IMPORT_PROCESSING_EXHAUSTED' if late else None), returned_at=observed)
                 return reconcile_cleanup(result, proof, self.wall()) if proof is not None else result
-            self.update(project, operation_id, retain)
-        request = ContentInput(canonical(value).decode(), dynamic_result(schema),
+            self.update_operation(project, operation_id, retain, copy_on_write=True)
+        request = ContentInput(model_prompt(value), dynamic_result(schema),
             GenerationPolicy(policy.model, timeout_seconds=min(180, max(0.001, remaining)), allow_repair=False,
-                reasoning_effort=policy.effort), on_return=returned)
+                reasoning_effort=policy.effort), on_return=returned, request_value=value)
         def launch():
             current = operation_in(self.read(project), operation_id)
             self.guard(project, current)
             remaining = deadline.remaining(current, self.wall(), self.elapsed())
             if remaining <= 0:
-                self.update(project, operation_id, lambda result, _data, _workspace: self.reconcile_unlaunched(
+                self.update_operation(project, operation_id, lambda result, _data, _workspace: self.reconcile_unlaunched(
                     observe_time(result, self.wall(), elapsed_remaining=0), attempt_id, self.wall()))
                 return None
             bounded = replace(request, policy=replace(request.policy, timeout_seconds=min(180, remaining)))
@@ -520,7 +585,7 @@ class TemplatePipeline(TemplateCheckpoints):
                 returned(ContentTransportReturn(error.raw_return, outcome_state(error.code), error.code,
                     error.logical_attempts, error.usage, error.cleanup_verified, error.dispatch_witness, policy.effort))
             else:
-                await asyncio.to_thread(self.update, project, operation_id, lambda result, _data, _workspace:
+                await asyncio.to_thread(self.update_operation, project, operation_id, lambda result, _data, _workspace:
                     record_return(result, attempt_id, error.raw_return,
                         attempt.outcome if attempt.outcome == 'timed_out' else outcome_state(error.code), attempt.usage,
                         attempt.cleanup, error_code=attempt.error_code if attempt.outcome == 'timed_out' else error.code))
@@ -552,7 +617,7 @@ class TemplatePipeline(TemplateCheckpoints):
                 inputHash=task.input_hash, value=value, sourceSpans=list(spans), itemHandles=list(dict.fromkeys(handles)),
                 issueIds=task.issue_ids, disposition=disposition))
             return operation
-        await asyncio.to_thread(self.update, project, operation_id, finish)
+        await asyncio.to_thread(self.update_operation, project, operation_id, finish)
 
     async def fallback(self, project, operation_id, task_id, errors):
         current = self.read(project)
@@ -563,8 +628,16 @@ class TemplatePipeline(TemplateCheckpoints):
         stored = next(value for value in operation.task_inputs if value.task_id == task_id)
         from packages.resume_core.models.template_facts import SourceSpan
         offered = offered_evidence(stored.value)
-        spans = ([SourceSpan.model_validate(value) for value in stored.value['sourceSpans']] if offered is None
-            else [option.span for option in offered.values()])
+        if offered is None:
+            # A request without references predates cited fallback and keeps its whole captured scope.
+            spans, scope = [SourceSpan.model_validate(value) for value in stored.value['sourceSpans']], 'cited'
+        else:
+            spans = cited_spans(operation, task_id, offered)
+            scope = 'cited' if spans else 'uncited'
+        if not spans and offered is not None:
+            # No reply is not evidence of absence: the block offers its whole scope, and the materializer places
+            # only the lines no other block shows.
+            spans = scope_units(offered, owner(current).sources)
         receipt = next((value for value in reversed(operation.receipts) if value.id in task.receipt_ids), None)
         failures = [result for result in receipt.reply.results if result.disposition != 'satisfied'] if receipt else []
         if failures and not any(result.target_id.startswith('scope-') for result in failures):
@@ -578,7 +651,7 @@ class TemplatePipeline(TemplateCheckpoints):
                 affected.extend(span for identifier, spans in relation_evidence(operation, proposal).items()
                     if identifier in rejected for span in spans)
             if affected:
-                spans = list({digest(span): span for span in affected}.values())
+                spans, scope = list({digest(span): span for span in affected}.values()), 'cited'
         issues = [ImportIssue(id=self.id_factory('issue'), ruleId=result.rule_id if result else None, taskId=task_id,
             targetIds=[result.target_id] if result else ['scope-' + task_id], blockIds=[],
             category=('content_violation' if result.disposition == 'violation' else 'uncertain_interpretation')
@@ -590,7 +663,7 @@ class TemplatePipeline(TemplateCheckpoints):
             for result in failures or [None]]
         await self.finish_task(project, operation_id, task_id,
             {'sourceTexts': {digest(span): source_slice(owner(current).sources, span) for span in spans},
-                'diagnostics': list(errors)}, spans,
+                'diagnostics': list(errors), 'scope': scope}, spans,
             task.allowed_handles, 'source_fallback', issues)
 
     async def finalize(self, project, operation_id):
@@ -667,7 +740,7 @@ class TemplatePipeline(TemplateCheckpoints):
             task = task_in(operation, task_id)
             if not any(value.task_id == task_id for value in operation.task_inputs):
                 value, handles = self.task_input(operation, task, data)
-                await asyncio.to_thread(self.update, project, operation_id, lambda result, _data, _workspace:
+                await asyncio.to_thread(self.update_operation, project, operation_id, lambda result, _data, _workspace:
                     capture_task_input(result, task_id, value, handles, self.wall(), id_factory=self.id_factory))
             await self.fallback(project, operation_id, task_id, ['IMPORT_PROCESSING_STOPPED'])
         return operation_in(self.read(project), operation_id)

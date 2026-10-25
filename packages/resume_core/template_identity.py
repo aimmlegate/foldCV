@@ -199,6 +199,15 @@ def allocate_discoveries(reply: ProposalReply,*,operation_id,task_id,attempt_id,
         fields = [field for field in reply.fields if field.item.kind == 'discovery_key' and field.item.key == discovery.key]
         value = _semantic_payload(reply.payload, fields, bindings=bindings, semantic_type=discovery.semantic_type,
             semantic_schema=schema, root_tokens=pointer_tokens(discovery.pointer)) if bindings is not None else item
+        if bindings is not None:
+            # A bound value without its entry is reported as such, not as a property the record lacks.
+            covered, root = {field.pointer for field in fields}, pointer_tokens(discovery.pointer)
+            missing = sorted((pointer, key) for pointer, semantic, key in _binding_instances(reply.payload, bindings)
+                if semantic == discovery.semantic_type and pointer not in covered
+                and _bound_root(pointer, semantic, key, bindings) == root and not empty_value(payload_value(reply.payload, pointer)))
+            if missing:
+                raise ValueError('compiled field/evidence binding coverage is incomplete: every bound value needs one fields entry; '
+                    'missing ' + ', '.join(pointer + ' (' + key + ')' for pointer, key in missing))
         validate_payload(schema,value)
         if not isinstance(value,dict): raise ValueError("semantic records require explicit object fields")
         identity=(operation_id,task_id,attempt_id,discovery.key)
@@ -303,9 +312,10 @@ def resolve_fields(reply: ProposalReply,allocations,*,allowed_handles,sources,ef
                     for leaf in supplied_fields(child, prefix + '.' + key if prefix else key)]
             return [prefix]
         covered = {key for handle, key in seen if handle == allocation.item_handle}
-        if any(not any(path == key or path.startswith(key + '.') for key in covered)
-               for path in supplied_fields(value)):
-            raise ValueError("supplied field/evidence binding is missing")
+        missing = [path for path in supplied_fields(value) if not any(path == key or path.startswith(key + '.') for key in covered)]
+        if missing:
+            raise ValueError('supplied field/evidence binding is missing: discovery ' + discovery.key + ' has no fields entry for '
+                + ', '.join(sorted(missing)))
     for handle, fields in selected_fields.items():
         if handle not in set(allowed_handles):
             continue
@@ -321,9 +331,13 @@ def resolve_fields(reply: ProposalReply,allocations,*,allowed_handles,sources,ef
                 return any(path == field.field_key or path.startswith(field.field_key + '.') for field in fields)
             if not covered(raw_item):
                 raise ValueError('supplied captured field/evidence binding is missing')
-    if expected_bindings is not None and expected_bindings != {(field.pointer,
-            handle_types.get(field.item_handle) or by_handle[field.item_handle].semantic_type, field.field_key) for field in resolved}:
-        raise ValueError('compiled field/evidence binding coverage is incomplete')
+    actual_bindings = {(field.pointer, handle_types.get(field.item_handle) or by_handle[field.item_handle].semantic_type,
+        field.field_key) for field in resolved}
+    if expected_bindings is not None and expected_bindings != actual_bindings:
+        # Pointers and field keys come from the compiled bindings, never from payload values.
+        missing = ', '.join(pointer + ' (' + key + ')' for pointer, _type, key in sorted(expected_bindings - actual_bindings))
+        raise ValueError('compiled field/evidence binding coverage is incomplete: every bound value needs one fields entry'
+            + ('; missing ' + missing if missing else '; an entry names no compiled binding'))
     return resolved
 
 

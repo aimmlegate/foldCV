@@ -284,7 +284,28 @@ class RichProjectStore(ProjectStore):
         except (StorageFailure, OSError, ValueError):
             raise ProjectStoreFailure("PROJECT_LOAD_FAILED") from None
 
-    def _read_template_cleanup_unlocked(self, identifier, operation_id):
+    def committed_key(self, identifier):
+        """The identity of a live project's saved file (inode, size, times), with the same registry and ownership
+        checks as a read; equal keys mean the same bytes, since every save replaces the file."""
+        try:
+            with locked_root(self.root, ".projects.lock"):
+                entry = next((entry for entry in self._registry().entries if entry.project_id == identifier), None)
+                if entry is None or entry.tombstoned:
+                    raise ProjectStoreFailure("PROJECT_DELETED")
+                path = self._directory(identifier) / "workspace.json"
+                owned_file(path, WORKSPACE_BYTES)
+                status = os.stat(path, follow_symlinks=False)
+                return (status.st_ino, status.st_size, status.st_mtime_ns, status.st_ctime_ns)
+        except ProjectStoreFailure:
+            raise
+        except (StorageFailure, OSError, ValueError):
+            raise ProjectStoreFailure("PROJECT_LOAD_FAILED") from None
+
+    def project_directory(self, identifier):
+        """The folder of a stored or deleted project; template import sidecars live in its imports folder."""
+        return self._directory(identifier)
+
+    def _read_template_cleanup_unlocked(self, identifier, operation_id, *, with_revision=False):
         """Read only durable owner evidence while the caller holds the deleted guard."""
         entry = next((item for item in self._registry().entries if item.project_id == identifier), None)
         if entry is None or not entry.tombstoned:
@@ -296,7 +317,7 @@ class RichProjectStore(ProjectStore):
             if item.id == operation_id), None)
         if operation is None:
             raise ProjectStoreFailure('PROJECT_LOAD_FAILED')
-        return operation
+        return (operation, workspace.project_revision) if with_revision else operation
 
     def _read_owned_snapshot_unlocked(self, identifier, *, synchronize=False):
         try:
@@ -425,6 +446,14 @@ class RichProjectStore(ProjectStore):
                             if re.fullmatch(r"[0-9a-f]{64}\." + suffix, blob.name) is None:
                                 raise StorageFailure("UNSAFE_STORAGE")
                             owned_file(blob, DOCX_BYTES); files.append(blob)
+                        folders.append(path)
+                    elif path.name == "imports":
+                        # Sidecars of running template imports: one whole operation each (S7e).
+                        private_directory(path)
+                        for blob in path.iterdir():
+                            if re.fullmatch(r"[A-Za-z0-9_-]{1,128}\.json(?:\.tmp)?", blob.name) is None:
+                                raise StorageFailure("UNSAFE_STORAGE")
+                            owned_file(blob, WORKSPACE_BYTES); files.append(blob)
                         folders.append(path)
                     else:
                         raise StorageFailure("UNSAFE_STORAGE")

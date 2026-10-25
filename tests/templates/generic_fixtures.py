@@ -282,8 +282,9 @@ def empty_object(block):
         for key, schema in properties.items()}
 
 
-async def generic_import(root, name, *, rewrite=True, verdict=None, table=None, cap=60):
-    """A published Generic import of one synthetic fixture through the coordinator and the real materializer."""
+async def generic_import(root, name, *, rewrite=True, verdict=None, table=None, cap=60, wrap=None):
+    """A published Generic import of one synthetic fixture through the coordinator and the real materializer; wrap
+    changes the scripted answers."""
     from packages.resume_core.background_limits import import_seconds
     from packages.resume_core.project_limits import finalization_seconds
     from packages.resume_core.templates.operations import derive_task
@@ -295,7 +296,8 @@ async def generic_import(root, name, *, rewrite=True, verdict=None, table=None, 
     fixture.command.capture.policy.processing_seconds = import_seconds()
     fixture.command.capture.policy.finalization_seconds = finalization_seconds()
     fixture.pipeline.derive = derive_task
-    fixture.transport.scripted = generic_script(src, table or TABLES[name](rewrite), verdict or REVIEWS.get(name))
+    script = generic_script(src, table or TABLES[name](rewrite), verdict or REVIEWS.get(name))
+    fixture.transport.scripted = wrap(script) if wrap else script
     result = await fixture.pipeline.run(fixture.project, fixture.command, admitted=fixture.admitted)
     return fixture, result, fixture.current(), {src.id: raw}
 

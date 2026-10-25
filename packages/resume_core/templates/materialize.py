@@ -4,15 +4,24 @@ from ..models.template_document import RichDocumentV2
 from ..models.template_workspace import SpanCoverage
 from ..template_capture import item_identities
 from ..template_effective import builtin_effective_cells, effective_cells
-from ..template_identity import _bound_root, capture_span, source_slice
+from ..template_identity import _bound_root, capture_span, line_spans, source_slice
 from ..template_import import digest
 from .captured_fields import capture_fields, ownership_parents, visible_path
 from .materialize_nodes import DisplayField, fallback_style, literal, locale_text, reference, render_nodes, render_plain_fields, stable_id
 from .operations import display_pointer, operation_value
 from ..rich_fields import field_key
 from .projection import pointer_tokens
-from .span_coverage import fallback_plan, overlaps, union_spans, unit_key, without_line_break
+from .span_coverage import fallback_plan, overlaps, subtract_spans, union_spans, unit_key, without_line_break
 from .store import verify_package
+
+
+def scope_lines(sources, spans):
+    """Each whole multi-line unit by its lines; any other span as it is."""
+    units = {(source.id, source.revision, unit.id, unit.revision): (source, unit) for source in sources for unit in source.units}
+    for span in spans:
+        source, unit = units[unit_key(span)]
+        whole = span.start == 0 and span.end == len(unit.text)
+        yield from (line_spans(source, unit) or [span]) if whole else [span]
 
 
 def materialize(package, facts, operations, sources, *, operation_id, revision=1):
@@ -40,7 +49,7 @@ def materialize(package, facts, operations, sources, *, operation_id, revision=1
                 hidden.setdefault(group, set()).update(records)
             if stored['added']:
                 assigned.setdefault(stored['uncertainGroup'], []).extend(stored['added'])
-    fallbacks_by_view, human_scopes = {}, []
+    fallbacks_by_view, uncited_by_view, human_scopes = {}, {}, []
     for operation in operations:
         tasks = {task.id: task for task in operation.tasks}
         attempts = {attempt.id: attempt for attempt in operation.attempts}
@@ -75,13 +84,26 @@ def materialize(package, facts, operations, sources, *, operation_id, revision=1
                 view = tasks[result.task_id].block_id
                 if view not in declarations:
                     raise ValueError('source fallback has no configured block view')
-                fallbacks_by_view.setdefault(view, []).extend(result.source_spans)
-    visible = {identifier: field.cell for (view, identifier), field in [*fields.items(), *unassigned.items()]
-        if visible_path(declarations[view], field.relative)}
-    fallback, suppressed, fallbacks_by_view = fallback_plan(sources, fallbacks_by_view, list(visible.values()), protected_spans=human_scopes)
+                uncited = isinstance(result.value, dict) and result.value.get('scope') == 'uncited'
+                (uncited_by_view if uncited else fallbacks_by_view).setdefault(view, []).extend(result.source_spans)
+    visible_by_view = {}
+    for (view, identifier), field in [*fields.items(), *unassigned.items()]:
+        if visible_path(declarations[view], field.relative):
+            visible_by_view.setdefault(view, {})[identifier] = field.cell
+    _fallback, suppressed, placements = fallback_plan(sources, fallbacks_by_view,
+        {view: list(cells.values()) for view, cells in visible_by_view.items()}, protected_spans=human_scopes)
+    ordered = sorted(declarations.values(), key=lambda value: (['header', 'sidebar', 'main'].index(value.placement.region), value.placement.order, value.id))
+    # Lines of an uncited scope that no accepted value or cited fallback shows go once to the last such block on the page.
+    occupied = [*[span for cells in visible_by_view.values() for cell in cells.values() for span in cell.evidence],
+        *[span for spans in placements.values() for span in spans]]
+    leftover = [line for spans in uncited_by_view.values() for line in scope_lines(sources, spans)
+        if not any(overlaps(line, other) for other in occupied)]
+    if leftover:
+        last = [declaration.id for declaration in ordered if declaration.id in uncited_by_view][-1]
+        placements[last] = union_spans(sources, [*placements.get(last, []), *leftover])
     regions = {role: {'id': stable_id(operation_id, role), 'role': role, 'revision': revision, 'blocks': []}
         for role in ['header', 'sidebar', 'main']}
-    coverage, displayed, owned, shown_scopes, shown_fallback = [], {}, set(), set(), set()
+    coverage, displayed, owned, shown_scopes, shown_fallback = [], {}, set(), set(), []
     scopes = {scope.id: scope for scope in facts.manual_scopes}
     parents = ownership_parents(facts)
     def primary_owner(identifier, view, seen=()):
@@ -112,7 +134,6 @@ def materialize(package, facts, operations, sources, *, operation_id, revision=1
                 'presentation': reference(package, declaration.id, fallback_style(declaration), instance, handle)})
             for identifier, blocks in mounted.items():
                 displayed.setdefault(identifier, []).extend(blocks)
-    ordered = sorted(declarations.values(), key=lambda value: (['header', 'sidebar', 'main'].index(value.placement.region), value.placement.order, value.id))
     for declaration in ordered:
         sections = []
         selected_roots = [value for (view, record), value in roots.items() if view == declaration.id
@@ -121,7 +142,7 @@ def materialize(package, facts, operations, sources, *, operation_id, revision=1
         for root, primary in selected_roots:
             selected = []
             for (view, identifier), field in fields.items():
-                if view != declaration.id or identifier in suppressed:
+                if view != declaration.id or (view, identifier) in suppressed:
                     continue
                 owners = primary_owner(field.record_id, view)
                 if len(owners) > 1:
@@ -132,7 +153,7 @@ def materialize(package, facts, operations, sources, *, operation_id, revision=1
             children, mounted = render_nodes(package, declaration, instance, selected, scopes, shown_scopes, period_format)
             plain_fields = []
             for (view, identifier), field in unassigned.items():
-                if view != declaration.id or identifier in suppressed:
+                if view != declaration.id or (view, identifier) in suppressed:
                     continue
                 owners = primary_owner(field.record_id, view)
                 if len(owners) > 1:
@@ -161,7 +182,7 @@ def materialize(package, facts, operations, sources, *, operation_id, revision=1
                     for record in compact[declaration.id] if record in active_records and field_key(record, 'employer') in current)])
         # An object view's list of independent records: the records below its root that no record of this view owns.
         listing = [field for (view, identifier), field in fields.items() if declaration.view.mode == 'object'
-            and view == declaration.id and identifier not in suppressed and field.record_id not in hidden.get(view, ())
+            and view == declaration.id and (view, identifier) not in suppressed and field.record_id not in hidden.get(view, ())
             and visible_path(declaration, field.relative) and not primary_owner(field.record_id, view)]
         records = [record for record in assigned.get(declaration.id, ())
             if record in active_records and field_key(record, 'display') in current]
@@ -191,13 +212,12 @@ def materialize(package, facts, operations, sources, *, operation_id, revision=1
                 output.append({'type': 'heading', 'id': stable_id(operation_id, declaration.id, 'heading'), 'revision': 1,
                     'props': {'level': 1}, 'content': [literal(title, ref)], 'children': [], 'provenance': [], 'presentation': ref})
             output.extend(sections)
-        for span in fallback:
+        # Each view shows its own placements; a line two failed blocks both cited shows once, in the first of them.
+        for span in subtract_spans(sources, placements.get(declaration.id, []), shown_fallback):
+            shown_fallback.append(span)
             key = digest(span)
-            if key in shown_fallback or not any(overlaps(span, raw) for raw in fallbacks_by_view.get(declaration.id, [])):
-                continue
-            shown_fallback.add(key)
             shown = without_line_break(sources, span)
-            if shown is None:
+            if shown is None or not source_slice(sources, shown).strip():
                 continue
             identifier = stable_id(operation_id, 'fallback', key)
             ref = reference(package, declaration.id, fallback_style(declaration),
@@ -207,7 +227,7 @@ def materialize(package, facts, operations, sources, *, operation_id, revision=1
             output.append({'type': 'paragraph', 'id': identifier, 'revision': 1, 'props': {}, 'content': [text],
                 'children': [], 'provenance': [], 'presentation': ref})
             add_coverage(shown, None, [identifier], 'fallback', 'exact source scope')
-    if len(shown_fallback) != len(fallback):
+    if set(placements) - set(declarations):
         raise ValueError('source fallback has no materialized placement')
     for identifier, blocks in displayed.items():
         record, handle = cell_owners[identifier]

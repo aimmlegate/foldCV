@@ -164,11 +164,12 @@ RelationChoiceSelector = Annotated[NewRelationKey | RelationChoice, Field(discri
 
 
 class ReferencedField(Wire):
-    item: ItemChoice
-    field_key: Id
+    # Protocol 5: null item, fieldKey or effectiveCells leave them to the coordinator (template_completion).
+    item: ItemChoice | None = None
+    field_key: Id | None = None
     pointer: str
     evidence: list[EvidenceRef]
-    effective_cells: list[CellRef]
+    effective_cells: list[CellRef] | None = None
 
 
 class ReferencedRelation(Wire):
@@ -188,10 +189,11 @@ class ReferencedLineage(Wire):
 class ReferencedProposalReply(Wire):
     schema_version: Literal[3]
     payload: JsonValue
-    discoveries: list[Discovery]
+    # Protocol 5: null discoveries, lineage or relations are derived from the payload and the bindings.
+    discoveries: list[Discovery] | None = None
     fields: list[ReferencedField]
-    lineage: list[ReferencedLineage]
-    relations: list[ReferencedRelation]
+    lineage: list[ReferencedLineage] | None = None
+    relations: list[ReferencedRelation] | None = None
 
 
 class CheckTarget(Wire):

@@ -383,6 +383,8 @@ class CapturedWriter:
         self.compact(header.paragraphs[0], .05)
         recipe = self.recipe.style.header
         region = self.recipe.layout.regions[0]
+        # Source fallback lines stack from the first slot; growth counts from the last slot, as if they filled both.
+        first, last = min(recipe.name_top, recipe.profession_top), max(recipe.name_top, recipe.profession_top)
         cursor = 0.0
         growth = 0.0
         for block in self.request.document.regions[0].blocks:
@@ -390,22 +392,35 @@ class CapturedWriter:
                 if not self.runs[child.id]:
                     continue
                 refs = [span.presentation or child.presentation for span, _link in authored_spans(child) if span.text]
-                slots = {getattr(resolved_node(self.resolver, ref), 'header_slot', None) for ref in refs}
-                if len(slots) != 1 or None in slots:
-                    raise RenderFailure('RICH_EXPORT_UNSUPPORTED')
-                slot = next(iter(slots))
-                top = getattr(recipe, slot + '_top')
+                if self.header_fallback(child, refs):
+                    top, designed = first, last
+                else:
+                    slots = {getattr(resolved_node(self.resolver, ref), 'header_slot', None) for ref in refs}
+                    if len(slots) != 1 or None in slots:
+                        raise RenderFailure('RICH_EXPORT_UNSUPPORTED')
+                    top = designed = getattr(recipe, next(iter(slots)) + '_top')
                 height = self.metrics.paragraph_height(self.runs[child.id], region.width, self.paragraphs[child.id][0])
                 paragraph = self.paragraph(header, child, header=True)
                 y = max(top, cursor)
                 self.frame(paragraph, region.x, y, region.width)
                 cursor = y + height
-                growth = max(growth, cursor - top - self.paragraphs[child.id][0])
+                growth = max(growth, cursor - designed - self.paragraphs[child.id][0])
         # A final ordinary paragraph terminates the last independent text frame.
         self.spacer(header, 1)
         if cursor > self.recipe.style.page.body_bottom or self.recipe.style.page.first_body_top + growth >= self.recipe.style.page.body_bottom:
             raise RenderFailure('RICH_EXPORT_UNSUPPORTED')
         return growth
+
+    def header_fallback(self, block, refs):
+        """A paragraph of source wording a header block kept: no view node, the block's own fallback style."""
+        if block.type != 'paragraph' or not refs or any(resolved_node(self.resolver, ref) is not None for ref in refs):
+            return False
+        keys = {ref.view_key for ref in refs}
+        if len(keys) != 1:
+            return False
+        view = self.resolver.views[next(iter(keys))]
+        style = view.fallback_style or (view.nodes[0].style if view.nodes else None)
+        return all(ref.style_token == style for ref in refs)
 
     def header_blocks(self, block):
         if block.type != 'section' or block.content:

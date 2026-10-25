@@ -51,6 +51,10 @@ class ProviderTemplateTransport:
             if error.code == 'BUSY' and error.dispatch_witness is None:
                 # Admission refused before any process started: nothing was dispatched.
                 raise ContentFailure('BUSY', cleanup_verified=True, dispatch_witness={'neverDispatched': True}) from None
+            if (error.code in {'INPUT_TOO_LARGE', 'INVALID_INPUT', 'MODEL_DENIED'} and error.dispatch_witness is None
+                    and files.process is None and not files.cleanup_failed):
+                # The provider refused the request before starting a process (LIVE-04: an oversized review).
+                raise ContentFailure(error.code, cleanup_verified=True, dispatch_witness={'neverDispatched': True}) from None
             raise
         except Exception:
             # An unexpected provider error still ends the owned process scope; report what cleanup actually proved.

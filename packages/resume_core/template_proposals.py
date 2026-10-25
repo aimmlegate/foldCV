@@ -11,6 +11,39 @@ from .templates.compiler import canonical, sha256
 from .templates.projection import pointer_tokens, reachable_schema, validate_payload
 from .templates.replies import proposal_schema
 from .template_capture import item_identities
+from .template_completion import complete_reply
+
+import json
+
+from pydantic import ValidationError
+
+# Schema rules whose expected value comes from the schema and can be named back to the model.
+NAMED_RULES = {'type': 'expected type', 'enum': 'expected one of', 'const': 'expected', 'format': 'expected format',
+    'pattern': 'expected pattern', 'minItems': 'expected at least items:', 'maxItems': 'expected at most items:',
+    'minLength': 'expected at least characters:', 'maxLength': 'expected at most characters:',
+    'minimum': 'expected at least', 'maximum': 'expected at most'}
+
+
+def reply_error(error):
+    """A refusal by path and broken rule; payload values, which may quote the source, are left out."""
+    if isinstance(error, ValidationError):
+        first = error.errors(include_url=False, include_input=False, include_context=False)[0]
+        return '/' + '/'.join(map(str, first['loc'])) + ': ' + first['msg']
+    rule = getattr(error, 'rule', None)
+    if rule is None:
+        return str(error)
+    validator, expected = rule
+    if validator == 'required':
+        reason = error.reason
+    elif validator in NAMED_RULES:
+        reason = NAMED_RULES[validator] + ' ' + json.dumps(expected, ensure_ascii=False)[:200]
+    elif validator in {'anyOf', 'oneOf'}:
+        reason = 'matches none of the allowed shapes'
+    elif validator == 'additionalProperties':
+        reason = 'has a property the schema does not allow'
+    else:
+        reason = 'breaks the ' + str(validator) + ' rule'
+    return error.path + ': ' + reason
 
 
 def restore_reply(reply, table, references, sources):
@@ -28,16 +61,21 @@ def restore_reply(reply, table, references, sources):
         return {'kind': 'handle', 'itemHandle': identity('item', selector.ref)}
     def spans(refs):
         return [span.model_dump(mode='json', by_alias=True) for span in restore_evidence(refs, table, sources)]
+    def key(field):
+        # Completion fills both for every entry at a compiled binding; any other pointer stays unresolved.
+        if field.field_key is None or field.item is None:
+            raise ValueError('fields entry at ' + field.pointer + ' matches no compiled binding')
+        return field.field_key
     return ProposalReply.model_validate({'schemaVersion': 1, 'payload': reply.payload,
-        'discoveries': [value.model_dump(mode='json', by_alias=True) for value in reply.discoveries],
-        'fields': [{'item': item(field.item), 'fieldKey': field.field_key, 'pointer': field.pointer, 'evidence': spans(field.evidence),
-            'effectiveCellIds': [identity('cell', ref) for ref in field.effective_cells]} for field in reply.fields],
+        'discoveries': [value.model_dump(mode='json', by_alias=True) for value in reply.discoveries or []],
+        'fields': [{'fieldKey': key(field), 'item': item(field.item), 'pointer': field.pointer, 'evidence': spans(field.evidence),
+            'effectiveCellIds': [identity('cell', ref) for ref in field.effective_cells or []]} for field in reply.fields],
         'lineage': [{'kind': value.kind, 'parents': [identity('item', ref) for ref in value.parents], 'children': value.children}
-            for value in reply.lineage],
+            for value in reply.lineage or []],
         'relations': [{'relation': {'kind': 'discovery_key', 'key': relation.relation.key} if relation.relation.kind == 'new'
                 else {'kind': 'relation_id', 'relationId': identity('relation', relation.relation.ref)},
             'kind': relation.kind, 'subject': item(relation.subject), 'target': item(relation.target),
-            'evidence': spans(relation.evidence)} for relation in reply.relations]}, strict=True)
+            'evidence': spans(relation.evidence)} for relation in reply.relations or []]}, strict=True)
 
 
 def relation_evidence(operation, proposal):
@@ -145,6 +183,23 @@ def resolve_relations(reply, operation, task, attempt, allocations, declarations
     return resolved, allocated
 
 
+def transport_refusal(attempt, package, block_id):
+    """Why the transport refused a returned reply, by path and rule; None when there is no reply to check."""
+    if attempt.raw_return is None:
+        return None
+    compiled = next(block for block in package.blocks if block.id == block_id)
+    try:
+        outer = strict_json(attempt.raw_return)
+        if not isinstance(outer, dict) or set(outer) != {'payload'}:
+            return 'the reply needs its exact payload envelope'
+        table = offered_evidence(attempt.request_value)
+        references = offered_references(attempt.request_value) if table is not None else None
+        validate_payload(proposal_schema(compiled.full_schema, None if table is None else list(table), references), outer['payload'])
+    except (ValueError, TypeError, KeyError, RecursionError) as error:
+        return reply_error(error)
+    return None
+
+
 def parse_proposal(operation, attempt_id, package, sources, facts, *, captured_relations=(), id_factory=identity):
     result, working = operation.model_copy(deep=True), facts.model_copy(deep=True)
     attempt = attempt_in(result, attempt_id)
@@ -174,7 +229,9 @@ def parse_proposal(operation, attempt_id, package, sources, facts, *, captured_r
         if table is None:
             reply = ProposalReply.model_validate(outer['payload'], strict=True)
         else:
-            reply = restore_reply(ReferencedProposalReply.model_validate(outer['payload'], strict=True), table, references, sources)
+            # Protocol 5: bookkeeping the payload implies is derived before the reply is restored.
+            completed = complete_reply(outer['payload'], block.bindings, table, references)
+            reply = restore_reply(ReferencedProposalReply.model_validate(completed, strict=True), table, references, sources)
         declarations = {declaration.id: declaration for declaration in package.definition.fact_types}
         schemas = {key: reachable_schema(declaration.data_schema, package.definition.content_definitions)
             for key, declaration in declarations.items()}
@@ -208,7 +265,7 @@ def parse_proposal(operation, attempt_id, package, sources, facts, *, captured_r
         task.allowed_handles = list(dict.fromkeys([*task.allowed_handles, *[allocation.item_handle for allocation in allocations]]))
         task.proposal_hash, task.state = proposal.proposal_hash, 'proposed'
     except (ValueError, TypeError, KeyError, RecursionError) as error:
-        proposal.errors = [str(error)]
+        proposal.errors = [reply_error(error)]
         attempt.outcome = 'invalid_payload'
         attempt.error_code = attempt.error_code or 'IMPORT_PROPOSAL_INVALID'
     result.proposals.append(proposal)

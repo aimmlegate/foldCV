@@ -360,3 +360,20 @@ def test_captured_human_fields_survive_source_fallback_without_resurrecting_old_
     assert text(document).count(HUMAN_TEXT) == 1
     assert src.units[0].text not in text(document)
     assert not any(value.disposition == 'fallback' for value in coverage)
+
+
+def test_a_fallback_suppresses_a_shared_cell_only_in_its_own_view():
+    # K02: a cell two views show is replaced by one view's source copy there and stays in the other view.
+    from types import SimpleNamespace
+    from packages.resume_core.templates.span_coverage import fallback_plan
+    src, _raw = employment_source()
+    unit = src.units[0]
+    def phrase(value):
+        start = unit.text.index(value)
+        return capture_span(src, unit, start, start + len(value))
+    shared = SimpleNamespace(id='cell-shared', origin='model', evidence=[phrase('Python')])
+    other = SimpleNamespace(id='cell-other', origin='model', evidence=[phrase('Example Labs')])
+    _spans, suppressed, placements = fallback_plan([src], {'tasks': [phrase('Python')]},
+        {'tasks': [shared], 'skills': [shared, other]})
+    assert suppressed == {('tasks', 'cell-shared')} and set(placements) == {'tasks'}
+    assert [source_slice([src], span) for span in placements['tasks']] == ['Python']

@@ -107,3 +107,23 @@ async def test_missing_connection_can_finalize_fallback_without_unknown_cleanup(
     result = await fixture.pipeline.run(fixture.project, fixture.command, admitted=fixture.admitted)
     assert result.state == 'published'
     assert result.attempts[0].cleanup.state == 'verified'
+
+
+@pytest.mark.parametrize('code', ['INPUT_TOO_LARGE', 'INVALID_INPUT', 'MODEL_DENIED'])
+def test_provider_refusals_before_any_process_are_proved_undispatched(tmp_path, code):
+    # LIVE-04: an oversized review was refused before launch but stayed unverified and fenced the import.
+    class Refusing(Provider):
+        def generate(self, _request, _files, _cancel):
+            raise ContentFailure(code)
+    transport = ProviderTemplateTransport(lambda: (Refusing(), 'model-a'), tmp_path)
+    with pytest.raises(ContentFailure) as refused:
+        transport.generate(request(), threading.Event())
+    assert (refused.value.code, refused.value.cleanup_verified, refused.value.dispatch_witness) == (
+        code, True, {'neverDispatched': True})
+    # A refusal that already carries a witness is the provider's own account and is kept.
+    class Witnessed(Provider):
+        def generate(self, _request, _files, _cancel):
+            raise ContentFailure(code, dispatch_witness={'transport': 'codex'})
+    with pytest.raises(ContentFailure) as kept:
+        ProviderTemplateTransport(lambda: (Witnessed(), 'model-a'), tmp_path).generate(request(), threading.Event())
+    assert kept.value.dispatch_witness == {'transport': 'codex'} and kept.value.cleanup_verified is not True

@@ -83,7 +83,10 @@ async def test_empty_output_is_omitted_only_after_complete_absence_review(tmp_pa
     else:
         assert result.tasks[0].state == 'source_fallback' and result.issues and not result.receipts
         assert fixture.source.units[0].text in fixture.text()
-    assert len(fixture.transport.calls) == (1 if outcome in {'no_reply', 'null'} else 2)
+    # A refused first reply gets one repair, then the fixture's fallback model; neither is reviewed (S7c).
+    assert len(fixture.transport.calls) == (3 if outcome in {'no_reply', 'null'} else 2)
+    if outcome in {'no_reply', 'null'}:
+        assert [call['feedback'][0]['ruleId'] for call in fixture.transport.calls[1:]] == ['reply-format', 'reply-format']
 
 
 @pytest.mark.asyncio
@@ -96,6 +99,9 @@ async def test_restart_never_replays_an_unknown_call_and_can_consume_a_retained_
     operation = fixture.current().pre_draft.template_operations[0]
     assert spent_calls(operation) == 1
     fixture.transport.fail_at = None
+    # P03: the prompt is a pure function of the stored request, so a reloaded attempt reads byte for byte the same.
+    from packages.resume_core.template_prompt import model_prompt
+    assert model_prompt(operation.attempts[0].request_value) == fixture.transport.prompts[0]
     fresh = fixture.fresh_pipeline()
     if cutpoint == 'dispatch':
         recovered = await fresh.recover(fixture.project, operation.id)
@@ -180,3 +186,96 @@ async def test_identical_replies_of_two_blocks_are_each_reviewed_against_their_o
     assert sorted((tasks[record.attempt_id], sorted({target.target_id for target in record.value.targets
         if target.target_id.startswith('scope-')})) for record in result.review_inputs) == sorted(
         (task.id, ['scope-' + task.id]) for task in result.tasks)
+
+
+def satisfied_review(value):
+    return {'results': [{'ruleId': target['ruleId'], 'targetId': target['targetId'], 'disposition': 'satisfied',
+        'reason': '', 'evidence': [], 'actionable': False} for target in value['targets']]}
+
+
+def refused_first(fixture, refuse):
+    """The first reply of the block is refused as refuse makes it; the repair and the review answer correctly."""
+    def script(_request, value):
+        if 'targets' in value:
+            return satisfied_review(value)
+        reply = raw_proposal(fixture.source)
+        if value['slot'] == 'initial':
+            refuse(reply)
+        return reply
+    return script
+
+
+def without_journal(reply):
+    # A value the source does not state word for word, sent without its entry: completion cannot cite it (S7d).
+    reply['payload'][0]['journal'] = 'Unstated Journal'
+    reply['fields'] = [field for field in reply['fields'] if field['pointer'] != '/0/journal']
+
+
+@pytest.mark.asyncio
+async def test_a_refused_first_reply_gets_one_repair_with_its_refusal_and_is_accepted(tmp_path):
+    # P07: the repair request carries the refusal; the refused attempt keeps its raw return and gets no review.
+    fixture = RuntimeFixture(tmp_path)
+    fixture.transport.scripted = refused_first(fixture, without_journal)
+    result = await fixture.pipeline.run(fixture.project, fixture.command, admitted=fixture.admitted)
+    assert result.state == 'published' and result.tasks[0].state == 'accepted' and not result.issues
+    assert [attempt.slot for attempt in result.attempts] == ['initial', 'primary_repair', 'replacement_review']
+    assert len(fixture.transport.calls) == spent_calls(result) == 3
+    refused = result.attempts[0]
+    assert refused.outcome == 'invalid_payload' and refused.raw_return and result.proposals[0].state == 'invalid'
+    [feedback] = fixture.transport.calls[1]['feedback']
+    assert (feedback['ruleId'], feedback['targetId']) == ('reply-format', 'scope-' + result.tasks[0].id)
+    assert feedback['reason'].endswith('missing /0/journal (journal)') and feedback['reason'] == result.proposals[0].errors[0][:300]
+    assert len(fixture.current().project.facts.extensions) == 2
+
+
+@pytest.mark.asyncio
+async def test_a_refused_first_reply_without_room_for_a_repair_and_its_review_falls_back(tmp_path):
+    # P08: one call left after the first reply is not enough for a repair that must also be reviewed.
+    fixture = RuntimeFixture(tmp_path, cap=2)
+    fixture.transport.scripted = refused_first(fixture, without_journal)
+    result = await fixture.pipeline.run(fixture.project, fixture.command, admitted=fixture.admitted)
+    assert result.state == 'published' and result.tasks[0].state == 'source_fallback'
+    assert len(fixture.transport.calls) == 1
+    [fallback] = result.task_results
+    assert fallback.value['scope'] == 'cited' and fallback.value['diagnostics'][-1] == 'IMPORT_CALL_CAP'
+    assert fixture.source.units[0].text in fixture.text()
+
+
+def test_refusal_text_names_paths_and_rules_but_no_reply_values():
+    # P09: a refused value may quote the source; the stored refusal and the repair note keep only its path and rule.
+    from pydantic import BaseModel, ConfigDict, ValidationError
+    from packages.resume_core.template_proposals import reply_error
+    from packages.resume_core.templates.projection import SchemaFailure, validate_payload
+    phrase = 'Example Labs Quality Award'
+    schema = {'type': 'object', 'properties': {'year': {'type': 'integer'}, 'status': {'enum': ['published', 'draft']},
+        'url': {'anyOf': [{'type': 'string'}, {'type': 'null'}]}}, 'required': ['year'], 'additionalProperties': False}
+    reasons = []
+    for value in [{'year': phrase}, {'year': 1, 'status': phrase}, {'year': 1, 'url': [phrase]}, {'year': 1, phrase: 1}, {}]:
+        with pytest.raises(SchemaFailure) as failure:
+            validate_payload(schema, value)
+        reasons.append(reply_error(failure.value))
+    class Strict(BaseModel):
+        model_config = ConfigDict(extra='forbid', strict=True)
+        year: int
+    with pytest.raises(ValidationError) as failure:
+        Strict.model_validate({'year': phrase})
+    assert phrase in str(failure.value)
+    reasons.append(reply_error(failure.value))
+    assert not any(phrase in reason for reason in reasons)
+    assert reasons == ['/payload/year: expected type "integer"', '/payload/status: expected one of ["published", "draft"]',
+        '/payload/url: matches none of the allowed shapes', '/payload/: has a property the schema does not allow',
+        "/payload/: 'year' is a required property", '/year: Input should be a valid integer']
+
+
+@pytest.mark.asyncio
+async def test_a_reply_the_transport_refuses_by_schema_is_repaired_without_its_quoted_value(tmp_path):
+    # P09 end to end: the transport refuses a value quoting the source; the repair note names only path and rule.
+    fixture = RuntimeFixture(tmp_path)
+    phrase = 'Example Labs Quality Award'
+    assert phrase in fixture.source.units[0].text
+    fixture.transport.scripted = refused_first(fixture, lambda reply: reply['payload'][0].update(year=phrase))
+    result = await fixture.pipeline.run(fixture.project, fixture.command, admitted=fixture.admitted)
+    assert result.tasks[0].state == 'accepted' and result.attempts[0].error_code == 'INVALID_RESULT'
+    [feedback] = fixture.transport.calls[1]['feedback']
+    assert '/0/year' in feedback['reason'] and phrase not in feedback['reason']
+    assert [attempt.slot for attempt in result.attempts] == ['initial', 'primary_repair', 'replacement_review']

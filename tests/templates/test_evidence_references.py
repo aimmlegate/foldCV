@@ -10,6 +10,7 @@ from packages.resume_core.models.template_import import ReferenceTable, Referenc
 from packages.resume_core.template_identity import capture_span, evidence_options
 from packages.resume_core.template_import import TemplateImportFailure, digest, dispatch_attempt, record_return, reserve_attempt
 from packages.resume_core.template_proposals import parse_proposal, restore_reply
+from packages.resume_core.template_prompt import model_prompt
 from packages.resume_core.template_review import make_review_input, record_review, reusable_receipt, validate_review_reply
 from packages.resume_core.templates.compiler import sha256
 from packages.resume_core.templates.projection import SchemaFailure, validate_payload
@@ -246,3 +247,78 @@ async def test_app_import_selects_evidence_by_reference_and_receipts_retain_rest
     assert all(isinstance(ref, str) for result in answered for ref in result['evidence'])
     assert sha256(review.raw_return.encode()) == review.raw_return_hash
     assert not operation.issues and [task.state for task in operation.tasks] == ['accepted']
+
+
+class PromptRecorder(CitingProvider):
+    """Records the text each call sends; answers come from the captured request as before."""
+
+    def __init__(self):
+        super().__init__()
+        self.prompts = []
+
+    def generate(self, request, files, cancel):
+        self.prompts.append(request.text)
+        return super().generate(request, files, cancel)
+
+
+@pytest.mark.asyncio
+async def test_model_prompts_offer_refs_and_texts_while_storage_keeps_spans_and_reads_the_same(tmp_path):
+    provider = PromptRecorder()
+    async with app_client(tmp_path, call_cap=4, provider=provider) as (client, service, _jobs):
+        project = (await upload(client)).json()['workspace']['projectId']
+        job = (await client.post(f'/v1/rich/projects/{project}/template-import',
+            json={'clientRequestId': 'lean', 'allowTextRewrite': True})).json()
+        async def finished():
+            while True:
+                current = (await client.post(f'/v1/rich/projects/{project}/jobs/{job["id"]}/read', json={})).json()
+                if current.get('templateOutcome') is not None:
+                    return current
+                await asyncio.sleep(0.05)
+        assert (await asyncio.wait_for(finished(), 60))['templateOutcome']['state'] == 'saved'
+        operation = service.read(project).project.template_operations[0]
+    assert len(provider.prompts) == len(operation.attempts) == 2
+    for prompt, attempt in zip(provider.prompts, operation.attempts, strict=True):
+        stored = attempt.request_value
+        sent = json.loads(prompt)
+        # The model sees each offered entry as its ref and text; the stored request restores spans from the ref.
+        assert sent['evidence'] and all(set(entry) == {'ref', 'text'} for entry in sent['evidence'])
+        assert all('span' in entry for entry in stored['evidence'])
+        assert [entry['ref'] for entry in sent['evidence']] == [entry['ref'] for entry in stored['evidence']]
+        assert len(json.dumps(sent['evidence'], ensure_ascii=False)) * 3 < len(json.dumps(stored['evidence'], ensure_ascii=False))
+        # Identities, hashes and spans stay in storage; the reply selects everything by reference.
+        assert not {'allowedHandles', 'capturedHandles', 'capturedRelations', 'handleMap', 'targets', 'policy',
+            'proposalHash', 'packageHash'} & set(sent)
+        if 'semanticContext' in sent:
+            assert sent['semanticContext']['checks'] and all('targetId' not in check for check in sent['semanticContext']['checks'])
+            assert 'replyProtocol' not in sent['semanticContext']['taskInput'] and {'handleMap', 'targets'} <= set(stored)
+        # Reloaded from storage with sorted keys, the request reads exactly as it was sent.
+        assert model_prompt(stored) == prompt
+
+
+def test_prompts_of_two_blocks_share_everything_up_to_the_offered_evidence():
+    shared = {'protocol': 'template_import_v1', 'replyProtocol': {'version': 'v', 'rules': ['one']},
+        'modelInstructions': {'extract': ['keep facts']}, 'allowTextRewrite': True,
+        'formattingAsOf': {'year': 2026, 'month': 10, 'day': 24}, 'packageHash': 'a' * 64,
+        'evidence': [{'ref': 'S1', 'span': {'sourceId': 'source', 'start': 0, 'end': 4}, 'text': 'Line'}]}
+    first = model_prompt({**shared, 'declaration': {'id': 'identity'}, 'slot': 'initial', 'feedback': []})
+    second = model_prompt({'slot': 'initial', 'declaration': {'id': 'projects'}, 'feedback': [], **dict(reversed(list(shared.items())))})
+    common = model_prompt(shared)[:-1]
+    assert first.startswith(common) and second.startswith(common)
+    assert first.index('"declaration"') > first.index('"evidence"')
+
+
+def test_review_prompts_carry_only_cells_their_proposal_reads_and_no_cell_spans():
+    # LIVE-04: a review input keeps every effective cell for its identity; its prompt keeps only the cells the
+    # proposal reads, without spans, so later reviews do not grow with the import (250k characters were refused).
+    span = {'sourceId': 'source-1', 'sourceRevision': 1, 'unitId': 'unit-1', 'unitRevision': 1, 'start': 0, 'end': 5,
+        'sliceHash': '0' * 64}
+    def cell(identifier):
+        return {'id': identifier, 'fieldKey': 'name', 'revision': 1, 'rawInput': 'Value ' + identifier, 'typedValue': 'Value',
+            'state': 'admitted', 'origin': 'model', 'userCorrected': False, 'evidence': [span], 'observationIds': [],
+            'admissionReceiptIds': [], 'manualScopeId': None}
+    lean = {'id': 'cell-2', 'fieldKey': 'name', 'rawInput': 'Value cell-2', 'typedValue': 'Value', 'state': 'admitted', 'origin': 'model'}
+    review = {'targets': [{'ruleId': 'rule', 'targetId': 'cell-2'}], 'effectiveCells': [cell('cell-1'), cell('cell-2')],
+        'semanticContext': {'proposal': {'fields': [{'pointer': '/name', 'effectiveCellIds': ['cell-2']}]}}}
+    assert json.loads(model_prompt(review))['effectiveCells'] == [lean]
+    extraction = json.loads(model_prompt({'effectiveCells': [cell('cell-2')], 'effectiveRecords': [{'id': 'record-1', 'cells': [cell('cell-2')]}]}))
+    assert extraction['effectiveCells'] == [lean] and extraction['effectiveRecords'][0]['cells'] == [lean]

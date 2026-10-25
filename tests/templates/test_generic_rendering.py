@@ -10,10 +10,10 @@ from packages.resume_core.models.template_render import TemplateRenderRequestV1
 from packages.resume_core.rendering.captured_docx import render_captured_docx, renderer_identity
 from packages.resume_core.template_export import capture_export, snapshot_identity
 from packages.resume_core.templates.compiler import sha256
-from tests.templates.generic_fixtures import direct_generic, export_through_service as exported
+from tests.templates.generic_fixtures import direct_generic, generic_import, export_through_service as exported
 from tests.templates.storage_fixtures import source_fixture
 from tests.templates.test_captured_docx import NS, emitted, parts, recapture, xml
-from tests.templates.test_generic_import import shared, views
+from tests.templates.test_generic_import import body, shared, views
 from tests.templates.test_template_view_adapters import text
 
 
@@ -198,3 +198,93 @@ def test_a_column_does_not_start_with_keep_with_next_but_later_headings_keep_it(
     assert [emitted(paragraph) for paragraph in first if emitted(paragraph)] == ['СЕРТИФИКАТЫ', 'ПРОЕКТЫ']
     assert not any(keep(paragraph) for paragraph in first)
     assert [emitted(paragraph) for paragraph in tree.xpath('//w:tbl//w:p', namespaces=NS) if keep(paragraph)] == ['ПОРТФОЛИО']
+
+
+def refused_identity(refuse):
+    """Identity answers the coordinator refuses on every attempt; other blocks answer as scripted."""
+    def wrap(script):
+        def scripted(request, value):
+            if 'targets' in value or value['declaration']['id'] != 'identity':
+                return script(request, value)
+            # The repair is refused the same way; it has no earlier items to select.
+            return refuse(script(request, {**value, 'slot': 'initial'}))
+        return scripted
+    return wrap
+
+
+def without_profession(reply):
+    # A reworded value the source does not state, sent without its entry: completion cannot cite it (S7d).
+    reply['payload'] = {**reply['payload'], 'profession': 'Senior backend engineer'}
+    reply['fields'] = [field for field in reply['fields'] if field['fieldKey'] != 'profession']
+    return reply
+
+
+def frames(tree):
+    """(top in twips, text) of every framed paragraph with text."""
+    return [(int(paragraph.xpath('string(w:pPr/w:framePr/@w:y)', namespaces=NS)), emitted(paragraph))
+        for paragraph in tree.xpath('//w:p[w:pPr/w:framePr]', namespaces=NS) if emitted(paragraph)]
+
+
+@pytest.mark.asyncio
+async def test_a_refused_identity_reply_keeps_its_cited_lines_in_the_header_and_every_other_block(tmp_path):
+    # P05: the failed block shows only the lines it cited, in its own view and fallback style; accepted blocks
+    # of other views stay (R05, K02), and the header exports the fallback text instead of refusing it.
+    _fixture, result, workspace, originals = await generic_import(tmp_path / 'import', 'F01',
+        wrap=refused_identity(without_profession))
+    identity = next(task for task in result.tasks if task.block_id == 'identity')
+    assert result.state == 'published' and identity.state == 'source_fallback'
+    shown = views(workspace)
+    # The two cited lines are adjacent in the source, so they stay one paragraph with its line break.
+    assert shown['identity'] == ['Alex Example\nBackend engineer']
+    assert shown['summary'][1] == 'Backend engineer who implemented queue processing.'
+    assert 'Implemented queue processing.' in shown['projects'] and shown['programming'][1] == 'Python'
+    [issue] = [issue for issue in workspace.project.import_issues if issue.code == 'IMPORT_SOURCE_FALLBACK']
+    assert issue.message == 'Source wording retained because interpretation checks did not complete.'
+    content = await exported(tmp_path / 'export', workspace, originals)
+    header = xml(content, 'word/header1.xml')
+    [(top, value)] = frames(header)
+    assert value == 'Alex Example\nBackend engineer' and styles(header, 'Alex ExampleBackend engineer') == [STYLES['body']]
+    # It starts at the name slot and ends above the first body line.
+    recipe = workspace.project.template_package.recipe.style
+    assert top == round(recipe.header.name_top * 20)
+    assert top + 2 * recipe.text['body'].line_height * 20 <= recipe.page.first_body_top * 20
+    assert 'Implemented queue processing.' in emitted(xml(content))
+
+
+@pytest.mark.asyncio
+async def test_an_identity_block_without_a_usable_reply_shows_only_lines_no_other_block_shows(tmp_path):
+    # No reply is not evidence of absence, so the block keeps its whole scope; of it, only the lines no accepted
+    # block shows are placed, once, and every accepted block stays.
+    _fixture, result, workspace, originals = await generic_import(tmp_path / 'import', 'F01',
+        wrap=refused_identity(lambda _reply: 'not a JSON reply'))
+    assert next(task for task in result.tasks if task.block_id == 'identity').state == 'source_fallback'
+    shown = views(workspace)
+    assert shown['identity'] == ['Alex Example'] and shown['summary'][1] == 'Backend engineer who implemented queue processing.'
+    assert 'Implemented queue processing.' in shown['projects']
+    assert body(workspace).count('Our team reduced median latency from 800 ms to 500 ms.') == 1
+    [issue] = [issue for issue in workspace.project.import_issues if issue.code == 'IMPORT_SOURCE_FALLBACK']
+    assert issue.message == 'Source wording retained because interpretation checks did not complete.'
+    content = await exported(tmp_path / 'export', workspace, originals)
+    assert [value for _top, value in frames(xml(content, 'word/header1.xml'))] == ['Alex Example']
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize('style', ['body', 'name'])
+async def test_unslotted_header_text_renders_only_in_its_block_fallback_style(tmp_path_factory, tmp_path, style):
+    # A header block's own fallback paragraph stacks from the name slot; other text without a slot still refuses.
+    from packages.resume_core.rendering.template import RenderFailure
+    workspace, _content = await f10_export(tmp_path_factory)
+    _attempt, capture = capture_export(workspace, snapshot_identity(workspace), renderer_identity())
+    request = TemplateRenderRequestV1(**capture.request.model_dump(by_alias=True), package=workspace.project.template_package)
+    document = request.document.model_copy(deep=True)
+    [name] = [block for block in walk(document.regions[0].blocks) if text(block) == 'Alex Example']
+    for part in name.content:
+        part.presentation = part.presentation.model_copy(update={'node_index': None, 'style_token': style})
+    if style == 'name':
+        with pytest.raises(RenderFailure, match='RICH_EXPORT_UNSUPPORTED'):
+            render_captured_docx(recapture(request, document=document), tmp_path)
+        return
+    header = xml(render_captured_docx(recapture(request, document=document), tmp_path), 'word/header1.xml')
+    recipe = workspace.project.template_package.recipe.style
+    assert styles(header, 'Alex Example') == [STYLES['body']] and styles(header, 'Backend engineer') == [STYLES['profession']]
+    assert frames(header)[0] == (round(recipe.header.name_top * 20), 'Alex Example')

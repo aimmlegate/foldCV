@@ -37,8 +37,9 @@ SERVER_KEYS = {"minLength", "maxLength", "pattern", "format", "minimum", "maximu
 
 
 class SchemaFailure(ValueError):
-    def __init__(self, path: str, reason: str):
-        self.path, self.reason = path, reason
+    def __init__(self, path: str, reason: str, rule=None):
+        # rule is the broken (validator, expected value) pair of a payload check; it names no payload value.
+        self.path, self.reason, self.rule = path, reason, rule
         super().__init__(f"{path}: {reason}")
 
 
@@ -231,7 +232,8 @@ def validate_payload(schema: JsonObject, value: JsonValue) -> None:
     except Unresolvable:
         raise SchemaFailure("/payload", "unresolvable offline schema reference") from None
     if error:
-        raise SchemaFailure("/payload/" + "/".join(map(str, error.absolute_path)), error.message)
+        raise SchemaFailure("/payload/" + "/".join(map(str, error.absolute_path)), error.message,
+            (error.validator, error.validator_value))
 
 
 def binding_shape(root: JsonObject, pointer: str) -> JsonValue:

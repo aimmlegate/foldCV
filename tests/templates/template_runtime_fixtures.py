@@ -18,15 +18,17 @@ from resume_api.providers.content import ContentFailure, ContentResult, ContentT
 class ControlledTransport:
     def __init__(self, fixture, scripted=None):
         self.fixture, self.scripted = fixture, scripted
-        self.calls, self.serial = [], count(1)
+        self.calls, self.prompts, self.serial = [], [], count(1)
         self.fail_at, self.cleanup_unknown = None, False
 
     def reserve_owner(self, _operation, _task, _policy):
         return owner(next(self.serial))
 
     def generate(self, request, cancel):
-        value = json.loads(request.text)
+        # The prompt omits span records; scripted answers build spans from the captured request.
+        value = request.request_value if request.request_value is not None else json.loads(request.text)
         self.calls.append(value)
+        self.prompts.append(request.text)
         if self.fail_at == 'dispatch':
             raise SystemExit('controlled process loss after durable dispatch')
         if self.scripted:
@@ -80,6 +82,11 @@ class RuntimeFixture(TemplatePublicationFixture):
         self.transport = ControlledTransport(self, scripted)
         self.admissions = 0
         self.pipeline = self.fresh_pipeline()
+
+    def current(self):
+        # The durable state: the saved project with the running import's sidecar steps (S7e).
+        saved = super().current()
+        return self.pipeline.overlaid(self.project, saved)[0] if hasattr(self, 'pipeline') else saved
 
     def fresh_pipeline(self, publisher=None):
         def authority(operation, current):
