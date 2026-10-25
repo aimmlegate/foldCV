@@ -229,7 +229,7 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--root', type=Path, required=True, help='an earlier live root to take the request from')
     parser.add_argument('--from-run', required=True)
-    parser.add_argument('--label', required=True, choices=['CV-A', 'CV-B'])
+    parser.add_argument('--label', required=True, choices=['CV-A', 'CV-B', 'CV-C'])
     parser.add_argument('--block', required=True)
     parser.add_argument('--slot', default='initial')
     parser.add_argument('--effort', nargs='+', default=['medium'])

@@ -64,10 +64,17 @@ class Ledger:
         with self.lock():
             ledger = self.read()
             # D100: after three failed runs in a row the work stops and is reported instead of trying again.
-            recent = [run['status'] for run in ledger['runs'] if run.get('decision') == 'D100'][-FAILURES_IN_A_ROW:]
+            recent = [run['status'] for run in ledger['runs'] if run.get('decision') in {'D100', 'D101'}][-FAILURES_IN_A_ROW:]
             if len(recent) == FAILURES_IN_A_ROW and 'saved' not in recent:
-                raise SystemExit('three failed D100 runs in a row: stop and report')
-            run = {'id': 'LIVE-%02d' % (len(ledger['runs']) + 1), 'decision': 'D100', 'model': model, 'source': label,
+                raise SystemExit('three failed runs in a row: stop and report')
+            # D101 (2026-10-25): three full imports; each is charged here before any model call.
+            decision, budget = 'D100', ledger.get('d101')
+            if budget is not None:
+                if budget['runsSpent'] >= budget['runCap']:
+                    raise SystemExit('D101 run cap reached: %d of %d' % (budget['runsSpent'], budget['runCap']))
+                budget['runsSpent'] += 1
+                decision = 'D101'
+            run = {'id': 'LIVE-%02d' % (len(ledger['runs']) + 1), 'decision': decision, 'model': model, 'source': label,
                 'sourceSha256': source_sha256, 'root': root.name, 'startedAt': now(), 'status': 'started', 'dispatches': []}
             ledger['runs'].append(run)
             self.write(ledger)
@@ -313,7 +320,7 @@ if __name__ == '__main__':
     parser.add_argument('--root', type=Path, required=True)
     parser.add_argument('--model')
     parser.add_argument('--source', type=Path)
-    parser.add_argument('--label', choices=['CV-A', 'CV-B'])
+    parser.add_argument('--label', choices=['CV-A', 'CV-B', 'CV-C'])
     parser.add_argument('--call-cap', type=int, default=60)
     parser.add_argument('--keep-wording', action='store_true')
     parser.add_argument('--finish', action='store_true', help='summarize and export an existing root; no model call')
