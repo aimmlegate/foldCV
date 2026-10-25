@@ -19,9 +19,12 @@ from tests.recovery.test_agent_tools import Fetcher
 async def incomplete(tmp_path):
     service, runtime, projects, workspace, session = environment(tmp_path)
     snapshot = await read_document(session)
-    result, _ = await append(session, 'part', snapshot=snapshot, phase='finalize')
-    assert result['disposition'] == 'incomplete'
+    # The turn ends before finalize, as in a live run; the end of the run seals the useful draft.
+    result, _ = await append(session, 'part', snapshot=snapshot)
+    assert result['disposition'] == 'building'
+    service.proposals.finish(workspace.project_id, session.run.id)
     value = service.proposals.get(workspace.project_id, result['proposalId'], 1)
+    assert value.proposal.state == 'incomplete'
     await session.close()
     service.store.finish(workspace.project_id, session.run.id, 'interrupted', error='AGENT_INTERRUPTED', text='Черновик сохранён, документ не изменён.')
     old = run_in(service.store.load(workspace.project_id), session.run.id)[2].request
@@ -248,7 +251,8 @@ async def test_queued_continue_uses_one_new_job_same_artifact_journal_and_never_
         session = jobs.tools.session(control)
         try:
             snapshot = await read_document(session)
-            result, _ = await append(session, 'part', snapshot=snapshot, phase='finalize')
+            result, _ = await append(session, 'part', snapshot=snapshot)
+            assert result['disposition'] == 'building'
             prepared.append(result)
             return ExecutionOutcome(finished_at=jobs.supervisor.clock.now())
         finally:
@@ -278,7 +282,10 @@ async def test_queued_continue_uses_one_new_job_same_artifact_journal_and_never_
         old, _ = await jobs.submit(workspace.project_id, payload)
         await factory.actor(old)
         await asyncio.wait_for(jobs.supervisor.controls[old.id].task, 10)
+        # The scripted factory bypasses the queued runtime, which seals a building draft at the end of the job.
+        service.proposals.finish(workspace.project_id, old.id)
         value = service.proposals.get(workspace.project_id, prepared[0]['proposalId'], 1)
+        assert value.proposal.state == 'incomplete'
         next_payload = payload.model_copy(deep=True); next_payload.request.client_request_id = 'continue_queue'
         factory.callbacks['continue_queue'] = second
         request = AssistantContinueJobV1(protocolVersion=1, proposal=identity_request(value), request=next_payload)
@@ -379,9 +386,10 @@ async def test_http_continue_requires_protocol_dispatches_one_scripted_turn_and_
             run.connection_epoch, time.monotonic()), run, Fetcher())
         try:
             snapshot = await read_document(session)
-            first, _ = await append(session, 'useful', snapshot=snapshot, phase='finalize')
+            first, _ = await append(session, 'useful', snapshot=snapshot)
         finally:
             await session.close()
+        service.proposals.finish(workspace.project_id, run.id)
         service.store.finish(workspace.project_id, run.id, 'interrupted', error='AGENT_INTERRUPTED')
         value = service.proposals.get(workspace.project_id, first['proposalId'], 1)
         next_request = request.model_copy(update={'client_request_id': 'http_continue'})

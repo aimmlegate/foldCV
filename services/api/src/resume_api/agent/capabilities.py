@@ -58,7 +58,8 @@ TOOL_TASKS = {"get_resume_context": "read_resume", "find_resume_content": "read_
     "prepare_edit_batch": "rewrite_resume"}
 PLANNING_INSTRUCTIONS = (
     " Before generating an action, check the user's task with get_project_resources(task:...) "
-    "using protocolVersion:1 and the advertised task ID. Read its stage availability and alternatives. "
+    "using protocolVersion:1 and the advertised task ID; every other tool, including get_application_skills, "
+    "waits for that check. Read its stage availability and alternatives. "
     "Unsupported tasks stop there. This check is not approval. Do not invent tools or files."
 )
 PROPOSAL_INSTRUCTIONS = (
@@ -81,15 +82,21 @@ def proposal_instructions():
     return PROPOSAL_INSTRUCTIONS + CHAT_SKILL_INSTRUCTIONS + (
         " Read complete context, document and working-facts pages for the frozen scope. "
         "Copy UTF-16 offsets from find_resume_content and pair them with a full document read, "
-        "never a search snapshot. Coverage IDs are opaque; reuse returned IDs and account for "
-        "all unresolved units before finalization. Split wording edits at rich-style/link/binding "
+        "never a search snapshot. After complete reads, add replace_text operations only for the wording "
+        "you improve and call phase:finalize; one finalize call with all operations is enough. On finalize "
+        "every unit you read fully and did not change stays unchanged automatically, so code, tables, quotes, "
+        "captions and lists may stay as they are. Use unchanged only for a specific reason. Units you did not "
+        "read fully stay unresolved. Coverage is the current document only; an original's extraction gap "
+        "never blocks it. Do not end the turn before finalize unless a limit stops you. If finalize names parts "
+        "not read fully, read them and finalize again. With edits off prepare the same complete proposal; only Apply waits. "
+        "Split wording edits at rich-style/link/binding "
         "boundaries. A compound format-and-rewrite request needs separate tasks, never partial Apply. "
         "Project actions prepare separate exact reviews. Undo/Redo use the native action captured for this "
         "request, complete document/fact reads and the versioned project-action preparation wrapper. "
         "They navigate the existing history only after explicit UI Apply, never create an inverse action. "
         "Explicit Continue carries useful operations and actual complete-read proof into a new bounded draft version. "
         "Use continuedDraft context and page its saved operations/coverage before extending it. "
-        "Retain its task/scope/baseline, do not repeat carried operations, and finalize the aggregate only after full coverage. "
+        "Retain its task/scope/baseline, do not repeat carried operations, and finalize the aggregate after complete reads. "
         "The same100-operation,64-call and current byte/time limits still apply. Do not retry a failed turn or publish pieces."
     )
 

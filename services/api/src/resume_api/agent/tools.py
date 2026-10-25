@@ -239,11 +239,14 @@ class ToolSession(PrivateMcp):
                 "Build a durable private draft, never a canonical save. Use protocolVersion:1, taskId, "
                 "key and phase:append/finalize. Omit proposalId for the first call, then reuse returned "
                 "proposalId/version. Each key is idempotent and each call extends the same baseline. "
-                "Use operations and snapshotIds from complete paged reads. unchanged lists unitId/reason "
-                "for preserved units; never infer coverage from an outline or search. An empty append "
-                "starts the scope ledger. Results expose up to 20 unresolved unit IDs; read and account "
-                "for those, append unchanged reasons and repeat within the same bounded turn. Finalize only after "
-                "all scope units are read and accounted for. draft_ready ends generation and awaits UI "
+                "Use operations and snapshotIds from complete paged reads; an outline or search is not a full read. "
+                "A text edit is {kind:\"replace_text\",target:{snapshotId,blockId,cellId:null,field:\"content\",start,end},"
+                "content:[{text:\"...\"}]} with the full document read snapshotId and exact UTF-16 start/end copied from "
+                "find_resume_content; table cells set cellId and captions use field:\"caption\". "
+                "Add replace_text operations only for wording you improve, then call phase:finalize; one finalize "
+                "call with all operations is enough. On finalize every fully read unit you did not change stays "
+                "unchanged automatically. Optional unchanged entries give unitId/reason only for a specific reason. "
+                "Units not read fully stay unresolved and leave the draft incomplete. draft_ready ends generation and awaits UI "
                 "review/Apply. incomplete retains useful work with Apply disabled. No operation publishes. "
                 "Maximum 100 aggregate operations and current transport/call/time limits. Wording, "
                 "facts/structure and formatting are separate tasks. Project action drafts, including in check-only "
@@ -374,7 +377,9 @@ class ToolSession(PrivateMcp):
         if self.argument_issues:
             result["argumentIssues"] = self.argument_issues
             if self.cap_mode and code == "AGENT_EDIT_INVALID":
-                result["format"] = "Use request:{protocolVersion:1,taskId,key,phase:'append'|'finalize',proposalId?,version:1,operations:[],snapshotIds:[],unchanged:[]}. Correct shape errors only; no field grants Apply authority."
+                result["format"] = ("Use request:{protocolVersion:1,taskId,key,phase:'append'|'finalize',proposalId?,version:1,operations:[],snapshotIds:[],unchanged:[]}. "
+                    "Each text edit is {kind:'replace_text',target:{snapshotId,blockId,cellId:null,field:'content',start,end},content:[{text:'...'}]} "
+                    "with UTF-16 start/end from find_resume_content. Correct shape errors only; no field grants Apply authority.")
                 return result
             if self.argument_issues[0]["path"] == "skillQuery":
                 result["format"] = "Use {} for the catalog, or {query:{skillId:'import-resume',resource:'SKILL.md',cursor:null}}. Follow top-level nextCursor with the same skillId/resource."

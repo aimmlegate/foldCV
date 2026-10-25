@@ -3608,7 +3608,8 @@
       "status": "partial",
       "tests": [
         "tests/recovery/test_assistant_fidelity.py::test_whole_cyrillic_rewrite_accounts_for_tables_images_captions_contacts_and_human_facts",
-        "tests/recovery/test_assistant_fidelity.py::test_mixed_rich_or_fact_replacement_is_rejected_without_dropping_the_draft"
+        "tests/recovery/test_assistant_fidelity.py::test_mixed_rich_or_fact_replacement_is_rejected_without_dropping_the_draft",
+        "tests/recovery/test_assistant_proposals.py::test_finalize_keeps_every_fully_read_untouched_unit_without_declarations"
       ]
     },
     {
@@ -3775,7 +3776,8 @@
         "tests/recovery/test_assistant_continuation.py::test_utf8_message_and_call_limits_keep_useful_draft_and_an_exact_remedy",
         "tests/recovery/test_assistant_continuation.py::test_aggregate_101st_operation_never_replaces_or_publishes_the_saved_100_operation_draft",
         "tests/recovery/test_assistant_continuation.py::test_twenty_retained_versions_keep_the_same_work_and_refuse_another_dispatch",
-        "tests/recovery/test_assistant_continuation.py::test_known_oversize_resources_disable_generation_with_an_alternative_that_fits"
+        "tests/recovery/test_assistant_continuation.py::test_known_oversize_resources_disable_generation_with_an_alternative_that_fits",
+        "tests/recovery/test_assistant_proposals.py::test_finalize_never_keeps_unread_units_and_keeps_explicit_reasons"
       ]
     },
     {

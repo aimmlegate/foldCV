@@ -353,11 +353,58 @@ async def test_selected_draft_uses_frozen_scope_and_partial_whole_draft_cannot_f
         await session.call("get_project_resources", AssistantTaskRequestV1(protocolVersion=1, taskId="rewrite_resume"))
         read = await session.call("get_resume_context", AgentQuery(kind="document", ids=["narrative"]))
         partial, _ = await append(session, "first", snapshot=AgentReadSnapshot.model_validate(read["snapshot"]), phase="finalize")
-        assert partial["disposition"] == "incomplete" and partial["unresolvedUnits"] > 0
+        assert partial["disposition"] == "building" and partial["unresolvedUnits"] > 0
         value = service.proposals.get(workspace.project_id, partial["proposalId"], 1)
         assert value.candidate is not None and value.proposal.changes
+        service.proposals.finish(workspace.project_id, session.run.id)
+        assert service.proposals.get(workspace.project_id, partial["proposalId"], 1).proposal.state == "incomplete"
         denied, _ = await append(session, "late", proposal=partial["proposalId"])
         assert denied["error"]["code"] == "AGENT_EDIT_LIMIT"
         assert not projects.storage.read_committed(workspace.project_id)[0].mutation_replay
+    finally:
+        await session.close()
+
+
+@pytest.mark.asyncio
+async def test_finalize_keeps_every_fully_read_untouched_unit_without_declarations(tmp_path):
+    from resume_api.agent.proposals import KEPT
+    service, runtime, projects, workspace, session = environment(tmp_path)
+    before = projects.storage.read_committed(workspace.project_id)[0].model_dump_json()
+    try:
+        snapshot = await read_document(session)
+        ready, _ = await append(session, "only", snapshot=snapshot, phase="finalize")
+        assert ready["disposition"] == "draft_ready" and ready["unresolvedUnits"] == 0 and ready["changedUnits"] >= 1
+        stored = service.proposals.list(workspace.project_id)[0].proposal
+        kept = [unit for unit in stored.coverage if unit.state == "unchanged"]
+        assert kept and all(unit.read and unit.reason == KEPT for unit in kept)
+        assert projects.storage.read_committed(workspace.project_id)[0].model_dump_json() == before and not runtime.calls
+    finally:
+        await session.close()
+
+
+@pytest.mark.asyncio
+async def test_finalize_never_keeps_unread_units_and_keeps_explicit_reasons(tmp_path):
+    service, _, _, workspace, session = environment(tmp_path)
+    try:
+        task = await session.call("get_project_resources", AssistantTaskRequestV1(protocolVersion=1, taskId="rewrite_resume"))
+        assert task["availability"]["state"] == "available"
+        query = AgentQuery(kind="document")
+        page = await session.call("get_resume_context", query)
+        snapshot = AgentReadSnapshot.model_validate(page["snapshot"])
+        while page["snapshot"]["nextCursor"]:
+            page = await session.call("get_resume_context", query.model_copy(update={"cursor": page["snapshot"]["nextCursor"]}))
+        started, _ = await append(session, "start", snapshot=snapshot)
+        block = next(unit["unitId"] for unit in started["coverage"] if unit["unitId"].startswith("block:") and unit["read"])
+        reason = "Оставить авторскую формулировку."
+        partial, _ = await append(session, "end", proposal=started["proposalId"], phase="finalize",
+            unchanged=[{"unitId": block, "reason": reason}])
+        # Unread scope keeps the draft open and names the reads still needed in the same turn.
+        assert partial["disposition"] == "building" and partial["unresolvedUnits"] > 0
+        assert "get_working_facts" in partial["reason"] and "kind=context" in partial["reason"]
+        service.proposals.finish(workspace.project_id, session.run.id)
+        stored = service.proposals.list(workspace.project_id)[0].proposal
+        assert stored.state == "incomplete"
+        assert all(not unit.read for unit in stored.coverage if unit.state == "unresolved")
+        assert next(unit for unit in stored.coverage if unit.unit_id == block).reason == reason
     finally:
         await session.close()

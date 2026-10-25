@@ -15,7 +15,10 @@ from .capabilities import BY_ID
 from .context import current_dependencies, query_fingerprint
 
 
-def coverage(session, baseline, candidate, scope, unchanged, operations=()):
+KEPT = "Прочитано полностью; оставлено без изменений."
+
+
+def coverage(session, baseline, candidate, scope, unchanged, operations=(), *, finalize=False):
     allowed = Scope(baseline, scope)
     new_ids = {block.id for block in candidate.project.document.blocks()} - {block.id for block in baseline.project.document.blocks()}
     before, after = units(baseline, scope, allowed=allowed), units(candidate, scope, allowed=allowed, new_ids=new_ids)
@@ -45,8 +48,13 @@ def coverage(session, baseline, candidate, scope, unchanged, operations=()):
         changed = digest(old.value if old else None) != digest(new.value if new else None)
         was_read = old is None or (context if unit.reader == "context" else facts_collection if unit.reader == "facts_collection" else
             unit.reader in facts if unit.kind == "fact" else unit.reader in read | cells)
-        state = "changed" if changed and was_read else "unchanged" if not changed and was_read and key in declared else "unresolved"
-        reason = "Изменение вычислено из подготовленного документа." if state == "changed" else declared.get(key, "Нужно полное чтение и явный учёт этой части.")
+        # Finalizing keeps every fully read, untouched unit; unread units can never become unchanged.
+        state = ("changed" if changed and was_read else
+            "unchanged" if not changed and was_read and (key in declared or finalize) else "unresolved")
+        reason = "Изменение вычислено из подготовленного документа." if state == "changed" else declared.get(key,
+            KEPT if state == "unchanged" else
+            "Прочитано: добавьте правку или завершите вариант." if was_read else
+            "Прочитайте эту часть полностью, затем добавьте правку или завершите вариант.")
         result.append(AssistantCoverageV1(unitId=key, state=state, reason=reason, read=was_read))
     whole = WholeResumeScope(kind="resume")
     changes = comparison(units(baseline, whole), units(candidate, whole))
@@ -74,13 +82,23 @@ def result(value):
     proposal = value.proposal
     pending = [unit for unit in proposal.coverage if unit.state == "unresolved"]
     visible = pending or proposal.coverage
-    return AssistantProposalResultV1(disposition="no_change" if value.no_change else
-        "draft_ready" if proposal.state == "ready" else "incomplete" if proposal.state == "incomplete" else "building",
+    disposition = ("no_change" if value.no_change else "draft_ready" if proposal.state == "ready" else
+        "incomplete" if proposal.state == "incomplete" else "building")
+    # A building draft is unfinished work: tell the model its next step, never that the draft is saved.
+    reads = {"fact": "get_working_facts", "facts": "get_working_facts", "scope": "get_resume_context kind=context",
+        "region": "get_resume_context kind=context"}
+    needed = sorted({reads.get(unit.unit_id.split(":", 1)[0], "get_resume_context kind=document") for unit in pending if not unit.read})
+    next_step = ("Draft not finished. " + (f"Not read fully yet: read with {', '.join(needed)} and follow nextCursor to null. " if needed else "")
+        + "Add replace_text operations for the wording you improve, then call phase:finalize. "
+        "On finalize every unit you read fully and did not change stays unchanged automatically; code, tables, quotes, "
+        "captions and lists may stay as they are. Do not end the turn before finalize."
+        if disposition == "building" and pending else None)
+    return AssistantProposalResultV1(disposition=disposition,
         proposalId=None if value.no_change else proposal.id, version=proposal.version, contentSha256=proposal.content_sha256,
         changedUnits=sum(unit.state == "changed" for unit in proposal.coverage),
         unresolvedUnits=sum(unit.state == "unresolved" for unit in proposal.coverage),
         coverage=visible[:20], coverageTruncated=len(visible) > 20, unitCount=len(proposal.coverage),
-        reason=proposal.reason or "Черновик сохранён для просмотра. Документ не изменён.")
+        reason=next_step or proposal.reason or "Черновик сохранён для просмотра. Документ не изменён.")
 
 
 def review(service, project_id):
@@ -236,13 +254,18 @@ def assemble(session, request):
             current.calls[request.key] = request_hash
             current.proposal.operation_count = len(current.operations)
             current.proposal.content_sha256 = content_digest(candidate)
-            current.proposal.coverage, current.proposal.changes = coverage(session, current.baseline, candidate, current.scope, current.unchanged, current.operations)
+            current.proposal.coverage, current.proposal.changes = coverage(session, current.baseline, candidate, current.scope,
+                current.unchanged, current.operations, finalize=request.phase == "finalize")
             if batch:
                 current.dependencies = list({digest(item): item for item in [*current.dependencies, *batch.dependencies]}.values())
             from .continuation import capture_groups
             current.read_groups = capture_groups(session.book, journal)
             if request.phase == "finalize":
                 complete = all(unit.read and unit.state != "unresolved" for unit in current.proposal.coverage)
+                if not complete:
+                    # Unread scope keeps the draft open so the same turn can read it and finalize again;
+                    # the end of the run seals whatever is still unfinished.
+                    return current
                 current.no_change = batch is None and complete
                 current.proposal.state = "invalid" if current.no_change else "ready" if complete and batch else "incomplete"
                 current.proposal.reason = "Изменений нет. Документ и история не изменены." if current.no_change else (
