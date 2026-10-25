@@ -490,6 +490,42 @@ def create_app(*, origin: str, secret: str, temp_root: Path, dist: Path, runner:
         return ModelCapture(adapter=adapter, model=model, effort=effort, capabilityProfile="closed-json-v1", capabilityVersion="1",
             configurationHash=capture_digest({"adapter": adapter, "model": model, "effort": effort}))
 
+    def template_fallback_model(primary):
+        # E07: the configured fallback with its catalog default effort, captured next to the primary. An unavailable
+        # fallback refuses the start instead of being replaced or dropped.
+        from packages.resume_core.models.template_import import ModelCapture
+        from packages.resume_core.template_import import digest as capture_digest
+        try:
+            model = preferences_store.load().selected_fallback_model
+        except PreferencesFailure as error:
+            raise ProjectFailure(error.code, 409) from None
+        if model is None or model == primary.model:
+            return None
+        reasoning = connection_state.modelReasoning.get(model)
+        effort = reasoning.default if reasoning is not None else None
+        if not connection_state.metadataReady or model not in connection_state.models or effort is None:
+            raise ProjectFailure("MODEL_DENIED", 409)
+        return ModelCapture(adapter=primary.adapter, model=model, effort=effort, capabilityProfile="closed-json-v1",
+            capabilityVersion="1", configurationHash=capture_digest({"adapter": primary.adapter, "model": model, "effort": effort}))
+
+    def template_model_provider(model):
+        # An import runs the model it captured while that model stays available, whatever Settings select later.
+        try:
+            selected = import_selected_provider()
+        except ProjectFailure:
+            selected = None
+        if selected is not None and selected[1] == model:
+            return selected
+        # Another captured model (the fallback, or the import model before a Settings change) runs while the catalog
+        # offers it; it is never replaced by a different one.
+        if not connection_state.metadataReady or model not in connection_state.models:
+            raise ProjectFailure("MODEL_DENIED", 409)
+        if gui_provider is not None and not unsafe_cleanup:
+            return gui_provider, model
+        if experimental_ready(model) and provider is not None:
+            return provider, model
+        return None
+
     template_factory = None
     if template_import_call_cap is not None:
         def template_factory(owner):
@@ -500,12 +536,14 @@ def create_app(*, origin: str, secret: str, temp_root: Path, dist: Path, runner:
             def authority(operation, current):
                 rich_projects.validate_template_capture(operation, current)
             # Registered deterministic operations over admitted facts; unimplemented kinds stay refused.
-            return TemplatePipeline(owner.publisher, ProviderTemplateTransport(import_selected_provider, temp_root),
+            return TemplatePipeline(owner.publisher, ProviderTemplateTransport(import_selected_provider, temp_root,
+                model_provider=template_model_provider),
                 originals=rich_projects.originals, authority=authority, assemble=assemble_template, derive=derive_task,
                 # One clock for jobs, request epochs and publication: the job store's.
                 wall=lambda: owner.store.clock())
     rich_projects.configure_template_imports(call_cap=template_import_call_cap,
-        model=template_import_model if template_import_call_cap is not None else None)
+        model=template_import_model if template_import_call_cap is not None else None,
+        fallback=template_fallback_model if template_import_call_cap is not None else None)
     jobs = JobService(rich_projects, resolved_agent_runtime, agent_connection, enabled=background_enabled,
         template_factory=template_factory,
         factory=background_factory, parallel=background_parallel, server_factory=background_server_factory,
@@ -1128,6 +1166,18 @@ def create_app(*, origin: str, secret: str, temp_root: Path, dist: Path, runner:
             try:
                 rules_store.load()
                 value = preferences_store.select_import_model(payload.model)
+                return JSONResponse(value.model_dump(mode="json", by_alias=True), headers={"Cache-Control": "no-store"})
+            except (PreferencesFailure, RulesFailure) as error:
+                return problem(error.code, 409, "settings")
+
+    @app.put("/v1/settings/fallback-model")
+    async def save_fallback_model(payload: SaveImportModelPreference):
+        async with gate:
+            if payload.model is not None and (not connection_state.metadataReady or payload.model not in connection_state.models):
+                return problem("MODEL_DENIED", 409, "settings")
+            try:
+                rules_store.load()
+                value = preferences_store.select_fallback_model(payload.model)
                 return JSONResponse(value.model_dump(mode="json", by_alias=True), headers={"Cache-Control": "no-store"})
             except (PreferencesFailure, RulesFailure) as error:
                 return problem(error.code, 409, "settings")

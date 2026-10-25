@@ -3,9 +3,16 @@
 A reply states the payload and the evidence of its values. Which item a value belongs to, the add lineage of new
 items and the relations the template configures follow from payload pointers and the compiled bindings, so they
 are derived here when the reply leaves them out or names them inconsistently. A value copied word for word from
-an offered entry cites the narrowest entries that contain it. What cannot be derived stays missing, and the
-existing checks refuse it with the binding named: a value with no evidence, a selection the request did not offer,
-an explicit split or merge that names unknown items.
+an offered entry cites the narrowest entries that contain it; a value whose words the source states in another
+form or order cites the few narrowest entries that state them all, and the review checks that support. What cannot
+be derived stays missing, and the existing checks refuse it with the binding named: a value with no evidence, a
+selection the request did not offer, an explicit split or merge that names unknown items.
+
+Repairs (LIVE-05..07) also showed bookkeeping the payload contradicts: an entry for a position the payload no longer
+has, or that no binding holds, carries no fact and is dropped; an entry inside a bound value cites that value, and
+the raw wording of a date or period cites the values read from it; a foreign field name at a pointer with one bound
+field names that field; an item reference of a type no binding at that pointer holds cannot name that value's item,
+so the value gets a new item instead.
 """
 
 import re
@@ -31,6 +38,16 @@ def _inside(inner, outer):
     return same and outer.start <= inner.start and inner.end <= outer.end and (inner.start, inner.end) != (outer.start, outer.end)
 
 
+def _resolves(payload, pointer):
+    if not isinstance(pointer, str):
+        return True
+    try:
+        payload_value(payload, pointer)
+    except ValueError:
+        return False
+    return True
+
+
 def stated_text(payload, pointer):
     """The source wording a value carries: a string, or the raw text of the date or period it belongs to."""
     value = payload_value(payload, pointer)
@@ -46,16 +63,41 @@ def stated_text(payload, pointer):
     return None
 
 
+def _narrowest(hits):
+    return [option for option in hits if not any(other is not option and _inside(other.span, option.span) for other in hits)]
+
+
 def stating(text, table):
     """Refs of the narrowest offered entries that contain the text word for word."""
     pattern = re.compile(r'(?<!\w)' + re.escape(text) + r'(?!\w)')
-    hits = [option for option in table.values() if pattern.search(option.text)]
-    narrow = [option for option in hits if not any(other is not option and _inside(other.span, option.span) for other in hits)]
+    narrow = _narrowest([option for option in table.values() if pattern.search(option.text)])
     return [option.ref for option in narrow[:STATED_LIMIT]]
 
 
-def complete_reply(reply, bindings, table, references):
-    """The referenced reply with derived fields entries, item selections, discoveries, add lineage and relations."""
+def stating_words(text, table):
+    """Refs of at most STATED_LIMIT narrowest entries that together state every word of the text, ignoring case."""
+    words = list(dict.fromkeys(word.casefold() for word in re.findall(r'\w+', text)))
+    if not words:
+        return []
+    def holds(option, word):
+        return re.search(r'(?<!\w)' + re.escape(word) + r'(?!\w)', option.text.casefold()) is not None
+    options = _narrowest([option for option in table.values() if any(holds(option, word) for word in words)])
+    # Greedy cover: one entry stating all words wins; otherwise the entries adding the most missing words.
+    chosen, missing = [], set(words)
+    while missing and len(chosen) < STATED_LIMIT:
+        best = max(options, key=lambda option: sum(holds(option, word) for word in missing), default=None)
+        if best is None or not any(holds(best, word) for word in missing):
+            return []
+        chosen.append(best)
+        missing -= {word for word in missing if holds(best, word)}
+    return [option.ref for option in chosen] if not missing else []
+
+
+def complete_reply(reply, bindings, table, references, allowed_relations=None):
+    """The referenced reply with derived fields entries, item selections, discoveries, add lineage and relations.
+
+    allowed_relations, when given, is the set of (subject type, kind, target type) the template declares; a model
+    relation outside it carries no fact (LIVE-11: one job owned by another) and is dropped."""
     if not isinstance(reply, dict) or not bindings:
         return reply
     payload = reply.get('payload')
@@ -67,18 +109,52 @@ def complete_reply(reply, bindings, table, references):
         return len(tokens) > len(parent) and tokens[:len(parent)] == parent
     # An entry at a list or object pointer that holds bound values gives its evidence to those values.
     entries, providers = [], {}
+    kinds = {value.ref: value.semantic_type for value in references.items} if references else {}
+    moved = []
     for given in reply.get('fields') or []:
         entry = dict(given)
         pointer = entry.get('pointer')
+        if not _resolves(payload, pointer):
+            continue
+        if isinstance(pointer, str) and pointer not in instances:
+            # An entry inside one bound value (LIVE-06: /0/period/raw of a bound period) cites that value.
+            holders = [candidate for candidate in instances if under(pointer, candidate)]
+            parent = pointer_of(pointer_tokens(pointer)[:-1])
+            if holders:
+                entry['pointer'] = pointer = max(holders, key=len)
+                moved.append(entry)
+            elif pointer_tokens(pointer)[-1:] == ['raw'] and any(under(candidate, parent) for candidate in instances):
+                # The raw wording of a date or period (LIVE-06: /0/period/raw) is the evidence of the values read from it.
+                providers[parent] = list(entry.get('evidence') or [])
+                continue
         matches = instances.get(pointer, [])
-        if entry.get('fieldKey') is None and len(matches) == 1:
-            entry['fieldKey'] = matches[0][1]
+        item = entry.get('item')
+        # An unoffered ref stays as given, so restoring the reply still refuses it.
+        if (isinstance(item, dict) and item.get('kind') == 'handle' and matches and item.get('ref') in kinds
+                and kinds[item.get('ref')] not in {semantic for semantic, _field in matches}):
+            entry['item'] = None
+        fields = {field for _semantic, field in matches}
+        if len(fields) == 1 and entry.get('fieldKey') not in fields:
+            # A missing or foreign field name (LIVE-07: the role family's 'family' on a tool) names the one bound field.
+            if entry.get('fieldKey') is not None:
+                moved.append(entry)
+            entry['fieldKey'] = next(iter(fields))
         if not matches and isinstance(pointer, str) and any(under(candidate, pointer) for candidate in instances):
             providers[pointer] = list(entry.get('evidence') or [])
+            continue
+        if not matches and isinstance(pointer, str):
+            # No binding holds this pointer, above or below (LIVE-07: /0/project, a null project): no fact to cite.
             continue
         if entry.get('effectiveCells') is None:
             entry['effectiveCells'] = []
         entries.append(entry)
+    # A moved or renamed entry joins the value's own entry, if the reply gave one, instead of duplicating it.
+    for entry in moved:
+        own = next((other for other in entries if other is not entry and not any(other is value for value in moved)
+            and (other.get('pointer'), other.get('fieldKey')) == (entry['pointer'], entry.get('fieldKey'))), None)
+        if own is not None:
+            own['evidence'] = list(dict.fromkeys([*(own.get('evidence') or []), *(entry.get('evidence') or [])]))
+            entries = [value for value in entries if value is not entry]
     def derived_evidence(pointer):
         if empty_value(payload_value(payload, pointer)):
             return []
@@ -86,7 +162,7 @@ def complete_reply(reply, bindings, table, references):
         if ancestors:
             return providers[ancestors[-1]]
         text = stated_text(payload, pointer)
-        return (stating(text, table) or None) if text else None
+        return (stating(text, table) or stating_words(text, table) or None) if text else None
     given = {(entry.get('pointer'), entry.get('fieldKey')) for entry in entries}
     for pointer in sorted(instances, key=_natural):
         for _semantic, field in instances[pointer]:
@@ -143,10 +219,10 @@ def complete_reply(reply, bindings, table, references):
     new = [value['key'] for value in discoveries if value['key'] not in children]
     lineage = explicit + ([{'kind': 'add', 'parents': [], 'children': new}] if new else [])
     return {**reply, 'fields': entries, 'discoveries': discoveries, 'lineage': lineage,
-        'relations': _relations(reply, entries, roots, keys, handles, instances, bindings, references)}
+        'relations': _relations(reply, entries, roots, keys, handles, instances, bindings, references, allowed_relations)}
 
 
-def _relations(reply, entries, roots, keys, handles, instances, bindings, references):
+def _relations(reply, entries, roots, keys, handles, instances, bindings, references, allowed_relations=None):
     """Model relations between final items, plus each configured relation the reply left out or aimed elsewhere."""
     def selector(root):
         if root in keys:
@@ -177,14 +253,24 @@ def _relations(reply, entries, roots, keys, handles, instances, bindings, refere
             if len(targets) == 1:
                 configured[(root, binding.relation.kind)] = targets[0]
     kept, present = [], set()
+    captured_relations = {value.ref: value for value in references.relations} if references else {}
+    types = {identity(selector(root)): root[0] for root in roots if selector(root) is not None}
     for value in reply.get('relations') or []:
         subject, target = identity(value.get('subject')), identity(value.get('target'))
         if subject not in selectable or target not in selectable:
+            continue
+        if allowed_relations is not None and (types.get(subject), value.get('kind'), types.get(target)) not in allowed_relations:
             continue
         aimed = next((goal for (root, kind), goal in configured.items()
             if identity(selector(root)) == subject and kind == value.get('kind')), None)
         if aimed is not None and identity(selector(aimed)) != target:
             continue
+        chosen = value.get('relation') or {}
+        captured = captured_relations.get(chosen.get('ref')) if chosen.get('kind') == 'relation' else None
+        if captured is not None and (captured.kind != value.get('kind') or subject != ('handle', captured.subject)):
+            # A captured relation keeps its subject and kind (LIVE-11: a repair named one for another subject); a
+            # relation of another subject or kind is a new one.
+            value = {**value, 'relation': {'kind': 'new', 'key': 'link-' + str(subject[1]) + '-' + str(value.get('kind'))}}
         kept.append(value)
         present.add((subject, value.get('kind')))
     existing = {(value.subject, value.kind): value.ref for value in references.relations} if references else {}

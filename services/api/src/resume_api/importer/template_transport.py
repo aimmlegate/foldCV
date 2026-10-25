@@ -20,9 +20,12 @@ class ProviderTemplateTransport:
     attempt stays fenced until durable evidence exists.
     """
 
-    def __init__(self, provider_factory, temp_root, *, incarnation=None):
+    def __init__(self, provider_factory, temp_root, *, incarnation=None, model_provider=None):
         self.provider_factory, self.temp_root = provider_factory, temp_root
         self.incarnation = incarnation or 'transport-' + uuid.uuid4().hex
+        # With model_provider an attempt runs the model its import captured (primary or fallback) while that model
+        # stays available, whatever Settings select later; without it only the selected model runs.
+        self.model_provider = model_provider
 
     def reserve_owner(self, _operation, _task, _policy):
         return LaunchOwner(reservationId='reservation-' + uuid.uuid4().hex, incarnationId=self.incarnation, generation=1,
@@ -30,7 +33,7 @@ class ProviderTemplateTransport:
 
     def generate(self, request, cancel):
         try:
-            selected = self.provider_factory()
+            selected = self.model_provider(request.policy.model) if self.model_provider else self.provider_factory()
         except Exception as error:
             raise ContentFailure(getattr(error, 'code', 'CONNECTION_REQUIRED'), cleanup_verified=True,
                 dispatch_witness={'neverDispatched': True}) from None

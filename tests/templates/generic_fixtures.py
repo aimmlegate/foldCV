@@ -251,9 +251,9 @@ REVIEWS = {'F10': f10_review}
 
 def satisfied(value, verdict=None):
     """Every check satisfied unless the case's verdict names another disposition for it."""
+    from tests.templates.evidence_references import expanded_checks
     results = []
-    checks = value.get('semanticContext', {}).get('checks', [])
-    for target, check in zip(value['targets'], checks, strict=True):
+    for target, check in zip(value['targets'], expanded_checks(value), strict=True):
         disposition = verdict(check) if verdict else None
         results.append({'ruleId': target['ruleId'], 'targetId': target['targetId'], 'disposition': disposition or 'satisfied',
             'reason': '' if disposition is None else 'Not supported by the cited source.', 'evidence': [], 'actionable': False})

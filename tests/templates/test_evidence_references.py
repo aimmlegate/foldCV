@@ -167,21 +167,29 @@ def review_returned(operation, proposal, captured, src, results_for):
     return operation, attempt, value, raw
 
 
+def per_check(value):
+    """Check ref -> its rule and the evidence refs of its target, read from the grouped review checks."""
+    return {ref: {'ruleId': rule, 'evidence': group.get('evidence', [])}
+        for group in value.semantic_context['checks'] for ref, rule in group['checks'].items()}
+
+
 def test_review_selects_checks_and_evidence_by_reference_and_its_receipt_keeps_identities_and_spans():
     operation, _, proposal, captured, src, options, _ = returned(referenced)
     def results(value):
-        return [{'check': entry['check'], 'disposition': 'satisfied', 'reason': '', 'evidence': entry.get('evidence', []),
-            'actionable': False} for entry in value.semantic_context['checks']]
+        return [{'check': ref, 'disposition': 'satisfied', 'reason': '', 'evidence': entry['evidence'], 'actionable': False}
+            for ref, entry in sorted(per_check(value).items(), key=lambda pair: int(pair[0][1:]))]
     operation, attempt, value, raw = review_returned(operation, proposal, captured, src, results)
     assert value.schema_version == 2 and not value.source_spans and not value.source_texts
     assert value.evidence[:2] == options
-    checks = {entry['check']: entry for entry in value.semantic_context['checks']}
-    assert list(checks) == list(check_references(value)) == ['C' + str(index) for index in range(1, len(value.targets) + 1)]
-    assert all((entry['ruleId'], entry['targetId']) == (target.rule_id, target.target_id)
-        for entry, target in zip(checks.values(), value.targets, strict=True))
+    checks = per_check(value)
+    assert sorted(checks, key=lambda ref: int(ref[1:])) == list(check_references(value)) == [
+        'C' + str(index) for index in range(1, len(value.targets) + 1)]
+    assert all(checks[ref]['ruleId'] == target.rule_id for ref, target in check_references(value).items())
+    # Stored checks state each target once; rules and targets are restored by ref from the captured targets.
+    assert len(value.semantic_context['checks']) <= len(checks) and 'targetId' not in json.dumps(value.semantic_context['checks'])
     assert value.semantic_context['proposal']['fields'][0]['evidence'] == ['S1']
     schema = review_schema(value)
-    assert schema['$defs']['CheckRef']['enum'] == list(checks) and schema['$defs']['EvidenceRef']['enum'] == ['S1', 'S2']
+    assert schema['$defs']['CheckRef']['enum'] == list(check_references(value)) and schema['$defs']['EvidenceRef']['enum'] == ['S1', 'S2']
     assert 'targetId' not in json.dumps(schema['$defs']['ReferencedDisposition'])
     operation, receipt = record_review(operation, attempt, [src], NOW)
     assert [(result.rule_id, result.target_id) for result in receipt.reply.results] == [
@@ -194,9 +202,47 @@ def test_review_selects_checks_and_evidence_by_reference_and_its_receipt_keeps_i
     for change in [{'check': 'C99'}, {'evidence': ['S99']}, {'targetId': value.targets[0].target_id}]:
         with pytest.raises(SchemaFailure):
             validate_review_reply({'results': [{**payload[0], **change}, *payload[1:]]}, value, [src])
-    for incomplete in [payload[1:], [payload[0], *payload]]:
-        with pytest.raises(TemplateImportFailure, match='IMPORT_REVIEW_INCOMPLETE'):
-            validate_review_reply({'results': incomplete}, value, [src])
+    with pytest.raises(TemplateImportFailure, match='IMPORT_REVIEW_INCOMPLETE'):
+        validate_review_reply({'results': [payload[0], *payload]}, value, [src])
+
+
+def test_a_protocol_3_review_lists_only_failing_checks_and_every_other_check_holds():
+    # LIVE-05..07: one entry per check could not be written in time, a list of satisfied refs was cut short, and a
+    # "the rest holds" flag was read as "all hold"; now a check the reply does not list is satisfied.
+    operation, _, proposal, captured, src, _options, _ = returned(referenced)
+    def results(value):
+        return [{'check': 'C1', 'disposition': 'violation', 'reason': 'Год не указан в источнике', 'evidence': ['S1'],
+            'actionable': True}]
+    operation, attempt, value, raw = review_returned(operation, proposal, captured, src, results)
+    refs = list(check_references(value))
+    assert value.semantic_context['replyProtocol']['version'] == 'template-review-protocol-3' and len(refs) > 2
+    assert review_schema(value)['required'] == ['results']
+    reply = validate_review_reply({'results': results(value)}, value, [src])
+    by_target = {(result.rule_id, result.target_id): result for result in reply.results}
+    assert [(result.rule_id, result.target_id) for result in reply.results] == [
+        (target.rule_id, target.target_id) for target in value.targets]
+    first = by_target.pop((value.targets[0].rule_id, value.targets[0].target_id))
+    assert first.disposition == 'violation' and first.evidence and first.reason
+    assert all(result.disposition == 'satisfied' and result.evidence == [] and result.reason == '' for result in by_target.values())
+    assert all(result.disposition == 'satisfied' for result in validate_review_reply({'results': []}, value, [src]).results)
+    with pytest.raises(TemplateImportFailure, match='IMPORT_REVIEW_INCOMPLETE'):
+        validate_review_reply({'results': [*results(value), *results(value)]}, value, [src])
+    with pytest.raises(SchemaFailure):
+        validate_review_reply({'results': [{**results(value)[0], 'check': 'C0'}]}, value, [src])
+
+
+def test_a_review_sent_with_protocol_2_still_decodes_its_one_entry_per_check_reply():
+    operation, _, proposal, captured, src, _options, _ = returned(referenced)
+    value = make_review_input(operation, proposal, captured, [src], operation.capture.primary,
+        effective_cells=[], semantic_context={'capturedTaskInput': operation.task_inputs[0].value})
+    value = value.model_copy(update={'semantic_context': {**value.semantic_context,
+        'replyProtocol': {'version': 'template-review-protocol-2', 'rules': []}}})
+    entries = [{'check': ref, 'disposition': 'satisfied', 'reason': '', 'evidence': [], 'actionable': False}
+        for ref in check_references(value)]
+    assert len(validate_review_reply({'results': entries}, value, [src]).results) == len(entries)
+    # Protocol 2 needs every check answered: a reply that leaves one out is incomplete.
+    with pytest.raises(TemplateImportFailure, match='IMPORT_REVIEW_INCOMPLETE'):
+        validate_review_reply({'results': entries[1:]}, value, [src])
 
 
 class CitingProvider(ScriptedTemplateProvider):
@@ -206,8 +252,8 @@ class CitingProvider(ScriptedTemplateProvider):
         def answer(value):
             if 'targets' not in value:
                 return scripted_template_answer(value)
-            return {'results': [{'check': entry['check'], 'disposition': 'satisfied', 'reason': '',
-                'evidence': entry.get('evidence', []), 'actionable': False} for entry in value['semanticContext']['checks']]}
+            return {'results': [{'check': ref, 'disposition': 'satisfied', 'reason': '', 'evidence': group.get('evidence', []),
+                'actionable': False} for group in value['semanticContext']['checks'] for ref in group['checks']]}
         return scripted_template_result(self, request, answer)
 
 
@@ -278,7 +324,9 @@ async def test_model_prompts_offer_refs_and_texts_while_storage_keeps_spans_and_
         operation = service.read(project).project.template_operations[0]
     assert len(provider.prompts) == len(operation.attempts) == 2
     for prompt, attempt in zip(provider.prompts, operation.attempts, strict=True):
-        stored = attempt.request_value
+        # A review attempt's request is its review input record (stored once).
+        stored = attempt.request_value or next(record.value.model_dump(mode='json', by_alias=True)
+            for record in operation.review_inputs if record.attempt_id == attempt.id)
         sent = json.loads(prompt)
         # The model sees each offered entry as its ref and text; the stored request restores spans from the ref.
         assert sent['evidence'] and all(set(entry) == {'ref', 'text'} for entry in sent['evidence'])

@@ -87,12 +87,20 @@ PROPOSAL_PROTOCOL = {'version': 'template-proposal-protocol-5', 'rules': [
     'A request with feedback repairs this block: each entry names a rule, its target and the defect of the previous reply. Return the whole corrected reply.']}
 
 # Application-owned reply rules sent with every review; the checks and rules come from the coordinator.
-REVIEW_PROTOCOL = {'version': 'template-review-protocol-2', 'rules': [
-    'Return one results entry for every semanticContext.checks entry, exactly once: {check: its check ref, disposition, reason, evidence, actionable}. Add no other entries.',
-    'Each check applies one rule (ruleId and rules) to one target: a field (its pointer, value and evidence refs in the proposed payload), a relation (its subject and target item pointers and evidence refs) or the extraction scope. evidence offers every source text by ref.',
-    'Apply the rule of the check to that target only. satisfied: the cited evidence supports the value or relation and the rule holds; a null value is satisfied when the source does not state it. violation: the rule is broken; reason names the defect. uncertain: the evidence does not settle it; reason names what is missing.',
-    'The scope target checks coverage: every source statement that belongs to the block declaration is extracted, or the source states none. Text outside the declared content is not a coverage gap.',
-    'reason is empty for satisfied. evidence lists the refs that support the disposition, or []. actionable is true only for a violation or uncertainty that a corrected proposal could fix from the offered evidence.']}
+# Protocol 3 (LIVE-05..07): one entry per check made a 477-check review too long to write in 90 s; a list of satisfied
+# refs was cut short and a "the rest holds" flag was read as "all checks hold". A reply now lists the checks that fail,
+# and a check it does not list holds.
+REVIEW_PROTOCOL = {'version': 'template-review-protocol-3', 'rules': [
+    'semanticContext.checks lists each target once: a field (its pointer in the proposed payload, value and evidence refs), a relation (its kind, subject and target items and evidence refs) or the extraction scope. Its checks map each check ref to the rule (rules) that check applies to that target; a target has one check per rule.',
+    'Apply every rule of every target. results holds one entry {check, disposition, reason, evidence, actionable} for each check whose rule is broken (violation) or that the evidence does not settle (uncertain). A check not in results is satisfied, so leave no failing check out.',
+    'Rule kinds: evidence_identity: the cited evidence states the value; a value that a cited line lists among others is stated, and a date, number or name written in another form is the same value. A category the declaration asks to choose (an enum value such as a role family) is stated when the cited evidence fits it; the source need not use its name. semantic_support: the cited evidence supports the meaning, qualifiers and individual or team attribution of the value; a null value holds when the source does not state it. claim_ownership, attribution and task_result_separation: as their instructions say. complete_assignment: the scope coverage below.',
+    'The scope target checks coverage. evidence offers the complete source text of the CV. Every source statement that belongs to the block declaration is extracted, or the source states none; text outside the declared content is not a coverage gap.',
+    'reason is one short sentence in Russian that names the defect or what is missing; evidence lists the refs that support the disposition, or []. actionable is true only when a corrected proposal could fix it from the offered evidence.']}
+
+
+def review_protocol(review):
+    """The reply protocol a review input was sent with; it selects the reply shape its return is decoded by."""
+    return ((review.semantic_context or {}).get('replyProtocol') or {}).get('version')
 
 
 def check_references(review):

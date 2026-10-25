@@ -264,6 +264,7 @@ class ReferencedReviewReply(Wire):
     results: list[ReferencedDisposition]
 
 
+
 class ReviewReceipt(Wire):
     id: Id
     review_input_hash: Sha256

@@ -239,7 +239,11 @@ async def test_a_refused_identity_reply_keeps_its_cited_lines_in_the_header_and_
     assert shown['summary'][1] == 'Backend engineer who implemented queue processing.'
     assert 'Implemented queue processing.' in shown['projects'] and shown['programming'][1] == 'Python'
     [issue] = [issue for issue in workspace.project.import_issues if issue.code == 'IMPORT_SOURCE_FALLBACK']
-    assert issue.message == 'Source wording retained because interpretation checks did not complete.'
+    assert issue.message == 'Показан исходный текст: проверку извлечённых данных не удалось завершить.'
+    # The notice points at the identity view's own fallback paragraph, not at every block of the page.
+    shown_blocks = [block for block in workspace.project.document.blocks()
+        if block.type != 'section' and block.presentation.view_key == 'identity']
+    assert issue.block_ids == [block.id for block in shown_blocks]
     content = await exported(tmp_path / 'export', workspace, originals)
     header = xml(content, 'word/header1.xml')
     [(top, value)] = frames(header)
@@ -252,20 +256,20 @@ async def test_a_refused_identity_reply_keeps_its_cited_lines_in_the_header_and_
 
 
 @pytest.mark.asyncio
-async def test_an_identity_block_without_a_usable_reply_shows_only_lines_no_other_block_shows(tmp_path):
-    # No reply is not evidence of absence, so the block keeps its whole scope; of it, only the lines no accepted
-    # block shows are placed, once, and every accepted block stays.
+async def test_an_identity_block_without_a_usable_reply_places_no_lines_of_its_whole_cv_scope(tmp_path):
+    # No reply is not evidence of absence, so the block is a source fallback with a notice. Its scope is the whole
+    # CV, which identifies no lines: LIVE-08 placed every unshown line, contacts included, so none are placed now.
     _fixture, result, workspace, originals = await generic_import(tmp_path / 'import', 'F01',
         wrap=refused_identity(lambda _reply: 'not a JSON reply'))
     assert next(task for task in result.tasks if task.block_id == 'identity').state == 'source_fallback'
     shown = views(workspace)
-    assert shown['identity'] == ['Alex Example'] and shown['summary'][1] == 'Backend engineer who implemented queue processing.'
+    assert 'identity' not in shown and shown['summary'][1] == 'Backend engineer who implemented queue processing.'
     assert 'Implemented queue processing.' in shown['projects']
     assert body(workspace).count('Our team reduced median latency from 800 ms to 500 ms.') == 1
     [issue] = [issue for issue in workspace.project.import_issues if issue.code == 'IMPORT_SOURCE_FALLBACK']
-    assert issue.message == 'Source wording retained because interpretation checks did not complete.'
+    assert issue.message.startswith('Блок не заполнен') and issue.block_ids
     content = await exported(tmp_path / 'export', workspace, originals)
-    assert [value for _top, value in frames(xml(content, 'word/header1.xml'))] == ['Alex Example']
+    assert frames(xml(content, 'word/header1.xml')) == []
 
 
 @pytest.mark.asyncio

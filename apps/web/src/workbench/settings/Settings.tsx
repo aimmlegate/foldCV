@@ -2,7 +2,7 @@ import { errorMessage } from "../../errors/messages";
 import { useEffect, useState } from "react";
 import { ConnectionWorkflow, type ConnectionView } from "../../connection/workflow";
 import { AgentBrowserApi } from "../../assistant/api";
-import { preferencesRequest, rulesRequest, saveRulesRequest, saveImportModelRequest, saveLimitsRequest, saveRewriteReasoningRequest } from "../../api/client";
+import { preferencesRequest, rulesRequest, saveRulesRequest, saveImportModelRequest, saveFallbackModelRequest, saveLimitsRequest, saveRewriteReasoningRequest } from "../../api/client";
 import { SettingsDrafts, limitRanges, type SettingsPart, type SettingsState } from "./drafts";
 import { Connection } from "./Connection";
 import { ModelSelect } from "./ModelSelect";
@@ -11,7 +11,7 @@ import { Button } from "../ui/Button";
 import { OperationStatus } from "../ui/OperationStatus";
 import type { PaneOrder } from "./interface";
 
-const partNames: Record<SettingsPart, string> = { reasoning: "reasoning правки текста", model: "модель обработки", import: "модель импорта", analysis: "проверка изменений", limits: "лимиты", assistant: "помощник", rules: "правила" };
+const partNames: Record<SettingsPart, string> = { reasoning: "reasoning правки текста", model: "модель обработки", import: "модель импорта", fallback: "резервная модель импорта", analysis: "проверка изменений", limits: "лимиты", assistant: "помощник", rules: "правила" };
 export function Settings({ close, connectionChanged, paneOrder, changePaneOrder }: { close: () => void; connectionChanged: (view: ConnectionView) => void; paneOrder: PaneOrder; changePaneOrder: (order: PaneOrder) => void }) {
   const [section, setSection] = useState<"model" | "rules" | "analysis" | "limits" | "interface">("model");
   const [view, setView] = useState<ConnectionView>(() => new ConnectionWorkflow(() => {}).view);
@@ -21,7 +21,7 @@ export function Settings({ close, connectionChanged, paneOrder, changePaneOrder 
     const api = new AgentBrowserApi("");
     return new SettingsDrafts({ preferences: () => preferencesRequest(), rules: rulesRequest, assistant: () => api.settings(),
       analysis: enabled => preferencesRequest(enabled), saveRules: saveRulesRequest, saveAssistant: value => api.saveSettings(value),
-      selectImport: saveImportModelRequest, saveReasoning: saveRewriteReasoningRequest, saveLimits: saveLimitsRequest,
+      selectImport: saveImportModelRequest, selectFallback: saveFallbackModelRequest, saveReasoning: saveRewriteReasoningRequest, saveLimits: saveLimitsRequest,
       select: async model => {
         if (!model || !workflow.view.snapshot.metadataReady || !workflow.view.snapshot.models.includes(model)) throw new Error("MODEL_UNAVAILABLE");
         await workflow.select(model);
@@ -53,6 +53,10 @@ export function Settings({ close, connectionChanged, paneOrder, changePaneOrder 
           <ModelSelect id="import-model-select" label="Модель импорта" value={current.draft.importModel} models={view.snapshot.models}
             defaultLabel="Использовать модель обработки" disabled={busy || !current.preferences || view.pending || !view.snapshot.metadataReady}
             change={value => controller.change("importModel", value)} />
+          <ModelSelect id="fallback-model-select" label="Резервная модель импорта" value={current.draft.fallbackModel} models={view.snapshot.models}
+            defaultLabel="Без резервной модели" disabled={busy || !current.preferences || view.pending || !view.snapshot.metadataReady}
+            change={value => controller.change("fallbackModel", value)} />
+          <p className="small muted">Делает одну дополнительную попытку исправить блок, если основная модель не справилась. Импорт, который уже идёт, сохраняет свои модели.</p>
         </div>
         <div className="uir-assistant-options"><h3>Помощник</h3><div className="switch-line"><label htmlFor="assistant-enabled">Включить помощника</label>
           <input className="switch" id="assistant-enabled" aria-label="Включить помощника" role="switch" type="checkbox" checked={current.draft.agentEnabled} disabled={!current.assistant}

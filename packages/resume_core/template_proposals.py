@@ -230,7 +230,9 @@ def parse_proposal(operation, attempt_id, package, sources, facts, *, captured_r
             reply = ProposalReply.model_validate(outer['payload'], strict=True)
         else:
             # Protocol 5: bookkeeping the payload implies is derived before the reply is restored.
-            completed = complete_reply(outer['payload'], block.bindings, table, references)
+            allowed = {(declaration.id, relation.kind, target) for declaration in package.definition.fact_types
+                for relation in declaration.relations for target in relation.target_types}
+            completed = complete_reply(outer['payload'], block.bindings, table, references, allowed)
             reply = restore_reply(ReferencedProposalReply.model_validate(completed, strict=True), table, references, sources)
         declarations = {declaration.id: declaration for declaration in package.definition.fact_types}
         schemas = {key: reachable_schema(declaration.data_schema, package.definition.content_definitions)

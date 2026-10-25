@@ -1,6 +1,7 @@
 """Complete review receipts bind every semantic input before effective admission."""
 
 from dataclasses import dataclass
+import json
 
 from .models.template_import import CheckTarget, ReferencedReviewReply, ReviewInput, ReviewReceipt, ReviewReply
 from .project_store import strict_json
@@ -9,7 +10,7 @@ from .template_import import TemplateImportFailure, attempt_in, checked, digest,
 from .templates.models import Check
 from .templates.compiler import sha256
 from .templates.projection import pointer_tokens, validate_payload
-from .templates.replies import REVIEW_PROTOCOL, check_references, review_schema
+from .templates.replies import REVIEW_PROTOCOL, check_references, review_protocol, review_schema
 from .template_capture import item_identities
 
 
@@ -89,6 +90,27 @@ def review_checks(task, proposal, allocations, targets, refs):
     return checks
 
 
+def grouped_checks(checks):
+    """Each target once with its value and evidence, then {check ref: rule} for every check of it.
+
+    LIVE-05: 477 per-check entries repeated each value, internal id and rule name (130k characters per review input,
+    stored again with every attempt); a field is checked by up to seven rules, so grouping states each value once.
+    The coordinator restores rules and targets from the captured targets by check ref, never from these entries."""
+    groups = {}
+    for check in checks:
+        kind = check.get('kind')
+        if kind == 'field':
+            head = {'pointer': check.get('pointer'), 'value': check.get('value'), 'evidence': check.get('evidence', [])}
+        elif kind == 'relation':
+            head = {'relation': check.get('relation'), 'subject': check.get('subject'), 'target': check.get('target'),
+                'evidence': check.get('evidence', [])}
+        else:
+            head = {'scope': check.get('block')}
+        key = json.dumps(head, ensure_ascii=False, sort_keys=True)
+        groups.setdefault(key, {**head, 'checks': {}})['checks'][check['check']] = check['ruleId']
+    return list(groups.values())
+
+
 def make_review_input(operation, proposal, package, sources, policy, *, effective_cells, semantic_context,
                       occurrence_context=None, occurrence_independent=True):
     if proposal.state != 'provisional' or proposal.reply is None:
@@ -113,7 +135,7 @@ def make_review_input(operation, proposal, package, sources, policy, *, effectiv
         'evidence': [refs[digest(span)] for span in relation.evidence]} for relation in proposal.reply.relations]
     # The proposal is shown in its resolved form with evidence named by the review's references.
     context = {**semantic_context, 'replyProtocol': REVIEW_PROTOCOL, 'proposal': shown,
-        'checks': review_checks(task, proposal, allocations, targets, refs)}
+        'checks': grouped_checks(review_checks(task, proposal, allocations, targets, refs))}
     if not operation.capture.allow_text_rewrite:
         context['sourceWordingPointers'] = sorted({field.pointer for field in proposal.resolved_fields
             if any(_matches(pattern, field.pointer) for pattern in block.rewrite.fields)})
@@ -147,6 +169,16 @@ def validate_review_reply(value, expected, sources):
     if expected.schema_version == 1:
         return check_review_reply(ReviewReply.model_validate(value, strict=True), expected, sources)
     referenced = ReferencedReviewReply.model_validate(value, strict=True)
+    if review_protocol(expected) == REVIEW_PROTOCOL['version']:
+        # Protocol 3 lists failing checks only; a check the reply does not list holds. Restored in check order, so a
+        # receipt lists every check as protocol 2 did; a repeated or unknown check still makes the reply incomplete.
+        entries = [result.model_dump(mode='json', by_alias=True) for result in referenced.results]
+        listed = {entry['check'] for entry in entries}
+        entries += [{'check': check, 'disposition': 'satisfied', 'reason': '', 'evidence': [], 'actionable': False}
+            for check in check_references(expected) if check not in listed]
+        order = {check: index for index, check in enumerate(check_references(expected))}
+        referenced = ReferencedReviewReply.model_validate({'results': sorted(entries,
+            key=lambda entry: order.get(entry['check'], len(order)))}, strict=True)
     checks, table = check_references(expected), {option.ref: option for option in expected.evidence}
     reply = ReviewReply.model_validate({'results': [{'ruleId': checks[result.check].rule_id,
         'targetId': checks[result.check].target_id, 'disposition': result.disposition, 'reason': result.reason,

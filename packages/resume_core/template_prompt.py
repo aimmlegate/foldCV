@@ -39,13 +39,24 @@ def lean_dependency(result):
     return {'taskId': result['taskId'], 'disposition': result['disposition'], 'value': result['value']}
 
 
+def lean_checks(checks):
+    """Review checks grouped by target; inputs stored before grouping hold one entry per check (LIVE-05)."""
+    if all(isinstance(check, dict) and 'check' in check for check in checks):
+        from .template_review import grouped_checks
+        return grouped_checks(checks)
+    return checks
+
+
 def lean_context(context):
     lean = {key: value for key, value in context.items() if key != 'effectiveFactsHash'}
     if isinstance(context.get('taskInput'), dict):
         lean['taskInput'] = {key: value for key, value in context['taskInput'].items()
             if key not in HIDDEN and key not in {'replyProtocol', 'evidence'}}
     if isinstance(context.get('checks'), list):
-        lean['checks'] = [{key: value for key, value in check.items() if key != 'targetId'} for check in context['checks']]
+        lean['checks'] = lean_checks(context['checks'])
+        # The checks carry every entry's pointer, evidence and relation; the proposal adds only its values.
+        if isinstance(context.get('proposal'), dict):
+            lean['proposal'] = {'payload': context['proposal'].get('payload')}
     return lean
 
 
@@ -67,7 +78,10 @@ def lean_part(key, value, request=None):
 
 
 def model_prompt(value):
-    keys = [key for key in LEADING if key in value] + sorted(key for key in value if key not in LEADING and key not in HIDDEN)
+    # A review's relations are the proposal's own, named by internal ids; its relation checks show them by item.
+    hidden = HIDDEN | ({'relations'} if 'targets' in value else set())
+    keys = [key for key in LEADING if key in value and key not in hidden] + sorted(
+        key for key in value if key not in LEADING and key not in hidden)
     parts = [json.dumps(key, ensure_ascii=False) + ':' + json.dumps(lean_part(key, value[key], value), ensure_ascii=False,
         sort_keys=True, separators=(',', ':'), allow_nan=False) for key in keys]
     return '{' + ','.join(parts) + '}'

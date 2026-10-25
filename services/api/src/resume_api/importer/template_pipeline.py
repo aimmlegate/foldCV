@@ -28,7 +28,8 @@ from packages.resume_core.template_prompt import model_prompt
 from packages.resume_core.templates.operations import operation_value
 from packages.resume_core.templates.replies import proposal_schema, review_schema, PROPOSAL_PROTOCOL
 
-from ..providers.content import ContentFailure, ContentInput, ContentTransportReturn, GenerationPolicy, outcome_state
+from ..providers.content import (ContentFailure, ContentInput, ContentTransportReturn, GenerationPolicy,
+    MAX_GENERATION_SECONDS, outcome_state)
 from ..providers.dynamic_result import dynamic_result
 from .template_persistence import PersistenceWindow, TemplatePersistence
 from .template_checkpoints import TemplateCheckpoints
@@ -77,6 +78,48 @@ def reply_refs(raw):
 def reply_feedback(task_id, errors):
     """The repair note for a refused reply: the first refusal, which names paths and rules but no reply values."""
     return {'ruleId': 'reply-format', 'targetId': 'scope-' + task_id, 'reason': (errors[0] if errors else 'invalid reply')[:300]}
+
+
+# Normal calls take 3-35 s and the CLI streams nothing before the reply, so a stalled call (LIVE-04: 180 s) is
+# only seen at its limit; a first call that runs out gets one retry with the full provider limit.
+CALL_SECONDS, RETRY_SECONDS = 90, MAX_GENERATION_SECONDS
+
+
+# The editor shows these notices in Russian; a reviewer's own reason (asked for in Russian since review protocol 3)
+# follows the category sentence.
+FALLBACK_MESSAGES = {'content_violation': 'проверка нашла ошибку в извлечённых данных.',
+    'uncertain_interpretation': 'проверка не подтвердила извлечённые данные.',
+    'check_not_completed': 'проверку извлечённых данных не удалось завершить.'}
+EMPTY_FALLBACK = 'Блок не заполнен: данные не удалось извлечь и проверить. Исходный текст сохранён в оригинале.'
+
+
+def fallback_message(result, count=1, shown=True):
+    """The notice names what the block shows: source lines, or only the values the review accepted."""
+    if result is None:
+        return 'Показан исходный текст: ' + FALLBACK_MESSAGES['check_not_completed'] if shown else EMPTY_FALLBACK
+    category = FALLBACK_MESSAGES['content_violation' if result.disposition == 'violation' else 'uncertain_interpretation']
+    text = 'Показан исходный текст: ' + category if shown else category[0].upper() + category[1:]
+    reason = ' '.join(result.reason.split())
+    if reason and reason[-1] not in '.!?…':
+        reason += '.'
+    more = ' Ещё замечаний: ' + str(count - 1) + '.' if count > 1 else ''
+    return text + (' ' + reason if reason else '') + more
+
+
+def failing(receipt):
+    return sum(result.disposition != 'satisfied' for result in receipt.reply.results)
+
+
+def applied_receipt(operation, task_id):
+    """The latest review of the task whose proposal was admitted."""
+    task = task_in(operation, task_id)
+    applied = {proposal.applied_receipt_id for proposal in operation.proposals if proposal.applied_receipt_id is not None}
+    return next((value for value in reversed(operation.receipts) if value.id in task.receipt_ids and value.id in applied), None)
+
+
+def timeout_feedback(task_id):
+    return {'ruleId': 'reply-time', 'targetId': 'scope-' + task_id,
+        'reason': 'No reply arrived within the call time limit. Return the whole reply.'}
 
 
 def repair_feedback(feedback, task_id, errors):
@@ -367,7 +410,8 @@ class TemplatePipeline(TemplateCheckpoints):
         if task.state == 'pending' and not any(value.task_id == task_id for value in operation.task_inputs):
             value, handles = self.task_input(operation, task, data)
             workspace = await asyncio.to_thread(self.update_operation, project, operation_id,
-                lambda value_op, _data, _workspace: capture_task_input(value_op, task_id, value, handles, self.wall(), id_factory=self.id_factory))
+                lambda value_op, _data, _workspace: capture_task_input(value_op, task_id, value, handles, self.wall(), id_factory=self.id_factory),
+                copy_on_write=True)
             operation = operation_in(workspace, operation_id)
         if task.kind in {'derive', 'source_copy'}:
             derived = self.derive(operation, task_in(operation, task_id), owner(workspace))
@@ -414,10 +458,12 @@ class TemplatePipeline(TemplateCheckpoints):
                 if offered is not None:
                     references = reference_table(captured, stored.value.get('effectiveCells', []), relations)
                     request['references'] = references.model_dump(mode='json', by_alias=True)
+                retry = any(value['ruleId'] == 'reply-time' for value in feedback)
                 try:
                     attempt_id = await self.call(project, operation_id, task_id, slot, request,
                         proposal_schema(next(value.full_schema for value in data.template_package.blocks
-                            if value.id == task.block_id), None if offered is None else list(offered), references), deadline, cancel)
+                            if value.id == task.block_id), None if offered is None else list(offered), references), deadline, cancel,
+                        seconds=RETRY_SECONDS if retry else CALL_SECONDS)
                 except TemplateImportFailure as error:
                     unresolved.append(error.code)
                     break
@@ -436,6 +482,9 @@ class TemplatePipeline(TemplateCheckpoints):
                 if refusal is not None:
                     # A reply the transport refused by schema is repaired like a refused proposal.
                     feedback = repair_feedback(feedback, task_id, [refusal])
+                    continue
+                if slot == 'initial' and attempt.error_code == 'DEADLINE_EXCEEDED':
+                    feedback = (timeout_feedback(task_id),)
                     continue
                 if slot == 'primary_repair' and feedback:
                     continue
@@ -466,7 +515,10 @@ class TemplatePipeline(TemplateCheckpoints):
             # The review offers its own evidence table under the same references, so the task input omits its copy.
             task_input = next(value.value for value in operation.task_inputs if value.task_id == task_id)
             review = prior_review or make_review_input(operation, proposal, data.template_package, data.sources, policy,
-                effective_cells=effective_cells(data.facts, data.template_operations),
+                # Only the cells the proposal reads: the reviewer sees no others and wording restores from these
+                # (LIVE-08: every effective cell was 250 KB of each 320 KB review input).
+                effective_cells=[cell for cell in effective_cells(data.facts, data.template_operations)
+                    if cell.id in {identifier for field in proposal.resolved_fields for identifier in field.effective_cell_ids}],
                 semantic_context={'taskInput': {key: value for key, value in task_input.items() if key != 'evidence'},
                     'effectiveFactsHash': digest(data.facts)})
             review_attempt = next((value for value in operation.attempts if value.task_id == task_id
@@ -482,6 +534,11 @@ class TemplatePipeline(TemplateCheckpoints):
                 def accept(value, current, _workspace):
                     self.facts_current(value, current.facts)
                     updated, receipt = record_review(value, review_id, current.sources, self.wall(), id_factory=self.id_factory)
+                    # A repair replaces the admitted proposal only when its review finds fewer problems (LIVE-09: a
+                    # repair failed 142 of 463 checks where the first reply failed 7); otherwise the first stays.
+                    admitted = applied_receipt(updated, task_id)
+                    if admitted is not None and admitted.id != receipt.id and failing(receipt) >= failing(admitted):
+                        return updated
                     updated, facts = admit_proposal(updated, proposal.id, receipt.id, current.template_package, current.sources,
                         current.facts, expected_revisions={handle: record.revision
                             for handle, record in current_handles(updated, current.facts).items()},
@@ -509,7 +566,8 @@ class TemplatePipeline(TemplateCheckpoints):
             unresolved = list(decision.unresolved_target_ids)
         await self.fallback(project, operation_id, task_id, unresolved)
 
-    async def call(self, project, operation_id, task_id, slot, value, schema, deadline, cancel, *, review=None):
+    async def call(self, project, operation_id, task_id, slot, value, schema, deadline, cancel, *, review=None,
+            seconds=CALL_SECONDS):
         workspace = self.read(project)
         operation = operation_in(workspace, operation_id)
         self.guard(project, operation)
@@ -524,8 +582,9 @@ class TemplatePipeline(TemplateCheckpoints):
                 observed = observe_time(result, self.wall(), elapsed_remaining=remaining)
                 if observed.inference_closed:
                     return observed
+            # A review's request is its review input record; storing it twice doubled the operation (LIVE-06: 5.3 MB).
             result, identifier = reserve_attempt(result, task_id, slot, digest(value), policy, launch_owner, self.wall(),
-                request_value=value, id_factory=self.id_factory)
+                request_value=None if review is not None else value, id_factory=self.id_factory)
             if review is not None:
                 record = ReviewInputRecord(id=self.id_factory('review-input'), attemptId=identifier, inputHash=digest(review), value=review)
                 result.review_inputs.append(record)
@@ -564,7 +623,7 @@ class TemplatePipeline(TemplateCheckpoints):
                 return reconcile_cleanup(result, proof, self.wall()) if proof is not None else result
             self.update_operation(project, operation_id, retain, copy_on_write=True)
         request = ContentInput(model_prompt(value), dynamic_result(schema),
-            GenerationPolicy(policy.model, timeout_seconds=min(180, max(0.001, remaining)), allow_repair=False,
+            GenerationPolicy(policy.model, timeout_seconds=min(seconds, max(0.001, remaining)), allow_repair=False,
                 reasoning_effort=policy.effort), on_return=returned, request_value=value)
         def launch():
             current = operation_in(self.read(project), operation_id)
@@ -574,7 +633,7 @@ class TemplatePipeline(TemplateCheckpoints):
                 self.update_operation(project, operation_id, lambda result, _data, _workspace: self.reconcile_unlaunched(
                     observe_time(result, self.wall(), elapsed_remaining=0), attempt_id, self.wall()))
                 return None
-            bounded = replace(request, policy=replace(request.policy, timeout_seconds=min(180, remaining)))
+            bounded = replace(request, policy=replace(request.policy, timeout_seconds=min(seconds, remaining)))
             return self.transport.generate(bounded, cancel)
         try:
             response = await asyncio.to_thread(launch)
@@ -628,19 +687,19 @@ class TemplatePipeline(TemplateCheckpoints):
         stored = next(value for value in operation.task_inputs if value.task_id == task_id)
         from packages.resume_core.models.template_facts import SourceSpan
         offered = offered_evidence(stored.value)
+        # The findings of the review whose proposal stays admitted: a repair that was not better is not shown.
+        receipt = applied_receipt(operation, task_id) or next((value for value in reversed(operation.receipts)
+            if value.id in task.receipt_ids), None)
+        leftover = []
+        failures = [result for result in receipt.reply.results if result.disposition != 'satisfied'] if receipt else []
+        sources = owner(current).sources
         if offered is None:
             # A request without references predates cited fallback and keeps its whole captured scope.
             spans, scope = [SourceSpan.model_validate(value) for value in stored.value['sourceSpans']], 'cited'
-        else:
-            spans = cited_spans(operation, task_id, offered)
-            scope = 'cited' if spans else 'uncited'
-        if not spans and offered is not None:
-            # No reply is not evidence of absence: the block offers its whole scope, and the materializer places
-            # only the lines no other block shows.
-            spans = scope_units(offered, owner(current).sources)
-        receipt = next((value for value in reversed(operation.receipts) if value.id in task.receipt_ids), None)
-        failures = [result for result in receipt.reply.results if result.disposition != 'satisfied'] if receipt else []
-        if failures and not any(result.target_id.startswith('scope-') for result in failures):
+        elif failures:
+            # A review named what fails, so its findings are the smallest reliable scope (R05): a rejected value shows
+            # its own evidence, a coverage gap the lines the reviewer cites as missing; accepted values stay. LIVE-08:
+            # showing every line the reply cited repeated the accepted values as raw text.
             rejected = {result.target_id for result in failures}
             proposal = next((value for value in reversed(operation.proposals) if value.applied_receipt_id == receipt.id), None)
             allocated = {value.item_handle: value for value in item_identities(operation)}
@@ -650,20 +709,34 @@ class TemplatePipeline(TemplateCheckpoints):
                 from packages.resume_core.template_proposals import relation_evidence
                 affected.extend(span for identifier, spans in relation_evidence(operation, proposal).items()
                     if identifier in rejected for span in spans)
-            if affected:
-                spans, scope = list({digest(span): span for span in affected}.values()), 'cited'
-        issues = [ImportIssue(id=self.id_factory('issue'), ruleId=result.rule_id if result else None, taskId=task_id,
-            targetIds=[result.target_id] if result else ['scope-' + task_id], blockIds=[],
-            category=('content_violation' if result.disposition == 'violation' else 'uncertain_interpretation')
-                if result else 'check_not_completed', code='IMPORT_SOURCE_FALLBACK',
-            message=result.reason if result and result.reason.strip() else
-                'Source wording retained because interpretation checks did not complete.',
-            importedFingerprint=digest(stored.value), reviewInputHash=receipt.review_input_hash if result else None,
-            lifecycleId=self.id_factory('issue-lifecycle'), state='active', retiredByAction=None)
-            for result in failures or [None]]
+            cited = list({digest(span): span for span in affected}.values())
+            # Lines the reviewer names as missing show only where no other block shows them (materialize).
+            missing = [span for span in {digest(span): span for result in failures if result.target_id.startswith('scope-')
+                for span in result.evidence}.values() if digest(span) not in {digest(value) for value in cited}]
+            spans, scope, leftover = [*cited, *missing], 'cited', [digest(span) for span in missing]
+        else:
+            spans = cited_spans(operation, task_id, offered)
+            scope = 'cited' if spans else 'uncited'
+            if not spans:
+                # No reply is not evidence of absence: a block offers its scope and the materializer places only the
+                # lines no other block shows. A scope of the whole CV identifies nothing (LIVE-08: an empty open
+                # source reply put every unshown line, contacts included, into the sidebar), so it places none.
+                units = scope_units(offered, sources)
+                whole = {(source.id, unit.id) for source in sources for unit in source.units if unit.text.strip()}
+                spans = [] if whole <= {(span.source_id, span.unit_id) for span in units} else units
+        # One notice per block (LIVE-07: 79 failing checks of one tools block were 79 notices): its first violation,
+        # else its first uncertainty, names the rule and reason; every failing target stays a target.
+        first = next((result for result in failures if result.disposition == 'violation'), failures[0] if failures else None)
+        issues = [ImportIssue(id=self.id_factory('issue'), ruleId=first.rule_id if first else None, taskId=task_id,
+            targetIds=list(dict.fromkeys(result.target_id for result in failures)) if failures else ['scope-' + task_id],
+            blockIds=[], category=('content_violation' if first.disposition == 'violation' else 'uncertain_interpretation')
+                if first else 'check_not_completed', code='IMPORT_SOURCE_FALLBACK',
+            message=fallback_message(first, len(failures), shown=len(spans) > len(leftover)),
+            importedFingerprint=digest(stored.value), reviewInputHash=receipt.review_input_hash if first else None,
+            lifecycleId=self.id_factory('issue-lifecycle'), state='active', retiredByAction=None)]
         await self.finish_task(project, operation_id, task_id,
             {'sourceTexts': {digest(span): source_slice(owner(current).sources, span) for span in spans},
-                'diagnostics': list(errors), 'scope': scope}, spans,
+                'diagnostics': list(errors), 'scope': scope, **({'leftoverOnly': leftover} if leftover else {})}, spans,
             task.allowed_handles, 'source_fallback', issues)
 
     async def finalize(self, project, operation_id):

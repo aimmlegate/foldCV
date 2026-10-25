@@ -55,7 +55,21 @@ def expiry(value, seconds):
 
 
 def checked(operation):
-    return ImportOperation.model_validate(operation.model_dump(by_alias=True))
+    # The JSON round trip validates the same model about a quarter faster than through Python objects.
+    return ImportOperation.model_validate_json(operation.model_dump_json(by_alias=True))
+
+
+def fork(operation, *, attempts=(), tasks=(), lists=()):
+    """A working copy for a step that changes only the given attempts and tasks and appends only to the given lists:
+    those are copied, everything else is shared with the input, which stays as it was. The step ends in checked(),
+    which builds a separate operation; a deep copy of the whole operation per step was most of the local import time."""
+    update = {name: list(getattr(operation, name)) for name in lists}
+    if attempts:
+        update['attempts'] = [value.model_copy(deep=True) if value.id in attempts else value
+            for value in update.get('attempts', operation.attempts)]
+    if tasks:
+        update['tasks'] = [value.model_copy(deep=True) if value.id in tasks else value for value in operation.tasks]
+    return operation.model_copy(update=update)
 
 
 def task_in(operation, identifier):
@@ -143,22 +157,24 @@ def admit_operation(operation, now):
         result.last_observed_at = now
     if result.state == 'captured':
         result.state = 'processing'
-    return observe_time(result, now)
+    return checked(observe_time(result, now))
 
 
 def observe_time(operation, now, *, elapsed_remaining=None):
-    result = operation.model_copy(deep=True)
+    # Only top-level time and state fields change, which no operation validator reads, so a shallow copy is safe;
+    # a deep copy and full check per observation were most of the local time between calls (LIVE-08 replay).
     current = instant(now)
-    if result.last_observed_at is not None and current < instant(result.last_observed_at):
-        result.inference_closed = True
-    elif result.expires_at is not None and (current >= instant(result.expires_at)
+    change = {}
+    if operation.last_observed_at is not None and current < instant(operation.last_observed_at):
+        change['inference_closed'] = True
+    elif operation.expires_at is not None and (current >= instant(operation.expires_at)
             or elapsed_remaining is not None and elapsed_remaining <= 0):
-        result.inference_closed = True
+        change['inference_closed'] = True
     else:
-        result.last_observed_at = now
-    if result.inference_closed and result.state == 'processing':
-        result.state = 'cleanup_pending'
-    return checked(result)
+        change['last_observed_at'] = now
+    if change.get('inference_closed', operation.inference_closed) and operation.state == 'processing':
+        change['state'] = 'cleanup_pending'
+    return operation.model_copy(update=change)
 
 
 @dataclass(frozen=True)
@@ -209,7 +225,7 @@ def cleanup_verified(operation):
 
 
 def reserve_attempt(operation, task_id, slot, input_hash, model, owner, now, *, request_value=None, id_factory=identity):
-    result = observe_time(operation, now)
+    result = fork(observe_time(operation, now), tasks={task_id}, lists=('attempts',))
     authority = authorization(result)
     if result.state != 'processing' or result.inference_closed or result.admitted_at is None:
         raise TemplateImportFailure('IMPORT_PROCESSING_EXHAUSTED')
@@ -258,7 +274,7 @@ def reserve_attempt(operation, task_id, slot, input_hash, model, owner, now, *, 
 
 
 def dispatch_attempt(operation, attempt_id, now):
-    result = observe_time(operation, now)
+    result = fork(observe_time(operation, now), attempts={attempt_id})
     authority = authorization(result)
     attempt = attempt_in(result, attempt_id)
     if (result.state != 'processing' or result.inference_closed or attempt.state != 'reserved'
@@ -269,7 +285,7 @@ def dispatch_attempt(operation, attempt_id, now):
 
 
 def record_return(operation, attempt_id, raw_return, outcome, usage, cleanup, *, error_code=None, returned_at=None):
-    result = observe_time(operation, returned_at) if returned_at is not None else operation.model_copy(deep=True)
+    result = fork(observe_time(operation, returned_at) if returned_at is not None else operation, attempts={attempt_id})
     attempt = attempt_in(result, attempt_id)
     checksum = sha256(raw_return.encode()) if raw_return is not None else None
     if returned_at is not None:
@@ -309,7 +325,7 @@ class CleanupProof:
 
 
 def reconcile_cleanup(operation, proof, now):
-    result = operation.model_copy(deep=True)
+    result = fork(operation, attempts={proof.attempt_id}, lists=('cleanup_records',))
     attempt = attempt_in(result, proof.attempt_id)
     if (proof.owner_hash != digest(attempt.owner) or not proof.witness
             or proof.never_dispatched and (attempt.raw_return_hash is not None or attempt.outcome in {
@@ -347,6 +363,9 @@ def resume_operation(operation, command, now):
     if operation.state == 'published':
         return operation.model_copy(deep=True)
     result = observe_time(operation, now)
+    # Resuming changes the authorizations, the publication and task states: those are copied, the rest is shared.
+    result = fork(result, tasks={task.id for task in result.tasks if task.state == 'cancelled'}, lists=('authorizations',))
+    result.publication = result.publication.model_copy()
     if not cleanup_verified(result):
         raise TemplateImportFailure('IMPORT_CLEANUP_UNKNOWN')
     known = next((item for item in result.authorizations if item.id == command.authorization_id), None)

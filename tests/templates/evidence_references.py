@@ -80,4 +80,30 @@ def by_reference(answer, value):
         proposal_entries(result, value, table)
     elif 'targets' in value and isinstance(result.get('results'), list):
         result['results'] = [review_entry(entry, value, table) for entry in result['results']]
+        if review_protocol(value) == 'template-review-protocol-3':
+            # Protocol 3 lists only failing checks, or ones with a reason or evidence; an unlisted check holds. Only a
+            # clean answer is shortened: an extra, repeated or conflicting entry stays for the test to refuse.
+            answered = [entry.get('check') for entry in result['results'] if isinstance(entry, dict)]
+            refs = {'C' + str(index) for index in range(1, len(value['targets']) + 1)}
+            if len(answered) == len(set(answered)) == len(result['results']) and set(answered) <= refs:
+                result['results'] = [entry for entry in result['results'] if not (entry.get('disposition') == 'satisfied'
+                    and not entry.get('reason') and not entry.get('evidence') and not entry.get('actionable'))]
     return result
+
+
+def review_protocol(value):
+    return ((value.get('semanticContext') or {}).get('replyProtocol') or {}).get('version')
+
+
+def expanded_checks(value):
+    """One entry per check, in check order, from review checks grouped by target (older inputs hold one per check)."""
+    entries = {}
+    for group in (value.get('semanticContext') or {}).get('checks', []):
+        if 'check' in group:
+            entries[group['check']] = group
+            continue
+        kind = 'field' if 'pointer' in group else 'relation' if 'relation' in group else 'scope'
+        for ref, rule in group['checks'].items():
+            entries[ref] = {**{key: part for key, part in group.items() if key != 'checks'}, 'check': ref, 'ruleId': rule,
+                'kind': kind, **({'block': group['scope']} if kind == 'scope' else {})}
+    return [entries[ref] for ref in sorted(entries, key=lambda ref: int(ref[1:]))]

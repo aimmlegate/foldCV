@@ -17,12 +17,15 @@ from .gui_projects import ProjectFailure
 class TemplateImports:
     template_import_call_cap = None
     template_import_model = None
+    template_import_fallback = None
 
-    def configure_template_imports(self, *, call_cap, model):
-        """`model` returns the ModelCapture for the selected import model or raises ProjectFailure."""
+    def configure_template_imports(self, *, call_cap, model, fallback=None):
+        """`model` returns the ModelCapture for the selected import model or raises ProjectFailure; `fallback`, given
+        that capture, returns the configured fallback model's capture, None when there is none, or raises."""
         if call_cap is not None and (not isinstance(call_cap, int) or call_cap < 1):
             raise ValueError('template import call cap must be an explicit positive integer')
         self.template_import_call_cap, self.template_import_model = call_cap, model
+        self.template_import_fallback = fallback
 
     def template_jobs_ready(self):
         jobs = getattr(self, 'background_jobs', None)
@@ -68,16 +71,23 @@ class TemplateImports:
         return StartTemplateImportV1(kind='start_new_import', protocol='template_import_v1', clientRequestId=client_request_id,
             capture=capture)
 
-    def template_import_capture(self, workspace, allow_text_rewrite):
+    def template_import_capture(self, workspace, allow_text_rewrite, models=None):
         data = workspace.project or workspace.pre_draft
         package, sources = data.template_package, {source.id: source.byte_sha256 for source in data.sources}
-        primary = self.template_import_model()
+        if models is not None:
+            primary, fallback = models
+        else:
+            primary = self.template_import_model()
+            fallback = self.template_import_fallback(primary) if self.template_import_fallback else None
+        models = {'model': primary.model_dump(mode='json', by_alias=True)}
+        if fallback is not None:
+            models['fallback'] = fallback.model_dump(mode='json', by_alias=True)
         return ImportCapture(packageHash=package.package_hash, sourceHashes=sources,
             factRevisions={record.id: record.revision for record in [*data.facts.records, *data.facts.extensions]
                 if getattr(record, 'active', True)},
-            authorityHash=digest({'project': workspace.project_id, 'model': primary.model_dump(mode='json', by_alias=True)}),
+            authorityHash=digest({'project': workspace.project_id, **models}),
             dependencyHash=digest({'package': package.package_hash, 'sources': sources}), allowTextRewrite=allow_text_rewrite,
-            primary=primary, fallback=None, formattingAsOf=workspace.formatting_as_of,
+            primary=primary, fallback=fallback, formattingAsOf=workspace.formatting_as_of,
             policy=RuntimePolicy(callCap=self.template_import_call_cap, concurrency=1, processingSeconds=import_seconds(), cleanupSeconds=5,
                 finalizationSeconds=finalization_seconds(), primaryRepairs=1, fallbackRepairs=1))
 
@@ -85,13 +95,15 @@ class TemplateImports:
         data = workspace.project or workspace.pre_draft
         if data is None or data.template_package is None or self.template_import_call_cap is None:
             raise TemplateImportFailure('IMPORT_CAPTURE_STALE')
+        # Facts advance through admitted proposals; the pipeline checks their captured revisions separately.
+        # A stored import keeps the time limits and models captured at its start when Settings change (E07); a new
+        # one must match.
+        stored = any(value.id == operation.id for value in data.template_operations)
         try:
-            expected = self.template_import_capture(workspace, operation.capture.allow_text_rewrite)
+            expected = self.template_import_capture(workspace, operation.capture.allow_text_rewrite,
+                models=(operation.capture.primary, operation.capture.fallback) if stored else None)
         except ProjectFailure:
             raise TemplateImportFailure('IMPORT_CAPTURE_STALE') from None
-        # Facts advance through admitted proposals; the pipeline checks their captured revisions separately.
-        # A stored import keeps the time limits captured at its start when Settings change; a new one must match.
-        stored = any(value.id == operation.id for value in data.template_operations)
         ignored = {'fact_revisions': True, **({'policy': {'processing_seconds', 'finalization_seconds'}} if stored else {})}
         if expected.model_dump(exclude=ignored) != operation.capture.model_dump(exclude=ignored):
             raise TemplateImportFailure('IMPORT_CAPTURE_STALE')

@@ -96,6 +96,11 @@ export async function saveImportModelRequest(model: string | null): Promise<Pref
   if (!isPreferences(value)) throw new Error("Invalid preferences response");
   return value;
 }
+export async function saveFallbackModelRequest(model: string | null): Promise<Preferences> {
+  const value = await request("/v1/settings/fallback-model", "PUT", { model });
+  if (!isPreferences(value)) throw new Error("Invalid preferences response");
+  return value;
+}
 export async function saveLimitsRequest(body: SaveLimitsPreference): Promise<Preferences> {
   const value = await request("/v1/settings/limits", "PUT", body);
   if (!isPreferences(value)) throw new ApiFailure("INVALID_RESULT");

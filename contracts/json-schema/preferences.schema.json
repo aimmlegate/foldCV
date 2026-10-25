@@ -46,6 +46,18 @@
       "title": "Schemaversion",
       "type": "integer"
     },
+    "selectedFallbackModel": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Selectedfallbackmodel"
+    },
     "selectedImportModel": {
       "anyOf": [
         {

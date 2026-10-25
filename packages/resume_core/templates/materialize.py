@@ -49,7 +49,7 @@ def materialize(package, facts, operations, sources, *, operation_id, revision=1
                 hidden.setdefault(group, set()).update(records)
             if stored['added']:
                 assigned.setdefault(stored['uncertainGroup'], []).extend(stored['added'])
-    fallbacks_by_view, uncited_by_view, human_scopes = {}, {}, []
+    fallbacks_by_view, uncited_by_view, missing_by_view, human_scopes = {}, {}, {}, []
     for operation in operations:
         tasks = {task.id: task for task in operation.tasks}
         attempts = {attempt.id: attempt for attempt in operation.attempts}
@@ -85,7 +85,11 @@ def materialize(package, facts, operations, sources, *, operation_id, revision=1
                 if view not in declarations:
                     raise ValueError('source fallback has no configured block view')
                 uncited = isinstance(result.value, dict) and result.value.get('scope') == 'uncited'
-                (uncited_by_view if uncited else fallbacks_by_view).setdefault(view, []).extend(result.source_spans)
+                # Lines a review names as missing from the block are placed only where no view shows them yet.
+                missing = set(result.value.get('leftoverOnly', ())) if isinstance(result.value, dict) else set()
+                (uncited_by_view if uncited else fallbacks_by_view).setdefault(view, []).extend(
+                    span for span in result.source_spans if digest(span) not in missing)
+                missing_by_view.setdefault(view, []).extend(span for span in result.source_spans if digest(span) in missing)
     visible_by_view = {}
     for (view, identifier), field in [*fields.items(), *unassigned.items()]:
         if visible_path(declarations[view], field.relative):
@@ -96,6 +100,13 @@ def materialize(package, facts, operations, sources, *, operation_id, revision=1
     # Lines of an uncited scope that no accepted value or cited fallback shows go once to the last such block on the page.
     occupied = [*[span for cells in visible_by_view.values() for cell in cells.values() for span in cell.evidence],
         *[span for spans in placements.values() for span in spans]]
+    # A coverage gap's lines go to the block's own view, once, unless an accepted value or another fallback shows them
+    # (LIVE-09: courses repeated the education lines, open source the portfolio items).
+    for view in [declaration.id for declaration in ordered if missing_by_view.get(declaration.id)]:
+        lines = [line for line in scope_lines(sources, missing_by_view[view]) if not any(overlaps(line, other) for other in occupied)]
+        if lines:
+            placements[view] = union_spans(sources, [*placements.get(view, []), *lines])
+            occupied.extend(lines)
     leftover = [line for spans in uncited_by_view.values() for line in scope_lines(sources, spans)
         if not any(overlaps(line, other) for other in occupied)]
     if leftover:
@@ -204,15 +215,8 @@ def materialize(package, facts, operations, sources, *, operation_id, revision=1
         if listing:
             listed(declaration, sections, stable_id(operation_id, declaration.id, 'list'), listing)
         output = regions[declaration.placement.region]['blocks']
-        if sections:
-            title = locale_text(declaration.view.title, package.definition.template.default_locale)
-            if declaration.view.heading != 'none' and title:
-                ref = reference(package, declaration.id, package.recipe.style.section_band.heading_style,
-                    stable_id(operation_id, declaration.id, 'heading'))
-                output.append({'type': 'heading', 'id': stable_id(operation_id, declaration.id, 'heading'), 'revision': 1,
-                    'props': {'level': 1}, 'content': [literal(title, ref)], 'children': [], 'provenance': [], 'presentation': ref})
-            output.extend(sections)
         # Each view shows its own placements; a line two failed blocks both cited shows once, in the first of them.
+        paragraphs = []
         for span in subtract_spans(sources, placements.get(declaration.id, []), shown_fallback):
             shown_fallback.append(span)
             key = digest(span)
@@ -224,9 +228,19 @@ def materialize(package, facts, operations, sources, *, operation_id, revision=1
                 stable_id(operation_id, declaration.id, 'fallback'))
             text = literal(source_slice(sources, shown), ref)
             text.citations = [shown]
-            output.append({'type': 'paragraph', 'id': identifier, 'revision': 1, 'props': {}, 'content': [text],
+            paragraphs.append({'type': 'paragraph', 'id': identifier, 'revision': 1, 'props': {}, 'content': [text],
                 'children': [], 'provenance': [], 'presentation': ref})
             add_coverage(shown, None, [identifier], 'fallback', 'exact source scope')
+        # A block that shows only source lines keeps its own title (LIVE-09: projects text without "ПРОЕКТЫ").
+        if sections or paragraphs:
+            title = locale_text(declaration.view.title, package.definition.template.default_locale)
+            if declaration.view.heading != 'none' and title:
+                ref = reference(package, declaration.id, package.recipe.style.section_band.heading_style,
+                    stable_id(operation_id, declaration.id, 'heading'))
+                output.append({'type': 'heading', 'id': stable_id(operation_id, declaration.id, 'heading'), 'revision': 1,
+                    'props': {'level': 1}, 'content': [literal(title, ref)], 'children': [], 'provenance': [], 'presentation': ref})
+        output.extend(sections)
+        output.extend(paragraphs)
     if set(placements) - set(declarations):
         raise ValueError('source fallback has no materialized placement')
     for identifier, blocks in displayed.items():

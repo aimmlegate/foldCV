@@ -11,8 +11,11 @@ def fail():
 def _append_only(before, after, *, key=lambda value: value.id, mutable=()):
     if [key(value) for value in after[:len(before)]] != [key(value) for value in before]:
         fail()
+    # Compared field by field, not through two dumps per record: every import step checks every retained record.
     for old, new in zip(before, after):
-        if old.model_dump(exclude=set(mutable)) != new.model_dump(exclude=set(mutable)):
+        if old is new:
+            continue
+        if any(getattr(old, name) != getattr(new, name) for name in type(old).model_fields if name not in mutable):
             fail()
 
 

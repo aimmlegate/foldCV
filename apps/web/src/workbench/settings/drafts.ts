@@ -12,13 +12,14 @@ export const limitRanges = { importMinutes: preferencesSchema.properties.importM
 type Limit = keyof typeof limitRanges;
 function limit(preferences: Preferences, key: Limit): string { return String(preferences[key] ?? limitRanges[key].default); }
 
-export type SettingsPart = "reasoning" | "model" | "import" | "analysis" | "limits" | "assistant" | "rules";
-export type SettingsValues = { reasoning: NonNullable<Preferences["rewriteReasoningEffort"]> | null; model: string | null; importModel: string | null; automatic: boolean; agentEnabled: boolean; agentModel: string | null; markdown: string;
+export type SettingsPart = "reasoning" | "model" | "import" | "fallback" | "analysis" | "limits" | "assistant" | "rules";
+export type SettingsValues = { reasoning: NonNullable<Preferences["rewriteReasoningEffort"]> | null; model: string | null; importModel: string | null; fallbackModel: string | null; automatic: boolean; agentEnabled: boolean; agentModel: string | null; markdown: string;
   importMinutes: string; projectMegabytes: string };
 export type SettingsApi = {
   preferences: () => Promise<Preferences>; rules: () => Promise<RulesSettings>; assistant: () => Promise<AgentSettings>;
   select: (model: string | null) => Promise<string>; analysis: (enabled: boolean) => Promise<Preferences>;
   selectImport: (model: string | null) => Promise<Preferences>;
+  selectFallback: (model: string | null) => Promise<Preferences>;
   saveReasoning: (model: string | null, effort: SettingsValues["reasoning"]) => Promise<Preferences>;
   saveLimits: (value: SaveLimitsPreference) => Promise<Preferences>;
   saveRules: (value: SaveRulesRequest) => Promise<RulesSettings>; saveAssistant: (value: AgentSettingsRequest) => Promise<AgentSettings>;
@@ -34,13 +35,13 @@ function message(error: unknown, part: SettingsPart): string {
   const known = knownErrorMessage(code);
   if (known) return known;
   if (part === "reasoning") return "Не удалось сохранить reasoning. Проверьте, что этот уровень доступен выбранной модели.";
-  if (part === "model" || part === "import") return "Не удалось сохранить модель. Проверьте подключение и выберите доступную модель.";
+  if (part === "model" || part === "import" || part === "fallback") return "Не удалось сохранить модель. Проверьте подключение и выберите доступную модель.";
   return "Не удалось сохранить этот раздел. Черновик остался в форме; повторите действие.";
 }
 
 export class SettingsDrafts {
   state: SettingsState = { preferences: null, rules: null, assistant: null,
-    draft: { reasoning: null, model: null, importModel: null, automatic: true, agentEnabled: true, agentModel: null, markdown: "",
+    draft: { reasoning: null, model: null, importModel: null, fallbackModel: null, automatic: true, agentEnabled: true, agentModel: null, markdown: "",
       importMinutes: String(limitRanges.importMinutes.default), projectMegabytes: String(limitRanges.projectMegabytes.default) },
     loading: false, saving: false, staleRules: false, comparison: false, saved: [], errors: {}, message: "" };
   private closed = false;
@@ -56,6 +57,7 @@ export class SettingsDrafts {
     if (preferences && (draft.reasoning !== (preferences.rewriteReasoningEffort ?? null)
         || draft.model !== preferences.selectedModel && draft.reasoning !== null)) result.push("reasoning");
     if (preferences && draft.importModel !== (preferences.selectedImportModel ?? null)) result.push("import");
+    if (preferences && draft.fallbackModel !== (preferences.selectedFallbackModel ?? null)) result.push("fallback");
     if (preferences && draft.automatic !== preferences.automaticAnalysis) result.push("analysis");
     if (preferences && (draft.importMinutes !== limit(preferences, "importMinutes") || draft.projectMegabytes !== limit(preferences, "projectMegabytes")))
       result.push("limits");
@@ -75,6 +77,7 @@ export class SettingsDrafts {
     if (preferences.status === "fulfilled") {
       if (!this.state.preferences) { draft.model = preferences.value.selectedModel; draft.automatic = preferences.value.automaticAnalysis;
         draft.importModel = preferences.value.selectedImportModel ?? null;
+        draft.fallbackModel = preferences.value.selectedFallbackModel ?? null;
         draft.reasoning = preferences.value.rewriteReasoningEffort ?? null;
         draft.importMinutes = limit(preferences.value, "importMinutes"); draft.projectMegabytes = limit(preferences.value, "projectMegabytes");
         this.publish({ preferences: preferences.value }); delete errors.model; delete errors.analysis; }
@@ -93,6 +96,7 @@ export class SettingsDrafts {
     const { preferences, rules, assistant, draft } = this.state;
     this.publish({ draft: { reasoning: preferences ? preferences.rewriteReasoningEffort ?? null : draft.reasoning, model: preferences ? preferences.selectedModel : draft.model, automatic: preferences?.automaticAnalysis ?? draft.automatic,
       importModel: preferences ? preferences.selectedImportModel ?? null : draft.importModel,
+      fallbackModel: preferences ? preferences.selectedFallbackModel ?? null : draft.fallbackModel,
       importMinutes: preferences ? limit(preferences, "importMinutes") : draft.importMinutes,
       projectMegabytes: preferences ? limit(preferences, "projectMegabytes") : draft.projectMegabytes,
       agentEnabled: assistant?.enabled ?? draft.agentEnabled, agentModel: assistant ? assistant.selectedAgentModel : draft.agentModel,
@@ -142,6 +146,11 @@ export class SettingsDrafts {
           const model = preferences.selectedImportModel ?? null;
           if (this.state.preferences) this.publish({ preferences: { ...this.state.preferences, selectedImportModel: model },
             draft: { ...this.state.draft, importModel: this.state.draft.importModel === submitted.importModel ? model : this.state.draft.importModel } });
+        } else if (part === "fallback") {
+          const preferences = await this.api.selectFallback(submitted.fallbackModel);
+          const model = preferences.selectedFallbackModel ?? null;
+          if (this.state.preferences) this.publish({ preferences: { ...this.state.preferences, selectedFallbackModel: model },
+            draft: { ...this.state.draft, fallbackModel: this.state.draft.fallbackModel === submitted.fallbackModel ? model : this.state.draft.fallbackModel } });
         } else if (part === "analysis") {
           const preferences = await this.api.analysis(submitted.automatic);
           if (this.state.preferences) this.publish({ preferences: { ...this.state.preferences, automaticAnalysis: preferences.automaticAnalysis },

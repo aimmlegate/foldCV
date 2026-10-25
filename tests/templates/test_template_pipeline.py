@@ -41,8 +41,9 @@ async def test_tool_free_new_protocol_runs_complete_review_and_publishes_once(tm
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize('entry', ['direct', 'queued'])
-@pytest.mark.parametrize('review_failure', ['missing', 'uncertain', 'unavailable'])
+@pytest.mark.parametrize('review_failure', ['repeated', 'uncertain', 'unavailable'])
 async def test_unusable_review_uses_source_fallback_and_no_review_retry(tmp_path, entry, review_failure):
+    # Review protocol 3: a check the reply leaves out holds, so a repeated entry is what leaves a reply incomplete.
     fixture = RuntimeFixture(tmp_path)
     def script(_request, value):
         if 'targets' not in value:
@@ -52,7 +53,7 @@ async def test_unusable_review_uses_source_fallback_and_no_review_retry(tmp_path
         results = [{'ruleId': target['ruleId'], 'targetId': target['targetId'],
             'disposition': 'uncertain' if review_failure == 'uncertain' else 'satisfied',
             'reason': 'Attribution is unclear', 'actionable': False, 'evidence': []} for target in value['targets']]
-        return {'results': results[:-1] if review_failure == 'missing' else results}
+        return {'results': [*results, results[0]] if review_failure == 'repeated' else results}
     fixture.transport.scripted = script
     result = await run_entry(fixture, entry)
     assert result.state == 'published' and result.tasks[0].state == 'source_fallback'
@@ -60,6 +61,11 @@ async def test_unusable_review_uses_source_fallback_and_no_review_retry(tmp_path
     assert not fixture.current().project.facts.extensions
     assert fixture.source.units[0].text in fixture.text()
     assert len(result.receipts) == (1 if review_failure == 'uncertain' else 0)
+    # One notice for the block, whatever the number of failing checks.
+    [issue] = result.issues
+    assert issue.message == ('Показан исходный текст: проверка не подтвердила извлечённые данные. Attribution is unclear. '
+        'Ещё замечаний: ' + str(len(issue.target_ids) - 1) + '.' if review_failure == 'uncertain'
+        else 'Показан исходный текст: проверку извлечённых данных не удалось завершить.')
 
 
 @pytest.mark.asyncio
@@ -73,7 +79,7 @@ async def test_empty_output_is_omitted_only_after_complete_absence_review(tmp_pa
         if 'targets' in value:
             results = [{'ruleId': target['ruleId'], 'targetId': target['targetId'], 'disposition': 'satisfied',
                 'reason': '', 'actionable': False, 'evidence': []} for target in value['targets']]
-            return {'results': results[:-1] if outcome == 'incomplete_review' else results}
+            return {'results': [*results, results[0]] if outcome == 'incomplete_review' else results}
         return '' if outcome == 'no_reply' else '{"payload":null}' if outcome == 'null' else raw_proposal(fixture.source, empty=True)
     fixture.transport.scripted = script
     result = await run_entry(fixture, entry)
@@ -81,8 +87,10 @@ async def test_empty_output_is_omitted_only_after_complete_absence_review(tmp_pa
         assert result.tasks[0].state == 'empty' and not result.issues and result.receipts
         assert fixture.text() == ''
     else:
+        # Not evidence of absence: the block is a source fallback with a notice, not empty. Its scope is the whole
+        # source, which identifies no lines to show (LIVE-08), so none are placed.
         assert result.tasks[0].state == 'source_fallback' and result.issues and not result.receipts
-        assert fixture.source.units[0].text in fixture.text()
+        assert fixture.text() == '' and result.issues[0].message.startswith('Блок не заполнен')
     # A refused first reply gets one repair, then the fixture's fallback model; neither is reviewed (S7c).
     assert len(fixture.transport.calls) == (3 if outcome in {'no_reply', 'null'} else 2)
     if outcome in {'no_reply', 'null'}:
@@ -160,7 +168,10 @@ async def test_budget_expiry_retains_accepted_scopes_before_finalizing_remaining
     assert result.state == 'published' and result.inference_closed and spent_calls(result) == 3
     assert [task.state for task in result.tasks] == ['accepted', 'source_fallback']
     assert len(fixture.current().project.facts.extensions) == 2 and len(result.receipts) == 1
-    assert fixture.source.units[0].text in fixture.text()
+    # The block that never ran had the whole source as its scope, which identifies no lines (LIVE-08); its notice
+    # says it is not filled, and the accepted block keeps its values.
+    [issue] = [issue for issue in result.issues if issue.task_id == result.tasks[1].id]
+    assert issue.message.startswith('Блок не заполнен') and 'Reliable Queues' in fixture.text()
 
 
 @pytest.mark.asyncio
@@ -279,3 +290,78 @@ async def test_a_reply_the_transport_refuses_by_schema_is_repaired_without_its_q
     [feedback] = fixture.transport.calls[1]['feedback']
     assert '/0/year' in feedback['reason'] and phrase not in feedback['reason']
     assert [attempt.slot for attempt in result.attempts] == ['initial', 'primary_repair', 'replacement_review']
+
+
+def timing_out(fixture, limits, *, slots=('initial',), review=False):
+    """Calls in slots (or the review) run out of time without a reply; the others answer correctly."""
+    from resume_api.providers.content import ContentFailure, ReportedUsage
+    def script(request, value):
+        limits.append(request.policy.timeout_seconds)
+        if ('targets' in value) == review and (review or value['slot'] in slots):
+            raise ContentFailure('DEADLINE_EXCEEDED', logical_attempts=1, usage=ReportedUsage(None, None, None, False),
+                cleanup_verified=True, dispatch_witness={'transport': 'controlled'})
+        return satisfied_review(value) if 'targets' in value else raw_proposal(fixture.source)
+    return script
+
+
+@pytest.mark.asyncio
+async def test_a_first_call_that_runs_out_of_time_is_retried_once_with_the_full_limit(tmp_path):
+    # LIVE-04: the projects call stalled for 180 s; the same request then answered in 15-19 s (PROBE-02).
+    from resume_api.importer.template_pipeline import CALL_SECONDS, RETRY_SECONDS
+    fixture, limits = RuntimeFixture(tmp_path), []
+    fixture.transport.scripted = timing_out(fixture, limits)
+    result = await fixture.pipeline.run(fixture.project, fixture.command, admitted=fixture.admitted)
+    assert result.state == 'published' and result.tasks[0].state == 'accepted' and not result.issues
+    assert [attempt.slot for attempt in result.attempts] == ['initial', 'primary_repair', 'replacement_review']
+    assert (result.attempts[0].outcome, result.attempts[0].error_code) == ('timed_out', 'DEADLINE_EXCEEDED')
+    assert fixture.transport.calls[1]['feedback'] == [{'ruleId': 'reply-time', 'targetId': 'scope-' + result.tasks[0].id,
+        'reason': 'No reply arrived within the call time limit. Return the whole reply.'}]
+    assert limits == [CALL_SECONDS, RETRY_SECONDS, CALL_SECONDS] and CALL_SECONDS < RETRY_SECONDS == 180
+    assert len(fixture.current().project.facts.extensions) == 2
+
+
+@pytest.mark.asyncio
+async def test_a_retry_that_also_runs_out_of_time_falls_back_without_a_third_call(tmp_path):
+    fixture, limits = RuntimeFixture(tmp_path, fallback=False), []
+    fixture.transport.scripted = timing_out(fixture, limits, slots=('initial', 'primary_repair'))
+    result = await fixture.pipeline.run(fixture.project, fixture.command, admitted=fixture.admitted)
+    assert result.state == 'published' and result.tasks[0].state == 'source_fallback'
+    assert len(fixture.transport.calls) == 2 and [attempt.slot for attempt in result.attempts] == ['initial', 'primary_repair']
+    assert fixture.text() == '' and result.issues[0].message.startswith('Блок не заполнен')
+
+
+@pytest.mark.asyncio
+async def test_a_review_that_runs_out_of_time_is_not_retried(tmp_path):
+    # K01: an incomplete review follows source fallback; only extraction gets the retry.
+    from resume_api.importer.template_pipeline import CALL_SECONDS
+    fixture, limits = RuntimeFixture(tmp_path), []
+    fixture.transport.scripted = timing_out(fixture, limits, review=True)
+    result = await fixture.pipeline.run(fixture.project, fixture.command, admitted=fixture.admitted)
+    assert result.state == 'published' and result.tasks[0].state == 'source_fallback'
+    assert limits == [CALL_SECONDS, CALL_SECONDS] and [attempt.slot for attempt in result.attempts] == ['initial', 'review']
+    assert fixture.source.units[0].text in fixture.text()
+
+
+@pytest.mark.asyncio
+async def test_a_repair_whose_review_finds_more_problems_does_not_replace_the_first_reply(tmp_path):
+    # LIVE-09: the first projects reply failed 7 of 397 checks, its repair 142 of 463; the first one now stays.
+    fixture, reviews = RuntimeFixture(tmp_path, fallback=False), []
+    def script(_request, value):
+        if 'targets' not in value:
+            return raw_proposal(fixture.source)
+        reviews.append(value)
+        failing = [target for target in value['targets'] if not target['targetId'].startswith('scope-')]
+        failing = failing[:1] if len(reviews) == 1 else failing
+        return {'results': [{'ruleId': target['ruleId'], 'targetId': target['targetId'],
+            'disposition': 'violation' if target in failing else 'satisfied', 'reason': 'Неверно' if target in failing else '',
+            'evidence': [], 'actionable': True} for target in value['targets']]}
+    fixture.transport.scripted = script
+    result = await fixture.pipeline.run(fixture.project, fixture.command, admitted=fixture.admitted)
+    assert [attempt.slot for attempt in result.attempts] == ['initial', 'review', 'primary_repair', 'replacement_review']
+    assert result.tasks[0].state == 'source_fallback'
+    first, repair = result.proposals
+    assert first.applied_receipt_id == result.receipts[0].id and repair.applied_receipt_id is None
+    # The notice and the source lines come from the first review: one failing value.
+    [issue] = result.issues
+    assert issue.target_ids == [next(target['targetId'] for target in reviews[0]['targets'] if not target['targetId'].startswith('scope-'))]
+    assert issue.message.startswith('Показан исходный текст: проверка нашла ошибку') and 'Ещё замечаний' not in issue.message

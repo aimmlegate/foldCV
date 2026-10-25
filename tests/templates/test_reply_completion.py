@@ -243,3 +243,129 @@ async def test_an_generic_import_with_lean_first_replies_publishes_the_same_bloc
     assert F10_REJECTED not in '\n'.join(value for values in shown.values() for value in values)
     fallback = [issue for issue in workspace.project.import_issues if issue.code == 'IMPORT_SOURCE_FALLBACK']
     assert [(issue.category, issue.rule_id) for issue in fallback] == [('content_violation', 'projects-support')]
+
+
+def test_a_value_whose_words_one_line_states_in_another_order_cites_that_line():
+    # LIVE-05: a repair joined listed tools into one value; its words are stated, though not word for word.
+    proposal, _operation, src = parsed('programming', lambda _request: reply({'items': ['docker Python']}))
+    assert proposal.state == 'provisional', proposal.errors
+    [field] = proposal.resolved_fields
+    assert [source_slice([src], span).strip() for span in field.evidence] == ['Python, PostgreSQL, Docker']
+    proposal, _operation, _src = parsed('programming', lambda _request: reply({'items': ['Docker and Rust']}))
+    assert proposal.state == 'invalid' and proposal.errors[0].endswith('missing /items/0 (display)')
+
+
+def test_an_entry_past_the_payload_is_dropped_and_a_wrong_type_item_ref_becomes_a_new_item():
+    # LIVE-05 repairs: entries for /items/25 and /items/26 of a 25-item list; a skill named by the role family's ref.
+    from packages.resume_core.models.template_import import ReferenceTable
+    blocks = {block.id: block for block in generic_package().definition.blocks}
+    src, _raw = source_fixture('F10')
+    request = request_for(src)
+    request['references']['items'] = [{'ref': 'H1', 'itemHandle': 'item-role', 'semanticType': 'foldcv:role_family', 'key': 'family'}]
+    line = refs(request)['Python, PostgreSQL, Docker']
+    given = reply({'items': ['Python']}, [entry('/items/0', [line], 'display', {'kind': 'handle', 'ref': 'H1'}),
+        entry('/items/1', [line], 'display', {'kind': 'handle', 'ref': 'H1'})])
+    completed = complete_reply(given, blocks['programming'].bindings, offered_evidence(request),
+        ReferenceTable.model_validate(request['references']))
+    [field] = completed['fields']
+    [discovery] = completed['discoveries']
+    assert field['pointer'] == '/items/0' and field['evidence'] == [line]
+    assert field['item'] == {'kind': 'discovery_key', 'key': discovery['key']} and discovery['pointer'] == '/items/0'
+    unoffered = reply({'items': ['Python']}, [entry('/items/0', [line], 'display', {'kind': 'handle', 'ref': 'H9'})])
+    kept = complete_reply(unoffered, blocks['programming'].bindings, offered_evidence(request),
+        ReferenceTable.model_validate(request['references']))
+    assert kept['fields'][0]['item'] == {'kind': 'handle', 'ref': 'H9'}
+
+
+def test_an_entry_for_the_raw_wording_of_a_period_cites_the_values_read_from_it():
+    # LIVE-06: a projects reply cited /0/period/raw, which no binding holds; start, end and ongoing are read from it.
+    def raw_period(request):
+        block = {value.id: value for value in generic_package().definition.blocks}['projects']
+        explicit = {**by_reference(block_reply(block, verbatim_jobs(), source_fixture('F10')[0]), request), 'schemaVersion': 3}
+        period = [field for field in explicit['fields'] if field['pointer'].startswith('/0/period/')]
+        explicit['fields'] = [field for field in explicit['fields'] if field not in period] + [
+            entry('/0/period/raw', period[0]['evidence'])]
+        return explicit
+    proposal, _operation, _src = parsed('projects', raw_period)
+    assert proposal.state == 'provisional', proposal.errors
+    explicit, _operation, _src = parsed('projects', lambda request: {**by_reference(block_reply(
+        {value.id: value for value in generic_package().definition.blocks}['projects'], verbatim_jobs(),
+        source_fixture('F10')[0]), request), 'schemaVersion': 3})
+    def period(value):
+        return sorted((field.pointer, tuple((span.start, span.end) for span in field.evidence))
+            for field in value.resolved_fields if field.pointer.startswith('/0/period/'))
+    assert [pointer for pointer, _spans in period(proposal)] == ['/0/period/end', '/0/period/ongoing', '/0/period/start']
+    assert period(proposal) == period(explicit)
+
+
+def test_an_entry_inside_a_bound_value_cites_that_value():
+    def inner(request):
+        block = {value.id: value for value in generic_package().definition.blocks}['projects']
+        explicit = {**by_reference(block_reply(block, verbatim_jobs(), source_fixture('F10')[0]), request), 'schemaVersion': 3}
+        for field in explicit['fields']:
+            if field['pointer'] == '/0/period/start':
+                field['pointer'], field['fieldKey'], field['item'] = '/0/period/start/raw', None, None
+        return explicit
+    proposal, _operation, _src = parsed('projects', inner)
+    assert proposal.state == 'provisional', proposal.errors
+    [start] = [field for field in proposal.resolved_fields if field.pointer == '/0/period/start']
+    assert start.field_key == 'start' and start.evidence
+
+
+def test_an_entry_no_binding_holds_is_dropped_and_a_foreign_field_name_joins_the_value_entry():
+    # LIVE-07 repairs: an entry at /0/project of a job without a project, and a tool cited again under the role
+    # family's field name and item ref next to its own entry.
+    from packages.resume_core.models.template_import import ReferenceTable
+    blocks = {block.id: block for block in generic_package().definition.blocks}
+    src, _raw = source_fixture('F10')
+    request = request_for(src)
+    request['references']['items'] = [{'ref': 'H1', 'itemHandle': 'item-role', 'semanticType': 'foldcv:role_family', 'key': 'family'}]
+    line = refs(request)['Python, PostgreSQL, Docker']
+    given = reply({'items': ['Python']}, [entry('/items/0', [line], 'family', {'kind': 'handle', 'ref': 'H1'}),
+        entry('/items/0', [line], 'display')])
+    completed = complete_reply(given, blocks['programming'].bindings, offered_evidence(request),
+        ReferenceTable.model_validate(request['references']))
+    [field] = completed['fields']
+    assert (field['pointer'], field['fieldKey'], field['evidence']) == ('/items/0', 'display', [line])
+    def null_project(request):
+        explicit = {**by_reference(block_reply(blocks['projects'], verbatim_jobs(), source_fixture('F10')[0]), request),
+            'schemaVersion': 3}
+        explicit['fields'].append(entry('/0/project', explicit['fields'][0]['evidence']))
+        return explicit
+    proposal, _operation, _src = parsed('projects', null_project)
+    assert proposal.state == 'provisional', proposal.errors
+    assert not any(field.pointer == '/0/project' for field in proposal.resolved_fields)
+
+
+def test_an_undeclared_relation_is_dropped_and_a_captured_relation_named_for_another_subject_becomes_new():
+    # LIVE-11 repair: one job "owned by" another, and a captured relation ref reused for a different item.
+    from packages.resume_core.models.template_import import ReferenceTable
+    blocks = {block.id: block for block in generic_package().definition.blocks}
+    package = generic_package()
+    allowed = {(declaration.id, relation.kind, target) for declaration in package.definition.fact_types
+        for relation in declaration.relations for target in relation.target_types}
+    src = source_fixture('F10')[0]
+    def bad_relations(request):
+        explicit = {**by_reference(block_reply(blocks['projects'], verbatim_jobs(), src), request), 'schemaVersion': 3}
+        jobs = [value['key'] for value in explicit['discoveries'] if value['semanticType'] == 'foldcv:projects']
+        evidence = explicit['fields'][0]['evidence']
+        explicit['relations'].append({'relation': {'kind': 'new', 'key': 'job-in-job'}, 'kind': 'owned_by',
+            'subject': {'kind': 'discovery_key', 'key': jobs[1]}, 'target': {'kind': 'discovery_key', 'key': jobs[0]},
+            'evidence': evidence})
+        return explicit
+    proposal, _operation, _src = parsed('projects', bad_relations)
+    assert proposal.state == 'provisional', proposal.errors
+    assert not any(relation.kind == 'owned_by' and relation.subject_id == relation.target_id for relation in proposal.resolved_relations)
+    request = request_for(src)
+    request['references'] = {'items': [{'ref': 'H1', 'itemHandle': 'item-job', 'semanticType': 'foldcv:projects', 'key': 'job'}],
+        'cells': [], 'relations': [{'ref': 'R1', 'relationId': 'relation-old', 'kind': 'owned_by', 'subject': 'H9', 'target': 'H1'}]}
+    explicit = by_reference(block_reply(blocks['projects'], verbatim_jobs()[:1], src), request_for(src))
+    technology = next(value['key'] for value in explicit['discoveries'] if value['semanticType'] == 'foldcv:project_technology')
+    job = next(value['key'] for value in explicit['discoveries'] if value['semanticType'] == 'foldcv:projects')
+    explicit['relations'] = [{'relation': {'kind': 'relation', 'ref': 'R1'}, 'kind': 'owned_by',
+        'subject': {'kind': 'discovery_key', 'key': technology}, 'target': {'kind': 'discovery_key', 'key': job},
+        'evidence': explicit['fields'][0]['evidence']}]
+    completed = complete_reply(explicit, blocks['projects'].bindings, offered_evidence(request),
+        ReferenceTable.model_validate(request['references']), allowed)
+    reused = [value for value in completed['relations'] if value['subject'] == {'kind': 'discovery_key', 'key': technology}]
+    assert reused and all(value['relation']['kind'] == 'new' for value in reused)

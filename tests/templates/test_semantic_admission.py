@@ -82,13 +82,12 @@ def test_safe_proposal_is_provisional_and_duplicate_return_reuses_allocations_an
     assert again == operation and unchanged == facts and same == proposal
 
 
-@pytest.mark.parametrize('failure', ['missing', 'extra', 'duplicate', 'conflict', 'invalid_evidence'])
+@pytest.mark.parametrize('failure', ['extra', 'duplicate', 'conflict', 'invalid_evidence'])
 def test_incomplete_review_has_no_receipt_or_effective_promotion(failure):
+    # Review protocol 3: a check the reply leaves out holds (protocol 2 omission: test_evidence_references).
     operation, facts, proposal, package, source = proposed()
     operation, attempt, _, results = review_attempt(operation, proposal, package, source)
-    if failure == 'missing':
-        results.pop()
-    elif failure == 'extra':
+    if failure == 'extra':
         results.append({**results[0], 'targetId': 'unknown-target'})
     elif failure == 'duplicate':
         results.append(results[0])

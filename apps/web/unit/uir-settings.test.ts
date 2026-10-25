@@ -22,6 +22,8 @@ function setup() {
       server.preferences.rewriteReasoningEffort = effort; return structuredClone(server.preferences); },
     selectImport: async model => { calls.push({ part: "import", value: model }); if (fail.has("import")) throw new Error("unavailable");
       server.preferences.selectedImportModel = model; return structuredClone(server.preferences); },
+    selectFallback: async model => { calls.push({ part: "fallback", value: model }); if (fail.has("fallback")) throw new Error("unavailable");
+      server.preferences.selectedFallbackModel = model; return structuredClone(server.preferences); },
     analysis: async automatic => { calls.push({ part: "analysis", value: automatic }); if (fail.has("analysis")) throw new Error("disk full");
       server.preferences.automaticAnalysis = automatic; return structuredClone(server.preferences); },
     saveLimits: async value => { calls.push({ part: "limits", value });
@@ -115,6 +117,22 @@ test("import selection persists independently and can return to the processing m
   reopened.change("importModel", null); await reopened.save();
   assert.equal(h.server.preferences.selectedImportModel, null);
   assert.deepEqual(h.calls.map(call => call.part), ["import", "import"]);
+});
+
+test("the fallback model saves on its own, clears to none and leaves the import and processing models unchanged", async () => {
+  const h = setup(); await h.controller.load();
+  assert.equal(h.controller.state.draft.fallbackModel, null);
+  h.controller.change("fallbackModel", "model-c"); assert.deepEqual(h.controller.dirty, ["fallback"]);
+  await h.controller.save();
+  assert.deepEqual(h.calls, [{ part: "fallback", value: "model-c" }]);
+  assert.equal(h.server.preferences.selectedFallbackModel, "model-c");
+  assert.equal(h.server.preferences.selectedImportModel, undefined); assert.equal(h.server.preferences.selectedModel, "model-a");
+  h.controller.change("fallbackModel", null); h.controller.cancel();
+  assert.equal(h.controller.state.draft.fallbackModel, "model-c");
+  h.fail.add("fallback"); h.controller.change("fallbackModel", null); await h.controller.save();
+  assert.equal(h.controller.state.draft.fallbackModel, null); assert.ok(h.controller.state.errors.fallback);
+  h.fail.delete("fallback"); await h.controller.save();
+  assert.equal(h.server.preferences.selectedFallbackModel, null); assert.deepEqual(h.controller.dirty, []);
 });
 
 test("failed import saves keep the choice while other settings save successfully", async () => {

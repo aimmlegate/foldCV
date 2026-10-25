@@ -786,6 +786,8 @@ class Preferences(Wire):
     theme: Literal["light", "dark", "system"]
     selected_model: str | None
     selected_import_model: str | None = None
+    # E07: one more repair by this model after the import model's own repair; None disables it.
+    selected_fallback_model: str | None = None
     rewrite_reasoning_effort: ReasoningEffort | None = None
     import_minutes: int = Field(default=IMPORT_MINUTES[0], ge=IMPORT_MINUTES[1], le=IMPORT_MINUTES[2])
     project_megabytes: int = Field(default=PROJECT_MEGABYTES[0], ge=PROJECT_MEGABYTES[1], le=PROJECT_MEGABYTES[2])

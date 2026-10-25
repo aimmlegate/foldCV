@@ -24,11 +24,35 @@ def assemble_template(workspace, operation):
                 target_spans.setdefault(identifier, []).extend(field.evidence)
             for identifier, spans in relation_evidence(retained, proposal).items():
                 target_spans.setdefault(identifier, []).extend(spans)
+    # A whole-scope issue points at the fallback lines its own task shows, else at its block's view; before, it
+    # named every block, so its notice showed the first block of the page and any edit anywhere retired it.
+    fallback_spans, views = {}, {}
+    for retained in data.template_operations:
+        views.update({task.id: task.block_id for task in retained.tasks})
+        for value in retained.task_results:
+            if value.disposition == 'source_fallback':
+                fallback_spans.setdefault(value.task_id, []).extend(value.source_spans)
+    order = {block.id: index for index, block in enumerate(document.blocks())}
+    gated = {}
+    for declaration in data.template_package.definition.blocks:
+        if declaration.when is not None:
+            gated.setdefault(declaration.when.operation, set()).add(declaration.id)
+    def placed(issue, value, target):
+        if target.startswith('scope-'):
+            return value.disposition == 'fallback' and any(overlaps(value.span, span) for span in fallback_spans.get(issue.task_id, []))
+        return any(overlaps(value.span, span) for span in target_spans.get(target, []))
     for issue in issues:
-        issue.block_ids = sorted({identifier for value in coverage
-            if value.disposition != 'source_only' and (not issue.target_ids or any(
-                target.startswith('scope-') or any(overlaps(value.span, span) for span in target_spans.get(target, []))
-                for target in issue.target_ids)) for identifier in value.block_ids})
+        blocks = {identifier for value in coverage if value.disposition != 'source_only'
+            and (not issue.target_ids or any(placed(issue, value, target) for target in issue.target_ids))
+            for identifier in value.block_ids}
+        if not blocks and any(target.startswith('scope-') for target in issue.target_ids):
+            # A step without a view of its own (the role branch) points at the views its result selects.
+            wanted = {views.get(issue.task_id)} | gated.get(views.get(issue.task_id), set())
+            blocks = {block.id for block in document.blocks() if block.presentation is not None
+                and block.presentation.view_key in wanted}
+        if not blocks:
+            blocks = {identifier for value in coverage if value.disposition != 'source_only' for identifier in value.block_ids}
+        issue.block_ids = sorted(blocks, key=lambda identifier: order.get(identifier, len(order)))
     result.project = ProjectV6(schemaVersion=6, projectId=result.project_id, revision=result.project_revision,
         createdAt=result.created_at, sources=data.sources, evidenceRecords=[], facts=data.facts, document=document,
         assets=[], operations=data.operations, renders=[], templatePackage=data.template_package,

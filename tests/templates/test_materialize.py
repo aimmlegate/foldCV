@@ -88,14 +88,15 @@ def test_shared_unit_fallback_replaces_overlapping_rewrites_with_one_source_copy
     before = canonical(facts)
     fallback(operation, [capture_span(src, src.units[0])])
     document, coverage = materialize(package, facts, [operation], [src], operation_id=operation.id)
-    assert len(document.blocks()) == 1
+    # The block keeps its own title (S8, LIVE-09) and adds no diagnostic heading (5.3).
+    assert [block.type for block in document.blocks()] == ['heading', 'paragraph']
+    assert document.blocks()[0].content[0].text == 'PROJECTS'
     # The paragraph shows the unit without its closing line break; only that whitespace stays source-only.
-    shown = document.blocks()[0].content[0]
+    shown = document.blocks()[1].content[0]
     assert shown.text == src.units[0].text.rstrip('\n') and source_slice([src], shown.citations[0]) == shown.text
     assert all(not source_slice([src], value.span).strip() for value in coverage if value.disposition == 'source_only')
     assert not any(value.disposition in {'accepted', 'multiple_views'} for value in coverage)
     assert canonical(facts) == before
-    assert not any(block.type == 'heading' for block in document.blocks())
 
 
 def test_fallback_places_disconnected_evidence_added_by_suppression_once_without_losing_facts():
@@ -185,8 +186,8 @@ def test_source_fallback_with_no_nodes_needs_an_explicit_captured_style(explicit
             materialize(package, facts, [operation], [src], operation_id=operation.id)
         return
     document, _coverage = materialize(package, facts, [operation], [src], operation_id=operation.id)
-    assert text(document) == src.units[0].text.rstrip('\n')
-    assert document.blocks()[0].presentation.style_token == 'body'
+    assert text(document) == 'PROJECTS\n' + src.units[0].text.rstrip('\n')
+    assert document.blocks()[-1].presentation.style_token == 'body'
 
 
 def test_captured_human_classification_is_retained_in_facts_without_becoming_cv_text():
@@ -377,3 +378,28 @@ def test_a_fallback_suppresses_a_shared_cell_only_in_its_own_view():
         {'tasks': [shared], 'skills': [shared, other]})
     assert suppressed == {('tasks', 'cell-shared')} and set(placements) == {'tasks'}
     assert [source_slice([src], span) for span in placements['tasks']] == ['Python']
+
+
+def test_lines_a_review_names_as_missing_show_only_where_no_view_shows_them():
+    # LIVE-09: a coverage gap repeated lines another block already showed; such lines now place only once, nowhere
+    # twice, while the accepted values stay.
+    from packages.resume_core.template_identity import line_spans
+    from packages.resume_core.template_import import digest
+    from packages.resume_core.templates.span_coverage import overlaps
+    operation, facts, package, src, _raw = admitted()
+    _document, before = materialize(package, facts, [operation], [src], operation_id=operation.id)
+    lines = [line for line in line_spans(src, src.units[0]) if source_slice([src], line).strip()]
+    # A line counts as shown when an accepted value cites it, whatever wording the view gives it.
+    unshown = [line for line in lines if not any(value.disposition in {'accepted', 'multiple_views'}
+        and overlaps(value.span, line) for value in before)]
+    assert unshown and len(unshown) < len(lines)
+    fallback(operation, lines)
+    operation.task_results[0].value = {'scope': 'cited', 'leftoverOnly': [digest(line) for line in lines]}
+    document, coverage = materialize(package, facts, [operation], [src], operation_id=operation.id)
+    placed = [block for block in document.blocks() if block.type == 'paragraph' and block.content[0].citations]
+    # Adjacent missing lines stay one paragraph.
+    assert '\n'.join(source_slice([src], block.content[0].citations[0]).strip() for block in placed) == '\n'.join(
+        source_slice([src], line).strip() for line in unshown)
+    # Nothing is lost: every line is shown by an accepted value or placed once.
+    assert all(any(value.disposition in {'accepted', 'multiple_views', 'fallback'} and overlaps(value.span, line)
+        for value in coverage) for line in lines)
