@@ -31,6 +31,11 @@ def identity(prefix):
     return prefix + '-' + uuid.uuid4().hex
 
 
+def same_captured_model(model, expected):
+    """The captured model whatever effort a block asked for (D101: a block may declare its own extraction effort)."""
+    return expected is not None and model.model_copy(update={'effort': expected.effort}) == expected
+
+
 def digest(value):
     def wire(item):
         if hasattr(item, 'model_dump'):
@@ -242,7 +247,7 @@ def reserve_attempt(operation, task_id, slot, input_hash, model, owner, now, *, 
         if any(attempt.slot == slot for attempt in prior):
             raise TemplateImportFailure('IMPORT_SLOT_SPENT')
         expected = result.capture.fallback if slot == 'fallback_repair' else result.capture.primary
-        if expected is None or model != expected:
+        if expected is None or not same_captured_model(model, expected):
             raise TemplateImportFailure('IMPORT_MODEL_NOT_CAPTURED')
         if slot != 'initial' and not any(attempt.slot == 'initial' for attempt in prior):
             raise TemplateImportFailure('IMPORT_REPAIR_WITHOUT_INITIAL')
@@ -252,7 +257,7 @@ def reserve_attempt(operation, task_id, slot, input_hash, model, owner, now, *, 
         if not any(attempt.slot in GENERATION_SLOTS and attempt.state in {'returned', 'reconciled'}
                 and attempt.outcome == 'completed' for attempt in prior):
             raise TemplateImportFailure('IMPORT_REVIEW_WITHOUT_PROPOSAL')
-        if model not in [result.capture.primary, result.capture.fallback] or any(
+        if not any(same_captured_model(model, captured) for captured in [result.capture.primary, result.capture.fallback]) or any(
                 attempt.slot in {'review', 'replacement_review'} and attempt.input_hash == input_hash for attempt in prior):
             raise TemplateImportFailure('IMPORT_REVIEW_ALREADY_SPENT')
     else:

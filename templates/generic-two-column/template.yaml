@@ -1606,6 +1606,7 @@ blocks:
       - Every interpretation and rewritten claim must be supported by its source; review absence/coverage for empty
         extraction.
 - id: projects
+  effort: high
   placement:
     region: main
     order: 20

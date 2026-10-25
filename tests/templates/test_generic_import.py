@@ -88,6 +88,10 @@ async def test_every_generic_block_imports_with_partial_records_and_one_rejected
     assert {block for block, state in states.items() if state == 'empty'} == {
         'key_skills', 'role_tools', 'portfolio', *([] if rewrite else ['other_projects'])}
     assert states['projects'] == 'source_fallback' and states['other_projects'] == ('accepted' if rewrite else 'empty')
+    # D101 probe H: the projects block declares effort high; every other block keeps the captured effort.
+    blocks = {task.id: task.block_id for task in result.tasks}
+    efforts = {blocks[attempt.task_id]: attempt.model.effort for attempt in result.attempts if attempt.slot == 'initial'}
+    assert efforts['projects'] == 'high' and all(effort == result.capture.primary.effort for block, effort in efforts.items() if block != 'projects')
     shown = views(workspace)
     assert order(workspace) == ['identity', 'focus', 'education', 'courses', 'location', 'languages', 'opensource', 'summary',
         'projects', *(['other_projects'] if rewrite else []), 'career_highlights', 'programming', 'data_and_tools', 'infrastructure']

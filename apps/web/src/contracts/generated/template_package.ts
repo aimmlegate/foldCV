@@ -41,6 +41,7 @@ export type Instructions = string[];
 export type Version = 1;
 export type Checks = Check[];
 export type DependsOn = string[];
+export type Effort = ("low" | "medium" | "high") | null;
 export type Extract = string[];
 export type Id4 = string;
 export type Mode = "model" | "derived" | "source_copy";
@@ -282,6 +283,7 @@ export interface Block {
   checks: Checks;
   content_schema: ContentSchema;
   depends_on: DependsOn;
+  effort?: Effort;
   extract: Extract;
   id: Id4;
   mode: Mode;

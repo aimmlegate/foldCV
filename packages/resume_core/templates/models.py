@@ -338,6 +338,9 @@ class Condition(Definition):
 class Block(Definition):
     id: Id
     mode: Literal["model", "derived", "source_copy"]
+    # Reasoning effort for this block's extraction calls; None keeps the captured model's effort (D101 probe H: the
+    # whole projects block came back complete at high where medium stopped after one to five jobs).
+    effort: Literal["low", "medium", "high"] | None = Field(default=None, exclude_if=lambda value: value is None)
     selectors: list[InputRef]
     content_schema: JsonObject
     bindings: list[Binding]

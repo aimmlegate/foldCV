@@ -88,10 +88,15 @@ def block_reply(block, payload, src, cites=None, request=None):
     captured = {value['key']: value for value in request.get('capturedHandles', []) if value.get('semanticType') in types}
     # A repair selects the items and links its earlier attempt allocated, by handle and relation id.
     known = {(value['kind'], value['subjectId'], value['targetId']): value['id'] for value in request['capturedRelations']}
+    # Without offered items the first reply carries no discoveries (I3), so the coordinator named the items after
+    # their pointer and type; a repair finds its earlier item under that derived key too.
+    derived = {value['key']: 'auto' + value['pointer'] + '@' + value['semanticType'] for value in discoveries}
+    def item(key):
+        return captured.get(key) or captured[derived[key]]
     for field in reply['fields']:
-        field['item'] = {'kind': 'handle', 'itemHandle': captured[field['item']['key']]['itemHandle']}
+        field['item'] = {'kind': 'handle', 'itemHandle': item(field['item']['key'])['itemHandle']}
     for relation in reply['relations']:
-        subject, target = captured[relation['subject']['key']], captured[relation['target']['key']]
+        subject, target = item(relation['subject']['key']), item(relation['target']['key'])
         relation['subject'] = {'kind': 'handle', 'itemHandle': subject['itemHandle']}
         relation['target'] = {'kind': 'handle', 'itemHandle': target['itemHandle']}
         relation['relation'] = {'kind': 'relation_id', 'relationId': known[(relation['kind'], subject['recordId'], target['recordId'])]}

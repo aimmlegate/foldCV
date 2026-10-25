@@ -1494,6 +1494,7 @@ export type SemanticType = string;
 export type Bindings = Binding[];
 export type Checks = Check[];
 export type DependsOn = string[];
+export type Effort1 = ("low" | "medium" | "high") | null;
 export type Extract = string[];
 export type Id62 = string;
 export type Mode2 = "model" | "derived" | "source_copy";
@@ -3889,6 +3890,7 @@ export interface Block1 {
   checks: Checks;
   content_schema: ContentSchema;
   depends_on: DependsOn;
+  effort?: Effort1;
   extract: Extract;
   id: Id62;
   mode: Mode2;

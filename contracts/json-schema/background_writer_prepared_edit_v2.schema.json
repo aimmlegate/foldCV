@@ -701,6 +701,23 @@
           "title": "Depends On",
           "type": "array"
         },
+        "effort": {
+          "anyOf": [
+            {
+              "enum": [
+                "low",
+                "medium",
+                "high"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Effort"
+        },
         "extract": {
           "items": {
             "type": "string"

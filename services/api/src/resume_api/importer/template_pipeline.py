@@ -589,6 +589,12 @@ class TemplatePipeline(TemplateCheckpoints):
         self.guard(project, operation)
         remaining = deadline.remaining(operation, self.wall(), self.elapsed())
         policy = review.policy if review is not None else operation.capture.fallback if slot == 'fallback_repair' else operation.capture.primary
+        if review is None:
+            block = next(value for value in owner(workspace).template_package.definition.blocks if value.id == task_in(operation, task_id).block_id)
+            if block.effort and block.effort != policy.effort:
+                # The block declares its own extraction effort (D101 probe H: the projects block is complete at high
+                # where medium stopped after one to five jobs); the attempt records the policy actually used.
+                policy = policy.model_copy(update={'effort': block.effort})
         launch_owner = self.transport.reserve_owner(operation, task_in(operation, task_id), policy)
         reserved = []
         def reserve(result, _data, _workspace):
