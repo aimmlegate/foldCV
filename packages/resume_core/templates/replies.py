@@ -101,16 +101,17 @@ REVIEW_PROTOCOL = {'version': 'template-review-protocol-3', 'rules': [
 
 
 # The same protocol for a request that offers no captured items or relations: nothing can be updated, split or merged,
-# so the reply carries no discoveries, lineage or relations and the coordinator derives them (LIVE-12: a first projects
-# reply was refused for relations that named a handle nobody offered).
+# so the reply needs no lineage or relations and the coordinator derives them (LIVE-12: a first projects reply was
+# refused for relations that named a handle nobody offered). The schema keeps the keys so a model that still sends them
+# decodes; selections of unoffered handles are dropped before completion, relations by discovery key stay.
 CONTENT_ONLY_RULES = [
-    'Return payload and fields. payload follows the block content schema; use null or [] for data the source does not state.',
+    'Return payload and fields; discoveries may be null. payload follows the block content schema; use null or [] for data the source does not state.',
     PROPOSAL_PROTOCOL['rules'][1],
     PROPOSAL_PROTOCOL['rules'][2],
-    'The coordinator derives the items, their add lineage and the relations the bindings configure from the payload; the reply has no discoveries, lineage or relations.',
+    'The coordinator derives the items, their add lineage and the relations the bindings configure from the payload; the reply has no lineage or relations. discoveries {key, semanticType, pointer} may name new items or be null.',
     PROPOSAL_PROTOCOL['rules'][4],
     PROPOSAL_PROTOCOL['rules'][5]]
-BOOKKEEPING_KEYS = ('discoveries', 'lineage', 'relations')
+BOOKKEEPING_KEYS = ()
 
 
 def offers_nothing(references):
@@ -125,10 +126,23 @@ def proposal_protocol(references):
 
 
 def strip_unoffered_bookkeeping(payload, references):
-    """A reply to a request without offers loses the bookkeeping keys the schema no longer has; the coordinator derives them."""
-    if offers_nothing(references) and isinstance(payload, dict):
-        return {key: value for key, value in payload.items() if key not in BOOKKEEPING_KEYS}
-    return payload
+    """A reply to a request without offers keeps only the bookkeeping it can mean: lineage adds, relations and items named
+    by discovery keys. A handle, cell or relation ref nobody offered (LIVE-12: target {kind: handle, ref: item-/0}) is
+    dropped and the coordinator derives the fact instead of refusing the whole reply."""
+    if not offers_nothing(references) or not isinstance(payload, dict):
+        return payload
+    def by_key(selection):
+        return isinstance(selection, dict) and selection.get('kind') in {'discovery_key', 'new'}
+    cleaned = dict(payload)
+    if isinstance(payload.get('fields'), list):
+        cleaned['fields'] = [{**entry, 'item': entry.get('item') if by_key(entry.get('item')) else None, 'effectiveCells': None}
+            if isinstance(entry, dict) else entry for entry in payload['fields']]
+    if isinstance(payload.get('lineage'), list):
+        cleaned['lineage'] = [entry for entry in payload['lineage'] if isinstance(entry, dict) and not entry.get('parents')] or None
+    if isinstance(payload.get('relations'), list):
+        cleaned['relations'] = [entry for entry in payload['relations'] if isinstance(entry, dict) and by_key(entry.get('subject'))
+            and by_key(entry.get('target')) and (entry.get('relation') is None or by_key(entry.get('relation')))] or None
+    return cleaned
 
 
 def review_protocol(review):
@@ -150,18 +164,11 @@ def proposal_schema(content_schema, refs=None, references=None):
         'CellRef': [value.ref for value in references.cells] if references else [],
         'RelationRef': [value.ref for value in references.relations] if references else []})
     if offers_nothing(references):
-        for key in BOOKKEEPING_KEYS:
-            root['properties'].pop(key, None)
-        root['required'] = [key for key in root['required'] if key not in BOOKKEEPING_KEYS]
-        # Definitions only the dropped properties used go with them.
-        while True:
-            text = json.dumps({key: value for key, value in root.items() if key != '$defs'}) + json.dumps(
-                {key: value for key, value in root.get('$defs', {}).items()})
-            unused = [name for name in root.get('$defs', {}) if '#/$defs/' + name + '"' not in text]
-            if not unused:
-                break
-            for name in unused:
-                del root['$defs'][name]
+        # No item, cell or relation can be selected, so a stray selection is a plain string the coordinator drops
+        # (strip_unoffered_bookkeeping) instead of a schema refusal of the whole reply.
+        for name in ('ItemRef', 'CellRef', 'RelationRef'):
+            if name in root.get('$defs', {}):
+                root['$defs'][name] = {'type': 'string'}
         validate_schema(root)
     return root
 

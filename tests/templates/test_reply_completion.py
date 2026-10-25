@@ -166,9 +166,10 @@ def test_missing_list_entries_empty_lineage_and_list_level_evidence_are_complete
     assert all(field.evidence and all(source_slice([src], span).strip() for span in field.evidence) for field in proposal.resolved_fields)
 
 
-def test_an_unoffered_handle_and_an_unstated_value_are_still_refused_with_the_binding_named():
+def test_an_unoffered_handle_is_dropped_without_offers_and_an_unstated_value_is_still_refused_with_the_binding_named():
+    # I3 (LIVE-12): a request that offers no items cannot mean a handle; the selection is dropped and the item derived.
     proposal, _operation, _src = parsed('summary', invented_handle)
-    assert proposal.state == 'invalid' and proposal.errors == ['/payload/fields/0/item: matches none of the allowed shapes']
+    assert proposal.state == 'provisional', proposal.errors
     unstated = lambda _request: reply({'items': ['Python', 'Rust']})
     proposal, _operation, _src = parsed('programming', unstated)
     assert proposal.state == 'invalid' and proposal.errors[0].endswith('missing /items/1 (display)')
@@ -453,11 +454,20 @@ def test_a_request_without_offers_has_no_bookkeeping_keys_and_ignores_the_ones_a
     assert [value.kind for value in proposal.lineage] == ['add'] and proposal.resolved_relations
     full = next(block.full_schema for block in generic_package().blocks if block.id == 'projects')
     nothing = ReferenceTable.model_validate({'items': [], 'cells': [], 'relations': []})
-    assert sorted(proposal_schema(full, ['S1'], nothing)['properties']) == ['fields', 'payload', 'schemaVersion']
-    assert sorted(proposal_schema(full, ['S1'], None)['properties']) == ['discoveries', 'fields', 'lineage', 'payload', 'relations', 'schemaVersion']
+    schema = proposal_schema(full, ['S1'], nothing)
+    assert schema['$defs']['ItemRef'] == {'type': 'string'} and schema['$defs']['RelationRef'] == {'type': 'string'}
+    assert proposal_schema(full, ['S1'], None)['$defs']['ItemRef'] == {'type': 'string', 'not': {}}
     assert proposal_protocol(None) is PROPOSAL_PROTOCOL and 'send null' not in proposal_protocol(nothing)['rules'][0]
-    assert 'no discoveries, lineage or relations' in proposal_protocol(nothing)['rules'][3]
-    assert strip_unoffered_bookkeeping({'payload': [], 'fields': [], 'relations': [1]}, nothing) == {'payload': [], 'fields': []}
+    assert 'no lineage or relations' in proposal_protocol(nothing)['rules'][3]
+    handle = {'kind': 'handle', 'ref': 'item-/0'}
+    keyed = {'kind': 'discovery_key', 'key': 'proj'}
+    stripped = strip_unoffered_bookkeeping({'payload': [], 'discoveries': [],
+        'fields': [{'pointer': '/0/role', 'item': handle, 'fieldKey': None, 'evidence': ['S1'], 'effectiveCells': ['E1']}],
+        'lineage': [{'kind': 'add', 'parents': [], 'children': ['proj']}, {'kind': 'split', 'parents': ['H1'], 'children': ['a']}],
+        'relations': [{'relation': {'kind': 'new', 'key': 'r'}, 'kind': 'owned_by', 'subject': keyed, 'target': handle, 'evidence': []},
+            {'relation': {'kind': 'new', 'key': 'q'}, 'kind': 'owned_by', 'subject': keyed, 'target': keyed, 'evidence': []}]}, nothing)
+    assert stripped['fields'] == [{'pointer': '/0/role', 'item': None, 'fieldKey': None, 'evidence': ['S1'], 'effectiveCells': None}]
+    assert stripped['lineage'] == [{'kind': 'add', 'parents': [], 'children': ['proj']}] and len(stripped['relations']) == 1
     assert strip_unoffered_bookkeeping({'payload': [], 'relations': [1]}, None) == {'payload': [], 'relations': [1]}
 
 
