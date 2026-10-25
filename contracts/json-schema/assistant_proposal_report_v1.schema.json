@@ -1,0 +1,262 @@
+{
+  "$defs": {
+    "AgentEditReceipt": {
+      "additionalProperties": false,
+      "properties": {
+        "batchId": {
+          "maxLength": 128,
+          "minLength": 1,
+          "pattern": "^[A-Za-z0-9_-]+$",
+          "title": "Batchid",
+          "type": "string"
+        },
+        "clientMutationId": {
+          "maxLength": 128,
+          "minLength": 1,
+          "pattern": "^[A-Za-z0-9_-]+$",
+          "title": "Clientmutationid",
+          "type": "string"
+        },
+        "disposition": {
+          "enum": [
+            "prepared",
+            "offered",
+            "applying",
+            "saved",
+            "stale",
+            "rejected",
+            "cancelled",
+            "save_failed",
+            "outcome_unknown"
+          ],
+          "title": "Disposition",
+          "type": "string"
+        },
+        "documentRevision": {
+          "anyOf": [
+            {
+              "minimum": 1,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Documentrevision"
+        },
+        "durable": {
+          "title": "Durable",
+          "type": "boolean"
+        },
+        "error": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/AgentError"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "factsRevision": {
+          "anyOf": [
+            {
+              "minimum": 1,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Factsrevision"
+        },
+        "projectRevision": {
+          "anyOf": [
+            {
+              "minimum": 1,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Projectrevision"
+        },
+        "requestSha256": {
+          "pattern": "^[a-f0-9]{64}$",
+          "title": "Requestsha256",
+          "type": "string"
+        },
+        "runId": {
+          "maxLength": 128,
+          "minLength": 1,
+          "pattern": "^[A-Za-z0-9_-]+$",
+          "title": "Runid",
+          "type": "string"
+        },
+        "toolKey": {
+          "maxLength": 128,
+          "minLength": 1,
+          "pattern": "^[A-Za-z0-9_-]+$",
+          "title": "Toolkey",
+          "type": "string"
+        }
+      },
+      "required": [
+        "batchId",
+        "runId",
+        "toolKey",
+        "clientMutationId",
+        "requestSha256",
+        "disposition",
+        "projectRevision",
+        "documentRevision",
+        "factsRevision",
+        "durable",
+        "error"
+      ],
+      "title": "AgentEditReceipt",
+      "type": "object"
+    },
+    "AgentError": {
+      "additionalProperties": false,
+      "properties": {
+        "code": {
+          "enum": [
+            "AGENT_DISABLED",
+            "AGENT_MODEL_REQUIRED",
+            "AGENT_MODEL_UNAVAILABLE",
+            "AGENT_MODEL_INCOMPATIBLE",
+            "AGENT_SETTINGS_CONFLICT",
+            "AGENT_SETTINGS_CORRUPT",
+            "AGENT_SETTINGS_SAVE_FAILED",
+            "AGENT_CONNECTION_UNAVAILABLE",
+            "AGENT_CONNECTION_CHANGED",
+            "AGENT_AUTH_REQUIRED",
+            "AGENT_QUOTA",
+            "AGENT_BUSY",
+            "AGENT_CANCELLED",
+            "AGENT_INTERRUPTED",
+            "AGENT_DEADLINE",
+            "AGENT_STARTUP_TIMEOUT",
+            "AGENT_PROTOCOL",
+            "AGENT_PROCESS_FAILED",
+            "AGENT_CLEANUP_FAILED",
+            "AGENT_RUNTIME_UNSUPPORTED",
+            "AGENT_MODEL_REROUTED",
+            "AGENT_UNEXPECTED_COMPACTION",
+            "AGENT_TOOL_DENIED",
+            "AGENT_TOOL_LIMIT",
+            "AGENT_OUTPUT_LIMIT",
+            "AGENT_CONTEXT_LIMIT",
+            "AGENT_ARGUMENT_INVALID",
+            "AGENT_WEB_DISABLED",
+            "AGENT_SOURCE_UNAVAILABLE",
+            "AGENT_SOURCE_DENIED",
+            "AGENT_SOURCE_LIMIT",
+            "AGENT_SCOPE_INVALID",
+            "AGENT_STALE_READ",
+            "AGENT_EDIT_INVALID",
+            "AGENT_EDIT_LIMIT",
+            "AGENT_EVIDENCE_INVALID",
+            "AGENT_NO_OWNER",
+            "AGENT_LEASE_EXPIRED",
+            "AGENT_OWNER_MISMATCH",
+            "AGENT_TICKET_INVALID",
+            "AGENT_RECEIPT_TIMEOUT",
+            "AGENT_SAVE_FAILED",
+            "AGENT_OUTCOME_UNKNOWN",
+            "AGENT_IDEMPOTENCY_CONFLICT",
+            "AGENT_NOT_FOUND",
+            "AGENT_CONVERSATION_FULL",
+            "AGENT_PROJECT_FULL",
+            "AGENT_STORE_CORRUPT",
+            "AGENT_STORE_UNAVAILABLE",
+            "AGENT_STORE_SAVE_FAILED",
+            "AGENT_PROJECT_DELETED",
+            "AGENT_CLEANUP_INCOMPLETE",
+            "AGENT_RESYNC_REQUIRED"
+          ],
+          "title": "Code",
+          "type": "string"
+        }
+      },
+      "required": [
+        "code"
+      ],
+      "title": "AgentError",
+      "type": "object"
+    },
+    "AgentOwner": {
+      "additionalProperties": false,
+      "properties": {
+        "epoch": {
+          "minimum": 1,
+          "title": "Epoch",
+          "type": "integer"
+        },
+        "token": {
+          "maxLength": 128,
+          "minLength": 32,
+          "pattern": "^[A-Za-z0-9_-]+$",
+          "title": "Token",
+          "type": "string"
+        }
+      },
+      "required": [
+        "token",
+        "epoch"
+      ],
+      "title": "AgentOwner",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "contentSha256": {
+      "pattern": "^[a-f0-9]{64}$",
+      "title": "Contentsha256",
+      "type": "string"
+    },
+    "owner": {
+      "$ref": "#/$defs/AgentOwner"
+    },
+    "proposalId": {
+      "maxLength": 128,
+      "minLength": 1,
+      "pattern": "^[A-Za-z0-9_-]+$",
+      "title": "Proposalid",
+      "type": "string"
+    },
+    "protocolVersion": {
+      "const": 1,
+      "title": "Protocolversion",
+      "type": "integer"
+    },
+    "receipt": {
+      "$ref": "#/$defs/AgentEditReceipt"
+    },
+    "schemaVersion": {
+      "const": 1,
+      "default": 1,
+      "title": "Schemaversion",
+      "type": "integer"
+    },
+    "version": {
+      "maximum": 20,
+      "minimum": 1,
+      "title": "Version",
+      "type": "integer"
+    }
+  },
+  "required": [
+    "protocolVersion",
+    "proposalId",
+    "version",
+    "contentSha256",
+    "owner",
+    "receipt"
+  ],
+  "title": "AssistantProposalReportV1",
+  "type": "object"
+}

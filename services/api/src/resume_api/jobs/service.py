@@ -49,6 +49,7 @@ class JobService:
         self.artifacts = JobArtifacts(self.store)
         self.history = ScopeHistory(self.store, query_fingerprint)
         self.publisher = CanonicalCoordinator(self.store, self.history, projects.storage, self.load_payload)
+        self.publisher.assistant_review_required = lambda: getattr(getattr(projects, "agent", None), "assistant_protocol_enabled", False)
         configure_exports = getattr(projects, 'configure_template_exports', None)
         if configure_exports is not None:
             configure_exports(self, cleanup_verified=template_cleanup_verified or (lambda: False))
@@ -112,6 +113,9 @@ class JobService:
                         self.store.fences.setdefault(project, "OUTCOME_UNKNOWN")
             from packages.resume_core.background_retention import JobRetention
             self.writers.recover_all()
+            agent = getattr(self.projects, "agent", None)
+            if agent is not None:
+                agent.approval.recover_all()
             JobRetention(self.store).sweep_all()
         if hasattr(self.projects, 'recover_template_exports'):
             await self.projects.recover_template_exports()
@@ -207,9 +211,24 @@ class JobService:
             return self.fixed.inputs.payload(state, directory, reference)
         return self.artifacts.payload_unlocked(state, directory, reference)
 
+    def agent_configuration(self, allow_edits, allow_web):
+        agent = getattr(self.projects, "agent", None)
+        cap_mode = getattr(agent, "assistant_protocol_enabled", False)
+        names = [name for name in TOOL_NAMES if (not cap_mode or name != "apply_edit_batch")
+            and (allow_edits or name not in {"prepare_edit_batch", "apply_edit_batch", "project_action"}
+                or cap_mode and name == "prepare_edit_batch")
+            and (allow_web or name != "read_public_page")]
+        protocol = agent.protocol_sha256 if cap_mode else PROTOCOL_V2_SHA256
+        return names, digest({"base": CONFIG_SHA256, "protocol": protocol,
+            "tools": names, "allowEdits": allow_edits, "allowWeb": allow_web})
+
     def preflight(self, job):
         if job.submission.protocol == 'template_import_v1':
             return self.templates.preflight(job) if self.templates is not None else 'JOB_DISABLED'
+        if job.submission.kind == "agent" and getattr(getattr(self.projects, "agent", None), "assistant_protocol_enabled", False):
+            names, config = self.agent_configuration(job.submission.allow_edits, job.submission.allow_web)
+            if job.submission.tools != names or any(model.config_sha256 != config for model in job.submission.models):
+                return "JOB_SCOPE_INVALID"
         connection = self.connection()
         if not connection.ready:
             return "RATE_LIMITED" if connection.reason == "AGENT_QUOTA" else "AUTH_REQUIRED"
@@ -242,10 +261,14 @@ class JobService:
         except AdmissionBlocked:
             raise BackgroundFailure("CLEANUP_FAILED") from None
 
-    async def submit(self, project, payload):
+    async def submit(self, project, payload, *, prepare=None):
         if not self.enabled or not self.accepting or self.supervisor.closed or self.supervisor.dispatcher is None:
             raise BackgroundFailure("JOB_DISABLED")
         logical = payload.request
+        if getattr(getattr(self.projects, "agent", None), "assistant_protocol_enabled", False):
+            from ..agent.capabilities import known_intent
+            if known_intent(logical.message) is not None:
+                raise AgentFailure("AGENT_TOOL_DENIED")
         identity = JobIdentity(projectId=project, lineage=payload.lineage, requestEpoch=payload.request_epoch,
             requestId=logical.client_request_id)
         logical_hash = digest({"identity": identity.model_dump(by_alias=True), "request": logical.model_dump(by_alias=True)})
@@ -279,10 +302,7 @@ class JobService:
             if logical.allow_edits and access.read_only:
                 raise AgentFailure("AGENT_TOOL_DENIED")
             record = self.artifacts.prepare_input(identity, logical, connection.epoch, digest(workspace.rules_used))
-            names = [name for name in TOOL_NAMES if (logical.allow_edits or name not in {"prepare_edit_batch", "apply_edit_batch", "project_action"})
-                and (logical.allow_web or name != "read_public_page")]
-            config = digest({"base": CONFIG_SHA256, "protocol": PROTOCOL_V2_SHA256,
-                "tools": names, "allowEdits": logical.allow_edits, "allowWeb": logical.allow_web})
+            names, config = self.agent_configuration(logical.allow_edits, logical.allow_web)
             captured = JobSubmissionV1(schemaVersion=1, identity=identity, payloadSha256=logical_hash,
                 kind="agent", schedulingClass="background", input={"kind": "agent_journal", "id": record.id,
                     "sha256": record.request_sha256}, models=[{"stage": "agent", "model": settings.selected_agent_model,
@@ -291,6 +311,12 @@ class JobService:
                 guards={"schemaVersion": 1, "reads": [], "writes": []}, submittedAt=self.store.clock())
             job, created = self.store.submit(captured)
             self.artifacts.bind(job)
+            if created and prepare is not None:
+                try:
+                    prepare(job)
+                except BaseException:
+                    self.store.cancel(project, job.id)
+                    raise
         try:
             if created:
                 await self.supervisor.observer("accepted_durable", job.id)
@@ -371,6 +397,8 @@ class JobService:
         try:
             state = self.store.load(project)
             for job in state.jobs:
+                if job.submission.kind == "agent" and getattr(getattr(self.projects, "agent", None), "assistant_protocol_enabled", False):
+                    continue
                 if job.submission.kind == "agent" and not self.settings.load().enabled:
                     continue
                 if job.submission.approval_required or job.publication not in {"ready", "waiting_for_sync", "save_failed"} or job.proposal_id is None:

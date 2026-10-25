@@ -7,6 +7,7 @@ from packages.resume_core.background_store import BackgroundFailure
 from packages.resume_core.models.agent import AgentEmptyRequest
 from packages.resume_core.models.background import JobAgentRequestV1, JobReplayRequestV1, JobReplayV1, JobFixedRequestV1
 from packages.resume_core.models.template_import import StartTemplateImportV1, ResumeTemplateImportV1
+from packages.resume_core.models.assistant_approval import AssistantJobRequestV1
 
 
 def mount_jobs(app, service):
@@ -34,7 +35,29 @@ def mount_jobs(app, service):
 
     @app.post(prefix + "/agent")
     async def submit(project_id: str, payload: JobAgentRequestV1):
+        if getattr(getattr(service.projects, "agent", None), "assistant_protocol_enabled", False):
+            raise BackgroundFailure("JOB_SCOPE_INVALID")
         job, created = await service.submit(project_id, payload)
+        return response(job, 202 if created else 200)
+
+    @app.post(prefix + "/assistant-v1")
+    async def submit_assistant(project_id: str, request: Request, payload: AssistantJobRequestV1):
+        versions = [value for key, value in request.headers.raw if key.lower() == b"x-foldcv-assistant-protocol"]
+        if versions != [b"1"] or not getattr(getattr(service.projects, "agent", None), "assistant_protocol_enabled", False):
+            raise BackgroundFailure("JOB_SCOPE_INVALID")
+        job, created = await service.submit(project_id, payload.request)
+        return response(job, 202 if created else 200)
+
+    from packages.resume_core.models.assistant_continuation import AssistantContinueJobV1
+
+    @app.post(prefix + "/assistant-continue-v1")
+    async def continue_assistant(project_id: str, request: Request, payload: AssistantContinueJobV1):
+        from ..agent.continuation import submit_job
+        versions = [value for key, value in request.headers.raw if key.lower() == b"x-foldcv-assistant-protocol"]
+        agent = getattr(service.projects, "agent", None)
+        if versions != [b"1"] or not getattr(agent, "assistant_protocol_enabled", False):
+            raise BackgroundFailure("JOB_SCOPE_INVALID")
+        job, created = await submit_job(agent, service, project_id, payload)
         return response(job, 202 if created else 200)
 
     @app.post(prefix + "/fixed")

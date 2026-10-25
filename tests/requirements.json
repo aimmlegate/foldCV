@@ -3568,6 +3568,245 @@
         "tests/recovery/test_gui_exports.py::test_export_while_editing_rejects_late_worker_result_without_losing_text_or_pointer[rename]",
         "tests/recovery/test_gui_exports.py::test_export_while_editing_rejects_late_worker_result_without_losing_text_or_pointer[text]"
       ]
+    },
+    {
+      "id": "CAP-A01",
+      "status": "partial",
+      "tests": [
+        "tests/recovery/test_assistant_capabilities.py::test_read_only_catalog_separates_generation_preparation_and_apply",
+        "tests/recovery/test_assistant_capabilities.py::test_ambiguous_prose_needs_planning_and_task_checks_are_precise",
+        "tests/recovery/test_assistant_capabilities.py::test_catalog_routes_require_cookie_protocol_and_strict_flags_without_inference"
+      ]
+    },
+    {
+      "id": "CAP-A02",
+      "status": "partial",
+      "tests": [
+        "tests/recovery/test_assistant_capabilities.py::test_read_only_catalog_separates_generation_preparation_and_apply",
+        "tests/recovery/test_assistant_capabilities.py::test_raw_invocation_cannot_bypass_catalog_or_supply_approval",
+        "tests/recovery/test_assistant_proposals.py::test_read_only_multicall_draft_is_durable_without_document_history_or_apply"
+      ]
+    },
+    {
+      "id": "CAP-A03",
+      "status": "partial",
+      "tests": [
+        "tests/recovery/test_assistant_capabilities.py::test_unambiguous_unsupported_request_is_rejected_before_runtime",
+        "tests/recovery/test_assistant_capabilities.py::test_catalog_routes_require_cookie_protocol_and_strict_flags_without_inference"
+      ]
+    },
+    {
+      "id": "CAP-A04",
+      "status": "partial",
+      "tests": [
+        "tests/recovery/test_assistant_proposals.py::test_read_only_multicall_draft_is_durable_without_document_history_or_apply",
+        "apps/web/unit/agent-controller.test.ts::review and reload never apply; one explicit click freezes exact version/digest and duplicate clicks coalesce"
+      ]
+    },
+    {
+      "id": "CAP-A05",
+      "status": "partial",
+      "tests": [
+        "tests/recovery/test_assistant_fidelity.py::test_whole_cyrillic_rewrite_accounts_for_tables_images_captions_contacts_and_human_facts",
+        "tests/recovery/test_assistant_fidelity.py::test_mixed_rich_or_fact_replacement_is_rejected_without_dropping_the_draft",
+        "tests/recovery/test_assistant_proposals.py::test_finalize_keeps_every_fully_read_untouched_unit_without_declarations"
+      ]
+    },
+    {
+      "id": "CAP-A06",
+      "status": "partial",
+      "tests": [
+        "tests/recovery/test_assistant_fidelity.py::test_explicit_fact_correction_shows_support_and_all_linked_mentions",
+        "tests/recovery/test_assistant_fidelity.py::test_source_reference_requires_a_full_read_and_remains_visible_as_support_not_truth",
+        "tests/recovery/test_assistant_fidelity.py::test_comparison_cannot_hide_precision_or_metadata_behind_identical_display_text"
+      ]
+    },
+    {
+      "id": "CAP-A07",
+      "status": "partial",
+      "tests": [
+        "tests/recovery/test_assistant_proposals.py::test_generation_finishes_with_a_ready_draft_and_releases_the_permit",
+        "tests/recovery/test_assistant_approval.py::test_local_commit_after_generation_deadline_saves_exact_displayed_content_once_without_inference",
+        "tests/recovery/test_assistant_approval.py::test_post_run_native_undo_redo_reuses_the_saved_action_and_original_receipt",
+        "tests/recovery/test_assistant_approval.py::test_post_run_apply_uses_the_existing_attached_canonical_writer_and_history",
+        "tests/recovery/test_assistant_continuation.py::test_continue_is_idempotent_new_version_with_complete_proof_and_no_canonical_change"
+      ]
+    },
+    {
+      "id": "CAP-A08",
+      "status": "partial",
+      "tests": [
+        "tests/recovery/test_assistant_review.py::test_review_marks_changed_authored_scope_stale_and_preserves_both_versions",
+        "apps/web/unit/agent-controller.test.ts::typing or a different displayed version blocks old acceptance while retaining manual edits",
+        "tests/recovery/test_assistant_approval.py::test_revocation_after_acceptance_never_saves_or_rebases_the_reviewed_draft"
+      ]
+    },
+    {
+      "id": "CAP-A09",
+      "status": "partial",
+      "tests": [
+        "apps/web/unit/agent-controller.test.ts::permissions and Stop revoke the pending review intent without implicit apply on re-enable",
+        "tests/recovery/test_assistant_review.py::test_local_review_availability_requires_origin_generation_to_finish_and_current_identity",
+        "tests/recovery/test_assistant_approval.py::test_revocation_after_acceptance_never_saves_or_rebases_the_reviewed_draft",
+        "tests/recovery/test_assistant_approval.py::test_model_bearer_and_changed_digest_cannot_obtain_a_ui_ticket",
+        "tests/recovery/test_assistant_rollout.py::test_queued_continue_refuses_a_different_captured_account_before_dispatch"
+      ]
+    },
+    {
+      "id": "CAP-A10",
+      "status": "partial",
+      "tests": [
+        "tests/recovery/test_assistant_approval.py::test_stop_before_delayed_claim_revokes_only_that_click_durably",
+        "tests/recovery/test_assistant_approval.py::test_cancelled_preparation_cannot_commit_and_retry_requires_a_new_explicit_click",
+        "apps/web/unit/agent-controller.test.ts::Stop sends the original acceptance nonce while an explicit Apply waits for its reply",
+        "tests/recovery/test_assistant_approval.py::test_saved_receipt_outlives_private_preview_and_current_replay_retention",
+        "apps/web/unit/agent-controller.test.ts::Stop during a lost Continue reply revokes the foreground lease without restoring the run"
+      ]
+    },
+    {
+      "id": "CAP-A11",
+      "status": "partial",
+      "tests": [
+        "tests/recovery/test_assistant_proposals.py::test_interrupted_build_survives_reopen_and_never_becomes_ready_implicitly",
+        "tests/recovery/test_assistant_proposals.py::test_expiry_corruption_and_cancelled_authority_preserve_canonical_bytes",
+        "tests/recovery/test_assistant_approval.py::test_applied_payload_compacts_and_expiry_preserves_the_original_journal_receipt",
+        "tests/recovery/test_assistant_approval.py::test_lost_claim_reply_can_resume_only_in_memory_and_restart_cannot_apply_it",
+        "tests/recovery/test_assistant_approval.py::test_saved_receipt_outlives_private_preview_and_current_replay_retention",
+        "tests/recovery/test_assistant_continuation.py::test_http_continue_requires_protocol_dispatches_one_scripted_turn_and_retains_useful_quota_draft",
+        "tests/recovery/test_assistant_continuation.py::test_continue_rejects_stale_or_expired_proof_without_dispatch",
+        "tests/recovery/test_assistant_rollout.py::test_unexpected_queued_runtime_failure_seals_the_useful_continued_draft"
+      ]
+    },
+    {
+      "id": "CAP-A12",
+      "status": "partial",
+      "tests": [
+        "apps/web/unit/agent-controller.test.ts::review and reload never apply; one explicit click freezes exact version/digest and duplicate clicks coalesce",
+        "apps/web/unit/agent-controller.test.ts::delayed proposal refresh cannot revive a stale response or replace the newer review",
+        "tests/recovery/test_assistant_approval.py::test_post_run_ui_ticket_keeps_reviewed_content_and_deduplicates_the_original_click",
+        "tests/recovery/test_assistant_approval.py::test_new_application_routes_require_protocol_exact_owner_and_nonce_and_fence_legacy_mutation",
+        "tests/recovery/test_assistant_approval.py::test_delayed_recovery_and_stop_for_an_old_click_never_settle_a_new_acceptance",
+        "tests/recovery/test_assistant_actions.py::test_old_action_recovery_and_stop_cannot_cancel_the_new_explicit_retry",
+        "apps/web/unit/agent-controller.test.ts::a lost Continue reply reuses its request identity only after another explicit click",
+        "tests/recovery/test_assistant_continuation.py::test_queued_continue_uses_one_new_job_same_artifact_journal_and_never_publishes"
+      ]
+    },
+    {
+      "id": "CAP-A13",
+      "status": "partial",
+      "tests": [
+        "tests/recovery/test_assistant_approval.py::test_restart_recovers_the_original_write_or_proves_no_save_without_generation",
+        "tests/recovery/test_assistant_approval.py::test_interrupted_claim_persistence_aborts_its_orphan_journal_without_a_save",
+        "apps/web/unit/agent-api.test.ts::lost UI claim reply resumes the same nonce over the versioned local API without generation",
+        "tests/recovery/test_assistant_actions.py::test_project_action_reconciles_original_catalog_intent_without_repeating_the_save",
+        "tests/recovery/test_assistant_approval.py::test_missing_private_payload_and_lost_ui_receipt_recover_only_exact_canonical_save_proof",
+        "tests/recovery/test_assistant_actions.py::test_restart_cleanup_finishes_the_original_reviewed_delete_without_a_second_apply",
+        "tests/recovery/test_assistant_continuation.py::test_terminal_origin_reserves_exact_receipt_headroom_before_apply",
+        "tests/recovery/test_assistant_continuation.py::test_exact_encoded_control_capacity_allows_max_nonce_metadata_and_one_saved_compaction"
+      ]
+    },
+    {
+      "id": "CAP-A14",
+      "status": "partial",
+      "tests": [
+        "tests/recovery/test_assistant_fidelity.py::test_source_instructions_cannot_switch_the_frozen_task_or_grant_model_apply"
+      ]
+    },
+    {
+      "id": "CAP-A15",
+      "status": "partial",
+      "tests": [
+        "tests/recovery/test_assistant_fidelity.py::test_format_changes_existing_heading_roles_without_rebuilding_authored_content",
+        "tests/recovery/test_assistant_skills.py::test_protocol_mode_uses_chat_skill_adapters_and_reads_every_resource_exactly"
+      ]
+    },
+    {
+      "id": "CAP-A16",
+      "status": "partial",
+      "tests": [
+        "apps/web/unit/assistant-proposals.test.ts::action preview displays the server's exact target and irreversible consequence without promising editor Undo",
+        "tests/recovery/test_assistant_actions.py::test_metadata_candidates_change_the_review_digest_without_saving_document_or_facts",
+        "tests/recovery/test_assistant_actions.py::test_delete_preview_requires_the_exact_project_and_names_its_irreversible_target",
+        "tests/recovery/test_assistant_actions.py::test_image_removal_requires_current_live_history_and_inflight_reference_proof",
+        "tests/recovery/test_assistant_actions.py::test_read_only_project_action_draft_survives_review_with_exact_metadata_and_no_write",
+        "tests/recovery/test_assistant_actions.py::test_explicit_action_after_generation_uses_one_catalog_receipt_and_preserves_text_history",
+        "tests/recovery/test_assistant_actions.py::test_reviewed_delete_uses_exact_target_and_recovers_receipt_after_private_project_cleanup",
+        "tests/recovery/test_assistant_actions.py::test_reviewed_action_rechecks_current_authority_and_baseline_before_commit",
+        "apps/web/unit/agent-editor-bridge.test.ts::reviewed metadata uses one guarded action port and refreshes the existing baseline without text history",
+        "tests/recovery/test_assistant_actions.py::test_project_cleanup_never_follows_a_private_draft_symlink_and_reports_incomplete_until_repaired"
+      ]
+    },
+    {
+      "id": "CAP-A17",
+      "status": "partial",
+      "tests": [
+        "tests/recovery/test_assistant_history.py::test_read_only_generation_reviews_the_captured_native_action_then_apply_navigates_it",
+        "tests/recovery/test_assistant_history.py::test_a_new_history_offer_cannot_replace_the_action_captured_for_the_same_request",
+        "tests/recovery/test_assistant_history.py::test_chat_undo_reuses_the_existing_backend_inverse_owner_and_native_redo_receipt",
+        "apps/web/unit/agent-editor-bridge.test.ts::reviewed chat Undo moves the captured native action without adding a compensating history entry"
+      ]
+    },
+    {
+      "id": "CAP-A18",
+      "status": "partial",
+      "tests": [
+        "tests/recovery/test_assistant_proposals.py::test_queued_check_only_completion_never_enters_background_publication",
+        "tests/recovery/test_assistant_approval.py::test_queued_read_only_origin_uses_its_existing_artifact_journal_and_the_current_ui_writer",
+        "tests/recovery/test_assistant_rollout.py::test_old_queued_configuration_is_rejected_before_owned_runtime_dispatch",
+        "tests/recovery/test_assistant_rollout.py::test_old_pending_publication_and_reconnect_stay_unapproved_after_restart"
+      ]
+    },
+    {
+      "id": "CAP-A19",
+      "status": "partial",
+      "tests": [
+        "tests/recovery/test_assistant_capabilities.py::test_provider_unavailable_does_not_disable_local_review_or_preparation"
+      ]
+    },
+    {
+      "id": "CAP-A20",
+      "status": "partial",
+      "tests": [
+        "tests/recovery/test_assistant_fidelity.py::test_one_character_wording_change_keeps_a_small_range_mutation_for_a_large_document",
+        "tests/recovery/test_assistant_fidelity.py::test_compound_format_and_rewrite_is_not_staged_or_applied_in_parts",
+        "tests/recovery/test_assistant_continuation.py::test_continued_draft_pages_are_exact_bounded_and_grant_no_read_credit",
+        "tests/recovery/test_assistant_continuation.py::test_large_authored_field_has_exact_comparison_chunks_and_a_small_edit_request",
+        "apps/web/unit/assistant-proposals.test.ts::incomplete preview displays server continuation budgets without offering partial Apply",
+        "apps/web/unit/agent-controller.test.ts::Continue starts one bounded draft request, preserves user text and never applies",
+        "tests/recovery/test_assistant_continuation.py::test_utf8_message_and_call_limits_keep_useful_draft_and_an_exact_remedy",
+        "tests/recovery/test_assistant_continuation.py::test_aggregate_101st_operation_never_replaces_or_publishes_the_saved_100_operation_draft",
+        "tests/recovery/test_assistant_continuation.py::test_twenty_retained_versions_keep_the_same_work_and_refuse_another_dispatch",
+        "tests/recovery/test_assistant_continuation.py::test_known_oversize_resources_disable_generation_with_an_alternative_that_fits",
+        "tests/recovery/test_assistant_proposals.py::test_finalize_never_keeps_unread_units_and_keeps_explicit_reasons"
+      ]
+    },
+    {
+      "id": "CAP-A21",
+      "status": "partial",
+      "tests": [
+        "tests/recovery/test_assistant_continuation.py::test_noop_result_survives_payload_reclamation_and_does_not_fill_version_slots"
+      ]
+    },
+    {
+      "id": "CAP-A22",
+      "status": "unimplemented",
+      "tests": []
+    },
+    {
+      "id": "CAP-A23",
+      "status": "partial",
+      "tests": [
+        "tests/recovery/test_assistant_rollout.py::test_already_claimed_old_job_reconciles_its_original_canonical_proof",
+        "tests/recovery/test_assistant_skills.py::test_protocol_off_keeps_the_pre_cap_model_surface"
+      ]
+    },
+    {
+      "id": "CAP-A24",
+      "status": "partial",
+      "tests": [
+        "apps/web/unit/assistant-capabilities.test.ts::capability display follows server readiness and hides behind the rollout gate",
+        "apps/web/unit/assistant-proposals.test.ts::preview renders exact server comparison as plain text and native keyboard controls without a modal"
+      ]
     }
   ],
   "foundation": {
@@ -3666,6 +3905,121 @@
       "unproved": "All rich OOXML and 17 all-page converter/T3 inspections pass; actual Word fonts/layout/edit/save/reopen remain manual.",
       "owner": "Manual Word",
       "check": "Follow manual-macos-checklist.md on the five exact hashed files."
+    },
+    "CAP-A01": {
+      "unproved": "CAP00–CAP05 have accepted offline evidence. CAP06 checks are in progress. CAP08 integration, V7, live native quality, manual Word and true narrow-viewport screenshot remain open.",
+      "owner": "CAP06/CAP08; CAP07 for V7",
+      "check": "Complete the affected final scoped checks and retained synthetic journeys; keep each family/native/manual gap explicit."
+    },
+    "CAP-A02": {
+      "unproved": "CAP00–CAP05 have accepted offline evidence. CAP06 checks are in progress. CAP08 integration, V7, live native quality, manual Word and true narrow-viewport screenshot remain open.",
+      "owner": "CAP06/CAP08; CAP07 for V7",
+      "check": "Complete the affected final scoped checks and retained synthetic journeys; keep each family/native/manual gap explicit."
+    },
+    "CAP-A03": {
+      "unproved": "CAP00–CAP05 have accepted offline evidence. CAP06 checks are in progress. CAP08 integration, V7, live native quality, manual Word and true narrow-viewport screenshot remain open.",
+      "owner": "CAP06/CAP08; CAP07 for V7",
+      "check": "Complete the affected final scoped checks and retained synthetic journeys; keep each family/native/manual gap explicit."
+    },
+    "CAP-A19": {
+      "unproved": "CAP00–CAP05 have accepted offline evidence. CAP06 checks are in progress. CAP08 integration, V7, live native quality, manual Word and true narrow-viewport screenshot remain open.",
+      "owner": "CAP06/CAP08; CAP07 for V7",
+      "check": "Complete the affected final scoped checks and retained synthetic journeys; keep each family/native/manual gap explicit."
+    },
+    "CAP-A24": {
+      "unproved": "CAP00–CAP05 have accepted offline evidence. CAP06 checks are in progress. CAP08 integration, V7, live native quality, manual Word and true narrow-viewport screenshot remain open.",
+      "owner": "CAP06/CAP08; CAP07 for V7",
+      "check": "Complete the affected final scoped checks and retained synthetic journeys; keep each family/native/manual gap explicit."
+    },
+    "CAP-A04": {
+      "unproved": "CAP00–CAP05 have accepted offline evidence. CAP06 checks are in progress. CAP08 integration, V7, live native quality, manual Word and true narrow-viewport screenshot remain open.",
+      "owner": "CAP06/CAP08; CAP07 for V7",
+      "check": "Complete the affected final scoped checks and retained synthetic journeys; keep each family/native/manual gap explicit."
+    },
+    "CAP-A07": {
+      "unproved": "CAP00–CAP05 have accepted offline evidence. CAP06 checks are in progress. CAP08 integration, V7, live native quality, manual Word and true narrow-viewport screenshot remain open.",
+      "owner": "CAP06/CAP08; CAP07 for V7",
+      "check": "Complete the affected final scoped checks and retained synthetic journeys; keep each family/native/manual gap explicit."
+    },
+    "CAP-A11": {
+      "unproved": "CAP00–CAP05 have accepted offline evidence. CAP06 checks are in progress. CAP08 integration, V7, live native quality, manual Word and true narrow-viewport screenshot remain open.",
+      "owner": "CAP06/CAP08; CAP07 for V7",
+      "check": "Complete the affected final scoped checks and retained synthetic journeys; keep each family/native/manual gap explicit."
+    },
+    "CAP-A18": {
+      "unproved": "CAP00–CAP05 have accepted offline evidence. CAP06 checks are in progress. CAP08 integration, V7, live native quality, manual Word and true narrow-viewport screenshot remain open.",
+      "owner": "CAP06/CAP08; CAP07 for V7",
+      "check": "Complete the affected final scoped checks and retained synthetic journeys; keep each family/native/manual gap explicit."
+    },
+    "CAP-A05": {
+      "unproved": "CAP00–CAP05 have accepted offline evidence. CAP06 checks are in progress. CAP08 integration, V7, live native quality, manual Word and true narrow-viewport screenshot remain open.",
+      "owner": "CAP06/CAP08; CAP07 for V7",
+      "check": "Complete the affected final scoped checks and retained synthetic journeys; keep each family/native/manual gap explicit."
+    },
+    "CAP-A06": {
+      "unproved": "CAP00–CAP05 have accepted offline evidence. CAP06 checks are in progress. CAP08 integration, V7, live native quality, manual Word and true narrow-viewport screenshot remain open.",
+      "owner": "CAP06/CAP08; CAP07 for V7",
+      "check": "Complete the affected final scoped checks and retained synthetic journeys; keep each family/native/manual gap explicit."
+    },
+    "CAP-A08": {
+      "unproved": "CAP00–CAP05 have accepted offline evidence. CAP06 checks are in progress. CAP08 integration, V7, live native quality, manual Word and true narrow-viewport screenshot remain open.",
+      "owner": "CAP06/CAP08; CAP07 for V7",
+      "check": "Complete the affected final scoped checks and retained synthetic journeys; keep each family/native/manual gap explicit."
+    },
+    "CAP-A09": {
+      "unproved": "CAP00–CAP05 have accepted offline evidence. CAP06 checks are in progress. CAP08 integration, V7, live native quality, manual Word and true narrow-viewport screenshot remain open.",
+      "owner": "CAP06/CAP08; CAP07 for V7",
+      "check": "Complete the affected final scoped checks and retained synthetic journeys; keep each family/native/manual gap explicit."
+    },
+    "CAP-A12": {
+      "unproved": "CAP00–CAP05 have accepted offline evidence. CAP06 checks are in progress. CAP08 integration, V7, live native quality, manual Word and true narrow-viewport screenshot remain open.",
+      "owner": "CAP06/CAP08; CAP07 for V7",
+      "check": "Complete the affected final scoped checks and retained synthetic journeys; keep each family/native/manual gap explicit."
+    },
+    "CAP-A14": {
+      "unproved": "CAP00–CAP05 have accepted offline evidence. CAP06 checks are in progress. CAP08 integration, V7, live native quality, manual Word and true narrow-viewport screenshot remain open.",
+      "owner": "CAP06/CAP08; CAP07 for V7",
+      "check": "Complete the affected final scoped checks and retained synthetic journeys; keep each family/native/manual gap explicit."
+    },
+    "CAP-A15": {
+      "unproved": "CAP00–CAP05 have accepted offline evidence. CAP06 checks are in progress. CAP08 integration, V7, live native quality, manual Word and true narrow-viewport screenshot remain open.",
+      "owner": "CAP06/CAP08; CAP07 for V7",
+      "check": "Complete the affected final scoped checks and retained synthetic journeys; keep each family/native/manual gap explicit."
+    },
+    "CAP-A16": {
+      "unproved": "CAP00–CAP05 have accepted offline evidence. CAP06 checks are in progress. CAP08 integration, V7, live native quality, manual Word and true narrow-viewport screenshot remain open.",
+      "owner": "CAP06/CAP08; CAP07 for V7",
+      "check": "Complete the affected final scoped checks and retained synthetic journeys; keep each family/native/manual gap explicit."
+    },
+    "CAP-A20": {
+      "unproved": "CAP00–CAP05 have accepted offline evidence. CAP06 checks are in progress. CAP08 integration, V7, live native quality, manual Word and true narrow-viewport screenshot remain open.",
+      "owner": "CAP06/CAP08; CAP07 for V7",
+      "check": "Complete the affected final scoped checks and retained synthetic journeys; keep each family/native/manual gap explicit."
+    },
+    "CAP-A10": {
+      "unproved": "CAP00–CAP05 have accepted offline evidence. CAP06 checks are in progress. CAP08 integration, V7, live native quality, manual Word and true narrow-viewport screenshot remain open.",
+      "owner": "CAP06/CAP08; CAP07 for V7",
+      "check": "Complete the affected final scoped checks and retained synthetic journeys; keep each family/native/manual gap explicit."
+    },
+    "CAP-A13": {
+      "unproved": "CAP00–CAP05 have accepted offline evidence. CAP06 checks are in progress. CAP08 integration, V7, live native quality, manual Word and true narrow-viewport screenshot remain open.",
+      "owner": "CAP06/CAP08; CAP07 for V7",
+      "check": "Complete the affected final scoped checks and retained synthetic journeys; keep each family/native/manual gap explicit."
+    },
+    "CAP-A17": {
+      "unproved": "CAP00–CAP05 have accepted offline evidence. CAP06 checks are in progress. CAP08 integration, V7, live native quality, manual Word and true narrow-viewport screenshot remain open.",
+      "owner": "CAP06/CAP08; CAP07 for V7",
+      "check": "Complete the affected final scoped checks and retained synthetic journeys; keep each family/native/manual gap explicit."
+    },
+    "CAP-A21": {
+      "unproved": "Server-derived no-change and retained incomplete outcomes have offline checks. CAP06 final checks and CAP08 integration of all recovery states, V7/native/manual gates remain open.",
+      "owner": "CAP06/CAP08; CAP07 for V7",
+      "check": "Verify distinct durable, unknown, stale, failed and draft outcomes in the final scoped gates and synthetic UI; never infer save from model prose."
+    },
+    "CAP-A23": {
+      "unproved": "CAP08 integration proof is in progress; V7/native/manual/visual gaps remain.",
+      "owner": "CAP08;CAP07 for V7",
+      "check": "Complete the final ordinary integration checks and preserve all family/native/manual gates."
     }
   },
   "recovery": {

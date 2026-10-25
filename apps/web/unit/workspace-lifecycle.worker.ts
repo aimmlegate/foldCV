@@ -70,8 +70,10 @@ events.length = 0;
 const gate = deferred();
 const editor: RichEditorHandle = {
   background: true, sessionId: "session", navigate: () => gate.promise,
+  reviewStamp: () => 0,
   resume: async () => { events.push("resume"); }, undo: () => {}, redo: () => {}, captureSelection: () => null,
   focusFinding: () => false, applyAssistant: async () => {},
+  applyAssistantAction: async () => { throw new Error("Unexpected action"); },
   flush: async () => { throw new Error("Unexpected flush"); },
   assistantBaseline: async () => { throw new Error("Unexpected assistant baseline"); },
 };

@@ -1,3 +1,4 @@
+import type { AssistantContinueJobV1 } from "../contracts/generated/assistant_continue_job_v1";
 import type { JobProjectV1 } from "../contracts/generated/background_project_v1";
 import type { JobSnapshotV1 } from "../contracts/generated/background_snapshot_v1";
 import type { JobAgentRequestV1 } from "../contracts/generated/background_agent_request_v1";
@@ -6,7 +7,7 @@ import { JobsApi } from "./api";
 import { sameValue } from "./wire";
 
 export type JobsTransport = Pick<JobsApi, "project" | "projectJobs" | "read" | "submit" | "cancel" | "replay" | "proposal" | "legacy" | "conversation">
-  & Partial<Pick<JobsApi, "discard">>;
+  & Partial<Pick<JobsApi, "discard" | "continueAgent">>;
 export type JobsView = { project: JobProjectV1 | null; error: string | null };
 export type JobsScheduler = { later: (callback: () => void) => () => void };
 const scheduler: JobsScheduler = { later: callback => { const timer = setTimeout(callback, 700); return () => clearTimeout(timer); } };
@@ -95,10 +96,16 @@ export class ProjectJobs {
       throw error;
     }
   }
-  async submit(request: JobAgentRequestV1): Promise<JobSnapshotV1> {
+  async submit(request: JobAgentRequestV1, protocol = false): Promise<JobSnapshotV1> {
     if (!this.view.project) await this.refresh();
     this.epoch++;
-    const job = await this.api.submit(request); this.epoch++; this.accept(job); this.plan(); return job;
+    const job = await this.api.submit(request, protocol); this.epoch++; this.accept(job); this.plan(); return job;
+  }
+  async continueDraft(request: AssistantContinueJobV1): Promise<JobSnapshotV1> {
+    if (!this.api.continueAgent) throw new RichApiFailure("JOB_DISABLED");
+    if (!this.view.project) await this.refresh();
+    this.epoch++;
+    const job = await this.api.continueAgent(request); this.epoch++; this.accept(job); this.plan(); return job;
   }
   async stop(id: string): Promise<JobSnapshotV1> {
     if (!this.view.project) await this.refresh();

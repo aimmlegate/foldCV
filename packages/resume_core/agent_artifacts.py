@@ -9,9 +9,10 @@ from .background_limits import LIMITS
 from .background_store import BackgroundFailure, TERMINAL_EXECUTION, expiration, job_in
 from .models.agent import AgentConversation, AgentError, AgentMessage, AgentProjectState, AgentRun, AgentRunJournal
 from .models.background import JobArtifactV1, JobLegacyRunV2
+from .models.assistant_artifacts import AssistantJobArtifactV1, decode_assistant_artifact
 from .project_store import encoded, owned_file, strict_json
 from .rich_mutations import mutation_sha256
-from .storage import StorageFailure, atomic_write, private_directory
+from .storage import StorageFailure, atomic_write, private_directory, locked_root
 
 
 def artifact_id(identity):
@@ -40,12 +41,12 @@ class JobArtifacts(AgentStore):
     def _artifact(self, path):
         try:
             owned_file(path, LIMITS.sidecar_project_bytes)
-            value = JobArtifactV1.model_validate(strict_json(path.read_bytes()))
+            value = decode_assistant_artifact(strict_json(path.read_bytes()))
             if (value.id != path.stem or value.id != artifact_id(value.identity)
                     or value.request_sha256 != digest(value.request)
                     or value.identity.request_id != value.request.client_request_id):
                 raise ValueError("changed input")
-            for item in value.batches:
+            for item in [*value.batches, *getattr(value, "applications", [])]:
                 batch = item.batch
                 if batch is not None and (batch.run_id != value.job_id or batch.id != item.result.batch_id
                         or batch.tool_key != item.key or batch.mutation.project_id != value.identity.project_id
@@ -56,7 +57,22 @@ class JobArtifacts(AgentStore):
             raise AgentFailure("AGENT_STORE_CORRUPT") from None
 
     def _save(self, directory, state, artifact):
-        value = JobArtifactV1.model_validate(artifact.model_dump(by_alias=True))
+        value = decode_assistant_artifact(artifact.model_dump(by_alias=True))
+        if isinstance(value, AssistantJobArtifactV1):
+            from .models.agent import TERMINAL_EDITS
+            value.application_control_padding = ""
+            active = any(item.batch.state not in TERMINAL_EDITS for item in value.applications)
+            if active:
+                size = lambda: len(encoded(value.model_dump(mode="json", by_alias=True)))
+                if value.application_control_capacity == 0:
+                    value.application_control_capacity = size() + 32768
+                    value.application_control_capacity = size() + 32768
+                remaining = value.application_control_capacity - size()
+                if not 0 <= remaining <= value.application_control_capacity:
+                    raise AgentFailure("AGENT_PROJECT_FULL")
+                value.application_control_padding = "_" * remaining
+            else:
+                value.application_control_capacity = 0
         path = self._path(directory, value.id)
         raw = encoded(value.model_dump(mode="json", by_alias=True))
         accepted = next((item for item in state.proposals if item.job_id == value.job_id), None)
@@ -220,7 +236,7 @@ class JobArtifacts(AgentStore):
                 messages=previous.messages + messages, runs=previous.runs + [run],
                 sources=previous.sources + record.sources, findings=previous.findings + record.findings)
         journal = AgentRunJournal(runId=job.id, request=request, requestSha256=digest(request), reserved=False,
-            snapshots=record.snapshots, batches=record.batches, events=[])
+            snapshots=record.snapshots, batches=[*record.batches, *getattr(record, "applications", [])], events=[])
         state = AgentProjectState(schemaVersion=1, projectId=record.identity.project_id,
             revision=job.event_cursor, ownerEpoch=job.execution_generation, conversations=[conversation],
             journals=([item for item in history.journals if item.request.conversation_id == request.conversation_id] if history else []) + [journal])
@@ -264,11 +280,40 @@ class JobArtifactView(AgentStore):
         run = run_in(self.load(self.project), self.job_id)[1]
         return JobLegacyRunV2(schemaVersion=2, jobId=job.id, publication=job.publication, run=run)
 
+    def update_under_canonical_lock(self, project, change):
+        if project != self.project:
+            raise AgentFailure("AGENT_NOT_FOUND")
+        # The coordinator owns canonical/background locks; only the assistant lock remains.
+        with locked_root(self.assistant, ".assistant.lock"):
+            directory = self.artifacts.jobs.projects / project
+            sidecar = self.artifacts.jobs._read(project, directory)
+            job = job_in(sidecar, self.job_id)
+            record = self.artifacts._artifact(self.artifacts._path(directory, job.submission.input.id))
+            view = self.artifacts.projection(job, record)
+            original = run_in(view, job.id)[1].model_copy(deep=True)
+            result = change(view)
+            _, run, journal = run_in(view, job.id)
+            if run != original:
+                raise AgentFailure("AGENT_TOOL_DENIED")
+            verify_journals(AgentProjectState.model_validate(view.model_dump(by_alias=True)))
+            old_keys = {item.key for item in record.batches}
+            if not isinstance(record, AssistantJobArtifactV1) or any(item not in journal.batches for item in record.batches):
+                raise AgentFailure("AGENT_TOOL_DENIED")
+            record.applications = [item for item in journal.batches if item.key not in old_keys]
+            self.artifacts._save(directory, sidecar, record)
+            return result
+
     def update(self, project, change, *, terminal=False):
+        return self._update(project, change, terminal=terminal)
+
+    def update_reviewed(self, project, change, *, terminal=False):
+        return self._update(project, change, terminal=terminal, reviewed=True)
+
+    def _update(self, project, change, *, terminal=False, reviewed=False):
         if project != self.project:
             raise AgentFailure("AGENT_NOT_FOUND")
         view = self.load(project)
-        with self.artifacts.jobs.guard(project) as directory:
+        with self.artifacts.jobs.guard(project) as directory, locked_root(self.assistant, ".assistant.lock"):
             sidecar = self.artifacts.jobs._read(project, directory)
             job = job_in(sidecar, self.job_id)
             path = self.artifacts._path(directory, job.submission.input.id)
@@ -289,7 +334,21 @@ class JobArtifactView(AgentStore):
                     or self._without_current(view).model_dump(by_alias=True) != self._without_current(
                         AgentProjectState.model_validate(before)).model_dump(by_alias=True) or journal.events):
                 raise AgentFailure("AGENT_TOOL_DENIED")
-            record.snapshots, record.batches = journal.snapshots, journal.batches
+            old_keys = {item.key for item in record.batches}
+            applications = getattr(record, "applications", [])
+            if reviewed:
+                if any(item not in journal.batches for item in record.batches):
+                    raise AgentFailure("AGENT_TOOL_DENIED")
+                if not isinstance(record, AssistantJobArtifactV1):
+                    record = AssistantJobArtifactV1.model_validate({**record.model_dump(by_alias=True),
+                        "assistantProtocolVersion": 1, "applications": []})
+                record.applications = [item for item in journal.batches if item.key not in old_keys]
+            else:
+                keys = {item.key for item in applications}
+                if [item for item in journal.batches if item.key in keys] != applications:
+                    raise AgentFailure("AGENT_TOOL_DENIED")
+                record.batches = [item for item in journal.batches if item.key not in keys]
+            record.snapshots = journal.snapshots
             record.sources = [item for item in conversation.sources if item.run_id == job.id]
             record.findings = [item for item in conversation.findings if item.run_id == job.id]
             users = [message for message in conversation.messages if message.role == "user" and message.run_id == job.id]
@@ -301,7 +360,7 @@ class JobArtifactView(AgentStore):
             verify_journals(AgentProjectState.model_validate(view.model_dump(by_alias=True)))
             old_keys = {item["key"] for item in before_journal["batches"]}
             prepared = [item.batch for item in journal.batches if item.key not in old_keys and item.batch is not None]
-            if prepared and self.artifacts.prepare_capture is not None:
+            if prepared and not reviewed and self.artifacts.prepare_capture is not None:
                 self.artifacts.prepare_capture(directory, sidecar, record, prepared[0])
             self.artifacts._save(directory, sidecar, record)
             return result

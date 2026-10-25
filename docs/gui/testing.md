@@ -1,5 +1,34 @@
 # Test strategy
 
+`CAP-A01`–`CAP-A24` map the assistant capability plan. CAP01 supplies partial
+catalog/readiness evidence for A01/A02/A03/A19 and capability display for A24.
+CAP02 adds private read-only preparation and draft/storage evidence for
+A02/A04/A07/A11/A18, including generation cleanup, reopen, corruption and bounds.
+CAP03 adds complete authored-scope coverage, Cyrillic/emoji/table/image/link
+preservation, supported fact corrections and separate formatting for
+A05/A06/A14/A15/A20. Comparison exposes precision and metadata effects.
+These are offline contracts; native meaning/quality remains unproved.
+CAP04 adds inline comparison, exact acceptance intent, discard and stale/permission
+controls. It maps display portions of A04/A08/A09/A12/A16/A24; canonical Apply,
+project/history action preparation and recovery remain CAP05. T3 checks cover
+keyboard acceptance intent, Settings return, permission controls and360px card
+geometry. Full-window visual/narrow proof is pending because snapshot/resize
+did not work; broader computer inspection was refused and was not retried.
+The remaining cases are unimplemented until their slices retain actual evidence.
+The rollout gate stays off through CAP04. Generated assistant contracts use new
+names; existing model-compatibility and CT schemas remain byte-identical.
+Review/Apply, V7, native quality and manual Word are separate gates.
+
+CAP05 is accepted_with_self_review for ordinary guarded application and recovery.
+It covers current UI authority, exact click identity, Stop/revocation, foreground/queued
+and attached-writer receipts, all nine mutating project actions and native chat history.
+Final fast passed3615 main Python and288 production-corpus cases,726 Node cases and all
+web gates, validating507 variants and304 traces. Render passed199. Real synthetic T3
+Apply/native Undo/Redo/reopen/DOCX passed with zero generation. See the CAP05 handoff.
+CAP06 adds bounded continuation and exact capacity/outcome boundaries. CAP08 integration,
+V7 committed dependencies, full-window/narrow proof, native rewrite quality and manual
+Word remain separate unproved gates. The rollout flag stays off at this checkpoint.
+
 The approved NB00b alternative uses one pinned App Server. `NB-PARALLEL`
 maps the bounded shared protocol, real synthetic pipes, exact routed capabilities,
 strict fixed validators, targeted cancellation, individual limits, idle rotation,

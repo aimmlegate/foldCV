@@ -41,13 +41,13 @@ async function jsonRequest(path: string, init: RequestInit): Promise<unknown> {
   }
   return value;
 }
-export function rootRequest(path: string, method = "GET", body?: unknown): Promise<unknown> {
-  const init: RequestInit = { method, credentials: "same-origin", cache: "no-store" };
+export function rootRequest(path: string, method = "GET", body?: unknown, headers: Record<string, string> = {}): Promise<unknown> {
+  const init: RequestInit = { method, credentials: "same-origin", cache: "no-store", headers };
   if (body instanceof FormData) init.body = body;
-  else if (body !== undefined) { init.body = JSON.stringify(body); init.headers = { "Content-Type": "application/json" }; }
+  else if (body !== undefined) { init.body = JSON.stringify(body); init.headers = { ...headers, "Content-Type": "application/json" }; }
   return jsonRequest(path, init);
 }
-export function request(path: string, method = "GET", body?: unknown): Promise<unknown> { return rootRequest(prefix + path, method, body); }
+export function request(path: string, method = "GET", body?: unknown, headers?: Record<string, string>): Promise<unknown> { return rootRequest(prefix + path, method, body, headers); }
 export function requestWire(path: string, body: JsonWireNode): Promise<unknown> {
   return jsonRequest(prefix + path, { method: "POST", credentials: "same-origin", cache: "no-store",
     headers: { "Content-Type": "application/json" }, body: parseJsonWire(body.wire).wire });

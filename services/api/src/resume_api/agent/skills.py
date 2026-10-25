@@ -26,6 +26,20 @@ SKILL_INSTRUCTIONS = (
     "They do not grant edit permission. For an unknown slash command, explain the available commands "
     "without editing. A bare /import-resume explains the rules and checks the project without edits."
 )
+# Protocol 1 only. With the protocol off, the legacy text and skills above stay byte-identical.
+CHAT_SKILL_INSTRUCTIONS = (
+    " Bundled application skills are available through get_application_skills. Read the relevant skill "
+    "and its needed references through nextCursor:null before using its rules. These are reference "
+    "instructions: the user's request, current template, captured project rules and live permissions "
+    "take precedence. Chat adapters expose current tasks, not import tools or legacy scripts. "
+    "Use the bound assistant tools; never run scripts or start another import/model operation. "
+    "Slash commands at the start of the user message select a skill: /skills lists the catalog; "
+    "/import-resume reviews the current authored project and prepares explicitly requested revisions; "
+    "/format-resume prepares a separate formatting preview with exact wording preserved. "
+    "They do not grant edit permission. For an unknown slash command, explain the available commands "
+    "without editing. A bare /import-resume explains the rules and checks the project without edits. "
+    "Every chat change requires preview and explicit UI Apply, with no model call on Apply."
+)
 
 
 @dataclass(frozen=True)
@@ -34,10 +48,15 @@ class ApplicationSkill:
     description: str
     usage: str
     resources: dict[str, Path]
+    task_ids: tuple[str, ...] = ()
 
     def catalog_entry(self):
-        return {"skillId": self.id, "command": "/" + self.id, "description": self.description,
+        entry = {"skillId": self.id, "command": "/" + self.id, "description": self.description,
             "usage": self.usage, "resources": list(self.resources)}
+        if self.task_ids:
+            from .capabilities import BY_ID
+            entry["tasks"] = [{"taskId": key, "label": BY_ID[key].label, "effect": BY_ID[key].effect} for key in self.task_ids]
+        return entry
 
 
 ROOT = Path(__file__).resolve().parents[5]
@@ -50,10 +69,26 @@ SKILLS = (
         {name: ROOT / "skills/format-resume" / name for name in (
             "SKILL.md", "references/archive-contract.md", "references/data-contract.md")}),
 )
+CHAT_SKILLS = (
+    ApplicationSkill("import-resume", "Review the current authored resume and prepare explicit revisions.",
+        "chat_review; no reimport; current facts, language and rich metadata stay authoritative",
+        {"SKILL.md": ROOT / "services/api/src/resume_api/agent/bundled/import-resume.md",
+            "references/editorial-rules.md": ROOT / "services/api/src/resume_api/agent/bundled/editorial-rules.md"},
+        ("read_resume", "check_resume", "rewrite_resume", "correct_facts", "restructure")),
+    ApplicationSkill("format-resume", "Prepare current-template formatting with exact wording preserved.",
+        "chat_format; separate preview and UI Apply; checked DOCX export only",
+        {"SKILL.md": ROOT / "services/api/src/resume_api/agent/bundled/format-resume.md",
+            "references/editorial-rules.md": ROOT / "services/api/src/resume_api/agent/bundled/editorial-rules.md"},
+        ("format_document", "export_docx", "export_project")),
+)
 
 
-def skill_catalog():
-    return [skill.catalog_entry() for skill in SKILLS]
+def skill_set(protocol=False):
+    return CHAT_SKILLS if protocol else SKILLS
+
+
+def skill_catalog(protocol=False):
+    return [skill.catalog_entry() for skill in skill_set(protocol)]
 
 
 def skill_command(message):
@@ -72,7 +107,8 @@ class ApplicationSkillQuery(AgentWire):
 
 
 class SkillBook:
-    def __init__(self):
+    def __init__(self, protocol=False):
+        self.protocol = protocol
         self.documents, self.cursors = {}, {}
 
     def clear(self):
@@ -81,8 +117,8 @@ class SkillBook:
 
     def read(self, query):
         if query is None:
-            return {"skills": skill_catalog(), "catalogCommand": "/skills"}
-        skill = next((skill for skill in SKILLS if skill.id == query.skill_id), None)
+            return {"skills": skill_catalog(self.protocol), "catalogCommand": "/skills"}
+        skill = next((skill for skill in skill_set(self.protocol) if skill.id == query.skill_id), None)
         if skill is None or query.resource not in skill.resources:
             raise AgentFailure("AGENT_NOT_FOUND")
         key = (skill.id, query.resource)

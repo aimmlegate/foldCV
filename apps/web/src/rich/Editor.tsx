@@ -13,9 +13,10 @@ import type { ImageSessionRequest } from "../contracts/generated/image_session_r
 import { documentCells, type StoredBlock } from "./document-cells";
 import { factCells, factsFromCells } from "./fact-cells";
 import { historyMutation } from "./history-offer";
+import type { AssistantHistoryOfferV1 } from "../contracts/generated/assistant_history_offer_v1";
 import type { AgentHistoryOffer } from "../contracts/generated/agent_history_offer";
 import { RichSynchronization, selectionChecksum, type PanelCommand } from "./synchronization";
-import { PreparedEditorBridge, type PreparedApi } from "../assistant/editor-bridge";
+import { PreparedEditorBridge, type PreparedApi, type PreparedActionApi } from "../assistant/editor-bridge";
 import { anchorCurrent } from "../assistant/presentation";
 import type { AgentFinding } from "../contracts/generated/agent_finding";
 import { Timeline, type TimelineControls } from "./Timeline";
@@ -96,10 +97,13 @@ export type CapturedEditorSelection = { selection: Omit<RichSelection, "capture"
 export type RichEditorHandle = { flush: () => Promise<RichProjectResponse>; undo: () => void; redo: () => void;
   background: boolean; navigate: () => Promise<void>; resume: () => Promise<void>;
   sessionId: string; captureSelection: () => CapturedEditorSelection | null;
+  reviewStamp: () => number;
   assistantBaseline: (captured: CapturedEditorSelection | null) => Promise<{ response: RichProjectResponse; selection: RichSelection | null;
-    historyOffers: Pick<AgentHistoryOffer, "undo" | "redo"> }>;
+    historyOffers: Pick<AgentHistoryOffer, "undo" | "redo">;
+    historyTargets?: Pick<AssistantHistoryOfferV1, "undoBackend" | "redoBackend"> }>;
   focusFinding: (anchor: AgentFinding["anchors"][number]) => boolean;
-  applyAssistant: (batchId: string, api: PreparedApi) => Promise<void> };
+  applyAssistant: (batchId: string, api: PreparedApi) => Promise<void>;
+  applyAssistantAction: (key: string, api: PreparedActionApi) => Promise<void> };
 export function RichEditor({ initial, acknowledge, onStatus, ref, onHistoryNavigation, onAssistantFence, onComparisonOpen, portalHost, assistant, paneOrder = "layout-first", writer: writerConnection = null }: { initial: RichProjectResponse;
   acknowledge: (response: RichProjectResponse) => void; onStatus: (status: string) => void; ref: Ref<RichEditorHandle>;
   onComparisonOpen?: () => void; onHistoryNavigation?: () => void; onAssistantFence?: (saved: boolean) => void; portalHost?: HTMLElement; assistant?: ReactNode; writer?: AttachedWriter | null; paneOrder?: PaneOrder }) {
@@ -485,10 +489,10 @@ export function RichEditor({ initial, acknowledge, onStatus, ref, onHistoryNavig
     bridge.history = history;
     bridge.historyOffers = () => {
       const current = queue.baseline.workspace.project;
-      if (!current || bridge.writer) return { undo: null, redo: null };
+      if (!current) return { undo: null, redo: null };
       const offer = (direction: "undo" | "redo") => {
         const value = history.navigation(direction);
-        return value ? historyMutation(current, bridge.session, direction, value.changes, bridge.current, bridge.values) : null;
+        return value ? historyMutation(current, bridge.session, direction, value.changes, bridge.current, bridge.values, value.actionId) : null;
       };
       return { undo: offer("undo"), redo: offer("redo") };
     };
@@ -567,6 +571,8 @@ export function RichEditor({ initial, acknowledge, onStatus, ref, onHistoryNavig
       return queue.baseline;
     };
     bridge.prepared = new PreparedEditorBridge({ history, queue, flush: () => bridge.assistantFlush(),
+      reviewedAuthority: batch => bridge.writer?.reviewedAuthority(batch) ?? Promise.resolve(null),
+      reviewedSaved: async project => { await bridge.writer?.adoptReviewed(project.workspace.projectRevision); },
       cells: response => {
         const current = response.workspace.project; if (!current) throw new Error("Document missing");
         return withFacts(current.document, current.facts);
@@ -574,10 +580,11 @@ export function RichEditor({ initial, acknowledge, onStatus, ref, onHistoryNavig
       enter: () => { bridge.applying = true; setApplying(true); if (bridge.timer) clearTimeout(bridge.timer); editor.isEditable = false; },
       leave: () => { bridge.applying = false; setApplying(false); if (!bridge.fenced) editor.isEditable = true; },
       retainImages: async () => { await publishImageReferences(); },
-      fence: receipt => {
+      fence: (receipt, savedAction) => {
         bridge.fenced = true; setRecovery(true); editor.isEditable = false;
-        setEditorWarning(receipt?.durable ? "Правки сохранены. Откройте резюме заново для продолжения." : "Нужно подтвердить сохранение. Откройте резюме заново.");
-        assistantCallbacks.current.onAssistantFence?.(receipt?.durable ?? false);
+        const saved = receipt?.durable ?? savedAction ?? false;
+        setEditorWarning(saved ? "Правки сохранены. Откройте резюме заново для продолжения." : "Нужно подтвердить сохранение. Откройте резюме заново.");
+        assistantCallbacks.current.onAssistantFence?.(saved);
       } });
     bridge.rewrite = async instruction => {
       available();
@@ -860,6 +867,7 @@ export function RichEditor({ initial, acknowledge, onStatus, ref, onHistoryNavig
     if (bridge.writer) await bridge.writer.navigate(); else { await bridge.intents?.drain(); await bridge.queue?.flush(); }
   }, resume: async () => { await bridge.writer?.resume(); },
   undo: () => bridge.undo(), redo: () => bridge.redo(), sessionId: bridge.session,
+  reviewStamp: () => bridge.history?.revisionClock ?? -1,
   focusFinding: anchor => {
     if (bridge.applying || !bridge.queue || !anchorCurrent(anchor, bridge.queue.baseline, bridge.current)) return false;
     if (anchor.blockId) {
@@ -895,7 +903,8 @@ export function RichEditor({ initial, acknowledge, onStatus, ref, onHistoryNavig
     const response = await bridge.assistantFlush(), project = response.workspace.project;
     if (!valid() || !project) throw new Error("AGENT_STALE_READ");
     const historyOffers = bridge.historyOffers();
-    if (!captured) return { response, selection: null, historyOffers };
+    const historyTargets = { undoBackend: bridge.writer?.historyTarget("undo") ?? null, redoBackend: bridge.writer?.historyTarget("redo") ?? null };
+    if (!captured) return { response, selection: null, historyOffers, historyTargets };
     const revisions = new Map<string, number>(), blocksById = new Map<string, RichBlock>();
     function visit(blocks: RichBlock[]) { for (const block of blocks) { revisions.set(block.id, block.revision); blocksById.set(block.id, block); visit(block.children); } }
     project.document.regions.forEach(region => visit(region.blocks));
@@ -915,10 +924,13 @@ export function RichEditor({ initial, acknowledge, onStatus, ref, onHistoryNavig
         dependencies } };
     selection.textSha256 = await selectionChecksum(project.document, selection);
     if (!valid()) throw new Error("AGENT_STALE_READ");
-    return { response, selection, historyOffers };
+    return { response, selection, historyOffers, historyTargets };
   }, applyAssistant: async (batchId, api) => {
     if (!bridge.prepared) throw new Error("Редактор ещё открывается");
     await bridge.prepared.apply(batchId, api);
+  }, applyAssistantAction: async (key, api) => {
+    if (!bridge.prepared) throw new Error("Редактор ещё открывается");
+    await bridge.prepared.applyAction(key, api);
   } }), [bridge]);
   function submitRewrite() {
     setRewriting(true); setRewriteError(""); setRewritePreview(null);

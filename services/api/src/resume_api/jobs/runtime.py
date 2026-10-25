@@ -34,6 +34,9 @@ class JobRuntime:
 
     async def finish_result(self, control):
         self.service.artifacts.finish(control.project_id, control.run_id, self.result)
+        agent = getattr(self.service.projects, "agent", None)
+        if getattr(agent, "assistant_protocol_enabled", False):
+            agent.proposals.finish(control.project_id, control.run_id, cancelled=self.result.state == "cancelled")
 
     async def run(self, control):
         if self.closed or self.driver is not None:
@@ -97,13 +100,17 @@ class JobRuntime:
                         job.activity = [item for item in job.activity if item.root.type != kind or item.root.payload.item_id != event.root.payload.item_id]
                     job.activity = [*job.activity, event][-40:]
                 self.service.store.update(control.project_id, control.run_id, progress)
+            instructions = self.instructions
+            if getattr(getattr(self.service.projects, "agent", None), "assistant_protocol_enabled", False):
+                from ..agent.capabilities import proposal_instructions
+                instructions = proposal_instructions()
             value = RuntimeInput(model=self.model.model, prompt=self.session.prompt, url=self.session.url,
                 token=self.session.token, tools=tuple(control.job.submission.tools), allow_web=control.job.submission.allow_web,
                 queued_at=time.monotonic(), before_start=ready_shared if multiplexed else
                     (lambda: call(control.execution_ready())) if getattr(runtime, "native", False) else control.execution_ready,
                 child_started=started_shared if multiplexed else lambda: call(control.child_started()),
                 revoke=revoke, close_tools=close_shared if multiplexed else close_tools,
-                developer_instructions=self.instructions, elapsed_clock=self.service.supervisor.clock.now,
+                developer_instructions=instructions, elapsed_clock=self.service.supervisor.clock.now,
                 active_seconds=control.active_seconds,
                 job_id=control.run_id, cancelled=control.cancelled)
             self.runtime_entered = True
@@ -119,6 +126,10 @@ class JobRuntime:
         finally:
             if self.session is not None:
                 await self.session.close()
+            agent = getattr(self.service.projects, "agent", None)
+            if getattr(agent, "assistant_protocol_enabled", False):
+                agent.proposals.finish(control.project_id, control.run_id,
+                    cancelled=control.stop_reason == "CANCELLED")
             self.closed = True
 
     async def close(self):

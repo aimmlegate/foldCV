@@ -179,6 +179,7 @@ class ReadCapture:
     dependencies: list
     snapshots: list[str] = field(default_factory=list)
     complete: bool = False
+    carried: object = None
 
 
 def page_entries(payload):
@@ -349,6 +350,8 @@ class ReadBook:
 
     def initial(self, run, journal):
         with self.service.projects.state_lock:
+            from .continuation import restore_book
+            continued = restore_book(self, run, journal)
             result = self.read(AgentQuery(kind="context"))
             current = self.by_snapshot[result.snapshot.id].workspace
             conversation, _, _ = run_in(self.service.store.load(run.project_id), run.id)
@@ -361,9 +364,11 @@ class ReadBook:
             prior = [{"id": old.id, "state": old.state, "savedBatchId": old.saved_batch_id,
                 "outcomeUnknown": old.outcome_unknown, "error": old.error} for old in conversation.runs if old.id != run.id]
             summary, clipped = clip(json_text(prior), 4096)
+            root = getattr(self.service, "catalog_service", self.service)
+            protocol = getattr(root, "assistant_protocol_enabled", False)
             context = {"scope": run.scope, "selectionContext": run.selection_context,
                 "allowEdits": run.allow_edits, "allowWeb": run.allow_web,
-                "applicationSkills": {"tool": "get_application_skills", "skills": skill_catalog(),
+                "applicationSkills": {"tool": "get_application_skills", "skills": skill_catalog(protocol),
                     "catalogCommand": "/skills", "command": skill_command(journal.request.message)},
                 "originalSourceAccess": original_source_access(current.project.sources),
                 "projectIndex": {"id": current.project_id, "name": current.title,
@@ -375,6 +380,11 @@ class ReadBook:
                 "outline": result, "recentOriginalMessages": recent, "olderMessagesOmitted": max(0, len(conversation.messages) - 8),
                 "derivedOutcomeDigest": summary, "digestTruncated": clipped,
                 "message": journal.request.message}
+            if protocol:
+                context["continuedDraft"] = continued
+                offer = root.publication.assistant_history.get((run.project_id, run.client_request_id))
+                context["capturedNativeHistory"] = {direction: bool(offer is not None and offer[0] > root.leases.clock()
+                    and getattr(offer[1].offer, direction) is not None) for direction in ("undo", "redo")}
             assembled = json_text(context)
             if len(assembled.encode()) > limits.CONTEXT_BYTES:
                 raise AgentFailure("AGENT_CONTEXT_LIMIT")

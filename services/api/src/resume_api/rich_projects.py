@@ -240,7 +240,7 @@ class RichProjectService(TemplateExports, TemplateRewrite, TemplateImports, Rich
         from packages.resume_core.agent_store import AgentFailure
         from packages.resume_core.project_catalog import AccessChanged
         for key, command in self.catalog.actions().items():
-            if command.get("action") != "delete" or command.get("status") not in {"pending", "deleting"}:
+            if command.get("action") != "delete" or command.get("status") not in {"pending", "deleting", "cleanup_incomplete"}:
                 continue
             if run_id is not None and command["runId"] != run_id:
                 continue
@@ -250,6 +250,11 @@ class RichProjectService(TemplateExports, TemplateRewrite, TemplateImports, Rich
                 command["status"] = "deleting"
                 self.catalog.record_action(key, command)
             if command["status"] == "pending":
+                if command.get("assistantProtocolVersion") == 1 or getattr(getattr(self, "agent", None), "assistant_protocol_enabled", False):
+                    command["status"] = "cancelled"
+                    command["result"] = {"durable": False, "error": {"code": "AGENT_CANCELLED"}}
+                    self.catalog.record_action(key, command)
+                    continue
                 completed = False
                 jobs, agent = getattr(self, "background_jobs", None), getattr(self, "agent", None)
                 current_revision = None

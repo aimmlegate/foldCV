@@ -19,6 +19,48 @@ from .rich_panel import new_record, period as new_period
 from .rich_sync import RichCompletionRequest, exact_completion, linked_field_steps, selection_checksum, selection_parts
 
 
+class AgentPolicyFailure(AgentFailure):
+    def __init__(self, reason_code, code="AGENT_EDIT_INVALID"):
+        super().__init__(code)
+        self.reason_code = reason_code
+
+
+def preserving_replacement(content, start, end, additions):
+    selected = cut_inline(content, start, end)
+    old_text, new_text = text_of(selected), "".join(part.text for part in additions)
+    if old_text == new_text and not any(part.marks for part in additions):
+        return selected
+    offset, anchor = 0, None
+    for span in content:
+        length = len(inline_text(span).encode("utf-16-le")) // 2
+        if isinstance(span, FactFieldSpan) and (max(offset, start) < min(offset + length, end) or start == end and offset < start < offset + length):
+            raise AgentPolicyFailure("ASSISTANT_FACT_TASK_REQUIRED")
+        if offset <= start < offset + length:
+            anchor = span
+        offset += length
+    templates = [span for span in selected if inline_text(span)]
+    if not templates:
+        anchor = anchor or (content[-1] if content else StyledText(type="text", text="", styles={}))
+        templates = [StyledText(type="text", text="", styles=anchor.styles) if isinstance(anchor, FactFieldSpan) else anchor]
+    signatures = []
+    for span in templates:
+        if isinstance(span, Hyperlink):
+            signatures.extend(("link", span.href, child.styles.model_dump_json()) for child in span.content)
+        elif isinstance(span, StyledText):
+            signatures.append(("text", None, span.styles.model_dump_json()))
+        else:
+            raise AgentPolicyFailure("ASSISTANT_FACT_TASK_REQUIRED")
+    if not signatures or len(set(signatures)) != 1:
+        raise AgentPolicyFailure("ASSISTANT_RICH_BOUNDARY")
+    template = templates[0]
+    style = template.content[0].styles if isinstance(template, Hyperlink) else template.styles
+    active = {name for name in ("bold", "italic", "underline", "strike", "code") if getattr(style, name)}
+    if any(part.marks and set(part.marks) != active for part in additions):
+        raise AgentPolicyFailure("ASSISTANT_FORMAT_SEPARATE")
+    values = [StyledText(type="text", text=part.text, styles=style.model_copy(deep=True)) for part in additions]
+    return [Hyperlink(type="link", href=template.href, content=values)] if isinstance(template, Hyperlink) else values
+
+
 def semantic(value):
     if hasattr(value, "model_dump"):
         value = value.model_dump(mode="json", by_alias=True)
@@ -33,6 +75,33 @@ def text_of(content):
     return "".join(inline_text(span) for span in content)
 
 
+def assistant_format_steps(document, facts):
+    from .rich_format import section_role
+    from .rich_presentation import authored_text
+    records = {record.id: record for record in facts.records}
+    places = placements(document)
+    steps = []
+    for block in document.blocks():
+        if block.type not in {"paragraph", "heading"}:
+            continue
+        level = 2 if section_role(authored_text(block)) else None
+        fields = [span for span in block.content if isinstance(span, FactFieldSpan)]
+        for span in fields:
+            record = records.get(span.record_id)
+            if span.text == authored_text(block) and getattr(record, "kind", None) == "candidate":
+                level = {"name": 1, "title": 2}.get(span.field_key, level)
+        if level is None:
+            continue
+        value = block.model_dump(mode="json", by_alias=True)
+        value.update(type="heading", props={**value["props"], "level": level}, children=[])
+        candidate = TypeAdapter(RichBlock).validate_python(value)
+        if semantic(candidate) != semantic(block.model_copy(update={"children": []})):
+            parent, previous, _ = places[block.id]
+            steps.append(PutBlock(kind="put_block", parentId=parent, afterId=previous,
+                beforeRevision=block.revision, block=candidate, keepChildren=True))
+    return steps
+
+
 def evidence_valid(workspace, evidence, message):
     records = {record.id for record in workspace.project.facts.records}
     units = {(source.id, unit.id) for source in workspace.project.sources for unit in source.units}
@@ -43,6 +112,25 @@ def evidence_valid(workspace, evidence, message):
             raise AgentFailure("AGENT_EVIDENCE_INVALID")
         if item.kind == "user_correction" and item.quote not in message:
             raise AgentFailure("AGENT_EVIDENCE_INVALID")
+
+
+def evidence_read(book, evidence):
+    for item in evidence:
+        if item.kind == "user_correction":
+            continue
+        found = False
+        for snapshot in book.by_snapshot:
+            try:
+                capture = book.require(snapshot)
+                if item.kind == "fact" and capture.query.kind == "facts":
+                    found |= any(record.id == item.record_id for record in capture.payload["records"])
+                if item.kind == "source" and capture.query.kind == "source":
+                    found |= any(source["id"] == item.source_id and any(unit.id == item.unit_id for unit in source["units"])
+                        for source in capture.payload["sources"])
+            except AgentFailure:
+                continue
+        if not found:
+            raise AgentPolicyFailure("ASSISTANT_EVIDENCE_READ_REQUIRED", code="AGENT_EVIDENCE_INVALID")
 
 
 def assign_value(target, value):
@@ -180,7 +268,17 @@ def validate_references(workspace):
                 raise AgentFailure("AGENT_EDIT_INVALID")
 
 
-def compile_batch(workspace, run, journal, request, book, session_id):
+def compile_batch(workspace, run, journal, request, book, session_id, *, assistant_policy=None):
+    if assistant_policy is not None:
+        allowed = {"wording": {"replace_text"}, "structure": {"replace_text", "insert_blocks", "delete_blocks", "move_blocks", "insert_table", "insert_asset"},
+            "facts": {"replace_text", "update_fact", "create_fact", "delete_fact"}, "format": {"format_template"}}
+        if assistant_policy not in allowed:
+            raise AgentFailure("AGENT_TOOL_DENIED")
+        denied = [operation.kind for operation in request.operations if operation.kind not in allowed[assistant_policy]]
+        if denied:
+            raise AgentPolicyFailure("ASSISTANT_FORMAT_SEPARATE" if "format_template" in denied else
+                "ASSISTANT_FACT_TASK_REQUIRED" if any(kind in {"create_fact", "update_fact", "delete_fact"} for kind in denied)
+                else "ASSISTANT_STRUCTURE_TASK_REQUIRED")
     scope = Scope(workspace, run.scope)
     document = workspace.project.document
     blocks = {block.id: block for block in document.blocks()}
@@ -217,7 +315,8 @@ def compile_batch(workspace, run, journal, request, book, session_id):
             if not scope.whole or capture.query.ids or len(request.operations) != 1:
                 raise AgentFailure("AGENT_SCOPE_INVALID")
             from .rich_format import format_steps
-            steps.extend(format_steps(document, workspace.project.facts))
+            formatter = assistant_format_steps if assistant_policy == "format" else format_steps
+            steps.extend(formatter(document, workspace.project.facts))
             write_blocks.update(blocks)
             read_ids.add(operation.snapshot_id)
         elif operation.kind in {"insert_table", "insert_asset"}:
@@ -253,13 +352,13 @@ def compile_batch(workspace, run, journal, request, book, session_id):
                 raise AgentFailure("AGENT_EDIT_INVALID")
             utf16_slice(text_of(content), target.start, target.end)
             scope.range(original.id, target.cell_id, target.field, target.start, target.end)
-            value = replacement(content, target.start, target.end, operation.content)
+            value = (preserving_replacement if assistant_policy is not None else replacement)(content, target.start, target.end, operation.content)
             key = (original.id, target.cell_id, target.field)
             if any(not (target.end <= start or target.start >= end) or target.start == target.end == start == end
                     for start, end in ranges.get(key, [])):
                 raise AgentFailure("AGENT_EDIT_INVALID")
             ranges.setdefault(key, []).append((target.start, target.end))
-            if utf16_slice(text_of(content), target.start, target.end) == text_of(value) and not any(part.marks for part in operation.content):
+            if utf16_slice(text_of(content), target.start, target.end) == text_of(value) and (assistant_policy is not None or not any(part.marks for part in operation.content)):
                 read_ids.add(target.snapshot_id)
                 continue
             steps.append(ReplaceInlineRange(kind="replace_inline_range", blockId=original.id, cellId=target.cell_id,
@@ -298,6 +397,8 @@ def compile_batch(workspace, run, journal, request, book, session_id):
                     moved.update(node.id for node in subtree(original)); after_id = identifier
                 write_blocks.update(node.id for node in subtree(original)); read_ids.add(operation.snapshot_id)
         elif operation.kind == "update_fact":
+            if assistant_policy == "facts":
+                evidence_read(book, operation.evidence)
             original = require_record(book, operation.snapshot_id, operation.record_id)
             scope.record(original.id)
             evidence_valid(workspace, operation.evidence, journal.request.message)
@@ -395,7 +496,7 @@ def compile_batch(workspace, run, journal, request, book, session_id):
     old_groups, new_groups = occurrences(document), occurrences(interim.project.document)
     removed_fields = [{"recordId": group.record_id, "fieldKey": group.key, "rootId": group.root}
         for key, group in old_groups.items() if key not in new_groups and set(group.block_ids) & text_blocks]
-    if any(operation.kind == "format_template" for operation in request.operations):
+    if assistant_policy in {"wording", "structure", "format"} or any(operation.kind == "format_template" for operation in request.operations):
         computed, conflicts = [], []
     else:
         computed, conflicts = exact_completion(interim, RichCompletionRequest(capture=capture,
@@ -407,7 +508,7 @@ def compile_batch(workspace, run, journal, request, book, session_id):
         if key in edited and semantic(edited[key]) != semantic(updated):
             raise AgentFailure("AGENT_EDIT_INVALID")
         edited[key] = updated
-    for identifier in text_blocks:
+    for identifier in text_blocks if assistant_policy not in {"wording", "structure", "format"} else []:
         for link in blocks[identifier].provenance:
             if link.kind == "citation" and link.record_id not in edited and link.record_id not in removed:
                 record = edited.setdefault(link.record_id, records[link.record_id].model_copy(deep=True))
@@ -444,16 +545,20 @@ def compile_batch(workspace, run, journal, request, book, session_id):
     mutation = mutation_for(steps + fact_steps())
     candidate = apply_rich_mutation(workspace, mutation)[0]
     validate_references(candidate)
+    if assistant_policy in {"wording", "structure", "format"} and semantic(candidate.project.facts) != semantic(workspace.project.facts):
+        raise AgentPolicyFailure("ASSISTANT_FACT_TASK_REQUIRED")
     if semantic(candidate.project.document) == semantic(document) and semantic(candidate.project.facts) == semantic(workspace.project.facts):
         return AgentPrepareResult(disposition="no_change", batchId=None, affected=[], preview=""), None
     # Freeze generated inline identities now; preview and commit must apply identical cells.
-    rewritten = {step.block_id for step in mutation.steps if isinstance(step, ReplaceInlineRange)}
-    rewritten.update(step.block.id for step in mutation.steps if isinstance(step, PutBlock) and step.keep_children)
+    rewritten = set() if assistant_policy == "wording" else {step.block_id for step in mutation.steps if isinstance(step, ReplaceInlineRange)}
+    if assistant_policy != "wording":
+        rewritten.update(step.block.id for step in mutation.steps if isinstance(step, PutBlock) and step.keep_children)
     final_blocks = {block.id: block for block in candidate.project.document.blocks()}
     final_places = placements(candidate.project.document)
     if not rewritten <= final_blocks.keys():
         raise AgentFailure("AGENT_EDIT_INVALID")
-    canonical = [step for step in mutation.steps if not isinstance(step, ReplaceInlineRange)
+    # Wording ranges cannot split fact bindings, so their identities stay stable.
+    canonical = list(mutation.steps) if assistant_policy == "wording" else [step for step in mutation.steps if not isinstance(step, ReplaceInlineRange)
         and not (isinstance(step, PutBlock) and step.keep_children)]
     canonical += [PutBlock(kind="put_block", parentId=final_places[key][0], afterId=final_places[key][1],
         beforeRevision=blocks[key].revision, block=final_blocks[key].model_copy(update={"children": []}), keepChildren=True)

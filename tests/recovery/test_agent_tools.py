@@ -33,7 +33,10 @@ class Fetcher:
 
 def tools_setup(tmp_path, **changes):
     scope_builder = changes.pop("scope_builder", None)
+    protocol = changes.pop("protocol", False)
     service, _, projects, workspace, conversation, request, connection = setup(tmp_path, None)
+    # A session captures the protocol mode when it is created.
+    service.assistant_protocol_enabled = protocol
     workspace = projects.workspaces[workspace.project_id]
     if scope_builder is not None:
         changes["scope"] = scope_builder(workspace)

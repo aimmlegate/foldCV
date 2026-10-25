@@ -2,17 +2,15 @@
 
 import base64
 import hashlib
-import json
 import re
 
 from packages.resume_core.agent_store import AgentFailure, digest, run_in
-from packages.resume_core.dates import partial_date
+from packages.resume_core.assistant_actions import workspace_action_candidate
 from packages.resume_core.gui_normalization import canonical_source
 from packages.resume_core.project_catalog import AccessChanged
 from packages.resume_core.project_store import ProjectStoreFailure
 from packages.resume_core.models.rich_workspace import RichMutationReplay
 from packages.resume_core.rich_images import normalize_image
-from packages.resume_core.rich_limits import retained_image_bytes, ImageReferences
 from packages.resume_core.storage import StorageFailure, atomic_write, private_directory
 from .project_action_recovery import reconcile_action, recover_actions
 from resume_api.extracting import run_extract
@@ -25,6 +23,9 @@ def owned_projects(session):
 
 
 async def project_action(session, request):
+    if (getattr(getattr(session.service, "catalog_service", session.service), "assistant_protocol_enabled", False)
+            and request.action not in {"export_docx", "export_project"}):
+        raise AgentFailure("AGENT_PROTOCOL")
     projects, project_id = owned_projects(session), session.control.project_id
     key = digest([project_id, session.control.run_id, request.key])
     checksum = digest(request)
@@ -128,37 +129,9 @@ async def project_action(session, request):
                 projects.catalog.reserve_action(key, {**command, "status": "pending"})
                 return result
             else:
-                updated = current.model_copy(deep=True)
-                if request.action == "rename":
-                    if not request.value.strip():
-                        raise AgentFailure("AGENT_ARGUMENT_INVALID")
-                    updated.title, updated.title_manually_set = request.value.strip(), True
-                elif request.action == "formatting_date":
-                    updated.formatting_as_of = partial_date(request.value)
-                elif source is not None:
-                    updated.project.sources.append(source)
-                    result.update(sourceId=source.id)
-                elif asset is not None:
-                    updated.project.assets.append(asset)
-                    retained_image_bytes(updated.project.assets,
-                        ImageReferences(durable=tuple(item.id for item in updated.project.assets)))
-                    result.update(assetId=asset.id)
-                elif request.action == "remove_source":
-                    if not any(item.id == request.target_id for item in updated.project.sources):
-                        raise AgentFailure("AGENT_NOT_FOUND")
-                    evidence = json.dumps({"document": updated.project.document.model_dump(by_alias=True),
-                        "facts": updated.project.facts.model_dump(by_alias=True)}, separators=(",", ":"))
-                    if json.dumps(request.target_id) in evidence:
-                        raise AgentFailure("AGENT_EVIDENCE_INVALID")
-                    updated.project.sources = [item for item in updated.project.sources if item.id != request.target_id]
-                    updated.project.import_coverage = [item for item in updated.project.import_coverage if item.source_id != request.target_id]
-                elif request.action == "remove_asset":
-                    if not any(item.id == request.target_id for item in updated.project.assets):
-                        raise AgentFailure("AGENT_NOT_FOUND")
-                    refs = projects.image_references(project_id)
-                    if request.target_id in {*refs.live, *refs.history, *refs.in_flight}:
-                        raise AgentFailure("AGENT_EVIDENCE_INVALID")
-                    updated.project.assets = [item for item in updated.project.assets if item.id != request.target_id]
+                updated, metadata = workspace_action_candidate(current, request, source=source, asset=asset,
+                    image_references=projects.image_references(project_id) if request.action == "remove_asset" else None)
+                result.update(metadata)
                 updated.project_revision += 1
                 updated.project.revision = updated.project_revision
                 updated.updated_at = projects.clock().isoformat()

@@ -7,12 +7,16 @@ import type { AgentProjectOperations } from "../../contracts/generated/agent_pro
 import { Transcript } from "./Transcript";
 import { currentActivity } from "./activity";
 import { Elapsed, OperationStatus, Spinner } from "../ui/OperationStatus";
+import { Capabilities } from "../../assistant/Capabilities";
+import { ProposalPreview, proposalKey } from "../../assistant/proposal";
+import type { AssistantProposalV1 } from "../../contracts/generated/assistant_proposal_v1";
 
 export function DrawerView(props: ComposerProps & { collapsed: boolean; expanded: boolean; toggle: () => void; expand: () => void;
   log: RefObject<HTMLDivElement | null>; failure: string | null; fence: string | null;
   select: (id: string) => void; fresh: () => void; more: () => void; older: () => void;
   resource: (kind: "sources" | "findings", id: string) => void; focus: (anchor: AgentFinding["anchors"][number]) => boolean;
-  operations?: AgentProjectOperations["items"] }) {
+  operations?: AgentProjectOperations["items"]; applyProposal?: (value: AssistantProposalV1) => void;
+  discardProposal?: (value: AssistantProposalV1) => void; continueProposal?: (value: AssistantProposalV1) => void }) {
   const { view, active, collapsed, expanded, toggle, expand } = props;
   const [threads, setThreads] = useState(false), menu = useRef<HTMLDivElement>(null), trigger = useRef<HTMLButtonElement>(null);
   const wasCollapsed = useRef(collapsed);
@@ -40,9 +44,17 @@ export function DrawerView(props: ComposerProps & { collapsed: boolean; expanded
         {view.conversations.map(item => <button key={item.id} disabled={view.submitting} aria-current={view.conversationId === item.id ? "true" : undefined}
           onClick={() => { props.select(item.id); setThreads(false); }}><Icon name="chat" /><span>{item.title || "Пустой диалог"}</span></button>)}
         {view.conversationCursor && <button onClick={props.more}>Ещё диалоги</button>}</div>}
+      {view.taskCatalog && <Capabilities catalog={view.taskCatalog} busy={active} choose={props.draft} />}
       <div ref={props.log} className="chat-messages" role="log" aria-live="polite" aria-relevant="additions text" aria-busy={active}>
         {view.messageCursor && <button className="text-button" onClick={props.older}>Ранее в диалоге</button>}
         <Transcript view={view} active={active} resource={props.resource} focus={props.focus} draft={props.draft} />
+        {view.taskCatalog?.protocolEnabled && view.proposals?.map(value => <ProposalPreview key={value.id} value={value}
+          catalog={view.taskCatalog} busy={active || !!view.proposalBusy} invalidated={view.reviewInvalidated?.includes(proposalKey(value)) ?? false}
+          continuation={view.continuations?.[proposalKey(value)]} continueDraft={() => props.continueProposal?.(value)}
+          stage={view.reviewAvailability?.[proposalKey(value)]}
+          action={view.reviewActions?.[proposalKey(value)]}
+          allowEdits={view.flags.allowEdits} apply={() => props.applyProposal?.(value)} discard={() => props.discardProposal?.(value)} />)}
+        {view.outcome && <p className="chat-load-status" role="status">{view.outcome.reason}</p>}
         {view.loading && <div className="chat-load-status"><OperationStatus label={view.loading} /></div>}
         {props.operations?.filter(item => item.durable && item.downloadUrl).map(item => <p key={item.id} className="chat-project-file">
           <a href={item.downloadUrl ?? ""} download={item.action === "export_docx" ? "resume.docx" : "resume.foldcv"}>{item.action === "export_docx" ? "Скачать DOCX" : "Скачать .foldcv"}</a></p>)}

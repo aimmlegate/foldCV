@@ -14,9 +14,47 @@ import { AgentApiFailure } from "../src/assistant/api";
 import { AssistantController, type AssistantApi } from "../src/assistant/controller";
 import { deferred } from "./support/background-writer";
 import { validateRichWorkspaceShape } from "../src/rich/validate";
+import { taskCatalog } from "./support/assistant-capabilities";
+import { proposal, reviewedProposal } from "./support/assistant-proposal";
+import { proposalKey } from "../src/assistant/proposal";
+import type { AssistantAcceptanceV1 } from "../src/contracts/generated/assistant_acceptance_v1";
 
 const now = "2026-10-15T12:00:00Z";
 const wait = () => new Promise<void>(resolve => { setImmediate(resolve); });
+
+test("unsupported task preflight retains the draft and never captures or submits an action", async () => {
+  const h = harness();
+  let captured = false;
+  h.api.tasks = () => Promise.resolve(taskCatalog());
+  h.api.checkMessage = () => Promise.resolve({ schemaVersion: 1, protocolVersion: 1, projectId: "project_1",
+    catalogRevision: "b".repeat(64), taskId: "export_pdf", needsPlanning: false,
+    availability: { state: "unsupported", reasonCode: "ASSISTANT_UNSUPPORTED_TASK", reason: "PDF недоступен.", remedy: "Экспортируйте DOCX." } });
+  try {
+    await h.controller.init();
+    h.controller.draft("Экспортируй PDF");
+    await h.controller.send(() => { captured = true; return baseline(); });
+    assert.equal(captured, false);
+    assert.equal(h.requests.length, 0);
+    assert.equal(h.controller.view.draft, "Экспортируй PDF");
+    assert.equal(h.controller.view.taskReason, "PDF недоступен. Экспортируйте DOCX.");
+    h.controller.draft("Проверь текст");
+    assert.equal(h.controller.view.taskReason, null);
+    assert.equal(h.controller.view.error, null);
+  } finally { h.controller.close(); }
+});
+
+test("a delayed catalog reply cannot restore readiness after a newer invalidation", async () => {
+  const h = harness(), older = deferred<ReturnType<typeof taskCatalog>>();
+  let calls = 0;
+  const newer = taskCatalog(); newer.catalogRevision = "c".repeat(64);
+  h.api.tasks = () => ++calls === 1 ? older.promise : Promise.resolve(newer);
+  try {
+    const pending = h.controller.refreshCatalog();
+    await h.controller.refreshCatalog();
+    older.resolve(taskCatalog()); await pending;
+    assert.equal(h.controller.view.taskCatalog?.catalogRevision, newer.catalogRevision);
+  } finally { h.controller.close(); }
+});
 
 test("foreground send binds editor history to its owner before submission and skips it in read-only", async () => {
   for (const readOnly of [false, true]) {
@@ -75,6 +113,7 @@ function baseline(): Promise<{ response: RichProjectResponse; scope: { kind: "re
   return Promise.resolve({ response: { workspace, durability: "durable", savedProjectRevision: 1, savedDocumentRevision: 1, saveError: null, generation: null }, scope: { kind: "resume" } });
 }
 function harness(heartbeatMs = 5000) {
+  let reviewStamp = 0;
   let settings: AgentSettings = { schemaVersion: 1, revision: 2, enabled: true, selectedAgentModel: "model_a" };
   const owner = { token: "synthetic_owner_capability_0123456789", epoch: 1 };
   const requests: AgentRunRequest[] = [], runs = new Map<string, AgentRun>(), applied: string[] = [], sequences: number[] = [];
@@ -112,14 +151,16 @@ function harness(heartbeatMs = 5000) {
     events: async function* (_run, _owner, after, signal) { sequences.push(after); yield* eventScript(after, signal); },
     prepared: () => ({ claim: () => Promise.reject<AgentClaimResult>(new Error("No claim expected")), commit: () => Promise.reject<AgentCommitResult>(new Error("No commit expected")), recover: () => Promise.resolve(null), report: () => Promise.resolve() }),
   };
-  const controller = new AssistantController(api, { sessionId: "history_1", apply: id => { applied.push(id); return Promise.resolve(); } }, () => {}, heartbeatMs);
+  const editor = { sessionId: "history_1", reviewStamp: () => reviewStamp, apply: (id: string) => { applied.push(id); return Promise.resolve(); } };
+  const controller = new AssistantController(api, editor, () => {}, heartbeatMs);
   const event = (sequence: number, type: "message.delta" | "edit.offered" | "run.state_changed"): AgentEvent => {
     const common = { schemaVersion: 1 as const, id: "event_" + String(sequence), sequence, projectId: "project-1", conversationId: "conversation_1", runId: "run_1", timestamp: now };
     if (type === "message.delta") return { ...common, type, payload: { text: "Привет 😀" } };
     if (type === "edit.offered") return { ...common, type, payload: { batchId: "batch_1", disposition: "offered", error: null } };
     return { ...common, type, payload: { state: "completed", error: null, savedBatchId: null, outcomeUnknown: false } };
   };
-  return { controller, api, requests, applied, sequences, event,
+  return { controller, api, editor, requests, applied, sequences, event,
+    typing: () => { reviewStamp++; },
     script: (script: typeof eventScript) => { eventScript = script; }, lose: () => { lostReply = true; },
     expire: () => { renewFails = true; }, finish: () => { assert.ok(current); current = { ...current, state: "completed", finishedAt: now }; },
     counts: () => ({ submitted, closes, cancelled }) };
@@ -177,7 +218,7 @@ test("assistant reconnect deduplicates deltas and offers without submitting anot
     await h.controller.init(); h.controller.draft("Check and edit"); await h.controller.send(baseline);
     for (let i = 0; i < 100 && h.sequences.length < 2; i++) await new Promise<void>(resolve => { setTimeout(resolve, 5); });
     await wait();
-    assert.deepEqual(h.sequences.slice(0, 2), [0, 2]); assert.deepEqual(h.applied, ["batch_1"]);
+    assert.deepEqual(h.sequences.slice(0, 2), [0, 2]); assert.deepEqual(h.applied, []);
     assert.equal(h.counts().submitted, 1); assert.equal(h.controller.view.run?.state, "completed");
   } finally { h.controller.close(); }
 });
@@ -207,5 +248,183 @@ test("assistant heartbeat loss closes the owner lease and never retries inferenc
     assert.equal(h.counts().closes, 1); assert.equal(h.counts().submitted, 1);
     await wait(); assert.equal(h.controller.view.run?.state, "interrupted");
     assert.equal(h.controller.view.error, "AGENT_LEASE_EXPIRED");
+  } finally { h.controller.close(); }
+});
+
+function reviewedHarness() {
+  const h = harness(), value = proposal(), accepted: AssistantAcceptanceV1[] = [];
+  const catalog = taskCatalog(); catalog.projectId = value.projectId;
+  assert.ok(catalog.tasks[0]); catalog.tasks[0].apply = { state: "available", reasonCode: null, reason: null, remedy: null };
+  h.api.tasks = () => Promise.resolve(catalog);
+  h.api.proposals = () => Promise.resolve({ schemaVersion: 1, protocolVersion: 1, projectId: value.projectId, reviews: [reviewedProposal(structuredClone(value))] });
+  h.api.proposal = () => Promise.resolve(reviewedProposal(structuredClone(value)));
+  h.api.reviewed = request => { accepted.push(structuredClone(request)); return h.api.prepared("run_1", request.owner); };
+  return { ...h, value, accepted };
+}
+
+test("review and reload never apply; one explicit click freezes exact version/digest and duplicate clicks coalesce", async () => {
+  const h = reviewedHarness();
+  try {
+    await h.controller.init(); await h.controller.refreshProposals();
+    assert.equal(h.applied.length, 0); assert.equal(h.requests.length, 0);
+    await Promise.all([h.controller.applyProposal(h.value), h.controller.applyProposal(h.value)]);
+    assert.equal(h.accepted.length, 1); assert.equal(h.applied.length, 1);
+    assert.ok(h.applied[0]?.startsWith(proposalKey(h.value) + ":"));
+    assert.equal(h.accepted[0]?.proposalId, h.value.id); assert.equal(h.accepted[0]?.version, h.value.version);
+    assert.equal(h.accepted[0]?.contentSha256, h.value.contentSha256); assert.equal(h.accepted[0]?.owner.epoch, 1);
+    assert.ok(h.accepted[0]?.acceptanceId);
+    assert.equal(h.requests.length, 0); assert.equal(h.controller.view.proposals?.[0]?.state, "ready");
+  } finally { h.controller.close(); }
+});
+
+test("typing or a different displayed version blocks old acceptance while retaining manual edits", async () => {
+  const h = reviewedHarness();
+  try {
+    await h.controller.init();
+    await h.controller.applyProposal({ ...h.value, version: 2 }); assert.equal(h.accepted.length, 0);
+    h.typing(); h.controller.reviewChanged();
+    await h.controller.applyProposal(h.value);
+    assert.equal(h.accepted.length, 0); assert.ok(h.controller.view.reviewInvalidated?.includes(proposalKey(h.value)));
+  } finally { h.controller.close(); }
+});
+
+test("permissions and Stop revoke the pending review intent without implicit apply on re-enable", async () => {
+  const h = reviewedHarness(), read = deferred<ReturnType<typeof reviewedProposal>>();
+  try {
+    await h.controller.init(); h.controller.flags({ allowEdits: false, allowWeb: false });
+    await h.controller.applyProposal(h.value); assert.equal(h.accepted.length, 0);
+    h.controller.flags({ allowEdits: true, allowWeb: false }); await wait(); assert.equal(h.accepted.length, 0);
+    h.api.proposal = () => read.promise;
+    const applying = h.controller.applyProposal(h.value); await wait();
+    await h.controller.stop(); read.resolve(reviewedProposal(h.value)); await applying;
+    assert.equal(h.accepted.length, 0); assert.equal(h.requests.length, 0);
+  } finally { read.resolve(reviewedProposal(h.value)); h.controller.close(); }
+});
+
+test("Stop sends the original acceptance nonce while an explicit Apply waits for its reply", async () => {
+  const h = reviewedHarness(), pending = deferred<void>(), cancelled: AssistantAcceptanceV1[] = [];
+  h.editor.apply = async () => { await pending.promise; };
+  h.api.cancelApplication = value => {
+    cancelled.push(structuredClone(value));
+    return Promise.resolve({ schemaVersion: 1, protocolVersion: 1, proposal: h.value, result: null, claim: null });
+  };
+  try {
+    await h.controller.init();
+    const applying = h.controller.applyProposal(h.value); await wait();
+    assert.equal(h.accepted.length, 1);
+    await h.controller.stop();
+    assert.deepEqual(cancelled, h.accepted);
+    assert.ok(cancelled[0]?.acceptanceId);
+    pending.resolve(); await applying;
+    assert.equal(h.accepted.length, 1); assert.equal(h.requests.length, 0);
+  } finally { pending.resolve(); h.controller.close(); }
+});
+
+test("a proved failed save retries only through a new explicit Apply with one unchanged nonce", async () => {
+  const h = reviewedHarness(), retries: AssistantAcceptanceV1[] = [];
+  h.value.state = "failed_before_commit";
+  h.api.retryApplication = accepted => {
+    retries.push(structuredClone(accepted)); h.value.state = "ready";
+    return Promise.resolve(structuredClone(h.value));
+  };
+  try {
+    await h.controller.init();
+    assert.equal(h.accepted.length, 0); assert.equal(retries.length, 0);
+    await h.controller.applyProposal(h.value);
+    assert.equal(retries.length, 1); assert.deepEqual(retries, h.accepted);
+    assert.ok(retries[0]?.acceptanceId); assert.equal(h.applied.length, 1); assert.equal(h.requests.length, 0);
+  } finally { h.controller.close(); }
+});
+
+test("Stop revokes the original click while its no-save retry check waits", async () => {
+  const h = reviewedHarness(), pending = deferred<ReturnType<typeof proposal>>(), cancelled: AssistantAcceptanceV1[] = [];
+  h.value.state = "failed_before_commit";
+  h.api.retryApplication = () => pending.promise;
+  h.api.cancelApplication = accepted => {
+    cancelled.push(structuredClone(accepted));
+    return Promise.resolve({ schemaVersion: 1, protocolVersion: 1, proposal: h.value, result: null, claim: null });
+  };
+  try {
+    await h.controller.init();
+    const applying = h.controller.applyProposal(h.value); await wait();
+    await h.controller.stop();
+    pending.resolve({ ...h.value, state: "ready" }); await applying;
+    assert.equal(cancelled.length, 1); assert.ok(cancelled[0]?.acceptanceId);
+    assert.equal(h.accepted.length, 0); assert.equal(h.applied.length, 0); assert.equal(h.requests.length, 0);
+  } finally { pending.resolve({ ...h.value, state: "ready" }); h.controller.close(); }
+});
+
+test("delayed proposal refresh cannot revive a stale response or replace the newer review", async () => {
+  const h = reviewedHarness(), old = deferred<Awaited<ReturnType<NonNullable<AssistantApi["proposals"]>>>>();
+  try {
+    await h.controller.init(); let count = 0;
+    h.api.proposals = () => ++count === 1 ? old.promise : Promise.resolve({ schemaVersion: 1, protocolVersion: 1, projectId: h.value.projectId,
+      reviews: [reviewedProposal({ ...h.value, state: "stale" })] });
+    const pending = h.controller.refreshProposals(); await h.controller.refreshProposals();
+    old.resolve({ schemaVersion: 1, protocolVersion: 1, projectId: h.value.projectId, reviews: [reviewedProposal(h.value)] }); await pending;
+    assert.equal(h.controller.view.proposals?.[0]?.state, "stale"); assert.equal(h.accepted.length, 0);
+  } finally { h.controller.close(); }
+});
+
+function continuationHarness() {
+  const h = reviewedHarness();
+  h.value.state = "incomplete";
+  const original = { clientRequestId: "original_request", conversationId: "conversation_1", message: "Rewrite the authored resume.",
+    allowEdits: false, allowWeb: false, scope: { kind: "resume" as const }, settingsRevision: 1,
+    projectRevision: 1, documentRevision: 1, factsRevision: 1 };
+  h.api.continuations = () => Promise.resolve({ schemaVersion: 1, protocolVersion: 1, projectId: h.value.projectId,
+    options: [{ schemaVersion: 1, protocolVersion: 1, proposal: { schemaVersion: 1, protocolVersion: 1,
+      proposalId: h.value.id, version: h.value.version, contentSha256: h.value.contentSha256 },
+    availability: { state: "available", reason: null, reasonCode: null, remedy: null }, request: original,
+    operationsRemaining: 99, versionsRemaining: 19, toolCalls: 64, toolBytes: 65536 }] });
+  return { ...h, original };
+}
+
+test("Continue starts one bounded draft request, preserves user text and never applies", async () => {
+  const h = continuationHarness(), pending = deferred<AgentRun>(), targets: string[] = [];
+  h.api.continueRun = async value => { targets.push(value.proposal.proposalId); const run = await h.api.submit(value.request); h.finish();
+    pending.resolve({ ...run, state: "completed", finishedAt: now }); return pending.promise; };
+  try {
+    await h.controller.init(); h.controller.draft("Keep my unsent text.");
+    await Promise.all([h.controller.continueProposal(h.value, baseline), h.controller.continueProposal(h.value, baseline)]);
+    assert.deepEqual(targets, [h.value.id]);
+    assert.equal(h.requests[0]?.message, h.original.message);
+    assert.deepEqual(h.requests[0]?.scope, h.original.scope);
+    assert.notEqual(h.requests[0]?.clientRequestId, h.original.clientRequestId);
+    assert.equal(h.controller.view.draft, "Keep my unsent text.");
+    assert.equal(h.applied.length, 0); assert.equal(h.accepted.length, 0); assert.equal(h.counts().submitted, 1);
+  } finally { h.controller.close(); }
+});
+
+test("a lost Continue reply reuses its request identity only after another explicit click", async () => {
+  const h = continuationHarness(); let first = true;
+  h.api.continueRun = async value => { const run = await h.api.submit(value.request); h.finish();
+    if (first) { first = false; throw new AgentApiFailure("REQUEST_FAILED"); }
+    return { ...run, state: "completed", finishedAt: now }; };
+  try {
+    await h.controller.init();
+    await h.controller.continueProposal(h.value, baseline);
+    assert.equal(h.requests.length, 1);
+    await wait(); assert.equal(h.requests.length, 1);
+    await h.controller.continueProposal(h.value, baseline);
+    assert.equal(h.requests.length, 2); assert.equal(h.requests[0]?.clientRequestId, h.requests[1]?.clientRequestId);
+    assert.equal(h.counts().submitted, 1); assert.equal(h.applied.length, 0);
+  } finally { h.controller.close(); }
+});
+
+test("Stop during a lost Continue reply revokes the foreground lease without restoring the run", async () => {
+  const h = continuationHarness(), reply = deferred<AgentRun>(), entered = deferred<void>();
+  h.api.continueRun = async value => { await h.api.submit(value.request); entered.resolve(); return reply.promise; };
+  try {
+    await h.controller.init();
+    const work = h.controller.continueProposal(h.value, baseline);
+    await entered.promise;
+    await h.controller.stop();
+    assert.equal(h.counts().closes, 1);
+    reply.reject(new AgentApiFailure("REQUEST_FAILED"));
+    await work;
+    assert.equal(h.requests.length, 1);
+    assert.equal(h.controller.view.run, null);
+    assert.equal(h.accepted.length, 0); assert.equal(h.applied.length, 0);
   } finally { h.controller.close(); }
 });

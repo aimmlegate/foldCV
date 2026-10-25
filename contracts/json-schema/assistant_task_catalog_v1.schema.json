@@ -1,0 +1,284 @@
+{
+  "$defs": {
+    "AssistantAvailabilityV1": {
+      "additionalProperties": false,
+      "properties": {
+        "reason": {
+          "anyOf": [
+            {
+              "maxLength": 2000,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Reason"
+        },
+        "reasonCode": {
+          "anyOf": [
+            {
+              "maxLength": 128,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Reasoncode"
+        },
+        "remedy": {
+          "anyOf": [
+            {
+              "maxLength": 1000,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Remedy"
+        },
+        "state": {
+          "enum": [
+            "available",
+            "permission_disabled",
+            "missing_input",
+            "temporarily_unavailable",
+            "unsupported"
+          ],
+          "title": "State",
+          "type": "string"
+        }
+      },
+      "required": [
+        "state",
+        "reasonCode",
+        "reason",
+        "remedy"
+      ],
+      "title": "AssistantAvailabilityV1",
+      "type": "object"
+    },
+    "AssistantTaskV1": {
+      "additionalProperties": false,
+      "properties": {
+        "apply": {
+          "$ref": "#/$defs/AssistantAvailabilityV1"
+        },
+        "editors": {
+          "items": {
+            "enum": [
+              "ordinary",
+              "template"
+            ],
+            "type": "string"
+          },
+          "maxItems": 2,
+          "title": "Editors",
+          "type": "array"
+        },
+        "effect": {
+          "enum": [
+            "read",
+            "proposal",
+            "project_action",
+            "export"
+          ],
+          "title": "Effect",
+          "type": "string"
+        },
+        "generation": {
+          "$ref": "#/$defs/AssistantAvailabilityV1"
+        },
+        "id": {
+          "enum": [
+            "read_resume",
+            "check_resume",
+            "draft_text",
+            "rewrite_resume",
+            "correct_facts",
+            "restructure",
+            "format_document",
+            "project_metadata",
+            "sources",
+            "images",
+            "archive_project",
+            "restore_project",
+            "delete_project",
+            "undo",
+            "redo",
+            "export_docx",
+            "export_project",
+            "read_public_page",
+            "export_pdf",
+            "shell",
+            "apps",
+            "send_application",
+            "import_resume"
+          ],
+          "title": "Id",
+          "type": "string"
+        },
+        "label": {
+          "maxLength": 160,
+          "minLength": 1,
+          "title": "Label",
+          "type": "string"
+        },
+        "limits": {
+          "additionalProperties": {
+            "type": "integer"
+          },
+          "title": "Limits",
+          "type": "object"
+        },
+        "preparation": {
+          "$ref": "#/$defs/AssistantAvailabilityV1"
+        },
+        "prompt": {
+          "anyOf": [
+            {
+              "maxLength": 1000,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Prompt"
+        },
+        "requiredInputs": {
+          "items": {
+            "type": "string"
+          },
+          "maxItems": 8,
+          "title": "Requiredinputs",
+          "type": "array"
+        },
+        "requiredPermissions": {
+          "items": {
+            "enum": [
+              "read",
+              "edit",
+              "internet"
+            ],
+            "type": "string"
+          },
+          "maxItems": 3,
+          "title": "Requiredpermissions",
+          "type": "array"
+        },
+        "reversibility": {
+          "enum": [
+            "none",
+            "shared_undo",
+            "action_specific",
+            "artifact"
+          ],
+          "title": "Reversibility",
+          "type": "string"
+        },
+        "review": {
+          "$ref": "#/$defs/AssistantAvailabilityV1"
+        },
+        "scopes": {
+          "items": {
+            "enum": [
+              "resume",
+              "selection",
+              "project",
+              "chat"
+            ],
+            "type": "string"
+          },
+          "maxItems": 4,
+          "minItems": 1,
+          "title": "Scopes",
+          "type": "array"
+        }
+      },
+      "required": [
+        "id",
+        "label",
+        "prompt",
+        "editors",
+        "effect",
+        "scopes",
+        "requiredInputs",
+        "requiredPermissions",
+        "reversibility",
+        "limits",
+        "generation",
+        "preparation",
+        "review",
+        "apply"
+      ],
+      "title": "AssistantTaskV1",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "catalogRevision": {
+      "pattern": "^[a-f0-9]{64}$",
+      "title": "Catalogrevision",
+      "type": "string"
+    },
+    "editorFamily": {
+      "enum": [
+        "ordinary",
+        "template"
+      ],
+      "title": "Editorfamily",
+      "type": "string"
+    },
+    "lineage": {
+      "pattern": "^[a-f0-9]{64}$",
+      "title": "Lineage",
+      "type": "string"
+    },
+    "projectId": {
+      "maxLength": 128,
+      "minLength": 1,
+      "pattern": "^[A-Za-z0-9_-]+$",
+      "title": "Projectid",
+      "type": "string"
+    },
+    "protocolEnabled": {
+      "title": "Protocolenabled",
+      "type": "boolean"
+    },
+    "protocolVersion": {
+      "const": 1,
+      "default": 1,
+      "title": "Protocolversion",
+      "type": "integer"
+    },
+    "schemaVersion": {
+      "const": 1,
+      "default": 1,
+      "title": "Schemaversion",
+      "type": "integer"
+    },
+    "tasks": {
+      "items": {
+        "$ref": "#/$defs/AssistantTaskV1"
+      },
+      "maxItems": 32,
+      "minItems": 1,
+      "title": "Tasks",
+      "type": "array"
+    }
+  },
+  "required": [
+    "projectId",
+    "lineage",
+    "editorFamily",
+    "catalogRevision",
+    "protocolEnabled",
+    "tasks"
+  ],
+  "title": "AssistantTaskCatalogV1",
+  "type": "object"
+}

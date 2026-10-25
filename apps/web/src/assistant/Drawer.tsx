@@ -38,6 +38,10 @@ export function AssistantDrawer({ projectId, editor, settingsOpen, settings, ref
           const kind = item.action === "archive" && item.status === "completed" ? "archive" : item.action === "delete" && item.status === "deleted" ? "delete" : null;
           if (kind && !handled.has(item.id) && await lifecycle.current?.(kind)) handled.add(item.id);
         }
+        if (alive) {
+          await controller.current?.refreshCatalog();
+          await controller.current?.refreshProposals();
+        }
       } catch (error) { if (alive) setFailure(error instanceof AgentApiFailure ? error.code : "REQUEST_FAILED"); }
       finally { if (alive) timer = setTimeout(() => { void refreshOperations(); }, 2000); }
     }
@@ -50,6 +54,8 @@ export function AssistantDrawer({ projectId, editor, settingsOpen, settings, ref
     if (!mounted) return;
     const api = new AgentBrowserApi(projectId), connection = new ConnectionWorkflow(() => {});
     const current = new AssistantController(api, { sessionId: mounted.sessionId,
+      reviewStamp: () => editor.current?.reviewStamp() ?? -1,
+      applyAction: (id, api) => { if (editor.current?.sessionId !== mounted.sessionId) return Promise.reject(new AgentApiFailure("AGENT_NO_OWNER")); return editor.current.applyAssistantAction(id, api); },
       apply: (id, api) => { if (editor.current?.sessionId !== mounted.sessionId) return Promise.reject(new AgentApiFailure("AGENT_NO_OWNER")); return editor.current.applyAssistant(id, api); } }, setView, 5000, background ? projectJobs(projectId) : null);
     controller.current = current; setView(current.view);
     void (async () => {
@@ -64,6 +70,7 @@ export function AssistantDrawer({ projectId, editor, settingsOpen, settings, ref
   useEffect(() => { try { localStorage.setItem(key, JSON.stringify(size)); } catch { /* Size is optional when browser storage is unavailable. */ } }, [size]);
   useEffect(() => {
     const timer = setInterval(() => {
+      controller.current?.reviewChanged();
       if (!document.activeElement?.closest(".cv-document")) return;
       const next = editor.current?.captureSelection() ?? null;
       const id = JSON.stringify(next ? [next.selection, [...next.epochs]] : null);
@@ -87,7 +94,7 @@ export function AssistantDrawer({ projectId, editor, settingsOpen, settings, ref
       const value = await mounted.assistantBaseline(scope);
       const onlySelection = limitsEditToSelection(current.view.draft);
       return { response: value.response, scope: onlySelection && value.selection ? { kind: "selection", selection: value.selection } : { kind: "resume" },
-        selectionContext: value.selection, historyOffers: value.historyOffers };
+        selectionContext: value.selection, historyOffers: value.historyOffers, ...(value.historyTargets ? { historyTargets: value.historyTargets } : {}) };
     }));
   }
   const active = controller.current?.active ?? false;
@@ -95,12 +102,19 @@ export function AssistantDrawer({ projectId, editor, settingsOpen, settings, ref
     toggle={() => setSize(value => ({ ...value, collapsed: !value.collapsed }))} expand={() => setSize(value => ({ ...value, height: value.height >= 500 ? 320 : 520 }))}
     log={log} captured={captured ? `${String(captured.selection.blockIds.length)} ${captured.selection.blockIds.length === 1 ? "блок" : "блоков"}` : null}
     applying={active && !view.pendingSend && (!view.run || ["completed", "failed", "cancelled", "interrupted"].includes(view.run.state))}
-    failure={failure || view.error ? errorText(failure || view.error) : null} fence={fence}
+    failure={failure ? errorText(failure) : view.taskReason ?? (view.error ? errorText(view.error) : null)} fence={fence}
     draft={value => controller.current?.draft(value)} flags={(allowEdits, allowWeb) => controller.current?.flags({ allowEdits, allowWeb })}
     model={model => report(controller.current?.chooseModel(model))} send={send} stop={() => report(controller.current?.stop())} clear={() => setCaptured(null)} settings={settings}
     select={id => report(controller.current?.select(id))} fresh={() => report(controller.current?.newConversation())}
     more={() => report(controller.current?.moreConversations())} older={() => report(controller.current?.older())}
     operations={operations}
+    applyProposal={value => report(controller.current?.applyProposal(value))}
+    discardProposal={value => report(controller.current?.discardProposal(value))}
+    continueProposal={value => { const mounted = editor.current; if (!mounted) return;
+      report(controller.current?.continueProposal(value, async () => {
+        const current = await mounted.assistantBaseline(null);
+        return { response: current.response, scope: { kind: "resume" } };
+      })); }}
     resource={(kind, id) => report(controller.current?.resource(kind, id))} focus={anchor => editor.current?.focusFinding(anchor) ?? false} />
     : null;
 }

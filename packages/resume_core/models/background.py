@@ -195,7 +195,7 @@ class JobSubmissionV1(BackgroundWire):
         if (self.scheduling_class != expected_class or [m.stage for m in self.models] != expected_stages
                 or self.input.kind != expected_input or len(self.tools) != len(set(self.tools))):
             raise ValueError("invalid server-assigned job capture")
-        if not self.allow_edits and (self.guards.writes or {"prepare_edit_batch", "apply_edit_batch", "project_action"} & set(self.tools)):
+        if not self.allow_edits and (self.guards.writes or {"apply_edit_batch", "project_action"} & set(self.tools)):
             raise ValueError("check-only job cannot capture edit authority")
         if not self.allow_web and "read_public_page" in self.tools:
             raise ValueError("web-disabled job cannot capture page fetching")

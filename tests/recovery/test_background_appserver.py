@@ -71,6 +71,18 @@ def test_pinned_schema_requires_routed_tools_structured_turns_and_targeted_inter
             require_capabilities(schemas)
 
 
+def test_retained_schema_survives_runtime_updates_without_certifying_them(monkeypatch):
+    from resume_api.cli import experimental_profile
+    from spikes.agent import profile
+    monkeypatch.setattr(experimental_profile, "BINARY_SHA256", "a" * 64)
+    monkeypatch.setattr(profile, "HOST_SHA256", "b" * 64)
+    monkeypatch.setattr(profile, "MANIFEST_SHA256", "c" * 64)
+    assert require_capabilities(load_pinned())["nativeGo"] is False
+    with pytest.raises(ProtocolUnsupported, match="does not prove this runtime"):
+        load_pinned(runtime_identity={"binarySha256": experimental_profile.BINARY_SHA256,
+            "hostSha256": profile.HOST_SHA256, "manifestSha256": profile.MANIFEST_SHA256})
+
+
 @pytest.mark.parametrize("fault", ["none", "negative", "bool", "float", "string", "overflow", "request", "response", "unknown-field"])
 def test_notification_timestamp_never_changes_authority_or_elapsed_deadlines(fault):
     router = MultiplexProtocol(clock=lambda: 10.0)

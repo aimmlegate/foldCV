@@ -150,7 +150,8 @@ if case == "fork_race":
         "\nwhile not (p/'fork_now').exists(): time.sleep(0.005)\n"
         "child=subprocess.Popen([sys.executable,'-c','import time; time.sleep(30)'], "
         "stdin=subprocess.DEVNULL,stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL); "
-        "(p/'forked_pid').write_text(str(child.pid)); time.sleep(30)"
+        "(p/'forked_pid.pending').write_text(str(child.pid))\n"
+        "(p/'forked_pid.pending').replace(p/'forked_pid'); time.sleep(30)"
     )
     worker = subprocess.Popen([sys.executable, "-c", worker_code, str(base)],
                               stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL,

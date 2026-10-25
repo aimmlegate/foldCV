@@ -8,12 +8,16 @@ import json
 import threading
 from typing import Literal
 
-from pydantic import Field, ValidationError
+from pydantic import Field, ValidationError, TypeAdapter
 from mcp.types import CallToolResult, TextContent
 
 from packages.resume_core import agent_limits as limits
 from packages.resume_core.agent_store import AgentFailure, digest, identity, run_in
 from packages.resume_core.models.agent import AgentAnchor, AgentApplyRequest, AgentFetchRequest, AgentFinding, AgentPrepareRequest, AgentProjectAction, AgentPublishFindings, AgentQuery, TERMINAL_RUNS
+from packages.resume_core.models.assistant_capabilities import AssistantTaskRequestV1
+from packages.resume_core.models.assistant_proposals import AssistantAssemblyRequestV1
+from packages.resume_core.models.assistant_actions import AssistantProjectActionPrepareV1
+from packages.resume_core.models.assistant_continuation import AssistantDraftReadV1
 from packages.resume_core.rich_dependencies import dependency
 from packages.resume_core.rich_fields import inline_groups, working_field
 from packages.resume_core.rich_mutations import inline_text, utf16_slice
@@ -62,7 +66,9 @@ READ_QUERIES = {"get_resume_context": ContextQuery, "find_resume_content": FindQ
 
 
 class AgentTools:
-    names = TOOL_NAMES
+    @property
+    def names(self):
+        return tuple(name for name in TOOL_NAMES if not getattr(self.service, "assistant_protocol_enabled", False) or name != "apply_edit_batch")
 
     def __init__(self, service, *, fetcher=None):
         self.service = service
@@ -82,10 +88,21 @@ class ToolSession(PrivateMcp):
     def __init__(self, service, control, run, fetcher):
         self.service, self.control, self.run, self.fetcher = service, control, run, fetcher
         self.book = ReadBook(service, control)
-        self.skills = SkillBook()
         self.calls, self.fetches, self.result_bytes = 0, 0, 0
         self.cache = {}
         self.argument_issues = []
+        self.planned_task = None
+        self.planning_revoked = False
+        self.capability_service = getattr(service, "catalog_service", service)
+        self.cap_mode = getattr(self.capability_service, "assistant_protocol_enabled", False)
+        self.skills = SkillBook(self.cap_mode)
+        self.draft_cursors = {}
+        if self.cap_mode:
+            from .continuation import current_draft
+            continued = current_draft(self.capability_service, control.project_id, control.run_id)
+            if continued is not None:
+                self.planned_task = continued.proposal.task_id
+        self.names = tuple(name for name in TOOL_NAMES if not self.cap_mode or name != "apply_edit_batch")
         self.fetch_cancel = threading.Event()
         self.fetch_tasks = set()
         self.gate = asyncio.Lock()
@@ -117,6 +134,7 @@ class ToolSession(PrivateMcp):
             self.book.by_snapshot.clear()
             self.book.cursors.clear()
             self.cache.clear()
+            self.draft_cursors.clear()
             self.skills.clear()
 
     def guard(self):
@@ -178,10 +196,19 @@ class ToolSession(PrivateMcp):
             """Read conversation history. IDs load full stored sources, findings or messages without network. Use nextCursor with the same query for later pages."""
             return self.wire(await self.call("get_conversation_context", query or HistoryQuery()))
 
-        @self.sdk.tool(structured_output=False)
-        async def get_project_resources(query: ResourcesQuery | None = None) -> CallToolResult:
-            """Read retained assets and their uses, sources, local dates, template specification, captured rules and operation history. Follow nextCursor with the same query until null."""
-            return self.wire(await self.call("get_project_resources", query or ResourcesQuery()))
+        if self.cap_mode:
+            async def get_project_resources(query: ResourcesQuery | None = None, task: AssistantTaskRequestV1 | None = None, draft: AssistantDraftReadV1 | None = None) -> CallToolResult:
+                """Read retained assets, sources, dates, template, rules and history. Follow nextCursor with the same query until null. In assistant protocol 1, check a typed task first with task:{protocolVersion:1,taskId,stage,scope,inputAvailable}; omit query when checking a task. This returns availability, never approval."""
+                if sum(value is not None for value in (query, task, draft)) > 1:
+                    return self.wire({"error": {"code": "AGENT_ARGUMENT_INVALID"}})
+                return self.wire(await self.call("get_project_resources", draft or task or query or ResourcesQuery()))
+            from .capabilities import TASKS
+            get_project_resources.__doc__ += " During explicit continuation, draft:{protocolVersion:1,proposalId,version,cursor:null} pages the saved candidate. Follow nextCursor in order; these JSON fragments grant no canonical read or write authority. Catalog task IDs: " + ", ".join(task.id for task in TASKS) + "."
+        else:
+            async def get_project_resources(query: ResourcesQuery | None = None) -> CallToolResult:
+                """Read retained assets and their uses, sources, local dates, template specification, captured rules and operation history. Follow nextCursor with the same query until null."""
+                return self.wire(await self.call("get_project_resources", query or ResourcesQuery()))
+        self.sdk.tool(structured_output=False)(get_project_resources)
 
         @self.sdk.tool(structured_output=False)
         async def get_application_skills(query: ApplicationSkillQuery | None = None) -> CallToolResult:
@@ -203,20 +230,52 @@ class ToolSession(PrivateMcp):
             """Store observations without editing. Use targets from a full document read, not the initial outline snapshot. A prose target has snapshotId, blockId, cellId:null, recordId:null, fieldKey:null, start:null, end:null. sourceIds are stored IDs returned by read_public_page, never URLs. findings use targets, not anchors."""
             return self.wire(await self.call("publish_findings", request))
 
-        @self.sdk.tool(structured_output=False)
         async def prepare_edit_batch(request: AgentPrepareRequest) -> CallToolResult:
             """Compile edits without saving. For template formatting, first read the entire document through nextCursor:null, then operations:[{kind:"format_template",snapshotId:"completed_read_id"}]. This preserves current wording and creates one shared undo action. Text edits use replace_text with target:{snapshotId,blockId,cellId:null,field:"content",start,end}, content:[{text:"..."}]. Copy exact UTF-16 offsets from find_resume_content. Insert headings/sections/lists with insert_blocks, tables with insert_table, retained images with insert_asset. Facts support create_fact/update_fact/delete_fact with evidence. Read real targets first. One saved batch per turn."""
             return self.wire(await self.call("prepare_edit_batch", request))
+        if self.cap_mode:
+            prepare_edit_batch.__annotations__["request"] = AssistantAssemblyRequestV1 | AssistantProjectActionPrepareV1
+            prepare_edit_batch.__doc__ = (
+                "Build a durable private draft, never a canonical save. Use protocolVersion:1, taskId, "
+                "key and phase:append/finalize. Omit proposalId for the first call, then reuse returned "
+                "proposalId/version. Each key is idempotent and each call extends the same baseline. "
+                "Use operations and snapshotIds from complete paged reads; an outline or search is not a full read. "
+                "A text edit is {kind:\"replace_text\",target:{snapshotId,blockId,cellId:null,field:\"content\",start,end},"
+                "content:[{text:\"...\"}]} with the full document read snapshotId and exact UTF-16 start/end copied from "
+                "find_resume_content; table cells set cellId and captions use field:\"caption\". "
+                "Add replace_text operations only for wording you improve, then call phase:finalize; one finalize "
+                "call with all operations is enough. On finalize every fully read unit you did not change stays "
+                "unchanged automatically. Optional unchanged entries give unitId/reason only for a specific reason. "
+                "Units not read fully stay unresolved and leave the draft incomplete. draft_ready ends generation and awaits UI "
+                "review/Apply. incomplete retains useful work with Apply disabled. No operation publishes. "
+                "Maximum 100 aggregate operations and current transport/call/time limits. Wording, "
+                "facts/structure and formatting are separate tasks. Project action drafts, including in check-only "
+                "mode, instead use request:{protocolVersion:1,request:{key,snapshotId,action,value?,targetId?}} "
+                "after complete resources and typed task planning. This is the same non-mutating action preparation "
+                "as project_action; the queued check-only tool set deliberately excludes direct project_action."
+            )
+        self.sdk.tool(structured_output=False)(prepare_edit_batch)
 
         async def apply_edit_batch(request: AgentApplyRequest) -> CallToolResult:
             return self.wire(await self.call("apply_edit_batch", request))
         apply_edit_batch.__doc__ = self.apply_description
-        self.sdk.tool(structured_output=False)(apply_edit_batch)
+        if not self.cap_mode:
+            self.sdk.tool(structured_output=False)(apply_edit_batch)
 
-        @self.sdk.tool(structured_output=False)
         async def project_action(request: AgentProjectAction) -> CallToolResult:
             """Perform one explicit bound-project operation after a complete get_project_resources read. Use its snapshotId and a unique key. Actions: rename (value:title), formatting_date (value:ISO date), add_source_text (value:literal text), remove_source (targetId; only unreferenced), import_asset (value:base64 PNG/JPEG/WebP), remove_asset (targetId; only unreferenced), export_docx/export_project (returns durable download), archive/restore/delete, undo/redo. Destructive actions require the user's explicit command. Editing permission is checked again at commit. Finish the turn after a project operation."""
             return self.wire(await self.call("project_action", request))
+        if self.cap_mode:
+            project_action.__annotations__["request"] = AssistantProjectActionPrepareV1
+            project_action.__doc__ = (
+                "Use request:{protocolVersion:1,request:{key,snapshotId,action,value?,targetId?}} after a typed task check "
+                "and complete get_project_resources read. Rename, formatting_date, add_source_text, remove_source, "
+                "import_asset, remove_asset, archive, restore and delete prepare an exact private review only. "
+                "They never save. Delete needs targetId equal to this project ID. Source text/image base64 must be "
+                "literal user input, never generated evidence. export_docx/export_project return a durable download "
+                "under current export readiness. UI review and explicit Apply are the only mutation authority."
+            )
+        self.sdk.tool(structured_output=False)(project_action)
 
     def wire(self, value):
         text = json_text(value)
@@ -240,6 +299,16 @@ class ToolSession(PrivateMcp):
             if not isinstance(arguments, dict):
                 raise ValueError("invalid tool arguments")
             if name in READ_TOOLS:
+                if self.cap_mode and name == "get_project_resources" and "draft" in arguments:
+                    if set(arguments) != {"draft"}:
+                        raise ValueError("draft read cannot include another query")
+                    AssistantDraftReadV1.model_validate(arguments["draft"])
+                    return None
+                if self.cap_mode and name == "get_project_resources" and "task" in arguments:
+                    if set(arguments) != {"task"}:
+                        raise ValueError("task check cannot include a read query")
+                    AssistantTaskRequestV1.model_validate(arguments["task"])
+                    return None
                 if arguments.keys() - {"query"}:
                     raise ValueError("invalid read envelope")
                 query = arguments.get("query")
@@ -257,13 +326,17 @@ class ToolSession(PrivateMcp):
             elif name in {"prepare_edit_batch", "apply_edit_batch", "publish_findings", "project_action"}:
                 if set(arguments) != {"request"}:
                     raise ValueError("invalid request envelope")
-                {"prepare_edit_batch": AgentPrepareRequest, "apply_edit_batch": AgentApplyRequest,
-                    "project_action": AgentProjectAction,
-                    "publish_findings": AgentPublishFindings}[name].model_validate(arguments["request"])
+                if name == "prepare_edit_batch" and self.cap_mode:
+                    TypeAdapter(AssistantAssemblyRequestV1 | AssistantProjectActionPrepareV1).validate_python(arguments["request"])
+                else:
+                    {"prepare_edit_batch": AgentPrepareRequest, "apply_edit_batch": AgentApplyRequest,
+                        "project_action": AssistantProjectActionPrepareV1 if self.cap_mode else AgentProjectAction,
+                        "publish_findings": AgentPublishFindings}[name].model_validate(arguments["request"])
             else:
                 raise ValueError("unknown tool")
             return None
         except AgentFailure as error:
+            self.note_limit(error)
             return error.code
         except ValidationError as error:
             self.calls += 1
@@ -275,6 +348,8 @@ class ToolSession(PrivateMcp):
                 return "AGENT_ARGUMENT_INVALID"
             if name == "prepare_edit_batch":
                 safe = {"operations", "target", "content", "text", "marks", "snapshotId", "blockId", "cellId", "field", "start", "end", "key", "snapshotIds", "kind", "replace_text"}
+                if self.cap_mode:
+                    safe |= {"protocolVersion", "proposalId", "version", "taskId", "phase", "unchanged", "unitId", "reason"}
                 self.argument_issues = [{"path": ".".join(str(part) if type(part) is int and 0 <= part <= 100 else part if part in safe else "*" for part in issue["loc"])[:160],
                     "issue": issue["type"] if issue["type"] in {"missing", "extra_forbidden", "string_type", "list_type", "int_type", "literal_error", "union_tag_invalid", "union_tag_not_found", "too_long", "value_error", "greater_than_equal", "string_too_long"} else "invalid"}
                     for issue in error.errors(include_input=False, include_context=False, include_url=False)[:3]]
@@ -301,6 +376,11 @@ class ToolSession(PrivateMcp):
         result = {"error": {"code": code}}
         if self.argument_issues:
             result["argumentIssues"] = self.argument_issues
+            if self.cap_mode and code == "AGENT_EDIT_INVALID":
+                result["format"] = ("Use request:{protocolVersion:1,taskId,key,phase:'append'|'finalize',proposalId?,version:1,operations:[],snapshotIds:[],unchanged:[]}. "
+                    "Each text edit is {kind:'replace_text',target:{snapshotId,blockId,cellId:null,field:'content',start,end},content:[{text:'...'}]} "
+                    "with UTF-16 start/end from find_resume_content. Correct shape errors only; no field grants Apply authority.")
+                return result
             if self.argument_issues[0]["path"] == "skillQuery":
                 result["format"] = "Use {} for the catalog, or {query:{skillId:'import-resume',resource:'SKILL.md',cursor:null}}. Follow top-level nextCursor with the same skillId/resource."
                 return result
@@ -312,12 +392,34 @@ class ToolSession(PrivateMcp):
         try:
             async with self.gate:
                 self.guard()
+                from .capabilities import catalog, check_task, guard_tool
+                task_check = name == "get_project_resources" and isinstance(arguments, AssistantTaskRequestV1)
                 if self.calls >= limits.TOOL_CALLS:
                     raise AgentFailure("AGENT_TOOL_LIMIT")
                 self.calls += 1
+                if not task_check:
+                    guard_tool(self, name, arguments)
                 if self.result_bytes >= limits.TOOL_TOTAL_BYTES:
                     raise AgentFailure("AGENT_TOOL_LIMIT")
-                if name in READ_TOOLS:
+                if task_check:
+                    service = getattr(self.service, "catalog_service", self.service)
+                    if not getattr(service, "assistant_protocol_enabled", False):
+                        raise AgentFailure("AGENT_TOOL_DENIED")
+                    result = check_task(catalog(service, self.control.project_id,
+                        allow_edits=self.run.allow_edits, allow_web=self.run.allow_web, draft_run_id=self.control.run_id), arguments)
+                    if arguments.stage == "generation":
+                        if result.availability.state != "available":
+                            self.planning_revoked, self.planned_task = True, None
+                        elif self.planning_revoked or self.planned_task is not None and arguments.task_id != self.planned_task:
+                            from packages.resume_core.agent_edits import AgentPolicyFailure
+                            self.planning_revoked, self.planned_task = True, None
+                            raise AgentPolicyFailure("ASSISTANT_TASK_LOCKED", code="AGENT_TOOL_DENIED")
+                        else:
+                            self.planned_task = arguments.task_id
+                elif name == "get_project_resources" and isinstance(arguments, AssistantDraftReadV1):
+                    from .continuation import draft_page
+                    result = draft_page(self, arguments)
+                elif name in READ_TOOLS:
                     if name == "get_resume_context" and arguments.kind == "context" and arguments.ids:
                         arguments = arguments.model_copy(update={"kind": "document"})
                     expected = READ_TOOLS[name]
@@ -356,17 +458,45 @@ class ToolSession(PrivateMcp):
                 elif name == "publish_findings":
                     result = self.findings(arguments)
                 elif name == "prepare_edit_batch":
-                    if not self.run.allow_edits:
+                    if self.cap_mode:
+                        if isinstance(arguments, AssistantProjectActionPrepareV1):
+                            if arguments.request.action in {"undo", "redo"}:
+                                from .history_proposals import prepare_history
+                                result = prepare_history(self, arguments)
+                            else:
+                                from .action_proposals import prepare_action
+                                result = await prepare_action(self, arguments)
+                        elif isinstance(arguments, AssistantAssemblyRequestV1):
+                            from .proposals import assemble
+                            result = assemble(self, arguments)
+                        else:
+                            raise AgentFailure("AGENT_PROTOCOL")
+                    elif not self.run.allow_edits:
                         raise AgentFailure("AGENT_TOOL_DENIED")
-                    from .edits import prepare
-                    result = prepare(self, arguments)
+                    else:
+                        from .edits import prepare
+                        result = prepare(self, arguments)
                 elif name == "apply_edit_batch":
                     if not self.run.allow_edits:
                         raise AgentFailure("AGENT_TOOL_DENIED")
                     result = await self.service.publication.offer(self, arguments.batch_id)
                 elif name == "project_action":
-                    from .project_actions import project_action
-                    result = await project_action(self, arguments)
+                    if self.cap_mode:
+                        if not isinstance(arguments, AssistantProjectActionPrepareV1):
+                            raise AgentFailure("AGENT_PROTOCOL")
+                        if arguments.request.action not in {"export_docx", "export_project"}:
+                            if arguments.request.action in {"undo", "redo"}:
+                                from .history_proposals import prepare_history
+                                result = prepare_history(self, arguments)
+                            else:
+                                from .action_proposals import prepare_action
+                                result = await prepare_action(self, arguments)
+                        else:
+                            from .project_actions import project_action
+                            result = await project_action(self, arguments.request)
+                    else:
+                        from .project_actions import project_action
+                        result = await project_action(self, arguments)
                 else:
                     raise AgentFailure("AGENT_TOOL_DENIED")
                 self.guard()
@@ -381,6 +511,12 @@ class ToolSession(PrivateMcp):
                 self.service.revoke(self.control, error.code)
                 self.service.cleanup_error(error.code)
             failure = {"error": {"code": error.code}}
+            reason = self.note_limit(error)
+            if reason:
+                failure["reason"] = reason
+            if getattr(error, "reason_code", None):
+                from .capabilities import availability
+                failure["reason"] = availability("unsupported", error.reason_code).reason
             if name in READ_TOOLS and error.code in {"AGENT_SCOPE_INVALID", "AGENT_STALE_READ"}:
                 failure["format"] = "The cursor is invalid, expired, or belongs to a changed snapshot. Restart this read with cursor:null; do not edit from the incomplete read."
             if name == "publish_findings" and error.code == "AGENT_EVIDENCE_INVALID":
@@ -390,6 +526,22 @@ class ToolSession(PrivateMcp):
             return {"error": {"code": "AGENT_ARGUMENT_INVALID"}, "format": "Correct the declared argument shape; access has not been denied."}
         except Exception:
             return {"error": {"code": "AGENT_PROTOCOL"}}
+
+    def note_limit(self, error):
+        if not self.cap_mode or error.code not in {"AGENT_EDIT_LIMIT", "AGENT_TOOL_LIMIT", "AGENT_PROJECT_FULL", "AGENT_CONTEXT_LIMIT"}:
+            return None
+        reason = getattr(error, "capacity_reason", None) or (
+            "Достигнут лимит подготовки:100 операций в итоговом варианте,64 вызова в шаге,64 КиБ на сообщение и текущие лимиты контекста. Сохранённый черновик доступен; продолжите новым ограниченным шагом или выберите меньшую задачу.")
+        try:
+            def limited(values):
+                current = next(value for value in values if value.proposal.origin_run_id == self.control.run_id
+                    and value.proposal.state == "building")
+                current.proposal.reason = "Лимит: " + reason
+                return current
+            self.capability_service.proposals.update(self.control.project_id, limited)
+        except (AgentFailure, StopIteration):
+            pass
+        return reason
 
     def check(self):
         with self.service.projects.state_lock:

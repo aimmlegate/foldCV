@@ -1,0 +1,55 @@
+{
+  "additionalProperties": false,
+  "properties": {
+    "durable": {
+      "title": "Durable",
+      "type": "boolean"
+    },
+    "outcome": {
+      "enum": [
+        "none",
+        "no_change",
+        "draft_ready",
+        "incomplete",
+        "applied",
+        "stale",
+        "failed",
+        "outcome_unknown"
+      ],
+      "title": "Outcome",
+      "type": "string"
+    },
+    "protocolVersion": {
+      "const": 1,
+      "default": 1,
+      "title": "Protocolversion",
+      "type": "integer"
+    },
+    "reason": {
+      "maxLength": 2000,
+      "title": "Reason",
+      "type": "string"
+    },
+    "runId": {
+      "maxLength": 128,
+      "minLength": 1,
+      "pattern": "^[A-Za-z0-9_-]+$",
+      "title": "Runid",
+      "type": "string"
+    },
+    "schemaVersion": {
+      "const": 1,
+      "default": 1,
+      "title": "Schemaversion",
+      "type": "integer"
+    }
+  },
+  "required": [
+    "runId",
+    "outcome",
+    "durable",
+    "reason"
+  ],
+  "title": "AssistantRunOutcomeV1",
+  "type": "object"
+}

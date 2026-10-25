@@ -245,7 +245,8 @@ def validate_map(node_context: Path | None = None, *, manual_qa: bool = False) -
                 "U01", "U02", "D01", "D02", "A01", "A02", "E01", "E02", "R01", "B01", "N01", "L01",
                 "NE-RICH", "NE-HISTORY", "NE-ASSETS", "NE-SYNC", "NE-FACTS", "NE-DATES", "NE-TEMPLATE",
                 "AG-RUNTIME", "AG-MODELS", "AG-WEB", "AG-EDITS", "AG-HISTORY", "AG-STORAGE", "AG-UI",
-                "NB-CONTRACTS", "NB-JOBS", "NB-PUBLICATION", "NB-WRITER", "NB-FIXED", "NB-UI", "NB-PARALLEL"}
+                "NB-CONTRACTS", "NB-JOBS", "NB-PUBLICATION", "NB-WRITER", "NB-FIXED", "NB-UI", "NB-PARALLEL"} | {
+                    f"CAP-A{number:02d}" for number in range(1, 25)}
     if ids != expected or len(entries) != len(expected):
         raise SystemExit("Requirement map IDs do not match docs/gui/testing.md")
     assert_partial_checks(entries, data.get("partialChecks"))

@@ -8,6 +8,7 @@ from datetime import datetime, timedelta, timezone
 import hashlib
 import json
 from pathlib import Path
+import re
 import secrets
 
 from pydantic import ValidationError
@@ -74,6 +75,15 @@ def budget_parts(state: AgentProjectState, journal: AgentRunJournal):
                  if item.run_id == run.id] for key in ("messages", "sources", "findings")}}
     size = lambda value: len(json.dumps(value, ensure_ascii=False, separators=(",", ":")).encode("utf-8"))
     return size(private), size(public)
+
+
+def reviewed_headroom(journal):
+    # A terminal origin has no tool writer; reserve its later UI receipt before claim.
+    return sum(max(0, 32768 - (len(wire_bytes(item.receipt)) if item.receipt is not None else 4)
+        - (len(wire_bytes(item.publication)) if item.publication is not None else 4)
+        - len(json.dumps(item.batch.state)))
+        for item in journal.batches if item.key.startswith("accepted_") and item.batch is not None
+        and item.batch.state not in TERMINAL_EDITS)
 
 
 def verify_journals(state: AgentProjectState):
@@ -155,7 +165,7 @@ class AgentStore:
         for journal in state.journals:
             private, public = budget_parts(state, journal)
             _, run, _ = run_in(state, journal.run_id)
-            if private > limits.JOURNAL_BYTES:
+            if private + reviewed_headroom(journal) > limits.JOURNAL_BYTES:
                 raise AgentFailure("AGENT_EDIT_LIMIT")
             if public > limits.RUN_BYTES - (0 if terminal or run.state in TERMINAL_RUNS else limits.TERMINAL_BYTES):
                 raise AgentFailure("AGENT_OUTPUT_LIMIT")
@@ -185,6 +195,18 @@ class AgentStore:
             state.revision += 1
             self._write(directory, state, terminal=terminal)
             return result
+
+    def update_under_canonical_lock(self, project_id, change):
+        with locked_root(self.assistant, ".assistant.lock"):
+            directory = self.projects / project_id
+            state = self._read(project_id, directory)
+            result = change(state)
+            state.revision += 1
+            self._write(directory, state, terminal=True)
+            return result
+
+    def update_reviewed(self, project_id, change, *, terminal=False):
+        return self.update(project_id, change, terminal=terminal)
 
     def create_conversation(self, project_id: str) -> AgentConversation:
         def create(state):
@@ -299,6 +321,31 @@ class AgentStore:
             return receipt
         return self.update(project_id, record, terminal=True)
 
+    def record_reviewed_receipt(self, project_id: str, run_id: str, receipt: AgentEditReceipt, authorize):
+        def record(state):
+            _, run, journal = run_in(state, run_id)
+            item = next((item for item in journal.batches if item.key == receipt.batch_id), None)
+            if item is None or item.batch is None or run.state not in TERMINAL_RUNS:
+                raise AgentFailure("AGENT_TICKET_INVALID")
+            authorize(item)
+            batch = item.batch
+            if (receipt.run_id, receipt.tool_key, receipt.client_mutation_id, receipt.request_sha256) != (
+                    run_id, item.key, batch.mutation.client_mutation_id, batch.request_sha256):
+                raise AgentFailure("AGENT_EDIT_INVALID")
+            if item.receipt is not None and item.receipt.disposition != "outcome_unknown":
+                if item.receipt != receipt:
+                    raise AgentFailure("AGENT_IDEMPOTENCY_CONFLICT")
+                return item.receipt
+            if receipt.durable and any(part is not item and part.receipt is not None and part.receipt.durable
+                    for part in journal.batches):
+                raise AgentFailure("AGENT_EDIT_LIMIT")
+            # The receipt belongs to the later UI action, not generation's permission or outcome.
+            item.receipt, batch.state = receipt, receipt.disposition
+            journal.reserved = any(part.batch is not None and part.batch.state not in TERMINAL_EDITS
+                for part in journal.batches)
+            return receipt
+        return self.update_reviewed(project_id, record, terminal=True)
+
     def finish(self, project_id: str, run_id: str, disposition: str, *, text="", error=None,
                sources=(), findings=(), truncated=False, native_completed=False):
         if disposition not in TERMINAL_RUNS or disposition == "completed" and not native_completed:
@@ -340,7 +387,7 @@ class AgentStore:
             return run
         return self.update(project_id, finish_run, terminal=True)
 
-    def recover(self, project_id: str) -> list[str]:
+    def recover(self, project_id: str, *, reviewed=lambda _project, _run, _batch: False) -> list[str]:
         def interrupt(state):
             state.owner_epoch += 1
             unresolved = []
@@ -353,12 +400,13 @@ class AgentStore:
                             continue
                         batch.state = "outcome_unknown" if batch.state in {"applying", "outcome_unknown"} else "cancelled"
                         if batch.state == "outcome_unknown":
-                            run.outcome_unknown = True
+                            if not reviewed(project_id, run.id, batch):
+                                run.outcome_unknown = True
                             unresolved.append(batch.id)
                         item.receipt = AgentEditReceipt(batchId=batch.id, runId=run.id, toolKey=batch.tool_key,
                             clientMutationId=batch.mutation.client_mutation_id, requestSha256=batch.request_sha256,
                             disposition=batch.state, projectRevision=None, documentRevision=None, factsRevision=None,
-                            durable=False, error={"code": "AGENT_OUTCOME_UNKNOWN" if run.outcome_unknown else "AGENT_INTERRUPTED"})
+                            durable=False, error={"code": "AGENT_OUTCOME_UNKNOWN" if batch.state == "outcome_unknown" else "AGENT_INTERRUPTED"})
                     if run.state not in TERMINAL_RUNS:
                         run.state, run.finished_at = "interrupted", self.clock()
                         run.error = AgentError(code="AGENT_INTERRUPTED")
@@ -388,6 +436,21 @@ class AgentStore:
                     for path in files:
                         path.unlink()
                     directory.rmdir()
+                from .assistant_proposals import VERSION_BYTES
+                namespace = self.assistant / "proposals"
+                drafts = namespace / project_id
+                if namespace.is_symlink() or namespace.exists() and not namespace.is_dir():
+                    raise StorageFailure("UNSAFE_STORAGE")
+                if drafts.exists() or drafts.is_symlink():
+                    private_directory(drafts)
+                    files = list(drafts.iterdir())
+                    for path in files:
+                        if not re.fullmatch(r"[A-Za-z0-9_-]+-[0-9]+\.json", path.name) and not path.name.startswith(".foldcv-write-"):
+                            raise StorageFailure("UNSAFE_STORAGE")
+                        owned_file(path, VERSION_BYTES)
+                    for path in files:
+                        path.unlink()
+                    drafts.rmdir()
                 canonical = self.canonical.projects / project_id
                 if not canonical.exists() and not canonical.is_symlink():
                     cleanup_status("complete")
@@ -398,7 +461,7 @@ class AgentStore:
                     pass
                 raise AgentFailure("AGENT_CLEANUP_INCOMPLETE") from None
 
-    def recover_all(self):
+    def recover_all(self, *, reviewed=lambda _project, _run, _batch: False):
         errors, unresolved = {}, {}
         registry = self.canonical.registry()
         for entry in registry.entries:
@@ -406,7 +469,7 @@ class AgentStore:
                 if entry.tombstoned:
                     self.cleanup_deleted(entry.project_id)
                 elif (self.projects / entry.project_id).exists():
-                    unresolved[entry.project_id] = self.recover(entry.project_id)
+                    unresolved[entry.project_id] = self.recover(entry.project_id, reviewed=reviewed)
             except AgentFailure as error:
                 errors[entry.project_id] = error.code
         return unresolved, errors

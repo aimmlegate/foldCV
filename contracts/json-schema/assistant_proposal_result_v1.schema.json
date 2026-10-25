@@ -1,0 +1,154 @@
+{
+  "$defs": {
+    "AssistantCoverageV1": {
+      "additionalProperties": false,
+      "properties": {
+        "protocolVersion": {
+          "const": 1,
+          "default": 1,
+          "title": "Protocolversion",
+          "type": "integer"
+        },
+        "read": {
+          "title": "Read",
+          "type": "boolean"
+        },
+        "reason": {
+          "maxLength": 1000,
+          "title": "Reason",
+          "type": "string"
+        },
+        "schemaVersion": {
+          "const": 1,
+          "default": 1,
+          "title": "Schemaversion",
+          "type": "integer"
+        },
+        "state": {
+          "enum": [
+            "changed",
+            "unchanged",
+            "unresolved"
+          ],
+          "title": "State",
+          "type": "string"
+        },
+        "unitId": {
+          "maxLength": 256,
+          "minLength": 1,
+          "title": "Unitid",
+          "type": "string"
+        }
+      },
+      "required": [
+        "unitId",
+        "state",
+        "reason",
+        "read"
+      ],
+      "title": "AssistantCoverageV1",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "changedUnits": {
+      "minimum": 0,
+      "title": "Changedunits",
+      "type": "integer"
+    },
+    "contentSha256": {
+      "pattern": "^[a-f0-9]{64}$",
+      "title": "Contentsha256",
+      "type": "string"
+    },
+    "coverage": {
+      "items": {
+        "$ref": "#/$defs/AssistantCoverageV1"
+      },
+      "maxItems": 20,
+      "title": "Coverage",
+      "type": "array"
+    },
+    "coverageTruncated": {
+      "title": "Coveragetruncated",
+      "type": "boolean"
+    },
+    "disposition": {
+      "enum": [
+        "building",
+        "draft_ready",
+        "incomplete",
+        "no_change"
+      ],
+      "title": "Disposition",
+      "type": "string"
+    },
+    "durable": {
+      "const": false,
+      "default": false,
+      "title": "Durable",
+      "type": "boolean"
+    },
+    "proposalId": {
+      "anyOf": [
+        {
+          "maxLength": 128,
+          "minLength": 1,
+          "pattern": "^[A-Za-z0-9_-]+$",
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "title": "Proposalid"
+    },
+    "protocolVersion": {
+      "const": 1,
+      "default": 1,
+      "title": "Protocolversion",
+      "type": "integer"
+    },
+    "reason": {
+      "title": "Reason",
+      "type": "string"
+    },
+    "schemaVersion": {
+      "const": 1,
+      "default": 1,
+      "title": "Schemaversion",
+      "type": "integer"
+    },
+    "unitCount": {
+      "minimum": 0,
+      "title": "Unitcount",
+      "type": "integer"
+    },
+    "unresolvedUnits": {
+      "minimum": 0,
+      "title": "Unresolvedunits",
+      "type": "integer"
+    },
+    "version": {
+      "maximum": 20,
+      "minimum": 1,
+      "title": "Version",
+      "type": "integer"
+    }
+  },
+  "required": [
+    "disposition",
+    "proposalId",
+    "version",
+    "contentSha256",
+    "changedUnits",
+    "unresolvedUnits",
+    "coverage",
+    "coverageTruncated",
+    "unitCount",
+    "reason"
+  ],
+  "title": "AssistantProposalResultV1",
+  "type": "object"
+}

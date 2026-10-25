@@ -1,6 +1,7 @@
 """Same-origin browser routes are separate from the private MCP capability."""
 
 from fastapi import Request
+from asyncio import to_thread
 from fastapi.responses import JSONResponse, StreamingResponse, Response
 
 from packages.resume_core.agent_store import AgentFailure, conversation_in, run_in
@@ -11,6 +12,12 @@ from packages.resume_core.models.agent import (
     AgentHistoryOffer,
     AgentProjectOperation, AgentProjectOperations,
 )
+from packages.resume_core.models.assistant_capabilities import AssistantMessageCheckV1
+from packages.resume_core.models.assistant_proposals import AssistantProposalListV1, AssistantProposalRequestV1, AssistantReviewListV1
+from packages.resume_core.models.assistant_approval import (AssistantAcceptanceV1, AssistantApplicationCommitV1,
+    AssistantApplicationReportV1, AssistantRunRequestV1)
+from packages.resume_core.models.assistant_actions import AssistantCapabilityReviewsV1
+from packages.resume_core.models.assistant_history import AssistantHistoryOfferV1
 
 
 def mount_agent(app, service):
@@ -29,6 +36,211 @@ def mount_agent(app, service):
         if value.project is None:
             raise AgentFailure("AGENT_NOT_FOUND")
         return value
+
+    def protocol(request):
+        versions = [value for key, value in request.headers.raw if key.lower() == b"x-foldcv-assistant-protocol"]
+        if versions != [b"1"]:
+            raise AgentFailure("AGENT_PROTOCOL")
+
+    def flags(request):
+        result = {}
+        for header, name in ((b"x-foldcv-agent-edits", "allow_edits"), (b"x-foldcv-agent-web", "allow_web")):
+            values = [value for key, value in request.headers.raw if key.lower() == header]
+            if len(values) > 1 or values and values[0] not in {b"0", b"1"}:
+                raise AgentFailure("AGENT_TOOL_DENIED")
+            result[name] = not values or values[0] == b"1"
+        return result
+
+    @app.get(prefix + "/tasks")
+    async def tasks(project_id: str, request: Request):
+        from .capabilities import catalog
+        protocol(request)
+        return response(catalog(service, project_id, **flags(request)))
+
+    @app.post(prefix + "/tasks/check-message")
+    async def task_message(project_id: str, request: Request, payload: AssistantMessageCheckV1):
+        from .capabilities import catalog, check_message
+        protocol(request)
+        return response(check_message(catalog(service, project_id,
+            allow_edits=payload.allow_edits, allow_web=payload.allow_web), payload))
+
+    def proposal_protocol(request):
+        protocol(request)
+        if not service.assistant_protocol_enabled:
+            raise AgentFailure("AGENT_PROTOCOL")
+
+    @app.get(prefix + "/proposals")
+    async def proposals(project_id: str, request: Request):
+        from .proposals import review
+        proposal_protocol(request)
+        project(project_id)
+        return response(AssistantProposalListV1(projectId=project_id,
+            proposals=[item.proposal for item in review(service, project_id) if not item.no_change]))
+
+    @app.get(prefix + "/proposals/{proposal_id}/versions/{version}")
+    async def proposal(project_id: str, proposal_id: str, version: int, request: Request):
+        from .proposals import review
+        proposal_protocol(request)
+        project(project_id)
+        review(service, project_id)
+        return response(service.proposals.get(project_id, proposal_id, version).proposal)
+
+    from packages.resume_core.models.assistant_continuation import AssistantContinueRunV1
+
+    @app.get(prefix + "/continuations")
+    async def continuation_options(project_id: str, request: Request):
+        from .continuation import options
+        proposal_protocol(request)
+        project(project_id)
+        return response(options(service, project_id, **flags(request)))
+
+    @app.get(prefix + "/outcomes/{run_id}")
+    async def draft_outcome(project_id: str, run_id: str, request: Request):
+        from .outcomes import outcome
+        proposal_protocol(request)
+        project(project_id)
+        return response(outcome(service, project_id, run_id))
+
+    @app.post(prefix + "/continuations/run")
+    async def continue_draft(project_id: str, request: Request, payload: AssistantContinueRunV1):
+        from .continuation import submit_run
+        proposal_protocol(request)
+        run, created = submit_run(service, project_id, payload)
+        if created:
+            service.start(project_id, run.id)
+        return response(run, 202 if created else 200)
+
+    @app.post(prefix + "/proposals/discard")
+    async def discard_proposal(project_id: str, request: Request, payload: AssistantProposalRequestV1):
+        proposal_protocol(request)
+        project(project_id)
+        def discard(values):
+            value = next((item for item in values if item.proposal.id == payload.proposal_id and item.proposal.version == payload.version), None)
+            if value is None:
+                raise AgentFailure("AGENT_NOT_FOUND")
+            if value.proposal.content_sha256 != payload.content_sha256:
+                raise AgentFailure("AGENT_IDEMPOTENCY_CONFLICT")
+            if value.proposal.state not in {"ready", "incomplete", "stale", "failed_before_commit", "discarded"}:
+                raise AgentFailure("AGENT_TOOL_DENIED")
+            value.proposal.state = "discarded"
+            return value
+        return response(service.proposals.update(project_id, discard).proposal)
+
+    @app.get(prefix + "/reviews")
+    async def reviews(project_id: str, request: Request):
+        from .proposals import review, review_view
+        from .capabilities import catalog
+        proposal_protocol(request)
+        project(project_id)
+        tasks = catalog(service, project_id, **flags(request))
+        values = review(service, project_id)
+        latest = {item.proposal.id: max(value.proposal.version for value in values if value.proposal.id == item.proposal.id)
+            for item in values}
+        return response(AssistantCapabilityReviewsV1(projectId=project_id,
+            reviews=[review_view(service, item, tasks) for item in values
+                if not item.no_change and item.proposal.version == latest[item.proposal.id]]))
+
+    @app.get(prefix + "/reviews/{proposal_id}/versions/{version}")
+    async def review_one(project_id: str, proposal_id: str, version: int, request: Request):
+        from .proposals import review, review_view
+        from .capabilities import catalog
+        proposal_protocol(request)
+        project(project_id)
+        tasks = catalog(service, project_id, **flags(request))
+        values = review(service, project_id)
+        item = next((item for item in values if item.proposal.id == proposal_id and item.proposal.version == version), None)
+        if item is None:
+            raise AgentFailure("ASSISTANT_PROPOSAL_MISSING")
+        return response(review_view(service, item, tasks))
+
+    @app.post(prefix + "/applications/claim")
+    async def accept_proposal(project_id: str, request: Request, payload: AssistantAcceptanceV1):
+        proposal_protocol(request)
+        return response(service.approval.claim(project_id, payload))
+
+    @app.post(prefix + "/history/offer-v1")
+    async def history_review_offer(project_id: str, request: Request, payload: AssistantHistoryOfferV1):
+        from .history_proposals import offer_history
+        proposal_protocol(request)
+        offer_history(service, project_id, payload)
+        return response(AgentEmptyRequest())
+
+    @app.post(prefix + "/applications/commit")
+    async def apply_proposal(project_id: str, request: Request, payload: AssistantApplicationCommitV1):
+        proposal_protocol(request)
+        return response(await to_thread(service.approval.commit, project_id, payload))
+
+    @app.post(prefix + "/applications/recover")
+    async def recover_proposal(project_id: str, request: Request, payload: AssistantAcceptanceV1):
+        proposal_protocol(request)
+        return response(service.approval.recover(project_id, payload))
+
+    @app.post(prefix + "/applications/cancel")
+    async def cancel_application(project_id: str, request: Request, payload: AssistantAcceptanceV1):
+        proposal_protocol(request)
+        return response(await to_thread(service.approval.cancel, project_id, payload))
+
+    @app.post(prefix + "/applications/resume")
+    async def resume_application(project_id: str, request: Request, payload: AssistantAcceptanceV1):
+        proposal_protocol(request)
+        return response(service.approval.recover(project_id, payload, resume=True))
+
+    @app.post(prefix + "/applications/retry")
+    async def retry_application(project_id: str, request: Request, payload: AssistantAcceptanceV1):
+        proposal_protocol(request)
+        return response(service.approval.retry(project_id, payload))
+
+    @app.post(prefix + "/applications/result")
+    async def application_result(project_id: str, request: Request, payload: AssistantApplicationReportV1):
+        proposal_protocol(request)
+        return response(service.approval.report(project_id, payload))
+
+    @app.post(prefix + "/actions/claim")
+    async def accept_action(project_id: str, request: Request, payload: AssistantAcceptanceV1):
+        proposal_protocol(request)
+        return response(service.action_approval.claim(project_id, payload))
+
+    @app.post(prefix + "/actions/commit")
+    async def apply_action(project_id: str, request: Request, payload: AssistantApplicationCommitV1):
+        proposal_protocol(request)
+        return response(await service.action_approval.commit(project_id, payload))
+
+    @app.post(prefix + "/actions/recover")
+    async def recover_action(project_id: str, request: Request, payload: AssistantAcceptanceV1):
+        proposal_protocol(request)
+        return response(service.action_approval.recover(project_id, payload))
+
+    @app.post(prefix + "/actions/resume")
+    async def resume_action(project_id: str, request: Request, payload: AssistantAcceptanceV1):
+        proposal_protocol(request)
+        return response(service.action_approval.recover(project_id, payload, resume=True))
+
+    @app.post(prefix + "/actions/cancel")
+    async def cancel_action(project_id: str, request: Request, payload: AssistantAcceptanceV1):
+        proposal_protocol(request)
+        return response(await to_thread(service.action_approval.cancel, project_id, payload))
+
+    @app.post(prefix + "/actions/retry")
+    async def retry_action(project_id: str, request: Request, payload: AssistantAcceptanceV1):
+        proposal_protocol(request)
+        return response(service.action_approval.retry(project_id, payload))
+
+    @app.get(prefix + "/proposals/{proposal_id}/versions/{version}/image-preview")
+    async def action_image(project_id: str, proposal_id: str, version: int):
+        import base64
+        value = service.proposals.get(project_id, proposal_id, version)
+        action = getattr(value, "action", None)
+        if action is None or action.request.action not in {"import_asset", "remove_asset"}:
+            raise AgentFailure("AGENT_NOT_FOUND")
+        if action.request.action == "import_asset":
+            asset = next(item for item in value.candidate.project.assets if item.id not in {old.id for old in value.baseline.project.assets})
+            data = base64.b64decode(action.blob_base64, validate=True)
+        else:
+            asset = next(item for item in value.baseline.project.assets if item.id == action.request.target_id)
+            data = service.projects.images.get((project_id, asset.id))
+            if data is None:
+                raise AgentFailure("AGENT_NOT_FOUND")
+        return Response(data, media_type=asset.mime_type, headers={"Cache-Control": "no-store", "X-Content-Type-Options": "nosniff"})
 
     def owned_run(project_id, run_id):
         project(project_id)
@@ -157,14 +369,25 @@ def mount_agent(app, service):
 
     @app.post(prefix + "/lease/close")
     async def close_lease(project_id: str, payload: AgentOwnerRequest):
+        closed = service.leases.close(project_id, payload.owner)
         project(project_id)
-        service.leases.close(project_id, payload.owner)
-        service.request_project_stop(project_id, reason="AGENT_INTERRUPTED")
-        await service.stop_project(project_id)
+        if closed is not None:
+            service.request_owner_stop(project_id, closed.epoch)
+            await service.stop_project(project_id, owner_epoch=closed.epoch)
         return response(AgentEmptyRequest())
 
     @app.post(prefix + "/conversations/{conversation_id}/runs")
     async def submit(project_id: str, conversation_id: str, payload: AgentRunRequest):
+        if service.assistant_protocol_enabled:
+            raise AgentFailure("AGENT_PROTOCOL")
+        return submit_run(project_id, conversation_id, payload)
+
+    @app.post(prefix + "/conversations/{conversation_id}/requests")
+    async def submit_assistant(project_id: str, conversation_id: str, request: Request, payload: AssistantRunRequestV1):
+        proposal_protocol(request)
+        return submit_run(project_id, conversation_id, payload.request)
+
+    def submit_run(project_id, conversation_id, payload):
         project(project_id)
         conversation_in(service.store.load(project_id), conversation_id)
         if payload.conversation_id != conversation_id:
