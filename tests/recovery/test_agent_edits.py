@@ -329,3 +329,61 @@ async def test_invalid_batch_is_atomic_and_never_creates_a_replay(tmp_path, bad)
         assert not journal.batches
     finally:
         await session.close()
+
+
+# A1 (2026-10-25): a replace_text without start and end rewrites the whole field. CAP live start 8 rewrote two sentences
+# whose ranges covered only their first words, so the old tails stayed; these are those paragraphs.
+WORDY_BULLET = ("В течение всего периода работы в компании я занимался тем, что разрабатывал и поддерживал внутренние сервисы, "
+    "которые потом использовались другими командами для решения их ежедневных рабочих задач.")
+SHORT_BULLET = "Разрабатывал и поддерживал внутренние сервисы для повседневных задач других команд."
+WORDY_NESTED = ("Кроме того, я на регулярной основе принимал активное участие в процессе проведения ревью кода, в ходе которого "
+    "внимательно проверял изменения коллег и давал им подробную обратную связь.")
+
+
+def whole(snapshot, block, content):
+    return {"kind": "replace_text", "target": {"snapshotId": snapshot.id, "blockId": block, "cellId": None, "field": "content"},
+        "content": content}
+
+
+@pytest.mark.asyncio
+async def test_a_replace_without_offsets_rewrites_the_whole_paragraph_and_leaves_no_tail(tmp_path):
+    session, service, workspace, _ = tools_setup(tmp_path)
+    try:
+        narrative = next(block for block in workspace.project.document.blocks() if block.id == "narrative")
+        narrative.content = [StyledText(type="text", text=WORDY_BULLET, styles=narrative.content[0].styles)]
+        read = session.book.read(AgentQuery(kind="document", ids=["narrative"]))
+        changed, batch = candidate(session, service, workspace, command(whole(read.snapshot, "narrative", [{"text": SHORT_BULLET}])))
+        rewritten = next(block for block in changed.project.document.blocks() if block.id == "narrative")
+        assert "".join(span.text for span in rewritten.content) == SHORT_BULLET
+        touched = {getattr(step, "block_id", getattr(getattr(step, "block", None), "id", None)) for step in batch.mutation.steps}
+        assert touched == {"narrative"} and batch.fact_record_ids == []
+    finally:
+        await session.close()
+
+
+@pytest.mark.asyncio
+async def test_a_whole_field_replace_keeps_marks_and_refuses_an_overlap_or_several_bound_fields(tmp_path):
+    session, service, workspace, _ = tools_setup(tmp_path)
+    try:
+        title = next(block for block in workspace.project.document.blocks() if block.id == "title")
+        second = title.content[0].model_copy(deep=True)
+        second.text, second.binding_id, second.field_key = " Example", "title-name", "name"
+        title.content.append(second)
+        narrative = next(block for block in workspace.project.document.blocks() if block.id == "narrative")
+        narrative.content = [StyledText(type="text", text=WORDY_NESTED, styles={})]
+        read = session.book.read(AgentQuery(kind="document"))
+        with pytest.raises(ValueError, match="both start and end"):
+            command({**whole(read.snapshot, "quote", [{"text": "x"}]), "target": {**whole(read.snapshot, "quote", [])["target"], "start": 0}})
+        with pytest.raises(AgentFailure, match="AGENT_EDIT_INVALID"):
+            prepare(session, command(whole(read.snapshot, "quote", [{"text": "x"}]), replace(read.snapshot, "quote", 0, 1, "y"), key="prepare_2"))
+        # The title carries two bound fact fragments (title and name): only ranges keep their bindings apart.
+        with pytest.raises(AgentFailure, match="AGENT_EDIT_INVALID"):
+            prepare(session, command(whole(read.snapshot, "title", [{"text": "Architect Example"}]), key="prepare_3"))
+        parts = [{"text": "Регулярно участвовал в код-ревью: "}, {"text": "проверял изменения коллег", "marks": ["bold"]},
+            {"text": " и давал подробную обратную связь."}]
+        changed, _ = candidate(session, service, workspace, command(whole(read.snapshot, "narrative", parts)))
+        rewritten = next(block for block in changed.project.document.blocks() if block.id == "narrative")
+        assert "".join(span.text for span in rewritten.content) == "".join(part["text"] for part in parts)
+        assert [span.styles.bold for span in rewritten.content] == [False, True, False]
+    finally:
+        await session.close()

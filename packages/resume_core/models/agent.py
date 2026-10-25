@@ -352,14 +352,21 @@ class AgentRange(AgentWire):
     block_id: ReferenceId
     cell_id: ReferenceId | None
     field: Literal["content", "caption"]
-    start: int = Field(ge=0)
-    end: int = Field(ge=0)
+    # Both absent means the whole field (A1, 2026-10-25): a sentence rewrite no longer depends on exact UTF-16 offsets.
+    start: int | None = Field(default=None, ge=0)
+    end: int | None = Field(default=None, ge=0)
 
     @model_validator(mode="after")
     def ordered_range(self):
-        if self.end < self.start:
+        if (self.start is None) != (self.end is None):
+            raise ValueError("edit range needs both start and end, or neither for the whole field")
+        if self.start is not None and self.end < self.start:
             raise ValueError("edit range ends before its start")
         return self
+
+    @property
+    def whole_field(self):
+        return self.start is None
 
 
 class AgentReplaceText(AgentWire):

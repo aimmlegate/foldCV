@@ -89,7 +89,7 @@ def result(value):
         "region": "get_resume_context kind=context"}
     needed = sorted({reads.get(unit.unit_id.split(":", 1)[0], "get_resume_context kind=document") for unit in pending if not unit.read})
     next_step = ("Draft not finished. " + (f"Not read fully yet: read with {', '.join(needed)} and follow nextCursor to null. " if needed else "")
-        + "Add replace_text operations for the wording you improve, then call phase:finalize. "
+        + "Add replace_text operations for the wording you improve (no start and end replaces the whole paragraph), then call phase:finalize. "
         "On finalize every unit you read fully and did not change stays unchanged automatically; code, tables, quotes, "
         "captions and lists may stay as they are. Do not end the turn before finalize."
         if disposition == "building" and pending else None)

@@ -173,12 +173,12 @@ class ToolSession(PrivateMcp):
     def register(self):
         @self.sdk.tool(structured_output=False)
         async def get_resume_context(query: ContextQuery | None = None) -> CallToolResult:
-            """Read the project index with query:{kind:"context"}. Read ALL document blocks with query:{kind:"document"}, or filter by ids. Each page contains whole blocks; only an oversized item uses json-fragments. Pass snapshot.nextCursor as query.cursor with the SAME query until nextCursor is null. Reading is complete only then. For substring edits, copy UTF-16 offsets from find_resume_content and use a full-read snapshotId."""
+            """Read the project index with query:{kind:"context"}. Read ALL document blocks with query:{kind:"document"}, or filter by ids. Each page contains whole blocks; only an oversized item uses json-fragments. Pass snapshot.nextCursor as query.cursor with the SAME query until nextCursor is null. Reading is complete only then. To rewrite a whole paragraph use replace_text without start and end; for a substring copy UTF-16 offsets from find_resume_content and use a full-read snapshotId."""
             return self.wire(await self.call("get_resume_context", query or ContextQuery()))
 
         @self.sdk.tool(structured_output=False)
         async def find_resume_content(query: FindQuery) -> CallToolResult:
-            """Search for nonempty literal text with kind:find. Matches provide exact UTF-16 start/end offsets; copy these unchanged for substring edits instead of counting characters. A match is not a full edit target. Read its block/cell with get_resume_context and use that full-read snapshotId with the search offsets. Use nextCursor with the same query for later pages."""
+            """Search for nonempty literal text with kind:find. Matches provide exact UTF-16 start/end offsets; copy these unchanged for substring edits instead of counting characters. To rewrite a whole paragraph omit start and end instead. A match is not a full edit target. Read its block/cell with get_resume_context and use that full-read snapshotId with the search offsets. Use nextCursor with the same query for later pages."""
             return self.wire(await self.call("find_resume_content", query))
 
         @self.sdk.tool(structured_output=False)
@@ -231,7 +231,7 @@ class ToolSession(PrivateMcp):
             return self.wire(await self.call("publish_findings", request))
 
         async def prepare_edit_batch(request: AgentPrepareRequest) -> CallToolResult:
-            """Compile edits without saving. For template formatting, first read the entire document through nextCursor:null, then operations:[{kind:"format_template",snapshotId:"completed_read_id"}]. This preserves current wording and creates one shared undo action. Text edits use replace_text with target:{snapshotId,blockId,cellId:null,field:"content",start,end}, content:[{text:"..."}]. Copy exact UTF-16 offsets from find_resume_content. Insert headings/sections/lists with insert_blocks, tables with insert_table, retained images with insert_asset. Facts support create_fact/update_fact/delete_fact with evidence. Read real targets first. One saved batch per turn."""
+            """Compile edits without saving. For template formatting, first read the entire document through nextCursor:null, then operations:[{kind:"format_template",snapshotId:"completed_read_id"}]. This preserves current wording and creates one shared undo action. Text edits use replace_text with target:{snapshotId,blockId,cellId:null,field:"content"}, content:[{text:"..."}] to replace a whole paragraph; add start and end (exact UTF-16 offsets from find_resume_content) only for a substring. Insert headings/sections/lists with insert_blocks, tables with insert_table, retained images with insert_asset. Facts support create_fact/update_fact/delete_fact with evidence. Read real targets first. One saved batch per turn."""
             return self.wire(await self.call("prepare_edit_batch", request))
         if self.cap_mode:
             prepare_edit_batch.__annotations__["request"] = AssistantAssemblyRequestV1 | AssistantProjectActionPrepareV1
@@ -240,9 +240,9 @@ class ToolSession(PrivateMcp):
                 "key and phase:append/finalize. Omit proposalId for the first call, then reuse returned "
                 "proposalId/version. Each key is idempotent and each call extends the same baseline. "
                 "Use operations and snapshotIds from complete paged reads; an outline or search is not a full read. "
-                "A text edit is {kind:\"replace_text\",target:{snapshotId,blockId,cellId:null,field:\"content\",start,end},"
-                "content:[{text:\"...\"}]} with the full document read snapshotId and exact UTF-16 start/end copied from "
-                "find_resume_content; table cells set cellId and captions use field:\"caption\". "
+                "A text edit is {kind:\"replace_text\",target:{snapshotId,blockId,cellId:null,field:\"content\"},"
+                "content:[{text:\"...\"}]} with the full document read snapshotId: it replaces the whole paragraph. Add start and end "
+                "(exact UTF-16 offsets copied from find_resume_content) only to replace a substring; table cells set cellId and captions use field:\"caption\". "
                 "Add replace_text operations only for wording you improve, then call phase:finalize; one finalize "
                 "call with all operations is enough. On finalize every fully read unit you did not change stays "
                 "unchanged automatically. Optional unchanged entries give unitId/reason only for a specific reason. "
@@ -378,14 +378,14 @@ class ToolSession(PrivateMcp):
             result["argumentIssues"] = self.argument_issues
             if self.cap_mode and code == "AGENT_EDIT_INVALID":
                 result["format"] = ("Use request:{protocolVersion:1,taskId,key,phase:'append'|'finalize',proposalId?,version:1,operations:[],snapshotIds:[],unchanged:[]}. "
-                    "Each text edit is {kind:'replace_text',target:{snapshotId,blockId,cellId:null,field:'content',start,end},content:[{text:'...'}]} "
-                    "with UTF-16 start/end from find_resume_content. Correct shape errors only; no field grants Apply authority.")
+                    "Each text edit is {kind:'replace_text',target:{snapshotId,blockId,cellId:null,field:'content'},content:[{text:'...'}]} "
+                    "for a whole paragraph, with start and end (UTF-16 from find_resume_content) only for a substring. Correct shape errors only; no field grants Apply authority.")
                 return result
             if self.argument_issues[0]["path"] == "skillQuery":
                 result["format"] = "Use {} for the catalog, or {query:{skillId:'import-resume',resource:'SKILL.md',cursor:null}}. Follow top-level nextCursor with the same skillId/resource."
                 return result
             result["format"] = ("Read arguments use {query:{kind:'document',cursor:null}}. Omit ids to read all blocks, or pass known IDs. Follow nextCursor using the same query."
-                if self.argument_issues[0]["path"] == "query" else "Use the advertised request wrapper. replace_text target requires snapshotId, blockId, cellId (null outside tables), field, start, end. content contains text and optional marks, not styles. Correct shape errors only; never retry permission denial.")
+                if self.argument_issues[0]["path"] == "query" else "Use the advertised request wrapper. replace_text target requires snapshotId, blockId, cellId (null outside tables), field; omit start and end for the whole paragraph or give both for a substring. content contains text and optional marks, not styles. Correct shape errors only; never retry permission denial.")
         return result
 
     async def call(self, name, arguments):

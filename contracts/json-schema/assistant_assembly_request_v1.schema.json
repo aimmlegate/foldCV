@@ -603,9 +603,17 @@
           "title": "Cellid"
         },
         "end": {
-          "minimum": 0,
-          "title": "End",
-          "type": "integer"
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "End"
         },
         "field": {
           "enum": [
@@ -623,18 +631,24 @@
           "type": "string"
         },
         "start": {
-          "minimum": 0,
-          "title": "Start",
-          "type": "integer"
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Start"
         }
       },
       "required": [
         "snapshotId",
         "blockId",
         "cellId",
-        "field",
-        "start",
-        "end"
+        "field"
       ],
       "title": "AgentRange",
       "type": "object"

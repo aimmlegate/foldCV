@@ -81,9 +81,10 @@ def proposal_instructions():
     from .skills import CHAT_SKILL_INSTRUCTIONS
     return PROPOSAL_INSTRUCTIONS + CHAT_SKILL_INSTRUCTIONS + (
         " Read complete context, document and working-facts pages for the frozen scope. "
-        "Copy UTF-16 offsets from find_resume_content and pair them with a full document read, "
-        "never a search snapshot. After complete reads, add replace_text operations only for the wording "
-        "you improve and call phase:finalize; one finalize call with all operations is enough. On finalize "
+        "To rewrite a paragraph, replace_text without start and end replaces its whole text; copy UTF-16 offsets from "
+        "find_resume_content only for a substring, paired with a full document read, never a search snapshot. After "
+        "complete reads, add replace_text operations only for the wording you improve and call phase:finalize; one "
+        "finalize call with all operations is enough. On finalize "
         "every unit you read fully and did not change stays unchanged automatically, so code, tables, quotes, "
         "captions and lists may stay as they are. Use unchanged only for a specific reason. Units you did not "
         "read fully stay unresolved. Coverage is the current document only; an original's extraction gap "

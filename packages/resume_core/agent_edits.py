@@ -348,21 +348,26 @@ def compile_batch(workspace, run, journal, request, book, session_id, *, assista
             if content is None or target.field == "caption" and target.cell_id is not None:
                 raise AgentFailure("AGENT_EDIT_INVALID")
             length = len(text_of(content).encode("utf-16-le")) // 2
-            if target.end > length:
+            # No offsets means the whole field (A1, 2026-10-25): a sentence rewrite no longer depends on exact UTF-16
+            # offsets. A field made of several bound fact fragments keeps its bindings only through ranges, so a
+            # whole-field rewrite of it is refused and the hint names ranges.
+            start, end = (0, length) if target.whole_field else (target.start, target.end)
+            bound = {(span.record_id, span.field_key) for span in content if isinstance(span, FactFieldSpan)}
+            if end > length or (target.whole_field and len(bound) > 1):
                 raise AgentFailure("AGENT_EDIT_INVALID")
-            utf16_slice(text_of(content), target.start, target.end)
-            scope.range(original.id, target.cell_id, target.field, target.start, target.end)
-            value = (preserving_replacement if assistant_policy is not None else replacement)(content, target.start, target.end, operation.content)
+            utf16_slice(text_of(content), start, end)
+            scope.range(original.id, target.cell_id, target.field, start, end)
+            value = (preserving_replacement if assistant_policy is not None else replacement)(content, start, end, operation.content)
             key = (original.id, target.cell_id, target.field)
-            if any(not (target.end <= start or target.start >= end) or target.start == target.end == start == end
-                    for start, end in ranges.get(key, [])):
+            if any(not (end <= other_start or start >= other_end) or start == end == other_start == other_end
+                    for other_start, other_end in ranges.get(key, [])):
                 raise AgentFailure("AGENT_EDIT_INVALID")
-            ranges.setdefault(key, []).append((target.start, target.end))
-            if utf16_slice(text_of(content), target.start, target.end) == text_of(value) and (assistant_policy is not None or not any(part.marks for part in operation.content)):
+            ranges.setdefault(key, []).append((start, end))
+            if utf16_slice(text_of(content), start, end) == text_of(value) and (assistant_policy is not None or not any(part.marks for part in operation.content)):
                 read_ids.add(target.snapshot_id)
                 continue
             steps.append(ReplaceInlineRange(kind="replace_inline_range", blockId=original.id, cellId=target.cell_id,
-                field=target.field, start=target.start, end=target.end, beforeRevision=original.revision, content=value))
+                field=target.field, start=start, end=end, beforeRevision=original.revision, content=value))
             write_blocks.add(original.id); text_blocks.add(original.id); read_ids.add(target.snapshot_id)
         elif operation.kind == "insert_blocks":
             parent_id, after_id = structural_anchor(operation.destination)

@@ -32,10 +32,10 @@ export type Content = AgentInline[];
 export type Kind = "replace_text";
 export type Blockid = string;
 export type Cellid = string | null;
-export type End = number;
+export type End = number | null;
 export type Field = "content" | "caption";
 export type Snapshotid = string;
-export type Start = number;
+export type Start = number | null;
 /**
  * @minItems 1
  * @maxItems 100
@@ -703,10 +703,10 @@ export interface AgentInline {
 export interface AgentRange {
   blockId: Blockid;
   cellId: Cellid;
-  end: End;
+  end?: End;
   field: Field;
   snapshotId: Snapshotid;
-  start: Start;
+  start?: Start;
 }
 export interface AgentInsertBlocks {
   blocks: Blocks;
