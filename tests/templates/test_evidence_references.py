@@ -202,8 +202,10 @@ def test_review_selects_checks_and_evidence_by_reference_and_its_receipt_keeps_i
     for change in [{'check': 'C99'}, {'evidence': ['S99']}, {'targetId': value.targets[0].target_id}]:
         with pytest.raises(SchemaFailure):
             validate_review_reply({'results': [{**payload[0], **change}, *payload[1:]]}, value, [src])
-    with pytest.raises(TemplateImportFailure, match='IMPORT_REVIEW_INCOMPLETE'):
-        validate_review_reply({'results': [payload[0], *payload]}, value, [src])
+    # A check listed twice merges (LIVE-11/12); the doubled reply decodes like the plain one.
+    doubled = validate_review_reply({'results': [payload[0], *payload]}, value, [src])
+    assert [(result.rule_id, result.target_id, result.disposition) for result in doubled.results] == [
+        (result.rule_id, result.target_id, result.disposition) for result in receipt.reply.results]
 
 
 def test_a_protocol_3_review_lists_only_failing_checks_and_every_other_check_holds():
@@ -225,8 +227,16 @@ def test_a_protocol_3_review_lists_only_failing_checks_and_every_other_check_hol
     assert first.disposition == 'violation' and first.evidence and first.reason
     assert all(result.disposition == 'satisfied' and result.evidence == [] and result.reason == '' for result in by_target.values())
     assert all(result.disposition == 'satisfied' for result in validate_review_reply({'results': []}, value, [src]).results)
-    with pytest.raises(TemplateImportFailure, match='IMPORT_REVIEW_INCOMPLETE'):
-        validate_review_reply({'results': [*results(value), *results(value)]}, value, [src])
+    # LIVE-11/12: the same check listed twice (a violation and an uncertain entry) merges into the worse disposition
+    # with both reasons and refs, instead of failing the whole review and the block with it.
+    doubled = validate_review_reply({'results': [*results(value), {'check': 'C1', 'disposition': 'uncertain',
+        'reason': 'Период не подтверждён', 'evidence': ['S2'], 'actionable': False}]}, value, [src])
+    merged = next(result for result in doubled.results if result.disposition != 'satisfied')
+    assert [result.disposition for result in doubled.results].count('satisfied') == len(refs) - 1
+    assert merged.disposition == 'violation' and merged.reason == 'Год не указан в источнике Период не подтверждён'
+    assert len(merged.evidence) == 2 and merged.actionable
+    same_twice = validate_review_reply({'results': [*results(value), *results(value)]}, value, [src])
+    assert sum(result.disposition == 'violation' for result in same_twice.results) == 1
     with pytest.raises(SchemaFailure):
         validate_review_reply({'results': [{**results(value)[0], 'check': 'C0'}]}, value, [src])
 

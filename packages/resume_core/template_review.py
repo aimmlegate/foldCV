@@ -171,9 +171,15 @@ def validate_review_reply(value, expected, sources):
     referenced = ReferencedReviewReply.model_validate(value, strict=True)
     if review_protocol(expected) == REVIEW_PROTOCOL['version']:
         # Protocol 3 lists failing checks only; a check the reply does not list holds. Restored in check order, so a
-        # receipt lists every check as protocol 2 did; a repeated or unknown check still makes the reply incomplete.
-        entries = [result.model_dump(mode='json', by_alias=True) for result in referenced.results]
-        listed = {entry['check'] for entry in entries}
+        # receipt lists every check as protocol 2 did. A check listed twice (LIVE-11/12 summary: a violation and an
+        # uncertain entry for the same target) merges into the worse disposition; an unknown check is refused by the
+        # schema's enum.
+        merged = {}
+        for result in referenced.results:
+            entry = result.model_dump(mode='json', by_alias=True)
+            merged[entry['check']] = merge_dispositions(merged[entry['check']], entry) if entry['check'] in merged else entry
+        entries = list(merged.values())
+        listed = set(merged)
         entries += [{'check': check, 'disposition': 'satisfied', 'reason': '', 'evidence': [], 'actionable': False}
             for check in check_references(expected) if check not in listed]
         order = {check: index for index, check in enumerate(check_references(expected))}
@@ -185,6 +191,18 @@ def validate_review_reply(value, expected, sources):
         'evidence': [span.model_dump(mode='json', by_alias=True) for span in restore_evidence(result.evidence, table, sources)],
         'actionable': result.actionable} for result in referenced.results]}, strict=True)
     return check_review_reply(reply, expected, sources)
+
+
+SEVERITY = {'satisfied': 0, 'uncertain': 1, 'violation': 2}
+
+
+def merge_dispositions(first, second):
+    """One entry for a check the reply listed twice: the worse disposition, every reason and every cited ref."""
+    worse = second if SEVERITY[second['disposition']] > SEVERITY[first['disposition']] else first
+    reasons = [reason for reason in (first['reason'], second['reason']) if reason]
+    return {'check': first['check'], 'disposition': worse['disposition'], 'reason': ' '.join(dict.fromkeys(reasons)),
+        'evidence': list(dict.fromkeys([*first['evidence'], *second['evidence']])),
+        'actionable': first['actionable'] or second['actionable']}
 
 
 def reusable_receipt(operation, value, sources):
