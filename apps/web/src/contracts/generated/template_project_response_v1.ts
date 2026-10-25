@@ -683,6 +683,10 @@ export type Admittedcellids = string[];
 export type Admittedrelationids = string[];
 export type Appliedreceiptid = string | null;
 export type Attemptid1 = string;
+export type Fieldkey3 = string;
+export type Pointer = string;
+export type Text7 = string;
+export type Droppedvalues = DroppedValue[];
 export type Errors = string[];
 export type Id33 = string;
 export type Inputhash1 = string;
@@ -695,18 +699,18 @@ export type Proposalhash1 = string;
 export type Rawreturn1 = string;
 export type Rawreturnhash1 = string;
 export type Key1 = string;
-export type Pointer = string;
+export type Pointer1 = string;
 export type Semantictype4 = string;
 export type Discoveries = Discovery[];
 export type Effectivecellids = string[];
 export type Evidence15 = SourceSpan[];
-export type Fieldkey3 = string;
+export type Fieldkey4 = string;
 export type Item = DiscoverySelector | HandleSelector;
 export type Key2 = string;
 export type Kind23 = "discovery_key";
 export type Itemhandle6 = string;
 export type Kind24 = "handle";
-export type Pointer1 = string;
+export type Pointer2 = string;
 export type Fields1 = ProposalField[];
 export type Children1 = string[];
 export type Kind25 = "add" | "split" | "merge";
@@ -725,9 +729,9 @@ export type Relations2 = ProposalRelation[];
 export type Schemaversion5 = 1;
 export type Effectivecellids1 = string[];
 export type Evidence17 = SourceSpan[];
-export type Fieldkey4 = string;
+export type Fieldkey5 = string;
 export type Itemhandle7 = string;
-export type Pointer2 = string;
+export type Pointer3 = string;
 export type Resolvedfields = FieldSidecar[];
 export type Resolvedrelations = Relation[];
 export type State6 = "invalid" | "provisional" | "accepted" | "rejected";
@@ -766,7 +770,7 @@ export type Inputhash2 = string;
 export type Allowtextrewrite2 = boolean;
 export type Effectivecells = ExtensionCell[];
 export type Ref = string;
-export type Text7 = string;
+export type Text8 = string;
 export type Evidence19 = EvidenceOption[];
 export type Handlemap = (HandleAllocation | CapturedItemIdentity)[];
 export type Occurrenceindependent = boolean;
@@ -855,7 +859,7 @@ export type Role2 = "font" | "logo" | "icon" | "catalog";
 export type Assets1 = AssetDeclaration[];
 export type Field1 = string;
 export type ItemPointer = string | null;
-export type Pointer3 = string;
+export type Pointer4 = string;
 export type Kind32 = "owned_by" | "extension_of" | "related_to";
 export type SubjectPointer = string;
 export type SemanticType = string;
@@ -997,7 +1001,7 @@ export type Italic2 = boolean;
 export type Strike = boolean;
 export type Textcolor = string;
 export type Underline = boolean;
-export type Text8 = string;
+export type Text9 = string;
 export type Type1 = "text";
 export type Content1 = PresentedText[];
 export type Href = string;
@@ -1007,16 +1011,16 @@ export type Bindingrootid = string | null;
 export type Cellid1 = string | null;
 export type Citations1 = SourceSpan[];
 export type Complete1 = boolean;
-export type Fieldkey5 = string;
+export type Fieldkey6 = string;
 export type Occurrenceid = string;
 export type Recordid4 = string;
 export type Syncedfactrevision = number;
-export type Text9 = string;
+export type Text10 = string;
 export type Type3 = "fact_field";
 export type Content2 = (PresentedText | FieldOccurrence)[];
 export type Href1 = string;
 export type Cellid2 = string;
-export type Fieldkey6 = string;
+export type Fieldkey7 = string;
 export type Occurrenceid1 = string;
 export type Recordid5 = string;
 export type Type4 = "bound_link";
@@ -1024,7 +1028,7 @@ export type Citations2 = SourceSpan[];
 export type Fragmentid = string;
 export type Occurrenceid2 = string;
 export type Scopeid = string;
-export type Text10 = string;
+export type Text11 = string;
 export type Type5 = "manual_scope";
 export type Content = (PresentedText | PresentedHyperlink | FieldOccurrence | BoundLink | ManualScopeSpan)[];
 export type Id54 = string;
@@ -1039,7 +1043,7 @@ export type Fieldkeys = string[];
 export type Id55 = string;
 export type Kind40 = "citation";
 export type Recordid7 = string;
-export type Fieldkey7 = string;
+export type Fieldkey8 = string;
 export type Id56 = string;
 export type Kind41 = "field_binding";
 export type Recordid8 = string;
@@ -1516,19 +1520,19 @@ export type Patch = [
   ...(PatchSet | PatchInsert | PatchRemove | PatchSpliceText)[]
 ];
 export type Kind64 = "set";
-export type Pointer4 = string;
+export type Pointer5 = string;
 export type Valuewire = string;
 export type Kind65 = "insert";
-export type Pointer5 = string;
+export type Pointer6 = string;
 export type Valuewire1 = string;
 export type Kind66 = "remove";
-export type Pointer6 = string;
+export type Pointer7 = string;
 export type Beforetexthash = string;
 export type End3 = number;
 export type Kind67 = "splice_text";
-export type Pointer7 = string;
+export type Pointer8 = string;
 export type Start4 = number;
-export type Text11 = string;
+export type Text12 = string;
 export type Blockid5 = string;
 export type Cellid5 = string | null;
 export type Field5 = "content" | "caption";
@@ -1646,17 +1650,17 @@ export type Children25 = (
   | ImageBlock
   | SectionBlock
 )[];
-export type Text12 = string;
+export type Text13 = string;
 export type Type18 = "text";
 export type Content16 = StyledText[];
 export type Href2 = string;
 export type Type19 = "link";
 export type Bindingid2 = string;
 export type Bindingrootid1 = string | null;
-export type Fieldkey8 = string;
+export type Fieldkey9 = string;
 export type Recordid13 = string;
 export type Syncedfactrevision1 = number;
-export type Text13 = string;
+export type Text14 = string;
 export type Type20 = "fact_field";
 export type Content15 = (StyledText | Hyperlink | FactFieldSpan)[];
 export type Id79 = string;
@@ -2957,6 +2961,7 @@ export interface ProposalRecord {
   admittedRelationRevisions?: Admittedrelationrevisions;
   appliedReceiptId?: Appliedreceiptid;
   attemptId: Attemptid1;
+  droppedValues?: Droppedvalues;
   errors: Errors;
   id: Id33;
   inputHash: Inputhash1;
@@ -2975,6 +2980,14 @@ export interface Admittedrecordrevisions {
 export interface Admittedrelationrevisions {
   [k: string]: number;
 }
+/**
+ * A value a repair still stated without any source line (I4): removed from the block and named in its notice.
+ */
+export interface DroppedValue {
+  fieldKey: Fieldkey3;
+  pointer: Pointer;
+  text: Text7;
+}
 export interface Lineage1 {
   attemptId: Attemptid2;
   children: Children;
@@ -2991,15 +3004,15 @@ export interface ProposalReply {
 }
 export interface Discovery {
   key: Key1;
-  pointer: Pointer;
+  pointer: Pointer1;
   semanticType: Semantictype4;
 }
 export interface ProposalField {
   effectiveCellIds: Effectivecellids;
   evidence: Evidence15;
-  fieldKey: Fieldkey3;
+  fieldKey: Fieldkey4;
   item: Item;
-  pointer: Pointer1;
+  pointer: Pointer2;
 }
 export interface DiscoverySelector {
   key: Key2;
@@ -3032,9 +3045,9 @@ export interface ExistingRelationSelector {
 export interface FieldSidecar {
   effectiveCellIds: Effectivecellids1;
   evidence: Evidence17;
-  fieldKey: Fieldkey4;
+  fieldKey: Fieldkey5;
   itemHandle: Itemhandle7;
-  pointer: Pointer2;
+  pointer: Pointer3;
 }
 export interface PublicationOutcome {
   errorCode: Errorcode4;
@@ -3103,7 +3116,7 @@ export interface ReviewInput {
 export interface EvidenceOption {
   ref: Ref;
   span: SourceSpan;
-  text: Text7;
+  text: Text8;
 }
 export interface Check {
   id: Id36;
@@ -3235,7 +3248,7 @@ export interface Block {
 export interface Binding {
   field: Field1;
   item_pointer?: ItemPointer;
-  pointer: Pointer3;
+  pointer: Pointer4;
   relation: BindingRelation | null;
   semantic_type: SemanticType;
 }
@@ -3543,7 +3556,7 @@ export interface PresentedText {
   citations?: Citations;
   presentation?: AuthoredPresentation | null;
   styles: InlineStyles;
-  text: Text8;
+  text: Text9;
   type: Type1;
 }
 export interface InlineStyles {
@@ -3567,13 +3580,13 @@ export interface FieldOccurrence {
   cellId: Cellid1;
   citations?: Citations1;
   complete: Complete1;
-  fieldKey: Fieldkey5;
+  fieldKey: Fieldkey6;
   occurrenceId: Occurrenceid;
   presentation: AuthoredPresentation | null;
   recordId: Recordid4;
   styles: InlineStyles;
   syncedFactRevision: Syncedfactrevision;
-  text: Text9;
+  text: Text10;
   type: Type3;
 }
 export interface BoundLink {
@@ -3586,7 +3599,7 @@ export interface BoundLink {
 }
 export interface FieldRef {
   cellId: Cellid2;
-  fieldKey: Fieldkey6;
+  fieldKey: Fieldkey7;
   occurrenceId: Occurrenceid1;
   recordId: Recordid5;
 }
@@ -3597,7 +3610,7 @@ export interface ManualScopeSpan {
   presentation: AuthoredPresentation | null;
   scopeId: Scopeid;
   styles: InlineStyles;
-  text: Text10;
+  text: Text11;
   type: Type5;
 }
 export interface SectionProps {
@@ -3616,7 +3629,7 @@ export interface NarrativeCitation {
   recordId: Recordid7;
 }
 export interface FieldBinding {
-  fieldKey: Fieldkey7;
+  fieldKey: Fieldkey8;
   id: Id56;
   kind: Kind41;
   recordId: Recordid8;
@@ -3903,25 +3916,25 @@ export interface RestoreAuthoredBlockPatch {
 }
 export interface PatchSet {
   kind: Kind64;
-  pointer: Pointer4;
+  pointer: Pointer5;
   valueWire: Valuewire;
 }
 export interface PatchInsert {
   kind: Kind65;
-  pointer: Pointer5;
+  pointer: Pointer6;
   valueWire: Valuewire1;
 }
 export interface PatchRemove {
   kind: Kind66;
-  pointer: Pointer6;
+  pointer: Pointer7;
 }
 export interface PatchSpliceText {
   beforeTextHash: Beforetexthash;
   end: End3;
   kind: Kind67;
-  pointer: Pointer7;
+  pointer: Pointer8;
   start: Start4;
-  text: Text11;
+  text: Text12;
 }
 export interface SetManualScopeDisplays {
   assignments: Assignments;
@@ -4115,7 +4128,7 @@ export interface SectionBlock {
 }
 export interface StyledText {
   styles: InlineStyles;
-  text: Text12;
+  text: Text13;
   type: Type18;
 }
 export interface Hyperlink {
@@ -4126,11 +4139,11 @@ export interface Hyperlink {
 export interface FactFieldSpan {
   bindingId: Bindingid2;
   bindingRootId?: Bindingrootid1;
-  fieldKey: Fieldkey8;
+  fieldKey: Fieldkey9;
   recordId: Recordid13;
   styles: InlineStyles;
   syncedFactRevision: Syncedfactrevision1;
-  text: Text13;
+  text: Text14;
   type: Type20;
 }
 export interface ImageProps {

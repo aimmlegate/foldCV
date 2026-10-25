@@ -459,3 +459,23 @@ def test_a_request_without_offers_has_no_bookkeeping_keys_and_ignores_the_ones_a
     assert 'no discoveries, lineage or relations' in proposal_protocol(nothing)['rules'][3]
     assert strip_unoffered_bookkeeping({'payload': [], 'fields': [], 'relations': [1]}, nothing) == {'payload': [], 'fields': []}
     assert strip_unoffered_bookkeeping({'payload': [], 'relations': [1]}, None) == {'payload': [], 'relations': [1]}
+
+
+# I4 (2026-10-25): a repair that still states a value no source line states loses that value and keeps the block.
+from packages.resume_core.template_completion import without_unbound
+
+
+def test_unbound_values_leave_the_payload_and_later_pointers_move_down():
+    payload = [{'company': 'North', 'tasks': [{'value': 'Kept first.'}, {'value': 'Invented task.'}, {'value': 'Kept last.'}]},
+        {'company': 'South', 'role': 'Invented role'}]
+    fields = [{'pointer': '/0/tasks/2/value', 'fieldKey': 'value', 'evidence': ['S3'], 'item': None, 'effectiveCells': None},
+        {'pointer': '/0/tasks/1/value', 'fieldKey': 'value', 'evidence': ['S9'], 'item': None, 'effectiveCells': None},
+        {'pointer': '/1/role', 'fieldKey': 'role', 'evidence': [], 'item': None, 'effectiveCells': None}]
+    instances = {'/0/company': [], '/0/tasks/0/value': [], '/0/tasks/1/value': [], '/0/tasks/2/value': [], '/1/company': [], '/1/role': []}
+    reduced, dropped = without_unbound({'payload': payload, 'fields': fields, 'discoveries': None},
+        [('/0/tasks/1/value', 'value'), ('/1/role', 'role')], instances)
+    assert [task['value'] for task in reduced['payload'][0]['tasks']] == ['Kept first.', 'Kept last.']
+    assert reduced['payload'][1]['role'] is None and payload[1]['role'] == 'Invented role'
+    assert [(entry['pointer'], entry['evidence']) for entry in reduced['fields']] == [('/0/tasks/1/value', ['S3'])]
+    assert dropped == [{'pointer': '/0/tasks/1/value', 'fieldKey': 'value', 'text': 'Invented task.'},
+        {'pointer': '/1/role', 'fieldKey': 'role', 'text': 'Invented role'}]

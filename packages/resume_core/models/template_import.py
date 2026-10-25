@@ -457,6 +457,13 @@ class RelationAllocation(Wire):
     target_id: Id
 
 
+class DroppedValue(Wire):
+    """A value a repair still stated without any source line (I4): removed from the block and named in its notice."""
+    pointer: str
+    field_key: Id
+    text: str
+
+
 class ProposalRecord(Wire):
     id: Id
     attempt_id: Id
@@ -475,6 +482,7 @@ class ProposalRecord(Wire):
     admitted_relation_ids: list[Id] = Field(default_factory=list, exclude_if=lambda value: not value)
     admitted_record_revisions: dict[str, Revision] = Field(default_factory=dict, exclude_if=lambda value: not value)
     admitted_relation_revisions: dict[str, Revision] = Field(default_factory=dict, exclude_if=lambda value: not value)
+    dropped_values: list[DroppedValue] = Field(default_factory=list, exclude_if=lambda value: not value)
 
 
 class ReviewInputRecord(Wire):

@@ -2165,6 +2165,32 @@
       "title": "DividerBlock",
       "type": "object"
     },
+    "DroppedValue": {
+      "additionalProperties": false,
+      "description": "A value a repair still stated without any source line (I4): removed from the block and named in its notice.",
+      "properties": {
+        "fieldKey": {
+          "minLength": 1,
+          "title": "Fieldkey",
+          "type": "string"
+        },
+        "pointer": {
+          "title": "Pointer",
+          "type": "string"
+        },
+        "text": {
+          "title": "Text",
+          "type": "string"
+        }
+      },
+      "required": [
+        "pointer",
+        "fieldKey",
+        "text"
+      ],
+      "title": "DroppedValue",
+      "type": "object"
+    },
     "EducationRecord": {
       "additionalProperties": false,
       "properties": {
@@ -7869,6 +7895,13 @@
           "minLength": 1,
           "title": "Attemptid",
           "type": "string"
+        },
+        "droppedValues": {
+          "items": {
+            "$ref": "#/$defs/DroppedValue"
+          },
+          "title": "Droppedvalues",
+          "type": "array"
         },
         "errors": {
           "items": {

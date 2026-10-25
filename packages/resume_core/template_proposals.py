@@ -1,7 +1,7 @@
 """Raw proposals resolve through captured identities before semantic review."""
 
 from .models.template_facts import Observation, Relation
-from .models.template_import import ProposalRecord, ProposalReply, ReferencedProposalReply, RelationAllocation
+from .models.template_import import ProposalRecord, ProposalReply, ReferencedProposalReply, RelationAllocation, DroppedValue
 from .project_store import strict_json
 from .rich_fields import field_key
 from .template_identity import (_bound_root, allocate_discoveries, offered_evidence, offered_references, payload_value,
@@ -234,7 +234,10 @@ def parse_proposal(operation, attempt_id, package, sources, facts, *, captured_r
             # Protocol 5: bookkeeping the payload implies is derived before the reply is restored.
             allowed = {(declaration.id, relation.kind, target) for declaration in package.definition.fact_types
                 for relation in declaration.relations for target in relation.target_types}
-            completed = complete_reply(outer['payload'], block.bindings, table, references, allowed)
+            # A repair that still states a value no source line states loses that value and keeps the block (I4).
+            dropped = [] if attempt.slot in {'primary_repair', 'fallback_repair'} else None
+            completed = complete_reply(outer['payload'], block.bindings, table, references, allowed, dropped=dropped)
+            proposal.dropped_values = [DroppedValue.model_validate(value) for value in dropped or []]
             reply = restore_reply(ReferencedProposalReply.model_validate(completed, strict=True), table, references, sources)
         declarations = {declaration.id: declaration for declaration in package.definition.fact_types}
         schemas = {key: reachable_schema(declaration.data_schema, package.definition.content_definitions)

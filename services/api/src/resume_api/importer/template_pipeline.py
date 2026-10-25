@@ -87,6 +87,20 @@ CALL_SECONDS, RETRY_SECONDS = 90, MAX_GENERATION_SECONDS
 
 # The editor shows these notices in Russian; a reviewer's own reason (asked for in Russian since review protocol 3)
 # follows the category sentence.
+# I4: a repair that still states values no source line states keeps the block; the removed values are named once.
+UNBOUND_MESSAGE = 'Убраны данные, которые источник не подтверждает: {values}. Остальное в блоке принято.'
+
+
+def unbound_issues(id_factory, task_id, proposal, fingerprint):
+    if not proposal.dropped_values:
+        return []
+    values = '; '.join('«' + value.text.strip()[:120] + '»' for value in proposal.dropped_values)
+    return [ImportIssue(id=id_factory('issue'), ruleId=None, taskId=task_id, targetIds=['scope-' + task_id], blockIds=[],
+        category='uncertain_interpretation', code='IMPORT_VALUE_UNBOUND', message=UNBOUND_MESSAGE.format(values=values),
+        importedFingerprint=fingerprint, reviewInputHash=None, lifecycleId=id_factory('issue-lifecycle'), state='active',
+        retiredByAction=None)]
+
+
 FALLBACK_MESSAGES = {'content_violation': 'проверка нашла ошибку в извлечённых данных.',
     'uncertain_interpretation': 'проверка не подтвердила извлечённые данные.',
     'check_not_completed': 'проверку извлечённых данных не удалось завершить.'}
@@ -561,8 +575,9 @@ class TemplatePipeline(TemplateCheckpoints):
                     if allocation.record_id in {record.id for record in effective.records})
                 handles = [handle for handle in [*[field.item_handle for field in proposal.resolved_fields],
                     *[parent for link in proposal.lineage for parent in link.parents]] if handle in active_handles]
+                fingerprint = digest(next(value for value in operation.task_inputs if value.task_id == task_id).value)
                 await self.finish_task(project, operation_id, task_id, None, (), handles,
-                    'empty' if empty_value(proposal.reply.payload) else 'admitted', [])
+                    'empty' if empty_value(proposal.reply.payload) else 'admitted', unbound_issues(self.id_factory, task_id, proposal, fingerprint))
                 return
             unresolved = list(decision.unresolved_target_ids)
         await self.fallback(project, operation_id, task_id, unresolved)

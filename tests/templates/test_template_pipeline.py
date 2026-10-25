@@ -241,6 +241,30 @@ async def test_a_refused_first_reply_gets_one_repair_with_its_refusal_and_is_acc
 
 
 @pytest.mark.asyncio
+async def test_a_repair_that_still_states_an_unbound_value_keeps_the_block_without_it(tmp_path):
+    # I4 (2026-10-25): the first reply is refused with the binding named; a repair that repeats the unstated value loses
+    # that value, the rest of the block is reviewed and accepted, and one notice names the removed text.
+    fixture = RuntimeFixture(tmp_path)
+    def script(_request, value):
+        if 'targets' in value:
+            return satisfied_review(value)
+        reply = raw_proposal(fixture.source)
+        without_journal(reply)
+        return reply
+    fixture.transport.scripted = script
+    result = await fixture.pipeline.run(fixture.project, fixture.command, admitted=fixture.admitted)
+    assert result.state == 'published' and result.tasks[0].state == 'accepted'
+    assert [attempt.slot for attempt in result.attempts] == ['initial', 'primary_repair', 'replacement_review']
+    assert result.proposals[0].state == 'invalid' and result.proposals[1].state == 'accepted'
+    assert [(value.pointer, value.text) for value in result.proposals[1].dropped_values] == [('/0/journal', 'Unstated Journal')]
+    [issue] = result.issues
+    assert issue.code == 'IMPORT_VALUE_UNBOUND' and issue.category == 'uncertain_interpretation' and issue.task_id == result.tasks[0].id
+    assert 'Unstated Journal' in issue.message and issue.message.startswith('Убраны данные')
+    assert 'Unstated Journal' not in fixture.text()
+    assert not any(cell.raw_input == 'Unstated Journal' for record in fixture.current().project.facts.extensions for cell in record.cells)
+
+
+@pytest.mark.asyncio
 async def test_a_refused_first_reply_without_room_for_a_repair_and_its_review_falls_back(tmp_path):
     # P08: one call left after the first reply is not enough for a repair that must also be reviewed.
     fixture = RuntimeFixture(tmp_path, cap=2)

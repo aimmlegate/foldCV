@@ -1311,6 +1311,10 @@ export type Admittedcellids = string[];
 export type Admittedrelationids = string[];
 export type Appliedreceiptid = string | null;
 export type Attemptid1 = string;
+export type Fieldkey6 = string;
+export type Pointer4 = string;
+export type Text11 = string;
+export type Droppedvalues = DroppedValue[];
 export type Errors = string[];
 export type Id52 = string;
 export type Inputhash1 = string;
@@ -1323,18 +1327,18 @@ export type Proposalhash1 = string;
 export type Rawreturn1 = string;
 export type Rawreturnhash1 = string;
 export type Key1 = string;
-export type Pointer4 = string;
+export type Pointer5 = string;
 export type Semantictype4 = string;
 export type Discoveries = Discovery[];
 export type Effectivecellids = string[];
 export type Evidence17 = SourceSpan[];
-export type Fieldkey6 = string;
+export type Fieldkey7 = string;
 export type Item = DiscoverySelector | HandleSelector;
 export type Key2 = string;
 export type Kind59 = "discovery_key";
 export type Itemhandle6 = string;
 export type Kind60 = "handle";
-export type Pointer5 = string;
+export type Pointer6 = string;
 export type Fields1 = ProposalField[];
 export type Children13 = string[];
 export type Kind61 = "add" | "split" | "merge";
@@ -1353,9 +1357,9 @@ export type Relations2 = ProposalRelation[];
 export type Schemaversion7 = 1;
 export type Effectivecellids1 = string[];
 export type Evidence19 = SourceSpan[];
-export type Fieldkey7 = string;
+export type Fieldkey8 = string;
 export type Itemhandle7 = string;
-export type Pointer6 = string;
+export type Pointer7 = string;
 export type Resolvedfields = FieldSidecar[];
 export type Resolvedrelations = Relation[];
 export type State6 = "invalid" | "provisional" | "accepted" | "rejected";
@@ -1394,7 +1398,7 @@ export type Inputhash2 = string;
 export type Allowtextrewrite2 = boolean;
 export type Effectivecells = ExtensionCell[];
 export type Ref = string;
-export type Text11 = string;
+export type Text12 = string;
 export type Evidence21 = EvidenceOption[];
 export type Handlemap = (HandleAllocation | CapturedItemIdentity)[];
 export type Occurrenceindependent = boolean;
@@ -1483,7 +1487,7 @@ export type Role3 = "font" | "logo" | "icon" | "catalog";
 export type Assets1 = AssetDeclaration[];
 export type Field4 = string;
 export type ItemPointer = string | null;
-export type Pointer7 = string;
+export type Pointer8 = string;
 export type Kind68 = "owned_by" | "extension_of" | "related_to";
 export type SubjectPointer = string;
 export type SemanticType = string;
@@ -1745,17 +1749,17 @@ export type Children25 = (
   | ImageBlock
   | SectionBlock
 )[];
-export type Text12 = string;
+export type Text13 = string;
 export type Type18 = "text";
 export type Content16 = StyledText[];
 export type Href2 = string;
 export type Type19 = "link";
 export type Bindingid2 = string;
 export type Bindingrootid1 = string | null;
-export type Fieldkey8 = string;
+export type Fieldkey9 = string;
 export type Recordid13 = string;
 export type Syncedfactrevision1 = number;
-export type Text13 = string;
+export type Text14 = string;
 export type Type20 = "fact_field";
 export type Content15 = (StyledText | Hyperlink | FactFieldSpan)[];
 export type Id80 = string;
@@ -3611,6 +3615,7 @@ export interface ProposalRecord {
   admittedRelationRevisions?: Admittedrelationrevisions;
   appliedReceiptId?: Appliedreceiptid;
   attemptId: Attemptid1;
+  droppedValues?: Droppedvalues;
   errors: Errors;
   id: Id52;
   inputHash: Inputhash1;
@@ -3629,6 +3634,14 @@ export interface Admittedrecordrevisions {
 export interface Admittedrelationrevisions {
   [k: string]: number;
 }
+/**
+ * A value a repair still stated without any source line (I4): removed from the block and named in its notice.
+ */
+export interface DroppedValue {
+  fieldKey: Fieldkey6;
+  pointer: Pointer4;
+  text: Text11;
+}
 export interface Lineage1 {
   attemptId: Attemptid2;
   children: Children12;
@@ -3645,15 +3658,15 @@ export interface ProposalReply {
 }
 export interface Discovery {
   key: Key1;
-  pointer: Pointer4;
+  pointer: Pointer5;
   semanticType: Semantictype4;
 }
 export interface ProposalField {
   effectiveCellIds: Effectivecellids;
   evidence: Evidence17;
-  fieldKey: Fieldkey6;
+  fieldKey: Fieldkey7;
   item: Item;
-  pointer: Pointer5;
+  pointer: Pointer6;
 }
 export interface DiscoverySelector {
   key: Key2;
@@ -3686,9 +3699,9 @@ export interface ExistingRelationSelector {
 export interface FieldSidecar {
   effectiveCellIds: Effectivecellids1;
   evidence: Evidence19;
-  fieldKey: Fieldkey7;
+  fieldKey: Fieldkey8;
   itemHandle: Itemhandle7;
-  pointer: Pointer6;
+  pointer: Pointer7;
 }
 export interface PublicationOutcome {
   errorCode: Errorcode5;
@@ -3757,7 +3770,7 @@ export interface ReviewInput {
 export interface EvidenceOption {
   ref: Ref;
   span: SourceSpan;
-  text: Text11;
+  text: Text12;
 }
 export interface Check {
   id: Id55;
@@ -3889,7 +3902,7 @@ export interface Block1 {
 export interface Binding {
   field: Field4;
   item_pointer?: ItemPointer;
-  pointer: Pointer7;
+  pointer: Pointer8;
   relation: BindingRelation | null;
   semantic_type: SemanticType;
 }
@@ -4286,7 +4299,7 @@ export interface SectionBlock {
 }
 export interface StyledText {
   styles: InlineStyles;
-  text: Text12;
+  text: Text13;
   type: Type18;
 }
 export interface Hyperlink {
@@ -4297,11 +4310,11 @@ export interface Hyperlink {
 export interface FactFieldSpan {
   bindingId: Bindingid2;
   bindingRootId?: Bindingrootid1;
-  fieldKey: Fieldkey8;
+  fieldKey: Fieldkey9;
   recordId: Recordid13;
   styles: InlineStyles;
   syncedFactRevision: Syncedfactrevision1;
-  text: Text13;
+  text: Text14;
   type: Type20;
 }
 export interface ImageProps {

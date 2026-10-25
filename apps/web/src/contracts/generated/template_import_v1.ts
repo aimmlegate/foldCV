@@ -152,6 +152,10 @@ export type Admittedcellids = string[];
 export type Admittedrelationids = string[];
 export type Appliedreceiptid = string | null;
 export type Attemptid1 = string;
+export type Fieldkey1 = string;
+export type Pointer = string;
+export type Text = string;
+export type Droppedvalues = DroppedValue[];
 export type Errors = string[];
 export type Id6 = string;
 export type Inputhash1 = string;
@@ -164,7 +168,7 @@ export type Proposalhash = string;
 export type Rawreturn1 = string;
 export type Rawreturnhash1 = string;
 export type Key1 = string;
-export type Pointer = string;
+export type Pointer1 = string;
 export type Semantictype2 = string;
 export type Discoveries = Discovery[];
 export type Effectivecellids = string[];
@@ -176,13 +180,13 @@ export type Start = number;
 export type Unitid = string;
 export type Unitrevision = number;
 export type Evidence = SourceSpan[];
-export type Fieldkey1 = string;
+export type Fieldkey2 = string;
 export type Item = DiscoverySelector | HandleSelector;
 export type Key2 = string;
 export type Kind2 = "discovery_key";
 export type Itemhandle2 = string;
 export type Kind3 = "handle";
-export type Pointer1 = string;
+export type Pointer2 = string;
 export type Fields = ProposalField[];
 export type Children1 = string[];
 export type Kind4 = "add" | "split" | "merge";
@@ -201,9 +205,9 @@ export type Relations = ProposalRelation[];
 export type Schemaversion = 1;
 export type Effectivecellids1 = string[];
 export type Evidence2 = SourceSpan[];
-export type Fieldkey2 = string;
+export type Fieldkey3 = string;
 export type Itemhandle3 = string;
-export type Pointer2 = string;
+export type Pointer3 = string;
 export type Resolvedfields = FieldSidecar[];
 export type Active = boolean;
 export type Id7 = string;
@@ -248,7 +252,7 @@ export type Inputhash2 = string;
 export type Allowtextrewrite1 = boolean;
 export type Admissionreceiptids = string[];
 export type Evidence4 = SourceSpan[];
-export type Fieldkey3 = string;
+export type Fieldkey4 = string;
 export type Id10 = string;
 export type Manualscopeid = string | null;
 export type Observationids = string[];
@@ -259,7 +263,7 @@ export type State7 = "admitted" | "human_raw" | "pending_manual" | "uncertain";
 export type Usercorrected = boolean;
 export type Effectivecells = ExtensionCell[];
 export type Ref = string;
-export type Text = string;
+export type Text1 = string;
 export type Evidence5 = EvidenceOption[];
 export type Handlemap = (HandleAllocation | CapturedItemIdentity)[];
 export type Occurrenceindependent = boolean;
@@ -559,6 +563,7 @@ export interface ProposalRecord {
   admittedRelationRevisions?: Admittedrelationrevisions;
   appliedReceiptId?: Appliedreceiptid;
   attemptId: Attemptid1;
+  droppedValues?: Droppedvalues;
   errors: Errors;
   id: Id6;
   inputHash: Inputhash1;
@@ -577,6 +582,14 @@ export interface Admittedrecordrevisions {
 export interface Admittedrelationrevisions {
   [k: string]: number;
 }
+/**
+ * A value a repair still stated without any source line (I4): removed from the block and named in its notice.
+ */
+export interface DroppedValue {
+  fieldKey: Fieldkey1;
+  pointer: Pointer;
+  text: Text;
+}
 export interface Lineage1 {
   attemptId: Attemptid2;
   children: Children;
@@ -593,15 +606,15 @@ export interface ProposalReply {
 }
 export interface Discovery {
   key: Key1;
-  pointer: Pointer;
+  pointer: Pointer1;
   semanticType: Semantictype2;
 }
 export interface ProposalField {
   effectiveCellIds: Effectivecellids;
   evidence: Evidence;
-  fieldKey: Fieldkey1;
+  fieldKey: Fieldkey2;
   item: Item;
-  pointer: Pointer1;
+  pointer: Pointer2;
 }
 export interface SourceSpan {
   end: End;
@@ -643,9 +656,9 @@ export interface ExistingRelationSelector {
 export interface FieldSidecar {
   effectiveCellIds: Effectivecellids1;
   evidence: Evidence2;
-  fieldKey: Fieldkey2;
+  fieldKey: Fieldkey3;
   itemHandle: Itemhandle3;
-  pointer: Pointer2;
+  pointer: Pointer3;
 }
 export interface Relation1 {
   active: Active;
@@ -722,7 +735,7 @@ export interface ReviewInput {
 export interface ExtensionCell {
   admissionReceiptIds: Admissionreceiptids;
   evidence: Evidence4;
-  fieldKey: Fieldkey3;
+  fieldKey: Fieldkey4;
   id: Id10;
   manualScopeId: Manualscopeid;
   observationIds: Observationids;
@@ -736,7 +749,7 @@ export interface ExtensionCell {
 export interface EvidenceOption {
   ref: Ref;
   span: SourceSpan;
-  text: Text;
+  text: Text1;
 }
 export interface Check {
   id: Id11;

@@ -15,6 +15,8 @@ field names that field; an item reference of a type no binding at that pointer h
 so the value gets a new item instead.
 """
 
+from copy import deepcopy
+import json
 import re
 
 from .template_identity import _binding_instances, _bound_root, empty_value, payload_value
@@ -159,11 +161,86 @@ def stating_stems(text, table, anchors=()):
     return [option.ref for option in chosen] if 1 - len(missing) / len(stems) >= threshold else []
 
 
-def complete_reply(reply, bindings, table, references, allowed_relations=None):
+def _under(pointer, ancestor):
+    tokens, parent = pointer_tokens(pointer), pointer_tokens(ancestor)
+    return len(tokens) > len(parent) and tokens[:len(parent)] == parent
+
+
+def _value_text(payload, pointer):
+    text = stated_text(payload, pointer)
+    if text is not None:
+        return text
+    value = payload_value(payload, pointer)
+    if isinstance(value, dict):
+        return ' '.join(str(part) for part in value.values() if isinstance(part, (str, int, float)) and str(part).strip())
+    return json.dumps(value, ensure_ascii=False)
+
+
+def _shifted(pointer, removed):
+    """The pointer after the list element at removed is deleted: None when it was inside it, one index lower when it
+    followed it in the same list, else unchanged."""
+    if pointer == removed or _under(pointer, removed):
+        return None
+    tokens, gone = pointer_tokens(pointer), pointer_tokens(removed)
+    if len(tokens) >= len(gone) and tokens[:len(gone) - 1] == gone[:-1] and tokens[len(gone) - 1].isdecimal() \
+            and int(tokens[len(gone) - 1]) > int(gone[-1]):
+        tokens[len(gone) - 1] = str(int(tokens[len(gone) - 1]) - 1)
+        return pointer_of(tokens)
+    return pointer
+
+
+def without_unbound(reply, unbound, instances):
+    """The reply without the values at the unbound pointers (I4). A list element whose every bound value is unbound
+    leaves its list (a task, a technology); any other value becomes null. Entries and discoveries of the removed values
+    go with them and the pointers after a removed element move one index down. Returns the reply and the dropped
+    values as {pointer, fieldKey, text}."""
+    payload = deepcopy(reply.get('payload'))
+    targets = {pointer for pointer, _field in unbound}
+    removals, nulls = [], []
+    for pointer, _field in unbound:
+        tokens, chosen = pointer_tokens(pointer), None
+        for depth in range(len(tokens), 0, -1):
+            candidate = pointer_of(tokens[:depth])
+            if not tokens[depth - 1].isdecimal():
+                continue
+            if all(value in targets for value in instances if value == candidate or _under(value, candidate)):
+                chosen = candidate
+            else:
+                break
+        (removals if chosen is not None else nulls).append(chosen or pointer)
+    dropped = [{'pointer': pointer, 'fieldKey': field, 'text': _value_text(payload, pointer)} for pointer, field in unbound]
+    fields = [dict(entry) for entry in reply.get('fields') or []]
+    discoveries = [dict(value) for value in reply.get('discoveries') or []]
+    for pointer in nulls:
+        tokens = pointer_tokens(pointer)
+        parent = payload_value(payload, pointer_of(tokens[:-1]))
+        if isinstance(parent, dict):
+            parent[tokens[-1]] = None
+        fields = [entry for entry in fields if entry.get('pointer') != pointer and not _under(entry.get('pointer') or '', pointer)]
+    for removed in sorted(set(removals), key=_natural, reverse=True):
+        tokens = pointer_tokens(removed)
+        parent = payload_value(payload, pointer_of(tokens[:-1]))
+        if isinstance(parent, list) and int(tokens[-1]) < len(parent):
+            del parent[int(tokens[-1])]
+        for group in (fields, discoveries):
+            kept = []
+            for value in group:
+                moved = _shifted(value.get('pointer') or '', removed)
+                if moved is not None:
+                    kept.append({**value, 'pointer': moved})
+            group[:] = kept
+    return {**reply, 'payload': payload, 'fields': fields, 'discoveries': discoveries or reply.get('discoveries')}, dropped
+
+
+def complete_reply(reply, bindings, table, references, allowed_relations=None, dropped=None):
     """The referenced reply with derived fields entries, item selections, discoveries, add lineage and relations.
 
     allowed_relations, when given, is the set of (subject type, kind, target type) the template declares; a model
-    relation outside it carries no fact (LIVE-11: one job owned by another) and is dropped."""
+    relation outside it carries no fact (LIVE-11: one job owned by another) and is dropped.
+
+    dropped, when a list, collects the values no entry can cite as {pointer, fieldKey, text}; they leave the payload
+    (I4: a repair that still states a value no source line states) and the reduced reply is completed instead. None
+    keeps them, so the existing checks refuse the reply with the binding named and the model gets its one repair."""
     if not isinstance(reply, dict) or not bindings:
         return reply
     payload = reply.get('payload')
@@ -245,6 +322,7 @@ def complete_reply(reply, bindings, table, references, allowed_relations=None):
             return None
         return stating(text, table) or stating_words(text, table) or stating_stems(text, table, anchors_for(pointer)) or None
     given = {(entry.get('pointer'), entry.get('fieldKey')) for entry in entries}
+    unbound = []
     for pointer in sorted(instances, key=_natural):
         for _semantic, field in instances[pointer]:
             if (pointer, field) in given:
@@ -252,6 +330,12 @@ def complete_reply(reply, bindings, table, references, allowed_relations=None):
             evidence = derived_evidence(pointer)
             if evidence is not None:
                 entries.append({'item': None, 'fieldKey': field, 'pointer': pointer, 'evidence': evidence, 'effectiveCells': []})
+            elif dropped is not None:
+                unbound.append((pointer, field))
+    if unbound:
+        reduced, gone = without_unbound(reply, unbound, instances)
+        dropped.extend(gone)
+        return complete_reply(reduced, bindings, table, references, allowed_relations)
     for entry in entries:
         if not entry.get('evidence') and not entry.get('effectiveCells') and entry.get('pointer') in instances:
             entry['evidence'] = derived_evidence(entry['pointer']) or []
