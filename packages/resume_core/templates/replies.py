@@ -1,6 +1,7 @@
 """Closed proposal/review schemas retain raw payload assertions and typed sidecars."""
 
 from copy import deepcopy
+import json
 
 from ..models.template_import import ProposalReply, ReferencedProposalReply, ReferencedReviewReply, ReviewReply
 from .projection import pointer_tokens, schema_children, validate_schema
@@ -98,6 +99,37 @@ REVIEW_PROTOCOL = {'version': 'template-review-protocol-3', 'rules': [
     'reason is one short sentence in Russian that names the defect or what is missing; evidence lists the refs that support the disposition, or []. actionable is true only when a corrected proposal could fix it from the offered evidence.']}
 
 
+# The same protocol for a request that offers no captured items or relations: nothing can be updated, split or merged,
+# so the reply carries no discoveries, lineage or relations and the coordinator derives them (LIVE-12: a first projects
+# reply was refused for relations that named a handle nobody offered).
+CONTENT_ONLY_RULES = [
+    'Return payload and fields. payload follows the block content schema; use null or [] for data the source does not state.',
+    PROPOSAL_PROTOCOL['rules'][1],
+    PROPOSAL_PROTOCOL['rules'][2],
+    'The coordinator derives the items, their add lineage and the relations the bindings configure from the payload; the reply has no discoveries, lineage or relations.',
+    PROPOSAL_PROTOCOL['rules'][4],
+    PROPOSAL_PROTOCOL['rules'][5]]
+BOOKKEEPING_KEYS = ('discoveries', 'lineage', 'relations')
+
+
+def offers_nothing(references):
+    return references is not None and not references.items and not references.relations
+
+
+def proposal_protocol(references):
+    """The reply rules for a request: the full protocol with offers, the content-only wording without them."""
+    if offers_nothing(references):
+        return {'version': PROPOSAL_PROTOCOL['version'], 'rules': list(CONTENT_ONLY_RULES)}
+    return PROPOSAL_PROTOCOL
+
+
+def strip_unoffered_bookkeeping(payload, references):
+    """A reply to a request without offers loses the bookkeeping keys the schema no longer has; the coordinator derives them."""
+    if offers_nothing(references) and isinstance(payload, dict):
+        return {key: value for key, value in payload.items() if key not in BOOKKEEPING_KEYS}
+    return payload
+
+
 def review_protocol(review):
     """The reply protocol a review input was sent with; it selects the reply shape its return is decoded by."""
     return ((review.semantic_context or {}).get('replyProtocol') or {}).get('version')
@@ -112,10 +144,25 @@ def proposal_schema(content_schema, refs=None, references=None):
     """The closed reply schema; refs and references select the request's offers, None keeps the copied-id form of older requests."""
     if refs is None:
         return _closed_schema(ProposalReply, content_schema)
-    return _closed_schema(ReferencedProposalReply, content_schema, {'EvidenceRef': refs,
+    root = _closed_schema(ReferencedProposalReply, content_schema, {'EvidenceRef': refs,
         'ItemRef': [value.ref for value in references.items] if references else [],
         'CellRef': [value.ref for value in references.cells] if references else [],
         'RelationRef': [value.ref for value in references.relations] if references else []})
+    if offers_nothing(references):
+        for key in BOOKKEEPING_KEYS:
+            root['properties'].pop(key, None)
+        root['required'] = [key for key in root['required'] if key not in BOOKKEEPING_KEYS]
+        # Definitions only the dropped properties used go with them.
+        while True:
+            text = json.dumps({key: value for key, value in root.items() if key != '$defs'}) + json.dumps(
+                {key: value for key, value in root.get('$defs', {}).items()})
+            unused = [name for name in root.get('$defs', {}) if '#/$defs/' + name + '"' not in text]
+            if not unused:
+                break
+            for name in unused:
+                del root['$defs'][name]
+        validate_schema(root)
+    return root
 
 
 def review_schema(review=None):

@@ -74,7 +74,8 @@ def probe(value, schema, model, effort, out, index):
     CodexCliProvider._run = run
     temp = out / ('operations-%d' % index)
     temp.mkdir(mode=0o700)
-    request = ContentInput(model_prompt(value), dynamic_result(schema),
+    from packages.resume_core.templates.replies import BOOKKEEPING_KEYS
+    request = ContentInput(model_prompt(value), dynamic_result(schema, BOOKKEEPING_KEYS),
         GenerationPolicy(model, timeout_seconds=180, allow_repair=False, reasoning_effort=effort), request_value=value)
     began, outcome, code, usage = time.monotonic(), 'completed', None, None
     try:

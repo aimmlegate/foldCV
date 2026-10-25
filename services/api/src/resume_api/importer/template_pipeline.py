@@ -26,7 +26,7 @@ from packages.resume_core.template_proposals import parse_proposal, transport_re
 from packages.resume_core.template_review import decide_review, make_review_input, record_review
 from packages.resume_core.template_prompt import model_prompt
 from packages.resume_core.templates.operations import operation_value
-from packages.resume_core.templates.replies import proposal_schema, review_schema, PROPOSAL_PROTOCOL
+from packages.resume_core.templates.replies import BOOKKEEPING_KEYS, proposal_protocol, proposal_schema, review_schema, PROPOSAL_PROTOCOL
 
 from ..providers.content import (ContentFailure, ContentInput, ContentTransportReturn, GenerationPolicy,
     MAX_GENERATION_SECONDS, outcome_state)
@@ -458,6 +458,7 @@ class TemplatePipeline(TemplateCheckpoints):
                 if offered is not None:
                     references = reference_table(captured, stored.value.get('effectiveCells', []), relations)
                     request['references'] = references.model_dump(mode='json', by_alias=True)
+                    request['replyProtocol'] = proposal_protocol(references)
                 retry = any(value['ruleId'] == 'reply-time' for value in feedback)
                 try:
                     attempt_id = await self.call(project, operation_id, task_id, slot, request,
@@ -622,7 +623,7 @@ class TemplatePipeline(TemplateCheckpoints):
                     error_code=frame.original_code or ('IMPORT_PROCESSING_EXHAUSTED' if late else None), returned_at=observed)
                 return reconcile_cleanup(result, proof, self.wall()) if proof is not None else result
             self.update_operation(project, operation_id, retain, copy_on_write=True)
-        request = ContentInput(model_prompt(value), dynamic_result(schema),
+        request = ContentInput(model_prompt(value), dynamic_result(schema, BOOKKEEPING_KEYS),
             GenerationPolicy(policy.model, timeout_seconds=min(seconds, max(0.001, remaining)), allow_repair=False,
                 reasoning_effort=policy.effort), on_return=returned, request_value=value)
         def launch():

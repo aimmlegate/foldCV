@@ -22,6 +22,15 @@ from .templates.projection import pointer_tokens
 
 # A derived value cites at most this many offered entries; each states it word for word.
 STATED_LIMIT = 3
+# A reworded value binds when at most STATED_LIMIT entries state this share of its word stems (I2). Near the item's
+# own cited lines the words are far less ambiguous, so the bar is lower there than in the whole source.
+STEM_THRESHOLD_NEAR, STEM_THRESHOLD_FAR = 0.5, 0.8
+# Lines around an item's own cited lines that may state its reworded values. An item's header is cited first and its
+# content follows, so the window reaches a few lines up and further down; the lines above belong to the previous item.
+STEM_WINDOW_BEFORE, STEM_WINDOW_AFTER = 2, 12
+# A reworded value may gather its stems from this many lines: a merged technology list (LIVE-12) spans employer,
+# project and two technology lines.
+STEM_LIMIT = 4
 
 
 def pointer_of(tokens):
@@ -93,6 +102,63 @@ def stating_words(text, table):
     return [option.ref for option in chosen] if not missing else []
 
 
+def _stems(text):
+    """Word stems of a text: the first five characters of words of six or more, words of four or five whole, short
+    acronyms such as PDF or WCF whole, and other short words (prepositions, 'для', 'код') dropped so they never pull
+    in a line of their own."""
+    words = [word for word in re.findall(r'\w+', text) if len(word) >= 4 or (len(word) >= 2 and word.isupper())]
+    return list(dict.fromkeys(word.casefold()[:5] if len(word) >= 6 else word.casefold() for word in words))
+
+
+def stating_stems(text, table, anchors=()):
+    """Refs of the narrowest entries whose words share stems with the text (LIVE-12: 'Создание и развитие
+    микросервисов' states 'Создавал и развивал микросервисы'), when they state enough of its stems. A value of up to
+    three stems cites one line, one more line per four further stems, at most STEM_LIMIT.
+
+    anchors are the refs already cited for the same item. With anchors only lines shortly before the first and within
+    STEM_WINDOW_AFTER of the last are candidates and STEM_THRESHOLD_NEAR applies: a technology binds to its own project's line, not to a similar line
+    of another project, and a claim the item's lines do not state stays unbound. Without anchors the whole table is
+    searched at STEM_THRESHOLD_FAR, and the first line chosen opens the window for the rest. Ties go to the line nearest
+    the anchors and the lines already chosen, then to the line stating most of the text, then to the line after the
+    anchors rather than before them, then to source order."""
+    stems = _stems(text)
+    if not stems:
+        return []
+    order = {ref: index for index, ref in enumerate(table)}
+    texts = {ref: option.text.casefold() for ref, option in table.items()}
+    def holds(ref, stem):
+        return re.search(r'(?<!\w)' + re.escape(stem) + r'\w*', texts[ref]) is not None
+    anchored = [order[anchor] for anchor in anchors if anchor in order]
+    positions = list(anchored)
+    threshold = STEM_THRESHOLD_NEAR if anchored else STEM_THRESHOLD_FAR
+    def within(option):
+        # The words of one value come from one place. Anchors are an item's header and description, so the window
+        # reaches a little above them and further below; a chosen content line may have its header well above it.
+        if not positions:
+            return True
+        chosen_positions = positions[len(anchored):]
+        low = min([value - STEM_WINDOW_BEFORE for value in anchored] + [value - STEM_WINDOW_AFTER for value in chosen_positions])
+        return low <= order[option.ref] <= max(positions) + STEM_WINDOW_AFTER
+    def distance(option):
+        return min((abs(order[option.ref] - position) for position in positions), default=0)
+    candidates = _narrowest([option for ref, option in table.items() if any(holds(ref, stem) for stem in stems)])
+    # A short value is one source line; a long merged value may gather its stems from several.
+    limit = min(STEM_LIMIT, 1 + len(stems) // 4)
+    chosen, missing = [], set(stems)
+    while missing and len(chosen) < limit:
+        first = min(anchored, default=0)
+        best = max((option for option in candidates if within(option)), key=lambda option: (
+            sum(holds(option.ref, stem) for stem in missing), -distance(option), sum(holds(option.ref, stem) for stem in stems),
+            order[option.ref] >= first, -order[option.ref]), default=None)
+        if best is None or not any(holds(best.ref, stem) for stem in missing):
+            break
+        chosen.append(best)
+        positions.append(order[best.ref])
+        candidates = [option for option in candidates if option is not best]
+        missing -= {stem for stem in missing if holds(best.ref, stem)}
+    return [option.ref for option in chosen] if 1 - len(missing) / len(stems) >= threshold else []
+
+
 def complete_reply(reply, bindings, table, references, allowed_relations=None):
     """The referenced reply with derived fields entries, item selections, discoveries, add lineage and relations.
 
@@ -155,6 +221,19 @@ def complete_reply(reply, bindings, table, references, allowed_relations=None):
         if own is not None:
             own['evidence'] = list(dict.fromkeys([*(own.get('evidence') or []), *(entry.get('evidence') or [])]))
             entries = [value for value in entries if value is not entry]
+    roots_of = {}
+    for pointer, pairs in instances.items():
+        roots_of[pointer] = {pointer_of(_bound_root(pointer, semantic, field, bindings)) for semantic, field in pairs}
+    def top_root(pointer):
+        # The outermost item a value belongs to: a task of a job is anchored by the whole job's lines, not only its own.
+        prefixes = [root for roots in roots_of.values() for root in roots
+            if isinstance(pointer, str) and (pointer == root or under(pointer, root))]
+        return min(prefixes, key=len) if prefixes else None
+    def anchors_for(pointer):
+        root = top_root(pointer)
+        if root is None:
+            return []
+        return [ref for entry in entries if top_root(entry.get('pointer')) == root for ref in (entry.get('evidence') or [])]
     def derived_evidence(pointer):
         if empty_value(payload_value(payload, pointer)):
             return []
@@ -162,7 +241,9 @@ def complete_reply(reply, bindings, table, references, allowed_relations=None):
         if ancestors:
             return providers[ancestors[-1]]
         text = stated_text(payload, pointer)
-        return (stating(text, table) or stating_words(text, table) or None) if text else None
+        if not text:
+            return None
+        return stating(text, table) or stating_words(text, table) or stating_stems(text, table, anchors_for(pointer)) or None
     given = {(entry.get('pointer'), entry.get('fieldKey')) for entry in entries}
     for pointer in sorted(instances, key=_natural):
         for _semantic, field in instances[pointer]:

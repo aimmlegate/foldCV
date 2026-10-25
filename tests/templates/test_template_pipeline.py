@@ -41,9 +41,10 @@ async def test_tool_free_new_protocol_runs_complete_review_and_publishes_once(tm
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize('entry', ['direct', 'queued'])
-@pytest.mark.parametrize('review_failure', ['repeated', 'uncertain', 'unavailable'])
+@pytest.mark.parametrize('review_failure', ['unknown', 'uncertain', 'unavailable'])
 async def test_unusable_review_uses_source_fallback_and_no_review_retry(tmp_path, entry, review_failure):
-    # Review protocol 3: a check the reply leaves out holds, so a repeated entry is what leaves a reply incomplete.
+    # Review protocol 3: a check the reply leaves out holds and a check listed twice merges (I1), so an entry naming an
+    # unknown target is what leaves a reply unusable.
     fixture = RuntimeFixture(tmp_path)
     def script(_request, value):
         if 'targets' not in value:
@@ -53,7 +54,7 @@ async def test_unusable_review_uses_source_fallback_and_no_review_retry(tmp_path
         results = [{'ruleId': target['ruleId'], 'targetId': target['targetId'],
             'disposition': 'uncertain' if review_failure == 'uncertain' else 'satisfied',
             'reason': 'Attribution is unclear', 'actionable': False, 'evidence': []} for target in value['targets']]
-        return {'results': [*results, results[0]] if review_failure == 'repeated' else results}
+        return {'results': [*results, {**results[0], 'targetId': 'unknown-target'}] if review_failure == 'unknown' else results}
     fixture.transport.scripted = script
     result = await run_entry(fixture, entry)
     assert result.state == 'published' and result.tasks[0].state == 'source_fallback'
@@ -79,7 +80,7 @@ async def test_empty_output_is_omitted_only_after_complete_absence_review(tmp_pa
         if 'targets' in value:
             results = [{'ruleId': target['ruleId'], 'targetId': target['targetId'], 'disposition': 'satisfied',
                 'reason': '', 'actionable': False, 'evidence': []} for target in value['targets']]
-            return {'results': [*results, results[0]] if outcome == 'incomplete_review' else results}
+            return {'results': [*results, {**results[0], 'targetId': 'unknown-target'}] if outcome == 'incomplete_review' else results}
         return '' if outcome == 'no_reply' else '{"payload":null}' if outcome == 'null' else raw_proposal(fixture.source, empty=True)
     fixture.transport.scripted = script
     result = await run_entry(fixture, entry)

@@ -82,17 +82,13 @@ def test_safe_proposal_is_provisional_and_duplicate_return_reuses_allocations_an
     assert again == operation and unchanged == facts and same == proposal
 
 
-@pytest.mark.parametrize('failure', ['extra', 'duplicate', 'conflict', 'invalid_evidence'])
+@pytest.mark.parametrize('failure', ['extra', 'invalid_evidence'])
 def test_incomplete_review_has_no_receipt_or_effective_promotion(failure):
     # Review protocol 3: a check the reply leaves out holds (protocol 2 omission: test_evidence_references).
     operation, facts, proposal, package, source = proposed()
     operation, attempt, _, results = review_attempt(operation, proposal, package, source)
     if failure == 'extra':
         results.append({**results[0], 'targetId': 'unknown-target'})
-    elif failure == 'duplicate':
-        results.append(results[0])
-    elif failure == 'conflict':
-        results.append({**results[0], 'disposition': 'violation'})
     else:
         results[0]['evidence'] = ['S99']
     operation.attempts[-1].raw_return = json.dumps({'payload': by_reference({'results': results}, operation.review_inputs[-1].value)})
@@ -100,6 +96,21 @@ def test_incomplete_review_has_no_receipt_or_effective_promotion(failure):
     with pytest.raises((TemplateImportFailure, ValueError)):
         record_review(operation, attempt, [source], NOW)
     assert not operation.receipts and not facts.extensions
+
+
+@pytest.mark.parametrize('failure', ['duplicate', 'conflict'])
+def test_a_check_listed_twice_merges_into_one_receipt_entry(failure):
+    # I1 (LIVE-11/12): the model listed one check twice; the worse disposition stands instead of losing the review.
+    operation, facts, proposal, package, source = proposed()
+    operation, attempt, _, results = review_attempt(operation, proposal, package, source)
+    results.append({**results[0], 'disposition': 'violation', 'reason': 'Значение не подтверждено'} if failure == 'conflict' else results[0])
+    operation.attempts[-1].raw_return = json.dumps({'payload': by_reference({'results': results}, operation.review_inputs[-1].value)})
+    operation.attempts[-1].raw_return_hash = operation.attempts[-1].return_hash = sha256(operation.attempts[-1].raw_return.encode())
+    operation, receipt = record_review(operation, attempt, [source], NOW)
+    assert len(receipt.reply.results) == len(operation.review_inputs[-1].value.targets)
+    first = next(result for result in receipt.reply.results if result.target_id == results[0]['targetId'] and result.rule_id == results[0]['ruleId'])
+    assert first.disposition == ('violation' if failure == 'conflict' else results[0]['disposition'])
+    assert not facts.extensions
 
 
 def test_complete_receipt_promotes_only_supported_cells_and_retains_rejected_observation():

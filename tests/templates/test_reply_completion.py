@@ -369,3 +369,93 @@ def test_an_undeclared_relation_is_dropped_and_a_captured_relation_named_for_ano
         ReferenceTable.model_validate(request['references']), allowed)
     reused = [value for value in completed['relations'] if value['subject'] == {'kind': 'discovery_key', 'key': technology}]
     assert reused and all(value['relation']['kind'] == 'new' for value in reused)
+
+
+# I2 (2026-10-25): a reworded value binds to the lines of its own item that state its word stems.
+from types import SimpleNamespace
+
+from packages.resume_core.template_completion import stating_stems
+
+
+def stem_table(*lines):
+    """Offered lines in source order, one unit each; only text and span identity matter to the matcher."""
+    return {'S%d' % (index + 1): SimpleNamespace(ref='S%d' % (index + 1), text=text,
+        span=SimpleNamespace(source_id='src', source_revision=1, unit_id='src/unit_%d' % index, unit_revision=1, start=0, end=len(text)))
+        for index, text in enumerate(lines)}
+
+
+def table_texts(table):
+    return [option.text for option in table.values()]
+
+
+def test_a_reworded_value_binds_to_the_lines_that_state_its_stems():
+    # LIVE-12: the template asks for verbs, the CV has nouns; a line split in two states one bullet.
+    table = stem_table('Ак Барс Цифровые Технологии', '- Создание и развитие микросервисов, осуществляющие интеграцию вендорских',
+        'платформ в информационной системе Гарантия.', '- Разработка генерации Microsoft Excel и Word файлов.')
+    assert stating_stems('Создавал и развивал микросервисы для интеграции вендорских платформ в информационную систему «Гарантия».',
+        table) == ['S2', 'S3']
+    assert stating_stems('Разрабатывал генерацию файлов Microsoft Excel и Word.', table) == ['S4']
+
+
+def test_short_words_and_a_typo_do_not_decide_a_binding():
+    # 'для', 'код', 'гос.' and a misspelt source word neither pull in a line nor block one near the item's own lines.
+    table = stem_table('Ак Барс Цифровые Технологии', '- Переработка старого кода, ревесринжериинг старого и вендорского функционала с',
+        'восстановлением описания.', *['строка %d' % index for index in range(20)], 'Государственная морская академия')
+    assert stating_stems('Перерабатывал старый код, проводил реверс-инжиниринг старого и вендорского функционала и восстанавливал его описание.',
+        table, anchors=['S1']) == ['S2', 'S3']
+    assert stating_stems('Нанимал кандидатов.', stem_table('Компания', '- Найм кандидатов.'), anchors=['S1']) == ['S2']
+
+
+def test_the_item_window_keeps_a_value_on_its_own_lines():
+    # LIVE-12: 'Разрабатывал генерацию PDF-файлов' belongs to the fourth job, not to the first job's Excel line, and a claim
+    # the item's lines do not state stays unbound even when another company's description states it.
+    table = stem_table('ROKO Labs разрабатывал IT продукты для различных заказчиков из США.', '- Разработка генерации Microsoft Excel и Word файлов.',
+        *['строка %d' % index for index in range(10)], 'ООО Перфект', 'Компания Перфект создавала IT продукты для бирж.',
+        '- Разработка сайта на ASP.NET Web Page.', '- Разработка генерации PDF файлов.')
+    assert stating_stems('Разрабатывал генерацию PDF-файлов.', table, anchors=['S13', 'S14']) == ['S16']
+    assert stating_stems('Проводил собеседования.', stem_table('- Проведение собеседований.', *table_texts(table)), anchors=['S14', 'S15']) == []
+    # A short value is one source line: two common stems on two different lines are no statement of it.
+    assert stating_stems('Разрабатывал продукт.', table, anchors=['S13', 'S14']) == ['S14']
+    # Without anchors the whole source is searched and the first line chosen opens the window for the rest.
+    assert stating_stems('Разрабатывал генерацию PDF-файлов.', table) == ['S16']
+
+
+def test_an_inferred_sentence_in_another_language_stays_unbound():
+    # LIVE-09: the model translated and inferred; two shared numbers are no statement of the value.
+    table = stem_table('Backend (Golang, NodeJS, PHP, C)', 'Июль 2021 — март 2025 (3 года 9 месяцев)', 'Основной стек: Go')
+    assert stating_stems('Worked in a Golang team for about 4 years (July 2021–March 2025; 3 years 9 months).', table) == []
+    assert stating_stems('WCF', table) == []
+
+
+def test_a_merged_technology_list_cites_its_employer_and_technology_lines():
+    table = stem_table('ООО Перфект', 'Компания Перфект создавала IT продукты для работы с финансовыми биржами.', 'Разработчик',
+        'ТЕХНОЛОГИИ: Microsoft .NET Framework 3.5, ADO.NET, WCF, WPF, WinFroms, SQL Server', '2008 R2, MS Report Service, Quik, Plaza2.')
+    refs = stating_stems('ООО Перфект — Microsoft .NET Framework 3.5, ADO.NET, WCF, WPF, WinFroms, SQL Server 2008 R2, MS Report Service, Quik, Plaza2.', table)
+    assert set(refs) == {'S4', 'S5', 'S2'} or set(refs) == {'S4', 'S5', 'S1'}
+
+
+# I3 (2026-10-25): a request that offers no items or relations asks for payload and fields only.
+from packages.resume_core.models.template_import import ReferenceTable
+from packages.resume_core.templates.replies import PROPOSAL_PROTOCOL, proposal_protocol, proposal_schema, strip_unoffered_bookkeeping
+
+
+def test_a_request_without_offers_has_no_bookkeeping_keys_and_ignores_the_ones_a_reply_still_sends():
+    # LIVE-12: the first projects reply named a relation target nobody offered and the schema refused the whole reply.
+    def with_bookkeeping(request):
+        value = payload_only(request)
+        value['discoveries'] = [{'key': 'proj', 'semanticType': 'foldcv:project', 'pointer': '/0/project'}]
+        value['lineage'] = [{'kind': 'add', 'parents': [], 'children': ['proj']}]
+        value['relations'] = [{'relation': {'kind': 'new', 'key': 'owned'}, 'kind': 'owned_by', 'subject': {'kind': 'discovery_key', 'key': 'proj'},
+            'target': {'kind': 'handle', 'ref': 'item-/0'}, 'evidence': [request['evidence'][0]['ref']]}]
+        return value
+    proposal, _operation, _src = parsed('projects', with_bookkeeping)
+    assert proposal.state == 'provisional', proposal.errors
+    assert [value.kind for value in proposal.lineage] == ['add'] and proposal.resolved_relations
+    full = next(block.full_schema for block in generic_package().blocks if block.id == 'projects')
+    nothing = ReferenceTable.model_validate({'items': [], 'cells': [], 'relations': []})
+    assert sorted(proposal_schema(full, ['S1'], nothing)['properties']) == ['fields', 'payload', 'schemaVersion']
+    assert sorted(proposal_schema(full, ['S1'], None)['properties']) == ['discoveries', 'fields', 'lineage', 'payload', 'relations', 'schemaVersion']
+    assert proposal_protocol(None) is PROPOSAL_PROTOCOL and 'send null' not in proposal_protocol(nothing)['rules'][0]
+    assert 'no discoveries, lineage or relations' in proposal_protocol(nothing)['rules'][3]
+    assert strip_unoffered_bookkeeping({'payload': [], 'fields': [], 'relations': [1]}, nothing) == {'payload': [], 'fields': []}
+    assert strip_unoffered_bookkeeping({'payload': [], 'relations': [1]}, None) == {'payload': [], 'relations': [1]}

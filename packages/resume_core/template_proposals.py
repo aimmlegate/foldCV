@@ -9,7 +9,7 @@ from .template_identity import (_bound_root, allocate_discoveries, offered_evide
 from .template_import import TemplateImportFailure, attempt_in, checked, digest, identity, task_in
 from .templates.compiler import canonical, sha256
 from .templates.projection import pointer_tokens, reachable_schema, validate_payload
-from .templates.replies import proposal_schema
+from .templates.replies import proposal_schema, strip_unoffered_bookkeeping
 from .template_capture import item_identities
 from .template_completion import complete_reply
 
@@ -194,6 +194,7 @@ def transport_refusal(attempt, package, block_id):
             return 'the reply needs its exact payload envelope'
         table = offered_evidence(attempt.request_value)
         references = offered_references(attempt.request_value) if table is not None else None
+        outer['payload'] = strip_unoffered_bookkeeping(outer['payload'], references)
         validate_payload(proposal_schema(compiled.full_schema, None if table is None else list(table), references), outer['payload'])
     except (ValueError, TypeError, KeyError, RecursionError) as error:
         return reply_error(error)
@@ -225,6 +226,7 @@ def parse_proposal(operation, attempt_id, package, sources, facts, *, captured_r
         # The raw reply is checked against the schema of its own captured request before decoding.
         table = offered_evidence(attempt.request_value)
         references = offered_references(attempt.request_value) if table is not None else None
+        outer['payload'] = strip_unoffered_bookkeeping(outer['payload'], references)
         validate_payload(proposal_schema(compiled.full_schema, None if table is None else list(table), references), outer['payload'])
         if table is None:
             reply = ProposalReply.model_validate(outer['payload'], strict=True)

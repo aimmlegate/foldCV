@@ -23,6 +23,9 @@ class DynamicResultSpec(Wire):
     decode: Literal["raw_json_payload_v1"]
     validation: Literal["raw_before_decode"]
     coordinator_owned: Literal[True]
+    # Keys a reply may still carry although the schema has none (I3: bookkeeping the coordinator derives when a request
+    # offers no items); they are dropped before validation instead of failing the whole reply.
+    tolerated_keys: list[str] = []
 
     @model_validator(mode="after")
     def compatible_projection(self):
@@ -35,12 +38,19 @@ class DynamicResultSpec(Wire):
     def decode_value(self, raw: object) -> PayloadEnvelope:
         if not isinstance(raw, dict) or set(raw) != {"payload"}:
             raise ValueError("dynamic result requires its exact payload envelope")
-        validate_payload(self.full_schema, raw["payload"])
-        return PayloadEnvelope.model_validate(raw, strict=True)
+        payload = self.tolerate(raw["payload"])
+        validate_payload(self.full_schema, payload)
+        return PayloadEnvelope.model_validate({"payload": payload}, strict=True)
+
+    def tolerate(self, payload):
+        defined = set(self.full_schema.get("properties", {}))
+        if not self.tolerated_keys or not isinstance(payload, dict):
+            return payload
+        return {key: value for key, value in payload.items() if key not in self.tolerated_keys or key in defined}
 
 
-def dynamic_result(schema: JsonObject) -> DynamicResultSpec:
+def dynamic_result(schema: JsonObject, tolerated_keys: tuple[str, ...] = ()) -> DynamicResultSpec:
     projected, _ = project_payload(schema)
     return DynamicResultSpec(schemaVersion=1,fullSchema=schema,providerSchema=projected,
         projectionVersion=PROJECTION_VERSION,capabilityProfile=PROFILE_ID,
-        decode="raw_json_payload_v1",validation="raw_before_decode",coordinatorOwned=True)
+        decode="raw_json_payload_v1",validation="raw_before_decode",coordinatorOwned=True, toleratedKeys=list(tolerated_keys))
