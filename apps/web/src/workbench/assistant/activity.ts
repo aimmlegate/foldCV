@@ -11,12 +11,24 @@ const tools: Record<string, [string, string]> = {
 };
 export type ActivityItem = { id: string; label: string; text: string; timestamp: string; state: "working" | "success" | "error" | "summary" };
 
+/** Activity titles are one line of plain text. The model sometimes wraps that line in markdown. */
+export function plainActivity(text: string): string {
+  return text
+    .replace(/```[\s\S]*?```/g, " ")
+    .replace(/`([^`]*)`/g, "$1")
+    .replace(/^\s{0,3}#{1,6}\s+/gm, "")
+    .replace(/\*\*|__/g, "")
+    .replace(/[ \t]{2,}/g, " ")
+    .replace(/ *\n */g, "\n")
+    .trim();
+}
+
 export function activityItems(view: Pick<AssistantView, "activity" | "run">): ActivityItem[] {
   const entries = new Map<string, ActivityItem>();
   for (const event of view.activity) {
     if (event.runId !== view.run?.id) continue;
     if (event.type === "activity.updated") {
-      entries.set(event.payload.itemId, { id: event.payload.itemId, label: "Кратко от модели", text: event.payload.text,
+      entries.set(event.payload.itemId, { id: event.payload.itemId, label: "Кратко от модели", text: plainActivity(event.payload.text),
         timestamp: event.timestamp, state: "summary" });
     } else if (event.type === "tool.started" || event.type === "tool.completed" || event.type === "tool.failed") {
       entries.set(event.payload.callId, { id: event.payload.callId, label: tools[event.payload.name]?.[1] ?? "Работа с резюме", text: "",

@@ -5,6 +5,7 @@ import { Icon } from "../ui/Icon";
 import { Spinner } from "../ui/OperationStatus";
 import { commandCompletion, commandSuggestions } from "../../assistant/commands";
 import { CommandMenu } from "./CommandMenu";
+import { modelChoices } from "./model-choices";
 
 export type ComposerProps = {
   view: AssistantView; captured: string | null; active: boolean; applying: boolean; title: string;
@@ -19,7 +20,7 @@ export function Composer({ view, captured, active, applying, title, draft, flags
   const selectedCommand = commandIndex < suggestions.length ? commandIndex : 0;
   const chooseCommand = (value: string) => { draft(value); setCommandIndex(0); input.current?.focus(); };
   const selected = view.settings?.selectedAgentModel ?? "", models = view.capabilities?.models ?? [];
-  const choices = selected && !models.some(item => item.model === selected) ? [{ model: selected, state: "unavailable" }, ...models] : models;
+  const choices = modelChoices(selected, models, view.capabilities?.ready === true && view.loading == null);
   return <form className="chat-composer" onSubmit={event => { event.preventDefault(); if (enabled) send(); }}>
     <div className="chat-context" aria-label="Область следующей задачи"><span className="chat-context-resume" title={title}><Icon name="file" />{title}</span>
       <button className={`chat-scope${captured ? " has-selection" : ""}`} type="button" disabled={!captured} onClick={clear}

@@ -45,7 +45,8 @@ export function DrawerView(props: ComposerProps & { collapsed: boolean; expanded
           onClick={() => { props.select(item.id); setThreads(false); }}><Icon name="chat" /><span>{item.title || "Пустой диалог"}</span></button>)}
         {view.conversationCursor && <button onClick={props.more}>Ещё диалоги</button>}</div>}
       {view.taskCatalog && <Capabilities catalog={view.taskCatalog} busy={active} choose={props.draft} />}
-      <div ref={props.log} className="chat-messages" role="log" aria-live="polite" aria-relevant="additions text" aria-busy={active}>
+      <div ref={props.log} className="chat-messages" role="log" aria-live="off" aria-busy={active}>
+        <p className="visually-hidden" role="status" aria-live="polite">{currentActivity(view, active)}</p>
         {view.messageCursor && <button className="text-button" onClick={props.older}>Ранее в диалоге</button>}
         <Transcript view={view} active={active} resource={props.resource} focus={props.focus} draft={props.draft} />
         {view.taskCatalog?.protocolEnabled && view.proposals?.map(value => <ProposalPreview key={value.id} value={value}
