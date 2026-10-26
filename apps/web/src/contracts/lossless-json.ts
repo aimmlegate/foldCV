@@ -25,12 +25,20 @@ export function parseJsonWire(source: string): JsonWireNode {
   const invalid = (): never => { throw new Error("INVALID_RESULT"); };
   function whitespace(): void { while (/[ \t\r\n]/.test(source[cursor] ?? "")) cursor++; }
   function string(): string {
-    const match = /^"(?:[^"\\\u0000-\u001f]|\\(?:["\\/bfnrt]|u[0-9a-fA-F]{4}))*"/.exec(source.slice(cursor));
-    if (!match) return invalid();
-    cursor += match[0].length;
-    const value: unknown = JSON.parse(match[0]);
-    if (typeof value !== "string" || [...value].some(character => character.length === 1
-      && character.charCodeAt(0) >= 0xd800 && character.charCodeAt(0) <= 0xdfff)) return invalid();
+    // A scan, not a repeated regex group: one backtrack entry per character overflowed on the 11 MB workspace wire.
+    if (source[cursor] !== '"') return invalid();
+    let end = cursor + 1;
+    for (let code = source.charCodeAt(end); code !== 0x22; code = source.charCodeAt(end)) {
+      if (Number.isNaN(code) || code < 0x20) return invalid();
+      if (code !== 0x5c) { end++; continue; }
+      const escape = source[end + 1] ?? "";
+      if (escape === "u" && /^[0-9a-fA-F]{4}$/.test(source.slice(end + 2, end + 6))) end += 6;
+      else if (escape !== "" && '"\\/bfnrt'.includes(escape)) end += 2;
+      else return invalid();
+    }
+    const value: unknown = JSON.parse(source.slice(cursor, end + 1));
+    cursor = end + 1;
+    if (typeof value !== "string" || /\p{Cs}/u.test(value)) return invalid();
     return value;
   }
   function parse(): JsonWireNode {
