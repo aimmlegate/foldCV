@@ -8,7 +8,8 @@ from packages.resume_core.models.template_import import CleanupOutcome
 from packages.resume_core.template_import import (CleanupProof, ProcessingDeadline, TemplateImportFailure,
     admit_operation, cancel_operation, capture_task_input, digest, dispatch_attempt, observe_time, reconcile_cleanup,
     record_return, recover_operation, reserve_attempt, resume_operation, spent_calls, start_operation)
-from tests.templates.pipeline_fixtures import (NOW, cleaned, owner, ready_operation, resume_command, setup_operation, usage)
+from tests.templates.pipeline_fixtures import (NOW, blocks_package, cleaned, owner, ready_operation, resume_command, setup_operation,
+    usage)
 
 
 def reserve(operation, slot='initial', index=1):
@@ -75,6 +76,82 @@ def test_reservations_are_sequential_and_not_refunded_from_usage():
     operation = returned(operation, repair)
     with pytest.raises(TemplateImportFailure, match='IMPORT_CALL_CAP'):
         reserve(operation, 'fallback_repair', 3)
+
+
+def parallel_operation(blocks, concurrency):
+    operation, _command, _captured, src, _facts = setup_operation(captured=blocks_package(blocks), concurrency=concurrency, cap=20)
+    operation = admit_operation(operation, NOW)
+    for task in operation.tasks:
+        operation = capture_task_input(operation, task.id, {'protocol': 'template_import_v1',
+            'sources': [src.model_dump(mode='json', by_alias=True)], 'effectiveCells': [], 'tools': []}, [], NOW)
+    return operation
+
+
+def reserve_task(operation, task, slot, index):
+    return reserve_attempt(operation, task, slot, digest([task, slot]), operation.capture.primary, owner(index), NOW)
+
+
+def test_parallel_reservations_stay_within_the_captured_concurrency():
+    # CT10: two blocks may be in flight at once; a third waits, and one block never has two attempts in flight.
+    operation = parallel_operation(3, 2)
+    first, second, third = [task.id for task in operation.tasks]
+    operation, attempt = reserve_task(operation, first, 'initial', 1)
+    operation, _other = reserve_task(operation, second, 'initial', 2)
+    with pytest.raises(TemplateImportFailure, match='IMPORT_CLEANUP_UNKNOWN'):
+        reserve_task(operation, third, 'initial', 3)
+    operation = dispatch_attempt(operation, attempt, NOW)
+    with pytest.raises(TemplateImportFailure, match='IMPORT_CLEANUP_UNKNOWN'):
+        reserve_task(operation, first, 'review', 4)
+    operation = record_return(operation, attempt, '{"payload":[]}', 'completed', usage(), cleaned())
+    # A returned attempt with proved cleanup frees its place: the third block and the first block's review start.
+    operation, _third = reserve_task(operation, third, 'initial', 5)
+    with pytest.raises(TemplateImportFailure, match='IMPORT_CLEANUP_UNKNOWN'):
+        reserve_task(operation, first, 'review', 6)
+    assert spent_calls(operation) == 3
+    assert sorted(attempt.state for attempt in operation.attempts) == ['reserved', 'reserved', 'returned']
+
+
+def test_one_concurrency_keeps_the_sequential_rule_across_blocks():
+    operation = parallel_operation(2, 1)
+    first, second = [task.id for task in operation.tasks]
+    operation, attempt = reserve_task(operation, first, 'initial', 1)
+    with pytest.raises(TemplateImportFailure, match='IMPORT_CLEANUP_UNKNOWN'):
+        reserve_task(operation, second, 'initial', 2)
+    operation = returned(operation, attempt)
+    reserve_task(operation, second, 'initial', 3)
+
+
+def test_unknown_cleanup_of_one_parallel_block_stops_every_other_block():
+    operation = parallel_operation(2, 2)
+    first, second = [task.id for task in operation.tasks]
+    operation, attempt = reserve_task(operation, first, 'initial', 1)
+    operation = dispatch_attempt(operation, attempt, NOW)
+    operation = record_return(operation, attempt, None, 'transport_failure', usage(),
+        CleanupOutcome(state='unknown', evidenceHash=None, witness=None))
+    assert operation.state == 'fenced'
+    with pytest.raises(TemplateImportFailure):
+        reserve_task(operation, second, 'initial', 2)
+
+
+def test_a_restart_fences_every_parallel_attempt_still_in_flight():
+    operation = parallel_operation(3, 3)
+    first, second, _third = [task.id for task in operation.tasks]
+    operation, attempt = reserve_task(operation, first, 'initial', 1)
+    operation, _other = reserve_task(operation, second, 'initial', 2)
+    recovered = recover_operation(dispatch_attempt(operation, attempt, NOW))
+    assert recovered.state == 'fenced' and [value.state for value in recovered.attempts] == ['outcome_unknown', 'outcome_unknown']
+    assert spent_calls(recovered) == 2
+    with pytest.raises(TemplateImportFailure, match='IMPORT_CLEANUP_UNKNOWN'):
+        resume_operation(recovered, resume_command(recovered), NOW)
+
+
+@pytest.mark.parametrize('value', [0, 5, True])
+def test_the_captured_concurrency_is_a_bounded_integer(value):
+    from pydantic import ValidationError
+    from packages.resume_core.models.template_import import RuntimePolicy
+    with pytest.raises(ValidationError):
+        RuntimePolicy.model_validate({'callCap': 1, 'concurrency': value, 'processingSeconds': 300, 'cleanupSeconds': 5,
+            'finalizationSeconds': 30, 'primaryRepairs': 1, 'fallbackRepairs': 1}, strict=True)
 
 
 def test_unknown_fallback_dispatch_stays_charged_after_verified_cleanup_and_resume():

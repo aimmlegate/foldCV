@@ -28,7 +28,7 @@ def refuse_execution(*_args, **_kwargs):
 
 
 @asynccontextmanager
-async def app_client(tmp_path, *, call_cap, provider):
+async def app_client(tmp_path, *, call_cap, provider, concurrency=1):
     from resume_api.agent.runtime import ScriptedAgentRuntime
     from resume_api.app import create_app
     dist = tmp_path / 'dist'; dist.mkdir()
@@ -36,7 +36,8 @@ async def app_client(tmp_path, *, call_cap, provider):
     data = tmp_path / 'data'
     wrapped = create_app(origin=ORIGIN, secret=SECRET, temp_root=tmp_path / 'operations', dist=dist, data_root=data,
         connection_adapter=CatalogAdapter(), agent_runtime=ScriptedAgentRuntime(None), agent_tools=Tools(), gui_provider=provider,
-        background_enabled=True, background_factory=refuse_execution, template_import_call_cap=call_cap)
+        background_enabled=True, background_factory=refuse_execution, template_import_call_cap=call_cap,
+        template_import_concurrency=concurrency)
     app, service, jobs = wrapped.app, wrapped.app.state.rich_projects, wrapped.app.state.jobs
     TemplateStore(service.storage.root).activate(employment_package())
     async with app.router.lifespan_context(app):
@@ -123,6 +124,30 @@ async def test_import_captures_the_settings_time_limit_and_keeps_it_when_setting
         assert (await client.put('/v1/settings/limits', json={'importMinutes': 30, 'projectMegabytes': 10})).status_code == 200
         service.validate_template_capture(operation, service.read(project))
         assert service.template_import_capture(workspace, True).policy.finalization_seconds == 30 + 2 * 10
+
+
+@pytest.mark.asyncio
+async def test_an_import_captures_the_configured_concurrency_and_a_stored_one_keeps_its_own(tmp_path):
+    # CT10: the policy records how many blocks run at once; changing the setting later does not make it stale.
+    provider = ScriptedTemplateProvider()
+    async with app_client(tmp_path, call_cap=4, provider=provider, concurrency=3) as (client, service, _jobs):
+        project = (await upload(client)).json()['workspace']['projectId']
+        job = (await client.post(f'/v1/rich/projects/{project}/template-import', json={'clientRequestId': 'import-1', 'allowTextRewrite': True})).json()
+        assert job['submission']['templateCommand']['capture']['policy']['concurrency'] == 3
+        async def finished():
+            while True:
+                current = (await client.post(f'/v1/rich/projects/{project}/jobs/{job["id"]}/read', json={})).json()
+                if current.get('templateOutcome') is not None:
+                    return current
+                await asyncio.sleep(0.05)
+        assert (await asyncio.wait_for(finished(), 60))['templateOutcome']['state'] == 'saved'
+        workspace = service.read(project)
+        [operation] = workspace.project.template_operations
+        service.template_import_concurrency = 1
+        service.validate_template_capture(operation, workspace)
+        assert operation.capture.policy.concurrency == 3 and service.template_import_capture(workspace, True).policy.concurrency == 1
+    with pytest.raises(ValueError, match='concurrency'):
+        service.configure_template_imports(call_cap=4, model=None, concurrency=5)
 
 
 @pytest.mark.asyncio

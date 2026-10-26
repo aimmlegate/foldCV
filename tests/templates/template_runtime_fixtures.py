@@ -65,10 +65,10 @@ class ControlledTransport:
 
 
 class RuntimeFixture(TemplatePublicationFixture):
-    def __init__(self, root, *, scripted=None, cap=8, fallback=True, captured=None, src=None, original_bytes=None):
+    def __init__(self, root, *, scripted=None, cap=8, fallback=True, captured=None, src=None, original_bytes=None, concurrency=1):
         super().__init__(root, create=False)
         operation, self.command, self.package, self.source, self.facts = setup_operation(cap=cap, fallback=fallback,
-            captured=captured, src=src)
+            captured=captured, src=src, concurrency=concurrency)
         self.now = NOW
         if src is None:
             from tests.templates.storage_fixtures import source

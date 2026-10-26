@@ -54,7 +54,9 @@ def materialize(package, facts, operations, sources, *, operation_id, revision=1
         tasks = {task.id: task for task in operation.tasks}
         attempts = {attempt.id: attempt for attempt in operation.attempts}
         allocated = {value.item_handle: value for value in item_identities(operation)}
-        for proposal in operation.proposals:
+        # Blocks run in parallel finish in any order (CT10); a stable sort reads them in declaration order.
+        order = {task.id: index for index, task in enumerate(operation.tasks)}
+        for proposal in sorted(operation.proposals, key=lambda value: order[attempts[value.attempt_id].task_id]):
             task = tasks[attempts[proposal.attempt_id].task_id]
             declaration = declarations.get(task.block_id)
             if declaration is None or proposal.applied_receipt_id is None:
@@ -79,7 +81,7 @@ def materialize(package, facts, operations, sources, *, operation_id, revision=1
                 if cell.state == 'uncertain' or (period_format is None and cell.origin != 'human' and cell.typed_value is True
                         and relative[-1:] == ('ongoing',)):
                     fallbacks_by_view.setdefault(declaration.id, []).extend(cell.evidence)
-        for result in operation.task_results:
+        for result in sorted(operation.task_results, key=lambda value: order[value.task_id]):
             if result.disposition == 'source_fallback':
                 view = tasks[result.task_id].block_id
                 if view not in declarations:

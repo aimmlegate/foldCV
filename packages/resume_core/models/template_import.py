@@ -296,9 +296,13 @@ class ImportIssue(Wire):
         return self
 
 
+MAX_IMPORT_CONCURRENCY = 4
+
+
 class RuntimePolicy(Wire):
     call_cap: int = Field(gt=0)
-    concurrency: Literal[1]
+    # Independent blocks in flight at once (CT10); 1 is the sequential mode every older operation captured.
+    concurrency: int = Field(ge=1, le=MAX_IMPORT_CONCURRENCY)
     # Captured from Settings at the start; operations captured at 300 s and 30 s stay valid.
     processing_seconds: int = Field(ge=IMPORT_MINUTES[1] * 60, le=IMPORT_MINUTES[2] * 60)
     cleanup_seconds: Literal[5]

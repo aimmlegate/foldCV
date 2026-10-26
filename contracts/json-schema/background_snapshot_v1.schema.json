@@ -1643,7 +1643,8 @@
           "type": "integer"
         },
         "concurrency": {
-          "const": 1,
+          "maximum": 4,
+          "minimum": 1,
           "title": "Concurrency",
           "type": "integer"
         },

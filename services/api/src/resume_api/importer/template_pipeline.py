@@ -11,7 +11,7 @@ from packages.resume_core.models.template_import import (CleanupOutcome, ImportI
     ReviewInputRecord, TaskResultRecord)
 from packages.resume_core.models.template_workspace import WorkspaceV7
 from packages.resume_core.models.template_authority import DeletedTemplateCleanupV1, TemplateFinalizationBinding
-from packages.resume_core.template_admission import admit_proposal
+from packages.resume_core.template_admission import admit_proposal, task_facts_digest
 from packages.resume_core.template_builtin_admission import current_handles
 from packages.resume_core.template_effective import effective_cells
 from packages.resume_core.template_capture import item_identities, prepare_builtin_identities
@@ -122,6 +122,22 @@ def fallback_message(result, count=1, shown=True):
 
 def failing(receipt):
     return sum(result.disposition != 'satisfied' for result in receipt.reply.results)
+
+
+def implicit_dependencies(package, operation):
+    """A block or operation that selects a fact type waits for the earlier blocks that produce it: its input reads
+    their admitted records, as it did when every task ran in declaration order (CT10)."""
+    blocks = {block.id: block for block in package.definition.blocks}
+    operations = {item.id: item for item in package.definition.operations}
+    produced, result = {}, {}
+    for task in operation.tasks:
+        block = blocks.get(task.block_id)
+        selectors = block.selectors if block is not None else operations[task.block_id].inputs if task.block_id in operations else []
+        wanted = {ref.id for ref in selectors if ref.kind == 'fact_type'}
+        result[task.id] = {producer for kind in wanted for producer in produced.get(kind, [])}
+        for binding in (block.bindings if block is not None else []):
+            produced.setdefault(binding.semantic_type, []).append(task.id)
+    return result
 
 
 def applied_receipt(operation, task_id):
@@ -254,7 +270,10 @@ class TemplatePipeline(TemplateCheckpoints):
         if (owner(workspace).template_package.package_hash != operation.capture.package_hash
                 or {source.id: source.byte_sha256 for source in owner(workspace).sources} != operation.capture.source_hashes):
             raise TemplateImportFailure('IMPORT_CAPTURE_STALE')
-        self.facts_current(operation, owner(workspace).facts)
+        # The facts and the admissions that explain them come from one read: a parallel block may admit between an
+        # earlier read of the operation and this one (CT10).
+        current = next((value for value in owner(workspace).template_operations if value.id == operation.id), operation)
+        self.facts_current(current, owner(workspace).facts)
         with self.publisher.jobs.guard(project) as directory:
             state = self.publisher.jobs._read(project, directory)
             self.publisher._writable(state)
@@ -347,15 +366,52 @@ class TemplatePipeline(TemplateCheckpoints):
                 lambda value, _data, _workspace: admit_operation(value, self.wall()))
             operation = operation_in(workspace, operation.id)
             deadline = ProcessingDeadline.capture(operation, self.wall(), self.elapsed())
-            for identifier in [task.id for task in operation.tasks]:
-                if cancel.is_set():
-                    break
-                await self.execute_task(project, operation.id, identifier, deadline, cancel)
+            await self.run_tasks(project, operation, deadline, cancel,
+                implicit=implicit_dependencies(owner(workspace).template_package, operation))
             workspace = self.read(project)
             operation = operation_in(workspace, operation.id)
             if cancel.is_set() or operation.state in {'cancelled', 'fenced'}:
                 return operation
             return await self.finalize(project, operation.id) if finalize else operation
+
+    async def run_tasks(self, project, operation, deadline, cancel, *, implicit=None):
+        """Tasks start in declaration order once the tasks they depend on ended; up to the captured concurrency run
+        at once (CT10). Concurrency 1 is the sequential loop. After a failure or a cancel nothing new starts, the
+        running tasks end, and the first failure is raised."""
+        order = [task.id for task in operation.tasks]
+        width = operation.capture.policy.concurrency
+        if width == 1:
+            for identifier in order:
+                if cancel.is_set():
+                    break
+                await self.execute_task(project, operation.id, identifier, deadline, cancel)
+            return
+        waits = {task.id: (set(task.dependencies) | (implicit or {}).get(task.id, set())) & set(order) for task in operation.tasks}
+        pending, running, ended, failure = list(order), {}, set(), None
+        try:
+            while pending or running:
+                if failure is None and not cancel.is_set():
+                    ready = [value for value in pending if waits[value] <= ended]
+                    if not ready and not running and pending:
+                        # A dependency no task here can end (a cycle) runs in declaration order, as sequentially.
+                        ready = pending[:1]
+                    for identifier in ready[:width - len(running)]:
+                        pending.remove(identifier)
+                        running[asyncio.ensure_future(self.execute_task(project, operation.id, identifier, deadline, cancel))] = identifier
+                if not running:
+                    break
+                finished, _ = await asyncio.wait(running, return_when=asyncio.FIRST_COMPLETED)
+                for future in finished:
+                    ended.add(running.pop(future))
+                    if failure is None and not future.cancelled() and future.exception() is not None:
+                        failure = future.exception()
+        except BaseException:
+            for future in running:
+                future.cancel()
+            await asyncio.gather(*running, return_exceptions=True)
+            raise
+        if failure is not None:
+            raise failure
 
     def resume(self, operation, command, workspace):
         self.authority(operation, workspace)
@@ -535,7 +591,7 @@ class TemplatePipeline(TemplateCheckpoints):
                 effective_cells=[cell for cell in effective_cells(data.facts, data.template_operations)
                     if cell.id in {identifier for field in proposal.resolved_fields for identifier in field.effective_cell_ids}],
                 semantic_context={'taskInput': {key: value for key, value in task_input.items() if key != 'evidence'},
-                    'effectiveFactsHash': digest(data.facts)})
+                    'taskFactsHash': task_facts_digest(operation, task_id, data.facts)})
             review_attempt = next((value for value in operation.attempts if value.task_id == task_id
                 and value.slot in {'review', 'replacement_review'} and value.input_hash == digest(review)), None)
             try:

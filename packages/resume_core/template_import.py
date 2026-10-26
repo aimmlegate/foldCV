@@ -11,6 +11,7 @@ from .templates.compiler import canonical, dependency_order, sha256
 
 TERMINAL_TASKS = frozenset({'accepted', 'empty', 'source_fallback', 'cancelled', 'technical_failure'})
 GENERATION_SLOTS = frozenset({'initial', 'primary_repair', 'fallback_repair'})
+IN_FLIGHT = frozenset({'reserved', 'dispatch_started'})
 
 
 def processing_protocol(submission):
@@ -237,8 +238,11 @@ def reserve_attempt(operation, task_id, slot, input_hash, model, owner, now, *, 
     task = task_in(result, task_id)
     if task.state in TERMINAL_TASKS or not any(record.task_id == task_id for record in result.task_inputs):
         raise TemplateImportFailure('IMPORT_TASK_NOT_READY')
-    if any(attempt.state in {'reserved', 'dispatch_started'} or attempt.cleanup.state != 'verified'
-            for attempt in result.attempts if attempt.state != 'released'):
+    # A finished attempt without cleanup proof fences new work. Attempts still in flight share the captured
+    # concurrency (CT10), and one task never has two in flight; concurrency 1 keeps the sequential rule.
+    in_flight = [attempt for attempt in result.attempts if attempt.state in IN_FLIGHT]
+    if (any(attempt.state not in {'released', *IN_FLIGHT} and attempt.cleanup.state != 'verified' for attempt in result.attempts)
+            or len(in_flight) >= result.capture.policy.concurrency or any(attempt.task_id == task_id for attempt in in_flight)):
         raise TemplateImportFailure('IMPORT_CLEANUP_UNKNOWN')
     if spent_calls(result) >= result.capture.policy.call_cap:
         raise TemplateImportFailure('IMPORT_CALL_CAP')

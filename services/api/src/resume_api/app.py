@@ -266,7 +266,8 @@ def create_app(*, origin: str, secret: str, temp_root: Path, dist: Path, runner:
                experimental_profile: ExperimentalCliProfile | None = None, data_root: Path | None = None,
                gui_provider=None, gui_clock=None, gui_renderer=None, agent_runtime=None, agent_tools=None,
                background_enabled=False, background_factory=None, background_native_authority=None,
-               background_parallel=False, background_server_factory=None, template_import_call_cap: int | None = None):
+               background_parallel=False, background_server_factory=None, template_import_call_cap: int | None = None,
+               template_import_concurrency: int = 1):
     if not origin.startswith("http://127.0.0.1:") or not origin.rsplit(":", 1)[-1].isdigit():
         raise ValueError("A concrete IPv4 loopback origin is required")
     if len(secret) < 32:
@@ -543,7 +544,8 @@ def create_app(*, origin: str, secret: str, temp_root: Path, dist: Path, runner:
                 wall=lambda: owner.store.clock())
     rich_projects.configure_template_imports(call_cap=template_import_call_cap,
         model=template_import_model if template_import_call_cap is not None else None,
-        fallback=template_fallback_model if template_import_call_cap is not None else None)
+        fallback=template_fallback_model if template_import_call_cap is not None else None,
+        concurrency=template_import_concurrency)
     jobs = JobService(rich_projects, resolved_agent_runtime, agent_connection, enabled=background_enabled,
         template_factory=template_factory,
         factory=background_factory, parallel=background_parallel, server_factory=background_server_factory,

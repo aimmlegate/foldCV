@@ -5,7 +5,7 @@ The runtime call cap has no default: without an explicit configured value the im
 
 from packages.resume_core.background_limits import import_seconds
 from packages.resume_core.project_limits import finalization_seconds
-from packages.resume_core.models.template_import import ImportCapture, RuntimePolicy, StartTemplateImportV1
+from packages.resume_core.models.template_import import MAX_IMPORT_CONCURRENCY, ImportCapture, RuntimePolicy, StartTemplateImportV1
 from packages.resume_core.models.template_workspace import WorkspaceV7
 from packages.resume_core.template_import import TemplateImportFailure, digest
 from packages.resume_core.templates.store import TemplateStore
@@ -18,14 +18,18 @@ class TemplateImports:
     template_import_call_cap = None
     template_import_model = None
     template_import_fallback = None
+    template_import_concurrency = 1
 
-    def configure_template_imports(self, *, call_cap, model, fallback=None):
+    def configure_template_imports(self, *, call_cap, model, fallback=None, concurrency=1):
         """`model` returns the ModelCapture for the selected import model or raises ProjectFailure; `fallback`, given
-        that capture, returns the configured fallback model's capture, None when there is none, or raises."""
+        that capture, returns the configured fallback model's capture, None when there is none, or raises.
+        `concurrency` is how many independent blocks one import runs at once (CT10); 1 is sequential."""
         if call_cap is not None and (not isinstance(call_cap, int) or call_cap < 1):
             raise ValueError('template import call cap must be an explicit positive integer')
+        if not isinstance(concurrency, int) or not 1 <= concurrency <= MAX_IMPORT_CONCURRENCY:
+            raise ValueError('template import concurrency must be an integer from 1 to ' + str(MAX_IMPORT_CONCURRENCY))
         self.template_import_call_cap, self.template_import_model = call_cap, model
-        self.template_import_fallback = fallback
+        self.template_import_fallback, self.template_import_concurrency = fallback, concurrency
 
     def template_jobs_ready(self):
         jobs = getattr(self, 'background_jobs', None)
@@ -88,7 +92,8 @@ class TemplateImports:
             authorityHash=digest({'project': workspace.project_id, **models}),
             dependencyHash=digest({'package': package.package_hash, 'sources': sources}), allowTextRewrite=allow_text_rewrite,
             primary=primary, fallback=fallback, formattingAsOf=workspace.formatting_as_of,
-            policy=RuntimePolicy(callCap=self.template_import_call_cap, concurrency=1, processingSeconds=import_seconds(), cleanupSeconds=5,
+            policy=RuntimePolicy(callCap=self.template_import_call_cap, concurrency=self.template_import_concurrency,
+                processingSeconds=import_seconds(), cleanupSeconds=5,
                 finalizationSeconds=finalization_seconds(), primaryRepairs=1, fallbackRepairs=1))
 
     def validate_template_capture(self, operation, workspace):
@@ -96,15 +101,15 @@ class TemplateImports:
         if data is None or data.template_package is None or self.template_import_call_cap is None:
             raise TemplateImportFailure('IMPORT_CAPTURE_STALE')
         # Facts advance through admitted proposals; the pipeline checks their captured revisions separately.
-        # A stored import keeps the time limits and models captured at its start when Settings change (E07); a new
-        # one must match.
+        # A stored import keeps the time limits, concurrency and models captured at its start when Settings change
+        # (E07); a new one must match.
         stored = any(value.id == operation.id for value in data.template_operations)
         try:
             expected = self.template_import_capture(workspace, operation.capture.allow_text_rewrite,
                 models=(operation.capture.primary, operation.capture.fallback) if stored else None)
         except ProjectFailure:
             raise TemplateImportFailure('IMPORT_CAPTURE_STALE') from None
-        ignored = {'fact_revisions': True, **({'policy': {'processing_seconds', 'finalization_seconds'}} if stored else {})}
+        ignored = {'fact_revisions': True, **({'policy': {'processing_seconds', 'finalization_seconds', 'concurrency'}} if stored else {})}
         if expected.model_dump(exclude=ignored) != operation.capture.model_dump(exclude=ignored):
             raise TemplateImportFailure('IMPORT_CAPTURE_STALE')
 

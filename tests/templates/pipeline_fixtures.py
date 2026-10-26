@@ -23,7 +23,7 @@ def owner(index):
         transportTurnId=None, pid=None)
 
 
-def setup_operation(*, cap=8, fallback=True, captured=None, src=None, allow_text_rewrite=True):
+def setup_operation(*, cap=8, fallback=True, captured=None, src=None, allow_text_rewrite=True, concurrency=1):
     captured, src = captured or package(), src or source()[0]
     facts = WorkingFactsV2(schemaVersion=2, revision=1, records=[], tombstones=[],
         extensions=[], observations=[], relations=[], manualScopes=[])
@@ -31,7 +31,7 @@ def setup_operation(*, cap=8, fallback=True, captured=None, src=None, allow_text
         authorityHash=digest('synthetic-account-and-permissions'), dependencyHash=digest('synthetic-dependencies'),
         allowTextRewrite=allow_text_rewrite, primary=model(), fallback=model('synthetic-fallback') if fallback else None,
         formattingAsOf={'precision': 'day', 'year': 2026, 'month': 10, 'day': 21},
-        policy=RuntimePolicy(callCap=cap, concurrency=1, processingSeconds=300, cleanupSeconds=5,
+        policy=RuntimePolicy(callCap=cap, concurrency=concurrency, processingSeconds=300, cleanupSeconds=5,
             finalizationSeconds=30, primaryRepairs=1, fallbackRepairs=1))
     command = StartTemplateImportV1(kind='start_new_import', protocol='template_import_v1', clientRequestId='request', capture=capture)
     serial = count()
@@ -39,6 +39,18 @@ def setup_operation(*, cap=8, fallback=True, captured=None, src=None, allow_text
         id_factory=lambda prefix: prefix + '-' + str(next(serial)))
     assert created
     return operation, command, captured, src, facts
+
+
+def blocks_package(count):
+    """The synthetic package with its one block repeated: independent blocks for parallel runs (CT10)."""
+    import json
+    from packages.resume_core.templates.compiler import compile_bytes
+    from packages.resume_core.templates.store import BUNDLED_TEMPLATE
+    config = package().definition.model_dump(mode='json', by_alias=True)
+    first = config['blocks'][0]
+    config['blocks'] += [{**first, 'id': 'view-' + str(index), 'placement': {**first['placement'], 'order': first['placement']['order'] + index}}
+        for index in range(1, count)]
+    return compile_bytes(json.dumps(config).encode(), BUNDLED_TEMPLATE.parent, original_format='json')
 
 
 def ready_operation(**options):

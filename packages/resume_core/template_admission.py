@@ -13,6 +13,23 @@ from .template_capture import item_identities, retain_builtin_identity
 from .template_wording import display_raw_input
 
 
+def task_facts_digest(operation, task_id, facts):
+    """The facts one task's review reads: the records, observations and relations of its own item handles.
+
+    Blocks that run in parallel (CT10) add other items between one block's review and its admission; those changes
+    do not touch this digest, while a change to this block's own items still makes its review stale."""
+    handles = set(task_in(operation, task_id).allowed_handles)
+    owned = {value.record_id for value in item_identities(operation) if value.item_handle in handles}
+    owned |= {record.id for record in facts.extensions if record.item_handle in handles}
+    dump = lambda values: sorted((value.model_dump(mode='json', by_alias=True) for value in values), key=canonical)
+    return digest({'records': dump(record for record in facts.records if record.id in owned),
+        'extensions': dump(record for record in facts.extensions if record.id in owned),
+        'tombstones': dump(value for value in facts.tombstones if value.record_id in owned),
+        'observations': dump(value for value in facts.observations if value.item_handle in handles),
+        'relations': dump(value for value in facts.relations if value.subject_id in owned or value.target_id in owned),
+        'manualScopes': dump(facts.manual_scopes)})
+
+
 def admit_proposal(operation, proposal_id, receipt_id, package, sources, facts, *, expected_revisions,
                    expected_relation_revisions):
     result, working = operation.model_copy(deep=True), facts.model_copy(deep=True)
@@ -28,7 +45,13 @@ def admit_proposal(operation, proposal_id, receipt_id, package, sources, facts, 
             raise TemplateImportFailure('IMPORT_ADMISSION_ALREADY_APPLIED')
         return result, working
     authorization(result)
-    if review.value.semantic_context.get('effectiveFactsHash', digest(facts)) != digest(facts):
+    context = review.value.semantic_context
+    if 'taskFactsHash' in context:
+        task_id = next(value.task_id for value in operation.attempts if value.id == proposal.attempt_id)
+        if context['taskFactsHash'] != task_facts_digest(result, task_id, facts):
+            raise TemplateImportFailure('IMPORT_ADMISSION_FACTS_STALE')
+    # A review input stored before CT10 names the whole facts; it was made and admitted with no other block between.
+    elif context.get('effectiveFactsHash', digest(facts)) != digest(facts):
         raise TemplateImportFailure('IMPORT_ADMISSION_FACTS_STALE')
     if package.package_hash != operation.capture.package_hash or review.value.package_hash != package.package_hash or (
             {source.id: source.byte_sha256 for source in sources} != operation.capture.source_hashes):

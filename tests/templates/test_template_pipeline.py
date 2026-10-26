@@ -461,3 +461,161 @@ async def test_a_stopped_check_keeps_admitted_values_and_a_short_notice(tmp_path
     assert operation.issues[0].target_ids == ['scope-' + operation.tasks[0].id]
     holder = fixture.current().project or fixture.current().pre_draft
     assert len(holder.facts.extensions) == 2
+
+
+@pytest.mark.asyncio
+async def test_independent_blocks_overlap_within_the_captured_concurrency_and_match_the_sequential_result(tmp_path):
+    # CT10: three blocks with concurrency 2 keep two calls in flight; admissions write facts concurrently and the
+    # outcome equals the sequential run.
+    import threading
+    import time
+    from tests.templates.pipeline_fixtures import blocks_package
+    outcomes = {}
+    for width in (1, 2):
+        fixture = RuntimeFixture(tmp_path / str(width), captured=blocks_package(3), concurrency=width, cap=20)
+        lock, state = threading.Lock(), {'now': 0, 'peak': 0}
+        def script(_request, value, fixture=fixture, lock=lock, state=state):
+            with lock:
+                state['now'] += 1
+                state['peak'] = max(state['peak'], state['now'])
+            try:
+                time.sleep(0.05)
+                return satisfied_review(value) if 'targets' in value else raw_proposal(fixture.source)
+            finally:
+                with lock:
+                    state['now'] -= 1
+        fixture.transport.scripted = script
+        result = await fixture.pipeline.run(fixture.project, fixture.command, admitted=fixture.admitted)
+        holder = fixture.current().project or fixture.current().pre_draft
+        outcomes[width] = (state['peak'], result.state, [task.state for task in result.tasks],
+            [next(value.disposition for value in result.task_results if value.task_id == task.id) for task in result.tasks],
+            len(holder.facts.extensions),
+            spent_calls(result), sorted(attempt.state for attempt in result.attempts))
+    assert outcomes[1][0] == 1 and outcomes[2][0] == 2
+    assert outcomes[1][1:] == outcomes[2][1:]
+    assert outcomes[2][1] == 'published' and outcomes[2][2] == ['accepted'] * 3 and outcomes[2][4] == 6 and outcomes[2][5] == 6
+
+
+def schedule(pipeline, dependencies, width, *, fail=None, cancel_at=None, slow=()):
+    """Runs pipeline.run_tasks over fake tasks; returns the start and end events and the peak in flight."""
+    import asyncio
+    import threading
+    from types import SimpleNamespace
+    from packages.resume_core.template_import import TemplateImportFailure
+    events, state, cancel = [], {'now': 0, 'peak': 0}, threading.Event()
+    async def execute(_project, _operation, identifier, _deadline, _cancel):
+        events.append(('start', identifier))
+        state['now'] += 1
+        state['peak'] = max(state['peak'], state['now'])
+        try:
+            await asyncio.sleep(0.05 if identifier in slow else 0.01)
+            if identifier == cancel_at:
+                cancel.set()
+            if identifier == fail:
+                raise TemplateImportFailure('IMPORT_AUTHORITY_REVOKED')
+        finally:
+            state['now'] -= 1
+            events.append(('end', identifier))
+    pipeline.execute_task = execute
+    operation = SimpleNamespace(id='operation', tasks=[SimpleNamespace(id=name, dependencies=list(after)) for name, after in dependencies],
+        capture=SimpleNamespace(policy=SimpleNamespace(concurrency=width)))
+    return pipeline.run_tasks('project', operation, None, cancel), events, state
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize('width,peak', [(1, 1), (2, 2), (4, 3)])
+async def test_the_scheduler_starts_ready_tasks_in_declaration_order_up_to_its_width(tmp_path, width, peak):
+    run, events, state = schedule(RuntimeFixture(tmp_path).pipeline, [('a', ()), ('b', ()), ('c', ())], width)
+    await run
+    assert [name for kind, name in events if kind == 'start'] == ['a', 'b', 'c'] and state['peak'] == peak
+    assert {name for kind, name in events if kind == 'end'} == {'a', 'b', 'c'}
+
+
+@pytest.mark.asyncio
+async def test_a_task_waits_for_the_tasks_it_depends_on(tmp_path):
+    run, events, _state = schedule(RuntimeFixture(tmp_path).pipeline, [('a', ()), ('b', ()), ('c', ('a',)), ('d', ('c', 'b'))], 4,
+        slow={'a'})
+    await run
+    assert events.index(('end', 'a')) < events.index(('start', 'c'))
+    assert max(events.index(('end', 'c')), events.index(('end', 'b'))) < events.index(('start', 'd'))
+
+
+@pytest.mark.asyncio
+async def test_a_failure_starts_nothing_new_lets_running_tasks_end_and_is_raised(tmp_path):
+    from packages.resume_core.template_import import TemplateImportFailure
+    run, events, _state = schedule(RuntimeFixture(tmp_path).pipeline, [('a', ()), ('b', ()), ('c', ())], 2, fail='a', slow={'b'})
+    with pytest.raises(TemplateImportFailure, match='IMPORT_AUTHORITY_REVOKED'):
+        await run
+    assert ('start', 'c') not in events and ('end', 'b') in events
+
+
+@pytest.mark.asyncio
+async def test_a_cancel_starts_nothing_new_and_lets_running_tasks_end(tmp_path):
+    run, events, _state = schedule(RuntimeFixture(tmp_path).pipeline, [('a', ()), ('b', ()), ('c', ())], 2, cancel_at='a', slow={'b'})
+    await run
+    assert ('start', 'c') not in events and ('end', 'b') in events
+
+
+@pytest.mark.asyncio
+async def test_a_dependency_cycle_runs_in_declaration_order_instead_of_waiting_forever(tmp_path):
+    run, events, _state = schedule(RuntimeFixture(tmp_path).pipeline, [('a', ('b',)), ('b', ('a',)), ('c', ('z',))], 3)
+    await run
+    starts = [name for kind, name in events if kind == 'start']
+    assert sorted(starts) == ['a', 'b', 'c'] and starts[0] in {'a', 'c'}
+
+
+@pytest.mark.asyncio
+async def test_a_review_goes_stale_only_when_its_own_items_change(tmp_path):
+    # CT10: another block's observation leaves this block's review valid; one on this block's own item does not.
+    from packages.resume_core.template_admission import task_facts_digest
+    from tests.templates.pipeline_fixtures import blocks_package
+    fixture = RuntimeFixture(tmp_path, captured=blocks_package(2), concurrency=2, cap=20)
+    fixture.transport.scripted = lambda _request, value: satisfied_review(value) if 'targets' in value else raw_proposal(fixture.source)
+    result = await fixture.pipeline.run(fixture.project, fixture.command, admitted=fixture.admitted)
+    facts = (fixture.current().project or fixture.current().pre_draft).facts
+    first, second = [task.id for task in result.tasks]
+    before = task_facts_digest(result, first, facts)
+    other = next(value for value in facts.observations if value.item_handle in result.tasks[1].allowed_handles)
+    own = next(value for value in facts.observations if value.item_handle in result.tasks[0].allowed_handles)
+    changed = facts.model_copy(update={'observations': [*facts.observations, other.model_copy(update={'id': 'observation-extra'})]})
+    assert task_facts_digest(result, first, changed) == before and task_facts_digest(result, second, changed) != task_facts_digest(result, second, facts)
+    changed = facts.model_copy(update={'observations': [*facts.observations, own.model_copy(update={'id': 'observation-extra'})]})
+    assert task_facts_digest(result, first, changed) != before
+
+
+def selecting_package():
+    """Three blocks of papers; the last also selects the papers the first two produce."""
+    import json
+    from packages.resume_core.templates.compiler import compile_bytes
+    from packages.resume_core.templates.store import BUNDLED_TEMPLATE
+    from tests.templates.pipeline_fixtures import blocks_package
+    config = blocks_package(3).definition.model_dump(mode='json', by_alias=True)
+    config['blocks'][2]['selectors'] = [*config['blocks'][2]['selectors'], {'kind': 'fact_type', 'id': 'papers'}]
+    return compile_bytes(json.dumps(config).encode(), BUNDLED_TEMPLATE.parent, original_format='json')
+
+
+def test_a_block_that_selects_a_fact_type_waits_for_the_earlier_blocks_that_produce_it():
+    from resume_api.importer.template_pipeline import implicit_dependencies
+    from tests.templates.pipeline_fixtures import setup_operation
+    package = selecting_package()
+    operation = setup_operation(captured=package, concurrency=3)[0]
+    first, second, third = [task.id for task in operation.tasks]
+    assert implicit_dependencies(package, operation) == {first: set(), second: set(), third: {first, second}}
+
+
+@pytest.mark.asyncio
+async def test_a_selecting_block_reads_the_same_records_in_parallel_as_in_sequence(tmp_path):
+    seen = {}
+    for width in (1, 3):
+        fixture = RuntimeFixture(tmp_path / str(width), captured=selecting_package(), concurrency=width, cap=20)
+        def script(_request, value, fixture=fixture, width=width):
+            if 'targets' in value:
+                return satisfied_review(value)
+            if value['declaration']['id'] == fixture.package.definition.blocks[2].id:
+                seen[width] = len(value['allowedHandles'])
+            return raw_proposal(fixture.source)
+        fixture.transport.scripted = script
+        result = await fixture.pipeline.run(fixture.project, fixture.command, admitted=fixture.admitted)
+        assert result.state == 'published' and [task.state for task in result.tasks] == ['accepted'] * 3
+    # The third block's request offers the four papers the first two admitted, in both modes.
+    assert seen == {1: 4, 3: 4}

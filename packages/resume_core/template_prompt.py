@@ -48,7 +48,7 @@ def lean_checks(checks):
 
 
 def lean_context(context):
-    lean = {key: value for key, value in context.items() if key != 'effectiveFactsHash'}
+    lean = {key: value for key, value in context.items() if key not in {'effectiveFactsHash', 'taskFactsHash'}}
     if isinstance(context.get('taskInput'), dict):
         lean['taskInput'] = {key: value for key, value in context['taskInput'].items()
             if key not in HIDDEN and key not in {'replyProtocol', 'evidence'}}
