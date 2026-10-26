@@ -1,0 +1,6 @@
+Alex Example
+Example Labs — engineer, 2020–2023
+Employer award: Example Labs Quality Award, 2022.
+Employer division: Queue Systems.
+Second Works — engineer, 2024–2025
+Publications: Reliable Queues, Systems Notes, 2024, https://example.org/paper-a; Reliable Queues, Queue Review, 2025, https://example.org/paper-b.

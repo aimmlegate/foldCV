@@ -58,6 +58,11 @@ def application(root, scenario):
         # Two identically worded tasks, a team result and a second employer: the E04 shape.
         from tests.templates.e04_fixtures import e04_workspace
         value, sources = e04_workspace()
+    elif scenario == 'publications':
+        # CT08: the second template; two equal-title papers and two employers, the first with an owned award and an
+        # extension-of division (D03/E04 for extension ownership).
+        from tests.templates.publications_fixtures import publications_workspace
+        value, sources = publications_workspace('F11')
     else:
         from tests.templates.test_bound_links import linked_workspace
         value, sources = {'joined': joined, 'linked': lambda: joined(linked), 'papers': lambda: workspace()[0],
@@ -118,7 +123,7 @@ async def serve(root, scenario):
 
 def main():
     if len(sys.argv) != 3:
-        raise SystemExit('usage: template_writer_harness.py <resolved-empty-root> <joined|linked|papers|issues|e04>')
+        raise SystemExit('usage: template_writer_harness.py <resolved-empty-root> <joined|linked|papers|issues|e04|publications>')
     root = Path(sys.argv[1])
     if root != root.resolve() or not root.is_dir() or any(root.iterdir()):
         raise SystemExit('harness root must be an existing empty resolved directory')

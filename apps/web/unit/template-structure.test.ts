@@ -472,3 +472,97 @@ test("B07/G02: lines inside one item move that item; a selection that crosses it
     assert.equal(warnings.length, 1);
   } finally { session.close(); await value.close(); }
 });
+
+const AWARD = "Example Labs Quality Award", PAPER = "Reliable Queues";
+/** The work items of the second template, in order, with the employment record each one shows. */
+function employers(response: TemplateProjectResponseV1, blocks: Shown[]): { section: Shown; record: string }[] {
+  const records = response.workspace.project?.facts.records.filter(record => record.kind === "employment") ?? [];
+  return blocks.filter(block => block.type === "section").flatMap(section => {
+    const record = records.find(value => blocks.some(block => block.parent === section.id
+      && fields(block).some(field => String(field.cellId).includes(value.id))));
+    return record ? [{ section, record: record.id }] : [];
+  });
+}
+function extensionTargets(response: TemplateProjectResponseV1, kind: string): Map<string, string> {
+  const facts = response.workspace.project?.facts;
+  assert.ok(facts);
+  return new Map(facts.relations.filter(value => value.active && value.kind === kind).map(value => [value.subjectId, value.targetId]));
+}
+
+test("D03/CT08: moving the award into the second employer changes only its owner; the division keeps its subject", async () => {
+  const value = await harness("publications");
+  const { session, editor, warnings } = await opened(value);
+  try {
+    let { response, blocks } = await shown(session);
+    const [a, b] = employers(response, blocks);
+    const award = blocks.find(block => block.text === AWARD), division = blocks.find(block => block.text.startsWith("Division: "));
+    assert.ok(a && b && award && division && award.parent === a.section.id && division.parent === a.section.id);
+    const owned = extensionTargets(response, "owned_by"), extended = extensionTargets(response, "extension_of");
+    const [awardRecord] = [...owned.keys()], [divisionRecord] = [...extended.keys()];
+    assert.ok(awardRecord && divisionRecord);
+    assert.equal(owned.get(awardRecord), a.record);
+    assert.equal(extended.get(divisionRecord), a.record);
+
+    select(editor, textStart(editor, award.id));
+    await session.move("down");
+    await session.move("down");
+    ({ response, blocks } = await shown(session));
+    assert.equal(blocks.find(block => block.id === award.id)?.parent, b.section.id);
+    assert.equal(extensionTargets(response, "owned_by").get(awardRecord), b.record, "the second employer owns the award");
+    assert.equal(extensionTargets(response, "extension_of").get(divisionRecord), a.record, "the division still extends the first");
+    await session.navigate("undo");
+    ({ response } = await shown(session));
+    assert.equal(extensionTargets(response, "owned_by").get(awardRecord), a.record, "Undo restores the first owner");
+    await session.navigate("redo");
+    ({ response } = await shown(session));
+    assert.equal(extensionTargets(response, "owned_by").get(awardRecord), b.record);
+
+    // The division occurrence moves among the first employer's lines only; its subject is fixed.
+    const before = blocks.find(block => block.id === division.id)?.parent;
+    select(editor, textStart(editor, division.id));
+    await session.move("down");
+    await session.move("down");
+    await session.move("down");
+    ({ response, blocks } = await shown(session));
+    assert.notEqual(blocks.find(block => block.id === division.id)?.parent, before, "the occurrence itself moves");
+    assert.deepEqual(warnings, []);
+    assert.equal(extensionTargets(response, "extension_of").get(divisionRecord), a.record, "the division's subject never moves");
+  } finally { session.close(); await value.close(); }
+});
+
+/** A block's parts with the parts inside its links: a bound link keeps its label occurrence among its children. */
+function deepParts(block: Shown): Part[] {
+  return block.parts.flatMap(part => Array.isArray(part["content"]) ? [part, ...(part["content"] as Part[])] : [part]);
+}
+const deepText = (block: Shown): string => deepParts(block).map(part => typeof part["text"] === "string" ? part["text"] : "").join("");
+const deepFields = (block: Shown) => deepParts(block).filter(part => "cellId" in part).map(part => ({ cellId: part["cellId"], occurrenceId: part["occurrenceId"] }));
+
+test("E04/CT08: two equal paper titles keep distinct cells and occurrences; reordering them changes no fact", async () => {
+  const value = await harness("publications");
+  const { session, editor } = await opened(value);
+  try {
+    let { response, blocks } = await shown(session);
+    const titles = () => blocks.filter(block => deepText(block) === PAPER);
+    const [first, second] = titles();
+    assert.ok(first && second, JSON.stringify(blocks.map(block => deepText(block))));
+    const [firstField] = deepFields(first), [secondField] = deepFields(second);
+    assert.ok(firstField && secondField);
+    assert.notEqual(firstField.cellId, secondField.cellId, "equal titles, distinct cells");
+    assert.notEqual(firstField.occurrenceId, secondField.occurrenceId, "equal titles, distinct occurrences");
+    const facts = factsWire(response), items = () => titles().map(block => block.parent);
+    const [firstItem, secondItem] = items();
+    assert.ok(firstItem && secondItem && firstItem !== secondItem);
+    // Both lines of the second paper select its item, which moves above the first; its title keeps its cell.
+    const lines = blocks.filter(block => block.parent === secondItem), last = lines[lines.length - 1];
+    assert.ok(lines.length === 2 && last);
+    select(editor, textStart(editor, second.id), at(editor, last.id, deepText(last).length));
+    await session.move("up");
+    ({ response, blocks } = await shown(session));
+    assert.deepEqual(items(), [secondItem, firstItem]);
+    assert.equal(factsWire(response), facts, "a reorder changes no fact");
+    assert.deepEqual(deepFields(titles()[0] ?? second), [secondField]);
+    await session.navigate("undo");
+    ({ response, blocks } = await shown(session));
+    assert.deepEqual(items(), [firstItem, secondItem]);
+  } finally { session.close(); await value.close(); }
+});

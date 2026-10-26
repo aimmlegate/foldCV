@@ -265,8 +265,8 @@ def satisfied(value, verdict=None):
     return {'results': results}
 
 
-def generic_script(src, table, verdict=None):
-    package = generic_package()
+def generic_script(src, table, verdict=None, package=None):
+    package = package or generic_package()
     blocks = {block.id: block for block in package.definition.blocks}
     def script(_request, value):
         if 'targets' in value:
@@ -275,33 +275,33 @@ def generic_script(src, table, verdict=None):
         if block.id in table:
             payload, cites = table[block.id]
         else:
-            payload, cites = ([] if block.view.mode == 'items' else empty_object(block)), {}
+            payload, cites = ([] if block.view.mode == 'items' else empty_object(block, package)), {}
         return block_reply(block, payload, src, cites, value)
     return script
 
 
-def empty_object(block):
-    full = next(value.full_schema for value in generic_package().blocks if value.id == block.id)
+def empty_object(block, package=None):
+    full = next(value.full_schema for value in (package or generic_package()).blocks if value.id == block.id)
     properties = full.get('properties') or full['$defs'][full['$ref'].rsplit('/', 1)[1]]['properties']
     return {key: [] if (schema.get('type') == 'array' or '$ref' in schema and schema['$ref'].endswith('/texts')) else None
         for key, schema in properties.items()}
 
 
-async def generic_import(root, name, *, rewrite=True, verdict=None, table=None, cap=60, wrap=None):
+async def generic_import(root, name, *, rewrite=True, verdict=None, table=None, cap=60, wrap=None, package=None):
     """A published Generic import of one synthetic fixture through the coordinator and the real materializer; wrap
-    changes the scripted answers."""
+    changes the scripted answers. Another compiled package (CT08) imports with its own table."""
     from packages.resume_core.background_limits import import_seconds
     from packages.resume_core.project_limits import finalization_seconds
     from packages.resume_core.templates.operations import derive_task
     from tests.templates.test_template_employment import EmploymentFixture
     src, raw = source_fixture(name)
-    fixture = EmploymentFixture(root, captured=generic_package(), src=src, original_bytes=raw, cap=cap, fallback=False)
+    fixture = EmploymentFixture(root, captured=package or generic_package(), src=src, original_bytes=raw, cap=cap, fallback=False)
     fixture.command.capture.allow_text_rewrite = rewrite
     # The default Settings limits hold about thirty durable calls and the publication on the real clock (D096).
     fixture.command.capture.policy.processing_seconds = import_seconds()
     fixture.command.capture.policy.finalization_seconds = finalization_seconds()
     fixture.pipeline.derive = derive_task
-    script = generic_script(src, table or TABLES[name](rewrite), verdict or REVIEWS.get(name))
+    script = generic_script(src, table or TABLES[name](rewrite), verdict or REVIEWS.get(name), package)
     fixture.transport.scripted = wrap(script) if wrap else script
     result = await fixture.pipeline.run(fixture.project, fixture.command, admitted=fixture.admitted)
     return fixture, result, fixture.current(), {src.id: raw}
@@ -331,9 +331,9 @@ async def export_through_service(tmp_path, workspace, originals):
         await jobs.shutdown()
 
 
-def direct_generic(name, blocks, *, rewrite=True, table=None):
+def direct_generic(name, blocks, *, rewrite=True, table=None, package=None):
     """Admission and assembly of the given blocks without the durable store, for rendering cases that do not need
-    the import record; every review answers satisfied."""
+    the import record; every review answers satisfied. Another compiled package (CT08) needs its own table."""
     import json
     from itertools import count
     from packages.resume_core.models.template_import import ReviewInputRecord
@@ -345,7 +345,7 @@ def direct_generic(name, blocks, *, rewrite=True, table=None):
     from packages.resume_core.template_review import make_review_input, record_review
     from tests.templates.evidence_references import by_reference
     from tests.templates.pipeline_fixtures import NOW, cleaned, owner, setup_operation, source_draft, usage
-    package = generic_package()
+    package = package or generic_package()
     src, raw = source_fixture(name)
     table, declarations = table or TABLES[name](rewrite), {block.id: block for block in package.definition.blocks}
     operation, _command, _package, _src, facts = setup_operation(captured=package, src=src, allow_text_rewrite=rewrite,
