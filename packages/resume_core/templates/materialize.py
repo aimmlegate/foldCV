@@ -28,6 +28,7 @@ def scope_lines(sources, spans):
 def materialize(package, facts, operations, sources, *, operation_id, revision=1, as_of=None):
     verify_package(package)
     declarations = {value.id: value for value in package.definition.blocks}
+    operation_ids = {value.id for value in package.definition.operations}
     current = {cell.id: cell for cell in effective_cells(facts, operations)}
     current.update({cell.id: cell for cell in builtin_effective_cells(facts, operations, include_raw=True)})
     active_records = {record.id for record in [*facts.records, *facts.extensions] if getattr(record, 'active', True)}
@@ -87,6 +88,9 @@ def materialize(package, facts, operations, sources, *, operation_id, revision=1
         for result in sorted(operation.task_results, key=lambda value: order[value.task_id]):
             if result.disposition == 'source_fallback':
                 view = tasks[result.task_id].block_id
+                if view in operation_ids:
+                    # An operation has no view; the blocks it reads show their own source lines.
+                    continue
                 if view not in declarations:
                     raise ValueError('source fallback has no configured block view')
                 uncited = isinstance(result.value, dict) and result.value.get('scope') == 'uncited'

@@ -1,6 +1,7 @@
 """Template jobs release inference ownership before application publication."""
 
 import asyncio
+import logging
 
 from packages.resume_core.background_store import BackgroundFailure, TERMINAL_EXECUTION
 from packages.resume_core.background_supervisor import ExecutionOutcome
@@ -18,6 +19,8 @@ def job_code(code):
         return 'DEPENDENCY_CHANGED'
     if code == 'QUOTA_EXHAUSTED':
         return 'RATE_LIMITED'
+    if code == 'IMPORT_PROCESSING_STOPPED':
+        return 'INTERRUPTED'
     if code.startswith('IMPORT_CLEANUP_'):
         return 'CLEANUP_FAILED'
     try:
@@ -98,6 +101,10 @@ class TemplateJobs:
                 # The account stopped the import (D104): saving would publish blocks no call could fill.
                 outcome = PublicationOutcome(state='failed_before_replacement', intentId=None, workspaceHash=None,
                     errorCode=account_stop(operation))
+            elif not operation.attempts and len(operation.task_results) < len(operation.tasks):
+                # Stopped before its first model call (the app closed): its fallbacks would be an empty resume (D104).
+                outcome = PublicationOutcome(state='failed_before_replacement', intentId=None, workspaceHash=None,
+                    errorCode='IMPORT_PROCESSING_STOPPED')
             else:
                 await self.pipeline.finish_fallbacks(project, operation.id)
                 operation = await self.pipeline.finalize(project, operation.id)
@@ -105,6 +112,11 @@ class TemplateJobs:
         except (BackgroundFailure, TemplateImportFailure, ProjectStoreFailure) as error:
             outcome = PublicationOutcome(state='outcome_unknown' if error.code == 'OUTCOME_UNKNOWN' else 'failed_before_replacement',
                 intentId=None, workspaceHash=None, errorCode=error.code)
+        except Exception:
+            # One import that cannot be assembled fails alone; at startup it must not stop the app.
+            logging.getLogger(__name__).exception('Template import completion failed')
+            outcome = PublicationOutcome(state='failed_before_replacement', intentId=None, workspaceHash=None,
+                errorCode='IMPORT_PROCESSING_STOPPED')
         if project in self.pipeline.persistence.pending:
             projected = job.model_copy(deep=True)
             projected.template_outcome = outcome

@@ -403,3 +403,20 @@ def test_lines_a_review_names_as_missing_show_only_where_no_view_shows_them():
     # Nothing is lost: every line is shown by an accepted value or placed once.
     assert all(any(value.disposition in {'accepted', 'multiple_views', 'fallback'} and overlaps(value.span, line)
         for value in coverage) for line in lines)
+
+
+def test_a_source_fallback_of_an_operation_task_places_no_text():
+    # finish_fallbacks gives every unfinished task a fallback, operations included; only blocks have views.
+    from tests.templates.generic_fixtures import generic_package
+    from tests.templates.pipeline_fixtures import setup_operation
+    package = generic_package()
+    src, _raw = employment_source()
+    operation, _command, _package, _source, facts = setup_operation(captured=package, src=src)
+    task = next(value for value in operation.tasks if value.block_id == 'project-window')
+    operation.task_results = [TaskResultRecord(id='operation-fallback', taskId=task.id, inputHash=task.input_hash,
+        value=None, sourceSpans=[capture_span(src, src.units[0])], itemHandles=[], issueIds=[], disposition='source_fallback')]
+    document, _coverage = materialize(package, facts, [operation], [src], operation_id=operation.id)
+    assert src.units[0].text.strip() not in text(document)
+    task.block_id = 'nowhere'
+    with pytest.raises(ValueError, match='no configured block view'):
+        materialize(package, facts, [operation], [src], operation_id=operation.id)

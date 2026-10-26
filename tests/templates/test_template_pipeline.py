@@ -680,3 +680,46 @@ async def test_a_failure_of_one_call_still_falls_back_for_that_block(tmp_path):
         else account_failure('CLI_FAILED'))
     result = await fixture.pipeline.run(fixture.project, fixture.command, admitted=fixture.admitted)
     assert result.state == 'published' and result.tasks[0].state == 'source_fallback'
+
+
+@pytest.mark.asyncio
+async def test_an_import_stopped_before_its_first_call_saves_nothing_and_recovers(tmp_path, monkeypatch):
+    # The app closed during an import before any model call: recovery used to fill every task with a fallback and
+    # failed to start the app on an operation task with no view; such an import now stays unsaved (D104).
+    from packages.resume_core.template_import import TemplateImportFailure
+    from resume_api.importer.template_pipeline import TemplatePipeline
+    async def stopped(*_args, **_kwargs):
+        raise TemplateImportFailure('IMPORT_PROCESSING_STOPPED')
+    monkeypatch.setattr(TemplatePipeline, 'run_tasks', stopped)
+    fixture = RuntimeFixture(tmp_path, cap=20)
+    service = await service_for(fixture)
+    try:
+        job = await queued(service, fixture, fixture.command)
+        operation = fixture.current().pre_draft.template_operations[0]
+        assert not operation.attempts and not operation.task_results
+        assert job.template_outcome.state == 'failed_before_replacement'
+        assert job.template_outcome.error_code == 'IMPORT_PROCESSING_STOPPED' and job.publication_error.code == 'INTERRUPTED'
+        await service.templates.recover()
+        assert fixture.current().project is None and not fixture.transport.calls
+    finally:
+        await service.shutdown()
+        service.supervisor.clock.verify()
+
+
+@pytest.mark.asyncio
+async def test_an_import_that_cannot_be_assembled_fails_alone_instead_of_stopping_recovery(tmp_path, monkeypatch):
+    from resume_api.importer.template_pipeline import TemplatePipeline
+    async def broken(*_args, **_kwargs):
+        raise ValueError('source fallback has no configured block view')
+    monkeypatch.setattr(TemplatePipeline, 'finalize', broken)
+    fixture = RuntimeFixture(tmp_path, cap=20)
+    service = await service_for(fixture)
+    try:
+        job = await queued(service, fixture, fixture.command)
+        assert job.template_outcome.state == 'failed_before_replacement'
+        assert job.template_outcome.error_code == 'IMPORT_PROCESSING_STOPPED'
+        await service.templates.recover()
+        assert fixture.current().project is None
+    finally:
+        await service.shutdown()
+        service.supervisor.clock.verify()
