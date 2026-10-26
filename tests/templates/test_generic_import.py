@@ -43,6 +43,10 @@ CASES = {
     'F06-analyst': ('F06', {}),
     'F06-technical': ('F06', {'table': f06(True, 'other')}),
     'F07': ('F07', {}),
+    # D104: Focus entries without a stated length show the time the jobs listing the technology span.
+    'F10-durations': ('F10', {'rewrite': True, 'table': {**TABLES['F10'](True), 'focus': ([
+        {'technology': 'Python', 'experience': '3 years'}, {'technology': 'PostgreSQL', 'experience': None},
+        {'technology': 'Perl', 'experience': None}, {'technology': 'Docker', 'experience': None}], {})}}),
 }
 
 
@@ -292,3 +296,15 @@ async def test_a_long_document_keeps_every_marker_once_and_in_order_and_exports(
     for prefix in ('SIDEBAR-MARKER-', 'PROJECT-MARKER-'):
         positions = [body.index(marker) for marker in markers if marker.startswith(prefix)]
         assert positions == sorted(positions)
+
+
+@pytest.mark.asyncio
+async def test_a_focus_entry_without_a_stated_length_shows_the_time_its_jobs_span(tmp_path_factory):
+    # D104: the user chose durations counted from projects. PostgreSQL and Docker are listed in 03.2020–11.2023 (45
+    # months, 4 years); Perl in 2010–2012, year precision (between 14 and 36 months, the middle rounds to 2 years).
+    _fixture, _result, workspace, _originals = await shared(tmp_path_factory, 'F10-durations')
+    assert views(workspace)['focus'] == ['ФОКУС', 'Python', '3 years', 'PostgreSQL', '4 года', 'Perl', '2 года', 'Docker', '4 года']
+    # The computed text is shown, not stored as stated experience.
+    stated = {record.display.raw_text: record.experience.raw_text for record in records(workspace, 'technology')
+        if record.display.raw_text in {'PostgreSQL', 'Perl', 'Docker'} and record.job_id is None}
+    assert stated and set(stated.values()) == {''}

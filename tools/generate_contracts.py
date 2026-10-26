@@ -40,6 +40,7 @@ from packages.resume_core.models.assistant_continuation import ASSISTANT_CONTINU
 from packages.resume_core.models.background import BACKGROUND_CONTRACTS
 from packages.resume_core.models.connection import CliInstallationPayload
 from packages.resume_core.templates.models import TemplateDefinition, TemplatePackage
+from packages.resume_core.templates.shorthand import source_schema
 from packages.resume_core.models.template_document import RichDocumentV2
 from packages.resume_core.models.template_facts import WorkingFactsV2
 from packages.resume_core.models.template_import import ImportOperation, StartTemplateImportV1, ResumeTemplateImportV1
@@ -125,6 +126,10 @@ def main() -> None:
             json.dumps(schema, ensure_ascii=False, sort_keys=True, indent=2) + "\n",
             encoding="utf-8",
         )
+    # Editor hints for template YAML in both forms; no TypeScript type is generated from it.
+    (ROOT / "contracts" / "template-source.schema.json").write_text(json.dumps(
+        source_schema(TemplateDefinition.model_json_schema(mode="validation")), ensure_ascii=False, sort_keys=True, indent=2)
+        + "\n", encoding="utf-8")
     (ROOT / "contracts" / "technology-catalog.json").write_text(
         json.dumps({"version": CATALOG_VERSION, "entries": [
             {"canonicalId": item.canonical_id, "aliases": list(item.aliases)} for item in CATALOG

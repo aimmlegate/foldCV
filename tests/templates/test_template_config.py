@@ -12,22 +12,23 @@ from tests.templates.scripted_template_provider import ScriptedTemplateProvider
 from tests.templates.test_template_import_app import app_client, upload
 
 BUNDLED_TEXT = BUNDLED_TEMPLATE.read_text(encoding='utf-8')
+BUNDLED_REVISION = compile_template(BUNDLED_TEMPLATE).revision
 
 
-def revised(text, revision='2.0.1', name=None):
-    text = text.replace('  revision: 2.0.0\n', f'  revision: {revision}\n', 1)
+def revised(text, revision='9.0.1', name=None):
+    text = text.replace(f'  revision: {BUNDLED_REVISION}\n', f'  revision: {revision}\n', 1)
     return text if name is None else text.replace('  name: Две колонки\n', f'  name: {name}\n', 1)
 
 
 def test_an_empty_store_offers_the_bundled_yaml_unchanged(tmp_path):
     state = TemplateConfig(tmp_path).read()
     assert state['text'] == BUNDLED_TEXT and state['format'] == 'yaml' and state['bundled'] is True
-    assert state['package']['revision'] == '2.0.0'
+    assert state['package']['revision'] == BUNDLED_REVISION
     assert TemplateConfig(tmp_path).check(BUNDLED_TEXT)['valid'] is True
 
 
 def test_a_changed_template_needs_a_new_revision_even_before_the_store_records_the_bundled_one(tmp_path):
-    result = TemplateConfig(tmp_path).check(revised(BUNDLED_TEXT, '2.0.0', 'Renamed'))
+    result = TemplateConfig(tmp_path).check(revised(BUNDLED_TEXT, BUNDLED_REVISION, 'Renamed'))
     assert result == {'schemaVersion': 1, 'valid': False, 'package': None,
         'error': {'path': '/template/revision', 'message': REVISION_TAKEN}}
     assert not (tmp_path / 'template-packages').exists()
@@ -37,13 +38,13 @@ def test_save_activates_for_new_imports_and_reset_restores_the_bundled_package(t
     config, edited = TemplateConfig(tmp_path), revised(BUNDLED_TEXT, name='Renamed')
     saved, refused = config.save(edited)
     assert refused is None and saved['text'] == edited and saved['bundled'] is False
-    assert saved['package']['name'] == 'Renamed' and TemplateStore(tmp_path).active().revision == '2.0.1'
+    assert saved['package']['name'] == 'Renamed' and TemplateStore(tmp_path).active().revision == '9.0.1'
     # The same revision with other content is refused; the same content saves again without change.
     assert config.check(revised(BUNDLED_TEXT, name='Other'))['error']['path'] == '/template/revision'
     assert config.save(edited)[1] is None
     reset = config.reset()
     assert reset['bundled'] is True and reset['text'] == BUNDLED_TEXT
-    # 2.0.1 stays registered, so a different 2.0.1 is still refused after the reset.
+    # 9.0.1 stays registered, so a different 9.0.1 is still refused after the reset.
     assert config.check(revised(BUNDLED_TEXT, name='Other'))['valid'] is False
 
 
@@ -65,16 +66,15 @@ def test_assets_come_from_the_active_package_and_paths_stay_inside_the_template(
     folder = tmp_path / 'template'
     shutil.copytree(BUNDLED_TEMPLATE.parent, folder)
     (folder / 'assets/extra.png').write_bytes((folder / 'assets/docker.png').read_bytes())
-    text = revised(BUNDLED_TEXT, '2.1.0').replace('assets:\n', 'assets:\n- id: extra\n  path: assets/extra.png\n  role: icon\n'
-        '  mime_type: image/png\n  embedding: not_applicable\n', 1)
+    text = revised(BUNDLED_TEXT, '9.1.0').replace('\nassets:\n', '\nassets:\n  extra: assets/extra.png\n', 1)
     (folder / 'template.yaml').write_text(text, encoding='utf-8')
     TemplateStore(tmp_path / 'data').activate(compile_template(folder / 'template.yaml'))
     config = TemplateConfig(tmp_path / 'data')
     # extra.png exists only inside the active package, not in the bundled folder.
     assert not (BUNDLED_TEMPLATE.parent / 'assets/extra.png').exists()
-    assert config.check(revised(text, '2.1.0').replace('revision: 2.1.0', 'revision: 2.1.1'))['valid'] is True
+    assert config.check(revised(text, '9.1.0').replace('revision: 9.1.0', 'revision: 9.1.1'))['valid'] is True
     for path in ('assets/missing.png', '../../../requirements.txt'):
-        result = config.check(text.replace('path: assets/extra.png', f'path: {path}').replace('revision: 2.1.0', 'revision: 2.1.2'))
+        result = config.check(text.replace('extra: assets/extra.png', f'extra: {path}').replace('revision: 9.1.0', 'revision: 9.1.2'))
         assert result['valid'] is False and result['error']['path'] == '/assets/' + path
 
 

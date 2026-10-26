@@ -80,7 +80,8 @@ class TemplatePublicationFixture:
             originals=self.originals, template_finalization=self.binding)
 
     def current(self):
-        return self.canonical.read_committed(self.project)[0]
+        # Import tests read the records a project keeps in its history files (D104).
+        return self.canonical.read_committed(self.project, history=True)[0]
 
     def fresh(self):
         fresh = TemplatePublicationFixture(self.root, create=False)

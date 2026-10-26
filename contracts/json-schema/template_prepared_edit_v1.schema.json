@@ -854,59 +854,6 @@
       "title": "CanonicalFieldBinding",
       "type": "object"
     },
-    "CapturedAsset": {
-      "additionalProperties": false,
-      "properties": {
-        "bytesBase64": {
-          "title": "Bytesbase64",
-          "type": "string"
-        },
-        "id": {
-          "minLength": 1,
-          "title": "Id",
-          "type": "string"
-        },
-        "mimeType": {
-          "title": "Mimetype",
-          "type": "string"
-        },
-        "path": {
-          "title": "Path",
-          "type": "string"
-        },
-        "role": {
-          "enum": [
-            "font",
-            "logo",
-            "icon",
-            "catalog"
-          ],
-          "title": "Role",
-          "type": "string"
-        },
-        "sha256": {
-          "pattern": "^[a-f0-9]{64}$",
-          "title": "Sha256",
-          "type": "string"
-        },
-        "size": {
-          "minimum": 0,
-          "title": "Size",
-          "type": "integer"
-        }
-      },
-      "required": [
-        "id",
-        "path",
-        "role",
-        "mimeType",
-        "sha256",
-        "size",
-        "bytesBase64"
-      ],
-      "title": "CapturedAsset",
-      "type": "object"
-    },
     "CapturedItemIdentity": {
       "additionalProperties": false,
       "properties": {
@@ -5121,6 +5068,28 @@
       "title": "ImportFact",
       "type": "object"
     },
+    "ImportHistoryRef": {
+      "additionalProperties": false,
+      "description": "A published import's record, kept in the project's history file of this hash (D104).",
+      "properties": {
+        "operationId": {
+          "minLength": 1,
+          "title": "Operationid",
+          "type": "string"
+        },
+        "sha256": {
+          "pattern": "^[a-f0-9]{64}$",
+          "title": "Sha256",
+          "type": "string"
+        }
+      },
+      "required": [
+        "operationId",
+        "sha256"
+      ],
+      "title": "ImportHistoryRef",
+      "type": "object"
+    },
     "ImportIssue": {
       "additionalProperties": false,
       "properties": {
@@ -7963,6 +7932,13 @@
           "title": "Importcoverage",
           "type": "array"
         },
+        "importHistory": {
+          "items": {
+            "$ref": "#/$defs/ImportHistoryRef"
+          },
+          "title": "Importhistory",
+          "type": "array"
+        },
         "importIssues": {
           "items": {
             "$ref": "#/$defs/ImportIssue"
@@ -8014,7 +7990,7 @@
           "type": "array"
         },
         "templatePackage": {
-          "$ref": "#/$defs/TemplatePackage"
+          "$ref": "#/$defs/StoredTemplatePackage"
         }
       },
       "required": [
@@ -8032,7 +8008,6 @@
         "templatePackage",
         "importCoverage",
         "importIssues",
-        "templateOperations",
         "exports"
       ],
       "title": "ProjectV6",
@@ -10097,7 +10072,7 @@
         "templatePackage": {
           "anyOf": [
             {
-              "$ref": "#/$defs/TemplatePackage"
+              "$ref": "#/$defs/StoredTemplatePackage"
             },
             {
               "type": "null"
@@ -11960,6 +11935,165 @@
         "reason"
       ],
       "title": "SpanCoverage",
+      "type": "object"
+    },
+    "StoredAsset": {
+      "additionalProperties": false,
+      "description": "An asset of a workspace's captured package. Its bytes stay in memory and in the project's asset files, never in\nthe workspace JSON, its hash or the browser's copy (D104: fonts were a quarter of every 10 MB reply).",
+      "properties": {
+        "bytesBase64": {
+          "default": "",
+          "title": "Bytesbase64",
+          "type": "string"
+        },
+        "id": {
+          "minLength": 1,
+          "title": "Id",
+          "type": "string"
+        },
+        "mimeType": {
+          "title": "Mimetype",
+          "type": "string"
+        },
+        "path": {
+          "title": "Path",
+          "type": "string"
+        },
+        "role": {
+          "enum": [
+            "font",
+            "logo",
+            "icon",
+            "catalog"
+          ],
+          "title": "Role",
+          "type": "string"
+        },
+        "sha256": {
+          "pattern": "^[a-f0-9]{64}$",
+          "title": "Sha256",
+          "type": "string"
+        },
+        "size": {
+          "minimum": 0,
+          "title": "Size",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "id",
+        "path",
+        "role",
+        "mimeType",
+        "sha256",
+        "size"
+      ],
+      "title": "StoredAsset",
+      "type": "object"
+    },
+    "StoredTemplatePackage": {
+      "additionalProperties": false,
+      "properties": {
+        "assets": {
+          "items": {
+            "$ref": "#/$defs/StoredAsset"
+          },
+          "title": "Assets",
+          "type": "array"
+        },
+        "blocks": {
+          "items": {
+            "$ref": "#/$defs/CompiledBlock"
+          },
+          "title": "Blocks",
+          "type": "array"
+        },
+        "compilerVersion": {
+          "minLength": 1,
+          "title": "Compilerversion",
+          "type": "string"
+        },
+        "configHash": {
+          "pattern": "^[a-f0-9]{64}$",
+          "title": "Confighash",
+          "type": "string"
+        },
+        "definition": {
+          "$ref": "#/$defs/TemplateDefinition"
+        },
+        "id": {
+          "minLength": 1,
+          "title": "Id",
+          "type": "string"
+        },
+        "manifest": {
+          "$ref": "#/$defs/CompilationManifest"
+        },
+        "operationVersion": {
+          "minLength": 1,
+          "title": "Operationversion",
+          "type": "string"
+        },
+        "originalBase64": {
+          "title": "Originalbase64",
+          "type": "string"
+        },
+        "originalFormat": {
+          "enum": [
+            "yaml",
+            "json"
+          ],
+          "title": "Originalformat",
+          "type": "string"
+        },
+        "originalHash": {
+          "pattern": "^[a-f0-9]{64}$",
+          "title": "Originalhash",
+          "type": "string"
+        },
+        "packageHash": {
+          "pattern": "^[a-f0-9]{64}$",
+          "title": "Packagehash",
+          "type": "string"
+        },
+        "projectionVersion": {
+          "minLength": 1,
+          "title": "Projectionversion",
+          "type": "string"
+        },
+        "recipe": {
+          "$ref": "#/$defs/CompiledRecipe"
+        },
+        "revision": {
+          "minLength": 1,
+          "title": "Revision",
+          "type": "string"
+        },
+        "schemaVersion": {
+          "const": 1,
+          "title": "Schemaversion",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "schemaVersion",
+        "id",
+        "revision",
+        "packageHash",
+        "configHash",
+        "originalHash",
+        "originalFormat",
+        "originalBase64",
+        "definition",
+        "compilerVersion",
+        "operationVersion",
+        "projectionVersion",
+        "recipe",
+        "assets",
+        "blocks",
+        "manifest"
+      ],
+      "title": "StoredTemplatePackage",
       "type": "object"
     },
     "Style": {
@@ -14220,111 +14354,6 @@
         "remainingOccurrenceIds"
       ],
       "title": "TemplateOwnershipConflict",
-      "type": "object"
-    },
-    "TemplatePackage": {
-      "additionalProperties": false,
-      "properties": {
-        "assets": {
-          "items": {
-            "$ref": "#/$defs/CapturedAsset"
-          },
-          "title": "Assets",
-          "type": "array"
-        },
-        "blocks": {
-          "items": {
-            "$ref": "#/$defs/CompiledBlock"
-          },
-          "title": "Blocks",
-          "type": "array"
-        },
-        "compilerVersion": {
-          "minLength": 1,
-          "title": "Compilerversion",
-          "type": "string"
-        },
-        "configHash": {
-          "pattern": "^[a-f0-9]{64}$",
-          "title": "Confighash",
-          "type": "string"
-        },
-        "definition": {
-          "$ref": "#/$defs/TemplateDefinition"
-        },
-        "id": {
-          "minLength": 1,
-          "title": "Id",
-          "type": "string"
-        },
-        "manifest": {
-          "$ref": "#/$defs/CompilationManifest"
-        },
-        "operationVersion": {
-          "minLength": 1,
-          "title": "Operationversion",
-          "type": "string"
-        },
-        "originalBase64": {
-          "title": "Originalbase64",
-          "type": "string"
-        },
-        "originalFormat": {
-          "enum": [
-            "yaml",
-            "json"
-          ],
-          "title": "Originalformat",
-          "type": "string"
-        },
-        "originalHash": {
-          "pattern": "^[a-f0-9]{64}$",
-          "title": "Originalhash",
-          "type": "string"
-        },
-        "packageHash": {
-          "pattern": "^[a-f0-9]{64}$",
-          "title": "Packagehash",
-          "type": "string"
-        },
-        "projectionVersion": {
-          "minLength": 1,
-          "title": "Projectionversion",
-          "type": "string"
-        },
-        "recipe": {
-          "$ref": "#/$defs/CompiledRecipe"
-        },
-        "revision": {
-          "minLength": 1,
-          "title": "Revision",
-          "type": "string"
-        },
-        "schemaVersion": {
-          "const": 1,
-          "title": "Schemaversion",
-          "type": "integer"
-        }
-      },
-      "required": [
-        "schemaVersion",
-        "id",
-        "revision",
-        "packageHash",
-        "configHash",
-        "originalHash",
-        "originalFormat",
-        "originalBase64",
-        "definition",
-        "compilerVersion",
-        "operationVersion",
-        "projectionVersion",
-        "recipe",
-        "assets",
-        "blocks",
-        "manifest"
-      ],
-      "title": "TemplatePackage",
       "type": "object"
     },
     "TemplateParagraphBlock": {

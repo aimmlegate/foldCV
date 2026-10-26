@@ -393,12 +393,16 @@ class WriterViewV2(WriterViewV1):
     schema_version: Literal[2]
     response: TemplateProjectResponseV1
     local_history_ack: LocalHistoryAckV2 | None = None
+    # The browser reads the workspace text from the response itself; a second copy doubled every reply (D104).
+    workspace_wire: str = Field(default='', exclude=True)
 
     @model_validator(mode='after')
     def exact_workspace(self):
+        from ..templates.compiler import canonical
         workspace = self.response.workspace
-        if (hashlib.sha256(self.workspace_wire.encode()).hexdigest() != self.workspace_sha256
-                or WorkspaceV7.model_validate_json(self.workspace_wire) != workspace
+        exact = canonical(workspace)
+        if (hashlib.sha256(exact).hexdigest() != self.workspace_sha256
+                or self.workspace_wire and self.workspace_wire.encode() != exact
                 or self.writer.project_id != workspace.project_id
                 or any(item.project_id != workspace.project_id or item.lineage != self.writer.lineage for item in self.drafts)
                 or not self.canonical_ready and self.response.durability == 'durable'

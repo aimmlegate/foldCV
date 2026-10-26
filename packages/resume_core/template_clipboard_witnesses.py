@@ -12,6 +12,11 @@ def fingerprint(value):
     return sha256(canonical(value))
 
 
+def captured_package_hash(package):
+    # A workspace's package keeps its asset bytes out of its JSON (D104); the guard still covers every byte.
+    return sha256(canonical(package) + "".join(asset.bytes_base64 for asset in package.assets).encode("ascii"))
+
+
 def records(project):
     return {record.id:record for record in [*project.facts.records,*project.facts.extensions]
         if getattr(record,'active',True)}
@@ -117,7 +122,7 @@ def verify_witness(project,witness):
 
 def verify_witnesses(project,witnesses,package_fingerprint):
     from .templates.store import verify_package
-    if fingerprint(project.template_package)!=package_fingerprint:
+    if captured_package_hash(project.template_package)!=package_fingerprint:
         raise ValueError('clipboard captured package changed')
     verify_package(project.template_package)
     for witness in witnesses:verify_witness(project,witness)

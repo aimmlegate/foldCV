@@ -148,8 +148,9 @@ def test_archive_and_reopen_keep_exact_version_format_and_original_meaning(tmp_p
         before=WorkspaceV7.model_validate(data)
     store=RichProjectStore(tmp_path/'first');store.save(before,{(before.project_id,key):value for key,value in sources.items()},{})
     loaded,failures,_=RichProjectStore(tmp_path/'first').load_all();assert not failures
-    recovered=loaded[before.project_id][0];assert canonical((recovered.project or recovered.pre_draft).template_package)==exact
+    # A workspace keeps its package's asset bytes in their own files (D104); the full package is unchanged.
+    recovered=loaded[before.project_id][0];assert canonical((recovered.project or recovered.pre_draft).template_package.full())==exact
     moved,originals,artifacts,images=open_rich_archive(export_rich_archive(recovered,sources,{},{}),'new-owner')
     restored=(moved.project or moved.pre_draft).template_package
-    assert canonical(restored)==exact and originals==sources and not artifacts and not images
-    assert verify_package(restored)==captured
+    assert canonical(restored.full())==exact and originals==sources and not artifacts and not images
+    assert verify_package(restored).full()==captured

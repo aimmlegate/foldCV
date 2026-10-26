@@ -650,6 +650,9 @@ export type Disposition = "accepted" | "fallback" | "source_only" | "multiple_vi
 export type Itemhandle4 = string | null;
 export type Reason = string | null;
 export type Importcoverage = SpanCoverage[];
+export type Operationid = string;
+export type Sha2563 = string;
+export type Importhistory = ImportHistoryRef[];
 export type Blockids2 = string[];
 export type Category1 = "content_violation" | "uncertain_interpretation" | "check_not_completed";
 export type Code2 = string;
@@ -747,7 +750,7 @@ export type Discoveryattemptid = string;
 export type Discoveryhash = string;
 export type Itemhandle5 = string;
 export type Key = string;
-export type Operationid = string;
+export type Operationid1 = string;
 export type Recordid8 = string;
 export type Semantictype2 = string;
 export type Taskid1 = string;
@@ -766,7 +769,7 @@ export type Capabilityversion = string;
 export type Configurationhash = string;
 export type Effort = string;
 export type Model = string;
-export type Operationid1 = string;
+export type Operationid2 = string;
 export type Outcome =
   | (
       | "completed"
@@ -850,7 +853,7 @@ export type Expiresat1 = string;
 export type Factshash3 = string;
 export type Id51 = string;
 export type Issueshash = string;
-export type Operationid2 = string;
+export type Operationid3 = string;
 export type Packagehash5 = string;
 export type Sourcehash = string;
 export type Startedat = string;
@@ -939,7 +942,7 @@ export type Receipts = ReviewReceipt[];
 export type Discoveryattemptid1 = string;
 export type Key4 = string;
 export type Kind28 = "owned_by" | "extension_of" | "related_to";
-export type Operationid3 = string;
+export type Operationid4 = string;
 export type Relationid1 = string;
 export type Subjectid1 = string;
 export type Targetid3 = string;
@@ -1002,7 +1005,7 @@ export type Id59 = string;
 export type Inputhash5 = string;
 export type Issueids1 = string[];
 export type Kind30 = "extract" | "rewrite" | "derive" | "source_copy";
-export type Operationid4 = string;
+export type Operationid5 = string;
 export type Proposalhash3 = string | null;
 export type Receiptids1 = string[];
 export type State9 =
@@ -1023,9 +1026,9 @@ export type Id60 = string;
 export type Mimetype2 = string;
 export type Path2 = string;
 export type Role1 = "font" | "logo" | "icon" | "catalog";
-export type Sha2563 = string;
+export type Sha2564 = string;
 export type Size3 = number;
-export type Assets2 = CapturedAsset[];
+export type Assets2 = StoredAsset[];
 export type Dependencyorder = number;
 export type Id61 = string;
 export type Serveronly = string[];
@@ -1234,6 +1237,7 @@ export interface ProjectV6 {
   exports: Exports;
   facts: WorkingFactsV2;
   importCoverage: Importcoverage;
+  importHistory?: Importhistory;
   importIssues: Importissues;
   operations: Operations;
   projectId: Projectid1;
@@ -1241,8 +1245,8 @@ export interface ProjectV6 {
   revision: Revision39;
   schemaVersion: Schemaversion4;
   sources: Sources;
-  templateOperations: Templateoperations;
-  templatePackage: TemplatePackage;
+  templateOperations?: Templateoperations;
+  templatePackage: StoredTemplatePackage;
 }
 export interface LocalImageAsset {
   height: Height;
@@ -1954,6 +1958,13 @@ export interface SpanCoverage {
   reason: Reason;
   span: SourceSpan;
 }
+/**
+ * A published import's record, kept in the project's history file of this hash (D104).
+ */
+export interface ImportHistoryRef {
+  operationId: Operationid;
+  sha256: Sha2563;
+}
 export interface ImportIssue {
   blockIds: Blockids2;
   category: Category1;
@@ -2092,7 +2103,7 @@ export interface HandleAllocation {
   discoveryHash: Discoveryhash;
   itemHandle: Itemhandle5;
   key: Key;
-  operationId: Operationid;
+  operationId: Operationid1;
   periodIds?: Periodids1;
   recordId: Recordid8;
   semanticType: Semantictype2;
@@ -2115,7 +2126,7 @@ export interface ImportAttempt {
   id: Id49;
   inputHash: Inputhash;
   model: ModelCapture;
-  operationId: Operationid1;
+  operationId: Operationid2;
   outcome?: Outcome;
   owner: LaunchOwner;
   proposalRecordId: Proposalrecordid;
@@ -2237,7 +2248,7 @@ export interface FinalizationCandidate {
   factsHash: Factshash3;
   id: Id51;
   issuesHash: Issueshash;
-  operationId: Operationid2;
+  operationId: Operationid3;
   packageHash: Packagehash5;
   sourceHash: Sourcehash;
   startedAt: Startedat;
@@ -2370,7 +2381,7 @@ export interface RelationAllocation {
   discoveryAttemptId: Discoveryattemptid1;
   key: Key4;
   kind: Kind28;
-  operationId: Operationid3;
+  operationId: Operationid4;
   relationId: Relationid1;
   subjectId: Subjectid1;
   targetId: Targetid3;
@@ -2452,12 +2463,12 @@ export interface ImportTask {
   inputHash: Inputhash5;
   issueIds: Issueids1;
   kind: Kind30;
-  operationId: Operationid4;
+  operationId: Operationid5;
   proposalHash: Proposalhash3;
   receiptIds: Receiptids1;
   state: State9;
 }
-export interface TemplatePackage {
+export interface StoredTemplatePackage {
   assets: Assets2;
   blocks: Blocks1;
   compilerVersion: Compilerversion;
@@ -2475,13 +2486,17 @@ export interface TemplatePackage {
   revision: Revision44;
   schemaVersion: Schemaversion9;
 }
-export interface CapturedAsset {
-  bytesBase64: Bytesbase64;
+/**
+ * An asset of a workspace's captured package. Its bytes stay in memory and in the project's asset files, never in
+ * the workspace JSON, its hash or the browser's copy (D104: fonts were a quarter of every 10 MB reply).
+ */
+export interface StoredAsset {
+  bytesBase64?: Bytesbase64;
   id: Id60;
   mimeType: Mimetype2;
   path: Path2;
   role: Role1;
-  sha256: Sha2563;
+  sha256: Sha2564;
   size: Size3;
 }
 export interface CompiledBlock {

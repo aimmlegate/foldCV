@@ -281,7 +281,7 @@ async def test_app_import_selects_evidence_by_reference_and_receipts_retain_rest
                     return current
                 await asyncio.sleep(0.05)
         assert (await asyncio.wait_for(finished(), 60))['templateOutcome']['state'] == 'saved'
-        operation = service.read(project).project.template_operations[0]
+        operation = service.storage.load_history(service.read(project)).project.template_operations[0]
     extraction, review = operation.attempts
     assert [call['kind'] for call in provider.calls] == ['template_extraction', 'template_review']
     assert 'evidence' in extraction.request_value and not {'sourceSpans', 'sourceTexts'} & set(extraction.request_value)
@@ -331,7 +331,7 @@ async def test_model_prompts_offer_refs_and_texts_while_storage_keeps_spans_and_
                     return current
                 await asyncio.sleep(0.05)
         assert (await asyncio.wait_for(finished(), 60))['templateOutcome']['state'] == 'saved'
-        operation = service.read(project).project.template_operations[0]
+        operation = service.storage.load_history(service.read(project)).project.template_operations[0]
     assert len(provider.prompts) == len(operation.attempts) == 2
     for prompt, attempt in zip(provider.prompts, operation.attempts, strict=True):
         # A review attempt's request is its review input record (stored once).

@@ -33,8 +33,9 @@ def verify_package(package: TemplatePackage) -> TemplatePackage:
             or package.recipe.render_input_version != 1 or set(package.recipe.capabilities) - set([*CAPABILITIES, *ADDED_CAPABILITIES])):
         raise SchemaFailure("/package", "unsupported package/recipe compatibility")
     try:
-        # Checkpoints reuse large packages. Cache only an exact hash of every captured byte.
-        fingerprint = sha256(canonical(package))
+        # Checkpoints reuse large packages. Cache only an exact hash of every captured byte; a workspace's package
+        # leaves its asset bytes out of its JSON (D104), so they join the key here.
+        fingerprint = sha256(canonical(package) + "".join(asset.bytes_base64 for asset in package.assets).encode("ascii"))
         with _VERIFIED_LOCK:
             if fingerprint in _VERIFIED_PACKAGES:
                 _VERIFIED_PACKAGES.move_to_end(fingerprint)

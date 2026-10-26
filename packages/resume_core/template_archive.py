@@ -9,7 +9,9 @@ from .models.template_workspace import ArchiveManifestV7, WorkspaceV7
 from .rich_archive import inert_sync_history, referenced_assets
 from .rich_images import ImageFailure, verify_image_bytes
 from .templates.compiler import canonical
-from .templates.models import TemplatePackage
+from .models.template_import import ImportOperation
+from .models.template_workspace import history_bytes, history_text
+from .templates.models import TemplatePackage, remember_asset
 from .templates.store import verify_package
 
 
@@ -20,7 +22,14 @@ def _verify_image(asset, blob):
         raise ArchiveFailure('ARCHIVE_IMAGE_MISMATCH') from None
 
 
-def archive_payload_v7(workspace,originals,images,current_render=None):
+def archive_payload_v7(workspace,originals,images,current_render=None,*,history=True):
+    # The import records are their own entries, as in the project folder (D104); a copy keeps the loaded ones. A
+    # project read without them cannot be carried, except for the size check of a save, which never opens it.
+    records=list(workspace.project.template_operations) if workspace.project else []
+    if history and workspace.project is not None and not workspace.project.history_loaded:
+        texts=[history_text(ref.sha256) for ref in workspace.project.import_history]
+        if any(text is None for text in texts): raise ArchiveFailure('ARCHIVE_WORKSPACE_INVALID')
+        records=[ImportOperation.model_validate_json(text) for text in texts]
     workspace=WorkspaceV7.model_validate(workspace.model_dump(by_alias=True))
     inert_sync_history(workspace)
     owner=workspace.project or workspace.pre_draft
@@ -36,10 +45,13 @@ def archive_payload_v7(workspace,originals,images,current_render=None):
         if raw is None or digest(raw)!=source.byte_sha256: raise ArchiveFailure('ARCHIVE_SOURCE_MISMATCH')
         add(source.byte_ref,'source_original',raw)
     if package is not None:
-        add('template/package.json','template_package',canonical(package))
+        add('template/package.json','template_package',canonical(package.full()))
         for asset in package.assets:
             add('template/assets/'+asset.sha256,'template_asset',base64.b64decode(asset.bytes_base64,validate=True))
     if workspace.project:
+        for record in records:
+            raw=history_bytes(record)
+            add('template/history/'+digest(raw),'template_history',raw)
         workspace.project.assets=referenced_assets(workspace.project)
         workspace.project.renders=[]
         for asset in workspace.project.assets:
@@ -61,13 +73,26 @@ def open_archive_v7(data,project_id):
         if set(entries)!=set(files)-{'manifest.json'}: raise ArchiveFailure('ARCHIVE_MANIFEST_INVALID')
         for path,entry in entries.items():
             if len(files[path])!=entry.size or digest(files[path])!=entry.sha256: raise ArchiveFailure('ARCHIVE_HASH_MISMATCH')
-        workspace=WorkspaceV7.model_validate(parse_json(files.get('workspace.json')))
+        data=parse_json(files.get('workspace.json'))
+        project=data.get('project') if isinstance(data,dict) else None
+        histories={e.path for e in entries.values() if e.role=='template_history'}
+        if isinstance(project,dict) and project.get('importHistory'):
+            named={'template/history/'+ref['sha256'] for ref in project['importHistory']}
+            if named!=histories: raise ArchiveFailure('ARCHIVE_TEMPLATE_INVALID')
+            project['templateOperations']=[parse_json(files['template/history/'+ref['sha256']]) for ref in project['importHistory']]
+        elif histories: raise ArchiveFailure('ARCHIVE_TEMPLATE_INVALID')
+        package_data=parse_json(files.get('template/package.json')) if 'template/package.json' in files else None
+        if package_data is not None:
+            # Asset bytes are their own entries; the captured package names them by hash.
+            for asset in package_data.get('assets',[]):
+                remember_asset(asset.get('sha256'),asset.get('bytesBase64',''))
+        workspace=WorkspaceV7.model_validate(data)
         if workspace.project_id!=manifest.project_id: raise ArchiveFailure('ARCHIVE_ID_MISMATCH')
         owner=workspace.project or workspace.pre_draft
         package=owner.template_package
         if package is not None:
-            captured=verify_package(TemplatePackage.model_validate(parse_json(files.get('template/package.json'))))
-            if canonical(package)!=canonical(captured): raise ArchiveFailure('ARCHIVE_TEMPLATE_INVALID')
+            captured=verify_package(TemplatePackage.model_validate(package_data))
+            if canonical(package.full())!=canonical(captured): raise ArchiveFailure('ARCHIVE_TEMPLATE_INVALID')
             expected_assets={'template/assets/'+a.sha256 for a in package.assets}
             for asset in package.assets:
                 if files.get('template/assets/'+asset.sha256)!=base64.b64decode(asset.bytes_base64,validate=True):
@@ -103,7 +128,10 @@ def open_archive_v7(data,project_id):
             if operation.status in {'queued','running'}:
                 operation.status='interrupted';operation.error_code='OPERATION_INTERRUPTED'
         inert_sync_history(workspace)
-        return WorkspaceV7.model_validate(workspace.model_dump(by_alias=True)),originals,{},images
+        result=workspace.model_dump(by_alias=True)
+        if workspace.project is not None and workspace.project.template_operations:
+            result['project']['templateOperations']=[value.model_dump(by_alias=True) for value in workspace.project.template_operations]
+        return WorkspaceV7.model_validate(result),originals,{},images
     except ArchiveFailure: raise
     except (ValueError,TypeError,KeyError,AttributeError,UnicodeError,RecursionError):
         raise ArchiveFailure('ARCHIVE_WORKSPACE_INVALID') from None

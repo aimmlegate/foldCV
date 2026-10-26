@@ -951,6 +951,7 @@
     "TECHNOLOGY_MOVE_INVALID": "technology",
     "TECHNOLOGY_SCOPE_MISMATCH": "technology",
     "TECHNOLOGY_TARGET_MISSING": "technology",
+    "TEMPLATE_ASSET_NOT_FOUND": "template",
     "TEMPLATE_MISMATCH": "template",
     "TEMPLATE_UNAVAILABLE": "template",
     "TEMP_FAILED": "storage",

@@ -161,7 +161,7 @@ class GuiProjectService(GuiExportMixin, GuiAnalysisMixin, GuiManagementMixin, Gu
             raise AdmissionCancelled()
         yield
 
-    def read(self, id):
+    def ensure_readable(self, id):
         self.ensure_loaded()
         if self.storage is not None:
             try:
@@ -170,11 +170,13 @@ class GuiProjectService(GuiExportMixin, GuiAnalysisMixin, GuiManagementMixin, Gu
             except ProjectStoreFailure as error:
                 raise ProjectFailure(error.code, 503) from None
         if id in self.deleted_ids: raise ProjectFailure("PROJECT_DELETED", 410)
-        workspace = self.workspaces.get(id)
-        if workspace is None:
+        if self.workspaces.get(id) is None:
             if id in self.load_errors:
                 raise ProjectFailure(self.load_errors[id], 409)
             raise ProjectFailure("PROJECT_NOT_FOUND", 404)
+
+    def read(self, id):
+        self.ensure_readable(id)
         with self.state_lock:
             return self.read_memory(id)
 

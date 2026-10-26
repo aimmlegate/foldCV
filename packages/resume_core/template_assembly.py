@@ -1,6 +1,6 @@
 """Publish the initial template tree while retaining original sources and fact history."""
 
-from .models.template_workspace import ProjectV6, WorkspaceV7
+from .models.template_workspace import ProjectV6, WorkspaceV7, validated_with_history
 from .templates.materialize import materialize
 from .templates.span_coverage import overlaps
 from .template_capture import item_identities
@@ -13,7 +13,7 @@ def assemble_template(workspace, operation):
     result = workspace.model_copy(deep=True)
     data = result.pre_draft
     document, coverage = materialize(data.template_package, data.facts, data.template_operations, data.sources,
-        operation_id=operation.id, revision=result.document_revision + 1)
+        operation_id=operation.id, revision=result.document_revision + 1, as_of=result.formatting_as_of)
     issues = [issue.model_copy(deep=True) for issue in operation.issues]
     identities = {identity.item_handle: identity for retained in data.template_operations for identity in item_identities(retained)}
     target_spans = {}
@@ -59,4 +59,4 @@ def assemble_template(workspace, operation):
         importCoverage=coverage, importIssues=issues, templateOperations=data.template_operations, exports=[])
     result.pre_draft = None
     result.document_revision = document.revision
-    return WorkspaceV7.model_validate(result.model_dump(by_alias=True))
+    return validated_with_history(result)

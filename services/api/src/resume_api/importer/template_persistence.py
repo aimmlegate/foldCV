@@ -113,7 +113,7 @@ class TemplatePersistence:
         with self.publisher._writer(project), self.publisher.jobs.guard(project) as directory:
             state = self.publisher.jobs._read(project, directory)
             self.publisher._writable(state)
-            workspace, _checksum = self.publisher.canonical._read_committed_unlocked(project)
+            workspace, _checksum = self.publisher.canonical._read_committed_unlocked(project, history=True)
             retained = next(value for value in (workspace.project or workspace.pre_draft).template_operations if value.id == operation.id)
             if retained != operation or workspace.project is not None:
                 raise BackgroundFailure('DEPENDENCY_CHANGED')
@@ -165,7 +165,7 @@ class TemplatePersistence:
         if outcome.state == 'saved':
             self.saved[(project, candidate.id)] = outcome.model_copy(deep=True)
         def checkpoint():
-            current, checksum = self.publisher.canonical.read_committed(project)
+            current, checksum = self.publisher.canonical.read_committed(project, history=True)
             retained = next(item for item in (current.project or current.pre_draft).template_operations if item.id == operation.id)
             if retained.publication == outcome:
                 return retained.publication

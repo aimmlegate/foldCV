@@ -301,6 +301,10 @@ def create_app(*, origin: str, secret: str, temp_root: Path, dist: Path, runner:
     @asynccontextmanager
     async def lifespan(_app: FastAPI):
         from .agent.project_action_recovery import recover_actions
+        # Files written before D104 move their import records and asset bytes out before anything reads them.
+        externalize = getattr(rich_projects.storage, "externalize_history", None)
+        if externalize is not None:
+            await asyncio.to_thread(externalize)
         recover_actions(rich_projects)
         await rich_projects.drain_catalog_actions()
         agent.recover()

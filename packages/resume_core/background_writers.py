@@ -131,7 +131,7 @@ class WriterSessions(TemplateWriterPreparation, TemplateWriterHistory, WriterDra
                 presentation=presentation(workspace.project.document, workspace.project.facts) if workspace.project else None)
             view_type, version = WriterViewV1, 1
         return view_type(schemaVersion=version, writer=state.writer.model_copy(deep=True), response=response,
-            workspaceSha256=checksum, workspaceWire=rich_snapshot_bytes(workspace).decode(), canonicalReady=ready,
+            workspaceSha256=checksum, workspaceWire=rich_snapshot_bytes(workspace).decode() if version == 1 else '', canonicalReady=ready,
             drafts=state.drafts, inverses=state.inverses)
 
     def validate_binding(self, state, binding):

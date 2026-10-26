@@ -89,7 +89,8 @@ def test_writer_v2_rejects_unbound_response_wire_or_acknowledgment(tmp_path, cha
     saved = fixture.writers.save(fixture.project, fixture.save_request(), originals=fixture.originals)
     value = saved.model_dump(mode='json', by_alias=True)
     if change == 'wire':
-        value['workspaceWire'] += ' '
+        # Replies no longer carry the workspace text (D104); one that does must match the canonical bytes.
+        value['workspaceWire'] = canonical(saved.response.workspace).decode() + ' '
     elif change == 'snapshot':
         value['response']['snapshot']['packageHash'] = '0' * 64
     elif change == 'presentation':

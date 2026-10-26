@@ -5,7 +5,14 @@ export type Appversion = string;
  */
 export type Entries = [TemplateArchiveEntry, ...TemplateArchiveEntry[]];
 export type Path = string;
-export type Role = "workspace" | "source_original" | "render" | "user_image" | "template_package" | "template_asset";
+export type Role =
+  | "workspace"
+  | "source_original"
+  | "render"
+  | "user_image"
+  | "template_package"
+  | "template_asset"
+  | "template_history";
 export type Sha256 = string;
 export type Size = number;
 export type Projectid = string;

@@ -31,9 +31,11 @@ class TemplateConfig:
 
     def read(self):
         package, bundled = self.store.active(), compile_template(BUNDLED_TEMPLATE)
-        return {'schemaVersion': 1, 'package': summary(package), 'format': package.original_format,
-            'text': base64.b64decode(package.original_base64).decode('utf-8'),
-            'bundled': package.package_hash == bundled.package_hash}
+        # The same package may have been captured from an older, longer text; show the bundled file's current form.
+        same = package.package_hash == bundled.package_hash
+        source = bundled if same else package
+        return {'schemaVersion': 1, 'package': summary(package), 'format': source.original_format,
+            'text': base64.b64decode(source.original_base64).decode('utf-8'), 'bundled': same}
 
     def compile(self, text):
         """Return (package, None) or (None, error). Assets keep the active package's bytes; new paths read the bundled folder."""

@@ -135,7 +135,7 @@ async def test_the_fallback_model_makes_the_last_repair_and_is_never_replaced_wh
         project = (await upload(client)).json()['workspace']['projectId']
         _job, done = await run_import(client, project, 'fallback')
         assert done['templateOutcome']['state'] == 'saved', done
-        operation = service.read(project).project.template_operations[0]
+        operation = service.storage.load_history(service.read(project)).project.template_operations[0]
         slots = [(attempt.slot, attempt.model.model) for attempt in operation.attempts]
         if available:
             assert slots == [('initial', 'processing-model'), ('primary_repair', 'processing-model'),

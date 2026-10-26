@@ -844,7 +844,7 @@ export type Path = string;
 export type Role1 = "font" | "logo" | "icon" | "catalog";
 export type Sha256 = string;
 export type Size3 = number;
-export type Assets = CapturedAsset[];
+export type Assets = StoredAsset[];
 export type Dependencyorder = number;
 export type Id41 = string;
 export type Serveronly = string[];
@@ -1352,6 +1352,9 @@ export type Disposition3 = "accepted" | "fallback" | "source_only" | "multiple_v
 export type Itemhandle8 = string | null;
 export type Reason2 = string | null;
 export type Importcoverage = SpanCoverage[];
+export type Operationid5 = string;
+export type Sha2564 = string;
+export type Importhistory = ImportHistoryRef[];
 export type Importissues = ImportIssue[];
 export type Operations2 = RichOperation[];
 export type Projectid2 = string;
@@ -1373,7 +1376,7 @@ export type Projectid3 = string;
 export type Projectrevision1 = number;
 export type Markdown = string;
 export type Revision45 = number;
-export type Sha2564 = string;
+export type Sha2565 = string;
 export type Schemaversion12 = 7;
 export type Actionid3 = string;
 export type Blockids3 = string[];
@@ -2238,7 +2241,7 @@ export interface RichPreDraftV2 {
   selectedSourceId: Selectedsourceid;
   sources: Sources;
   templateOperations: Templateoperations;
-  templatePackage: TemplatePackage | null;
+  templatePackage: StoredTemplatePackage | null;
   warnings: Warnings1;
 }
 export interface WorkingFactsV2 {
@@ -3170,7 +3173,7 @@ export interface ImportTask {
   receiptIds: Receiptids1;
   state: State9;
 }
-export interface TemplatePackage {
+export interface StoredTemplatePackage {
   assets: Assets;
   blocks: Blocks4;
   compilerVersion: Compilerversion;
@@ -3188,8 +3191,12 @@ export interface TemplatePackage {
   revision: Revision28;
   schemaVersion: Schemaversion8;
 }
-export interface CapturedAsset {
-  bytesBase64: Bytesbase64;
+/**
+ * An asset of a workspace's captured package. Its bytes stay in memory and in the project's asset files, never in
+ * the workspace JSON, its hash or the browser's copy (D104: fonts were a quarter of every 10 MB reply).
+ */
+export interface StoredAsset {
+  bytesBase64?: Bytesbase64;
   id: Id40;
   mimeType: Mimetype1;
   path: Path;
@@ -3404,6 +3411,7 @@ export interface ProjectV6 {
   exports: Exports;
   facts: WorkingFactsV2;
   importCoverage: Importcoverage;
+  importHistory?: Importhistory;
   importIssues: Importissues;
   operations: Operations2;
   projectId: Projectid2;
@@ -3411,8 +3419,8 @@ export interface ProjectV6 {
   revision: Revision44;
   schemaVersion: Schemaversion11;
   sources: Sources1;
-  templateOperations: Templateoperations1;
-  templatePackage: TemplatePackage;
+  templateOperations?: Templateoperations1;
+  templatePackage: StoredTemplatePackage;
 }
 export interface LocalImageAsset {
   height: Height3;
@@ -3741,6 +3749,13 @@ export interface SpanCoverage {
   reason: Reason2;
   span: SourceSpan;
 }
+/**
+ * A published import's record, kept in the project's history file of this hash (D104).
+ */
+export interface ImportHistoryRef {
+  operationId: Operationid5;
+  sha256: Sha2564;
+}
 export interface RichRenderSnapshot {
   documentRevision: Documentrevision2;
   docxPath: Docxpath;
@@ -3755,7 +3770,7 @@ export interface RichRenderSnapshot {
 export interface Rules1 {
   markdown: Markdown;
   revision: Revision45;
-  sha256: Sha2564;
+  sha256: Sha2565;
 }
 export interface TemplateSyncRecord {
   actionId: Actionid3;

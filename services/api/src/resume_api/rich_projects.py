@@ -49,6 +49,8 @@ class RichProjectService(TemplateExports, TemplateRewrite, TemplateImports, Rich
         self.images = {}
         self.generations = {}
         self.saved_baselines = {}
+        # Saved-file identity and checksum each project last adopted on read; an unchanged file needs no new merge.
+        self.adopted_keys = {}
         self.agent_recovery_fences = set()
         self.catalog_recovery_fences = set()
         self.import_runtime = import_runtime
@@ -111,8 +113,11 @@ class RichProjectService(TemplateExports, TemplateRewrite, TemplateImports, Rich
 
     def read_memory(self, identifier):
         value = self.workspaces[identifier]
-        model = WorkspaceV7 if value.schema_version == 7 else WorkspaceV6
-        return model.model_validate(value.model_dump(by_alias=True))
+        if value.schema_version == 7:
+            # A project not yet saved may still hold the import records its first save writes (D104).
+            from packages.resume_core.models.template_workspace import validated_with_history
+            return validated_with_history(value)
+        return WorkspaceV6.model_validate(value.model_dump(by_alias=True))
 
     def read(self, identifier):
         super().read(identifier)
@@ -120,19 +125,28 @@ class RichProjectService(TemplateExports, TemplateRewrite, TemplateImports, Rich
         if jobs is not None:
             with self.state_lock:
                 try:
+                    key = None
                     if (jobs.store.projects / identifier).exists():
                         with jobs.store.guard(identifier) as directory:
                             state = jobs.store._read(identifier, directory)
                             jobs.publisher._writable(state)
-                            current, checksum = self.storage._read_committed_unlocked(identifier)
+                            key = self.storage._committed_key_unlocked(identifier)
+                            adopted = self.adopted_keys.get(identifier)
+                            # Merging an unchanged 10 MB file again took seconds per read and changed nothing (D104).
+                            if adopted is not None and adopted[0] == key and identifier not in self.save_errors:
+                                current, checksum = None, adopted[1]
+                            else:
+                                current, checksum = self.storage._read_committed_unlocked(identifier)
                             if state.history is not None or (directory / "history-activation.json").exists():
                                 jobs.publisher.history._ready(state, directory, checksum)
                     else:
                         current, checksum = self.storage.read_committed(identifier)
                     base = self.saved_baselines.get(identifier)
-                    if base is not None:
+                    if base is not None and current is not None:
                         merged = merge_snapshot(base, self.read_memory(identifier), current)
                         self.adopt_committed(identifier, current, checksum, cache=merged)
+                        if key is not None:
+                            self.adopted_keys[identifier] = (key, checksum)
                 except (BackgroundFailure, ProjectStoreFailure) as error:
                     self.save_errors[identifier] = error.code
         return self.read_memory(identifier)
@@ -227,9 +241,11 @@ class RichProjectService(TemplateExports, TemplateRewrite, TemplateImports, Rich
         return {"entries": entries, "errors": [{"projectId": identifier, "errorCode": code} for identifier, code in self.load_errors.items()]}
 
     def activate(self, identifier):
-        result = self.response(identifier)
+        # The browser has read the project before it activates it; the full reply built here again was discarded
+        # and cost seconds per switch (D104).
+        self.ensure_readable(identifier)
         self.catalog.update(identifier, opened=True)
-        return result
+        return {"schemaVersion": 1, "projectId": identifier}
 
     def archive_entry(self, identifier, archived):
         with self.state_lock:
@@ -424,7 +440,7 @@ class RichProjectService(TemplateExports, TemplateRewrite, TemplateImports, Rich
             try:
                 workspace, replay = apply_rich_mutation(self.workspaces[identifier], request)
                 archive_payload(workspace, {sid: blob for (pid, sid), blob in self.originals.items() if pid == identifier},
-                    {aid: blob for (pid, aid), blob in self.images.items() if pid == identifier})
+                    {aid: blob for (pid, aid), blob in self.images.items() if pid == identifier}, history=False)
             except (RichMutationFailure, ArchiveFailure) as error:
                 raise ProjectFailure(error.code, 409) from None
             except ValidationError:
@@ -543,8 +559,11 @@ class RichProjectService(TemplateExports, TemplateRewrite, TemplateImports, Rich
     def _portable(self, identifier, workspace, originals, images):
         artifacts = {rid: blob for (pid, rid), blob in self.artifacts.items() if pid == identifier}
         try:
+            # A portable copy carries the import records the project folder keeps apart (D104).
+            if workspace.schema_version == 7 and hasattr(self.storage, "load_history"):
+                workspace = self.storage.load_history(workspace)
             return export_rich_archive(workspace, originals, artifacts, images)
-        except (ArchiveFailure, RenderFailure) as error:
+        except (ArchiveFailure, RenderFailure, ProjectStoreFailure) as error:
             raise ProjectFailure(error.code, 422) from None
 
     def import_portable(self, data):

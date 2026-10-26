@@ -7,6 +7,7 @@ from ..template_effective import builtin_effective_cells, effective_cells
 from ..template_identity import _bound_root, capture_span, line_spans, source_slice
 from ..template_import import digest
 from .captured_fields import capture_fields, ownership_parents, visible_path
+from .focus import focus_durations
 from .materialize_nodes import DisplayField, fallback_style, literal, locale_text, reference, render_nodes, render_plain_fields, stable_id
 from .operations import display_pointer, operation_value
 from ..rich_fields import field_key
@@ -24,7 +25,7 @@ def scope_lines(sources, spans):
         yield from (line_spans(source, unit) or [span]) if whole else [span]
 
 
-def materialize(package, facts, operations, sources, *, operation_id, revision=1):
+def materialize(package, facts, operations, sources, *, operation_id, revision=1, as_of=None):
     verify_package(package)
     declarations = {value.id: value for value in package.definition.blocks}
     current = {cell.id: cell for cell in effective_cells(facts, operations)}
@@ -35,6 +36,8 @@ def materialize(package, facts, operations, sources, *, operation_id, revision=1
     # One declared period format applies to every period view.
     period_format = next(({'separator': value.parameters.separator, 'ongoingLabel': dict(value.parameters.ongoing_label)}
         for value in package.definition.operations if value.kind == 'format_period'), None)
+    # Focus durations need the formatting date that ends an ongoing job; without it nothing is computed.
+    durations = focus_durations(facts, as_of, package.definition.template.default_locale) if as_of is not None else {}
     # Stored operation results hide records in some views and list records of other blocks in others.
     hidden, compact, assigned = {}, {}, {}
     for value in package.definition.operations:
@@ -140,7 +143,7 @@ def materialize(package, facts, operations, sources, *, operation_id, revision=1
         coverage.append(SpanCoverage(span=span, itemHandle=handle, blockIds=blocks, disposition=disposition, reason=reason))
     def listed(declaration, sections, instance, selected, handle=None):
         """One section of records another block owns, rendered through this view's own nodes."""
-        children, mounted = render_nodes(package, declaration, instance, selected, scopes, shown_scopes, period_format)
+        children, mounted = render_nodes(package, declaration, instance, selected, scopes, shown_scopes, period_format, durations)
         if children:
             sections.append({'type': 'section', 'id': stable_id(instance, 'item'), 'revision': 1, 'props': {'recordId': None},
                 'content': [], 'children': children, 'provenance': [],
@@ -163,7 +166,7 @@ def materialize(package, facts, operations, sources, *, operation_id, revision=1
                 if primary.record_id in owners:
                     selected.append(field)
             instance = stable_id(operation_id, declaration.id, primary.item_handle)
-            children, mounted = render_nodes(package, declaration, instance, selected, scopes, shown_scopes, period_format)
+            children, mounted = render_nodes(package, declaration, instance, selected, scopes, shown_scopes, period_format, durations)
             plain_fields = []
             for (view, identifier), field in unassigned.items():
                 if view != declaration.id or (view, identifier) in suppressed:

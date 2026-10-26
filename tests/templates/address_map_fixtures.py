@@ -127,8 +127,12 @@ def transport():
     prepared = prepare_edit(base, request.preparation, request.proof)
     reply = json.loads(value['replyWire'])
     delta = prepared_delta(base, prepared)
-    if canonical(delta) != canonical(reply['delta']):
+    # The workspace patch and hashes follow the project format (D104); the edit itself must reproduce.
+    format_fields = {'workspacePatch', 'baseWorkspaceSha256', 'resultWorkspaceSha256'}
+    if ({key: item for key, item in json.loads(canonical(delta)).items() if key not in format_fields}
+            != {key: item for key, item in reply['delta'].items() if key not in format_fields}):
         raise ValueError('retained transport delta is not reproducible from its base and request')
+    value['baseWire'] = canonical(base).decode()
     address = build_address_map(base, request.preparation, prepared)
     wrapped = WriterPreparedDeltaV2(schemaVersion=2, preparationInputSha256=reply['preparationInputSha256'],
         requestHash=reply['requestHash'], delta=delta, addressMap=address, addressMapSha256=address_map_sha256(address))

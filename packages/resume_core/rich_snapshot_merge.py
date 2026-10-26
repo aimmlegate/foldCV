@@ -89,7 +89,22 @@ def merge_snapshot(base, proposed, current):
     result["documentRevision"] = result["project"]["document"]["revision"] if result["project"] else current.document_revision
     if result["project"]:
         result["project"]["revision"] = result["projectRevision"]
-    return type(proposed).model_validate(result)
+    return carry_history(type(proposed).model_validate(result), proposed, current, base)
+
+
+def carry_history(merged, *sources):
+    """A merge works on the JSON, which names a project's import records by hash (D104); the loaded records it names
+    come back from the snapshot that had them."""
+    from .models.template_workspace import history_refs
+    project = getattr(merged, "project", None)
+    if project is None or not hasattr(project, "import_history") or project.history_loaded:
+        return merged
+    wanted = [ref.model_dump() for ref in project.import_history]
+    for source in sources:
+        loaded = getattr(getattr(source, "project", None), "template_operations", None)
+        if loaded and [ref.model_dump() for ref in history_refs(loaded)] == wanted:
+            return merged.model_copy(update={"project": project.model_copy(update={"template_operations": list(loaded)})})
+    return merged
 
 
 def reconcile(target, source):

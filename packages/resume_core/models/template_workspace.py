@@ -5,7 +5,11 @@ from __future__ import annotations
 from math import isclose
 from typing import Literal
 
-from pydantic import ConfigDict, Field, model_validator
+import hashlib
+import threading
+from collections import OrderedDict
+
+from pydantic import ConfigDict, Field, field_serializer, model_validator
 
 from ..project_limits import ARCHIVE_BYTES, ARCHIVE_EXPANDED_BYTES, PROJECT_CEILING_BYTES
 from .contracts import Id, Revision, Sha256, Source, Wire, _safe_path, _unique
@@ -17,7 +21,7 @@ from .template_document import BoundLink, FieldOccurrence, RichDocumentV2
 from .template_facts import SourceSpan, WorkingFactsV2
 from .template_import import ExportAttempt, ImportIssue, ImportOperation
 from .template_render import TemplateExportCapture, TemplateRenderRequestV1
-from ..templates.models import TemplatePackage
+from ..templates.models import StoredTemplatePackage
 from ..templates.store import verify_package
 
 
@@ -27,6 +31,50 @@ class SpanCoverage(Wire):
     block_ids: list[Id]
     disposition: Literal["accepted", "fallback", "source_only", "multiple_views"]
     reason: str | None
+
+
+class ImportHistoryRef(Wire):
+    """A published import's record, kept in the project's history file of this hash (D104)."""
+    operation_id: Id
+    sha256: Sha256
+
+
+# Recently written or read history files by hash; a copy read without its records can still be archived (D104).
+_HISTORY_TEXTS: 'OrderedDict[str, bytes]' = OrderedDict()
+_HISTORY_LOCK = threading.Lock()
+HISTORY_CACHE_BYTES = 64 * 1024 * 1024
+
+
+def remember_history(digest: str, raw: bytes) -> None:
+    with _HISTORY_LOCK:
+        _HISTORY_TEXTS[digest] = raw
+        _HISTORY_TEXTS.move_to_end(digest)
+        while sum(len(value) for value in _HISTORY_TEXTS.values()) > HISTORY_CACHE_BYTES and len(_HISTORY_TEXTS) > 1:
+            _HISTORY_TEXTS.popitem(last=False)
+
+
+def history_text(digest: str) -> bytes | None:
+    with _HISTORY_LOCK:
+        return _HISTORY_TEXTS.get(digest)
+
+
+def history_bytes(operation) -> bytes:
+    from ..templates.compiler import canonical
+    return canonical(operation)
+
+
+def history_refs(operations) -> list[ImportHistoryRef]:
+    return [ImportHistoryRef(operationId=operation.id, sha256=hashlib.sha256(history_bytes(operation)).hexdigest())
+        for operation in operations]
+
+
+def validated_with_history(workspace):
+    """Validate a workspace again without losing its loaded import records, which no dump carries (D104)."""
+    data = workspace.model_dump(by_alias=True)
+    project = getattr(workspace, 'project', None)
+    if project is not None and getattr(project, 'template_operations', None):
+        data['project']['templateOperations'] = [value.model_dump(by_alias=True) for value in project.template_operations]
+    return type(workspace).model_validate(data)
 
 
 class ProjectV6(Wire):
@@ -41,12 +89,36 @@ class ProjectV6(Wire):
     assets: list[LocalImageAsset]
     operations: list[RichOperation]
     renders: list[RichRenderSnapshot]
-    template_package: TemplatePackage
+    template_package: StoredTemplatePackage
     import_coverage: list[SpanCoverage]
     import_issues: list[ImportIssue]
-    template_operations: list[ImportOperation]
+    # The import records are 70% of a project's bytes and the editor never reads them (D104): the workspace JSON names
+    # their history files, and the records themselves are loaded only by imports, publication and archives.
+    import_history: list[ImportHistoryRef] = Field(default_factory=list)
+    template_operations: list[ImportOperation] = Field(default_factory=list, exclude=True)
     exports: list[ExportAttempt]
     export_inputs: list[TemplateExportCapture] = Field(default_factory=list, exclude_if=lambda value: not value)
+
+    @field_serializer('import_history', mode='wrap')
+    def serialized_history(self, value, handler):
+        # Loaded records name their current files; a project read without them keeps the references it was read with.
+        return handler(history_refs(self.template_operations) if self.template_operations else value)
+
+    @property
+    def history_loaded(self) -> bool:
+        return bool(self.template_operations) or not self.import_history
+
+    def current_history(self) -> list[ImportHistoryRef]:
+        return history_refs(self.template_operations) if self.template_operations else list(self.import_history)
+
+    def __eq__(self, other):
+        # Equal saved state: the same import records by hash, whether a copy has them loaded or not (D104).
+        if not isinstance(other, ProjectV6) or not (self.template_operations or other.template_operations):
+            return super().__eq__(other)
+        if self.current_history() != other.current_history():
+            return False
+        aligned = other.model_copy(update={'import_history': self.import_history, 'template_operations': self.template_operations})
+        return super().__eq__(aligned)
 
     @model_validator(mode="after")
     def integrity(self):
@@ -56,6 +128,13 @@ class ProjectV6(Wire):
         validate_scope_occurrences(self)
         for name in ('evidence_records','assets','operations','renders','import_issues','template_operations','exports'):
             _unique([item.id for item in getattr(self,name)],'project '+name)
+        _unique([ref.operation_id for ref in self.import_history], 'project import history')
+        if self.template_operations and self.import_history and (
+                {ref.operation_id for ref in self.import_history} != {operation.id for operation in self.template_operations}):
+            raise ValueError('loaded import records differ from the import history')
+        if self.template_operations:
+            # Loaded records name their own files, so a loaded copy equals the one read from them.
+            self.import_history = history_refs(self.template_operations)
         _unique([(source.id, source.revision) for source in self.sources], 'source revision')
         for source in self.sources:
             _unique([(unit.id, unit.revision) for unit in source.units], 'source unit revision')
@@ -184,15 +263,17 @@ class ProjectV6(Wire):
         from ..template_capture import item_identities
         handles = ({r.item_handle for r in self.facts.extensions} | {value.item_handle for value in self.facts.builtin_identities}
             | {value.item_handle for operation in self.template_operations for value in item_identities(operation)})
+        loaded = self.history_loaded
         for coverage in self.import_coverage:
-            if not set(coverage.block_ids) <= block_ids or coverage.item_handle is not None and coverage.item_handle not in handles:
+            if not set(coverage.block_ids) <= block_ids or loaded and coverage.item_handle is not None and coverage.item_handle not in handles:
                 raise ValueError('missing source coverage target')
+        # Receipts live in the import records; a project read without them was checked when it was published.
         receipt_ids = [r.id for operation in self.template_operations for r in operation.receipts]
         _unique(receipt_ids, 'project review receipt')
         receipts=set(receipt_ids)
-        for observation in self.facts.observations:
+        for observation in self.facts.observations if loaded else ():
             if not set(observation.receipt_ids)<=receipts: raise ValueError('unresolved observation receipt')
-        for record in self.facts.extensions:
+        for record in self.facts.extensions if loaded else ():
             for cell in record.cells:
                 if not set(cell.admission_receipt_ids)<=receipts: raise ValueError('unresolved admission receipt')
         for operation in self.template_operations:
@@ -212,7 +293,7 @@ class ProjectV6(Wire):
 
 class RichPreDraftV2(RichPreDraft):
     facts: WorkingFactsV2
-    template_package: TemplatePackage | None
+    template_package: StoredTemplatePackage | None
     template_operations: list[ImportOperation]
 
     @model_validator(mode='after')
@@ -279,7 +360,7 @@ class WorkspaceV7(WorkspaceV6):
 
 class TemplateArchiveEntry(Wire):
     path: str
-    role: Literal['workspace','source_original','render','user_image','template_package','template_asset']
+    role: Literal['workspace','source_original','render','user_image','template_package','template_asset','template_history']
     sha256: Sha256
     size: int = Field(ge=0,le=PROJECT_CEILING_BYTES)
 
@@ -290,7 +371,8 @@ class TemplateArchiveEntry(Wire):
         if self.role!='workspace' and self.size>32*1024*1024: raise ValueError('archive entry exceeds 32 MiB')
         required={'workspace':'workspace.json','template_package':'template/package.json'}
         if self.role in required and self.path!=required[self.role]: raise ValueError('invalid archive role path')
-        prefix={'source_original':'sources/','render':'renders/','user_image':'images/','template_asset':'template/assets/'}
+        prefix={'source_original':'sources/','render':'renders/','user_image':'images/','template_asset':'template/assets/',
+            'template_history':'template/history/'}
         if self.role in prefix and not self.path.startswith(prefix[self.role]): raise ValueError('invalid archive role path')
         return self
 

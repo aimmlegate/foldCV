@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { parseCheck, parseConfigState, pointerRange } from "../src/workbench/settings/template/config";
+import { parseCheck, parseConfigState, pointerRange, technicalLines } from "../src/workbench/settings/template/config";
 
 const source = [
   "# yaml-language-server: $schema=schema.json",
@@ -56,4 +56,10 @@ test("responses are validated before use", () => {
     { valid: false, error: { path: "/template", message: "bad" } });
   assert.throws(() => parseCheck({ schemaVersion: 1, valid: false, package: null, error: null }), /INVALID_RESULT/);
   assert.throws(() => parseCheck({ schemaVersion: 1, valid: "yes" }), /INVALID_RESULT/);
+});
+
+test("technical sections are found by their top-level keys only", () => {
+  const text = ["schema_version: 4", "template:", "  id: generic", "blocks:", "- id: projects", "  assets: nested", "style:",
+    "  page: {}", "fact_types:", "- id: identity", "assets:", "  logo: assets/logo.png", "provenance: {}", ""].join("\n");
+  assert.deepEqual(technicalLines(text), [6, 8, 10, 12]);
 });

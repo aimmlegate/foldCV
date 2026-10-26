@@ -14,15 +14,9 @@ export const presentationMeta = "foldcv-v7-presentation";
 export type TemplateSheet = { css: string; variables: CSSProperties; logo: { url: string; style: CSSProperties } | null;
   presentation: Presentation; styles: ReadonlyMap<string, string>; icons: ReadonlyMap<string, string> };
 
-const urls = new Map<string, string>();
+/** Captured fonts and icons load once by hash and stay cached; replies carry only their names (D104). */
 function assetUrl(asset: Asset): string {
-  let url = urls.get(asset.sha256);
-  if (!url) {
-    const binary = atob(asset.bytesBase64);
-    url = URL.createObjectURL(new Blob([Uint8Array.from(binary, character => character.charCodeAt(0))], { type: asset.mimeType }));
-    urls.set(asset.sha256, url);
-  }
-  return url;
+  return `/v1/rich/template-assets/${asset.sha256}`;
 }
 
 const pt = (value: number): string => `${value}pt`;

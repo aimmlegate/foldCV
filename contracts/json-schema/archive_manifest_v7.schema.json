@@ -14,7 +14,8 @@
             "render",
             "user_image",
             "template_package",
-            "template_asset"
+            "template_asset",
+            "template_history"
           ],
           "title": "Role",
           "type": "string"

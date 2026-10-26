@@ -81,7 +81,8 @@ def test_new_employment_allocates_only_human_canonical_identity_and_preserves_al
     assert new.periods[0].start.value.year==2020 and new.periods[0].start.value.month is None
     assert new.periods[0].present.value is None and new.periods[0].present.raw_text=='not yet sure'
     assert current.project.facts.builtin_identities==before.project.facts.builtin_identities
-    assert current.project.template_operations==before.project.template_operations
+    # Import records are named by history file; an unloaded copy and a loaded one name the same (D104).
+    assert current.project.current_history()==before.project.current_history()
     for block in current.project.document.blocks():
         if block.id in old:assert block==old[block.id]
     section=next(block for block in current.project.document.blocks() if block.type=='section' and block.props.record_id==new.id)

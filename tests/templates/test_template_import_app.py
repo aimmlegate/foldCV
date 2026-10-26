@@ -116,7 +116,7 @@ async def test_import_captures_the_settings_time_limit_and_keeps_it_when_setting
         window = datetime.fromisoformat(attempt['activeDeadline']) - datetime.fromisoformat(attempt['dispatchedAt'])
         assert 90 * 60 <= window.total_seconds() < 90 * 60 + 30
         assert (await client.put('/v1/settings/limits', json={'importMinutes': 30, 'projectMegabytes': 64})).status_code == 200
-        workspace = service.read(project)
+        workspace = service.storage.load_history(service.read(project))
         [operation] = workspace.project.template_operations
         service.validate_template_capture(operation, workspace)
         assert operation.capture.policy.processing_seconds == 90 * 60
@@ -141,7 +141,7 @@ async def test_an_import_captures_the_configured_concurrency_and_a_stored_one_ke
                     return current
                 await asyncio.sleep(0.05)
         assert (await asyncio.wait_for(finished(), 60))['templateOutcome']['state'] == 'saved'
-        workspace = service.read(project)
+        workspace = service.storage.load_history(service.read(project))
         [operation] = workspace.project.template_operations
         service.template_import_concurrency = 1
         service.validate_template_capture(operation, workspace)

@@ -19,6 +19,7 @@ export default function TemplateSettings({ dirtyChange }: { dirtyChange: (dirty:
   const [failure, setFailure] = useState<unknown>(null);
   const [outcome, setOutcome] = useState<Outcome>(null);
   const [confirmReset, setConfirmReset] = useState(false);
+  const [technical, setTechnical] = useState(false);
   const dirty = state !== null && text !== state.text;
   useEffect(() => { dirtyChange(dirty); }, [dirty, dirtyChange]);
 
@@ -57,8 +58,10 @@ export default function TemplateSettings({ dirtyChange }: { dirtyChange: (dirty:
     {outcome?.kind === "checked" && <OperationStatus state="success" label={`Шаблон корректен: ${outcome.label}.`} />}
     {outcome?.kind === "saved" && <OperationStatus state="success" label={`Сохранено. Новые импорты используют «${outcome.label}».`} />}
     {outcome?.kind === "reset" && <OperationStatus state="success" label={`Возвращён встроенный шаблон «${outcome.label}».`} />}
+    {state && <label className="template-technical small"><input type="checkbox" checked={technical} onChange={event => setTechnical(event.target.checked)} />
+      Развернуть технические разделы (шрифты и файлы, хранение фактов, операции)</label>}
     {state && <Suspense fallback={<div className="template-yaml-loading"><OperationStatus label="Загружаем редактор" /></div>}>
-      <YamlEditor value={text} problem={problem} readOnly={busy}
+      <YamlEditor value={text} problem={problem} readOnly={busy} technical={technical}
         change={value => { setText(value); setProblem(null); setOutcome(null); }} />
     </Suspense>}
     {state && <p className="small muted">Подсказки и проверка по схеме работают при вводе. Перед сохранением сервер проверяет весь шаблон, включая ссылки между блоками и файлы шрифтов и логотипов. Изменённое содержимое требует новой версии в <code>template.revision</code>.</p>}

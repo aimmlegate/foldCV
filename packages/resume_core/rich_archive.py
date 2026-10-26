@@ -25,10 +25,10 @@ def inert_sync_history(workspace):
             sync.error_code = sync.error_code or "OPERATION_INTERRUPTED"
 
 
-def archive_payload(workspace, originals, images, current_render=None):
+def archive_payload(workspace, originals, images, current_render=None, *, history=True):
     if workspace.schema_version == 7:
         from .template_archive import archive_payload_v7
-        return archive_payload_v7(workspace,originals,images,current_render)
+        return archive_payload_v7(workspace,originals,images,current_render,history=history)
     workspace = WorkspaceV6.model_validate(workspace.model_dump(by_alias=True))
     inert_sync_history(workspace)
     owner = workspace.project or workspace.pre_draft

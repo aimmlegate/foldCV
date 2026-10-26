@@ -6,7 +6,7 @@ import mutationSchema from "../../../../contracts/json-schema/template_mutation_
 import type { TemplateProjectResponseV1 } from "./generated/template_project_response_v1";
 import type { WriterViewV2 } from "./generated/background_writer_view_v2";
 import type { TemplateMutationV1 } from "./generated/template_mutation_v1";
-import type { TemplatePackage } from "./generated/template_package";
+import type { StoredTemplatePackage as TemplatePackage } from "./generated/template_project_response_v1";
 import { sameValue, sha256 } from "../background/wire";
 import { jsonObjectWire, jsonWireAt, parseJsonWire, type JsonWireNode } from "./lossless-json";
 import { jsonResponseWire } from "./json-response";
@@ -40,13 +40,14 @@ async function packageIntegrity(value: TemplatePackage, root: JsonWireNode): Pro
   const declared = new Map(value.definition.assets.map(asset => [asset.id, asset]));
   if (declared.size !== value.definition.assets.length || declared.size !== value.assets.length
     || new Set(value.assets.map(asset => asset.id)).size !== value.assets.length) return false;
+  // Asset bytes stay on the server and load by hash (D104); the package identity below names each hash.
   let total = 0;
   for (const asset of value.assets) {
-    const source = declared.get(asset.id), bytes = base64Bytes(asset.bytesBase64);
-    total += bytes.length;
+    const source = declared.get(asset.id);
+    total += asset.size;
     if (!source || source.path !== asset.path || source.role !== asset.role || source.mime_type !== asset.mimeType
-      || bytes.length !== asset.size || bytes.length > 20 * 1024 * 1024 || total > 40 * 1024 * 1024
-      || await sha256(bytes) !== asset.sha256) return false;
+      || asset.bytesBase64 !== undefined || asset.size > 20 * 1024 * 1024 || total > 40 * 1024 * 1024
+      || !/^[0-9a-f]{64}$/.test(asset.sha256)) return false;
   }
   const definition = jsonWireAt(root, ["definition"]), recipe = jsonWireAt(root, ["recipe"]);
   if (jsonWireAt(definition, ["style"]).wire !== jsonWireAt(recipe, ["style"]).wire
@@ -136,13 +137,13 @@ export async function templateProjectReply(value: unknown): Promise<TemplateProj
 
 export async function templateWriterReply(value: unknown): Promise<WriterViewV2 | null> {
   try {
-    if (!writerShape(value) || await sha256(value.workspaceWire) !== value.workspaceSha256) return null;
-    const root = parseJsonWire(value.workspaceWire), workspace = value.response.workspace;
-    if (!sameValue(root.value, workspace) || value.writer.projectId !== workspace.projectId
+    // The canonical workspace bytes are the response's own workspace text; no second copy travels (D104).
+    if (!writerShape(value) || value.workspaceWire !== undefined) return null;
+    const responseRoot = jsonResponseWire(value), workspace = value.response.workspace;
+    if (await sha256(jsonWireAt(responseRoot, ["response", "workspace"]).wire) !== value.workspaceSha256
+      || value.writer.projectId !== workspace.projectId
       || value.drafts.some(draft => draft.projectId !== workspace.projectId || draft.lineage !== value.writer.lineage)
       || value.canonicalReady !== (value.response.durability === "durable")) return null;
-    const responseRoot = jsonResponseWire(value);
-    if (root.wire !== jsonWireAt(responseRoot, ["response", "workspace"]).wire) return null;
     if (!await templateProjectWire(jsonWireAt(responseRoot, ["response"]))) return null;
     if (value.mutationWire !== null && value.mutationWire !== undefined) {
       const mutation: unknown = parseJsonWire(value.mutationWire).value;

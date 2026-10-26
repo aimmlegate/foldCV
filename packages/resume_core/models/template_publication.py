@@ -2,7 +2,7 @@
 
 from typing import Literal
 
-from pydantic import model_validator
+from pydantic import field_serializer, model_validator
 
 from .background import CanonicalCandidateV1
 from .template_authority import TemplateFinalizationBinding
@@ -16,6 +16,16 @@ class TemplateCanonicalCandidateV2(CanonicalCandidateV1):
     manual_mutation: TemplateMutationV1 | None
     inverse: TemplateMutationV1 | None
     template_finalization: TemplateFinalizationBinding | None = None
+
+    @field_serializer('workspace', mode='wrap')
+    def published_records(self, value, handler, info):
+        # The project file only names its import records (D104); a candidate that publishes them carries them along.
+        dumped = handler(value)
+        if value.project is not None and value.project.template_operations and isinstance(dumped, dict):
+            mode = 'json' if info.mode_is_json() else 'python'
+            dumped['project']['templateOperations' if info.by_alias else 'template_operations'] = [
+                operation.model_dump(mode=mode, by_alias=bool(info.by_alias)) for operation in value.project.template_operations]
+        return dumped
 
     @model_validator(mode='after')
     def finalization_owner(self):

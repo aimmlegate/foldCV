@@ -2,6 +2,9 @@
 
 from __future__ import annotations
 
+import base64
+import hashlib
+import threading
 from typing import Annotated, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, JsonValue, model_validator
@@ -422,6 +425,85 @@ class TemplatePackage(Wire):
     assets: list[CapturedAsset]
     blocks: list[CompiledBlock]
     manifest: CompilationManifest
+
+
+# Captured asset bytes by SHA-256. They are immutable, so every copy of a workspace shares one text (D104).
+_ASSET_TEXTS: dict[str, str] = {}
+_ASSET_TYPES: dict[str, str] = {}
+_ASSET_LOCK = threading.Lock()
+
+
+def remember_asset(sha256: str, text: str, mime_type: str | None = None) -> None:
+    with _ASSET_LOCK:
+        known = sha256 in _ASSET_TEXTS
+        if known and mime_type:
+            _ASSET_TYPES.setdefault(sha256, mime_type)
+    if known:
+        return
+    if hashlib.sha256(base64.b64decode(text, validate=True)).hexdigest() != sha256:
+        raise ValueError("captured asset bytes do not match their hash")
+    with _ASSET_LOCK:
+        _ASSET_TEXTS[sha256] = text
+        if mime_type:
+            _ASSET_TYPES.setdefault(sha256, mime_type)
+
+
+def asset_text(sha256: str) -> str | None:
+    with _ASSET_LOCK:
+        return _ASSET_TEXTS.get(sha256)
+
+
+def asset_type(sha256: str) -> str | None:
+    with _ASSET_LOCK:
+        return _ASSET_TYPES.get(sha256)
+
+
+class StoredAsset(CapturedAsset):
+    """An asset of a workspace's captured package. Its bytes stay in memory and in the project's asset files, never in
+    the workspace JSON, its hash or the browser's copy (D104: fonts were a quarter of every 10 MB reply)."""
+    bytes_base64: str = Field(default="", exclude=True)
+
+    @model_validator(mode="before")
+    @classmethod
+    def shared_bytes(cls, data):
+        if isinstance(data, CapturedAsset) and not isinstance(data, cls):
+            data = {**data.model_dump(by_alias=True), "bytesBase64": data.bytes_base64}
+        if not isinstance(data, dict):
+            return data
+        text, digest, mime = data.get("bytesBase64"), data.get("sha256"), data.get("mimeType")
+        if not isinstance(digest, str):
+            return data
+        if text:
+            remember_asset(digest, text, mime if isinstance(mime, str) else None)
+            return data
+        text = asset_text(digest)
+        if text is None:
+            raise ValueError("captured asset bytes are not loaded")
+        if isinstance(mime, str):
+            remember_asset(digest, text, mime)
+        return {**data, "bytesBase64": text}
+
+
+class StoredTemplatePackage(TemplatePackage):
+    assets: list[StoredAsset]
+
+    @model_validator(mode="before")
+    @classmethod
+    def from_package(cls, data):
+        if isinstance(data, TemplatePackage) and not isinstance(data, cls):
+            return {**data.model_dump(by_alias=True), "assets": list(data.assets)}
+        return data
+
+    def full(self) -> TemplatePackage:
+        """The same package with its asset bytes, for archives and the template store."""
+        return TemplatePackage.model_validate({**self.model_dump(by_alias=True),
+            "assets": [{**asset.model_dump(by_alias=True), "bytesBase64": asset.bytes_base64} for asset in self.assets]})
+
+    def __eq__(self, other):
+        # The same captured package whichever form holds it; Python asks the subclass first in both directions.
+        if isinstance(other, TemplatePackage) and not isinstance(other, StoredTemplatePackage):
+            return self.full() == other
+        return super().__eq__(other)
 
 
 class StyleOverrides(Wire):

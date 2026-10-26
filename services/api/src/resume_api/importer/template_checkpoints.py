@@ -5,7 +5,7 @@ import threading
 
 from packages.resume_core.background_store import BackgroundFailure
 from packages.resume_core.background_limits import LIMITS
-from packages.resume_core.models.template_workspace import WorkspaceV7
+from packages.resume_core.models.template_workspace import WorkspaceV7, validated_with_history
 from packages.resume_core.project_limits import save_allowance_seconds
 from packages.resume_core.template_import import TemplateImportFailure, checked, identity
 
@@ -23,9 +23,15 @@ def export_scope(before, after):
         project.pop('revision')
         for field in ('exports', 'exportInputs', 'renders'):
             project.pop(field, None)
-        for operation in project['templateOperations']:
-            operation.pop('exportAttempts', None)
+        # A recorded export attempt changes its import record's history file (D104); the records are compared below.
+        project.pop('importHistory', None)
     if left != right:
+        raise BackgroundFailure('JOB_SCOPE_INVALID')
+    def records(workspace):
+        if not workspace.project.history_loaded:
+            return [ref.model_dump(by_alias=True) for ref in workspace.project.import_history]
+        return [value.model_dump(mode='json', by_alias=True, exclude={'export_attempts'}) for value in workspace.project.template_operations]
+    if records(before) != records(after):
         raise BackgroundFailure('JOB_SCOPE_INVALID')
     previous, current = before.project, after.project
     if (current.export_inputs[:len(previous.export_inputs)] != previous.export_inputs or
@@ -95,7 +101,7 @@ class TemplateCheckpoints:
 
     def read_saved(self, project):
         """The project as saved, without the sidecar steps of a running import, and the checksum of its file."""
-        workspace, checksum = self.publisher.canonical.read_committed(project)
+        workspace, checksum = self.publisher.canonical.read_committed(project, history=True)
         if workspace.schema_version != 7:
             raise TemplateImportFailure('IMPORT_PROTOCOL_MISMATCH')
         return workspace, checksum
@@ -212,7 +218,7 @@ class TemplateCheckpoints:
                 if after.project is not None:
                     after.project.revision = after.project_revision
                 after.updated_at = self.wall()
-                after = WorkspaceV7.model_validate(after.model_dump(by_alias=True))
+                after = validated_with_history(after)
                 try:
                     saved, _duplicate = self.publisher.snapshot(project, checksum, after,
                         self.id_factory('metadata_template'), originals=self.originals, artifacts=self.artifacts, images=self.images)

@@ -9,7 +9,7 @@ import time
 from packages.resume_core.background_store import BackgroundFailure
 from packages.resume_core.models.template_import import (CleanupOutcome, ImportIssue, ObservedUsage, ReferenceTable,
     ReviewInputRecord, TaskResultRecord)
-from packages.resume_core.models.template_workspace import WorkspaceV7
+from packages.resume_core.models.template_workspace import WorkspaceV7, validated_with_history
 from packages.resume_core.models.template_authority import DeletedTemplateCleanupV1, TemplateFinalizationBinding
 from packages.resume_core.template_admission import admit_proposal, task_facts_digest
 from packages.resume_core.template_builtin_admission import current_handles
@@ -909,7 +909,7 @@ class TemplatePipeline(TemplateCheckpoints):
         authored.document_revision = before.document_revision + 1
         authored.project.document.revision = authored.document_revision
         authored.updated_at = self.wall()
-        authored = WorkspaceV7.model_validate(authored.model_dump(by_alias=True))
+        authored = validated_with_history(authored)
         outcome = await self.persistence.publish(before, authored, operation, originals=self.originals,
             artifacts=self.artifacts, images=self.images)
         result = operation.model_copy(deep=True)

@@ -70,7 +70,7 @@ def test_real_issue_undo_redo_and_exact_duplicate_retire_only_the_original_targe
     assert [issue.state for issue in redone.workspace.project.import_issues] == ['retired', 'active']
     assert 'Exact human correction' in text(redone.workspace.project.document)
     assert redone.workspace.project.facts == before.project.facts
-    assert redone.workspace.project.template_operations == before.project.template_operations
+    assert redone.workspace.project.current_history() == before.project.current_history()
     assert redone.workspace.sync_records == before.sync_records
     assert not fixture.jobs.load(fixture.project).history_commands and not fixture.jobs.load(fixture.project).inverses
 

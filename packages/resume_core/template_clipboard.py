@@ -8,7 +8,7 @@ from .models.rich_document import FactFieldSpan,Hyperlink
 from .rich_fields import inline_groups
 from .rich_mutations import locate
 from .template_authoring import citation_spans,classify_blocks,classify_fragment
-from .template_clipboard_witnesses import field_witness,fingerprint,scope_witness,source_witness,verify_witnesses
+from .template_clipboard_witnesses import captured_package_hash,field_witness,fingerprint,scope_witness,source_witness,verify_witnesses
 from .template_identity import capture_span
 from .templates.presentation import snapshot_identity,validate_presentation
 from .templates.store import verify_package
@@ -126,7 +126,7 @@ def capture_clipboard(workspace,capture,request_hash):
         payload=ClassifiedClipboardBlocks(kind='blocks',blocks=validation_blocks)
     validate_presentation(SimpleNamespace(blocks=lambda:iter(validation_blocks)),project.template_package)
     witnesses=selected_witnesses(project,payload)
-    package=fingerprint(project.template_package)
+    package=captured_package_hash(project.template_package)
     verify_witnesses(project,witnesses,package)
     return RetainedTemplateClipboardV1(capture=capture.model_copy(deep=True),requestHash=request_hash,
         packageFingerprint=package,payload=payload,witnesses=witnesses)

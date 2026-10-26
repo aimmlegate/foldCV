@@ -182,7 +182,8 @@ class RichAssets:
                 images = {aid: blob for (pid, aid), blob in self.images.items() if pid == identifier}
                 images[asset.id] = data
                 rich_snapshot_bytes(workspace)
-                archive_payload(proof, {sid: blob for (pid, sid), blob in self.originals.items() if pid == identifier}, images)
+                archive_payload(proof, {sid: blob for (pid, sid), blob in self.originals.items() if pid == identifier}, images,
+                    history=False)
                 self.images[(identifier, asset.id)] = data
                 self.workspaces[identifier] = reconcile(self.workspaces[identifier], workspace)
                 current.pending.add(asset.id)

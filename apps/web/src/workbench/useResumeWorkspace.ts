@@ -48,6 +48,8 @@ export function useResumeWorkspace() {
   const mountedEditor = () => editor.current ?? templateEditor.current;
   const assistant = useRef<AssistantHandle>(null);
   const reads = useRef(new WorkspaceReads());
+  // Template projects with a document open through their writer alone; the first full read only named the family.
+  const templateProjects = useRef(new Set<string>());
   const [opening, setOpening] = useState<ReadCapture | null>(null);
   const lifetime = useRef<object | null>(null), acting = useRef<object | null>(null);
   const activeProject = useRef<string | null>(null);
@@ -93,10 +95,20 @@ export function useResumeWorkspace() {
     setTemplate(null); setBackground(available); activeProject.current = next.workspace.projectId; adopt(next, capture);
   }
   async function load(id: string, capture: ReadCapture) {
+    if (templateProjects.current.has(id)) {
+      const connection = await attachExclusiveTemplateWriter(id);
+      if (!reads.current.selectionCurrent(capture)) return null;
+      if (connection) {
+        await request(`/${id}/activate`, "POST", {});
+        if (!reads.current.selectionCurrent(capture)) return null;
+        return { kind: "template" as const, next: connection.view.response, connection, catalog: await listProjects() };
+      }
+    }
     const opened = await openedProject(`/${id}`);
     if (!reads.current.selectionCurrent(capture)) return null;
     if (opened.response.workspace.projectId !== id) throw new RichApiFailure("INVALID_RESULT");
     if (opened.kind === "template") {
+      if (opened.response.workspace.project) templateProjects.current.add(id);
       const connection = opened.response.workspace.project ? await attachExclusiveTemplateWriter(id) : null;
       if (!reads.current.selectionCurrent(capture)) return null;
       await request(`/${id}/activate`, "POST", {});
@@ -113,7 +125,7 @@ export function useResumeWorkspace() {
       catch (error) { if (!(error instanceof RichApiFailure) || error.code !== "JOB_DISABLED") throw error; }
     }
     if (!reads.current.selectionCurrent(capture)) return null;
-    await projectRequest(`/${id}/activate`, "POST", {});
+    await request(`/${id}/activate`, "POST", {});
     if (!reads.current.selectionCurrent(capture)) return null;
     const catalog = await listProjects();
     return { kind: "rich" as const, next: connection?.view.response ?? next, connection, available, catalog };
@@ -180,6 +192,7 @@ export function useResumeWorkspace() {
       if (activeProject.current === id) await leave(current);
       if (!current()) return;
       const result = await deleteProject(id);
+      templateProjects.current.delete(id);
       if (!current()) return;
       if ((response ?? template?.response)?.workspace.projectId === id) clear();
       const catalog = await listProjects();

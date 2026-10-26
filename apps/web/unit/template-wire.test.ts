@@ -66,7 +66,8 @@ test("snapshot, presentation, asset and save-ack tampering cannot reuse a verifi
     [["snapshot", "documentHash"], JSON.stringify("0".repeat(64))],
     [["snapshot", "factsHash"], JSON.stringify("0".repeat(64))],
     [["presentation", "recipe", "style", "page", "first_body_top"], "999.0"],
-    [["workspace", "project", "templatePackage", "assets", 0, "bytesBase64"], '"Zm9yZ2Vk"'],
+    // Asset bytes load by hash (D104); a changed hash breaks the package identity.
+    [["workspace", "project", "templatePackage", "assets", 0, "sha256"], JSON.stringify("0".repeat(64))],
     [["workspace", "project", "templatePackage", "configHash"], JSON.stringify("0".repeat(64))],
     [["savedDocumentRevision"], "999"],
   ];

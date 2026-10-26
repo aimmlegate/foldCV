@@ -103,7 +103,9 @@ class TemplateImports:
         # Facts advance through admitted proposals; the pipeline checks their captured revisions separately.
         # A stored import keeps the time limits, concurrency and models captured at its start when Settings change
         # (E07); a new one must match.
-        stored = any(value.id == operation.id for value in data.template_operations)
+        # A published project names its records by history file (D104).
+        stored = any(value.id == operation.id for value in data.template_operations) or any(
+            ref.operation_id == operation.id for ref in getattr(data, 'import_history', []))
         try:
             expected = self.template_import_capture(workspace, operation.capture.allow_text_rewrite,
                 models=(operation.capture.primary, operation.capture.fallback) if stored else None)

@@ -97,3 +97,14 @@ export function pointerRange(source: string, pointer: string): { start: number; 
   const start = first < 0 ? 0 : first;
   return { start, end: Math.max(start + 1, lineEnd(source, start)) };
 }
+
+// Top-level sections people rarely edit: fonts and files, fact storage, operations, provenance.
+const TECHNICAL = new Set(["style", "layout", "source", "content_definitions", "fact_types", "operations", "assets", "provenance"]);
+
+/** 0-based lines of the technical top-level keys, folded in the editor by default. */
+export function technicalLines(source: string): number[] {
+  return source.split("\n").flatMap((line, index) => {
+    const key = /^([a-z_]+):/.exec(line)?.[1];
+    return key !== undefined && TECHNICAL.has(key) ? [index] : [];
+  });
+}

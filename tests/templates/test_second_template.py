@@ -113,9 +113,14 @@ def test_a_transfer_keeps_the_template_its_equal_titles_and_its_owners():
 
 def renamed(workspace, identifier):
     """The same workspace under another project id, so two projects share one service."""
+    import json
     from packages.resume_core.models.template_workspace import WorkspaceV7
-    return WorkspaceV7.model_validate_json(workspace.model_dump_json(by_alias=True).replace(
-        '"' + workspace.project_id + '"', '"' + identifier + '"'))
+    data = workspace.model_dump(mode='json', by_alias=True)
+    if workspace.project is not None and workspace.project.template_operations:
+        # The JSON names import records by history file (D104); a renamed copy carries them along.
+        data['project']['templateOperations'] = [value.model_dump(mode='json', by_alias=True)
+            for value in workspace.project.template_operations]
+    return WorkspaceV7.model_validate_json(json.dumps(data).replace('"' + workspace.project_id + '"', '"' + identifier + '"'))
 
 
 @pytest.mark.asyncio

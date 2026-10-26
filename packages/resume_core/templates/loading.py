@@ -11,6 +11,7 @@ from yaml.events import AliasEvent
 from yaml.nodes import MappingNode, ScalarNode, SequenceNode
 
 from .projection import SchemaFailure
+from .shorthand import expand
 
 CONFIG_BYTES = 2 * 1024 * 1024
 CONFIG_DEPTH = 64
@@ -52,9 +53,11 @@ def load_declared_definition(raw: bytes, original_format: str) -> dict:
             elif isinstance(value,str):value.encode('utf-8')
         check(value,'',0)
         if not isinstance(value,dict):raise SchemaFailure('/', 'template must be an object')
-        return value
+    except SchemaFailure:
+        raise
     except (UnicodeError,ValueError,RecursionError) as error:
         raise SchemaFailure('/', 'invalid JSON: '+str(error).splitlines()[0]) from None
+    return expand(value)
 
 
 def load_definition(raw: bytes) -> dict:
@@ -95,7 +98,8 @@ def load_definition(raw: bytes) -> dict:
 
         result = read(node, "", 0)
         if not isinstance(result, dict): raise SchemaFailure("/", "template must be an object")
-        return result
+        # A short document (schema_version 4) becomes the canonical form every caller works with.
+        return expand(result)
     except SchemaFailure:
         raise
     except (yaml.YAMLError, UnicodeError, ValueError, RecursionError) as error:

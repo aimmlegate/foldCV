@@ -1,4 +1,4 @@
-"""S5: the Generic 2.0.0 package through the actual export route and captured worker (V01, V03, V04) and long content (V02)."""
+"""S5: the Generic 2.1.0 package through the actual export route and captured worker (V01, V03, V04) and long content (V02)."""
 
 import uuid
 

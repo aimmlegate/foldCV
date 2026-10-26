@@ -100,7 +100,7 @@ def render_plain_fields(package, declaration, instance, fields, scopes, shown_sc
     return blocks, displayed
 
 
-def render_nodes(package, declaration, instance, fields, scopes, shown_scopes, period_format=None):
+def render_nodes(package, declaration, instance, fields, scopes, shown_scopes, period_format=None, durations=None):
     blocks, displayed = [], {}
     locale = package.definition.template.default_locale
     def scalar(path):
@@ -145,7 +145,8 @@ def render_nodes(package, declaration, instance, fields, scopes, shown_scopes, p
                 block([*lead(), link_part(ref, instance, name, url, scopes, shown_scopes)], ref, [*name, *url])
             continue
         if node.type == 'focus_entry':
-            # The stated experience is its own line in the detail style; nothing is recomputed from years.
+            # The stated experience is its own line in the detail style; without one, the time the technology's jobs
+            # span is shown as plain text (D104).
             detail = reference(package, declaration.id, node.detail_style or node.style, instance, node_index=index)
             name, experience = parts(scalar(node.name_field), ref), parts(scalar(node.experience_field), detail)
             if name or experience:
@@ -153,6 +154,9 @@ def render_nodes(package, declaration, instance, fields, scopes, shown_scopes, p
                     block([literal(label, ref)], ref, suffix='label')
                 if name:
                     block([*lead(), *(part for _field, part in name)], ref, [field for field, _part in name])
+                computed = (durations or {}).get(name[0][0].record_id) if name and not experience else None
+                if computed:
+                    block([literal(computed, detail)], detail, suffix='detail')
                 block([part for _field, part in experience], detail, [field for field, _part in experience], suffix='detail')
             continue
         if node.type == 'text':

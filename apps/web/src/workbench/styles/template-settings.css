@@ -1,5 +1,6 @@
-.template-yaml-editor { height: max(420px, calc(100vh - 430px)); border: 1px solid var(--line); border-radius: 5px; overflow: hidden; margin-top: 12px; }
-.template-yaml-loading { height: max(420px, calc(100vh - 430px)); display: flex; align-items: center; justify-content: center; margin-top: 12px; border: 1px dashed var(--line); border-radius: 5px; }
+.template-yaml-editor { height: max(420px, calc(100vh - 460px)); border: 1px solid var(--line); border-radius: 5px; overflow: hidden; margin-top: 8px; }
+.template-yaml-loading { height: max(420px, calc(100vh - 460px)); display: flex; align-items: center; justify-content: center; margin-top: 8px; border: 1px dashed var(--line); border-radius: 5px; }
 .template-active { display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px 12px; }
 .template-problem { overflow-wrap: anywhere; }
 .template-problem code { font-size: inherit; }
+.template-technical { display: inline-flex; align-items: center; gap: 6px; margin-top: 8px; cursor: pointer; }

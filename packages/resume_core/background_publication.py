@@ -94,7 +94,7 @@ class CanonicalCoordinator:
         with self.jobs.guard(project) as directory:
             state = self.jobs._read(project, directory)
             self._writable(state)
-            workspace, _checksum = self.canonical._read_committed_unlocked(project)
+            workspace, _checksum = self.canonical._read_committed_unlocked(project, history=True)
             retained = next((item for item in (workspace.project or workspace.pre_draft).template_operations if item.id == operation.id), None)
             if retained is None or retained != operation or operation.project_id != project:
                 raise BackgroundFailure('DEPENDENCY_CHANGED')
@@ -122,7 +122,7 @@ class CanonicalCoordinator:
             if claimed:
                 return False
             if not any(value.operation_id == operation_id for value in state.template_authorizations):
-                workspace, _checksum = self.canonical._read_committed_unlocked(project)
+                workspace, _checksum = self.canonical._read_committed_unlocked(project, history=True)
                 operation = next((item for item in (workspace.project or workspace.pre_draft).template_operations if item.id == operation_id), None)
                 if operation is None or not operation.authorizations:
                     raise BackgroundFailure('JOB_NOT_FOUND')
@@ -721,7 +721,9 @@ class CanonicalCoordinator:
             with self.jobs.guard(project) as directory:
                 state = self.jobs._read(project, directory)
                 intent = next(intent for intent in self._intents(state) if intent.id == intent_id)
-                before, checksum = self.canonical._read_committed_unlocked(project)
+                # A finalization compares the import record before and after; a project names it by history file (D104).
+                before, checksum = self.canonical._read_committed_unlocked(project,
+                    history=getattr(candidate, 'template_finalization', None) is not None)
                 self._writable(state, own=intent.id)
                 if checksum != candidate.before_workspace_sha256 or checkpoint_sha(checkpoint(state)) != checkpoint_sha(candidate.before_history):
                     raise BackgroundFailure("DEPENDENCY_CHANGED")

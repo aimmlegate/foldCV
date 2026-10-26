@@ -19,7 +19,7 @@ from packages.resume_core.models.template_writer import WriterCaptureClipboardV2
 from packages.resume_core.template_authoring import split_block
 from packages.resume_core.template_clipboard import capture_clipboard
 from packages.resume_core.template_clipboard_store import TemplateClipboards
-from packages.resume_core.template_clipboard_witnesses import (field_witness,fingerprint,ownership_witness,scope_witness,
+from packages.resume_core.template_clipboard_witnesses import (captured_package_hash,field_witness,fingerprint,ownership_witness,scope_witness,
     source_witness,verify_witness,verify_witnesses)
 from packages.resume_core.template_facts import human_edit
 from packages.resume_core.templates.compiler import canonical
@@ -126,11 +126,11 @@ def test_builtin_field_witness_uses_canonical_cell_and_raw_typed_revision():
 
 def test_package_guard_covers_exact_bytes_and_validates_even_matching_tampered_fingerprint():
     before,_=workspace();project=before.project;witness=field_witness(project,'paper-a','title','a-title')
-    captured=fingerprint(project.template_package)
+    captured=captured_package_hash(project.template_package)
     verify_witnesses(project,[witness],captured)
     project.template_package.assets[0].bytes_base64='eA=='
     with pytest.raises(ValueError,match='package changed'):verify_witnesses(project,[witness],captured)
-    with pytest.raises(ValueError):verify_witnesses(project,[witness],fingerprint(project.template_package))
+    with pytest.raises(ValueError):verify_witnesses(project,[witness],captured_package_hash(project.template_package))
 
 
 def captured(before,*,start=0,end=None,blocks=None):

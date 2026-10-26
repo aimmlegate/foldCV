@@ -66,6 +66,18 @@ def mount_rich_projects(app, service, problem):
         workspace = await service.select(data, name, pasted)
         return response(workspace.project_id, 201)
 
+    @app.get("/v1/rich/template-assets/{digest}")
+    async def template_asset(digest: str):
+        # Captured fonts and icons by hash: immutable, so the browser keeps them instead of one copy per reply (D104).
+        import base64
+        import re
+        from packages.resume_core.templates.models import asset_text, asset_type
+        text = asset_text(digest) if re.fullmatch(r"[0-9a-f]{64}", digest) else None
+        if text is None:
+            return problem("TEMPLATE_ASSET_NOT_FOUND", 404, "template")
+        return Response(base64.b64decode(text), media_type=asset_type(digest) or "application/octet-stream",
+            headers={"Cache-Control": "private, max-age=31536000, immutable"})
+
     @app.get("/v1/rich/template-import")
     async def template_import_status():
         return JSONResponse(service.template_import_status(), headers={"Cache-Control": "no-store"})
@@ -132,7 +144,7 @@ def mount_rich_projects(app, service, problem):
 
     @app.post(prefix + "/{identifier}/activate")
     async def activate(identifier: str, _payload: EmptyRequest):
-        return wire_response(service.activate(identifier))
+        return JSONResponse(service.activate(identifier), headers={"Cache-Control": "no-store"})
 
     @app.post(prefix + "/{identifier}/catalog/archive")
     async def archive_entry(identifier: str, _payload: EmptyRequest):

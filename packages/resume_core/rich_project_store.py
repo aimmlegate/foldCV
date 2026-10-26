@@ -2,9 +2,10 @@
 
 from __future__ import annotations
 
+import base64
 import hashlib
 import json
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 import os
 import re
 
@@ -30,12 +31,47 @@ def rich_snapshot_bytes(workspace: WorkspaceV6) -> bytes:
 
 
 def decode_rich_snapshot(raw: bytes) -> WorkspaceV6:
-    data = strict_json(raw)
+    return decode_rich_data(strict_json(raw))
+
+
+def decode_rich_data(data) -> WorkspaceV6:
     if not isinstance(data, dict) or type(data.get("schemaVersion")) is not int:
         raise ProjectStoreFailure("PROJECT_LOAD_FAILED")
     if data["schemaVersion"] == 6: return WorkspaceV6.model_validate(data)
     if data["schemaVersion"] == 7: return WorkspaceV7.model_validate(data)
     raise ProjectStoreFailure("PROJECT_VERSION_UNSUPPORTED")
+
+
+def stored_owners(data):
+    return [owner for owner in (data.get("project"), data.get("preDraft")) if isinstance(owner, dict)] if isinstance(data, dict) else []
+
+
+def inline_history(data) -> bool:
+    """A version 7 file written before D104 keeps import records or asset bytes in the workspace JSON."""
+    if not isinstance(data, dict) or data.get("schemaVersion") != 7:
+        return False
+    project = data.get("project")
+    return (isinstance(project, dict) and "templateOperations" in project) or any(
+        isinstance(asset, dict) and "bytesBase64" in asset
+        for owner in stored_owners(data) for asset in ((owner.get("templatePackage") or {}).get("assets") or []))
+
+
+def history_blobs(workspace):
+    """Content-addressed files for a project's loaded import records and every captured asset (D104)."""
+    from .models.template_workspace import history_bytes
+    blobs = []
+    owner = workspace.project or workspace.pre_draft if workspace.schema_version == 7 else None
+    if owner is None:
+        return blobs
+    if workspace.project is not None:
+        for operation in workspace.project.template_operations:
+            raw = history_bytes(operation)
+            digest = hashlib.sha256(raw).hexdigest()
+            blobs.append(("history", digest, raw, digest))
+    if owner.template_package is not None:
+        for asset in owner.template_package.assets:
+            blobs.append(("template-assets", asset.sha256, base64.b64decode(asset.bytes_base64, validate=True), asset.sha256))
+    return blobs
 
 
 @dataclass(frozen=True)
@@ -44,9 +80,36 @@ class PreparedRichSave:
     raw: bytes
     blobs: tuple
     images: tuple
+    history: tuple = field(default=())
 
 
-def retain_template_state(previous, candidate):
+def changed_operations(previous, candidate, history=(), load=None):
+    """Pairs of (retained record, its new version) for every import record whose content may have changed. A project
+    names its records by history file; one whose file is unchanged needs no comparison (D104)."""
+    before_owner, after_owner = previous.project or previous.pre_draft, candidate.project or candidate.pre_draft
+    before_refs = {ref.operation_id: ref.sha256 for ref in getattr(before_owner, "import_history", [])}
+    after_refs = {ref.operation_id: ref.sha256 for ref in getattr(after_owner, "import_history", [])}
+    before_ops = {value.id: value for value in before_owner.template_operations}
+    after_ops = {value.id: value for value in (history or after_owner.template_operations)}
+    pairs = []
+    for identifier in [*before_ops, *[key for key in before_refs if key not in before_ops]]:
+        if identifier not in after_ops and identifier not in after_refs:
+            raise ProjectStoreFailure('PROJECT_SAVE_FAILED')
+        if identifier in before_refs and after_refs.get(identifier) == before_refs[identifier]:
+            continue
+        retained = before_ops.get(identifier)
+        if retained is None:
+            if load is None:
+                raise ProjectStoreFailure('PROJECT_SAVE_FAILED')
+            retained = load(identifier, before_refs[identifier])
+        current = after_ops.get(identifier)
+        if current is None:
+            raise ProjectStoreFailure('PROJECT_SAVE_FAILED')
+        pairs.append((retained, current))
+    return pairs
+
+
+def retain_template_state(previous, candidate, history=(), load=None):
     if previous.schema_version != 7:
         if candidate.schema_version == 7:
             raise ProjectStoreFailure('PROJECT_VERSION_UNSUPPORTED')
@@ -88,9 +151,7 @@ def retain_template_state(previous, candidate):
         if current is None or observation.model_dump(exclude={'admission', 'receipt_ids'}) != current.model_dump(
                 exclude={'admission', 'receipt_ids'}) or not set(observation.receipt_ids) <= set(current.receipt_ids):
             raise ProjectStoreFailure('PROJECT_SAVE_FAILED')
-    operations = {value.id: value for value in after.template_operations}
-    for operation in before.template_operations:
-        current = operations.get(operation.id)
+    for operation, current in changed_operations(previous, candidate, history, load):
         if current is None or operation.capture != current.capture or any(
                 getattr(operation, key) is not None and getattr(operation, key) != getattr(current, key)
                 for key in ('admitted_at', 'expires_at')):
@@ -103,6 +164,108 @@ def retain_template_state(previous, candidate):
 
 
 class RichProjectStore(ProjectStore):
+    def _decode(self, directory, raw, *, history=False):
+        """The workspace of a project file; asset bytes come from the project's asset files and import records from its
+        history files, and only when asked for (D104)."""
+        from .templates.models import asset_text, remember_asset
+        data = strict_json(raw)
+        for owner in stored_owners(data):
+            for asset in ((owner.get("templatePackage") or {}).get("assets") or []):
+                digest = asset.get("sha256") if isinstance(asset, dict) else None
+                if isinstance(digest, str) and "bytesBase64" not in asset and asset_text(digest) is None:
+                    path = self._blob(directory, "template-assets", digest)
+                    owned_file(path, 20 * 1024 * 1024)
+                    remember_asset(digest, base64.b64encode(path.read_bytes()).decode("ascii"))
+        project = data.get("project") if isinstance(data, dict) else None
+        if history and isinstance(project, dict) and project.get("importHistory") and "templateOperations" not in project:
+            project["templateOperations"] = [strict_json(self._history(directory, ref.get("sha256")))
+                for ref in project["importHistory"] if isinstance(ref, dict)]
+        return decode_rich_data(data)
+
+    def _history(self, directory, digest):
+        if not isinstance(digest, str) or re.fullmatch(r"[0-9a-f]{64}", digest) is None:
+            raise ProjectStoreFailure("PROJECT_LOAD_FAILED")
+        path = self._blob(directory, "history", digest)
+        owned_file(path, WORKSPACE_BYTES)
+        raw = path.read_bytes()
+        if hashlib.sha256(raw).hexdigest() != digest:
+            raise ProjectStoreFailure("PROJECT_LOAD_FAILED")
+        from .models.template_workspace import remember_history
+        remember_history(digest, raw)
+        return raw
+
+    def load_history(self, workspace):
+        """The same workspace with its project's import records loaded, for imports, publication and archives."""
+        project = workspace.project if workspace.schema_version == 7 else None
+        if project is None or project.history_loaded:
+            return workspace
+        try:
+            directory = self._directory(workspace.project_id)
+            records = [strict_json(self._history(directory, ref.sha256)) for ref in project.import_history]
+            data = workspace.model_dump(mode="json", by_alias=True)
+            data["project"]["templateOperations"] = records
+            return decode_rich_data(data)
+        except ProjectStoreFailure:
+            raise
+        except (StorageFailure, OSError, ValueError):
+            raise ProjectStoreFailure("PROJECT_LOAD_FAILED") from None
+
+    def externalize_history(self):
+        """Move import records and asset bytes of files written before D104 into their own files, once, before any
+        service reads a project. Each editor state keeps working: its recorded file hash moves to the new bytes."""
+        try:
+            with locked_root(self.root, ".projects.lock"):
+                if not self.projects.exists():
+                    return []
+                moved = []
+                for directory in sorted(self.projects.iterdir()):
+                    target = directory / "workspace.json"
+                    if not target.is_file() or target.is_symlink():
+                        continue
+                    owned_file(target)
+                    raw = target.read_bytes()
+                    if not inline_history(strict_json(raw)):
+                        continue
+                    workspace = self._decode(directory, raw)
+                    for kind, identifier, blob, checksum in history_blobs(workspace):
+                        path = self._blob(directory, kind, identifier)
+                        if not path.exists():
+                            atomic_write(path, blob)
+                    slim = rich_snapshot_bytes(workspace)
+                    self._rebase_background(workspace.project_id, hashlib.sha256(raw).hexdigest(), hashlib.sha256(slim).hexdigest())
+                    atomic_write(target, slim)
+                    moved.append(workspace.project_id)
+                return moved
+        except ProjectStoreFailure:
+            raise
+        except (StorageFailure, OSError, ValueError):
+            raise ProjectStoreFailure("PROJECT_LOAD_FAILED") from None
+
+    def _rebase_background(self, project, before, after):
+        folder = self.root / "background" / "projects" / project
+        state_path = folder / "state.json"
+        if not state_path.exists():
+            return
+        background = self.root / "background"
+        with locked_root(background, ".jobs.lock"):
+            from .background_limits import LIMITS
+            owned_file(state_path, LIMITS.sidecar_project_bytes)
+            state = strict_json(state_path.read_bytes())
+            settled = all(intent.get("phase") in {"receipt_stored", "reconciled"}
+                for intent in [*state.get("intents", []), *state.get("manualIntents", [])])
+            if not settled:
+                # An unfinished save names the old bytes; that editor state starts again instead.
+                spare = self.root / "migrated-d104" / project
+                private_directory(spare.parent)
+                os.replace(folder, spare)
+                return
+            history, writer = state.get("history"), state.get("writer")
+            if isinstance(history, dict) and history.get("workspaceSha256") == before:
+                history["workspaceSha256"] = after
+            if isinstance(writer, dict) and writer.get("acknowledgedSha256") == before:
+                writer["acknowledgedSha256"] = after
+            atomic_write(state_path, json.dumps(state, ensure_ascii=False, separators=(",", ":")).encode("utf-8"))
+
     def _observe(self, phase, identifier):
         observer = getattr(self, "background_observer", None)
         if observer is not None:
@@ -118,7 +281,7 @@ class RichProjectStore(ProjectStore):
                 target = directory / "workspace.json"
                 owned_file(target)
                 raw = target.read_bytes()
-                current = decode_rich_snapshot(raw)
+                current = self._decode(directory, raw)
                 if hashlib.sha256(raw).hexdigest() != self.expected.get(workspace.project_id):
                     return
                 folder = directory / "images"
@@ -164,6 +327,9 @@ class RichProjectStore(ProjectStore):
     def prepare_save(self, workspace, originals, artifacts, images=None):
         images = images or {}
         try:
+            # Records and assets go to their own files; the workspace JSON and its hash only name them (D104).
+            external = history_blobs(workspace)
+            history = tuple(workspace.project.template_operations) if workspace.schema_version == 7 and workspace.project else ()
             workspace = decode_rich_snapshot(rich_snapshot_bytes(workspace))
             raw = rich_snapshot_bytes(workspace)
             if len(raw) > project_file_bytes():
@@ -173,7 +339,7 @@ class RichProjectStore(ProjectStore):
             from .gui_archive_zip import ArchiveFailure
             try:
                 archive_payload(workspace, {key[1]: blob for key, blob in originals.items() if key[0] == workspace.project_id},
-                    {key[1]: blob for key, blob in images.items() if key[0] == workspace.project_id})
+                    {key[1]: blob for key, blob in images.items() if key[0] == workspace.project_id}, history=False)
             except ArchiveFailure as error:
                 raise ProjectStoreFailure(error.code) from None
             prepared = []
@@ -182,6 +348,7 @@ class RichProjectStore(ProjectStore):
                 if blob is None or len(blob) > 32 * 1024 * 1024 or hashlib.sha256(blob).hexdigest() != source.byte_sha256:
                     raise ProjectStoreFailure("SOURCE_BYTES_MISMATCH")
                 prepared.append(("sources", source.id, blob, source.byte_sha256))
+            prepared.extend(external)
             if workspace.project:
                 try:
                     retained_image_bytes(workspace.project.assets, ImageReferences(durable=tuple(asset.id for asset in workspace.project.assets)))
@@ -199,7 +366,7 @@ class RichProjectStore(ProjectStore):
                             raise ProjectStoreFailure("ARTIFACT_BYTES_MISMATCH")
                         prepared.append(("renders", render.id, blob, render.docx_sha256))
             retained = tuple((asset, images[(workspace.project_id, asset.id)]) for asset in workspace.project.assets) if workspace.project else ()
-            return PreparedRichSave(workspace, raw, tuple(prepared), retained)
+            return PreparedRichSave(workspace, raw, tuple(prepared), retained, history)
         except ProjectStoreFailure:
             raise
         except ImageFailure as error:
@@ -222,14 +389,24 @@ class RichProjectStore(ProjectStore):
             if target.exists():
                 owned_file(target)
                 old_raw = target.read_bytes()
-                existing = decode_rich_snapshot(old_raw)
+                existing = self._decode(directory, old_raw)
                 if hashlib.sha256(old_raw).hexdigest() != self.expected.get(workspace.project_id) or (
                     existing.project_revision > workspace.project_revision or existing.document_revision > workspace.document_revision
                 ):
                     raise ProjectStoreFailure("PROJECT_REVISION_CHANGED")
-                retain_template_state(existing, workspace)
+                from .models.template_import import ImportOperation
+                retain_template_state(existing, workspace, prepared.history,
+                    lambda _identifier, digest: ImportOperation.model_validate(strict_json(self._history(directory, digest))))
+            if workspace.schema_version == 7 and workspace.project is not None:
+                staged = {identifier for kind, identifier, _blob, _checksum in prepared.blobs if kind == "history"}
+                for ref in workspace.project.import_history:
+                    if ref.sha256 not in staged and not self._blob(directory, "history", ref.sha256).exists():
+                        raise ProjectStoreFailure("PROJECT_SAVE_FAILED")
             self._observe("before_assets_staged", workspace.project_id)
+            from .models.template_workspace import remember_history
             for kind, identifier, blob, checksum in prepared.blobs:
+                if kind == "history":
+                    remember_history(checksum, blob)
                 path = self._blob(directory, kind, identifier)
                 if path.exists():
                     owned_file(path, DOCX_BYTES if kind == "renders" else 32 * 1024 * 1024)
@@ -263,22 +440,22 @@ class RichProjectStore(ProjectStore):
         except (OSError, UnicodeError, ValueError, RecursionError):
             raise ProjectStoreFailure("PROJECT_SAVE_FAILED") from None
 
-    def read_committed(self, identifier, *, synchronize=False):
+    def read_committed(self, identifier, *, synchronize=False, history=False):
         try:
             with locked_root(self.root, ".projects.lock"):
-                return self._read_committed_unlocked(identifier, synchronize=synchronize)
+                return self._read_committed_unlocked(identifier, synchronize=synchronize, history=history)
         except ProjectStoreFailure:
             raise
         except (StorageFailure, OSError, ValueError):
             raise ProjectStoreFailure("PROJECT_LOAD_FAILED") from None
 
-    def _read_committed_unlocked(self, identifier, *, synchronize=False):
+    def _read_committed_unlocked(self, identifier, *, synchronize=False, history=False):
         """Read under an existing canonical lifecycle guard without reentering it."""
         try:
             entry = next((entry for entry in self._registry().entries if entry.project_id == identifier), None)
             if entry is None or entry.tombstoned:
                 raise ProjectStoreFailure("PROJECT_DELETED")
-            return self._read_owned_snapshot_unlocked(identifier, synchronize=synchronize)
+            return self._read_owned_snapshot_unlocked(identifier, synchronize=synchronize, history=history)
         except ProjectStoreFailure:
             raise
         except (StorageFailure, OSError, ValueError):
@@ -287,15 +464,19 @@ class RichProjectStore(ProjectStore):
     def committed_key(self, identifier):
         """The identity of a live project's saved file (inode, size, times), with the same registry and ownership
         checks as a read; equal keys mean the same bytes, since every save replaces the file."""
+        with locked_root(self.root, ".projects.lock"):
+            return self._committed_key_unlocked(identifier)
+
+    def _committed_key_unlocked(self, identifier):
+        """committed_key under an existing canonical lifecycle guard."""
         try:
-            with locked_root(self.root, ".projects.lock"):
-                entry = next((entry for entry in self._registry().entries if entry.project_id == identifier), None)
-                if entry is None or entry.tombstoned:
-                    raise ProjectStoreFailure("PROJECT_DELETED")
-                path = self._directory(identifier) / "workspace.json"
-                owned_file(path, WORKSPACE_BYTES)
-                status = os.stat(path, follow_symlinks=False)
-                return (status.st_ino, status.st_size, status.st_mtime_ns, status.st_ctime_ns)
+            entry = next((entry for entry in self._registry().entries if entry.project_id == identifier), None)
+            if entry is None or entry.tombstoned:
+                raise ProjectStoreFailure("PROJECT_DELETED")
+            path = self._directory(identifier) / "workspace.json"
+            owned_file(path, WORKSPACE_BYTES)
+            status = os.stat(path, follow_symlinks=False)
+            return (status.st_ino, status.st_size, status.st_mtime_ns, status.st_ctime_ns)
         except ProjectStoreFailure:
             raise
         except (StorageFailure, OSError, ValueError):
@@ -310,7 +491,7 @@ class RichProjectStore(ProjectStore):
         entry = next((item for item in self._registry().entries if item.project_id == identifier), None)
         if entry is None or not entry.tombstoned:
             raise ProjectStoreFailure('PROJECT_NOT_DELETED')
-        workspace, _checksum = self._read_owned_snapshot_unlocked(identifier)
+        workspace, _checksum = self._read_owned_snapshot_unlocked(identifier, history=True)
         if workspace.schema_version != 7:
             raise ProjectStoreFailure('PROJECT_VERSION_UNSUPPORTED')
         operation = next((item for item in (workspace.project or workspace.pre_draft).template_operations
@@ -319,7 +500,7 @@ class RichProjectStore(ProjectStore):
             raise ProjectStoreFailure('PROJECT_LOAD_FAILED')
         return (operation, workspace.project_revision) if with_revision else operation
 
-    def _read_owned_snapshot_unlocked(self, identifier, *, synchronize=False):
+    def _read_owned_snapshot_unlocked(self, identifier, *, synchronize=False, history=False):
         try:
             directory = self._directory(identifier)
             path = directory / "workspace.json"
@@ -334,7 +515,7 @@ class RichProjectStore(ProjectStore):
                 if len(raw) > WORKSPACE_BYTES or (before.st_ino, before.st_size, before.st_mtime_ns, before.st_nlink) != (
                         after.st_ino, after.st_size, after.st_mtime_ns, after.st_nlink):
                     raise StorageFailure("UNSAFE_STORAGE")
-                workspace = decode_rich_snapshot(raw)
+                workspace = self._decode(directory, raw, history=history)
                 if workspace.project_id != identifier:
                     raise StorageFailure("UNSAFE_STORAGE")
                 if synchronize:
@@ -356,7 +537,7 @@ class RichProjectStore(ProjectStore):
         target = directory / "workspace.json"
         owned_file(target)
         raw = target.read_bytes()
-        workspace = decode_rich_snapshot(raw)
+        workspace = self._decode(directory, raw)
         if len(raw) > WORKSPACE_BYTES or workspace.project_id != id:
             raise ProjectStoreFailure("PROJECT_LOAD_FAILED")
         owner = workspace.project or workspace.pre_draft
@@ -439,9 +620,10 @@ class RichProjectStore(ProjectStore):
                 for path in directory.iterdir():
                     if path.name in {"workspace.json", ".project-identity.json"}:
                         owned_file(path); files.append(path)
-                    elif path.name in {"sources", "renders", "images"}:
+                    elif path.name in {"sources", "renders", "images", "history", "template-assets"}:
                         private_directory(path)
-                        suffix = {"sources": "bin", "renders": "(?:docx|foldcv)", "images": "(?:png|jpg)"}[path.name]
+                        suffix = {"sources": "bin", "renders": "(?:docx|foldcv)", "images": "(?:png|jpg)",
+                            "history": "bin", "template-assets": "bin"}[path.name]
                         for blob in path.iterdir():
                             if re.fullmatch(r"[0-9a-f]{64}\." + suffix, blob.name) is None:
                                 raise StorageFailure("UNSAFE_STORAGE")
