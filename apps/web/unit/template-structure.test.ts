@@ -418,7 +418,7 @@ test("E08: a bound link's URL edit changes only its URL cell and target, with it
   } finally { session.close(); await value.close(); }
 });
 
-test("B07/G02: a whole selected item moves among its sibling items; a partial selection is refused", async () => {
+test("B07/G02: lines inside one item move that item; a selection that crosses items is refused", async () => {
   const value = await harness("e04");
   const { session, editor, warnings } = await opened(value);
   try {
@@ -439,10 +439,34 @@ test("B07/G02: a whole selected item moves among its sibling items; a partial se
     blocks = (await shown(session)).blocks;
     assert.deepEqual(order([first.id, second.id]), [first.id, second.id]);
     assert.deepEqual(warnings, []);
-    // Two lines that are not one whole item are refused with a notice, as before.
+    // The section line is hidden, so two visible lines of one item move that item and keep its lines.
     const partial = children(first.id);
-    assert.ok(partial[0] && partial[1]);
+    assert.ok(partial[0] && partial[1] && partial.length > 1);
     select(editor, at(editor, partial[0].id, 0), at(editor, partial[1].id, partial[1].text.length));
+    await session.move("down");
+    blocks = (await shown(session)).blocks;
+    assert.deepEqual(order([first.id, second.id]), [second.id, first.id]);
+    assert.deepEqual(children(first.id).map(block => block.id), partial.map(block => block.id), "a partial selection keeps the item's lines");
+    await session.navigate("undo");
+    blocks = (await shown(session)).blocks;
+    assert.deepEqual(order([first.id, second.id]), [first.id, second.id]);
+    // One selected line stays a line move. The item does not jump.
+    const line = children(first.id)[0];
+    assert.ok(line && line.text.length > 0);
+    const inside = children(first.id).map(block => block.id);
+    select(editor, at(editor, line.id, 0), at(editor, line.id, line.text.length));
+    await session.move("down");
+    blocks = (await shown(session)).blocks;
+    assert.deepEqual(order([first.id, second.id]), [first.id, second.id], "one line does not move the item");
+    assert.equal(warnings.length, 0);
+    if (children(first.id).map(block => block.id).join() !== inside.join()) {
+      await session.navigate("undo");
+      blocks = (await shown(session)).blocks;
+    }
+    // Lines from two items are not one item: one warning, and nothing moves.
+    const tail = partial[partial.length - 1], head = children(second.id)[0];
+    assert.ok(tail && head);
+    select(editor, at(editor, tail.id, 0), at(editor, head.id, head.text.length));
     await session.move("down");
     assert.deepEqual((await shown(session)).blocks.map(block => block.id), blocks.map(block => block.id));
     assert.equal(warnings.length, 1);

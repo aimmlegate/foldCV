@@ -15,7 +15,7 @@ import { RichSaveQueue, type TemplateAdoption, type TemplateQueueState } from ".
 import { restoreTableIdentities } from "./table-identity";
 import type { templateSchema } from "./template-schema";
 import { blockAt, containerText, copySource, correctionOperation, extractOperations, foldComposition, insertionAt, mergeAt, placementOf,
-  itemOf, replacementAt, selectedBlocks, showText, splitAt, textPoint, textPosition, type ExtractedOperation, type TextPoint } from "./v7-extraction";
+  itemContaining, replacementAt, selectedBlocks, showText, splitAt, textPoint, textPosition, type ExtractedOperation, type TextPoint } from "./v7-extraction";
 import { wireMarks } from "./inline";
 import type { PanelCommand } from "./synchronization";
 import { employmentPanelCommands } from "./v7-panel";
@@ -241,8 +241,8 @@ export class TemplateEditorSession {
     if (!editor || this.closed || this.composing || this.panelBusy || !this.writer.writable) return;
     const blocks = editor.getSelection()?.blocks ?? [];
     if (blocks.length > 1) {
-      // A whole selected item (every line of one section) moves among its sibling items.
-      const item = itemOf(editor._tiptapEditor.state.doc, blocks.map(block => block.id));
+      // The section line is hidden, so any lines inside one item move that item. A selection that crosses items does not.
+      const item = itemContaining(editor._tiptapEditor.state.doc, blocks.map(block => block.id));
       if (!item) { this.refuse("only one block or one whole item moves at a time"); return; }
       const index = item.siblings.indexOf(item.id), rest = item.siblings.filter(id => id !== item.id);
       if (direction === "up" ? index < 1 : index >= rest.length) return;

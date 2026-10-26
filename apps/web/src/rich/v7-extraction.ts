@@ -409,6 +409,32 @@ export function placementOf(doc: Node, blockId: string): Placement | null {
   return found;
 }
 
+/** The item whose visible lines contain every selected block. A selection that leaves the item is not one item. */
+export function itemContaining(doc: Node, ids: readonly string[]): { id: string; parentId: string; siblings: string[] } | null {
+  const wanted = new Set(ids.filter(id => id.length > 0));
+  if (wanted.size === 0) return null;
+  let found: { id: string; parentId: string; siblings: string[] } | null = null;
+  doc.descendants((node, pos) => {
+    if (found) return false;
+    const group = node.lastChild;
+    if (node.type.name !== "blockContainer" || node.firstChild?.type.name !== "section" || node.childCount < 2 || !group) return true;
+    const children: string[] = [];
+    group.forEach(child => { const id: unknown = child.attrs["id"]; if (typeof id === "string") children.push(id); });
+    const id: unknown = node.attrs["id"];
+    if (typeof id !== "string") return true;
+    const held = children.filter(child => wanted.has(child));
+    const covered = held.length + (wanted.has(id) ? 1 : 0);
+    if (covered === 0) return true;
+    if (covered !== wanted.size) { found = null; return false; }
+    const position = doc.resolve(pos), owner = position.depth >= 2 ? position.node(position.depth - 1) : null;
+    const parentId: unknown = owner?.attrs["id"], siblings: string[] = [];
+    position.parent.forEach(child => siblings.push(String(child.attrs["id"])));
+    if (owner?.type.name === "blockContainer" && typeof parentId === "string") found = { id, parentId, siblings };
+    return false;
+  });
+  return found;
+}
+
 /** The item section whose children are exactly these blocks, in order, with its sibling order. */
 export function itemOf(doc: Node, ids: readonly string[]): { id: string; parentId: string; siblings: string[] } | null {
   let found: { id: string; parentId: string; siblings: string[] } | null = null;
