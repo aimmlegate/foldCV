@@ -200,23 +200,31 @@ def test_a_column_does_not_start_with_keep_with_next_but_later_headings_keep_it(
     assert [emitted(paragraph) for paragraph in tree.xpath('//w:tbl//w:p', namespaces=NS) if keep(paragraph)] == ['ПОРТФОЛИО']
 
 
-def refused_identity(refuse):
-    """Identity answers the coordinator refuses on every attempt; other blocks answer as scripted."""
+def refused_identity(refuse, repair=None):
+    """Identity answers the coordinator refuses on every attempt; other blocks answer as scripted. repair, when
+    given, answers the repair slot instead of refuse."""
     def wrap(script):
         def scripted(request, value):
             if 'targets' in value or value['declaration']['id'] != 'identity':
                 return script(request, value)
-            # The repair is refused the same way; it has no earlier items to select.
-            return refuse(script(request, {**value, 'slot': 'initial'}))
+            # A repair has no earlier items to select, so it starts from the first reply's shape.
+            reply = script(request, {**value, 'slot': 'initial'})
+            return (repair or refuse)(reply) if value.get('slot', 'initial') != 'initial' else refuse(reply)
         return scripted
     return wrap
 
 
-def without_profession(reply):
-    # A reworded value the source does not state, sent without its entry: completion cannot cite it (S7d).
-    reply['payload'] = {**reply['payload'], 'profession': 'Senior backend engineer'}
+def unstated_profession(reply):
+    # A title no source line states, sent without its entry: the first reply is refused with the binding named.
+    # A reworded title is not refused any more, because its word stems bind it to the line it rewords (I2).
+    reply['payload'] = {**reply['payload'], 'profession': 'Chief quantum officer'}
     reply['fields'] = [field for field in reply['fields'] if field['fieldKey'] != 'profession']
     return reply
+
+
+def unreadable(_reply):
+    # A repair that does not parse cannot drop the unstated title (I4), so no attempt is admitted.
+    return 'not a JSON reply'
 
 
 def frames(tree):
@@ -230,7 +238,7 @@ async def test_a_refused_identity_reply_keeps_its_cited_lines_in_the_header_and_
     # P05: the failed block shows only the lines it cited, in its own view and fallback style; accepted blocks
     # of other views stay (R05, K02), and the header exports the fallback text instead of refusing it.
     _fixture, result, workspace, originals = await generic_import(tmp_path / 'import', 'F01',
-        wrap=refused_identity(without_profession))
+        wrap=refused_identity(unstated_profession, repair=unreadable))
     identity = next(task for task in result.tasks if task.block_id == 'identity')
     assert result.state == 'published' and identity.state == 'source_fallback'
     shown = views(workspace)
