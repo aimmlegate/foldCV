@@ -471,6 +471,15 @@ test("B07/G02: lines inside one item move that item; a selection that crosses it
     await session.move("down");
     assert.deepEqual((await shown(session)).blocks.map(block => block.id), blocks.map(block => block.id));
     assert.equal(warnings.length, 1);
+    // Review 2026-10-26: the first item does not move above its section heading.
+    const heading = blocks.find(block => block.parent === first.parent && block.type === "heading");
+    assert.ok(heading && order([heading.id, first.id])[0] === heading.id);
+    const opening = children(first.id), closing = opening[opening.length - 1];
+    assert.ok(opening[0] && closing);
+    select(editor, at(editor, opening[0].id, 0), at(editor, closing.id, closing.text.length));
+    await session.move("up");
+    assert.deepEqual((await shown(session)).blocks.map(block => block.id), blocks.map(block => block.id));
+    assert.equal(warnings.length, 1);
   } finally { session.close(); await value.close(); }
 });
 

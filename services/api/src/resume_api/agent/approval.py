@@ -77,7 +77,7 @@ class AssistantApproval:
                         unresolved = None
             except (AgentFailure, BackgroundFailure) as error:
                 code = error.code if isinstance(error, AgentFailure) else "AGENT_OUTCOME_UNKNOWN"
-                service.startup_errors[directory.name] = code
+                service.proposal_errors[directory.name] = code
                 if unresolved is not None:
                     service.publication._fence(directory.name, unresolved)
                     jobs = getattr(service.projects, "background_jobs", None)
@@ -363,6 +363,15 @@ class AssistantApproval:
                         jobs.writers.advance(state, workspace, digest_bytes(workspace), payload.writer)
                         if history_binding is not None:
                             jobs.writers.validate_history_binding(state, directory, workspace, history_binding)
+                            # The editor builds the chat steps itself; they must do what the stored backend inverse does.
+                            stored = jobs.writers.history_material(directory, state, history_binding, workspace)[3].model_copy(deep=True)
+                            stored.client_mutation_id = "preview_" + history_binding.transfer_id
+                            try:
+                                expected, _duplicate = apply_rich_mutation(workspace, stored)
+                            except ValueError:
+                                raise AgentFailure("AGENT_STALE_READ") from None
+                            if content_digest(expected) != value.proposal.content_sha256:
+                                raise AgentFailure("AGENT_STALE_READ")
                         jobs.writers.write(directory, state)
                         return WriterCommitBindingV1(epoch=writer.epoch, incarnation=writer.incarnation,
                             actionCursor=writer.acknowledged_cursor, touchGeneration=writer.touch_generation)

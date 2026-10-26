@@ -119,10 +119,11 @@ def stating_stems(text, table, anchors=()):
 
     anchors are the refs already cited for the same item. With anchors only lines shortly before the first and within
     STEM_WINDOW_AFTER of the last are candidates and STEM_THRESHOLD_NEAR applies: a technology binds to its own project's line, not to a similar line
-    of another project, and a claim the item's lines do not state stays unbound. Without anchors the whole table is
-    searched at STEM_THRESHOLD_FAR, and the first line chosen opens the window for the rest. Ties go to the line nearest
-    the anchors and the lines already chosen, then to the line stating most of the text, then to the line after the
-    anchors rather than before them, then to source order."""
+    of another project, and a claim the item's lines do not state stays unbound. The lines from the first anchor down
+    are tried first; the lines just above it, which may end the previous item, count only when those do not state the
+    value. Without anchors the whole table is searched at STEM_THRESHOLD_FAR, and the first line chosen opens the
+    window for the rest. Ties go to the line nearest the anchors and the lines already chosen, then to the line stating
+    most of the text, then to the line after the anchors rather than before them, then to source order."""
     stems = _stems(text)
     if not stems:
         return []
@@ -131,34 +132,37 @@ def stating_stems(text, table, anchors=()):
     def holds(ref, stem):
         return re.search(r'(?<!\w)' + re.escape(stem) + r'\w*', texts[ref]) is not None
     anchored = [order[anchor] for anchor in anchors if anchor in order]
-    positions = list(anchored)
     threshold = STEM_THRESHOLD_NEAR if anchored else STEM_THRESHOLD_FAR
-    def within(option):
-        # The words of one value come from one place. Anchors are an item's header and description, so the window
-        # reaches a little above them and further below; a chosen content line may have its header well above it.
-        if not positions:
-            return True
-        chosen_positions = positions[len(anchored):]
-        low = min([value - STEM_WINDOW_BEFORE for value in anchored] + [value - STEM_WINDOW_AFTER for value in chosen_positions])
-        return low <= order[option.ref] <= max(positions) + STEM_WINDOW_AFTER
-    def distance(option):
-        return min((abs(order[option.ref] - position) for position in positions), default=0)
-    candidates = _narrowest([option for ref, option in table.items() if any(holds(ref, stem) for stem in stems)])
     # A short value is one source line; a long merged value may gather its stems from several.
     limit = min(STEM_LIMIT, 1 + len(stems) // 4)
-    chosen, missing = [], set(stems)
-    while missing and len(chosen) < limit:
-        first = min(anchored, default=0)
-        best = max((option for option in candidates if within(option)), key=lambda option: (
-            sum(holds(option.ref, stem) for stem in missing), -distance(option), sum(holds(option.ref, stem) for stem in stems),
-            order[option.ref] >= first, -order[option.ref]), default=None)
-        if best is None or not any(holds(best.ref, stem) for stem in missing):
-            break
-        chosen.append(best)
-        positions.append(order[best.ref])
-        candidates = [option for option in candidates if option is not best]
-        missing -= {stem for stem in missing if holds(best.ref, stem)}
-    return [option.ref for option in chosen] if 1 - len(missing) / len(stems) >= threshold else []
+    def pick(candidates):
+        positions = list(anchored)
+        def within(option):
+            # The words of one value come from one place. Anchors are an item's header and description, so the window
+            # reaches a little above them and further below; a chosen content line may have its header well above it.
+            if not positions:
+                return True
+            chosen_positions = positions[len(anchored):]
+            low = min([value - STEM_WINDOW_BEFORE for value in anchored] + [value - STEM_WINDOW_AFTER for value in chosen_positions])
+            return low <= order[option.ref] <= max(positions) + STEM_WINDOW_AFTER
+        def distance(option):
+            return min((abs(order[option.ref] - position) for position in positions), default=0)
+        chosen, missing = [], set(stems)
+        while missing and len(chosen) < limit:
+            first = min(anchored, default=0)
+            best = max((option for option in candidates if within(option)), key=lambda option: (
+                sum(holds(option.ref, stem) for stem in missing), -distance(option), sum(holds(option.ref, stem) for stem in stems),
+                order[option.ref] >= first, -order[option.ref]), default=None)
+            if best is None or not any(holds(best.ref, stem) for stem in missing):
+                break
+            chosen.append(best)
+            positions.append(order[best.ref])
+            candidates = [option for option in candidates if option is not best]
+            missing -= {stem for stem in missing if holds(best.ref, stem)}
+        return [option.ref for option in chosen] if 1 - len(missing) / len(stems) >= threshold else []
+    candidates = _narrowest([option for ref, option in table.items() if any(holds(ref, stem) for stem in stems)])
+    own = [option for option in candidates if anchored and order[option.ref] >= min(anchored)]
+    return (anchored and pick(own)) or pick(candidates)
 
 
 def _under(pointer, ancestor):

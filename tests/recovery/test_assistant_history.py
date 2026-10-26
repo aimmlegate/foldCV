@@ -84,7 +84,8 @@ async def test_a_new_history_offer_cannot_replace_the_action_captured_for_the_sa
 
 
 @pytest.mark.asyncio
-async def test_chat_undo_reuses_the_existing_backend_inverse_owner_and_native_redo_receipt(tmp_path):
+@pytest.mark.parametrize("forged", [False, True])
+async def test_chat_undo_reuses_the_existing_backend_inverse_owner_and_native_redo_receipt(tmp_path, forged):
     import time
     from resume_api.agent.runtime import ScriptedAgentRuntime
     from packages.resume_core.background_history import digest_bytes
@@ -125,6 +126,9 @@ async def test_chat_undo_reuses_the_existing_backend_inverse_owner_and_native_re
     inverse = RichMutation.model_validate_json(native.mutation_wire)
     inverse.action_id = inverse.capture.action_id = "background:" + job.id + ":" + proposal.id
     inverse.capture.session_id = lease.session_id
+    if forged:
+        # Review 2026-10-26: other steps under the honest backend target must not become the recorded undo.
+        inverse.steps[0].block.content[0].text = "Другое"
     offer_history(service, project, AssistantHistoryOfferV1(protocolVersion=1, requestId=request.client_request_id,
         offer=AgentHistoryOffer(owner=lease.owner, projectRevision=current.project_revision,
             documentRevision=current.document_revision, factsRevision=current.project.facts.revision, undo=inverse, redo=None),
@@ -145,6 +149,13 @@ async def test_chat_undo_reuses_the_existing_backend_inverse_owner_and_native_re
         header = WriterAdvanceV1(schemaVersion=1, proof=fixture.proof, canonicalRevision=current.project_revision,
             canonicalSha256=digest_bytes(current), actionCursor=0)
         command = commit_request(payload, claim).model_copy(update={"writer": header})
+        if forged:
+            refused = service.approval.commit(project, command)
+            assert refused.receipt.disposition == "stale" and refused.receipt.error.code == "AGENT_STALE_READ"
+            state = jobs.store.load(project)
+            assert state.inverses[0].direction == "undo" and not state.history_commands
+            assert projects.storage.read_committed(project)[0].project.document == current.project.document
+            return
         saved = service.approval.commit(project, command)
         assert saved.receipt.durable
         state = jobs.store.load(project)

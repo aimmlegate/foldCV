@@ -566,7 +566,7 @@ export class AssistantController {
           if (event.sequence <= this.sequence) continue;
           if (event.sequence !== this.sequence + 1) throw new AgentApiFailure("AGENT_RESYNC_REQUIRED");
           this.sequence = event.sequence; failures = 0;
-          this.accept(event);
+          this.accept(event, owner);
         }
         if (stream.signal.aborted || this.closed || epoch !== this.epoch) return;
         const read = await this.api.read(runId);
@@ -585,7 +585,7 @@ export class AssistantController {
       await pause(250 * Math.max(1, failures));
     }
   }
-  private accept(event: AgentEvent): void {
+  private accept(event: AgentEvent, owner: AgentOwner): void {
     const activity = event.type === "activity.updated" ? this.view.activity.filter(item => item.type !== "activity.updated" || item.payload.itemId !== event.payload.itemId) : this.view.activity;
     const update: Partial<AssistantView> = { activity: event.type === "message.delta" ? activity : [...activity, event].slice(-40) };
     if (event.type === "message.delta") {
@@ -601,8 +601,16 @@ export class AssistantController {
     } else if (event.type === "edit.result") {
       const epoch = this.epoch;
       void this.api.read(event.runId).then(read => { if (epoch === this.epoch) this.publish({ receipts: read.receipts }); }).catch(error => this.publish({ error: code(error) }));
-    } else if (event.type === "edit.offered") {
+    } else if (event.type === "edit.offered" && this.view.taskCatalog?.protocolEnabled) {
       void this.refreshProposals().catch(error => this.publish({ error: code(error) }));
+    } else if (event.type === "edit.offered" && !terminal(this.view.run) && !this.applying.has(event.payload.batchId)
+      && !this.view.receipts.some(receipt => receipt.batchId === event.payload.batchId)) {
+      // Without the reviewed protocol the server waits for the editor to claim and save the offered batch.
+      const id = event.payload.batchId, epoch = this.epoch;
+      this.applying.add(id);
+      void this.editor.apply(id, this.api.prepared(event.runId, owner)).catch(error => {
+        if (epoch === this.epoch) this.publish({ error: code(error) });
+      }).finally(() => { this.applying.delete(id); this.publish({}); });
     }
     this.publish(update);
   }

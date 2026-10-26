@@ -410,10 +410,10 @@ export function placementOf(doc: Node, blockId: string): Placement | null {
 }
 
 /** The item whose visible lines contain every selected block. A selection that leaves the item is not one item. */
-export function itemContaining(doc: Node, ids: readonly string[]): { id: string; parentId: string; siblings: string[] } | null {
+export function itemContaining(doc: Node, ids: readonly string[]): { id: string; parentId: string; siblings: string[]; kinds: string[] } | null {
   const wanted = new Set(ids.filter(id => id.length > 0));
   if (wanted.size === 0) return null;
-  let found: { id: string; parentId: string; siblings: string[] } | null = null;
+  let found: { id: string; parentId: string; siblings: string[]; kinds: string[] } | null = null;
   doc.descendants((node, pos) => {
     if (found) return false;
     const group = node.lastChild;
@@ -427,9 +427,9 @@ export function itemContaining(doc: Node, ids: readonly string[]): { id: string;
     if (covered === 0) return true;
     if (covered !== wanted.size) { found = null; return false; }
     const position = doc.resolve(pos), owner = position.depth >= 2 ? position.node(position.depth - 1) : null;
-    const parentId: unknown = owner?.attrs["id"], siblings: string[] = [];
-    position.parent.forEach(child => siblings.push(String(child.attrs["id"])));
-    if (owner?.type.name === "blockContainer" && typeof parentId === "string") found = { id, parentId, siblings };
+    const parentId: unknown = owner?.attrs["id"], siblings: string[] = [], kinds: string[] = [];
+    position.parent.forEach(child => { siblings.push(String(child.attrs["id"])); kinds.push(child.firstChild?.type.name ?? ""); });
+    if (owner?.type.name === "blockContainer" && typeof parentId === "string") found = { id, parentId, siblings, kinds };
     return false;
   });
   return found;

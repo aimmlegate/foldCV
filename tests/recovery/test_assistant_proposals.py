@@ -73,6 +73,21 @@ def test_corrupt_proposal_namespace_disables_assistant_recovery_without_blocking
     assert list(outside.iterdir()) == [] and not runtime.calls
 
 
+def test_a_foreign_file_among_proposals_blocks_only_the_reviewed_protocol(tmp_path):
+    # Review 2026-10-26: Finder's .DS_Store made the store corrupt and took readiness from the assistant without the protocol.
+    service, runtime, projects, workspace, _, _, _ = setup(tmp_path, None)
+    assert service.capabilities(workspace.project_id).ready
+    directory = service.proposals.directory(workspace.project_id)
+    directory.mkdir(parents=True)
+    (directory / ".DS_Store").write_bytes(b"\0")
+    service.recover()
+    assert service.capabilities(workspace.project_id).ready
+    service.assistant_protocol_enabled = True
+    current = service.capabilities(workspace.project_id)
+    assert not current.ready and current.unavailable.code == "AGENT_STORE_CORRUPT"
+    assert not runtime.calls
+
+
 async def read_document(session, task_id="rewrite_resume"):
     task = await session.call("get_project_resources", AssistantTaskRequestV1(protocolVersion=1, taskId=task_id))
     assert task["availability"]["state"] == "available"

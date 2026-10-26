@@ -161,8 +161,8 @@ def catalog(service, project_id, *, allow_edits=True, allow_web=True, draft_run_
         local = availability()
         if not service.settings.load().enabled:
             local = availability("permission_disabled", "AGENT_DISABLED", "Включите помощника в настройках.")
-        elif getattr(service, "proposal_recovery_error", None) or service.startup_errors.get(project_id):
-            local = availability("temporarily_unavailable", service.proposal_recovery_error or service.startup_errors[project_id],
+        elif service.recovery_error(project_id):
+            local = availability("temporarily_unavailable", service.recovery_error(project_id),
                 "Подготовленные варианты недоступны. Сохранённый документ можно открыть и редактировать вручную.")
         elif recovering:
             local = availability("temporarily_unavailable", "AGENT_OUTCOME_UNKNOWN", "Сначала восстановите результат исходного сохранения.")

@@ -421,6 +421,16 @@ def test_the_item_window_keeps_a_value_on_its_own_lines():
     assert stating_stems('Разрабатывал генерацию PDF-файлов.', table) == ['S16']
 
 
+def test_the_previous_items_last_line_loses_to_the_items_own_line():
+    # Review 2026-10-26: the line just above the anchors ends the previous job; stating more stems must not win it.
+    table = stem_table('ООО Альфа', '- Разработка генерации PDF-файлов для внутренних отчётов.', 'ООО Перфект',
+        'Компания Перфект создавала IT продукты.', '- Разработка генерации PDF файлов.')
+    assert stating_stems('Разрабатывал генерацию PDF-файлов для внутренних отчётов.', table, anchors=['S3', 'S4']) == ['S5']
+    table = stem_table('- Разработка генерации Microsoft Excel и Word файлов.', 'ООО Перфект',
+        'Компания Перфект создавала IT продукты.', '- Разработка генерации Excel отчётов.')
+    assert stating_stems('Разрабатывал генерацию файлов Microsoft Excel и Word.', table, anchors=['S2', 'S3']) == ['S4']
+
+
 def test_an_inferred_sentence_in_another_language_stays_unbound():
     # LIVE-09: the model translated and inferred; two shared numbers are no statement of the value.
     table = stem_table('Backend (Golang, NodeJS, PHP, C)', 'Июль 2021 — март 2025 (3 года 9 месяцев)', 'Основной стек: Go')

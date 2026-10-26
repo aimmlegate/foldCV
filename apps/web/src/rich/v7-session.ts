@@ -246,6 +246,8 @@ export class TemplateEditorSession {
       if (!item) { this.refuse("only one block or one whole item moves at a time"); return; }
       const index = item.siblings.indexOf(item.id), rest = item.siblings.filter(id => id !== item.id);
       if (direction === "up" ? index < 1 : index >= rest.length) return;
+      // The section heading stays above its items, so an item never moves past it.
+      if (item.kinds[direction === "up" ? index - 1 : index + 1] === "heading") return;
       const afterId = (direction === "up" ? rest[index - 2] : rest[index]) ?? null;
       await this.structure([{ operation: { kind: "move_block", blockId: item.id, placement: { parentId: item.parentId, afterId } } }]);
       return;

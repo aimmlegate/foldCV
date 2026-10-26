@@ -50,7 +50,7 @@ class AssistantActionApproval(AssistantApproval):
             try:
                 self.reconcile_reviews(directory.name)
             except AgentFailure as error:
-                self.service.startup_errors[directory.name] = error.code
+                self.service.proposal_errors[directory.name] = error.code
 
     def value(self, project_id, payload):
         value = super().value(project_id, payload)

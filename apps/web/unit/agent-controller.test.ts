@@ -218,7 +218,8 @@ test("assistant reconnect deduplicates deltas and offers without submitting anot
     await h.controller.init(); h.controller.draft("Check and edit"); await h.controller.send(baseline);
     for (let i = 0; i < 100 && h.sequences.length < 2; i++) await new Promise<void>(resolve => { setTimeout(resolve, 5); });
     await wait();
-    assert.deepEqual(h.sequences.slice(0, 2), [0, 2]); assert.deepEqual(h.applied, []);
+    // Review 2026-10-26: without the reviewed protocol the server waits for the editor to save the offered batch, once.
+    assert.deepEqual(h.sequences.slice(0, 2), [0, 2]); assert.deepEqual(h.applied, ["batch_1"]);
     assert.equal(h.counts().submitted, 1); assert.equal(h.controller.view.run?.state, "completed");
   } finally { h.controller.close(); }
 });

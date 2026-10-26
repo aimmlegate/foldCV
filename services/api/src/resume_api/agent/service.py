@@ -66,6 +66,8 @@ class AgentService:
         self.assistant_protocol_enabled = False
         self.capability_states = {}
         self.startup_errors = {}
+        # Errors of the reviewed-proposal store; the assistant without the protocol never reads that store.
+        self.proposal_errors = {}
         self.proposal_recovery_error = None
         self.unresolved = {}
         self.leases = AgentLeases(self.store, projects.state_lock, clock=lease_clock, active=self.active)
@@ -80,18 +82,24 @@ class AgentService:
 
     def recover(self):
         self.unresolved, self.startup_errors = self.store.recover_all(reviewed=self.approval.is_reviewed)
+        self.proposal_errors = {}
         self.leases.invalidate()
         self.approval.recover_all()
         self.action_approval.recover_all()
         self.publication.recover_all()
         try:
-            self.startup_errors.update(self.proposals.recover())
+            self.proposal_errors.update(self.proposals.recover())
             self.proposal_recovery_error = None
             from .outcomes import retire_noops
             for directory in self.proposals.root.iterdir() if self.proposals.root.exists() else []:
                 retire_noops(self, directory.name)
         except AgentFailure as error:
             self.proposal_recovery_error = error.code
+
+    def recovery_error(self, project_id):
+        if self.assistant_protocol_enabled:
+            return self.proposal_recovery_error or self.startup_errors.get(project_id) or self.proposal_errors.get(project_id)
+        return self.startup_errors.get(project_id)
 
     def active(self, project_id):
         return any(control.project_id == project_id and control.task is not None and not control.task.done()
@@ -124,7 +132,7 @@ class AgentService:
         reason = ("AGENT_DISABLED" if not settings.enabled else "AGENT_CLEANUP_FAILED" if INFERENCE.blocked else
             self.proposal_recovery_error if self.assistant_protocol_enabled and self.proposal_recovery_error else
             "AGENT_OUTCOME_UNKNOWN" if self.unresolved.get(project_id) else
-            self.startup_errors.get(project_id) if project_id in self.startup_errors else
+            self.recovery_error(project_id) if self.recovery_error(project_id) else
             "AGENT_RUNTIME_UNSUPPORTED" if self.runtime is None or self.tools is None else
             connection.reason or "AGENT_CONNECTION_UNAVAILABLE" if not connection.ready else
             "AGENT_MODEL_REQUIRED" if settings.selected_agent_model is None else
