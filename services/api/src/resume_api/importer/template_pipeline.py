@@ -688,10 +688,12 @@ class TemplatePipeline(TemplateCheckpoints):
         result.state = 'fenced'
         return result
 
-    async def finish_task(self, project, operation_id, task_id, value, spans, handles, disposition, issues):
+    async def finish_task(self, project, operation_id, task_id, value, spans, handles, disposition, issues, *, accepted=False):
         def finish(operation, _data, _workspace):
             task = task_in(operation, task_id)
-            task.state = 'source_fallback' if disposition == 'source_fallback' else 'empty' if disposition == 'empty' else 'accepted'
+            # A review remark on a block that already has admitted values is not a failed import. The result
+            # disposition stays source_fallback so the lines the review named still appear under those values.
+            task.state = 'accepted' if accepted else 'source_fallback' if disposition == 'source_fallback' else 'empty' if disposition == 'empty' else 'accepted'
             task.issue_ids = [issue.id for issue in issues]
             operation.issues.extend(issues)
             operation.task_results.append(TaskResultRecord(id=self.id_factory('task-result'), taskId=task_id,
@@ -712,6 +714,10 @@ class TemplatePipeline(TemplateCheckpoints):
         # The findings of the review whose proposal stays admitted: a repair that was not better is not shown.
         receipt = applied_receipt(operation, task_id) or next((value for value in reversed(operation.receipts)
             if value.id in task.receipt_ids), None)
+        applied = next((value for value in reversed(operation.proposals) if receipt is not None
+            and value.applied_receipt_id == receipt.id), None)
+        # Admitted values stay. The remark does not mark the block as a failed import.
+        kept = applied is not None and bool(applied.admitted_cell_ids)
         leftover = []
         failures = [result for result in receipt.reply.results if result.disposition != 'satisfied'] if receipt else []
         sources = owner(current).sources
@@ -749,17 +755,25 @@ class TemplatePipeline(TemplateCheckpoints):
         # One notice per block (LIVE-07: 79 failing checks of one tools block were 79 notices): its first violation,
         # else its first uncertainty, names the rule and reason; every failing target stays a target.
         first = next((result for result in failures if result.disposition == 'violation'), failures[0] if failures else None)
+        if kept and first is None:
+            message = 'Проверка не завершилась. Принятые данные в блоке сохранены.'
+        else:
+            message = fallback_message(first, len(failures), shown=not kept and len(spans) > len(leftover))
+        # A rejected cell is absent from the document. The scope target keeps the notice on this block's view.
+        targets = list(dict.fromkeys(result.target_id for result in failures)) if failures else ['scope-' + task_id]
+        if kept and not any(target.startswith('scope-') for target in targets):
+            targets.append('scope-' + task_id)
         issues = [ImportIssue(id=self.id_factory('issue'), ruleId=first.rule_id if first else None, taskId=task_id,
-            targetIds=list(dict.fromkeys(result.target_id for result in failures)) if failures else ['scope-' + task_id],
+            targetIds=targets,
             blockIds=[], category=('content_violation' if first.disposition == 'violation' else 'uncertain_interpretation')
                 if first else 'check_not_completed', code='IMPORT_SOURCE_FALLBACK',
-            message=fallback_message(first, len(failures), shown=len(spans) > len(leftover)),
+            message=message,
             importedFingerprint=digest(stored.value), reviewInputHash=receipt.review_input_hash if first else None,
             lifecycleId=self.id_factory('issue-lifecycle'), state='active', retiredByAction=None)]
         await self.finish_task(project, operation_id, task_id,
             {'sourceTexts': {digest(span): source_slice(owner(current).sources, span) for span in spans},
                 'diagnostics': list(errors), 'scope': scope, **({'leftoverOnly': leftover} if leftover else {})}, spans,
-            task.allowed_handles, 'source_fallback', issues)
+            task.allowed_handles, 'source_fallback', issues, accepted=kept)
 
     async def finalize(self, project, operation_id):
         workspace = self.read(project)

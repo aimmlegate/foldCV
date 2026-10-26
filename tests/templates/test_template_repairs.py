@@ -66,7 +66,8 @@ async def test_repairs_keep_siblings_and_use_only_configured_slots(tmp_path, ent
         assert len(operation.receipts) == 2 and reviews[0] != reviews[-1]
         assert len(fixture.transport.calls) == (4 if repair == 'primary' else 5)
     else:
-        assert operation.issues and operation.tasks[0].state == 'source_fallback'
+        assert operation.issues and operation.tasks[0].state == 'accepted'
+        assert operation.task_results[0].disposition == 'source_fallback'
         assert rejected[0] not in {cell.id for record in facts.extensions for cell in record.cells}
         assert len(fixture.transport.calls) == (3 if repair == 'no_fallback' else 4 if repair == 'fallback_unavailable' else 6)
         if repair == 'fallback_unavailable':
@@ -103,6 +104,9 @@ async def test_a_repair_starts_only_when_its_replacement_review_fits_the_cap(tmp
     if cap == 3:
         # The third call could not be reviewed, so it is not spent.
         assert spent_calls(operation) == 2 and [attempt.slot for attempt in operation.attempts] == ['initial', 'review']
-        assert operation.tasks[0].state == 'source_fallback' and 'IMPORT_CALL_CAP' in operation.task_results[0].value['diagnostics']
+        # The review admitted the other cells, so the block stays accepted and the cap is only a diagnostic.
+        assert operation.tasks[0].state == 'accepted' and operation.task_results[0].disposition == 'source_fallback'
+        assert 'IMPORT_CALL_CAP' in operation.task_results[0].value['diagnostics']
+        assert not operation.issues[0].message.startswith('Показан исходный текст')
     else:
         assert spent_calls(operation) == 4 and operation.tasks[0].state == 'accepted' and not operation.issues

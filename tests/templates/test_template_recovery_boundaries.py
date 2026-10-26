@@ -90,7 +90,8 @@ async def test_spent_primary_and_uncertain_fallback_resume_without_any_resend(tm
             result = fixture.current().project.template_operations[0]
         else:
             result = await fixture.fresh_pipeline().run(fixture.project, resume_command(previous), admitted=fixture.admitted)
-        assert result.state == 'published' and result.tasks[0].state == 'source_fallback'
+        assert result.state == 'published' and result.tasks[0].state == 'accepted'
+        assert result.task_results[0].disposition == 'source_fallback'
         assert result.capture == previous.capture and result.expires_at == previous.expires_at
         assert result.allocations == previous.allocations and result.id == previous.id
         assert result.attempts[-1].state == 'outcome_unknown' and spent_calls(result) == 4

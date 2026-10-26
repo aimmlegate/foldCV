@@ -365,6 +365,8 @@ async def test_a_review_that_runs_out_of_time_is_not_retried(tmp_path):
     assert result.state == 'published' and result.tasks[0].state == 'source_fallback'
     assert limits == [CALL_SECONDS, CALL_SECONDS] and [attempt.slot for attempt in result.attempts] == ['initial', 'review']
     assert fixture.source.units[0].text in fixture.text()
+    # The review never finished, so nothing was admitted and the notice still names the source text.
+    assert result.issues[0].message.startswith('Показан исходный текст')
 
 
 @pytest.mark.asyncio
@@ -383,10 +385,79 @@ async def test_a_repair_whose_review_finds_more_problems_does_not_replace_the_fi
     fixture.transport.scripted = script
     result = await fixture.pipeline.run(fixture.project, fixture.command, admitted=fixture.admitted)
     assert [attempt.slot for attempt in result.attempts] == ['initial', 'review', 'primary_repair', 'replacement_review']
-    assert result.tasks[0].state == 'source_fallback'
+    # Admitted values stay, so the block is accepted. The result still carries the rejected line.
+    assert result.tasks[0].state == 'accepted' and result.task_results[0].disposition == 'source_fallback'
     first, repair = result.proposals
     assert first.applied_receipt_id == result.receipts[0].id and repair.applied_receipt_id is None
-    # The notice and the source lines come from the first review: one failing value.
+    assert first.admitted_cell_ids
     [issue] = result.issues
-    assert issue.target_ids == [next(target['targetId'] for target in reviews[0]['targets'] if not target['targetId'].startswith('scope-'))]
-    assert issue.message.startswith('Показан исходный текст: проверка нашла ошибку') and 'Ещё замечаний' not in issue.message
+    cell = next(target['targetId'] for target in reviews[0]['targets'] if not target['targetId'].startswith('scope-'))
+    assert issue.target_ids == [cell, 'scope-' + result.tasks[0].id]
+    assert issue.message.startswith('Проверка нашла ошибку') and not issue.message.startswith('Показан исходный текст')
+    assert 'Ещё замечаний' not in issue.message and 'Неверно' in issue.message
+
+
+def failing_review(value, failing):
+    return {'results': [{'ruleId': target['ruleId'], 'targetId': target['targetId'],
+        'disposition': 'violation' if target in failing else 'satisfied', 'reason': 'Неверно' if target in failing else '',
+        'evidence': [], 'actionable': target in failing} for target in value['targets']]}
+
+
+@pytest.mark.asyncio
+async def test_two_findings_on_an_admitted_block_are_one_notice(tmp_path):
+    # Two failing cells stay one notice. The count is in the sentence, and the block is not a failed import.
+    fixture, reviews = RuntimeFixture(tmp_path, fallback=False), []
+    def script(_request, value):
+        if 'targets' not in value:
+            return raw_proposal(fixture.source)
+        reviews.append(value)
+        cells = [target for target in value['targets'] if not target['targetId'].startswith('scope-')]
+        return failing_review(value, cells[:2])
+    fixture.transport.scripted = script
+    result = await fixture.pipeline.run(fixture.project, fixture.command, admitted=fixture.admitted)
+    assert result.tasks[0].state == 'accepted' and result.task_results[0].disposition == 'source_fallback'
+    assert result.proposals[0].admitted_cell_ids and result.proposals[1].applied_receipt_id is None
+    [issue] = result.issues
+    assert issue.message.startswith('Проверка нашла ошибку') and 'Ещё замечаний: 1.' in issue.message
+    assert not issue.message.startswith('Показан исходный текст')
+    assert issue.target_ids[-1] == 'scope-' + result.tasks[0].id
+    assert len(issue.target_ids) == 3
+
+
+@pytest.mark.asyncio
+async def test_a_review_that_admits_nothing_keeps_the_source_notice(tmp_path):
+    fixture = RuntimeFixture(tmp_path, fallback=False)
+    def script(_request, value):
+        if 'targets' not in value:
+            return raw_proposal(fixture.source)
+        return failing_review(value, list(value['targets']))
+    fixture.transport.scripted = script
+    result = await fixture.pipeline.run(fixture.project, fixture.command, admitted=fixture.admitted)
+    assert result.tasks[0].state == 'source_fallback' and result.task_results[0].disposition == 'source_fallback'
+    assert not result.proposals[0].admitted_cell_ids
+    [issue] = result.issues
+    assert issue.message.startswith('Показан исходный текст') and 'Ещё замечаний:' in issue.message
+    assert fixture.source.units[0].text in fixture.text()
+
+
+@pytest.mark.asyncio
+async def test_a_stopped_check_keeps_admitted_values_and_a_short_notice(tmp_path):
+    # Admission is saved, then the process stops before the task result. The values stay and the notice is short.
+    fixture = RuntimeFixture(tmp_path)
+    original = fixture.pipeline.finish_task
+    seen = {'n': 0}
+    async def skip_first(*args, **kwargs):
+        seen['n'] += 1
+        if seen['n'] == 1:
+            return None
+        return await original(*args, **kwargs)
+    fixture.pipeline.finish_task = skip_first
+    operation = await fixture.pipeline.run(fixture.project, fixture.command, admitted=fixture.admitted, finalize=False)
+    assert not operation.task_results and operation.proposals[0].admitted_cell_ids
+    operation = await fixture.pipeline.finish_fallbacks(fixture.project, operation.id)
+    assert operation.tasks[0].state == 'accepted' and operation.task_results[0].disposition == 'source_fallback'
+    assert operation.issues[0].message == 'Проверка не завершилась. Принятые данные в блоке сохранены.'
+    assert 'IMPORT_PROCESSING_STOPPED' in operation.task_results[0].value['diagnostics']
+    assert operation.issues[0].target_ids == ['scope-' + operation.tasks[0].id]
+    holder = fixture.current().project or fixture.current().pre_draft
+    assert len(holder.facts.extensions) == 2
