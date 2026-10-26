@@ -60,22 +60,28 @@ class Ledger:
         temporary.write_text(json.dumps(ledger, ensure_ascii=False, indent=1) + '\n')
         os.replace(temporary, self.path)
 
-    def charge(self, model, label, source_sha256, root):
+    def charge(self, model, label, source_sha256, root, concurrency=1):
         with self.lock():
             ledger = self.read()
             # D100: after three failed runs in a row the work stops and is reported instead of trying again.
-            recent = [run['status'] for run in ledger['runs'] if run.get('decision') in {'D100', 'D101'}][-FAILURES_IN_A_ROW:]
+            recent = [run['status'] for run in ledger['runs'] if run.get('decision') in {'D100', 'D101', 'CT10'}][-FAILURES_IN_A_ROW:]
             if len(recent) == FAILURES_IN_A_ROW and 'saved' not in recent:
                 raise SystemExit('three failed runs in a row: stop and report')
-            # D101 (2026-10-25): three full imports; each is charged here before any model call.
-            decision, budget = 'D100', ledger.get('d101')
+            # D101 (2026-10-25): three full imports; CT10 parallel runs have their own allowance. Each run is charged
+            # here before any model call.
+            decision, key = ('CT10', 'ct10') if concurrency > 1 else ('D101', 'd101')
+            budget = ledger.get(key)
+            if budget is None and key == 'ct10':
+                raise SystemExit('a parallel run needs the ct10 allowance in the ledger')
             if budget is not None:
                 if budget['runsSpent'] >= budget['runCap']:
-                    raise SystemExit('D101 run cap reached: %d of %d' % (budget['runsSpent'], budget['runCap']))
+                    raise SystemExit('%s run cap reached: %d of %d' % (decision, budget['runsSpent'], budget['runCap']))
                 budget['runsSpent'] += 1
-                decision = 'D101'
+            else:
+                decision = 'D100'
             run = {'id': 'LIVE-%02d' % (len(ledger['runs']) + 1), 'decision': decision, 'model': model, 'source': label,
-                'sourceSha256': source_sha256, 'root': root.name, 'startedAt': now(), 'status': 'started', 'dispatches': []}
+                'sourceSha256': source_sha256, 'root': root.name, 'startedAt': now(), 'status': 'started', 'dispatches': [],
+                **({'concurrency': concurrency} if concurrency > 1 else {})}
             ledger['runs'].append(run)
             self.write(ledger)
             return run['id']
@@ -149,12 +155,12 @@ async def main(args):
     atomic_write(data / 'preferences.json', json.dumps({'schemaVersion': 1, 'selectedModel': args.model,
         'selectedImportModel': args.model, 'automaticAnalysis': False, 'theme': 'system'}).encode())
     ledger = Ledger(LEDGER)
-    run_id = ledger.charge(args.model, args.label, hashlib.sha256(raw).hexdigest(), root)
+    run_id = ledger.charge(args.model, args.label, hashlib.sha256(raw).hexdigest(), root, args.concurrency)
     record_dispatches(ledger, run_id, evidence)
     origin, secret = 'http://127.0.0.1:39301', secrets.token_urlsafe(32)
     wrapped = create_app(origin=origin, secret=secret, temp_root=root / 'operations', dist=dist,
         experimental_profile=installed_profile(PROFILE), data_root=data, background_enabled=True,
-        template_import_call_cap=args.call_cap)
+        template_import_call_cap=args.call_cap, template_import_concurrency=args.concurrency)
     app, service, jobs = wrapped.app, wrapped.app.state.rich_projects, wrapped.app.state.jobs
     TemplateStore(service.storage.root).activate(generic_package())
     timings, outcome = {}, None
@@ -204,13 +210,15 @@ async def main(args):
         await jobs.shutdown()
         service.request_shutdown()
         await service.shutdown()
-    result = {'run': run_id, 'model': args.model, 'source': args.label, 'callCap': args.call_cap,
+    result = {'run': run_id, 'model': args.model, 'source': args.label, 'callCap': args.call_cap, 'concurrency': args.concurrency,
         'rewrite': not args.keep_wording, 'outcome': outcome, 'timings': timings, **summary}
     atomic_write(root / 'result.json', json.dumps(result, ensure_ascii=False, indent=1).encode())
     def settle(record):
         model_seconds = round(sum(item['elapsedSeconds'] for item in record['dispatches']), 1)
+        # Parallel calls overlap (CT10): the wall time with at least one call in flight is what the import waited for.
+        busy = busy_seconds(record['dispatches'])
         record.update(status=(outcome or {}).get('state', 'no_outcome'), finishedAt=now(), timings=timings,
-            modelSeconds=model_seconds, localSeconds=round(timings.get('importSeconds', 0) - model_seconds, 1),
+            modelSeconds=model_seconds, modelWallSeconds=busy, localSeconds=round(timings.get('importSeconds', 0) - busy, 1),
             counts=summary['counts'], workspaceBytes=summary['workspaceBytes'], errorCodes=summary['errorCodes'],
             calls=summary['calls'])
     ledger.update(run_id, settle)
@@ -280,6 +288,19 @@ def seconds(start, end):
     return round((datetime.fromisoformat(end) - datetime.fromisoformat(start)).total_seconds(), 2)
 
 
+def busy_seconds(dispatches):
+    """The length of the union of the dispatch intervals: sequential calls give their sum, parallel ones less."""
+    spans = sorted((datetime.fromisoformat(item['startedAt']).timestamp(),
+        datetime.fromisoformat(item['startedAt']).timestamp() + item['elapsedSeconds']) for item in dispatches)
+    total, end = 0.0, None
+    for start, stop in spans:
+        if end is None or start > end:
+            total, end = total + stop - start, stop
+        elif stop > end:
+            total, end = total + stop - end, stop
+    return round(total, 1)
+
+
 def summarize(workspace, path):
     """Counts, codes and one row per model call (block ids and numbers only, never resume text)."""
     from packages.resume_core.template_prompt import model_prompt
@@ -322,6 +343,7 @@ if __name__ == '__main__':
     parser.add_argument('--source', type=Path)
     parser.add_argument('--label', choices=['CV-A', 'CV-B', 'CV-C'])
     parser.add_argument('--call-cap', type=int, default=60)
+    parser.add_argument('--concurrency', type=int, default=1, help='independent blocks in flight at once (CT10)')
     parser.add_argument('--keep-wording', action='store_true')
     parser.add_argument('--finish', action='store_true', help='summarize and export an existing root; no model call')
     arguments = parser.parse_args()
