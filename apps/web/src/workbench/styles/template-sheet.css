@@ -1,4 +1,6 @@
 /* The mounted V7 page: geometry from the captured recipe, faces and sizes from Python's plan. */
+/* The sheet is the page, so the paper around it adds no padding and no width cap (it overflowed by 31 px). */
+.resume-paper[data-template="v7"] { width: max-content; max-width: none; padding: 0; }
 .fcv-sheet { position: relative; width: var(--fcv-page-width); min-width: var(--fcv-page-width); padding: var(--fcv-top) 0 42pt;
   background: #fff; color: #000; }
 .fcv-sheet .bn-container, .fcv-sheet .bn-editor { background: transparent; color: inherit; font: inherit; }
