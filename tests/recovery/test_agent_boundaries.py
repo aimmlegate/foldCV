@@ -130,6 +130,99 @@ def test_profile_ownership_excludes_another_process_and_is_cancellable(tmp_path)
         assert path.stat().st_mode & 0o777 == 0o600
 
 
+def profile_free(owned):
+    """Whether an owner without a share key could take the profile right now."""
+    try:
+        with native_profile(owned, threading.Event(), deadline=time.monotonic() + 1, blocking=False):
+            return True
+    except AdmissionTimeout:
+        return False
+
+
+def test_calls_under_one_share_key_hold_the_profile_together_and_the_last_one_releases_it(tmp_path):
+    # CT10: blocks of one import run at once under the job's permit; another owner still waits for all of them.
+    owned, permit = profile(tmp_path / "native-profile"), object()
+    together, first_out, second_out = threading.Barrier(2, timeout=2), threading.Event(), threading.Event()
+    errors = []
+    def call(leave):
+        try:
+            with native_profile(owned, threading.Event(), deadline=time.monotonic() + 2, share=permit):
+                together.wait()
+                leave.wait(2)
+        except Exception as error:
+            errors.append(error)
+    threads = [threading.Thread(target=call, args=(event,)) for event in (first_out, second_out)]
+    for thread in threads:
+        thread.start()
+    time.sleep(0.2)
+    assert not profile_free(owned)
+    first_out.set()
+    threads[0].join(2)
+    assert not profile_free(owned)
+    second_out.set()
+    threads[1].join(2)
+    assert not errors and profile_free(owned)
+
+
+def test_another_share_key_waits_for_the_shared_hold(tmp_path):
+    owned, inside, leave = profile(tmp_path / "native-profile"), threading.Event(), threading.Event()
+    def hold():
+        with native_profile(owned, threading.Event(), deadline=time.monotonic() + 2, share="first-import"):
+            inside.set()
+            leave.wait(2)
+    thread = threading.Thread(target=hold)
+    thread.start()
+    try:
+        assert inside.wait(2)
+        with pytest.raises(AdmissionTimeout):
+            with native_profile(owned, threading.Event(), deadline=time.monotonic() + 0.2, share="second-import"):
+                pytest.fail("a second import joined the first one's profile hold")
+    finally:
+        leave.set()
+        thread.join(2)
+    with native_profile(owned, threading.Event(), deadline=time.monotonic() + 1, share="second-import"):
+        pass
+
+
+def test_a_joiner_takes_the_profile_itself_when_the_first_call_could_not(tmp_path):
+    owned, permit = profile(tmp_path / "native-profile"), object()
+    path = owned.root / ".foldcv-inference.lock"
+    child = subprocess.Popen([sys.executable, "-c",
+        "import fcntl,os,sys,time; fd=os.open(sys.argv[1],os.O_RDWR|os.O_CREAT,0o600); "
+        "fcntl.flock(fd,fcntl.LOCK_EX); print('ready',flush=True); time.sleep(0.6)", str(path)],
+        stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+    outcomes = {}
+    def call(name, seconds, delay):
+        time.sleep(delay)
+        try:
+            with native_profile(owned, threading.Event(), deadline=time.monotonic() + seconds, share=permit):
+                outcomes[name] = "entered"
+        except AdmissionTimeout:
+            outcomes[name] = "timeout"
+    try:
+        assert child.stdout.readline().strip() == "ready"
+        threads = [threading.Thread(target=call, args=("first", 0.3, 0)), threading.Thread(target=call, args=("joiner", 3, 0.1))]
+        for thread in threads:
+            thread.start()
+        for thread in threads:
+            thread.join(5)
+    finally:
+        child.communicate(timeout=3)
+    assert outcomes == {"first": "timeout", "joiner": "entered"}
+
+
+def test_a_cleanup_failure_inside_a_shared_hold_still_blocks_the_profile(tmp_path):
+    owned = profile(tmp_path / "native-profile")
+    operations = tmp_path / "operations"
+    private_directory(operations)
+    with pytest.raises(AgentFailure, match="AGENT_CLEANUP_FAILED"):
+        with native_profile(owned, threading.Event(), deadline=time.monotonic() + 1, operations_root=operations, share="import"):
+            raise AgentFailure("AGENT_CLEANUP_FAILED")
+    with pytest.raises(AdmissionBlocked):
+        with native_profile(owned, threading.Event(), deadline=time.monotonic() + 1, share="import"):
+            pytest.fail("a blocked profile admitted a shared call")
+
+
 def test_profile_cleanup_marker_requires_its_own_verified_operation_root(tmp_path):
     owned = profile(tmp_path / "native-profile")
     operations = tmp_path / "operations"

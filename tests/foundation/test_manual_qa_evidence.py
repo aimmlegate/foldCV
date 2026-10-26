@@ -88,7 +88,7 @@ def test_native_observer_counts_before_every_real_provider_entry_once(tmp_path, 
         def __init__(self):
             pass
         @contextmanager
-        def _profile_owner(self, *_args):
+        def _profile_owner(self, *_args, **_kwargs):
             yield
         def _generate(self, *_args):
             events.append("native_start")

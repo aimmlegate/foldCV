@@ -127,3 +127,29 @@ def test_provider_refusals_before_any_process_are_proved_undispatched(tmp_path, 
     with pytest.raises(ContentFailure) as kept:
         ProviderTemplateTransport(lambda: (Witnessed(), 'model-a'), tmp_path).generate(request(), threading.Event())
     assert kept.value.dispatch_witness == {'transport': 'codex'} and kept.value.cleanup_verified is not True
+
+
+def test_owned_codex_calls_under_one_permit_generate_at_once(tmp_path):
+    # CT10: the job permit is the profile share key, so two blocks of one import are inside generation together.
+    from contextlib import contextmanager
+    from pathlib import Path
+    from packages.resume_core.storage import private_directory
+    from resume_api.providers.codex_cli import CodexCliProvider
+    root = tmp_path / 'profile'
+    private_directory(root)
+    provider = CodexCliProvider(Path('/nonexistent/synthetic'),
+        experimental_profile=SimpleNamespace(root=root, prepare=lambda: None, launch=None))
+    together, results = threading.Barrier(2, timeout=3), []
+    provider._generate = lambda _request, _files, _cancel: together.wait() is not None and 'generated'
+    class Permit:
+        @contextmanager
+        def hold(self, _cancel):
+            yield
+    permit, files = Permit(), SimpleNamespace(root=tmp_path / 'operations')
+    threads = [threading.Thread(target=lambda: results.append(provider.generate_owned(None, files, threading.Event(), permit)))
+        for _ in range(2)]
+    for thread in threads:
+        thread.start()
+    for thread in threads:
+        thread.join(5)
+    assert results == ['generated', 'generated']

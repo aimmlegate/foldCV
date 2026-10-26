@@ -5,6 +5,7 @@ import fcntl
 import json
 import os
 import re
+import threading
 import time
 
 from packages.resume_core.project_store import owned_file, strict_json
@@ -102,15 +103,11 @@ def recover_profile(profile, operations_root):
         return True
 
 
-@contextmanager
-def native_profile(profile, cancel, *, deadline, blocking=True, operations_root=None):
-    if profile is None:
-        yield
-        return
+def _acquire(profile, cancel, deadline, blocking):
+    """Open the profile lock file and take its exclusive lock; the returned descriptor holds it."""
     profile.prepare()
     path = profile.root / ".foldcv-inference.lock"
     descriptor = os.open(path, os.O_RDWR | os.O_CREAT | os.O_NOFOLLOW, 0o600)
-    acquired = False
     try:
         private_file(path)
         if path.stat().st_nlink != 1:
@@ -124,30 +121,115 @@ def native_profile(profile, cancel, *, deadline, blocking=True, operations_root=
                 raise AdmissionTimeout()
             try:
                 fcntl.flock(descriptor, fcntl.LOCK_EX | fcntl.LOCK_NB)
-                acquired = True
-                if (profile.root / BLOCKED).exists() or (profile.root / BLOCKED).is_symlink():
-                    raise AdmissionBlocked()
-                if (profile.root / SHARED).exists() or (profile.root / SHARED).is_symlink():
-                    raise AdmissionBlocked()
-                break
             except BlockingIOError:
                 if not blocking:
                     raise AdmissionTimeout() from None
                 cancel.wait(0.025)
-        try:
-            yield
-        except BaseException as error:
-            if getattr(error, "code", None) in {"PROCESS_CLEANUP_FAILED", "CLEANUP_FAILED", "AGENT_CLEANUP_FAILED"}:
-                try:
-                    atomic_write(profile.root / BLOCKED, json.dumps({"schemaVersion": 1,
-                        "operationsRoot": str(operations_root.absolute()) if operations_root is not None else None}).encode())
-                except (StorageFailure, OSError):
-                    pass
-            raise
-    finally:
-        if acquired:
-            fcntl.flock(descriptor, fcntl.LOCK_UN)
+                continue
+            try:
+                for marker in (BLOCKED, SHARED):
+                    if (profile.root / marker).exists() or (profile.root / marker).is_symlink():
+                        raise AdmissionBlocked()
+            except BaseException:
+                fcntl.flock(descriptor, fcntl.LOCK_UN)
+                raise
+            return descriptor
+    except BaseException:
         os.close(descriptor)
+        raise
+
+
+def _release(descriptor):
+    try:
+        fcntl.flock(descriptor, fcntl.LOCK_UN)
+    finally:
+        os.close(descriptor)
+
+
+class _SharedHold:
+    def __init__(self, key, share):
+        self.key, self.share, self.count, self.descriptor, self.failed = key, share, 1, None, False
+        self.ready = threading.Event()
+
+
+# Calls under one share key (a running import's inference permit) hold the profile together (CT10): the first takes
+# the exclusive lock, later ones join it, and the last one out releases it. Other owners and processes still wait.
+_HOLDS, _HOLDS_GUARD = {}, threading.Lock()
+
+
+def _leave(hold):
+    with _HOLDS_GUARD:
+        hold.count -= 1
+        last = hold.count == 0
+        if last and _HOLDS.get(hold.key) is hold:
+            del _HOLDS[hold.key]
+    if last and hold.descriptor is not None:
+        _release(hold.descriptor)
+
+
+def _join(profile, share, cancel, deadline, blocking):
+    key = (str(profile.root), id(share))
+    while True:
+        with _HOLDS_GUARD:
+            hold = _HOLDS.get(key)
+            first = hold is None or hold.share is not share
+            if first:
+                hold = _HOLDS[key] = _SharedHold(key, share)
+            else:
+                hold.count += 1
+        if first:
+            try:
+                hold.descriptor = _acquire(profile, cancel, deadline, blocking)
+            except BaseException:
+                hold.failed = True
+                _leave(hold)
+                raise
+            finally:
+                hold.ready.set()
+            return hold
+        while not hold.ready.wait(0.025):
+            if cancel.is_set() or time.monotonic() >= deadline:
+                _leave(hold)
+                raise AdmissionCancelled() if cancel.is_set() else AdmissionTimeout()
+        if not hold.failed:
+            return hold
+        # The first call could not take the lock; this one tries on its own deadline.
+        _leave(hold)
+
+
+@contextmanager
+def _owned(profile, operations_root):
+    try:
+        yield
+    except BaseException as error:
+        if getattr(error, "code", None) in {"PROCESS_CLEANUP_FAILED", "CLEANUP_FAILED", "AGENT_CLEANUP_FAILED"}:
+            try:
+                atomic_write(profile.root / BLOCKED, json.dumps({"schemaVersion": 1,
+                    "operationsRoot": str(operations_root.absolute()) if operations_root is not None else None}).encode())
+            except (StorageFailure, OSError):
+                pass
+        raise
+
+
+@contextmanager
+def native_profile(profile, cancel, *, deadline, blocking=True, operations_root=None, share=None):
+    if profile is None:
+        yield
+        return
+    if share is None:
+        descriptor = _acquire(profile, cancel, deadline, blocking)
+        try:
+            with _owned(profile, operations_root):
+                yield
+        finally:
+            _release(descriptor)
+        return
+    hold = _join(profile, share, cancel, deadline, blocking)
+    try:
+        with _owned(profile, operations_root):
+            yield
+    finally:
+        _leave(hold)
 
 
 @contextmanager
