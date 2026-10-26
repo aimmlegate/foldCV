@@ -185,3 +185,36 @@ async def test_generic_route_refuses_forged_capture_before_persistence(tmp_path,
         assert reply.status_code == (422 if malformed else 409), reply.text
         assert provider.calls == []
         assert service.read(project).pre_draft.template_operations == []
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize('quota,code', [('exhausted', 'QUOTA_EXHAUSTED'), ('available', 'CONNECTION_REQUIRED')])
+async def test_an_import_start_names_an_exhausted_plan_instead_of_asking_to_connect(tmp_path, quota, code):
+    # D104: with the plan used up the start said "connect a model in Settings", where nothing could be fixed.
+    from resume_api.agent.runtime import ScriptedAgentRuntime
+    from resume_api.app import create_app
+    from resume_api.connection import Quota
+    class Exhausted(CatalogAdapter):
+        def inspect(self, files, cancel, *, full=True):
+            return replace(super().inspect(files, cancel, full=full), quota=Quota(quota, 100 if quota == 'exhausted' else 10))
+    dist = tmp_path / 'dist'; dist.mkdir()
+    (dist / 'index.html').write_text('Synthetic template import boundary')
+    wrapped = create_app(origin=ORIGIN, secret=SECRET, temp_root=tmp_path / 'operations', dist=dist, data_root=tmp_path / 'data',
+        connection_adapter=Exhausted(), agent_runtime=ScriptedAgentRuntime(None), agent_tools=Tools(),
+        background_enabled=True, background_factory=refuse_execution, template_import_call_cap=4)
+    app, service, jobs = wrapped.app, wrapped.app.state.rich_projects, wrapped.app.state.jobs
+    TemplateStore(service.storage.root).activate(employment_package())
+    async with app.router.lifespan_context(app):
+        async with httpx.AsyncClient(transport=httpx.ASGITransport(app=wrapped), base_url=ORIGIN, headers={'Origin': ORIGIN}) as client:
+            try:
+                assert (await client.post('/v1/session/exchange', json={'secret': SECRET})).status_code == 200
+                status = (await client.post('/v1/host/status', json={})).json()
+                assert status['quota']['state'] == quota
+                project = (await upload(client)).json()['workspace']['projectId']
+                started = await client.post(f'/v1/rich/projects/{project}/template-import',
+                    json={'clientRequestId': 'start', 'allowTextRewrite': True})
+                assert started.status_code == 409 and started.json()['error']['code'] == code
+            finally:
+                await jobs.shutdown()
+                service.request_shutdown()
+                await service.shutdown()

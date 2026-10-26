@@ -170,6 +170,16 @@ if case in ("quota", "model_denied", "expired"):
 if case == "bad_error_code":
     emit({"type": "error", "error": {"code": ["rate_limit_exceeded"], "message": prompt}})
     sys.exit(1)
+if case in ("usage_limit", "usage_limit_turn", "plain_error"):
+    # The real CLI states an exhausted plan as plain text with no code (D104, codex-cli 0.163).
+    text = ("You\u2019ve hit your usage limit. Upgrade to Plus to continue using Codex, or try again at Nov 25th."
+            if case != "plain_error" else "Stream disconnected before completion.")
+    emit({"type": "thread.started", "thread_id": "fake-thread"})
+    emit({"type": "turn.started"})
+    if case != "usage_limit_turn":
+        emit({"type": "error", "message": text})
+    emit({"type": "turn.failed", "error": {"message": text}})
+    sys.exit(1)
 if case == "nonzero":
     print(prompt + " synthetic-secret", file=sys.stderr)
     sys.exit(7)

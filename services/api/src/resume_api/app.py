@@ -481,7 +481,8 @@ def create_app(*, origin: str, secret: str, temp_root: Path, dist: Path, runner:
         from packages.resume_core.template_import import digest as capture_digest
         selected = import_selected_provider()
         if selected is None:
-            raise ProjectFailure("CONNECTION_REQUIRED", 409)
+            # A known exhausted plan is named as such; "connect a model" sent the user to Settings for nothing (D104).
+            raise ProjectFailure("QUOTA_EXHAUSTED" if connection_state.quota.state == "exhausted" else "CONNECTION_REQUIRED", 409)
         provider, model = selected
         reasoning = connection_state.modelReasoning.get(model)
         effort = reasoning.default if reasoning is not None else None

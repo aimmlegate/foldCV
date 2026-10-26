@@ -10,12 +10,14 @@ from packages.resume_core.models.template_authority import TemplateFinalizationB
 from packages.resume_core.rich_api import RichGenerationState
 from packages.resume_core.project_store import ProjectStoreFailure
 from packages.resume_core.template_import import TemplateImportFailure, digest
-from ..importer.template_pipeline import operation_in
+from ..importer.template_pipeline import account_stop, operation_in
 
 
 def job_code(code):
     if code in {'IMPORT_CAPTURE_STALE', 'IMPORT_AUTHORITY_REVOKED', 'IMPORT_ADMISSION_FACTS_STALE'}:
         return 'DEPENDENCY_CHANGED'
+    if code == 'QUOTA_EXHAUSTED':
+        return 'RATE_LIMITED'
     if code.startswith('IMPORT_CLEANUP_'):
         return 'CLEANUP_FAILED'
     try:
@@ -92,6 +94,10 @@ class TemplateJobs:
                 candidate = operation.finalization
                 outcome = self.pipeline.persistence.outcome(project, TemplateFinalizationBinding(operationId=operation.id,
                     authorizationId=candidate.authorization_id, finalizationId=candidate.id))
+            elif account_stop(operation) is not None:
+                # The account stopped the import (D104): saving would publish blocks no call could fill.
+                outcome = PublicationOutcome(state='failed_before_replacement', intentId=None, workspaceHash=None,
+                    errorCode=account_stop(operation))
             else:
                 await self.pipeline.finish_fallbacks(project, operation.id)
                 operation = await self.pipeline.finalize(project, operation.id)

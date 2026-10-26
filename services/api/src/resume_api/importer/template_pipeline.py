@@ -35,6 +35,25 @@ from .template_persistence import PersistenceWindow, TemplatePersistence
 from .template_checkpoints import TemplateCheckpoints
 
 
+# No later call of the import can succeed after these, so the import stops instead of saving empty blocks (D104).
+ACCOUNT_STOP = frozenset({'QUOTA_EXHAUSTED', 'AUTH_REQUIRED', 'AUTH_MODE_MISMATCH', 'MODEL_DENIED'})
+
+
+class AccountStop(TemplateImportFailure):
+    pass
+
+
+def stops_import(operation, attempt):
+    # An unavailable fallback model fails only its own repair (E07); the import model being refused stops everything.
+    return attempt.error_code in ACCOUNT_STOP and (attempt.error_code != 'MODEL_DENIED'
+        or attempt.model.model == operation.capture.primary.model)
+
+
+def account_stop(operation):
+    """The account-wide failure that stopped this import, or None."""
+    return next((attempt.error_code for attempt in operation.attempts if stops_import(operation, attempt)), None)
+
+
 @dataclass(frozen=True)
 class DerivedTask:
     value: object
@@ -535,6 +554,8 @@ class TemplatePipeline(TemplateCheckpoints):
                         proposal_schema(next(value.full_schema for value in data.template_package.blocks
                             if value.id == task.block_id), None if offered is None else list(offered), references), deadline, cancel,
                         seconds=RETRY_SECONDS if retry else CALL_SECONDS)
+                except AccountStop:
+                    raise
                 except TemplateImportFailure as error:
                     unresolved.append(error.code)
                     break
@@ -620,6 +641,8 @@ class TemplatePipeline(TemplateCheckpoints):
                 operation = operation_in(workspace, operation_id)
                 receipt = next(value for value in operation.receipts if value.attempt_id == review_id)
                 decision = decide_review(review, receipt, proposal)
+            except AccountStop:
+                raise
             except (TemplateImportFailure, ValueError) as error:
                 unresolved.append(getattr(error, 'code', 'IMPORT_REVIEW_INVALID'))
                 break
@@ -730,6 +753,9 @@ class TemplatePipeline(TemplateCheckpoints):
             if attempt_in(operation_in(self.read(project), operation_id), attempt_id).state == 'dispatch_started':
                 returned(ContentTransportReturn(response.raw_return, 'completed', None, response.logical_attempts,
                     response.usage, response.cleanup_verified, response.dispatch_witness, response.reasoning_effort))
+        current = operation_in(self.read(project), operation_id)
+        if stops_import(current, attempt_in(current, attempt_id)):
+            raise AccountStop(attempt_in(current, attempt_id).error_code)
         return attempt_id
 
     def reconcile_unlaunched(self, operation, attempt_id, now):

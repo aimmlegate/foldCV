@@ -163,7 +163,11 @@ class Events:
             code = detail.get("code") if isinstance(detail, dict) else None
             mapped = {"rate_limit_exceeded": "RATE_LIMITED", "authentication_error": "AUTH_REQUIRED",
                       "model_not_supported": "MODEL_DENIED", "invalid_json_schema": "INVALID_SCHEMA"}
-            raise ContentFailure(mapped.get(code, "CLI_FAILED") if isinstance(code, str) else "CLI_FAILED")
+            if isinstance(code, str) and code in mapped:
+                raise ContentFailure(mapped[code])
+            # An exhausted plan comes as plain text with no code ("You've hit your usage limit ..."), D104.
+            text = detail.get("message") if isinstance(detail, dict) else event.get("message")
+            raise ContentFailure("QUOTA_EXHAUSTED" if isinstance(text, str) and "usage limit" in text.lower() else "CLI_FAILED")
         else:
             raise ContentFailure("INVALID_RESULT")
 
@@ -534,7 +538,7 @@ class CodexCliProvider:
         except ContentFailure as error:
             observed(outcome_state(error.code), error.code)
             if error.code in {"AUTH_REQUIRED", "AUTH_MODE_MISMATCH", "MODEL_DENIED", "CLI_UNSUPPORTED",
-                    "CLI_PROFILE_UNSAFE", "CLI_FAILED", "METADATA_FAILED", "PROCESS_CLEANUP_FAILED"}:
+                    "CLI_PROFILE_UNSAFE", "CLI_FAILED", "METADATA_FAILED", "PROCESS_CLEANUP_FAILED", "QUOTA_EXHAUSTED"}:
                 self.invalidate_preflight()
             raise ContentFailure(error.code, logical_attempts=attempts, usage=_combine(usages),
                 cleanup_verified=not files.cleanup_failed and files.process is None, dispatch_witness=dispatch_witness, raw_return=raw_return) from None

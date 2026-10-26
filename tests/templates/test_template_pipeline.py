@@ -619,3 +619,64 @@ async def test_a_selecting_block_reads_the_same_records_in_parallel_as_in_sequen
         assert result.state == 'published' and [task.state for task in result.tasks] == ['accepted'] * 3
     # The third block's request offers the four papers the first two admitted, in both modes.
     assert seen == {1: 4, 3: 4}
+
+
+def account_failure(code):
+    # A verified process end with an account-wide code, as the CLI adapter raises it (D104).
+    from resume_api.providers.content import ContentFailure
+    raise ContentFailure(code, logical_attempts=1, cleanup_verified=True, dispatch_witness={'transport': 'controlled'})
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize('code', ['QUOTA_EXHAUSTED', 'AUTH_REQUIRED', 'MODEL_DENIED'])
+@pytest.mark.parametrize('stage', ['extraction', 'review'])
+async def test_an_account_failure_stops_the_import_instead_of_saving_empty_blocks(tmp_path, code, stage):
+    # D104: with the plan exhausted every call failed and the import published 14 empty blocks as a saved resume.
+    from resume_api.importer.template_pipeline import AccountStop
+    from tests.templates.pipeline_fixtures import blocks_package
+    fixture = RuntimeFixture(tmp_path, captured=blocks_package(3), cap=20)
+    def script(_request, value):
+        if ('targets' in value) == (stage == 'review'):
+            account_failure(code)
+        return satisfied_review(value) if 'targets' in value else raw_proposal(fixture.source)
+    fixture.transport.scripted = script
+    with pytest.raises(AccountStop, match=code):
+        await fixture.pipeline.run(fixture.project, fixture.command, admitted=fixture.admitted)
+    # The first block's failing call is the last one: nothing new starts and no repair or fallback model is tried.
+    assert len(fixture.transport.calls) == (1 if stage == 'extraction' else 2)
+    workspace = fixture.current()
+    assert workspace.project is None
+    operation = workspace.pre_draft.template_operations[0]
+    assert operation.state != 'published' and operation.attempts[-1].error_code == code
+    assert all(task.state == 'pending' for task in operation.tasks[1:])
+
+
+@pytest.mark.asyncio
+async def test_a_queued_import_stopped_by_the_account_reports_the_limit_and_saves_nothing(tmp_path):
+    from tests.templates.pipeline_fixtures import blocks_package
+    fixture = RuntimeFixture(tmp_path, captured=blocks_package(2), cap=20)
+    fixture.transport.scripted = lambda _request, _value: account_failure('QUOTA_EXHAUSTED')
+    service = await service_for(fixture)
+    try:
+        job = await queued(service, fixture, fixture.command)
+        assert job.execution == 'failed' and job.error.code == 'RATE_LIMITED'
+        assert job.template_outcome.state == 'failed_before_replacement' and job.template_outcome.error_code == 'QUOTA_EXHAUSTED'
+        assert job.publication == 'save_failed' and job.publication_error.code == 'RATE_LIMITED'
+        assert service.templates.generation(job).status == 'failed' and service.templates.generation(job).error_code == 'RATE_LIMITED'
+        assert fixture.current().project is None and len(fixture.transport.calls) == 1
+        # Recovery after a restart keeps the import unsaved.
+        await service.templates.complete(fixture.project, job.id)
+        assert fixture.current().project is None
+    finally:
+        await service.shutdown()
+        service.supervisor.clock.verify()
+
+
+@pytest.mark.asyncio
+async def test_a_failure_of_one_call_still_falls_back_for_that_block(tmp_path):
+    # Only account-wide codes stop the import; a single broken call keeps the per-block fallback.
+    fixture = RuntimeFixture(tmp_path, cap=20)
+    fixture.transport.scripted = lambda _request, value: (satisfied_review(value) if 'targets' in value
+        else account_failure('CLI_FAILED'))
+    result = await fixture.pipeline.run(fixture.project, fixture.command, admitted=fixture.admitted)
+    assert result.state == 'published' and result.tasks[0].state == 'source_fallback'
