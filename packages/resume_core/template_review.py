@@ -5,7 +5,7 @@ import json
 
 from .models.template_import import CheckTarget, ReferencedReviewReply, ReviewInput, ReviewReceipt, ReviewReply
 from .project_store import strict_json
-from .template_identity import capture_span, evidence_options, offered_evidence, payload_value, restore_evidence, source_slice
+from .template_identity import capture_span, empty_value, evidence_options, offered_evidence, payload_value, restore_evidence, source_slice
 from .template_import import TemplateImportFailure, attempt_in, checked, digest, identity, task_in
 from .templates.models import Check
 from .templates.compiler import sha256
@@ -269,7 +269,62 @@ def decide_review(value, receipt, proposal):
         cell_id = cells[field.item_handle][field.field_key]
         if cell_id in targets and cell_id not in failed and allocation.record_id not in denied_subjects:
             admitted.append(cell_id)
-    feedback = tuple({'ruleId': result.rule_id, 'targetId': result.target_id, 'reason': result.reason}
+    # A repair reads the reviewed reply as previousReply; a field finding names its place there.
+    pointers = {cells[field.item_handle][field.field_key]: field.pointer for field in proposal.resolved_fields}
+    feedback = tuple({'ruleId': result.rule_id, 'targetId': result.target_id, 'reason': result.reason,
+            **({'pointer': pointers[result.target_id]} if result.target_id in pointers else {})}
         for result in results if result.disposition == 'violation' or result.disposition == 'uncertain'
             and result.actionable and result.reason.strip())
     return ReviewDecision(tuple(admitted), tuple(sorted(admitted_relations)), feedback, tuple(sorted(failed)))
+
+
+@dataclass(frozen=True)
+class ShownValue:
+    item_handle: str
+    semantic_type: str
+    field_key: str
+    text: str
+    units: frozenset
+    reworded: bool
+
+
+def _text_key(value):
+    # Spelling only: "Node.js" and "NodeJS" are one value, "Kafka 4.0.x" and "Kafka" are not.
+    text = value if isinstance(value, str) else json.dumps(value, ensure_ascii=False, sort_keys=True)
+    return ''.join(character for character in text.casefold() if character.isalnum())
+
+
+def shown_values(proposal, cell_ids, allocations, rewrite_fields):
+    """The non-empty values a proposal admits, comparable with another reply of the same block."""
+    by_handle = {allocation.item_handle: allocation for allocation in allocations}
+    values = []
+    for field in proposal.resolved_fields:
+        allocation = by_handle[field.item_handle]
+        value = payload_value(proposal.reply.payload, field.pointer)
+        if allocation.cell_ids[field.field_key] not in cell_ids or empty_value(value):
+            continue
+        values.append(ShownValue(field.item_handle, allocation.semantic_type, field.field_key, _text_key(value),
+            frozenset((span.source_id, span.unit_id) for span in field.evidence),
+            any(_matches(pattern, field.pointer) for pattern in rewrite_fields)))
+    return values
+
+
+def _same_value(left, right):
+    # A reworded value is the same claim when both cite a common source line.
+    return (left.semantic_type, left.field_key) == (right.semantic_type, right.field_key) and (left.text == right.text
+        or left.reworded and right.reworded and bool(left.units & right.units))
+
+
+def repair_wins(first, first_failed, repair, repair_failed):
+    """Whether a repair replaces the admitted reply: what shows after it (repair) keeps every admitted value, it adds
+    no failing value, and it fixes a finding or adds a value. LIVE-09: a repair failed 142 checks where the first
+    reply failed 7. D107: a repair that added ZeroMQ tied on one coverage finding and was dropped; one that fixed a
+    claim wrote over another."""
+    if any(not any(_same_value(value, other) for other in repair) for value in first):
+        return False
+    def values(failed):
+        return {target for target in failed if not target.startswith('scope-')}
+    if len(values(repair_failed)) > len(values(first_failed)):
+        return False
+    return len(set(repair_failed)) < len(set(first_failed)) or any(
+        not any(_same_value(value, other) for other in first) for value in repair)

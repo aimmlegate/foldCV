@@ -2,7 +2,7 @@
 schema_version: 4
 template:
   id: generic-two-column
-  revision: 2.3.0
+  revision: 2.4.0
   name: Две колонки
   default_locale: ru
 model:
@@ -410,14 +410,14 @@ blocks:
         minLength: 1
         maxLength: 48
         pattern: ^[^:;\n]+$
-        description: One technology, tool or library name exactly as the source writes it, such as PostgreSQL or Kafka 4.0.
+        description: One technology, tool or library name exactly as the source writes it, such as Go, Laravel 5.1 or React.
           Never a sentence, a description of how it was used, or experience.
       maxItems: 40
   facts:
     programming: [items/*=display]
   extract:
   - Collect languages, frameworks and libraries from all source sections, including older projects.
-  - Each item is one short name as the source writes it, such as PostgreSQL, Kafka 4.0, Docker Compose or CTE (WITH); never
+  - Each item is one short name as the source writes it, such as Go, Python 3.12, Laravel 5.1 or React; never
     a sentence, a description of how it was used, or experience.
   - Leave out a language's standard-library packages and built-in features (Go sync, Go reflect, goroutines).
   - Preserve versions and qualifiers; assign each canonical item once across active bottom groups.
@@ -483,14 +483,14 @@ blocks:
         minLength: 1
         maxLength: 48
         pattern: ^[^:;\n]+$
-        description: One technology, tool or library name exactly as the source writes it, such as PostgreSQL or Kafka 4.0.
+        description: One technology, tool or library name exactly as the source writes it, such as Docker Compose, Kubernetes or Ubuntu 22.04.
           Never a sentence, a description of how it was used, or experience.
       maxItems: 40
   facts:
     infrastructure: [items/*=display]
   extract:
   - Collect containers, orchestration, operating systems, cloud platforms, version control and task management.
-  - Each item is one short name as the source writes it, such as PostgreSQL, Kafka 4.0, Docker Compose or CTE (WITH); never
+  - Each item is one short name as the source writes it, such as Docker Compose, Kubernetes, GitLab CI or Jira; never
     a sentence, a description of how it was used, or experience.
   - Include technologies found only in earlier work; do not duplicate another active bottom group.
   review:

@@ -23,7 +23,7 @@ from packages.resume_core.template_import import (CleanupProof, ProcessingDeadli
     record_return, reconcile_cleanup, recover_operation, reserve_attempt, resume_operation, spent_calls, start_operation,
     task_in)
 from packages.resume_core.template_proposals import parse_proposal, transport_refusal
-from packages.resume_core.template_review import decide_review, make_review_input, record_review
+from packages.resume_core.template_review import decide_review, make_review_input, record_review, repair_wins, shown_values
 from packages.resume_core.template_prompt import model_prompt
 from packages.resume_core.templates.operations import operation_value
 from packages.resume_core.templates.replies import BOOKKEEPING_KEYS, proposal_protocol, proposal_schema, review_schema, PROPOSAL_PROTOCOL
@@ -139,8 +139,50 @@ def fallback_message(result, count=1, shown=True):
     return text + (' ' + reason if reason else '') + more
 
 
-def failing(receipt):
-    return sum(result.disposition != 'satisfied' for result in receipt.reply.results)
+def failed_targets(receipt):
+    return {result.target_id for result in receipt.reply.results if result.disposition != 'satisfied'}
+
+
+def better_repair(operation, package, first_receipt, receipt, review, proposal):
+    """Whether a reviewed repair replaces the admitted reply of its task (see repair_wins)."""
+    first = next(value for value in operation.proposals if value.applied_receipt_id == first_receipt.id)
+    task = task_in(operation, attempt_in(operation, first.attempt_id).task_id)
+    block = next(value for value in package.definition.blocks if value.id == task.block_id)
+    rewrite = block.rewrite.fields if operation.capture.allow_text_rewrite else []
+    allocations = item_identities(operation)
+    # What each review admitted; admitted_cell_ids leaves out cells an earlier admission already holds unchanged.
+    first_review = next(value.value for value in operation.review_inputs if value.attempt_id == first_receipt.attempt_id)
+    before = shown_values(first, set(decide_review(first_review, first_receipt, first).admitted_cell_ids), allocations, rewrite)
+    admitted = decide_review(review, receipt, proposal).admitted_cell_ids
+    # The view reads every active record, so items the repair does not send keep their admitted values.
+    touched = {field.item_handle for field in proposal.resolved_fields}
+    after = [value for value in before if value.item_handle not in touched]
+    return repair_wins(before, failed_targets(first_receipt),
+        after + shown_values(proposal, set(admitted), allocations, rewrite), failed_targets(receipt))
+
+
+def previous_reply(proposal, offered, references):
+    """The reviewed reply a repair corrects: each value's pointer, item and evidence by the request's references."""
+    refs = {digest(option.span): ref for ref, option in (offered or {}).items()}
+    items = {item.item_handle: item.ref for item in references.items} if references is not None else {}
+    return {'payload': proposal.reply.payload, 'fields': [{'pointer': field.pointer, 'item': items.get(field.item_handle),
+        'evidence': [refs[digest(span)] for span in field.evidence if digest(span) in refs]} for field in proposal.resolved_fields]}
+
+
+def other_blocks(operation, task, package):
+    """What the other blocks of this import collect, so coverage review leaves their content to them (D107)."""
+    result = []
+    for block in package.definition.blocks:
+        if block.id == task.block_id:
+            continue
+        if block.when is not None:
+            selected = operation_value([operation], block.when.operation)
+            if selected is not None and selected['branch'] != block.when.equals:
+                continue
+        title = block.view.title
+        result.append({'block': block.id, 'title': title.get(package.definition.template.default_locale)
+            or next(iter(title.values()), None), 'extract': list(block.extract)})
+    return result
 
 
 def implicit_dependencies(package, operation):
@@ -513,7 +555,7 @@ class TemplatePipeline(TemplateCheckpoints):
             await self.finish_task(project, operation_id, task_id, derived.value, derived.source_spans,
                 derived.item_handles, 'empty' if empty_value(derived.value) else 'derived', issues)
             return
-        feedback, unresolved = (), []
+        feedback, unresolved, previous = (), [], None
         for slot in ['initial', 'primary_repair', 'fallback_repair']:
             workspace = self.read(project)
             operation, data = operation_in(workspace, operation_id), owner(workspace)
@@ -539,15 +581,18 @@ class TemplatePipeline(TemplateCheckpoints):
                 captured = [allocation for allocation in item_identities(operation) if allocation.item_handle in allowed]
                 relations = [value for value in known_relations.values()
                     if value.subject_id in {allocation.record_id for allocation in captured}]
+                offered = offered_evidence(stored.value)
                 request = {**stored.value, 'slot': slot, 'feedback': list(feedback),
                     'capturedHandles': [allocation.model_dump(mode='json', by_alias=True) for allocation in captured],
                     'capturedRelations': [value.model_dump(mode='json', by_alias=True) for value in relations]}
-                offered = offered_evidence(stored.value)
                 references = None
                 if offered is not None:
                     references = reference_table(captured, stored.value.get('effectiveCells', []), relations)
                     request['references'] = references.model_dump(mode='json', by_alias=True)
                     request['replyProtocol'] = proposal_protocol(references)
+                if previous is not None:
+                    # D107: a repair that saw only the findings wrote the block anew and lost admitted values.
+                    request['previousReply'] = previous_reply(previous, offered, references)
                 retry = any(value['ruleId'] == 'reply-time' for value in feedback)
                 try:
                     attempt_id = await self.call(project, operation_id, task_id, slot, request,
@@ -612,7 +657,8 @@ class TemplatePipeline(TemplateCheckpoints):
                 effective_cells=[cell for cell in effective_cells(data.facts, data.template_operations)
                     if cell.id in {identifier for field in proposal.resolved_fields for identifier in field.effective_cell_ids}],
                 semantic_context={'taskInput': {key: value for key, value in task_input.items() if key != 'evidence'},
-                    'taskFactsHash': task_facts_digest(operation, task_id, data.facts)})
+                    'taskFactsHash': task_facts_digest(operation, task_id, data.facts),
+                    'otherBlocks': other_blocks(operation, task, data.template_package)})
             review_attempt = next((value for value in operation.attempts if value.task_id == task_id
                 and value.slot in {'review', 'replacement_review'} and value.input_hash == digest(review)), None)
             try:
@@ -623,13 +669,14 @@ class TemplatePipeline(TemplateCheckpoints):
                 else:
                     review_id = review_attempt.id
                 self.guard(project, operation_in(self.read(project), operation_id))
+                kept_first = [False]
                 def accept(value, current, _workspace):
                     self.facts_current(value, current.facts)
                     updated, receipt = record_review(value, review_id, current.sources, self.wall(), id_factory=self.id_factory)
-                    # A repair replaces the admitted proposal only when its review finds fewer problems (LIVE-09: a
-                    # repair failed 142 of 463 checks where the first reply failed 7); otherwise the first stays.
                     admitted = applied_receipt(updated, task_id)
-                    if admitted is not None and admitted.id != receipt.id and failing(receipt) >= failing(admitted):
+                    kept_first[:] = [admitted is not None and admitted.id != receipt.id and not better_repair(updated,
+                        current.template_package, admitted, receipt, review, proposal)]
+                    if kept_first[0]:
                         return updated
                     updated, facts = admit_proposal(updated, proposal.id, receipt.id, current.template_package, current.sources,
                         current.facts, expected_revisions={handle: record.revision
@@ -646,20 +693,25 @@ class TemplatePipeline(TemplateCheckpoints):
             except (TemplateImportFailure, ValueError) as error:
                 unresolved.append(getattr(error, 'code', 'IMPORT_REVIEW_INVALID'))
                 break
-            feedback = decision.feedback
-            if not decision.unresolved_target_ids:
-                effective = owner(workspace).facts
-                active_handles = {record.item_handle for record in effective.extensions if record.active}
-                active_handles.update(allocation.item_handle for allocation in item_identities(operation)
-                    if allocation.record_id in {record.id for record in effective.records})
-                handles = [handle for handle in [*[field.item_handle for field in proposal.resolved_fields],
-                    *[parent for link in proposal.lineage for parent in link.parents]] if handle in active_handles]
-                fingerprint = digest(next(value for value in operation.task_inputs if value.task_id == task_id).value)
-                await self.finish_task(project, operation_id, task_id, None, (), handles,
-                    'empty' if empty_value(proposal.reply.payload) else 'admitted', unbound_issues(self.id_factory, task_id, proposal, fingerprint))
+            feedback, previous = decision.feedback, proposal
+            # A clean repair that was not better leaves the first reply and its findings in place.
+            if not decision.unresolved_target_ids and not kept_first[0]:
+                await self.finish_admitted(project, operation_id, task_id, proposal)
                 return
             unresolved = list(decision.unresolved_target_ids)
         await self.fallback(project, operation_id, task_id, unresolved)
+
+    async def finish_admitted(self, project, operation_id, task_id, proposal):
+        workspace = self.read(project)
+        operation, effective = operation_in(workspace, operation_id), owner(workspace).facts
+        active_handles = {record.item_handle for record in effective.extensions if record.active}
+        active_handles.update(allocation.item_handle for allocation in item_identities(operation)
+            if allocation.record_id in {record.id for record in effective.records})
+        handles = [handle for handle in [*[field.item_handle for field in proposal.resolved_fields],
+            *[parent for link in proposal.lineage for parent in link.parents]] if handle in active_handles]
+        fingerprint = digest(next(value for value in operation.task_inputs if value.task_id == task_id).value)
+        await self.finish_task(project, operation_id, task_id, None, (), handles,
+            'empty' if empty_value(proposal.reply.payload) else 'admitted', unbound_issues(self.id_factory, task_id, proposal, fingerprint))
 
     async def call(self, project, operation_id, task_id, slot, value, schema, deadline, cancel, *, review=None,
             seconds=CALL_SECONDS):
@@ -802,6 +854,13 @@ class TemplatePipeline(TemplateCheckpoints):
         kept = applied is not None and bool(applied.admitted_cell_ids)
         leftover = []
         failures = [result for result in receipt.reply.results if result.disposition != 'satisfied'] if receipt else []
+        if kept and failures and len(task.receipt_ids) > 1:
+            # D107: after a reviewed repair a coverage finding is not shown: the reviewer names a new partial list
+            # each round, and its raw lines split the block. Findings on shown values stay.
+            failures = [result for result in failures if not result.target_id.startswith('scope-')]
+            if not failures:
+                await self.finish_admitted(project, operation_id, task_id, applied)
+                return
         sources = owner(current).sources
         if offered is None:
             # A request without references predates cited fallback and keeps its whole captured scope.

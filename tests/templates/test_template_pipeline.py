@@ -424,6 +424,129 @@ async def test_two_findings_on_an_admitted_block_are_one_notice(tmp_path):
     assert len(issue.target_ids) == 3
 
 
+def papers(source, keys, handles=None):
+    """raw_proposal with only the named papers, in order; a paper in handles updates that captured item."""
+    value, old, handles = raw_proposal(source), {'a': 0, 'b': 1}, handles or {}
+    position = {key: index for index, key in enumerate(keys)}
+    added = [key for key in keys if key not in handles]
+    value['payload'] = [value['payload'][old[key]] for key in keys]
+    value['discoveries'] = [{'key': key, 'semanticType': 'papers', 'pointer': '/' + str(position[key])} for key in added]
+    value['fields'] = [{**field, 'pointer': '/' + str(position[field['item']['key']]) + '/' + field['fieldKey'],
+        **({'item': {'kind': 'handle', 'itemHandle': handles[field['item']['key']]}} if field['item']['key'] in handles else {})}
+        for field in value['fields'] if field['item']['key'] in keys]
+    value['lineage'] = [{'kind': 'add', 'parents': [], 'children': added}] if added else []
+    return value
+
+
+def captured_handles(value):
+    return {item['key']: item['itemHandle'] for item in value['references']['items']}
+
+
+def scope_only(value):
+    return failing_review(value, [target for target in value['targets'] if target['targetId'].startswith('scope-')])
+
+
+@pytest.mark.asyncio
+async def test_a_repair_that_adds_a_missing_value_replaces_the_first_on_a_coverage_tie(tmp_path):
+    # D107: a repair added ZeroMQ, the next review named other gaps, and the 1:1 tie kept the first reply.
+    fixture = RuntimeFixture(tmp_path, fallback=False)
+    def script(_request, value):
+        if 'targets' not in value:
+            # Like the live repairs, the repair updates the captured item it keeps.
+            return papers(fixture.source, ['a', 'b'], captured_handles(value)) if value.get('feedback') else papers(fixture.source, ['a'])
+        return scope_only(value)
+    fixture.transport.scripted = script
+    result = await fixture.pipeline.run(fixture.project, fixture.command, admitted=fixture.admitted)
+    assert [attempt.slot for attempt in result.attempts] == ['initial', 'review', 'primary_repair', 'replacement_review']
+    first, repair = result.proposals
+    assert repair.applied_receipt_id == result.receipts[1].id
+    # The repair corrects the reviewed reply: it reads that reply and the finding.
+    request = fixture.transport.calls[2]
+    assert request['previousReply']['payload'] == first.reply.payload
+    assert {field['item'] for field in request['previousReply']['fields']} == {'H1'} and len(request['previousReply']['fields']) == 5
+    assert [entry['targetId'] for entry in request['feedback']] == ['scope-' + result.tasks[0].id]
+    # The coverage finding left after the repair is not shown and places no source lines.
+    assert result.tasks[0].state == 'accepted' and result.task_results[0].disposition == 'admitted' and not result.issues
+    assert len(fixture.current().project.facts.extensions) == 2
+
+
+@pytest.mark.asyncio
+async def test_a_repair_that_drops_an_admitted_value_does_not_replace_the_first(tmp_path):
+    # D107: a highlights repair fixed one claim and wrote another into the item of a third (TLS/SSL); fewer findings
+    # alone no longer decide.
+    fixture, reviews = RuntimeFixture(tmp_path, fallback=False), []
+    def script(_request, value):
+        if 'targets' not in value:
+            if not value.get('feedback'):
+                return papers(fixture.source, ['a', 'b'])
+            return papers(fixture.source, ['b'], {'b': captured_handles(value)['a']})
+        reviews.append(value)
+        cells = [target for target in value['targets'] if not target['targetId'].startswith('scope-')]
+        return failing_review(value, cells[:1] if len(reviews) == 1 else [])
+    fixture.transport.scripted = script
+    result = await fixture.pipeline.run(fixture.project, fixture.command, admitted=fixture.admitted)
+    first, repair = result.proposals
+    assert first.applied_receipt_id == result.receipts[0].id and repair.applied_receipt_id is None
+    assert fixture.transport.calls[2]['feedback'][0]['pointer'].startswith('/')
+    # The first reply's finding on a value stays shown.
+    assert result.tasks[0].state == 'accepted' and result.task_results[0].disposition == 'source_fallback'
+    [issue] = result.issues
+    assert issue.message.startswith('Проверка нашла ошибку') and 'Неверно' in issue.message
+
+
+@pytest.mark.asyncio
+async def test_a_coverage_finding_without_a_reviewed_repair_is_still_shown(tmp_path):
+    # Only a repair that ran and was reviewed hides a coverage finding; here the call cap leaves no room for one.
+    fixture = RuntimeFixture(tmp_path, fallback=False, cap=2)
+    def script(_request, value):
+        return scope_only(value) if 'targets' in value else papers(fixture.source, ['a'])
+    fixture.transport.scripted = script
+    result = await fixture.pipeline.run(fixture.project, fixture.command, admitted=fixture.admitted)
+    assert [attempt.slot for attempt in result.attempts] == ['initial', 'review']
+    assert result.tasks[0].state == 'accepted' and result.task_results[0].disposition == 'source_fallback'
+    [issue] = result.issues
+    assert issue.target_ids == ['scope-' + result.tasks[0].id] and 'Неверно' in issue.message
+
+
+def test_a_repair_wins_only_when_it_keeps_every_admitted_value():
+    from packages.resume_core.template_review import ShownValue, _text_key, repair_wins
+    def shown(text, line='u1', reworded=False):
+        return ShownValue('item-' + text, 'foldcv:programming', 'display', _text_key(text), frozenset({('s', line)}), reworded)
+    first = [shown('Go'), shown('NodeJS'), shown('Kafka 4.0.x')]
+    scope = {'scope-task'}
+    # Spelling differences are one value; a lost version is a lost value.
+    assert repair_wins(first, scope, [shown('go'), shown('Node.js'), shown('Kafka 4.0.x'), shown('ZeroMQ')], scope)
+    assert not repair_wins(first, scope, [shown('Go'), shown('Node.js'), shown('Kafka'), shown('ZeroMQ')], scope)
+    # The same values and findings keep the first reply; a new failing value does too.
+    assert not repair_wins(first, scope, list(first), scope)
+    assert not repair_wins(first, {'cell-1'}, [*first, shown('ZeroMQ')], {'cell-1', 'cell-2'})
+    assert repair_wins(first, {'cell-1', 'scope-task'}, list(first), {'cell-2'})
+    # A reworded claim matches by its source line, so a dropped claim is found even when the rest is reworded.
+    claims = [shown('Создал aggregate functions', 'u1', True), shown('Настроил TLS/SSL', 'u2', True)]
+    fixed = shown('Создал кластер из трёх брокеров', 'u3', True)
+    assert not repair_wins(claims, {'cell-1'}, [shown('Создавал aggregate functions', 'u1', True), fixed], set())
+    assert repair_wins(claims, {'cell-1'}, [shown('Создавал aggregate functions', 'u1', True), claims[1], fixed], set())
+
+
+def test_coverage_review_lists_the_other_blocks_of_the_selected_branch():
+    from types import SimpleNamespace
+    from resume_api.importer.template_pipeline import other_blocks
+    from tests.templates.generic_fixtures import generic_package
+    package = generic_package()
+    branch = SimpleNamespace(id='task-branch', block_id='role-branch')
+    programming = SimpleNamespace(id='task-programming', block_id='programming')
+    operation = SimpleNamespace(tasks=[branch, programming], task_results=[SimpleNamespace(task_id='task-branch',
+        disposition='derived', value={'branch': 'technical', 'family': 'backend'})])
+    blocks = {entry['block']: entry for entry in other_blocks(operation, programming, package)}
+    assert 'programming' not in blocks and {'data_and_tools', 'infrastructure', 'summary'} <= set(blocks)
+    assert not {'key_skills', 'role_tools'} & set(blocks)
+    assert blocks['data_and_tools']['title'] == 'СУБД, ИНСТРУМЕНТЫ'
+    assert blocks['data_and_tools']['extract'][0].startswith('Collect databases, message brokers')
+    # Before the branch is known, no block is left out.
+    operation.task_results = []
+    assert {'key_skills', 'role_tools'} <= {entry['block'] for entry in other_blocks(operation, programming, package)}
+
+
 @pytest.mark.asyncio
 async def test_a_review_that_admits_nothing_keeps_the_source_notice(tmp_path):
     fixture = RuntimeFixture(tmp_path, fallback=False)
