@@ -4,10 +4,20 @@ from .template_import import digest
 from .templates.compiler import canonical
 
 
+def display_text(raw):
+    """The text a reader sees: a date or period shows its stated wording, any other object its canonical JSON.
+    Built-in records already map dates this way; a template-only type (CT08) showed the JSON."""
+    if isinstance(raw, str):
+        return raw
+    if isinstance(raw, dict) and isinstance(raw.get('raw'), str) and raw['raw'].strip():
+        return raw['raw']
+    return canonical(raw).decode()
+
+
 def display_raw_input(review, field, raw):
     if (review.allow_text_rewrite or not isinstance(raw, str) or not raw.strip()
             or field.pointer not in review.semantic_context.get('sourceWordingPointers', [])):
-        return raw if isinstance(raw, str) else canonical(raw).decode()
+        return display_text(raw)
     if field.evidence:
         offered = ([(option.span, option.text) for option in review.evidence] if review.schema_version == 2
             else [(span, review.source_texts[digest(span)]) for span in review.source_spans])
