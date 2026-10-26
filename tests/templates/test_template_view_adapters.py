@@ -254,3 +254,44 @@ async def test_editor_plan_keeps_inline_styles_and_drops_links_that_export_as_te
     plan = editor_plan(value.project)
     [entry] = [entry for entry in plan['blocks'].values() if 'inline' in entry]
     assert 'links' not in entry and entry['inline'] == {label.binding_id: 'emphasis'} and entry['style'] == 'body'
+
+
+@pytest.mark.asyncio
+async def test_editor_plan_records_literal_styles_in_utf16_units(tmp_path):
+    # A literal has no binding id. An emoji outside the BMP is two UTF-16 units and one Python character.
+    from packages.resume_core.models.template_document import PresentedText
+    from packages.resume_core.models.template_workspace import WorkspaceV7
+    from packages.resume_core.templates.presentation_plan import editor_plan, literal_key, utf16_len
+    _fixture, workspace, _originals = await published(tmp_path)
+    value = workspace.model_copy(deep=True)
+    block = next(block for block in value.project.document.blocks() if any(isinstance(part, BoundLink) for part in block.content))
+    link = next(part for part in block.content if isinstance(part, BoundLink))
+    emphasis = block.presentation.model_copy(update={'style_token': 'emphasis'})
+    link.presentation = emphasis
+    label = link.content[0]
+    label.presentation = emphasis
+    inherited = PresentedText(type='text', text='ид', styles={}, presentation=None)
+    link.content = [label, inherited]
+    prefix = PresentedText(type='text', text='A🙂', styles={}, presentation=emphasis)
+    same = PresentedText(type='text', text='same', styles={}, presentation=block.presentation)
+    empty = PresentedText(type='text', text='', styles={}, presentation=emphasis)
+    plain = PresentedText(type='text', text='plain', styles={}, presentation=None)
+    suffix = PresentedText(type='text', text='Z', styles={}, presentation=emphasis)
+    block.content = [prefix, same, empty, plain, link, suffix]
+    value = WorkspaceV7.model_validate(value.model_dump(by_alias=True))
+    plan = editor_plan(value.project)
+    entry = plan['blocks'][block.id]
+    assert utf16_len('A🙂') == 3 and len('A🙂') == 2
+    prefix_end = utf16_len(prefix.text)
+    cursor = prefix_end + utf16_len(same.text) + utf16_len(plain.text)
+    label_end = cursor + utf16_len(label.text)
+    inherited_end = label_end + utf16_len(inherited.text)
+    suffix_end = inherited_end + utf16_len(suffix.text)
+    assert entry['style'] == 'body'
+    assert entry['inline'] == {
+        literal_key(0, prefix_end): 'emphasis',
+        label.binding_id: 'emphasis',
+        literal_key(label_end, inherited_end): 'emphasis',
+        literal_key(inherited_end, suffix_end): 'emphasis'}
+    assert literal_key(cursor, label_end) not in entry['inline']
+    assert literal_key(prefix_end, prefix_end + utf16_len(same.text)) not in entry['inline']

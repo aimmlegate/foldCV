@@ -11,7 +11,6 @@ import { errorMessage, knownErrorMessage } from "../errors/messages";
 import { ComparisonWorkspace } from "../workbench/editor/ComparisonWorkspace";
 import { EditorNotices } from "../workbench/editor/EditorNotices";
 import { FactsPanel } from "../workbench/facts/FactsPanel";
-import { NotificationSection } from "../workbench/ui/NotificationCenter";
 import { RewritePanel } from "../workbench/editor/RewritePanel";
 import { LinkTargetDialog } from "../workbench/editor/LinkTargetDialog";
 import type { RewriteActivity } from "./rewrite-progress";
@@ -21,6 +20,7 @@ import { selectionLocation } from "./selection";
 import { tableIdentityAttributes } from "./table-identity";
 import { templateSchema } from "./template-schema";
 import { projectTemplateDocument } from "./v7-projection";
+import { blockNotices } from "./import-notices";
 import { presentationMeta, templatePresentationPlugin, templateSheet, type TemplateSheet } from "./v7-presentation";
 import { TemplateEditorSession, type TemplateRewrite } from "./v7-session";
 
@@ -57,8 +57,12 @@ export function TemplateEditor({ initial, connection, onStatus, onShown, ref, po
   callbacks.current = { onStatus, onShown };
   // The compiled presentation of the verified state; decorations read the latest one.
   const sheet = useMemo(() => templateSheet(shown), [shown]);
+  const notices = useMemo(() => blockNotices(shown.workspace.project?.importIssues ?? []), [shown]);
   const presented = useRef<TemplateSheet | null>(sheet);
-  const presentation = useMemo(() => templatePresentationPlugin(() => presented.current), []);
+  const noticeRef = useRef(notices);
+  presented.current = sheet;
+  noticeRef.current = notices;
+  const presentation = useMemo(() => templatePresentationPlugin(() => presented.current, () => noticeRef.current), []);
   const session = useMemo(() => new TemplateEditorSession(connection, {
     status: text => { callbacks.current.onStatus(text); refresh(value => value + 1); },
     warning: text => setWarning(text),
@@ -88,8 +92,9 @@ export function TemplateEditor({ initial, connection, onStatus, onShown, ref, po
   }, [editor, session]);
   useEffect(() => {
     presented.current = sheet;
+    noticeRef.current = notices;
     editor.transact(tr => { tr.setMeta(presentationMeta, true); });
-  }, [editor, sheet]);
+  }, [editor, sheet, notices]);
   useImperativeHandle(ref, () => ({ background: true,
     flush: async () => {
       await session.flush(); await session.writer.flushTouches();
@@ -151,14 +156,6 @@ export function TemplateEditor({ initial, connection, onStatus, onShown, ref, po
     finally { setPanelPending([]); }
   }
   const facts = shown.workspace.project?.facts ?? project.facts, documentShown = shown.workspace.project?.document ?? project.document;
-  const activeIssues = (shown.workspace.project?.importIssues ?? []).filter(issue => issue.state === "active");
-  // An issue names its scope by the text it covers, so identical messages stay distinguishable.
-  const scopeText = (blockId: string | undefined): string => {
-    const block = blockId ? editor.getBlock(blockId) : undefined, content = block?.content;
-    const text = Array.isArray(content) ? content.map(span => "text" in span ? span.text : "content" in span && Array.isArray(span.content)
-      ? span.content.map(part => "text" in part ? part.text : "").join("") : "").join("") : "";
-    return text.length > 60 ? `${text.slice(0, 59)}…` : text;
-  };
   const state = session.queue.template.state, styles = editor.getActiveStyles();
   const locked = mode === "read_only" || mode === "detached" || mode === "recovering";
   return <div className="contents uir-editor-session">
@@ -182,16 +179,6 @@ export function TemplateEditor({ initial, connection, onStatus, onShown, ref, po
         <EditorNotices mode={mode === "recovering" ? null : mode} localDraft={false} warning={warning} clearWarning={() => setWarning("")} onOpen={() => {}}
           resolveDraft={() => Promise.reject(new Error("DRAFT_RECOVERY_REQUIRED"))} syncRecords={[]}
           resolve={() => Promise.resolve()} retry={() => Promise.resolve()} dismiss={() => Promise.resolve()} report={setWarning} />
-        {/* Concise scoped issues: no blocking dialog; editing the scoped text retires them in Python. */}
-        <NotificationSection count={activeIssues.length}>
-          <section className="notice-group" aria-label="Замечания импорта"><h3>Замечания импорта</h3>
-            {activeIssues.map(issue => <p className="notice warning" key={issue.id} data-issue-id={issue.id}>{issue.message}
-              {scopeText(issue.blockIds[0]) && <> — «{scopeText(issue.blockIds[0])}»</>}
-              {issue.blockIds[0] && <button type="button" className="text-button" onClick={() => {
-                const block = editor.getBlock(issue.blockIds[0] ?? ""); if (block) { editor.setTextCursorPosition(block, "end"); editor.focus(); }
-              }}>Показать</button>}</p>)}
-          </section>
-        </NotificationSection>
         {(state.kind === "conflict" || state.kind === "rejected") && <div className="notice warning" role="alert">
           <p>{errorMessage(state.kind === "conflict" ? "V7_INPUT_CONFLICT" : "V7_INPUT_REJECTED")}</p>
           <button type="button" onClick={() => session.retry()}>Сохранить текст из редактора</button>

@@ -2,6 +2,7 @@
 
 from urllib.parse import urlsplit
 
+from ..rendering.captured_styles import authored_spans
 from .compiler import canonical, sha256
 from .focus import focus_icon, icon_catalog
 
@@ -60,6 +61,16 @@ def style_key(ref):
     return ref.style_token + '~' + sha256(canonical(overrides))[:12]
 
 
+def utf16_len(text):
+    """Editor offsets are UTF-16 code units, the same length a JavaScript string reports."""
+    return len(text.encode('utf-16-le')) // 2
+
+
+def literal_key(start, end):
+    """A literal has no binding id. The editor paints this range; a field or scope keeps its own key."""
+    return f'literal@{start}@{end}'
+
+
 def style_entry(package, fonts, ref):
     """Size, line height, color and the captured face for each mark combination; a missing face is None."""
     from ..rendering.captured_fonts import FontRequest
@@ -99,7 +110,7 @@ def editor_plan(project):
             if cached[0] is None:
                 cached[0] = icon_catalog(package)
             entry['focus'] = {'blocks': [child.id for child in row], 'icon': focus_icon(package, project.facts, row, cached[0])}
-        inline, links = {}, []
+        inline, links, offset = {}, [], 0
         for span in block.content if isinstance(block.content, list) else []:
             for part in span.content if span.type == 'bound_link' else [span]:
                 identity = getattr(part, 'binding_id', None) or getattr(part, 'fragment_id', None)
@@ -107,6 +118,15 @@ def editor_plan(project):
                     inline[identity] = keyed(part.presentation)
             if span.type == 'bound_link' and hyperlink_target(span.href) is not None:
                 links.append((span.label_binding or span.url_binding).occurrence_id)
+        # A literal span has no node id. Record its UTF-16 range when its style is not the block's.
+        if isinstance(block.content, list):
+            for span, _link in authored_spans(block):
+                text = span.text or ''
+                identity = getattr(span, 'binding_id', None) or getattr(span, 'fragment_id', None)
+                if identity is None and span.presentation is not None and text and style_key(span.presentation) != entry['style']:
+                    end = offset + utf16_len(text)
+                    inline[literal_key(offset, end)] = keyed(span.presentation)
+                offset += utf16_len(text)
         if inline:
             entry['inline'] = inline
         if links:

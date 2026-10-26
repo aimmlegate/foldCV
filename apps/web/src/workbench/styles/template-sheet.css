@@ -40,5 +40,10 @@
 .fcv-sheet [data-fcv-focus] > .bn-block::before { content: ""; position: absolute; left: var(--fcv-focus-icon-x); top: 50%;
   width: var(--fcv-focus-icon-width); height: var(--fcv-focus-icon-height); transform: translateY(-50%);
   background: var(--fcv-icon, none) center / contain no-repeat; pointer-events: none; }
-.fcv-sheet .fcv-link { text-decoration: underline dotted; text-underline-offset: 2px; }
+.uir-prototype .fcv-sheet .fcv-link,
+.uir-prototype .fcv-sheet .bn-editor a,
+.fcv-sheet .fcv-link,
+.fcv-sheet .bn-editor a { color: inherit; text-decoration: underline dotted; text-underline-offset: 2px; }
+.fcv-sheet .fcv-import-note { margin: 2pt 0 0; padding: 1pt 0 1pt 6pt; border-left: 2px solid #8a6a2f; color: #5c4a28;
+  font: 9pt var(--sans), sans-serif; line-height: 1.35; }
 .fcv-logo { position: absolute; object-fit: contain; pointer-events: none; }
