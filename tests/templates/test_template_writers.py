@@ -180,3 +180,21 @@ async def test_existing_writer_routes_dispatch_v2_without_accepting_a_v1_content
         request['schemaVersion'] = 1
         rejected = await client.post(path + '/flush', json=request)
         assert rejected.status_code == 409 and rejected.json()['error']['code'] == 'JOB_SCOPE_INVALID'
+
+
+def test_a_template_save_slower_than_the_lease_commits_and_keeps_the_writer(tmp_path):
+    from datetime import datetime, timedelta
+    from packages.resume_core.background_limits import LIMITS
+    fixture = TemplateWriterFixture(tmp_path)
+    request, prepare = fixture.save_request(), fixture.writers.local_history.prepare_edit
+    def slow(*args, **kwargs):
+        # The commit's own work outlasts the lease several times over, as a 72 s save did on a large import.
+        seconds = LIMITS.writer_lease_seconds * 4
+        fixture.elapsed.advance(seconds)
+        fixture.now = (datetime.fromisoformat(fixture.now) + timedelta(seconds=seconds)).isoformat()
+        return prepare(*args, **kwargs)
+    fixture.writers.local_history.prepare_edit = slow
+    with fixture.writers.serving(fixture.project, fixture.proof):
+        saved = fixture.writers.save(fixture.project, request, originals=fixture.originals)
+    assert saved.writer.acknowledged_cursor == 1 and saved.workspace == fixture.current()
+    assert fixture.writers.heartbeat(fixture.project, fixture.proof).writer.status == 'attached'

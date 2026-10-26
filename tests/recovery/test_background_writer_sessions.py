@@ -198,3 +198,22 @@ def test_clean_detach_can_publish_headlessly_without_a_browser_receipt(tmp_path)
     reopened = fixture.writers.open(fixture.project, fixture.open_request.model_copy(update={"incarnation": "next-open"}))
     assert reopened.workspace == fixture.publication.current()
     assert reopened.writer.epoch > fixture.proof.epoch
+
+
+def test_requests_waiting_on_the_server_keep_the_writer_lease(tmp_path):
+    fixture = WriterFixture(tmp_path)
+    proof, stale = fixture.proof, fixture.proof.model_copy(update={"incarnation": "connection-old"})
+    with fixture.writers.serving(fixture.project, proof), fixture.writers.serving(fixture.project, stale):
+        # A long save holds the server past the lease; a heartbeat sent meanwhile waits behind it.
+        fixture.advance(LIMITS.writer_lease_seconds * 4)
+        with fixture.writers.serving(fixture.project, proof):
+            assert fixture.writers.heartbeat(fixture.project, proof).writer.status == "attached"
+    fixture.advance(LIMITS.writer_lease_seconds - 0.001)
+    fixture.writers.heartbeat(fixture.project, proof)
+    forged = proof.model_copy(update={"credential": "synthetic_writer_credential_9876543210"})
+    # Only proven requests of the live incarnation count, and only those that arrived while it was alive.
+    with fixture.writers.serving(fixture.project, stale), fixture.writers.serving(fixture.project, forged):
+        fixture.advance(LIMITS.writer_lease_seconds + 0.001)
+        with fixture.writers.serving(fixture.project, proof), pytest.raises(BackgroundFailure, match="WRITER_UNKNOWN"):
+            fixture.writers.heartbeat(fixture.project, proof)
+    assert not fixture.writers.serving_requests

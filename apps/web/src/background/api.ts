@@ -99,6 +99,8 @@ export class WriterApi {
   templateFlush(body: WriterAdvanceV2): Promise<WriterViewV2> { return this.templateCall("/flush", body); }
   templateReconcile(body: WriterAdvanceV2): Promise<WriterViewV2> { return this.templateCall("/reconcile", body); }
   templateDetach(body: WriterAdvanceV2): Promise<WriterViewV2> { return this.templateCall("/detach", body); }
+  /** Take the writer over from another browser or a lost session; editing continues from the saved state. */
+  templateAbandon(body: WriterAbandonV1): Promise<WriterViewV2> { return this.templateCall("/abandon", body); }
   templateCheckpoint(body: WriterCheckpointV2): Promise<DraftCheckpointV1> { return this.call("background_draft_v1", "/checkpoint", body); }
   async templateDraft(proof: WriterProofV1, id: string): Promise<WriterDraftReadV2> {
     const value = await this.transport(this.prefix + "/draft/read", "POST", { schemaVersion: 1, proof, id });
@@ -204,6 +206,6 @@ export class JobsApi {
 export type WriterTransport = Pick<WriterApi, "project" | "bootstrap" | "open" | "heartbeat" | "read" | "suspend" | "flush" | "reconcile" | "detach"
   | "save" | "barrier" | "revoke" | "checkpoint" | "draft" | "discard" | "recover" | "useDraft" | "abandon" | "publish" | "offer" | "begin" | "acknowledge" | "history">;
 export type TemplateWriterTransport = Pick<WriterApi, "project" | "templateBootstrap" | "templateOpen" | "templateRead" | "templateHeartbeat"
-  | "templateSuspend" | "templateFlush" | "templateReconcile" | "templateDetach" | "templateHistory" | "templatePrepareDelta" | "templateSavePrepared"
+  | "templateSuspend" | "templateFlush" | "templateReconcile" | "templateDetach" | "templateAbandon" | "templateHistory" | "templatePrepareDelta" | "templateSavePrepared"
   | "templateCheckpoint" | "templateDraft" | "templatePendingInput" | "templateDiscardDraft" | "templateCaptureClipboard" | "templateReleaseClipboard"
   | "templateRewritePreview" | "templateRewriteCancel">;

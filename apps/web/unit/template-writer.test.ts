@@ -5,12 +5,13 @@ import { TemplateBackgroundWriter } from "../src/background/template-writer";
 import { WriterApi } from "../src/background/api";
 import type { WriterViewV2 } from "../src/contracts/generated/background_writer_view_v2";
 import type { WriterCaptureClipboardV2 } from "../src/contracts/generated/background_writer_capture_clipboard_v2";
-import type { WriterMode } from "../src/background/writer-lifecycle";
+import { timers, type WriterMode, type WriterTimers } from "../src/background/writer-lifecycle";
 import { jsonWireAt, type JsonWireNode } from "../src/contracts/lossless-json";
 import { contentText, responseBlocks } from "../src/contracts/template-address";
 import { DraftRepository, type LocalDraft } from "../src/background/drafts";
 import { RichSaveQueue, snapshotIdentity, type TemplateAdoption } from "../src/rich/save-queue";
 import { containerKey, type LocalContainer, type Side, type V7Intent } from "../src/rich/v7-translation";
+import { decodeJsonResponse } from "../src/contracts/json-response";
 import { client, harness, record, type Harness, type Traffic } from "./support/template-harness";
 
 // Resume tokens use Web Storage; Node tests provide an isolated in-memory store.
@@ -33,7 +34,7 @@ function textOf(response: JsonWireNode): string {
   assert.ok(content); return contentText(content);
 }
 
-async function opened(value: Harness, traffic: Traffic[]) {
+async function opened(value: Harness, traffic: Traffic[], time: WriterTimers = timers) {
   const api = client(value, traffic), modes: WriterMode[] = [], locks: boolean[] = [], adopted: TemplateAdoption[] = [];
   let rows: LocalDraft[] = [];
   const repository = new DraftRepository({ transact: work => { const next = work(rows); rows = next.rows; return Promise.resolve(next.result); },
@@ -45,11 +46,15 @@ async function opened(value: Harness, traffic: Traffic[]) {
   const connection = await attachTemplateWriter(value.project, api, repository);
   assert.ok(connection?.proof, connection?.error ?? "attach failed");
   const writer = new TemplateBackgroundWriter(connection, { compositionEnd: () => Promise.resolve(),
-    lock: locked => locks.push(locked), changed: mode => modes.push(mode) });
+    lock: locked => locks.push(locked), changed: mode => modes.push(mode) }, time);
   const queue = new RichSaveQueue({ durable: writer.durable, sessionId: connection.proof.sessionId,
     ports: writer.queuePorts({ adopted: adoption => adopted.push(adoption), changed: () => {}, retained: () => {}, released: () => {} }) });
   writer.attach(queue);
   return { writer, queue, modes, locks, adopted };
+}
+
+function isWriterView(value: unknown): value is WriterViewV2 {
+  return typeof value === "object" && value !== null && "canonicalReady" in value && "writer" in value;
 }
 
 test("V7 input advances null touches that the compact save acknowledges with the saved transaction", async () => {
@@ -196,7 +201,9 @@ for (const pending of [false, true]) test(`heartbeat recovery preserves known in
     if (pending) {
       writer.input(); queue.template.enqueue(typing(15, "before", "!", textOf(writer.durable)), "before-recovery", 0);
     }
-    writer.connection.api.templateHeartbeat = () => Promise.reject(new TypeError("fetch failed"));
+    const api = writer.connection.api, beat = api.templateHeartbeat.bind(api);
+    // One lost heartbeat; the network is back for recovery.
+    api.templateHeartbeat = () => { api.templateHeartbeat = beat; return Promise.reject(new TypeError("fetch failed")); };
     await writer.heartbeat();
     assert.equal(writer.mode, "recovering"); assert.equal(queue.template.state.kind, "ready");
     await writer.recover();
@@ -255,5 +262,92 @@ test("clipboard replies must match the requested selection and snapshot", async 
     mutable.snapshot = snapshot;
     deliver(captured);
     assert.deepEqual(await pending, captured, "later changes to the request object cannot change the captured identity");
+  } finally { await value.close(); }
+});
+
+test("a heartbeat waits for the previous one instead of queueing behind a slow server", async () => {
+  const value = await harness();
+  try {
+    const { writer } = await opened(value, []), api = writer.connection.api, beat = api.templateHeartbeat.bind(api);
+    let calls = 0, release = () => {};
+    api.templateHeartbeat = proof => { calls++; return new Promise(resolve => { release = () => resolve(beat(proof)); }); };
+    const first = writer.heartbeat(), later = [writer.heartbeat(), writer.heartbeat()];
+    assert.equal(calls, 1, "a heartbeat in flight suppresses later ones");
+    await Promise.all(later);
+    release(); await first;
+    const next = writer.heartbeat(); release(); await next;
+    assert.equal(calls, 2); assert.equal(writer.mode, "normal");
+  } finally { await value.close(); }
+});
+
+for (const event of ["restart", "expire-lease"]) test(`after ${event} the writer reopens its session and saving continues`, async () => {
+  const value = await harness();
+  try {
+    const traffic: Traffic[] = [], { writer, queue } = await opened(value, traffic), before = writer.proof;
+    const opens = () => traffic.filter(item => item.path.endsWith("/open")).length, initialOpens = opens();
+    assert.equal((await fetch(`${value.origin}/harness/${event}`, { method: "POST" })).ok, true);
+    await writer.heartbeat();
+    assert.equal(writer.mode, "recovering");
+    await writer.recover();
+    assert.equal(writer.mode, "normal");
+    assert.equal(opens(), initialOpens + 1);
+    assert.equal(writer.proof.sessionId, before.sessionId); assert.notEqual(writer.proof.incarnation, before.incarnation);
+    writer.input(); queue.template.enqueue(typing(15, "before", "!", textOf(writer.durable)), `after-${event}`, 0);
+    await queue.flush();
+    assert.equal(textOf(queue.template.durable), "By Shared title! / Journal North.");
+    await writer.heartbeat(); assert.equal(writer.mode, "normal");
+  } finally { await value.close(); }
+});
+
+test("another browser opens read-only, takes the writer over and the first one becomes read-only", async () => {
+  const value = await harness();
+  try {
+    const traffic: Traffic[] = [], { writer } = await opened(value, traffic), api = client(value, traffic);
+    const repository = () => new DraftRepository({ transact: work => Promise.resolve(work([]).result),
+      discardProject: () => Promise.resolve() }, () => Promise.reject(new Error("unused")));
+    // Another browser holds no resume token for this session.
+    sessionStorage.clear(); localStorage.clear();
+    const other = await attachTemplateWriter(value.project, api, repository());
+    assert.equal(other?.proof, null); assert.equal(other?.error, "WRITER_READ_ONLY");
+    const taken = await attachTemplateWriter(value.project, api, repository(), null, true);
+    assert.ok(taken?.proof); assert.notEqual(taken.proof.sessionId, writer.proof.sessionId);
+    assert.equal(taken.view.writer.status, "attached");
+    await writer.heartbeat();
+    assert.equal(writer.mode, "recovering");
+    await assert.rejects(writer.recover(), /WRITER_UNKNOWN/);
+    assert.equal(writer.mode, "read_only"); assert.equal(writer.connection.error, "WRITER_READ_ONLY");
+  } finally { await value.close(); }
+});
+
+test("a heartbeat whose reply never comes stops blocking later heartbeats after its bound", async () => {
+  const value = await harness();
+  try {
+    const alarms: (() => void)[] = [];
+    const time: WriterTimers = { alarm: callback => { alarms.push(callback); return () => {}; } };
+    const { writer } = await opened(value, [], time), api = writer.connection.api;
+    let calls = 0;
+    api.templateHeartbeat = () => { calls++; return new Promise(() => {}); };
+    void writer.heartbeat(); void writer.heartbeat();
+    assert.equal(calls, 1);
+    alarms.forEach(fire => fire());
+    void writer.heartbeat();
+    assert.equal(calls, 2, "the bound frees the next heartbeat");
+  } finally { await value.close(); }
+});
+
+test("taking over waits while a save outcome is unknown", async () => {
+  const value = await harness();
+  try {
+    const api = client(value, []), view = await api.templateRead(value.proof);
+    // The bootstrap of a project whose last save outcome is not yet resolved.
+    const pending: unknown = decodeJsonResponse(JSON.stringify({ ...view, canonicalReady: false }));
+    assert.ok(isWriterView(pending));
+    let abandoned = false;
+    api.templateBootstrap = () => Promise.resolve(pending);
+    api.templateAbandon = () => { abandoned = true; return Promise.reject(new Error("unexpected takeover")); };
+    const repository = new DraftRepository({ transact: work => Promise.resolve(work([]).result),
+      discardProject: () => Promise.reject(new Error("drafts must stay")) }, () => Promise.reject(new Error("unused")));
+    const result = await attachTemplateWriter(value.project, api, repository, null, true);
+    assert.equal(result?.proof, null); assert.equal(result?.error, "OUTCOME_UNKNOWN"); assert.equal(abandoned, false);
   } finally { await value.close(); }
 });

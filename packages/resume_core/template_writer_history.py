@@ -46,7 +46,8 @@ class TemplateWriterHistory:
                 raise
             self.observer('before_local_history_receipt', project)
             with self.guard(project) as (directory, state, workspace, checksum):
-                self.require(state, request.proof, recovery=True, expired=True)
+                writer = self.require(state, request.proof, recovery=True, expired=True)
+                self.keep_after_slow_request(state, writer, directory)
                 opening = registry.reconcile(self, state, workspace, directory)
                 self.preparations.committed(state, workspace, request.mutation)
                 if request.response_mode == 'prepared_delta':
@@ -111,7 +112,8 @@ class TemplateWriterHistory:
                 raise
             self.observer('before_local_history_receipt', project)
             with self.guard(project) as (directory, state, workspace, checksum):
-                self.require(state, request.proof, recovery=True, expired=True)
+                writer = self.require(state, request.proof, recovery=True, expired=True)
+                self.keep_after_slow_request(state, writer, directory)
                 opening = registry.reconcile(self, state, workspace, directory)
                 if opening is None or request.client_mutation_id not in opening.commands:
                     raise BackgroundFailure('REQUEST_EXPIRED')

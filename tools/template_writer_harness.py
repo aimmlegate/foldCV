@@ -70,7 +70,7 @@ def application(root, scenario):
     fixture = TemplateWriterFixture(root, value, sources)
     rewrites = ScriptedRewrite()
     service = SimpleNamespace(enabled=True, writers=fixture.writers, store=fixture.jobs, publisher=fixture.publisher,
-        projects=SimpleNamespace(originals=fixture.originals, artifacts={}, images={}, state_lock=threading.RLock(),
+        projects=SimpleNamespace(originals=fixture.originals, artifacts={}, images={}, image_sessions={}, state_lock=threading.RLock(),
             template_rewrite_text=rewrites.text, template_rewrite_cancel=rewrites.cancel),
         publication=SimpleNamespace(adopt=lambda *_args: None),
         # No background publication supervisor runs in this harness.
@@ -91,6 +91,18 @@ def application(root, scenario):
         saved, _duplicate = fixture.publisher.snapshot(fixture.project, digest_bytes(before), WorkspaceV7.model_validate(data),
             'metadata_harness_' + str(data['projectRevision']), originals=fixture.originals)
         return {'projectRevision': saved.project_revision}
+
+    @app.post('/harness/expire-lease')
+    async def expire_lease():
+        # The writer's lease runs out while the browser cannot reach the server.
+        fixture.writers.live.clear()
+        return {}
+
+    @app.post('/harness/restart')
+    async def restart():
+        # A service restart: in-memory leases are gone and every open writer must recover.
+        fixture.writers.recover_all()
+        return {}
 
     @app.get('/harness/rewrites')
     async def rewrite_calls():

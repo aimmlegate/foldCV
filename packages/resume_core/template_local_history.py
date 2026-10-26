@@ -12,7 +12,7 @@ from .rich_dependencies import placements
 from .rich_mutations import mutation_sha256
 from .template_inverse import inverse_template_mutation
 from .template_mutations import HistoryAuthorization
-from .template_anchors import coverage_address
+from .template_anchors import coverage_addresses
 from .models.template_mutations import AuthoredBlockHistoryDelta
 from .template_block_patches import block_delta, block_hash, restore_payload
 from .templates.compiler import canonical, sha256
@@ -28,8 +28,8 @@ def values(workspace):
         result.update({(name, item.id): item.model_dump(mode='json', by_alias=True) for item in items})
     result.update({('builtin_scope', key): value for key, value in project.facts.builtin_manual_scopes.items()})
     result.update({('tombstone', item.record_id): item.model_dump(mode='json', by_alias=True) for item in project.facts.tombstones})
-    result.update({('coverage_anchor', coverage_address(project, index)): item.model_dump(mode='json', by_alias=True)
-        for index, item in enumerate(project.import_coverage)})
+    result.update({('coverage_anchor', address): item.model_dump(mode='json', by_alias=True)
+        for address, item in zip(coverage_addresses(project), project.import_coverage, strict=True)})
     previous = None
     for row in workspace.sync_records:
         result[('sync', row.id)] = row.model_dump(mode='json', by_alias=True)
@@ -121,8 +121,8 @@ def restore(current, delta):
     result.project.facts = type(result.project.facts).model_validate(facts)
     issue_type = type(result.project.import_issues[0]) if result.project.import_issues else None
     result.project.import_issues = [issue_type.model_validate(value) for (kind, _identifier), value in restored.items() if kind == 'issue']
-    for index, item in enumerate(result.project.import_coverage):
-        retained = restored.get(('coverage_anchor', coverage_address(result.project, index)))
+    for address, item in zip(coverage_addresses(result.project), result.project.import_coverage, strict=True):
+        retained = restored.get(('coverage_anchor', address))
         if retained is None:
             raise BackgroundFailure('DEPENDENCY_CHANGED')
         item.block_ids = list(retained['blockIds'])

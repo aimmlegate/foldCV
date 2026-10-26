@@ -11,7 +11,7 @@ from packages.resume_core.template_anchors import anchor_steps, coverage_address
 from packages.resume_core.template_authoring import copy_blocks, merge_blocks, split_block
 from packages.resume_core.template_dependencies import selector
 from packages.resume_core.template_inverse import inverse_template_mutation
-from packages.resume_core.template_local_history import changes, restore
+from packages.resume_core.template_local_history import changes, restore, values
 from packages.resume_core.templates.compiler import canonical
 from tests.templates.storage_fixtures import workspace
 from tests.templates.test_transactions import authorization, issue, request
@@ -341,3 +341,22 @@ def test_unrelated_real_edit_cannot_authorize_retirement_of_preserved_block_scop
         'afterState': 'retired', 'actionId': 'human-edit', 'importedFingerprint': imported.imported_fingerprint}]
     with pytest.raises(RichMutationFailure, match='STALE_MUTATION'):
         apply_rich_mutation(before, request(before, steps))
+
+
+def test_history_values_hash_the_coverage_ledger_once(monkeypatch):
+    import packages.resume_core.template_anchors as anchors
+    before, _originals = anchored()
+    row = before.project.import_coverage[0]
+    before.project.import_coverage = [row.model_copy(deep=True) for _index in range(300)]
+    expected = [coverage_address(before.project, index) for index in range(300)]
+    calls, original = [], anchors.coverage_sequence
+    monkeypatch.setattr(anchors, 'coverage_sequence', lambda project: calls.append(1) or original(project))
+    # Hashing the whole ledger per row made every save quadratic in import coverage size.
+    keys = [key for kind, key in values(before) if kind == 'coverage_anchor']
+    assert keys == expected and len(calls) == 1
+    calls.clear()
+    assert restore(before, {}) is not None and len(calls) == 2
+    calls.clear()
+    steps = anchor_steps(before.project, {row.block_ids[0]: ['block-new']})
+    assert sum(step.target.kind == 'coverage' for step in steps) == 300 and len(calls) == 1
+

@@ -1,5 +1,6 @@
 """One resumable editor writer; lost leases do not establish a clean boundary."""
 
+from collections import Counter
 from contextlib import contextmanager
 from datetime import datetime
 import hashlib
@@ -39,6 +40,7 @@ class WriterSessions(TemplateWriterPreparation, TemplateWriterHistory, WriterDra
         self.coordinator, self.jobs, self.history = coordinator, coordinator.jobs, coordinator.history
         self.clock, self.observer = clock or coordinator.authority.clock, observer
         self.live = {}
+        self.serving_requests = Counter()
         self.local_history = TemplateLocalHistory(self.jobs)
         if not hasattr(self.jobs, 'template_preparations'):
             self.jobs.template_preparations = TemplatePreparations(self.jobs)
@@ -88,10 +90,40 @@ class WriterSessions(TemplateWriterPreparation, TemplateWriterHistory, WriterDra
             self.ensure(state, workspace)
             self.write(directory, state)
 
-    def alive(self, writer):
+    def lease_running(self, writer):
         live = self.live.get(writer.project_id)
         return (live is not None and live[:2] == (writer.epoch, writer.incarnation)
             and self.clock.now() < live[2] and not at_or_after(self.jobs.clock(), writer.lease_expires_at))
+
+    def alive(self, writer):
+        return bool(self.serving_requests[(writer.project_id, writer.epoch, writer.incarnation)]) or self.lease_running(writer)
+
+    def keep_after_slow_request(self, state, writer, directory):
+        """A request that outlasted the lease ends with it renewed while its writer is still present."""
+        if writer.status == "attached" and self.alive(writer) and not self.lease_running(writer):
+            self.renew(writer)
+            self.write(directory, state)
+
+    @contextmanager
+    def serving(self, project, proof):
+        """A proven request that arrives while its writer is alive keeps it alive until it ends.
+
+        Waiting behind a long save is server time; it must not cost the writer its lease."""
+        key = None if proof is None else (project, proof.epoch, proof.incarnation)
+        live = self.live.get(project)
+        if key is not None and not (live is not None and live[:2] == key[1:]
+                and hmac.compare_digest(live[3], secret_hash(proof.credential))
+                and (self.serving_requests[key] or self.clock.now() < live[2])):
+            key = None
+        if key is not None:
+            self.serving_requests[key] += 1
+        try:
+            yield
+        finally:
+            if key is not None:
+                self.serving_requests[key] -= 1
+                if not self.serving_requests[key]:
+                    del self.serving_requests[key]
 
     def require(self, state, proof, *, recovery=False, expired=False, detached=False):
         writer = state.writer
@@ -108,7 +140,8 @@ class WriterSessions(TemplateWriterPreparation, TemplateWriterHistory, WriterDra
 
     def renew(self, writer):
         writer.lease_expires_at = expiration(self.jobs.clock(), LIMITS.writer_lease_seconds)
-        self.live[writer.project_id] = (writer.epoch, writer.incarnation, self.clock.now() + LIMITS.writer_lease_seconds)
+        self.live[writer.project_id] = (writer.epoch, writer.incarnation, self.clock.now() + LIMITS.writer_lease_seconds,
+            writer.resume_credential_sha256)
 
     def view(self, state, workspace, checksum):
         self.local_history.opening(state)

@@ -28,15 +28,17 @@ export type TemplateEditorHandle = { background: boolean; flush: () => Promise<T
   navigate: () => Promise<void>; resume: () => Promise<void>; refresh: () => Promise<void>; undo: () => void; redo: () => void };
 
 /** The V7 editor: the same BlockNote view and controls, bound to one TemplateEditorSession. */
-export function TemplateEditor({ initial, connection, onStatus, onShown, ref, portalHost }: {
+export function TemplateEditor({ initial, connection, onStatus, onShown, ref, portalHost, takeOver }: {
   initial: TemplateProjectResponseV1; connection: AttachedTemplateWriter; onStatus: (status: string) => void;
-  onShown: (response: TemplateProjectResponseV1) => void; ref: Ref<TemplateEditorHandle>; portalHost?: HTMLElement }) {
+  onShown: (response: TemplateProjectResponseV1) => void; ref: Ref<TemplateEditorHandle>; portalHost?: HTMLElement;
+  takeOver: () => void }) {
   const project = initial.workspace.project;
   if (!project) throw new Error("Document is missing");
   const [warning, setWarning] = useState("");
   const [mode, setMode] = useState<WriterMode | null>(null);
   const [conflicts, setConflicts] = useState(0);
   const [recovering, setRecovering] = useState(false);
+  const recoveryRunning = useRef(false);
   // The verified state shown in the editor: facts and issues are read from it, never from editor content.
   const [shown, setShown] = useState(initial);
   const [factsVisible, setFactsVisible] = useState(false);
@@ -79,7 +81,6 @@ export function TemplateEditor({ initial, connection, onStatus, onShown, ref, po
     initialContent: projectTemplateDocument(project.document) }, []);
   useEffect(() => {
     session.bind(editor, project.document);
-    if (session.writer.mode === "recovering") void recover(null);
     const stop = editor.onSelectionChange(() => { session.selected(editor.transact(tr => selectionLocation(tr))); refresh(value => value + 1); });
     const heartbeat = setInterval(() => { void session.writer.heartbeat(); }, 5000);
     const suspend = () => {
@@ -105,14 +106,19 @@ export function TemplateEditor({ initial, connection, onStatus, onShown, ref, po
     navigate: () => session.writer.navigate(), resume: () => session.resume(), refresh: () => session.refresh(),
     undo: () => void session.navigate("undo"), redo: () => void session.navigate("redo") }), [session]);
   async function recover(choice: "keep" | "saved" | null) {
-    setRecovering(true);
+    if (recoveryRunning.current) return;
+    recoveryRunning.current = true; setRecovering(true);
     try {
       // The writer's own recovery first resolves any fenced head; a retained draft is then saved as corrections.
       if (!session.writer.connection.local) await session.recoverWriter();
       else setConflicts((await session.recoverDraft(choice)).conflicts);
-    } catch (error) { setWarning(errorMessage(error)); }
-    finally { setRecovering(false); }
+      // The lost-connection warning is stale once editing resumes.
+      if (session.writer.mode === "normal") setWarning("");
+    } catch (error) { if (session.writer.mode !== "read_only") setWarning(errorMessage(error)); }
+    finally { recoveryRunning.current = false; setRecovering(false); }
   }
+  // Opening in recovery, a lost heartbeat or a restarted service: try one silent recovery before asking the user.
+  useEffect(() => { if (mode === "recovering") void recover(null); }, [mode]);
   const unsupported = () => setWarning(knownErrorMessage("V7_INPUT_UNSUPPORTED") ?? "");
   function openRewrite() {
     const source = session.rewriteSource();
@@ -176,7 +182,19 @@ export function TemplateEditor({ initial, connection, onStatus, onShown, ref, po
           <p>{recovering ? "Восстанавливаем введённый текст…" : errorMessage("WRITER_RECOVERY_REQUIRED")}</p>
           {!recovering && <button type="button" onClick={() => void recover(null)}>Продолжить с сохранённого состояния</button>}
         </div>)}
-        <EditorNotices mode={mode === "recovering" ? null : mode} localDraft={false} warning={warning} clearWarning={() => setWarning("")} onOpen={() => {}}
+        {mode === "read_only" && (connection.error === "WRITER_READ_ONLY" ? <div className="notice warning" role="alert">
+          <p>Это резюме редактируется в другом окне или браузере. Здесь его можно только читать.</p>
+          <button type="button" onClick={takeOver}>Редактировать здесь</button>
+          <p>Несохранённые правки в другом окне будут потеряны.</p>
+        </div> : <div className="notice warning" role="alert">
+          <p>{errorMessage(connection.error ?? "WRITER_READ_ONLY")}</p>
+          {connection.error !== "OUTCOME_UNKNOWN" && <>
+            <button type="button" onClick={takeOver}>Продолжить с сохранённого состояния</button>
+            <p>Несохранённый черновик этого резюме в браузере будет удалён.</p>
+          </>}
+        </div>)}
+        {/* The V1 draft choices do not apply to V7; read-only and recovery have their own notices above. */}
+        <EditorNotices mode={mode === "recovering" || mode === "read_only" ? null : mode} localDraft={false} warning={warning} clearWarning={() => setWarning("")} onOpen={() => {}}
           resolveDraft={() => Promise.reject(new Error("DRAFT_RECOVERY_REQUIRED"))} syncRecords={[]}
           resolve={() => Promise.resolve()} retry={() => Promise.resolve()} dismiss={() => Promise.resolve()} report={setWarning} />
         {(state.kind === "conflict" || state.kind === "rejected") && <div className="notice warning" role="alert">

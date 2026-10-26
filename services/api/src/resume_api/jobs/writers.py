@@ -18,6 +18,11 @@ from packages.resume_core.models.template_writer import (WriterAdvanceV2, Writer
 def mount_writers(app, service):
     prefix = "/v1/rich/projects/{project_id}/writer"
 
+    def serving(project, payload):
+        # Proven writer requests keep the lease while they wait behind other work on this server.
+        proof = payload if isinstance(payload, WriterProofV1) else getattr(payload, "proof", None)
+        return service.writers.serving(project, proof)
+
     async def call(project, method, payload=None):
         if not service.enabled:
             raise BackgroundFailure("JOB_DISABLED")
@@ -34,7 +39,8 @@ def mount_writers(app, service):
                     return result
             result = await asyncio.to_thread(abandon)
         else:
-            result = await asyncio.to_thread(function, project, *([] if payload is None else [payload]))
+            with serving(project, payload):
+                result = await asyncio.to_thread(function, project, *([] if payload is None else [payload]))
         if method in {"detach", "abandon", "restore_saved_draft", "discard_draft", "pending_input_draft", "reconcile"}:
             service.wake_publication(project)
         return wire_response(result)
@@ -127,7 +133,8 @@ def mount_writers(app, service):
             with service.projects.state_lock:
                 service.publication.adopt(project_id, view.workspace, view.workspace_sha256)
             return view
-        result = await asyncio.to_thread(commit)
+        with serving(project_id, payload):
+            result = await asyncio.to_thread(commit)
         return wire_response(result)
 
     @app.post(prefix + "/history/offer")
@@ -152,7 +159,8 @@ def mount_writers(app, service):
             with service.projects.state_lock:
                 service.publication.adopt(project_id, result.view.workspace, result.view.workspace_sha256)
             return result
-        result = await asyncio.to_thread(commit)
+        with serving(project_id, payload):
+            result = await asyncio.to_thread(commit)
         job = service.store.read(project_id, payload.job_id)
         await service.supervisor._emit(job)
         return wire_response(result)
@@ -169,7 +177,8 @@ def mount_writers(app, service):
                     if isinstance(payload, WriterMutationV2) and payload.response_mode == 'prepared_delta' else view)
                 service.publication.adopt(project_id, current.workspace, current.workspace_sha256)
             return view
-        result = await asyncio.to_thread(commit)
+        with serving(project_id, payload):
+            result = await asyncio.to_thread(commit)
         return wire_response(result)
 
     @app.post(prefix + '/prepare')
@@ -218,7 +227,8 @@ def mount_writers(app, service):
             with service.projects.state_lock:
                 service.publication.adopt(project_id, view.workspace, view.workspace_sha256)
             return view
-        result = await asyncio.to_thread(commit)
+        with serving(project_id, payload):
+            result = await asyncio.to_thread(commit)
         return wire_response(result)
 
     @app.post(prefix + "/publish")

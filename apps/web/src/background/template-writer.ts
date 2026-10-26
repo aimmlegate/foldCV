@@ -57,7 +57,8 @@ export class TemplateBackgroundWriter extends WriterLifecycle {
   private sequence: number;
   private readonly writes = new Set<Promise<void>>();
   private draftSource: () => TemplateDraftQueue | null = () => null;
-  private readonly saves = new WeakMap<BoundTemplatePreparation, { header: JsonWireNode; opening: PreparedSaveOpening; proof: WriterProofV1 }>();
+  private saves = new WeakMap<BoundTemplatePreparation, { header: JsonWireNode; opening: PreparedSaveOpening; proof: WriterProofV1 }>();
+  private beating: object | null = null;
   constructor(readonly connection: AttachedTemplateWriter, private readonly port: TemplateWriterPort, time = timers,
     observe: WriterObserver = () => Promise.resolve()) {
     super(time, observe);
@@ -141,6 +142,42 @@ export class TemplateBackgroundWriter extends WriterLifecycle {
   /** Leave recovery: a server draft ends with pending_input, otherwise the writer reconciles; the queue starts from the read state. */
   async reattach(): Promise<void> {
     if (this.mode !== "recovering") return;
+    try { await this.reattachOnce(); }
+    catch (error) {
+      // An expired lease or a service restart leaves this proof unable to reconcile; the same session opens again once.
+      if (!(error instanceof RichApiFailure) || error.code !== "WRITER_UNKNOWN") throw error;
+      try { await this.reopen(); }
+      catch (reopenError) {
+        // Another session took this resume over: this one only reads until the user takes it back.
+        if (reopenError instanceof RichApiFailure && reopenError.code === "WRITER_UNKNOWN") {
+          ++this.operation; this.connection.proof = null; this.connection.error = "WRITER_READ_ONLY";
+          this.port.lock(true); this.setMode("read_only");
+        }
+        throw reopenError;
+      }
+      await this.reattachOnce();
+    }
+  }
+  private async reopen(): Promise<void> {
+    const old = this.proof, ticket = this.operation;
+    const view = await this.connection.api.templateOpen({ schemaVersion: 1, sessionId: old.sessionId, incarnation: crypto.randomUUID(),
+      credential: old.credential, previousEpoch: old.epoch, previousIncarnation: old.incarnation,
+      canonicalRevision: this.latest.revision, canonicalSha256: this.latest.sha256,
+      actionCursor: this.cursor, draftSequence: this.local?.sequence ?? 0 });
+    if (this.connection.proof !== old || this.operation !== ticket) throw new Error("WRITER_STALE_CALLBACK");
+    const proof: WriterProofV1 = { schemaVersion: 1, lineage: view.writer.lineage, epoch: view.writer.epoch,
+      sessionId: view.writer.sessionId, incarnation: view.writer.incarnation, credential: old.credential };
+    if (this.local) {
+      const replacement = { ...this.local, incarnation: proof.incarnation };
+      await this.connection.repository.replaceOwner(this.local, replacement);
+      this.local = replacement;
+    }
+    this.connection.proof = proof;
+    // Retained save headers name the old incarnation; the fenced head was resolved before recovery reached here.
+    this.saves = new WeakMap();
+    retainResume(this.connection.api.project, proof, view, this.cursor, this.local?.sequence ?? 0);
+  }
+  private async reattachOnce(): Promise<void> {
     const proof = this.proof, ticket = this.operation, read = await this.connection.api.templateRead(proof);
     if (this.connection.proof !== proof || this.operation !== ticket || !this.adoptView(read)) throw new Error("WRITER_STALE_CALLBACK");
     this.touches = this.touches.filter(touch => touch.cursor > read.writer.acknowledgedCursor);
@@ -157,6 +194,8 @@ export class TemplateBackgroundWriter extends WriterLifecycle {
         view = await this.connection.api.templateReconcile(this.headerValue(this.latest));
       }
     }
+    // An attached writer may still have lost its lease; confirm it before input resumes.
+    else view = await this.connection.api.templateHeartbeat(proof);
     if (this.connection.proof !== proof || this.operation !== ticket || !this.adoptView(view)) throw new Error("WRITER_STALE_CALLBACK");
     this.cursor = Math.max(this.cursor, view.writer.acknowledgedCursor);
     const template = this.requireQueue().template;
@@ -275,10 +314,15 @@ export class TemplateBackgroundWriter extends WriterLifecycle {
     await this.observe("touch_watermark_durable");
   }
   async heartbeat(): Promise<void> {
-    if (this.mode !== "normal") return;
-    const proof = this.proof;
+    // One heartbeat at a time: each holds the server writer lock, so overlapping ones only queue behind a slow save.
+    if (this.mode !== "normal" || this.beating) return;
+    const beat = {}, proof = this.proof;
+    this.beating = beat;
+    // A reply that never comes must not stop later heartbeats for good.
+    const release = this.time.alarm(() => { if (this.beating === beat) this.beating = null; }, 30_000);
     try { await this.connection.api.templateHeartbeat(proof); }
     catch (error) { if (this.connection.proof === proof) this.enterRecovery(error); }
+    finally { release(); if (this.beating === beat) this.beating = null; }
   }
   /** Drain, then one server Undo/Redo for the action at the cursor; its verified state becomes the queue base. */
   history(direction: "undo" | "redo", originActionId: string, actionGeneration: number): Promise<WriterViewV2> {

@@ -187,6 +187,21 @@ export function useResumeWorkspace() {
       } finally { reads.current.cancelSelection(capture); }
     }, "Открываем резюме");
   }
+  /** Edit the open template resume here: another session's writer is replaced and editing starts from the saved state. */
+  async function takeOver() {
+    const id = activeProject.current;
+    if (!id || !template) return false;
+    return action(async current => {
+      const capture = reads.current.beginSelection(id);
+      try {
+        const connection = await attachExclusiveTemplateWriter(id, true);
+        if (!connection || !current() || !reads.current.selectionCurrent(capture)) return;
+        const catalog = await listProjects();
+        if (!current() || !reads.current.selectionCurrent(capture)) return;
+        show({ kind: "template", next: connection.view.response, connection, catalog }, capture);
+      } finally { reads.current.cancelSelection(capture); }
+    }, "Открываем редактирование");
+  }
   async function remove(id: string) {
     return action(async current => {
       if (activeProject.current === id) await leave(current);
@@ -412,5 +427,5 @@ export function useResumeWorkspace() {
     }, "Сохраняем изменения перед скачиванием");
   }
   return { templateImport, strictImport, setStrictImport, response, template, templateEditor, acknowledgeTemplate, writer, background, openingEpoch: opening?.selectionEpoch ?? 0, projects, input, setInput, textDraft, allowTextRewrite, setAllowTextRewrite, error, status, setStatus, busy, operation, loading, settings, setSettings,
-    editor, assistant, acknowledge, action, fresh, open, remove, archive, projectLifecycle, process, upload, exportFile, dismissError };
+    editor, assistant, acknowledge, action, fresh, open, takeOver, remove, archive, projectLifecycle, process, upload, exportFile, dismissError };
 }

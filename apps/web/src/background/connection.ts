@@ -105,18 +105,32 @@ export type TemplateLocalDraft = { record: LocalDraft; payload: DraftPayloadV2 }
 export type AttachedTemplateWriter = { api: TemplateWriterTransport; proof: WriterProofV1 | null; view: WriterViewV2;
   viewWire: JsonWireNode; repository: DraftRepository; local: TemplateLocalDraft | null; error: string | null };
 
-export function attachExclusiveTemplateWriter(project: string): Promise<AttachedTemplateWriter | null> {
-  return attachTemplateWriter(project, new WriterApi(project), draftRepository(project), applicationTabActive);
+export function attachExclusiveTemplateWriter(project: string, takeOver = false): Promise<AttachedTemplateWriter | null> {
+  return attachTemplateWriter(project, new WriterApi(project), draftRepository(project), applicationTabActive, takeOver);
 }
 
+/** `takeOver` replaces another session's writer: this browser continues from the saved state and drops its stale drafts. */
 export async function attachTemplateWriter(project: string, api: TemplateWriterTransport = new WriterApi(project),
-  repository = draftRepository(project), exclusiveTab: (() => boolean) | null = null): Promise<AttachedTemplateWriter | null> {
+  repository = draftRepository(project), exclusiveTab: (() => boolean) | null = null, takeOver = false): Promise<AttachedTemplateWriter | null> {
   const requireTab = () => { if (exclusiveTab && !exclusiveTab()) throw new Error("TAB_LOCK_REQUIRED"); };
   requireTab();
   let bootstrap: WriterViewV2;
   try { bootstrap = await api.templateBootstrap(); }
   catch (error) { if (error instanceof RichApiFailure && error.code === "JOB_DISABLED") return null; throw error; }
   requireTab();
+  // An unknown save outcome must be resolved first: taking over then would drop text that may still be unsaved.
+  if (takeOver && bootstrap.canonicalReady) {
+    const credential = crypto.randomUUID() + crypto.randomUUID();
+    // The other session's server drafts go with it, as the takeover notice says.
+    const view = await api.templateAbandon({ schemaVersion: 1, sessionId: crypto.randomUUID(), incarnation: crypto.randomUUID(), credential,
+      canonicalRevision: bootstrap.response.workspace.projectRevision, canonicalSha256: bootstrap.workspaceSha256,
+      discardDrafts: bootstrap.drafts.map(draft => draft.id) });
+    const proof: WriterProofV1 = { schemaVersion: 1, lineage: view.writer.lineage, epoch: view.writer.epoch,
+      sessionId: view.writer.sessionId, incarnation: view.writer.incarnation, credential };
+    await repository.discardProject(project);
+    retainResume(project, proof, view, view.writer.acknowledgedCursor, 0);
+    return { api, proof, view, viewWire: jsonResponseWire(view), repository, local: null, error: null };
+  }
   let previous: Resume | null = null, local: TemplateLocalDraft | null = null;
   const readOnly = (view: WriterViewV2, error: string): AttachedTemplateWriter =>
     ({ api, proof: null, view, viewWire: jsonResponseWire(view), repository, local, error });

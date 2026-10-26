@@ -61,12 +61,13 @@ def inverse_template_mutation(before, after, *, origin_action_id, mutation_id, s
         if old_builtin.get(identifier) != new_builtin.get(identifier):
             steps.append({'kind': 'set_builtin_manual_scope', 'cellId': identifier,
                 'beforeScopeId': new_builtin.get(identifier), 'afterScopeId': old_builtin.get(identifier)})
-    if coverage_sequence(before.project) != coverage_sequence(after.project):
+    sequence = coverage_sequence(after.project)
+    if coverage_sequence(before.project) != sequence:
         raise ValueError('history cannot replace immutable coverage sequence')
     for index, old in enumerate(before.project.import_coverage):
         current = after.project.import_coverage[index]
         if old.block_ids != current.block_ids:
-            steps.append({'kind': 'set_authored_anchors', 'target': coverage_target(after.project, index).model_dump(by_alias=True),
+            steps.append({'kind': 'set_authored_anchors', 'target': coverage_target(after.project, index, sequence).model_dump(by_alias=True),
                 'beforeBlockIds': current.block_ids, 'afterBlockIds': old.block_ids})
     current_issues = {issue.id: issue for issue in after.project.import_issues}
     for issue in before.project.import_issues:

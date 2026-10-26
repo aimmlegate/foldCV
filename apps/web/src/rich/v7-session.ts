@@ -134,7 +134,8 @@ export class TemplateEditorSession {
   /** Explicit continuation after a writer fault: resolve any fenced head from the durable record, then show it. */
   async recoverWriter(): Promise<void> {
     try { await this.writer.recover(); await this.reproject(); this.schedule(); }
-    catch (error) { this.port.warning(errorMessage(error)); }
+    // A writer that became read-only shows its own notice.
+    catch (error) { if (this.writer.mode !== "read_only") this.port.warning(errorMessage(error)); }
   }
 
   /** Back from a clean detach (settings): reattach the same session and show the verified state. */

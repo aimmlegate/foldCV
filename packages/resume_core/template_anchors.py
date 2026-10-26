@@ -14,9 +14,15 @@ def coverage_sequence(project):
     return sha256(canonical([coverage_identity(value) for value in project.import_coverage]))
 
 
-def coverage_address(project, index):
+def coverage_address(project, index, sequence=None):
     return canonical([index, sha256(canonical(coverage_identity(project.import_coverage[index]))),
-        coverage_sequence(project)]).decode()
+        sequence or coverage_sequence(project)]).decode()
+
+
+def coverage_addresses(project):
+    # The sequence hash covers the whole ledger; hashing it per entry made saves quadratic in coverage size.
+    sequence = coverage_sequence(project)
+    return [coverage_address(project, index, sequence) for index in range(len(project.import_coverage))]
 
 
 def coverage_at(project, address):
@@ -30,10 +36,10 @@ def coverage_at(project, address):
         return None
 
 
-def coverage_target(project, index):
+def coverage_target(project, index, sequence=None):
     return CoverageAnchorTarget(kind='coverage', coverageIndex=index,
         coverageIdentityHash=sha256(canonical(coverage_identity(project.import_coverage[index]))),
-        coverageSequenceHash=coverage_sequence(project))
+        coverageSequenceHash=sequence or coverage_sequence(project))
 
 
 def issue_target(issue):
@@ -45,6 +51,7 @@ def apply_anchor_steps(project, request, before):
     seen, live = set(), {block.id for block in project.document.blocks()}
     original_issues = {issue.id: issue for issue in before.import_issues}
     current_issues = {issue.id: issue for issue in project.import_issues}
+    sequence = None
     for step in request.steps:
         if not isinstance(step, SetAuthoredAnchors):
             continue
@@ -57,8 +64,9 @@ def apply_anchor_steps(project, request, before):
             current = current_issues[target.issue_id]
         else:
             key = ('coverage', target.coverage_index)
+            sequence = sequence or coverage_sequence(before)
             if (target.coverage_index >= len(before.import_coverage)
-                    or coverage_target(before, target.coverage_index) != target):
+                    or coverage_target(before, target.coverage_index, sequence) != target):
                 raise ValueError('stale coverage anchor identity or sequence')
             old = before.import_coverage[target.coverage_index]
             current = project.import_coverage[target.coverage_index]
@@ -77,7 +85,8 @@ def anchor_steps(before, replacements):
                     result.append(replacement)
         return result
     steps = []
-    targets = [(coverage_target(before, index), value) for index, value in enumerate(before.import_coverage)]
+    sequence = coverage_sequence(before)
+    targets = [(coverage_target(before, index, sequence), value) for index, value in enumerate(before.import_coverage)]
     targets += [(issue_target(issue), issue) for issue in before.import_issues]
     for target, value in targets:
         after = mapped(value.block_ids)
