@@ -23,7 +23,7 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path[:0] = [str(ROOT), str(ROOT / 'services/api/src')]
 LEDGER = ROOT / 'docs/gui/handoffs/CONFIGURABLE-TEMPLATES/ct06-live-ledger.json'
 PROFILE = Path.home() / 'Library/Application Support/FoldCV/cli-experiment'
-MODELS = {'gpt-6.1-sol', 'gpt-6-luna'}
+MODELS = {'gpt-6.1-sol', 'gpt-6-luna', 'gpt-5.6-terra'}
 TERMINAL = {'completed', 'failed', 'cancelled', 'interrupted'}
 FAILURES_IN_A_ROW = 3
 
@@ -60,19 +60,21 @@ class Ledger:
         temporary.write_text(json.dumps(ledger, ensure_ascii=False, indent=1) + '\n')
         os.replace(temporary, self.path)
 
-    def charge(self, model, label, source_sha256, root, concurrency=1):
+    def charge(self, model, label, source_sha256, root, concurrency=1, allowance=None):
         with self.lock():
             ledger = self.read()
             # D100: after three failed runs in a row the work stops and is reported instead of trying again.
-            recent = [run['status'] for run in ledger['runs'] if run.get('decision') in {'D100', 'D101', 'CT10'}][-FAILURES_IN_A_ROW:]
+            recent = [run['status'] for run in ledger['runs'] if run.get('decision') in {'D100', 'D101', 'CT10', 'D104'}][-FAILURES_IN_A_ROW:]
             if len(recent) == FAILURES_IN_A_ROW and 'saved' not in recent:
                 raise SystemExit('three failed runs in a row: stop and report')
             # D101 (2026-10-25): three full imports; CT10 parallel runs have their own allowance. Each run is charged
             # here before any model call.
             decision, key = ('CT10', 'ct10') if concurrency > 1 else ('D101', 'd101')
+            if allowance is not None:
+                decision, key = allowance.upper(), allowance
             budget = ledger.get(key)
-            if budget is None and key == 'ct10':
-                raise SystemExit('a parallel run needs the ct10 allowance in the ledger')
+            if budget is None and (key == 'ct10' or allowance is not None):
+                raise SystemExit('the %s allowance is missing from the ledger' % key)
             if budget is not None:
                 if budget['runsSpent'] >= budget['runCap']:
                     raise SystemExit('%s run cap reached: %d of %d' % (decision, budget['runsSpent'], budget['runCap']))
@@ -155,7 +157,7 @@ async def main(args):
     atomic_write(data / 'preferences.json', json.dumps({'schemaVersion': 1, 'selectedModel': args.model,
         'selectedImportModel': args.model, 'automaticAnalysis': False, 'theme': 'system'}).encode())
     ledger = Ledger(LEDGER)
-    run_id = ledger.charge(args.model, args.label, hashlib.sha256(raw).hexdigest(), root, args.concurrency)
+    run_id = ledger.charge(args.model, args.label, hashlib.sha256(raw).hexdigest(), root, args.concurrency, args.allowance)
     record_dispatches(ledger, run_id, evidence)
     origin, secret = 'http://127.0.0.1:39301', secrets.token_urlsafe(32)
     wrapped = create_app(origin=origin, secret=secret, temp_root=root / 'operations', dist=dist,
@@ -184,7 +186,8 @@ async def main(args):
                 # A failed job has no outcome (LIVE-04 polled one until stopped by hand); a completed job attaches its
                 # outcome just after it ends (LIVE-05 left before it), so only that case waits a little longer.
                 ended = None
-                while job.get('templateOutcome') is None:
+                # A refused start (D104: the account quota ran out) answers with a problem, not a job.
+                while 'id' in job and job.get('templateOutcome') is None:
                     if job.get('execution') in TERMINAL - {'completed'}:
                         break
                     if job.get('execution') == 'completed':
@@ -194,8 +197,8 @@ async def main(args):
                     await asyncio.sleep(2)
                     job = (await client.post(f'/v1/rich/projects/{project}/jobs/{job["id"]}/read', json={})).json()
                 timings['importSeconds'] = round(time.monotonic() - started, 2)
-                outcome = job.get('templateOutcome') or {'state': 'job_' + str(job.get('execution')),
-                    'errorCode': (job.get('error') or {}).get('code')}
+                outcome = (job.get('templateOutcome') or {'state': 'job_' + str(job.get('execution')),
+                    'errorCode': (job.get('error') or {}).get('code')}) if 'id' in job else {'state': 'refused', 'errorCode': (job.get('error') or {}).get('code') or job.get('code')}
                 workspace = service.storage.read_committed(project)[0]
                 if outcome and outcome['state'] == 'saved':
                     started = time.monotonic()
@@ -205,7 +208,14 @@ async def main(args):
                     if exported.status_code == 200:
                         atomic_write(root / 'output.docx', exported.content)
                     timings['exportStatus'] = exported.status_code
-                summary = summarize(durable(service, project), service.storage.projects / project / 'workspace.json')
+                if outcome and outcome['state'] == 'saved':
+                    # The replies the browser reads to open the resume; the client checks run on them afterwards.
+                    for name, path in (('project', f'/v1/rich/projects/{project}'), ('writer', f'/v1/rich/projects/{project}/writer')):
+                        reply = await client.get(path)
+                        timings[name + 'OpenStatus'] = reply.status_code
+                        atomic_write(root / f'open-{name}.json', reply.content)
+                summary = (summarize(durable(service, project), service.storage.projects / project / 'workspace.json')
+                    if 'id' in job else {'workspaceBytes': None, 'errorCodes': {}, 'calls': [], 'counts': {'calls': 0}})
     finally:
         await jobs.shutdown()
         service.request_shutdown()
@@ -341,9 +351,10 @@ if __name__ == '__main__':
     parser.add_argument('--root', type=Path, required=True)
     parser.add_argument('--model')
     parser.add_argument('--source', type=Path)
-    parser.add_argument('--label', choices=['CV-A', 'CV-B', 'CV-C'])
+    parser.add_argument('--label', choices=['CV-A', 'CV-B', 'CV-C', 'CV-D', 'CV-E'])
     parser.add_argument('--call-cap', type=int, default=60)
     parser.add_argument('--concurrency', type=int, default=1, help='independent blocks in flight at once (CT10)')
+    parser.add_argument('--allowance', help='ledger allowance key to charge, such as d104')
     parser.add_argument('--keep-wording', action='store_true')
     parser.add_argument('--finish', action='store_true', help='summarize and export an existing root; no model call')
     arguments = parser.parse_args()
