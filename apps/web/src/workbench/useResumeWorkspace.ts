@@ -33,7 +33,7 @@ export function useResumeWorkspace() {
   const [allowTextRewrite, setAllowTextRewrite] = useState(true);
   // Strict template import is opt-in and shown only when the service offers it.
   const [templateImport, setTemplateImport] = useState<TemplateImportPackage | null>(null);
-  const [strictImport, setStrictImport] = useState(false);
+  const [strictImport, setStrictImport] = useState(true);
   function setInput(next: ResumeInput) { storeInput(next); if (next.kind === "text") setTextDraft(next.text); }
   const [error, setError] = useState("");
   const dismissError = useCallback(() => setError(""), []);
@@ -222,12 +222,18 @@ export function useResumeWorkspace() {
       reads.current.cancelSelection(capture);
     });
     void listProjects().then(next => { if (alive) setProjects(next); }).catch(error => { if (alive) setError(label(error)); });
-    void templateImportStatus().then(value => { if (alive) setTemplateImport(value); }).catch(() => { if (alive) setTemplateImport(null); });
     return () => {
       alive = false;
       if (lifetime.current === owner) { lifetime.current = null; acting.current = null; reads.current.clear(); }
     };
   }, [adopt]);
+  // Read again after Settings close: a saved template changes the package that new imports name and use.
+  useEffect(() => {
+    if (settings) return;
+    let alive = true;
+    void templateImportStatus().then(value => { if (alive) setTemplateImport(value); }).catch(() => { if (alive) setTemplateImport(null); });
+    return () => { alive = false; };
+  }, [settings]);
   const generation = response?.generation;
   const creating = generation !== null && generation !== undefined && ["queued", "running"].includes(generation.status);
   useEffect(() => {

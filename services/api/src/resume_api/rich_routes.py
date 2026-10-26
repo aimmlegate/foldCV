@@ -12,6 +12,7 @@ from packages.resume_core.models.template_mutations import TemplateMutationV1
 from packages.resume_core.models.template_render import TemplateExportRequestV1
 from packages.resume_core.models.contracts import Id, Wire
 from packages.resume_core.project_limits import ARCHIVE_BYTES
+from packages.resume_core.storage import StorageFailure
 from packages.resume_core.rendering.template import RenderFailure
 from .contracts import EmptyRequest
 from .extracting import UploadFailure, parse_one_part
@@ -20,6 +21,7 @@ from .rich_assets import ImageSessionRequest, ImageUploadCapture
 from .rewrite_timing import rewrite_timing
 from .original_sources import mount_original_sources
 from .template_responses import wire_response
+from .template_config import TemplateConfig, TemplateConfigRequest
 from packages.resume_core.rich_sync import RichCompletionRequest, RichRewriteRequest, RichSyncDisposition
 from packages.resume_core.text_rewrite import RichRewriteEditRequest
 from packages.resume_core.rich_panel import RichPanelRequest, RichPanelSyncRequest
@@ -67,6 +69,36 @@ def mount_rich_projects(app, service, problem):
     @app.get("/v1/rich/template-import")
     async def template_import_status():
         return JSONResponse(service.template_import_status(), headers={"Cache-Control": "no-store"})
+
+    # Settings: the YAML of the active template for new imports. Projects keep the package they captured.
+    def template_config():
+        return TemplateConfig(service.storage.root)
+
+    def config_reply(body, status=200):
+        return JSONResponse(body, status_code=status, headers={"Cache-Control": "no-store"})
+
+    @app.get("/v1/rich/template-config")
+    async def template_config_read():
+        return config_reply(await asyncio.to_thread(template_config().read))
+
+    @app.post("/v1/rich/template-config/check")
+    async def template_config_check(payload: TemplateConfigRequest):
+        return config_reply(await asyncio.to_thread(template_config().check, payload.text))
+
+    @app.put("/v1/rich/template-config")
+    async def template_config_save(payload: TemplateConfigRequest):
+        try:
+            saved, refused = await asyncio.to_thread(template_config().save, payload.text)
+        except StorageFailure:
+            return problem("SAVE_FAILED", 500, "template", True)
+        return config_reply(refused, 422) if refused is not None else config_reply(saved)
+
+    @app.post("/v1/rich/template-config/reset")
+    async def template_config_reset(_payload: EmptyRequest):
+        try:
+            return config_reply(await asyncio.to_thread(template_config().reset))
+        except StorageFailure:
+            return problem("SAVE_FAILED", 500, "template", True)
 
     @app.post(prefix + "/template-input")
     async def template_source(request: Request):

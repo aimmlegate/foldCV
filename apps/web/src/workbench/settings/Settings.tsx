@@ -1,5 +1,5 @@
 import { errorMessage } from "../../errors/messages";
-import { useEffect, useState } from "react";
+import { lazy, Suspense, useCallback, useEffect, useState } from "react";
 import { ConnectionWorkflow, type ConnectionView } from "../../connection/workflow";
 import { AgentBrowserApi } from "../../assistant/api";
 import { preferencesRequest, rulesRequest, saveRulesRequest, saveImportModelRequest, saveFallbackModelRequest, saveLimitsRequest, saveRewriteReasoningRequest } from "../../api/client";
@@ -10,10 +10,18 @@ import { ReasoningSelect } from "./ReasoningSelect";
 import { Button } from "../ui/Button";
 import { OperationStatus } from "../ui/OperationStatus";
 import type { PaneOrder } from "./interface";
+import { Dialog } from "../ui/Dialog";
 
+// Loaded on first visit: the YAML parser and Monaco stay out of the startup bundle.
+const TemplateSettings = lazy(() => import("./template/TemplateSettings"));
 const partNames: Record<SettingsPart, string> = { reasoning: "reasoning правки текста", model: "модель обработки", import: "модель импорта", fallback: "резервная модель импорта", analysis: "проверка изменений", limits: "лимиты", assistant: "помощник", rules: "правила" };
 export function Settings({ close, connectionChanged, paneOrder, changePaneOrder }: { close: () => void; connectionChanged: (view: ConnectionView) => void; paneOrder: PaneOrder; changePaneOrder: (order: PaneOrder) => void }) {
-  const [section, setSection] = useState<"model" | "rules" | "analysis" | "limits" | "interface">("model");
+  const [section, setSection] = useState<"model" | "rules" | "analysis" | "limits" | "template" | "interface">("model");
+  // The template editor stays mounted after its first visit so switching sections keeps unsaved YAML.
+  const [templateOpened, setTemplateOpened] = useState(false), [templateDirty, setTemplateDirty] = useState(false);
+  const [confirmClose, setConfirmClose] = useState(false);
+  const templateDirtyChange = useCallback((dirty: boolean) => setTemplateDirty(dirty), []);
+  const leave = () => { if (templateDirty) setConfirmClose(true); else close(); };
   const [view, setView] = useState<ConnectionView>(() => new ConnectionWorkflow(() => {}).view);
   const [workflow] = useState(() => new ConnectionWorkflow(value => { setView(value); connectionChanged(value); }));
   const [state, setState] = useState<SettingsState | null>(null);
@@ -32,19 +40,20 @@ export function Settings({ close, connectionChanged, paneOrder, changePaneOrder 
   useEffect(() => { void controller.load(); void workflow.peek(); return () => { controller.close(); workflow.close(); }; }, [controller, workflow]);
   const current = state ?? controller.state, dirty = controller.dirty.length > 0, busy = current.loading || current.saving;
   return <section className="settings-screen" aria-label="Настройки">
-    <div className="settings-title"><button className="text-button" disabled={current.saving} onClick={close}>← Вернуться к резюме</button></div>
+    <div className="settings-title"><button className="text-button" disabled={current.saving} onClick={leave}>← Вернуться к резюме</button></div>
     <div className="settings-layout"><nav className="settings-nav" aria-label="Разделы настроек">
-      {(["model", "rules", "analysis", "limits", "interface"] as const).map(value => <button key={value} data-settings={value} className={section === value ? "active" : ""}
-        aria-current={section === value ? "page" : undefined} onClick={() => setSection(value)}>
-        {value === "model" ? "Модель и подключение" : value === "rules" ? "Общие правила и команды" : value === "interface" ? "Интерфейс" : value === "limits" ? "Лимиты" : "Проверка изменений"}
+      {(["model", "rules", "analysis", "limits", "template", "interface"] as const).map(value => <button key={value} data-settings={value} className={section === value ? "active" : ""}
+        aria-current={section === value ? "page" : undefined} onClick={() => { setSection(value); if (value === "template") setTemplateOpened(true); }}>
+        {value === "model" ? "Модель и подключение" : value === "rules" ? "Общие правила и команды" : value === "interface" ? "Интерфейс" : value === "limits" ? "Лимиты" : value === "template" ? "Шаблон резюме" : "Проверка изменений"}
       </button>)}
     </nav><div className="settings-content">
-      <div className="settings-feedback">
+      {templateOpened && <div hidden={section !== "template"}><Suspense fallback={<OperationStatus label="Загружаем шаблон" />}><TemplateSettings dirtyChange={templateDirtyChange} /></Suspense></div>}
+      {section !== "template" && <div className="settings-feedback">
         {current.loading && <OperationStatus label="Загружаем настройки" detail="Подключение, модели и сохранённые правила." timed />}
         {current.saved.length > 0 && <OperationStatus state="success" label={`Сохранено: ${current.saved.map(part => partNames[part]).join(", ")}.`} />}
         {current.message && <p className="notice" role="status">{current.message}</p>}
         {Object.entries(current.errors).map(([part, error]) => <p className="notice error" role="alert" key={part}>{partNames[part as SettingsPart]}: {errorMessage(error)}</p>)}
-      </div>
+      </div>}
       {section === "model" && <><Connection view={view} workflow={workflow} model={current.draft.model} change={value => controller.change("model", value)} disabled={current.saving} selectionDisabled={!current.preferences} />
         <ReasoningSelect value={current.draft.reasoning} metadata={view.snapshot.modelReasoning?.[current.draft.model ?? ""]}
           disabled={busy || !current.preferences || view.pending || !view.snapshot.metadataReady || !current.draft.model}
@@ -97,11 +106,16 @@ export function Settings({ close, connectionChanged, paneOrder, changePaneOrder 
           <option value="original-first">Оригинал слева, макет справа</option>
         </select><p>Настройка сохраняется сразу на этом устройстве.</p>
       </>}
-      {section !== "interface" && !controller.ready && !current.loading && <Button className="small" onClick={() => void controller.load()}>Повторить загрузку настроек</Button>}
-      {section !== "interface" && <div className="settings-actions"><Button variant="primary" busy={current.saving} busyLabel="Сохраняем…" disabled={!dirty || current.loading || view.pending} onClick={() => void controller.save()}>Сохранить изменения</Button>
+      {section !== "interface" && section !== "template" && !controller.ready && !current.loading && <Button className="small" onClick={() => void controller.load()}>Повторить загрузку настроек</Button>}
+      {section !== "interface" && section !== "template" && <div className="settings-actions"><Button variant="primary" busy={current.saving} busyLabel="Сохраняем…" disabled={!dirty || current.loading || view.pending} onClick={() => void controller.save()}>Сохранить изменения</Button>
         <Button variant="quiet" disabled={!dirty || busy} onClick={() => controller.cancel()}>Отмена</Button>
         <span className="settings-saved" role="status">{current.saving ? "Сохраняем по разделам…" : dirty ? "Есть несохранённые изменения" : current.staleRules ? "Нужно обновить правила" : controller.ready ? "Изменения сохранены" : "Не все настройки доступны"}</span>
       </div>}
     </div></div>
+    <Dialog open={confirmClose} close={() => setConfirmClose(false)} title="Выйти без сохранения шаблона?">
+      <p className="dialog-copy">Правки шаблона не сохранены и пропадут.</p>
+      <div className="dialog-actions"><Button variant="quiet" onClick={() => setConfirmClose(false)}>Остаться</Button>
+        <Button variant="danger" onClick={() => { setConfirmClose(false); close(); }}>Выйти без сохранения</Button></div>
+    </Dialog>
   </section>;
 }

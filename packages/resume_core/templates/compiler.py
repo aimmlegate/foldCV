@@ -127,7 +127,8 @@ def compile_template(path: Path) -> TemplatePackage:
     return compile_bytes(raw, path.parent, original_format="json" if path.suffix.lower() == ".json" else "yaml")
 
 
-def compile_bytes(raw: bytes, root: Path, *, original_format="yaml") -> TemplatePackage:
+def compile_bytes(raw: bytes, root: Path, *, original_format="yaml", assets=None) -> TemplatePackage:
+    """`assets` maps an asset path to bytes captured earlier (an edited active package); other paths read from `root`."""
     try:
         definition = TemplateDefinition.model_validate(load_declared_definition(raw,original_format))
     except ValidationError as error:
@@ -140,7 +141,11 @@ def compile_bytes(raw: bytes, root: Path, *, original_format="yaml") -> Template
     captured = []
     total = 0
     for asset in definition.assets:
-        blob = asset_path(root, asset.path).read_bytes()
+        blob = assets.get(asset.path) if assets is not None else None
+        if blob is None:
+            blob = asset_path(root, asset.path).read_bytes()
+        elif len(blob) > ASSET_BYTES:
+            raise SchemaFailure("/assets/" + asset.path, "asset exceeds technical byte limit")
         total += len(blob)
         if total > PACKAGE_BYTES: raise SchemaFailure("/assets", "package exceeds technical byte limit")
         captured.append(CapturedAsset(id=asset.id,path=asset.path,role=asset.role,mimeType=asset.mime_type,

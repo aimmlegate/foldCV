@@ -1,0 +1,99 @@
+import { isMap, isScalar, isSeq, parseDocument } from "yaml";
+import { RichApiFailure } from "../../../rich/api";
+
+export type TemplateSummary = { id: string; name: string; revision: string; packageHash: string };
+export type TemplateConfigState = { package: TemplateSummary; format: "yaml" | "json"; text: string; bundled: boolean };
+export type TemplateProblem = { path: string; message: string };
+export type TemplateCheck = { valid: true; package: TemplateSummary } | { valid: false; error: TemplateProblem };
+export type TemplateSave = { saved: true; state: TemplateConfigState } | { saved: false; error: TemplateProblem };
+
+const path = "/v1/rich/template-config";
+
+function field(value: unknown, key: string): unknown {
+  return typeof value === "object" && value !== null ? Reflect.get(value, key) : undefined;
+}
+function text(value: unknown, key: string): string {
+  const item = field(value, key);
+  if (typeof item !== "string") throw new RichApiFailure("INVALID_RESULT");
+  return item;
+}
+function summary(value: unknown): TemplateSummary {
+  return { id: text(value, "id"), name: text(value, "name"), revision: text(value, "revision"), packageHash: text(value, "packageHash") };
+}
+export function parseConfigState(value: unknown): TemplateConfigState {
+  const format = field(value, "format"), bundled = field(value, "bundled");
+  if (field(value, "schemaVersion") !== 1 || (format !== "yaml" && format !== "json") || typeof bundled !== "boolean") throw new RichApiFailure("INVALID_RESULT");
+  return { package: summary(field(value, "package")), format, text: text(value, "text"), bundled };
+}
+export function parseCheck(value: unknown): TemplateCheck {
+  if (field(value, "schemaVersion") !== 1) throw new RichApiFailure("INVALID_RESULT");
+  const valid = field(value, "valid");
+  if (valid === true) return { valid: true, package: summary(field(value, "package")) };
+  if (valid !== false) throw new RichApiFailure("INVALID_RESULT");
+  const error = field(value, "error");
+  return { valid: false, error: { path: text(error, "path"), message: text(error, "message") } };
+}
+
+/** A refused save answers 422 with the same body as a failed check; other failures carry an error code. */
+async function call(url: string, method: string, body?: unknown): Promise<{ status: number; value: unknown }> {
+  const init: RequestInit = { method, credentials: "same-origin", cache: "no-store" };
+  if (body !== undefined) { init.body = JSON.stringify(body); init.headers = { "Content-Type": "application/json" }; }
+  const response = await fetch(url, init);
+  let value: unknown = null;
+  try { value = JSON.parse(await response.text()) as unknown; } catch { value = null; }
+  if (response.ok || response.status === 422 && field(value, "valid") === false) return { status: response.status, value };
+  const code = field(field(value, "error"), "code");
+  throw new RichApiFailure(typeof code === "string" ? code : "REQUEST_FAILED", response.status);
+}
+
+export async function readTemplateConfig(): Promise<TemplateConfigState> {
+  return parseConfigState((await call(path, "GET")).value);
+}
+export async function checkTemplateConfig(source: string): Promise<TemplateCheck> {
+  return parseCheck((await call(`${path}/check`, "POST", { text: source })).value);
+}
+export async function saveTemplateConfig(source: string): Promise<TemplateSave> {
+  const { status, value } = await call(path, "PUT", { text: source });
+  if (status === 422) {
+    const check = parseCheck(value);
+    if (check.valid) throw new RichApiFailure("INVALID_RESULT");
+    return { saved: false, error: check.error };
+  }
+  return { saved: true, state: parseConfigState(value) };
+}
+export async function resetTemplateConfig(): Promise<TemplateConfigState> {
+  return parseConfigState((await call(`${path}/reset`, "POST", {})).value);
+}
+
+function tokens(pointer: string): string[] {
+  return pointer.split("/").slice(1).filter(part => part !== "").map(part => part.replace(/~1/g, "/").replace(/~0/g, "~"));
+}
+function lineEnd(source: string, start: number): number {
+  const end = source.indexOf("\n", start);
+  return end < 0 ? source.length : end;
+}
+
+/** Text range for a server JSON pointer: the deepest key, item or value that exists, else the first line. */
+export function pointerRange(source: string, pointer: string): { start: number; end: number } {
+  const document = parseDocument(source);
+  let node: unknown = document.contents, best: { start: number; end: number } | null = null;
+  for (const token of tokens(pointer)) {
+    if (isMap(node)) {
+      const pair = node.items.find(item => isScalar(item.key) && String(item.key.value) === token);
+      if (!pair || !isScalar(pair.key) || !pair.key.range) break;
+      best = { start: pair.key.range[0], end: pair.key.range[1] };
+      node = pair.value;
+    } else if (isSeq(node)) {
+      const item: unknown = /^\d+$/.test(token) ? node.items[Number(token)] : undefined;
+      const range = isMap(item) || isSeq(item) || isScalar(item) ? item.range : undefined;
+      if (!range) break;
+      best = { start: range[0], end: Math.min(range[1], lineEnd(source, range[0])) };
+      node = item;
+    } else break;
+  }
+  if (isScalar(node) && node.range && best) best = { start: best.start, end: Math.max(best.end, node.range[1]) };
+  if (best && best.end > best.start) return best;
+  const first = source.search(/^[^#\s]/m);
+  const start = first < 0 ? 0 : first;
+  return { start, end: Math.max(start + 1, lineEnd(source, start)) };
+}

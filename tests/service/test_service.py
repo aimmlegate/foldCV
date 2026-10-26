@@ -634,6 +634,27 @@ async def test_launcher_bounds_startup_and_shutdown(tmp_path, monkeypatch, phase
 
 
 @pytest.mark.asyncio
+async def test_launcher_offers_template_import_by_default(tmp_path, monkeypatch):
+    dist = tmp_path / "apps/web/dist"
+    dist.mkdir(parents=True)
+    (dist / "index.html").write_text("synthetic shell", encoding="utf-8")
+    monkeypatch.setattr(launcher, "ROOT", tmp_path)
+    monkeypatch.setattr(launcher, "trusted_temp_root", lambda: tmp_path / "operations")
+    monkeypatch.setattr(launcher, "require_supported_host", lambda: None)
+    captured = {}
+
+    def create(**kwargs):
+        captured.update(kwargs)
+        raise RuntimeError("stop after configuration")
+    monkeypatch.setattr(launcher, "create_app", create)
+    with pytest.raises(RuntimeError, match="stop after configuration"):
+        await launcher.launch(open_browser=False)
+    # Without both, /v1/rich/template-import reports unavailable and the app falls back to the old import.
+    assert captured["background_enabled"] is True
+    assert captured["template_import_call_cap"] == launcher.TEMPLATE_IMPORT_CALL_CAP > 0
+
+
+@pytest.mark.asyncio
 async def test_html_entries_are_fresh_and_static_assets_keep_the_existing_cache_policy(tmp_path):
     def forbidden(*_args):
         pytest.fail("Static entry started content work")

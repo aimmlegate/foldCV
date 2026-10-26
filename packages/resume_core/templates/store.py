@@ -92,6 +92,14 @@ class TemplateStore:
         owned_file(path, 2 * PACKAGE_BYTES)
         return strict_json(path.read_bytes())
 
+    def revision_taken(self, package: TemplatePackage) -> bool:
+        """True when the package's ID/revision already names different stored bytes, so activation would refuse it."""
+        registry_path = self.root / "identities.json"
+        if not registry_path.exists(): return False
+        registry = self._read(registry_path)
+        retained = registry.get(canonical([package.id,package.revision]).decode("utf-8")) if isinstance(registry,dict) else None
+        return retained is not None and retained != package.package_hash
+
     def activate(self, package: TemplatePackage) -> None:
         verify_package(package)
         with locked_root(self.root, ".templates.lock"):
