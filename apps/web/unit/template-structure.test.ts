@@ -10,6 +10,7 @@ import { templateProjectWire } from "../src/contracts/template-validate";
 import { templateSchema } from "../src/rich/template-schema";
 import { selectedBlocks, textPosition } from "../src/rich/v7-extraction";
 import { projectTemplateDocument } from "../src/rich/v7-projection";
+import { templateSheet } from "../src/rich/v7-presentation";
 import { TemplateEditorSession, type TemplateEditor } from "../src/rich/v7-session";
 import { client, harness, type Harness } from "./support/template-harness";
 
@@ -564,5 +565,21 @@ test("E04/CT08: two equal paper titles keep distinct cells and occurrences; reor
     await session.navigate("undo");
     ({ response, blocks } = await shown(session));
     assert.deepEqual(items(), [firstItem, secondItem]);
+  } finally { session.close(); await value.close(); }
+});
+
+test("N04/CT08: the mounted sheet reads the second template's columns, type and bullet from its recipe", async () => {
+  const value = await harness("publications");
+  const { session } = await opened(value);
+  try {
+    const { response } = await shown(session);
+    const sheet = templateSheet(response);
+    assert.ok(sheet);
+    const variables = sheet.variables as Record<string, string>;
+    assert.deepEqual([variables["--fcv-sidebar"], variables["--fcv-main"], variables["--fcv-gap"], variables["--fcv-bullet"]],
+      ["130pt", "420pt", "10pt", JSON.stringify("–")]);
+    const body = sheet.styles.get("body");
+    assert.ok(body && sheet.css.includes(`[data-fcv-style="${body}"]`) && /font-size: 11pt/.test(sheet.css));
+    assert.equal(sheet.logo, null);
   } finally { session.close(); await value.close(); }
 });

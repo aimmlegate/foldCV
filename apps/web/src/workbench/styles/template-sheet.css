@@ -46,6 +46,7 @@
 .uir-prototype .fcv-sheet .bn-editor a,
 .fcv-sheet .fcv-link,
 .fcv-sheet .bn-editor a { color: inherit; text-decoration: underline dotted; text-underline-offset: 2px; }
+.fcv-sheet .bn-block-content[data-content-type="bulletListItem"]::before { content: var(--fcv-bullet, "•") !important; }
 .fcv-sheet .fcv-import-note { margin: 2pt 0 0; padding: 1pt 0 1pt 6pt; border-left: 2px solid #8a6a2f; color: #5c4a28;
   font: 9pt var(--sans), sans-serif; line-height: 1.35; }
 .fcv-logo { position: absolute; object-fit: contain; pointer-events: none; }
