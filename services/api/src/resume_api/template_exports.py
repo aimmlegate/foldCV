@@ -48,6 +48,8 @@ class TemplateExports:
             self.save_errors[identifier] = getattr(error, 'code', 'PROJECT_SAVE_FAILED')
 
     async def export_template(self, identifier, expected, *, retry_attempt_id=None):
+        if not getattr(self, 'legacy_v7_writes', True):
+            raise ProjectFailure('IMPORT_PROTOCOL_MISMATCH', 409)
         if self.template_export_stopping:
             raise ProjectFailure('CANCELLED', 409)
         captured = self.read(identifier)

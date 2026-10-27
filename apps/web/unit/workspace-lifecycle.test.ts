@@ -7,7 +7,7 @@ const worker = fileURLToPath(new URL("./workspace-lifecycle.worker.ts", import.m
 const scenarios = [
   ...["open", "upload", "fresh", "remove", "archive", "lifecycle"].flatMap(action =>
     ["navigate", "assistant", "remount"].map(wait => `${action}:${wait}`)),
-  "failed-leave", "pending-request", "new-action-lock", "fresh-reopen", "template-open", "template-upload",
+  "failed-leave", "pending-request", "pending-family-read", "new-action-lock", "fresh-reopen", "template-open", "template-upload",
   "import-cancelled", "import-failed", "import-interrupted", "import-timeout",
 ];
 for (const scenario of scenarios) test(`workspace hook lifecycle: ${scenario}`, () => {

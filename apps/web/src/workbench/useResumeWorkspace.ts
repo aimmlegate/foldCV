@@ -7,11 +7,15 @@ import type { TemplateEditorHandle } from "../rich/TemplateEditor";
 import type { TemplateProjectResponseV1 } from "../contracts/generated/template_project_response_v1";
 import type { AssistantHandle } from "../assistant/Drawer";
 import { hasInput, importBody, type ResumeInput } from "../rich/import-source";
-import { deleteProject, download, downloadTemplate, listProjects, openedProject, projectRequest, request, RichApiFailure, templateImportStatus,
+import { deleteProject, download, listProjects, openedProject, projectRequest, request, RichApiFailure, templateImportStatus,
   type TemplateImportPackage } from "../rich/api";
 import { attachExclusiveTemplateWriter, attachExclusiveWriter, type AttachedTemplateWriter, type AttachedWriter } from "../background/connection";
 import { FixedOperations } from "../background/fixed";
-import { JobsApi, startTemplateImport } from "../background/api";
+import { JobsApi } from "../background/api";
+import { cancelImport, catalogFlag, deleteTemplateProject, openFoldcv, projectTasks, resumeImport, startImport } from "../projects/api";
+import type { ProjectTask } from "../projects/api";
+import { IMPORT_WAIT_MS } from "../projects/import-wait";
+import { ProjectApiFailure } from "../rich/v7-connection";
 import { warningLabel } from "./import/notices";
 import { WorkspaceReads } from "./read-capture";
 import type { ReadCapture } from "../contracts/template-export";
@@ -39,8 +43,15 @@ export function useResumeWorkspace() {
   const dismissError = useCallback(() => setError(""), []);
   const [status, setStatus] = useState("Сохранено");
   const [busy, setBusy] = useState(false);
-  const [operation, setOperation] = useState<{ label: string; startedAt: number } | null>(null);
-  function stage(label: string) { setOperation(current => current ? { ...current, label } : { label, startedAt: Date.now() }); }
+  const [importTask, setImportTask] = useState<ProjectTask | null>(null);
+  const [operation, setOperation] = useState<{ label: string; startedAt: number; cancel?: () => Promise<void> } | null>(null);
+  function stage(label: string, cancel?: () => Promise<void>) {
+    setOperation(current => {
+      const next = cancel ?? current?.cancel;
+      const startedAt = current?.startedAt ?? Date.now();
+      return next ? { label, startedAt, cancel: next } : { label, startedAt };
+    });
+  }
   const [loading, setLoading] = useState(() => new URLSearchParams(location.search).has("project"));
   const [settings, setSettings] = useState(false);
   const editor = useRef<RichEditorHandle>(null);
@@ -77,6 +88,7 @@ export function useResumeWorkspace() {
   function selectTemplate(next: TemplateProjectResponseV1, connection: AttachedTemplateWriter | null, loaded: ReadCapture) {
     if (loaded.projectId !== next.workspace.projectId) throw new RichApiFailure("INVALID_RESULT");
     if (!reads.current.adoptSelection(loaded)) return;
+    templateProjects.current.add(next.workspace.projectId);
     setOpening(loaded); setResponse(null); setWriter(null); setBackground(connection !== null);
     activeProject.current = next.workspace.projectId; adoptTemplate(next, loaded, connection);
   }
@@ -108,8 +120,8 @@ export function useResumeWorkspace() {
     if (!reads.current.selectionCurrent(capture)) return null;
     if (opened.response.workspace.projectId !== id) throw new RichApiFailure("INVALID_RESULT");
     if (opened.kind === "template") {
-      if (opened.response.workspace.project) templateProjects.current.add(id);
-      const connection = opened.response.workspace.project ? await attachExclusiveTemplateWriter(id) : null;
+      templateProjects.current.add(id);
+      const connection = await attachExclusiveTemplateWriter(id);
       if (!reads.current.selectionCurrent(capture)) return null;
       await request(`/${id}/activate`, "POST", {});
       if (!reads.current.selectionCurrent(capture)) return null;
@@ -191,26 +203,40 @@ export function useResumeWorkspace() {
     return action(async current => {
       if (activeProject.current === id) await leave(current);
       if (!current()) return;
-      const result = await deleteProject(id);
+      let incomplete = false, code = "PROJECT_CLEANUP_INCOMPLETE";
+      const templateProject = await isTemplateProject(id);
+      if (!current()) return;
+      if (templateProject) incomplete = (await deleteTemplateProject(id)).cleanupStatus === "cleanup_incomplete";
+      else { const result = await deleteProject(id); incomplete = result.status === "cleanup_incomplete"; code = result.errorCode ?? code; }
       templateProjects.current.delete(id);
       if (!current()) return;
       if ((response ?? template?.response)?.workspace.projectId === id) clear();
       const catalog = await listProjects();
       if (!current()) return;
       setProjects(catalog);
-      if (result.status === "cleanup_incomplete") throw new RichApiFailure(result.errorCode ?? "PROJECT_CLEANUP_INCOMPLETE");
+      if (incomplete) throw new RichApiFailure(code);
     }, "Удаляем резюме");
   }
   async function archive(id: string, archived: boolean) {
     return action(async current => {
       if (archived && activeProject.current === id) await leave(current);
       if (!current()) return;
-      await request(`/${id}/catalog/${archived ? "archive" : "restore"}`, "POST", {});
+      const templateProject = await isTemplateProject(id);
+      if (!current()) return;
+      if (templateProject) await catalogFlag(id, archived);
+      else await request(`/${id}/catalog/${archived ? "archive" : "restore"}`, "POST", {});
       if (!current()) return;
       if (archived && activeProject.current === id) clear();
       const catalog = await listProjects();
       if (current()) setProjects(catalog);
     }, archived ? "Перемещаем резюме в архив" : "Восстанавливаем резюме");
+  }
+  async function isTemplateProject(id: string) {
+    if (templateProjects.current.has(id)) return true;
+    const opened = await openedProject(`/${id}`);
+    if (opened.kind !== "template") return false;
+    templateProjects.current.add(id);
+    return true;
   }
   async function projectLifecycle(id: string, kind: "archive" | "delete") {
     return action(async current => {
@@ -283,24 +309,43 @@ export function useResumeWorkspace() {
     } finally { reads.current.cancelReplacement(version); }
     const catalog = await listProjects();
     if (current()) setProjects(catalog);
-    stage("Импортируем по шаблону");
-    const jobs = new JobsApi(id);
-    let job = await startTemplateImport(id, { clientRequestId: crypto.randomUUID(), allowTextRewrite });
-    while (!job.templateOutcome) {
-      if (!current()) return;
-      // The server owns the limits from Settings: wait past its deadline for the captured cleanup and
-      // publication windows, plus a minute for the outcome.
-      const attempt = job.attempts.at(-1), command = job.submission.templateCommand;
-      const policy = command && "capture" in command ? command.capture.policy : null;
-      const grace = ((policy?.cleanupSeconds ?? 0) + (policy?.finalizationSeconds ?? 0) + 60) * 1000;
-      if (attempt && Date.now() > Date.parse(attempt.activeDeadline) + grace) throw new RichApiFailure("PROCESS_TIMEOUT");
-      // An execution that ended in failure without a typed outcome stays unresolved on the server; report it.
-      if (["failed", "cancelled", "interrupted"].includes(job.execution))
-        throw new RichApiFailure(job.error?.code ?? (job.execution === "cancelled" ? "CANCELLED" : "PROCESS_FAILED"));
+    const startedAt = Date.now();
+    let task = await startImport(id, { clientRequestId: crypto.randomUUID(), allowTextRewrite });
+    const url = new URL(location.href); url.searchParams.set("project", id); history.replaceState(null, "", url.pathname + url.search);
+    await finishTemplateImport(id, task, current, startedAt);
+  }
+  async function finishTemplateImport(id: string, first: ProjectTask, current: () => boolean, startedAt = Date.now()) {
+    let task = first;
+    let operationId: string | null = null, stopped = false;
+    const stop = async () => {
+      try { await cancelImport(id, task.id); stopped = true; }
+      catch (error) { if (current()) setError(label(error)); }
+    };
+    stage("Запускаем импорт", stop);
+    setImportTask(task);
+    while (task.state === "running") {
+      if (!current() || stopped) return;
+      const policySeconds = task.detail["processingSeconds"];
+      const wait = typeof policySeconds === "number" ? policySeconds * 1000 + 223000 : IMPORT_WAIT_MS;
+      if (Date.now() - startedAt > wait) throw new ProjectApiFailure("PROCESS_TIMEOUT");
+      const named = task.detail["operationId"];
+      if (typeof named === "string" && named) operationId = named;
+      stage(task.stage === "processing" ? "Импортируем по шаблону" : "Запускаем импорт", stop);
       await new Promise(resolve => setTimeout(resolve, 1000));
-      job = await jobs.read(job.id);
+      if (!current() || stopped) return;
+      const tasks = await projectTasks(id);
+      const next = tasks.find(item => item.id === task.id);
+      if (!next) {
+        if (!operationId) throw new ProjectApiFailure("PROCESS_FAILED");
+        task = await resumeImport(id, operationId);
+        continue;
+      }
+      task = next;
+      setImportTask(task);
     }
-    if (job.templateOutcome.state !== "saved") throw new RichApiFailure(job.templateOutcome.errorCode ?? job.error?.code ?? "PROCESS_FAILED");
+    if (!current() || stopped) return;
+    if (task.state === "cancelled") throw new ProjectApiFailure("CANCELLED");
+    if (task.state !== "succeeded") throw new ProjectApiFailure(task.error ?? "PROCESS_FAILED");
     if (!current()) return;
     const capture = reads.current.beginSelection(id);
     try {
@@ -309,6 +354,18 @@ export function useResumeWorkspace() {
         show(result, capture); prepared.current = null; setInput({ kind: "text", text: "" });
       }
     } finally { reads.current.cancelSelection(capture); }
+  }
+  async function resumeTemplate() {
+    const workspace = template?.response.workspace;
+    const operation = workspace?.preDraft?.templateOperations.at(-1);
+    if (!workspace) return false;
+    return action(async current => {
+      const tasks = await projectTasks(workspace.projectId);
+      const running = tasks.find(task => task.kind === "import" && task.state === "running");
+      const task = running ?? (operation ? await resumeImport(workspace.projectId, operation.id)
+        : await startImport(workspace.projectId, { clientRequestId: crypto.randomUUID(), allowTextRewrite }));
+      await finishTemplateImport(workspace.projectId, task, current);
+    }, "Продолжаем импорт");
   }
   async function process() {
     await action(async current => {
@@ -357,8 +414,13 @@ export function useResumeWorkspace() {
       const body = new FormData(); body.append("file", file);
       const version = reads.current.beginReplacement();
       try {
-        // The archive decides the family: a V7 project opens in the template editor with its captured package.
-        const opened = await openedProject("/archive", "POST", body);
+        // A V7 archive opens on /v2. A file the server rejects as not V7 still opens on the V6 route.
+        let opened: Awaited<ReturnType<typeof openedProject>>;
+        try { opened = { kind: "template", response: await openFoldcv(file) }; }
+        catch (error) {
+          if (!(error instanceof ProjectApiFailure) || error.code !== "ARCHIVE_WORKSPACE_INVALID") throw error;
+          opened = await openedProject("/archive", "POST", body);
+        }
         if (!reads.current.replacementCurrent(version)) return;
         const id = opened.response.workspace.projectId;
         if (opened.kind === "template") {
@@ -388,16 +450,15 @@ export function useResumeWorkspace() {
       const capture = reads.current.begin(kind);
       if (!capture) throw new Error("Откройте резюме перед сохранением файла.");
       if (!editor.current && (templateEditor.current || template)) {
-        const current = templateEditor.current ? await templateEditor.current.flush() : template?.response;
-        if (!current) throw new Error("Откройте резюме перед сохранением файла.");
+        await templateEditor.current?.flush();
+        const connection = template?.connection;
+        const current = connection?.response ?? template?.response;
+        if (!current || !connection) throw new Error("Откройте резюме перед сохранением файла.");
         if (!reads.current.current(kind, capture) || current.workspace.projectId !== capture.projectId) return;
         stage(kind === "export" ? "Создаём документ DOCX" : "Собираем файл проекта");
-        // V7 DOCX is rendered from the captured template package of exactly this flushed snapshot.
-        if (kind === "export" && !current.snapshot) throw new RichApiFailure("INVALID_RESULT");
         let blob: Blob;
-        // A V7 export records its attempt in the canonical workspace; the open editor adopts that advance afterwards.
-        try { blob = kind === "export" && current.snapshot ? (await downloadTemplate(current.workspace.projectId, current.snapshot)).blob
-          : await download(current.workspace.projectId, kind, current.workspace); }
+        // The editor token and the flushed revision go with the file. Refresh adopts the commit.
+        try { blob = kind === "export" ? (await connection.exportDocx()).blob : await connection.saveFoldcv(); }
         finally { if (reads.current.current(kind, capture)) await templateEditor.current?.refresh(); }
         if (reads.current.current(kind, capture)) deliver(blob, typeof filename === "function" ? filename(current) : filename ?? fallback);
         return;
@@ -411,6 +472,19 @@ export function useResumeWorkspace() {
       deliver(blob, typeof filename === "function" ? filename(current) : filename ?? fallback);
     }, "Сохраняем изменения перед скачиванием");
   }
-  return { templateImport, strictImport, setStrictImport, response, template, templateEditor, acknowledgeTemplate, writer, background, openingEpoch: opening?.selectionEpoch ?? 0, projects, input, setInput, textDraft, allowTextRewrite, setAllowTextRewrite, error, status, setStatus, busy, operation, loading, settings, setSettings,
-    editor, assistant, acknowledge, action, fresh, open, remove, archive, projectLifecycle, process, upload, exportFile, dismissError };
+  async function renameTemplate(title: string) {
+    const next = title.trim();
+    if (!next) return false;
+    return action(async current => {
+      const connection = template?.connection;
+      if (!connection) return;
+      await templateEditor.current?.flush();
+      if (!current()) return;
+      await connection.rename(next);
+      if (!current()) return;
+      await templateEditor.current?.refresh();
+    }, "Переименовываем резюме");
+  }
+  return { templateImport, strictImport, setStrictImport, response, template, templateEditor, acknowledgeTemplate, writer, background, openingEpoch: opening?.selectionEpoch ?? 0, projects, input, setInput, textDraft, allowTextRewrite, setAllowTextRewrite, error, status, setStatus, busy, operation, importTask, resumeTemplate, loading, settings, setSettings,
+    editor, assistant, acknowledge, action, fresh, open, remove, archive, projectLifecycle, process, upload, exportFile, renameTemplate, dismissError };
 }

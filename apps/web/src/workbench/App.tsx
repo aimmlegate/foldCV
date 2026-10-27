@@ -11,6 +11,7 @@ import { History } from "./layout/History";
 import { Header } from "./layout/Header";
 import { SourceForm } from "./import/SourceForm";
 import { Progress } from "./import/Progress";
+import { TaskProgress } from "./import/TaskProgress";
 import { Assessment } from "./import/Assessment";
 import { importView, reviewId } from "./import/view";
 import { Settings } from "./settings/Settings";
@@ -47,7 +48,7 @@ export function App({ portalHost }: { portalHost: HTMLElement }) {
   const generation = response?.generation;
   const creating = generation !== null && generation !== undefined && ["queued", "running"].includes(generation.status);
   const source = response?.workspace.preDraft?.sources.find(item => item.id === response.workspace.preDraft?.selectedSourceId);
-  const view = template ? "editor" : importView(response, reviewed, sourceOpen);
+  const view = workspace.importTask?.state === "running" && busy ? "template_progress" : template ? "editor" : importView(response, reviewed, sourceOpen);
   const sourceWarnings = response?.workspace.warnings ?? [];
   const draftWarnings = sourceWarnings.length ? [] : groupedWarnings(response?.workspace.preDraft?.warnings ?? [], response?.workspace.preDraft?.sources);
   const failure = processingFailure(generation);
@@ -89,6 +90,7 @@ export function App({ portalHost }: { portalHost: HTMLElement }) {
       <Header title={settings ? "Настройки" : shown?.identity?.title ?? shown?.workspace.title ?? (workspace.loading ? "Открываем резюме…" : "Новое резюме")}
         subtitle={settings ? "FoldCV" : shown?.identity?.subtitle || "Рабочий документ"} collapsed={collapsed} expand={() => setCollapsed(false)} status={status}
         ready={!settings && view === "editor"} busy={busy} save={() => openFile("save")} exportFile={() => openFile("export")}
+        rename={!settings && template?.connection ? title => { void workspace.renameTemplate(title); } : undefined}
         retrySave={status !== "Сохранено" && status !== "Изменения сохраняются…" && status !== "Требуется восстановление черновика" ? () => void action(async current => { await mounted()?.flush(); if (current()) setStatus("Сохранено"); }) : undefined}
         activity={<><NotificationCenter />{jobs.view.enabled && <BackgroundJobs registry={jobs.registry} view={jobs.view} openProject={navigate} />}</>} />
       <NotificationSection count={Number(!!error && !fileMode) + Number(!!jobs.view.error)}>
@@ -107,8 +109,17 @@ export function App({ portalHost }: { portalHost: HTMLElement }) {
           {failure && <p className="notice warning" role="alert">{failure}</p>}
         </section>
       </NotificationSection>
-      {busy && workspace.operation && !fileMode && <div className="workspace-operation"><OperationStatus label={workspace.operation.label} timed startedAt={workspace.operation.startedAt} /></div>}
+      {busy && workspace.operation && !fileMode && <div className="workspace-operation">
+        <OperationStatus label={workspace.operation.label} timed startedAt={workspace.operation.startedAt} />
+        {workspace.operation.cancel && <button type="button" className="text-button" onClick={() => void workspace.operation?.cancel?.()}>Остановить импорт</button>}
+      </div>}
       <div className="screen uir-proof-screen" hidden={settings}>
+        {view === "template_progress" && workspace.importTask && <TaskProgress task={workspace.importTask}
+          cancel={async () => { await workspace.operation?.cancel?.(); }} />}
+        {view === "editor" && template && !template.response.workspace.project && <section className="progress-screen"><div className="progress-content">
+          <h2>Импорт резюме</h2><p>Исходник и промежуточные результаты сохранены.</p>
+          <button type="button" disabled={busy} onClick={() => void workspace.resumeTemplate()}>Продолжить импорт</button>
+        </div></section>}
         {workspace.loading && <div className="workspace-loading"><OperationStatus label="Открываем резюме" detail="Загружаем документ, факты и историю проекта." timed /></div>}
         {view === "progress" && response && generation && <Progress key={`${response.workspace.projectId}:${generation.id}`} response={{ ...response, generation }} sourceName={source?.originalName ?? (input.kind === "file" ? input.file.name : "Вставленный текст")} busy={busy}
           cancel={() => void action(async () => acknowledge(await projectRequest(`/${response.workspace.projectId}/cancel`, "POST", {})), "Останавливаем обработку")} />}

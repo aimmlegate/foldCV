@@ -46,6 +46,8 @@ class JournalStale(Exception):
 
 def snapshot(workspace):
     """The undoable state: every `values()` key with its full payload, plus the id order of the keyed lists."""
+    if workspace.project is None:
+        return {}
     result = values(workspace)
     project = workspace.project
     facts = project.facts

@@ -234,7 +234,8 @@ class RichProjectService(TemplateExports, TemplateRewrite, TemplateImports, Rich
             meta = catalog.get(entry.project_id)
             value.update(lastOpenedAt=meta.last_opened_at if meta else None, archived=meta.archived if meta else False)
             if entry.project_id in self.workspaces:
-                identity = resume_identity(self.workspaces[entry.project_id])
+                from packages.resume_core.rich_identity import display_identity
+                identity = display_identity(self.workspaces[entry.project_id])
                 value.update(title=identity.title, subtitle=identity.subtitle)
             entries.append(value)
         entries.sort(key=lambda entry: (entry["lastOpenedAt"] or entry["updatedAt"], entry["projectId"]), reverse=True)
@@ -539,6 +540,8 @@ class RichProjectService(TemplateExports, TemplateRewrite, TemplateImports, Rich
             await asyncio.gather(*list(self.image_tasks), return_exceptions=True)
 
     def portable(self, identifier):
+        if self.read(identifier).schema_version == 7 and not getattr(self, 'legacy_v7_writes', True):
+            raise ProjectFailure('IMPORT_PROTOCOL_MISMATCH', 409)
         self.require_agent_writable(identifier)
         jobs = getattr(self, "background_jobs", None)
         if jobs is not None and jobs.enabled:
@@ -573,6 +576,8 @@ class RichProjectService(TemplateExports, TemplateRewrite, TemplateImports, Rich
             workspace, originals, artifacts, images = open_rich_archive(data, identifier)
         except ArchiveFailure as error:
             raise ProjectFailure(error.code, 422) from None
+        if workspace.schema_version == 7 and not getattr(self, 'legacy_v7_writes', True):
+            raise ProjectFailure('IMPORT_PROTOCOL_MISMATCH', 409)
         self.workspaces[identifier] = workspace
         self.originals.update({(identifier, sid): blob for sid, blob in originals.items()})
         self.images.update({(identifier, aid): blob for aid, blob in images.items()})

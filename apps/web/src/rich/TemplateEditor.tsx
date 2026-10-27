@@ -6,7 +6,8 @@ import { useEffect, useImperativeHandle, useMemo, useRef, useState, type Ref } f
 import type { AttachedTemplateWriter } from "../background/connection";
 import type { TemplateProjectResponseV1 } from "../contracts/generated/template_project_response_v1";
 import { errorMessage, knownErrorMessage } from "../errors/messages";
-import { ComparisonWorkspace } from "../workbench/editor/ComparisonWorkspace";
+import { ComparisonWorkspace, WorkspaceViews, type WorkspaceView } from "../workbench/editor/ComparisonWorkspace";
+import { SourceDialog } from "../workbench/editor/SourceDialog";
 import { EditorNotices } from "../workbench/editor/EditorNotices";
 import { FactsPanel } from "../workbench/facts/FactsPanel";
 import { RewritePanel } from "../workbench/editor/RewritePanel";
@@ -38,6 +39,8 @@ export function TemplateEditor({ initial, connection, onStatus, onShown, ref, po
   // The verified state shown in the editor: facts and issues are read from it, never from editor content.
   const [shown, setShown] = useState(initial);
   const [factsVisible, setFactsVisible] = useState(false);
+  const [workspaceView, setWorkspaceView] = useState<WorkspaceView>("layout");
+  const [sourceVisited, setSourceVisited] = useState(false);
   const [panelPending, setPanelPending] = useState<PanelCommand[]>([]);
   const [, refresh] = useState(0);
   // Selected-text rewrite: one preview at a time; nothing changes until Apply.
@@ -143,6 +146,12 @@ export function TemplateEditor({ initial, connection, onStatus, onShown, ref, po
     finally { setPanelPending([]); }
   }
   const facts = shown.workspace.project?.facts ?? project.facts, documentShown = shown.workspace.project?.document ?? project.document;
+  const sources = (shown.workspace.project?.sources ?? project.sources).map(source => ({
+    id: source.id, originalName: source.originalName, byteSha256: source.byteSha256 }));
+  function changeWorkspaceView(view: WorkspaceView) {
+    setWorkspaceView(view);
+    if (view !== "layout") setSourceVisited(true);
+  }
   const state = session.queue.template.state, styles = editor.getActiveStyles();
   const locked = mode === "read_only" || mode === "detached" || mode === "recovering";
   return <div className="contents uir-editor-session">
@@ -152,6 +161,7 @@ export function TemplateEditor({ initial, connection, onStatus, onShown, ref, po
       anchor={rewriteAnchor} focusInstruction activity={rewriteActivity} cancel={id => { void session.cancelRewrite(id); }} />
     {linkTarget && <LinkTargetDialog href={linkTarget.href} close={() => { setLinkTarget(null); editor.focus(); }}
       apply={href => void applyLinkTarget(linkTarget, href)} />}
+    <WorkspaceViews view={workspaceView} change={changeWorkspaceView} hasSource={sources.length > 0} notices={null} />
     <div className="editor-body uir-editor-body">
       <aside className="editor-notifications" aria-label="Уведомления редактора">
         {mode === "recovering" && <div className="notice warning" role="alert">
@@ -168,7 +178,9 @@ export function TemplateEditor({ initial, connection, onStatus, onShown, ref, po
         </div>}
       </aside>
       {/* The shared layout host: the facts panel floats over the document exactly as in the V1 editor. */}
-      <ComparisonWorkspace view="layout" original={null} layout={<div className="document-workspace">
+      <ComparisonWorkspace view={workspaceView} original={sourceVisited && <SourceDialog projectId={initial.workspace.projectId} sources={sources}
+        expanded={workspaceView === "original"} toggle={() => changeWorkspaceView(workspaceView === "original" ? "compare" : "original")}
+        close={() => { changeWorkspaceView("layout"); editor.focus(); }} version="v2" />} layout={<div className="document-workspace">
         <fieldset className="contents uir-editor-controls" disabled={locked}>
           <Toolbar command={command} textStyle={unsupported} factsVisible={factsVisible} selecting={session.rewriteSource() !== null} style="p"
             canUndo={session.canUndo} canRedo={session.canRedo}

@@ -23,7 +23,18 @@ def mount_writers(app, service):
         proof = payload if isinstance(payload, WriterProofV1) else getattr(payload, "proof", None)
         return service.writers.serving(project, proof)
 
+    def refuse_legacy_v7(project):
+        if getattr(service, 'legacy_v7_writes', True):
+            return
+        try:
+            workspace = service.projects.read(project)
+        except Exception:
+            return
+        if getattr(workspace, 'schema_version', None) == 7:
+            raise BackgroundFailure('IMPORT_PROTOCOL_MISMATCH')
+
     async def call(project, method, payload=None):
+        refuse_legacy_v7(project)
         if not service.enabled:
             raise BackgroundFailure("JOB_DISABLED")
         function = getattr(service.writers, method)
@@ -47,6 +58,7 @@ def mount_writers(app, service):
 
     @app.get(prefix)
     async def bootstrap(project_id: str):
+        refuse_legacy_v7(project_id)
         if not service.enabled:
             raise BackgroundFailure("JOB_DISABLED")
         def read():

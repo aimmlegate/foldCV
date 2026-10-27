@@ -29,12 +29,14 @@ mock.module(file("../src/errors/messages.ts"), { namedExports: { errorMessage: (
 mock.module(file("../src/rich/import-source.ts"), { namedExports: { hasInput: () => importing, importBody: () => ({}) } });
 const pendingRequest = deferred();
 let holdRequest = false;
+let holdFamilyRead = false;
 mock.module(file("../src/rich/api.ts"), { namedExports: {
   deleteProject: async (id: string) => { events.push(`delete:${id}`); if (holdRequest) await pendingRequest.promise; return {}; },
   download: async () => new Blob(),
   downloadTemplate: async () => ({ blob: new Blob() }),
   openedProject: async (path: string) => {
     events.push(`request:${path}`);
+    if (holdFamilyRead) await pendingRequest.promise;
     if (path === "/T" || path === "/template-input" || path === "/archive" && scenario === "template-upload")
       return { kind: "template", response: { workspace: { projectId: "T", project: {} }, identity: null } };
     return { kind: "rich", response: { workspace: { projectId: path === "/A" ? "A" : "B", project: {}, preDraft: null } } };
@@ -60,7 +62,25 @@ const importJob = () => ({ id: "synthetic-job", execution: scenario === "import-
   submission: { templateCommand: { kind: "start_new_import", capture: { policy: { cleanupSeconds: 5, finalizationSeconds: 158 } } } } });
 mock.module(file("../src/background/api.ts"), { namedExports: {
   JobsApi: class { async read() { importReads++; return importJob(); } },
-  startTemplateImport: async () => { if (!importing) throw new Error("unused"); return importJob(); },
+  startTemplateImport: async () => { throw new Error("unused"); },
+} });
+const importState = scenario === "import-timeout" ? "running" : scenario === "import-cancelled" ? "cancelled" : "failed";
+mock.module(file("../src/projects/api.ts"), { namedExports: {
+  startImport: async () => {
+    if (!importing) throw new Error("unused");
+    events.push("import:start");
+    return { id: "task-1", state: importState, stage: "processing", detail: {}, error: importState === "failed" ? "PROCESS_FAILED" : null };
+  },
+  projectTasks: async () => { importReads++; return [{ id: "task-1", state: "running", stage: "processing", detail: {}, error: null }]; },
+  resumeImport: async () => { throw new Error("unused"); },
+  cancelImport: async () => { events.push("import:cancel"); },
+  openFoldcv: async () => {
+    if (scenario !== "template-upload") throw new Error("unused");
+    events.push("request:/v2/projects/archive");
+    return { workspace: { projectId: "T", project: {} }, identity: null };
+  },
+  deleteTemplateProject: async () => { throw new Error("unused"); },
+  catalogFlag: async (id: string, archived: boolean) => { events.push(`v2-catalog:${id}:${archived}`); },
 } });
 mock.module(file("../src/workbench/import/notices.ts"), { namedExports: { warningLabel: (value: unknown) => value } });
 const { useResumeWorkspace } = await import("../src/workbench/useResumeWorkspace");
@@ -132,7 +152,14 @@ if (importing) {
   holdRequest = true; editor.navigate = async () => {};
   const pending = hook.remove("A");
   await new Promise<void>(resolve => setImmediate(resolve));
-  assert.deepEqual(events, ["delete:A"]);
+  assert.deepEqual(events, ["request:/A", "delete:A"]);
+  unmount(); events.length = 0; pendingRequest.resolve();
+  assert.equal(await pending, false); assert.deepEqual(events, []);
+} else if (scenario === "pending-family-read") {
+  holdFamilyRead = true; editor.navigate = async () => {};
+  const pending = hook.remove("A");
+  await new Promise<void>(resolve => setImmediate(resolve));
+  assert.deepEqual(events, ["request:/A"]);
   unmount(); events.length = 0; pendingRequest.resolve();
   assert.equal(await pending, false); assert.deepEqual(events, []);
 } else if (scenario === "new-action-lock") {
@@ -162,7 +189,11 @@ if (importing) {
   // A V7 .foldcv opens in the template editor with its own writer, like a V7 project from the list.
   gate.resolve(); await hook.fresh(); events.length = 0;
   assert.equal(await hook.upload(new File(["synthetic"], "project.foldcv")), true);
-  assert.deepEqual(events, ["request:/archive", "attach-template:T", "url:/?project=T", "catalog"]);
+  assert.deepEqual(events, ["request:/v2/projects/archive", "attach-template:T", "url:/?project=T", "catalog"]);
+  events.length = 0;
+  assert.equal(await hook.archive("T", true), true);
+  assert.ok(events.includes("v2-catalog:T:true"), "a newly opened V7 archive uses the v2 catalog route");
+  assert.ok(!events.includes("request:/T/catalog/archive"));
 } else throw new Error(`Unknown scenario ${scenario}`);
 assert.equal(staleState, 0);
 unmount();

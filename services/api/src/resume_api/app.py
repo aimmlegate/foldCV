@@ -169,6 +169,15 @@ class LocalBoundary:
         if rich is not None and path.startswith(project_prefix) and method in {"POST", "PUT", "PATCH", "DELETE"}:
             parts = path[len(project_prefix):].split("/", 1)
             tail = parts[1] if len(parts) == 2 else ""
+            if tail and tail not in {'activate', 'catalog/archive', 'catalog/restore'} and not getattr(self.app.state, 'legacy_routes', True):
+                from packages.resume_core.project_repository import RepositoryFailure
+                try:
+                    workspace = await asyncio.to_thread(self.app.state.projects.repository.read, parts[0])
+                except RepositoryFailure:
+                    workspace = None
+                if workspace is not None and workspace.schema_version == 7:
+                    await problem('IMPORT_PROTOCOL_MISMATCH', 409)(scope, receive, send)
+                    return
             if parts[0] in rich.agent_recovery_fences | rich.catalog_recovery_fences and not tail.startswith(("assistant/", "writer/")) and tail not in {"cancel", "cancel-action", "delete", "images/session"}:
                 await problem("AGENT_OUTCOME_UNKNOWN", 409)(scope, receive, send)
                 return
@@ -198,8 +207,9 @@ class LocalBoundary:
                 image_upload = path.startswith("/v1/rich/projects/") and path.endswith("/images/upload")
                 writer_payload = path.startswith("/v1/rich/projects/") and any(path.endswith("/writer/" + command)
                     for command in ("checkpoint", "save", "flush", "barrier", "reconcile", "detach", "draft/use"))
-                project_upload = image_upload or path in {"/v1/projects/input", "/v1/projects/archive", "/v1/rich/projects/input", "/v1/rich/projects/template-input", "/v1/rich/projects/archive"} or (path.startswith("/v1/projects/") and path.endswith("/input"))
-                body_limit = 10 * 1024 * 1024 + 64 * 1024 if image_upload else ARCHIVE_BYTES + 4096 if path in {"/v1/projects/archive", "/v1/rich/projects/archive"} else MAX_EXTRACT_BODY if path == "/v1/extract" or project_upload else MAX_BODY
+                project_upload = image_upload or path in {"/v1/projects/input", "/v1/projects/archive", "/v1/rich/projects/input", "/v1/rich/projects/template-input", "/v1/rich/projects/archive", "/v2/projects/archive"} or (path.startswith("/v1/projects/") and path.endswith("/input"))
+                archive_upload = path in {"/v1/projects/archive", "/v1/rich/projects/archive", "/v2/projects/archive"}
+                body_limit = 10 * 1024 * 1024 + 64 * 1024 if image_upload else ARCHIVE_BYTES + 4096 if archive_upload else MAX_EXTRACT_BODY if path == "/v1/extract" or project_upload else MAX_BODY
                 if writer_payload:
                     from packages.resume_core.background_limits import LIMITS
                     body_limit = LIMITS.draft_project_bytes + MAX_BODY
@@ -271,7 +281,7 @@ def create_app(*, origin: str, secret: str, temp_root: Path, dist: Path, runner:
                gui_provider=None, gui_clock=None, gui_renderer=None, agent_runtime=None, agent_tools=None,
                background_enabled=False, background_factory=None, background_native_authority=None,
                background_parallel=False, background_server_factory=None, template_import_call_cap: int | None = None,
-               template_import_concurrency: int = 3):
+               template_import_concurrency: int = 3, legacy_routes: bool = True):
     if not origin.startswith("http://127.0.0.1:") or not origin.rsplit(":", 1)[-1].isdigit():
         raise ValueError("A concrete IPv4 loopback origin is required")
     if len(secret) < 32:
@@ -460,9 +470,12 @@ def create_app(*, origin: str, secret: str, temp_root: Path, dist: Path, runner:
     from packages.resume_core.project_repository import ProjectRepository
     from .projects.routes import mount_projects_v2
     from .projects.service import ProjectService
-    # The in-memory project repository on the same data root (D109); the old routes stay mounted until SR04.
+    # V7 writes go through the repository. Old write routes stay mounted for schema 6 and for legacy_routes=True.
     project_repository = ProjectRepository(rules_store.root)
+    from .projects.fold import register_import_fold
+    register_import_fold(project_repository)
     projects = ProjectService(project_repository, catalog=rich_projects.catalog)
+    projects.rich = rich_projects
     projects.rewrite_text = rich_projects.template_rewrite_text
     projects.rewrite_cancel = rich_projects.template_rewrite_cancel
     app.state.projects = projects
@@ -551,19 +564,22 @@ def create_app(*, origin: str, secret: str, temp_root: Path, dist: Path, runner:
 
     template_factory = None
     if template_import_call_cap is not None:
-        def template_factory(owner):
+        def template_factory(owner, *, repository=None):
             from packages.resume_core.template_assembly import assemble_template
             from packages.resume_core.templates.operations import derive_task
             from .importer.template_pipeline import TemplatePipeline
+            from .projects.pipeline import RepositoryPipeline
             from .importer.template_transport import ProviderTemplateTransport
             def authority(operation, current):
                 rich_projects.validate_template_capture(operation, current)
             # Registered deterministic operations over admitted facts; unimplemented kinds stay refused.
-            return TemplatePipeline(owner.publisher, ProviderTemplateTransport(import_selected_provider, temp_root,
+            pipeline_type = RepositoryPipeline if repository is not None else TemplatePipeline
+            return pipeline_type(None if repository is not None else owner.publisher,
+                ProviderTemplateTransport(import_selected_provider, temp_root,
                 model_provider=template_model_provider),
                 originals=rich_projects.originals, authority=authority, assemble=assemble_template, derive=derive_task,
                 # One clock for jobs, request epochs and publication: the job store's.
-                wall=lambda: owner.store.clock())
+                wall=lambda: owner.store.clock(), **({'repository': repository} if repository is not None else {}))
     rich_projects.configure_template_imports(call_cap=template_import_call_cap,
         model=template_import_model if template_import_call_cap is not None else None,
         fallback=template_fallback_model if template_import_call_cap is not None else None,
@@ -576,7 +592,24 @@ def create_app(*, origin: str, secret: str, temp_root: Path, dist: Path, runner:
         template_cleanup_verified=lambda: not unsafe_cleanup,
         **({"authorize_native": background_native_authority} if background_native_authority else {}))
     app.state.jobs = jobs
+    app.state.legacy_routes = legacy_routes
+    rich_projects.legacy_v7_writes = legacy_routes
+    jobs.legacy_v7_writes = legacy_routes
     mount_jobs(app, jobs)
+    from .projects.exports import ExportService, production_render
+    from .projects.imports import ImportService
+    v2_pipeline = None
+    if template_factory is not None and jobs.templates is not None:
+        v2_pipeline = template_factory(jobs, repository=project_repository)
+    def import_command(identifier, request_id, allow_text_rewrite):
+        return rich_projects.template_import_command(identifier, request_id, allow_text_rewrite,
+            workspace=project_repository.read(identifier))
+    projects.imports = ImportService(projects, v2_pipeline, commands=import_command)
+
+    async def render_export(request):
+        return await production_render(rich_projects, request)
+
+    projects.exports = ExportService(projects, render_export)
 
     def execute_content(files, runner, payload, cancel, runner_epoch):
         worker_error = None

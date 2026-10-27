@@ -136,7 +136,7 @@ async def main(args):
             experimental_profile=None, connection_adapter=connection, gui_provider=content,
             gui_clock=lambda: datetime.fromisoformat(NOW), agent_runtime=runtime,
             background_enabled=True, background_factory=refuse_execution,
-            template_import_call_cap=args.template_call_cap)
+            template_import_call_cap=args.template_call_cap, legacy_routes=False)
     app.app.state.agent.tools.fetcher = web
     service = app.app.state.rich_projects
     if args.template_call_cap is not None:

@@ -64,8 +64,8 @@ class TemplateImports:
         identifier = self.allocate_template('Новое резюме' if pasted else name, self.template_import_package())
         return await self.select(data, name, pasted, id=identifier)
 
-    def template_import_command(self, identifier, client_request_id, allow_text_rewrite):
-        workspace = self.read(identifier)
+    def template_import_command(self, identifier, client_request_id, allow_text_rewrite, *, workspace=None):
+        workspace = workspace if workspace is not None else self.read(identifier)
         pre = workspace.pre_draft
         if workspace.schema_version != 7 or workspace.project is not None or pre is None or pre.template_package is None:
             raise ProjectFailure('IMPORT_PROTOCOL_MISMATCH', 409)
@@ -116,6 +116,8 @@ class TemplateImports:
             raise TemplateImportFailure('IMPORT_CAPTURE_STALE')
 
     async def start_template_import(self, identifier, client_request_id, allow_text_rewrite):
+        if not getattr(self, 'legacy_v7_writes', True):
+            raise ProjectFailure('IMPORT_PROTOCOL_MISMATCH', 409)
         if not self.template_import_status()['available']:
             raise ProjectFailure('JOB_DISABLED', 409)
         command = self.template_import_command(identifier, client_request_id, allow_text_rewrite)

@@ -6,6 +6,8 @@ import type { V7Operation } from "./v7-translation";
 import type { EditResultV1 } from "../contracts/generated/edit_result_v1";
 import type { ProjectOpenResultV1 } from "../contracts/generated/project_open_result_v1";
 import type { HistoryStateV1 } from "../contracts/generated/history_state_v1";
+import { templateExportArtifact } from "../contracts/template-export";
+import archiveSchema from "../../../../contracts/json-schema/archive_manifest_v7.schema.json" with { type: "json" };
 
 /** One open V7 project on the /v2 routes: the editor token, the last verified response and the server's undo state (D109).
  * Replies are parsed with JSON.parse and typed; the server validated them before sending. */
@@ -110,6 +112,57 @@ export class ProjectEditorConnection {
       { requestId, editorToken: token }, this.fetcher));
     return value.cancelled;
   }
+
+  async rename(title: string): Promise<TemplateProjectResponseV1> {
+    const response = await this.editing(token => v2Request<TemplateProjectResponseV1>(this.path("/rename"), "POST",
+      { editorToken: token, baseRevision: this.response.workspace.projectRevision, title }, this.fetcher));
+    this.response = response;
+    return response;
+  }
+
+  async exportDocx(): Promise<{ blob: Blob; attemptId: string }> {
+    const snapshot = this.response.snapshot;
+    if (!snapshot) throw new ProjectApiFailure("INVALID_RESULT");
+    const captured = structuredClone(snapshot);
+    return this.editing(async token => {
+      const response = await this.fetcher(this.path("/export"), { method: "POST", credentials: "same-origin", cache: "no-store",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ schemaVersion: 1, editorToken: token, snapshot: captured }) });
+      if (!response.ok) throw await rejected(response);
+      try {
+        const artifact = await templateExportArtifact(response, captured);
+        return { blob: artifact.blob, attemptId: artifact.attemptId };
+      } catch (error) {
+        throw new ProjectApiFailure(error instanceof Error && error.message === "ARTIFACT_BYTES_MISMATCH" ? error.message : "INVALID_RESULT", response.status);
+      }
+    });
+  }
+
+  saveFoldcv(): Promise<Blob> {
+    const workspace = this.response.workspace;
+    return this.editing(async token => fileBody(await this.fetcher(this.path("/archive"), {
+      method: "POST", credentials: "same-origin", cache: "no-store", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ editorToken: token, projectRevision: workspace.projectRevision, documentRevision: workspace.documentRevision }),
+    }), "application/vnd.foldcv.project+zip", archiveSchema["x-maxArchiveBytes"]));
+  }
+}
+
+async function rejected(response: Response): Promise<ProjectApiFailure> {
+  const text = await response.text();
+  let value: unknown = null;
+  try { value = text ? JSON.parse(text) : null; } catch { return new ProjectApiFailure("INVALID_RESULT", response.status); }
+  const record = typeof value === "object" && value !== null ? value as Record<string, unknown> : {};
+  const error = record["error"];
+  const code = typeof error === "object" && error !== null && typeof Reflect.get(error, "code") === "string"
+    ? String(Reflect.get(error, "code")) : "REQUEST_FAILED";
+  return new ProjectApiFailure(code, response.status, record);
+}
+
+async function fileBody(response: Response, mime: string, maximum: number): Promise<Blob> {
+  if (!response.ok) throw await rejected(response);
+  const blob = await response.blob();
+  if (!blob.size || blob.size > maximum || blob.type !== mime) throw new ProjectApiFailure("INVALID_RESULT", response.status);
+  return blob;
 }
 
 /** Unacknowledged intents of one project, kept in IndexedDB until the server confirms them (plan 2.6). */

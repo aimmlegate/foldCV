@@ -161,9 +161,13 @@ test("E05: cancelling a running preview and a failed generation leave the docume
     const before = JSON.stringify(response.workspace.project), length = session.history.length;
     select(editor, at(editor, target.id, 0), at(editor, target.id, 4));
     const running = session.rewritePreview("hold", "held-request");
+    // Attach before cancel: the preview can reject as soon as the server answers, before the assertion awaits it.
+    const settled = running.then(result => ({ failed: false as const, result }), (error: unknown) => ({ failed: true as const, error }));
     for (let attempt = 0; attempt < 100 && (await rewriteCalls(value)).length === 0; attempt++) await new Promise(resolve => setTimeout(resolve, 20));
     assert.equal(await session.cancelRewrite("held-request"), true);
-    await assert.rejects(running, /CANCELLED/);
+    const outcome = await settled;
+    assert.equal(outcome.failed, true);
+    assert.match(String(outcome.failed ? outcome.error : ""), /CANCELLED/);
     await assert.rejects(session.rewritePreview("fail"), /MODEL_DENIED/);
     assert.equal(JSON.stringify((await shown(session)).response.workspace.project), before);
     assert.equal(session.history.length, length);

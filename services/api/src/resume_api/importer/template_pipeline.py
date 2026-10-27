@@ -402,6 +402,9 @@ class TemplatePipeline(TemplateCheckpoints):
         await asyncio.to_thread(self.update, project, identifier, lambda operation, _data, _workspace: cancel_operation(operation))
         return True
 
+    def authorize(self, project, operation):
+        self.publisher.authorize_template(project, operation)
+
     async def run(self, project, command, *, admitted, finalize=True, cancel_event=None):
         if command.protocol != 'template_import_v1':
             raise TemplateImportFailure('IMPORT_PROTOCOL_MISMATCH')
@@ -420,7 +423,7 @@ class TemplatePipeline(TemplateCheckpoints):
                     lambda value, _data, workspace: self.resume(value, command, workspace))
                 operation = operation_in(workspace, operation.id)
             cancel = self.cancels[(project, operation.id)] = cancel_event if cancel_event is not None else threading.Event()
-            await asyncio.to_thread(self.publisher.authorize_template, project, operation)
+            await asyncio.to_thread(self.authorize, project, operation)
             self.guard(project, operation)
             await admitted()
             workspace = await asyncio.to_thread(self.update, project, operation.id,
