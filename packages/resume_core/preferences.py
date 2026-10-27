@@ -6,7 +6,7 @@ from pathlib import Path
 
 from pydantic import ValidationError
 
-from .models.settings import Preferences
+from .models.settings import Preferences, ProviderSelection
 from .storage import StorageFailure, atomic_write, locked_root, private_file
 
 MODEL = re.compile(r'[a-zA-Z0-9][a-zA-Z0-9._-]{0,79}\Z')
@@ -38,8 +38,12 @@ class PreferencesStore:
                     result[key] = value
                 return result
             value = Preferences.model_validate(json.loads(raw, object_pairs_hook=unique))
-            for model in (value.selected_model, value.selected_import_model, value.selected_fallback_model):
+            kept = [model for selection in value.provider_selections.values() for model in (
+                selection.selected_model, selection.selected_import_model, selection.selected_fallback_model,
+                selection.selected_agent_model)]
+            for model in (value.selected_model, value.selected_import_model, value.selected_fallback_model, *kept):
                 if model is not None and not MODEL.fullmatch(model):raise ValueError()
+            if value.selected_provider in value.provider_selections:raise ValueError()
             return value
         except (OSError, ValueError, ValidationError):
             raise PreferencesFailure('PREFERENCES_CORRUPT') from None
@@ -117,5 +121,29 @@ class PreferencesStore:
                 value.selected_fallback_model = model
                 self._write(value)
                 return value
+        except StorageFailure:
+            raise PreferencesFailure('PREFERENCES_SAVE_FAILED') from None
+
+    def select_provider(self, kind, agent_model):
+        """Keeps the outgoing provider's choices, including the assistant model held in its own file, and
+        restores the incoming provider's; returns the preferences and the assistant model to restore."""
+        try:
+            with locked_root(self.root, '.preferences.lock'):
+                value = self._read()
+                if value.selected_provider == kind:
+                    return value, agent_model
+                selections = dict(value.provider_selections)
+                selections[value.selected_provider] = ProviderSelection(
+                    selectedModel=value.selected_model, selectedImportModel=value.selected_import_model,
+                    selectedFallbackModel=value.selected_fallback_model,
+                    rewriteReasoningEffort=value.rewrite_reasoning_effort, selectedAgentModel=agent_model)
+                restored = selections.pop(kind, ProviderSelection())
+                value.selected_provider = kind
+                value.selected_model, value.selected_import_model = restored.selected_model, restored.selected_import_model
+                value.selected_fallback_model = restored.selected_fallback_model
+                value.rewrite_reasoning_effort = restored.rewrite_reasoning_effort
+                value.provider_selections = selections
+                self._write(value)
+                return value, restored.selected_agent_model
         except StorageFailure:
             raise PreferencesFailure('PREFERENCES_SAVE_FAILED') from None

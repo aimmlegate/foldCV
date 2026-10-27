@@ -28,7 +28,8 @@ from packages.resume_core.reasoning import ModelReasoning
 from packages.resume_core.storage import atomic_write
 from packages.resume_core.text_rewrite import PlainTextReply
 from resume_api.agent.runtime import RuntimeResult, ScriptedAgentRuntime
-from resume_api.app import create_app
+from resume_api.app import ProviderSlot, create_app
+from resume_api.providers.registry import ProviderRegistry
 from resume_api.connection import Metadata, Quota
 from resume_api.providers.content import ContentFailure, ContentResult, ReportedUsage
 from resume_api.providers.dynamic_result import DynamicResultSpec
@@ -53,6 +54,17 @@ class ScriptedConnection:
 
     def detach(self, *_args, **_kwargs):
         self.calls.append('scripted_detach')
+
+
+class ScriptedClaude(ScriptedConnection):
+    """The unlisted Claude provider in preview: two catalog models and no usage read (decision 15)."""
+    executable = None
+
+    def inspect(self, _files, _cancel, *, full=True):
+        self.calls.append('inspect_claude')
+        models = ('claude-sonnet-5-5', 'claude-opus-5-5')
+        return Metadata('2.1.308 (Claude Code)', models, 'max', Quota('not_provided'),
+            reasoning={name: ModelReasoning(supported=['low', 'medium', 'high'], default='medium') for name in models})
 
 
 class ScriptedContent:
@@ -203,7 +215,9 @@ async def main(args):
         app = create_app(origin=origin, secret=secret, temp_root=operations, data_root=data, dist=dist,
             experimental_profile=None, connection_adapter=connection, content_provider=content,
             clock=lambda: datetime.fromisoformat(NOW), agent_runtime=runtime,
-            template_import_call_cap=args.template_call_cap)
+            template_import_call_cap=args.template_call_cap,
+            provider_registry=ProviderRegistry(frozenset({'claude_cli'})) if args.preview_claude else None,
+            provider_slots={'claude_cli': ProviderSlot(ScriptedClaude())} if args.preview_claude else None)
     app.app.state.assistant._fetcher = web
     repository = app.app.state.projects.repository
     if args.template_call_cap is not None:
@@ -256,4 +270,6 @@ if __name__ == '__main__':
     parser.add_argument('--employment', choices=['issues', 'views', 'generic-f06', 'generic-f10'], default='issues')
     # Explicit test allowance for template imports; without it the import stays unavailable, as in production.
     parser.add_argument('--template-call-cap', type=int, default=None)
+    # Lists the scripted Claude provider next to Codex, as `preview_kinds` does in tests.
+    parser.add_argument('--preview-claude', action='store_true')
     asyncio.run(main(parser.parse_args()))

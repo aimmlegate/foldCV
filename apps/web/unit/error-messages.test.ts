@@ -95,7 +95,7 @@ test("save status and installation render descriptions without error codes in vi
     expand: () => {}, status: "PROJECT_SAVE_FAILED", ready: true, busy: false, save: () => {}, exportFile: () => {}, retrySave: () => {} }));
   assert.ok(!header.includes("PROJECT_SAVE_FAILED")); assert.match(header, /Не сохранено/u); assert.match(header, /сохранить/u);
   const installation = renderToStaticMarkup(createElement(Installation, { value: { available: true, state: "failed",
-    version: "0.0.0", downloadedBytes: 0, totalBytes: 0, error: "download_failed" } }));
+    version: "0.0.0", downloadedBytes: 0, totalBytes: 0, error: "download_failed" }, display: "Codex" }));
   assert.ok(!installation.includes("download_failed")); assert.match(installation, /скачать/u);
 });
 

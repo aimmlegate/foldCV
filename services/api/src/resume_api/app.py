@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 from concurrent.futures import ThreadPoolExecutor
+from dataclasses import dataclass
 from io import BytesIO
 from contextlib import asynccontextmanager
 from http.cookies import SimpleCookie
@@ -20,13 +21,14 @@ from fastapi.responses import FileResponse, JSONResponse, Response
 from starlette.exceptions import HTTPException as StarletteHTTPException
 from pydantic import ValidationError
 
-from .host_models import (ConnectionPayload, EmptyRequest, ErrorEnvelope, ErrorPayload, QuotaPayload, SelectModelRequest,
-                          SelectReasoningRequest)
+from .host_models import (ConnectionPayload, ErrorEnvelope, ErrorPayload, HostRequest, ProviderSummary, QuotaPayload,
+                          SelectModelRequest, SelectProviderRequest, SelectReasoningRequest)
 from .lifecycle import OperationFiles, SpikeError, has_blocked_owned, reap_owned
 from .connection import ConnectionAdapter, ConnectionFailure, Metadata
 from .cli.experimental_profile import ExperimentalCliProfile, ExperimentalProfileError
 from .cli.installation import CliInstallation
 from .providers.codex_cli import CodexCliProvider
+from .providers.registry import DESCRIPTORS, ProviderRegistry, discovered
 from .extracting import MAX_BODY as MAX_EXTRACT_BODY
 from packages.resume_core.rendering.template import ROOT as TEMPLATE_ROOT, MANIFEST as TEMPLATE_MANIFEST, RenderFailure, require_template
 from packages.resume_core.rules import PRESET_HEADINGS, RulesFailure, RulesStore, presets
@@ -45,10 +47,24 @@ MAX_BODY = 1_048_576
 MAX_CONCURRENT = 2
 BODY_TIMEOUT_SECONDS = 10
 CANCEL_GRACE_SECONDS = 0.5
+# "not_provided": the provider has no sanctioned usage read (decision 15); runs stay allowed.
+USABLE_QUOTA = frozenset({"available", "not_provided"})
 POST_ONLY_PATHS = frozenset({"session/exchange", "host/discover", "host/status", "host/login", "host/detach", "host/models",
-                            "host/select", "host/cancel-login", "host/install", "host/cancel-install"})
+                            "host/select", "host/cancel-login", "host/install", "host/cancel-install",
+                            "host/select-provider"})
 JSON_POST_PATHS = frozenset("/v1/" + path for path in POST_ONLY_PATHS)
 JSON_PUT_PATHS = frozenset({"/v1/settings/rules", "/v1/settings/assistant"})
+
+
+@dataclass
+class ProviderSlot:
+    """One provider's connection adapter, content provider, native profile, installer and assistant runtime;
+    only the active slot runs processes."""
+    connection: object
+    provider: object | None = None
+    profile: object | None = None
+    installation: CliInstallation | None = None
+    runtime: object | None = None
 
 
 def problem(code: str, status: int, stage: str = "request", retryable: bool = False) -> JSONResponse:
@@ -202,15 +218,21 @@ class LocalBoundary:
 def create_app(*, origin: str, secret: str, temp_root: Path, dist: Path, cli_executable: Path | None = None,
                connection_adapter: ConnectionAdapter | None = None, experimental_profile: ExperimentalCliProfile | None = None,
                data_root: Path | None = None, content_provider=None, clock=None, agent_runtime=None,
-               template_import_call_cap: int | None = None, template_import_concurrency: int = 3):
+               template_import_call_cap: int | None = None, template_import_concurrency: int = 3,
+               provider_registry: ProviderRegistry | None = None, provider_slots: dict[str, ProviderSlot] | None = None):
     if not origin.startswith("http://127.0.0.1:") or not origin.rsplit(":", 1)[-1].isdigit():
         raise ValueError("A concrete IPv4 loopback origin is required")
     if len(secret) < 32:
         raise ValueError("Startup secret is too short")
     if experimental_profile is not None and (content_provider is not None or agent_runtime is not None):
         raise ValueError("Experimental CLI cannot use injected generation runners")
+    registry = provider_registry or ProviderRegistry()
+    if any(kind == "codex_cli" or kind not in DESCRIPTORS for kind in provider_slots or {}):
+        raise ValueError("Extra provider slots name other known kinds")
     reap_owned(temp_root)
-    blocked_on_start = has_blocked_owned(temp_root) or recover_profile(experimental_profile, temp_root)
+    blocked_on_start = (has_blocked_owned(temp_root) or recover_profile(experimental_profile, temp_root)
+                        or any(recover_profile(slot.profile, temp_root) for slot in (provider_slots or {}).values()
+                               if slot.profile is not None))
     operations: dict[asyncio.Task, OperationFiles] = {}
     cancellation_pending: set[asyncio.Task] = set()
     connection_work: dict[asyncio.Task, tuple[OperationFiles, threading.Event]] = {}
@@ -257,11 +279,15 @@ def create_app(*, origin: str, secret: str, temp_root: Path, dist: Path, cli_exe
     connection_state = ConnectionPayload(state="unchecked")
     connection_epoch = 0
     connection_namespace = secrets.token_hex(12)
+    # The names above always hold the active slot; a provider switch rebinds them after a clean detach.
+    slots = {"codex_cli": ProviderSlot(connection, provider, experimental_profile, installation), **(provider_slots or {})}
+    active_kind = "codex_cli"
+    provider_notice = None
 
     def experimental_authorized(model=None) -> bool:
         return (experimental_profile is not None and not unsafe_cleanup and not INFERENCE.blocked
                 and connection_state.state == "connected" and connection_state.metadataReady
-                and connection_state.quota.state == "available"
+                and connection_state.quota.state in USABLE_QUOTA
                 and (model or connection_state.selectedModel) in connection_state.models)
 
     def experimental_ready(model=None) -> bool:
@@ -349,7 +375,7 @@ def create_app(*, origin: str, secret: str, temp_root: Path, dist: Path, cli_exe
             "AGENT_AUTH_REQUIRED" if connection_state.state in {"login_required", "login_pending", "detached"} else
             "AGENT_QUOTA" if connection_state.quota.state == "exhausted" else "AGENT_CONNECTION_UNAVAILABLE")
         ready = (not unsafe_cleanup and not INFERENCE.blocked and connection_state.state == "connected"
-            and connection_state.metadataReady and connection_state.quota.state == "available"
+            and connection_state.metadataReady and connection_state.quota.state in USABLE_QUOTA
             and not connection_work)
         return AgentConnection(ready, tuple(connection_state.models),
             "connection_" + connection_namespace + "_" + str(connection_epoch), None if ready else reason)
@@ -364,6 +390,33 @@ def create_app(*, origin: str, secret: str, temp_root: Path, dist: Path, cli_exe
     projects.on_deleted = assistant.project_deleted
     app.state.assistant = assistant
     mount_assistant(app, assistant)
+    slots["codex_cli"].runtime = resolved_agent_runtime
+
+    def activate(kind):
+        nonlocal active_kind, connection, provider, experimental_profile, installation
+        slot = slots[kind]
+        active_kind = kind
+        connection, provider, experimental_profile, installation = (slot.connection, slot.provider, slot.profile,
+                                                                    slot.installation)
+        assistant.runtime = slot.runtime
+
+    def switch_preferences(kind):
+        # The assistant model lives in its own file; it moves with the provider's other choices.
+        _, agent_model = preferences_store.select_provider(kind, assistant.settings.load().selected_agent_model)
+        assistant.settings.restore_model(agent_model)
+
+    try:
+        stored = preferences_store.load().selected_provider if preferences_store.path.exists() else "codex_cli"
+    except PreferencesFailure:
+        stored = "codex_cli"
+    if stored != "codex_cli" and registry.resolve(stored) == stored and stored in slots:
+        activate(stored)
+    elif stored != "codex_cli":
+        provider_notice = "provider_unavailable"
+        try:
+            switch_preferences("codex_cli")
+        except (PreferencesFailure, AgentFailure):
+            pass
 
     def template_import_model():
         # The capture records the selected import model with its catalog default effort; nothing is chosen here.
@@ -584,8 +637,25 @@ def create_app(*, origin: str, secret: str, temp_root: Path, dist: Path, cli_exe
     login_task: asyncio.Task | None = None
     install_task: asyncio.Task | None = None
 
+    def provider_summaries() -> list[ProviderSummary]:
+        summaries = []
+        for item in registry.listed():
+            if item.kind not in slots:
+                continue
+            slot = slots[item.kind]
+            executable = getattr(slot.connection, "executable", None)
+            # The runtime FoldCV installed is pinned by hash, not by signature, so its file is enough here.
+            installed = (connection_state.state not in {"cli_missing", "launcher_unsupported"} if item.kind == active_kind
+                         else executable is not None and executable.is_file() if getattr(slot.profile, "managed", False)
+                         else discovered(item, executable))
+            summaries.append(ProviderSummary(kind=item.kind, display=item.display, subscription=item.subscription,
+                                             publisher=item.publisher, installed=installed))
+        return summaries
+
     def connection_response() -> JSONResponse:
-        state = ConnectionPayload(**(connection_state.model_dump() | {"experimentalMode": experimental_profile is not None,
+        state = ConnectionPayload(**(connection_state.model_dump() | {"provider": active_kind, "providers": provider_summaries(),
+                                                    "providerNotice": provider_notice,
+                                                    "experimentalMode": experimental_profile is not None,
                                                     "generationReady": experimental_ready(),
                                                     "installation": installation.snapshot() if installation else None}))
         return JSONResponse(state.model_dump(), headers={"Cache-Control": "no-store"})
@@ -725,6 +795,8 @@ def create_app(*, origin: str, secret: str, temp_root: Path, dist: Path, cli_exe
                         connection.experimental_profile = experimental_profile
                         provider = CodexCliProvider(result, experimental_profile=experimental_profile)
                         assistant.runtime = CodexAgentRuntime(connection, temp_root)
+                        slots["codex_cli"] = ProviderSlot(connection, provider, experimental_profile, installation,
+                                                          assistant.runtime)
                         if epoch == connection_epoch:
                             connection_state = ConnectionPayload(state="unchecked")
                     return connection_response()
@@ -747,6 +819,7 @@ def create_app(*, origin: str, secret: str, temp_root: Path, dist: Path, cli_exe
                 state = ("unchecked" if kind == "discover" else "quota_exhausted" if quota.state == "exhausted"
                          else "unknown_limits" if quota.state == "unknown" else "connected")
                 connection_state = ConnectionPayload(state=state, version=result.version, plan=result.plan,
+                                                     versionStatus=result.version_status,
                                                      models=list(result.models), selectedModel=selected, quota=quota, modelReasoning=result.reasoning,
                                                      metadataReady=kind != "discover")
                 return connection_response()
@@ -807,25 +880,38 @@ def create_app(*, origin: str, secret: str, temp_root: Path, dist: Path, cli_exe
             if install_task is task:
                 install_task = None
 
-    async def discover(_payload: EmptyRequest):
-        return await connection_job("discover", lambda files, cancel: connection.inspect(files, cancel, full=False))
+    def inactive(payload: HostRequest) -> JSONResponse | None:
+        return problem("PROVIDER_INACTIVE", 409, "host") if payload.provider not in (None, active_kind) else None
 
-    async def status(_payload: EmptyRequest):
-        return await connection_job("status", lambda files, cancel: connection.inspect(files, cancel))
+    async def discover(payload: HostRequest):
+        if refused := inactive(payload):
+            return refused
+        return await connection_job("discover", lambda files, cancel, adapter=connection: adapter.inspect(files, cancel, full=False))
 
-    async def models(_payload: EmptyRequest):
-        return await status(_payload)
+    async def status(payload: HostRequest):
+        if refused := inactive(payload):
+            return refused
+        return await connection_job("status", lambda files, cancel, adapter=connection: adapter.inspect(files, cancel))
 
-    async def login(_payload: EmptyRequest):
+    async def models(payload: HostRequest):
+        return await status(payload)
+
+    async def login(payload: HostRequest):
+        if refused := inactive(payload):
+            return refused
         return await connection_job("login", connection.login)
 
-    async def install_cli(_payload: EmptyRequest):
+    async def install_cli(payload: HostRequest):
+        if refused := inactive(payload):
+            return refused
         if installation is None:
             return problem("INSTALL_NOT_AVAILABLE", 409, "host")
         return await connection_job("install", lambda files, _cancel: installation.install(files))
 
-    async def cancel_install(_payload: EmptyRequest):
+    async def cancel_install(payload: HostRequest):
         nonlocal connection_epoch
+        if refused := inactive(payload):
+            return refused
         async with gate:
             current = install_task
             if current is None or current not in connection_work:
@@ -843,6 +929,8 @@ def create_app(*, origin: str, secret: str, temp_root: Path, dist: Path, cli_exe
 
     async def select(payload: SelectModelRequest):
         nonlocal connection_state
+        if refused := inactive(payload):
+            return refused
         async with gate:
             if not connection_state.metadataReady or payload.model not in connection_state.models:
                 return problem("MODEL_DENIED", 409, "host")
@@ -854,8 +942,10 @@ def create_app(*, origin: str, secret: str, temp_root: Path, dist: Path, cli_exe
             connection_state = connection_state.model_copy(update={"selectedModel": payload.model})
             return connection_response()
 
-    async def detach(_payload: EmptyRequest):
+    async def detach(payload: HostRequest):
         nonlocal connection_epoch, connection_state
+        if refused := inactive(payload):
+            return refused
         async with gate:
             if provider is not None:
                 provider.invalidate_preflight()
@@ -877,8 +967,10 @@ def create_app(*, origin: str, secret: str, temp_root: Path, dist: Path, cli_exe
             connection_state = ConnectionPayload(state="cleanup_blocked")
         return connection_response()
 
-    async def cancel_login(_payload: EmptyRequest):
+    async def cancel_login(payload: HostRequest):
         nonlocal connection_epoch, connection_state
+        if refused := inactive(payload):
+            return refused
         async with gate:
             current = login_task
             if current is None or current not in connection_work:
@@ -894,9 +986,34 @@ def create_app(*, origin: str, secret: str, temp_root: Path, dist: Path, cli_exe
             connection_state = ConnectionPayload(state="cleanup_blocked")
         return connection_response()
 
+    async def select_provider(payload: SelectProviderRequest):
+        nonlocal connection_epoch, connection_state, provider_notice
+        if payload.provider not in {item.kind for item in registry.listed()} or payload.provider not in slots:
+            return problem("PROVIDER_UNAVAILABLE", 409, "host")
+        if payload.provider == active_kind:
+            return connection_response()
+        # A clean detach first, never a CLI logout; runs in flight stop on the provider they started on.
+        detached = await detach(HostRequest())
+        async with gate:
+            if unsafe_cleanup or connection_state.state == "cleanup_blocked":
+                return detached
+            if connection_work or cancellation_pending:
+                return problem("BUSY", 429, "host", True)
+            try:
+                rules_store.load()
+                switch_preferences(payload.provider)
+            except (PreferencesFailure, RulesFailure, AgentFailure) as error:
+                return problem(error.code, 409, "settings")
+            activate(payload.provider)
+            connection_epoch += 1
+            connection_state = ConnectionPayload(state="unchecked")
+            provider_notice = None
+            return connection_response()
+
     for path, handler in (("discover", discover), ("status", status), ("models", models),
                           ("login", login), ("select", select), ("detach", detach),
-                          ("cancel-login", cancel_login), ("install", install_cli), ("cancel-install", cancel_install)):
+                          ("cancel-login", cancel_login), ("install", install_cli), ("cancel-install", cancel_install),
+                          ("select-provider", select_provider)):
         app.add_api_route(f"/v1/host/{path}", handler, methods=["POST"])
 
     @app.get("/{path:path}")

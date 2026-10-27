@@ -24,7 +24,61 @@ def test_private_preferences_keep_defaults_model_and_unrelated_fields_on_restart
     assert PreferencesStore(root).load() == selected and selected.automatic_analysis == initial.automatic_analysis
     assert stat.S_IMODE(root.stat().st_mode) == 0o700 and stat.S_IMODE(store.path.stat().st_mode) == 0o600
     assert set(json.loads(store.path.read_text())) == {'schemaVersion', 'automaticAnalysis', 'theme', 'selectedModel',
-        'selectedImportModel', 'selectedFallbackModel', 'rewriteReasoningEffort', 'importMinutes', 'projectMegabytes'}
+        'selectedImportModel', 'selectedFallbackModel', 'rewriteReasoningEffort', 'importMinutes', 'projectMegabytes',
+        'selectedProvider', 'providerSelections'}
+
+
+def test_preferences_from_before_providers_load_as_codex(tmp_path):
+    root = tmp_path / 'FoldCV'
+    RulesStore(root).load()
+    store = PreferencesStore(root)
+    atomic_write(store.path, json.dumps({'schemaVersion': 1, 'automaticAnalysis': False, 'theme': 'dark',
+        'selectedModel': 'model-a', 'selectedImportModel': 'model-b', 'rewriteReasoningEffort': 'high'}).encode())
+    value = store.load()
+    assert value.selected_provider == 'codex_cli' and value.provider_selections == {}
+    assert (value.selected_model, value.selected_import_model, value.rewrite_reasoning_effort) == ('model-a', 'model-b', 'high')
+    assert not value.automatic_analysis and value.theme == 'dark'
+
+
+def test_provider_switch_keeps_and_restores_each_providers_choices(tmp_path):
+    root = tmp_path / 'FoldCV'
+    RulesStore(root).load()
+    store = PreferencesStore(root)
+    store.select_model('model-a')
+    store.select_import_model('model-b')
+    store.select_fallback_model('model-c')
+    store.select_rewrite_reasoning('model-a', 'high')
+    value, agent = store.select_provider('claude_cli', 'agent-a')
+    assert value.selected_provider == 'claude_cli' and agent is None
+    assert (value.selected_model, value.selected_import_model, value.selected_fallback_model,
+            value.rewrite_reasoning_effort) == (None, None, None, None)
+    store.select_model('claude-model')
+    value, agent = store.select_provider('codex_cli', 'agent-b')
+    assert agent == 'agent-a' and value.selected_provider == 'codex_cli'
+    assert (value.selected_model, value.selected_import_model, value.selected_fallback_model,
+            value.rewrite_reasoning_effort) == ('model-a', 'model-b', 'model-c', 'high')
+    assert set(value.provider_selections) == {'claude_cli'}
+    value, agent = store.select_provider('claude_cli', 'agent-a')
+    assert value.selected_model == 'claude-model' and agent == 'agent-b'
+    assert store.select_provider('claude_cli', 'agent-x') == (store.load(), 'agent-x')
+
+
+@pytest.mark.parametrize('change', [
+    {'selectedProvider': 'grok_cli'},
+    {'providerSelections': {'codex_cli': {'selectedModel': 'model-a'}}},
+    {'selectedProvider': 'claude_cli', 'providerSelections': {'claude_cli': {}}},
+    {'providerSelections': {'claude_cli': {'selectedAgentModel': 'email@example.invalid'}}},
+])
+def test_invalid_provider_preferences_are_corrupt_without_reset(tmp_path, change):
+    root = tmp_path / 'FoldCV'
+    RulesStore(root).load()
+    store = PreferencesStore(root)
+    raw = json.dumps({'schemaVersion': 1, 'automaticAnalysis': True, 'theme': 'system', 'selectedModel': None,
+                      **change}).encode()
+    atomic_write(store.path, raw)
+    with pytest.raises(PreferencesFailure, match='PREFERENCES_CORRUPT'):
+        store.load()
+    assert store.path.read_bytes() == raw
 
 
 def test_preferences_invalid_model_corrupt_json_and_symlink_fail_without_reset_or_leak(tmp_path, capsys):

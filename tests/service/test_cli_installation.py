@@ -45,8 +45,6 @@ def package(tmp_path, monkeypatch):
                         ("MANIFEST_SHA256", hashlib.sha256(payloads["codex-package.json"]).hexdigest())):
         monkeypatch.setattr(release, name, value)
     monkeypatch.setattr(CliInstallation, "download", lambda _self, _files, destination: shutil.copyfile(archive, destination))
-    from resume_api.agent import host_profile as agent
-    monkeypatch.setattr(agent, "MANIFEST_SHA256", release.MANIFEST_SHA256)
     return archive, payloads
 
 
@@ -187,19 +185,18 @@ def test_relocated_agent_uses_the_pinned_local_companion(package, tmp_path, monk
 
     installer = CliInstallation(tmp_path / "cli-runtime")
     assert install(installer, tmp_path)
-    monkeypatch.setattr(agent, "MANIFEST_SHA256", release.MANIFEST_SHA256)
-    agent.check_host(installer.executable.parent.parent)
+    agent.check_host(installer.executable.parent.parent, managed=True)
     current = ExperimentalCliProfile(tmp_path / "profile", installer.executable)
     adapter = ConnectionAdapter(current.executable, experimental_profile=current)
     relocated = AgentProfile.from_connection(adapter)
-    assert relocated.binary_sha256 == release.CLI_SHA256
+    assert relocated.managed
     assert relocated.host_path == installer.executable.parent / "codex-code-mode-host"
     policy = relocated._policy(tmp_path, agent.APP_SERVER_PREFIX)
     assert '(allow process-exec (literal "' + str(relocated.host_path) + '"))' in policy
     assert str(agent.CODE_MODE_HOST) not in policy
     relocated.host_path.write_bytes(b"changed-host")
     with pytest.raises(ExperimentalProfileError, match="AGENT_CODE_MODE_HOST_UNSUPPORTED"):
-        agent.check_host(installer.executable.parent.parent)
+        agent.check_host(installer.executable.parent.parent, managed=True)
 
 
 class InstalledMetadata(ConnectionAdapter):

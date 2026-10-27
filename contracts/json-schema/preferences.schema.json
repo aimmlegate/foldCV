@@ -1,4 +1,84 @@
 {
+  "$defs": {
+    "ProviderSelection": {
+      "additionalProperties": false,
+      "description": "Choices kept for a provider while another one is active; restored when it is selected again.",
+      "properties": {
+        "rewriteReasoningEffort": {
+          "anyOf": [
+            {
+              "enum": [
+                "none",
+                "minimal",
+                "low",
+                "medium",
+                "high",
+                "xhigh",
+                "max",
+                "ultra"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Rewritereasoningeffort"
+        },
+        "selectedAgentModel": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Selectedagentmodel"
+        },
+        "selectedFallbackModel": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Selectedfallbackmodel"
+        },
+        "selectedImportModel": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Selectedimportmodel"
+        },
+        "selectedModel": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Selectedmodel"
+        }
+      },
+      "title": "ProviderSelection",
+      "type": "object"
+    }
+  },
   "additionalProperties": false,
   "properties": {
     "automaticAnalysis": {
@@ -18,6 +98,19 @@
       "minimum": 10,
       "title": "Projectmegabytes",
       "type": "integer"
+    },
+    "providerSelections": {
+      "additionalProperties": {
+        "$ref": "#/$defs/ProviderSelection"
+      },
+      "propertyNames": {
+        "enum": [
+          "codex_cli",
+          "claude_cli"
+        ]
+      },
+      "title": "Providerselections",
+      "type": "object"
     },
     "rewriteReasoningEffort": {
       "anyOf": [
@@ -80,6 +173,15 @@
         }
       ],
       "title": "Selectedmodel"
+    },
+    "selectedProvider": {
+      "default": "codex_cli",
+      "enum": [
+        "codex_cli",
+        "claude_cli"
+      ],
+      "title": "Selectedprovider",
+      "type": "string"
     },
     "theme": {
       "enum": [

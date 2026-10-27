@@ -1,8 +1,11 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { ConnectionWorkflow, validConnection } from "../src/connection/workflow";
+import { ConnectionWorkflow, providerNames, validConnection, type ConnectionSnapshot } from "../src/connection/workflow";
 
-const ready = { state: "connected", version: "codex-cli 0.162.0-alpha.2", plan: "plus",
+const codex = { kind: "codex_cli", display: "Codex", subscription: "ChatGPT", publisher: "OpenAI", installed: true };
+const claude = { kind: "claude_cli", display: "Claude", subscription: "Claude", publisher: "Anthropic", installed: true };
+const ready = { provider: "codex_cli", providers: [codex], providerNotice: null, state: "connected",
+  version: "codex-cli 0.162.0-alpha.2", versionStatus: "supported", plan: "plus",
   models: ["gpt-6-luna"], selectedModel: null,
   quota: { state: "available", usedPercent: 25, resetsAt: 1800000000 }, metadataReady: true,
   generationReady: false, experimentalMode: false };
@@ -21,6 +24,48 @@ test("connection response rejects arbitrary models, quotas and production readin
   assert.equal(validConnection({ ...ready, quota: { ...ready.quota, usedPercent: Infinity } }), false);
   assert.equal(validConnection({ ...ready, state: "launcher_unsupported", models: [],
     selectedModel: null, metadataReady: false }), true);
+});
+
+test("connection response names a listed active provider and bounded provider fields", () => {
+  assert.equal(validConnection({ ...ready, providers: [codex, claude], provider: "claude_cli", versionStatus: "graceful",
+    quota: { state: "not_provided", usedPercent: null, resetsAt: null } }), true);
+  assert.equal(validConnection({ ...ready, provider: "claude_cli" }), false);
+  assert.equal(validConnection({ ...ready, provider: "grok_cli", providers: [{ ...codex, kind: "grok_cli" }] }), false);
+  assert.equal(validConnection({ ...ready, providers: [codex, codex] }), false);
+  assert.equal(validConnection({ ...ready, providers: [{ ...codex, display: "" }] }), false);
+  assert.equal(validConnection({ ...ready, providers: [{ ...codex, installed: "yes" }] }), false);
+  assert.equal(validConnection({ ...ready, providerNotice: "other" }), false);
+  assert.equal(validConnection({ ...ready, versionStatus: "broken" }), false);
+  const { provider: _provider, ...unnamed } = ready;
+  assert.equal(validConnection(unnamed), false);
+  assert.equal(providerNames({ ...ready, provider: "claude_cli", providers: [codex, claude] } as ConnectionSnapshot).display, "Claude");
+});
+
+test("host requests name the provider and a switch checks the new provider", async () => {
+  const calls: { path: string; body: unknown }[] = [];
+  const both = { ...ready, providers: [codex, claude] };
+  const request: typeof fetch = (input, init) => {
+    const path = String(input);
+    calls.push({ path, body: init?.body ? JSON.parse(String(init.body)) : null });
+    if (path.endsWith("/select-provider")) return Promise.resolve(response({ ...both, provider: "claude_cli", state: "unchecked",
+      version: null, versionStatus: null, plan: null, models: [], quota: { state: "unknown", usedPercent: null, resetsAt: null }, metadataReady: false }));
+    if (path.endsWith("/status") && calls.length > 2) return Promise.resolve(response({ ...both, provider: "claude_cli", models: ["claude-sonnet-5-5"],
+      quota: { state: "not_provided", usedPercent: null, resetsAt: null } }));
+    return Promise.resolve(response(both));
+  };
+  const workflow = new ConnectionWorkflow(() => {}, request);
+  await workflow.refresh();
+  assert.equal(await workflow.selectProvider("codex_cli"), false);
+  assert.equal(await workflow.selectProvider("claude_cli"), true);
+  assert.deepEqual(calls.map(call => [call.path, call.body]), [
+    ["/v1/host/status", {}],
+    ["/v1/host/select-provider", { provider: "claude_cli" }],
+    ["/v1/host/status", { provider: "claude_cli" }],
+  ]);
+  assert.equal(workflow.view.snapshot.provider, "claude_cli");
+  assert.equal(workflow.view.snapshot.quota.state, "not_provided");
+  await workflow.detach();
+  assert.deepEqual(calls.at(-1), { path: "/v1/host/detach", body: { provider: "claude_cli" } });
 });
 
 test("detach discards a late metadata result", async () => {

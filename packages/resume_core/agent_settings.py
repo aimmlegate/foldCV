@@ -53,3 +53,17 @@ class AgentSettingsStore:
                 return result
         except (StorageFailure, OSError):
             raise AgentFailure("AGENT_SETTINGS_SAVE_FAILED") from None
+
+    def restore_model(self, model: str | None) -> AgentSettings:
+        """A provider switch restores that provider's assistant model; the next run checks it against the catalog."""
+        try:
+            with locked_root(self.root, ".assistant-settings.lock"):
+                current = self._read()
+                if current.selected_agent_model == model:
+                    return current
+                result = AgentSettings(schemaVersion=1, revision=current.revision + 1,
+                    enabled=current.enabled, selectedAgentModel=model)
+                atomic_write(self.path, wire_bytes(result))
+                return result
+        except (StorageFailure, OSError):
+            raise AgentFailure("AGENT_SETTINGS_SAVE_FAILED") from None

@@ -29,7 +29,9 @@ from resume_api.providers.content import (ContentFailure, ContentInput, ContentR
 from resume_api.providers.structured_schema import StructuredSchema
 from resume_api.providers.dynamic_result import DynamicResultSpec
 from resume_api.providers.preflight import PreflightCache, preflight_key
-from resume_api.cli.profile import FIXTURE_VERSION, GAPS, REQUIRED_FLAGS, VERSION, exec_arguments, overrides
+from resume_api.cli.profile import (FIXTURE_VERSION, GAPS, REQUIRED_FLAGS, check_features, exec_arguments, overrides,
+                                     qualify)
+from resume_api.cli.qualification import QualificationError, missing_flags
 
 
 MODEL = re.compile(r"[a-zA-Z0-9][a-zA-Z0-9._-]{0,79}\Z")
@@ -265,6 +267,9 @@ class CodexCliProvider:
         except ExperimentalProfileError as error:
             raise ContentFailure(str(error)) from None
 
+    def _config(self, files: OperationFiles) -> list[str]:
+        return self.experimental_profile.config(files.path) if self.experimental_profile else overrides(files.path)
+
     def probe(self, files: OperationFiles, cancel: threading.Event, *, deadline: float | None = None) -> Probe:
         end = deadline if deadline is not None else self.clock() + 15
         version_raw, _ = self._run(files, ("--version",), end, cancel)
@@ -272,12 +277,18 @@ class CodexCliProvider:
             version = version_raw.decode("utf-8", "strict").strip()
         except UnicodeError:
             raise ContentFailure("CLI_UNSUPPORTED") from None
-        expected = {self.experimental_profile.version} if self.experimental_profile else {VERSION, FIXTURE_VERSION}
-        if version not in expected:
-            raise ContentFailure("CLI_UNSUPPORTED")
+        try:
+            qualify(version)
+        except QualificationError:
+            raise ContentFailure("CLI_UNSUPPORTED") from None
         help_raw, _ = self._run(files, ("exec", "--help"), end, cancel)
-        if any(flag.encode() not in help_raw for flag in REQUIRED_FLAGS):
+        if missing_flags(help_raw.decode("utf-8", "replace"), REQUIRED_FLAGS):
             raise ContentFailure("CLI_PROFILE_UNSAFE")
+        listing, _ = self._run(files, ("features", "list", *self._config(files)), end, cancel)
+        try:
+            check_features(listing.decode("utf-8", "replace"))
+        except QualificationError:
+            raise ContentFailure("CLI_PROFILE_UNSAFE") from None
         stdout, stderr = self._run(files, ("login", "status"), end, cancel, login_status=True)
         status = (stdout + stderr).decode("utf-8", "replace").lower()
         if "api key" in status or "api-key" in status:
@@ -287,7 +298,7 @@ class CodexCliProvider:
         fixture_ready = (self.fixture_transport is not None
                          and self.fixture_transport.executable.absolute() == self.executable
                          and version == FIXTURE_VERSION)
-        experimental_ready = self.experimental_profile is not None and version == self.experimental_profile.version
+        experimental_ready = self.experimental_profile is not None
         return Probe(version, "chatgpt", fixture_ready or experimental_ready,
                      () if fixture_ready or experimental_ready else GAPS)
 
@@ -345,8 +356,7 @@ class CodexCliProvider:
 
         if files.path is None:
             raise ContentFailure("TEMP_FAILED")
-        config = (self.experimental_profile.config(files.path) if self.experimental_profile
-                  else overrides(files.path))
+        config = self._config(files)
         self._run(files, ("app-server", "--strict-config", *config), end, cancel,
                   data=request(0, "initialize", {"clientInfo": {"name": "foldcv", "version": "0.1.0"}}),
                   on_line=accept, interactive=True)

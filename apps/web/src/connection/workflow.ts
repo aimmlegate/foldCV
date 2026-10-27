@@ -6,15 +6,23 @@ export type ConnectionState = "unchecked" | "detached" | "cli_missing" | "launch
   "unknown_limits" | "connected" | "login_pending" | "login_failed" | "cleanup_blocked";
 
 export type CliInstallation = CliInstallationPayload;
+export type ProviderKind = "codex_cli" | "claude_cli";
+export type ProviderSummary = { kind: ProviderKind; display: string; subscription: string; publisher: string; installed: boolean };
+export type QuotaState = "unknown" | "available" | "exhausted" | "not_provided";
 
 export type ConnectionSnapshot = {
+  // Null only before the first server reply.
+  provider: ProviderKind | null;
+  providers: ProviderSummary[];
+  providerNotice: "provider_unavailable" | null;
   state: ConnectionState;
   version: string | null;
+  versionStatus: "supported" | "graceful" | null;
   plan: string | null;
   models: string[];
   selectedModel: string | null;
   modelReasoning?: Record<string, ModelReasoning>;
-  quota: { state: "unknown" | "available" | "exhausted"; usedPercent: number | null; resetsAt: number | null };
+  quota: { state: QuotaState; usedPercent: number | null; resetsAt: number | null };
   metadataReady: boolean;
   generationReady: boolean;
   experimentalMode: boolean;
@@ -27,9 +35,16 @@ const states = new Set<ConnectionState>(["unchecked", "detached", "cli_missing",
   "api_key_mode", "metadata_failed", "quota_exhausted", "unknown_limits", "connected", "login_pending",
   "login_failed", "cleanup_blocked"]);
 const model = /^[a-zA-Z0-9][a-zA-Z0-9._-]{0,79}$/;
-const initial: ConnectionSnapshot = { state: "unchecked", version: null, plan: null, models: [], selectedModel: null,
+const kinds: readonly string[] = ["codex_cli", "claude_cli"];
+const initial: ConnectionSnapshot = { provider: null, providers: [], providerNotice: null, state: "unchecked", version: null,
+  versionStatus: null, plan: null, models: [], selectedModel: null,
   quota: { state: "unknown", usedPercent: null, resetsAt: null }, metadataReady: false,
   generationReady: false, experimentalMode: false };
+
+/** Names of the active provider; neutral words until the server has named it. */
+export function providerNames(snapshot: ConnectionSnapshot): Pick<ProviderSummary, "display" | "subscription" | "publisher"> {
+  return snapshot.providers.find(item => item.kind === snapshot.provider) ?? { display: "CLI", subscription: "подписки", publisher: "поставщика" };
+}
 
 function record(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
@@ -46,8 +61,19 @@ function validInstallation(value: unknown): value is CliInstallation {
     (value.error === null || typeof value.error === "string" && errors.includes(value.error));
 }
 
+function validProviders(value: unknown, active: unknown): boolean {
+  const name = (entry: unknown) => typeof entry === "string" && entry.length > 0 && entry.length <= 40;
+  return Array.isArray(value) && value.length <= 8 && new Set(value.map(item => record(item) ? item.kind : null)).size === value.length &&
+    value.every(item => record(item) && kinds.includes(String(item.kind)) && name(item.display) && name(item.subscription) &&
+      name(item.publisher) && typeof item.installed === "boolean") &&
+    value.some(item => record(item) && item.kind === active);
+}
+
 export function validConnection(value: unknown): value is ConnectionSnapshot {
   if (!record(value) || typeof value.state !== "string" || !states.has(value.state as ConnectionState) ||
+      typeof value.provider !== "string" || !kinds.includes(value.provider) || !validProviders(value.providers, value.provider) ||
+      !(value.providerNotice === null || value.providerNotice === "provider_unavailable") ||
+      !(value.versionStatus === null || value.versionStatus === "supported" || value.versionStatus === "graceful") ||
       !(value.version === null || (typeof value.version === "string" && value.version.length <= 80)) ||
       !(value.plan === null || (typeof value.plan === "string" && /^[a-z][a-z0-9_]{0,39}$/.test(value.plan))) ||
       !Array.isArray(value.models) || value.models.length > 100 ||
@@ -59,9 +85,9 @@ export function validConnection(value: unknown): value is ConnectionSnapshot {
   if (value.modelReasoning !== undefined && !validReasoning(value.modelReasoning, value.models)) return false;
   if (value.installation !== undefined && value.installation !== null && !validInstallation(value.installation)) return false;
   if (value.generationReady && (!value.experimentalMode || value.state !== "connected" || !value.metadataReady ||
-      value.selectedModel === null || value.quota.state !== "available")) return false;
+      value.selectedModel === null || !["available", "not_provided"].includes(String(value.quota.state)))) return false;
   const quota = value.quota;
-  return ["unknown", "available", "exhausted"].includes(String(quota.state)) &&
+  return ["unknown", "available", "exhausted", "not_provided"].includes(String(quota.state)) &&
     (quota.usedPercent === null || (typeof quota.usedPercent === "number" && Number.isFinite(quota.usedPercent) && quota.usedPercent >= 0 && quota.usedPercent <= 100)) &&
     (quota.resetsAt === null || (typeof quota.resetsAt === "number" && Number.isSafeInteger(quota.resetsAt) && quota.resetsAt >= 0));
 }
@@ -107,8 +133,11 @@ export class ConnectionWorkflow {
 
   private async post(path: string, body: object, signal?: AbortSignal): Promise<ConnectionSnapshot> {
     const peek = path === "peek";
+    // Every host request names the provider on screen, so a stale screen cannot act on another provider.
+    const provider = this.view.snapshot.provider;
+    const payload = provider === null ? body : { provider, ...body };
     const response = await this.request(peek ? "/v1/settings/connection" : `/v1/host/${path}`, { method: peek ? "GET" : "POST", credentials: "same-origin",
-      ...(peek ? {} : { headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) }), ...(signal ? { signal } : {}) });
+      ...(peek ? {} : { headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) }), ...(signal ? { signal } : {}) });
     if (!response.ok || !response.headers.get("content-type")?.startsWith("application/json")) throw new Error("request failed");
     const length = Number(response.headers.get("content-length") ?? "0");
     if (!Number.isFinite(length) || length > 32_768) throw new Error("response too large");
@@ -164,6 +193,16 @@ export class ConnectionWorkflow {
     if (!this.view.snapshot.models.includes(modelName)) return Promise.resolve();
     return this.run("select", { model: modelName });
   }
+  /** Detaches the current provider on the server, then checks the selected one. */
+  async selectProvider(kind: ProviderKind): Promise<boolean> {
+    if (this.view.pending || this.view.detaching || kind === this.view.snapshot.provider ||
+        !this.view.snapshot.providers.some(item => item.kind === kind)) return false;
+    const epoch = this.epoch + 1;
+    await this.run("select-provider", { provider: kind });
+    if (epoch !== this.epoch || this.view.error || this.view.snapshot.provider !== kind) return false;
+    await this.refresh();
+    return true;
+  }
   async install(): Promise<void> {
     const installation = this.view.snapshot.installation;
     if (this.view.pending || !installation?.available || ["downloading", "verifying", "extracting"].includes(installation.state)
@@ -212,12 +251,14 @@ export class ConnectionWorkflow {
     const epoch = this.epoch;
     this.abort?.abort();
     this.abort = null;
-    this.publish({ snapshot: initial, pending: true, detaching: true, error: null });
+    // The provider stays named while it detaches; only its metadata is dropped.
+    const cleared: ConnectionSnapshot = { ...initial, provider: this.view.snapshot.provider, providers: this.view.snapshot.providers };
+    this.publish({ snapshot: cleared, pending: true, detaching: true, error: null });
     try {
       const snapshot = await this.post("detach", {});
       if (epoch !== this.epoch) return;
       this.publish({ snapshot, pending: false, detaching: false, error: null });
-    } catch { if (epoch === this.epoch) this.publish({ snapshot: initial, pending: false, detaching: false,
+    } catch { if (epoch === this.epoch) this.publish({ snapshot: cleared, pending: false, detaching: false,
       error: "Could not confirm detach. Try again." }); }
   }
   close(): void {

@@ -18,7 +18,8 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "services/api/src")
 from packages.resume_core.text_rewrite import PlainTextReply
 from resume_api import app as app_module
 from resume_api.app import create_app
-from resume_api.cli.experimental_profile import BINARY, ExperimentalCliProfile, ExperimentalProfileError, VERSION
+from resume_api.cli import distribution
+from resume_api.cli.experimental_profile import BINARY, ExperimentalCliProfile, ExperimentalProfileError
 from resume_api.connection import Metadata, Quota
 from resume_api.providers.codex_cli import CodexCliProvider
 from resume_api.providers.content import ContentResult, ReportedUsage
@@ -27,6 +28,7 @@ from tests.service.app_fixtures import add_project
 
 ORIGIN = "http://127.0.0.1:39279"
 SECRET = "synthetic-personal-experiment-0123456789"
+VERSION = "codex-cli " + distribution.RELEASE
 
 
 class MetadataOnly:

@@ -233,6 +233,7 @@ def test_total_output_budget_includes_incomplete_second_attempt(fake) -> None:
     ("valid", "CLI_UNSUPPORTED", {"version": "codex-cli 0.0.1"}),
     ("valid", "CLI_PROFILE_UNSAFE", {"version": "codex-cli 0.162.0-alpha.2"}),
     ("bad_help", "CLI_PROFILE_UNSAFE", {}),
+    ("unsafe_features", "CLI_PROFILE_UNSAFE", {}),
     ("api_key", "AUTH_MODE_MISMATCH", {}),
     ("missing_login", "AUTH_REQUIRED", {}),
     ("login_failure", "CLI_FAILED", {}),
@@ -376,7 +377,8 @@ def test_cleanup_failure_blocks_repair_and_preserves_owner_evidence(fake) -> Non
         nonlocal calls
         calls += 1
         original(process)
-        if calls == 5:
+        # Version, help, features, login status and model list come first; the sixth is generation.
+        if calls == 6:
             raise SpikeError("PROCESS_CLEANUP_FAILED")
 
     with patch.object(lifecycle, "stop_group", fail_generation_cleanup):

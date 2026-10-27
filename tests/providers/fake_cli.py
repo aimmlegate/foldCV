@@ -37,6 +37,11 @@ if args == ["--version"]:
 if args == ["exec", "--help"]:
     print("--ephemeral --ignore-user-config --ignore-rules --json --output-schema --skip-git-repo-check" if case != "bad_help" else "unsupported")
     sys.exit(0)
+if args[:2] == ["features", "list"]:
+    print("shell_tool                               stable             " + ("true" if case == "unsafe_features" else "false"))
+    print("unified_exec                             stable             true")
+    print("code_mode                                under development  false")
+    sys.exit(0)
 if args == ["login", "status"]:
     if case == "missing_login":
         print("Not logged in", file=sys.stderr)

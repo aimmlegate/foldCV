@@ -324,7 +324,9 @@
     "assistantProjectNotAuthored": "Помощник доступен после завершения импорта резюме.",
     "assistantRunActive": "Помощник уже выполняет задачу в этом резюме. Дождитесь её окончания или остановите её.",
     "assistantFileNotFound": "Файл больше недоступен. Попросите помощника выгрузить его снова.",
-    "agentStoreFull": "Диалог помощника слишком большой. Начните новый диалог."
+    "agentStoreFull": "Диалог помощника слишком большой. Начните новый диалог.",
+    "providerInactive": "Активный провайдер изменился. Обновите настройки подключения и повторите.",
+    "providerUnavailable": "Этот провайдер пока недоступен в FoldCV."
   },
   "codes": {
     "ASSISTANT_UNSUPPORTED_TASK": "assistantUnsupported",
@@ -1138,7 +1140,9 @@
     "ASSISTANT_PROJECT_NOT_AUTHORED": "assistantProjectNotAuthored",
     "ASSISTANT_RUN_ACTIVE": "assistantRunActive",
     "ASSISTANT_FILE_NOT_FOUND": "assistantFileNotFound",
-    "AGENT_STORE_FULL": "agentStoreFull"
+    "AGENT_STORE_FULL": "agentStoreFull",
+    "PROVIDER_INACTIVE": "providerInactive",
+    "PROVIDER_UNAVAILABLE": "providerUnavailable"
   },
   "nonErrorSymbols": {
     "CLOCK_BOOTTIME": "Operating-system clock identifier",
@@ -1157,6 +1161,25 @@
     "XDG_DATA_HOME": "Data environment setting",
     "XDG_STATE_HOME": "State environment setting",
     "COPY_OK": "Successful clipboard marker",
-    "FOLDCV_VERIFY": "Test verification environment setting"
+    "FOLDCV_VERIFY": "Test verification environment setting",
+    "ANTHROPIC_API_KEY": "Credential environment variable kept from the CLI",
+    "ANTHROPIC_AUTH_TOKEN": "Credential environment variable kept from the CLI",
+    "ANTHROPIC_BASE_URL": "Credential environment variable kept from the CLI",
+    "CLAUDE_CODE_OAUTH_TOKEN": "Credential environment variable kept from the CLI",
+    "CLAUDE_CONFIG_DIR": "CLI profile environment setting",
+    "CLAUDE_CODE_TMPDIR": "CLI profile environment setting",
+    "CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC": "CLI profile environment setting",
+    "DISABLE_AUTOUPDATER": "CLI profile environment setting",
+    "DISABLE_TELEMETRY": "CLI profile environment setting",
+    "DISABLE_ERROR_REPORTING": "CLI profile environment setting",
+    "CLAUDE_CODE_DISABLE_AUTO_MEMORY": "CLI profile environment setting",
+    "CLAUDE_CODE_DISABLE_CLAUDE_MDS": "CLI profile environment setting",
+    "CLAUDE_CODE_DISABLE_BACKGROUND_TASKS": "CLI profile environment setting",
+    "CLAUDE_CODE_DISABLE_TERMINAL_TITLE": "CLI profile environment setting",
+    "CLAUDE_CODE_AUTO_CONNECT_IDE": "CLI profile environment setting",
+    "CLAUDE_CODE_IDE_SKIP_AUTO_INSTALL": "CLI profile environment setting",
+    "ENABLE_CLAUDEAI_MCP_SERVERS": "CLI profile environment setting",
+    "CLAUDE_CODE_SKIP_PROMPT_HISTORY": "CLI profile environment setting",
+    "CLAUDE_CODE_DISABLE_FEEDBACK_SURVEY": "CLI profile environment setting"
   }
 }

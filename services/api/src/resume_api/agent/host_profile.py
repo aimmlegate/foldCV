@@ -9,34 +9,41 @@ from pathlib import Path
 import stat
 
 from resume_api.cli.experimental_profile import BINARY, ExperimentalCliProfile, ExperimentalProfileError
-from resume_api.cli import distribution
+from resume_api.cli import distribution, profile as codex
+from resume_api.cli.qualification import QualificationError, require_publisher
 
 
 TOKEN_ENV = "FOLDCV_AGENT_MCP_CAPABILITY"
 TOOLS = ("get_resume_context", "check_resume", "read_public_page")
 PACKAGE = BINARY.parents[3]
 CODE_MODE_HOST = PACKAGE / "bin/codex-code-mode-host"
-HOST_SHA256 = "d5d746d540258822c3b0ef3b5e3d18e715741d2972540c886a4a96f290d441bb"
 PACKAGE_MANIFEST = PACKAGE / "codex-package.json"
-# Installed plugin CLI 0.163.0-alpha.11.1 (D092); the managed runtime keeps its own release pins.
-MANIFEST_SHA256 = "1547027f3ba8d82a62e9ced7b32a67737037342477262c28d5e3822ef740ce19"
 APP_SERVER_PREFIX = ("app-server", "--strict-config", "--listen", "stdio://")
 
 
-def check_host(package: Path | None = None) -> None:
+def check_host(package: Path | None = None, *, managed: bool = False) -> None:
+    """The managed runtime keeps its release pins; a user-installed package needs the publisher's
+    signed host and a manifest that names a qualifying version."""
     host = CODE_MODE_HOST if package is None else package / "bin/codex-code-mode-host"
     manifest = PACKAGE_MANIFEST if package is None else package / "codex-package.json"
-    for path, digest in ((host, HOST_SHA256 if package is None else distribution.HOST_SHA256),
-                         (manifest, MANIFEST_SHA256 if package is None else distribution.MANIFEST_SHA256)):
-        try:
+    try:
+        for path in (host, manifest):
             if any(part.is_symlink() for part in (path, *path.parents)) or not stat.S_ISREG(path.stat().st_mode):
                 raise ExperimentalProfileError("AGENT_CODE_MODE_HOST_UNSUPPORTED")
-            with path.open("rb") as stream:
-                actual = hashlib.file_digest(stream, "sha256").hexdigest()
-            if actual != digest:
+        if managed:
+            for path, digest in ((host, distribution.HOST_SHA256), (manifest, distribution.MANIFEST_SHA256)):
+                with path.open("rb") as stream:
+                    if hashlib.file_digest(stream, "sha256").hexdigest() != digest:
+                        raise ExperimentalProfileError("AGENT_CODE_MODE_HOST_UNSUPPORTED")
+        else:
+            require_publisher(host, codex.TEAM_ID, codex.HOST_IDENTIFIER)
+            raw = manifest.read_bytes()
+            value = json.loads(raw) if len(raw) <= 4096 else None
+            if not isinstance(value, dict) or value.get("variant") != "codex" or not isinstance(value.get("version"), str):
                 raise ExperimentalProfileError("AGENT_CODE_MODE_HOST_UNSUPPORTED")
-        except OSError as error:
-            raise ExperimentalProfileError("AGENT_CODE_MODE_HOST_UNSUPPORTED") from error
+            codex.qualify("codex-cli " + value["version"])
+    except (OSError, ValueError, QualificationError) as error:
+        raise ExperimentalProfileError("AGENT_CODE_MODE_HOST_UNSUPPORTED") from error
     if not os.access(host, os.X_OK):
         raise ExperimentalProfileError("AGENT_CODE_MODE_HOST_UNSUPPORTED")
 
@@ -55,7 +62,7 @@ class AgentProofProfile(ExperimentalCliProfile):
         if (args[:4] != APP_SERVER_PREFIX or (len(args) - 4) % 2
                 or any(arg != "--config" for arg in args[4::2])):
             raise ExperimentalProfileError("AGENT_RUNTIME_ONLY")
-        check_host() if self.executable == BINARY else check_host(self.package_root)
+        check_host() if self.executable == BINARY else check_host(self.package_root, managed=self.managed)
         return super().launch(executable, args, operation)
 
     def _policy(self, operation: Path, args: tuple[str, ...]) -> str:

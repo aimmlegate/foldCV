@@ -53,7 +53,8 @@ export function Settings({ close, connectionChanged, paneOrder, changePaneOrder 
         {current.message && <p className="notice" role="status">{current.message}</p>}
         {Object.entries(current.errors).map(([part, error]) => <p className="notice error" role="alert" key={part}>{partNames[part as SettingsPart]}: {errorMessage(error)}</p>)}
       </div>}
-      {section === "model" && <><Connection view={view} workflow={workflow} model={current.draft.model} change={value => controller.change("model", value)} disabled={current.saving} selectionDisabled={!current.preferences} />
+      {section === "model" && <><Connection view={view} workflow={workflow} model={current.draft.model} change={value => controller.change("model", value)} disabled={current.saving} selectionDisabled={!current.preferences}
+          switchDisabled={busy || dirty} providerChanged={() => void controller.load()} />
         <ReasoningSelect value={current.draft.reasoning} metadata={view.snapshot.modelReasoning?.[current.draft.model ?? ""]}
           disabled={busy || !current.preferences || view.pending || !view.snapshot.metadataReady || !current.draft.model}
           change={value => controller.change("reasoning", value)} />

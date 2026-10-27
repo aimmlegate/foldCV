@@ -30,6 +30,10 @@ class ClaudeConnectionAdapter:
         self.profile = profile
         self.fixture_transport = fixture_transport
 
+    @property
+    def executable(self):
+        return self.profile.executable if self.profile is not None else None
+
     def _provider(self) -> ClaudeCliProvider:
         if self.profile is None and self.fixture_transport is None:
             raise ConnectionFailure("CLI_MISSING")
@@ -48,8 +52,8 @@ class ClaudeConnectionAdapter:
         except ContentFailure as error:
             raise ConnectionFailure(STATES.get(error.code, "CLI_FAILED")) from None
         if not full:
-            return Metadata(probe.version, (), None, NOT_PROVIDED)
-        return Metadata(probe.version, tuple(probe.reasoning), probe.plan, NOT_PROVIDED, dict(probe.reasoning))
+            return Metadata(probe.version, (), None, NOT_PROVIDED, version_status=probe.status)
+        return Metadata(probe.version, tuple(probe.reasoning), probe.plan, NOT_PROVIDED, dict(probe.reasoning), probe.status)
 
     def login(self, files: OperationFiles, cancel: threading.Event,
               code: Callable[[], str | None] | None = None) -> None:

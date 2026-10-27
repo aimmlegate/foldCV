@@ -78,10 +78,10 @@ def test_local_readiness_reports_renderer_failure(monkeypatch, code, remedy):
 def test_unsupported_cli_version_never_checks_login(tmp_path):
     calls = tmp_path / "calls"
     cli = tmp_path / "codex"
-    cli.write_text(f"#!/bin/sh\nprintf '%s\\n' \"$1\" >> '{calls}'\nprintf 'codex-cli 0.162.0-alpha.17.2\\n'\n",
+    cli.write_text(f"#!/bin/sh\nprintf '%s\\n' \"$1\" >> '{calls}'\nprintf 'codex-cli 0.161.0\\n'\n",
                    encoding="utf-8")
     cli.chmod(0o700)
-    assert "outside the pinned profile" in readiness.check_cli(cli)
+    assert "outside the supported range" in readiness.check_cli(cli)
     assert calls.read_text(encoding="utf-8") == "--version\n"
 
 
@@ -99,13 +99,13 @@ def test_entrypoint_handles_cli_path_with_spaces_without_login(tmp_path):
     directory.mkdir()
     calls = directory / "calls"
     cli = directory / "codex"
-    cli.write_text(f"#!/bin/sh\nprintf '%s\\n' \"$1\" >> '{calls}'\nprintf 'codex-cli 0.162.0-alpha.17.2\\n'\n",
+    cli.write_text(f"#!/bin/sh\nprintf '%s\\n' \"$1\" >> '{calls}'\nprintf 'codex-cli 0.161.0\\n'\n",
                    encoding="utf-8")
     cli.chmod(0o700)
     result = subprocess.run([sys.executable, "tools/run-local.py", "--check", "--codex-executable", str(cli)],
                             cwd=readiness.ROOT, capture_output=True, text=True, timeout=10)
     assert result.returncode == 0
-    assert "outside the pinned profile" in result.stderr
+    assert "outside the supported range" in result.stderr
     assert "http://" not in result.stdout
     assert calls.read_text(encoding="utf-8") == "--version\n"
 
