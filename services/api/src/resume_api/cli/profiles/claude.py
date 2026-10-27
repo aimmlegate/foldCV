@@ -116,7 +116,10 @@ class ClaudeCliProfile:
     def policy(self, operation: Path, args: tuple[str, ...], *, network: bool = True) -> str:
         paths = (self.root.resolve(), operation.resolve())
         binary = Path(os.path.realpath(self.executable))
-        read = " ".join("(subpath " + _literal(path) + ")" for path in paths)
+        # The CLI keeps its sign-in in the login keychain and rewrites it on token refresh;
+        # `security` sees a denied keychain file as a missing one.
+        keychains = "(subpath " + _literal(self.home.resolve() / "Library" / "Keychains") + ")"
+        read = " ".join("(subpath " + _literal(path) + ")" for path in paths) + " " + keychains
         write = read
         rules = ["(version 1)", "(allow default)"]
         if not network:
@@ -125,7 +128,7 @@ class ClaudeCliProfile:
             '(deny file-read-data (subpath "/Users") (subpath "/Volumes") (subpath "/Network") '
             '(subpath "/private/tmp") (subpath "/private/var") (subpath "/tmp") (subpath "/var"))',
             # Without the time zone database the runtime spins at startup.
-            '(allow file-read-data (subpath "/private/var/db/timezone"))',
+            '(allow file-read-data (subpath "/private/var/db/timezone") (subpath "/private/var/db/mds"))',
             "(allow file-read-data " + read + " (literal " + _literal(binary) + "))",
             "(deny file-write*)",
             "(allow file-write* " + write + ' (literal "/dev/null"))',

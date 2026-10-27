@@ -87,15 +87,19 @@ def run(value: claude.ClaudeCliProfile, args: tuple[str, ...], *, data: bytes = 
             timers.append(threading.Timer(interrupt_after, interrupt))
         for timer in timers:
             timer.start()
+        # Stream runs keep every line seen, so a deadline or cancel still shows what came before it.
+        seen: list[bytes] = []
+        stream = {"on_line": lambda raw: seen.append(raw)} if args[:1] == ("-p",) else {}
         try:
             stdout, stderr = runner.run(files, args, data=data, deadline=time.monotonic() + timeout,
-                                        cancel=cancel, max_output=4 * 1024 * 1024, max_line=4 * 1024 * 1024)
+                                        cancel=cancel, max_output=4 * 1024 * 1024, max_line=4 * 1024 * 1024,
+                                        **stream)
             outcome["exit"] = 0
         except ProcessExit as error:
             stdout, stderr = error.stdout, error.stderr
             outcome["exit"] = "nonzero"
         except SpikeError as error:
-            stdout, stderr = b"", b""
+            stdout, stderr = b"\n".join(seen), b""
             outcome["exit"] = error.code
         finally:
             for timer in timers:
@@ -153,7 +157,20 @@ def summary(outcome: dict) -> dict:
     kinds = [f"{event.get('type')}/{event.get('subtype') or ''}".rstrip("/") for event in events]
     tool_uses = [block.get("name") for event in events if event.get("type") == "assistant"
                  for block in (event.get("message") or {}).get("content") or [] if block.get("type") == "tool_use"]
-    outcome.update({"eventKinds": kinds, "toolUses": tool_uses, "rawInit": init,
+    def short(value):
+        if isinstance(value, str):
+            return value if len(value) <= 300 else value[:300] + f"…<{len(value)} chars>"
+        if isinstance(value, list):
+            return [short(item) for item in value[:12]]
+        if isinstance(value, dict):
+            return {key: short(item) for key, item in value.items()}
+        return value
+
+    samples = {}
+    for kind, event in zip(kinds, events):
+        if kind not in samples and kind != "system/init":
+            samples[kind] = short(event)
+    outcome.update({"eventKinds": kinds, "toolUses": tool_uses, "rawInit": init, "samples": samples,
                     "init": {key: init.get(key) for key in (
                         "tools", "mcp_servers", "slash_commands", "skills", "plugins", "agents", "permissionMode",
                         "model", "apiKeySource", "claude_code_version", "capabilities", "analytics_disabled",
@@ -200,6 +217,10 @@ def status(args) -> None:
         body = json.loads(outcome["raw"])
     except ValueError:
         body = None
+    if isinstance(body, dict):
+        # Account identity stays out of the evidence; only the fields the gates read are kept.
+        body = {key: body.get(key) for key in ("loggedIn", "authMethod", "apiProvider", "configDirectory",
+                                               "subscriptionType") if key in body}
     write(f"status-{args.label}.json", {
         "at": now(), "exit": outcome["exit"], "network": outcome["network"], "status": body,
         "configDirectoryMatches": bool(body) and Path(body.get("configDirectory", "")).resolve() == value.config_dir.resolve(),
@@ -236,7 +257,9 @@ def offline(args) -> None:
     outcome = summary(run(value, argv, data=prompt, network=False, timeout=args.timeout, canary=canary, **kwargs))
     outcome["initCheck"] = init_check(outcome.pop("rawInit"), "2.1.308", claude.STRUCTURED_TOOLS)
     before = scan(canary)
+    present = sorted(str(path.relative_to(value.config_dir)) for path in value.config_dir.rglob("*") if path.is_file())
     removed = value.wipe()
+    outcome["profileFilesBeforeWipe"] = present
     write(f"offline-{args.case}.json", {"at": now(), "case": args.case, **outcome, "canaryHitsBeforeWipe": before,
                                        "wiped": removed, "canaryHitsAfterWipe": scan(canary)})
 
@@ -274,6 +297,8 @@ def live(args) -> None:
     passed = (outcome["exit"] == 0 and result.get("subtype") == "success" and result.get("is_error") is False
               and schema_valid(produced) and set(outcome["toolUses"]) <= {"StructuredOutput"} and checked == "pass")
     before = scan(canary)
+    outcome["profileFilesBeforeWipe"] = sorted(str(path.relative_to(value.config_dir))
+                                               for path in value.config_dir.rglob("*") if path.is_file())
     removed = value.wipe()
     entry.update({"status": "completed" if passed else "failed", "finishedAt": now(),
                   "elapsedSeconds": outcome["seconds"], "stdoutSha256": outcome["stdoutSha256"]})

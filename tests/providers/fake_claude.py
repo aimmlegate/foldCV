@@ -39,11 +39,17 @@ if args == ["--help"]:
     print(FLAGS if case != "bad_help" else "--print --output-format")
     sys.exit(0)
 if args == ["auth", "login", "--claudeai"]:
+    if case == "login_code":
+        sys.stdout.write("Opening browser to sign in…\nPaste code here if prompted > ")
+        sys.stdout.flush()
+        if sys.stdin.readline().strip() != "synthetic-code":
+            print("Login failed: invalid code")
+            sys.exit(1)
     (base / "signed-in").touch()
     print("Login successful.")
     sys.exit(0)
 if args == ["auth", "status", "--json"]:
-    signed_out = case == "logged_out" and not (base / "signed-in").exists()
+    signed_out = case in {"logged_out", "login_code"} and not (base / "signed-in").exists()
     status = {"loggedIn": not signed_out and case != "api_key", "authMethod": "claude.ai",
               "apiProvider": "firstParty", "configDirectory": os.environ.get("CLAUDE_CONFIG_DIR", "/fixture"),
               "subscriptionType": "max"}

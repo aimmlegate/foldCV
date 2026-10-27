@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import threading
 import time
+from typing import Callable
 
 from resume_api.cli.process_runner import ProcessExit
 from resume_api.cli.profiles.claude import ClaudeCliProfile, ClaudeProfileError
@@ -21,6 +22,7 @@ STATES = {"AUTH_REQUIRED": "LOGIN_REQUIRED", "AUTH_MODE_MISMATCH": "API_KEY_MODE
           "TEMP_FAILED": "TEMP_FAILED"}
 # No CLI-mediated usage read exists; credential files are never read for it (decision 15).
 NOT_PROVIDED = Quota("not_provided")
+LOGIN_SECONDS = 300
 
 
 class ClaudeConnectionAdapter:
@@ -49,7 +51,10 @@ class ClaudeConnectionAdapter:
             return Metadata(probe.version, (), None, NOT_PROVIDED)
         return Metadata(probe.version, tuple(probe.reasoning), probe.plan, NOT_PROVIDED, dict(probe.reasoning))
 
-    def login(self, files: OperationFiles, cancel: threading.Event) -> None:
+    def login(self, files: OperationFiles, cancel: threading.Event,
+              code: Callable[[], str | None] | None = None) -> None:
+        """Without a terminal the CLI waits for the code shown after the browser sign-in;
+        `code` returns it once the user pastes it, else None."""
         try:
             self.inspect(files, cancel, full=False)
             return
@@ -57,10 +62,20 @@ class ClaudeConnectionAdapter:
             if error.code != "LOGIN_REQUIRED":
                 raise
         provider = self._provider()
+        sent = False
+
+        def pasted() -> bytes | None:
+            nonlocal sent
+            value = code() if code is not None and not sent else None
+            if not value:
+                return None
+            sent = True
+            return (value.strip() + "\n").encode()
+
         # The CLI owns the browser flow and the keychain entry of the FoldCV config directory.
         try:
-            provider.process.run(files, ("auth", "login", "--claudeai"), deadline=time.monotonic() + 120,
-                                 cancel=cancel, max_output=65_536)
+            provider.process.run(files, ("auth", "login", "--claudeai"), deadline=time.monotonic() + LOGIN_SECONDS,
+                                 cancel=cancel, max_output=65_536, interactive=True, poll_input=pasted)
         except ProcessExit:
             raise ConnectionFailure("CLI_FAILED") from None
         except SpikeError as error:

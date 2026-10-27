@@ -258,6 +258,27 @@ def test_login_runs_the_cli_sign_in_only_when_signed_out(fake):
     assert ["auth", "logout"] not in [entry["args"] for entry in audit()]
 
 
+def test_login_forwards_the_pasted_code_and_keeps_stdin_open_until_then(fake):
+    cli, root, _directory, configure, _audit = fake
+    configure("login_code")
+    adapter = ClaudeConnectionAdapter(None, fixture_transport=FixtureTransport(cli))
+    calls = []
+
+    def code():
+        calls.append(1)
+        return "synthetic-code" if len(calls) > 3 else None
+
+    with OperationFiles(root).open() as files:
+        adapter.login(files, threading.Event(), code)
+    with OperationFiles(root).open() as files:
+        assert adapter.inspect(files, threading.Event(), full=False).version == "2.1.308"
+    configure("login_code")
+    with pytest.raises(ConnectionFailure) as raised:
+        with OperationFiles(root).open() as files:
+            adapter.login(files, threading.Event(), lambda: "wrong")
+    assert raised.value.code == "CLI_FAILED"
+
+
 # Version policy (section 5) and the profile, without processes.
 
 @pytest.mark.parametrize(("text", "parsed"), [
@@ -303,7 +324,9 @@ def test_policy_confines_files_and_processes(tmp_path):
     policy = profile.policy(tmp_path, ("-p",))
     assert "(deny network*)" not in policy and '"/usr/bin/open"' not in policy
     assert "(deny process-exec)" in policy and '(literal "/usr/bin/security")' in policy
-    assert '(allow file-read-data (subpath "/private/var/db/timezone"))' in policy
+    assert '(subpath "/private/var/db/timezone")' in policy
+    keychains = '(subpath "' + str(tmp_path.resolve() / "Library/Keychains") + '")'
+    assert policy.count(keychains) == 2 and "/Library/Application Support" not in policy
     assert "(deny network*)" in profile.policy(tmp_path, ("-p",), network=False)
     assert '"/usr/bin/open"' in profile.policy(tmp_path, ("auth", "login", "--claudeai"))
 
@@ -339,3 +362,21 @@ def test_init_check_requires_the_exact_reported_session():
                        ("skills", ["x"]), ("claude_code_version", "2.1.309")):
         with pytest.raises(rules.ClaudeProfileError):
             rules.check_init({**event, key: value}, model=MODEL, version="2.1.308", tools=("StructuredOutput",))
+
+
+def test_envelopes_of_the_live_mp00_run_are_accepted():
+    from resume_api.providers.claude_cli import ClaudeEvents
+    from resume_api.providers.structured_schema import StructuredSchema
+
+    class Check(BaseModel):
+        model_config = ConfigDict(extra="forbid", strict=True)
+        answer: str
+        count: int
+        items: list[str]
+
+    events = ClaudeEvents(model=MODEL, version="2.1.308", structured=True, max_bytes=262_144)
+    for raw in (SOURCE / "fixtures/claude-2.1.308-structured.jsonl").read_bytes().splitlines():
+        events.accept(raw)
+    value = events.result(Check, StructuredSchema(Check.model_json_schema()))
+    assert value == Check(answer="ready", count=3, items=["alpha", "beta", "gamma"])
+    assert (events.usage.input_tokens, events.usage.output_tokens, events.usage.complete) == (1230, 107, True)
