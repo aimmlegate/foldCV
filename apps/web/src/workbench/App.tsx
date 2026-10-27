@@ -8,6 +8,7 @@ import { History } from "./layout/History";
 import { Header } from "./layout/Header";
 import { SourceForm } from "./import/SourceForm";
 import { TaskProgress } from "./import/TaskProgress";
+import { TaskNotices } from "./import/TaskNotices";
 import { Settings } from "./settings/Settings";
 import { readPaneOrder, savePaneOrder, type PaneOrder } from "./settings/interface";
 import { FileDialog, type FileMode } from "./files/FileDialog";
@@ -76,7 +77,9 @@ export function App({ portalHost }: { portalHost: HTMLElement }) {
             <button className="icon" aria-label="Скрыть сообщение" onClick={workspace.dismissError}><Icon name="close" /></button></div>}
         </section>
       </NotificationSection>
-      {busy && workspace.operation && !fileMode && <div className="workspace-operation">
+      <TaskNotices task={workspace.importTask} stop={workspace.importTask?.state === "running" ? workspace.operation?.cancel : undefined} />
+      {/* A running import has its own screen and a «Задачи» notification, so the floating bar stays for other work. */}
+      {busy && workspace.operation && !fileMode && workspace.importTask?.state !== "running" && <div className="workspace-operation">
         <OperationStatus label={workspace.operation.label} timed startedAt={workspace.operation.startedAt} />
         {workspace.operation.cancel && <button type="button" className="text-button" onClick={() => void workspace.operation?.cancel?.()}>Остановить импорт</button>}
       </div>}
