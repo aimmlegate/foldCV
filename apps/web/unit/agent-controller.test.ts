@@ -156,3 +156,19 @@ test("an unavailable assistant refuses Send with its reason and makes no run", a
     assert.equal(controller.view.pendingSend, false);
   } finally { controller.close(); }
 });
+
+test("a quiet capability read replaces a connection refusal without a loading state", async () => {
+  const { api } = fakeApi();
+  let ready = false;
+  api.capabilities = () => Promise.resolve(ready ? { ready: true, unavailable: null, models: [], webAvailable: true, tools: [] }
+    : { ready: false, unavailable: { code: "AGENT_CONNECTION_UNAVAILABLE", detail: [] }, models: [], webAvailable: true, tools: [] });
+  const views: AssistantView[] = [], controller = new AssistantController(api, editor(), view => views.push(view), 1);
+  try {
+    await controller.init();
+    assert.equal(controller.view.capabilities?.unavailable?.code, "AGENT_CONNECTION_UNAVAILABLE");
+    ready = true; views.length = 0;
+    await controller.refreshCapabilities();
+    assert.equal(controller.view.capabilities?.ready, true);
+    assert.ok(views.every(view => !view.loading));
+  } finally { controller.close(); }
+});

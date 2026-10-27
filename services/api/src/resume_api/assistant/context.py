@@ -35,6 +35,13 @@ def _units(text):
     return len(text.encode('utf-16-le')) // 2
 
 
+def refusal(code, detail):
+    """A refused read that tells the model how to correct its arguments; live runs retried blindly without it."""
+    error = AgentFailure(code)
+    error.detail = [detail[:300]]
+    return error
+
+
 def block_entry(block, positions):
     containers = []
     for key, content in inline_groups(block):
@@ -79,7 +86,8 @@ def source_entries(workspace, source_id):
                 else 'unavailable'} for source in sources]
     source = next((value for value in sources if value.id == source_id), None)
     if source is None:
-        raise AgentFailure('AGENT_NOT_FOUND')
+        raise refusal('AGENT_NOT_FOUND', 'unknown sourceId; use an id from read_original without sourceId: '
+            + ', '.join(value.id for value in sources[:20]))
     units = sorted(source.units, key=lambda unit: unit.order)
     if not units:
         # An empty extraction is reported, never reconstructed from the edited document.
@@ -104,7 +112,8 @@ def paged(entries, page, *, budget=limits.PAGE_BYTES):
         size += cost
     pages.append(current)
     if not 0 <= page < len(pages):
-        raise AgentFailure('AGENT_SCOPE_INVALID')
+        raise refusal('AGENT_SCOPE_INVALID', f'pages are numbered from 0; this read has {len(pages)} page(s): '
+            f'0..{len(pages) - 1}; follow nextPage until it is null')
     return {'page': page, 'pages': len(pages), 'items': pages[page], 'nextPage': page + 1 if page + 1 < len(pages) else None}
 
 
