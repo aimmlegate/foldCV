@@ -3,7 +3,8 @@
 from dataclasses import asdict, dataclass
 
 from . import agent_limits
-from .project_limits import BACKGROUND_FACTOR, GLOBAL_PROJECTS, IMPORT_CEILING_SECONDS, MIB, PROJECT_CEILING_BYTES, USER_LIMITS
+from .project_limits import (BACKGROUND_FACTOR, GLOBAL_PROJECTS, IMPORT_CEILING_SECONDS, INVERSE_BYTES, MIB,
+    PROJECT_CEILING_BYTES, RENDER_WORKERS, USER_LIMITS, import_seconds as settings_import_seconds)
 
 
 @dataclass(frozen=True)
@@ -12,7 +13,7 @@ class BackgroundLimits:
     executions: int = 3
     noninteractive_executions: int = 2
     serial_executions: int = 1
-    render_workers: int = 2
+    render_workers: int = RENDER_WORKERS
     pending_global: int = 20
     pending_project: int = 4
     pending_noninteractive_global: int = 16
@@ -32,7 +33,7 @@ class BackgroundLimits:
     metadata_global_records: int = 32768
     metadata_project_records: int = 4096
     proposal_bytes: int = agent_limits.RUN_BYTES
-    inverse_bytes: int = agent_limits.RUN_BYTES
+    inverse_bytes: int = INVERSE_BYTES
     replay_events: int = 512
     replay_bytes: int = 256 * 1024
     resolved_seconds: int = 7 * 24 * 60 * 60
@@ -51,7 +52,7 @@ LIMITS = BackgroundLimits()
 
 # Settings budgets; callers pass their module's LIMITS so a lowered ceiling still bounds them.
 def import_seconds(limits=LIMITS):
-    return min(limits.import_active_seconds, USER_LIMITS.import_minutes * 60)
+    return settings_import_seconds(limits.import_active_seconds)
 
 
 def background_project_bytes(limits=LIMITS):

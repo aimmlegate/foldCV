@@ -17,9 +17,8 @@ if str(ROOT) not in sys.path:
 import pymupdf
 
 from packages.resume_core.rendering import layout
-from packages.resume_core.rendering.models import RenderRequest
+from packages.resume_core.rendering.models import Anchor, RenderRequest
 from packages.resume_core.rendering.docx_errors import DocxFailure, failure, validate_document, writer_failure
-from packages.resume_core.models.recovery import Anchor
 from pydantic import TypeAdapter
 from packages.resume_core.rendering.template import (APP_FONTS, PACKAGE_SHA256, SOFFICE,
                                                      RenderFailure, icon_path, require_template,

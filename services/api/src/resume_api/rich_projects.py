@@ -9,7 +9,7 @@ from packages.resume_core.dates import partial_date
 from packages.resume_core.background_store import BackgroundFailure
 from packages.resume_core.background_history import digest_bytes
 from packages.resume_core.background_store import identity as command_identity
-from packages.resume_core.gui_archive_zip import ArchiveFailure
+from packages.resume_core.archive_zip import ArchiveFailure
 from packages.resume_core.gui_normalization import canonical_source
 from packages.resume_core.models.contracts import Source
 from packages.resume_core.models.rich_workspace import RichOperation, RichRenderSnapshot, WorkspaceV6

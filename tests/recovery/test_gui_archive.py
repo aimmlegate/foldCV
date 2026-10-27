@@ -9,7 +9,7 @@ import pytest
 import sys
 sys.path.insert(0,str(Path(__file__).resolve().parents[2]/"services/api/src"))
 from packages.resume_core.gui_archive import export_archive,open_archive
-from packages.resume_core.gui_archive_zip import ArchiveFailure,read_zip,write_zip,json_bytes,digest
+from packages.resume_core.archive_zip import ArchiveFailure,read_zip,write_zip,json_bytes,digest
 from tests.recovery.generation_fixtures import render_workspace,frozen_now
 from tests.recovery.candidate_fixtures import ROOT
 from tests.recovery.test_gui_mutations import edit,restore

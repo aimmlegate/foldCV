@@ -9,7 +9,7 @@ from packages.resume_core.models.template_facts import Observation, WorkingFacts
 from packages.resume_core.models.template_workspace import WorkspaceV7
 from packages.resume_core.project_store import ProjectStoreFailure
 from packages.resume_core.rich_archive import export_rich_archive, open_rich_archive
-from packages.resume_core.gui_archive_zip import ArchiveFailure, digest, read_zip, write_zip
+from packages.resume_core.archive_zip import ArchiveFailure, digest, read_zip, write_zip
 from packages.resume_core.rich_images import normalize_image
 from packages.resume_core.models.template_document import TemplateImageBlock
 from packages.resume_core.rich_project_store import RichProjectStore

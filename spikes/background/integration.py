@@ -6,7 +6,7 @@ import hashlib
 import json
 import random
 
-from packages.resume_core.models import validate_contract
+from packages.resume_core.models.background import BACKGROUND_CONTRACTS
 from packages.resume_core.models.rich_workspace import WorkspaceV6
 from packages.resume_core.project_store import encoded
 from spikes.background.corpus import ACTIONS, FIXED_TRANSITIONS, reached_orders
@@ -88,7 +88,7 @@ class IntegrationTrace:
         assert result["status"] == status, (path, result)
         value = result["value"]
         if contract:
-            validate_contract(contract, value)
+            BACKGROUND_CONTRACTS[contract].model_validate(value)
         return value
 
     async def open(self, label, incarnation, *, previous=None):
@@ -258,7 +258,7 @@ class IntegrationTrace:
             assert result["error"]["code"] == "WRITER_UNKNOWN"
             await self.remember("claim", label, key, "rejected")
             return
-        validate_contract("background_writer_publication_v1", result)
+        BACKGROUND_CONTRACTS["background_writer_publication_v1"].model_validate(result)
         self.views[label], self.jobs[key] = result["view"], result["job"]
         self.models[label].texts["narrative"] = "Scripted bridge change" + self.models[label].texts["narrative"][6:]
         self.models[label].revision += 1

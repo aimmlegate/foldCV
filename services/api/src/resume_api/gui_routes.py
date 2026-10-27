@@ -6,7 +6,7 @@ from fastapi.responses import JSONResponse, Response
 from packages.resume_core.gui_projects import GuiCreateProjectRequest, GuiStartGenerationRequest, GuiProjectResponse, GuiRenameProjectRequest
 from packages.resume_core.gui_projects import GuiDeleteProjectRequest
 from packages.resume_core.gui_projects import GuiArchiveRequest
-from packages.resume_core.gui_archive_zip import MAX_ARCHIVE
+from packages.resume_core.archive_zip import MAX_ARCHIVE
 from packages.resume_core.gui_legacy_context import migration_context
 from packages.resume_core.gui_selection import selection_fingerprint
 from packages.resume_core.gui_source_context import source_context

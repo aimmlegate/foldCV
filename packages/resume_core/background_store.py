@@ -13,6 +13,7 @@ import re
 from . import agent_limits
 from .background_limits import LIMITS, background_global_bytes, background_project_bytes
 from .models.background import BackgroundSidecarV1, DispatchStateV1, JobFailure, JobSnapshotV1, JobSubmissionV1, RequestReplayV1
+from .project_repository import RepositoryFailure as BackgroundFailure
 from .project_store import ProjectStore, ProjectStoreFailure, SAFE_ID, encoded, owned_file, strict_json
 from .storage import StorageFailure, atomic_write, locked_root, private_directory
 
@@ -25,12 +26,6 @@ class RetainedUsage:
     draft_bytes: int = 0
     owned_bytes: int = 0
     records: int = 0
-
-
-class BackgroundFailure(Exception):
-    def __init__(self, code: str):
-        self.code = code
-        super().__init__(code)
 
 
 def utc_now() -> str:

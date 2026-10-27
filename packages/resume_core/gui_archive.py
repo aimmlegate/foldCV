@@ -1,7 +1,7 @@
 """Portable v5 snapshots and explicit dispatch of legacy project archives."""
 
 from pydantic import ValidationError
-from .gui_archive_zip import (ArchiveFailure,read_zip,write_zip,parse_json,json_bytes,digest,safe_path,alias)
+from .archive_zip import (ArchiveFailure,read_zip,write_zip,parse_json,json_bytes,digest,safe_path,alias)
 from .gui_exports import matching_snapshot
 from .gui_rendering import render_input
 from .gui_archive_validation import validate_workspace

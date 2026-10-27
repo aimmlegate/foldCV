@@ -1,6 +1,6 @@
 """Check portable references before admitting data into a local project."""
 
-from .gui_archive_zip import ArchiveFailure,digest,safe_path,alias
+from .archive_zip import ArchiveFailure,digest,safe_path,alias
 from .gui_mutations import unicode_valid
 from .gui_selection import field_index,normalized_text,utf16_slice
 from .models.recovery import ObservationFact,authored_fields,record_slot

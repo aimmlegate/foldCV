@@ -18,8 +18,8 @@ in a normal terminal or with the execution tool's approved escalation.
 The installed binary was outside PATH. Use an explicit path:
 
 ```sh
-.venv/bin/python -m spikes.cli.runner probe --executable /Users/fostral/.codex/plugins/.plugin-appserver/codex-cli/bin/codex
-.venv/bin/python -m spikes.cli.runner metadata --executable /Users/fostral/.codex/plugins/.plugin-appserver/codex-cli/bin/codex
+PYTHONPATH=services/api/src .venv/bin/python -m resume_api.cli.runner probe --executable /Users/fostral/.codex/plugins/.plugin-appserver/codex-cli/bin/codex
+PYTHONPATH=services/api/src .venv/bin/python -m resume_api.cli.runner metadata --executable /Users/fostral/.codex/plugins/.plugin-appserver/codex-cli/bin/codex
 ```
 
 `probe` checks version, exec options and native login status. `metadata` uses
@@ -32,7 +32,7 @@ CODEX_HOME, proxy variables and launch overrides are not passed to the child.
 The opt-in synthetic command is:
 
 ```sh
-.venv/bin/python -m spikes.cli.runner live --executable /Users/fostral/.codex/plugins/.plugin-appserver/codex-cli/bin/codex
+PYTHONPATH=services/api/src .venv/bin/python -m resume_api.cli.runner live --executable /Users/fostral/.codex/plugins/.plugin-appserver/codex-cli/bin/codex
 ```
 
 It currently exits 1 with `CLI_PROFILE_UNSAFE`, before generation. The real
@@ -69,7 +69,7 @@ Malformed ownership markers are left untouched while cleanup continues for
 independent directories.
 
 ```sh
-.venv/bin/python -m spikes.cli.runner cleanup
+PYTHONPATH=services/api/src .venv/bin/python -m resume_api.cli.runner cleanup
 ```
 
 Normal cleanup follows TERM, then KILL of the operation's process group. A macOS

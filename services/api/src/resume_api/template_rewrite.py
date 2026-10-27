@@ -5,10 +5,10 @@ import threading
 
 from packages.resume_core.preferences import PreferencesFailure
 from packages.resume_core.text_rewrite import PlainTextReply, plain_prompt
-from .gui_admission import AdmissionCancelled, QueuedProvider
-from .gui_content import generate_admitted
-from .gui_projects import ProjectFailure
+from .inference_admission import AdmissionCancelled
 from .lifecycle import OperationFiles
+from .projects.errors import ProjectFailure
+from .providers.admitted import QueuedProvider, generate_admitted
 from .providers.content import ContentFailure, ContentInput, GenerationPolicy
 
 

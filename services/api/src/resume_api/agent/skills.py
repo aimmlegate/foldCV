@@ -10,7 +10,7 @@ from typing import Literal
 from pydantic import Field
 
 from packages.resume_core import agent_limits as limits
-from packages.resume_core.agent_store import AgentFailure
+from packages.resume_core.assistant_store import AgentFailure
 from packages.resume_core.models.agent import AgentWire
 
 

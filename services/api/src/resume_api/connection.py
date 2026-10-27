@@ -17,7 +17,7 @@ from resume_api.cli.process_runner import ProcessExit, ProcessRunner
 from resume_api.cli.experimental_profile import ExperimentalCliProfile, ExperimentalProfileError
 from resume_api.lifecycle import OperationFiles, SpikeError
 from resume_api.providers.codex_cli import MODEL, strict_json
-from spikes.cli.profile import VERSION, overrides
+from resume_api.cli.profile import VERSION, overrides
 
 
 MAX_MODELS = 100

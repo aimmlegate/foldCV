@@ -3,7 +3,7 @@
 from pydantic import ValidationError
 
 from packages.resume_core.resume_assessment import ResumeAssessment, assessment_input
-from .gui_content import generate_admitted
+from .providers.admitted import generate_admitted
 from .providers.content import ContentFailure, ContentInput, GenerationPolicy, MAX_GENERATION_SECONDS
 
 

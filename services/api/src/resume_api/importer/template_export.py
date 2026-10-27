@@ -4,7 +4,7 @@ import asyncio
 from dataclasses import dataclass
 import inspect
 
-from packages.resume_core.background_store import BackgroundFailure
+from packages.resume_core.project_repository import RepositoryFailure
 from packages.resume_core.models.rich_workspace import RichRenderSnapshot
 from packages.resume_core.models.template_render import TemplateRenderRequestV1
 from packages.resume_core.rich_limits import DOCX_BYTES
@@ -142,7 +142,7 @@ class TemplateExporter:
                 result = await asyncio.wait_for(asyncio.shield(cleanup), self.pipeline.cleanup_seconds)
             except (asyncio.TimeoutError, asyncio.CancelledError):
                 self.pipeline.fence_checkpoint(project, attempt.id)
-                raise BackgroundFailure('OUTCOME_UNKNOWN') from None
+                raise RepositoryFailure('OUTCOME_UNKNOWN') from None
             except Exception:
                 self.pipeline.fence_checkpoint(project, attempt.id)
                 raise

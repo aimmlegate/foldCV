@@ -16,7 +16,7 @@ from packages.resume_core.models.agent import (
 )
 from resume_api.cli.experimental_profile import BINARY_SHA256, VERSION
 from resume_api.inference_admission import AdmissionCancelled, AdmissionTimeout, AdmissionBlocked, INFERENCE
-from spikes.agent.profile import HOST_SHA256, MANIFEST_SHA256
+from resume_api.agent.host_profile import HOST_SHA256, MANIFEST_SHA256
 
 from .leases import AgentLeases
 from .runtime import RuntimeInput, RuntimeResult, BASE_INSTRUCTIONS, DEVELOPER_INSTRUCTIONS

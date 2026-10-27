@@ -12,7 +12,7 @@ ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / "services/api/src"))
 
 from resume_api.cli.experimental_profile import BINARY, ExperimentalCliProfile, ExperimentalProfileError
-from spikes.agent import profile as agent
+from resume_api.agent import host_profile as agent
 
 
 @pytest.fixture

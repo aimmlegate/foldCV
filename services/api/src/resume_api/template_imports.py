@@ -3,15 +3,14 @@
 The runtime call cap has no default: without an explicit configured value the import is unavailable.
 """
 
-from packages.resume_core.background_limits import import_seconds
-from packages.resume_core.project_limits import finalization_seconds
+from packages.resume_core.project_limits import finalization_seconds, import_seconds
 from packages.resume_core.models.template_import import MAX_IMPORT_CONCURRENCY, ImportCapture, RuntimePolicy, StartTemplateImportV1
 from packages.resume_core.models.template_workspace import WorkspaceV7
 from packages.resume_core.template_import import TemplateImportFailure, digest
 from packages.resume_core.templates.store import TemplateStore
 from packages.resume_core.dates import partial_date
 from packages.resume_core.rich_assembly import identity
-from .gui_projects import ProjectFailure
+from .projects.errors import ProjectFailure
 
 
 class TemplateImports:

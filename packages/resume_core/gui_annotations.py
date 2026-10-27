@@ -6,6 +6,7 @@ from .gui_derived import complete_period
 from .gui_normalization import GuiNormalizedResult
 from .models.recovery import Annotation, Dependencies, Document, JobRecord, NameAssessmentFact, authored_fields
 from .normalization import _id
+from .rich_assembly import unresolved_source_units
 
 
 def complete_job_dates(job: JobRecord, facts) -> bool:
@@ -16,13 +17,6 @@ def complete_job_dates(job: JobRecord, facts) -> bool:
 
 def filled_section(rows) -> bool:
     return any(row.visible and any(field.text.strip() for field in authored_fields(row)) for row in rows)
-
-
-def unresolved_source_units(normalized):
-    assessments = {fact.id for fact in normalized.facts if fact.kind == "name_assessment"
-        or fact.kind == "source_observation" and fact.value.source_observed_at is None}
-    return [(source, unit) for source in normalized.sources for unit in source.units
-        if unit.text.strip() and unit.disposition == "unresolved" and not set(unit.represented_fact_ids) - assessments]
 
 
 def initial_annotations(project_id: str, document: Document, normalized: GuiNormalizedResult,

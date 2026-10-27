@@ -14,7 +14,7 @@ import time
 import unittest
 from unittest.mock import patch
 
-from spikes.cli.runner import OWNER, Runner, SpikeError, group_members, operation, reap_owned
+from resume_api.cli.runner import OWNER, Runner, SpikeError, group_members, operation, reap_owned
 
 
 PROMPT = "T00B_SYNTHETIC_CANARY — Alex Example; quotes '\" $() ; `inert` ☃"
@@ -265,8 +265,8 @@ class RunnerTests(unittest.TestCase):
             return group_members(group_id)
 
         try:
-            with patch("spikes.cli.runner.os.killpg", side_effect=killpg), patch(
-                "spikes.cli.runner.group_members", side_effect=members
+            with patch("resume_api.cli.runner.os.killpg", side_effect=killpg), patch(
+                "resume_api.cli.runner.group_members", side_effect=members
             ):
                 self.assertEqual(self.generate().summary, "Fictional engineer builds small services.")
             self.assertGreaterEqual(inspected[0], 3)
@@ -289,7 +289,7 @@ class RunnerTests(unittest.TestCase):
                 raise SpikeError("PROCESS_CLEANUP_FAILED")
             return group_members(group_id)
 
-        with patch("spikes.cli.runner.group_members", side_effect=members):
+        with patch("resume_api.cli.runner.group_members", side_effect=members):
             with self.assertRaisesRegex(SpikeError, "PROCESS_CLEANUP_FAILED"):
                 self.generate()
         directories = [path for path in self.root.iterdir() if path.is_dir()]
@@ -445,12 +445,12 @@ class RunnerTests(unittest.TestCase):
                 markers.append(json.loads((Path(kwargs["cwd"]) / ".worker").read_text()))
             return original_popen(*args, **kwargs)
 
-        with patch("spikes.cli.runner.subprocess.Popen", side_effect=checked_popen):
+        with patch("resume_api.cli.runner.subprocess.Popen", side_effect=checked_popen):
             self.runner.probe()
         self.assertEqual(markers, [{"state": "spawning"}] * 3)
         self.assert_clean()
 
-        with patch("spikes.cli.runner.subprocess.Popen", side_effect=FileNotFoundError):
+        with patch("resume_api.cli.runner.subprocess.Popen", side_effect=FileNotFoundError):
             with self.assertRaisesRegex(SpikeError, "CLI_MISSING"):
                 self.runner.probe()
         self.assert_clean()

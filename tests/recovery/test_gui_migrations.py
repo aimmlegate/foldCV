@@ -6,7 +6,7 @@ import sys
 import pytest
 sys.path.insert(0,str(Path(__file__).resolve().parents[2]/'services/api/src'))
 from packages.resume_core.gui_archive import open_archive,export_archive
-from packages.resume_core.gui_archive_zip import read_zip,write_zip,json_bytes,digest,ArchiveFailure
+from packages.resume_core.archive_zip import read_zip,write_zip,json_bytes,digest,ArchiveFailure
 from packages.resume_core.gui_legacy_context import migration_context,public_workspace_facts
 from packages.resume_core.gui_rendering import render_input
 from tests.recovery.generation_fixtures import frozen_now,render_workspace

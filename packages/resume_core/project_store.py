@@ -9,7 +9,7 @@ import re
 
 from pydantic import ValidationError
 
-from .models.recovery import Registry, RegistryEntry, WorkspaceV5
+from .models.registry import Registry, RegistryEntry
 from .storage import StorageFailure, atomic_write, data_root, locked_root, private_directory, private_file
 
 
@@ -49,6 +49,9 @@ def owned_file(path, limit=MAX_SNAPSHOT_BYTES):
 
 
 class ProjectStore:
+    # The V5 workspace model of the legacy GUI store; only its save and _load read it.
+    workspace_model = None
+
     def __init__(self, root: Path | None = None):
         self.root = data_root(root)
         self.projects = self.root / "projects"
@@ -120,7 +123,7 @@ class ProjectStore:
                 if target.exists():
                     owned_file(target)
                     raw = target.read_bytes()
-                    existing = WorkspaceV5.model_validate(strict_json(raw))
+                    existing = self.workspace_model.model_validate(strict_json(raw))
                     if (hashlib.sha256(raw).hexdigest() != self.expected.get(workspace.project_id)
                         or existing.project_revision > workspace.project_revision
                         or existing.document_revision > workspace.document_revision):
@@ -152,7 +155,7 @@ class ProjectStore:
                 snapshot = encoded(workspace.model_dump(mode="json", by_alias=True))
                 if len(snapshot) > MAX_SNAPSHOT_BYTES:
                     raise ProjectStoreFailure("PROJECT_TOO_LARGE")
-                from .gui_archive_zip import ArchiveFailure, json_bytes
+                from .archive_zip import ArchiveFailure, json_bytes
                 try:
                     json_bytes(workspace.model_dump(mode="json", by_alias=True))
                 except ArchiveFailure:
@@ -174,7 +177,7 @@ class ProjectStore:
         path = directory / "workspace.json"
         owned_file(path)
         raw = path.read_bytes()
-        workspace = WorkspaceV5.model_validate(strict_json(raw))
+        workspace = self.workspace_model.model_validate(strict_json(raw))
         self.expected[id] = hashlib.sha256(raw).hexdigest()
         if workspace.project_id != id:
             raise StorageFailure("UNSAFE_STORAGE")

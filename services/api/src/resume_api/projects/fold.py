@@ -65,9 +65,8 @@ def fold_sidecar(session, after):
                 raise RepositoryFailure('OUTCOME_UNKNOWN')
             else:
                 older.append((operation, facts))
-    except RepositoryFailure:
-        raise
     except Exception:
+        # Sidecar read failures share the RepositoryFailure class; every one of them is an unknown outcome here.
         raise RepositoryFailure('OUTCOME_UNKNOWN') from None
     if len(current) > 1:
         raise RepositoryFailure('OUTCOME_UNKNOWN')

@@ -34,7 +34,7 @@ def build(root):
 
 
 def controls(root, bridge):
-    from packages.resume_core.models import validate_contract
+    from packages.resume_core.models.background import BACKGROUND_CONTRACTS
     from tests.recovery.test_background_writer_drafts import checkpoint
     fixture = WriterFixture(root)
     request = checkpoint(fixture)
@@ -63,7 +63,7 @@ def controls(root, bridge):
         "draft_read": {"schemaVersion": 1, "checkpoint": draft.model_dump(by_alias=True), "payload": request.payload.model_dump(by_alias=True)},
         "draft_resolve": {**command, "mutation": request.payload.outbox[0].model_dump(by_alias=True)},
     }
-    return {"background_writer_" + key + "_v1": validate_contract("background_writer_" + key + "_v1", value).model_dump(mode="json", by_alias=True)
+    return {"background_writer_" + key + "_v1": BACKGROUND_CONTRACTS["background_writer_" + key + "_v1"].model_validate(value).model_dump(mode="json", by_alias=True)
         for key, value in examples.items()}
 
 

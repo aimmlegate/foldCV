@@ -23,6 +23,9 @@ GLOBAL_PROJECTS = 8
 SAVE_SECONDS_PER_MEGABYTE = 2
 FINALIZATION_BASE_SECONDS = 30
 FINALIZATION_CEILING_SECONDS = FINALIZATION_BASE_SECONDS + SAVE_SECONDS_PER_MEGABYTE * PROJECT_MEGABYTES[2]
+# One encoded undo inverse, and the DOCX render worker threads.
+INVERSE_BYTES = 512 * 1024
+RENDER_WORKERS = 2
 
 
 @dataclass
@@ -39,6 +42,11 @@ def apply_preferences(preferences):
     """Apply saved Settings; None restores the defaults."""
     USER_LIMITS.import_minutes = IMPORT_MINUTES[0] if preferences is None else preferences.import_minutes
     USER_LIMITS.project_megabytes = PROJECT_MEGABYTES[0] if preferences is None else preferences.project_megabytes
+
+
+def import_seconds(ceiling_seconds=IMPORT_CEILING_SECONDS):
+    """The Settings import time, bounded by a ceiling the caller may lower."""
+    return min(ceiling_seconds, USER_LIMITS.import_minutes * 60)
 
 
 def project_file_bytes():

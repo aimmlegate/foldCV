@@ -6,7 +6,7 @@ from urllib.parse import quote
 
 from fastapi.responses import Response
 
-from .gui_projects import ProjectFailure
+from .projects.errors import ProjectFailure
 
 
 def original_response(service, identifier, source_id, *, download=False):

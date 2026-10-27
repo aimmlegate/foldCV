@@ -335,25 +335,26 @@ def test_focus_reconciliation_updates_display_and_duration_references_together()
 
 
 def test_local_v5_save_enforces_portable_workspace_size(tmp_path, monkeypatch):
-    from packages.resume_core import gui_archive_zip
-    from packages.resume_core.project_store import ProjectStore, ProjectStoreFailure
+    from packages.resume_core import archive_zip
+    from packages.resume_core.gui_projects import GuiProjectStore
+    from packages.resume_core.project_store import ProjectStoreFailure
     workspace = render_workspace()
     workspace.project.sources = []
-    store = ProjectStore(tmp_path)
+    store = GuiProjectStore(tmp_path)
     store.save(workspace, {}, {})
     path = store.projects / workspace.project_id / "workspace.json"
     before = path.read_bytes()
-    monkeypatch.setattr(gui_archive_zip, "MAX_JSON", 10)
+    monkeypatch.setattr(archive_zip, "MAX_JSON", 10)
     with pytest.raises(ProjectStoreFailure, match="PROJECT_TOO_LARGE"):
         store.save(workspace, {}, {})
     assert path.read_bytes() == before
 
 
 def test_loading_shared_catalog_does_not_delete_a_supported_foreign_version(tmp_path):
-    from packages.resume_core.project_store import ProjectStore
+    from packages.resume_core.gui_projects import GuiProjectStore
     workspace = without_sources()
     RichProjectStore(tmp_path).save(workspace, {}, {})
-    _, errors, registry = ProjectStore(tmp_path).load_all()
+    _, errors, registry = GuiProjectStore(tmp_path).load_all()
     assert workspace.project_id in errors
     assert not any(entry.tombstoned for entry in registry.entries)
     loaded, errors, _ = RichProjectStore(tmp_path).load_all()

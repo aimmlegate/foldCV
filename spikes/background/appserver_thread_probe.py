@@ -12,7 +12,7 @@ from resume_api.cli.experimental_profile import BINARY
 from resume_api.cli.process_runner import ProcessRunner
 from resume_api.lifecycle import OperationFiles
 from .appserver_offline import OfflineProfile, ProbeFinished, alive, validate_config, structured_features
-from spikes.agent.profile import APP_SERVER_PREFIX
+from resume_api.agent.host_profile import APP_SERVER_PREFIX
 
 
 def probe(root, evidence, label):

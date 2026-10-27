@@ -333,7 +333,7 @@ def test_tombstone_blocks_late_publication_and_cleanup_recovers_without_model_wo
 
 
 def test_portable_resume_omits_local_conversation_and_import_uses_fresh_namespace(tmp_path):
-    from packages.resume_core.gui_archive_zip import read_zip
+    from packages.resume_core.archive_zip import read_zip
     from packages.resume_core.rich_archive import export_rich_archive, open_rich_archive
     store, canonical, workspace, conversation = isolated_project(tmp_path)
     run, _ = submit(store, workspace, conversation, message="Keep this local conversation")

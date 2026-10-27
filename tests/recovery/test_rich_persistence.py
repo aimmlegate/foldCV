@@ -12,7 +12,7 @@ import pytest
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "services/api/src"))
 
-from packages.resume_core.gui_archive_zip import ArchiveFailure, read_zip, write_zip
+from packages.resume_core.archive_zip import ArchiveFailure, read_zip, write_zip
 from packages.resume_core.models.rich_mutations import RichMutation
 from packages.resume_core.models.rich_workspace import WorkspaceV6
 from packages.resume_core.rich_archive import archive_payload, export_rich_archive, open_rich_archive

@@ -1,7 +1,7 @@
 """Validate old workspace envelopes and retain uncommitted input as history."""
 
 import re
-from .gui_archive_zip import ArchiveFailure,digest,parse_json,json_bytes
+from .archive_zip import ArchiveFailure,digest,parse_json,json_bytes
 from .gui_migration import empty_workspace,migrate_v3,history
 from .gui_normalization import canonical_source,source_fingerprint
 from .extraction.models import ExtractResult

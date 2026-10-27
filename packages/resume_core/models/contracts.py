@@ -633,19 +633,14 @@ def validate_manifest(manifest: ZipManifest) -> ZipManifest:
 def validate_contract(kind: str, data: object) -> Wire:
     models = {"project": Project, "proposal": Proposal, "template": TemplateManifest,
               "zip_manifest": ZipManifest, "archive_manifest": ArchiveManifest}
-    from .recovery import RECOVERY_CONTRACTS
-    from ..gui_normalization import GUI_NORMALIZATION_CONTRACTS
-    from ..gui_drafting import GUI_DRAFT_CONTRACTS
-    from ..gui_projects import GUI_PROJECT_CONTRACTS
+    from ..rendering.models import DocxError
     from .agent import AGENT_CONTRACTS
-    from .background import BACKGROUND_CONTRACTS
+    from .registry import Registry
+    from .settings import SETTINGS_CONTRACTS
     from ..rich_panel import RichPanelRequest
-    models.update(RECOVERY_CONTRACTS)
-    models.update(GUI_NORMALIZATION_CONTRACTS)
-    models.update(GUI_DRAFT_CONTRACTS)
-    models.update(GUI_PROJECT_CONTRACTS)
+    models.update(SETTINGS_CONTRACTS)
     models.update(AGENT_CONTRACTS)
-    models.update(BACKGROUND_CONTRACTS)
+    models.update(registry=Registry, docx_error=DocxError)
     models["rich_panel_request"] = RichPanelRequest
     if kind not in models:
         raise ValueError("unknown contract")

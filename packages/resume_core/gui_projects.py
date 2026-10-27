@@ -5,6 +5,7 @@ from pydantic import Field, field_validator
 
 from .models.contracts import Id, Revision, Wire, Sha256
 from .models.recovery import WorkspaceV5, RegistryEntry
+from .project_store import ProjectStore
 
 
 class GuiCreateProjectRequest(Wire):
@@ -73,3 +74,8 @@ GUI_PROJECT_CONTRACTS = {"gui_create_project_request": GuiCreateProjectRequest,
     "gui_rename_project_request": GuiRenameProjectRequest,
     "gui_project_list_response": GuiProjectListResponse, "gui_delete_project_request": GuiDeleteProjectRequest,
     "gui_delete_project_result": GuiDeleteProjectResult, "gui_archive_request": GuiArchiveRequest}
+
+
+class GuiProjectStore(ProjectStore):
+    """The V5 project store of the legacy GUI routes."""
+    workspace_model = WorkspaceV5

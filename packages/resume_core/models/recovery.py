@@ -4,10 +4,13 @@ from __future__ import annotations
 
 from typing import Annotated, Literal, Union
 
-from pydantic import ConfigDict, Field, RootModel, model_validator
+from pydantic import Field, RootModel, model_validator
 
-from ..project_limits import IMPORT_MINUTES, PROJECT_MEGABYTES
-from ..reasoning import ReasoningEffort
+from ..rendering.models import Anchor, DocumentAnchor, DocxError, DocxErrorCode, FieldAnchor, Range, SafeRenderPath, SectionAnchor
+from .evidence import EvidenceSpan
+from .registry import Registry, RegistryEntry
+from .settings import (Preferences, RulePresets, Rules, RulesErrorPayload, RulesSettings, RulesSettingsError,
+    SaveImportModelPreference, SaveLimitsPreference, SaveRulesRequest)
 
 from .contracts import (
     ArchiveEntry, AssetRef, Block, Evidence, Fact, Id, Job, Subproject, Operation, PartialDate,
@@ -18,10 +21,6 @@ from .contracts import (
 
 Status = Literal["queued", "running", "completed", "failed", "cancelled", "interrupted"]
 ContentKind = Literal["normalize_semantics", "draft_prose", "rewrite_prose", "reconcile_edits"]
-
-
-class EvidenceSpan(Evidence):
-    text: str = Field(min_length=1)
 
 
 class NameAssessment(Wire):
@@ -109,13 +108,6 @@ class EmploymentFact(TextFact):
 
 GuiFact = Annotated[Union[GuiTextFact, GuiTechnologyFact, GuiMetricFact, GuiLeadershipFact, GuiDateFact], Field(discriminator="kind")]
 RecoveryFact = Union[GuiFact, Fact, CandidateFact, NameAssessmentFact, ObservationFact, EmploymentFact]
-
-
-class Rules(Wire):
-    model_config = ConfigDict(frozen=True)
-    markdown: str
-    revision: Revision
-    sha256: Sha256
 
 
 class JobDisposition(Wire):
@@ -308,35 +300,6 @@ class Document(Wire):
         return self
 
 
-class Range(Wire):
-    start: int = Field(ge=0)
-    end: int = Field(ge=0)
-
-    @model_validator(mode="after")
-    def ordered(self) -> Range:
-        if self.end < self.start:
-            raise ValueError("range is reversed")
-        return self
-
-
-class FieldAnchor(Wire):
-    kind: Literal["field"]
-    field_id: Id
-    range: Range | None
-
-
-class SectionAnchor(Wire):
-    kind: Literal["section"]
-    section_id: Id
-
-
-class DocumentAnchor(Wire):
-    kind: Literal["document"]
-
-
-Anchor = Annotated[Union[FieldAnchor, SectionAnchor, DocumentAnchor], Field(discriminator="kind")]
-
-
 class Dependencies(Wire):
     project_revision: Revision
     document_revision: Revision
@@ -362,27 +325,6 @@ class Annotation(Wire):
     resolved: bool
     update_suggestion_id: Id | None
     removed_focus: list[FocusRemoval]
-
-
-DocxErrorCode = Literal[
-    "DOCX_NAME_LINE_LIMIT", "DOCX_TITLE_LINE_LIMIT", "DOCX_UNBREAKABLE_TEXT",
-    "DOCX_BLOCK_PAGE_BUDGET", "DOCX_BLOCK_PLANNED_PAGE", "DOCX_UNKNOWN_FOCUS_ICON",
-    "DOCX_TEXT_LIMIT", "DOCX_LIST_LIMIT", "DOCX_TOTAL_TEXT_LIMIT",
-    "DOCX_INVALID_CHARACTER", "DOCX_INVALID_RENDER_INPUT", "DOCX_RENDER_FAILED",
-]
-SafeRenderPath = Annotated[str, Field(pattern=(
-    r"^(candidate\.(name|title|summary)|footer|focus(\[[0-9]+\]\.(label|duration|icon))?|"
-    r"sidebar(\[[0-9]+\]\.(title|items(\[[0-9]+\])?))?|"
-    r"projects(\[[0-9]+\]\.(company|role|period|stack|description|tasks(\[[0-9]+\])?|"
-    r"results(\[[0-9]+\])?))?|achievements(\[[0-9]+\])?|"
-    r"skillGroups(\[[0-9]+\]\.(title|items))?)$"
-))]
-
-
-class DocxError(Wire):
-    code: DocxErrorCode
-    path: SafeRenderPath | None
-    anchor: Anchor
 
 
 class RenderSnapshotV4(Wire):
@@ -767,41 +709,6 @@ class MutationResult(Wire):
     persistence: Literal["memory", "durable", "pending", "failed"]
 
 
-class RegistryEntry(Wire):
-    project_id: Id
-    title: str
-    updated_at: str
-    tombstoned: bool
-    cleanup_status: Literal["none", "pending", "complete", "failed"]
-
-
-class Registry(Wire):
-    schema_version: Literal[1]
-    entries: list[RegistryEntry]
-
-
-class Preferences(Wire):
-    schema_version: Literal[1]
-    automatic_analysis: bool
-    theme: Literal["light", "dark", "system"]
-    selected_model: str | None
-    selected_import_model: str | None = None
-    # E07: one more repair by this model after the import model's own repair; None disables it.
-    selected_fallback_model: str | None = None
-    rewrite_reasoning_effort: ReasoningEffort | None = None
-    import_minutes: int = Field(default=IMPORT_MINUTES[0], ge=IMPORT_MINUTES[1], le=IMPORT_MINUTES[2])
-    project_megabytes: int = Field(default=PROJECT_MEGABYTES[0], ge=PROJECT_MEGABYTES[1], le=PROJECT_MEGABYTES[2])
-
-
-class SaveImportModelPreference(Wire):
-    model: str | None = Field(max_length=80, pattern=r"^[a-zA-Z0-9][a-zA-Z0-9._-]{0,79}$")
-
-
-class SaveLimitsPreference(Wire):
-    import_minutes: int = Field(ge=IMPORT_MINUTES[1], le=IMPORT_MINUTES[2])
-    project_megabytes: int = Field(ge=PROJECT_MEGABYTES[1], le=PROJECT_MEGABYTES[2])
-
-
 class ArchiveManifestV5(Wire):
     schema_version: Literal[5]
     app_version: str
@@ -824,32 +731,6 @@ class ArchiveManifestV5(Wire):
         if any(entry.role == "source_original" and not entry.path.startswith("sources/") for entry in self.entries):
             raise ValueError("source entry path mismatch")
         return self
-
-
-class SaveRulesRequest(Wire):
-    markdown: str = Field(min_length=1, max_length=32_768)
-    base_revision: Revision
-
-
-class RulePresets(Wire):
-    shorten: str = Field(min_length=1)
-    clarify: str = Field(min_length=1)
-
-
-class RulesSettings(Rules):
-    presets: RulePresets
-
-
-class RulesErrorPayload(Wire):
-    code: Literal["RULES_PRESETS_REQUIRED", "RULES_STALE", "RULES_TOO_LARGE",
-                  "RULES_INVALID_TEXT", "RULES_LOAD_FAILED", "RULES_SAVE_FAILED", "RULES_UNSAFE_STORAGE"]
-    retryable: Literal[False]
-    stage: Literal["rules"]
-
-
-class RulesSettingsError(Wire):
-    error: RulesErrorPayload
-    required_headings: list[Literal["## Preset: shorten", "## Preset: clarify"]]
 
 
 RECOVERY_CONTRACTS = {

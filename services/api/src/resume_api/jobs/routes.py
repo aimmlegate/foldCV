@@ -23,8 +23,13 @@ def mount_jobs(app, service):
     async def index():
         return response(service.index())
 
+    # BackgroundFailure is the repository's failure class now; /v2 replies keep the handler mounted before this one.
+    repository_handler = app.exception_handlers.get(BackgroundFailure)
+
     @app.exception_handler(BackgroundFailure)
-    async def failure(_request: Request, error: BackgroundFailure):
+    async def failure(request: Request, error: BackgroundFailure):
+        if repository_handler is not None and request.url.path.startswith("/v2/"):
+            return await repository_handler(request, error)
         status = (404 if error.code == "JOB_NOT_FOUND" else 410 if error.code == "PROJECT_DELETED" else
             503 if error.code in {"JOB_STORE_CORRUPT", "JOB_STORE_UNAVAILABLE", "CLEANUP_FAILED"} else 409)
         return JSONResponse({"error": {"code": error.code}}, status_code=status, headers={"Cache-Control": "no-store"})

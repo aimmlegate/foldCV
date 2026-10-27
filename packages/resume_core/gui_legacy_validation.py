@@ -1,7 +1,7 @@
 """Retain the old workspace envelope's rejection rules on Python import."""
 
 import re
-from .gui_archive_zip import ArchiveFailure,safe_path
+from .archive_zip import ArchiveFailure,safe_path
 from .extraction.models import ExtractResult
 from .models.contracts import BlockState,Review,MetricValue,LeadershipValue
 from .normalization import FactSheet

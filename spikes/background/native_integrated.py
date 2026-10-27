@@ -24,7 +24,7 @@ from resume_api.jobs.appserver import SharedContentProvider
 from resume_api.jobs.service import JobService
 from resume_api.profile_ownership import native_profile
 from resume_api.rich_projects import RichProjectService
-from spikes.agent.profile import check_host
+from resume_api.agent.host_profile import check_host
 from tests.recovery.test_background_agent import hold_writer
 from tests.recovery.test_background_fixed_jobs import completion_command, fixed_request, rewrite_command
 from tests.recovery.test_rich_synchronization import selection

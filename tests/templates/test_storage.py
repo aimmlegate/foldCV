@@ -5,7 +5,7 @@ from pathlib import Path
 
 import pytest
 
-from packages.resume_core.gui_archive_zip import ArchiveFailure, digest, read_zip, write_zip
+from packages.resume_core.archive_zip import ArchiveFailure, digest, read_zip, write_zip
 from packages.resume_core.models.template_workspace import WorkspaceV7
 from packages.resume_core.project_store import ProjectStoreFailure
 from packages.resume_core.rich_archive import export_rich_archive, open_rich_archive

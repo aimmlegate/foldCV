@@ -24,7 +24,7 @@ from resume_api.cli.process_runner import ProcessRunner
 from resume_api.lifecycle import OperationFiles
 from resume_api.providers.codex_cli import strict_json
 from spikes.agent.listener import ProofMcp
-from spikes.agent.profile import AgentProofProfile, CODE_MODE_HOST, TOKEN_ENV, TOOLS
+from resume_api.agent.host_profile import AgentProofProfile, CODE_MODE_HOST, TOKEN_ENV, TOOLS
 
 STATE = ROOT / "docs/gui/handoffs/AGENT-ASSISTANT/state.json"
 MODEL = "gpt-6-luna"
@@ -262,7 +262,7 @@ class Probe:
     def execute(self):
         started = time.monotonic()
         self.report["sourceSha256"] = {name: hashlib.sha256((ROOT / name).read_bytes()).hexdigest()
-            for name in ("spikes/agent/proof.py", "spikes/agent/profile.py", "spikes/agent/listener.py",
+            for name in ("spikes/agent/proof.py", "services/api/src/resume_api/agent/host_profile.py", "spikes/agent/listener.py",
                          "spikes/agent/host_probe.py", "services/api/src/resume_api/cli/process_runner.py",
                          "services/api/src/resume_api/cli/experimental_profile.py")}
         stopped = threading.Event()

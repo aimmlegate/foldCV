@@ -8,7 +8,7 @@ import pytest
 
 from resume_api.jobs.process_ownership import GuardedPipe, ProcessInspector
 from resume_api.lifecycle import SpikeError
-from spikes.cli.runner import group_members
+from resume_api.cli.runner import group_members
 from spikes.background.appserver_protocol import TransportFailure
 from tests.recovery.test_background_appserver import pipe_peer
 

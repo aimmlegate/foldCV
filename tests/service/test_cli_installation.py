@@ -45,7 +45,7 @@ def package(tmp_path, monkeypatch):
                         ("MANIFEST_SHA256", hashlib.sha256(payloads["codex-package.json"]).hexdigest())):
         monkeypatch.setattr(release, name, value)
     monkeypatch.setattr(CliInstallation, "download", lambda _self, _files, destination: shutil.copyfile(archive, destination))
-    from spikes.agent import profile as agent
+    from resume_api.agent import host_profile as agent
     monkeypatch.setattr(agent, "MANIFEST_SHA256", release.MANIFEST_SHA256)
     return archive, payloads
 
@@ -183,7 +183,7 @@ def test_package_failure_and_publish_failure_preserve_previous(package, tmp_path
 
 def test_relocated_agent_uses_the_pinned_local_companion(package, tmp_path, monkeypatch):
     from resume_api.agent.profile import AgentProfile
-    from spikes.agent import profile as agent
+    from resume_api.agent import host_profile as agent
 
     installer = CliInstallation(tmp_path / "cli-runtime")
     assert install(installer, tmp_path)

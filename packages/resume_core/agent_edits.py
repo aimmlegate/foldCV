@@ -12,6 +12,7 @@ from .models.rich_mutations import (
     ActionCapture, MoveBlock, PutBlock, PutRecord, RemoveBlock, RemoveRecord, ReplaceInlineRange, RichMutation,
 )
 from .rich_assembly import field
+from .template_inverse import semantic
 from .rich_dependencies import dependencies_current, placements
 from .rich_fields import inline_groups, occurrences, working_field
 from .rich_mutations import apply_rich_mutation, cut_inline, inline_text, locate, mutation_sha256, parent_items, subtree, utf16_slice
@@ -59,16 +60,6 @@ def preserving_replacement(content, start, end, additions):
         raise AgentPolicyFailure("ASSISTANT_FORMAT_SEPARATE")
     values = [StyledText(type="text", text=part.text, styles=style.model_copy(deep=True)) for part in additions]
     return [Hyperlink(type="link", href=template.href, content=values)] if isinstance(template, Hyperlink) else values
-
-
-def semantic(value):
-    if hasattr(value, "model_dump"):
-        value = value.model_dump(mode="json", by_alias=True)
-    if isinstance(value, dict):
-        return {key: semantic(part) for key, part in value.items() if key not in {"revision", "syncedFactRevision"}}
-    if isinstance(value, list):
-        return [semantic(part) for part in value]
-    return value
 
 
 def text_of(content):

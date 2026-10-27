@@ -137,7 +137,7 @@ class _Prepared:
 
 async def production_render(owner, request):
     """The DOCX worker already used by the legacy exporter, in its own operation directory."""
-    from ..gui_admission import AdmissionCancelled
+    from ..inference_admission import AdmissionCancelled
     from ..lifecycle import OperationFiles, SpikeError
     files, cancel = OperationFiles(owner.temp_root), threading.Event()
     try:

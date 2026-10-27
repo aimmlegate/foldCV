@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import asyncio
 from concurrent.futures import ThreadPoolExecutor
-from packages.resume_core.gui_reconciliation import SaveAnalysisPreference
 from io import BytesIO
 from contextlib import asynccontextmanager
 from http.cookies import SimpleCookie
@@ -23,10 +22,10 @@ from fastapi.responses import FileResponse, JSONResponse, Response, StreamingRes
 from starlette.exceptions import HTTPException as StarletteHTTPException
 from pydantic import ValidationError
 
-from .contracts import (CompletedEvent, CompletedPayload, ConnectionPayload, DraftRequest, EmptyRequest, ErrorEnvelope, ErrorPayload,
-                        FailedEvent, NormalizeRequest, OperationResult, RenderRequest, RewriteRequest, StartedEvent,
-                        SelectModelRequest, SelectReasoningRequest, QuotaPayload, ValidateRequest,
-                        StartedPayload, TextRequest, UsagePayload)
+from .contracts import (CompletedEvent, CompletedPayload, DraftRequest, FailedEvent, NormalizeRequest, OperationResult,
+                        RenderRequest, RewriteRequest, StartedEvent, StartedPayload, TextRequest, UsagePayload, ValidateRequest)
+from .host_models import (ConnectionPayload, EmptyRequest, ErrorEnvelope, ErrorPayload, QuotaPayload, SelectModelRequest,
+                          SelectReasoningRequest)
 from .lifecycle import OperationFiles, SpikeError, has_blocked_owned, reap_owned
 from .connection import ConnectionAdapter, ConnectionFailure, Metadata
 from .cli.experimental_profile import ExperimentalCliProfile, ExperimentalProfileError
@@ -46,16 +45,17 @@ from packages.resume_core.rewriting import (RewritePreflightError, RewritePrefli
                                             RewriteRequest as ScopedRewriteRequest, RewriteResult as ScopedRewriteResult,
                                             rewrite_input)
 from packages.resume_core.rules import PRESET_HEADINGS, RulesFailure, RulesStore, presets
-from packages.resume_core.models.recovery import SaveRulesRequest, RulesSettingsError, RulesSettings
-from .gui_projects import GuiProjectService, ProjectFailure
+from packages.resume_core.models.settings import (RulesSettings, RulesSettingsError, SaveAnalysisPreference,
+    SaveImportModelPreference, SaveLimitsPreference, SaveRulesRequest)
+from packages.resume_core.gui_projects import GuiProjectStore
+from .gui_projects import GuiProjectService
+from .projects.errors import ProjectFailure
 from packages.resume_core.preferences import PreferencesStore, PreferencesFailure
 from packages.resume_core.project_limits import ARCHIVE_BYTES, apply_preferences as apply_limits
-from packages.resume_core.models.recovery import SaveImportModelPreference, SaveLimitsPreference
-from packages.resume_core.project_store import ProjectStore
 from .gui_routes import mount_projects
 from .inference_admission import INFERENCE, AdmissionBlocked, AdmissionTimeout, AdmissionCancelled
 from .profile_ownership import native_profile, recover_profile
-from packages.resume_core.agent_store import AgentFailure
+from packages.resume_core.assistant_store import AgentFailure
 from .agent.service import AgentService, AgentConnection
 from .agent.runtime import CodexAgentRuntime
 
@@ -354,9 +354,9 @@ def create_app(*, origin: str, secret: str, temp_root: Path, dist: Path, runner:
     count = 0
     unsafe_cleanup = blocked_on_start
     gate = asyncio.Lock()
-    from packages.resume_core.background_limits import LIMITS as BACKGROUND_LIMITS
+    from packages.resume_core.project_limits import RENDER_WORKERS
     from .gui_rendering import GuiDocxRenderer, RichDocxRenderer
-    render_executor = ThreadPoolExecutor(max_workers=BACKGROUND_LIMITS.render_workers, thread_name_prefix="foldcv-render")
+    render_executor = ThreadPoolExecutor(max_workers=RENDER_WORKERS, thread_name_prefix="foldcv-render")
     document_renderer = DocumentRenderer(executor=render_executor)
     connection = connection_adapter or ConnectionAdapter(experimental_profile.executable if experimental_profile else cli_executable,
                                                           experimental_profile=experimental_profile)
@@ -415,7 +415,6 @@ def create_app(*, origin: str, secret: str, temp_root: Path, dist: Path, runner:
                 if unsafe_cleanup:
                     raise SpikeError("PROCESS_CLEANUP_FAILED")
                 if cancel.is_set():
-                    from .gui_admission import AdmissionCancelled
                     raise AdmissionCancelled()
                 if active < MAX_CONCURRENT and not cancellation_pending:
                     active += 1
@@ -457,7 +456,7 @@ def create_app(*, origin: str, secret: str, temp_root: Path, dist: Path, runner:
     gui_projects = GuiProjectService(temp_root, rules_store, gui_selected_provider,
         worker_slot=gui_worker_slot, cleanup_error=lifecycle_code,
         renderer=gui_renderer or GuiDocxRenderer(executor=render_executor),
-        storage=ProjectStore(rules_store.root), preferences=preferences_store, **gui_options)
+        storage=GuiProjectStore(rules_store.root), preferences=preferences_store, **gui_options)
     app.state.gui_projects = gui_projects
     mount_projects(app, gui_projects, problem)
     from .rich_projects import RichProjectService

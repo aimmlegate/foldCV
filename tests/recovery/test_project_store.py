@@ -14,7 +14,8 @@ import pytest
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / 'services/api/src'))
 
 from packages.resume_core import project_store as storage_module
-from packages.resume_core.project_store import ProjectStore, ProjectStoreFailure
+from packages.resume_core.gui_projects import GuiProjectStore
+from packages.resume_core.project_store import ProjectStoreFailure
 from packages.resume_core.rules import RulesStore
 from packages.resume_core.storage import atomic_write
 from resume_api.gui_projects import GuiProjectService, ProjectFailure
@@ -28,7 +29,7 @@ from tests.recovery.test_gui_mutations import mutation
 def service(tmp_path, provider=None):
     root = tmp_path / 'FoldCV'
     return GuiProjectService(tmp_path / 'operations', RulesStore(root), lambda: (provider or CreationProvider(), 'fixture'),
-        clock=frozen_now, storage=ProjectStore(root))
+        clock=frozen_now, storage=GuiProjectStore(root))
 
 
 async def created(tmp_path):
@@ -191,7 +192,7 @@ async def test_original_is_durable_before_extraction_and_interrupted_file_does_n
     workspace = service(tmp_path).read(id)
     assert workspace.pre_draft.selected_input == 'file' and workspace.pre_draft.extracted_text == ''
     assert workspace.pre_draft.warnings == ['EXTRACT_INTERRUPTED', 'NO_USABLE_TEXT']
-    loaded, _, _ = ProjectStore(tmp_path / 'FoldCV').load_all()
+    loaded, _, _ = GuiProjectStore(tmp_path / 'FoldCV').load_all()
     assert next(iter(loaded[id][1].values())) == data
     task.cancel()
     with pytest.raises(asyncio.CancelledError):await task

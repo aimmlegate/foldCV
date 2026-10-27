@@ -73,7 +73,7 @@ def test_pinned_schema_requires_routed_tools_structured_turns_and_targeted_inter
 
 def test_retained_schema_survives_runtime_updates_without_certifying_them(monkeypatch):
     from resume_api.cli import experimental_profile
-    from spikes.agent import profile
+    from resume_api.agent import host_profile as profile
     monkeypatch.setattr(experimental_profile, "BINARY_SHA256", "a" * 64)
     monkeypatch.setattr(profile, "HOST_SHA256", "b" * 64)
     monkeypatch.setattr(profile, "MANIFEST_SHA256", "c" * 64)
@@ -1093,7 +1093,7 @@ async def shared_publication_flow(tmp_path, *, cleanup_failure=False, monkeypatc
         await service_a.shutdown()
         await service_b.shutdown()
         if failed_pipe is not None:
-            from spikes.cli.runner import stop_group
+            from resume_api.cli.runner import stop_group
             await asyncio.to_thread(stop_group, failed_pipe.process)
             for stream in (failed_pipe.process.stdin, failed_pipe.process.stdout, failed_pipe.process.stderr):
                 stream.close()
@@ -1219,7 +1219,7 @@ async def test_shared_structured_turn_keeps_existing_strict_validator_without_re
         GenerationPolicy(model="gpt-6-luna", allow_repair=False)), threading.Event()))
     try:
         await asyncio.wait_for(ready.wait(), 5)
-        from spikes.cli.profile import DISABLED_FEATURES
+        from resume_api.cli.profile import DISABLED_FEATURES
         request = next(row["frame"] for row in wire_frames if row["direction"] == "client" and row["frame"].get("method") == "thread/start")
         features = request["params"]["config"]["features"]
         assert all(features[name] is False for name in DISABLED_FEATURES)

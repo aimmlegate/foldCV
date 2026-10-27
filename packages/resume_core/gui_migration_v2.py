@@ -1,6 +1,6 @@
 """Direct selected-view mapping for the preserved experimental v2 format."""
 
-from .gui_archive_zip import ArchiveFailure,parse_json,digest,safe_path
+from .archive_zip import ArchiveFailure,parse_json,digest,safe_path
 from .gui_migration import (empty_workspace,blank_document,field,job_record,legacy_row,history,finish_document,stable,date_text)
 from .dates import partial_date
 from .models.contracts import Source,TextFact,TechnologyFact,Job

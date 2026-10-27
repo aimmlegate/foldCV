@@ -7,7 +7,7 @@ from typing import Annotated, Generic, Literal, TypeVar, Union
 from pydantic import Field, model_validator
 
 from .contracts import Id, LeadershipValue, MetricValue, PartialDate, Revision, Wire, _unique
-from .recovery import EvidenceSpan
+from .evidence import EvidenceSpan
 
 T = TypeVar("T")
 

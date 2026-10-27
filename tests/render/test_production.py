@@ -318,5 +318,5 @@ async def test_worker_cancel_stops_group_and_cleans_workspace(tmp_path, monkeypa
     with pytest.raises(asyncio.CancelledError):
         await task
     assert list((tmp_path / "operations").iterdir()) == []
-    from spikes.cli.runner import group_members
+    from resume_api.cli.runner import group_members
     assert group_members(group_id) == []

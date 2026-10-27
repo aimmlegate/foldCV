@@ -6,7 +6,7 @@ import hashlib
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from packages.resume_core.gui_archive_zip import ArchiveFailure, write_zip
+from packages.resume_core.archive_zip import ArchiveFailure, write_zip
 from packages.resume_core.project_repository import blob_path, decode_project
 from packages.resume_core.template_archive import archive_payload_v7, open_archive_v7
 from packages.resume_core.template_import import identity

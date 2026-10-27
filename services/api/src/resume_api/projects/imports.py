@@ -9,7 +9,6 @@ from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from packages.resume_core.background_store import BackgroundFailure
 from packages.resume_core.models.template_import import ResumeTemplateImportV1
 from packages.resume_core.project_repository import RepositoryFailure, decode_project
 from packages.resume_core.template_import import TemplateImportFailure
@@ -98,7 +97,7 @@ class ImportService:
             error = None if state != 'failed' else getattr(publication, 'error_code', None) or 'PROCESS_FAILED'
             self.projects.tasks.finish(task.id, state or 'succeeded', error=error,
                 detail={'operationId': getattr(result, 'id', request.client_request_id)})
-        except (ProjectFailure, RepositoryFailure, BackgroundFailure, TemplateImportFailure) as error:
+        except (ProjectFailure, RepositoryFailure, TemplateImportFailure) as error:
             self._fail(task.id, getattr(error, 'code', 'PROCESS_FAILED'))
         except Exception:
             LOG.exception('import task failed')

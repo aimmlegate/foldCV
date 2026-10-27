@@ -12,6 +12,7 @@ from .gui_prompts import content_input
 from .gui_refresh import refresh
 from .gui_selection import field_index, selection_fingerprint, normalized_text, utf16_slice
 from .models.contracts import Id, Wire
+from .models.settings import SaveAnalysisPreference
 from .models.recovery import (RecoveryFact, Anchor, EditorialPlan, Annotation, Dependencies,
     FieldReplacement, RelatedUpdateSuggestion, NameAssessmentFact, authored_fields)
 
@@ -19,10 +20,6 @@ from .models.recovery import (RecoveryFact, Anchor, EditorialPlan, Annotation, D
 class GuiAnalysisRequest(Wire):
     action: Literal['invalidate', 'retry']
     field_ids: list[Id] = Field(default_factory=list, max_length=500)
-
-
-class SaveAnalysisPreference(Wire):
-    automatic_analysis: bool
 
 
 class ReconciledField(Wire):

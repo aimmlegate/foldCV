@@ -7,7 +7,7 @@ import struct
 from zipfile import ZipFile,ZIP_DEFLATED
 import pytest
 sys.path.insert(0,str(Path(__file__).resolve().parents[2]/'services/api/src'))
-from packages.resume_core import gui_archive_zip as codec
+from packages.resume_core import archive_zip as codec
 from packages.resume_core.gui_archive import export_archive,open_archive
 from tests.recovery.generation_fixtures import render_workspace,frozen_now
 from tests.recovery.candidate_fixtures import ROOT

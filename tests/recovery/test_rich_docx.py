@@ -10,7 +10,7 @@ from packages.resume_core.models.rich_document import RichDocumentV1
 from packages.resume_core.rendering.rich_docx import render_rich_docx, current_snapshot
 from packages.resume_core.rendering.template import RenderFailure
 from packages.resume_core.rich_archive import export_rich_archive
-from packages.resume_core.gui_archive_zip import read_zip
+from packages.resume_core.archive_zip import read_zip
 from tests.recovery.test_rich_persistence import without_sources
 
 

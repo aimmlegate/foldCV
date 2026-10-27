@@ -47,6 +47,9 @@ LEGACY = [
 ]
 # Rewritten in place under a new design; they stay as modules but their current imports are protocol edges too.
 REWRITTEN = {'packages.resume_core.agent_progress'}
+# The SR05 assistant: kept although an `assistant_*` pattern above names its module.
+CURRENT = ['packages.resume_core.assistant_store', 'packages.resume_core.assistant_compiler',
+    'packages.resume_core.models.assistant', 'resume_api.assistant', 'resume_api.assistant.*']
 
 
 def modules():
@@ -63,7 +66,8 @@ def modules():
 
 
 def legacy(name):
-    return any(fnmatch.fnmatchcase(name, pattern) for pattern in LEGACY)
+    return (any(fnmatch.fnmatchcase(name, pattern) for pattern in LEGACY)
+        and not any(fnmatch.fnmatchcase(name, pattern) for pattern in CURRENT))
 
 
 def resolve(name, known):

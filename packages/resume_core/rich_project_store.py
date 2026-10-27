@@ -253,7 +253,7 @@ class RichProjectStore(ProjectStore):
                 raise ProjectStoreFailure("PROJECT_TOO_LARGE")
             owner = workspace.project or workspace.pre_draft
             from .rich_archive import archive_payload
-            from .gui_archive_zip import ArchiveFailure
+            from .archive_zip import ArchiveFailure
             try:
                 archive_payload(workspace, {key[1]: blob for key, blob in originals.items() if key[0] == workspace.project_id},
                     {key[1]: blob for key, blob in images.items() if key[0] == workspace.project_id}, history=False)

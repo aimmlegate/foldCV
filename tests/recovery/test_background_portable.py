@@ -6,7 +6,7 @@ import json
 import pytest
 
 from packages.resume_core.background_store import JobStore
-from packages.resume_core.gui_archive_zip import json_bytes, read_zip, write_zip
+from packages.resume_core.archive_zip import json_bytes, read_zip, write_zip
 from packages.resume_core.models.rich_workspace import RichSyncRecord
 from packages.resume_core.rich_archive import export_rich_archive, open_rich_archive
 from packages.resume_core.rich_dependencies import dependency

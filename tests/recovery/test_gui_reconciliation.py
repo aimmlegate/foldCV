@@ -16,8 +16,8 @@ from packages.resume_core.gui_mutations import document_content
 from packages.resume_core.gui_selection import field_index
 from packages.resume_core.models.recovery import GuiTextFact
 from packages.resume_core.preferences import PreferencesStore
-from packages.resume_core.project_store import ProjectStore, ProjectStoreFailure
-from packages.resume_core.gui_projects import GuiRenameProjectRequest
+from packages.resume_core.project_store import ProjectStoreFailure
+from packages.resume_core.gui_projects import GuiProjectStore, GuiRenameProjectRequest
 from packages.resume_core.storage import StorageFailure
 from resume_api.gui_projects import GuiProjectService, ProjectFailure
 from resume_api.gui_admission import QueuedProvider
@@ -55,7 +55,7 @@ def setup(tmp_path, provider=None, *, durable=False, delay=.01):
     provider=provider or AnalysisProvider();store=service(tmp_path,provider);store.analysis_delay=delay
     workspace=render_workspace();workspace.rules_used=store.rules.load();store.workspaces[workspace.project_id]=workspace
     if durable:
-        store.storage=ProjectStore(store.rules.root)
+        store.storage=GuiProjectStore(store.rules.root)
         # This seam uses the existing source ownership contract.
         for source in workspace.project.sources:
             store.originals[(workspace.project_id,source.id)]=b''
@@ -175,7 +175,7 @@ async def test_failed_durable_write_starts_no_model_and_requires_explicit_retry(
 async def test_restart_preserves_pending_fields_and_completion_without_resuming_inference(tmp_path):
     store,w,p=setup(tmp_path,durable=True,delay=1)
     change(store,w,'Completed',completion='paragraph');store.stop_analysis_timer(w.project_id)
-    reopened=GuiProjectService(tmp_path/'reopened',store.rules,lambda:(p,'fixture'),storage=ProjectStore(store.rules.root),clock=frozen_now,analysis_delay=.01)
+    reopened=GuiProjectService(tmp_path/'reopened',store.rules,lambda:(p,'fixture'),storage=GuiProjectStore(store.rules.root),clock=frozen_now,analysis_delay=.01)
     current=reopened.read(w.project_id);pending=reopened.pending_analysis(w.project_id)
     assert pending.target_field_ids==['profile/text'] and pending.analysis_batch.completed_field_ids==['profile/text']
     assert not pending.analysis_batch.enabled and pending.error_code=='INTERRUPTED'

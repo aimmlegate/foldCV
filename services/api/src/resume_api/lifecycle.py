@@ -11,7 +11,7 @@ import re
 import subprocess
 import sys
 
-from spikes.cli.runner import SpikeError, cleanup_intent_ids, operation, reap_owned as spike_reap_owned, safe_environment, stop_group, strict_json
+from resume_api.cli.runner import SpikeError, cleanup_intent_ids, operation, reap_owned as spike_reap_owned, safe_environment, stop_group, strict_json
 
 
 OWNER = "foldcv-service-v1"

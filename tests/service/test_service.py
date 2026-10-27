@@ -21,7 +21,7 @@ from resume_api.contracts import NormalizeResult, UsagePayload
 from resume_api import lifecycle
 from resume_api import launcher
 from resume_api.lifecycle import OWNER, OperationFiles, reap_owned
-from spikes.cli.runner import SpikeError, group_members, operation
+from resume_api.cli.runner import SpikeError, group_members, operation
 
 
 ORIGIN = "http://127.0.0.1:39271"
@@ -542,7 +542,7 @@ def test_reaper_removes_only_owned_stale_dirs(tmp_path):
 
 @pytest.mark.asyncio
 async def test_reaper_partial_cleanup_intent_blocks_service_restart(tmp_path, monkeypatch):
-    from spikes.cli import runner as spike_runner
+    from resume_api.cli import runner as spike_runner
 
     root = tmp_path / "operations"
     root.mkdir()

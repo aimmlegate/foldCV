@@ -321,7 +321,7 @@ async def test_unrelated_blocked_marker_does_not_disable_new_service(tmp_path):
 
 @pytest.mark.asyncio
 async def test_artifact_cleanup_failure_latches_service(tmp_path, monkeypatch):
-    from spikes.cli import runner as spike_runner
+    from resume_api.cli import runner as spike_runner
 
     async def fake_render(self, request, files):
         return b"synthetic ZIP bytes"
@@ -346,7 +346,7 @@ async def test_artifact_cleanup_failure_latches_service(tmp_path, monkeypatch):
 
 @pytest.mark.asyncio
 async def test_partial_artifact_cleanup_keeps_intent_and_blocks_restart(tmp_path, monkeypatch):
-    from spikes.cli import runner as spike_runner
+    from resume_api.cli import runner as spike_runner
 
     async def fake_render(self, request, files):
         return b"synthetic ZIP bytes"
@@ -389,7 +389,7 @@ async def test_partial_artifact_cleanup_keeps_intent_and_blocks_restart(tmp_path
 
 @pytest.mark.asyncio
 async def test_intent_setup_failure_does_not_start_deletion(tmp_path, monkeypatch):
-    from spikes.cli import runner as spike_runner
+    from resume_api.cli import runner as spike_runner
 
     async def fake_render(self, request, files):
         return b"synthetic ZIP bytes"
@@ -452,7 +452,7 @@ async def test_intent_unlink_failure_blocks_restart_without_directory(tmp_path, 
 @pytest.mark.asyncio
 @pytest.mark.parametrize("kind", ["render", "normalize"])
 async def test_late_artifact_failure_latches_after_timeout(tmp_path, monkeypatch, kind):
-    from spikes.cli import runner as spike_runner
+    from resume_api.cli import runner as spike_runner
 
     started = asyncio.Event()
     release = asyncio.Event()

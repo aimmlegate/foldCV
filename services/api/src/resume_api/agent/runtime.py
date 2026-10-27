@@ -14,7 +14,7 @@ import time
 from typing import Callable, Protocol
 
 from packages.resume_core import agent_limits as limits
-from packages.resume_core.agent_store import AgentFailure
+from packages.resume_core.assistant_store import AgentFailure
 from packages.resume_core.models.agent import AgentUsage
 from packages.resume_core.storage import StorageFailure
 from resume_api.cli.experimental_profile import ExperimentalProfileError
@@ -23,7 +23,7 @@ from resume_api.inference_admission import AdmissionCancelled, AdmissionTimeout,
 from resume_api.lifecycle import OperationFiles, SpikeError
 from resume_api.providers.codex_cli import strict_json
 from resume_api.profile_ownership import native_profile
-from spikes.agent.profile import CODE_MODE_HOST, TOKEN_ENV
+from resume_api.agent.host_profile import CODE_MODE_HOST, TOKEN_ENV
 
 from .profile import AgentProfile
 from .skills import SKILL_INSTRUCTIONS

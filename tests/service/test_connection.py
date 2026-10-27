@@ -19,7 +19,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "services/api/src")
 from resume_api.app import create_app
 from resume_api.connection import ConnectionAdapter, ConnectionFailure, Metadata, Quota, quota_from_result
 from resume_api.lifecycle import OperationFiles, SpikeError
-from spikes.cli.profile import VERSION
+from resume_api.cli.profile import VERSION
 
 
 ORIGIN = "http://127.0.0.1:39272"

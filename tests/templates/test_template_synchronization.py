@@ -334,7 +334,7 @@ def test_actual_writer_delete_recreate_order_undo_redo_and_failed_save_are_atomi
 
 
 def test_archive_import_also_clears_crafted_foreign_capture_and_pending_authority():
-    from packages.resume_core.gui_archive_zip import read_zip,write_zip,parse_json,json_bytes,digest
+    from packages.resume_core.archive_zip import read_zip,write_zip,parse_json,json_bytes,digest
     before,sources=workspace();current,_=apply_rich_mutation(before,add(before))
     source=current.sync_records[0];source.status='pending';source.ready=True
     files=read_zip(export_rich_archive(current,sources,{},{}))

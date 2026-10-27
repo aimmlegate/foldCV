@@ -2,7 +2,7 @@
 
 import pytest
 
-from packages.resume_core.gui_archive_zip import write_zip
+from packages.resume_core.archive_zip import write_zip
 from packages.resume_core.models.template_workspace import WorkspaceV7
 from packages.resume_core.rich_mutations import cut_inline
 from packages.resume_core.template_archive import archive_payload_v7,open_archive_v7

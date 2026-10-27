@@ -1,15 +1,30 @@
 """Initial rich assembly from ephemeral normalization/drafting results."""
 
+from dataclasses import dataclass
 import uuid
 
 from .dates import partial_date
-from .gui_annotations import unresolved_source_units
 from .models.rich_workspace import ProjectV5
 from .rendering.rich_template import require_rich_template
 
 
+@dataclass(frozen=True)
+class SourceText:
+    """Text of one generated block and the facts it cites."""
+    field_id: str
+    text: str
+    fact_ids: list
+
+
 def identity(prefix):
     return prefix + "-" + uuid.uuid4().hex
+
+
+def unresolved_source_units(normalized):
+    assessments = {fact.id for fact in normalized.facts if fact.kind == "name_assessment"
+        or fact.kind == "source_observation" and fact.value.source_observed_at is None}
+    return [(source, unit) for source in normalized.sources for unit in source.units
+        if unit.text.strip() and unit.disposition == "unresolved" and not set(unit.represented_fact_ids) - assessments]
 
 
 def field(value, raw=None):
@@ -223,19 +238,17 @@ def assemble_rich(workspace, normalized, draft, rules):
         children.append(block(job.stack, technology_scope=job.id))
         children.extend(block(part) for part in (job.context, job.tasks, job.results))
         for sub in jobs.get(job.id).subprojects if job.id in jobs else []:
-            from .models.recovery import AuthoredField
             source_facts = [fact for fact in normalized.facts if fact.subproject_id == sub.id]
-            details = [block(AuthoredField(fieldId=identity("subproject-name"), text=sub.name, factIds=sub.fact_ids,
-                evidence=[], origin="source"), sub.id, "name", "heading", 3)]
+            details = [block(SourceText(identity("subproject-name"), sub.name, sub.fact_ids), sub.id, "name", "heading", 3)]
             working_sub = next(item for item in records if item["id"] == sub.id)
             for period in working_sub["periods"]:
                 for part in ("start", "end"):
-                    details.append(block(AuthoredField(fieldId=identity("subproject-date"), text=period[part]["rawText"],
-                        factIds=sub.fact_ids, evidence=[], origin="source"), sub.id, "period:" + period["id"] + ":" + part))
+                    details.append(block(SourceText(identity("subproject-date"), period[part]["rawText"], sub.fact_ids),
+                        sub.id, "period:" + period["id"] + ":" + part))
             for fact in source_facts:
                 text = fact.value.text if fact.kind == "text" else fact.value.display if fact.kind == "technology" else None
                 if text:
-                    details.append(block(AuthoredField(fieldId=identity("subproject-fact"), text=text, factIds=[fact.id], evidence=[], origin="source"),
+                    details.append(block(SourceText(identity("subproject-fact"), text, [fact.id]),
                         technology_scope=job.id if fact.kind == "technology" else None))
             children.append(section("section-" + sub.id, "", details, sub.id))
         if job.id not in jobs:

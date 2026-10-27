@@ -9,7 +9,7 @@ import subprocess
 import sys
 import time
 
-from spikes.cli.runner import group_members
+from resume_api.cli.runner import group_members
 
 
 ROOT = Path(__file__).resolve().parents[2]

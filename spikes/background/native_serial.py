@@ -28,7 +28,7 @@ from resume_api.cli.process_runner import ProcessExit, ProcessRunner
 from resume_api.lifecycle import SpikeError
 from resume_api.cli.experimental_profile import BINARY, ExperimentalCliProfile
 from spikes.agent.native_proof import Exclusion, ProofServer, alive
-from spikes.agent.profile import check_host
+from resume_api.agent.host_profile import check_host
 from tools.background_evidence import source_hashes
 from tests.support.agent import isolated_project
 

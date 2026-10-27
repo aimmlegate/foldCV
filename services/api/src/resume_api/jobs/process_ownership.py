@@ -9,7 +9,7 @@ import signal
 import subprocess
 import time
 
-from spikes.cli.runner import group_members
+from resume_api.cli.runner import group_members
 from ..lifecycle import SpikeError
 
 

@@ -19,7 +19,7 @@ sys.path[:0] = [str(ROOT / "services/api/src"), str(ROOT)]
 from resume_api.lifecycle import OperationFiles
 from resume_api.cli.experimental_profile import BINARY
 from resume_api.cli.process_runner import ProcessRunner
-from spikes.agent.profile import AgentProofProfile, APP_SERVER_PREFIX, CODE_MODE_HOST, check_host
+from resume_api.agent.host_profile import AgentProofProfile, APP_SERVER_PREFIX, CODE_MODE_HOST, check_host
 from spikes.agent.proof import frame
 
 READ_TOOL = {"name": "mcp__foldcv__get_resume_context",

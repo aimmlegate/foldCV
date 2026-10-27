@@ -2,27 +2,12 @@
 
 from pydantic import ValidationError
 
-from .gui_archive_zip import ArchiveFailure, alias, digest, json_bytes, parse_json, read_zip, write_zip
-from .models.rich_document import ImageBlock
+from .archive_zip import ArchiveFailure, alias, digest, json_bytes, parse_json, read_zip, write_zip
 from .models.rich_workspace import ArchiveManifestV6, WorkspaceV6
 from .rich_images import ImageFailure, verify_image_bytes
 from .rendering.rich_template import require_rich_template
 from .rendering.template import RenderFailure
-
-
-def referenced_assets(project):
-    refs = {block.props.asset_id for block in project.document.blocks() if isinstance(block, ImageBlock)}
-    return [asset for asset in project.assets if asset.id in refs]
-
-
-def inert_sync_history(workspace):
-    for sync in workspace.sync_records:
-        sync.proposed_steps, sync.ready, sync.dependencies, sync.selection = [], False, [], None
-        if workspace.schema_version == 7 and hasattr(sync, 'capture'):
-            sync.capture = None
-        if sync.status == "pending":
-            sync.status = "stale"
-            sync.error_code = sync.error_code or "OPERATION_INTERRUPTED"
+from .template_archive import inert_sync_history, referenced_assets
 
 
 def archive_payload(workspace, originals, images, current_render=None, *, history=True):

@@ -6,7 +6,7 @@ import sys
 import pytest
 import httpx
 sys.path.insert(0,str(Path(__file__).resolve().parents[2]/'services/api/src'))
-from packages.resume_core.gui_archive_zip import read_zip,parse_json
+from packages.resume_core.archive_zip import read_zip,parse_json
 from packages.resume_core.gui_projects import GuiArchiveRequest
 from packages.resume_core.project_store import ProjectStoreFailure
 from packages.resume_core.preferences import PreferencesStore
@@ -19,7 +19,7 @@ from tests.recovery.test_gui_rewriting import request as rewrite_request
 from tests.recovery.test_gui_migrations import legacy_v3,v2
 from tests.recovery.generation_fixtures import CreationProvider
 from tests.recovery.candidate_fixtures import ROOT
-from packages.resume_core.gui_archive_zip import write_zip
+from packages.resume_core.archive_zip import write_zip
 
 
 def request(workspace):return GuiArchiveRequest(projectRevision=workspace.project_revision,documentRevision=workspace.document_revision)

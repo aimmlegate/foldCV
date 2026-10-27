@@ -5,7 +5,7 @@ import hashlib
 from pydantic import Field
 
 from .dates import partial_date
-from .gui_archive_zip import ArchiveFailure
+from .archive_zip import ArchiveFailure
 from .gui_drafting import _field, _record
 from .gui_mutations import checkpoint
 from .gui_projection import compatibility_views

@@ -3,7 +3,7 @@
 import asyncio
 import uuid
 from packages.resume_core.gui_archive import export_archive,open_archive
-from packages.resume_core.gui_archive_zip import ArchiveFailure
+from packages.resume_core.archive_zip import ArchiveFailure
 from .gui_errors import ProjectFailure
 
 

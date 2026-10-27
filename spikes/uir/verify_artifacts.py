@@ -10,7 +10,7 @@ from zipfile import ZipFile
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT))
 from packages.resume_core.rich_archive import export_rich_archive, open_rich_archive
-from packages.resume_core.gui_archive_zip import read_zip
+from packages.resume_core.archive_zip import read_zip
 from packages.resume_core.rich_project_store import RichProjectStore
 
 

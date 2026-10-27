@@ -11,8 +11,8 @@ import time
 from resume_api.cli.experimental_profile import BINARY
 from resume_api.cli.process_runner import ProcessRunner
 from resume_api.lifecycle import OperationFiles
-from spikes.agent.profile import AgentProofProfile, APP_SERVER_PREFIX, CODE_MODE_HOST
-from spikes.cli.profile import DISABLED_FEATURES
+from resume_api.agent.host_profile import AgentProofProfile, APP_SERVER_PREFIX, CODE_MODE_HOST
+from resume_api.cli.profile import DISABLED_FEATURES
 
 
 class ProbeFinished(Exception):

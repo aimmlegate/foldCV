@@ -3,7 +3,7 @@
 import asyncio
 from dataclasses import dataclass, field
 
-from packages.resume_core.gui_archive_zip import ArchiveFailure
+from packages.resume_core.archive_zip import ArchiveFailure
 from packages.resume_core.background_store import BackgroundFailure
 from packages.resume_core.models.rich_document import ImageBlock
 from packages.resume_core.rich_api import ImageSessionRequest, ImageUploadCapture

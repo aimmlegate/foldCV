@@ -13,6 +13,15 @@ from packages.resume_core.rendering.preparation import PrepareRequest
 from packages.resume_core.extraction.models import ExtractResult
 from packages.resume_core.normalization import FactRequest, FactSheet, SemanticProposal
 from packages.resume_core.drafting import DraftRequest, DraftProposal, DraftResult
+from packages.resume_core.gui_drafting import GUI_DRAFT_CONTRACTS
+from packages.resume_core.gui_normalization import GUI_NORMALIZATION_CONTRACTS
+from packages.resume_core.gui_projects import GUI_PROJECT_CONTRACTS
+from packages.resume_core.models.background import BACKGROUND_CONTRACTS
+from packages.resume_core.models.recovery import RECOVERY_CONTRACTS
+
+# validate_contract registers only current contracts; the legacy cases leave with their modules in SR06 step 2.
+LEGACY_CONTRACTS = {**{kind: model for kind, model in RECOVERY_CONTRACTS.items() if model.__module__.endswith('.recovery')},
+    **GUI_NORMALIZATION_CONTRACTS, **GUI_DRAFT_CONTRACTS, **GUI_PROJECT_CONTRACTS, **BACKGROUND_CONTRACTS}
 
 
 EXAMPLES = Path(__file__).resolve().parents[2] / "contracts" / "examples"
@@ -87,6 +96,8 @@ def test_shared_case(case: dict) -> None:
             DraftProposal.model_validate(case_data(case))
         elif case["contract"] == "draft_result":
             DraftResult.model_validate(case_data(case))
+        elif case["contract"] in LEGACY_CONTRACTS:
+            LEGACY_CONTRACTS[case["contract"]].model_validate(case_data(case))
         else:
             validate_contract(case["contract"], case_data(case))
         accepted = True

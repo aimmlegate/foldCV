@@ -6,7 +6,7 @@ import json
 import threading
 import time
 
-from packages.resume_core.background_store import BackgroundFailure
+from packages.resume_core.project_repository import RepositoryFailure
 from packages.resume_core.models.template_import import (CleanupOutcome, ImportIssue, ObservedUsage, ReferenceTable,
     ReviewInputRecord, TaskResultRecord)
 from packages.resume_core.models.template_workspace import WorkspaceV7, validated_with_history
@@ -275,7 +275,7 @@ class TemplatePipeline(TemplateCheckpoints):
             self.authority(operation, before)
             self.facts_current(operation, owner(before).facts)
         except TemplateImportFailure:
-            raise BackgroundFailure('DEPENDENCY_CHANGED') from None
+            raise RepositoryFailure('DEPENDENCY_CHANGED') from None
 
     def cleanup_deleted(self, project, identifier=None):
         jobs = self.publisher.jobs
@@ -957,7 +957,7 @@ class TemplatePipeline(TemplateCheckpoints):
             self.wall(), self.elapsed(), started_at=candidate.started_at))
         try:
             before = await self.persistence.bounded(project, lambda: self.update(project, operation_id, prepare), window)
-        except BackgroundFailure:
+        except RepositoryFailure:
             from packages.resume_core.models.template_import import PublicationOutcome
             result = operation.model_copy(deep=True)
             result.state = 'fenced'

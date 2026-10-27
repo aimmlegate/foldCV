@@ -8,7 +8,7 @@ from pathlib import Path
 import pytest
 from pydantic import ValidationError
 
-from packages.resume_core.models.contracts import Project, RenderSnapshot, validate_contract
+from packages.resume_core.models.contracts import Project, RenderSnapshot
 from packages.resume_core.models.recovery import (
     ArchiveManifestV5, Document, DocxError, ObservationAssessment, RenderSnapshotV4,
     WorkspaceV5, RECOVERY_CONTRACTS,
@@ -26,7 +26,7 @@ def fixture(name):
 @pytest.mark.parametrize("name", sorted(set(RECOVERY_CONTRACTS) - {"docx_error"}))
 def test_frozen_contract_roundtrip(name):
     raw = fixture(name)
-    result = validate_contract(name, raw)
+    result = RECOVERY_CONTRACTS[name].model_validate(raw)
     assert result.model_dump(mode="json", by_alias=True) == raw
 
 

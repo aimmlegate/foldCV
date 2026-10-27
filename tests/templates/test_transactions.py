@@ -159,7 +159,7 @@ def test_extension_only_inverse_obeys_the_existing_history_capacity(monkeypatch)
     before, _ = workspace()
     edited = human_edit(before.project.facts, 'paper-a', 'year', 'forthcoming')
     changed, _ = apply_rich_mutation(before, request(before, [extension_step(before, edited.extensions[0])]))
-    monkeypatch.setattr(module, 'LIMITS', replace(module.LIMITS, inverse_bytes=1024))
+    monkeypatch.setattr(module, 'INVERSE_BYTES', 1024)
     with pytest.raises(BackgroundFailure, match='JOB_STORAGE_FULL'):
         inverse_template_mutation(before, changed, origin_action_id='human-edit',
             mutation_id='undo', session_id='session', action_token=2)

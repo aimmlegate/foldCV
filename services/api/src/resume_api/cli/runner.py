@@ -18,7 +18,7 @@ import threading
 import time
 import uuid
 
-from spikes.cli.profile import (
+from .profile import (
     FIXTURE_PROFILE, GAPS, REAL_PROFILE, REQUIRED_FLAGS, exec_arguments, overrides,
 )
 
