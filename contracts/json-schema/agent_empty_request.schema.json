@@ -1,6 +1,0 @@
-{
-  "additionalProperties": false,
-  "properties": {},
-  "title": "AgentEmptyRequest",
-  "type": "object"
-}

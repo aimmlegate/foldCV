@@ -1,6 +1,5 @@
 -r requirements-service.txt
 -r requirements-contracts.txt
--r spikes/render/requirements.txt
 pytest-cov==7.0.0
 pytest-asyncio==1.2.0
 coverage==7.16.2

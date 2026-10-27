@@ -61,6 +61,7 @@ def normalized(value: str) -> str:
     return re.sub(r"\s+", " ", value).strip()
 
 
+@pytest.mark.slow
 @pytest.mark.asyncio
 async def test_real_renderer_content_layout_and_rasters(tmp_path):
     require_template()
@@ -104,6 +105,7 @@ async def test_real_renderer_content_layout_and_rasters(tmp_path):
                     assert changed / (image.width * image.height) <= 0.002
 
 
+@pytest.mark.slow
 @pytest.mark.asyncio
 async def test_long_project_and_education_are_complete_and_editable(tmp_path):
     data = json.loads((FIXTURES / "long-sidebar.json").read_text(encoding="utf-8"))
@@ -127,6 +129,7 @@ async def test_long_project_and_education_are_complete_and_editable(tmp_path):
     assert "Edited synthetic task in Word" in normalized(" ".join(node.text or "" for node in Document(edited).element.body.iter(qn("w:t"))))
 
 
+@pytest.mark.slow
 @pytest.mark.asyncio
 async def test_oversize_individual_paragraphs_flow_across_pages(tmp_path):
     data = json.loads((FIXTURES / "short.json").read_text(encoding="utf-8"))
@@ -173,6 +176,7 @@ async def test_unknown_focus_icon_fails_with_a_public_code_and_cleans(tmp_path):
     assert list((tmp_path / "operations").iterdir()) == []
 
 
+@pytest.mark.slow
 @pytest.mark.asyncio
 async def test_empty_optional_sections_disappear(tmp_path):
     data = json.loads((FIXTURES / "short.json").read_text(encoding="utf-8"))

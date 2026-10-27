@@ -20,9 +20,9 @@ def generated_tree(tmp_path, monkeypatch):
             path = directory / f"contract-{index}{suffix}"
             path.write_bytes(f"original {index}".encode())
             paths.append(path)
-    catalog = tmp_path / "contracts/technology-catalog.json"
-    catalog.write_bytes(b"original catalog")
-    return {path: path.read_bytes() for path in paths + [catalog]}
+    source = tmp_path / "contracts/template-source.schema.json"
+    source.write_bytes(b"original template source schema")
+    return {path: path.read_bytes() for path in paths + [source]}
 
 
 @pytest.mark.parametrize("change", ["add", "nested", "edit", "delete", "fail"])

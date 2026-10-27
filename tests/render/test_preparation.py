@@ -248,6 +248,7 @@ def test_preparation_rejects_ambiguous_or_stale_mapping(change):
         prepare_document(PrepareRequest.model_validate(data))
 
 
+@pytest.mark.slow
 @pytest.mark.asyncio
 async def test_prepared_snapshot_converts_to_matching_pdf_and_editable_docx(tmp_path):
     data = example()
