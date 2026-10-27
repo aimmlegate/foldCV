@@ -55,3 +55,25 @@ def test_concurrent_settings_writes_conflict_and_damage_does_not_reset(tmp_path)
     with pytest.raises(AgentFailure, match="AGENT_SETTINGS_CORRUPT"):
         store.load()
     assert store.path.read_bytes() == raw
+
+
+def test_assistant_effort_is_checked_against_the_model_and_old_files_load_without_it(tmp_path):
+    from packages.resume_core.reasoning import ModelReasoning
+    settings = AgentSettingsStore(tmp_path)
+    atomic_write(settings.path, b'{"schemaVersion":1,"revision":4,"enabled":true,"selectedAgentModel":"model-a"}')
+    settings.path.chmod(0o600)
+    assert settings.load().reasoning_effort is None
+    reasoning = {"model-a": ModelReasoning(supported=["low", "high"], default="low")}
+    saved = settings.save(AgentSettingsRequest(expectedRevision=4, enabled=True, selectedAgentModel="model-a",
+        reasoningEffort="high"), ("model-a",), reasoning)
+    assert saved.reasoning_effort == "high" and saved.revision == 5
+    for model, effort, catalog, code in (("model-a", "medium", ("model-a",), "AGENT_MODEL_INCOMPATIBLE"),
+                                         (None, "low", ("model-a",), "AGENT_MODEL_INCOMPATIBLE"),
+                                         ("model-a", "low", None, "AGENT_CONNECTION_UNAVAILABLE")):
+        with pytest.raises(AgentFailure, match=code):
+            settings.save(AgentSettingsRequest(expectedRevision=5, enabled=True, selectedAgentModel=model,
+                reasoningEffort=effort), catalog, reasoning)
+    # An unchanged choice saves without a catalog, like the model.
+    assert settings.save(AgentSettingsRequest(expectedRevision=5, enabled=False, selectedAgentModel="model-a",
+        reasoningEffort="high"), None).revision == 6
+    assert settings.restore_model("model-b", "max").reasoning_effort == "max"

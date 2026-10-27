@@ -13,7 +13,7 @@ type Limit = keyof typeof limitRanges;
 function limit(preferences: Preferences, key: Limit): string { return String(preferences[key] ?? limitRanges[key].default); }
 
 export type SettingsPart = "reasoning" | "model" | "import" | "fallback" | "analysis" | "limits" | "assistant" | "rules";
-export type SettingsValues = { reasoning: NonNullable<Preferences["rewriteReasoningEffort"]> | null; model: string | null; importModel: string | null; fallbackModel: string | null; automatic: boolean; agentEnabled: boolean; agentModel: string | null; markdown: string;
+export type SettingsValues = { reasoning: NonNullable<Preferences["rewriteReasoningEffort"]> | null; model: string | null; importModel: string | null; fallbackModel: string | null; automatic: boolean; agentEnabled: boolean; agentModel: string | null; agentEffort: NonNullable<AgentSettings["reasoningEffort"]> | null; markdown: string;
   importMinutes: string; projectMegabytes: string };
 export type SettingsApi = {
   preferences: () => Promise<Preferences>; rules: () => Promise<RulesSettings>; assistant: () => Promise<AgentSettings>;
@@ -41,7 +41,7 @@ function message(error: unknown, part: SettingsPart): string {
 
 export class SettingsDrafts {
   state: SettingsState = { preferences: null, rules: null, assistant: null,
-    draft: { reasoning: null, model: null, importModel: null, fallbackModel: null, automatic: true, agentEnabled: true, agentModel: null, markdown: "",
+    draft: { reasoning: null, model: null, importModel: null, fallbackModel: null, automatic: true, agentEnabled: true, agentModel: null, agentEffort: null, markdown: "",
       importMinutes: String(limitRanges.importMinutes.default), projectMegabytes: String(limitRanges.projectMegabytes.default) },
     loading: false, saving: false, staleRules: false, comparison: false, saved: [], errors: {}, message: "" };
   private closed = false;
@@ -61,7 +61,8 @@ export class SettingsDrafts {
     if (preferences && draft.automatic !== preferences.automaticAnalysis) result.push("analysis");
     if (preferences && (draft.importMinutes !== limit(preferences, "importMinutes") || draft.projectMegabytes !== limit(preferences, "projectMegabytes")))
       result.push("limits");
-    if (assistant && (draft.agentEnabled !== assistant.enabled || draft.agentModel !== assistant.selectedAgentModel)) result.push("assistant");
+    if (assistant && (draft.agentEnabled !== assistant.enabled || draft.agentModel !== assistant.selectedAgentModel
+        || draft.agentEffort !== (assistant.reasoningEffort ?? null))) result.push("assistant");
     if (rules && draft.markdown !== rules.markdown) result.push("rules");
     return result;
   }
@@ -87,9 +88,16 @@ export class SettingsDrafts {
     } else errors.rules = "Не удалось загрузить правила. Повторите загрузку.";
     if (assistant.status === "fulfilled") {
       if (!this.state.assistant) { draft.agentEnabled = assistant.value.enabled; draft.agentModel = assistant.value.selectedAgentModel;
+        draft.agentEffort = assistant.value.reasoningEffort ?? null;
         this.publish({ assistant: assistant.value }); delete errors.assistant; }
     } else errors.assistant = "Не удалось загрузить настройки помощника. Повторите загрузку.";
     this.publish({ draft, errors, loading: false });
+  }
+  /** A provider switch moved that provider's choices into place on the server; with clean drafts, read them again. */
+  async reloadChoices(): Promise<void> {
+    if (this.state.saving || this.closed || this.dirty.length > 0) return;
+    this.publish({ preferences: null, assistant: null, saved: [] });
+    await this.load();
   }
   cancel(): void {
     if (this.state.saving) return;
@@ -100,6 +108,7 @@ export class SettingsDrafts {
       importMinutes: preferences ? limit(preferences, "importMinutes") : draft.importMinutes,
       projectMegabytes: preferences ? limit(preferences, "projectMegabytes") : draft.projectMegabytes,
       agentEnabled: assistant?.enabled ?? draft.agentEnabled, agentModel: assistant ? assistant.selectedAgentModel : draft.agentModel,
+      agentEffort: assistant ? assistant.reasoningEffort ?? null : draft.agentEffort,
       markdown: rules?.markdown ?? draft.markdown }, errors: this.state.staleRules ? { rules: knownErrorMessage("RULES_STALE") ?? "Обновите правила." } : {},
       saved: [], message: "Несохранённые изменения отменены." });
   }
@@ -164,10 +173,12 @@ export class SettingsDrafts {
               importMinutes: this.state.draft.importMinutes === submitted.importMinutes ? minutes : this.state.draft.importMinutes,
               projectMegabytes: this.state.draft.projectMegabytes === submitted.projectMegabytes ? megabytes : this.state.draft.projectMegabytes } });
         } else if (part === "assistant" && bases.assistant) {
-          const assistant = await this.api.saveAssistant({ expectedRevision: bases.assistant.revision, enabled: submitted.agentEnabled, selectedAgentModel: submitted.agentModel });
+          const assistant = await this.api.saveAssistant({ expectedRevision: bases.assistant.revision, enabled: submitted.agentEnabled,
+            selectedAgentModel: submitted.agentModel, reasoningEffort: submitted.agentEffort });
           this.publish({ assistant, draft: { ...this.state.draft,
             agentEnabled: this.state.draft.agentEnabled === submitted.agentEnabled ? assistant.enabled : this.state.draft.agentEnabled,
-            agentModel: this.state.draft.agentModel === submitted.agentModel ? assistant.selectedAgentModel : this.state.draft.agentModel } });
+            agentModel: this.state.draft.agentModel === submitted.agentModel ? assistant.selectedAgentModel : this.state.draft.agentModel,
+            agentEffort: this.state.draft.agentEffort === submitted.agentEffort ? assistant.reasoningEffort ?? null : this.state.draft.agentEffort } });
         } else if (part === "rules" && bases.rules) {
           if (bases.staleRules) throw Object.assign(new Error("stale"), { code: "RULES_STALE" });
           const rules = await this.api.saveRules({ baseRevision: bases.rules.revision, markdown: submitted.markdown });

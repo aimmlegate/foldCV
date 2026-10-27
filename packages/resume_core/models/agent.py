@@ -8,6 +8,7 @@ from typing import Annotated, Literal, Union
 from pydantic import AfterValidator, ConfigDict, Field, RootModel, model_validator
 
 from .. import agent_limits as limits
+from ..reasoning import ReasoningEffort
 from .contracts import Revision, Sha256, Wire, _unique
 from .rich_mutations import DependencyStamp
 
@@ -95,12 +96,15 @@ class AgentSettings(AgentWire):
     revision: Revision
     enabled: bool
     selected_agent_model: ModelId | None
+    # Null runs the model's catalog default (decision 17); files written before MP01b load as null.
+    reasoning_effort: ReasoningEffort | None = None
 
 
 class AgentSettingsRequest(AgentWire):
     expected_revision: Revision
     enabled: bool
     selected_agent_model: ModelId | None
+    reasoning_effort: ReasoningEffort | None = None
 
 
 class AgentUsage(AgentWire):

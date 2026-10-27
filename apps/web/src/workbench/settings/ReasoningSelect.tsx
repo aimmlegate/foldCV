@@ -5,14 +5,14 @@ const labels: Record<ReasoningEffort, string> = {
   medium: "Medium · баланс", high: "High · подробнее", xhigh: "XHigh · глубже", max: "Max · максимум", ultra: "Ultra",
 };
 
-export function ReasoningSelect({ value, metadata, disabled, change }: {
+export function ReasoningSelect({ value, metadata, disabled, change, id = "rewrite-reasoning", label = "Reasoning при правке текста" }: {
   value: ReasoningEffort | null; metadata: ModelReasoning | undefined; disabled: boolean;
-  change: (value: ReasoningEffort | null) => void;
+  change: (value: ReasoningEffort | null) => void; id?: string; label?: string;
 }) {
   const supported = metadata?.supported ?? [];
   const choices = value && !supported.includes(value) ? [value, ...supported] : supported;
-  return <><label htmlFor="rewrite-reasoning">Reasoning при правке текста</label>
-    <select className="model-select" id="rewrite-reasoning" aria-label="Reasoning при правке текста" value={value ?? ""}
+  return <><label htmlFor={id}>{label}</label>
+    <select className="model-select" id={id} aria-label={label} value={value ?? ""}
       disabled={disabled} onChange={event => {
         const next = event.currentTarget.value;
         if (next === "" || isReasoningEffort(next)) change(next === "" ? null : next);

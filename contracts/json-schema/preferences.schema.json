@@ -4,6 +4,28 @@
       "additionalProperties": false,
       "description": "Choices kept for a provider while another one is active; restored when it is selected again.",
       "properties": {
+        "agentReasoningEffort": {
+          "anyOf": [
+            {
+              "enum": [
+                "none",
+                "minimal",
+                "low",
+                "medium",
+                "high",
+                "xhigh",
+                "max",
+                "ultra"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Agentreasoningeffort"
+        },
         "rewriteReasoningEffort": {
           "anyOf": [
             {

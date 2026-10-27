@@ -32,7 +32,8 @@ function setup() {
       server.preferences = { ...server.preferences, ...value }; return structuredClone(server.preferences); },
     saveAssistant: async request => { calls.push({ part: "assistant", value: request });
       if (fail.has("assistant") || request.expectedRevision !== server.assistant.revision) throw Object.assign(new Error("conflict"), { code: "AGENT_SETTINGS_CONFLICT" });
-      server.assistant = { schemaVersion: 1, revision: server.assistant.revision + 1, enabled: request.enabled, selectedAgentModel: request.selectedAgentModel }; return structuredClone(server.assistant); },
+      server.assistant = { schemaVersion: 1, revision: server.assistant.revision + 1, enabled: request.enabled, selectedAgentModel: request.selectedAgentModel,
+        reasoningEffort: request.reasoningEffort ?? null }; return structuredClone(server.assistant); },
     saveRules: async request => { calls.push({ part: "rules", value: request });
       if (fail.has("rules") || request.baseRevision !== server.rules.revision) throw Object.assign(new Error("stale"), { code: "RULES_STALE" });
       server.rules = { ...server.rules, markdown: request.markdown, revision: server.rules.revision + 1 }; return structuredClone(server.rules); },
@@ -52,6 +53,25 @@ test("partial Save retains failed drafts and Cancel keeps successful writes", as
   const calls = h.calls.length; h.controller.cancel(); assert.equal(h.calls.length, calls);
   assert.deepEqual(h.controller.dirty, []); assert.equal(h.controller.state.draft.model, "model-b"); assert.equal(h.controller.state.draft.automatic, false);
   assert.equal(h.controller.state.draft.agentEnabled, false); assert.equal(h.controller.state.draft.markdown, originalRules);
+});
+
+test("the assistant effort is a draft saved with the assistant model and reread after a provider switch", async () => {
+  const h = setup(); await h.controller.load();
+  assert.equal(h.controller.state.draft.agentEffort, null);
+  h.controller.change("agentModel", "agent-b"); h.controller.change("agentEffort", "high");
+  assert.deepEqual(h.controller.dirty, ["assistant"]);
+  await h.controller.reloadChoices();
+  assert.equal(h.controller.state.draft.agentEffort, "high", "dirty drafts are never replaced");
+  await h.controller.save();
+  assert.deepEqual(h.calls.at(-1), { part: "assistant", value: { expectedRevision: 1, enabled: false, selectedAgentModel: "agent-b", reasoningEffort: "high" } });
+  assert.deepEqual(h.controller.dirty, []);
+  // The server switched provider: other choices are in place now.
+  h.server.preferences = { ...h.server.preferences, selectedModel: "claude-model", rewriteReasoningEffort: "low" };
+  h.server.assistant = { ...h.server.assistant, revision: 3, selectedAgentModel: "claude-agent", reasoningEffort: null };
+  await h.controller.reloadChoices();
+  assert.equal(h.controller.state.draft.model, "claude-model"); assert.equal(h.controller.state.draft.reasoning, "low");
+  assert.equal(h.controller.state.draft.agentModel, "claude-agent"); assert.equal(h.controller.state.draft.agentEffort, null);
+  assert.deepEqual(h.controller.dirty, []);
 });
 
 test("limits show contract defaults, send numbers and keep a rejected draft for correction", async () => {
@@ -78,7 +98,7 @@ test("explicit retries reload conflict bases without replacing local choices or 
   await h.controller.save(); assert.deepEqual(h.controller.dirty, []);
   assert.equal(h.calls.filter(call => call.part === "analysis").length, 1);
   assert.deepEqual(h.calls.filter(call => call.part === "rules").at(-1)?.value, { baseRevision: 4, markdown: "Local rules" });
-  assert.deepEqual(h.calls.filter(call => call.part === "assistant").at(-1)?.value, { expectedRevision: 7, enabled: true, selectedAgentModel: "agent-b" });
+  assert.deepEqual(h.calls.filter(call => call.part === "assistant").at(-1)?.value, { expectedRevision: 7, enabled: true, selectedAgentModel: "agent-b", reasoningEffort: null });
 });
 
 test("an older Save acknowledgment keeps newer draft text for the next explicit Save", async () => {

@@ -15,7 +15,7 @@ class AgentProfile(AgentProofProfile):
             raise AgentFailure("AGENT_RUNTIME_UNSUPPORTED")
         return cls(current.root, current.executable)
 
-    def arguments(self, operation, *, url, tools, allow_web):
+    def arguments(self, operation, *, url, tools, allow_web, effort="medium"):
         parsed = urlsplit(url)
         if (parsed.scheme != "http" or parsed.hostname != "127.0.0.1" or parsed.port is None
                 or parsed.path != "/mcp" or parsed.query or parsed.fragment
@@ -25,4 +25,4 @@ class AgentProfile(AgentProofProfile):
         config += '",required=true,enabled=true,enabled_tools=' + json.dumps(list(tools))
         config += ',default_tools_approval_mode="approve",startup_timeout_sec=10,tool_timeout_sec=20}}'
         return ("app-server", "--strict-config", "--listen", "stdio://",
-            *self.config(operation, allow_web=allow_web), "--config", config)
+            *self.config(operation, allow_web=allow_web, effort=effort), "--config", config)

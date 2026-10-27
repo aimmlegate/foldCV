@@ -54,7 +54,7 @@ export function Settings({ close, connectionChanged, paneOrder, changePaneOrder 
         {Object.entries(current.errors).map(([part, error]) => <p className="notice error" role="alert" key={part}>{partNames[part as SettingsPart]}: {errorMessage(error)}</p>)}
       </div>}
       {section === "model" && <><Connection view={view} workflow={workflow} model={current.draft.model} change={value => controller.change("model", value)} disabled={current.saving} selectionDisabled={!current.preferences}
-          switchDisabled={busy || dirty} providerChanged={() => void controller.load()} />
+          switchDisabled={busy || dirty} providerChanged={() => void controller.reloadChoices()} />
         <ReasoningSelect value={current.draft.reasoning} metadata={view.snapshot.modelReasoning?.[current.draft.model ?? ""]}
           disabled={busy || !current.preferences || view.pending || !view.snapshot.metadataReady || !current.draft.model}
           change={value => controller.change("reasoning", value)} />
@@ -73,6 +73,10 @@ export function Settings({ close, connectionChanged, paneOrder, changePaneOrder 
           <ModelSelect id="assistant-model-select" label="Модель помощника" value={current.draft.agentModel} models={view.snapshot.models}
             defaultLabel="Выберите модель помощника" disabled={busy || !current.assistant || view.pending || !view.snapshot.metadataReady}
             change={value => controller.change("agentModel", value)} />
+          <ReasoningSelect id="assistant-reasoning" label="Reasoning помощника" value={current.draft.agentEffort}
+            metadata={view.snapshot.modelReasoning?.[current.draft.agentModel ?? ""]}
+            disabled={busy || !current.assistant || view.pending || !view.snapshot.metadataReady || !current.draft.agentModel}
+            change={value => controller.change("agentEffort", value)} />
           {current.errors.assistant && current.assistant && <button className="text-button" disabled={busy} onClick={() => void controller.reloadAssistant()}>Загрузить настройки помощника</button>}
         </div></>}
       {section === "rules" && <><h3>Общие правила и команды</h3><p>Эти правила действуют для всех резюме и применяются при следующей обработке текста.</p>

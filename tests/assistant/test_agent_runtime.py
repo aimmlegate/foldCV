@@ -189,14 +189,26 @@ async def test_startup_and_active_deadlines_have_distinct_typed_outcomes(tmp_pat
     assert result.error == "AGENT_DEADLINE" and result.native_started
 
 
-def test_untrusted_configuration_and_web_off_fail_before_side_effects():
+def test_untrusted_configuration_fails_before_side_effects():
     value = input_value()
     session = NativeSession(value, threading.Event(), lambda *_: None)
     config = config_result(value)
     config["layers"][0]["config"] = {"mcp_servers": {"foreign": {}}}
     with pytest.raises(AgentFailure, match="AGENT_RUNTIME_UNSUPPORTED"):
         session.validate_config(config)
-    with pytest.raises(AgentFailure, match="AGENT_WEB_DISABLED"):
+
+
+@pytest.mark.parametrize("allow_web", [False, True])
+def test_native_web_search_is_off_and_denied_with_or_without_internet(allow_web):
+    tools = ("read_resume", "check_resume", "read_public_page") if allow_web else ("read_resume", "check_resume")
+    value = input_value(allow_web=allow_web, tools=tools)
+    session = NativeSession(value, threading.Event(), lambda *_: None)
+    session.validate_config(config_result(value))
+    live = config_result(value)
+    live["config"]["web_search"] = "live"
+    with pytest.raises(AgentFailure, match="AGENT_RUNTIME_UNSUPPORTED"):
+        session.validate_config(live)
+    with pytest.raises(AgentFailure, match="AGENT_TOOL_DENIED"):
         session.item("item/started", {"id": "web_1", "type": "webSearch"})
 
 

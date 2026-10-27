@@ -50,6 +50,16 @@ class AgentConnection:
     models: tuple[str, ...]
     epoch: str
     reason: str | None = None
+    reasoning: dict = field(default_factory=dict)
+
+    def effort(self, model, chosen):
+        """The chosen assistant effort, else the model's catalog default; None keeps the runtime default."""
+        metadata = self.reasoning.get(model)
+        return chosen or (metadata.default if metadata is not None else None)
+
+    def refuses(self, model, effort):
+        metadata = self.reasoning.get(model)
+        return effort is not None and metadata is not None and effort not in metadata.supported
 
 
 @dataclass
@@ -67,6 +77,7 @@ class Control:
     tools: object = None
     # Set when the project is deleted: the ending run writes no more assistant files.
     deleted: bool = False
+    effort: str | None = None
 
     @property
     def run_id(self):
@@ -105,7 +116,9 @@ class AssistantService:
             'AGENT_RUNTIME_UNSUPPORTED' if self.runtime is None else
             connection.reason or 'AGENT_CONNECTION_UNAVAILABLE' if not connection.ready else
             'AGENT_MODEL_REQUIRED' if model is None else
-            'AGENT_MODEL_UNAVAILABLE' if model not in connection.models else None)
+            'AGENT_MODEL_UNAVAILABLE' if model not in connection.models else
+            'AGENT_MODEL_INCOMPATIBLE' if connection.refuses(model, connection.effort(model, settings.reasoning_effort))
+            else None)
         models = [ModelChoiceV1(model=value, state='verified' if (connection.epoch, value) in self.verified else 'unverified')
             for value in connection.models]
         return AssistantCapabilitiesV1(ready=reason is None, unavailable=AssistantErrorV1(code=reason) if reason else None,
@@ -174,9 +187,10 @@ class AssistantService:
             raise ProjectFailure('ASSISTANT_RUN_ACTIVE', 409)
         workspace = self._require_project(project_id)
         now = timestamp()
+        settings = self.settings.load()
         run = AssistantRunV1(id=identity('run'), conversationId=conversation_id, projectId=project_id,
             clientRequestId=request.client_request_id, state='queued', allowEdits=request.allow_edits,
-            allowWeb=request.allow_web, model=self.settings.load().selected_agent_model, baseRevision=workspace.project_revision,
+            allowWeb=request.allow_web, model=settings.selected_agent_model, baseRevision=workspace.project_revision,
             createdAt=now, finishedAt=None, error=None, usage=None)
         message = AgentMessage(id=identity('message'), role='user', text=request.message, runId=run.id, timestamp=now,
             sources=[], findings=[], truncated=False, error=None)
@@ -187,7 +201,8 @@ class AssistantService:
             conversation.messages.append(message)
             conversation.runs.append(run)
         self.store.update_conversation(project_id, conversation_id, record)
-        control = Control(project_id, conversation_id, run, time.monotonic())
+        control = Control(project_id, conversation_id, run, time.monotonic(),
+            effort=self.connection().effort(run.model, settings.reasoning_effort))
         self.controls[run.id] = control
         self.loop = asyncio.get_running_loop()
         control.task = asyncio.create_task(self._drive(control, request))
@@ -261,7 +276,8 @@ class AssistantService:
                 value = RuntimeInput(model=control.run.model, prompt=prompt, url=tools.url, token=tools.token,
                     tools=tuple(tools.names), allow_web=control.run.allow_web, before_start=lambda: self._running(control),
                     revoke=tools.revoke, close_tools=close_tools, queued_at=control.queued_at,
-                    developer_instructions=DEVELOPER_INSTRUCTIONS)
+                    developer_instructions=DEVELOPER_INSTRUCTIONS,
+                    **({'reasoning_effort': control.effort} if control.effort else {}))
                 result = await self.runtime.run(value, control.cancel,
                     lambda kind, payload: self.emit(control, kind, payload))
         except asyncio.CancelledError:

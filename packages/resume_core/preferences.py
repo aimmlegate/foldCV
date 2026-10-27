@@ -124,19 +124,20 @@ class PreferencesStore:
         except StorageFailure:
             raise PreferencesFailure('PREFERENCES_SAVE_FAILED') from None
 
-    def select_provider(self, kind, agent_model):
-        """Keeps the outgoing provider's choices, including the assistant model held in its own file, and
-        restores the incoming provider's; returns the preferences and the assistant model to restore."""
+    def select_provider(self, kind, agent_model, agent_effort=None):
+        """Keeps the outgoing provider's choices, including the assistant model and effort held in their own
+        file, and restores the incoming provider's; returns the preferences and the assistant pair to restore."""
         try:
             with locked_root(self.root, '.preferences.lock'):
                 value = self._read()
                 if value.selected_provider == kind:
-                    return value, agent_model
+                    return value, (agent_model, agent_effort)
                 selections = dict(value.provider_selections)
                 selections[value.selected_provider] = ProviderSelection(
                     selectedModel=value.selected_model, selectedImportModel=value.selected_import_model,
                     selectedFallbackModel=value.selected_fallback_model,
-                    rewriteReasoningEffort=value.rewrite_reasoning_effort, selectedAgentModel=agent_model)
+                    rewriteReasoningEffort=value.rewrite_reasoning_effort, selectedAgentModel=agent_model,
+                    agentReasoningEffort=agent_effort)
                 restored = selections.pop(kind, ProviderSelection())
                 value.selected_provider = kind
                 value.selected_model, value.selected_import_model = restored.selected_model, restored.selected_import_model
@@ -144,6 +145,6 @@ class PreferencesStore:
                 value.rewrite_reasoning_effort = restored.rewrite_reasoning_effort
                 value.provider_selections = selections
                 self._write(value)
-                return value, restored.selected_agent_model
+                return value, (restored.selected_agent_model, restored.agent_reasoning_effort)
         except StorageFailure:
             raise PreferencesFailure('PREFERENCES_SAVE_FAILED') from None

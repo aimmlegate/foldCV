@@ -1,6 +1,7 @@
 export type Automaticanalysis = boolean;
 export type Importminutes = number;
 export type Projectmegabytes = number;
+export type Agentreasoningeffort = ("none" | "minimal" | "low" | "medium" | "high" | "xhigh" | "max" | "ultra") | null;
 export type Rewritereasoningeffort =
   ("none" | "minimal" | "low" | "medium" | "high" | "xhigh" | "max" | "ultra") | null;
 export type Selectedagentmodel = string | null;
@@ -36,6 +37,7 @@ export interface Providerselections {
  * Choices kept for a provider while another one is active; restored when it is selected again.
  */
 export interface ProviderSelection {
+  agentReasoningEffort?: Agentreasoningeffort;
   rewriteReasoningEffort?: Rewritereasoningeffort;
   selectedAgentModel?: Selectedagentmodel;
   selectedFallbackModel?: Selectedfallbackmodel;

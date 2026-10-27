@@ -55,6 +55,7 @@ class ProviderSelection(Wire):
     selected_fallback_model: str | None = None
     rewrite_reasoning_effort: ReasoningEffort | None = None
     selected_agent_model: str | None = None
+    agent_reasoning_effort: ReasoningEffort | None = None
 
 
 class Preferences(Wire):

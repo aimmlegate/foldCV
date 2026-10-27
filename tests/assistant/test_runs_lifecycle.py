@@ -5,7 +5,9 @@ import asyncio
 import threading
 import time
 
-from tests.assistant.support import MODEL, PROJECT, assistant_app, base, conversation, finish, start
+from packages.resume_core.reasoning import ModelReasoning
+from resume_api.connection import Metadata, Quota
+from tests.assistant.support import MODEL, PROJECT, MetadataAdapter, assistant_app, base, conversation, finish, start
 
 
 def blocking(started, release, models):
@@ -74,3 +76,30 @@ def test_deleting_the_project_stops_its_run_and_the_ending_run_writes_no_assista
         assert control.cancel.is_set() and control.deleted
         assert client.get(base() + '/conversations').status_code == 404
         assert not store.directory(PROJECT).exists()
+
+
+class ReasoningAdapter(MetadataAdapter):
+    def inspect(self, _files, _cancel, *, full=True):
+        reasoning = {MODEL: ModelReasoning(supported=['low', 'medium', 'high'], default='medium'),
+                     'processing-model': ModelReasoning(supported=['medium'], default='medium')}
+        return Metadata('fixture', (MODEL, 'processing-model'), 'plus', Quota('available', 10), reasoning)
+
+
+def test_the_chosen_assistant_effort_reaches_the_run_and_null_runs_the_catalog_default(tmp_path):
+    efforts = []
+
+    async def steps(_tools, value, _cancel, _emit):
+        efforts.append(value.reasoning_effort)
+        return 'Ответ.'
+    with assistant_app(tmp_path, steps, adapter=ReasoningAdapter()) as (client, _application, _runtime):
+        cid = conversation(client)
+        assert client.get('/v1/settings/assistant').json()['reasoningEffort'] is None
+        finish(client, start(client, cid))
+        assert settings(client, reasoningEffort='high')['reasoningEffort'] == 'high'
+        finish(client, start(client, cid, request_id='request-2'))
+        assert efforts == ['medium', 'high']
+        current = client.get('/v1/settings/assistant').json()
+        refused = client.put('/v1/settings/assistant', json={'expectedRevision': current['revision'], 'enabled': True,
+            'selectedAgentModel': 'processing-model', 'reasoningEffort': 'high'})
+        assert refused.status_code == 409 and refused.json()['error']['code'] == 'AGENT_MODEL_INCOMPATIBLE'
+        assert client.get('/v1/settings/assistant').json() == current

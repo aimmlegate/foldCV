@@ -127,7 +127,6 @@ class RuntimeResult:
     native_started: bool = False
     cleanup_verified: bool = False
     tool_calls: int = 0
-    web_actions: int = 0
     timings: dict[str, float] = field(default_factory=dict)
 
 
@@ -236,7 +235,7 @@ class NativeSession:
                 or config.get("openai_base_url") is not None or config.get("model_providers")
                 or config.get("project_doc_max_bytes") != 0 or config.get("model_instructions_file") is not None
                 or config.get("history", {}).get("persistence") != "none"
-                or config.get("web_search") != ("live" if self.value.allow_web else "disabled")
+                or config.get("web_search") != "disabled"
                 or any(features.get(name) is not False for name in (
                     "shell_tool", "unified_exec", "multi_agent", "multi_agent_v2", "guardian_approval",
                     "daemon_auto_start", "plugins", "hooks", "memories", "apps", "browser_use", "computer_use"))
@@ -447,12 +446,11 @@ class NativeSession:
 
     def item(self, method, item):
         kind, identifier = item.get("type"), item.get("id")
-        if kind not in {"userMessage", "agentMessage", "reasoning", "mcpToolCall", "webSearch"} or not isinstance(identifier, str):
+        # Native web search is off (decision 12); a webSearch item is a tool the run never granted.
+        if kind not in {"userMessage", "agentMessage", "reasoning", "mcpToolCall"} or not isinstance(identifier, str):
             raise AgentFailure("AGENT_TOOL_DENIED")
         if kind == "mcpToolCall" and (item.get("server") != "foldcv" or item.get("tool") not in self.value.tools):
             raise AgentFailure("AGENT_TOOL_DENIED")
-        if kind == "webSearch" and not self.value.allow_web:
-            raise AgentFailure("AGENT_WEB_DISABLED")
         if method == "item/started":
             if identifier in self.items:
                 return
@@ -461,17 +459,9 @@ class NativeSession:
                 raise AgentFailure("AGENT_OUTPUT_LIMIT")
             self.items[identifier] = kind
             self.progress.accept(method, {"item": item}, self.publish)
-            if kind == "webSearch":
-                self.result.web_actions += 1
-                if self.result.web_actions >= limits.WEB_ACTIONS:
-                    self.result.error = "AGENT_TOOL_LIMIT"
-                    self.abort_at = self.clock() + self.interrupt_grace
-                    self.value.revoke()
-            if kind in {"mcpToolCall", "webSearch"}:
-                if kind == "mcpToolCall":
-                    self.result.tool_calls += 1
-                self.publish("tool.started", {"callId": self.public_id(identifier),
-                    "name": item["tool"] if kind == "mcpToolCall" else "web_search", "error": None})
+            if kind == "mcpToolCall":
+                self.result.tool_calls += 1
+                self.publish("tool.started", {"callId": self.public_id(identifier), "name": item["tool"], "error": None})
         else:
             if self.items.get(identifier) != kind:
                 raise AgentFailure("AGENT_PROTOCOL")
@@ -479,11 +469,10 @@ class NativeSession:
                 return
             self.completed_items.add(identifier)
             self.progress.accept(method, {"item": item}, self.publish)
-            if kind in {"mcpToolCall", "webSearch"}:
-                failed = kind == "mcpToolCall" and item.get("status") != "completed"
+            if kind == "mcpToolCall":
+                failed = item.get("status") != "completed"
                 self.publish("tool.failed" if failed else "tool.completed", {"callId": self.public_id(identifier),
-                    "name": item["tool"] if kind == "mcpToolCall" else "web_search",
-                    "error": {"code": "AGENT_TOOL_DENIED"} if failed else None})
+                    "name": item["tool"], "error": {"code": "AGENT_TOOL_DENIED"} if failed else None})
             if kind == "agentMessage" and item.get("phase") != "commentary":
                 text = item.get("text", self.texts.get(identifier, ""))
                 self.limit_text(text)
@@ -616,7 +605,7 @@ class CodexAgentRuntime:
                     "operationRemoved": operation_path is None or not operation_path.exists(), "framedStdoutBytes": raw_bytes,
                     "normalizedBytes": session.normalized if session else 0, "state": result.state, "error": result.error,
                     "model": value.model, "reasoningEffort": value.reasoning_effort,
-                    "nativeStarted": result.native_started, "toolCalls": result.tool_calls, "webActions": result.web_actions,
+                    "nativeStarted": result.native_started, "toolCalls": result.tool_calls,
                     "usage": result.usage.model_dump(by_alias=True) if result.usage else None, "timings": result.timings})
         return result
 

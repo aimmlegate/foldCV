@@ -48,19 +48,19 @@ def test_provider_switch_keeps_and_restores_each_providers_choices(tmp_path):
     store.select_import_model('model-b')
     store.select_fallback_model('model-c')
     store.select_rewrite_reasoning('model-a', 'high')
-    value, agent = store.select_provider('claude_cli', 'agent-a')
-    assert value.selected_provider == 'claude_cli' and agent is None
+    value, agent = store.select_provider('claude_cli', 'agent-a', 'low')
+    assert value.selected_provider == 'claude_cli' and agent == (None, None)
     assert (value.selected_model, value.selected_import_model, value.selected_fallback_model,
             value.rewrite_reasoning_effort) == (None, None, None, None)
     store.select_model('claude-model')
-    value, agent = store.select_provider('codex_cli', 'agent-b')
-    assert agent == 'agent-a' and value.selected_provider == 'codex_cli'
+    value, agent = store.select_provider('codex_cli', 'agent-b', 'max')
+    assert agent == ('agent-a', 'low') and value.selected_provider == 'codex_cli'
     assert (value.selected_model, value.selected_import_model, value.selected_fallback_model,
             value.rewrite_reasoning_effort) == ('model-a', 'model-b', 'model-c', 'high')
     assert set(value.provider_selections) == {'claude_cli'}
-    value, agent = store.select_provider('claude_cli', 'agent-a')
-    assert value.selected_model == 'claude-model' and agent == 'agent-b'
-    assert store.select_provider('claude_cli', 'agent-x') == (store.load(), 'agent-x')
+    value, agent = store.select_provider('claude_cli', 'agent-a', 'low')
+    assert value.selected_model == 'claude-model' and agent == ('agent-b', 'max')
+    assert store.select_provider('claude_cli', 'agent-x', None) == (store.load(), ('agent-x', None))
 
 
 @pytest.mark.parametrize('change', [

@@ -77,19 +77,20 @@ class AgentProofProfile(ExperimentalCliProfile):
         ))
 
     def config(self, operation: Path, *, url: str | None = None,
-               allow_web: bool = True) -> list[str]:
+               allow_web: bool = True, effort: str = "medium") -> list[str]:
         values = [
             'features.code_mode=true',
             'features.code_mode_host=true',
             'features.code_mode_prewarm=true',
             'approvals_reviewer="user"',
-            'web_search="live"' if allow_web else 'web_search="disabled"',
+            # Decision 12: web access is the FoldCV read_public_page tool on every provider, never native search.
+            'web_search="disabled"',
             'features.guardian_approval=false',
             'features.daemon_auto_start=false',
             'features.multi_agent=false',
             'features.multi_agent_v2=false',
             'model_auto_compact_token_limit=1000000',
-            'model_reasoning_effort="medium"',
+            'model_reasoning_effort=' + json.dumps(effort),
             'model_reasoning_summary="none"',
         ]
         if url is not None:

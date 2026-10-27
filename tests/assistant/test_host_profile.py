@@ -123,3 +123,14 @@ def test_sandbox_allows_host_only_for_agent_and_still_denies_shell(tmp_path):
     denied = run(policy, "/bin/sh", "-c", "printf FORBIDDEN_AGENT_SHELL")
     assert denied.returncode != 0
     assert "FORBIDDEN_AGENT_SHELL" not in denied.stdout
+
+
+@pytest.mark.parametrize("allow_web", [False, True])
+@pytest.mark.parametrize("effort", ["low", "medium", "high", "xhigh"])
+def test_assistant_config_keeps_native_search_off_and_carries_the_effort(tmp_path, allow_web, effort):
+    values = agent.AgentProofProfile(tmp_path).config(tmp_path, url="http://127.0.0.1:1234/mcp", allow_web=allow_web,
+                                                      effort=effort)[1::2]
+    settings = dict(value.split("=", 1) for value in values)
+    assert settings["web_search"] == '"disabled"'
+    assert settings["model_reasoning_effort"] == json.dumps(effort)
+    assert ('"read_public_page"' in settings["mcp_servers"]) is allow_web

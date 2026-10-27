@@ -70,7 +70,7 @@ async def test_switch_detaches_restores_choices_and_never_runs_the_inactive_prov
         assert connected["providers"][1]["installed"] is False
         assert (await host(client, "select", {"model": "model-a", "provider": "codex_cli"})).status_code == 200
         assert (await client.put("/v1/settings/rewrite-reasoning", json={"model": "model-a", "effort": "high"})).status_code == 200
-        AgentSettingsStore(tmp_path / "store").restore_model("model-b")
+        AgentSettingsStore(tmp_path / "store").restore_model("model-b", "high")
         assert claude.inspections == 0
 
         switched = (await host(client, "select-provider", {"provider": "claude_cli"})).json()
@@ -86,6 +86,7 @@ async def test_switch_detaches_restores_choices_and_never_runs_the_inactive_prov
         preferences = (await client.get("/v1/settings/preferences")).json()
         assert preferences["selectedProvider"] == "claude_cli" and preferences["selectedModel"] is None
         assert AgentSettingsStore(tmp_path / "store").load().selected_agent_model is None
+        assert AgentSettingsStore(tmp_path / "store").load().reasoning_effort is None
         assert (await host(client, "select", {"model": "claude-sonnet-5-5"})).status_code == 200
 
         back = (await host(client, "select-provider", {"provider": "codex_cli"})).json()
@@ -93,7 +94,8 @@ async def test_switch_detaches_restores_choices_and_never_runs_the_inactive_prov
         preferences = (await client.get("/v1/settings/preferences")).json()
         assert preferences["selectedModel"] == "model-a" and preferences["rewriteReasoningEffort"] == "high"
         assert preferences["providerSelections"]["claude_cli"]["selectedModel"] == "claude-sonnet-5-5"
-        assert AgentSettingsStore(tmp_path / "store").load().selected_agent_model == "model-b"
+        restored = AgentSettingsStore(tmp_path / "store").load()
+        assert (restored.selected_agent_model, restored.reasoning_effort) == ("model-b", "high")
         assert claude.inspections == 1
 
 

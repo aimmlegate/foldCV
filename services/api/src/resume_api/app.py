@@ -378,7 +378,8 @@ def create_app(*, origin: str, secret: str, temp_root: Path, dist: Path, cli_exe
             and connection_state.metadataReady and connection_state.quota.state in USABLE_QUOTA
             and not connection_work)
         return AgentConnection(ready, tuple(connection_state.models),
-            "connection_" + connection_namespace + "_" + str(connection_epoch), None if ready else reason)
+            "connection_" + connection_namespace + "_" + str(connection_epoch), None if ready else reason,
+            dict(connection_state.modelReasoning))
 
     resolved_agent_runtime = agent_runtime
     if resolved_agent_runtime is None and experimental_profile is not None:
@@ -401,9 +402,10 @@ def create_app(*, origin: str, secret: str, temp_root: Path, dist: Path, cli_exe
         assistant.runtime = slot.runtime
 
     def switch_preferences(kind):
-        # The assistant model lives in its own file; it moves with the provider's other choices.
-        _, agent_model = preferences_store.select_provider(kind, assistant.settings.load().selected_agent_model)
-        assistant.settings.restore_model(agent_model)
+        # The assistant model and effort live in their own file; they move with the provider's other choices.
+        current = assistant.settings.load()
+        _, (model, effort) = preferences_store.select_provider(kind, current.selected_agent_model, current.reasoning_effort)
+        assistant.settings.restore_model(model, effort)
 
     try:
         stored = preferences_store.load().selected_provider if preferences_store.path.exists() else "codex_cli"

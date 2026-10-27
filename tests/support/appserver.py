@@ -47,7 +47,7 @@ def input_value(**changes):
 def config_result(value):
     return {"config": {"model_provider": "openai", "forced_login_method": "chatgpt", "project_doc_max_bytes": 0,
         "openai_base_url": None, "model_providers": {}, "model_instructions_file": None,
-        "web_search": "live" if value.allow_web else "disabled", "history": {"persistence": "none"},
+        "web_search": "disabled", "history": {"persistence": "none"},
         "features": {**{key: False for key in ("shell_tool", "unified_exec", "multi_agent", "multi_agent_v2",
             "guardian_approval", "daemon_auto_start", "plugins", "hooks", "memories", "apps", "browser_use", "computer_use")},
             **{key: True for key in ("code_mode", "code_mode_host", "code_mode_prewarm", "skip_host_skill_discovery")}},
