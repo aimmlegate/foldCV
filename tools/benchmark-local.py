@@ -33,7 +33,7 @@ def percentile(samples: list[float], percent: float) -> float:
 
 
 def request_for(stem: str) -> RenderRequest:
-    data = json.loads((ROOT / "spikes/render/fixtures" / f"{stem}.json").read_text(encoding="utf-8"))
+    data = json.loads((ROOT / "tests/fixtures/synthetic/render" / f"{stem}.json").read_text(encoding="utf-8"))
     document = RenderDocument.model_validate(data, by_name=True)
     identity = RenderIdentity.model_construct(id=stem, project_revision=1, snapshot_sha256="0" * 64,
                                               template_id="generic", template_version="1.0.0",

@@ -1,0 +1,42 @@
+{
+  "additionalProperties": false,
+  "properties": {
+    "filename": {
+      "maxLength": 200,
+      "title": "Filename",
+      "type": "string"
+    },
+    "format": {
+      "enum": [
+        "docx",
+        "foldcv"
+      ],
+      "title": "Format",
+      "type": "string"
+    },
+    "id": {
+      "minLength": 1,
+      "title": "Id",
+      "type": "string"
+    },
+    "size": {
+      "minimum": 0,
+      "title": "Size",
+      "type": "integer"
+    },
+    "url": {
+      "maxLength": 512,
+      "title": "Url",
+      "type": "string"
+    }
+  },
+  "required": [
+    "id",
+    "format",
+    "url",
+    "filename",
+    "size"
+  ],
+  "title": "AssistantFileV1",
+  "type": "object"
+}

@@ -2,7 +2,6 @@
 
 import pytest
 
-from packages.resume_core.models.background import WriterProofV1
 from packages.resume_core.models.template_authoring import TemplateEditPreparationV1
 from packages.resume_core.models.template_document import ManualScopeSpan, PresentedText
 from packages.resume_core.rich_mutations import RichMutationFailure, apply_rich_mutation
@@ -33,10 +32,6 @@ def command(value, *, start=0, end=6, text='Human', styles=None, target=None, ki
         capture={'sessionId': 'session', 'actionId': 'action', 'actionToken': 1, 'dependencies': []}, operations=[operation])
 
 
-def proof():
-    return WriterProofV1(schemaVersion=1, lineage='lineage', epoch=1, incarnation='opening', sessionId='session', credential='x' * 32)
-
-
 def test_partial_field_edit_prepares_whole_raw_field_and_issue_retirement_atomically(monkeypatch):
     before, _ = workspace()
     imported = issue('issue-a', 'a-title'); imported.block_ids = ['block-paper-a']
@@ -46,7 +41,7 @@ def test_partial_field_edit_prepares_whole_raw_field_and_issue_retirement_atomic
     monkeypatch.setattr('packages.resume_core.templates.projection.validate_payload', forbidden)
     original = canonical(before)
     request = command(before)
-    prepared = prepare_text_edit(response(before), request, proof())
+    prepared = prepare_text_edit(response(before), request)
     assert canonical(before) == original
     block = prepared.preview.workspace.project.document.regions[2].blocks[0]
     assert ''.join(span.text for span in block.content) == 'Human title'
@@ -55,7 +50,7 @@ def test_partial_field_edit_prepares_whole_raw_field_and_issue_retirement_atomic
     assert prepared.preview.workspace.project.import_issues[0].state == 'retired'
     committed, _ = apply_rich_mutation(before, prepared.mutation)
     assert committed == prepared.preview.workspace
-    retry = prepare_text_edit(response(before), request, proof())
+    retry = prepare_text_edit(response(before), request)
     assert canonical(prepared) == canonical(retry)
     assert prepared.created_ids == retry.created_ids
 
@@ -63,7 +58,7 @@ def test_partial_field_edit_prepares_whole_raw_field_and_issue_retirement_atomic
 @pytest.mark.parametrize('text', ['', 'Exact 😀'])
 def test_full_field_replacement_keeps_one_logical_occurrence_and_raw_authority(text):
     before, _ = workspace()
-    prepared = prepare_text_edit(response(before), command(before, end=12, text=text), proof())
+    prepared = prepare_text_edit(response(before), command(before, end=12, text=text))
     block = prepared.preview.workspace.project.document.regions[2].blocks[0]
     assert ''.join(span.text for span in block.content) == text
     assert block.content[0].occurrence_id == 'occurrence-paper-a'
@@ -74,7 +69,7 @@ def test_marks_preserve_cell_values_and_active_issue_lifecycle():
     before, _ = workspace()
     imported = issue('issue-a', 'a-title'); imported.block_ids = ['block-paper-a']
     before.project.import_issues = [imported]
-    prepared = prepare_text_edit(response(before), command(before, kind='set_marks', styles={'bold': True}), proof())
+    prepared = prepare_text_edit(response(before), command(before, kind='set_marks', styles={'bold': True}))
     assert prepared.preview.workspace.project.facts == before.project.facts
     assert prepared.preview.workspace.project.import_issues == before.project.import_issues
     block = prepared.preview.workspace.project.document.regions[2].blocks[0]
@@ -84,7 +79,7 @@ def test_marks_preserve_cell_values_and_active_issue_lifecycle():
 
 def test_same_text_and_marks_are_noop_without_allocations_or_revision_advance():
     before, _ = workspace()
-    prepared = prepare_text_edit(response(before), command(before, text='Shared'), proof())
+    prepared = prepare_text_edit(response(before), command(before, text='Shared'))
     assert prepared.mutation is None and prepared.created_ids == {'text': {}}
     assert prepared.preview.workspace == before and prepared.preview.durability == 'durable'
 
@@ -93,8 +88,8 @@ def test_explicit_field_vs_literal_boundary_insertion_has_distinct_ownership():
     before, _ = workspace()
     field = command(before, start=0, end=0, text='New ', target={'kind': 'field', 'bindingId': 'fragment-paper-a'})
     literal = command(before, start=0, end=0, text='New ', target={'kind': 'literal'})
-    bound = prepare_text_edit(response(before), field, proof())
-    plain = prepare_text_edit(response(before), literal, proof())
+    bound = prepare_text_edit(response(before), field)
+    plain = prepare_text_edit(response(before), literal)
     assert bound.preview.workspace.project.facts.extensions[0].cells[0].raw_input == 'New Shared title'
     assert plain.preview.workspace.project.facts == before.project.facts
     assert plain.preview.workspace.project.document.regions[2].blocks[0].content[0].type == 'text'
@@ -105,7 +100,7 @@ def test_field_plus_literal_replacement_keeps_one_cell_pending_without_inventing
     before, _ = workspace()
     block = before.project.document.regions[2].blocks[0]
     block.content.append(PresentedText(type='text', text=' — literal', styles={}))
-    prepared = prepare_text_edit(response(before), command(before, start=7, end=15, text='Exact replacement'), proof())
+    prepared = prepare_text_edit(response(before), command(before, start=7, end=15, text='Exact replacement'))
     cell = prepared.preview.workspace.project.facts.extensions[0].cells[0]
     scope = prepared.preview.workspace.project.facts.manual_scopes[-1]
     assert cell.state == 'pending_manual' and cell.typed_value is None and cell.manual_scope_id == scope.id
@@ -116,7 +111,7 @@ def test_field_plus_literal_replacement_keeps_one_cell_pending_without_inventing
     assert inserted.citations == before.project.facts.extensions[0].cells[0].evidence
 
 
-@pytest.mark.parametrize('change', ['snapshot', 'revision', 'owner', 'binding', 'literal_boundary', 'surrogate'])
+@pytest.mark.parametrize('change', ['snapshot', 'revision', 'binding', 'literal_boundary', 'surrogate'])
 def test_invalid_captured_range_fails_without_changing_base(change):
     before, _ = workspace()
     request = command(before)
@@ -124,8 +119,6 @@ def test_invalid_captured_range_fails_without_changing_base(change):
         request.snapshot.project_revision += 1
     elif change == 'revision':
         request.operations[0].range.before_revision += 1
-    elif change == 'owner':
-        request.capture.session_id = 'other'
     elif change == 'binding':
         request = command(before, start=0, end=0, text='New', target={'kind': 'field', 'bindingId': 'missing'})
     elif change == 'literal_boundary':
@@ -135,7 +128,7 @@ def test_invalid_captured_range_fails_without_changing_base(change):
         request = command(before, start=1, end=2)
     original = canonical(before)
     with pytest.raises((ValueError, RichMutationFailure)):
-        prepare_text_edit(response(before), request, proof())
+        prepare_text_edit(response(before), request)
     assert canonical(before) == original
 
 
@@ -145,7 +138,7 @@ def test_mutated_response_cannot_reuse_its_old_snapshot_claim():
     request = command(before)
     captured.workspace.project.document.regions[2].blocks[0].content[0].text = 'Changed without a new claim'
     with pytest.raises(ValueError, match='exact durable base'):
-        prepare_text_edit(captured, request, proof())
+        prepare_text_edit(captured, request)
 
 
 def test_bound_link_label_edit_keeps_url_binding_and_its_separate_issue():
@@ -160,7 +153,7 @@ def test_bound_link_label_edit_keeps_url_binding_and_its_separate_issue():
     for identifier, cell in [('title-issue', 'a-title'), ('url-issue', 'a-url')]:
         finding = issue(identifier, cell); finding.block_ids = [block.id]
         before.project.import_issues.append(finding)
-    prepared = prepare_text_edit(response(before), command(before), proof())
+    prepared = prepare_text_edit(response(before), command(before))
     result = prepared.preview.workspace.project.document.regions[2].blocks[0]
     assert len(result.content) == 1 and isinstance(result.content[0], BoundLink)
     assert result.content[0].href == 'https://example.test/retained'
@@ -177,7 +170,7 @@ def test_cross_cell_replacement_keeps_one_shared_scope_and_untouched_literal_met
     other.occurrence_id = other.binding_root_id = 'joined-occurrence-b'
     first.content = [PresentedText(type='text', text='X', styles={}), first.content[0],
         PresentedText(type='text', text=' / ', styles={}), other]
-    prepared = prepare_text_edit(response(before), command(before, start=10, end=19, text='X'), proof())
+    prepared = prepare_text_edit(response(before), command(before, start=10, end=19, text='X'))
     facts = prepared.preview.workspace.project.facts
     scope = facts.manual_scopes[-1]
     assert scope.cell_ids == ['a-title', 'b-title'] and scope.raw_input == 'X'
@@ -197,7 +190,7 @@ def test_independently_bound_literal_link_label_updates_whole_human_raw_value(st
     link.content = [PresentedText(type='text', text='Shared title', styles={}, presentation=link.presentation)]
     imported = issue('label-issue', 'a-title'); imported.block_ids = ['block-paper-a']
     before.project.import_issues = [imported]
-    prepared = prepare_text_edit(response(before), command(before, start=start, end=end, text=text), proof())
+    prepared = prepare_text_edit(response(before), command(before, start=start, end=end, text=text))
     result = prepared.preview.workspace.project.document.regions[2].blocks[0].content[0]
     expected = text + 'Shared title'[end:]
     cell = prepared.preview.workspace.project.facts.extensions[0].cells[0]
@@ -206,7 +199,7 @@ def test_independently_bound_literal_link_label_updates_whole_human_raw_value(st
     assert result.label_binding == link.label_binding and result.url_binding == link.url_binding and result.href == link.href
     assert prepared.preview.workspace.project.facts.extensions[0].cells[3] == before.project.facts.extensions[0].cells[3]
     assert prepared.preview.workspace.project.import_issues[0].state == 'retired'
-    assert canonical(prepared) == canonical(prepare_text_edit(response(before), command(before, start=start, end=end, text=text), proof()))
+    assert canonical(prepared) == canonical(prepare_text_edit(response(before), command(before, start=start, end=end, text=text)))
 
 
 def test_independent_label_literal_parts_belong_to_the_whole_label_occurrence():
@@ -214,7 +207,7 @@ def test_independent_label_literal_parts_belong_to_the_whole_label_occurrence():
     before, _ = linked_workspace()
     link = before.project.document.regions[2].blocks[0].content[0]
     link.content = [PresentedText(type='text', text='Prefix ', styles={}), link.content[0]]
-    prepared = prepare_text_edit(response(before), command(before, start=0, end=6, text='Human'), proof())
+    prepared = prepare_text_edit(response(before), command(before, start=0, end=6, text='Human'))
     cell = prepared.preview.workspace.project.facts.extensions[0].cells[0]
     assert cell.state == 'human_raw' and cell.raw_input == 'Human Shared title'
 
@@ -234,7 +227,7 @@ def test_url_only_text_changes_reject_before_preview(start, end):
     target = {'kind': 'field', 'bindingId': span.binding_id} if start == end else None
     original = canonical(before)
     with pytest.raises(ValueError, match='URL-only'):
-        prepare_text_edit(response(before), command(before, start=start, end=end, target=target), proof())
+        prepare_text_edit(response(before), command(before, start=start, end=end, target=target))
     assert canonical(before) == original
 
 
@@ -244,7 +237,7 @@ def test_bound_label_cannot_be_bypassed_by_literal_insertion_inside_the_link():
     link = before.project.document.regions[2].blocks[0].content[0]
     link.content = [PresentedText(type='text', text='Shared title', styles={})]
     with pytest.raises(ValueError, match='literal boundary'):
-        prepare_text_edit(response(before), command(before, start=5, end=5, target={'kind': 'literal'}), proof())
+        prepare_text_edit(response(before), command(before, start=5, end=5, target={'kind': 'literal'}))
 
 
 def test_cross_link_replacement_cannot_discard_an_untouched_url_reference():
@@ -252,7 +245,7 @@ def test_cross_link_replacement_cannot_discard_an_untouched_url_reference():
     before, _ = linked_workspace()
     before.project.document.regions[2].blocks[0].content.append(PresentedText(type='text', text=' trailing', styles={}))
     with pytest.raises(ValueError, match='untouched URL'):
-        prepare_text_edit(response(before), command(before, start=0, end=14), proof())
+        prepare_text_edit(response(before), command(before, start=0, end=14))
 
 
 @pytest.mark.parametrize('start,end,text,target', [(7, 24, 'Changed replacement', None),
@@ -260,16 +253,16 @@ def test_cross_link_replacement_cannot_discard_an_untouched_url_reference():
 def test_repeat_edit_of_shared_input_uses_addressed_scope_and_guards_literal_insertion(start, end, text, target):
     before, _ = workspace()
     before.project.document.regions[2].blocks[0].content.append(PresentedText(type='text', text=' — literal', styles={}))
-    initial = prepare_text_edit(response(before), command(before, start=7, end=15, text='Exact replacement'), proof())
+    initial = prepare_text_edit(response(before), command(before, start=7, end=15, text='Exact replacement'))
     saved = initial.preview.workspace
     request = command(saved, start=start, end=end, text=text, target=target)
     request.client_mutation_id = 'second-edit'
     original = canonical(saved)
     if target is not None:
         with pytest.raises(ValueError, match='literal boundary'):
-            prepare_text_edit(response(saved), request, proof())
+            prepare_text_edit(response(saved), request)
     else:
-        prepared = prepare_text_edit(response(saved), request, proof())
+        prepared = prepare_text_edit(response(saved), request)
         new_scope = prepared.preview.workspace.project.facts.manual_scopes[-1]
         assert new_scope.raw_input == text and new_scope.cell_ids == ['a-title']
         assert new_scope.id != saved.project.facts.manual_scopes[-1].id
@@ -279,9 +272,9 @@ def test_repeat_edit_of_shared_input_uses_addressed_scope_and_guards_literal_ins
 def test_marks_of_shared_raw_text_preserve_exact_pending_scope():
     before, _ = workspace()
     before.project.document.regions[2].blocks[0].content.append(PresentedText(type='text', text=' — literal', styles={}))
-    saved = prepare_text_edit(response(before), command(before, start=7, end=15, text='Exact replacement'), proof()).preview.workspace
+    saved = prepare_text_edit(response(before), command(before, start=7, end=15, text='Exact replacement')).preview.workspace
     request = command(saved, start=7, end=24, kind='set_marks', styles={'italic': True})
     request.client_mutation_id = 'second-edit'
-    result = prepare_text_edit(response(saved), request, proof()).preview.workspace
+    result = prepare_text_edit(response(saved), request).preview.workspace
     assert result.project.facts == saved.project.facts
     assert result.project.facts.manual_scopes[-1].raw_input == 'Exact replacement'

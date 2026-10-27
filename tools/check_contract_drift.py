@@ -8,18 +8,18 @@ import sys
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
-from tools.generate_contracts import RECOVERY_MODELS
+from tools.generate_contracts import CONTRACTS
 
 WEB = ROOT / "apps" / "web"
-PAIR_COUNT = 18 + len(RECOVERY_MODELS)
+PAIR_COUNT = len(CONTRACTS)
 
 
 def generated_files() -> set[Path]:
     files = {path for directory in (ROOT / "contracts/json-schema", WEB / "src/contracts/generated")
              for path in directory.rglob("*") if path.is_file()}
-    for extra in (ROOT / "contracts/technology-catalog.json", ROOT / "contracts/template-source.schema.json"):
-        if extra.is_file():
-            files.add(extra)
+    source = ROOT / "contracts/template-source.schema.json"
+    if source.is_file():
+        files.add(source)
     return files
 
 
@@ -31,8 +31,8 @@ def generated_directories() -> set[Path]:
 def main() -> None:
     before = {path: path.read_bytes() for path in generated_files()}
     directories = generated_directories()
-    if len(before) != PAIR_COUNT * 2 + 2:
-        raise SystemExit(f"expected {PAIR_COUNT} schema/type pairs, the catalog and the template source schema")
+    if len(before) != PAIR_COUNT * 2 + 1:
+        raise SystemExit(f"expected {PAIR_COUNT} schema/type pairs and the template source schema")
     try:
         subprocess.run(["npm", "run", "contracts:generate"], cwd=WEB, env=os.environ.copy(), check=True)
         after = {path: path.read_bytes() for path in generated_files()}
@@ -49,7 +49,7 @@ def main() -> None:
         for directory in sorted(generated_directories() - directories, key=lambda path: len(path.parts), reverse=True):
             directory.rmdir()
         raise
-    print(f"{PAIR_COUNT * 2 + 2} generated contract, catalog and template source files match Python models")
+    print(f"{PAIR_COUNT * 2 + 1} generated contract and template source files match Python models")
 
 
 if __name__ == "__main__":

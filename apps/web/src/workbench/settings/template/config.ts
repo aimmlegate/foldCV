@@ -1,5 +1,5 @@
 import { isMap, isScalar, isSeq, parseDocument } from "yaml";
-import { RichApiFailure } from "../../../rich/api";
+import { ProjectApiFailure } from "../../../rich/v7-connection";
 
 export type TemplateSummary = { id: string; name: string; revision: string; packageHash: string };
 export type TemplateConfigState = { package: TemplateSummary; format: "yaml" | "json"; text: string; bundled: boolean };
@@ -14,7 +14,7 @@ function field(value: unknown, key: string): unknown {
 }
 function text(value: unknown, key: string): string {
   const item = field(value, key);
-  if (typeof item !== "string") throw new RichApiFailure("INVALID_RESULT");
+  if (typeof item !== "string") throw new ProjectApiFailure("INVALID_RESULT");
   return item;
 }
 function summary(value: unknown): TemplateSummary {
@@ -22,14 +22,14 @@ function summary(value: unknown): TemplateSummary {
 }
 export function parseConfigState(value: unknown): TemplateConfigState {
   const format = field(value, "format"), bundled = field(value, "bundled");
-  if (field(value, "schemaVersion") !== 1 || (format !== "yaml" && format !== "json") || typeof bundled !== "boolean") throw new RichApiFailure("INVALID_RESULT");
+  if (field(value, "schemaVersion") !== 1 || (format !== "yaml" && format !== "json") || typeof bundled !== "boolean") throw new ProjectApiFailure("INVALID_RESULT");
   return { package: summary(field(value, "package")), format, text: text(value, "text"), bundled };
 }
 export function parseCheck(value: unknown): TemplateCheck {
-  if (field(value, "schemaVersion") !== 1) throw new RichApiFailure("INVALID_RESULT");
+  if (field(value, "schemaVersion") !== 1) throw new ProjectApiFailure("INVALID_RESULT");
   const valid = field(value, "valid");
   if (valid === true) return { valid: true, package: summary(field(value, "package")) };
-  if (valid !== false) throw new RichApiFailure("INVALID_RESULT");
+  if (valid !== false) throw new ProjectApiFailure("INVALID_RESULT");
   const error = field(value, "error");
   return { valid: false, error: { path: text(error, "path"), message: text(error, "message") } };
 }
@@ -43,7 +43,7 @@ async function call(url: string, method: string, body?: unknown): Promise<{ stat
   try { value = JSON.parse(await response.text()) as unknown; } catch { value = null; }
   if (response.ok || response.status === 422 && field(value, "valid") === false) return { status: response.status, value };
   const code = field(field(value, "error"), "code");
-  throw new RichApiFailure(typeof code === "string" ? code : "REQUEST_FAILED", response.status);
+  throw new ProjectApiFailure(typeof code === "string" ? code : "REQUEST_FAILED", response.status);
 }
 
 export async function readTemplateConfig(): Promise<TemplateConfigState> {
@@ -56,7 +56,7 @@ export async function saveTemplateConfig(source: string): Promise<TemplateSave> 
   const { status, value } = await call(path, "PUT", { text: source });
   if (status === 422) {
     const check = parseCheck(value);
-    if (check.valid) throw new RichApiFailure("INVALID_RESULT");
+    if (check.valid) throw new ProjectApiFailure("INVALID_RESULT");
     return { saved: false, error: check.error };
   }
   return { saved: true, state: parseConfigState(value) };

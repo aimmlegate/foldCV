@@ -4,8 +4,8 @@ from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 import uuid
 
-from .models.template_import import (AttemptCleanupRecord, CleanupOutcome, ImportAttempt, ImportAuthorization,
-    ImportOperation, ImportTask, ObservedUsage, PublicationOutcome, TaskInputRecord)
+from .models.template_import import (AttemptCleanupRecord, CleanupOutcome, FinalizationCandidate, ImportAttempt,
+    ImportAuthorization, ImportOperation, ImportTask, ObservedUsage, PublicationOutcome, TaskInputRecord)
 from .templates.compiler import canonical, dependency_order, sha256
 
 
@@ -404,3 +404,135 @@ def cancel_operation(operation, *, commit_claimed=False):
         if task.state not in TERMINAL_TASKS:
             task.state = 'cancelled'
     return checked(result)
+
+
+# A sidecar may only move an operation forward: spending, captured inputs and review evidence are append-only.
+def _refuse():
+    from .project_store import ProjectStoreFailure
+    raise ProjectStoreFailure('PROJECT_SAVE_FAILED')
+
+
+def _append_only(before, after, *, key=lambda value: value.id, mutable=()):
+    if [key(value) for value in after[:len(before)]] != [key(value) for value in before]:
+        _refuse()
+    # Compared field by field, not through two dumps per record: every import step checks every retained record.
+    for old, new in zip(before, after):
+        if old is new:
+            continue
+        if any(getattr(old, name) != getattr(new, name) for name in type(old).model_fields if name not in mutable):
+            _refuse()
+
+
+def retain_operation(before, after):
+    if (before.id, before.project_id, before.client_request_id, before.capture, before.captured_relation_revisions,
+            before.captured_items) != (after.id, after.project_id, after.client_request_id, after.capture,
+            after.captured_relation_revisions, after.captured_items):
+        _refuse()
+    if before.inference_closed and not after.inference_closed:
+        _refuse()
+    if before.last_observed_at is not None and (after.last_observed_at is None or instant(after.last_observed_at) < instant(before.last_observed_at)):
+        _refuse()
+    for name in ('allocations', 'relation_allocations', 'task_inputs', 'review_inputs', 'receipts', 'cleanup_records', 'finalization_history',
+                 'task_results', 'issues'):
+        key = ((lambda value: (value.task_id, value.discovery_attempt_id, value.key)) if name in {'allocations', 'relation_allocations'}
+            else (lambda value: value.attempt_id) if name == 'cleanup_records' else (lambda value: value.id))
+        _append_only(getattr(before, name), getattr(after, name), key=key)
+    _append_only(before.authorizations, after.authorizations, mutable={'state'})
+    for old, new in zip(before.authorizations, after.authorizations):
+        if old.state == 'cancelled' and new.state != 'cancelled':
+            _refuse()
+    if [value.id for value in before.tasks] != [value.id for value in after.tasks]:
+        _refuse()
+    captured = {value.task_id for value in before.task_inputs}
+    for old, new in zip(before.tasks, after.tasks):
+        if any(getattr(old, name) != getattr(new, name) for name in ('operation_id', 'block_id', 'kind', 'dependencies')):
+            _refuse()
+        if old.id in captured and old.input_hash != new.input_hash:
+            _refuse()
+        if not set(old.allowed_handles) <= set(new.allowed_handles) or new.attempt_ids[:len(old.attempt_ids)] != old.attempt_ids:
+            _refuse()
+    _append_only(before.attempts, after.attempts, mutable={'state', 'owner', 'dispatched_at', 'return_hash', 'usage', 'cleanup',
+        'proposal_record_id', 'review_input_record_id', 'review_receipt_id', 'raw_return', 'raw_return_hash',
+        'outcome', 'error_code', 'returned_at'})
+    transitions = {'reserved': {'reserved', 'dispatch_started', 'outcome_unknown', 'released'},
+        'dispatch_started': {'dispatch_started', 'returned', 'outcome_unknown', 'released'},
+        'returned': {'returned', 'reconciled', 'released'}, 'outcome_unknown': {'outcome_unknown', 'returned', 'reconciled', 'released'},
+        'reconciled': {'reconciled'}, 'released': {'released'}}
+    for old, new in zip(before.attempts, after.attempts):
+        if new.state not in transitions[old.state]:
+            _refuse()
+        if any(getattr(old.owner, name) != getattr(new.owner, name) for name in ('reservation_id', 'incarnation_id', 'generation', 'lease_id')):
+            _refuse()
+        for name in ('process_start_witness', 'transport_session_id', 'transport_turn_id', 'pid'):
+            if getattr(old.owner, name) is not None and getattr(old.owner, name) != getattr(new.owner, name):
+                _refuse()
+        for name in ('dispatched_at', 'return_hash', 'raw_return', 'raw_return_hash', 'returned_at',
+                     'proposal_record_id', 'review_input_record_id', 'review_receipt_id', 'error_code'):
+            if getattr(old, name) is not None and getattr(old, name) != getattr(new, name):
+                _refuse()
+        for name in ('input_tokens', 'cached_input_tokens', 'output_tokens'):
+            if getattr(old.usage, name) is not None and getattr(old.usage, name) != getattr(new.usage, name):
+                _refuse()
+        if old.usage.complete and not new.usage.complete or old.cleanup.state == 'verified' and old.cleanup != new.cleanup:
+            _refuse()
+        if old.outcome is not None and new.outcome != old.outcome and not (old.outcome == 'completed'
+                and old.state != 'reconciled' and new.outcome in {'invalid_payload', 'transport_failure', 'cleanup_failure', 'cancelled', 'timed_out'}):
+            _refuse()
+        if new.state == 'released' and old.state != 'released' and not any(
+                proof.attempt_id == new.id and proof.never_dispatched for proof in after.cleanup_records):
+            _refuse()
+    _append_only(before.proposals, after.proposals, mutable={'state', 'applied_receipt_id', 'admitted_cell_ids', 'admitted_relation_ids',
+        'admitted_record_revisions', 'admitted_relation_revisions'})
+    for old, new in zip(before.proposals, after.proposals):
+        if old.applied_receipt_id is not None and (old.state, old.applied_receipt_id, old.admitted_cell_ids, old.admitted_relation_ids) != (
+                new.state, new.applied_receipt_id, new.admitted_cell_ids, new.admitted_relation_ids):
+            _refuse()
+        if old.applied_receipt_id is not None and (old.admitted_record_revisions, old.admitted_relation_revisions) != (
+                new.admitted_record_revisions, new.admitted_relation_revisions):
+            _refuse()
+    if before.finalization is not None and before.finalization != after.finalization:
+        if (before.finalization not in after.finalization_history or after.finalization is None
+                or before.finalization.candidate_hash != after.finalization.candidate_hash
+                or not after.authorizations or after.authorizations[-1].kind != 'resume'
+                or after.finalization.authorization_id != after.authorizations[-1].id
+                or before.finalization.authorization_id == after.finalization.authorization_id):
+            _refuse()
+    if before.state == 'published' and (after.state != 'published' or before.publication != after.publication):
+        _refuse()
+    retain_exports(before.export_attempts, after.export_attempts)
+
+
+def retain_exports(before, after):
+    _append_only(before, after, mutable={'state', 'artifact_hash', 'error_code'})
+    export_states = {'pending': {'pending', 'running', 'completed', 'failed'}, 'running': {'running', 'completed', 'failed'},
+        'completed': {'completed'}, 'failed': {'failed'}}
+    for old, new in zip(before, after):
+        if new.state not in export_states[old.state] or old.state in {'completed', 'failed'} and old != new:
+            _refuse()
+
+
+def finalization_hashes(operation, project):
+    return {'operationId': operation.id, 'sourceHash': digest(operation.capture.source_hashes),
+        'dependencyHash': operation.capture.dependency_hash, 'authorityHash': operation.capture.authority_hash,
+        'packageHash': project.template_package.package_hash, 'documentHash': digest(project.document),
+        'factsHash': digest(project.facts), 'issuesHash': digest(project.import_issues),
+        'coverageHash': digest(project.import_coverage)}
+
+
+def capture_finalization(operation, project, now, *, id_factory=identity):
+    from .project_repository import RepositoryFailure
+    current = authorization(operation)
+    if any(task.state not in {'accepted', 'empty', 'source_fallback'} for task in operation.tasks):
+        raise RepositoryFailure('JOB_SCOPE_INVALID')
+    if any(attempt.cleanup.state != 'verified' for attempt in operation.attempts):
+        raise RepositoryFailure('CLEANUP_FAILED')
+    values = finalization_hashes(operation, project)
+    if operation.finalization is not None:
+        previous = operation.finalization
+        if previous.candidate_hash != digest(values) or previous.authorization_id != current.id:
+            raise RepositoryFailure('DEPENDENCY_CHANGED')
+        return previous.model_copy(deep=True)
+    if project.template_package.package_hash != operation.capture.package_hash:
+        raise RepositoryFailure('DEPENDENCY_CHANGED')
+    return FinalizationCandidate(id=id_factory('finalization'), authorizationId=current.id, **values,
+        candidateHash=digest(values), startedAt=now, expiresAt=expiry(now, operation.capture.policy.finalization_seconds))

@@ -71,13 +71,26 @@ class TemplateProjectResponseV1(Wire):
 
     @model_validator(mode='after')
     def coherent_snapshot(self):
-        expected = snapshot_identity(self.workspace)
-        if self.snapshot != expected:
-            raise ValueError('template response snapshot differs from its workspace')
-        if not presentation_matches(self.presentation.model_dump(mode='json', by_alias=True) if self.presentation is not None
-                else None, self.workspace):
-            raise ValueError('template response presentation differs from its captured workspace')
         if self.durability == 'durable' and (self.saved_project_revision, self.saved_document_revision) != (
                 self.workspace.project_revision, self.workspace.document_revision):
             raise ValueError('durable template response needs the matching save acknowledgment')
+        # Recomputing snapshot and presentation costs a full pass over the project; tests and FOLDCV_VERIFY do it on
+        # every construction, the service builds them from the workspace it serves (D109).
+        if verifying():
+            verify_response(self)
         return self
+
+
+def verifying():
+    import os
+    return os.environ.get('FOLDCV_VERIFY') == '1'
+
+
+def verify_response(response):
+    """A response's snapshot and presentation are the ones its workspace yields."""
+    if response.snapshot != snapshot_identity(response.workspace):
+        raise ValueError('template response snapshot differs from its workspace')
+    if not presentation_matches(response.presentation.model_dump(mode='json', by_alias=True) if response.presentation is not None
+            else None, response.workspace):
+        raise ValueError('template response presentation differs from its captured workspace')
+    return response

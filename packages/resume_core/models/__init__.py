@@ -1,3 +1,3 @@
-from .contracts import Project, Proposal, TemplateManifest, ZipManifest, validate_contract
+from .contracts import Project, Proposal, TemplateManifest, ZipManifest
 
-__all__ = ["Project", "Proposal", "TemplateManifest", "ZipManifest", "validate_contract"]
+__all__ = ["Project", "Proposal", "TemplateManifest", "ZipManifest"]

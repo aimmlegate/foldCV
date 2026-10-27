@@ -14,7 +14,7 @@ from packages.resume_core.templates.operations import OperationContext, derive_t
 from packages.resume_core.templates.projection import SchemaFailure
 from packages.resume_core.templates.store import BUNDLED_TEMPLATE
 from tests.templates.employment_fixtures import TEXT, employment_source, object_schema
-from tests.templates.test_template_employment import EmploymentFixture
+from tests.templates.template_runtime_fixtures import EmploymentFixture
 
 
 FAMILY = {'type': ['string', 'null'], 'enum': ['business_analyst', 'tester', 'other', None]}

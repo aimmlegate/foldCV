@@ -12,7 +12,6 @@ from packages.resume_core.templates.compiler import canonical
 from tests.templates.storage_fixtures import workspace
 from tests.templates.test_manual_scope_occurrences import shared_workspace
 from tests.templates.test_sync_preparation import link_mentions
-from tests.templates.test_template_preparation import proof
 from tests.templates.test_template_synchronization import conflicted_move
 
 
@@ -41,7 +40,7 @@ def test_split_capture_freezes_complete_or_partial_authority_and_allocates_fresh
     for record in before.project.facts.extensions:
         for cell in record.cells:cell.raw_input='Later independent wording'
     allocated=allocate_classified_blocks(selected,
-        id_factory=EditIdAllocator(proof(),'paste-captured','copy',existing_ids(before)))
+        id_factory=EditIdAllocator('template-project', 'paste-captured','copy',existing_ids(before)))
     assert canonical([block.model_dump(mode='json',by_alias=True) for block in selected])==captured
     spans=[block.content[0] for block in allocated]
     assert len({part.occurrence_id for part in spans})==1 and spans[0].occurrence_id!=old_root
@@ -72,7 +71,7 @@ def test_independent_bound_link_capture_keeps_refs_until_allocation_and_partial_
     assert all(isinstance(child,PresentedText) for child in partial.content)
     assert partial.content[0].citations and not hasattr(partial,'label_binding')
     allocated=allocate_classified_blocks(captured,
-        id_factory=EditIdAllocator(proof(),'paste-link','copy',existing_ids(before)))[0].content[0]
+        id_factory=EditIdAllocator('template-project', 'paste-link','copy',existing_ids(before)))[0].content[0]
     assert isinstance(allocated,BoundLink) and allocated.label_binding.cell_id==source.label_binding.cell_id
     assert allocated.label_binding.occurrence_id!=source.label_binding.occurrence_id
     assert all(isinstance(child,PresentedText) for child in allocated.content)

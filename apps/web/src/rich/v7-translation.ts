@@ -1,8 +1,7 @@
-import type { WriterCaptureClipboardV2 } from "../contracts/generated/background_writer_capture_clipboard_v2";
-import type { PreparedAddressMapV1 } from "../contracts/generated/template_address_map_v1";
+import type { TemplateClipboardCaptureV1 } from "../contracts/generated/template_clipboard_capture_v1";
 import type { TemplateEditPreparationV1 } from "../contracts/generated/template_edit_preparation_v1";
-import { jsonWireAt, type JsonWireNode } from "../contracts/lossless-json";
-import { addressLeaves, contentText, leafTarget, responseBlocks, type AddressLeaf } from "../contracts/template-address";
+import type { TemplateProjectResponseV1 } from "../contracts/generated/template_project_response_v1";
+import { contentText, leafTarget, responseBlocks, responseLeaves, type ResponseLeaf } from "./v7-response";
 
 type Operation = TemplateEditPreparationV1["operations"][0];
 type ReplaceText = Extract<Operation, { kind: "replace_text" }>;
@@ -13,7 +12,6 @@ type Capture = TemplateEditPreparationV1["capture"];
 export type PanelCommandV7 = Omit<PanelRequest, "capture" | "factsRevision" | "documentRevision">;
 type Styles = ReplaceText["styles"];
 type Target = NonNullable<ReplaceText["range"]["insertionTarget"]>;
-type AddressEntry = PreparedAddressMapV1["containers"][number];
 
 export type LocalContainer = { blockId: string; kind: "content" | "caption" | "cell"; cellId: string | null };
 export type Side = "before" | "after" | "interior" | "anchor";
@@ -34,18 +32,19 @@ export type Placement = { parentId: string; afterId: string | null };
 /** A copy source in editor coordinates; its texts must equal the verified ones when it is captured. */
 export type ClipboardSource = { kind: "range"; container: LocalContainer; start: number; end: number; prior: string }
   | { kind: "blocks"; blockIds: string[] };
-type ClipboardSelection = WriterCaptureClipboardV2["selection"];
+type ClipboardSelection = TemplateClipboardCaptureV1["selection"];
 /** Prior texts are the optimistic container texts this intent was expressed against. */
 export type V7Intent = { localId: string; operation: V7Operation; prior: ReadonlyMap<string, string> };
 export type Translation = { kind: "operation"; operation: Operation } | { kind: "conflict"; reason: string };
-export type Basis = { response: JsonWireNode; map: PreparedAddressMapV1 | null; locals: ReadonlyMap<string, string> };
+/** The verified response the next intent is expressed against, and the canonical ids of blocks created in this editor. */
+export type Basis = { response: TemplateProjectResponseV1; locals: ReadonlyMap<string, string> };
 
-type Container = { blockId: string; revision: number; text: string; leaves: AddressLeaf[]; kind: LocalContainer["kind"]; cellId: string | null };
+type Container = { blockId: string; revision: number; text: string; leaves: ResponseLeaf[]; kind: LocalContainer["kind"]; cellId: string | null };
 
 class Conflict extends Error {}
 function conflict(reason: string): never { throw new Conflict(reason); }
-function text(node: JsonWireNode, key: string): string {
-  const value = jsonWireAt(node, [key]).value;
+function text(node: Record<string, unknown>, key: string): string {
+  const value = node[key];
   return typeof value === "string" ? value : conflict("invalid canonical text");
 }
 
@@ -59,54 +58,35 @@ function resolve(basis: Basis, local: LocalContainer): Container {
   const blockId = canonicalBlockId(basis, local.blockId), block = responseBlocks(basis.response).get(blockId);
   const group = block?.groups.find(value => value.kind === local.kind && (local.kind !== "cell" || value.key === local.cellId));
   if (!block || !group) return conflict("addressed container is not in the verified result");
-  const values = addressLeaves(group.content);
+  const values = responseLeaves(group.content);
   return { blockId, revision: block.revision, kind: local.kind, cellId: local.cellId, leaves: values, text: contentText(group.content) };
 }
 
-function entries(basis: Basis, container: Container): AddressEntry[] {
-  return (basis.map?.containers ?? []).filter(entry => entry.output.blockId === container.blockId && entry.output.kind === container.kind
-    && (entry.output.kind !== "cell" || entry.output.cellId === container.cellId));
-}
-
-function owner(leaf: AddressLeaf): string {
+function owner(leaf: ResponseLeaf): string {
   const type = text(leaf.span, "type");
   if (type === "fact_field") return JSON.stringify(["field", text(leaf.span, "occurrenceId")]);
   if (type === "manual_scope") return JSON.stringify(["scope", text(leaf.span, "scopeId"), text(leaf.span, "occurrenceId")]);
   return JSON.stringify(["literal", leaf.owner ? leaf.path[0] ?? -1 : null]);
 }
 
-/** Address a collapsed insertion by offset and side through the verified map, never by wording. */
-function target(container: Container, mapped: AddressEntry[], offset: number, side: Side): Target {
-  const segments = mapped.flatMap(entry => entry.segments), boundaries = mapped.flatMap(entry => entry.boundaries);
+/** Address a collapsed insertion by offset and side through the verified leaves, never by wording. */
+function target(container: Container, offset: number, side: Side): Target {
   const nonempty = container.leaves.filter(leaf => leaf.end > leaf.start);
   const chosen = (value: Target | null | undefined): Target => value ?? conflict("unsupported insertion target");
   if (side === "anchor") {
-    const listed = segments.filter(segment => segment.result.start === offset && segment.result.end === offset);
     const anchors = container.leaves.filter(leaf => leaf.start === offset && leaf.end === offset);
-    if (anchors.length !== 1) return conflict("ambiguous or missing empty anchor");
     const [anchor] = anchors;
-    if (!anchor) return conflict("missing empty anchor");
-    return listed.length ? chosen(listed.length === 1 ? listed[0]?.target : null) : chosen(leafTarget(anchor));
+    if (anchors.length !== 1 || !anchor) return conflict("ambiguous or missing empty anchor");
+    return chosen(leafTarget(anchor));
   }
   const inside = nonempty.find(leaf => leaf.start < offset && offset < leaf.end);
   const left = offset === 0 ? null : nonempty.find(leaf => leaf.end === offset);
   const right = offset === container.text.length ? null : nonempty.find(leaf => leaf.start === offset);
-  // The editor saw one node across this offset; the result may have cut it into pieces of one owner only.
-  const sameOwner = inside !== undefined || !!left && !!right && owner(left) === owner(right);
-  // A server boundary decides first, even inside one leaf, so a withheld (null) address stays withheld.
-  const boundary = boundaries.find(value => value.offset === offset);
-  if (boundary) {
-    if (side === "before") return chosen(boundary.before);
-    if (side === "after") return chosen(boundary.after);
-    if (!sameOwner) return conflict("interior input now spans different owners");
-    return chosen(boundary.before && boundary.after ? boundary.before : null);
-  }
-  const covering = segments.find(value => value.result.start < offset && offset < value.result.end);
-  if (covering) return chosen(covering.target);
   if (inside) return chosen(leafTarget(inside));
   if (side === "before") return chosen(offset === 0 ? { kind: "literal" } : left ? leafTarget(left) : null);
   if (side === "after") return chosen(offset === container.text.length ? { kind: "literal" } : right ? leafTarget(right) : null);
-  if (!sameOwner || !left || !right) return conflict("interior input now spans different owners");
+  // The editor saw one node across this offset; the result may have cut it into pieces of one owner only.
+  if (!left || !right || owner(left) !== owner(right)) return conflict("interior input now spans different owners");
   const before = leafTarget(left), after = leafTarget(right);
   return chosen(before && after ? before : null);
 }
@@ -125,19 +105,15 @@ function range(container: Container, start: number, end: number, insertion?: Tar
 
 function checked(basis: Basis, intent: V7Intent, local: LocalContainer): Container {
   const container = resolve(basis, local);
-  // Any addressed output without correspondence keeps the input, whatever the operation.
-  if (entries(basis, container).some(entry => entry.correspondence === "none")) return conflict("server offered no correspondence");
   if (intent.prior.get(containerKey(local)) !== container.text) return conflict("verified text differs from optimistic text");
   return container;
 }
 
 function revisions(basis: Basis): { facts: number; document: number; records: Map<string, number> } {
-  const workspace = jsonWireAt(basis.response, ["workspace"]), facts = jsonWireAt(workspace, ["project", "facts"]);
-  const number = (node: JsonWireNode): number => typeof node.value === "number" ? node.value : conflict("invalid canonical revision");
+  const workspace = basis.response.workspace, facts = workspace.project?.facts ?? conflict("verified result has no project");
   const records = new Map<string, number>();
-  for (const key of ["records", "extensions"]) for (const record of jsonWireAt(facts, [key]).children.values())
-    records.set(text(record, "id"), number(jsonWireAt(record, ["revision"])));
-  return { facts: number(jsonWireAt(facts, ["revision"])), document: number(jsonWireAt(workspace, ["documentRevision"])), records };
+  for (const record of [...facts.records, ...facts.extensions]) records.set(record.id, record.revision);
+  return { facts: facts.revision, document: workspace.documentRevision, records };
 }
 
 type BlockTargets = Extract<ClipboardSelection, { kind: "blocks" }>["blocks"];
@@ -153,8 +129,7 @@ function blockTarget(basis: Basis, id: string): { blockId: string; beforeRevisio
 
 function placement(basis: Basis, value: Placement): Placement {
   const parentId = canonicalBlockId(basis, value.parentId), afterId = value.afterId === null ? null : canonicalBlockId(basis, value.afterId);
-  const regions = new Set([...jsonWireAt(basis.response, ["workspace", "project", "document", "regions"]).children.values()]
-    .map(region => text(region, "id")));
+  const regions = new Set((basis.response.workspace.project?.document.regions ?? []).map(region => region.id));
   const blocks = responseBlocks(basis.response);
   if (!regions.has(parentId) && !blocks.has(parentId) || afterId !== null && !blocks.has(afterId)) return conflict("placement is not in the verified result");
   return { parentId, afterId };
@@ -215,7 +190,7 @@ export function translateIntent(intent: V7Intent, basis: Basis, capture: Capture
       const container = checked(basis, intent, value.container);
       if (container.kind !== "content") return conflict("paste goes into block text only");
       if ((value.start === value.end) !== (value.side !== null)) return conflict("collapsed paste needs exactly one side");
-      const insertion = value.side ? target(container, entries(basis, container), value.start, value.side) : undefined;
+      const insertion = value.side ? target(container, value.start, value.side) : undefined;
       return { kind: "operation", operation: { kind: "paste_inline", opId, destination: range(container, value.start, value.end, insertion),
         source: structuredClone(value.source) } };
     }
@@ -223,7 +198,7 @@ export function translateIntent(intent: V7Intent, basis: Basis, capture: Capture
       const container = checked(basis, intent, value.container);
       const collapsed = value.start === value.end;
       if (collapsed !== (value.side !== null)) return conflict("collapsed input needs exactly one side");
-      const insertion = value.side ? target(container, entries(basis, container), value.start, value.side) : undefined;
+      const insertion = value.side ? target(container, value.start, value.side) : undefined;
       return { kind: "operation", operation: { kind: "replace_text", opId, text: value.text, styles: value.styles,
         range: range(container, value.start, value.end, insertion) } };
     }
@@ -248,17 +223,14 @@ export function translateIntent(intent: V7Intent, basis: Basis, capture: Capture
   }
 }
 
-/** After a verified result, local blocks created by that intent resolve only through its created entries. */
-export function createdLocals(intent: V7Intent, basis: Basis): Map<string, string> | null {
+/** After a verified result, the block a split created in the editor resolves to the one id Python reported for it. */
+export function createdLocals(intent: V7Intent, createdBlocks: Readonly<Record<string, readonly string[]>>): Map<string, string> | null {
   const value = intent.operation, result = new Map<string, string>();
   if (value.kind !== "split_block") return result;
-  const source = canonicalBlockId(basis, value.container.blockId);
-  // The created slot must belong to this intent's own operation, not merely to the same source block.
-  const created = (basis.map?.containers ?? []).filter(entry => entry.created?.opId === intent.localId
-    && entry.input?.blockId === source);
-  const [entry] = created;
-  if (created.length !== 1 || !entry) return null;
-  result.set(value.created, entry.output.blockId);
+  const created = createdBlocks[intent.localId] ?? [];
+  const [id] = created;
+  if (created.length !== 1 || !id) return null;
+  result.set(value.created, id);
   return result;
 }
 

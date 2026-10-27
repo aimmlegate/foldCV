@@ -8,7 +8,7 @@ export function originalKind(name: string): OriginalKind {
 }
 
 export function originalUrl(projectId: string, sourceId: string): string {
-  return `/v1/rich/projects/${encodeURIComponent(projectId)}/sources/${encodeURIComponent(sourceId)}/original`;
+  return `/v2/projects/${encodeURIComponent(projectId)}/sources/${encodeURIComponent(sourceId)}/original`;
 }
 
 export async function loadOriginal(url: string, hash: string, signal: AbortSignal): Promise<Blob> {

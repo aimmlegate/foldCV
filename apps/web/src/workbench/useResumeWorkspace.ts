@@ -1,142 +1,78 @@
 import { errorMessage } from "../errors/messages";
 import { useCallback, useEffect, useRef, useState } from "react";
-import type { RichProjectResponse } from "../contracts/generated/rich_project_response";
-import type { GuiProjectListResponse } from "../contracts/generated/gui_project_list_response";
-import type { RichEditorHandle } from "../rich/Editor";
 import type { TemplateEditorHandle } from "../rich/TemplateEditor";
 import type { TemplateProjectResponseV1 } from "../contracts/generated/template_project_response_v1";
 import type { AssistantHandle } from "../assistant/Drawer";
 import { hasInput, importBody, type ResumeInput } from "../rich/import-source";
-import { deleteProject, download, downloadTemplate, listProjects, openedProject, projectRequest, request, RichApiFailure, templateImportStatus,
-  type TemplateImportPackage } from "../rich/api";
-import { attachExclusiveTemplateWriter, attachExclusiveWriter, type AttachedTemplateWriter, type AttachedWriter } from "../background/connection";
-import { FixedOperations } from "../background/fixed";
-import { JobsApi, startTemplateImport } from "../background/api";
-import { warningLabel } from "./import/notices";
-import { WorkspaceReads } from "./read-capture";
-import type { ReadCapture } from "../contracts/template-export";
-export { warningLabel } from "./import/notices";
+import { cancelImport, catalogFlag, createProject, deleteProject, listProjects, openFoldcv, projectTasks, resumeImport, startImport,
+  type ProjectList, type ProjectTask } from "../projects/api";
+import { IMPORT_WAIT_MS } from "../projects/import-wait";
+import { ProjectApiFailure, type ProjectEditorConnection } from "../rich/v7-connection";
+import { openEditor } from "./open-editor";
+import { WorkspaceReads, type ReadCapture } from "./read-capture";
 
 function label(error: unknown): string { return errorMessage(error); }
-export const stageLabels = { assess_resume: "Проверяем, похоже ли содержимое на резюме", normalize_semantics: "Извлекаем факты", draft_prose: "Редактируем текст",
-  assemble: "Применяем структуру шаблона", render: "Готовим DOCX" };
-export type TemplateOpening = { response: TemplateProjectResponseV1; connection: AttachedTemplateWriter | null };
+export type TemplateOpening = { response: TemplateProjectResponseV1; connection: ProjectEditorConnection };
 export function useResumeWorkspace() {
-  const [response, setResponse] = useState<RichProjectResponse | null>(null);
-  // A V7 project opens in the template editor; `response` stays the V1 opening only.
   const [template, setTemplate] = useState<TemplateOpening | null>(null);
-  const [writer, setWriter] = useState<AttachedWriter | null>(null);
-  const [background, setBackground] = useState(false);
-  const [projects, setProjects] = useState<GuiProjectListResponse | null>(null);
+  const [projects, setProjects] = useState<ProjectList | null>(null);
   const [input, storeInput] = useState<ResumeInput>({ kind: "text", text: "" });
   const [textDraft, setTextDraft] = useState("");
   const [allowTextRewrite, setAllowTextRewrite] = useState(true);
-  // Strict template import is opt-in and shown only when the service offers it.
-  const [templateImport, setTemplateImport] = useState<TemplateImportPackage | null>(null);
-  const [strictImport, setStrictImport] = useState(true);
   function setInput(next: ResumeInput) { storeInput(next); if (next.kind === "text") setTextDraft(next.text); }
   const [error, setError] = useState("");
   const dismissError = useCallback(() => setError(""), []);
   const [status, setStatus] = useState("Сохранено");
   const [busy, setBusy] = useState(false);
-  const [operation, setOperation] = useState<{ label: string; startedAt: number } | null>(null);
-  function stage(label: string) { setOperation(current => current ? { ...current, label } : { label, startedAt: Date.now() }); }
+  const [importTask, setImportTask] = useState<ProjectTask | null>(null);
+  const [operation, setOperation] = useState<{ label: string; startedAt: number; cancel?: () => Promise<void> } | null>(null);
+  function stage(label: string, cancel?: () => Promise<void>) {
+    setOperation(current => {
+      const next = cancel ?? current?.cancel;
+      const startedAt = current?.startedAt ?? Date.now();
+      return next ? { label, startedAt, cancel: next } : { label, startedAt };
+    });
+  }
   const [loading, setLoading] = useState(() => new URLSearchParams(location.search).has("project"));
   const [settings, setSettings] = useState(false);
-  const editor = useRef<RichEditorHandle>(null);
   const templateEditor = useRef<TemplateEditorHandle>(null);
-  const mountedEditor = () => editor.current ?? templateEditor.current;
   const assistant = useRef<AssistantHandle>(null);
   const reads = useRef(new WorkspaceReads());
-  // Template projects with a document open through their writer alone; the first full read only named the family.
-  const templateProjects = useRef(new Set<string>());
   const [opening, setOpening] = useState<ReadCapture | null>(null);
   const lifetime = useRef<object | null>(null), acting = useRef<object | null>(null);
   const activeProject = useRef<string | null>(null);
-  const prepared = useRef<{ input: ResumeInput; projectId: string } | null>(null);
-  const adopt = useCallback((next: RichProjectResponse, capture: ReadCapture | null) => {
+  const adoptTemplate = useCallback((next: TemplateProjectResponseV1, capture: ReadCapture | null, connection?: ProjectEditorConnection) => {
     if (!reads.current.matchesOpening(capture) || next.workspace.projectId !== capture?.projectId
       || next.workspace.projectId !== activeProject.current) return;
-    setResponse(next);
-    if (next.identity) setProjects(current => current ? { ...current, entries: current.entries.map(entry => entry.projectId === next.workspace.projectId
-      ? { ...entry, title: next.identity?.title ?? entry.title, subtitle: next.identity?.subtitle ?? "" } : entry) } : current);
-    const url = new URL(location.href); url.searchParams.set("project", next.workspace.projectId);
-    history.replaceState(null, "", url.pathname + url.search);
-  }, []);
-  const acknowledge = useCallback((next: RichProjectResponse) => adopt(next, opening), [adopt, opening]);
-  const adoptTemplate = useCallback((next: TemplateProjectResponseV1, capture: ReadCapture | null, connection?: AttachedTemplateWriter | null) => {
-    if (!reads.current.matchesOpening(capture) || next.workspace.projectId !== capture?.projectId
-      || next.workspace.projectId !== activeProject.current) return;
-    setTemplate(current => ({ response: next, connection: connection === undefined ? current?.connection ?? null : connection }));
+    setTemplate(current => {
+      const kept = connection ?? current?.connection;
+      return kept ? { response: next, connection: kept } : current;
+    });
     if (next.identity) setProjects(current => current ? { ...current, entries: current.entries.map(entry => entry.projectId === next.workspace.projectId
       ? { ...entry, title: next.identity?.title ?? entry.title, subtitle: next.identity?.subtitle ?? "" } : entry) } : current);
     const url = new URL(location.href); url.searchParams.set("project", next.workspace.projectId);
     history.replaceState(null, "", url.pathname + url.search);
   }, []);
   const acknowledgeTemplate = useCallback((next: TemplateProjectResponseV1) => adoptTemplate(next, opening), [adoptTemplate, opening]);
-  function selectTemplate(next: TemplateProjectResponseV1, connection: AttachedTemplateWriter | null, loaded: ReadCapture) {
-    if (loaded.projectId !== next.workspace.projectId) throw new RichApiFailure("INVALID_RESULT");
+  function selectTemplate(connection: ProjectEditorConnection, loaded: ReadCapture) {
+    const next = connection.response;
+    if (loaded.projectId !== next.workspace.projectId) throw new ProjectApiFailure("INVALID_RESULT");
     if (!reads.current.adoptSelection(loaded)) return;
-    setOpening(loaded); setResponse(null); setWriter(null); setBackground(connection !== null);
-    activeProject.current = next.workspace.projectId; adoptTemplate(next, loaded, connection);
-  }
-  function select(next: RichProjectResponse, available = false, loaded?: ReadCapture) {
-    if (loaded && loaded.projectId !== next.workspace.projectId) throw new RichApiFailure("INVALID_RESULT");
-    let capture = loaded ?? reads.current.opening;
-    if (loaded || capture?.projectId !== next.workspace.projectId) {
-      capture = loaded ?? reads.current.beginSelection(next.workspace.projectId);
-      if (!reads.current.adoptSelection(capture)) return;
-      setOpening(capture);
-    }
-    if (activeProject.current !== next.workspace.projectId) {
-      const draft = next.workspace.preDraft?.importDraft;
-      setAllowTextRewrite(draft ? draft.allowTextRewrite ?? false : true);
-    }
-    setTemplate(null); setBackground(available); activeProject.current = next.workspace.projectId; adopt(next, capture);
+    setOpening(loaded); activeProject.current = next.workspace.projectId; adoptTemplate(next, loaded, connection);
   }
   async function load(id: string, capture: ReadCapture) {
-    if (templateProjects.current.has(id)) {
-      const connection = await attachExclusiveTemplateWriter(id);
-      if (!reads.current.selectionCurrent(capture)) return null;
-      if (connection) {
-        await request(`/${id}/activate`, "POST", {});
-        if (!reads.current.selectionCurrent(capture)) return null;
-        return { kind: "template" as const, next: connection.view.response, connection, catalog: await listProjects() };
-      }
-    }
-    const opened = await openedProject(`/${id}`);
+    const connection = await openEditor(id);
     if (!reads.current.selectionCurrent(capture)) return null;
-    if (opened.response.workspace.projectId !== id) throw new RichApiFailure("INVALID_RESULT");
-    if (opened.kind === "template") {
-      if (opened.response.workspace.project) templateProjects.current.add(id);
-      const connection = opened.response.workspace.project ? await attachExclusiveTemplateWriter(id) : null;
-      if (!reads.current.selectionCurrent(capture)) return null;
-      await request(`/${id}/activate`, "POST", {});
-      if (!reads.current.selectionCurrent(capture)) return null;
-      const catalog = await listProjects();
-      return { kind: "template" as const, next: connection?.view.response ?? opened.response, connection, catalog };
-    }
-    const next = opened.response;
-    const connection = next.workspace.project ? await attachExclusiveWriter(id) : null;
-    if (!reads.current.selectionCurrent(capture)) return null;
-    let available = connection !== null;
-    if (!next.workspace.project) {
-      try { await new JobsApi(id).projectJobs(); available = true; }
-      catch (error) { if (!(error instanceof RichApiFailure) || error.code !== "JOB_DISABLED") throw error; }
-    }
-    if (!reads.current.selectionCurrent(capture)) return null;
-    await request(`/${id}/activate`, "POST", {});
-    if (!reads.current.selectionCurrent(capture)) return null;
+    if (connection.response.workspace.projectId !== id) throw new ProjectApiFailure("INVALID_RESULT");
     const catalog = await listProjects();
-    return { kind: "rich" as const, next: connection?.view.response ?? next, connection, available, catalog };
+    return { connection, catalog };
   }
   function show(result: NonNullable<Awaited<ReturnType<typeof load>>>, capture: ReadCapture) {
-    if (result.kind === "template") selectTemplate(result.next, result.connection, capture);
-    else { setWriter(result.connection); select(result.next, result.available, capture); }
+    selectTemplate(result.connection, capture);
     setProjects(result.catalog);
   }
   async function leave(current: () => boolean) {
-    const previousEditor = mountedEditor(), previousAssistant = assistant.current;
+    const previousEditor = templateEditor.current, previousAssistant = assistant.current;
     if (!previousEditor?.background) await previousAssistant?.stop();
     if (current()) await previousEditor?.navigate();
   }
@@ -144,12 +80,12 @@ export function useResumeWorkspace() {
     const owner = lifetime.current;
     if (!owner || acting.current) return false;
     const current = () => lifetime.current === owner, operation = {};
-    const previousEditor = mountedEditor(), previousProject = activeProject.current;
+    const previousEditor = templateEditor.current, previousProject = activeProject.current;
     acting.current = operation; setBusy(true); setOperation({ label: labelText, startedAt: Date.now() }); setError("");
     try { await work(current); return current(); } catch (error) {
       if (!current()) return false;
       let message = label(error);
-      if (!settings && previousEditor?.background && mountedEditor() === previousEditor && activeProject.current === previousProject) {
+      if (!settings && previousEditor?.background && templateEditor.current === previousEditor && activeProject.current === previousProject) {
         try { await previousEditor.resume(); } catch (resumeError) { message += ` ${label(resumeError)}`; }
       }
       if (current()) setError(message); return false;
@@ -160,7 +96,7 @@ export function useResumeWorkspace() {
     }
   }
   function clear() {
-    reads.current.clear(); setOpening(null); activeProject.current = null; setResponse(null); setTemplate(null); setWriter(null); setBackground(false); setStatus("Сохранено"); prepared.current = null;
+    reads.current.clear(); setOpening(null); activeProject.current = null; setTemplate(null); setStatus("Сохранено");
     setAllowTextRewrite(true);
     setInput({ kind: "text", text: "" }); history.replaceState(null, "", location.pathname);
   }
@@ -173,7 +109,7 @@ export function useResumeWorkspace() {
   }
   async function open(id: string) {
     return action(async current => {
-      if (activeProject.current === id && (response ?? template)) { await mountedEditor()?.resume(); if (current()) setSettings(false); return; }
+      if (activeProject.current === id && template) { await templateEditor.current?.resume(); if (current()) setSettings(false); return; }
       await leave(current);
       if (!current()) return;
       const capture = reads.current.beginSelection(id);
@@ -181,7 +117,7 @@ export function useResumeWorkspace() {
         const result = await load(id, capture);
         if (result && reads.current.selectionCurrent(capture)) {
           show(result, capture);
-          setStatus("Сохранено"); prepared.current = null;
+          setStatus("Сохранено");
           setInput({ kind: "text", text: "" }); setSettings(false);
         }
       } finally { reads.current.cancelSelection(capture); }
@@ -191,21 +127,20 @@ export function useResumeWorkspace() {
     return action(async current => {
       if (activeProject.current === id) await leave(current);
       if (!current()) return;
-      const result = await deleteProject(id);
-      templateProjects.current.delete(id);
+      const incomplete = (await deleteProject(id)).cleanupStatus === "cleanup_incomplete";
       if (!current()) return;
-      if ((response ?? template?.response)?.workspace.projectId === id) clear();
+      if (template?.response.workspace.projectId === id) clear();
       const catalog = await listProjects();
       if (!current()) return;
       setProjects(catalog);
-      if (result.status === "cleanup_incomplete") throw new RichApiFailure(result.errorCode ?? "PROJECT_CLEANUP_INCOMPLETE");
+      if (incomplete) throw new ProjectApiFailure("PROJECT_CLEANUP_INCOMPLETE");
     }, "Удаляем резюме");
   }
   async function archive(id: string, archived: boolean) {
     return action(async current => {
       if (archived && activeProject.current === id) await leave(current);
       if (!current()) return;
-      await request(`/${id}/catalog/${archived ? "archive" : "restore"}`, "POST", {});
+      await catalogFlag(id, archived);
       if (!current()) return;
       if (archived && activeProject.current === id) clear();
       const catalog = await listProjects();
@@ -239,145 +174,97 @@ export function useResumeWorkspace() {
       alive = false;
       if (lifetime.current === owner) { lifetime.current = null; acting.current = null; reads.current.clear(); }
     };
-  }, [adopt]);
-  // Read again after Settings close: a saved template changes the package that new imports name and use.
-  useEffect(() => {
-    if (settings) return;
-    let alive = true;
-    void templateImportStatus().then(value => { if (alive) setTemplateImport(value); }).catch(() => { if (alive) setTemplateImport(null); });
-    return () => { alive = false; };
-  }, [settings]);
-  const generation = response?.generation;
-  const creating = generation !== null && generation !== undefined && ["queued", "running"].includes(generation.status);
-  useEffect(() => {
-    if (!response || !generation || !["queued", "running"].includes(generation.status)) return;
-    let alive = true, polling = false;
-    const timer = setInterval(() => {
-      if (polling) return;
-      const capture = reads.current.begin("poll");
-      if (!capture || capture.projectId !== response.workspace.projectId) return;
-      polling = true;
-      void projectRequest(`/${response.workspace.projectId}`).then(async next => {
-        if (!alive || !reads.current.current("poll", capture)) return;
-        if (next.generation?.status === "completed" && next.workspace.project) {
-          const connection = await attachExclusiveWriter(next.workspace.projectId);
-          if (!alive || !reads.current.current("poll", capture)) return;
-          setWriter(connection); adopt(connection?.view.response ?? next, capture);
-        } else adopt(next, capture);
-        if (next.generation?.status === "completed") {
-          const catalog = await listProjects();
-          if (alive && reads.current.current("poll", capture)) setProjects(catalog);
-        }
-      }).catch(error => { if (alive && reads.current.current("poll", capture)) setError(label(error)); }).finally(() => { polling = false; });
-    }, 700);
-    return () => { alive = false; clearInterval(timer); };
-  }, [response?.workspace.projectId, generation?.status, opening, adopt]);
-  /** Upload into a V7 pre-draft, run one strict template import job and open its published result. */
-  async function importStrict(current: () => boolean) {
-    const version = reads.current.beginReplacement();
-    let id: string;
-    try {
-      const created = await openedProject("/template-input", "POST", importBody(input));
-      if (!reads.current.replacementCurrent(version) || created.kind !== "template") return;
-      id = created.response.workspace.projectId;
-    } finally { reads.current.cancelReplacement(version); }
-    const catalog = await listProjects();
-    if (current()) setProjects(catalog);
-    stage("Импортируем по шаблону");
-    const jobs = new JobsApi(id);
-    let job = await startTemplateImport(id, { clientRequestId: crypto.randomUUID(), allowTextRewrite });
-    while (!job.templateOutcome) {
-      if (!current()) return;
-      // The server owns the limits from Settings: wait past its deadline for the captured cleanup and
-      // publication windows, plus a minute for the outcome.
-      const attempt = job.attempts.at(-1), command = job.submission.templateCommand;
-      const policy = command && "capture" in command ? command.capture.policy : null;
-      const grace = ((policy?.cleanupSeconds ?? 0) + (policy?.finalizationSeconds ?? 0) + 60) * 1000;
-      if (attempt && Date.now() > Date.parse(attempt.activeDeadline) + grace) throw new RichApiFailure("PROCESS_TIMEOUT");
-      // An execution that ended in failure without a typed outcome stays unresolved on the server; report it.
-      if (["failed", "cancelled", "interrupted"].includes(job.execution))
-        throw new RichApiFailure(job.error?.code ?? (job.execution === "cancelled" ? "CANCELLED" : "PROCESS_FAILED"));
+  }, [adoptTemplate]);
+  async function finishTemplateImport(id: string, first: ProjectTask, current: () => boolean, startedAt = Date.now()) {
+    let task = first;
+    let operationId: string | null = null, stopped = false;
+    const stop = async () => {
+      try { await cancelImport(id, task.id); stopped = true; }
+      catch (error) { if (current()) setError(label(error)); }
+    };
+    stage("Запускаем импорт", stop);
+    setImportTask(task);
+    while (task.state === "running") {
+      if (!current() || stopped) return;
+      const policySeconds = task.detail["processingSeconds"];
+      const wait = typeof policySeconds === "number" ? policySeconds * 1000 + 223000 : IMPORT_WAIT_MS;
+      if (Date.now() - startedAt > wait) throw new ProjectApiFailure("PROCESS_TIMEOUT");
+      const named = task.detail["operationId"];
+      if (typeof named === "string" && named) operationId = named;
+      stage(task.stage === "processing" ? "Импортируем по шаблону" : "Запускаем импорт", stop);
       await new Promise(resolve => setTimeout(resolve, 1000));
-      job = await jobs.read(job.id);
+      if (!current() || stopped) return;
+      const tasks = await projectTasks(id);
+      const next = tasks.find(item => item.id === task.id);
+      if (!next) {
+        if (!operationId) throw new ProjectApiFailure("PROCESS_FAILED");
+        task = await resumeImport(id, operationId);
+        continue;
+      }
+      task = next;
+      setImportTask(task);
     }
-    if (job.templateOutcome.state !== "saved") throw new RichApiFailure(job.templateOutcome.errorCode ?? job.error?.code ?? "PROCESS_FAILED");
+    if (!current() || stopped) return;
+    if (task.state === "cancelled") throw new ProjectApiFailure("CANCELLED");
+    if (task.state !== "succeeded") throw new ProjectApiFailure(task.error ?? "PROCESS_FAILED");
     if (!current()) return;
     const capture = reads.current.beginSelection(id);
     try {
       const result = await load(id, capture);
       if (result && reads.current.selectionCurrent(capture)) {
-        show(result, capture); prepared.current = null; setInput({ kind: "text", text: "" });
+        show(result, capture); setInput({ kind: "text", text: "" });
       }
     } finally { reads.current.cancelSelection(capture); }
   }
+  async function resumeTemplate() {
+    const workspace = template?.response.workspace;
+    const operation = workspace?.preDraft?.templateOperations.at(-1);
+    if (!workspace) return false;
+    return action(async current => {
+      const tasks = await projectTasks(workspace.projectId);
+      const running = tasks.find(task => task.kind === "import" && task.state === "running");
+      const task = running ?? (operation ? await resumeImport(workspace.projectId, operation.id)
+        : await startImport(workspace.projectId, { clientRequestId: crypto.randomUUID(), allowTextRewrite }));
+      await finishTemplateImport(workspace.projectId, task, current);
+    }, "Продолжаем импорт");
+  }
+  /** The pasted text or file becomes a V7 pre-draft; one import task fills it and the result opens in the editor. */
   async function process() {
     await action(async current => {
-      if (strictImport && templateImport && hasInput(input)) { await importStrict(current); return; }
-      let id = response?.workspace.preDraft?.selectedSourceId ? response.workspace.projectId : null;
-      if (hasInput(input)) {
-        if (prepared.current?.input === input && !response?.workspace.project) id = prepared.current.projectId;
-        else {
-          const version = reads.current.beginReplacement();
-          try {
-            const selected = await projectRequest("/input", "POST", importBody(input));
-            if (!reads.current.replacementCurrent(version)) return;
-            select(selected, false, reads.current.beginSelection(selected.workspace.projectId));
-            setAllowTextRewrite(allowTextRewrite); id = selected.workspace.projectId;
-            prepared.current = { input, projectId: id };
-            const capture = reads.current.opening, catalog = await listProjects();
-            if (reads.current.matchesOpening(capture)) setProjects(catalog);
-          } finally { reads.current.cancelReplacement(version); }
-        }
-      }
-      if (id) {
-        const capture = reads.current.begin("process");
-        if (!capture || capture.projectId !== id) return;
-        stage("Запускаем обработку резюме");
-        try {
-          await new FixedOperations(id).submit({ kind: "processing", allowTextRewrite });
-          if (!reads.current.current("process", capture)) return;
-          const next = await projectRequest(`/${id}`);
-          if (reads.current.current("process", capture)) select(next, true);
-        }
-        catch (error) {
-          if (!reads.current.current("process", capture)) return;
-          if (error instanceof RichApiFailure && error.code === "JOB_DISABLED") {
-            const next = await projectRequest(`/${id}/generation`, "POST", { allowTextRewrite });
-            if (reads.current.current("process", capture)) select(next);
-          }
-          else throw error;
-        }
-      }
+      if (!hasInput(input)) return;
+      const version = reads.current.beginReplacement();
+      let id: string;
+      try {
+        const created = await createProject(importBody(input));
+        if (!reads.current.replacementCurrent(version)) return;
+        id = created.workspace.projectId;
+      } finally { reads.current.cancelReplacement(version); }
+      const catalog = await listProjects();
+      if (current()) setProjects(catalog);
+      const startedAt = Date.now();
+      const task = await startImport(id, { clientRequestId: crypto.randomUUID(), allowTextRewrite });
+      const url = new URL(location.href); url.searchParams.set("project", id); history.replaceState(null, "", url.pathname + url.search);
+      await finishTemplateImport(id, task, current, startedAt);
     }, input.kind === "file" ? "Загружаем и читаем файл" : "Читаем исходный текст");
   }
   async function upload(file: File) {
     return action(async current => {
       await leave(current);
       if (!current()) return;
-      const body = new FormData(); body.append("file", file);
       const version = reads.current.beginReplacement();
       try {
-        // The archive decides the family: a V7 project opens in the template editor with its captured package.
-        const opened = await openedProject("/archive", "POST", body);
+        const opened = await openFoldcv(file);
         if (!reads.current.replacementCurrent(version)) return;
-        const id = opened.response.workspace.projectId;
-        if (opened.kind === "template") {
-          const connection = opened.response.workspace.project ? await attachExclusiveTemplateWriter(id) : null;
-          if (!reads.current.replacementCurrent(version)) return;
-          selectTemplate(connection?.view.response ?? opened.response, connection, reads.current.beginSelection(id));
-        } else {
-          const imported = opened.response;
-          const connection = imported.workspace.project ? await attachExclusiveWriter(id) : null;
-          if (!reads.current.replacementCurrent(version)) return;
-          setWriter(connection); select(connection?.view.response ?? imported, connection !== null, reads.current.beginSelection(id));
-        }
-        prepared.current = null; setInput({ kind: "text", text: "" }); setSettings(false);
+        const connection = await openEditor(opened.workspace.projectId);
+        if (!reads.current.replacementCurrent(version)) return;
+        selectTemplate(connection, reads.current.beginSelection(opened.workspace.projectId));
+        setInput({ kind: "text", text: "" }); setSettings(false);
         const capture = reads.current.opening, catalog = await listProjects();
         if (reads.current.matchesOpening(capture)) setProjects(catalog);
       } finally { reads.current.cancelReplacement(version); }
     }, "Открываем файл проекта");
   }
-  async function exportFile(kind: "export" | "archive", filename?: string | ((current: RichProjectResponse | TemplateProjectResponseV1) => string)) {
+  async function exportFile(kind: "export" | "archive", filename?: string | ((current: TemplateProjectResponseV1) => string)) {
     const deliver = (blob: Blob, name: string) => {
       const url = URL.createObjectURL(blob), anchor = document.createElement("a");
       anchor.href = url; anchor.download = name;
@@ -387,30 +274,33 @@ export function useResumeWorkspace() {
     return action(async () => {
       const capture = reads.current.begin(kind);
       if (!capture) throw new Error("Откройте резюме перед сохранением файла.");
-      if (!editor.current && (templateEditor.current || template)) {
-        const current = templateEditor.current ? await templateEditor.current.flush() : template?.response;
-        if (!current) throw new Error("Откройте резюме перед сохранением файла.");
-        if (!reads.current.current(kind, capture) || current.workspace.projectId !== capture.projectId) return;
-        stage(kind === "export" ? "Создаём документ DOCX" : "Собираем файл проекта");
-        // V7 DOCX is rendered from the captured template package of exactly this flushed snapshot.
-        if (kind === "export" && !current.snapshot) throw new RichApiFailure("INVALID_RESULT");
-        let blob: Blob;
-        // A V7 export records its attempt in the canonical workspace; the open editor adopts that advance afterwards.
-        try { blob = kind === "export" && current.snapshot ? (await downloadTemplate(current.workspace.projectId, current.snapshot)).blob
-          : await download(current.workspace.projectId, kind, current.workspace); }
-        finally { if (reads.current.current(kind, capture)) await templateEditor.current?.refresh(); }
-        if (reads.current.current(kind, capture)) deliver(blob, typeof filename === "function" ? filename(current) : filename ?? fallback);
-        return;
-      }
-      const current = editor.current ? await editor.current.flush() : response;
-      if (!current) throw new Error("Откройте резюме перед сохранением файла.");
+      await templateEditor.current?.flush();
+      const connection = template?.connection;
+      const current = connection?.response ?? template?.response;
+      if (!current || !connection) throw new Error("Откройте резюме перед сохранением файла.");
       if (!reads.current.current(kind, capture) || current.workspace.projectId !== capture.projectId) return;
       stage(kind === "export" ? "Создаём документ DOCX" : "Собираем файл проекта");
-      const blob = await download(current.workspace.projectId, kind, current.workspace);
-      if (!reads.current.current(kind, capture)) return;
-      deliver(blob, typeof filename === "function" ? filename(current) : filename ?? fallback);
+      let blob: Blob;
+      // The editor token and the flushed revision go with the file. Refresh adopts the commit.
+      try { blob = kind === "export" ? (await connection.exportDocx()).blob : await connection.saveFoldcv(); }
+      finally { if (reads.current.current(kind, capture)) await templateEditor.current?.refresh(); }
+      if (reads.current.current(kind, capture)) deliver(blob, typeof filename === "function" ? filename(current) : filename ?? fallback);
     }, "Сохраняем изменения перед скачиванием");
   }
-  return { templateImport, strictImport, setStrictImport, response, template, templateEditor, acknowledgeTemplate, writer, background, openingEpoch: opening?.selectionEpoch ?? 0, projects, input, setInput, textDraft, allowTextRewrite, setAllowTextRewrite, error, status, setStatus, busy, operation, loading, settings, setSettings,
-    editor, assistant, acknowledge, action, fresh, open, remove, archive, projectLifecycle, process, upload, exportFile, dismissError };
+  async function renameTemplate(title: string) {
+    const next = title.trim();
+    if (!next) return false;
+    return action(async current => {
+      const connection = template?.connection;
+      if (!connection) return;
+      await templateEditor.current?.flush();
+      if (!current()) return;
+      await connection.rename(next);
+      if (!current()) return;
+      await templateEditor.current?.refresh();
+    }, "Переименовываем резюме");
+  }
+  return { template, templateEditor, acknowledgeTemplate, openingEpoch: opening?.selectionEpoch ?? 0, projects, input, setInput, textDraft,
+    allowTextRewrite, setAllowTextRewrite, error, status, setStatus, busy, operation, importTask, resumeTemplate, loading, settings, setSettings,
+    assistant, action, fresh, open, remove, archive, projectLifecycle, process, upload, exportFile, renameTemplate, dismissError };
 }

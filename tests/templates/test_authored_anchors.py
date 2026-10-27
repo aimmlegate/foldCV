@@ -5,13 +5,11 @@ from copy import deepcopy
 import pytest
 
 from packages.resume_core.models.template_workspace import SpanCoverage
-from packages.resume_core.rich_dependencies import dependency
 from packages.resume_core.rich_mutations import RichMutationFailure, apply_rich_mutation
 from packages.resume_core.template_anchors import anchor_steps, coverage_address, coverage_target, issue_target
 from packages.resume_core.template_authoring import copy_blocks, merge_blocks, split_block
-from packages.resume_core.template_dependencies import selector
 from packages.resume_core.template_inverse import inverse_template_mutation
-from packages.resume_core.template_local_history import changes, restore
+from packages.resume_core.template_local_history import values
 from packages.resume_core.templates.compiler import canonical
 from tests.templates.storage_fixtures import workspace
 from tests.templates.test_transactions import authorization, issue, request
@@ -137,102 +135,21 @@ def test_issue_anchor_and_retirement_guards_use_original_lifecycle_in_either_ste
     assert restored.project.import_issues == before.project.import_issues
 
 
-def test_coverage_dependency_and_local_restore_guard_exact_anchor_and_sequence():
-    before, _ = anchored()
-    mutation, _ = split_request(before)
-    after, _ = apply_rich_mutation(before, mutation)
-    address = coverage_address(before.project, 0)
-    target = selector('coverage_anchor', address)
-    old = dependency(before, 'field', target)
-    assert dependency(after, 'field', target).fingerprint != old.fingerprint
-    delta = changes(before, after)
-    assert any(kind == 'coverage_anchor' for kind, _ in delta)
-    restored = restore(after, delta)
-    assert restored.project.import_coverage == before.project.import_coverage
-    assert restored.project.import_issues == before.project.import_issues
-    stale = after.model_copy(deep=True)
-    stale.project.import_coverage[0].block_ids = []
-    from packages.resume_core.background_store import BackgroundFailure
-    with pytest.raises(BackgroundFailure, match='DEPENDENCY_CHANGED'):
-        restore(stale, delta)
-    stale.project.import_coverage.reverse()
-    stale.project.import_coverage[0].reason = 'changed-sequence'
-    with pytest.raises(ValueError, match='DEPENDENCY_MISSING'):
-        dependency(stale, 'field', target)
-
-
-def writer_split(fixture):
-    from packages.resume_core.models.template_writer import WriterMutationV2
-    command, _ = split_request(fixture.current())
-    command.capture.session_id = fixture.proof.session_id
-    return WriterMutationV2(**fixture.advance_request(1, [{'cursor': 1, 'mutation': command}]).model_dump(by_alias=True),
-        mutation=command)
-
-
-def test_existing_writer_undo_redo_retains_coverage_and_issue_anchors(tmp_path):
-    from tests.templates.test_template_local_history import history_request
-    from tests.templates.test_template_writers import TemplateWriterFixture
+def test_split_undo_redo_through_the_journal_retains_coverage_and_issue_anchors(tmp_path):
+    from tests.templates.editor_fixtures import TemplateEditor
     before, originals = anchored()
-    fixture = TemplateWriterFixture(tmp_path, before, originals)
-    saved = fixture.writers.save(fixture.project, writer_split(fixture), originals=fixture.originals)
-    assert saved.local_history_ack is not None
-    assert len(saved.workspace.project.import_coverage[0].block_ids) == 2
-    undone = fixture.writers.local_history_command(fixture.project,
-        history_request(fixture, saved.local_history_ack), originals=fixture.originals)
-    assert undone.workspace.project.import_coverage == before.project.import_coverage
-    assert undone.workspace.project.import_issues == before.project.import_issues
-    redone = fixture.writers.local_history_command(fixture.project,
-        history_request(fixture, undone.local_history_ack, 'redo', 'redo'), originals=fixture.originals)
-    assert redone.workspace.project.import_coverage == saved.workspace.project.import_coverage
-    assert redone.workspace.project.import_issues == saved.workspace.project.import_issues
-
-
-def test_interrupted_writer_commit_keeps_prior_document_coverage_and_issue_transaction(tmp_path):
-    from tests.templates.test_template_writers import TemplateWriterFixture
-    before, originals = anchored()
-    fixture = TemplateWriterFixture(tmp_path, before, originals)
-    command = writer_split(fixture)
-    def interrupt(phase, _project):
-        if phase == 'before_workspace_replaced':
-            raise SystemExit('synthetic cut')
-    fixture.publisher.observer = interrupt
-    with pytest.raises(SystemExit, match='synthetic cut'):
-        fixture.writers.save(fixture.project, command, originals=fixture.originals)
-    fixture.publisher.observer = lambda *_args: None
-    fixture.publisher.recover(fixture.project)
-    assert canonical(fixture.current()) == canonical(before)
-    assert fixture.writers.local_history.openings[fixture.project].cursor == 0
-
-
-@pytest.mark.parametrize('coherent', [False, True])
-def test_private_draft_recovery_requires_anchors_with_document_and_issue_state(tmp_path, coherent):
-    from packages.resume_core.background_store import BackgroundFailure
-    from packages.resume_core.models.template_writer import WriterCheckpointV2, WriterDraftResolveV2
-    from tests.templates.test_template_writers import TemplateWriterFixture
-    before, originals = anchored()
-    fixture = TemplateWriterFixture(tmp_path, before, originals)
-    mutation = writer_split(fixture).mutation
-    pending, _ = apply_rich_mutation(before, mutation)
-    coverage = pending.project.import_coverage if coherent else before.project.import_coverage
-    record = fixture.writers.checkpoint(fixture.project, WriterCheckpointV2(schemaVersion=2, proof=fixture.proof,
-        id='anchor-checkpoint', sequence=1, actionCursor=1, baseRevision=before.project_revision,
-        baseSha256=fixture.view.workspace_sha256, payload={'schemaVersion': 2,
-            'document': pending.project.document.model_dump(by_alias=True), 'facts': pending.project.facts.model_dump(by_alias=True),
-            'importIssues': [value.model_dump(by_alias=True) for value in pending.project.import_issues],
-            'importCoverage': [value.model_dump(by_alias=True) for value in coverage],
-            'outbox': [mutation.model_dump(by_alias=True)], 'assetPins': [],
-            'touches': [{'cursor': 1, 'mutation': mutation.model_dump(by_alias=True)}]}))
-    command = WriterDraftResolveV2(schemaVersion=2, proof=fixture.proof, id=record.id, sequence=record.sequence,
-        payloadSha256=record.payload_sha256, canonicalRevision=before.project_revision,
-        canonicalSha256=fixture.view.workspace_sha256, mutation=mutation)
-    if not coherent:
-        with pytest.raises(BackgroundFailure, match='JOB_SCOPE_INVALID'):
-            fixture.writers.use_draft(fixture.project, command, originals=fixture.originals)
-        assert fixture.current() == before
-    else:
-        restored = fixture.writers.use_draft(fixture.project, command, originals=fixture.originals)
-        assert restored.workspace.project.import_coverage == pending.project.import_coverage
-        assert restored.workspace.project.import_issues == pending.project.import_issues
+    editor = TemplateEditor(tmp_path, before, originals)
+    mutation, _ = split_request(editor.current())
+    editor.commit(mutation)
+    saved = editor.current()
+    assert editor.history_state()['undo']['actionId'] == mutation.action_id
+    assert len(saved.project.import_coverage[0].block_ids) == 2
+    editor.undo('undo', expected=mutation.action_id)
+    assert editor.current().project.import_coverage == before.project.import_coverage
+    assert editor.current().project.import_issues == before.project.import_issues
+    editor.redo('redo', expected=mutation.action_id)
+    assert editor.current().project.import_coverage == saved.project.import_coverage
+    assert editor.current().project.import_issues == saved.project.import_issues
 
 
 def test_block_target_retirement_uses_original_anchors_when_the_content_is_removed():
@@ -341,3 +258,20 @@ def test_unrelated_real_edit_cannot_authorize_retirement_of_preserved_block_scop
         'afterState': 'retired', 'actionId': 'human-edit', 'importedFingerprint': imported.imported_fingerprint}]
     with pytest.raises(RichMutationFailure, match='STALE_MUTATION'):
         apply_rich_mutation(before, request(before, steps))
+
+
+def test_history_values_hash_the_coverage_ledger_once(monkeypatch):
+    import packages.resume_core.template_anchors as anchors
+    before, _originals = anchored()
+    row = before.project.import_coverage[0]
+    before.project.import_coverage = [row.model_copy(deep=True) for _index in range(300)]
+    expected = [coverage_address(before.project, index) for index in range(300)]
+    calls, original = [], anchors.coverage_sequence
+    monkeypatch.setattr(anchors, 'coverage_sequence', lambda project: calls.append(1) or original(project))
+    # Hashing the whole ledger per row made every save quadratic in import coverage size.
+    keys = [key for kind, key in values(before) if kind == 'coverage_anchor']
+    assert keys == expected and len(calls) == 1
+    calls.clear()
+    steps = anchor_steps(before.project, {row.block_ids[0]: ['block-new']})
+    assert sum(step.target.kind == 'coverage' for step in steps) == 300 and len(calls) == 1
+

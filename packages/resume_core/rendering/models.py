@@ -4,10 +4,12 @@ from __future__ import annotations
 
 import hashlib
 import json
-from typing import Literal
+from typing import Annotated, Literal, Union
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 from pydantic.alias_generators import to_camel
+
+from ..models.contracts import Id, Wire
 
 
 class RenderWire(BaseModel):
@@ -118,3 +120,53 @@ def snapshot_digest(request: RenderRequest) -> str:
     }
     raw = json.dumps(data, ensure_ascii=False, sort_keys=True, separators=(",", ":")).encode("utf-8")
     return hashlib.sha256(raw).hexdigest()
+
+
+class Range(Wire):
+    start: int = Field(ge=0)
+    end: int = Field(ge=0)
+
+    @model_validator(mode="after")
+    def ordered(self) -> Range:
+        if self.end < self.start:
+            raise ValueError("range is reversed")
+        return self
+
+
+class FieldAnchor(Wire):
+    kind: Literal["field"]
+    field_id: Id
+    range: Range | None
+
+
+class SectionAnchor(Wire):
+    kind: Literal["section"]
+    section_id: Id
+
+
+class DocumentAnchor(Wire):
+    kind: Literal["document"]
+
+
+Anchor = Annotated[Union[FieldAnchor, SectionAnchor, DocumentAnchor], Field(discriminator="kind")]
+
+
+DocxErrorCode = Literal[
+    "DOCX_NAME_LINE_LIMIT", "DOCX_TITLE_LINE_LIMIT", "DOCX_UNBREAKABLE_TEXT",
+    "DOCX_BLOCK_PAGE_BUDGET", "DOCX_BLOCK_PLANNED_PAGE", "DOCX_UNKNOWN_FOCUS_ICON",
+    "DOCX_TEXT_LIMIT", "DOCX_LIST_LIMIT", "DOCX_TOTAL_TEXT_LIMIT",
+    "DOCX_INVALID_CHARACTER", "DOCX_INVALID_RENDER_INPUT", "DOCX_RENDER_FAILED",
+]
+SafeRenderPath = Annotated[str, Field(pattern=(
+    r"^(candidate\.(name|title|summary)|footer|focus(\[[0-9]+\]\.(label|duration|icon))?|"
+    r"sidebar(\[[0-9]+\]\.(title|items(\[[0-9]+\])?))?|"
+    r"projects(\[[0-9]+\]\.(company|role|period|stack|description|tasks(\[[0-9]+\])?|"
+    r"results(\[[0-9]+\])?))?|achievements(\[[0-9]+\])?|"
+    r"skillGroups(\[[0-9]+\]\.(title|items))?)$"
+))]
+
+
+class DocxError(Wire):
+    code: DocxErrorCode
+    path: SafeRenderPath | None
+    anchor: Anchor

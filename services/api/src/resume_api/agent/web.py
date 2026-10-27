@@ -18,7 +18,7 @@ from urllib.parse import urljoin, urlsplit, urlunsplit
 import zlib
 import certifi
 
-from packages.resume_core.agent_store import AgentFailure, identity, timestamp
+from packages.resume_core.assistant_store import AgentFailure, identity, timestamp
 from packages.resume_core.models.agent import AgentWebSource
 from resume_api.cli.process_runner import ProcessRunner
 from resume_api.lifecycle import OperationFiles, SpikeError, safe_environment
@@ -191,7 +191,10 @@ class PublicFetcher:
     def __init__(self, root):
         self.root = root
 
-    async def fetch(self, url, cancel):
+    async def fetch(self, request, cancel):
+        # The assistant passes its AgentFetchRequest; a plain URL string still works.
+        url = getattr(request, "url", request)
+
         def work():
             module = Path(__file__).resolve()
             def launch(executable, args, operation):

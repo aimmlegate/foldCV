@@ -1,9 +1,0 @@
-{
-  "schemaVersion": 2,
-  "disposition": "waiting_for_sync",
-  "jobId": "job-one",
-  "proposalId": "proposal-one",
-  "proposalStored": true,
-  "durable": false,
-  "reason": "WRITER_DIRTY"
-}

@@ -2,7 +2,7 @@
 
 import pytest
 
-from packages.resume_core.gui_archive_zip import write_zip
+from packages.resume_core.archive_zip import write_zip
 from packages.resume_core.models.template_workspace import WorkspaceV7
 from packages.resume_core.rich_mutations import cut_inline
 from packages.resume_core.template_archive import archive_payload_v7,open_archive_v7
@@ -12,7 +12,7 @@ from packages.resume_core.templates.compiler import canonical
 from tests.templates.storage_fixtures import workspace
 from tests.templates.test_bound_links import linked_workspace
 from tests.templates.test_clipboard_retention import captured
-from tests.templates.test_template_preparation import command,proof,response
+from tests.templates.test_template_preparation import command,response
 from packages.resume_core.template_preparation import prepare_text_edit
 
 
@@ -32,7 +32,7 @@ def test_exact_run_citations_survive_cut_allocation_marks_and_partial_literal_co
     assert fragment.citations==[extra]
     allocated=allocate_classified_inline([fragment])[0]
     assert allocated.citations==[extra] and allocated.binding_id!=fragment.binding_id
-    prepared=prepare_text_edit(response(before),command(before,kind='set_marks',styles={'bold':True}),proof())
+    prepared=prepare_text_edit(response(before),command(before,kind='set_marks',styles={'bold':True}))
     assert all(part.citations==[extra] for part in prepared.preview.workspace.project.document.regions[2].blocks[0].content)
     literal=classify_fragment(before.project,block,1,4).content[0]
     assert literal.type=='text' and literal.citations==[extra,*before.project.facts.extensions[0].cells[0].evidence]

@@ -1,10 +1,9 @@
-"""Same-origin local service. Text generation remains closed by policy."""
+"""Same-origin local service: the V7 workbench, its settings and the model connection."""
 
 from __future__ import annotations
 
 import asyncio
 from concurrent.futures import ThreadPoolExecutor
-from packages.resume_core.gui_reconciliation import SaveAnalysisPreference
 from io import BytesIO
 from contextlib import asynccontextmanager
 from http.cookies import SimpleCookie
@@ -13,91 +12,43 @@ from pathlib import Path
 import secrets
 import threading
 import time
-from typing import Protocol
-import uuid
 from zipfile import ZipFile, ZIP_STORED
 
 from fastapi import FastAPI, Request
 from fastapi.exceptions import RequestValidationError
-from fastapi.responses import FileResponse, JSONResponse, Response, StreamingResponse
+from fastapi.responses import FileResponse, JSONResponse, Response
 from starlette.exceptions import HTTPException as StarletteHTTPException
 from pydantic import ValidationError
 
-from .contracts import (CompletedEvent, CompletedPayload, ConnectionPayload, DraftRequest, EmptyRequest, ErrorEnvelope, ErrorPayload,
-                        FailedEvent, NormalizeRequest, OperationResult, RenderRequest, RewriteRequest, StartedEvent,
-                        SelectModelRequest, SelectReasoningRequest, QuotaPayload, ValidateRequest,
-                        StartedPayload, TextRequest, UsagePayload)
+from .host_models import (ConnectionPayload, EmptyRequest, ErrorEnvelope, ErrorPayload, QuotaPayload, SelectModelRequest,
+                          SelectReasoningRequest)
 from .lifecycle import OperationFiles, SpikeError, has_blocked_owned, reap_owned
 from .connection import ConnectionAdapter, ConnectionFailure, Metadata
 from .cli.experimental_profile import ExperimentalCliProfile, ExperimentalProfileError
 from .cli.installation import CliInstallation
 from .providers.codex_cli import CodexCliProvider
-from .providers.content import ContentFailure
-from .normalization_content import NormalizationContentService
-from .drafting_content import DraftingContentService
-from .rewriting_content import RewritingContentService
-from .rendering import DocumentRenderer
-from .extracting import MAX_BODY as MAX_EXTRACT_BODY, UploadFailure, parse_one_part, run_extract
-from packages.resume_core.rendering.template import PACKAGE_SHA256, ROOT as TEMPLATE_ROOT, MANIFEST as TEMPLATE_MANIFEST, RenderFailure, renderer_sha256, require_template
-from packages.resume_core.rendering.preparation import PreparationFailure, PrepareRequest, prepare_document
-from packages.resume_core.normalization import FactRequest, FactSheet, fingerprint, literal_sheet, semantic_input
-from packages.resume_core.drafting import DraftRequest as ProseDraftRequest, DraftResult as ProseDraftResult, draft_input
-from packages.resume_core.rewriting import (RewritePreflightError, RewritePreflightFailure,
-                                            RewriteRequest as ScopedRewriteRequest, RewriteResult as ScopedRewriteResult,
-                                            rewrite_input)
+from .extracting import MAX_BODY as MAX_EXTRACT_BODY
+from packages.resume_core.rendering.template import ROOT as TEMPLATE_ROOT, MANIFEST as TEMPLATE_MANIFEST, RenderFailure, require_template
 from packages.resume_core.rules import PRESET_HEADINGS, RulesFailure, RulesStore, presets
-from packages.resume_core.models.recovery import SaveRulesRequest, RulesSettingsError, RulesSettings
-from .gui_projects import GuiProjectService, ProjectFailure
+from packages.resume_core.models.settings import (RulesSettings, RulesSettingsError, SaveAnalysisPreference,
+    SaveImportModelPreference, SaveLimitsPreference, SaveRulesRequest)
+from .projects.errors import ProjectFailure
 from packages.resume_core.preferences import PreferencesStore, PreferencesFailure
 from packages.resume_core.project_limits import ARCHIVE_BYTES, apply_preferences as apply_limits
-from packages.resume_core.models.recovery import SaveImportModelPreference, SaveLimitsPreference
-from packages.resume_core.project_store import ProjectStore
-from .gui_routes import mount_projects
 from .inference_admission import INFERENCE, AdmissionBlocked, AdmissionTimeout, AdmissionCancelled
 from .profile_ownership import native_profile, recover_profile
-from packages.resume_core.agent_store import AgentFailure
-from .agent.service import AgentService, AgentConnection
+from packages.resume_core.assistant_store import AgentFailure
 from .agent.runtime import CodexAgentRuntime
 
 
 MAX_BODY = 1_048_576
-MAX_OPERATIONS = 20
 MAX_CONCURRENT = 2
-TIMEOUT_SECONDS = 30
 BODY_TIMEOUT_SECONDS = 10
 CANCEL_GRACE_SECONDS = 0.5
-POST_ONLY_PATHS = frozenset({"session/exchange", "extract", "facts", "facts/normalize", "facts/draft", "facts/rewrite", "normalize", "draft", "rewrite",
-                            "validate", "prepare-render", "render", "host/discover", "host/status", "host/login",
-                            "host/detach", "host/models", "host/select", "host/cancel-login", "host/install", "host/cancel-install"})
-JSON_POST_PATHS = frozenset("/v1/" + path for path in POST_ONLY_PATHS if path != "extract")
+POST_ONLY_PATHS = frozenset({"session/exchange", "host/discover", "host/status", "host/login", "host/detach", "host/models",
+                            "host/select", "host/cancel-login", "host/install", "host/cancel-install"})
+JSON_POST_PATHS = frozenset("/v1/" + path for path in POST_ONLY_PATHS)
 JSON_PUT_PATHS = frozenset({"/v1/settings/rules", "/v1/settings/assistant"})
-
-
-class OperationTimeout(Exception):
-    pass
-
-
-class SyntheticRunner(Protocol):
-    """Trusted in-process runner; cancellation must complete within the grace period.
-
-    External work must use OperationFiles.spawn so its process group can be stopped.
-    """
-    async def run(self, kind: str, request: TextRequest, files: OperationFiles) -> tuple[OperationResult, UsagePayload]: ...
-
-
-class SemanticRunner(Protocol):
-    def run(self, request: FactRequest, files: OperationFiles,
-            cancel: threading.Event) -> tuple[FactSheet, dict[str, int | None]]: ...
-
-
-class ProseDraftRunner(Protocol):
-    def run(self, request: ProseDraftRequest, files: OperationFiles,
-            cancel: threading.Event) -> tuple[ProseDraftResult, dict[str, int | None]]: ...
-
-
-class ProseRewriteRunner(Protocol):
-    def run(self, request: ScopedRewriteRequest, files: OperationFiles,
-            cancel: threading.Event) -> tuple[ScopedRewriteResult, dict[str, int | None]]: ...
 
 
 def problem(code: str, status: int, stage: str = "request", retryable: bool = False) -> JSONResponse:
@@ -152,7 +103,7 @@ class LocalBoundary:
             return
         path = scope["path"]
         method = scope["method"]
-        is_api = path.startswith("/v1/")
+        is_api = path.startswith(("/v1/", "/v2/"))
         response = None
         if host != self.host or b"forwarded" in headers or b"x-forwarded-host" in headers or b"x-forwarded-proto" in headers:
             response = problem("HOST_DENIED", 403)
@@ -163,15 +114,6 @@ class LocalBoundary:
         if response is not None:
             await response(scope, receive, send)
             return
-
-        rich = getattr(self.app.state, "rich_projects", None)
-        project_prefix = "/v1/rich/projects/"
-        if rich is not None and path.startswith(project_prefix) and method in {"POST", "PUT", "PATCH", "DELETE"}:
-            parts = path[len(project_prefix):].split("/", 1)
-            tail = parts[1] if len(parts) == 2 else ""
-            if parts[0] in rich.agent_recovery_fences | rich.catalog_recovery_fences and not tail.startswith(("assistant/", "writer/")) and tail not in {"cancel", "cancel-action", "delete", "images/session"}:
-                await problem("AGENT_OUTCOME_UNKNOWN", 409)(scope, receive, send)
-                return
 
         if is_api and sum(key.lower() == b"content-type" for key, _ in raw_headers) > 1:
             await problem("INVALID_REQUEST", 422)(scope, receive, send)
@@ -195,14 +137,12 @@ class LocalBoundary:
                     return
                 part = message.get("body", b"")
                 size += len(part)
-                image_upload = path.startswith("/v1/rich/projects/") and path.endswith("/images/upload")
-                writer_payload = path.startswith("/v1/rich/projects/") and any(path.endswith("/writer/" + command)
-                    for command in ("checkpoint", "save", "flush", "barrier", "reconcile", "detach", "draft/use"))
-                project_upload = image_upload or path in {"/v1/projects/input", "/v1/projects/archive", "/v1/rich/projects/input", "/v1/rich/projects/template-input", "/v1/rich/projects/archive"} or (path.startswith("/v1/projects/") and path.endswith("/input"))
-                body_limit = 10 * 1024 * 1024 + 64 * 1024 if image_upload else ARCHIVE_BYTES + 4096 if path in {"/v1/projects/archive", "/v1/rich/projects/archive"} else MAX_EXTRACT_BODY if path == "/v1/extract" or project_upload else MAX_BODY
-                if writer_payload:
-                    from packages.resume_core.background_limits import LIMITS
-                    body_limit = LIMITS.draft_project_bytes + MAX_BODY
+                project_upload = path in {"/v1/rich/projects/template-input", "/v2/projects/archive"}
+                body_limit = (ARCHIVE_BYTES + 4096 if path == "/v2/projects/archive" else MAX_EXTRACT_BODY if project_upload
+                    else MAX_BODY)
+                if path.startswith("/v2/projects/") and path.endswith("/edits"):
+                    # A preparation is bounded to 1 MiB; the envelope adds the token and the base revision.
+                    body_limit = MAX_BODY + 64 * 1024
                 if size > body_limit:
                     await problem("INPUT_TOO_LARGE", 413)(scope, receive, send)
                     return
@@ -210,7 +150,7 @@ class LocalBoundary:
                 if not message.get("more_body", False):
                     break
             body = b"".join(chunks)
-            project_json = (path == "/v1/projects" or path.startswith("/v1/projects/") or path == "/v1/rich/projects" or path.startswith("/v1/rich/projects/")) and not project_upload
+            project_json = path.startswith("/v2/projects") and path != "/v2/projects/archive"
             if (method == "POST" and path in JSON_POST_PATHS) or (method == "PUT" and path in JSON_PUT_PATHS) or project_json:
                 if not is_json_media_type(headers.get(b"content-type", b"")):
                     await problem("INVALID_REQUEST", 415)(scope, receive, send)
@@ -259,92 +199,58 @@ class LocalBoundary:
         return item is not None and secrets.compare_digest(item.value, self.session)
 
 
-def create_app(*, origin: str, secret: str, temp_root: Path, dist: Path, runner: SyntheticRunner | None = None,
-               cli_executable: Path | None = None, connection_adapter: ConnectionAdapter | None = None,
-               semantic_runner: SemanticRunner | None = None, draft_runner: ProseDraftRunner | None = None,
-               rewrite_runner: ProseRewriteRunner | None = None, fixture_generation_ready: bool = False,
-               experimental_profile: ExperimentalCliProfile | None = None, data_root: Path | None = None,
-               gui_provider=None, gui_clock=None, gui_renderer=None, agent_runtime=None, agent_tools=None,
-               background_enabled=False, background_factory=None, background_native_authority=None,
-               background_parallel=False, background_server_factory=None, template_import_call_cap: int | None = None,
-               template_import_concurrency: int = 3):
+def create_app(*, origin: str, secret: str, temp_root: Path, dist: Path, cli_executable: Path | None = None,
+               connection_adapter: ConnectionAdapter | None = None, experimental_profile: ExperimentalCliProfile | None = None,
+               data_root: Path | None = None, content_provider=None, clock=None, agent_runtime=None,
+               template_import_call_cap: int | None = None, template_import_concurrency: int = 3):
     if not origin.startswith("http://127.0.0.1:") or not origin.rsplit(":", 1)[-1].isdigit():
         raise ValueError("A concrete IPv4 loopback origin is required")
     if len(secret) < 32:
         raise ValueError("Startup secret is too short")
-    if background_parallel and not background_enabled:
-        raise ValueError("Parallel execution requires background delivery")
-    if background_parallel and experimental_profile is not None and (background_factory or background_server_factory):
-        raise ValueError("Native parallel execution cannot use an injected server or runtime")
-    parallel_transport_sources = None
-    if background_parallel and experimental_profile is not None:
-        if background_native_authority is None:
-            raise ValueError("Native parallel execution requires an explicit turn authority")
-        from .jobs.feasibility import require_native_transport
-        parallel_transport_sources = require_native_transport(Path(__file__).resolve().parents[4])
-    if fixture_generation_ready and (semantic_runner is None or draft_runner is None):
-        raise ValueError("Fixture generation requires both injected runners")
-    if experimental_profile is not None and (fixture_generation_ready or any(
-            runner is not None for runner in (semantic_runner, draft_runner, rewrite_runner, gui_provider, agent_runtime))):
+    if experimental_profile is not None and (content_provider is not None or agent_runtime is not None):
         raise ValueError("Experimental CLI cannot use injected generation runners")
-    background_operations = temp_root / "background-transport"
     reap_owned(temp_root)
-    if background_parallel:
-        reap_owned(background_operations)
-    blocked_on_start = (has_blocked_owned(temp_root) or background_parallel and has_blocked_owned(background_operations)
-        or recover_profile(experimental_profile, background_operations if background_parallel else temp_root))
+    blocked_on_start = has_blocked_owned(temp_root) or recover_profile(experimental_profile, temp_root)
     operations: dict[asyncio.Task, OperationFiles] = {}
     cancellation_pending: set[asyncio.Task] = set()
     connection_work: dict[asyncio.Task, tuple[OperationFiles, threading.Event]] = {}
-    semantic_work: dict[asyncio.Task, tuple[OperationFiles, threading.Event]] = {}
 
     @asynccontextmanager
     async def lifespan(_app: FastAPI):
-        from .agent.project_action_recovery import recover_actions
-        # Files written before D104 move their import records and asset bytes out before anything reads them.
-        externalize = getattr(rich_projects.storage, "externalize_history", None)
-        if externalize is not None:
-            await asyncio.to_thread(externalize)
-        recover_actions(rich_projects)
-        await rich_projects.drain_catalog_actions()
-        agent.recover()
-        await jobs.start()
+        # Externalizes import records of files written before D104, once; old job, agent and V6 files stay untouched.
+        await asyncio.to_thread(project_repository.start)
         yield
-        await jobs.shutdown()
-        gui_projects.request_shutdown()
-        rich_projects.request_shutdown()
-        agent.request_stop(reason="AGENT_INTERRUPTED")
-        await gui_projects.shutdown()
-        await rich_projects.shutdown()
+        intake.request_shutdown()
+        rewrite.request_shutdown()
+        await assistant.shutdown()
+        for stopping in (intake.shutdown, rewrite.shutdown):
+            try:
+                await stopping()
+            except ProjectFailure:
+                pass
+        for identifier in list(project_repository.sessions):
+            await asyncio.to_thread(project_repository.close, identifier)
         render_executor.shutdown(wait=True, cancel_futures=True)
         for task, (files, cancel) in list(connection_work.items()):
             await stop_connection(task, files, cancel)
-        for task, (files, cancel) in list(semantic_work.items()):
-            await stop_semantic(task, files, cancel)
         for task, files in list(operations.items()):
-            if task not in connection_work and task not in semantic_work:
+            if task not in connection_work:
                 await cancel_operation(task, files)
 
     app = FastAPI(docs_url=None, redoc_url=None, openapi_url=None, lifespan=lifespan)
-    app.state.parallel_transport_sources = parallel_transport_sources
     boundary = LocalBoundary(app, origin, secret)
-    if data_root is None and any(value is not None for value in (runner, connection_adapter, semantic_runner, draft_runner, rewrite_runner, gui_provider)):
+    if data_root is None and (connection_adapter is not None or content_provider is not None):
         data_root = temp_root.parent / "FoldCV"
     rules_store = RulesStore(data_root)
     active = 0
-    import_active = False
-    count = 0
     unsafe_cleanup = blocked_on_start
     gate = asyncio.Lock()
-    from packages.resume_core.background_limits import LIMITS as BACKGROUND_LIMITS
-    from .gui_rendering import GuiDocxRenderer, RichDocxRenderer
-    render_executor = ThreadPoolExecutor(max_workers=BACKGROUND_LIMITS.render_workers, thread_name_prefix="foldcv-render")
-    document_renderer = DocumentRenderer(executor=render_executor)
+    from packages.resume_core.project_limits import RENDER_WORKERS
+    from .rendering import TemplateDocxRenderer
+    render_executor = ThreadPoolExecutor(max_workers=RENDER_WORKERS, thread_name_prefix="foldcv-render")
+    docx_renderer = TemplateDocxRenderer(executor=render_executor)
     connection = connection_adapter or ConnectionAdapter(experimental_profile.executable if experimental_profile else cli_executable,
                                                           experimental_profile=experimental_profile)
-    if background_parallel and experimental_profile is not None:
-        from spikes.background.appserver_driver import SharedAppServer
-        background_server_factory = lambda: SharedAppServer.native(background_operations, connection)
     provider = (CodexCliProvider(experimental_profile.executable, experimental_profile=experimental_profile)
                 if experimental_profile else None)
     installation = CliInstallation(experimental_profile.root.parent / "cli-runtime") if experimental_profile else None
@@ -362,42 +268,20 @@ def create_app(*, origin: str, secret: str, temp_root: Path, dist: Path, runner:
         return (experimental_authorized(model)
                 and not any(not task.done() for task in connection_work))
 
-    def accepted_operation_valid(epoch: int) -> bool:
-        return experimental_profile is not None and epoch == connection_epoch and not unsafe_cleanup
-
-    def selected_runner(kind: str):
-        if not experimental_ready() or provider is None or connection_state.selectedModel is None:
-            return None
-        service = {"normalize": NormalizationContentService, "draft": DraftingContentService,
-                   "rewrite": RewritingContentService}[kind]
-        return service(provider, connection_state.selectedModel)
-
     def lifecycle_code(error: SpikeError) -> str:
         nonlocal unsafe_cleanup
         if error.code in {"PROCESS_CLEANUP_FAILED", "CLEANUP_FAILED", "UNSAFE_TEMP_ROOT"}:
             unsafe_cleanup = True
         return error.code if error.code in {"PROCESS_CLEANUP_FAILED", "CLEANUP_FAILED", "UNSAFE_TEMP_ROOT", "TEMP_FAILED"} else "OPERATION_FAILED"
 
-    def content_error_code(error: Exception) -> str:
-        if isinstance(error, asyncio.TimeoutError):
-            return "OPERATION_TIMEOUT"
-        if isinstance(error, ContentFailure):
-            return error.code
-        if isinstance(error, InterruptedError) and str(error) == "cancelled":
-            return "CANCELLED"
-        if isinstance(error, SpikeError):
-            return "CANCELLED" if error.code == "CANCELLED" else lifecycle_code(error)
-        return "INVALID_RESULT"
-
     @asynccontextmanager
-    async def gui_worker_slot(cancel):
+    async def worker_slot(cancel):
         nonlocal active
         while True:
             async with gate:
                 if unsafe_cleanup:
                     raise SpikeError("PROCESS_CLEANUP_FAILED")
                 if cancel.is_set():
-                    from .gui_admission import AdmissionCancelled
                     raise AdmissionCancelled()
                 if active < MAX_CONCURRENT and not cancellation_pending:
                     active += 1
@@ -408,14 +292,13 @@ def create_app(*, origin: str, secret: str, temp_root: Path, dist: Path, runner:
         finally:
             active -= 1
 
-    def gui_selected_provider():
-        if gui_provider is not None and not unsafe_cleanup:
-            return gui_provider, connection_state.selectedModel or "fixture"
+    def selected_provider():
+        if content_provider is not None and not unsafe_cleanup:
+            return content_provider, connection_state.selectedModel or "fixture"
         if experimental_ready() and provider is not None:
             return provider, connection_state.selectedModel
         return None
 
-    gui_options = {"clock": gui_clock} if gui_clock is not None else {}
     preferences_store = PreferencesStore(rules_store.root)
     try:
         apply_limits(preferences_store.load() if preferences_store.path.exists() else None)
@@ -427,29 +310,39 @@ def create_app(*, origin: str, secret: str, temp_root: Path, dist: Path, runner:
         except PreferencesFailure as error:
             raise ProjectFailure(error.code, 409) from None
         if model is None:
-            return gui_selected_provider()
+            return selected_provider()
         if not connection_state.metadataReady or model not in connection_state.models:
             raise ProjectFailure("MODEL_DENIED", 409)
-        if gui_provider is not None and not unsafe_cleanup:
-            return gui_provider, model
+        if content_provider is not None and not unsafe_cleanup:
+            return content_provider, model
         if experimental_ready(model) and provider is not None:
             return provider, model
         return None
 
-    gui_projects = GuiProjectService(temp_root, rules_store, gui_selected_provider,
-        worker_slot=gui_worker_slot, cleanup_error=lifecycle_code,
-        renderer=gui_renderer or GuiDocxRenderer(executor=render_executor),
-        storage=ProjectStore(rules_store.root), preferences=preferences_store, **gui_options)
-    app.state.gui_projects = gui_projects
-    mount_projects(app, gui_projects, problem)
-    from .rich_projects import RichProjectService
-    from .rich_routes import mount_rich_projects
-    rich_projects = RichProjectService(temp_root, rules_store, gui_selected_provider,
-        import_provider_factory=import_selected_provider,
-        worker_slot=gui_worker_slot, cleanup_error=lifecycle_code, preferences=preferences_store,
-        renderer=RichDocxRenderer(executor=render_executor), **gui_options)
-    app.state.rich_projects = rich_projects
-    mount_rich_projects(app, rich_projects, problem)
+    from packages.resume_core.project_repository import ProjectRepository
+    from .projects.exports import ExportService, production_render
+    from .projects.fold import register_import_fold
+    from .projects.imports import ImportService
+    from .projects.intake import TemplateIntake
+    from .projects.routes import mount_projects_v2
+    from .projects.service import ProjectService
+    from .template_rewrite import TemplateRewrite
+    from .templates_routes import mount_template_routes
+    # Every project write goes through the repository (D109).
+    project_repository = ProjectRepository(rules_store.root)
+    register_import_fold(project_repository)
+    projects = ProjectService(project_repository)
+    app.state.projects = projects
+    intake = TemplateIntake(project_repository, temp_root=temp_root, worker_slot=worker_slot, cleanup_error=lifecycle_code,
+        **({"clock": clock} if clock is not None else {}))
+    app.state.intake = intake
+    rewrite = TemplateRewrite(selected_provider, preferences=preferences_store, temp_root=temp_root, worker_slot=worker_slot,
+        cleanup_error=lifecycle_code)
+    projects.rewrite_text, projects.rewrite_cancel = rewrite.text, rewrite.cancel
+    mount_projects_v2(app, projects)
+
+    from .assistant.runs import AgentConnection, AssistantService
+    from .assistant.routes import mount_assistant
 
     def agent_connection():
         reason = ("AGENT_CLEANUP_FAILED" if unsafe_cleanup or INFERENCE.blocked else
@@ -467,17 +360,10 @@ def create_app(*, origin: str, secret: str, temp_root: Path, dist: Path, runner:
             resolved_agent_runtime = CodexAgentRuntime(connection, temp_root)
         except AgentFailure:
             resolved_agent_runtime = None
-    agent = AgentService(rich_projects, resolved_agent_runtime, agent_connection, tools=agent_tools,
-        cleanup_error=lambda _code: INFERENCE.block())
-    if agent_tools is None:
-        from .agent.tools import AgentTools
-        agent.tools = AgentTools(agent)
-    rich_projects.agent = agent
-    app.state.agent = agent
-    from .agent.routes import mount_agent
-    mount_agent(app, agent)
-    from .jobs.service import JobService
-    from .jobs.routes import mount_jobs
+    assistant = AssistantService(projects, resolved_agent_runtime, agent_connection)
+    projects.on_deleted = assistant.project_deleted
+    app.state.assistant = assistant
+    mount_assistant(app, assistant)
 
     def template_import_model():
         # The capture records the selected import model with its catalog default effort; nothing is chosen here.
@@ -526,54 +412,38 @@ def create_app(*, origin: str, secret: str, temp_root: Path, dist: Path, runner:
         # offers it; it is never replaced by a different one.
         if not connection_state.metadataReady or model not in connection_state.models:
             raise ProjectFailure("MODEL_DENIED", 409)
-        if gui_provider is not None and not unsafe_cleanup:
-            return gui_provider, model
+        if content_provider is not None and not unsafe_cleanup:
+            return content_provider, model
         if experimental_ready(model) and provider is not None:
             return provider, model
         return None
 
-    template_factory = None
+    v2_pipeline = None
     if template_import_call_cap is not None:
-        def template_factory(owner):
-            from packages.resume_core.template_assembly import assemble_template
-            from packages.resume_core.templates.operations import derive_task
-            from .importer.template_pipeline import TemplatePipeline
-            from .importer.template_transport import ProviderTemplateTransport
-            def authority(operation, current):
-                rich_projects.validate_template_capture(operation, current)
-            # Registered deterministic operations over admitted facts; unimplemented kinds stay refused.
-            return TemplatePipeline(owner.publisher, ProviderTemplateTransport(import_selected_provider, temp_root,
-                model_provider=template_model_provider),
-                originals=rich_projects.originals, authority=authority, assemble=assemble_template, derive=derive_task,
-                # One clock for jobs, request epochs and publication: the job store's.
-                wall=lambda: owner.store.clock())
-    rich_projects.configure_template_imports(call_cap=template_import_call_cap,
+        from packages.resume_core.template_assembly import assemble_template
+        from packages.resume_core.templates.operations import derive_task
+        from .importer.template_pipeline import TemplatePipeline
+        from .importer.template_transport import ProviderTemplateTransport
+        # Registered deterministic operations over admitted facts; unimplemented kinds stay refused.
+        v2_pipeline = TemplatePipeline(ProviderTemplateTransport(import_selected_provider, temp_root,
+            model_provider=template_model_provider), repository=project_repository, authority=intake.validate,
+            assemble=assemble_template, derive=derive_task, wall=lambda: project_repository.clock())
+    intake.configure(call_cap=template_import_call_cap,
         model=template_import_model if template_import_call_cap is not None else None,
         fallback=template_fallback_model if template_import_call_cap is not None else None,
         # CT10 (LIVE-15): three blocks at once imported CV-B in 155 s against 389 s sequentially, with no transport errors.
         concurrency=template_import_concurrency)
-    jobs = JobService(rich_projects, resolved_agent_runtime, agent_connection, enabled=background_enabled,
-        template_factory=template_factory,
-        factory=background_factory, parallel=background_parallel, server_factory=background_server_factory,
-        shared_native=experimental_profile is not None,
-        template_cleanup_verified=lambda: not unsafe_cleanup,
-        **({"authorize_native": background_native_authority} if background_native_authority else {}))
-    app.state.jobs = jobs
-    mount_jobs(app, jobs)
+    intake.ready = v2_pipeline is not None
 
-    def execute_content(files, runner, payload, cancel, runner_epoch):
-        worker_error = None
-        with files.open():
-            if experimental_profile and not accepted_operation_valid(runner_epoch):
-                raise SpikeError("CLI_PROFILE_UNSAFE")
-            try:
-                result = runner.run(payload, files, cancel)
-            except OSError as error:
-                # Re-raise worker cancellation/timeout after the filesystem scope cleans up.
-                worker_error = error
-        if worker_error is not None:
-            raise worker_error
-        return result
+    def import_command(identifier, request_id, allow_text_rewrite):
+        return intake.command(identifier, request_id, allow_text_rewrite, workspace=project_repository.read(identifier))
+    projects.imports = ImportService(projects, v2_pipeline, commands=import_command)
+
+    async def render_export(request):
+        return await production_render(request, temp_root=temp_root, worker_slot=worker_slot, renderer=docx_renderer,
+            cleanup_error=lifecycle_code)
+    projects.exports = ExportService(projects, render_export)
+    mount_template_routes(app, root=rules_store.root, intake=intake, projects=projects, problem=problem)
 
     async def cancel_operation(task: asyncio.Task, files: OperationFiles) -> str | None:
         if not task.done():
@@ -593,24 +463,6 @@ def create_app(*, origin: str, secret: str, temp_root: Path, dist: Path, runner:
             except Exception:
                 pass
         return cleanup_code
-
-    async def stop_semantic(task: asyncio.Task, files: OperationFiles, cancel: threading.Event) -> str | None:
-        cancel.set()
-        try:
-            files.stop_worker()
-        except SpikeError as error:
-            return lifecycle_code(error)
-        done, _ = await asyncio.wait((task,), timeout=CANCEL_GRACE_SECONDS)
-        if task not in done:
-            return lifecycle_code(SpikeError("PROCESS_CLEANUP_FAILED"))
-        try:
-            await task
-        except SpikeError as error:
-            if error.code in {"PROCESS_CLEANUP_FAILED", "CLEANUP_FAILED", "UNSAFE_TEMP_ROOT"}:
-                return lifecycle_code(error)
-        except Exception:
-            pass
-        return None
 
     async def stop_connection(task: asyncio.Task, files: OperationFiles, cancel: threading.Event) -> str | None:
         if not task.done():
@@ -647,7 +499,6 @@ def create_app(*, origin: str, secret: str, temp_root: Path, dist: Path, runner:
                 lifecycle_code(SpikeError(error.code))
         operations.pop(done, None)
         connection_work.pop(done, None)
-        semantic_work.pop(done, None)
         cancellation_pending.discard(done)
         active -= 1
 
@@ -679,8 +530,9 @@ def create_app(*, origin: str, secret: str, temp_root: Path, dist: Path, runner:
         boundary.secret = None
         boundary.session = secrets.token_urlsafe(32)
         response = JSONResponse({"sessionReady": True}, headers={"Cache-Control": "no-store"})
+        # One cookie for /v1/ and /v2/ routes (D109); it stays HttpOnly and strictly same-site.
         response.set_cookie(boundary.cookie_name, boundary.session, httponly=True, secure=False,
-                            samesite="strict", path="/v1/")
+                            samesite="strict", path="/")
         return response
 
     def rules_failure(error: RulesFailure):
@@ -714,28 +566,6 @@ def create_app(*, origin: str, secret: str, temp_root: Path, dist: Path, runner:
         except RulesFailure as error:
             return rules_failure(error)
 
-    @app.get("/v1/capabilities")
-    async def capabilities():
-        try:
-            require_template()
-            ready = not unsafe_cleanup
-        except RenderFailure:
-            ready = False
-        return JSONResponse({
-            "appVersion": "0.1.0", "projectSchemaVersion": 3, "transportVersion": 1,
-            "generationReady": fixture_generation_ready or experimental_ready(),
-            "rewriteReady": rewrite_runner is not None or experimental_ready(),
-            "renderers": ["docx", "pdf"] if ready else [],
-            "formats": ["docx", "pdf"] if ready else [],
-            "templates": [{"id": "generic", "version": "1.0.0", "packageSha256": PACKAGE_SHA256}] if ready else [],
-            "rendererSha256": renderer_sha256() if ready else None,
-            "providers": [{"kind": "codex_cli", "ready": bool(experimental_ready()),
-                           "reason": None if experimental_ready() else "CLI_PROFILE_UNSAFE"}],
-            "limits": {"maxBodyBytes": MAX_BODY, "maxTextOperations": MAX_OPERATIONS,
-                       "maxConcurrent": MAX_CONCURRENT, "timeoutSeconds": TIMEOUT_SECONDS,
-                       "maxExtractBodyBytes": MAX_EXTRACT_BODY},
-        }, headers={"Cache-Control": "no-store"})
-
     @app.get("/v1/template-package")
     async def template_package():
         try:
@@ -750,379 +580,6 @@ def create_app(*, origin: str, secret: str, temp_root: Path, dist: Path, runner:
             return Response(output.getvalue(), media_type="application/zip", headers={"Cache-Control": "no-store"})
         except (RenderFailure, OSError):
             return problem("TEMPLATE_UNAVAILABLE", 503)
-
-    async def extract(request: Request):
-        nonlocal active, import_active
-        if not request.headers.get("content-type", "").lower().startswith("multipart/form-data;"):
-            return problem("INVALID_REQUEST", 415, "extract")
-        try:
-            data, name, pasted = parse_one_part(await request.body(), request.headers.get("content-type", ""))
-        except (UploadFailure, UnicodeError) as error:
-            code = error.code if isinstance(error, UploadFailure) else "INVALID_REQUEST"
-            return problem(code, 413 if code == "INPUT_TOO_LARGE" else 422, "extract")
-        async with gate:
-            if unsafe_cleanup or cancellation_pending or active >= MAX_CONCURRENT or import_active:
-                return problem("BUSY", 429, "extract", True)
-            active += 1
-            import_active = True
-        files = OperationFiles(temp_root)
-
-        async def execute():
-            with files.open():
-                return await run_extract(data, name, pasted, files)
-
-        task = asyncio.create_task(execute())
-        operations[task] = files
-
-        def import_done(done: asyncio.Task) -> None:
-            nonlocal import_active
-            operation_done(done)
-            import_active = False
-
-        task.add_done_callback(import_done)
-
-        async def disconnected() -> None:
-            while not await request.is_disconnected():
-                await asyncio.sleep(0.05)
-
-        watcher = asyncio.create_task(disconnected())
-        try:
-            done, _ = await asyncio.wait((task, watcher), timeout=TIMEOUT_SECONDS,
-                                         return_when=asyncio.FIRST_COMPLETED)
-            if task in done:
-                result = await task
-                return JSONResponse(result.model_dump(mode="json", by_alias=True),
-                                    headers={"Cache-Control": "no-store"})
-            cleanup_code = await cancel_operation(task, files)
-            if cleanup_code:
-                return problem(cleanup_code, 503, "extract")
-            return problem("OPERATION_CANCELLED" if watcher in done else "OPERATION_TIMEOUT",
-                           499 if watcher in done else 504, "extract")
-        except UploadFailure as error:
-            code = error.code
-            status = 413 if code.endswith(("LIMIT", "LARGE")) else 503 if code in {"EXTRACT_FAILED", "EXTRACT_MONITOR_UNAVAILABLE"} else 422
-            return problem(code, status, "extract")
-        except SpikeError as error:
-            return problem(lifecycle_code(error), 503, "extract")
-        except asyncio.CancelledError:
-            await cancel_operation(task, files)
-            raise
-        except Exception:
-            return problem("EXTRACT_FAILED", 500, "extract")
-        finally:
-            watcher.cancel()
-
-    async def validate(_payload: ValidateRequest):
-        return problem("FEATURE_UNAVAILABLE", 501, "validate")
-
-    async def facts(payload: FactRequest):
-        try:
-            sheet = literal_sheet(payload)
-            encoded = sheet.model_dump_json(by_alias=True).encode("utf-8")
-            if len(encoded) > 4 * 1024 * 1024:
-                return problem("INPUT_TOO_LARGE", 413, "facts")
-            return Response(encoded, media_type="application/json", headers={"Cache-Control": "no-store"})
-        except ValueError:
-            return problem("INVALID_REQUEST", 422, "facts")
-
-    async def normalize_facts(payload: FactRequest):
-        nonlocal active, count
-        active_runner = semantic_runner or selected_runner("normalize")
-        runner_epoch = connection_epoch
-        if active_runner is None:
-            return problem("CLI_PROFILE_UNSAFE", 503, "normalize")
-        try:
-            semantic_input(literal_sheet(payload), payload)
-        except ValueError as error:
-            return problem("INPUT_TOO_LARGE" if str(error) == "INPUT_TOO_LARGE" else "INVALID_REQUEST",
-                           413 if str(error) == "INPUT_TOO_LARGE" else 422, "normalize")
-        request_id = "op_" + uuid.uuid4().hex
-
-        async def events():
-            nonlocal active, count
-            reject_code: str | None = None
-            async with gate:
-                if unsafe_cleanup or cancellation_pending or active >= MAX_CONCURRENT or count >= MAX_OPERATIONS:
-                    reject_code = "OPERATION_LIMIT" if count >= MAX_OPERATIONS else "BUSY"
-                else:
-                    active += 1
-                    count += 1
-            if reject_code:
-                yield (json.dumps({"transportVersion": 1, "requestId": request_id, "sequence": 1,
-                                   "baseRevision": payload.base_revision, "type": "operation.failed",
-                                   "payload": {"code": reject_code, "retryable": reject_code == "BUSY",
-                                               "stage": "normalize"}}) + "\n").encode()
-                return
-            files = OperationFiles(temp_root)
-            cancel = threading.Event()
-
-            def execute():
-                return execute_content(files, active_runner, payload, cancel, runner_epoch)
-
-            task = asyncio.create_task(asyncio.to_thread(execute))
-            operations[task] = files
-            semantic_work[task] = (files, cancel)
-            task.add_done_callback(operation_done)
-            try:
-                yield (json.dumps({"transportVersion": 1, "requestId": request_id, "sequence": 1,
-                                   "baseRevision": payload.base_revision, "type": "operation.started",
-                                   "payload": {"stage": "normalize"}}) + "\n").encode()
-                sheet, usage = await asyncio.wait_for(asyncio.shield(task), timeout=TIMEOUT_SECONDS)
-                if experimental_profile and not accepted_operation_valid(runner_epoch):
-                    raise SpikeError("CANCELLED")
-                sheet = FactSheet.model_validate(sheet.model_dump(mode="json", by_alias=True))
-                expected_units = {(source.result.source_id, unit.id) for source in payload.sources for unit in source.result.units}
-                expected_units.update((source.result.source_id, f"gap:{index}") for source in payload.sources
-                                      for index in range(len(source.result.gaps))
-                                      if source.overlays.get(f"gap:{index}", "").strip())
-                if sheet.source_fingerprint != fingerprint(payload) or {(unit.source_id, unit.unit_id)
-                                                                         for unit in sheet.units} != expected_units:
-                    raise ValueError("semantic response has stale source references")
-                usage = UsagePayload.model_validate(usage).model_dump()
-                if len(sheet.model_dump_json(by_alias=True).encode("utf-8")) > 4 * 1024 * 1024:
-                    raise ValueError("result too large")
-                yield (json.dumps({"transportVersion": 1, "requestId": request_id, "sequence": 2,
-                                   "baseRevision": payload.base_revision, "type": "operation.completed",
-                                   "payload": {"result": sheet.model_dump(mode="json", by_alias=True), "usage": usage}},
-                                  ensure_ascii=False, separators=(",", ":")) + "\n").encode()
-            except asyncio.CancelledError:
-                await stop_semantic(task, files, cancel)
-                raise
-            except Exception as error:
-                cancel.set()
-                code = content_error_code(error)
-                if not task.done():
-                    cleanup_code = await stop_semantic(task, files, cancel)
-                    if cleanup_code:
-                        code = cleanup_code
-                yield (json.dumps({"transportVersion": 1, "requestId": request_id, "sequence": 2,
-                                   "baseRevision": payload.base_revision, "type": "operation.failed",
-                                   "payload": {"code": code, "retryable": code in {"RATE_LIMITED", "BUSY", "OPERATION_TIMEOUT"},
-                                               "stage": "normalize"}}) + "\n").encode()
-            finally:
-                if not task.done():
-                    await stop_semantic(task, files, cancel)
-
-        return StreamingResponse(events(), media_type="application/x-ndjson", headers={"Cache-Control": "no-store"})
-
-    async def draft_facts(payload: ProseDraftRequest):
-        nonlocal active, count
-        active_runner = draft_runner or selected_runner("draft")
-        runner_epoch = connection_epoch
-        if active_runner is None:
-            return problem("CLI_PROFILE_UNSAFE", 503, "draft")
-        try:
-            draft_input(payload)
-        except ValueError as error:
-            return problem("INPUT_TOO_LARGE" if str(error) == "INPUT_TOO_LARGE" else "INVALID_REQUEST",
-                           413 if str(error) == "INPUT_TOO_LARGE" else 422, "draft")
-        request_id = "op_" + uuid.uuid4().hex
-
-        async def events():
-            nonlocal active, count
-            reject_code: str | None = None
-            async with gate:
-                if unsafe_cleanup or cancellation_pending or active >= MAX_CONCURRENT or count >= MAX_OPERATIONS:
-                    reject_code = "OPERATION_LIMIT" if count >= MAX_OPERATIONS else "BUSY"
-                else:
-                    active += 1
-                    count += 1
-            if reject_code:
-                yield (json.dumps({"transportVersion": 1, "requestId": request_id, "sequence": 1,
-                                   "baseRevision": payload.base_revision, "type": "operation.failed",
-                                   "payload": {"code": reject_code, "retryable": reject_code == "BUSY",
-                                               "stage": "draft"}}) + "\n").encode()
-                return
-            files = OperationFiles(temp_root)
-            cancel = threading.Event()
-
-            def execute():
-                return execute_content(files, active_runner, payload, cancel, runner_epoch)
-
-            task = asyncio.create_task(asyncio.to_thread(execute))
-            operations[task] = files
-            semantic_work[task] = (files, cancel)
-            task.add_done_callback(operation_done)
-            try:
-                yield (json.dumps({"transportVersion": 1, "requestId": request_id, "sequence": 1,
-                                   "baseRevision": payload.base_revision, "type": "operation.started",
-                                   "payload": {"stage": "draft"}}) + "\n").encode()
-                draft, usage = await asyncio.wait_for(asyncio.shield(task), timeout=TIMEOUT_SECONDS)
-                if experimental_profile and not accepted_operation_valid(runner_epoch):
-                    raise SpikeError("CANCELLED")
-                draft = ProseDraftResult.model_validate(draft.model_dump(mode="json", by_alias=True))
-                if draft.source_fingerprint != payload.source_fingerprint or draft.base_revision != payload.base_revision:
-                    raise ValueError("stale draft")
-                usage = UsagePayload.model_validate(usage).model_dump()
-                encoded = draft.model_dump(mode="json", by_alias=True)
-                if len(json.dumps(encoded, ensure_ascii=False).encode("utf-8")) > 4 * 1024 * 1024:
-                    raise ValueError("result too large")
-                yield (json.dumps({"transportVersion": 1, "requestId": request_id, "sequence": 2,
-                                   "baseRevision": payload.base_revision, "type": "operation.completed",
-                                   "payload": {"result": encoded, "usage": usage}},
-                                  ensure_ascii=False, separators=(",", ":")) + "\n").encode()
-            except asyncio.CancelledError:
-                await stop_semantic(task, files, cancel)
-                raise
-            except Exception as error:
-                cancel.set()
-                code = content_error_code(error)
-                if not task.done():
-                    cleanup_code = await stop_semantic(task, files, cancel)
-                    if cleanup_code:
-                        code = cleanup_code
-                yield (json.dumps({"transportVersion": 1, "requestId": request_id, "sequence": 2,
-                                   "baseRevision": payload.base_revision, "type": "operation.failed",
-                                   "payload": {"code": code, "retryable": code in {"RATE_LIMITED", "BUSY", "OPERATION_TIMEOUT"},
-                                               "stage": "draft"}}) + "\n").encode()
-            finally:
-                if not task.done():
-                    await stop_semantic(task, files, cancel)
-
-        return StreamingResponse(events(), media_type="application/x-ndjson", headers={"Cache-Control": "no-store"})
-
-    async def rewrite_facts(payload: ScopedRewriteRequest):
-        nonlocal active, count
-        active_runner = rewrite_runner or selected_runner("rewrite")
-        runner_epoch = connection_epoch
-        if active_runner is None:
-            return problem("CLI_PROFILE_UNSAFE", 503, "rewrite")
-        try:
-            rewrite_input(payload)
-        except ValueError as error:
-            code = str(error) if str(error) in {"INPUT_TOO_LARGE", "NO_SAFE_CONTENT"} else "INVALID_REQUEST"
-            if code == "NO_SAFE_CONTENT":
-                failure = RewritePreflightFailure(error=RewritePreflightError(code="NO_SAFE_CONTENT", retryable=False,
-                    stage="rewrite"), baseRevision=payload.base_revision,
-                    blockId=payload.block_id, blockRevision=payload.block_revision,
-                    dependencyHash=payload.dependency_hash, issues=[])
-                return JSONResponse(failure.model_dump(mode="json", by_alias=True), status_code=422,
-                                    headers={"Cache-Control": "no-store"})
-            return problem(code, 413 if code == "INPUT_TOO_LARGE" else 422, "rewrite")
-        request_id = "op_" + uuid.uuid4().hex
-
-        async def events():
-            nonlocal active, count
-            reject_code: str | None = None
-            async with gate:
-                if unsafe_cleanup or cancellation_pending or active >= MAX_CONCURRENT or count >= MAX_OPERATIONS:
-                    reject_code = "OPERATION_LIMIT" if count >= MAX_OPERATIONS else "BUSY"
-                else:
-                    active += 1
-                    count += 1
-            if reject_code:
-                yield (json.dumps({"transportVersion": 1, "requestId": request_id, "sequence": 1,
-                                   "baseRevision": payload.base_revision, "type": "operation.failed",
-                                   "payload": {"code": reject_code, "retryable": reject_code == "BUSY",
-                                               "stage": "rewrite"}}) + "\n").encode()
-                return
-            files = OperationFiles(temp_root)
-            cancel = threading.Event()
-
-            def execute():
-                return execute_content(files, active_runner, payload, cancel, runner_epoch)
-
-            task = asyncio.create_task(asyncio.to_thread(execute))
-            operations[task] = files
-            semantic_work[task] = (files, cancel)
-            task.add_done_callback(operation_done)
-            try:
-                yield (json.dumps({"transportVersion": 1, "requestId": request_id, "sequence": 1,
-                                   "baseRevision": payload.base_revision, "type": "operation.started",
-                                   "payload": {"stage": "rewrite"}}) + "\n").encode()
-                rewritten, usage = await asyncio.wait_for(asyncio.shield(task), timeout=TIMEOUT_SECONDS)
-                if experimental_profile and not accepted_operation_valid(runner_epoch):
-                    raise SpikeError("CANCELLED")
-                rewritten = ScopedRewriteResult.model_validate(rewritten.model_dump(mode="json", by_alias=True))
-                if (rewritten.block_id != payload.block_id or rewritten.block_revision != payload.block_revision or
-                        rewritten.dependency_hash != payload.dependency_hash or rewritten.base_revision != payload.base_revision):
-                    raise ValueError("stale rewrite")
-                usage = UsagePayload.model_validate(usage).model_dump()
-                encoded = rewritten.model_dump(mode="json", by_alias=True)
-                if len(json.dumps(encoded, ensure_ascii=False).encode("utf-8")) > 4 * 1024 * 1024:
-                    raise ValueError("result too large")
-                yield (json.dumps({"transportVersion": 1, "requestId": request_id, "sequence": 2,
-                                   "baseRevision": payload.base_revision, "type": "operation.completed",
-                                   "payload": {"result": encoded, "usage": usage}},
-                                  ensure_ascii=False, separators=(",", ":")) + "\n").encode()
-            except asyncio.CancelledError:
-                await stop_semantic(task, files, cancel)
-                raise
-            except Exception as error:
-                cancel.set()
-                code = content_error_code(error)
-                if not task.done():
-                    cleanup_code = await stop_semantic(task, files, cancel)
-                    if cleanup_code:
-                        code = cleanup_code
-                yield (json.dumps({"transportVersion": 1, "requestId": request_id, "sequence": 2,
-                                   "baseRevision": payload.base_revision, "type": "operation.failed",
-                                   "payload": {"code": code, "retryable": code in {"RATE_LIMITED", "BUSY", "OPERATION_TIMEOUT"},
-                                               "stage": "rewrite"}}) + "\n").encode()
-            finally:
-                if not task.done():
-                    await stop_semantic(task, files, cancel)
-
-        return StreamingResponse(events(), media_type="application/x-ndjson", headers={"Cache-Control": "no-store"})
-
-    async def prepare_render(payload: PrepareRequest):
-        try:
-            prepared = prepare_document(payload)
-            return JSONResponse(prepared.model_dump(mode="json", by_alias=True), headers={"Cache-Control": "no-store"})
-        except PreparationFailure as error:
-            return problem(error.code, 422, "prepare")
-        except RenderFailure as error:
-            return problem("PREPARATION_FAILED", 422, "prepare")
-        except ValueError:
-            return problem("PREPARATION_FAILED", 422, "prepare")
-
-    async def render(request: Request, payload: RenderRequest):
-        nonlocal active
-        async with gate:
-            if unsafe_cleanup or cancellation_pending or active >= MAX_CONCURRENT:
-                return problem("BUSY", 429, "render", True)
-            active += 1
-        files = OperationFiles(temp_root)
-
-        async def execute() -> bytes:
-            with files.open():
-                return await document_renderer.render(payload, files)
-
-        task = asyncio.create_task(execute())
-        operations[task] = files
-        task.add_done_callback(operation_done)
-
-        async def disconnected() -> None:
-            while not await request.is_disconnected():
-                await asyncio.sleep(0.05)
-
-        watcher = asyncio.create_task(disconnected())
-        try:
-            done, _ = await asyncio.wait((task, watcher), timeout=TIMEOUT_SECONDS,
-                                         return_when=asyncio.FIRST_COMPLETED)
-            if task in done:
-                data = await task
-                return Response(data, media_type="application/zip", headers={"Cache-Control": "no-store"})
-            if task not in done:
-                cleanup_code = await cancel_operation(task, files)
-                if cleanup_code:
-                    return problem(cleanup_code, 503, "render")
-                if watcher in done:
-                    return problem("OPERATION_CANCELLED", 499, "render")
-                return problem("OPERATION_TIMEOUT", 504, "render")
-            return problem("RENDER_FAILED", 500, "render")
-        except RenderFailure as error:
-            status = 422 if error.code in {"RENDER_UNSUPPORTED_CONTENT", "UNSUPPORTED_FOCUS_ICON"} else 503 if error.code.endswith(("UNAVAILABLE", "MISMATCH")) else 500
-            return problem(error.code, status, "render")
-        except SpikeError as error:
-            return problem(lifecycle_code(error), 503, "render")
-        except asyncio.CancelledError:
-            await cancel_operation(task, files)
-            raise
-        except Exception:
-            return problem("RENDER_FAILED", 500, "render")
-        finally:
-            watcher.cancel()
 
     login_task: asyncio.Task | None = None
     install_task: asyncio.Task | None = None
@@ -1151,9 +608,8 @@ def create_app(*, origin: str, secret: str, temp_root: Path, dist: Path, runner:
         try:
             rules_store.load()
             value = preferences_store.save_analysis(payload.automatic_analysis)
-            await gui_projects.set_analysis_preference(value.automatic_analysis)
             return JSONResponse(value.model_dump(mode="json", by_alias=True), headers={"Cache-Control": "no-store"})
-        except (PreferencesFailure, RulesFailure, ProjectFailure) as error:
+        except (PreferencesFailure, RulesFailure) as error:
             return problem(error.code, 409, "settings")
 
     @app.put("/v1/settings/limits")
@@ -1212,7 +668,7 @@ def create_app(*, origin: str, secret: str, temp_root: Path, dist: Path, runner:
             if INFERENCE.blocked:
                 connection_state = ConnectionPayload(state="cleanup_blocked")
                 return connection_response()
-            if INFERENCE.locked() or background_enabled and not jobs.supervisor.login_allowed():
+            if INFERENCE.locked():
                 return connection_response() if kind not in {"login", "install"} else problem("BUSY", 429, "host", True)
             if kind == "login" and connection_state.state != "login_required":
                 return problem("LOGIN_NOT_AVAILABLE", 409, "host")
@@ -1253,7 +709,7 @@ def create_app(*, origin: str, secret: str, temp_root: Path, dist: Path, runner:
             if kind in {"login", "install"}:
                 connection_epoch += 1
                 epoch = connection_epoch
-                agent.request_stop(reason="AGENT_CONNECTION_CHANGED")
+                assistant.stop_all()
                 if kind == "install":
                     install_task = task
                 else:
@@ -1268,7 +724,7 @@ def create_app(*, origin: str, secret: str, temp_root: Path, dist: Path, runner:
                         connection.executable = result
                         connection.experimental_profile = experimental_profile
                         provider = CodexCliProvider(result, experimental_profile=experimental_profile)
-                        agent.runtime = CodexAgentRuntime(connection, temp_root)
+                        assistant.runtime = CodexAgentRuntime(connection, temp_root)
                         if epoch == connection_epoch:
                             connection_state = ConnectionPayload(state="unchecked")
                     return connection_response()
@@ -1405,21 +861,16 @@ def create_app(*, origin: str, secret: str, temp_root: Path, dist: Path, runner:
                 provider.invalidate_preflight()
             connection_epoch += 1
             connection_state = ConnectionPayload(state="detached")
-            if background_enabled:
-                jobs.supervisor.confirmed_account_change(jobs.store.dispatch_state().account_generation + 1)
             current = list(connection_work.items())
-            generating = list(semantic_work.items())
-            gui_projects.request_shutdown()
-            rich_projects.request_shutdown()
-            agent.request_stop(reason="AGENT_CONNECTION_CHANGED")
+            intake.request_shutdown()
+            rewrite.request_shutdown()
+            assistant.stop_all()
         codes = await asyncio.gather(*(stop_connection(task, files, cancel)
-                                       for task, (files, cancel) in current),
-                                     *(stop_semantic(task, files, cancel)
-                                       for task, (files, cancel) in generating))
+                                       for task, (files, cancel) in current))
         try:
-            await gui_projects.shutdown()
-            await rich_projects.shutdown(close_agent=False)
-        except (ProjectFailure, AgentFailure):
+            await intake.shutdown()
+            await rewrite.shutdown()
+        except ProjectFailure:
             unsafe_code = SpikeError("PROCESS_CLEANUP_FAILED")
             lifecycle_code(unsafe_code)
         if any(code is not None for code in codes) or unsafe_cleanup:
@@ -1435,115 +886,18 @@ def create_app(*, origin: str, secret: str, temp_root: Path, dist: Path, runner:
             if provider is not None:
                 provider.invalidate_preflight()
             connection_epoch += 1
-            agent.request_stop(reason="AGENT_CONNECTION_CHANGED")
+            assistant.stop_all()
             connection_state = ConnectionPayload(state="login_required", version=connection_state.version)
             files, cancel = connection_work[current]
         code = await stop_connection(current, files, cancel)
-        try:
-            await agent.stop_all(reason="AGENT_CONNECTION_CHANGED")
-        except AgentFailure:
-            connection_state = ConnectionPayload(state="cleanup_blocked")
         if code is not None or unsafe_cleanup:
             connection_state = ConnectionPayload(state="cleanup_blocked")
         return connection_response()
 
-    app.add_api_route("/v1/extract", extract, methods=["POST"])
-    app.add_api_route("/v1/facts", facts, methods=["POST"])
-    app.add_api_route("/v1/facts/normalize", normalize_facts, methods=["POST"])
-    app.add_api_route("/v1/facts/draft", draft_facts, methods=["POST"])
-    app.add_api_route("/v1/facts/rewrite", rewrite_facts, methods=["POST"])
-    app.add_api_route("/v1/validate", validate, methods=["POST"])
-    app.add_api_route("/v1/prepare-render", prepare_render, methods=["POST"])
-    app.add_api_route("/v1/render", render, methods=["POST"])
     for path, handler in (("discover", discover), ("status", status), ("models", models),
                           ("login", login), ("select", select), ("detach", detach),
                           ("cancel-login", cancel_login), ("install", install_cli), ("cancel-install", cancel_install)):
         app.add_api_route(f"/v1/host/{path}", handler, methods=["POST"])
-
-    async def text_operation(kind: str, request: Request, payload: TextRequest):
-        nonlocal active, count
-        if runner is None:
-            return problem("FEATURE_UNAVAILABLE", 501, kind)
-        request_id = "op_" + uuid.uuid4().hex
-
-        async def events():
-            nonlocal active, count
-            acquired = False
-            handed_off = False
-            task: asyncio.Task | None = None
-            files: OperationFiles | None = None
-            sequence = 1
-            try:
-                reject_code: str | None = None
-                async with gate:
-                    if unsafe_cleanup or cancellation_pending or active >= MAX_CONCURRENT:
-                        reject_code = "BUSY"
-                    elif count >= MAX_OPERATIONS:
-                        reject_code = "OPERATION_LIMIT"
-                    else:
-                        count += 1
-                        active += 1
-                        acquired = True
-                if reject_code is not None:
-                    failed = FailedEvent(requestId=request_id, sequence=1, type="operation.failed",
-                                         baseRevision=payload.baseRevision,
-                                         payload=ErrorPayload(code=reject_code, retryable=reject_code == "BUSY", stage=kind))
-                    yield (failed.model_dump_json() + "\n").encode()
-                    return
-                started = StartedEvent(requestId=request_id, sequence=sequence, type="operation.started",
-                                       baseRevision=payload.baseRevision, payload=StartedPayload(stage=kind))
-                yield (started.model_dump_json() + "\n").encode()
-                files = OperationFiles(temp_root)
-
-                async def execute():
-                    with files.open():
-                        return await runner.run(kind, payload, files)
-
-                task = asyncio.create_task(execute())
-                operations[task] = files
-                task.add_done_callback(operation_done)
-                handed_off = True
-                try:
-                    result, usage = await asyncio.wait_for(asyncio.shield(task), timeout=TIMEOUT_SECONDS)
-                except asyncio.TimeoutError:
-                    raise OperationTimeout() from None
-                completed = CompletedEvent(requestId=request_id, sequence=sequence + 1, type="operation.completed",
-                                           baseRevision=payload.baseRevision,
-                                           payload=CompletedPayload(result=result, usage=usage))
-                yield (completed.model_dump_json() + "\n").encode()
-            except asyncio.CancelledError:
-                if task is not None and files is not None:
-                    await cancel_operation(task, files)
-                raise
-            except Exception as error:
-                code = lifecycle_code(error) if isinstance(error, SpikeError) else "OPERATION_TIMEOUT" if isinstance(error, OperationTimeout) else "OPERATION_FAILED"
-                if task is not None and files is not None and not task.done():
-                    cleanup_code = await cancel_operation(task, files)
-                    if cleanup_code:
-                        code = cleanup_code
-                failed = FailedEvent(requestId=request_id, sequence=sequence + 1, type="operation.failed",
-                                     baseRevision=payload.baseRevision,
-                                     payload=ErrorPayload(code=code, retryable=False, stage=kind))
-                yield (failed.model_dump_json() + "\n").encode()
-            finally:
-                if acquired and not handed_off:
-                    async with gate:
-                        active -= 1
-
-        return StreamingResponse(events(), media_type="application/x-ndjson", headers={"Cache-Control": "no-store"})
-
-    async def normalize(request: Request, payload: NormalizeRequest):
-        return await text_operation("normalize", request, payload)
-
-    async def draft(request: Request, payload: DraftRequest):
-        return await text_operation("draft", request, payload)
-
-    async def rewrite(request: Request, payload: RewriteRequest):
-        return await text_operation("rewrite", request, payload)
-
-    app.add_api_route("/v1/normalize", normalize, methods=["POST"])
-    app.add_api_route("/v1/draft", draft, methods=["POST"])
-    app.add_api_route("/v1/rewrite", rewrite, methods=["POST"])
 
     @app.get("/{path:path}")
     async def static(path: str):

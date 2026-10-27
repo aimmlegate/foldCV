@@ -3,7 +3,7 @@
 from pydantic import TypeAdapter
 
 from .models.contracts import PartialDate
-from .models.recovery import EvidenceSpan
+from .models.evidence import EvidenceSpan
 from .models.rich_facts import RichFact, WorkingField, RecordTombstone
 from .rich_fact_mutations import _revise
 from .rich_fields import working_field

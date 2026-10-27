@@ -2,25 +2,23 @@
 
 import pytest
 
-from packages.resume_core.agent_edits import semantic
+from packages.resume_core.template_inverse import semantic
 from packages.resume_core.models.template_authoring import TemplateEditPreparationV1
-from packages.resume_core.models.template_document import FieldOccurrence, PresentedText, TemplateParagraphBlock
-from packages.resume_core.models.rich_facts import WorkingPeriod
+from packages.resume_core.models.template_document import FieldOccurrence, PresentedText, TemplateParagraphBlock, TemplateSectionBlock
+from packages.resume_core.models.rich_facts import TechnologyRecord, TextField, WorkingPeriod
 from packages.resume_core.models.template_workspace import WorkspaceV7
-from packages.resume_core.models.template_writer import WriterPrepareEditV2
-from packages.resume_core.rich_archive import export_rich_archive, open_rich_archive
+from packages.resume_core.archive_zip import write_zip
+from packages.resume_core.template_archive import archive_payload_v7, open_archive_v7
 from packages.resume_core.rich_fields import field_key, set_text
 from packages.resume_core.rich_mutations import apply_rich_mutation
 from packages.resume_core.template_inverse import inverse_template_mutation
 from packages.resume_core.template_preparation import prepare_edit
 from packages.resume_core.templates.compiler import canonical
+from tests.templates.editor_fixtures import TemplateEditor
 from tests.templates.test_builtin_scopes import scoped_workspace
-from tests.templates.test_compact_save import compact_command
 from tests.templates.test_relation_transactions import related_workspace, owner_sections
 from tests.templates.test_structural_preparation import intent
-from tests.templates.test_template_local_history import history_request
-from tests.templates.test_template_preparation import command as text_command, proof, response
-from tests.templates.test_template_writers import TemplateWriterFixture
+from tests.templates.test_template_preparation import command as text_command, response
 from tests.templates.test_transactions import authorization, issue
 
 
@@ -56,9 +54,9 @@ def panel(before, operation='edit', *, values=None, period_id=None, identifier='
 
 def prepared(before, request):
     raw=canonical(before)
-    result=prepare_edit(response(before),request,proof())
+    result=prepare_edit(response(before),request)
     assert canonical(before)==raw
-    assert canonical(result)==canonical(prepare_edit(response(before),request,proof()))
+    assert canonical(result)==canonical(prepare_edit(response(before),request))
     if result.mutation:
         assert apply_rich_mutation(before,result.mutation)[0]==result.preview.workspace
     return result
@@ -102,6 +100,101 @@ def test_unchanged_panel_input_is_a_true_noop_without_issue_retirement():
     result=prepared(before,panel(before,values={'employer':record.employer.raw_text}))
     assert result.mutation is None and result.created_ids=={'panel':{}}
     assert result.preview.workspace==before and result.preview.durability=='durable'
+
+
+def _named(name):
+    return TextField(value=name,rawText=name,status='known',revision=1,pendingRawText=None)
+
+
+def _technology(identifier,name,job):
+    text=_named(name)
+    return TechnologyRecord(id=identifier,kind='technology',revision=1,origin='user',evidence=[],
+        jobId=job,subprojectId=None,display=text,canonicalId=text.model_copy(update={'value':name.lower()}))
+
+
+def _span(record,presentation,suffix):
+    root=record.id+suffix+'-root'
+    return FieldOccurrence(type='fact_field',bindingId=record.id+suffix+'-fragment',bindingRootId=root,
+        recordId=record.id,fieldKey='display',cellId=field_key(record.id,'display'),occurrenceId=root,complete=True,
+        presentation=presentation,text=record.display.raw_text,styles={},syncedFactRevision=1)
+
+
+def _line(identifier,records,presentation,prefix='',suffix=''):
+    content=[]
+    if prefix:
+        content.append(PresentedText(type='text',text=prefix,styles={},presentation=presentation))
+    for record in records:
+        if any(isinstance(span,FieldOccurrence) for span in content):
+            content.append(PresentedText(type='text',text=', ',styles={},presentation=presentation))
+        content.append(_span(record,presentation,suffix))
+    return TemplateParagraphBlock(type='paragraph',id=identifier,revision=1,props={},children=[],
+        content=content,provenance=[],presentation=presentation)
+
+
+def technology_workspace():
+    before,_sources=scoped_workspace()
+    presentation=before.project.document.regions[2].blocks[0].presentation
+    records=[_technology(name,label,'employer-a') for name,label in
+        (('python','Python'),('postgres','PostgreSQL'),('docker','Docker'))]
+    other=_technology('go','Go','employer-b')
+    hidden=_technology('rust','Rust','employer-a')
+    before.project.facts.records.extend([*records,other,hidden])
+    focus=_line('focus-line',[records[0],records[2]],presentation,suffix='-focus')
+    before.project.document.regions[2].blocks.extend([
+        _line('tool-line',records,presentation,prefix='Tools: ',suffix='-job'),
+        TemplateSectionBlock(type='section',id='focus-tools',revision=1,props={'recordId':None,'presentation':'focus'},
+            content=[],children=[focus],provenance=[],presentation=presentation),
+        _line('other-tools',[other],presentation,suffix='-other')])
+    return WorkspaceV7.model_validate(before.model_dump(by_alias=True))
+
+
+def move(before,record_id,before_id,identifier='panel-move'):
+    capture={'sessionId':'session','actionId':identifier,'actionToken':1,'dependencies':[]}
+    command={'operation':'move_technology','recordId':record_id,'recordKind':'technology','jobId':None,'periodId':None,
+        'values':{},'factsRevision':before.project.facts.revision,'documentRevision':before.document_revision,'capture':capture}
+    if before_id is not None:
+        command['beforeRecordId']=before_id
+    return TemplateEditPreparationV1(schemaVersion=1,clientMutationId=identifier,snapshot=response(before).snapshot,
+        capture=capture,operations=[{'kind':'builtin_panel','opId':'panel','command':command}])
+
+
+def _chips(before,identifier):
+    block=next(value for value in before.project.document.blocks() if value.id==identifier)
+    return [span.text if isinstance(span,FieldOccurrence) else span.text for span in block.content]
+
+
+def test_technology_reorder_moves_one_job_list_and_undoes():
+    before=technology_workspace()
+    result=prepared(before,move(before,'docker','python'))
+    current=result.preview.workspace
+    assert _chips(current,'tool-line')==['Tools: ','Docker',', ','Python',', ','PostgreSQL']
+    assert _chips(current,'focus-line')==['Python',', ','Docker']
+    assert _chips(current,'other-tools')==['Go']
+    assert [record.display.raw_text for record in current.project.facts.records if record.kind=='technology']==[
+        'Python','PostgreSQL','Docker','Go','Rust']
+    assert [value.state for value in current.project.import_issues]==['active','active']
+    restore(before,result)
+    ended=prepared(before,move(before,'python',None,identifier='panel-move-end'))
+    assert _chips(ended.preview.workspace,'tool-line')==['Tools: ','PostgreSQL',', ','Docker',', ','Python']
+    restore(before,ended)
+
+
+def test_technology_reorder_already_in_place_is_a_noop():
+    before=technology_workspace()
+    result=prepared(before,move(before,'python','postgres'))
+    assert result.mutation is None and result.preview.workspace==before
+
+
+def test_technology_reorder_rejects_another_job_or_a_list_that_does_not_contain_both():
+    before=technology_workspace()
+    raw=canonical(before)
+    with pytest.raises(ValueError,match='TECHNOLOGY_MOVE_INVALID'):
+        prepare_edit(response(before),move(before,'docker','go'))
+    with pytest.raises(ValueError,match='TECHNOLOGY_MOVE_INVALID'):
+        prepare_edit(response(before),move(before,'rust','python'))
+    with pytest.raises(ValueError,match='TECHNOLOGY_TARGET_MISSING'):
+        prepare_edit(response(before),move(before,'docker','rust'))
+    assert canonical(before)==raw
 
 
 def test_period_endpoint_switch_updates_every_binding_identity_and_preserves_authored_marks():
@@ -149,7 +242,7 @@ def test_independent_link_references_reject_panel_changes_even_without_field_chi
         labelBinding=bound if binding=='label' else None,urlBinding=bound if binding=='url' else None,presentation=original.presentation)
     before=WorkspaceV7.model_validate(before.model_dump(by_alias=True));raw=canonical(before)
     with pytest.raises(ValueError,match='semantic link panel editing'):
-        prepare_edit(response(before),panel(before,values={'employer':'Changed company'}),proof())
+        prepare_edit(response(before),panel(before,values={'employer':'Changed company'}))
     assert canonical(before)==raw
     role=prepared(before,panel(before,values={'role':'Unrelated role'}))
     assert role.preview.workspace.project.document.regions[2].blocks[0].content[0]==block.content[0]
@@ -223,7 +316,7 @@ def test_period_deletion_detaches_unowned_human_scope_and_history_restores_its_e
 def test_panel_edit_detaches_only_last_unowned_manual_display_and_preserves_historical_scope():
     before,_=scoped_workspace();block=before.project.document.regions[2].blocks[0]
     joined=text_command(before,start=0,end=sum(len(span.text) for span in block.content),text='Exact company and role')
-    before=prepare_edit(response(before),joined,proof()).preview.workspace
+    before=prepare_edit(response(before),joined).preview.workspace
     result=prepared(before,panel(before,values={'employer':'Direct company','role':'Direct role'}))
     current=result.preview.workspace
     assert current.project.facts.manual_scopes==before.project.facts.manual_scopes
@@ -262,43 +355,38 @@ def test_stale_or_unsupported_panel_request_retains_base(damage):
     elif damage=='capture':command.capture.action_token+=1
     else:command.operation='add_period'
     raw=canonical(before)
-    with pytest.raises(ValueError):prepare_edit(response(before),request,proof())
+    with pytest.raises(ValueError):prepare_edit(response(before),request)
     assert canonical(before)==raw
 
 
-def test_real_compact_panel_save_undo_redo_reopen_and_archive(tmp_path):
-    before,sources=scoped_workspace();fixture=TemplateWriterFixture(tmp_path,before,sources)
+def test_real_panel_save_undo_redo_reopen_and_archive(tmp_path):
+    before,sources=scoped_workspace();editor=TemplateEditor(tmp_path,before,sources)
     request=panel(before,values={'employer':'Human employer'})
-    request.capture.session_id=fixture.proof.session_id
     request.operations[0].command.capture=request.capture.model_copy(deep=True)
-    wrapped=WriterPrepareEditV2(schemaVersion=2,proof=fixture.proof,preparation=request)
-    value=fixture.writers.prepare_edit_delta(fixture.project,wrapped)
-    saved=fixture.writers.save(fixture.project,compact_command(fixture,value),originals=fixture.originals)
-    undo=fixture.writers.local_history_command(fixture.project,history_request(fixture,saved.local_history_ack),originals=fixture.originals)
-    assert semantic(undo.workspace.project.document)==semantic(before.project.document)
-    redo=fixture.writers.local_history_command(fixture.project,history_request(fixture,undo.local_history_ack,'redo','redo-panel'),originals=fixture.originals)
-    reopened=fixture.current()
+    editor.edit(request)
+    undo=editor.undo('undo-panel',expected='panel-edit').response.workspace
+    assert semantic(undo.project.document)==semantic(before.project.document)
+    redo=editor.redo('redo-panel',expected='panel-edit').response.workspace
+    reopened=editor.reopen()
     assert any(span.text=='Human employer' for block in reopened.project.document.blocks() for span in block.content)
-    transferred,retained,_,_=open_rich_archive(export_rich_archive(reopened,sources,{},{}),'panel-transfer')
+    transferred,retained,_,_=open_archive_v7(write_zip(archive_payload_v7(reopened,sources,{})),'panel-transfer')
     assert transferred.project.document==reopened.project.document and transferred.project.facts==reopened.project.facts
-    assert retained==sources and redo.workspace==reopened
+    assert retained==sources and redo==reopened
 
 
-@pytest.mark.parametrize('form',['full','delta'])
-def test_actual_preparer_maps_tree_guard_failure_without_accepting_an_id_or_changing_input(tmp_path,form):
-    from packages.resume_core.background_store import BackgroundFailure
-    before,sources=scoped_workspace();fixture=TemplateWriterFixture(tmp_path,before,sources)
+def test_actual_preparer_maps_tree_guard_failure_without_accepting_an_id_or_changing_input(tmp_path):
+    from resume_api.projects.errors import ProjectFailure
+    before,sources=scoped_workspace();editor=TemplateEditor(tmp_path,before,sources)
     block=before.project.document.regions[2].blocks[0]
     request=intent(before,'move_block',blockId=block.id,beforeRevision=block.revision,
         placement={'parentId':'missing','afterId':None})
-    request.capture.session_id=fixture.proof.session_id
-    wrapped=WriterPrepareEditV2(schemaVersion=2,proof=fixture.proof,preparation=request)
-    method=fixture.writers.prepare_edit if form=='full' else fixture.writers.prepare_edit_delta
-    raw=canonical(fixture.current())
-    with pytest.raises(BackgroundFailure,match='JOB_SCOPE_INVALID'):
-        method(fixture.project,wrapped)
-    assert canonical(fixture.current())==raw
-    opening=fixture.writers.preparations.openings.get(fixture.project)
-    assert opening is None or request.client_mutation_id not in opening.entries
+    raw=canonical(editor.current())
+    with pytest.raises(ProjectFailure) as refused:
+        editor.edit(request)
+    assert (refused.value.code,refused.value.status)==('V7_INPUT_REJECTED',422)
+    assert canonical(editor.current())==raw
+    assert request.client_mutation_id not in editor.session().replays
     request.operations[0].placement.parent_id='main'
-    assert method(fixture.project,wrapped).client_mutation_id==request.client_mutation_id
+    request.operations[0].placement.after_id=before.project.document.regions[2].blocks[-1].id
+    assert editor.edit(request).client_mutation_id==request.client_mutation_id
+    assert editor.current().project.document.regions[2].blocks[-1].id==block.id

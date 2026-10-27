@@ -5,19 +5,22 @@ import threading
 
 from packages.resume_core.preferences import PreferencesFailure
 from packages.resume_core.text_rewrite import PlainTextReply, plain_prompt
-from .gui_admission import AdmissionCancelled, QueuedProvider
-from .gui_content import generate_admitted
-from .gui_projects import ProjectFailure
-from .lifecycle import OperationFiles
+from .inference_admission import AdmissionCancelled
+from .lifecycle import OperationFiles, SpikeError
+from .projects.errors import ProjectFailure
+from .providers.admitted import QueuedProvider, generate_admitted
 from .providers.content import ContentFailure, ContentInput, GenerationPolicy
+
+CANCEL_SECONDS = 65
 
 
 class TemplateRewrite:
-    @staticmethod
-    def _rewrite_key(identifier, request_id):
-        return identifier, 'template-rewrite:' + request_id
+    def __init__(self, provider_factory, *, preferences, temp_root, worker_slot, cleanup_error):
+        self.provider_factory, self.preferences, self.temp_root = provider_factory, preferences, temp_root
+        self.worker_slot, self.cleanup_error = worker_slot, cleanup_error
+        self.tasks, self.cancels, self.files = {}, {}, {}
 
-    async def template_rewrite_text(self, identifier, request_id, instruction, source):
+    async def text(self, identifier, request_id, instruction, source):
         selected = self.provider_factory()
         if selected is None:
             raise ProjectFailure('CONNECTION_REQUIRED', 409)
@@ -25,7 +28,7 @@ class TemplateRewrite:
             effort = self.preferences.load().rewrite_reasoning_effort if self.preferences else None
         except PreferencesFailure as error:
             raise ProjectFailure(error.code, 409) from None
-        key = self._rewrite_key(identifier, request_id)
+        key = (identifier, request_id)
         if key in self.cancels:
             raise ProjectFailure('REQUEST_IN_PROGRESS', 409)
         cancel, files = threading.Event(), OperationFiles(self.temp_root)
@@ -43,6 +46,9 @@ class TemplateRewrite:
             return PlainTextReply.model_validate(response.value).text
         except AdmissionCancelled:
             raise ProjectFailure('CANCELLED', 409) from None
+        except SpikeError as error:
+            self.cleanup_error(error)
+            raise ProjectFailure(error.code, 503) from None
         except ContentFailure as error:
             raise ProjectFailure(error.code, 409 if error.code == 'CANCELLED' else 502) from None
         finally:
@@ -50,9 +56,34 @@ class TemplateRewrite:
             self.cancels.pop(key, None)
             self.files.pop(key, None)
 
-    def template_rewrite_cancel(self, identifier, request_id):
-        cancel = self.cancels.get(self._rewrite_key(identifier, request_id))
+    def cancel(self, identifier, request_id):
+        cancel = self.cancels.get((identifier, request_id))
         if cancel is None:
             return False
         cancel.set()
         return True
+
+    def request_shutdown(self):
+        for cancel in list(self.cancels.values()):
+            cancel.set()
+
+    async def shutdown(self):
+        """Stop every running rewrite and wait for it; a worker that does not stop blocks new work."""
+        self.request_shutdown()
+        for key, task in list(self.tasks.items()):
+            files = self.files.get(key)
+            try:
+                if files is not None:
+                    files.stop_worker()
+            except SpikeError as error:
+                self.cleanup_error(error)
+                raise ProjectFailure('PROCESS_CLEANUP_FAILED', 503) from None
+            if task is asyncio.current_task() or task.done():
+                continue
+            try:
+                await asyncio.wait_for(asyncio.shield(task), timeout=CANCEL_SECONDS)
+            except asyncio.TimeoutError:
+                self.cleanup_error(SpikeError('PROCESS_CLEANUP_FAILED'))
+                raise ProjectFailure('PROCESS_CLEANUP_FAILED', 503) from None
+            except Exception:
+                pass

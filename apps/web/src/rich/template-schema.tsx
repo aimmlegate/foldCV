@@ -18,7 +18,7 @@ const boundLink = createReactInlineContentSpec({ type: "boundLink", content: "st
 } }, { render: ({ inlineContent, contentRef }) => <span className="cv-bound-link" data-href={inlineContent.props.href}
   data-cell-id={inlineContent.props.cellId} ref={contentRef} /> });
 
-/** The same blocks and style rules as the V1 editor; only the V7 inline identities differ. */
+/** The shared blocks and style rules with the V7 inline identities. */
 export const templateSchema = BlockNoteSchema.create({ blockSpecs: schema.blockSpecs,
   inlineContentSpecs: { ...defaultInlineContentSpecs, templateField, manualScope, boundLink } });
 allowRichCodeStyles(templateSchema);

@@ -1,13 +1,12 @@
 import { useState } from "react";
-import type { RichProjectResponse } from "../../contracts/generated/rich_project_response";
 import { Icon } from "../ui/Icon";
 import { OriginalPreview } from "./OriginalPreview";
 import { originalUrl } from "./original-source";
 
-type Sources = NonNullable<RichProjectResponse["workspace"]["project"]>["sources"];
+type SourceFile = { id: string; originalName: string; byteSha256: string };
 
 export function SourceDialog({ projectId, sources, expanded, toggle, close }: {
-  projectId: string; sources: Sources; expanded: boolean; toggle: () => void; close: () => void;
+  projectId: string; sources: SourceFile[]; expanded: boolean; toggle: () => void; close: () => void;
 }) {
   const [id, setId] = useState(sources[0]?.id ?? "");
   const source = sources.find(item => item.id === id) ?? sources[0];

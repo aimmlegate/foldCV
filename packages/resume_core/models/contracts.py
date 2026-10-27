@@ -629,25 +629,3 @@ def validate_manifest(manifest: ZipManifest) -> ZipManifest:
             raise ValueError("unsafe ZIP path")
     return manifest
 
-
-def validate_contract(kind: str, data: object) -> Wire:
-    models = {"project": Project, "proposal": Proposal, "template": TemplateManifest,
-              "zip_manifest": ZipManifest, "archive_manifest": ArchiveManifest}
-    from .recovery import RECOVERY_CONTRACTS
-    from ..gui_normalization import GUI_NORMALIZATION_CONTRACTS
-    from ..gui_drafting import GUI_DRAFT_CONTRACTS
-    from ..gui_projects import GUI_PROJECT_CONTRACTS
-    from .agent import AGENT_CONTRACTS
-    from .background import BACKGROUND_CONTRACTS
-    from ..rich_panel import RichPanelRequest
-    models.update(RECOVERY_CONTRACTS)
-    models.update(GUI_NORMALIZATION_CONTRACTS)
-    models.update(GUI_DRAFT_CONTRACTS)
-    models.update(GUI_PROJECT_CONTRACTS)
-    models.update(AGENT_CONTRACTS)
-    models.update(BACKGROUND_CONTRACTS)
-    models["rich_panel_request"] = RichPanelRequest
-    if kind not in models:
-        raise ValueError("unknown contract")
-    result = models[kind].model_validate(data)
-    return result

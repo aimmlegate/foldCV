@@ -4,13 +4,13 @@ from copy import deepcopy
 
 import pytest
 
-from packages.resume_core.agent_edits import semantic
+from packages.resume_core.template_inverse import semantic
 from packages.resume_core.models.template_authoring import TemplateEditPreparationV1
 from packages.resume_core.models.template_document import FieldOccurrence, PresentedText, TemplateParagraphBlock
 from packages.resume_core.models.template_facts import WorkingFactsV2
 from packages.resume_core.models.template_workspace import WorkspaceV7
-from packages.resume_core.models.template_writer import WriterPrepareEditV2
-from packages.resume_core.rich_archive import export_rich_archive, open_rich_archive
+from packages.resume_core.archive_zip import write_zip
+from packages.resume_core.template_archive import archive_payload_v7, open_archive_v7
 from packages.resume_core.rich_fields import builtin_cell_values, field_key
 from packages.resume_core.rich_mutations import apply_rich_mutation, RichMutationFailure
 from packages.resume_core.template_assembly import assemble_template
@@ -21,13 +21,11 @@ from packages.resume_core.template_preparation_ids import EditIdAllocator,existi
 from packages.resume_core.templates.compiler import canonical, compile_bytes
 from packages.resume_core.templates.materialize_nodes import reference
 from packages.resume_core.templates.store import BUNDLED_TEMPLATE
+from tests.templates.editor_fixtures import TemplateEditor
 from tests.templates.pipeline_fixtures import source_draft
-from tests.templates.test_compact_save import compact_command
 from tests.templates.test_materialize import admitted
 from tests.templates.test_panel_preparation import prepared, restore
-from tests.templates.test_template_local_history import history_request
-from tests.templates.test_template_preparation import proof, response
-from tests.templates.test_template_writers import TemplateWriterFixture
+from tests.templates.test_template_preparation import response
 
 
 def employment_workspace():
@@ -164,7 +162,7 @@ def test_multiple_copied_sections_require_explicit_exact_owner_context():
     before.project.document.regions[2].blocks.append(copied)
     before=WorkspaceV7.model_validate(before.model_dump(by_alias=True))
     with pytest.raises(ValueError,match='one authored employment section'):
-        prepare_edit(response(before),request(before,operation='add_period',record_id=section.props.record_id),proof())
+        prepare_edit(response(before),request(before,operation='add_period',record_id=section.props.record_id))
     copied_period=period_block(copied)
     result=prepared(before,request(before,operation='add_period',record_id=section.props.record_id,
         context=context(copied,copied_period),values={'start':'2026'}))
@@ -179,7 +177,7 @@ def test_new_employment_context_cannot_make_it_a_child_of_an_existing_employment
     before,_=employment_workspace();section=owner(before)
     raw=canonical(before)
     with pytest.raises(ValueError,match='another item child'):
-        prepare_edit(response(before),request(before,context=context(section)),proof())
+        prepare_edit(response(before),request(before,context=context(section)))
     assert canonical(before)==raw
 
 
@@ -189,7 +187,7 @@ def test_two_configured_views_require_a_context_and_never_choose_by_declaration_
         config['blocks'].append(other)
     before=empty_configure(edit)
     with pytest.raises(ValueError,match='one captured view'):
-        prepare_edit(response(before),request(before),proof())
+        prepare_edit(response(before),request(before))
     package=before.project.template_package;view=package.definition.blocks[1]
     block=TemplateParagraphBlock(type='paragraph',id='explicit-view-context',revision=1,props={},children=[],provenance=[],
         presentation=reference(package,view.id,view.view.nodes[0].style,'context-instance',node_index=0),
@@ -206,7 +204,7 @@ def test_two_configured_views_require_a_context_and_never_choose_by_declaration_
     chosen['placement']={'parentId':wrong.id,'afterId':None}
     raw=canonical(before)
     with pytest.raises(ValueError,match='another item child'):
-        prepare_edit(response(before),request(before,context=chosen,values={'employer':'Wrong container'}),proof())
+        prepare_edit(response(before),request(before,context=chosen,values={'employer':'Wrong container'}))
     assert canonical(before)==raw
 
 
@@ -237,13 +235,13 @@ def test_an_unsupported_node_selecting_new_canonical_fields_rejects_instead_of_d
         config['blocks'][0]['view']['nodes']=[{'type':'link','name_field':'/company','url_field':'/role','style':'body'}]
     before=empty_configure(edit);raw=canonical(before)
     with pytest.raises(ValueError,match='creation node is unsupported'):
-        prepare_edit(response(before),request(before,values={'employer':'Keep raw','role':'https://example.test'}),proof())
+        prepare_edit(response(before),request(before,values={'employer':'Keep raw','role':'https://example.test'}))
     assert canonical(before)==raw
 
 
 def test_new_canonical_selector_collision_rejects_without_partial_creation():
     before=empty_configure(lambda _config:None);value=request(before,values={'employer':'Collision'})
-    allocator=EditIdAllocator(proof(),value.client_mutation_id,'new-item',existing_ids(before))
+    allocator=EditIdAllocator(before.project_id, value.client_mutation_id,'new-item',existing_ids(before))
     record=allocator.allocate('employment',['panel-employment'])
     selector=field_key(record,'employer');package=before.project.template_package
     before.project.document.regions[2].blocks.append(TemplateParagraphBlock(type='paragraph',id=selector,revision=1,
@@ -252,18 +250,18 @@ def test_new_canonical_selector_collision_rejects_without_partial_creation():
     before=WorkspaceV7.model_validate(before.model_dump(by_alias=True));raw=canonical(before)
     value=request(before,values={'employer':'Collision'})
     with pytest.raises(ValueError,match='derived authoring identity collides'):
-        prepare_edit(response(before),value,proof())
+        prepare_edit(response(before),value)
     assert canonical(before)==raw
 
 
 def test_aliases_target_the_new_period_exactly_and_conflicts_retain_input():
     before,_=employment_workspace();section=owner(before)
     value=request(before,operation='add_period',record_id=section.props.record_id,values={'start':'2026'})
-    allocator=EditIdAllocator(proof(),value.client_mutation_id,'new-item',existing_ids(before))
+    allocator=EditIdAllocator(before.project_id, value.client_mutation_id,'new-item',existing_ids(before))
     period=allocator.allocate('period',['panel-period',section.props.record_id])
     key='period:'+period+':start'
     value.operations[0].command.values[key]='2025';raw=canonical(before)
-    with pytest.raises(ValueError,match='aliases conflict'):prepare_edit(response(before),value,proof())
+    with pytest.raises(ValueError,match='aliases conflict'):prepare_edit(response(before),value)
     assert canonical(before)==raw
     value.operations[0].command.values[key]='2026'
     result=prepared(before,value)
@@ -283,7 +281,7 @@ def test_copied_section_with_disagreeing_exact_employment_references_rejects_per
     added=WorkspaceV7.model_validate(added.model_dump(by_alias=True));raw=canonical(added)
     with pytest.raises(ValueError,match='one authored employment section'):
         prepare_edit(response(added),request(added,operation='add_period',record_id=original.props.record_id,
-            context=context(copied,period_block(copied)),identifier='conflicting-copy'),proof())
+            context=context(copied,period_block(copied)),identifier='conflicting-copy'))
     assert canonical(added)==raw
 
 
@@ -294,7 +292,7 @@ def test_conflicting_retained_paragraph_overrides_require_one_explicit_context_b
     section.children.append(copied)
     before=WorkspaceV7.model_validate(before.model_dump(by_alias=True))
     with pytest.raises(ValueError,match='overrides need explicit context'):
-        prepare_edit(response(before),request(before,operation='add_period',record_id=section.props.record_id),proof())
+        prepare_edit(response(before),request(before,operation='add_period',record_id=section.props.record_id))
     result=prepared(before,request(before,operation='add_period',record_id=section.props.record_id,
         context=context(section,copied),values={'start':'2026'}))
     current=next(block for block in result.preview.workspace.project.document.blocks() if block.id==section.id)
@@ -314,7 +312,7 @@ def test_multiple_period_nodes_require_the_explicit_captured_node_context():
     assert len(periods)==2 and periods[0].presentation.node_index!=periods[1].presentation.node_index
     with pytest.raises(ValueError,match='one compatible captured node'):
         prepare_edit(response(before),request(before,operation='add_period',record_id=section.props.record_id,
-            identifier='period-without-node'),proof())
+            identifier='period-without-node'))
     result=prepared(before,request(before,operation='add_period',record_id=section.props.record_id,
         context=context(section,periods[1]),values={'start':'2026'},identifier='period-selected-node'))
     changed=next(block for block in result.preview.workspace.project.document.blocks() if block.id==section.id)
@@ -338,7 +336,7 @@ def test_period_context_from_another_view_rejects_even_inside_the_selected_secti
     before=WorkspaceV7.model_validate(before.model_dump(by_alias=True));raw=canonical(before)
     with pytest.raises(ValueError,match='another captured view'):
         prepare_edit(response(before),request(before,operation='add_period',record_id=section.props.record_id,
-            context=context(section,foreign),identifier='foreign-period'),proof())
+            context=context(section,foreign),identifier='foreign-period'))
     assert canonical(before)==raw
 
 
@@ -379,24 +377,21 @@ def test_invalid_creation_retains_base_without_a_partial_record(damage):
         operation.placement_context=PanelPlacementContext(contextBlockId='missing',
             placement={'parentId':before.project.document.regions[2].id,'afterId':None})
     raw=canonical(before)
-    with pytest.raises((ValueError,RichMutationFailure)):prepare_edit(response(before),value,proof())
+    with pytest.raises((ValueError,RichMutationFailure)):prepare_edit(response(before),value)
     assert canonical(before)==raw
 
 
 def test_actual_prepared_creation_save_undo_redo_reopen_and_portable_transfer(tmp_path):
-    before,sources=employment_workspace();fixture=TemplateWriterFixture(tmp_path,before,sources)
+    before,sources=employment_workspace();editor=TemplateEditor(tmp_path,before,sources)
     value=request(before,values={'employer':'New exact company','start':'2026'})
-    value.capture.session_id=fixture.proof.session_id
     value.operations[0].command.capture=value.capture.model_copy(deep=True)
-    wrapped=WriterPrepareEditV2(schemaVersion=2,proof=fixture.proof,preparation=value)
-    delta=fixture.writers.prepare_edit_delta(fixture.project,wrapped)
-    saved=fixture.writers.save(fixture.project,compact_command(fixture,delta),originals=fixture.originals)
-    undo=fixture.writers.local_history_command(fixture.project,history_request(fixture,saved.local_history_ack),originals=fixture.originals)
-    assert semantic(undo.workspace.project.document)==semantic(before.project.document)
-    assert semantic(undo.workspace.project.facts.records)==semantic(before.project.facts.records)
-    fixture.writers.local_history_command(fixture.project,history_request(fixture,undo.local_history_ack,'redo','redo-creation'),originals=fixture.originals)
-    reopened=fixture.current()
+    editor.edit(value)
+    undo=editor.undo('undo-creation',expected='create-item').response.workspace
+    assert semantic(undo.project.document)==semantic(before.project.document)
+    assert semantic(undo.project.facts.records)==semantic(before.project.facts.records)
+    editor.redo('redo-creation',expected='create-item')
+    reopened=editor.reopen()
     assert any(record.kind=='employment' and record.employer.raw_text=='New exact company' for record in reopened.project.facts.records)
-    transferred,retained,_,_=open_rich_archive(export_rich_archive(reopened,sources,{},{}),'creation-transfer')
+    transferred,retained,_,_=open_archive_v7(write_zip(archive_payload_v7(reopened,sources,{})),'creation-transfer')
     assert transferred.project.document==reopened.project.document and transferred.project.facts==reopened.project.facts
     assert retained==sources

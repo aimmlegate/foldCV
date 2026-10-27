@@ -29,7 +29,7 @@ from resume_api.providers.content import (ContentFailure, ContentInput, ContentR
 from resume_api.providers.structured_schema import StructuredSchema
 from resume_api.providers.dynamic_result import DynamicResultSpec
 from resume_api.providers.preflight import PreflightCache, preflight_key
-from spikes.cli.profile import FIXTURE_VERSION, GAPS, REQUIRED_FLAGS, VERSION, exec_arguments, overrides
+from resume_api.cli.profile import FIXTURE_VERSION, GAPS, REQUIRED_FLAGS, VERSION, exec_arguments, overrides
 
 
 MODEL = re.compile(r"[a-zA-Z0-9][a-zA-Z0-9._-]{0,79}\Z")

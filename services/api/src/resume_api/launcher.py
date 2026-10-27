@@ -12,11 +12,12 @@ import subprocess
 import time
 import webbrowser
 
+from pydantic import Field
 import uvicorn
 
 from .app import create_app
-from .contracts import HostLaunchOptions
-from .lifecycle import require_supported_host
+from .host_models import Transport
+from .lifecycle import require_supported_host, tune_garbage_collector
 from .cli.experimental_profile import installed_profile
 
 
@@ -25,6 +26,11 @@ STARTUP_TIMEOUT_SECONDS = 5
 SHUTDOWN_TIMEOUT_SECONDS = 5
 # Template import is the default flow; the cap bounds one import's model calls (the CT06 live runs used 60).
 TEMPLATE_IMPORT_CALL_CAP = 60
+
+
+class HostLaunchOptions(Transport):
+    openBrowser: bool = True
+    port: int = Field(default=0, ge=0, le=65535)
 
 
 def trusted_temp_root() -> Path:
@@ -54,8 +60,8 @@ async def launch(*, port: int = 0, open_browser: bool = True,
                    if experimental_cli else None)
         app = create_app(origin=origin, secret=secret, temp_root=temp_root, dist=dist,
                          cli_executable=profile.executable if profile else cli_executable,
-                         experimental_profile=profile, background_enabled=True,
-                         template_import_call_cap=TEMPLATE_IMPORT_CALL_CAP)
+                         experimental_profile=profile, template_import_call_cap=TEMPLATE_IMPORT_CALL_CAP)
+        tune_garbage_collector()
         config = uvicorn.Config(app, host="127.0.0.1", port=actual_port, proxy_headers=False,
                                 access_log=False, server_header=False, log_level="critical",
                                 timeout_graceful_shutdown=2)

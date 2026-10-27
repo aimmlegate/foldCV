@@ -1,0 +1,84 @@
+{
+  "additionalProperties": false,
+  "properties": {
+    "detail": {
+      "additionalProperties": true,
+      "title": "Detail",
+      "type": "object"
+    },
+    "elapsed": {
+      "minimum": 0,
+      "title": "Elapsed",
+      "type": "number"
+    },
+    "error": {
+      "anyOf": [
+        {
+          "minLength": 1,
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "title": "Error"
+    },
+    "id": {
+      "minLength": 1,
+      "title": "Id",
+      "type": "string"
+    },
+    "kind": {
+      "enum": [
+        "import",
+        "export",
+        "rewrite"
+      ],
+      "title": "Kind",
+      "type": "string"
+    },
+    "projectId": {
+      "minLength": 1,
+      "title": "Projectid",
+      "type": "string"
+    },
+    "stage": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "title": "Stage"
+    },
+    "startedAt": {
+      "title": "Startedat",
+      "type": "string"
+    },
+    "state": {
+      "enum": [
+        "running",
+        "succeeded",
+        "failed",
+        "cancelled"
+      ],
+      "title": "State",
+      "type": "string"
+    }
+  },
+  "required": [
+    "id",
+    "projectId",
+    "kind",
+    "state",
+    "stage",
+    "startedAt",
+    "elapsed",
+    "detail",
+    "error"
+  ],
+  "title": "TaskStatusV1",
+  "type": "object"
+}

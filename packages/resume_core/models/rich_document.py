@@ -7,7 +7,7 @@ from typing import Annotated, Literal, Union
 from pydantic import Field, model_validator
 
 from .contracts import Id, Revision, Wire, _unique
-from .recovery import EvidenceSpan
+from .evidence import EvidenceSpan
 
 Color = Annotated[str, Field(pattern=r"^(default|#[a-fA-F0-9]{6})$")]
 Alignment = Literal["left", "center", "right", "justify"]

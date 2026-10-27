@@ -1,0 +1,31 @@
+{
+  "additionalProperties": false,
+  "description": "The body of a 409 for a stale base: the client drops what was applied and re-issues or reports the rest.",
+  "properties": {
+    "appliedClientMutationIds": {
+      "items": {
+        "minLength": 1,
+        "type": "string"
+      },
+      "title": "Appliedclientmutationids",
+      "type": "array"
+    },
+    "error": {
+      "additionalProperties": true,
+      "title": "Error",
+      "type": "object"
+    },
+    "revision": {
+      "minimum": 1,
+      "title": "Revision",
+      "type": "integer"
+    }
+  },
+  "required": [
+    "error",
+    "revision",
+    "appliedClientMutationIds"
+  ],
+  "title": "RevisionConflictV1",
+  "type": "object"
+}

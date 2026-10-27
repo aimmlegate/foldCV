@@ -17,6 +17,8 @@ from tests.templates.test_generic_import import body, shared, views
 from tests.templates.test_template_view_adapters import text
 
 
+pytestmark = pytest.mark.slow
+
 EXPORTS = {}
 F10_LINE = 'Reduced median latency by 80%.'
 # W01's measured Generic faces and sizes (half-points): name, profession, section, project, body.

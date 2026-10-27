@@ -9,8 +9,7 @@ from .rich_mutations import locate, parent_items, subtree
 from .template_anchors import anchor_steps
 from .template_authoring import (allocate_classified_blocks, copy_blocks, copy_fragment, inserted_paragraph, merge_blocks,
     move_occurrence_steps, split_block)
-from .template_preparation_common import finish_preparation, prepared_response, validate_preparation
-from .template_preparation_ids import EditIdAllocator, existing_ids
+from .template_preparation_common import allocator_for, finish_preparation, prepared_response, validate_preparation
 from .templates.compiler import canonical
 
 
@@ -50,13 +49,13 @@ def formatted(block, patch):
     return result
 
 
-def prepare_structure_edit(response, request, proof, *, clipboard=None):
-    validate_preparation(response, request, proof)
+def prepare_structure_edit(response, request, *, clipboard=None, occupied=None):
+    validate_preparation(response, request)
     workspace = response.workspace
     before = workspace.project
     candidate = before.model_copy(deep=True)
     operation = request.operations[0]
-    allocator = EditIdAllocator(proof, request.client_mutation_id, operation.op_id, existing_ids(workspace))
+    allocator = allocator_for(response, request, operation, occupied)
     steps, replacements = [], {}
 
     def put(block, parent_id, after_id):

@@ -4,9 +4,10 @@ import pytest
 
 from packages.resume_core.models.template_document import ManualScopeSpan, PresentedText
 from packages.resume_core.models.template_workspace import WorkspaceV7
-from packages.resume_core.rich_archive import export_rich_archive,open_rich_archive
+from packages.resume_core.archive_zip import write_zip
+from packages.resume_core.template_archive import archive_payload_v7, open_archive_v7
 from packages.resume_core.rich_mutations import RichMutationFailure,apply_rich_mutation,mutation_sha256
-from packages.resume_core.template_authoring import copy_blocks,split_block
+from packages.resume_core.template_authoring import split_block
 from packages.resume_core.template_inverse import inverse_template_mutation
 from packages.resume_core.template_mutations import HistoryAuthorization
 from packages.resume_core.template_preparation import prepare_text_edit
@@ -14,7 +15,7 @@ from packages.resume_core.template_scope_occurrences import active_scope_cells,s
 from packages.resume_core.templates.compiler import canonical
 from tests.templates.test_manual_scope_occurrences import shared_workspace
 from tests.templates.test_scope_displays import copied_workspace
-from tests.templates.test_template_preparation import command,proof,response
+from tests.templates.test_template_preparation import command,response
 
 
 def prepared(value,*,identifier='scope-edit',block_id=None,**kwargs):
@@ -23,7 +24,7 @@ def prepared(value,*,identifier='scope-edit',block_id=None,**kwargs):
     if block_id is not None:
         block=next(value for value in value.project.document.blocks() if value.id==block_id)
         request.operations[0].range.block_id=block.id;request.operations[0].range.before_revision=block.revision
-    return prepare_text_edit(response(value),request,proof())
+    return prepare_text_edit(response(value),request)
 
 
 @pytest.mark.parametrize('start,end,text,expected',[(1,4,'!','E!t human input'),(0,17,'',''),(2,6,'😀','Ex😀human input')])
@@ -147,7 +148,7 @@ def test_two_selected_scopes_share_only_current_cell_union_and_replacement_text(
     from packages.resume_core.template_preparation_ids import EditIdAllocator,existing_ids
     from tests.templates.test_scope_displays import command as mutation
     before,_=shared_workspace();block=before.project.document.regions[2].blocks[0].model_copy(deep=True)
-    allocator=EditIdAllocator(proof(),'separate-scopes','scope',existing_ids(before));steps=[];parts=[]
+    allocator=EditIdAllocator('template-project', 'separate-scopes','scope',existing_ids(before));steps=[];parts=[]
     for index,(cell,text) in enumerate([('a-title','Alpha'),('b-title','Beta')]):
         changes=human_cell_steps(before,[cell],text,'display-action',[block.id],allocator,ambiguous=True)
         steps.extend(changes)
@@ -177,7 +178,7 @@ def test_repeat_undo_redo_archive_and_stale_result_have_exact_retained_authority
     auth=HistoryAuthorization(restored.project_id,restored.document_revision,'session',4,result.mutation.action_id,mutation_sha256(redo))
     redone,_=apply_rich_mutation(restored,redo,history_authorization=auth)
     assert [group.text for group in scope_occurrences(redone.project.document).values()]==['E!t human input']
-    portable,_,_,_=open_rich_archive(export_rich_archive(redone,sources,{},{}),'repeat-transfer')
+    portable,_,_,_=open_archive_v7(write_zip(archive_payload_v7(redone,sources,{})),'repeat-transfer')
     assert portable.project.facts==redone.project.facts and portable.project.document==redone.project.document
     stale=result.mutation.model_copy(update={'client_mutation_id':'stale-repeat'},deep=True)
     with pytest.raises(RichMutationFailure):apply_rich_mutation(redone,stale)
@@ -199,28 +200,24 @@ def test_builtin_shared_repeat_keeps_null_values_and_exact_pending_input_without
         assert next_value.project.facts.builtin_manual_scopes[field_key(company.id,name)]==scope.id
 
 
-def test_real_delta_save_shared_issue_undo_redo_and_reopen_use_one_retained_history(tmp_path):
-    from tests.templates.test_compact_save import compact_command
-    from tests.templates.test_preparation_store import request
-    from tests.templates.test_template_local_history import history_request
-    from tests.templates.test_template_writers import TemplateWriterFixture
+def test_shared_issue_edit_undo_redo_and_reopen_through_the_journal(tmp_path):
+    from tests.templates.editor_fixtures import TemplateEditor
     from tests.templates.test_transactions import issue
     before,sources,copied_id=copied_workspace()
     changed_issue=issue('scope-cell-issue','a-title');changed_issue.block_ids=['block-paper-a']
     detached_issue=issue('copy-wording-issue',copied_id);detached_issue.block_ids=[copied_id]
     before.project.import_issues=[changed_issue,detached_issue]
-    fixture=TemplateWriterFixture(tmp_path,before,sources)
-    intent=request(fixture,start=1,end=4,text='!')
-    delta=fixture.writers.prepare_edit_delta(fixture.project,intent)
-    assert len(canonical(delta))<32*1024
-    saved=fixture.writers.save(fixture.project,compact_command(fixture,delta),originals=fixture.originals)
-    assert saved.local_history_ack is not None
-    assert [value.state for value in fixture.current().project.import_issues]==['retired','active']
-    undo=fixture.writers.local_history_command(fixture.project,history_request(fixture,saved.local_history_ack),originals=fixture.originals)
-    assert [value.state for value in undo.workspace.project.import_issues]==['active','active']
-    assert [group.text for group in scope_occurrences(undo.workspace.project.document).values()]==['Exact human input']*2
-    redo=fixture.writers.local_history_command(fixture.project,history_request(fixture,undo.local_history_ack,'redo','scope-redo'),originals=fixture.originals)
-    assert [value.state for value in redo.workspace.project.import_issues]==['retired','active']
-    assert [group.text for group in scope_occurrences(redo.workspace.project.document).values()]==['E!t human input']
-    reopened=fixture.canonical.read_committed(fixture.project)[0]
-    assert reopened==redo.workspace
+    editor=TemplateEditor(tmp_path,before,sources)
+    request=command(editor.current(),start=1,end=4,text='!')
+    editor.edit(request)
+    assert [value.state for value in editor.current().project.import_issues]==['retired','active']
+    editor.undo('scope-undo',expected=request.capture.action_id)
+    undone=editor.current()
+    assert [value.state for value in undone.project.import_issues]==['active','active']
+    assert [group.text for group in scope_occurrences(undone.project.document).values()]==['Exact human input']*2
+    assert active_scope_cells(undone.project.facts)==active_scope_cells(before.project.facts)
+    editor.redo('scope-redo',expected=request.capture.action_id)
+    redone=editor.current()
+    assert [value.state for value in redone.project.import_issues]==['retired','active']
+    assert [group.text for group in scope_occurrences(redone.project.document).values()]==['E!t human input']
+    assert editor.reopen()==redone

@@ -109,7 +109,7 @@ def bounded_version(executable: Path) -> str | None:
 
 
 def check_cli(executable: Path | None = None) -> str:
-    from spikes.cli.profile import VERSION
+    from resume_api.cli.profile import VERSION
 
     selected = executable or shutil.which("codex")
     if selected is None or not Path(selected).is_file():

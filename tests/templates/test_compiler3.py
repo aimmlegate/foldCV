@@ -10,13 +10,15 @@ import yaml
 
 from packages.resume_core.models.template_facts import WorkingFactsV2
 from packages.resume_core.models.template_workspace import WorkspaceV7
-from packages.resume_core.rich_archive import export_rich_archive,open_rich_archive
-from packages.resume_core.rich_project_store import RichProjectStore
+from packages.resume_core.archive_zip import write_zip
+from packages.resume_core.template_archive import archive_payload_v7, open_archive_v7
+from packages.resume_core.project_repository import ProjectRepository
 from packages.resume_core.templates.compiler import canonical,compile_bytes,compile_definition,compile_template
 from packages.resume_core.templates.loading import load_declared_definition,load_definition
 from packages.resume_core.templates.models import TemplatePackage
 from packages.resume_core.templates.projection import SchemaFailure
 from packages.resume_core.templates.store import verify_package
+from tests.templates.editor_fixtures import source_blobs
 from tests.templates.storage_fixtures import workspace
 from tests.templates.test_compiler_versions import retained
 
@@ -146,11 +148,10 @@ def test_archive_and_reopen_keep_exact_version_format_and_original_meaning(tmp_p
         data['project']['facts']=before.pre_draft.facts.model_dump(by_alias=True)
         for region in data['project']['document']['regions']:region['blocks']=[]
         before=WorkspaceV7.model_validate(data)
-    store=RichProjectStore(tmp_path/'first');store.save(before,{(before.project_id,key):value for key,value in sources.items()},{})
-    loaded,failures,_=RichProjectStore(tmp_path/'first').load_all();assert not failures
+    ProjectRepository(tmp_path/'first').create(before,blobs=source_blobs(sources))
     # A workspace keeps its package's asset bytes in their own files (D104); the full package is unchanged.
-    recovered=loaded[before.project_id][0];assert canonical((recovered.project or recovered.pre_draft).template_package.full())==exact
-    moved,originals,artifacts,images=open_rich_archive(export_rich_archive(recovered,sources,{},{}),'new-owner')
+    recovered=ProjectRepository(tmp_path/'first').read(before.project_id);assert canonical((recovered.project or recovered.pre_draft).template_package.full())==exact
+    moved,originals,artifacts,images=open_archive_v7(write_zip(archive_payload_v7(recovered,sources,{})),'new-owner')
     restored=(moved.project or moved.pre_draft).template_package
     assert canonical(restored.full())==exact and originals==sources and not artifacts and not images
     assert verify_package(restored).full()==captured

@@ -1,0 +1,76 @@
+"""Run lifecycle hooks of the assistant service (assistant/runs): the model is captured at submit, and turning the
+assistant off or deleting the project stops a running run."""
+
+import asyncio
+import threading
+import time
+
+from tests.assistant.support import MODEL, PROJECT, assistant_app, base, conversation, finish, start
+
+
+def blocking(started, release, models):
+    async def steps(_tools, value, cancel, _emit):
+        models.append(value.model)
+        started.set()
+        while not release.is_set() and not cancel.is_set():
+            await asyncio.sleep(0.01)
+        return 'Ответ.'
+    return steps
+
+
+def wait(event):
+    deadline = time.monotonic() + 5
+    while not event.is_set():
+        assert time.monotonic() < deadline, 'the run did not start'
+        event.wait(0.01)
+
+
+def settings(client, **values):
+    current = client.get('/v1/settings/assistant').json()
+    reply = client.put('/v1/settings/assistant', json={'expectedRevision': current['revision'], 'enabled': current['enabled'],
+        'selectedAgentModel': current['selectedAgentModel'], **values})
+    assert reply.status_code == 200, reply.text[:300]
+    return reply.json()
+
+
+def test_a_model_change_during_a_run_keeps_the_captured_model_and_reaches_only_the_next_run(tmp_path):
+    started, release, models = threading.Event(), threading.Event(), []
+    with assistant_app(tmp_path, blocking(started, release, models)) as (client, _application, _runtime):
+        cid = conversation(client)
+        run = start(client, cid)
+        wait(started)
+        settings(client, selectedAgentModel='processing-model')
+        release.set()
+        run, _events = finish(client, run)
+        assert run['state'] == 'completed' and run['model'] == MODEL and models == [MODEL]
+        started.clear()
+        later, _events = finish(client, start(client, cid, request_id='request-2'))
+        assert later['model'] == 'processing-model' and models == [MODEL, 'processing-model']
+
+
+def test_turning_the_assistant_off_cancels_the_running_run(tmp_path):
+    started, release, models = threading.Event(), threading.Event(), []
+    with assistant_app(tmp_path, blocking(started, release, models)) as (client, _application, _runtime):
+        run = start(client, conversation(client))
+        wait(started)
+        settings(client, enabled=False)
+        run, _events = finish(client, run)
+        assert run['state'] == 'cancelled' and not release.is_set()
+
+
+def test_deleting_the_project_stops_its_run_and_the_ending_run_writes_no_assistant_files(tmp_path):
+    started, release, models = threading.Event(), threading.Event(), []
+    with assistant_app(tmp_path, blocking(started, release, models)) as (client, application, _runtime):
+        run = start(client, conversation(client))
+        wait(started)
+        store = application.state.assistant.store
+        deleted = client.request('DELETE', '/v2/projects/' + PROJECT, json={'confirmed': True})
+        assert deleted.status_code == 200, deleted.text[:300]
+        control = next(control for control in application.state.assistant.controls.values() if control.run.id == run['id'])
+        deadline = time.monotonic() + 5
+        while control.task is not None and not control.task.done():
+            assert time.monotonic() < deadline, 'the run did not stop'
+            time.sleep(0.01)
+        assert control.cancel.is_set() and control.deleted
+        assert client.get(base() + '/conversations').status_code == 404
+        assert not store.directory(PROJECT).exists()

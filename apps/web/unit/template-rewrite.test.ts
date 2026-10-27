@@ -3,15 +3,12 @@ import test from "node:test";
 import { BlockNoteEditor } from "@blocknote/core";
 import type { Node } from "@tiptap/pm/model";
 import { TextSelection } from "@tiptap/pm/state";
-import { attachTemplateWriter } from "../src/background/connection";
-import { DraftRepository, type LocalDraft } from "../src/background/drafts";
 import type { TemplateProjectResponseV1 } from "../src/contracts/generated/template_project_response_v1";
-import { templateProjectWire } from "../src/contracts/template-validate";
 import { templateSchema } from "../src/rich/template-schema";
 import { textPosition } from "../src/rich/v7-extraction";
 import { projectTemplateDocument } from "../src/rich/v7-projection";
 import { TemplateEditorSession, type TemplateEditor } from "../src/rich/v7-session";
-import { client, harness, type Harness } from "./support/template-harness";
+import { projectClient, harness, type Harness, type Traffic } from "./support/template-harness";
 
 function storage(): Storage {
   const values = new Map<string, string>();
@@ -25,33 +22,26 @@ const TASK = "Implemented queue processing.";
 const RESULT = "Our team reduced median latency from 800 ms to 500 ms.";
 type Opened = { session: TemplateEditorSession; editor: TemplateEditor; warnings: string[]; reopen: () => Promise<Opened> };
 
-async function opened(value: Harness, detach = true): Promise<Opened> {
-  const api = client(value, []), warnings: string[] = [];
-  let rows: LocalDraft[] = [];
-  const repository = new DraftRepository({ transact: work => { const next = work(rows); rows = next.rows; return Promise.resolve(next.result); },
-    discardProject: () => { rows = []; return Promise.resolve(); } }, () => Promise.reject(new Error("unused")));
-  if (detach) {
-    const fixture = await api.templateRead(value.proof);
-    await api.templateDetach({ schemaVersion: 2, proof: value.proof, canonicalRevision: fixture.writer.acknowledgedRevision,
-      canonicalSha256: fixture.writer.acknowledgedSha256 ?? fixture.workspaceSha256, actionCursor: fixture.writer.acknowledgedCursor, touches: [] });
-  }
-  const connection = await attachTemplateWriter(value.project, api, repository);
-  assert.ok(connection?.proof, connection?.error ?? "attach failed");
+async function opened(value: Harness): Promise<Opened> {
+  const warnings: string[] = [];
+  const traffic: Traffic[] = [];
+  const connection = await projectClient(value, traffic);
   const session = new TemplateEditorSession(connection, { status: () => {}, warning: text => warnings.push(text), mode: () => {}, shown: () => {} }, 60_000);
-  const response = await templateProjectWire(session.writer.durable);
+  const response = session.queue.template.durable;
   assert.ok(response?.workspace.project);
   const editor: TemplateEditor = BlockNoteEditor.create({ schema: templateSchema, initialContent: projectTemplateDocument(response.workspace.project.document) });
   editor._tiptapEditor.registerPlugin(session.plugin);
   session.bind(editor, response.workspace.project.document);
+  await session.recoverDraft();
   // Reopen: a clean detach, then a new writer session reads only the durable record.
-  const reopen = async () => { await session.writer.navigate(); session.close(); return opened(value, false); };
+  const reopen = async () => { await session.navigateAway(); session.close(); return opened(value); };
   return { session, editor, warnings, reopen };
 }
 
 type Part = Record<string, unknown>;
 type Shown = { id: string; parent: string; type: string; text: string; parts: Part[] };
 async function shown(session: TemplateEditorSession): Promise<{ response: TemplateProjectResponseV1; blocks: Shown[] }> {
-  const response = await templateProjectWire(session.queue.template.durable), project = response?.workspace.project;
+  const response = session.queue.template.durable, project = response?.workspace.project;
   assert.ok(response && project);
   const blocks: Shown[] = [];
   const visit = (block: Record<string, unknown>, parent: string) => {
@@ -171,9 +161,13 @@ test("E05: cancelling a running preview and a failed generation leave the docume
     const before = JSON.stringify(response.workspace.project), length = session.history.length;
     select(editor, at(editor, target.id, 0), at(editor, target.id, 4));
     const running = session.rewritePreview("hold", "held-request");
+    // Attach before cancel: the preview can reject as soon as the server answers, before the assertion awaits it.
+    const settled = running.then(result => ({ failed: false as const, result }), (error: unknown) => ({ failed: true as const, error }));
     for (let attempt = 0; attempt < 100 && (await rewriteCalls(value)).length === 0; attempt++) await new Promise(resolve => setTimeout(resolve, 20));
     assert.equal(await session.cancelRewrite("held-request"), true);
-    await assert.rejects(running, /CANCELLED/);
+    const outcome = await settled;
+    assert.equal(outcome.failed, true);
+    assert.match(String(outcome.failed ? outcome.error : ""), /CANCELLED/);
     await assert.rejects(session.rewritePreview("fail"), /MODEL_DENIED/);
     assert.equal(JSON.stringify((await shown(session)).response.workspace.project), before);
     assert.equal(session.history.length, length);

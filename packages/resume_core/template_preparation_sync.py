@@ -1,8 +1,7 @@
 """Ownership conflicts reuse the canonical preparer and shared history."""
 
 from .models.template_mutations import TemplateSyncWrite
-from .template_preparation_common import finish_preparation, validate_preparation
-from .template_preparation_ids import EditIdAllocator, existing_ids
+from .template_preparation_common import allocator_for, finish_preparation, validate_preparation
 from .template_synchronization import effective_owner, occurrence_blocks, resolution_source, row_hash
 
 
@@ -37,12 +36,12 @@ def move_conflict_steps(workspace, request, allocator, steps, conflicts):
     return result
 
 
-def prepare_sync_resolution(response, request, proof):
-    validate_preparation(response, request, proof)
+def prepare_sync_resolution(response, request, *, occupied=None):
+    validate_preparation(response, request)
     workspace = response.workspace
     operation = request.operations[0]
     source = resolution_source(workspace, operation.sync_id, operation.before_record_hash, operation.before_lifecycle_id)
-    allocator = EditIdAllocator(proof, request.client_mutation_id, operation.op_id, existing_ids(workspace))
+    allocator = allocator_for(response, request, operation, occupied)
     payload = source.model_dump(by_alias=True, exclude={'lifecycle_id', 'dependencies'})
     payload.update(capture=request.capture.model_dump(by_alias=True), dependencies=[], ready=False, proposedSteps=[])
     superseded = TemplateSyncWrite.model_validate({**payload, 'status': 'stale', 'errorCode': 'SYNC_SUPERSEDED'})

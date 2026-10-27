@@ -1,0 +1,170 @@
+{
+  "$defs": {
+    "AgentUsage": {
+      "additionalProperties": false,
+      "properties": {
+        "cachedInputTokens": {
+          "minimum": 0,
+          "title": "Cachedinputtokens",
+          "type": "integer"
+        },
+        "inputTokens": {
+          "minimum": 0,
+          "title": "Inputtokens",
+          "type": "integer"
+        },
+        "outputTokens": {
+          "minimum": 0,
+          "title": "Outputtokens",
+          "type": "integer"
+        },
+        "totalTokens": {
+          "minimum": 0,
+          "title": "Totaltokens",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "inputTokens",
+        "cachedInputTokens",
+        "outputTokens",
+        "totalTokens"
+      ],
+      "title": "AgentUsage",
+      "type": "object"
+    },
+    "AssistantErrorV1": {
+      "additionalProperties": false,
+      "properties": {
+        "code": {
+          "pattern": "^[A-Z][A-Z0-9_]{1,63}$",
+          "title": "Code",
+          "type": "string"
+        },
+        "detail": {
+          "items": {
+            "type": "string"
+          },
+          "maxItems": 20,
+          "title": "Detail",
+          "type": "array"
+        }
+      },
+      "required": [
+        "code"
+      ],
+      "title": "AssistantErrorV1",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "allowEdits": {
+      "title": "Allowedits",
+      "type": "boolean"
+    },
+    "allowWeb": {
+      "title": "Allowweb",
+      "type": "boolean"
+    },
+    "baseRevision": {
+      "minimum": 1,
+      "title": "Baserevision",
+      "type": "integer"
+    },
+    "clientRequestId": {
+      "minLength": 1,
+      "title": "Clientrequestid",
+      "type": "string"
+    },
+    "conversationId": {
+      "minLength": 1,
+      "title": "Conversationid",
+      "type": "string"
+    },
+    "createdAt": {
+      "maxLength": 64,
+      "minLength": 1,
+      "title": "Createdat",
+      "type": "string"
+    },
+    "error": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/AssistantErrorV1"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "finishedAt": {
+      "anyOf": [
+        {
+          "maxLength": 64,
+          "minLength": 1,
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "title": "Finishedat"
+    },
+    "id": {
+      "minLength": 1,
+      "title": "Id",
+      "type": "string"
+    },
+    "model": {
+      "maxLength": 80,
+      "title": "Model",
+      "type": "string"
+    },
+    "projectId": {
+      "minLength": 1,
+      "title": "Projectid",
+      "type": "string"
+    },
+    "state": {
+      "enum": [
+        "queued",
+        "running",
+        "cancelling",
+        "completed",
+        "failed",
+        "cancelled",
+        "interrupted"
+      ],
+      "title": "State",
+      "type": "string"
+    },
+    "usage": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/AgentUsage"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    }
+  },
+  "required": [
+    "id",
+    "conversationId",
+    "projectId",
+    "clientRequestId",
+    "state",
+    "allowEdits",
+    "allowWeb",
+    "model",
+    "baseRevision",
+    "createdAt",
+    "finishedAt",
+    "error",
+    "usage"
+  ],
+  "title": "AssistantRunV1",
+  "type": "object"
+}

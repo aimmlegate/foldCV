@@ -1,6 +1,5 @@
 """E07: the fallback model preference is captured with each import, used for at most one repair and never replaced."""
 
-import asyncio
 import json
 
 import pytest
@@ -9,7 +8,7 @@ from resume_api.providers.content import ContentFailure, ReportedUsage
 
 from packages.resume_core.preferences import PreferencesFailure, PreferencesStore
 from tests.templates.scripted_template_provider import ScriptedTemplateProvider, scripted_template_answer, scripted_template_result
-from tests.templates.test_template_import_app import app_client, upload
+from tests.templates.test_template_import_app import app_client, operation_of, run_import as run_task, upload
 
 
 class ModelRecorder(ScriptedTemplateProvider):
@@ -36,18 +35,10 @@ class ModelRecorder(ScriptedTemplateProvider):
                 raw_return=json.dumps({'payload': answer(value)})) from None
 
 
-async def run_import(client, project, request_id):
-    started = await client.post(f'/v1/rich/projects/{project}/template-import',
-        json={'clientRequestId': request_id, 'allowTextRewrite': True})
-    assert started.status_code == 202, started.text
-    job = started.json()
-    async def finished():
-        while True:
-            current = (await client.post(f'/v1/rich/projects/{project}/jobs/{job["id"]}/read', json={})).json()
-            if current.get('templateOutcome') is not None:
-                return current
-            await asyncio.sleep(0.05)
-    return job, await asyncio.wait_for(finished(), 60)
+async def run_import(client, app, project, request_id):
+    """The finished import task and the operation it saved."""
+    done = await run_task(client, app, project, request_id)
+    return operation_of(app, project), done
 
 
 def test_the_fallback_preference_saves_clears_and_keeps_other_choices(tmp_path):
@@ -67,7 +58,7 @@ def test_the_fallback_preference_saves_clears_and_keeps_other_choices(tmp_path):
 async def test_an_import_captures_the_fallback_and_settings_changes_reach_only_later_imports(tmp_path):
     # Null disables fallback; the fallback never replaces the primary, and editing models stay as they are.
     provider = ModelRecorder()
-    async with app_client(tmp_path, call_cap=4, provider=provider) as (client, service, _jobs):
+    async with app_client(tmp_path, call_cap=4, provider=provider) as (client, app):
         path = '/v1/settings/fallback-model'
         assert (await client.put(path, json={'model': 'unlisted'})).status_code == 409
         saved = await client.put(path, json={'model': 'assistant-model'})
@@ -75,21 +66,20 @@ async def test_an_import_captures_the_fallback_and_settings_changes_reach_only_l
         assert saved.json()['selectedFallbackModel'] == 'assistant-model'
         assert saved.json()['selectedModel'] == 'processing-model' and saved.json().get('selectedImportModel') is None
         project = (await upload(client)).json()['workspace']['projectId']
-        job, done = await run_import(client, project, 'first')
-        capture = job['submission']['templateCommand']['capture']
-        assert capture['primary']['model'] == 'processing-model' and capture['fallback']['model'] == 'assistant-model'
-        assert done['templateOutcome']['state'] == 'saved' and set(provider.models) == {'processing-model'}
+        operation, done = await run_import(client, app, project, 'first')
+        capture = operation.capture
+        assert capture.primary.model == 'processing-model' and capture.fallback.model == 'assistant-model'
+        assert done['state'] == 'succeeded' and set(provider.models) == {'processing-model'}
         assert (await client.put(path, json={'model': None})).status_code == 200
         second = (await upload(client)).json()['workspace']['projectId']
-        job, _done = await run_import(client, second, 'second')
-        assert job['submission']['templateCommand']['capture']['fallback'] is None
+        operation, _done = await run_import(client, app, second, 'second')
+        assert operation.capture.fallback is None
         # A fallback equal to the import model adds nothing.
         assert (await client.put(path, json={'model': 'assistant-model'})).status_code == 200
         assert (await client.put('/v1/settings/import-model', json={'model': 'assistant-model'})).status_code == 200
         third = (await upload(client)).json()['workspace']['projectId']
-        job, _done = await run_import(client, third, 'third')
-        capture = job['submission']['templateCommand']['capture']
-        assert capture['primary']['model'] == 'assistant-model' and capture['fallback'] is None
+        operation, _done = await run_import(client, app, third, 'third')
+        assert operation.capture.primary.model == 'assistant-model' and operation.capture.fallback is None
         assert (await client.get('/v1/settings/connection')).json()['selectedModel'] == 'processing-model'
 
 
@@ -100,11 +90,11 @@ async def test_a_running_import_keeps_its_captured_models_when_settings_change(t
         if count == 1:
             PreferencesStore(tmp_path / 'data').select_import_model('processing-model')
     provider = ModelRecorder(during=during)
-    async with app_client(tmp_path, call_cap=4, provider=provider) as (client, _service, _jobs):
+    async with app_client(tmp_path, call_cap=4, provider=provider) as (client, app):
         assert (await client.put('/v1/settings/import-model', json={'model': 'assistant-model'})).status_code == 200
         project = (await upload(client)).json()['workspace']['projectId']
-        _job, done = await run_import(client, project, 'running')
-        assert done['templateOutcome']['state'] == 'saved', done
+        _operation, done = await run_import(client, app, project, 'running')
+        assert done['state'] == 'succeeded', done
         assert provider.models == ['assistant-model', 'assistant-model']
         assert (await client.get('/v1/settings/preferences')).json()['selectedImportModel'] == 'processing-model'
 
@@ -120,12 +110,12 @@ async def test_the_fallback_model_makes_the_last_repair_and_is_never_replaced_wh
             return None
         return {'unexpected': True}
     provider = ModelRecorder(refuse=refuse)
-    async with app_client(tmp_path, call_cap=8, provider=provider) as (client, service, jobs):
+    async with app_client(tmp_path, call_cap=8, provider=provider) as (client, app):
         assert (await client.put('/v1/settings/fallback-model', json={'model': 'assistant-model'})).status_code == 200
         if not available:
             # The fallback leaves the catalog after the import captured it.
-            from resume_api.gui_projects import ProjectFailure
-            transport = jobs.templates.pipeline.transport
+            from resume_api.projects.errors import ProjectFailure
+            transport = app.state.projects.imports.pipeline.transport
             offered = transport.model_provider
             def leaving(model):
                 if model == 'assistant-model':
@@ -133,9 +123,8 @@ async def test_the_fallback_model_makes_the_last_repair_and_is_never_replaced_wh
                 return offered(model)
             transport.model_provider = leaving
         project = (await upload(client)).json()['workspace']['projectId']
-        _job, done = await run_import(client, project, 'fallback')
-        assert done['templateOutcome']['state'] == 'saved', done
-        operation = service.storage.load_history(service.read(project)).project.template_operations[0]
+        operation, done = await run_import(client, app, project, 'fallback')
+        assert done['state'] == 'succeeded', done
         slots = [(attempt.slot, attempt.model.model) for attempt in operation.attempts]
         if available:
             assert slots == [('initial', 'processing-model'), ('primary_repair', 'processing-model'),

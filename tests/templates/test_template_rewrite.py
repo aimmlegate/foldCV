@@ -7,7 +7,7 @@ import threading
 import pytest
 
 from packages.resume_core.text_rewrite import PlainTextReply
-from resume_api.gui_projects import ProjectFailure
+from resume_api.projects.errors import ProjectFailure
 from resume_api.providers.content import ContentFailure, ContentResult, ReportedUsage
 from resume_api.template_rewrite import TemplateRewrite
 
@@ -28,23 +28,20 @@ class Provider:
         return ContentResult(PlainTextReply(text=self.reply), ReportedUsage(), 'scripted', request.policy.model, 0, 1)
 
 
-class Service(TemplateRewrite):
-    def __init__(self, tmp_path, provider):
-        self.provider, self.preferences, self.temp_root = provider, None, tmp_path
-        self.tasks, self.cancels, self.files = {}, {}, {}
+@contextlib.asynccontextmanager
+async def worker_slot(_cancel):
+    yield
 
-    def provider_factory(self):
-        return self.provider, 'scripted-model'
 
-    @contextlib.asynccontextmanager
-    async def worker_slot(self, _cancel):
-        yield
+def Service(tmp_path, provider):
+    return TemplateRewrite(lambda: (provider, 'scripted-model'), preferences=None, temp_root=tmp_path,
+        worker_slot=worker_slot, cleanup_error=lambda _error: None)
 
 
 def test_preview_sends_only_the_selected_text_and_returns_the_plain_reply(tmp_path):
     provider = Provider(reply='Built queue processing.')
     service = Service(tmp_path, provider)
-    text = asyncio.run(service.template_rewrite_text('project', 'request-1', 'Make it shorter', 'Implemented queue processing.'))
+    text = asyncio.run(service.text('project', 'request-1', 'Make it shorter', 'Implemented queue processing.'))
     assert text == 'Built queue processing.'
     assert len(provider.requests) == 1
     prompt = provider.requests[0].text
@@ -56,19 +53,18 @@ def test_preview_sends_only_the_selected_text_and_returns_the_plain_reply(tmp_pa
 def test_failure_and_cancellation_report_codes_and_release_the_request(tmp_path):
     failing = Service(tmp_path, Provider(failure='MODEL_DENIED'))
     with pytest.raises(ProjectFailure) as failed:
-        asyncio.run(failing.template_rewrite_text('project', 'request-2', 'x', 'text'))
+        asyncio.run(failing.text('project', 'request-2', 'x', 'text'))
     assert (failed.value.code, failed.value.status) == ('MODEL_DENIED', 502)
     held = threading.Event()
     service = Service(tmp_path, Provider(hold=held))
     async def run():
-        task = asyncio.create_task(service.template_rewrite_text('project', 'request-3', 'x', 'text'))
-        while not held.is_set():
-            await asyncio.sleep(.01)
-        assert service.template_rewrite_cancel('project', 'request-3') is True
+        task = asyncio.create_task(service.text('project', 'request-3', 'x', 'text'))
+        assert await asyncio.to_thread(held.wait, 5)
+        assert service.cancel('project', 'request-3') is True
         with pytest.raises(ProjectFailure) as cancelled:
             await task
         return cancelled.value
     error = asyncio.run(run())
     assert (error.code, error.status) == ('CANCELLED', 409)
-    assert service.template_rewrite_cancel('project', 'request-3') is False
+    assert service.cancel('project', 'request-3') is False
     assert service.cancels == {}

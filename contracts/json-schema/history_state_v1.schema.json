@@ -1,0 +1,54 @@
+{
+  "$defs": {
+    "HistoryActionV1": {
+      "additionalProperties": false,
+      "properties": {
+        "actionId": {
+          "minLength": 1,
+          "title": "Actionid",
+          "type": "string"
+        },
+        "kind": {
+          "const": "edit",
+          "title": "Kind",
+          "type": "string"
+        }
+      },
+      "required": [
+        "actionId",
+        "kind"
+      ],
+      "title": "HistoryActionV1",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "redo": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/HistoryActionV1"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "undo": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/HistoryActionV1"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    }
+  },
+  "required": [
+    "undo",
+    "redo"
+  ],
+  "title": "HistoryStateV1",
+  "type": "object"
+}

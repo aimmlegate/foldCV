@@ -6,7 +6,7 @@ from pathlib import Path
 
 from pydantic import ValidationError
 
-from .models.recovery import Preferences
+from .models.settings import Preferences
 from .storage import StorageFailure, atomic_write, locked_root, private_file
 
 MODEL = re.compile(r'[a-zA-Z0-9][a-zA-Z0-9._-]{0,79}\Z')

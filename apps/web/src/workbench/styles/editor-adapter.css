@@ -76,6 +76,8 @@
 .uir-rewrite { top: calc(var(--uir-gap) + 128px); }
 .uir-editor-body { position: relative; }
 .editor-notifications { position: absolute; top: 59px; right: 12px; z-index: 140; display: grid; gap: 8px; width: min(410px, calc(100% - 24px)); max-height: calc(100% - 115px); overflow-y: auto; overscroll-behavior: contain; padding: 4px; pointer-events: none; }
+/* The layer passes clicks to the document; its notices and their buttons take them back. */
+.editor-notifications > .notice { pointer-events: auto; }
 .editor-notifications .rewrite-activities { display: grid; gap: 8px; max-height: none; overflow: visible; background: transparent; border: 0; }
 .editor-notifications .rewrite-activity { flex-wrap: wrap; gap: 8px; padding: 12px; border: 1px solid var(--line); border-radius: 9px; background: var(--paper); box-shadow: 0 4px 12px color-mix(in srgb, var(--ink) 8%, transparent); pointer-events: auto; }
 .editor-notifications .rewrite-activity-copy { flex-basis: 180px; overflow-wrap: anywhere; }

@@ -1,0 +1,70 @@
+{
+  "$defs": {
+    "AssistantSelectionV1": {
+      "additionalProperties": false,
+      "properties": {
+        "blockIds": {
+          "items": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "maxItems": 100,
+          "title": "Blockids",
+          "type": "array"
+        },
+        "text": {
+          "maxLength": 4000,
+          "title": "Text",
+          "type": "string"
+        }
+      },
+      "required": [
+        "blockIds",
+        "text"
+      ],
+      "title": "AssistantSelectionV1",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "allowEdits": {
+      "title": "Allowedits",
+      "type": "boolean"
+    },
+    "allowWeb": {
+      "title": "Allowweb",
+      "type": "boolean"
+    },
+    "clientRequestId": {
+      "minLength": 1,
+      "title": "Clientrequestid",
+      "type": "string"
+    },
+    "message": {
+      "maxLength": 8000,
+      "minLength": 1,
+      "title": "Message",
+      "type": "string"
+    },
+    "selection": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/AssistantSelectionV1"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
+    }
+  },
+  "required": [
+    "clientRequestId",
+    "message",
+    "allowEdits",
+    "allowWeb"
+  ],
+  "title": "AssistantRunRequestV2",
+  "type": "object"
+}

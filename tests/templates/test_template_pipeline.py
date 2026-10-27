@@ -7,22 +7,12 @@ import pytest
 from packages.resume_core.template_import import CleanupProof, digest, reconcile_cleanup, spent_calls
 from tests.templates.pipeline_fixtures import resume_command
 from tests.templates.template_runtime_fixtures import RuntimeFixture
+from tests.templates.template_runtime_fixtures import import_task
 from tests.templates.test_semantic_admission import raw_proposal
-from tests.templates.test_template_finalization_flow import queued
-from tests.templates.test_template_job_routing import service_for
 
 
-async def run_entry(fixture, entry):
-    service = await service_for(fixture) if entry == 'queued' else None
-    try:
-        if service:
-            await queued(service, fixture, fixture.command)
-            return fixture.current().project.template_operations[0]
-        return await fixture.pipeline.run(fixture.project, fixture.command, admitted=fixture.admitted)
-    finally:
-        if service:
-            await service.shutdown()
-            service.supervisor.clock.verify()
+async def run_entry(fixture):
+    return await fixture.pipeline.run(fixture.project, fixture.command, admitted=fixture.admitted)
 
 
 @pytest.mark.asyncio
@@ -40,9 +30,8 @@ async def test_tool_free_new_protocol_runs_complete_review_and_publishes_once(tm
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize('entry', ['direct', 'queued'])
 @pytest.mark.parametrize('review_failure', ['unknown', 'uncertain', 'unavailable'])
-async def test_unusable_review_uses_source_fallback_and_no_review_retry(tmp_path, entry, review_failure):
+async def test_unusable_review_uses_source_fallback_and_no_review_retry(tmp_path, review_failure):
     # Review protocol 3: a check the reply leaves out holds and a check listed twice merges (I1), so an entry naming an
     # unknown target is what leaves a reply unusable.
     fixture = RuntimeFixture(tmp_path)
@@ -56,7 +45,7 @@ async def test_unusable_review_uses_source_fallback_and_no_review_retry(tmp_path
             'reason': 'Attribution is unclear', 'actionable': False, 'evidence': []} for target in value['targets']]
         return {'results': [*results, {**results[0], 'targetId': 'unknown-target'}] if review_failure == 'unknown' else results}
     fixture.transport.scripted = script
-    result = await run_entry(fixture, entry)
+    result = await run_entry(fixture)
     assert result.state == 'published' and result.tasks[0].state == 'source_fallback'
     assert len(fixture.transport.calls) == 2 and result.issues
     assert not fixture.current().project.facts.extensions
@@ -70,9 +59,8 @@ async def test_unusable_review_uses_source_fallback_and_no_review_retry(tmp_path
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize('entry', ['direct', 'queued'])
 @pytest.mark.parametrize('outcome', ['satisfied', 'no_reply', 'null', 'incomplete_review'])
-async def test_empty_output_is_omitted_only_after_complete_absence_review(tmp_path, entry, outcome):
+async def test_empty_output_is_omitted_only_after_complete_absence_review(tmp_path, outcome):
     from tests.templates.storage_fixtures import source_fixture
     source, raw = source_fixture('F02')
     fixture = RuntimeFixture(tmp_path, src=source, original_bytes=raw)
@@ -83,7 +71,7 @@ async def test_empty_output_is_omitted_only_after_complete_absence_review(tmp_pa
             return {'results': [*results, {**results[0], 'targetId': 'unknown-target'}] if outcome == 'incomplete_review' else results}
         return '' if outcome == 'no_reply' else '{"payload":null}' if outcome == 'null' else raw_proposal(fixture.source, empty=True)
     fixture.transport.scripted = script
-    result = await run_entry(fixture, entry)
+    result = await run_entry(fixture)
     if outcome == 'satisfied':
         assert result.tasks[0].state == 'empty' and not result.issues and result.receipts
         assert fixture.text() == ''
@@ -111,7 +99,7 @@ async def test_restart_never_replays_an_unknown_call_and_can_consume_a_retained_
     # P03: the prompt is a pure function of the stored request, so a reloaded attempt reads byte for byte the same.
     from packages.resume_core.template_prompt import model_prompt
     assert model_prompt(operation.attempts[0].request_value) == fixture.transport.prompts[0]
-    fresh = fixture.fresh_pipeline()
+    fresh = fixture.restart()
     if cutpoint == 'dispatch':
         recovered = await fresh.recover(fixture.project, operation.id)
         assert recovered.state == 'fenced' and len(fixture.transport.calls) == 1
@@ -125,14 +113,13 @@ async def test_restart_never_replays_an_unknown_call_and_can_consume_a_retained_
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize('entry', ['direct', 'queued'])
-async def test_exhausted_processing_still_finalizes_after_verified_cleanup(tmp_path, entry):
+async def test_exhausted_processing_still_finalizes_after_verified_cleanup(tmp_path):
     fixture = RuntimeFixture(tmp_path)
     def script(_request, _value):
         fixture.now = '2026-10-21T00:05:01+00:00'
         return raw_proposal(fixture.source)
     fixture.transport.scripted = script
-    result = await run_entry(fixture, entry)
+    result = await run_entry(fixture)
     assert result.state == 'published' and result.inference_closed
     assert result.tasks[0].state == 'source_fallback' and spent_calls(result) == 1
     assert not fixture.current().project.facts.extensions
@@ -148,8 +135,7 @@ async def test_unknown_cleanup_fences_without_fallback_publication(tmp_path):
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize('entry', ['direct', 'queued'])
-async def test_budget_expiry_retains_accepted_scopes_before_finalizing_remaining_source(tmp_path, entry):
+async def test_budget_expiry_retains_accepted_scopes_before_finalizing_remaining_source(tmp_path):
     import json
     from packages.resume_core.templates.compiler import compile_bytes
     from packages.resume_core.templates.store import BUNDLED_TEMPLATE
@@ -165,7 +151,7 @@ async def test_budget_expiry_retains_accepted_scopes_before_finalizing_remaining
             fixture.now = '2026-10-21T00:05:01+00:00'
         return original(request, cancel)
     fixture.transport.generate = generate
-    result = await run_entry(fixture, entry)
+    result = await run_entry(fixture)
     assert result.state == 'published' and result.inference_closed and spent_calls(result) == 3
     assert [task.state for task in result.tasks] == ['accepted', 'source_fallback']
     assert len(fixture.current().project.facts.extensions) == 2 and len(result.receipts) == 1
@@ -775,24 +761,16 @@ async def test_an_account_failure_stops_the_import_instead_of_saving_empty_block
 
 
 @pytest.mark.asyncio
-async def test_a_queued_import_stopped_by_the_account_reports_the_limit_and_saves_nothing(tmp_path):
+async def test_an_import_task_stopped_by_the_account_reports_the_limit_and_saves_nothing(tmp_path):
     from tests.templates.pipeline_fixtures import blocks_package
     fixture = RuntimeFixture(tmp_path, captured=blocks_package(2), cap=20)
     fixture.transport.scripted = lambda _request, _value: account_failure('QUOTA_EXHAUSTED')
-    service = await service_for(fixture)
-    try:
-        job = await queued(service, fixture, fixture.command)
-        assert job.execution == 'failed' and job.error.code == 'RATE_LIMITED'
-        assert job.template_outcome.state == 'failed_before_replacement' and job.template_outcome.error_code == 'QUOTA_EXHAUSTED'
-        assert job.publication == 'save_failed' and job.publication_error.code == 'RATE_LIMITED'
-        assert service.templates.generation(job).status == 'failed' and service.templates.generation(job).error_code == 'RATE_LIMITED'
-        assert fixture.current().project is None and len(fixture.transport.calls) == 1
-        # Recovery after a restart keeps the import unsaved.
-        await service.templates.complete(fixture.project, job.id)
-        assert fixture.current().project is None
-    finally:
-        await service.shutdown()
-        service.supervisor.clock.verify()
+    status = await import_task(fixture)
+    assert (status['state'], status['error']) == ('failed', 'QUOTA_EXHAUSTED')
+    assert fixture.current().project is None and len(fixture.transport.calls) == 1
+    # A restarted service keeps the import unsaved.
+    fixture.restart()
+    assert fixture.current().project is None
 
 
 @pytest.mark.asyncio
@@ -815,34 +793,23 @@ async def test_an_import_stopped_before_its_first_call_saves_nothing_and_recover
         raise TemplateImportFailure('IMPORT_PROCESSING_STOPPED')
     monkeypatch.setattr(TemplatePipeline, 'run_tasks', stopped)
     fixture = RuntimeFixture(tmp_path, cap=20)
-    service = await service_for(fixture)
-    try:
-        job = await queued(service, fixture, fixture.command)
-        operation = fixture.current().pre_draft.template_operations[0]
-        assert not operation.attempts and not operation.task_results
-        assert job.template_outcome.state == 'failed_before_replacement'
-        assert job.template_outcome.error_code == 'IMPORT_PROCESSING_STOPPED' and job.publication_error.code == 'INTERRUPTED'
-        await service.templates.recover()
-        assert fixture.current().project is None and not fixture.transport.calls
-    finally:
-        await service.shutdown()
-        service.supervisor.clock.verify()
+    status = await import_task(fixture)
+    assert (status['state'], status['error']) == ('failed', 'IMPORT_PROCESSING_STOPPED')
+    operation = fixture.current().pre_draft.template_operations[0]
+    assert not operation.attempts and not operation.task_results
+    fixture.restart()
+    assert fixture.current().project is None and not fixture.transport.calls
 
 
 @pytest.mark.asyncio
-async def test_an_import_that_cannot_be_assembled_fails_alone_instead_of_stopping_recovery(tmp_path, monkeypatch):
+async def test_an_import_that_cannot_be_assembled_fails_alone_and_the_project_still_opens(tmp_path, monkeypatch):
     from resume_api.importer.template_pipeline import TemplatePipeline
     async def broken(*_args, **_kwargs):
         raise ValueError('source fallback has no configured block view')
     monkeypatch.setattr(TemplatePipeline, 'finalize', broken)
     fixture = RuntimeFixture(tmp_path, cap=20)
-    service = await service_for(fixture)
-    try:
-        job = await queued(service, fixture, fixture.command)
-        assert job.template_outcome.state == 'failed_before_replacement'
-        assert job.template_outcome.error_code == 'IMPORT_PROCESSING_STOPPED'
-        await service.templates.recover()
-        assert fixture.current().project is None
-    finally:
-        await service.shutdown()
-        service.supervisor.clock.verify()
+    status = await import_task(fixture)
+    assert (status['state'], status['error']) == ('failed', 'PROCESS_FAILED')
+    fixture.restart()
+    assert fixture.current().project is None
+    assert fixture.current().pre_draft.template_operations[0].state != 'published'

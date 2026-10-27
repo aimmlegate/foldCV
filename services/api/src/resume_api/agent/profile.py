@@ -3,8 +3,8 @@
 import json
 from urllib.parse import urlsplit
 
-from packages.resume_core.agent_store import AgentFailure
-from spikes.agent.profile import AgentProofProfile, TOKEN_ENV
+from packages.resume_core.assistant_store import AgentFailure
+from resume_api.agent.host_profile import AgentProofProfile, TOKEN_ENV
 
 
 class AgentProfile(AgentProofProfile):

@@ -6,7 +6,7 @@ import hashlib
 from pathlib import Path
 import re
 
-from .models.recovery import Rules
+from .models.settings import Rules
 from .storage import StorageFailure, atomic_write, data_root, locked_root, private_file
 
 

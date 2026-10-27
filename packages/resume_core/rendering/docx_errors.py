@@ -6,8 +6,7 @@ import re
 
 from pydantic import TypeAdapter, ValidationError
 
-from packages.resume_core.models.recovery import DocxError, DocumentAnchor, SafeRenderPath
-from .models import RenderDocument
+from .models import DocumentAnchor, DocxError, RenderDocument, SafeRenderPath
 
 
 class DocxFailure(Exception):

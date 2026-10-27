@@ -5,7 +5,7 @@ import { loadOriginal, originalKind, originalUrl } from "../src/workbench/editor
 test("original dispatch handles case, Markdown aliases and opaque identifiers", () => {
   assert.deepEqual(["resume.PDF", "resume.docx", "resume.TXT", "resume.md", "resume.MARKDOWN", "resume.html"].map(originalKind),
     ["pdf", "docx", "text", "markdown", "markdown", "unsupported"]);
-  assert.equal(originalUrl("p/q", "s #"), "/v1/rich/projects/p%2Fq/sources/s%20%23/original");
+  assert.equal(originalUrl("p/q", "s #"), "/v2/projects/p%2Fq/sources/s%20%23/original");
 });
 
 test("loading verifies exact bytes and rejects stale, missing or mismatched originals", async context => {

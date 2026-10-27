@@ -2,7 +2,6 @@
 
 import pytest
 
-from packages.resume_core.background_scopes import mutation_selectors
 from packages.resume_core.models.template_document import ManualScopeSpan, PresentedText
 from packages.resume_core.models.template_mutations import TemplateMutationV1
 from packages.resume_core.models.template_workspace import WorkspaceV7
@@ -15,13 +14,12 @@ from packages.resume_core.template_preparation_ids import EditIdAllocator, exist
 from packages.resume_core.template_scope_displays import capture_source, inline_addresses, node_hash
 from packages.resume_core.templates.compiler import canonical
 from tests.templates.test_manual_scope_occurrences import shared_workspace
-from tests.templates.test_template_preparation import proof
 
 
 def copied_workspace():
     value, sources = shared_workspace()
     original = value.project.document.regions[2].blocks[0]
-    allocator = EditIdAllocator(proof(), 'copy', 'copy', existing_ids(value))
+    allocator = EditIdAllocator('template-project', 'copy', 'copy', existing_ids(value))
     copied = copy_blocks(value.project, [original], id_factory=allocator)[0]
     value.project.document.regions[2].blocks.append(copied)
     return WorkspaceV7.model_validate(value.model_dump(by_alias=True)), sources, copied.id
@@ -56,9 +54,6 @@ def test_detaching_a_copy_preserves_exact_values_cells_and_issues_and_has_guarde
     assert isinstance(literal,PresentedText) and literal.text == scope_span.text
     assert literal.styles == scope_span.styles and literal.presentation == scope_span.presentation and literal.citations == scope_span.citations
     assert result.project.facts == before.project.facts and result.project.import_issues == before.project.import_issues
-    selectors = mutation_selectors(before,mutation)
-    assert any(value.stamp.kind == 'block' and value.stamp.id == copied_id for value in selectors)
-    assert any('scope_occurrence' in value.stamp.id for value in selectors)
     inverse = inverse_template_mutation(before,result,origin_action_id=mutation.action_id,mutation_id='undo-display',
         session_id='session',action_token=3)
     from packages.resume_core.rich_mutations import mutation_sha256
@@ -73,7 +68,7 @@ def test_repointing_all_cells_and_original_fragments_detaches_other_occurrences_
     before,_sources,copied_id = copied_workspace()
     first = before.project.document.regions[2].blocks[0].content[0]
     copied = next(block for block in before.project.document.blocks() if block.id == copied_id).content[0]
-    allocator = EditIdAllocator(proof(),'repoint','scope',existing_ids(before))
+    allocator = EditIdAllocator('template-project', 'repoint','scope',existing_ids(before))
     steps = human_cell_steps(before,['a-title','b-title'],first.text,'display-action',['block-paper-a'],allocator,ambiguous=True)
     new_scope = steps[0]['scope']['id']
     steps.append(metadata(before,{first.occurrence_id:new_scope,copied.occurrence_id:None}))
@@ -146,7 +141,7 @@ def test_table_cells_named_like_plain_containers_keep_their_explicit_cell_addres
 def test_surviving_original_fragment_cannot_be_retargeted_by_tree_change_without_assignment(include_metadata):
     before,_=shared_workspace();block=before.project.document.regions[2].blocks[0]
     span=block.content[0]
-    allocator=EditIdAllocator(proof(),'retarget','scope',existing_ids(before))
+    allocator=EditIdAllocator('template-project', 'retarget','scope',existing_ids(before))
     steps=human_cell_steps(before,['a-title','b-title'],span.text,'display-action',[block.id],allocator,ambiguous=True)
     copied=span.model_copy(update={'scope_id':steps[0]['scope']['id']},deep=True)
     steps.append({'kind':'replace_inline_range','blockId':block.id,'beforeRevision':block.revision,
@@ -160,7 +155,7 @@ def test_surviving_original_fragment_cannot_be_retargeted_by_tree_change_without
 def test_retained_retarget_assignment_must_guard_its_original_source(include_original_source):
     before,_=shared_workspace();first,second=before.project.document.regions[2].blocks[:2]
     original=first.content[0]
-    allocator=EditIdAllocator(proof(),'second-scope','scope',existing_ids(before))
+    allocator=EditIdAllocator('template-project', 'second-scope','scope',existing_ids(before))
     steps=human_cell_steps(before,['b-title'],original.text,'display-action',[second.id],allocator,ambiguous=True)
     other=original.model_copy(update={'scope_id':steps[0]['scope']['id'],
         'occurrence_id':'other-root','fragment_id':'other-fragment'},deep=True)

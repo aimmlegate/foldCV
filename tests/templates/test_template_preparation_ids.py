@@ -2,7 +2,6 @@
 
 import pytest
 
-from packages.resume_core.models.background import WriterProofV1
 from packages.resume_core.models.template_document import BoundLink, FieldRef, PresentedText
 from packages.resume_core.rich_mutations import cut_inline
 from packages.resume_core.template_authoring import copy_blocks, copy_fragment, copy_inline, inserted_paragraph, split_block
@@ -11,12 +10,8 @@ from packages.resume_core.templates.compiler import canonical
 from tests.templates.storage_fixtures import workspace
 
 
-def allocator(original, *, op='operation', mutation='mutation', changes=None, occupied=None):
-    proof = WriterProofV1(schemaVersion=1, lineage='lineage', epoch=1, incarnation='incarnation',
-        sessionId='session', credential='c' * 32)
-    if changes:
-        proof = proof.model_copy(update=changes)
-    return EditIdAllocator(proof, mutation, op, existing_ids(original) if occupied is None else occupied)
+def allocator(original, *, op='operation', mutation='mutation', project='template-project', occupied=None):
+    return EditIdAllocator(project, mutation, op, existing_ids(original) if occupied is None else occupied)
 
 
 def test_named_slots_are_order_independent_and_report_every_result():
@@ -33,18 +28,18 @@ def test_named_slots_are_order_independent_and_report_every_result():
         first.allocate('citation', a)
 
 
-@pytest.mark.parametrize('changes', [{'lineage': 'next'}, {'epoch': 2}, {'incarnation': 'next'}, {'session_id': 'next'}])
-def test_every_opening_component_separates_identity(changes):
+def test_the_same_request_allocates_the_same_ids_in_any_session_and_projects_stay_apart():
     original, _ = workspace()
-    assert allocator(original).allocate('block', ['insert']) != allocator(original, changes=changes).allocate('block', ['insert'])
+    value = allocator(original).allocate('block', ['insert'])
+    assert value == allocator(original).allocate('block', ['insert'])
+    assert value != allocator(original, project='other-project').allocate('block', ['insert'])
 
 
-def test_operation_and_request_ids_separate_identity_but_credentials_do_not():
+def test_operation_and_request_ids_separate_identity():
     original, _ = workspace()
     value = allocator(original).allocate('block', ['insert'])
     assert value != allocator(original, op='next').allocate('block', ['insert'])
     assert value != allocator(original, mutation='next').allocate('block', ['insert'])
-    assert value == allocator(original, changes={'credential': 'z' * 32}).allocate('block', ['insert'])
 
 
 def test_collisions_fail_without_partial_allocation_or_silent_suffix():

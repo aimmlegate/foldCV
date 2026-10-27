@@ -9,7 +9,8 @@ from pydantic import Field, model_validator
 
 from ..project_limits import ARCHIVE_EXPANDED_BYTES, PROJECT_CEILING_BYTES
 from .contracts import Evidence, Id, PartialDate, Revision, Sha256, Source, TemplateManifest, Wire, _safe_path, _unique
-from .recovery import EvidenceSpan, Rules
+from .evidence import EvidenceSpan
+from .settings import Rules
 from .rich_document import ImageBlock, RichDocumentV1, SectionBlock
 from .rich_facts import WorkingFacts
 from .rich_mutations import DependencyStamp, RichStep, RichSelection

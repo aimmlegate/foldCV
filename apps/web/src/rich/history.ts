@@ -1,5 +1,6 @@
 export type CellValue = string | null;
 export type CellChange = { key: string; before: CellValue; after: CellValue };
+
 export type HistoryKind = "typing" | "composition" | "structure" | "panel" | "rewrite" | "cascade";
 type Action = { id: string; token: number; kind: HistoryKind; group: string | null; changes: CellChange[]; lastNavigationToken: number };
 export type DependencyCapture = {

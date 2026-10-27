@@ -80,26 +80,6 @@ def test_preprovider_refusals_prove_no_dispatch(tmp_path, failure):
 
 
 @pytest.mark.asyncio
-async def test_direct_import_passes_and_resets_its_shared_permit(tmp_path):
-    from tests.templates.template_runtime_fixtures import RuntimeFixture
-    from resume_api.importer.template_direct import TemplateDirect
-    from resume_api.inference_admission import InferenceAdmission
-    fixture, admission, calls = RuntimeFixture(tmp_path), InferenceAdmission(), []
-    class OwnedProvider:
-        def generate_owned(self, request, files, cancel, permit):
-            calls.append('owned')
-            with permit.hold(cancel):
-                return fixture.transport.generate(request, cancel)
-        def generate(self, *args):
-            raise AssertionError('direct import lost its permit')
-    fixture.pipeline.transport = ProviderTemplateTransport(
-        lambda: (OwnedProvider(), fixture.command.capture.primary.model), tmp_path / 'transport')
-    result = await TemplateDirect(fixture.pipeline, admission).run(fixture.project, fixture.command)
-    assert result.state == 'published' and calls == ['owned', 'owned']
-    assert JOB_PERMIT.get() is None and not admission.locked()
-
-
-@pytest.mark.asyncio
 async def test_missing_connection_can_finalize_fallback_without_unknown_cleanup(tmp_path):
     from tests.templates.template_runtime_fixtures import RuntimeFixture
     fixture = RuntimeFixture(tmp_path)

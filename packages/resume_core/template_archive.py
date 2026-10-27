@@ -4,15 +4,30 @@ import base64
 
 from pydantic import ValidationError
 
-from .gui_archive_zip import ArchiveFailure, alias, digest, json_bytes, parse_json, read_zip, write_zip
+from .archive_zip import ArchiveFailure, alias, digest, json_bytes, parse_json, read_zip, write_zip
 from .models.template_workspace import ArchiveManifestV7, WorkspaceV7
-from .rich_archive import inert_sync_history, referenced_assets
+from .models.rich_document import ImageBlock
 from .rich_images import ImageFailure, verify_image_bytes
 from .templates.compiler import canonical
 from .models.template_import import ImportOperation
 from .models.template_workspace import history_bytes, history_text
 from .templates.models import TemplatePackage, remember_asset
 from .templates.store import verify_package
+
+
+def referenced_assets(project):
+    refs = {block.props.asset_id for block in project.document.blocks() if isinstance(block, ImageBlock)}
+    return [asset for asset in project.assets if asset.id in refs]
+
+
+def inert_sync_history(workspace):
+    for sync in workspace.sync_records:
+        sync.proposed_steps, sync.ready, sync.dependencies, sync.selection = [], False, [], None
+        if workspace.schema_version == 7 and hasattr(sync, 'capture'):
+            sync.capture = None
+        if sync.status == "pending":
+            sync.status = "stale"
+            sync.error_code = sync.error_code or "OPERATION_INTERRUPTED"
 
 
 def _verify_image(asset, blob):

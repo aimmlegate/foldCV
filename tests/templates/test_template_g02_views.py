@@ -6,7 +6,8 @@ import pytest
 
 from packages.resume_core.models.template_authoring import TemplateEditPreparationV1
 from packages.resume_core.models.template_document import BoundLink, FieldOccurrence, ManualScopeSpan
-from packages.resume_core.rich_archive import export_rich_archive, open_rich_archive
+from packages.resume_core.archive_zip import write_zip
+from packages.resume_core.template_archive import archive_payload_v7, open_archive_v7
 from packages.resume_core.rich_mutations import apply_rich_mutation
 from packages.resume_core.template_inverse import inverse_template_mutation
 from packages.resume_core.template_preparation import prepare_edit
@@ -15,8 +16,8 @@ from packages.resume_core.templates.presentation_plan import editor_plan
 from packages.resume_core.templates.store import BUNDLED_TEMPLATE
 from tests.templates.employment_fixtures import employment_package, employment_source
 from tests.templates.test_captured_docx import NS, emitted, xml
-from tests.templates.test_template_employment import EmploymentFixture, scripted_employment
-from tests.templates.test_template_preparation import command, proof, response
+from tests.templates.template_runtime_fixtures import EmploymentFixture, scripted_employment
+from tests.templates.test_template_preparation import command, response
 from tests.templates.test_template_view_adapters import URL, hyperlinks, published, render, text
 from tests.templates.test_transactions import authorization
 
@@ -29,7 +30,7 @@ def request(workspace, operation, identifier):
 
 
 def edit(workspace, operation, identifier):
-    prepared = prepare_edit(response(workspace), request(workspace, operation, identifier), proof())
+    prepared = prepare_edit(response(workspace), request(workspace, operation, identifier))
     after = apply_rich_mutation(workspace, prepared.mutation)[0]
     assert canonical(after) == canonical(prepared.preview.workspace)
     return after
@@ -42,7 +43,7 @@ def undo(before, after, action):
 
 
 def transferred(workspace, originals):
-    copied, *_ = open_rich_archive(export_rich_archive(workspace, originals, {}, {}), 'g02-transfer')
+    copied, *_ = open_archive_v7(write_zip(archive_payload_v7(workspace, originals, {})), 'g02-transfer')
     assert copied.project.document == workspace.project.document and copied.project.facts == workspace.project.facts
     return copied
 

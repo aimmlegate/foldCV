@@ -309,38 +309,34 @@ def test_materialized_fallback_issue_edit_undo_redo_is_scoped_without_new_checks
 
 
 def test_failed_save_of_materialized_issue_edit_keeps_coherent_disk_and_retry_transfer(tmp_path, monkeypatch):
-    from packages.resume_core import rich_project_store as module
-    from packages.resume_core.project_store import ProjectStoreFailure
-    from packages.resume_core.rich_archive import export_rich_archive, open_rich_archive
-    from packages.resume_core.rich_mutations import apply_rich_mutation
-    from packages.resume_core.rich_project_store import RichProjectStore
+    from packages.resume_core import project_repository as module
+    from packages.resume_core.archive_zip import write_zip
+    from packages.resume_core.template_archive import archive_payload_v7, open_archive_v7
+    from tests.templates.editor_fixtures import TemplateEditor
     before, sources = issue_workspace()
-    store = RichProjectStore(tmp_path / 'isolated')
-    originals = {(before.project_id, key): value for key, value in sources.items()}
-    store.save(before, originals, {})
-    path = store.projects / before.project_id / 'workspace.json'
+    editor = TemplateEditor(tmp_path, before, sources)
+    path = editor.session().directory / 'workspace.json'
     previous = path.read_bytes()
     command = fallback_edit(before)
-    candidate, _ = apply_rich_mutation(before, command)
     write = module.atomic_write
     def fail(target, data, **kwargs):
         if target.name == 'workspace.json':
             raise OSError('synthetic disk failure')
         return write(target, data, **kwargs)
     monkeypatch.setattr(module, 'atomic_write', fail)
-    with pytest.raises(ProjectStoreFailure, match='PROJECT_SAVE_FAILED'):
-        store.save(candidate, originals, {})
+    with pytest.raises(module.RepositoryFailure, match='PROJECT_SAVE_FAILED'):
+        editor.commit(command)
     assert path.read_bytes() == previous
-    prior = module.decode_rich_snapshot(previous)
+    prior = module.decode_project(path.parent, previous)
     assert prior.project.document == before.project.document and prior.project.facts == before.project.facts
     assert prior.project.import_issues[0].state == 'active'
     monkeypatch.setattr(module, 'atomic_write', write)
-    retried, replayed = apply_rich_mutation(candidate, command)
-    assert replayed and retried == candidate
-    store.save(retried, originals, {})
-    reopened = RichProjectStore(tmp_path / 'isolated').load_all()[0][before.project_id][0]
+    assert not editor.commit(command).replayed
+    candidate = editor.current()
+    assert [finding.state for finding in candidate.project.import_issues] == ['retired', 'active']
+    reopened = editor.reopen()
     assert reopened == candidate
-    transferred, _originals, _, _ = open_rich_archive(export_rich_archive(reopened, sources, {}, {}), 'employment-copy')
+    transferred, _originals, _, _ = open_archive_v7(write_zip(archive_payload_v7(reopened, sources, {})), 'employment-copy')
     assert transferred.project.document == reopened.project.document
     assert transferred.project.facts == reopened.project.facts
     assert [finding.state for finding in transferred.project.import_issues] == ['retired', 'active']

@@ -1,0 +1,23 @@
+{
+  "additionalProperties": false,
+  "properties": {
+    "code": {
+      "pattern": "^[A-Z][A-Z0-9_]{1,63}$",
+      "title": "Code",
+      "type": "string"
+    },
+    "detail": {
+      "items": {
+        "type": "string"
+      },
+      "maxItems": 20,
+      "title": "Detail",
+      "type": "array"
+    }
+  },
+  "required": [
+    "code"
+  ],
+  "title": "AssistantErrorV1",
+  "type": "object"
+}

@@ -1,8 +1,10 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { readCaptureCurrent, templateExportArtifact } from "../src/contracts/template-export";
+import { readFileSync } from "node:fs";
+import { templateExportArtifact } from "../src/contracts/template-export";
 import type { TemplateSnapshotIdentity } from "../src/contracts/generated/template_snapshot_identity";
-import { downloadTemplate, RichApiFailure } from "../src/rich/api";
+import type { TemplateProjectResponseV1 } from "../src/contracts/generated/template_project_response_v1";
+import { ProjectApiFailure, ProjectEditorConnection } from "../src/rich/v7-connection";
 
 const expected: TemplateSnapshotIdentity = { projectId: "synthetic-project", projectRevision: 3, documentRevision: 2,
   documentHash: "a".repeat(64), factsHash: "b".repeat(64), packageHash: "c".repeat(64), presentationHash: "d".repeat(64) };
@@ -36,9 +38,9 @@ test("every snapshot field and required success header rejects a different captu
   await assert.rejects(templateExportArtifact(new Response(artifact, { headers: await headers() }), expected, "another-export"), /INVALID_RESULT/);
 });
 
-test("duplicate, unsafe and extra snapshot values cannot reuse a claimed identity", async () => {
-  for (const source of [JSON.stringify(expected).replace('"projectRevision":3', '"projectRevision":99,"projectRevision":3'),
-    JSON.stringify({ ...expected, projectRevision: Number.MAX_SAFE_INTEGER + 1 }), JSON.stringify({ ...expected, extra: true }), "null", "{}"]) {
+test("unsafe, extra and missing snapshot values cannot reuse a claimed identity", async () => {
+  for (const source of [JSON.stringify({ ...expected, projectRevision: Number.MAX_SAFE_INTEGER + 1 }), JSON.stringify({ ...expected, extra: true }),
+    "null", "{}", "[]", "not json"]) {
     const fields = await headers(); fields.set("X-FoldCV-Snapshot", source);
     await assert.rejects(templateExportArtifact(new Response(artifact, { headers: fields }), expected));
   }
@@ -63,35 +65,6 @@ test("an oversized stream stops at the artifact boundary and cancels its reader"
   assert.ok(cancelled);
 });
 
-test("project, selection epoch and request ID reject A to B to A and superseded reads", () => {
-  const first = { projectId: "A", selectionEpoch: 1, requestId: 10 };
-  assert.ok(readCaptureCurrent(first, { ...first }));
-  assert.equal(readCaptureCurrent(first, { ...first, projectId: "B" }), false);
-  assert.equal(readCaptureCurrent(first, { ...first, selectionEpoch: 3 }), false);
-  assert.equal(readCaptureCurrent(first, { ...first, requestId: 11 }), false);
-});
-
-test("the actual download transport sends the exact V7 snapshot and validates the reply", async () => {
-  const previous = globalThis.fetch;
-  const paths: string[] = [], bodies: unknown[] = [];
-  globalThis.fetch = async (input, init) => {
-    paths.push(String(input));
-    const body = init?.body;
-    assert.ok(typeof body === "string");
-    bodies.push(JSON.parse(body));
-    return new Response(artifact, { headers: await headers() });
-  };
-  try {
-    const result = await downloadTemplate(expected.projectId, expected);
-    assert.equal(result.attemptId, "synthetic-export");
-    assert.deepEqual(bodies[0], { schemaVersion: 1, snapshot: expected });
-    await downloadTemplate(expected.projectId, expected, { retryAttemptId: "prior/attempt" });
-    assert.equal(paths[1], "/v1/rich/projects/synthetic-project/exports/prior%2Fattempt/retry");
-    assert.deepEqual(bodies[1], {});
-    await assert.rejects(downloadTemplate("another-project", expected), /INVALID_RESULT/);
-  } finally { globalThis.fetch = previous; }
-});
-
 test("an artifact at the exact size boundary is accepted when its bytes match", async () => {
   const bytes = new Uint8Array(32 * 1024 * 1024);
   const hash = await crypto.subtle.digest("SHA-256", bytes);
@@ -101,11 +74,10 @@ test("an artifact at the exact size boundary is accepted when its bytes match", 
   assert.equal(result.blob.size, bytes.byteLength);
 });
 
-test("the download transport preserves a server failure without consuming it as an artifact", async () => {
-  const previous = globalThis.fetch;
-  globalThis.fetch = async () => new Response(JSON.stringify({ error: { code: "IMPORT_EXPORT_SNAPSHOT_STALE" } }), { status: 409 });
-  try {
-    await assert.rejects(downloadTemplate(expected.projectId, expected), (error: unknown) => error instanceof RichApiFailure
-      && error.code === "IMPORT_EXPORT_SNAPSHOT_STALE" && error.status === 409);
-  } finally { globalThis.fetch = previous; }
+test("the export request preserves a server failure without consuming it as an artifact", async () => {
+  const base = JSON.parse(readFileSync(new URL("../../../tests/fixtures/synthetic/projects/v7-response.json", import.meta.url), "utf8")) as TemplateProjectResponseV1;
+  const editor = new ProjectEditorConnection(base.workspace.projectId, "editor-token", base, { undo: null, redo: null },
+    () => Promise.resolve(Response.json({ error: { code: "IMPORT_EXPORT_SNAPSHOT_STALE" } }, { status: 409 })));
+  await assert.rejects(editor.exportDocx(), (error: unknown) => error instanceof ProjectApiFailure
+    && error.code === "IMPORT_EXPORT_SNAPSHOT_STALE" && error.status === 409);
 });

@@ -24,10 +24,13 @@ def existing_ids(workspace):
     return identifiers
 
 
+NAMESPACE = 'FoldCV authoring v2'
+
+
 class EditIdAllocator:
-    def __init__(self, proof, client_mutation_id, op_id, occupied):
-        self.namespace = [proof.lineage, proof.epoch, proof.incarnation, proof.session_id,
-            client_mutation_id, op_id]
+    """Ids named by the request: the same project, client mutation and operation allocate the same ids (D109)."""
+    def __init__(self, project_id, client_mutation_id, op_id, occupied):
+        self.namespace = [NAMESPACE, project_id, client_mutation_id, op_id]
         self.op_id = op_id
         self.occupied = set(occupied)
         self.slots = {}
@@ -40,7 +43,7 @@ class EditIdAllocator:
             if key in self.derived_slots or self.prefixes[key] != prefix:
                 raise ValueError('allocation slot changes purpose')
             return self.slots[key]
-        digest = sha256(b'FoldCV authoring v1\0' + canonical([*self.namespace, slot]))
+        digest = sha256(canonical([*self.namespace, slot]))
         identifier = prefix + '-' + digest
         if identifier in self.occupied:
             raise ValueError('allocated authoring identity collides')

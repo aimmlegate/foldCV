@@ -1,15 +1,14 @@
 import { useState } from "react";
-import type { GuiProjectListResponse } from "../../contracts/generated/gui_project_list_response";
+import type { ProjectList } from "../../projects/api";
 import { Button } from "../ui/Button";
 import { Dialog } from "../ui/Dialog";
 import { Icon } from "../ui/Icon";
 
-export function History({ projects, activeId, busy, collapse, fresh, open, remove, archive, openFile, settings, connection, activity }: {
-  projects: GuiProjectListResponse | null; activeId: string | null; busy: boolean; collapse: () => void;
+export function History({ projects, activeId, busy, collapse, fresh, open, remove, archive, openFile, settings, connection }: {
+  projects: ProjectList | null; activeId: string | null; busy: boolean; collapse: () => void;
   fresh: () => void; open: (id: string) => Promise<boolean>; remove: (id: string) => Promise<boolean>;
   archive: (id: string, archived: boolean) => Promise<boolean>;
   openFile: () => void; settings: () => void; connection: string;
-  activity?: ReadonlyMap<string, string>;
 }) {
   const [deleting, setDeleting] = useState<string | null>(null);
   const [archived, setArchived] = useState(false);
@@ -25,7 +24,7 @@ export function History({ projects, activeId, busy, collapse, fresh, open, remov
     <div className="project-list">{!entries.length && <p className="empty-state">{archived ? "Архив пуст." : "Здесь появятся ваши резюме."}</p>}
       {entries.map(item => <div className={`project-row${item.projectId === activeId ? " active" : ""}`} key={item.projectId}>
         <button className="project-select" disabled={busy || item.tombstoned} aria-current={item.projectId === activeId ? "page" : undefined} onClick={() => void open(item.projectId)}>
-          <strong>{item.title}</strong>{item.subtitle && <small>{item.subtitle}</small>}<em>{item.tombstoned ? "Очистка не завершена — повторите удаление" : projects?.errors.some(error => error.projectId === item.projectId) ? "Не удалось прочитать" : activity?.get(item.projectId) ?? "Рабочая версия"}</em>
+          <strong>{item.title}</strong>{item.subtitle && <small>{item.subtitle}</small>}<em>{item.tombstoned ? "Очистка не завершена — повторите удаление" : projects?.errors.some(error => error.projectId === item.projectId) ? "Не удалось прочитать" : "Рабочая версия"}</em>
         </button><button className="project-archive" disabled={busy || item.tombstoned} aria-label={`${archived ? "Восстановить" : "В архив"}: ${item.title}`}
           onClick={() => void archive(item.projectId, !archived)}>{archived ? "Вернуть" : "В архив"}</button>
         <button className="project-delete" disabled={busy} aria-label={`Удалить проект: ${item.title}`} title="Удалить резюме" onClick={() => setDeleting(item.projectId)}><Icon name="trash" /></button>

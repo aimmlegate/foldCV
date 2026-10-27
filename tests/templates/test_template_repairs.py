@@ -5,15 +5,12 @@ import pytest
 from packages.resume_core.template_import import spent_calls
 from tests.templates.template_runtime_fixtures import RuntimeFixture
 from tests.templates.test_semantic_admission import raw_proposal
-from tests.templates.test_template_finalization_flow import queued
-from tests.templates.test_template_job_routing import service_for
 from resume_api.providers.content import ContentFailure
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize('entry', ['direct', 'queued'])
 @pytest.mark.parametrize('repair', ['primary', 'fallback', 'fallback_failure', 'fallback_unavailable', 'no_fallback'])
-async def test_repairs_keep_siblings_and_use_only_configured_slots(tmp_path, entry, repair):
+async def test_repairs_keep_siblings_and_use_only_configured_slots(tmp_path, repair):
     fixture = RuntimeFixture(tmp_path, fallback=repair != 'no_fallback')
     rejected, reviews, models = [], [], []
     def script(request, value):
@@ -43,17 +40,7 @@ async def test_repairs_keep_siblings_and_use_only_configured_slots(tmp_path, ent
             field['item'] = {'kind': 'handle', 'itemHandle': handles[field['item']['key']]}
         return result
     fixture.transport.scripted = script
-    service = await service_for(fixture) if entry == 'queued' else None
-    try:
-        if service:
-            await queued(service, fixture, fixture.command)
-            operation = fixture.current().project.template_operations[0]
-        else:
-            operation = await fixture.pipeline.run(fixture.project, fixture.command, admitted=fixture.admitted)
-    finally:
-        if service:
-            await service.shutdown()
-            service.supervisor.clock.verify()
+    operation = await fixture.pipeline.run(fixture.project, fixture.command, admitted=fixture.admitted)
     assert operation.state == 'published' and len(operation.allocations) == 2
     assert spent_calls(operation) == len(fixture.transport.calls) - (repair == 'fallback_unavailable')
     facts = fixture.current().project.facts

@@ -263,7 +263,7 @@ def live_sync_record(workspace, sync_id, before_hash, before_lifecycle_id):
 
 
 def restore_sync_rows(current, restored, delta):
-    from .background_store import BackgroundFailure
+    from .project_repository import RepositoryFailure
     from pydantic import TypeAdapter
     from .models.rich_workspace import RichSyncRecord
     adapter = TypeAdapter(TemplateSyncRecord | RichSyncRecord)
@@ -278,22 +278,22 @@ def restore_sync_rows(current, restored, delta):
         for identifier, value in list(pending.items()):
             placement = delta.get(('sync_placement', identifier))
             if placement is None or placement[0] is None:
-                raise BackgroundFailure('DEPENDENCY_CHANGED')
+                raise RepositoryFailure('DEPENDENCY_CHANGED')
             predecessor = placement[0]['afterSyncId']
             if predecessor in pending:
                 continue
             index = next((index for index, row in enumerate(rows) if row.id == predecessor), None)
             if predecessor is not None and index is None:
-                raise BackgroundFailure('DEPENDENCY_CHANGED')
+                raise RepositoryFailure('DEPENDENCY_CHANGED')
             rows.insert(index + 1 if index is not None else 0, adapter.validate_python(value))
             pending.pop(identifier)
             progress = True
         if not progress:
-            raise BackgroundFailure('DEPENDENCY_CHANGED')
+            raise RepositoryFailure('DEPENDENCY_CHANGED')
     previous, actual = None, {}
     for row in rows:
         actual[('sync_placement', row.id)] = {'afterSyncId': previous}
         previous = row.id
     if any(restored.get(key) != actual.get(key) for key in delta if key[0] == 'sync_placement'):
-        raise BackgroundFailure('DEPENDENCY_CHANGED')
+        raise RepositoryFailure('DEPENDENCY_CHANGED')
     return rows

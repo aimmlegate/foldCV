@@ -9,7 +9,7 @@ import os
 from pathlib import Path
 import stat
 
-from spikes.cli.profile import overrides
+from resume_api.cli.profile import overrides
 from . import distribution
 
 
@@ -159,7 +159,7 @@ class ExperimentalCliProfile:
 
 def installed_profile(root: Path) -> ExperimentalCliProfile:
     import shutil
-    from spikes.agent.profile import check_host
+    from resume_api.agent.host_profile import check_host
 
     managed = distribution.managed_executable(root.parent / "cli-runtime")
     candidates = [managed, BINARY]

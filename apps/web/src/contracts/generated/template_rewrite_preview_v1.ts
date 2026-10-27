@@ -22,6 +22,9 @@ export type Projectrevision = number;
 export type Source = string;
 export type Text = string;
 
+/**
+ * A rewrite preview: the selected source and the model's text; the document changes only through Apply.
+ */
 export interface TemplateRewritePreviewV1 {
   range: AuthoredRange;
   requestId: Requestid;

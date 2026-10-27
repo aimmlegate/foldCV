@@ -131,11 +131,11 @@ class InlineReplacement:
         return result
 
 
-def prepare_inline_paste(response,request,proof,*,clipboard=None):
+def prepare_inline_paste(response,request,*,clipboard=None,occupied=None):
     from .template_preparation import prepare_text_edit
     operation=request.operations[0]
     content=source_content(response,operation,clipboard)
     replacement=InlineReplacement(content)
     text=''.join(inline_text(part) for part in content)
     command=ReplaceText(kind='replace_text',opId=operation.op_id,range=operation.destination,text=text,styles={})
-    return prepare_text_edit(response,request,proof,operation=command,replacement=replacement)
+    return prepare_text_edit(response,request,operation=command,replacement=replacement,occupied=occupied)

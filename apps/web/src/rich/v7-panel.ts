@@ -1,10 +1,20 @@
-import type { PanelCommand } from "./synchronization";
+import type { RichPanelRequest } from "../contracts/generated/rich_panel_request";
 import type { PanelCommandV7 } from "./v7-translation";
 
-/** The shared facts panel speaks the V1 command. Python's V7 panel path accepts employment commands only, and refuses
- * values on period creation/removal, so changed values the dialog attaches there become a preceding edit. */
+/** The facts panel's command; the V7 session translates it below. */
+export type PanelCommand = Omit<RichPanelRequest, "capture" | "factsRevision" | "documentRevision">;
+
+/** The facts panel speaks the generic panel command. Python's V7 panel path accepts employment commands and a technology
+ * reorder, and refuses values on period creation/removal, so changed values the dialog attaches there become a preceding edit. */
 export function employmentPanelCommands(command: PanelCommand, kinds: ReadonlyMap<string, string>): PanelCommandV7[] | null {
   const kind = command.recordId ? kinds.get(command.recordId) : command.recordKind;
+  if (command.operation === "move_technology") {
+    const values = command.values && Object.keys(command.values).length > 0;
+    if (kind !== "technology" || !command.recordId || command.jobId || command.periodId || values) return null;
+    const move: PanelCommandV7 = { operation: "move_technology", recordId: command.recordId };
+    if (command.beforeRecordId) move.beforeRecordId = command.beforeRecordId;
+    return [move];
+  }
   if (kind !== "employment" || command.jobId) return null;
   const values = command.values && Object.keys(command.values).length ? structuredClone(command.values) : null;
   const recordId = command.recordId;

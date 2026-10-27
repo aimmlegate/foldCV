@@ -1,0 +1,18 @@
+import assert from "node:assert/strict";
+import test from "node:test";
+import type { AssistantView } from "../src/assistant/controller";
+import { activityText } from "../src/workbench/assistant/status";
+import { run as assistantRun, view as assistantView } from "./support/assistant";
+
+const run = assistantRun("completed", "run", "conversation");
+const view: AssistantView = assistantView({ run });
+
+test("a terminal server run still waits for the mounted editor acknowledgment", () => {
+  assert.equal(activityText(view, true), "Подтверждаем изменения в редакторе");
+  assert.equal(activityText(view, false), "Завершено");
+  assert.equal(activityText({ ...view, run: { ...run, state: "cancelled" } }, false), "Остановлено");
+});
+test("a new submission and a lost submission response keep their own states", () => {
+  assert.equal(activityText({ ...view, submitting: true }, true), "Отправляем задачу…");
+  assert.match(activityText({ ...view, pendingSend: true }, true), /Ответ на отправку потерян/);
+});

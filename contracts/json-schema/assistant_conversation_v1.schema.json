@@ -1,0 +1,35 @@
+{
+  "additionalProperties": false,
+  "properties": {
+    "createdAt": {
+      "maxLength": 64,
+      "minLength": 1,
+      "title": "Createdat",
+      "type": "string"
+    },
+    "id": {
+      "minLength": 1,
+      "title": "Id",
+      "type": "string"
+    },
+    "title": {
+      "maxLength": 120,
+      "title": "Title",
+      "type": "string"
+    },
+    "updatedAt": {
+      "maxLength": 64,
+      "minLength": 1,
+      "title": "Updatedat",
+      "type": "string"
+    }
+  },
+  "required": [
+    "id",
+    "title",
+    "createdAt",
+    "updatedAt"
+  ],
+  "title": "AssistantConversationV1",
+  "type": "object"
+}

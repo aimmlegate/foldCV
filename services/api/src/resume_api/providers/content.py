@@ -12,12 +12,12 @@ from pydantic import BaseModel, JsonValue
 from .dynamic_result import DynamicResultSpec
 
 from packages.resume_core.reasoning import EFFORTS, ReasoningEffort
-from packages.resume_core.gui_prompts import CONTENT_INPUT_BYTES
 from resume_api.lifecycle import OperationFiles
 
 
 ResultT = TypeVar("ResultT", bound=BaseModel)
 MAX_GENERATION_SECONDS = 180
+CONTENT_INPUT_BYTES = 256 * 1024
 
 
 class ContentTransport(Protocol[ResultT]):

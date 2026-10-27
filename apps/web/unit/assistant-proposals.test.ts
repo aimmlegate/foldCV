@@ -2,71 +2,38 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
-import { ProposalPreview, proposalControls } from "../src/assistant/proposal";
-import { validateContract } from "../src/contracts/validate";
-import { proposal } from "./support/assistant-proposal";
-import { taskCatalog } from "./support/assistant-capabilities";
+import { ProposalPreview, proposalControls, proposalTitle } from "../src/assistant/proposal";
+import { proposal } from "./support/assistant";
 
-test("preview renders exact server comparison as plain text and native keyboard controls without a modal", () => {
-  const value = proposal(); value.changes[0]!.after = '<img src="https://example.invalid/tracker"> Создавал 😀';
-  const html = renderToStaticMarkup(createElement(ProposalPreview, { value, catalog: taskCatalog(), busy: false,
-    invalidated: false, allowEdits: false, apply: () => {}, discard: () => {} }));
-  assert.ok(html.includes("Разрабатывал API 😀") && html.includes("&lt;img"));
-  assert.equal(/<img|<dialog|role="dialog"/.test(html), false);
-  assert.ok(html.includes("<summary>") && html.includes('type="button"') && html.includes("Применить"));
-  assert.ok(html.includes("Документ пока не изменён"));
+const render = (props: Partial<Parameters<typeof ProposalPreview>[0]>) => renderToStaticMarkup(createElement(ProposalPreview, {
+  value: proposal(), busy: false, stale: false, allowEdits: true, apply: () => {}, discard: () => {}, ...props }));
+
+test("the preview shows the server's before and after text as plain text, with native controls and no modal", () => {
+  const value = proposal({ preview: [{ target: "block-paper-a", label: "set_block_text", before: "Разработал API 😀",
+    after: '<img src="https://example.invalid/tracker"> Создавал 😀' }] });
+  const html = render({ value });
+  assert.ok(html.includes("Разработал API 😀") && html.includes("&lt;img"));
+  assert.equal(/<img|<dialog|role="dialog"/u.test(html), false);
+  assert.ok(html.includes("Сейчас") && html.includes("После применения") && html.includes("Текст · 1"));
+  assert.ok(html.includes("Документ пока не изменён") && html.includes("одна отмена"));
 });
 
-test("explicit controls follow server stages and stay disabled while stale, busy, read-only or unknown", () => {
-  const value = proposal(), catalog = taskCatalog();
-  assert.ok(catalog.tasks[0]); catalog.tasks[0].apply = { state: "available", reason: null, reasonCode: null, remedy: null };
-  assert.ok(proposalControls(value, catalog, false, false, true).apply);
-  for (const state of ["building", "incomplete", "stale", "cancelled", "outcome_unknown", "applied"] as const)
-    assert.equal(proposalControls({ ...value, state }, catalog, false, false, true).apply, false);
-  assert.equal(proposalControls(value, catalog, true, false, true).apply, false);
-  assert.equal(proposalControls(value, catalog, false, true, true).apply, false);
-  assert.equal(proposalControls(value, catalog, false, false, false).apply, false);
-  const failed = { ...value, state: "failed_before_commit" as const };
-  assert.equal(proposalControls(failed, catalog, false, false, true).apply, false);
-  assert.ok(proposalControls(failed, catalog, false, false, true, catalog.tasks[0].apply).apply);
-  const html = renderToStaticMarkup(createElement(ProposalPreview, { value: { ...value, state: "outcome_unknown" }, catalog,
-    busy: false, invalidated: false, allowEdits: true, apply: () => {}, discard: () => {} }));
-  assert.equal(html.includes("Документ пока не изменён"), false);
-  assert.ok(html.includes("Проверяем исходное сохранение"));
-  const saved = renderToStaticMarkup(createElement(ProposalPreview, { value: { ...value, state: "applied" }, catalog,
-    busy: false, invalidated: true, allowEdits: true, apply: () => {}, discard: () => {} }));
-  assert.ok(saved.includes("Вариант сохранён"));
-  assert.equal(saved.includes("Подготовьте новый вариант; текущие правки сохранены"), false);
+test("Apply needs a current draft and the edits flag; Discard needs only a draft", () => {
+  const value = proposal();
+  assert.deepEqual(proposalControls(value, false, false, true), { apply: true, discard: true, reason: null });
+  assert.equal(proposalControls(value, true, false, true).apply, false);
+  const off = proposalControls(value, false, false, false);
+  assert.equal(off.apply, false); assert.equal(off.discard, true); assert.match(off.reason ?? "", /Разрешите правки/u);
+  const stale = proposalControls(value, false, true, true);
+  assert.equal(stale.apply, false); assert.match(stale.reason ?? "", /документ изменился/u);
+  for (const state of ["applied", "discarded"] as const) assert.deepEqual(proposalControls({ ...value, state }, false, false, true), { apply: false, discard: false, reason: null });
+  assert.ok(render({ stale: true }).includes("Вариант устарел"));
+  assert.ok(render({ value: { ...value, state: "applied" } }).includes("Вариант сохранён"));
 });
 
-test("acceptance wire requires protocol, exact content identity and UI-only owner; model booleans cannot approve", () => {
-  const value = { protocolVersion: 1, proposalId: "proposal_1", version: 1, contentSha256: "b".repeat(64),
-    owner: { epoch: 1, token: "synthetic_owner_capability_0123456789" } };
-  assert.ok(validateContract("assistant_proposal_accept_v1", value));
-  assert.equal(validateContract("assistant_proposal_accept_v1", { ...value, approved: true }), false);
-  assert.equal(validateContract("assistant_proposal_accept_v1", { ...value, owner: null }), false);
-  assert.equal(validateContract("assistant_proposal_accept_v1", { ...value, protocolVersion: undefined }), false);
-});
-
-test("action preview displays the server's exact target and irreversible consequence without promising editor Undo", () => {
-  const value = proposal(), catalog = taskCatalog();
-  value.taskId = "delete_project"; value.reason = "Удалить проект «Синтетический проект». Локальные файлы будут удалены окончательно; отмены в редакторе нет.";
-  assert.ok(catalog.tasks[0]); Object.assign(catalog.tasks[0], { id: "delete_project", effect: "project_action", reversibility: "action_specific" });
-  const html = renderToStaticMarkup(createElement(ProposalPreview, { value, catalog, busy: false,
-    invalidated: false, allowEdits: true, apply: () => {}, discard: () => {} }));
-  assert.ok(html.includes("Синтетический проект") && html.includes("удалены окончательно"));
-  assert.equal(html.includes("одна отмена в истории"), false);
-});
-
-test("incomplete preview displays server continuation budgets without offering partial Apply", () => {
-  const value = { ...proposal(), state: "incomplete" as const };
-  const html = renderToStaticMarkup(createElement(ProposalPreview, { value, catalog: taskCatalog(), busy: false,
-    invalidated: false, allowEdits: true, apply: () => {}, discard: () => {}, continueDraft: () => {},
-    continuation: { schemaVersion: 1, protocolVersion: 1, proposal: { schemaVersion: 1, protocolVersion: 1,
-      proposalId: value.id, version: value.version, contentSha256: value.contentSha256 }, request: null,
-    availability: { state: "available", reason: null, reasonCode: null, remedy: null }, operationsRemaining: 3,
-    versionsRemaining: 2, toolCalls: 64, toolBytes: 65536 } }));
-  assert.ok(html.includes("Продолжить черновик") && html.includes("Осталось операций: 3") && html.includes("65536"));
-  assert.match(html, /disabled="">Применить/);
-  assert.ok(html.includes("Документ пока не изменён"));
+test("history and project actions name what Apply does", () => {
+  assert.equal(proposalTitle(proposal({ kind: "history", ops: [{ op: "history", direction: "undo" }] })), "Отменить последнее действие");
+  assert.equal(proposalTitle(proposal({ kind: "action", ops: [{ op: "action", action: "archive", value: null, targetId: null }] })), "Перенести резюме в архив");
+  const html = render({ value: proposal({ kind: "history", ops: [{ op: "history", direction: "redo" }], preview: [] }) });
+  assert.ok(html.includes("Повторить отменённое действие") && html.includes("Новая запись в истории не создаётся"));
 });

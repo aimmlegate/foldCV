@@ -1,9 +1,0 @@
-{
-  "schemaVersion": 1,
-  "sessionId": "new-session",
-  "incarnation": "new-connection",
-  "credential": "synthetic_writer_credential_0123456789",
-  "canonicalRevision": 1,
-  "canonicalSha256": "97b841f787fcaec5244055a3ed5ea88ede96cdfe008124f536a9a900cd39d718",
-  "discardDrafts": []
-}

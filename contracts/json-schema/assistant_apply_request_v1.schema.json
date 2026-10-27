@@ -1,0 +1,27 @@
+{
+  "additionalProperties": false,
+  "properties": {
+    "allowEdits": {
+      "title": "Allowedits",
+      "type": "boolean"
+    },
+    "clientMutationId": {
+      "minLength": 1,
+      "title": "Clientmutationid",
+      "type": "string"
+    },
+    "editorToken": {
+      "maxLength": 256,
+      "minLength": 1,
+      "title": "Editortoken",
+      "type": "string"
+    }
+  },
+  "required": [
+    "editorToken",
+    "clientMutationId",
+    "allowEdits"
+  ],
+  "title": "AssistantApplyRequestV1",
+  "type": "object"
+}
