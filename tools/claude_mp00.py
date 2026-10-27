@@ -131,6 +131,20 @@ def scan(canary: str) -> list[str]:
     return hits
 
 
+def schema_valid(value: object) -> bool:
+    return (isinstance(value, dict) and set(value) == set(SCHEMA["required"])
+            and isinstance(value["answer"], str) and type(value["count"]) is int
+            and isinstance(value["items"], list) and all(isinstance(item, str) for item in value["items"]))
+
+
+def init_check(init: dict | None, version: str, tools: tuple[str, ...]) -> str:
+    try:
+        claude.check_init(init or {}, model=LIVE_MODEL, version=version, tools=tools)
+        return "pass"
+    except claude.ClaudeProfileError as error:
+        return error.code
+
+
 def summary(outcome: dict) -> dict:
     events = outcome.pop("events")
     outcome.pop("raw")
@@ -139,7 +153,7 @@ def summary(outcome: dict) -> dict:
     kinds = [f"{event.get('type')}/{event.get('subtype') or ''}".rstrip("/") for event in events]
     tool_uses = [block.get("name") for event in events if event.get("type") == "assistant"
                  for block in (event.get("message") or {}).get("content") or [] if block.get("type") == "tool_use"]
-    outcome.update({"eventKinds": kinds, "toolUses": tool_uses,
+    outcome.update({"eventKinds": kinds, "toolUses": tool_uses, "rawInit": init,
                     "init": {key: init.get(key) for key in (
                         "tools", "mcp_servers", "slash_commands", "skills", "plugins", "agents", "permissionMode",
                         "model", "apiKeySource", "claude_code_version", "capabilities", "analytics_disabled",
@@ -220,6 +234,7 @@ def offline(args) -> None:
     kwargs = {"cancel_after": args.after} if args.case == "cancel" else (
         {"interrupt_after": args.after} if args.case == "interrupt" else {})
     outcome = summary(run(value, argv, data=prompt, network=False, timeout=args.timeout, canary=canary, **kwargs))
+    outcome["initCheck"] = init_check(outcome.pop("rawInit"), "2.1.308", claude.STRUCTURED_TOOLS)
     before = scan(canary)
     removed = value.wipe()
     write(f"offline-{args.case}.json", {"at": now(), "case": args.case, **outcome, "canaryHitsBeforeWipe": before,
@@ -255,14 +270,16 @@ def live(args) -> None:
     outcome = summary(run(value, argv, data=prompt, network=True, timeout=180, canary=canary))
     result = outcome["result"] or {}
     produced = result.get("structured_output")
+    checked = init_check(outcome.pop("rawInit"), "2.1.308", claude.STRUCTURED_TOOLS)
     passed = (outcome["exit"] == 0 and result.get("subtype") == "success" and result.get("is_error") is False
-              and produced == EXPECTED and outcome["toolUses"] in (["StructuredOutput"], []))
+              and schema_valid(produced) and set(outcome["toolUses"]) <= {"StructuredOutput"} and checked == "pass")
     before = scan(canary)
     removed = value.wipe()
     entry.update({"status": "completed" if passed else "failed", "finishedAt": now(),
                   "elapsedSeconds": outcome["seconds"], "stdoutSha256": outcome["stdoutSha256"]})
     LEDGER.write_text(json.dumps(book, indent=1) + "\n", encoding="utf-8")
-    write("live-1.json", {"at": now(), "passed": passed, "expected": EXPECTED, **outcome,
+    write("live-1.json", {"at": now(), "passed": passed, "initCheck": checked, "matchesExpected": produced == EXPECTED,
+                          "expected": EXPECTED, **outcome,
                           "canaryHitsBeforeWipe": before, "wiped": removed, "canaryHitsAfterWipe": scan(canary)})
 
 
