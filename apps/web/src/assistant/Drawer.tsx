@@ -42,6 +42,13 @@ export function AssistantDrawer({ projectId, editor, settingsOpen, settings, ref
     return () => { connection.close(); current.close(); if (controller.current === current) controller.current = null; };
   }, [projectId, editor]);
   useEffect(() => { if (!settingsOpen) report(controller.current?.refresh()); }, [settingsOpen]);
+  // At service start the connection check is still running when the panel opens; re-read until it settles.
+  const waitingForConnection = view?.capabilities?.unavailable?.code === "AGENT_CONNECTION_UNAVAILABLE";
+  useEffect(() => {
+    if (!waitingForConnection) return;
+    const timer = setInterval(() => { report(controller.current?.refreshCapabilities()); }, 2000);
+    return () => clearInterval(timer);
+  }, [waitingForConnection]);
   useEffect(() => { try { localStorage.setItem(key, JSON.stringify(size)); } catch { /* Size is optional when browser storage is unavailable. */ } }, [size]);
   useEffect(() => {
     const timer = setInterval(() => {

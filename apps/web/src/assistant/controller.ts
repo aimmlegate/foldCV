@@ -87,6 +87,11 @@ export class AssistantController {
     });
   }
   async refresh(): Promise<void> { return this.wait("Обновляем подключение и диалоги", () => this.refreshWork()); }
+  /** A quiet capability read: the connection check can finish after the panel opened, and nothing else re-reads it. */
+  async refreshCapabilities(): Promise<void> {
+    const capabilities = await this.api.capabilities();
+    if (!this.closed) this.publish({ capabilities });
+  }
   private async refreshWork(): Promise<void> {
     const [settings, capabilities, conversations] = await Promise.all([this.api.settings(), this.api.capabilities(), this.api.conversations()]);
     this.publish({ settings, capabilities, conversations: conversations.items });

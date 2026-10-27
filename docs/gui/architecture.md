@@ -9,12 +9,8 @@
 > paginated preview are deferred; the new flow must work without LibreOffice.
 > Portable project save/open and PDF source import remain supported.
 
-> Next iteration: [backend reuse and frontend ownership](flow-recovery-plan.md#backend-reuse-and-frontend-ownership).
-> Build the frontend from scratch and reuse/extend Python for canonical project
-> state, domain operations, local storage, and export. This supersedes the
-> browser-owned state, stateless-project service, and memory-only restrictions
-> below. The new plan also overrides conflicting fixed editorial rules and UI
-> assumptions. This document retains the previous implementation's architecture.
+> Storage and transport follow D109; see [Storage and transport](#storage-and-transport).
+> Later sections that conflict with it describe the first-release design; D109 wins.
 
 ## Runtime boundaries
 
@@ -23,25 +19,25 @@ document work and CLI subprocesses, and shared versioned JSON contracts. Serve t
 production frontend from the local service so the default installation has one
 origin and one launcher. Vite is a development build tool, not a production server.
 
-The browser owns project state. The service receives self-contained operations
-and returns data or bytes; it has no project database, session history, durable
-job queue, or upload registry. Process-level state may contain active requests,
-CLI process handles and public template assets, but not completed projects. The
-installed CLI owns its credentials; this application does not read or copy them.
+The Python service owns project state. Each open project lives in memory in the
+service process and every edit is saved to the local data root before it is
+acknowledged. The browser keeps the last reply it adopted and the edits that are
+not acknowledged yet. Editor tokens, clipboard captures, task status and assistant
+run buffers live only in process memory and are lost at a restart. The installed
+CLI owns its credentials; this application does not read or copy them.
 
 ```mermaid
 flowchart LR
-    UI[Browser editor and in-memory project] -->|Self-contained operation| API[Local Python service]
+    UI[Browser editor, one active tab] -->|One request per edit, /v2| API[Local Python service]
+    API --> Repo[ProjectRepository: open projects in memory]
+    Repo --> Disk[Data root: workspace.json, history.jsonl, blobs]
     API --> Parse[PDF and DOCX extraction]
-    API --> Policy[Facts, coverage and duration rules]
-    API --> Model[Bounded text operation]
+    API --> Model[Bounded model call]
     Model --> CLI[Installed Codex CLI and native login]
-    CLI --> Plan[User subscription]
-    API --> Docx[DOCX renderer]
-    Docx --> PDF[Isolated LibreOffice conversion]
-    PDF -->|DOCX and PDF bytes| UI
-    UI -->|Explicit save| Bundle[User-owned project archive]
-    Bundle -->|Open without regeneration| UI
+    API --> Docx[DOCX render worker]
+    Docx -->|DOCX bytes| UI
+    API -->|.foldcv download| UI
+    UI -->|.foldcv upload| API
 ```
 
 Define ports for `Extractor`, `ContentProvider`, `DocumentRenderer`,
@@ -53,25 +49,250 @@ decision: a protected local companion for the user's CLI, or a different approve
 provider adapter. A shared server cannot use a CLI installed on the user's laptop
 merely by changing an API URL. Never pool employee subscriptions on that server.
 
-Suggested source layout:
+Source layout:
 
 ```text
-apps/web/src/{project,editor,evidence,preview,operations,export,settings}/
-services/api/src/resume_api/{routes,providers,cli,workers}/
-packages/resume_core/{models,extraction,policy,validation,rendering,migrations}/
-contracts/{json-schema,examples}/
-templates/generic/{manifest.json,base.docx,assets}/
-prompts/{normalize,draft,rewrite}/
-tests/{contracts,unit,property,integration,e2e,render,privacy,fixtures/synthetic}/
-evals/{synthetic,private-manifest}/
+apps/web/src/{workbench,rich,assistant,projects,api,connection,errors,contracts}/
+services/api/src/resume_api/{projects,assistant,importer,agent,cli,providers}/
+packages/resume_core/{models,extraction,rendering,templates}/ plus project_*, template_*, rich_*, assistant_*
+contracts/{json-schema,examples,error-messages.ru.json}
+templates/{generic,generic-two-column,foldcv-reference}/
+tests/  (layout in testing.md)
+tools/
 ```
 
-Use Python Pydantic models as the contract authority, export JSON Schema, and
-generate TypeScript types. Validate imported files and responses at runtime too.
-Do not maintain independent handwritten Python and TypeScript schemas.
+Python Pydantic models are the contract authority; JSON Schema and TypeScript types
+are generated from them ([contracts.md](contracts.md)). The service validates every
+request and every reply it builds. The client parses replies with `JSON.parse` and
+types them with the generated types; it has no runtime schema validator. Uploaded
+`.foldcv` files are checked on the service. Do not maintain independent handwritten
+Python and TypeScript schemas.
 Build the first frontend from the current wireframe and standard controls. Do not
 build a design system, rich text editor or custom PDF viewer. Establish the fake-process test
 harness and forbidden provider before feature work; see [testing.md](testing.md).
+
+## Storage and transport
+
+Each open project lives in memory; an edit is one request and one file write; undo
+has its own journal (D109, [plan](simplification-plan.md), slice records in
+[handoffs/SIMPLIFY/](handoffs/SIMPLIFY/)). The V1–V6 project generations and the
+earlier writer and protocol layers are gone; only version 7 projects open.
+
+### Data root
+
+`storage.data_root()` is `~/Library/Application Support/FoldCV` unless the launcher
+passes another root. Tests and `tools/serve_synthetic.py` always use a temporary root.
+
+```text
+registry.json                       project list and tombstones (project_store)
+catalog.json                        archive flags (project_catalog)
+preferences.json, rules.md, assistant-settings.json   settings
+template-packages/                  template packages for new imports
+projects/<projectId>/workspace.json         the WorkspaceV7 file
+projects/<projectId>/history.jsonl          undo journal, local only
+projects/<projectId>/{sources,history,template-assets,renders,images}/   content-addressed files
+projects/<projectId>/imports/<operation>.json   import operation sidecar while an import runs
+assistant/<projectId>/{conversations,runs,proposals}/
+```
+
+### Repository
+
+`packages/resume_core/project_repository.py`. `ProjectRepository` keeps one
+`ProjectSession` per open project: the committed `WorkspaceV7` object (replaced on
+each commit, never changed in place), its `projectRevision`, one `RLock`, the journal,
+the editor token, the replay window, the occupied ids and up to 20 clipboard
+captures. At most three sessions stay open; idle ones are evicted, pinned ones
+(import, export, assistant run) stay. `start()` runs the D104/D105 history
+externalize pass once before any open. Route handlers run repository work in a
+worker thread (`asyncio.to_thread`) and never hold a project lock across an `await`.
+
+A commit runs under the session lock. `mutate` serves edits, undo and redo;
+`replace` commits a workspace computed outside the lock from a given base revision
+(import checkpoints and publication, export records, metadata).
+
+1. A `clientMutationId` in the replay window returns the stored outcome and applies
+   nothing; the same id with another request hash is `MUTATION_ID_REUSED`.
+2. A base revision other than the current one is `REVISION_CONFLICT` (409 with
+   `revision` and `appliedClientMutationIds`).
+3. `build(committed)` returns the new workspace; it must not change the committed
+   object (checked under `FOLDCV_VERIFY=1`).
+4. Fold hooks run (import sidecar, below).
+5. One model validation; `updatedAt` is set; `mutationReplay` gets the id and keeps
+   the last 200; the size is checked against the D096 setting (`PROJECT_TOO_LARGE`).
+6. One serialization (`rich_snapshot_bytes`) and `storage.atomic_write` (temp file,
+   fsync, rename, directory fsync). An edit writes nothing else. `replace` writes
+   its blobs first: written when missing, checked by hash when present.
+7. Memory follows the file.
+8. The journal line is appended. A failure there is logged as a journal gap and does
+   not fail the request: the committed state is the file.
+
+A crash leaves the previous or the new `workspace.json`, never a partial one. A retry
+after a crash or restart is recognized from `mutationReplay`. An edit costs at most
+three fsync calls. `registry.json` is written on create, rename, delete and archive
+flags and at close or eviction, not per edit; the listing lays open sessions over it.
+
+### Undo journal
+
+`packages/resume_core/project_journal.py`, file `history.jsonl`. Line kinds: `edit`
+(action id, mutation id, revisions, full `before` and `after` payloads of the
+undoable keys that changed), `undo`, `redo` and `barrier`. The keys are those of
+`template_local_history.values` (blocks, placements, builtin records, extensions,
+relations, issues, scopes, tombstones, coverage anchors, sync rows) plus the order of
+the lists those keys do not encode.
+
+- Edits with one `actionId` form one action, so typing is one undo step.
+- Undo applies the action's `before`, redo its `after`, both through `mutate`:
+  revision-checked, validated, saved and journaled like an edit. An action whose keys
+  changed since is refused as `HISTORY_STALE`.
+- A `replace` that changes undoable keys (import publication) writes a barrier, which
+  clears both stacks. Export records, rename, sources, assets and the template
+  package are not on the stack.
+- Bounds: 200 actions and 16 MiB. A corrupt tail is truncated; the file is compacted
+  on load and close. The journal is not part of `.foldcv`.
+
+### Editor token and one tab
+
+The browser holds one `navigator.locks` lock per profile (`workbench/tab.ts`); a
+secondary tab shows the blocking notice (`workbench/BlockedTab.tsx`) and sends no
+request. `POST /v2/projects/{id}/open` always issues a fresh editor token and
+replaces the previous one; there is no takeover. Writes carry the token. A replaced
+token gets `EDITOR_REPLACED` and the page turns read-only with the notice. An unknown
+token (service restart) gets `EDITOR_TOKEN_UNKNOWN` and the page reopens. Tokens live
+in memory only.
+
+### Edit path
+
+Client: `rich/v7-session.ts` (`TemplateEditorSession`), `v7-translation.ts`,
+`save-queue.ts` and `v7-connection.ts`. The queue translates the next intent against
+the last adopted response, sends `POST /edits` with `{editorToken, baseRevision,
+preparation}` (the preparation carries the `clientMutationId`), adopts the reply's
+`response` and maps local block ids through `createdBlocks`. Undo and redo send
+`POST /history` with `expectedActionId`, the top of the server's stack.
+
+Server: `projects/editing.py`. Inside `mutate`, `response_for_workspace`
+(`projects/service.py`) builds the current response and
+`template_preparation.prepare_edit` prepares the authored operation on it;
+`validate_preparation` keeps the snapshot and dependency stamp checks.
+`EditIdAllocator` derives ids from `[FoldCV authoring v2, project, clientMutationId,
+opId]`, so a retry allocates the same ids.
+
+The reply `EditResultV1` has `revision`, `documentRevision`, `clientMutationId`,
+`replayed`, `createdIds`, `createdBlocks`, `changedBlockIds`, `history` and the full
+`TemplateProjectResponseV1`. The full response per edit replaces D105's slim replies
+on purpose: no patches and no client re-verification.
+
+Lost acknowledgment (after `REVISION_CONFLICT`, after `EDITOR_TOKEN_UNKNOWN`, and at
+reopen with a pending draft): the client reads the current state; an intent whose id
+is in `appliedClientMutationIds` is applied and dropped; one whose base revision
+equals the current revision is sent again; any other intent's text is shown in a
+notice and dropped. IndexedDB (`foldcv-pending-edits`) keeps unacknowledged intents
+with their mutation id and base revision.
+
+Under `FOLDCV_VERIFY=1` the server also decodes the written bytes and compares them
+with memory, and rechecks the response snapshot and presentation (`verify_response`).
+
+### Routes
+
+Project routes, under `/v2/projects` (`projects/routes.py`):
+
+| Route | Purpose |
+|---|---|
+| `GET /v2/projects` | listing |
+| `POST /v2/projects/archive` | import a `.foldcv` upload as a new project |
+| `POST /{id}/open` | editor token, response, history state, running tasks |
+| `GET /{id}` | read without a token |
+| `POST /{id}/edits`, `POST /{id}/history` | one edit; undo or redo |
+| `POST /{id}/clipboard` | same-project clipboard capture |
+| `POST /{id}/rewrite/preview`, `/rewrite/cancel` | rewrite preview of a selection |
+| `POST /{id}/import`, `GET /{id}/tasks` | import start, resume or cancel; task status |
+| `POST /{id}/export`, `/exports/{attemptId}/retry` | DOCX export |
+| `POST /{id}/archive` | `.foldcv` download |
+| `POST /{id}/rename`, `/catalog/archive`, `/catalog/restore`, `/restore` | title and archive flags |
+| `DELETE /{id}` | delete, body `{"confirmed": true}` |
+| `GET /{id}/images/{sha}`, `/sources/{sourceId}/original`, `/original/download` | image and original bytes |
+
+Assistant routes, under `/v2/projects/{id}/assistant` (`assistant/routes.py`):
+`/capabilities`, `/conversations` (GET, POST), `/conversations/{cid}/messages`,
+`/conversations/{cid}/runs` (POST), `/runs/{rid}/events/{after}` (long poll),
+`/runs/{rid}/cancel`, `/proposals`, `/proposals/{pid}`, `/proposals/{pid}/apply`,
+`/proposals/{pid}/discard`, `/skills`, `/files/{fileId}` (export links).
+
+Kept `/v1` routes: `POST /v1/session/exchange`; `/v1/settings/*` (rules, connection,
+preferences, limits, import model, fallback model, rewrite reasoning, assistant);
+`POST /v1/host/*` (CLI discovery, status, models, login, model choice, detach,
+install); `/v1/rich/template-config` with `/check` and `/reset` (Settings template
+editor); `GET /v1/rich/template-assets/{sha}`; `GET /v1/rich/template-import` (import
+availability); `POST /v1/rich/projects/template-input` (the upload that creates a V7
+pre-draft); `GET /v1/template-package`. The template routes are in
+`templates_routes.py`, the others in `app.py`.
+
+Boundary (`app.py`): loopback Host and Origin checks; a session cookie from the
+one-shot secret exchange (HttpOnly, SameSite=Strict, path `/`); no query strings on
+`/v1/` and `/v2/` paths; bounded JSON bodies; `Cache-Control: no-store` on project
+replies. Errors are `{"error": {"code", "retryable", "stage"}}`; every code has a
+Russian text in `contracts/error-messages.ru.json`.
+
+### Tasks, import, export, rewrite
+
+`packages/resume_core/project_tasks.py` keeps an in-memory `TaskRegistry` of `{id,
+projectId, kind, state, stage, startedAt, elapsed, detail, error}` for import, export
+and rewrite, one running task per project and kind. `GET /tasks` feeds the import
+activity view (stage, elapsed time, saved discoveries). Nothing there is durable.
+
+- Import (`projects/intake.py`, `projects/imports.py`, `importer/template_pipeline.py`):
+  the upload becomes a V7 pre-draft through `repository.create`; the import runs as a
+  task that holds one inference permit. Checkpoints and publication are
+  `repository.replace` with the revision of the snapshot the pipeline computed from;
+  on `REVISION_CONFLICT` the pipeline re-bases or fails the task.
+- Operation sidecar (`importer/template_sidecar.py`, `projects/fold.py`): each
+  processing step replaces `imports/<operation>.json` atomically, bound to the
+  project revision it extends. A fold hook folds a sidecar at the current revision
+  into any commit (an edit at that revision keeps its document and takes the
+  sidecar's operation and facts) and removes the file after the write. A sidecar at
+  an older revision fences the import. After a crash, `import` with `kind: resume`
+  continues from the sidecar.
+- Export (`projects/exports.py`): renders DOCX through the render worker
+  (`rendering.TemplateDocxRenderer`) and records the attempt, capture and artifact
+  with one `replace` that changes no undoable key. Reply headers name the attempt,
+  the artifact hash and the rendered snapshot; the client checks the snapshot
+  (`contracts/template-export.ts`).
+- Rewrite preview (`projects/rewrite.py`, `template_rewrite.py`): one model call and
+  no project write; Apply is an ordinary edit.
+- Clipboard (`projects/clipboard.py`): captures stay in the session (20 at most), are
+  checked against their witnesses at paste and are lost at a restart.
+- Files (`projects/sources.py`, `projects/images.py`, `projects/blobs.py`): reads
+  only private, owned files with size and hash checks; unreferenced images are
+  removed at session close.
+- Archive (`projects/archive.py`, `template_archive.py`): the `.foldcv` V7 format is
+  unchanged; the journal is not included.
+
+### Assistant
+
+Runtime: the pinned Codex app-server subprocess (`agent/runtime.py`), the in-process
+MCP listener with a bearer token (`agent/mcp.py`), the public page fetcher
+(`agent/web.py`) and the bundled skills (`assistant/skills/`).
+
+- Runs (`assistant/runs.py`): one run per project; the project stays editable. A run
+  pins the committed workspace object at its start and every read serves that object
+  (`assistant/context.py`). Events go to a ring buffer and `runs/<id>.jsonl`; Stop
+  cancels the run. `allowWeb` and `allowEdits` are captured at run start.
+- Tools (`assistant/tools.py`, ten): `read_resume`, `find_text`, `read_facts`,
+  `read_original`, `read_skill`, `check_resume`, `read_public_page`,
+  `export_document`, `propose_changes`, `publish_findings`. Only the last two store
+  anything, and neither writes the project.
+- Proposals (`assistant_store.py`, `assistant_compiler.py`, `assistant/proposals.py`):
+  a proposal file holds the ops, the preview and the hash of each touched block or
+  record in the pinned workspace. Only the user applies it (D093). Apply runs inside
+  one `repository.mutate`: a changed hash gives `ASSISTANT_PROPOSAL_STALE` with the
+  targets; otherwise the ops compile to `AuthoredOperation` values through
+  `prepare_edit` against the current workspace and commit with the proposal id as
+  action id, so one Undo reverts the whole proposal. Apply carries the panel's
+  current `allowEdits` and is refused when it is off (`ASSISTANT_EDITS_OFF`). A
+  history proposal carries `expectedActionId`; project actions call the same service
+  functions as the UI.
+- Client: `assistant/api.ts`, `controller.ts` (one long-poll loop per run),
+  `Drawer.tsx`, `proposal.tsx`. Apply goes through
+  `TemplateEditorSession.applyAssistant` and adopts the `EditResultV1`.
 
 ## Frontend controls and appearance
 
@@ -105,7 +326,9 @@ All project-owned TypeScript, including tests and generated contracts, must use
 `strict`, `noUncheckedIndexedAccess`, `exactOptionalPropertyTypes`,
 `noImplicitOverride`, and `noFallthroughCasesInSwitch`. Do not disable individual
 strict checks. Explicit and implicit `any` are forbidden. Treat external data as
-`unknown` until runtime validation establishes its type.
+`unknown` until it is checked. Replies of the local service are the exception: the
+service validated them, so the client parses them with `JSON.parse` and types them
+with the generated contracts.
 
 Do not declare `enum` or `const enum`. Use literal unions or `as const` objects;
 configure generated contracts to emit unions too. Do not bypass checks with
@@ -161,6 +384,9 @@ duration labels and all other deterministic work follow
 [the execution policy](execution-policy.md).
 
 ## Canonical project contract
+
+> First-release contract design (`models/contracts.py`, `schemaVersion: 3`). Stored
+> projects are `WorkspaceV7` (`models/template_workspace.py`); see [Storage and transport](#storage-and-transport).
 
 Use a new project schema version, distinct from the current version 2 experiment.
 Migrate old archives explicitly; never reinterpret them as complete atomic facts.
@@ -254,66 +480,24 @@ transcripts. Derived values are reproducible and can be recomputed from facts.
 
 ## Application API
 
-All candidate-bearing routes are POST, with `Cache-Control: no-store`. Inputs are
-validated before work. Use opaque request IDs; no candidate names in URLs, logs,
-temporary directory names, or error text.
+The routes are listed under [Storage and transport](#routes). Rules for all of them:
 
-- `GET /v1/capabilities`: app/schema versions, ready renderers, supported formats,
-  public templates, configured limits, provider capability summaries.
-- `POST /v1/extract`: multipart file; returns source units, locations, extraction
-  diagnostics and hash. No durable file ID that must later be fetched.
-- `POST /v1/normalize`: source units and explicit options; returns canonical facts
-  and unresolved items. Does not rewrite original units.
-- `POST /v1/draft`: selected facts and template content rules; returns a complete
-  proposed view. No free-form document bytes from the model.
-- `POST /v1/rewrite`: one block snapshot, dependency facts, instruction and budgets;
-  returns a proposed replacement with the base revision.
-- `POST /v1/validate`: facts, view and policy; returns issues and coverage. Full
-  archive integrity is checked locally on import/export, not by resending source
-  PDFs on each keystroke.
-- `POST /v1/render`: immutable render snapshot and exact template assets/version;
-  returns a bounded ZIP of `resume.docx`, `resume.pdf`, and `render.json` metadata.
-  The browser unpacks it into memory. No server-side download handles.
-- Local host-only connection routes: discover/validate the executable, inspect
-  native login status, start the CLI's sign-in on explicit request, detach the
-  runtime, and list reported models/limits. Expose typed options, never arbitrary
-  command strings. Detach must not run a global CLI logout.
-
-Normalize, draft, and rewrite use a streaming POST response consumed with `fetch`
-and `AbortController`. Do not use GET EventSource with resume data in query strings.
-FastAPI provides streaming responses; use its documented response primitives.
-[FastAPI response documentation](https://fastapi.tiangolo.com/advanced/custom-response/)
-
-Each application event is a complete envelope:
-
-```json
-{
-  "requestId": "op_123",
-  "sequence": 3,
-  "type": "operation.completed",
-  "baseRevision": 12,
-  "payload": {"result": {}, "usage": {"inputTokens": 1500, "outputTokens": 500}}
-}
-```
-
-Events include `operation.started`, `stage.changed`, `result.ready`,
-`usage.updated`, `operation.completed`, and `operation.failed`. Do not invent
-provider progress percentages. Parse and validate the entire structured result
-before publishing accepted facts or replacements in version 1. Streaming text
-can be shown as provisional activity, never applied as incomplete JSON.
-
-There is no durable reconnect/resume endpoint. On disconnect mark the operation
-interrupted, keep accepted work, and offer explicit retry. A `requestId` dedupes
-responses inside the live tab, not provider billing across restarts. Cancellation
-stops local application and closes the upstream request best-effort; already
-consumed inference may still count. Do not promise exactly-once charging.
-
-Standard error codes include `UNSUPPORTED_INPUT`, `EXTRACTION_INCOMPLETE`,
-`INPUT_TOO_LARGE`, `AUTH_REQUIRED`, `PLAN_NOT_ELIGIBLE`, `RATE_LIMITED`,
-`CLI_MISSING`, `CLI_UNSUPPORTED`, `CLI_PROFILE_UNSAFE`, `AUTH_MODE_MISMATCH`,
-`BUDGET_EXCEEDED`, `INVALID_RESULT`, `STALE_PROPOSAL`, `RENDER_UNAVAILABLE`,
-`RENDER_FAILED`, `SCHEMA_UNSUPPORTED`, and `ARCHIVE_CORRUPT`. Include retryability
-and stage, never raw prompts or upstream response bodies.
+- Inputs are validated before work. Bodies are JSON, except the two uploads
+  (`POST /v1/rich/projects/template-input`, `POST /v2/projects/archive`).
+- Use opaque ids. No candidate names in URLs, logs, temporary directory names or
+  error text. API paths take no query strings; a cursor is a path segment.
+- Replies with project data carry `Cache-Control: no-store`.
+- Long work is a task (import, export, rewrite) polled through `GET /tasks`, or an
+  assistant run whose events the client long-polls. Do not invent provider progress
+  percentages. A model result is parsed and validated whole before anything is
+  saved; partial text is never applied.
+- Cancellation stops local work and closes the upstream request best effort;
+  consumed inference may still count. Do not promise exactly-once charging.
+- Host connection routes (`/v1/host/*`) expose typed options, never command
+  strings. Detach must not run a global CLI logout.
+- Errors carry a public code, `retryable` and `stage`, never raw prompts or upstream
+  response bodies. Every code has a Russian text in `contracts/error-messages.ru.json`;
+  `tests/settings/test_error_messages.py` checks the coverage.
 
 ## CLI adapter and usage controls
 
@@ -355,10 +539,11 @@ the child environment so subscription mode cannot silently select another route.
 Avoid sending contacts when the text operation does not need them; remaining
 career details are still personal data.
 
-Cache accepted results in the current browser project only, keyed by fact
-revisions, prompt version, model settings and schema. Export them only through
-the explicit project save. Reuse deterministic results freely. A deliberate
-rewrite requests a new proposal. Never persist raw CLI transcripts for replay.
+Accepted model results are stored in the project on the service: import records
+in the project's `history/` files, applied text in `workspace.json`. A rewrite
+preview is not stored; Apply saves it as an ordinary edit. Reuse deterministic
+results freely. A deliberate rewrite requests a new preview. Never persist raw CLI
+transcripts for replay.
 
 ## Subscription and deployment boundaries
 
@@ -385,7 +570,7 @@ does not grant their usage. Do not implement a silent API fallback in this relea
 
 Ephemeral CLI sessions do not establish remote zero retention. The CLI sends text
 to the account's provider, under that account's applicable data settings. Keep
-this separate from the application's no-project-storage promise.
+this separate from what the application stores locally.
 
 ## DOCX and PDF rendering
 
@@ -408,11 +593,10 @@ no macros, no external links, a timeout, and process-tree cleanup. Its documente
 CLI supports headless conversion and a separate user profile.
 [LibreOffice parameters](https://help.libreoffice.org/latest/en-US/text/shared/guide/start_parameters.html)
 
-Cache the latest DOCX/PDF pair in browser memory by snapshot/template/renderer
-hash. Render on explicit preview refresh or document export; typing only marks
-the current pair stale. Keep at most one active render and one latest requested
-snapshot. Discard late results from old revisions. Reuse
-the displayed bytes on export; do not rerender them through another engine.
+Export renders the snapshot the editor sends (`TemplateSnapshotIdentity`) through
+the render worker; typing never renders. The reply names the snapshot it rendered
+and the client refuses a different one. The project records one completed attempt
+with the artifact hash; a retry reuses the attempt id.
 
 PDF is the visual reference. Word and LibreOffice can paginate DOCX differently;
 test both target readers and report any material discrepancy. Do not promise
@@ -423,33 +607,27 @@ before continuing the renderer-dependent tasks.
 
 ## Portable project format
 
-Use `.cvproject` as a ZIP with an explicit schema and entry hashes:
+`.foldcv` is a ZIP in the V7 archive format (`template_archive.py`):
 
 ```text
-manifest.json
-project.json
-sources/<source-id>/original.<ext>
-sources/<source-id>/extracted.json
-templates/<template-id>/<version>/...
-renders/<snapshot-id>/resume.docx
-renders/<snapshot-id>/resume.pdf
-checks.json
+manifest.json                 ArchiveManifestV7: path, role, SHA-256 and size of every entry
+workspace.json                the WorkspaceV7 file, without render records
+<source byteRef>              original source bytes
+template/package.json         the captured template package
+template/assets/<sha256>      template fonts and icons
+template/history/<sha256>     import records
+<image path>                  user images the project references
 ```
 
-The manifest records schema version, app/renderer versions, hashes, declared
-uncompressed sizes, source metadata, and template versions. Render entries are
-optional; original files, extracted units, facts, and accepted edits are not.
-No auth credentials, provider secrets, tokens, or unrelated filesystem paths.
+Download: `POST /v2/projects/{id}/archive`. Upload: `POST /v2/projects/archive`
+creates a new project. The undo journal, renders, credentials, provider secrets,
+tokens and filesystem paths are never included.
 
-Import into a new in-memory project only after validation. Reject path traversal,
-symlinks, duplicate entries, excessive expansion ratios, oversized totals, unknown
-major versions, unsupported executable templates, and hash mismatches. Hashes
-detect corruption, not trusted authorship. Never execute imported code.
-
-Migrate v2 experiment data by preserving originals, units and old view. Mark
-unstructured units/facts as needing normalization. Reopening that migrated view
-may render without inference, but new fact-aware rewriting requires the explicit
-normalization step. Save the migrated project separately from the original.
+Open an archive only after validation (`archive_zip.py`, `open_archive_v7`). Reject
+path traversal, symlinks, duplicate entries, excessive expansion, oversized entries
+or totals, unknown versions, invalid templates and hash or source mismatches. Hashes
+detect corruption, not trusted authorship. Never execute imported code. Only version
+7 archives open; there is no migration of older formats.
 
 ## Privacy and local service controls
 

@@ -55,8 +55,10 @@ def test_pages_hold_whole_entries_and_clip_an_oversized_one():
     assert [item['id'] for item in flat] == [entry['id'] for entry in entries]
     assert flat[-1]['clipped'] is True and 'yyyy' in flat[-1]['json']
     assert context.paged(entries, 1) == context.paged(entries, 1)
-    with pytest.raises(AgentFailure):
+    with pytest.raises(AgentFailure) as refused:
         context.paged(entries, len(pages))
+    # A live run asked for page `pages` (counting from 1) and retried blindly on a bare code.
+    assert refused.value.code == 'AGENT_SCOPE_INVALID' and f'0..{len(pages) - 1}' in refused.value.detail[0]
 
 
 def test_search_gives_utf16_offsets_and_matching_facts():
@@ -78,8 +80,9 @@ def test_an_original_with_no_extracted_text_is_reported_not_reconstructed():
     empty.project.sources[0].units = []
     assert context.source_entries(empty, source.id) == [{'sourceId': source.id, 'extractedText': 'unavailable',
         'warnings': list(source.warnings)}]
-    with pytest.raises(AgentFailure):
+    with pytest.raises(AgentFailure) as refused:
         context.source_entries(workspace, 'missing-source')
+    assert source.id in refused.value.detail[0]
 
 
 def test_skills_and_their_references_are_readable_and_unknown_resources_are_refused(tmp_path):
@@ -89,6 +92,7 @@ def test_skills_and_their_references_are_readable_and_unknown_resources_are_refu
         results.append(await tools.call('read_skill', {'name': 'format-resume'}))
         results.append(await tools.call('read_skill', {'name': 'format-resume', 'resource': 'references/editorial-rules.md'}))
         results.append(await tools.call('read_skill', {'name': 'format-resume', 'resource': '../secrets'}))
+        results.append(await tools.call('read_resume', {'page': 5}))
         return 'Готово.'
     with assistant_app(tmp_path, steps) as (client, _app, _runtime):
         finish(client, start(client, conversation(client)))
@@ -96,6 +100,7 @@ def test_skills_and_their_references_are_readable_and_unknown_resources_are_refu
     assert results[0]['content'].startswith('# Format the current resume')
     assert results[1]['content'].startswith('# Chat editorial rules')
     assert results[2] == {'error': {'code': 'AGENT_NOT_FOUND'}}
+    assert results[3]['error']['code'] == 'AGENT_SCOPE_INVALID' and 'numbered from 0' in results[3]['detail'][0]
 
 
 def test_the_export_tool_runs_the_export_task_and_links_the_file(tmp_path):

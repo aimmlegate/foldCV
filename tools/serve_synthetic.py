@@ -7,7 +7,7 @@ The one-shot browser secret is written only to root/launch.json (mode 0600); std
 
 import argparse
 import asyncio
-from datetime import datetime
+from datetime import datetime, timezone
 import hashlib
 import json
 import os
@@ -181,14 +181,50 @@ async def assistant_script(value, cancel, emit):
         return RuntimeResult(state='completed', text=text, native_started=True, tool_calls=counter[0])
 
 
+LIVE_PROFILE = Path.home() / 'Library/Application Support/FoldCV/cli-experiment'
+LEDGER = ROOT / 'docs/gui/handoffs/SIMPLIFY/logs/sr08-live-ledger.jsonl'
+LIVE_LIMIT = 20
+OUTCOMES = ROOT / 'docs/gui/handoffs/SIMPLIFY/logs/sr08-live-outcomes.jsonl'
+
+
+class LiveBudget:
+    """Counts native assistant starts in a ledger kept across restarts and refuses any start past the limit."""
+    native = True
+
+    def __init__(self, runtime, ledger, limit):
+        self.runtime, self.ledger, self.limit = runtime, ledger, limit
+        self.calls = []
+
+    def used(self):
+        return len(self.ledger.read_text().splitlines()) if self.ledger.is_file() else 0
+
+    async def run(self, value, cancel, emit):
+        from resume_api.agent.runtime import RuntimeResult
+        if self.used() >= self.limit:
+            return RuntimeResult(state='failed', error='AGENT_QUOTA')
+        # Charged before the start, so an unknown outcome still counts.
+        with self.ledger.open('a') as handle:
+            handle.write(json.dumps({'at': datetime.now(timezone.utc).isoformat(), 'model': value.model,
+                'message': json.loads(value.prompt.split('\n', 1)[1])['message'][:200]}, ensure_ascii=False) + '\n')
+        self.calls.append(value.model)
+        result = await self.runtime.run(value, cancel, emit)
+        with OUTCOMES.open('a') as handle:
+            handle.write(json.dumps({'at': datetime.now(timezone.utc).isoformat(), 'model': value.model, 'state': result.state,
+                'error': result.error, 'toolCalls': result.tool_calls, 'text': (result.text or '')[:600]}, ensure_ascii=False) + '\n')
+        return result
+
+
 async def main(args):
     root = args.root.resolve()
-    if root.parent != Path('/private/tmp') or not root.name.startswith('foldcv-') or root.exists():
-        raise ValueError('A new /private/tmp/foldcv-* root is required')
+    # --reopen restarts on a root this tool created (isolation.json present), keeping its store.
+    if root.parent != Path('/private/tmp') or not root.name.startswith('foldcv-') or \
+            (not (root / 'isolation.json').is_file() if args.reopen else root.exists()):
+        raise ValueError('An existing root of this tool is required' if args.reopen else 'A new /private/tmp/foldcv-* root is required')
     dist = args.dist.resolve()
     if not (dist / 'index.html').is_file():
         raise ValueError('A built frontend directory is required')
-    root.mkdir(mode=0o700)
+    if not args.reopen:
+        root.mkdir(mode=0o700)
     data, operations = root / 'data', root / 'operations'
     listener = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     listener.bind(('127.0.0.1', args.port))
@@ -197,29 +233,42 @@ async def main(args):
     secret = secrets.token_urlsafe(32)
     connection, content, web = ScriptedConnection(), ScriptedContent(), StoredWeb()
     runtime = ScriptedAgentRuntime(assistant_script)
-    with patch('resume_api.app.ConnectionAdapter', side_effect=AssertionError('native connection')), \
-         patch('resume_api.app.CodexCliProvider', side_effect=AssertionError('native content')), \
-         patch('resume_api.app.CodexAgentRuntime', side_effect=AssertionError('native agent')):
+    if args.live_assistant:
+        # The user's existing Codex sign-in is used in place (allowed 2026-10-27); projects stay in this temp root.
+        from resume_api.cli.experimental_profile import installed_profile
+        profile = installed_profile(LIVE_PROFILE)
         app = create_app(origin=origin, secret=secret, temp_root=operations, data_root=data, dist=dist,
-            experimental_profile=None, connection_adapter=connection, content_provider=content,
-            clock=lambda: datetime.fromisoformat(NOW), agent_runtime=runtime,
-            template_import_call_cap=args.template_call_cap)
-    app.app.state.assistant._fetcher = web
+            experimental_profile=profile, template_import_call_cap=args.template_call_cap)
+        runtime = LiveBudget(app.app.state.assistant.runtime, LEDGER, LIVE_LIMIT)
+        app.app.state.assistant.runtime = runtime
+    else:
+        with patch('resume_api.app.ConnectionAdapter', side_effect=AssertionError('native connection')), \
+             patch('resume_api.app.CodexCliProvider', side_effect=AssertionError('native content')), \
+             patch('resume_api.app.CodexAgentRuntime', side_effect=AssertionError('native agent')):
+            app = create_app(origin=origin, secret=secret, temp_root=operations, data_root=data, dist=dist,
+                experimental_profile=None, connection_adapter=connection, content_provider=content,
+                clock=lambda: datetime.fromisoformat(NOW), agent_runtime=runtime,
+                template_import_call_cap=args.template_call_cap)
+        app.app.state.assistant._fetcher = web
     repository = app.app.state.projects.repository
-    if args.template_call_cap is not None:
+    if args.template_call_cap is not None and not args.reopen:
         # The store's active package for new imports: the synthetic employment subset.
         from packages.resume_core.templates.store import TemplateStore
         from tests.templates.employment_fixtures import employment_package
         TemplateStore(repository.root).activate(employment_package())
-    identifiers = []
-    for value, sources in await projects(root, args.employment):
+    identifiers = json.loads((root / 'isolation.json').read_text())['projects'] if args.reopen else []
+    for value, sources in [] if args.reopen else await projects(root, args.employment):
         repository.create(value, blobs=[('sources', key, raw, hashlib.sha256(raw).hexdigest()) for key, raw in sources.items()])
         identifiers.append(value.project_id)
     info = {'schemaVersion': 1, 'root': str(root), 'dataRoot': str(data), 'operationRoot': str(operations), 'origin': origin,
         'ownedServicePid': os.getpid(), 'buildDirectory': str(dist), 'projects': identifiers,
-        'providers': {'connection': 'ScriptedConnection', 'content': 'ScriptedContent', 'agent': 'ScriptedAgentRuntime',
-            'web': 'StoredWeb'}, 'experimentalProfile': None,
-        'nativeConstructorGuard': 'all three native factory branches guarded; zero calls', 'serviceState': 'running',
+        'providers': {'connection': 'native' if args.live_assistant else 'ScriptedConnection',
+            'content': 'native' if args.live_assistant else 'ScriptedContent',
+            'agent': 'CodexAgentRuntime (LiveBudget)' if args.live_assistant else 'ScriptedAgentRuntime',
+            'web': 'PublicFetcher' if args.live_assistant else 'StoredWeb'},
+        'experimentalProfile': 'cli-experiment (in place)' if args.live_assistant else None,
+        'nativeConstructorGuard': 'not guarded: live assistant' if args.live_assistant else 'all three native factory branches guarded; zero calls',
+        'serviceState': 'running',
         'sourceSha256': {str(path.relative_to(ROOT)): digest(path) for path in [Path(__file__),
             ROOT / 'tests/templates/storage_fixtures.py', ROOT / 'tests/templates/test_materialize.py',
             ROOT / 'services/api/src/resume_api/app.py']}}
@@ -256,4 +305,7 @@ if __name__ == '__main__':
     parser.add_argument('--employment', choices=['issues', 'views', 'generic-f06', 'generic-f10'], default='issues')
     # Explicit test allowance for template imports; without it the import stays unavailable, as in production.
     parser.add_argument('--template-call-cap', type=int, default=None)
+    # Native assistant runs on the user's Codex sign-in, charged to the SR08 ledger (at most LIVE_LIMIT starts).
+    parser.add_argument('--live-assistant', action='store_true')
+    parser.add_argument('--reopen', action='store_true')
     asyncio.run(main(parser.parse_args()))

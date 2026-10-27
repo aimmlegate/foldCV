@@ -62,7 +62,8 @@ class ToolSession(PrivateMcp):
 
         @tool
         async def read_resume(page: int = 0) -> CallToolResult:
-            """Read the resume blocks in document order, one page at a time; follow nextPage until it is null. Each block
+            """Read the resume blocks in document order, one page at a time, starting at page 0; follow nextPage until it
+            is null. Each block
             has id, type, parentId, afterId and containers (key content/caption/cell id, text, field occurrences)."""
             return await self.call('read_resume', lambda: context.paged(context.document_entries(self.pinned), page))
 
@@ -168,7 +169,7 @@ class ToolSession(PrivateMcp):
                 self.result_bytes += size
                 return CallToolResult(content=[TextContent(type='text', text=text)], isError=False)
             except AgentFailure as error:
-                return self.failure(error.code)
+                return self.failure(error.code, getattr(error, 'detail', ()))
             except CompileFailure as error:
                 return self.failure(error.code, error.detail)
             except (ProjectFailure, RepositoryFailure) as error:
