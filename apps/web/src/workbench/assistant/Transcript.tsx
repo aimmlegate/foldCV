@@ -1,13 +1,12 @@
 import { useState } from "react";
-import type { AgentFinding } from "../../contracts/generated/agent_finding";
-import type { AssistantView } from "../../assistant/controller";
+import type { AssistantFinding, AssistantView } from "../../assistant/controller";
 import { sourceUrl } from "../../assistant/presentation";
 import { Activity } from "./AgentActivity";
 import { MessageText } from "../../assistant/MessageText";
 import { Icon } from "../ui/Icon";
 
 export function Transcript({ view, active, resource, focus, draft }: { view: AssistantView; active: boolean;
-  resource: (kind: "sources" | "findings", id: string) => void; focus: (anchor: AgentFinding["anchors"][number]) => boolean; draft: (value: string) => void }) {
+  resource: (kind: "sources" | "findings", id: string) => void; focus: (anchor: AssistantFinding["anchors"][number]) => boolean; draft: (value: string) => void }) {
   const [stale, setStale] = useState<Set<string>>(() => new Set()), [copy, setCopy] = useState("");
   return <>
     {!view.messages.length && !active && <div className="chat-empty"><span className="chat-empty-icon"><Icon name="spark" /></span><h3>Чат по этому резюме</h3>
@@ -27,8 +26,6 @@ export function Transcript({ view, active, resource, focus, draft }: { view: Ass
     </article>)}
     {(view.run || view.submitting || view.pendingSend) && <article className="chat-message"><Activity key={view.run?.id ?? "sending"} view={view} active={active} />
       {view.partial && <div className="chat-message-text" aria-label="Текущий ответ"><p>{view.partial}</p>{view.partialTruncated && <small>Ответ сокращён.</small>}</div>}
-      {view.receipts.map(receipt => <div className="chat-receipt" key={receipt.batchId}><span><Icon name={receipt.durable && receipt.disposition === "saved" ? "check" : "info"} /><strong>{receipt.durable && receipt.disposition === "saved" ? "Изменения сохранены" : receipt.disposition === "outcome_unknown" ? "Проверяем результат сохранения" : "Правки не применены"}</strong>
-        <small>{receipt.durable && receipt.disposition === "saved" ? `Одна отмена в истории редактора · версия ${String(receipt.projectRevision)}` : "Состояние сохранения"}</small></span></div>)}
     </article>}
     {view.sources.map(source => { const url = sourceUrl(source.finalUrl); return <details className="chat-message uir-chat-source" key={source.id} open><summary className="chat-source"><Icon name="file" />{source.title || "Полученная страница"} · {url ? new URL(url).hostname : "Сохранённый источник"}</summary>
       {url && <a href={url} target="_blank" rel="noopener noreferrer">Открыть источник</a>}<small>Получен {new Date(source.retrievedAt).toLocaleString("ru")}{source.truncated ? " · текст сокращён" : ""}</small><div className="chat-message-text"><p>{source.text}</p></div></details>; })}

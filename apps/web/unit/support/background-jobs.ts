@@ -5,8 +5,6 @@ import type { JobProjectV1 } from "../../src/contracts/generated/background_proj
 import type { JobSnapshotV1 } from "../../src/contracts/generated/background_snapshot_v1";
 import type { JobAgentRequestV1 } from "../../src/contracts/generated/background_agent_request_v1";
 import type { AgentRun } from "../../src/contracts/generated/agent_run";
-import type { AgentSettings } from "../../src/contracts/generated/agent_settings";
-import type { AssistantApi } from "../../src/assistant/controller";
 import { before, job, proposal } from "./background-writer";
 
 export function running(id = "job-one", cursor = 1): JobSnapshotV1 {
@@ -54,23 +52,4 @@ export function jobsHarness(projectId = job.submission.identity.projectId, initi
   return { jobs, api, calls, timers, get state() { return state; }, set: (next: JobSnapshotV1[]) => { state = { ...state, jobs: next }; },
     projectReply: (reply: typeof projectReply) => { projectReply = reply; }, conversationReply: (reply: typeof conversationReply) => { conversationReply = reply; },
     close() { jobs.close(); assert.equal(timers.size, 0); } };
-}
-
-export function assistantApi(projectId = before.response.workspace.projectId) {
-  const now = "2026-10-16T12:00:00Z", calls = { lease: 0, cancel: 0 };
-  let settings: AgentSettings = { schemaVersion: 1, revision: 1, enabled: true, selectedAgentModel: "model-one" };
-  const forbidden = () => { calls.lease++; return Promise.reject(new Error("Legacy owner path reached")); };
-  const api: AssistantApi = { projectId, settings: () => Promise.resolve(settings),
-    saveSettings: value => { settings = { schemaVersion: 1, revision: settings.revision + 1, ...value }; return Promise.resolve(settings); },
-    capabilities: () => Promise.resolve({ schemaVersion: 1, ready: true, binaryVersion: "synthetic", binarySha256: "a".repeat(64),
-      protocolSha256: "b".repeat(64), configSha256: "c".repeat(64), connectionEpoch: "account-one", modes: ["edit", "check_only"],
-      tools: [], webAvailable: false, models: [], unavailable: null }),
-    conversations: () => Promise.resolve({ items: [{ id: "conversation-one", createdAt: now, updatedAt: now, title: "Synthetic", activeRunId: null }], nextCursor: null }),
-    conversation: () => Promise.resolve({ schemaVersion: 1, id: "conversation-two", projectId, createdAt: now, updatedAt: now, messages: [], runs: [], sources: [], findings: [] }),
-    messages: () => Promise.resolve({ items: [], nextCursor: null }), resources: () => Promise.resolve({ sources: [], findings: [], nextCursor: null }),
-    open: forbidden, renew: forbidden, close: forbidden, submit: forbidden, read: forbidden,
-    cancel: () => { calls.cancel++; return Promise.reject(new Error("Legacy Stop reached")); },
-    events: async function* () { yield* []; },
-    prepared: () => ({ claim: forbidden, commit: forbidden, recover: forbidden, report: forbidden }) };
-  return { api, calls };
 }

@@ -90,12 +90,8 @@ events.length = 0;
 const gate = deferred();
 const editor: RichEditorHandle = {
   background: true, sessionId: "session", navigate: () => gate.promise,
-  reviewStamp: () => 0,
-  resume: async () => { events.push("resume"); }, undo: () => {}, redo: () => {}, captureSelection: () => null,
-  focusFinding: () => false, applyAssistant: async () => {},
-  applyAssistantAction: async () => { throw new Error("Unexpected action"); },
+  resume: async () => { events.push("resume"); }, undo: () => {}, redo: () => {},
   flush: async () => { throw new Error("Unexpected flush"); },
-  assistantBaseline: async () => { throw new Error("Unexpected assistant baseline"); },
 };
 hook.editor.current = editor;
 function unmount() {
@@ -110,7 +106,7 @@ const [action, wait] = scenario.split(":");
 if (wait === "assistant") {
   editor.background = false;
   editor.navigate = async () => { events.push("navigate"); };
-  hook.assistant.current = { stop: () => gate.promise, history: () => {}, fence: () => {} };
+  hook.assistant.current = { stop: () => gate.promise };
 }
 function invoke(): Promise<unknown> {
   switch (action) {
@@ -181,7 +177,8 @@ if (importing) {
   // Leaving a V7 opening drains and detaches its own editor, exactly like V1.
   hook.editor.current = null;
   hook.templateEditor.current = { background: true, navigate: async () => { events.push("template-navigate"); }, resume: async () => {}, refresh: async () => {},
-    flush: async () => { throw new Error("Unexpected flush"); }, undo: () => {}, redo: () => {} };
+    flush: async () => { throw new Error("Unexpected flush"); }, undo: () => {}, redo: () => {},
+    applyAssistant: () => Promise.reject(new Error("Unexpected apply")), captureSelection: () => null, focusFinding: () => false };
   events.length = 0;
   assert.equal(await hook.open("B"), true);
   assert.deepEqual(events, ["template-navigate", "request:/B", "request:/B/activate", "catalog", "url:/?project=B"]);

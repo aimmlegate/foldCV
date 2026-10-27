@@ -14,9 +14,8 @@ import type { DraftPayloadV1 } from "../contracts/generated/background_draft_pay
 import type { JobSnapshotV1 } from "../contracts/generated/background_snapshot_v1";
 import type { ProposalBindingV1 } from "../contracts/generated/background_proposal_v1";
 import type { UndoOwnershipV1 } from "../contracts/generated/background_undo_v1";
-import { cellChanges } from "../assistant/editor-bridge";
 import { documentSteps, factSteps, type RichSaveQueue } from "../rich/save-queue";
-import type { CellValue, HistoryReservation, SessionHistory } from "../rich/history";
+import { cellChanges, type CellValue, type HistoryReservation, type SessionHistory } from "../rich/history";
 import { retainResume, type AttachedWriter } from "./connection";
 import { sha256, sameValue, containsSubmitted } from "./wire";
 import type { LocalDraft } from "./drafts";

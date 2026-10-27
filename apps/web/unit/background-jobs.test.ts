@@ -1,28 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { AssistantController } from "../src/assistant/controller";
-import { deferred, before, job, proposal, published, saved, harness } from "./support/background-writer";
-import { assistantApi, conversation, jobsHarness, running, run } from "./support/background-jobs";
-
-for (const phase of ["baseline", "submit"] as const) {
-  test(`Stop fences a background send during ${phase}`, async () => {
-    const h = jobsHarness(undefined, []), metadata = assistantApi(), reached = deferred<void>(), release = deferred<void>();
-    const controller = new AssistantController(metadata.api, { sessionId: "session", apply: () => Promise.resolve() }, () => {}, 5000, h.jobs);
-    try {
-      await controller.init(); await h.jobs.refresh(); controller.draft("Keep background draft");
-      if (phase === "submit") { const original = h.api.submit; h.api.submit = async request => { const value = await original(request); reached.resolve(); await release.promise; return value; }; }
-      const sending = controller.send(async () => {
-        if (phase === "baseline") { reached.resolve(); await release.promise; }
-        return { response: before.response, scope: { kind: "resume" } };
-      });
-      await reached.promise; await controller.stop(); release.resolve(); await sending;
-      assert.equal(h.calls.submit.length, phase === "submit" ? 1 : 0);
-      assert.equal(h.calls.cancel, phase === "submit" ? 1 : 0);
-      assert.equal(controller.view.draft, "Keep background draft");
-      assert.equal(controller.view.pendingSend, false);
-    } finally { release.resolve(); controller.close(); h.close(); }
-  });
-}
+import { deferred, job, proposal, published, saved, harness } from "./support/background-writer";
+import { jobsHarness, running } from "./support/background-jobs";
 
 for (const [index, target] of ["other-project", job.submission.identity.projectId].entries()) {
   test(`NB-W10:v${index ? "06" : "04"} old project metadata cannot publish into ${index ? "a new instance" : "another project"}`, async () => {
@@ -63,51 +42,4 @@ test("screen-independent jobs keep their original accepted order and reject olde
     const unsubscribe = h.jobs.subscribe(() => {}); unsubscribe(); assert.equal(h.timers.size, 1);
     assert.equal(h.calls.cancel, 0);
   } finally { h.close(); }
-});
-
-test("changing conversations and closing the assistant never stops a background job or opens a legacy lease", async () => {
-  const h = jobsHarness(), metadata = assistantApi(), controller = new AssistantController(metadata.api,
-    { sessionId: "assistant-session", apply: () => Promise.reject(new Error("Legacy publication reached")) }, () => {}, 5000, h.jobs);
-  try {
-    await h.jobs.refresh(); await controller.init(); assert.equal(controller.view.run?.id, "job-one");
-    await controller.newConversation(); assert.equal(controller.view.conversationId, "conversation-two");
-    await controller.select("conversation-one"); assert.equal(controller.view.run?.id, "job-one");
-    controller.close(); assert.equal(h.timers.size, 1); assert.equal(h.calls.cancel, 0);
-    assert.deepEqual(metadata.calls, { lease: 0, cancel: 0 });
-  } finally { controller.close(); h.close(); }
-});
-
-test("a cached conversation projection for one job cannot regress another job's completed state", async () => {
-  const first = running("first", 1), second = running("second", 1), h = jobsHarness(undefined, [first, second]);
-  const metadata = assistantApi(), latest = deferred<void>();
-  const controller = new AssistantController(metadata.api, { sessionId: "session", apply: () => Promise.resolve() }, view => {
-    if (view.run?.id === "second" && view.run.state === "completed") latest.resolve();
-  }, 5000, h.jobs);
-  h.conversationReply(id => {
-    const own = h.state.jobs.find(job => job.id === id); assert.ok(own);
-    const value = conversation(own);
-    return Promise.resolve({ ...value, runs: [run(first), run(second), run(own)].filter((value, index, all) => all.findIndex(item => item.id === value.id) === index)
-      .map(value => value.id === own.id ? run(own) : value) });
-  });
-  try {
-    await h.jobs.refresh(); await controller.init(); assert.equal(controller.view.run?.id, "second");
-    h.set([first, { ...second, execution: "completed", eventCursor: 2 }]); await h.jobs.refresh(); await latest.promise;
-    assert.equal(controller.view.run?.state, "completed"); assert.equal(h.calls.cancel, 0);
-  } finally { controller.close(); h.close(); }
-});
-
-test("background Send retries keep the captured request and never acquire or stop a legacy owner", async () => {
-  const h = jobsHarness(undefined, []), metadata = assistantApi(), controller = new AssistantController(metadata.api,
-    { sessionId: "session", apply: () => Promise.reject(new Error("Legacy publication reached")) }, () => {}, 5000, h.jobs);
-  const submit = h.api.submit; let first = true;
-  h.api.submit = request => { if (first) { first = false; h.calls.submit.push(structuredClone(request)); return Promise.reject(new Error("Lost submit reply")); }
-    return submit(request); };
-  try {
-    await controller.init(); controller.draft("Keep this background request");
-    const baseline = () => Promise.resolve({ response: before.response, scope: { kind: "resume" as const } });
-    await controller.send(baseline); assert.equal(controller.view.pendingSend, true);
-    await controller.chooseModel("different-model"); await controller.send(baseline);
-    assert.equal(h.calls.submit.length, 2); assert.deepEqual(h.calls.submit[0], h.calls.submit[1]);
-    assert.deepEqual(metadata.calls, { lease: 0, cancel: 0 }); assert.equal(h.calls.cancel, 0);
-  } finally { controller.close(); h.close(); }
 });

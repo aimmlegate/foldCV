@@ -27,7 +27,7 @@ from packages.resume_core.storage import atomic_write
 from resume_api.agent.runtime import ScriptedAgentRuntime
 from resume_api.app import create_app
 from spikes.uir.fixtures import NOW
-from spikes.uir.providers import ScriptedConnection, ScriptedContent, StoredWeb, scripted_agent
+from spikes.uir.providers import ScriptedConnection, ScriptedContent, StoredWeb
 from tests.templates.address_map_fixtures import joined
 from tests.templates.storage_fixtures import workspace as papers
 from packages.resume_core.text_rewrite import PlainTextReply
@@ -111,6 +111,50 @@ async def projects(root, employment_shape='issues'):
         (employment, employment_sources)]
 
 
+async def assistant_script(value, cancel, emit):
+    """SR05 T3 check B: a scripted assistant that calls the real run tools; no model is started."""
+    import httpx
+    from resume_api.agent.runtime import RuntimeResult
+    message = json.loads(value.prompt.split('\n', 1)[1])['message'].lower()
+    headers = {'Authorization': 'Bearer ' + value.token, 'Accept': 'application/json, text/event-stream'}
+    async with httpx.AsyncClient(headers=headers, timeout=30) as client:
+        counter = [0]
+
+        async def call(name, arguments=None):
+            counter[0] += 1
+            reply = await client.post(value.url, json={'jsonrpc': '2.0', 'id': counter[0], 'method': 'tools/call',
+                'params': {'name': name, 'arguments': arguments or {}}})
+            result = reply.json()['result']
+            return json.loads(result['content'][0]['text']) if result.get('content') else {}
+        await client.post(value.url, json={'jsonrpc': '2.0', 'id': 0, 'method': 'initialize', 'params': {
+            'protocolVersion': '2025-03-26', 'capabilities': {}, 'clientInfo': {'name': 'ct05', 'version': '1'}}})
+        emit('activity.updated', {'itemId': 'read', 'kind': 'summary', 'text': 'Читаю резюме'})
+        page = await call('read_resume', {'page': 0})
+        first = next(item for item in page['items'] if item['type'] != 'section' and item['containers']
+            and item['containers'][0]['text'].strip())
+        if 'долго' in message:
+            while not cancel.is_set():
+                await asyncio.sleep(0.05)
+            return RuntimeResult(state='cancelled', error='AGENT_CANCELLED', native_started=True)
+        if 'docx' in message:
+            await call('export_document', {'format': 'docx'})
+            text = 'Файл DOCX готов, ссылка ниже.'
+        elif 'перепиши' in message or 'сократи' in message:
+            container = first['containers'][0]
+            op = {'op': 'set_block_text', 'blockId': first['id'], 'text': container['text'] + ' (короче)'}
+            if container['key'] not in {'content', 'caption'}:
+                op['cellId'] = container['key']
+            result = await call('propose_changes', {'request': {'summary': 'Сократить первый абзац', 'ops': [op]}})
+            text = 'Подготовил вариант. Посмотрите и примените.' if 'proposalId' in result else 'Не удалось подготовить вариант.'
+        else:
+            await call('check_resume')
+            await call('publish_findings', {'request': {'findings': [{'severity': 'info',
+                'message': 'Уточните формулировку первого абзаца.', 'targets': [{'blockId': first['id']}]}]}})
+            text = 'Проверил резюме: одно замечание.'
+        emit('message.delta', {'text': text})
+        return RuntimeResult(state='completed', text=text, native_started=True, tool_calls=counter[0])
+
+
 def refuse_execution(*_args, **_kwargs):
     raise AssertionError('CT05 V7 proof runs no background execution')
 
@@ -128,7 +172,7 @@ async def main(args):
     listener.bind(('127.0.0.1', args.port)); listener.listen(128)
     origin = 'http://127.0.0.1:' + str(listener.getsockname()[1]); secret = secrets.token_urlsafe(32)
     connection, content, web = TemplateConnection(), RewriteContent(), StoredWeb()
-    runtime = ScriptedAgentRuntime(scripted_agent)
+    runtime = ScriptedAgentRuntime(assistant_script)
     with patch('resume_api.app.ConnectionAdapter', side_effect=AssertionError('native connection')), \
          patch('resume_api.app.CodexCliProvider', side_effect=AssertionError('native content')), \
          patch('resume_api.app.CodexAgentRuntime', side_effect=AssertionError('native agent')):
@@ -138,6 +182,7 @@ async def main(args):
             background_enabled=True, background_factory=refuse_execution,
             template_import_call_cap=args.template_call_cap, legacy_routes=False)
     app.app.state.agent.tools.fetcher = web
+    app.app.state.assistant._fetcher = web
     service = app.app.state.rich_projects
     if args.template_call_cap is not None:
         # The store's active package for new strict imports: the synthetic employment subset.

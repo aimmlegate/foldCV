@@ -52,13 +52,14 @@ class ExportService:
             self._renderer = renderer_identity()
         return self._renderer
 
-    async def export(self, project_id, snapshot, editor_token, *, retry_attempt_id=None):
+    async def export(self, project_id, snapshot, editor_token, *, retry_attempt_id=None, trusted=False):
+        """`trusted` is the assistant's server-side export: it has no page, so no editor token."""
         task = self.projects.tasks.start(project_id, 'export', stage='rendering')
         session = self.projects.repository.open(project_id)
         with session.lock:
             session.pins += 1
         try:
-            prepared = await asyncio.to_thread(self._prepare, project_id, snapshot, editor_token, retry_attempt_id)
+            prepared = await asyncio.to_thread(self._prepare, project_id, snapshot, editor_token, retry_attempt_id, trusted)
             artifact = await self.render(prepared.request)
             if not isinstance(artifact, bytes) or not 0 < len(artifact) <= DOCX_BYTES:
                 raise ProjectFailure('IMPORT_EXPORT_INVALID_ARTIFACT', 422)
@@ -78,10 +79,11 @@ class ExportService:
             with session.lock:
                 session.pins -= 1
 
-    def _prepare(self, project_id, snapshot, editor_token, retry_attempt_id):
+    def _prepare(self, project_id, snapshot, editor_token, retry_attempt_id, trusted=False):
         session = self.projects.repository.open(project_id)
         with session.lock:
-            session.require_editor(editor_token)
+            if not trusted:
+                session.require_editor(editor_token)
             workspace = session.workspace
             project = workspace.project
             if project is None:

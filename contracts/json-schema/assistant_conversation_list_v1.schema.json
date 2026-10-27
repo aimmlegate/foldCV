@@ -1,0 +1,55 @@
+{
+  "$defs": {
+    "AssistantConversationV1": {
+      "additionalProperties": false,
+      "properties": {
+        "createdAt": {
+          "maxLength": 64,
+          "minLength": 1,
+          "title": "Createdat",
+          "type": "string"
+        },
+        "id": {
+          "minLength": 1,
+          "title": "Id",
+          "type": "string"
+        },
+        "title": {
+          "maxLength": 120,
+          "title": "Title",
+          "type": "string"
+        },
+        "updatedAt": {
+          "maxLength": 64,
+          "minLength": 1,
+          "title": "Updatedat",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "title",
+        "createdAt",
+        "updatedAt"
+      ],
+      "title": "AssistantConversationV1",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "items": {
+      "items": {
+        "$ref": "#/$defs/AssistantConversationV1"
+      },
+      "maxItems": 100,
+      "title": "Items",
+      "type": "array"
+    }
+  },
+  "required": [
+    "items"
+  ],
+  "title": "AssistantConversationListV1",
+  "type": "object"
+}

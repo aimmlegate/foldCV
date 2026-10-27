@@ -6,6 +6,7 @@ import type { V7Operation } from "./v7-translation";
 import type { EditResultV1 } from "../contracts/generated/edit_result_v1";
 import type { ProjectOpenResultV1 } from "../contracts/generated/project_open_result_v1";
 import type { HistoryStateV1 } from "../contracts/generated/history_state_v1";
+import type { AssistantApplyResultV1 } from "../contracts/generated/assistant_apply_result_v1";
 import { templateExportArtifact } from "../contracts/template-export";
 import archiveSchema from "../../../../contracts/json-schema/archive_manifest_v7.schema.json" with { type: "json" };
 
@@ -95,6 +96,15 @@ export class ProjectEditorConnection {
   async step(direction: "undo" | "redo", clientMutationId: string, expectedActionId: string | null, baseRevision: number): Promise<EditResult> {
     return this.adopt(await this.editing(token => v2Request<EditResult>(this.path("/history"), "POST",
       { editorToken: token, baseRevision, direction, clientMutationId, expectedActionId }, this.fetcher), true));
+  }
+
+  /** Apply an assistant proposal with this page's token; an edit result becomes the shown state and undo history. */
+  async applyProposal(proposalId: string, clientMutationId: string, allowEdits: boolean): Promise<AssistantApplyResultV1> {
+    const result = await this.editing(token => v2Request<AssistantApplyResultV1>(
+      this.path(`/assistant/proposals/${encodeURIComponent(proposalId)}/apply`), "POST",
+      { editorToken: token, clientMutationId, allowEdits }, this.fetcher), true);
+    if (result.edit) this.adopt(result.edit);
+    return result;
   }
 
   async capture(clientCaptureId: string, snapshot: Snapshot, selection: Selection): Promise<{ clipboardCaptureId: string }> {

@@ -24,11 +24,12 @@ class ArchiveDownload(BaseModel):
     document_revision: int = Field(alias='documentRevision')
 
 
-def export_archive(service, project_id, request):
-    """The open editor's project as a .foldcv file. The journal stays on disk."""
+def export_archive(service, project_id, request, *, trusted=False):
+    """The open editor's project as a .foldcv file. The journal stays on disk. `trusted` is the assistant's export."""
     session = service.repository.open(project_id)
     with session.lock:
-        session.require_editor(request.editor_token)
+        if not trusted:
+            session.require_editor(request.editor_token)
         workspace = session.workspace
         if (workspace.project_revision, workspace.document_revision) != (request.project_revision, request.document_revision):
             raise ProjectFailure('STALE_ARCHIVE', 409)

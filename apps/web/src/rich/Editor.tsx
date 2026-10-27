@@ -16,8 +16,6 @@ import { historyMutation } from "./history-offer";
 import type { AssistantHistoryOfferV1 } from "../contracts/generated/assistant_history_offer_v1";
 import type { AgentHistoryOffer } from "../contracts/generated/agent_history_offer";
 import { RichSynchronization, selectionChecksum, type PanelCommand } from "./synchronization";
-import { PreparedEditorBridge, type PreparedApi, type PreparedActionApi } from "../assistant/editor-bridge";
-import { anchorCurrent } from "../assistant/presentation";
 import type { AgentFinding } from "../contracts/generated/agent_finding";
 import { Timeline, type TimelineControls } from "./Timeline";
 import { dateAnchors, type DateAnchor } from "./date-edit";
@@ -96,14 +94,7 @@ function toBlock(block: RichBlock): InputBlock {
 export type CapturedEditorSelection = { selection: Omit<RichSelection, "capture" | "textSha256">; session: string; epochs: ReadonlyMap<string, number> };
 export type RichEditorHandle = { flush: () => Promise<RichProjectResponse>; undo: () => void; redo: () => void;
   background: boolean; navigate: () => Promise<void>; resume: () => Promise<void>;
-  sessionId: string; captureSelection: () => CapturedEditorSelection | null;
-  reviewStamp: () => number;
-  assistantBaseline: (captured: CapturedEditorSelection | null) => Promise<{ response: RichProjectResponse; selection: RichSelection | null;
-    historyOffers: Pick<AgentHistoryOffer, "undo" | "redo">;
-    historyTargets?: Pick<AssistantHistoryOfferV1, "undoBackend" | "redoBackend"> }>;
-  focusFinding: (anchor: AgentFinding["anchors"][number]) => boolean;
-  applyAssistant: (batchId: string, api: PreparedApi) => Promise<void>;
-  applyAssistantAction: (key: string, api: PreparedActionApi) => Promise<void> };
+  sessionId: string };
 export function RichEditor({ initial, acknowledge, onStatus, ref, onHistoryNavigation, onAssistantFence, onComparisonOpen, portalHost, assistant, paneOrder = "layout-first", writer: writerConnection = null }: { initial: RichProjectResponse;
   acknowledge: (response: RichProjectResponse) => void; onStatus: (status: string) => void; ref: Ref<RichEditorHandle>;
   onComparisonOpen?: () => void; onHistoryNavigation?: () => void; onAssistantFence?: (saved: boolean) => void; portalHost?: HTMLElement; assistant?: ReactNode; writer?: AttachedWriter | null; paneOrder?: PaneOrder }) {
@@ -164,7 +155,7 @@ export function RichEditor({ initial, acknowledge, onStatus, ref, onHistoryNavig
   const bridge = useMemo(() => ({ session: writerConnection?.proof?.sessionId ?? crypto.randomUUID(), group: 0, composing: false, observing: false, replaying: false,
     kind: "typing" as RichMutation["kind"],
     lastTypingAt: 0, history: null as SessionHistory | null, queue: null as RichSaveQueue | null, intents: null as IntentQueue<FactIntent> | null,
-    prepared: null as PreparedEditorBridge | null, applying: false, fenced: false,
+    applying: false, fenced: false,
     writer: null as BackgroundWriter | null, backgroundHistory: false, compositionWaiters: new Set<() => void>(),
     latestSelection: null as ReturnType<typeof selectedRange>, location: null as string | null,
     assistantFlush: async (): Promise<RichProjectResponse> => { throw new Error("Редактор ещё открывается"); },
@@ -570,22 +561,6 @@ export function RichEditor({ initial, acknowledge, onStatus, ref, onHistoryNavig
       queue.refreshMetadata(await projectRequest(`/${initial.workspace.projectId}`));
       return queue.baseline;
     };
-    bridge.prepared = new PreparedEditorBridge({ history, queue, flush: () => bridge.assistantFlush(),
-      reviewedAuthority: batch => bridge.writer?.reviewedAuthority(batch) ?? Promise.resolve(null),
-      reviewedSaved: async project => { await bridge.writer?.adoptReviewed(project.workspace.projectRevision); },
-      cells: response => {
-        const current = response.workspace.project; if (!current) throw new Error("Document missing");
-        return withFacts(current.document, current.facts);
-      }, preview: batch => projectRequest(`/${initial.workspace.projectId}/preview`, "POST", batch.mutation),
-      enter: () => { bridge.applying = true; setApplying(true); if (bridge.timer) clearTimeout(bridge.timer); editor.isEditable = false; },
-      leave: () => { bridge.applying = false; setApplying(false); if (!bridge.fenced) editor.isEditable = true; },
-      retainImages: async () => { await publishImageReferences(); },
-      fence: (receipt, savedAction) => {
-        bridge.fenced = true; setRecovery(true); editor.isEditable = false;
-        const saved = receipt?.durable ?? savedAction ?? false;
-        setEditorWarning(saved ? "Правки сохранены. Откройте резюме заново для продолжения." : "Нужно подтвердить сохранение. Откройте резюме заново.");
-        assistantCallbacks.current.onAssistantFence?.(saved);
-      } });
     bridge.rewrite = async instruction => {
       available();
       if (!rewriteSelection.current || bridge.composing) throw new Error("Выделите фрагмент текста");
@@ -848,7 +823,7 @@ export function RichEditor({ initial, acknowledge, onStatus, ref, onHistoryNavig
       }).catch(error => { if (writer.mode !== "closed") setEditorWarning(error instanceof Error ? error.message : "JOB_REQUEST_FAILED"); });
     });
     setReady(true);
-    return () => { stop(); sync.close(); intents.close(); bridge.prepared?.close(); open = false; imageRevision++; for (const upload of uploads.values()) upload.abort();
+    return () => { stop(); sync.close(); intents.close(); open = false; imageRevision++; for (const upload of uploads.values()) upload.abort();
       if (heartbeat) clearInterval(heartbeat); bridge.writer?.close(); bridge.compositionWaiters.forEach(resolve => resolve()); bridge.compositionWaiters.clear();
       unsubscribeJobs?.();
       window.removeEventListener("beforeunload", guardUnload);
@@ -866,72 +841,7 @@ export function RichEditor({ initial, acknowledge, onStatus, ref, onHistoryNavig
   }, background: writerConnection !== null, navigate: async () => {
     if (bridge.writer) await bridge.writer.navigate(); else { await bridge.intents?.drain(); await bridge.queue?.flush(); }
   }, resume: async () => { await bridge.writer?.resume(); },
-  undo: () => bridge.undo(), redo: () => bridge.redo(), sessionId: bridge.session,
-  reviewStamp: () => bridge.history?.revisionClock ?? -1,
-  focusFinding: anchor => {
-    if (bridge.applying || !bridge.queue || !anchorCurrent(anchor, bridge.queue.baseline, bridge.current)) return false;
-    if (anchor.blockId) {
-      const blockId = anchor.blockId, block = editor.getBlock(blockId);
-      if (!block) return false;
-      const element = window.document.querySelector(`.cv-document[data-project-id="${CSS.escape(initial.workspace.projectId)}"] [data-id="${CSS.escape(blockId)}"]`);
-      if (!element) return false;
-      if (anchor.cellId) {
-        const cellId = anchor.cellId;
-        let position: number | null = null;
-        editor.transact(tr => {
-          tr.doc.descendants((node, pos) => {
-            if (node.type.name !== "blockContainer" || node.attrs["id"] !== blockId) return;
-            node.firstChild?.descendants((cell, offset) => {
-              if (cell.attrs["foldcvNodeId"] === cellId) position = pos + offset + 4;
-            });
-          });
-          if (position !== null) tr.setSelection(TextSelection.near(tr.doc.resolve(position))).scrollIntoView();
-        });
-        if (position === null) return false;
-      } else editor.setTextCursorPosition(blockId, "start");
-      editor.focus(); element.scrollIntoView({ block: "center", behavior: "smooth" }); return true;
-    }
-    if (!anchor.recordId) return false;
-      if (!prototypeFacts.current.records.some(record => record.id === anchor.recordId)) return false;
-    setFactsVisible(true);
-    setFactFocus({ recordId: anchor.recordId });
-    return true;
-  }, captureSelection: () => captureSelected(bridge.latestSelection), assistantBaseline: async captured => {
-    const valid = () => !captured || captured.session === bridge.session && !!bridge.history
-      && [...captured.epochs].every(([key, revision]) => bridge.history?.revision(key) === revision);
-    if (!valid()) throw new Error("AGENT_STALE_READ");
-    const response = await bridge.assistantFlush(), project = response.workspace.project;
-    if (!valid() || !project) throw new Error("AGENT_STALE_READ");
-    const historyOffers = bridge.historyOffers();
-    const historyTargets = { undoBackend: bridge.writer?.historyTarget("undo") ?? null, redoBackend: bridge.writer?.historyTarget("redo") ?? null };
-    if (!captured) return { response, selection: null, historyOffers, historyTargets };
-    const revisions = new Map<string, number>(), blocksById = new Map<string, RichBlock>();
-    function visit(blocks: RichBlock[]) { for (const block of blocks) { revisions.set(block.id, block.revision); blocksById.set(block.id, block); visit(block.children); } }
-    project.document.regions.forEach(region => visit(region.blocks));
-    const dependencies: RichSelection["capture"]["dependencies"] = [];
-    for (const id of captured.selection.blockIds) {
-      const block = blocksById.get(id);
-      if (!block) throw new Error("AGENT_STALE_READ");
-      if (block.type === "table" && captured.selection.kind !== "blocks") {
-        const cells = block.content.rows.flatMap(row => row.cells);
-        const first = id === captured.selection.anchor.blockId ? cells.findIndex(cell => cell.id === captured.selection.anchor.cellId) : 0;
-        const last = id === captured.selection.head.blockId ? cells.findIndex(cell => cell.id === captured.selection.head.cellId) : cells.length - 1;
-        for (const cell of cells.slice(first, last + 1)) dependencies.push({ kind: "field", id: JSON.stringify(["cell", id, cell.id]), revision: cell.revision, fingerprint: null });
-      } else dependencies.push({ kind: "block", id, revision: revisions.get(id) ?? 1, fingerprint: null });
-    }
-    const selection: RichSelection = { ...captured.selection, textSha256: "0".repeat(64),
-      capture: { sessionId: bridge.session, actionId: `${bridge.session}:selection`, actionToken: bridge.history?.revisionClock ?? 0,
-        dependencies } };
-    selection.textSha256 = await selectionChecksum(project.document, selection);
-    if (!valid()) throw new Error("AGENT_STALE_READ");
-    return { response, selection, historyOffers, historyTargets };
-  }, applyAssistant: async (batchId, api) => {
-    if (!bridge.prepared) throw new Error("Редактор ещё открывается");
-    await bridge.prepared.apply(batchId, api);
-  }, applyAssistantAction: async (key, api) => {
-    if (!bridge.prepared) throw new Error("Редактор ещё открывается");
-    await bridge.prepared.applyAction(key, api);
-  } }), [bridge]);
+  undo: () => bridge.undo(), redo: () => bridge.redo(), sessionId: bridge.session }), [bridge]);
   function submitRewrite() {
     setRewriting(true); setRewriteError(""); setRewritePreview(null);
     void bridge.rewrite(instruction).catch(error => { setRewriting(false); setRewriteError(error instanceof Error && /stale|устар|обнов|измен/i.test(error.message)

@@ -2,9 +2,11 @@ import { createExtension } from "@blocknote/core";
 import { Extension } from "@tiptap/core";
 import { useCreateBlockNote } from "@blocknote/react";
 import { BlockNoteView } from "@blocknote/shadcn";
-import { useEffect, useImperativeHandle, useMemo, useRef, useState, type Ref } from "react";
+import { useEffect, useImperativeHandle, useMemo, useRef, useState, type ReactNode, type Ref } from "react";
 import type { AttachedTemplateWriter } from "../background/connection";
 import type { TemplateProjectResponseV1 } from "../contracts/generated/template_project_response_v1";
+import type { AssistantApplyResultV1 } from "../contracts/generated/assistant_apply_result_v1";
+import type { AssistantFinding, AssistantSelection } from "../assistant/controller";
 import { errorMessage, knownErrorMessage } from "../errors/messages";
 import { ComparisonWorkspace, WorkspaceViews, type WorkspaceView } from "../workbench/editor/ComparisonWorkspace";
 import { SourceDialog } from "../workbench/editor/SourceDialog";
@@ -24,12 +26,24 @@ import { presentationMeta, templatePresentationPlugin, templateSheet, type Templ
 import { TemplateEditorSession, type TemplateRewrite, type EditorMode } from "./v7-session";
 
 export type TemplateEditorHandle = { background: boolean; flush: () => Promise<TemplateProjectResponseV1>;
-  navigate: () => Promise<void>; resume: () => Promise<void>; refresh: () => Promise<void>; undo: () => void; redo: () => void };
+  navigate: () => Promise<void>; resume: () => Promise<void>; refresh: () => Promise<void>; undo: () => void; redo: () => void;
+  /** The assistant drawer's bridge: Apply through this page's token, the selection as run context, and a finding's place. */
+  applyAssistant: (proposalId: string, allowEdits: boolean) => Promise<AssistantApplyResultV1>;
+  captureSelection: () => AssistantSelection | null;
+  focusFinding: (anchor: AssistantFinding["anchors"][number]) => boolean };
+type ShownBlock = NonNullable<TemplateProjectResponseV1["workspace"]["project"]>["document"]["regions"][number]["blocks"][number];
+
+function blockRevisions(response: TemplateProjectResponseV1): Map<string, number> {
+  const revisions = new Map<string, number>();
+  const visit = (blocks: readonly ShownBlock[]) => { for (const block of blocks) { revisions.set(block.id, block.revision); visit(block.children); } };
+  response.workspace.project?.document.regions.forEach(region => visit(region.blocks));
+  return revisions;
+}
 
 /** The V7 editor: the same BlockNote view and controls, bound to one TemplateEditorSession. */
-export function TemplateEditor({ initial, connection, onStatus, onShown, ref, portalHost }: {
+export function TemplateEditor({ initial, connection, onStatus, onShown, ref, portalHost, assistant }: {
   initial: TemplateProjectResponseV1; connection: AttachedTemplateWriter; onStatus: (status: string) => void;
-  onShown: (response: TemplateProjectResponseV1) => void; ref: Ref<TemplateEditorHandle>; portalHost?: HTMLElement }) {
+  onShown: (response: TemplateProjectResponseV1) => void; ref: Ref<TemplateEditorHandle>; portalHost?: HTMLElement; assistant?: ReactNode }) {
   const project = initial.workspace.project;
   if (!project) throw new Error("Document is missing");
   const [warning, setWarning] = useState("");
@@ -94,7 +108,29 @@ export function TemplateEditor({ initial, connection, onStatus, onShown, ref, po
       return session.queue.template.durable;
     },
     navigate: () => session.navigateAway(), resume: () => session.resume(), refresh: () => session.refresh(),
-    undo: () => void session.navigate("undo"), redo: () => void session.navigate("redo") }), [session]);
+    undo: () => void session.navigate("undo"), redo: () => void session.navigate("redo"),
+    applyAssistant: (proposalId, allowEdits) => session.applyAssistant(proposalId, allowEdits),
+    captureSelection: () => {
+      const selected = editor.getSelection(), text = window.getSelection()?.toString().trim() ?? "";
+      if (!selected?.blocks.length || !text) return null;
+      return { blockIds: selected.blocks.slice(0, 100).map(block => block.id), text: text.slice(0, 4000) };
+    },
+    focusFinding: anchor => {
+      // A finding points at the state the run read; a block or fact changed since then is reported, not guessed.
+      const durable = session.queue.template.durable, revisions = blockRevisions(durable);
+      const records = new Map((durable.workspace.project?.facts.records ?? []).map(record => [record.id, record.revision]));
+      if (!anchor.dependencies.every(stamp => stamp.kind === "block" ? revisions.get(stamp.id) === stamp.revision
+        : stamp.kind !== "record" || records.get(stamp.id) === stamp.revision)) return false;
+      if (anchor.blockId) {
+        if (!editor.getBlock(anchor.blockId)) return false;
+        editor.setTextCursorPosition(anchor.blockId, "start"); editor.focus();
+        document.querySelector(`.cv-document [data-id="${CSS.escape(anchor.blockId)}"]`)?.scrollIntoView({ block: "center", behavior: "smooth" });
+        return true;
+      }
+      if (!anchor.recordId || !records.has(anchor.recordId)) return false;
+      setFactsVisible(true);
+      return true;
+    } }), [session, editor]);
   async function recover() {
     if (recoveryRunning.current) return;
     recoveryRunning.current = true; setRecovering(true);
@@ -201,6 +237,7 @@ export function TemplateEditor({ initial, connection, onStatus, onShown, ref, po
             </div>
           </div>
         </div>
+        {assistant ?? <div className="uir-chat-reservation" aria-hidden="true" />}
       </div>} />
     </div>
   </div>;

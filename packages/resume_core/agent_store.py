@@ -23,26 +23,8 @@ from .models.agent import (
 from .project_store import ProjectStore, ProjectStoreFailure, SAFE_ID, owned_file, strict_json
 from .rich_mutations import mutation_sha256
 from .storage import StorageFailure, atomic_write, locked_root, private_directory
-
-
-class AgentFailure(Exception):
-    def __init__(self, code):
-        self.code = code
-        super().__init__(code)
-
-
-def identity(prefix: str) -> str:
-    return prefix + "_" + secrets.token_hex(12)
-
-
-def timestamp() -> str:
-    return datetime.now(timezone.utc).isoformat()
-
-
-def digest(value) -> str:
-    data = value.model_dump(mode="json", by_alias=True) if hasattr(value, "model_dump") else value
-    return hashlib.sha256(json.dumps(data, sort_keys=True, ensure_ascii=False,
-        separators=(",", ":"), allow_nan=False).encode("utf-8")).hexdigest()
+# Moved to the assistant store (plan 1.4); this module goes in SR06.
+from .assistant_store import AgentFailure, digest, identity, timestamp  # noqa: F401
 
 
 def journal_request(request: AgentRunRequest) -> AgentJournalRequest:

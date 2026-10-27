@@ -1,21 +1,17 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import type { AssistantView } from "../src/assistant/controller";
+import { run as assistantRun, view as assistantView } from "./support/assistant";
 import type { AgentEvent } from "../src/contracts/generated/agent_event";
 import { activityItems, currentActivity } from "../src/workbench/assistant/activity";
 import { validateContract } from "../src/contracts/validate";
 import { running } from "./support/background-jobs";
 
-const run = { id: "run", conversationId: "conversation", projectId: "project", clientRequestId: "request", state: "running" as const,
-  model: "assistant", scope: { kind: "resume" as const }, allowEdits: true, allowWeb: false, createdAt: "2026-10-18T12:00:00Z",
-  finishedAt: null, connectionEpoch: "account", deadline: "2026-10-18T12:05:00Z", ownerEpoch: 1, settingsRevision: 1,
-  error: null, savedBatchId: null, outcomeUnknown: false, usage: null };
-const view: AssistantView = { settings: null, capabilities: null, flags: { allowEdits: true, allowWeb: false }, conversations: [],
-  conversationCursor: null, conversationId: "conversation", messages: [], messageCursor: null, sources: [], findings: [],
-  run, receipts: [], activity: [], partial: "", partialTruncated: false, draft: "", submitting: false, pendingSend: false, error: null };
+const run = assistantRun("running", "run", "conversation");
+const view: AssistantView = assistantView({ run });
 const base = (sequence: number) => ({ schemaVersion: 1 as const, id: `event_${sequence}`, runId: "run", projectId: "project",
   conversationId: "conversation", sequence, timestamp: `2026-10-18T12:00:${String(sequence).padStart(2, "0")}Z` });
-const started: AgentEvent = { ...base(1), type: "tool.started", payload: { callId: "read", name: "get_original_source", error: null } };
+const started: AgentEvent = { ...base(1), type: "tool.started", payload: { callId: "read", name: "read_original", error: null } };
 const summary: AgentEvent = { ...base(2), type: "activity.updated", payload: { itemId: "summary", kind: "summary", text: "Сверяю факты с исходником." } };
 
 test("public activity groups each tool and summary update without leaving a finished tool running", () => {

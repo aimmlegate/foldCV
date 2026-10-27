@@ -681,7 +681,7 @@ class ResourcePayload(AgentWire):
 
 
 class ResourceEvent(EventBase):
-    type: Literal["source.ready", "finding.ready"]
+    type: Literal["source.ready", "finding.ready", "proposal.ready", "file.ready"]
     payload: ResourcePayload
 
 

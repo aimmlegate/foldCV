@@ -1,6 +1,5 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { AssistantController } from "../src/assistant/controller";
 import { backgroundReply, GlobalJobsApi, JobsApi, type BackgroundRequest } from "../src/background/api";
 import { FixedOperations } from "../src/background/fixed";
 import { GlobalJobs, type GlobalJobsTransport } from "../src/background/global";
@@ -11,7 +10,7 @@ import type { JobSnapshotV1 } from "../src/contracts/generated/background_snapsh
 import type { RichSelection } from "../src/contracts/generated/rich_selection";
 import { RichApiFailure } from "../src/rich/api";
 import { selectionChecksum } from "../src/rich/synchronization";
-import { assistantApi, jobsHarness, running } from "./support/background-jobs";
+import { jobsHarness, running } from "./support/background-jobs";
 import { deferred } from "./support/background-writer";
 import { PythonBridge } from "./support/python-bridge";
 
@@ -175,9 +174,9 @@ test("NB-W13:v05 execution completes before Saved; later publication emits one n
   } finally { await held.release(); h.close(); await bridge.close(!passed); }
 });
 
-for (const [variant, screen] of [["NB-W13:v06", "New"], ["NB-W13:v07", "Settings"], ["NB-W13:v08", "another conversation"]] as const) {
+for (const [variant, screen] of [["NB-W13:v06", "New"], ["NB-W13:v07", "Settings"]] as const) {
   test(`${variant} ${screen} keeps real background work and exact result identity`, { timeout: 60000 }, async t => {
-    const { bridge, ready } = await PythonBridge.start(); let passed = false, controller: AssistantController | null = null;
+    const { bridge, ready } = await PythonBridge.start(); let passed = false;
     const h = realGlobal(bridge), api = bridge.jobs(ready.project), jobs = new ProjectJobs(api, { later: () => () => {} });
     const held = await bridge.hold("scripted_model_ready", "job"); t.after(() => bridge.close(!passed));
     let unsubProject = () => {}, unsubGlobal = () => {};
@@ -186,14 +185,6 @@ for (const [variant, screen] of [["NB-W13:v06", "New"], ["NB-W13:v07", "Settings
       unsubGlobal = h.registry.subscribe(() => {}); unsubProject = jobs.subscribe(() => {});
       await h.registry.refresh(); await jobs.refresh();
       if (screen === "New") unsubProject();
-      if (screen === "another conversation") {
-        const metadata = assistantApi(ready.project);
-        metadata.api.conversations = async () => ({ items: [{ id: ready.conversation, createdAt: accepted.createdAt,
-          updatedAt: accepted.updatedAt, title: "Synthetic", activeRunId: accepted.id }], nextCursor: null });
-        controller = new AssistantController(metadata.api, { sessionId: "screen-test", apply: () => Promise.reject(new Error("Legacy publication reached")) }, () => {}, 5000, jobs);
-        await controller.init(); await controller.newConversation(); await controller.select(ready.conversation); controller.close();
-        assert.deepEqual(metadata.calls, { lease: 0, cancel: 0 });
-      }
       await held.release(); await bridge.call({ kind: "wait_job", job: accepted.id }); await h.registry.refresh(); await jobs.refresh();
       const row = h.registry.view.jobs[0]; assert.ok(row); assert.equal(row.projectId, ready.project); assert.equal(row.jobId, accepted.id);
       assert.equal(row.execution, "completed"); assert.equal(row.saved, false); assert.equal(row.publication, "none");
@@ -201,7 +192,7 @@ for (const [variant, screen] of [["NB-W13:v06", "New"], ["NB-W13:v07", "Settings
       await h.registry.refresh(); assert.equal(h.registry.view.notices.length, 1);
       assert.equal(h.calls.stop, 0); assert.equal(jobs.view.project?.jobs[0]?.id, accepted.id);
       assert.equal((await api.conversation(accepted.id)).id, ready.conversation); passed = true;
-    } finally { await held.release(); controller?.close(); unsubProject(); unsubGlobal(); jobs.close(); h.close(); await bridge.close(!passed); }
+    } finally { await held.release(); unsubProject(); unsubGlobal(); jobs.close(); h.close(); await bridge.close(!passed); }
   });
 }
 

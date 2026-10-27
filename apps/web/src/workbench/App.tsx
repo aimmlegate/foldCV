@@ -126,14 +126,14 @@ export function App({ portalHost }: { portalHost: HTMLElement }) {
         {view === "assessment" && response && <Assessment response={response} open={() => setReviewed(reviewId(response))} back={() => setSourceOpen(true)} />}
         {view === "editor" && response?.workspace.project && <>
           <RichEditor key={`${response.workspace.projectId}:${workspace.openingEpoch}`} initial={response} writer={writer} acknowledge={acknowledge} onStatus={setStatus} ref={editor} portalHost={portalHost} paneOrder={paneOrder}
-            onComparisonOpen={() => setCollapsed(true)} onHistoryNavigation={() => assistant.current?.history()} onAssistantFence={saved => assistant.current?.fence(saved)}
-            assistant={<AssistantDrawer key={response.workspace.projectId} projectId={response.workspace.projectId} editor={editor} settingsOpen={settings} ref={assistant} background={writer !== null}
-              onProjectLifecycle={kind => workspace.projectLifecycle(response.workspace.projectId, kind)}
-              title={projectTitle} settings={openSettings} />} />
+            onComparisonOpen={() => setCollapsed(true)} />
         </>}
         {view === "editor" && template?.response.workspace.project && (template.connection
           ? <TemplateEditor key={`${template.response.workspace.projectId}:${workspace.openingEpoch}`} initial={template.response} connection={template.connection}
-            onStatus={setStatus} onShown={workspace.acknowledgeTemplate} ref={templateEditor} portalHost={portalHost} />
+            onStatus={setStatus} onShown={workspace.acknowledgeTemplate} ref={templateEditor} portalHost={portalHost}
+            assistant={<AssistantDrawer key={template.response.workspace.projectId} projectId={template.response.workspace.projectId} editor={templateEditor}
+              settingsOpen={settings} ref={assistant} onProjectLifecycle={kind => workspace.projectLifecycle(template.response.workspace.projectId, kind)}
+              title={projectTitle} settings={openSettings} />} />
           : <p className="notice warning" role="alert">{errorMessage("JOB_DISABLED")}</p>)}
         {view === "source" && !workspace.loading && <SourceForm input={input} change={setInput} textDraft={textDraft} busy={busy || creating} sourceName={source?.originalName ?? null}
           allowTextRewrite={workspace.allowTextRewrite} changeTextRewrite={workspace.setAllowTextRewrite}

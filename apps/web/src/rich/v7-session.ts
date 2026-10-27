@@ -1,6 +1,7 @@
 import { selectedFragmentToHTML, type BlockNoteEditor } from "@blocknote/core";
 import { Plugin, PluginKey, TextSelection, type Transaction } from "@tiptap/pm/state";
 import type { EditorView } from "@tiptap/pm/view";
+import type { AssistantApplyResultV1 } from "../contracts/generated/assistant_apply_result_v1";
 import { ProjectEditorConnection, ProjectApiFailure, pendingStore, type PendingNavigation, type PendingRecord, type PendingStore } from "./v7-connection";
 import type { RichDocumentV2, TemplateProjectResponseV1 } from "../contracts/generated/template_project_response_v1";
 import { contentText, responseBlocks } from "./v7-response";
@@ -228,6 +229,35 @@ export class TemplateEditorSession {
         throw error;
       }
       await this.reproject();
+    } finally {
+      this.panelBusy = false;
+      this.lock(!this.writable);
+      if (focused && this.editor?.isEditable) this.editor.focus();
+    }
+  }
+
+  /** Apply an assistant proposal: typing drains, input locks, and the editor shows Python's committed result (one undo
+   * action). An unknown token re-opens and repeats the same request; a lost reply repeats it once, which the server's
+   * replay window answers without applying twice. */
+  async applyAssistant(proposalId: string, allowEdits: boolean): Promise<AssistantApplyResultV1> {
+    if (!this.editor || this.closed || this.composing || this.panelBusy || this.navigating || this.mode !== "normal") throw new Error("WRITER_INPUT_BLOCKED");
+    await this.flush();
+    const focused = this.editor.isFocused();
+    this.panelBusy = true;
+    this.lock(true);
+    try {
+      this.boundary();
+      const mutationId = crypto.randomUUID();
+      let result: AssistantApplyResultV1;
+      try { result = await this.connection.applyProposal(proposalId, mutationId, allowEdits); }
+      catch (error) {
+        if (error instanceof ProjectApiFailure && error.code === "EDITOR_REPLACED") { this.setMode("read_only"); throw error; }
+        if (error instanceof ProjectApiFailure && error.code !== "EDITOR_TOKEN_UNKNOWN") throw error;
+        result = await this.connection.applyProposal(proposalId, mutationId, allowEdits);
+      }
+      if (result.edit) this.queue.template.adoptDurable(result.edit.response);
+      await this.reproject();
+      return result;
     } finally {
       this.panelBusy = false;
       this.lock(!this.writable);

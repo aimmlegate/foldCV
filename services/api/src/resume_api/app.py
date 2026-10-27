@@ -329,6 +329,7 @@ def create_app(*, origin: str, secret: str, temp_root: Path, dist: Path, runner:
         gui_projects.request_shutdown()
         rich_projects.request_shutdown()
         agent.request_stop(reason="AGENT_INTERRUPTED")
+        await assistant.shutdown()
         await gui_projects.shutdown()
         await rich_projects.shutdown()
         for identifier in list(project_repository.sessions):
@@ -506,6 +507,13 @@ def create_app(*, origin: str, secret: str, temp_root: Path, dist: Path, runner:
     app.state.agent = agent
     from .agent.routes import mount_agent
     mount_agent(app, agent)
+    # The assistant on the repository (D109); the old agent routes stay mounted until SR06 and the client no longer calls them.
+    from .assistant.runs import AssistantService
+    from .assistant.routes import mount_assistant
+    assistant = AssistantService(projects, resolved_agent_runtime, agent_connection)
+    projects.on_deleted = assistant.project_deleted
+    app.state.assistant = assistant
+    mount_assistant(app, assistant)
     from .jobs.service import JobService
     from .jobs.routes import mount_jobs
 
@@ -1305,6 +1313,7 @@ def create_app(*, origin: str, secret: str, temp_root: Path, dist: Path, runner:
                 connection_epoch += 1
                 epoch = connection_epoch
                 agent.request_stop(reason="AGENT_CONNECTION_CHANGED")
+                assistant.stop_all()
                 if kind == "install":
                     install_task = task
                 else:
@@ -1320,6 +1329,7 @@ def create_app(*, origin: str, secret: str, temp_root: Path, dist: Path, runner:
                         connection.experimental_profile = experimental_profile
                         provider = CodexCliProvider(result, experimental_profile=experimental_profile)
                         agent.runtime = CodexAgentRuntime(connection, temp_root)
+                        assistant.runtime = agent.runtime
                         if epoch == connection_epoch:
                             connection_state = ConnectionPayload(state="unchecked")
                     return connection_response()
@@ -1463,6 +1473,7 @@ def create_app(*, origin: str, secret: str, temp_root: Path, dist: Path, runner:
             gui_projects.request_shutdown()
             rich_projects.request_shutdown()
             agent.request_stop(reason="AGENT_CONNECTION_CHANGED")
+            assistant.stop_all()
         codes = await asyncio.gather(*(stop_connection(task, files, cancel)
                                        for task, (files, cancel) in current),
                                      *(stop_semantic(task, files, cancel)
@@ -1487,6 +1498,7 @@ def create_app(*, origin: str, secret: str, temp_root: Path, dist: Path, runner:
                 provider.invalidate_preflight()
             connection_epoch += 1
             agent.request_stop(reason="AGENT_CONNECTION_CHANGED")
+            assistant.stop_all()
             connection_state = ConnectionPayload(state="login_required", version=connection_state.version)
             files, cancel = connection_work[current]
         code = await stop_connection(current, files, cancel)

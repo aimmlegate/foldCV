@@ -1,0 +1,825 @@
+{
+  "$defs": {
+    "ActionOp": {
+      "additionalProperties": false,
+      "properties": {
+        "action": {
+          "enum": [
+            "rename",
+            "formatting_date",
+            "archive",
+            "restore",
+            "delete"
+          ],
+          "title": "Action",
+          "type": "string"
+        },
+        "op": {
+          "const": "action",
+          "title": "Op",
+          "type": "string"
+        },
+        "targetId": {
+          "anyOf": [
+            {
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Targetid"
+        },
+        "value": {
+          "anyOf": [
+            {
+              "maxLength": 200,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Value"
+        }
+      },
+      "required": [
+        "op",
+        "action"
+      ],
+      "title": "ActionOp",
+      "type": "object"
+    },
+    "CreateFactOp": {
+      "additionalProperties": false,
+      "properties": {
+        "jobId": {
+          "anyOf": [
+            {
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Jobid"
+        },
+        "kind": {
+          "enum": [
+            "candidate",
+            "employment",
+            "technology",
+            "education",
+            "language",
+            "claim",
+            "period"
+          ],
+          "title": "Kind",
+          "type": "string"
+        },
+        "op": {
+          "const": "create_fact",
+          "title": "Op",
+          "type": "string"
+        },
+        "values": {
+          "additionalProperties": {
+            "type": "string"
+          },
+          "maxProperties": 20,
+          "title": "Values",
+          "type": "object"
+        }
+      },
+      "required": [
+        "op",
+        "kind"
+      ],
+      "title": "CreateFactOp",
+      "type": "object"
+    },
+    "DeleteBlocksOp": {
+      "additionalProperties": false,
+      "properties": {
+        "blockIds": {
+          "items": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "maxItems": 100,
+          "minItems": 1,
+          "title": "Blockids",
+          "type": "array"
+        },
+        "op": {
+          "const": "delete_blocks",
+          "title": "Op",
+          "type": "string"
+        }
+      },
+      "required": [
+        "op",
+        "blockIds"
+      ],
+      "title": "DeleteBlocksOp",
+      "type": "object"
+    },
+    "DeleteFactOp": {
+      "additionalProperties": false,
+      "properties": {
+        "op": {
+          "const": "delete_fact",
+          "title": "Op",
+          "type": "string"
+        },
+        "recordId": {
+          "minLength": 1,
+          "title": "Recordid",
+          "type": "string"
+        }
+      },
+      "required": [
+        "op",
+        "recordId"
+      ],
+      "title": "DeleteFactOp",
+      "type": "object"
+    },
+    "FormatBlockOp": {
+      "additionalProperties": false,
+      "properties": {
+        "alignment": {
+          "anyOf": [
+            {
+              "enum": [
+                "left",
+                "center",
+                "right",
+                "justify"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Alignment"
+        },
+        "backgroundColor": {
+          "anyOf": [
+            {
+              "maxLength": 32,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Backgroundcolor"
+        },
+        "blockId": {
+          "minLength": 1,
+          "title": "Blockid",
+          "type": "string"
+        },
+        "kind": {
+          "anyOf": [
+            {
+              "enum": [
+                "paragraph",
+                "heading",
+                "bullet",
+                "numbered"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Kind"
+        },
+        "level": {
+          "anyOf": [
+            {
+              "enum": [
+                1,
+                2,
+                3
+              ],
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Level"
+        },
+        "op": {
+          "const": "format_block",
+          "title": "Op",
+          "type": "string"
+        },
+        "textColor": {
+          "anyOf": [
+            {
+              "maxLength": 32,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Textcolor"
+        }
+      },
+      "required": [
+        "op",
+        "blockId"
+      ],
+      "title": "FormatBlockOp",
+      "type": "object"
+    },
+    "HistoryOp": {
+      "additionalProperties": false,
+      "properties": {
+        "direction": {
+          "enum": [
+            "undo",
+            "redo"
+          ],
+          "title": "Direction",
+          "type": "string"
+        },
+        "op": {
+          "const": "history",
+          "title": "Op",
+          "type": "string"
+        }
+      },
+      "required": [
+        "op",
+        "direction"
+      ],
+      "title": "HistoryOp",
+      "type": "object"
+    },
+    "InlineStyles": {
+      "additionalProperties": false,
+      "properties": {
+        "backgroundColor": {
+          "default": "default",
+          "pattern": "^(default|#[a-fA-F0-9]{6})$",
+          "title": "Backgroundcolor",
+          "type": "string"
+        },
+        "bold": {
+          "default": false,
+          "title": "Bold",
+          "type": "boolean"
+        },
+        "code": {
+          "default": false,
+          "title": "Code",
+          "type": "boolean"
+        },
+        "italic": {
+          "default": false,
+          "title": "Italic",
+          "type": "boolean"
+        },
+        "strike": {
+          "default": false,
+          "title": "Strike",
+          "type": "boolean"
+        },
+        "textColor": {
+          "default": "default",
+          "pattern": "^(default|#[a-fA-F0-9]{6})$",
+          "title": "Textcolor",
+          "type": "string"
+        },
+        "underline": {
+          "default": false,
+          "title": "Underline",
+          "type": "boolean"
+        }
+      },
+      "title": "InlineStyles",
+      "type": "object"
+    },
+    "InsertBlocksOp": {
+      "additionalProperties": false,
+      "properties": {
+        "afterBlockId": {
+          "anyOf": [
+            {
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Afterblockid"
+        },
+        "blocks": {
+          "items": {
+            "$ref": "#/$defs/NewBlock"
+          },
+          "maxItems": 20,
+          "minItems": 1,
+          "title": "Blocks",
+          "type": "array"
+        },
+        "op": {
+          "const": "insert_blocks",
+          "title": "Op",
+          "type": "string"
+        },
+        "parentId": {
+          "anyOf": [
+            {
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Parentid"
+        }
+      },
+      "required": [
+        "op",
+        "blocks"
+      ],
+      "title": "InsertBlocksOp",
+      "type": "object"
+    },
+    "MoveBlockOp": {
+      "additionalProperties": false,
+      "properties": {
+        "afterBlockId": {
+          "anyOf": [
+            {
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Afterblockid"
+        },
+        "blockId": {
+          "minLength": 1,
+          "title": "Blockid",
+          "type": "string"
+        },
+        "op": {
+          "const": "move_block",
+          "title": "Op",
+          "type": "string"
+        },
+        "parentId": {
+          "anyOf": [
+            {
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Parentid"
+        }
+      },
+      "required": [
+        "op",
+        "blockId"
+      ],
+      "title": "MoveBlockOp",
+      "type": "object"
+    },
+    "NewBlock": {
+      "additionalProperties": false,
+      "properties": {
+        "kind": {
+          "default": "paragraph",
+          "enum": [
+            "paragraph",
+            "heading",
+            "bullet",
+            "numbered"
+          ],
+          "title": "Kind",
+          "type": "string"
+        },
+        "level": {
+          "default": 2,
+          "enum": [
+            1,
+            2,
+            3
+          ],
+          "title": "Level",
+          "type": "integer"
+        },
+        "text": {
+          "maxLength": 16000,
+          "title": "Text",
+          "type": "string"
+        }
+      },
+      "required": [
+        "text"
+      ],
+      "title": "NewBlock",
+      "type": "object"
+    },
+    "PreviewEntryV1": {
+      "additionalProperties": false,
+      "properties": {
+        "after": {
+          "maxLength": 16000,
+          "title": "After",
+          "type": "string"
+        },
+        "before": {
+          "maxLength": 16000,
+          "title": "Before",
+          "type": "string"
+        },
+        "label": {
+          "maxLength": 256,
+          "title": "Label",
+          "type": "string"
+        },
+        "target": {
+          "maxLength": 256,
+          "title": "Target",
+          "type": "string"
+        }
+      },
+      "required": [
+        "target",
+        "label",
+        "before",
+        "after"
+      ],
+      "title": "PreviewEntryV1",
+      "type": "object"
+    },
+    "ReplaceTextOp": {
+      "additionalProperties": false,
+      "properties": {
+        "blockId": {
+          "minLength": 1,
+          "title": "Blockid",
+          "type": "string"
+        },
+        "cellId": {
+          "anyOf": [
+            {
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Cellid"
+        },
+        "field": {
+          "default": "content",
+          "enum": [
+            "content",
+            "caption"
+          ],
+          "title": "Field",
+          "type": "string"
+        },
+        "find": {
+          "maxLength": 4000,
+          "minLength": 1,
+          "title": "Find",
+          "type": "string"
+        },
+        "op": {
+          "const": "replace_text",
+          "title": "Op",
+          "type": "string"
+        },
+        "replace": {
+          "maxLength": 4000,
+          "title": "Replace",
+          "type": "string"
+        }
+      },
+      "required": [
+        "op",
+        "blockId",
+        "find",
+        "replace"
+      ],
+      "title": "ReplaceTextOp",
+      "type": "object"
+    },
+    "SetBlockTextOp": {
+      "additionalProperties": false,
+      "properties": {
+        "blockId": {
+          "minLength": 1,
+          "title": "Blockid",
+          "type": "string"
+        },
+        "cellId": {
+          "anyOf": [
+            {
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Cellid"
+        },
+        "field": {
+          "default": "content",
+          "enum": [
+            "content",
+            "caption"
+          ],
+          "title": "Field",
+          "type": "string"
+        },
+        "marks": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/InlineStyles"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "op": {
+          "const": "set_block_text",
+          "title": "Op",
+          "type": "string"
+        },
+        "text": {
+          "maxLength": 16000,
+          "title": "Text",
+          "type": "string"
+        }
+      },
+      "required": [
+        "op",
+        "blockId",
+        "text"
+      ],
+      "title": "SetBlockTextOp",
+      "type": "object"
+    },
+    "UpdateFactOp": {
+      "additionalProperties": false,
+      "properties": {
+        "field": {
+          "minLength": 1,
+          "title": "Field",
+          "type": "string"
+        },
+        "op": {
+          "const": "update_fact",
+          "title": "Op",
+          "type": "string"
+        },
+        "recordId": {
+          "minLength": 1,
+          "title": "Recordid",
+          "type": "string"
+        },
+        "value": {
+          "maxLength": 4000,
+          "title": "Value",
+          "type": "string"
+        }
+      },
+      "required": [
+        "op",
+        "recordId",
+        "field",
+        "value"
+      ],
+      "title": "UpdateFactOp",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "appliedRevision": {
+      "anyOf": [
+        {
+          "minimum": 1,
+          "type": "integer"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "title": "Appliedrevision"
+    },
+    "baseRevision": {
+      "minimum": 1,
+      "title": "Baserevision",
+      "type": "integer"
+    },
+    "conversationId": {
+      "minLength": 1,
+      "title": "Conversationid",
+      "type": "string"
+    },
+    "createdAt": {
+      "maxLength": 64,
+      "minLength": 1,
+      "title": "Createdat",
+      "type": "string"
+    },
+    "expectedActionId": {
+      "anyOf": [
+        {
+          "minLength": 1,
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Expectedactionid"
+    },
+    "id": {
+      "minLength": 1,
+      "title": "Id",
+      "type": "string"
+    },
+    "kind": {
+      "enum": [
+        "edit",
+        "history",
+        "action"
+      ],
+      "title": "Kind",
+      "type": "string"
+    },
+    "ops": {
+      "items": {
+        "discriminator": {
+          "mapping": {
+            "action": "#/$defs/ActionOp",
+            "create_fact": "#/$defs/CreateFactOp",
+            "delete_blocks": "#/$defs/DeleteBlocksOp",
+            "delete_fact": "#/$defs/DeleteFactOp",
+            "format_block": "#/$defs/FormatBlockOp",
+            "history": "#/$defs/HistoryOp",
+            "insert_blocks": "#/$defs/InsertBlocksOp",
+            "move_block": "#/$defs/MoveBlockOp",
+            "replace_text": "#/$defs/ReplaceTextOp",
+            "set_block_text": "#/$defs/SetBlockTextOp",
+            "update_fact": "#/$defs/UpdateFactOp"
+          },
+          "propertyName": "op"
+        },
+        "oneOf": [
+          {
+            "$ref": "#/$defs/SetBlockTextOp"
+          },
+          {
+            "$ref": "#/$defs/ReplaceTextOp"
+          },
+          {
+            "$ref": "#/$defs/InsertBlocksOp"
+          },
+          {
+            "$ref": "#/$defs/DeleteBlocksOp"
+          },
+          {
+            "$ref": "#/$defs/MoveBlockOp"
+          },
+          {
+            "$ref": "#/$defs/FormatBlockOp"
+          },
+          {
+            "$ref": "#/$defs/UpdateFactOp"
+          },
+          {
+            "$ref": "#/$defs/CreateFactOp"
+          },
+          {
+            "$ref": "#/$defs/DeleteFactOp"
+          },
+          {
+            "$ref": "#/$defs/HistoryOp"
+          },
+          {
+            "$ref": "#/$defs/ActionOp"
+          }
+        ]
+      },
+      "maxItems": 100,
+      "title": "Ops",
+      "type": "array"
+    },
+    "preview": {
+      "items": {
+        "$ref": "#/$defs/PreviewEntryV1"
+      },
+      "maxItems": 200,
+      "title": "Preview",
+      "type": "array"
+    },
+    "projectId": {
+      "minLength": 1,
+      "title": "Projectid",
+      "type": "string"
+    },
+    "runId": {
+      "minLength": 1,
+      "title": "Runid",
+      "type": "string"
+    },
+    "schemaVersion": {
+      "const": 1,
+      "title": "Schemaversion",
+      "type": "integer"
+    },
+    "state": {
+      "enum": [
+        "draft",
+        "applied",
+        "discarded"
+      ],
+      "title": "State",
+      "type": "string"
+    },
+    "summary": {
+      "maxLength": 2000,
+      "title": "Summary",
+      "type": "string"
+    },
+    "touched": {
+      "additionalProperties": {
+        "pattern": "^[a-f0-9]{64}$",
+        "type": "string"
+      },
+      "maxProperties": 500,
+      "title": "Touched",
+      "type": "object"
+    },
+    "updatedAt": {
+      "maxLength": 64,
+      "minLength": 1,
+      "title": "Updatedat",
+      "type": "string"
+    }
+  },
+  "required": [
+    "schemaVersion",
+    "id",
+    "projectId",
+    "conversationId",
+    "runId",
+    "kind",
+    "summary",
+    "baseRevision",
+    "touched",
+    "ops",
+    "preview",
+    "state",
+    "appliedRevision",
+    "createdAt",
+    "updatedAt"
+  ],
+  "title": "AssistantChangeProposalV1",
+  "type": "object"
+}

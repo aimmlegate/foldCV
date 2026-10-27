@@ -2,30 +2,8 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
-import fixture from "../../../tests/fixtures/rich_workspace.json" with { type: "json" };
-import type { AgentFinding } from "../src/contracts/generated/agent_finding";
-import type { RichProjectResponse } from "../src/contracts/generated/rich_project_response";
-import { validateRichWorkspaceShape } from "../src/rich/validate";
-import { documentCells } from "../src/rich/document-cells";
-import { factCells } from "../src/rich/fact-cells";
-import type { RichBlock } from "../src/rich/save-queue";
-import { anchorCurrent, drawerSize, sourceUrl, submitKey } from "../src/assistant/presentation";
+import { drawerSize, sourceUrl, submitKey } from "../src/assistant/presentation";
 import { MessageText } from "../src/assistant/MessageText";
-
-test("assistant findings reject changed revisions and unsaved target cells without matching text", () => {
-  const workspace: unknown = structuredClone(fixture); assert.ok(validateRichWorkspaceShape(workspace)); assert.ok(workspace.project);
-  const response: RichProjectResponse = { workspace, durability: "durable", savedProjectRevision: 1, savedDocumentRevision: 1, saveError: null, generation: null };
-  const flatten = (items: RichBlock[]): RichBlock[] => items.flatMap(item => [item, ...flatten(item.children)]);
-  const block = workspace.project.document.regions.flatMap(region => flatten(region.blocks)).find(item => item.id === "narrative"); assert.ok(block);
-  const anchor: AgentFinding["anchors"][number] = { blockId: block.id, cellId: null, recordId: null, fieldKey: null, start: 0, end: 6,
-    text: "Python", dependencies: [{ kind: "block", id: block.id, revision: block.revision, fingerprint: "a".repeat(64) }] };
-  const cells = new Map([...documentCells(workspace.project.document, new Map()), ...factCells(workspace.project.facts)]);
-  assert.ok(anchorCurrent(anchor, response, cells));
-  cells.set("block:unrelated", "Manual text"); assert.ok(anchorCurrent(anchor, response, cells));
-  cells.set("block:narrative", "Changed Python"); assert.equal(anchorCurrent(anchor, response, cells), false);
-  assert.equal(anchorCurrent({ ...anchor, blockId: "missing" }, response, cells), false);
-  block.revision++; assert.equal(anchorCurrent(anchor, response, cells), false);
-});
 
 test("assistant message markup stays plain text and stored source URLs reject active schemes", () => {
   const html = renderToStaticMarkup(createElement(MessageText, { text: '<img src="https://unretrieved.example/pixel"> [link](https://unretrieved.example) https://unretrieved.example', truncated: false, error: null }));

@@ -1,5 +1,10 @@
 export type CellValue = string | null;
 export type CellChange = { key: string; before: CellValue; after: CellValue };
+
+export function cellChanges(before: ReadonlyMap<string, CellValue>, after: ReadonlyMap<string, CellValue>): CellChange[] {
+  return [...new Set([...before.keys(), ...after.keys()])].filter(key => !key.startsWith("request:"))
+    .map(key => ({ key, before: before.get(key) ?? null, after: after.get(key) ?? null })).filter(change => change.before !== change.after);
+}
 export type HistoryKind = "typing" | "composition" | "structure" | "panel" | "rewrite" | "cascade";
 type Action = { id: string; token: number; kind: HistoryKind; group: string | null; changes: CellChange[]; lastNavigationToken: number };
 export type DependencyCapture = {

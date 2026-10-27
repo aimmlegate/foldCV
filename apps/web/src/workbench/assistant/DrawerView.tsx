@@ -1,22 +1,19 @@
 import { errorMessage } from "../../errors/messages";
 import { useEffect, useRef, useState, type RefObject } from "react";
-import type { AgentFinding } from "../../contracts/generated/agent_finding";
 import { Icon } from "../ui/Icon";
 import { Composer, type ComposerProps } from "./Composer";
-import type { AgentProjectOperations } from "../../contracts/generated/agent_project_operations";
 import { Transcript } from "./Transcript";
 import { currentActivity } from "./activity";
 import { Elapsed, OperationStatus, Spinner } from "../ui/OperationStatus";
-import { Capabilities } from "../../assistant/Capabilities";
-import { ProposalPreview, proposalKey } from "../../assistant/proposal";
-import type { AssistantProposalV1 } from "../../contracts/generated/assistant_proposal_v1";
+import { ProposalPreview } from "../../assistant/proposal";
+import type { Proposal } from "../../assistant/api";
+import type { AssistantFinding } from "../../assistant/controller";
 
 export function DrawerView(props: ComposerProps & { collapsed: boolean; expanded: boolean; toggle: () => void; expand: () => void;
   log: RefObject<HTMLDivElement | null>; failure: string | null; fence: string | null;
-  select: (id: string) => void; fresh: () => void; more: () => void; older: () => void;
-  resource: (kind: "sources" | "findings", id: string) => void; focus: (anchor: AgentFinding["anchors"][number]) => boolean;
-  operations?: AgentProjectOperations["items"]; applyProposal?: (value: AssistantProposalV1) => void;
-  discardProposal?: (value: AssistantProposalV1) => void; continueProposal?: (value: AssistantProposalV1) => void }) {
+  select: (id: string) => void; fresh: () => void;
+  resource: (kind: "sources" | "findings", id: string) => void; focus: (anchor: AssistantFinding["anchors"][number]) => boolean;
+  applyProposal: (value: Proposal) => void; discardProposal: (value: Proposal) => void }) {
   const { view, active, collapsed, expanded, toggle, expand } = props;
   const [threads, setThreads] = useState(false), menu = useRef<HTMLDivElement>(null), trigger = useRef<HTMLButtonElement>(null);
   const wasCollapsed = useRef(collapsed);
@@ -42,23 +39,16 @@ export function DrawerView(props: ComposerProps & { collapsed: boolean; expanded
       {threads && <div className="chat-thread-menu" id="chat-threads" ref={menu} onKeyDown={event => { if (event.key === "Escape") { event.stopPropagation(); setThreads(false); trigger.current?.focus(); } }}><span>Диалоги по этому резюме</span>
         <button disabled={view.submitting} onClick={() => { props.fresh(); setThreads(false); }}><Icon name="plus" /><span>Новый диалог</span></button>
         {view.conversations.map(item => <button key={item.id} disabled={view.submitting} aria-current={view.conversationId === item.id ? "true" : undefined}
-          onClick={() => { props.select(item.id); setThreads(false); }}><Icon name="chat" /><span>{item.title || "Пустой диалог"}</span></button>)}
-        {view.conversationCursor && <button onClick={props.more}>Ещё диалоги</button>}</div>}
-      {view.taskCatalog && <Capabilities catalog={view.taskCatalog} busy={active} choose={props.draft} />}
+          onClick={() => { props.select(item.id); setThreads(false); }}><Icon name="chat" /><span>{item.title || "Пустой диалог"}</span></button>)}</div>}
       <div ref={props.log} className="chat-messages" role="log" aria-live="off" aria-busy={active}>
         <p className="visually-hidden" role="status" aria-live="polite">{currentActivity(view, active)}</p>
-        {view.messageCursor && <button className="text-button" onClick={props.older}>Ранее в диалоге</button>}
         <Transcript view={view} active={active} resource={props.resource} focus={props.focus} draft={props.draft} />
-        {view.taskCatalog?.protocolEnabled && view.proposals?.map(value => <ProposalPreview key={value.id} value={value}
-          catalog={view.taskCatalog} busy={active || !!view.proposalBusy} invalidated={view.reviewInvalidated?.includes(proposalKey(value)) ?? false}
-          continuation={view.continuations?.[proposalKey(value)]} continueDraft={() => props.continueProposal?.(value)}
-          stage={view.reviewAvailability?.[proposalKey(value)]}
-          action={view.reviewActions?.[proposalKey(value)]}
-          allowEdits={view.flags.allowEdits} apply={() => props.applyProposal?.(value)} discard={() => props.discardProposal?.(value)} />)}
-        {view.outcome && <p className="chat-load-status" role="status">{view.outcome.reason}</p>}
+        {view.proposals.map(value => <ProposalPreview key={value.id} value={value} busy={active || view.proposalBusy !== null}
+          stale={view.staleProposals.includes(value.id)} allowEdits={view.flags.allowEdits}
+          apply={() => props.applyProposal(value)} discard={() => props.discardProposal(value)} />)}
         {view.loading && <div className="chat-load-status"><OperationStatus label={view.loading} /></div>}
-        {props.operations?.filter(item => item.durable && item.downloadUrl).map(item => <p key={item.id} className="chat-project-file">
-          <a href={item.downloadUrl ?? ""} download={item.action === "export_docx" ? "resume.docx" : "resume.foldcv"}>{item.action === "export_docx" ? "Скачать DOCX" : "Скачать .foldcv"}</a></p>)}
+        {view.files.map(file => <p key={file.id} className="chat-project-file">
+          <a href={file.url} download={file.filename}>{file.format === "docx" ? "Скачать DOCX" : "Скачать .foldcv"}</a></p>)}
         {props.failure && <p className="chat-error" role="alert">{errorMessage(props.failure)}</p>}{props.fence && <p className="chat-error" role="alert">{errorMessage(props.fence)}</p>}
       </div><Composer {...props} /></div>}
   </section>;

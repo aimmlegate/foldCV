@@ -1,0 +1,98 @@
+{
+  "$defs": {
+    "AssistantErrorV1": {
+      "additionalProperties": false,
+      "properties": {
+        "code": {
+          "pattern": "^[A-Z][A-Z0-9_]{1,63}$",
+          "title": "Code",
+          "type": "string"
+        },
+        "detail": {
+          "items": {
+            "type": "string"
+          },
+          "maxItems": 20,
+          "title": "Detail",
+          "type": "array"
+        }
+      },
+      "required": [
+        "code"
+      ],
+      "title": "AssistantErrorV1",
+      "type": "object"
+    },
+    "ModelChoiceV1": {
+      "additionalProperties": false,
+      "properties": {
+        "model": {
+          "maxLength": 80,
+          "title": "Model",
+          "type": "string"
+        },
+        "state": {
+          "enum": [
+            "unverified",
+            "verified",
+            "incompatible"
+          ],
+          "title": "State",
+          "type": "string"
+        }
+      },
+      "required": [
+        "model",
+        "state"
+      ],
+      "title": "ModelChoiceV1",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "models": {
+      "items": {
+        "$ref": "#/$defs/ModelChoiceV1"
+      },
+      "maxItems": 100,
+      "title": "Models",
+      "type": "array"
+    },
+    "ready": {
+      "title": "Ready",
+      "type": "boolean"
+    },
+    "tools": {
+      "items": {
+        "type": "string"
+      },
+      "maxItems": 32,
+      "title": "Tools",
+      "type": "array"
+    },
+    "unavailable": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/AssistantErrorV1"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "webAvailable": {
+      "title": "Webavailable",
+      "type": "boolean"
+    }
+  },
+  "required": [
+    "ready",
+    "unavailable",
+    "models",
+    "webAvailable",
+    "tools"
+  ],
+  "title": "AssistantCapabilitiesV1",
+  "type": "object"
+}

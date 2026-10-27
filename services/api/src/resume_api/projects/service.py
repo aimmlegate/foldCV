@@ -168,6 +168,9 @@ class ProjectService:
             raise RepositoryFailure('REQUEST_IN_PROGRESS')
         entry = self.repository.delete(project_id)
         self.tasks.forget(project_id)
+        deleted = getattr(self, 'on_deleted', None)
+        if deleted is not None:
+            deleted(project_id)
         rich = getattr(self, 'rich', None)
         if rich is not None:
             rich.workspaces.pop(project_id, None)

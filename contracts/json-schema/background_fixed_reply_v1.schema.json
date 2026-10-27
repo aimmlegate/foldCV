@@ -210,8 +210,10 @@
           "activity.updated": "#/$defs/ActivityEvent",
           "edit.offered": "#/$defs/EditEvent",
           "edit.result": "#/$defs/EditEvent",
+          "file.ready": "#/$defs/ResourceEvent",
           "finding.ready": "#/$defs/ResourceEvent",
           "message.delta": "#/$defs/MessageDelta",
+          "proposal.ready": "#/$defs/ResourceEvent",
           "run.state_changed": "#/$defs/RunStateEvent",
           "source.ready": "#/$defs/ResourceEvent",
           "tool.completed": "#/$defs/ToolEvent",
@@ -1532,7 +1534,9 @@
         "type": {
           "enum": [
             "source.ready",
-            "finding.ready"
+            "finding.ready",
+            "proposal.ready",
+            "file.ready"
           ],
           "title": "Type",
           "type": "string"

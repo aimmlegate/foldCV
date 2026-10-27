@@ -1,7 +1,7 @@
 import { errorMessage } from "../../errors/messages";
 import { lazy, Suspense, useCallback, useEffect, useState } from "react";
 import { ConnectionWorkflow, type ConnectionView } from "../../connection/workflow";
-import { AgentBrowserApi } from "../../assistant/api";
+import { assistantSettings, saveAssistantSettings } from "../../assistant/api";
 import { preferencesRequest, rulesRequest, saveRulesRequest, saveImportModelRequest, saveFallbackModelRequest, saveLimitsRequest, saveRewriteReasoningRequest } from "../../api/client";
 import { SettingsDrafts, limitRanges, type SettingsPart, type SettingsState } from "./drafts";
 import { Connection } from "./Connection";
@@ -26,9 +26,8 @@ export function Settings({ close, connectionChanged, paneOrder, changePaneOrder 
   const [workflow] = useState(() => new ConnectionWorkflow(value => { setView(value); connectionChanged(value); }));
   const [state, setState] = useState<SettingsState | null>(null);
   const [controller] = useState(() => {
-    const api = new AgentBrowserApi("");
-    return new SettingsDrafts({ preferences: () => preferencesRequest(), rules: rulesRequest, assistant: () => api.settings(),
-      analysis: enabled => preferencesRequest(enabled), saveRules: saveRulesRequest, saveAssistant: value => api.saveSettings(value),
+    return new SettingsDrafts({ preferences: () => preferencesRequest(), rules: rulesRequest, assistant: () => assistantSettings(),
+      analysis: enabled => preferencesRequest(enabled), saveRules: saveRulesRequest, saveAssistant: value => saveAssistantSettings(value),
       selectImport: saveImportModelRequest, selectFallback: saveFallbackModelRequest, saveReasoning: saveRewriteReasoningRequest, saveLimits: saveLimitsRequest,
       select: async model => {
         if (!model || !workflow.view.snapshot.metadataReady || !workflow.view.snapshot.models.includes(model)) throw new Error("MODEL_UNAVAILABLE");
