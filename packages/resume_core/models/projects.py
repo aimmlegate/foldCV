@@ -7,7 +7,7 @@ from typing import Literal
 from pydantic import Field
 
 from .contracts import Id, Revision, Sha256, Wire
-from .template_authoring import ClipboardSelection, TemplateEditPreparationV1
+from .template_authoring import AuthoredRange, ClipboardSelection, TemplateEditPreparationV1
 from .template_render import TemplateSnapshotIdentity
 from ..template_api import TemplateProjectResponseV1
 
@@ -76,6 +76,19 @@ class ClipboardCaptureRequestV1(Wire):
     selection: ClipboardSelection
 
 
+class RewritePreviewRequestV1(Wire):
+    editor_token: str = Field(min_length=1, max_length=128)
+    request_id: Id
+    snapshot: TemplateSnapshotIdentity
+    range: AuthoredRange
+    instruction: str = Field(min_length=1, max_length=8000)
+
+
+class RewriteCancelRequestV1(Wire):
+    editor_token: str = Field(min_length=1, max_length=128)
+    request_id: Id
+
+
 class RevisionConflictV1(Wire):
     """The body of a 409 for a stale base: the client drops what was applied and re-issues or reports the rest."""
     error: dict
@@ -104,6 +117,8 @@ PROJECT_CONTRACTS = {
     'revision_conflict_v1': RevisionConflictV1,
     'rename_request_v1': RenameRequestV1,
     'delete_request_v1': DeleteRequestV1,
+    'rewrite_preview_request_v1': RewritePreviewRequestV1,
+    'rewrite_cancel_request_v1': RewriteCancelRequestV1,
 }
 
 

@@ -77,20 +77,22 @@ def application(root, scenario):
         wake_publication=lambda _project: None)
     app = FastAPI()
     mount_writers(app, service)
+    from packages.resume_core.project_repository import ProjectRepository
+    from resume_api.projects.service import ProjectService
+    from resume_api.projects.routes import mount_projects_v2
+    repository = ProjectRepository(fixture.canonical.root)
+    projects = ProjectService(repository)
+    projects.rewrite_text, projects.rewrite_cancel = rewrites.text, rewrites.cancel
+    mount_projects_v2(app, projects)
 
     @app.post('/harness/advance')
     async def advance():
         # An outside metadata-only canonical advance, as an export record makes; the document is unchanged.
-        from packages.resume_core.background_history import digest_bytes
-        from packages.resume_core.models.template_workspace import WorkspaceV7
-        before = fixture.canonical.read_committed(fixture.project)[0]
-        data = before.model_dump(by_alias=True)
-        data['projectRevision'] += 1
-        data['project']['revision'] += 1
-        data['updatedAt'] = '2026-10-21T00:00:01Z'
-        saved, _duplicate = fixture.publisher.snapshot(fixture.project, digest_bytes(before), WorkspaceV7.model_validate(data),
-            'metadata_harness_' + str(data['projectRevision']), originals=fixture.originals)
-        return {'projectRevision': saved.project_revision}
+        before = repository.read(fixture.project)
+        after = before.model_copy()
+        after.updated_at = '2026-10-21T00:00:01Z'
+        saved = repository.replace(fixture.project, base_revision=before.project_revision, workspace=after)
+        return {'projectRevision': saved.revision}
 
     @app.post('/harness/expire-lease')
     async def expire_lease():
@@ -102,6 +104,8 @@ def application(root, scenario):
     async def restart():
         # A service restart: in-memory leases are gone and every open writer must recover.
         fixture.writers.recover_all()
+        for project in list(repository.sessions):
+            repository.close(project)
         return {}
 
     @app.get('/harness/rewrites')

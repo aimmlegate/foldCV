@@ -24,6 +24,10 @@ def mount_errors(app):
     from packages.resume_core.project_repository import RepositoryFailure
     from packages.resume_core.project_tasks import TaskFailure
 
+    @app.exception_handler(ProjectFailure)
+    async def project_failure(_request: Request, error: ProjectFailure):
+        return failure_response(error.code, error.status, error.details)
+
     @app.exception_handler(RepositoryFailure)
     async def repository_failure(_request: Request, error: RepositoryFailure):
         return failure_response(error.code, STATUS.get(error.code, 409), error.details)

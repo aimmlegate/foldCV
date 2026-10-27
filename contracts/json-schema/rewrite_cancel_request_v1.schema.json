@@ -1,0 +1,22 @@
+{
+  "additionalProperties": false,
+  "properties": {
+    "editorToken": {
+      "maxLength": 128,
+      "minLength": 1,
+      "title": "Editortoken",
+      "type": "string"
+    },
+    "requestId": {
+      "minLength": 1,
+      "title": "Requestid",
+      "type": "string"
+    }
+  },
+  "required": [
+    "editorToken",
+    "requestId"
+  ],
+  "title": "RewriteCancelRequestV1",
+  "type": "object"
+}

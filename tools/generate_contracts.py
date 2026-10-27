@@ -52,6 +52,7 @@ from packages.resume_core.models.template_writer import TEMPLATE_WRITER_CONTRACT
 from packages.resume_core.models.template_authoring import TEMPLATE_AUTHORING_CONTRACTS
 from packages.resume_core.models.canonical_patch import CanonicalPatchV1
 from packages.resume_core.models.template_delta import TemplatePreparedEditDeltaV1
+from packages.resume_core.models.projects import PROJECT_CONTRACTS
 
 OUT = ROOT / "contracts" / "json-schema"
 RICH_CONTRACTS = {
@@ -87,6 +88,7 @@ TEMPLATE_CONTRACTS = {
 RECOVERY_MODELS = {**RECOVERY_CONTRACTS, **GUI_NORMALIZATION_CONTRACTS, **GUI_DRAFT_CONTRACTS, **GUI_PROJECT_CONTRACTS, **GUI_REWRITE_CONTRACTS, **GUI_EXPORT_CONTRACTS, **GUI_RECONCILE_CONTRACTS, **RICH_CONTRACTS, **AGENT_CONTRACTS, **ASSISTANT_CAPABILITY_CONTRACTS, **ASSISTANT_PROPOSAL_CONTRACTS, **ASSISTANT_APPROVAL_CONTRACTS, **ASSISTANT_ACTION_CONTRACTS, **BACKGROUND_CONTRACTS, "cli_installation_payload": CliInstallationPayload, **TEMPLATE_CONTRACTS}
 RECOVERY_MODELS.update(ASSISTANT_HISTORY_CONTRACTS)
 RECOVERY_MODELS.update(ASSISTANT_CONTINUATION_CONTRACTS)
+RECOVERY_MODELS.update(PROJECT_CONTRACTS)
 
 
 def main() -> None:

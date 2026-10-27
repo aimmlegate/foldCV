@@ -303,7 +303,7 @@ class ProjectRepository:
             if existing is not None:
                 return existing
             self.sessions[project_id] = session
-            self._evict()
+            self._evict(keep=project_id)
             return session
 
     def _load(self, project_id):
@@ -349,12 +349,12 @@ class ProjectRepository:
             row.resulting_revision, 'edit', replayed=True)) for row in session.workspace.mutation_replay[-REPLAY_WINDOW:])
         session.occupied_ids = existing_ids(session.workspace)
 
-    def _evict(self):
+    def _evict(self, *, keep):
         """Close least recently used sessions above the limit; a session with a held lock or a pin stays open."""
         for identifier, session in list(self.sessions.items()):
             if len(self.sessions) <= self.open_limit:
                 return
-            if session.pins or not session.lock.acquire(blocking=False):
+            if identifier == keep or session.pins or not session.lock.acquire(blocking=False):
                 continue
             try:
                 self._close(session)

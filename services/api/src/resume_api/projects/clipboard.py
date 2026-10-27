@@ -16,11 +16,11 @@ from .errors import ProjectFailure
 
 def capture(service, project_id, request):
     session = service.repository.open(project_id)
-    session.require_editor(request.editor_token)
     fingerprint = digest_request({'snapshot': request.snapshot.model_dump(mode='json', by_alias=True),
         'selection': request.selection.model_dump(mode='json', by_alias=True)})
     identifier = 'clipboard-' + sha256(canonical(['FoldCV clipboard v2', project_id, request.client_capture_id]))
     with session.lock:
+        session.require_editor(request.editor_token)
         retained = session.clipboard.get(identifier)
         if retained is not None:
             if retained.request_hash != fingerprint:

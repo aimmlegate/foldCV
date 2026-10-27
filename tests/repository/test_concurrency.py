@@ -106,3 +106,23 @@ def test_an_outside_write_is_adopted_instead_of_overwritten(tmp_path):
         edit(repo, 'Late', identifier='edit-2', base=2)
     assert refused.value.code == 'REVISION_CONFLICT' and refused.value.details['revision'] == 5
     assert repo.read(PROJECT).title == 'Written elsewhere' and repo.open(PROJECT).journal.state()['undo'] is None
+
+
+def test_a_new_editor_keeps_its_token_when_all_older_sessions_are_pinned(tmp_path):
+    import hashlib
+    from tests.templates.storage_fixtures import workspace as papers
+    repo = repository(tmp_path)
+    repo.open_limit = 1
+    other, sources = papers()
+    data = other.model_dump(by_alias=True)
+    data['projectId'] = data['project']['projectId'] = 'new-project'
+    other = type(other).model_validate(data)
+    with repo.pinned(PROJECT):
+        opened = repo.create(other, blobs=[('sources', key, raw, hashlib.sha256(raw).hexdigest()) for key, raw in sources.items()])
+        token = opened.open_editor()
+        current = repo.open('new-project')
+        current.require_editor(token)
+        assert current is opened
+        repo.mutate('new-project', base_revision=1, client_mutation_id='new-edit', request_sha256='a' * 64,
+            action_id='new-action', kind='edit', build=typing('Still open', identifier='new-edit'))
+        assert text_of(repo.read('new-project')) == 'Still open'

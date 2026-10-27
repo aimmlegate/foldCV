@@ -30,8 +30,13 @@ def block_changes(before, after, op_id):
 
 
 def edit(service, project_id, request):
+    session = service.repository.open(project_id)
+    with session.lock:
+        return _edit_locked(service, project_id, request, session)
+
+
+def _edit_locked(service, project_id, request, session):
     repository = service.repository
-    session = repository.open(project_id)
     session.require_editor(request.editor_token)
     service.require_writable(project_id)
     preparation = request.preparation
@@ -61,8 +66,13 @@ def edit(service, project_id, request):
 
 
 def history(service, project_id, request):
+    session = service.repository.open(project_id)
+    with session.lock:
+        return _history_locked(service, project_id, request, session)
+
+
+def _history_locked(service, project_id, request, session):
     repository = service.repository
-    session = repository.open(project_id)
     session.require_editor(request.editor_token)
     service.require_writable(project_id)
     outcome = repository.history(project_id, direction=request.direction, base_revision=request.base_revision,

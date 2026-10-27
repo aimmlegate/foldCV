@@ -4,8 +4,8 @@ import pytest
 
 from packages.resume_core.agent_edits import semantic
 from packages.resume_core.models.template_authoring import TemplateEditPreparationV1
-from packages.resume_core.models.template_document import FieldOccurrence, PresentedText, TemplateParagraphBlock
-from packages.resume_core.models.rich_facts import WorkingPeriod
+from packages.resume_core.models.template_document import FieldOccurrence, PresentedText, TemplateParagraphBlock, TemplateSectionBlock
+from packages.resume_core.models.rich_facts import TechnologyRecord, TextField, WorkingPeriod
 from packages.resume_core.models.template_workspace import WorkspaceV7
 from packages.resume_core.models.template_writer import WriterPrepareEditV2
 from packages.resume_core.rich_archive import export_rich_archive, open_rich_archive
@@ -102,6 +102,101 @@ def test_unchanged_panel_input_is_a_true_noop_without_issue_retirement():
     result=prepared(before,panel(before,values={'employer':record.employer.raw_text}))
     assert result.mutation is None and result.created_ids=={'panel':{}}
     assert result.preview.workspace==before and result.preview.durability=='durable'
+
+
+def _named(name):
+    return TextField(value=name,rawText=name,status='known',revision=1,pendingRawText=None)
+
+
+def _technology(identifier,name,job):
+    text=_named(name)
+    return TechnologyRecord(id=identifier,kind='technology',revision=1,origin='user',evidence=[],
+        jobId=job,subprojectId=None,display=text,canonicalId=text.model_copy(update={'value':name.lower()}))
+
+
+def _span(record,presentation,suffix):
+    root=record.id+suffix+'-root'
+    return FieldOccurrence(type='fact_field',bindingId=record.id+suffix+'-fragment',bindingRootId=root,
+        recordId=record.id,fieldKey='display',cellId=field_key(record.id,'display'),occurrenceId=root,complete=True,
+        presentation=presentation,text=record.display.raw_text,styles={},syncedFactRevision=1)
+
+
+def _line(identifier,records,presentation,prefix='',suffix=''):
+    content=[]
+    if prefix:
+        content.append(PresentedText(type='text',text=prefix,styles={},presentation=presentation))
+    for record in records:
+        if any(isinstance(span,FieldOccurrence) for span in content):
+            content.append(PresentedText(type='text',text=', ',styles={},presentation=presentation))
+        content.append(_span(record,presentation,suffix))
+    return TemplateParagraphBlock(type='paragraph',id=identifier,revision=1,props={},children=[],
+        content=content,provenance=[],presentation=presentation)
+
+
+def technology_workspace():
+    before,_sources=scoped_workspace()
+    presentation=before.project.document.regions[2].blocks[0].presentation
+    records=[_technology(name,label,'employer-a') for name,label in
+        (('python','Python'),('postgres','PostgreSQL'),('docker','Docker'))]
+    other=_technology('go','Go','employer-b')
+    hidden=_technology('rust','Rust','employer-a')
+    before.project.facts.records.extend([*records,other,hidden])
+    focus=_line('focus-line',[records[0],records[2]],presentation,suffix='-focus')
+    before.project.document.regions[2].blocks.extend([
+        _line('tool-line',records,presentation,prefix='Tools: ',suffix='-job'),
+        TemplateSectionBlock(type='section',id='focus-tools',revision=1,props={'recordId':None,'presentation':'focus'},
+            content=[],children=[focus],provenance=[],presentation=presentation),
+        _line('other-tools',[other],presentation,suffix='-other')])
+    return WorkspaceV7.model_validate(before.model_dump(by_alias=True))
+
+
+def move(before,record_id,before_id,identifier='panel-move'):
+    capture={'sessionId':'session','actionId':identifier,'actionToken':1,'dependencies':[]}
+    command={'operation':'move_technology','recordId':record_id,'recordKind':'technology','jobId':None,'periodId':None,
+        'values':{},'factsRevision':before.project.facts.revision,'documentRevision':before.document_revision,'capture':capture}
+    if before_id is not None:
+        command['beforeRecordId']=before_id
+    return TemplateEditPreparationV1(schemaVersion=1,clientMutationId=identifier,snapshot=response(before).snapshot,
+        capture=capture,operations=[{'kind':'builtin_panel','opId':'panel','command':command}])
+
+
+def _chips(before,identifier):
+    block=next(value for value in before.project.document.blocks() if value.id==identifier)
+    return [span.text if isinstance(span,FieldOccurrence) else span.text for span in block.content]
+
+
+def test_technology_reorder_moves_one_job_list_and_undoes():
+    before=technology_workspace()
+    result=prepared(before,move(before,'docker','python'))
+    current=result.preview.workspace
+    assert _chips(current,'tool-line')==['Tools: ','Docker',', ','Python',', ','PostgreSQL']
+    assert _chips(current,'focus-line')==['Python',', ','Docker']
+    assert _chips(current,'other-tools')==['Go']
+    assert [record.display.raw_text for record in current.project.facts.records if record.kind=='technology']==[
+        'Python','PostgreSQL','Docker','Go','Rust']
+    assert [value.state for value in current.project.import_issues]==['active','active']
+    restore(before,result)
+    ended=prepared(before,move(before,'python',None,identifier='panel-move-end'))
+    assert _chips(ended.preview.workspace,'tool-line')==['Tools: ','PostgreSQL',', ','Docker',', ','Python']
+    restore(before,ended)
+
+
+def test_technology_reorder_already_in_place_is_a_noop():
+    before=technology_workspace()
+    result=prepared(before,move(before,'python','postgres'))
+    assert result.mutation is None and result.preview.workspace==before
+
+
+def test_technology_reorder_rejects_another_job_or_a_list_that_does_not_contain_both():
+    before=technology_workspace()
+    raw=canonical(before)
+    with pytest.raises(ValueError,match='TECHNOLOGY_MOVE_INVALID'):
+        prepare_edit(response(before),move(before,'docker','go'))
+    with pytest.raises(ValueError,match='TECHNOLOGY_MOVE_INVALID'):
+        prepare_edit(response(before),move(before,'rust','python'))
+    with pytest.raises(ValueError,match='TECHNOLOGY_TARGET_MISSING'):
+        prepare_edit(response(before),move(before,'docker','rust'))
+    assert canonical(before)==raw
 
 
 def test_period_endpoint_switch_updates_every_binding_identity_and_preserves_authored_marks():

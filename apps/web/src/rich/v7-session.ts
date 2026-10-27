@@ -1,21 +1,17 @@
 import { selectedFragmentToHTML, type BlockNoteEditor } from "@blocknote/core";
 import { Plugin, PluginKey, TextSelection, type Transaction } from "@tiptap/pm/state";
 import type { EditorView } from "@tiptap/pm/view";
-import type { AttachedTemplateWriter } from "../background/connection";
-import { TemplateBackgroundWriter, type TemplateDraftQueue } from "../background/template-writer";
-import type { WriterMode } from "../background/writer-lifecycle";
+import { ProjectEditorConnection, ProjectApiFailure, pendingStore, type PendingNavigation, type PendingRecord, type PendingStore } from "./v7-connection";
 import type { RichDocumentV2, TemplateProjectResponseV1 } from "../contracts/generated/template_project_response_v1";
-import { jsonWireAt } from "../contracts/lossless-json";
-import { contentText, responseBlocks } from "../contracts/template-address";
-import { templateProjectWire } from "../contracts/template-validate";
+import { contentText, responseBlocks } from "./v7-response";
 import { errorMessage } from "../errors/messages";
 import { projectRegionChildren } from "../workbench/editor/regions";
 import { SessionHistory, type HistoryKind, type HistoryReservation } from "./history";
-import { RichSaveQueue, type TemplateAdoption, type TemplateQueueState } from "./save-queue";
+import { RichSaveQueue, type TemplateAdoption, type TemplateQueueState, type TemplateQueuedIntent } from "./save-queue";
 import { restoreTableIdentities } from "./table-identity";
 import type { templateSchema } from "./template-schema";
-import { blockAt, containerText, copySource, correctionOperation, extractOperations, foldComposition, insertionAt, mergeAt, placementOf,
-  itemContaining, replacementAt, selectedBlocks, showText, splitAt, textPoint, textPosition, type ExtractedOperation, type TextPoint } from "./v7-extraction";
+import { blockAt, copySource, correctionOperation, extractOperations, foldComposition, insertionAt, mergeAt, placementOf,
+  itemContaining, replacementAt, selectedBlocks, splitAt, textPoint, textPosition, type ExtractedOperation, type TextPoint } from "./v7-extraction";
 import { wireMarks } from "./inline";
 import type { PanelCommand } from "./synchronization";
 import { employmentPanelCommands } from "./v7-panel";
@@ -23,12 +19,13 @@ import { projectTemplateBlock, templateTableIdentities } from "./v7-projection";
 import { clipboardSelection, containerKey, correctionRange, verifiedRange, type ClipboardSource, type LocalContainer, type Placement,
   type V7Intent, type V7Operation } from "./v7-translation";
 
+export type EditorMode = "normal" | "recovering" | "read_only" | "detached" | "closed";
 type Schema = typeof templateSchema;
 export type TemplateEditor = BlockNoteEditor<Schema["blockSchema"], Schema["inlineContentSchema"], Schema["styleSchema"]>;
 export type TemplateSessionPort = {
   status: (text: string) => void;
   warning: (text: string) => void;
-  mode: (mode: WriterMode) => void;
+  mode: (mode: EditorMode) => void;
   /** The verified canonical state now shown in the editor. */
   shown: (response: TemplateProjectResponseV1) => void;
 };
@@ -44,7 +41,6 @@ export type TemplateRewrite = { requestId: string; instruction: string; containe
 
 /** Binds one BlockNote editor to the shared V7 queue, writer and server-retained SessionHistory. */
 export class TemplateEditorSession {
-  readonly writer: TemplateBackgroundWriter;
   readonly queue: RichSaveQueue;
   readonly history: SessionHistory;
   readonly plugin: Plugin;
@@ -58,7 +54,6 @@ export class TemplateEditorSession {
   private readonly serverFirst = new Set<string>();
   private readonly stash = new WeakMap<Transaction, ExtractedOperation[]>();
   private readonly tokens = new Map<string, number>();
-  private readonly generations = new Map<string, number>();
   private readonly waiters = new Set<() => void>();
   private composing = false;
   private composed: ExtractedOperation[] = [];
@@ -74,21 +69,35 @@ export class TemplateEditorSession {
   private panelBusy = false;
   private closed = false;
 
-  constructor(connection: AttachedTemplateWriter, private readonly port: TemplateSessionPort, private readonly debounce = 400) {
-    this.writer = new TemplateBackgroundWriter(connection, {
-      compositionEnd: () => this.composing ? new Promise(resolve => this.waiters.add(resolve)) : Promise.resolve(),
-      lock: locked => this.lock(locked),
-      changed: (mode, error) => { port.mode(mode); if (error) port.warning(errorMessage(error)); },
-    });
-    const sessionId = connection.proof?.sessionId ?? crypto.randomUUID();
-    this.queue = new RichSaveQueue({ durable: this.writer.durable, sessionId, ports: this.writer.queuePorts({
-      adopted: adoption => this.adopted(adoption), changed: state => this.queueChanged(state),
-      retained: () => {}, released: actionId => { this.history.acknowledgeServerAction(actionId, this.tokens.get(actionId) ?? 0, false); },
-    }) });
-    this.writer.attach(this.queue);
-    this.writer.useDraftSource(() => this.draftQueue());
-    // V7 content is server-owned: actions carry no local cells, only identity, order and tokens.
+  private modeValue: EditorMode = "recovering";
+  private retention: Promise<void> = Promise.resolve();
+  private recovery: Promise<void> | null = null;
+  private pendingLoaded = false;
+  private pendingNavigation: PendingNavigation | null = null;
+  private historyNeedsRefresh = false;
+  readonly sessionId = crypto.randomUUID();
+
+  get mode(): EditorMode { return this.modeValue; }
+  get writable(): boolean { return this.modeValue === "normal"; }
+  get canUndo(): boolean { return this.connection.history.undo !== null; }
+  get canRedo(): boolean { return this.connection.history.redo !== null; }
+  private setMode(mode: EditorMode): void { this.modeValue = mode; this.port.mode(mode); this.lock(!this.writable); }
+
+  constructor(readonly connection: ProjectEditorConnection, private readonly port: TemplateSessionPort, private readonly debounce = 400,
+    private readonly store: PendingStore = pendingStore()) {
+    const sessionId = this.sessionId;
     this.history = new SessionHistory(sessionId, new Map(), () => {}, () => !this.closed, `${sessionId}:${crypto.randomUUID()}`, "server");
+    this.queue = new RichSaveQueue({ durable: connection.response, sessionId, ports: {
+      edit: (preparation, base) => connection.edit(preparation, base), read: () => connection.read(),
+      adopted: adoption => this.adopted(adoption), changed: state => this.queueChanged(state), retained: () => {},
+      released: actionId => { this.history.acknowledgeServerAction(actionId, this.tokens.get(actionId) ?? 0, false); },
+      lost: items => this.lost(items), pending: () => {
+        const retained = this.retain();
+        void retained.catch(error => this.port.warning(errorMessage(error)));
+        return retained;
+      },
+    } });
+    queueMicrotask(() => { if (!this.closed) this.setMode("recovering"); });
     this.plugin = new Plugin({ key: new PluginKey("foldcv-v7-session"),
       filterTransaction: transaction => this.filter(transaction),
       appendTransaction: transactions => {
@@ -123,31 +132,33 @@ export class TemplateEditorSession {
       finally { this.projecting = false; }
     }
     // Input waits while recovering: retained text is shown and saved before new input joins it.
-    if (this.writer.mode === "read_only" || this.writer.mode === "recovering") editor.isEditable = false;
+    if (this.mode === "read_only" || this.mode === "recovering") editor.isEditable = false;
   }
 
-  /** After an outside canonical advance (export records), adopt it as base while idle and show it. */
   async refresh(): Promise<void> {
-    if (await this.writer.refresh()) await this.reproject();
-  }
-
-  /** Explicit continuation after a writer fault: resolve any fenced head from the durable record, then show it. */
-  async recoverWriter(): Promise<void> {
-    try { await this.writer.recover(); await this.reproject(); this.schedule(); }
-    // A writer that became read-only shows its own notice.
-    catch (error) { if (this.writer.mode !== "read_only") this.port.warning(errorMessage(error)); }
-  }
-
-  /** Back from a clean detach (settings): reattach the same session and show the verified state. */
-  async resume(): Promise<void> {
-    await this.writer.resume();
+    await this.flush();
+    this.queue.template.adoptDurable(await this.connection.read());
     await this.reproject();
   }
 
+  async recoverWriter(): Promise<void> {
+    try { await this.queue.template.recoverPending(); await this.queue.flush(); this.setMode("normal"); await this.reproject(); }
+    catch (error) { this.port.warning(errorMessage(error)); }
+  }
+
+  async navigateAway(): Promise<void> {
+    this.compositionEnd();
+    await this.flush();
+    await this.retention;
+    this.setMode("detached");
+  }
+
+  async resume(): Promise<void> { this.setMode("normal"); await this.refresh(); }
+
   private lock(locked: boolean): void {
-    if (this.editor) this.editor.isEditable = !locked && this.writer.mode !== "read_only";
+    if (this.editor) this.editor.isEditable = !locked && this.mode !== "read_only";
     if (locked && this.timer) { clearTimeout(this.timer); this.timer = null; }
-    if (!locked && this.deferred.length && this.writer.writable) {
+    if (!locked && this.deferred.length && this.writable) {
       const deferred = this.deferred;
       this.deferred = [];
       for (const { value, kind } of deferred) this.enqueue(value, kind);
@@ -162,7 +173,7 @@ export class TemplateEditorSession {
   private filter(transaction: Transaction): boolean {
     if (this.probe && transaction.docChanged) { this.probe.placement = placementOf(transaction.doc, this.probe.blockId); return false; }
     if (!transaction.docChanged || this.projecting || transaction.getMeta(projectionMeta)) return true;
-    if (this.closed || this.navigating || this.panelBusy || !this.writer.writable) return false;
+    if (this.closed || this.navigating || this.pendingNavigation || this.panelBusy || !this.writable) return false;
     const result = extractOperations(transaction);
     if (result.kind === "unsupported") { this.refuse(result.reason); return false; }
     if (result.operations.length) this.stash.set(transaction, result.operations);
@@ -177,17 +188,12 @@ export class TemplateEditorSession {
   }
 
   private recordKinds(): Map<string, string> {
-    const kinds = new Map<string, string>(), facts = jsonWireAt(this.queue.template.durable, ["workspace", "project", "facts"]);
-    for (const record of jsonWireAt(facts, ["records"]).children.values()) {
-      const id = jsonWireAt(record, ["id"]).value, kind = jsonWireAt(record, ["kind"]).value;
-      if (typeof id === "string" && typeof kind === "string") kinds.set(id, kind);
-    }
-    return kinds;
+    return new Map((this.queue.template.durable.workspace.project?.facts.records ?? []).map(record => [record.id, record.kind]));
   }
 
   /** A facts-panel command: typing drains first; input stays locked until Python's verified result is adopted and shown. */
   async panel(command: PanelCommand): Promise<void> {
-    if (!this.editor || this.closed || this.composing || this.panelBusy || this.writer.mode !== "normal") throw new Error("WRITER_INPUT_BLOCKED");
+    if (!this.editor || this.closed || this.composing || this.panelBusy || this.mode !== "normal") throw new Error("WRITER_INPUT_BLOCKED");
     const commands = employmentPanelCommands(command, this.recordKinds());
     if (!commands) { this.refuse(`panel ${command.operation} is not a V7 employment command`); throw new Error("V7_INPUT_UNSUPPORTED"); }
     await this.command(commands.map(value => ({ operation: { kind: "builtin_panel", command: value }, prior: new Map() })), "panel");
@@ -195,7 +201,7 @@ export class TemplateEditorSession {
 
   /** One server-first action: typing drains, input locks, and Python's verified result is shown before input continues. */
   private async command(items: { operation: V7Operation; prior: ReadonlyMap<string, string> }[], kind: HistoryKind): Promise<void> {
-    if (!this.editor || this.closed || this.composing || this.panelBusy || this.writer.mode !== "normal") throw new Error("WRITER_INPUT_BLOCKED");
+    if (!this.editor || this.closed || this.composing || this.panelBusy || this.mode !== "normal") throw new Error("WRITER_INPUT_BLOCKED");
     await this.flush();
     // Locking turns the contenteditable read-only and drops its focus; an editor command gives it back.
     const focused = this.editor.isFocused();
@@ -210,7 +216,6 @@ export class TemplateEditorSession {
       for (const item of items) {
         const localId = `intent-${crypto.randomUUID()}`;
         this.serverFirst.add(localId);
-        this.writer.input();
         this.queue.template.enqueue({ localId, operation: item.operation, prior: item.prior }, id, token);
       }
       this.action = id;
@@ -225,7 +230,7 @@ export class TemplateEditorSession {
       await this.reproject();
     } finally {
       this.panelBusy = false;
-      this.lock(!this.writer.writable);
+      this.lock(!this.writable);
       if (focused && this.editor?.isEditable) this.editor.focus();
     }
   }
@@ -239,7 +244,7 @@ export class TemplateEditorSession {
   /** Shift+Mod+Arrow: BlockNote decides the target as usual; Python moves the block and decides any owner change. */
   async move(direction: "up" | "down"): Promise<void> {
     const editor = this.editor;
-    if (!editor || this.closed || this.composing || this.panelBusy || !this.writer.writable) return;
+    if (!editor || this.closed || this.composing || this.panelBusy || !this.writable) return;
     const blocks = editor.getSelection()?.blocks ?? [];
     if (blocks.length > 1) {
       // The section line is hidden, so any lines inside one item move that item. A selection that crosses items does not.
@@ -298,18 +303,18 @@ export class TemplateEditorSession {
   async rewritePreview(instruction: string, requestId: string = crypto.randomUUID()): Promise<TemplateRewrite> {
     const source = this.rewriteSource();
     if (!source) throw new Error("V7_INPUT_UNSUPPORTED");
-    if (this.closed || this.composing || this.panelBusy || this.writer.mode !== "normal") throw new Error("WRITER_INPUT_BLOCKED");
+    if (this.closed || this.composing || this.panelBusy || this.mode !== "normal") throw new Error("WRITER_INPUT_BLOCKED");
     await this.flush();
     const template = this.queue.template;
-    const range = verifiedRange(source, { response: template.durable, map: null, locals: template.localBlocks });
+    const range = verifiedRange(source, { response: template.durable, locals: template.localBlocks });
     if ("conflict" in range) throw new Error("V7_INPUT_CONFLICT");
-    const preview = await this.writer.rewritePreview(requestId, range, instruction);
+    const preview = await this.connection.rewritePreview(requestId, this.snapshot(), range, instruction);
     if (preview.source !== source.text) throw new Error("INVALID_RESULT");
     return { requestId, instruction, container: source.container, start: source.start, end: source.end, prior: source.prior,
       source: preview.source, text: preview.text };
   }
 
-  cancelRewrite(requestId: string): Promise<boolean> { return this.writer.rewriteCancel(requestId); }
+  cancelRewrite(requestId: string): Promise<boolean> { return this.connection.rewriteCancel(requestId); }
 
   /** Apply exactly the shown text as one replacement and one Undo; only the changed middle is replaced, so the rest keeps
    * its marks and owners. A container edited since the preview conflicts instead of applying. */
@@ -329,7 +334,7 @@ export class TemplateEditorSession {
     const editor = this.editor, data = event.clipboardData;
     if (!editor || !data || this.closed) return false;
     event.preventDefault();
-    if (cut && (!copySource(view.state) || !this.writer.writable || this.composing || this.panelBusy)) {
+    if (cut && (!copySource(view.state) || !this.writable || this.composing || this.panelBusy)) {
       this.refuse("cut needs whole blocks or text inside one block"); return true;
     }
     const { clipboardHTML, externalHTML, markdown } = selectedFragmentToHTML(view, editor);
@@ -338,7 +343,7 @@ export class TemplateEditorSession {
     data.setData("text/html", externalHTML);
     data.setData("text/plain", markdown);
     const copied = this.copySelection(cut);
-    if (copied) data.setData(clipboardType, JSON.stringify({ projectId: this.writer.connection.api.project, token: copied.token }));
+    if (copied) data.setData(clipboardType, JSON.stringify({ projectId: this.connection.project, token: copied.token }));
     return true;
   }
 
@@ -346,13 +351,12 @@ export class TemplateEditorSession {
    * once the capture exists. Null when the selection names nothing Python copies. */
   copySelection(cut = false): (Copied & { done: Promise<void> }) | null {
     const editor = this.editor;
-    if (!editor || this.closed || !this.writer.writable || this.composing || this.panelBusy) return null;
+    if (!editor || this.closed || !this.writable || this.composing || this.panelBusy) return null;
     const state = editor._tiptapEditor.state, source = copySource(state);
     if (!source) return null;
-    const previous = this.copied, capture = this.capture(source);
+    const capture = this.capture(source);
     const copied: Copied = { token: crypto.randomUUID(), text: state.doc.textBetween(state.selection.from, state.selection.to, "\n"), capture };
     this.copied = copied;
-    if (previous) void previous.capture.then(value => value ? this.writer.releaseClipboard(value.id) : undefined).catch(() => {});
     return { ...copied, done: cut ? this.cut(source, capture) : capture.then(() => {}) };
   }
 
@@ -361,9 +365,9 @@ export class TemplateEditorSession {
     try {
       await this.flush();
       const template = this.queue.template;
-      const selection = clipboardSelection(source, { response: template.durable, map: null, locals: template.localBlocks });
+      const selection = clipboardSelection(source, { response: template.durable, locals: template.localBlocks });
       if ("conflict" in selection) { console.warn(`V7 copy not captured: ${selection.conflict}`); return null; }
-      const captured = await this.writer.captureClipboard(selection);
+      const captured = await this.connection.capture(crypto.randomUUID(), this.snapshot(), selection);
       return { id: captured.clipboardCaptureId, kind: source.kind };
     } catch (error) {
       console.warn(`V7 copy not captured: ${error instanceof Error ? error.message : String(error)}`);
@@ -383,11 +387,11 @@ export class TemplateEditorSession {
     const data = event.clipboardData;
     if (!this.editor || !data || this.closed) return false;
     event.preventDefault();
-    if (!this.writer.writable || this.composing || this.panelBusy) return true;
+    if (!this.writable || this.composing || this.panelBusy) return true;
     let marker: unknown = null;
     try { marker = JSON.parse(data.getData(clipboardType) || "null"); } catch { marker = null; }
     const own = this.copied && typeof marker === "object" && marker !== null && Reflect.get(marker, "token") === this.copied.token
-      && Reflect.get(marker, "projectId") === this.writer.connection.api.project ? this.copied : null;
+      && Reflect.get(marker, "projectId") === this.connection.project ? this.copied : null;
     void this.pasteFrom(own, own?.text ?? data.getData("text/plain"));
     return true;
   }
@@ -428,7 +432,7 @@ export class TemplateEditorSession {
   }
 
   private enqueue(value: ExtractedOperation, kind: HistoryKind): void {
-    if (!this.writer.writable || this.deferred.length) { this.deferred.push({ value, kind }); return; }
+    if (!this.writable || this.deferred.length) { this.deferred.push({ value, kind }); return; }
     const now = Date.now();
     if (kind === "structure" || now - this.lastInput > 500) this.boundary();
     this.lastInput = now;
@@ -437,113 +441,70 @@ export class TemplateEditorSession {
     if (this.action !== id) { if (this.action) this.queue.template.seal(this.action); this.action = id; }
     const token = this.history.capture(id, [])?.actionToken ?? 0;
     this.tokens.set(id, token);
-    this.writer.input();
     this.queue.template.enqueue({ localId: `intent-${crypto.randomUUID()}`, operation: value.operation, prior: value.prior }, id, token);
     if (kind === "structure") this.boundary();
     this.retainSoon();
     this.schedule();
   }
 
-  private retaining = false;
-  /** Every accepted input is retained locally before it is saved; writes in one task coalesce. */
-  private retainSoon(): void {
-    if (this.retaining || this.closed) return;
-    this.retaining = true;
-    queueMicrotask(() => {
-      this.retaining = false;
-      if (!this.closed) void this.writer.retain().catch(error => this.port.warning(errorMessage(error)));
-    });
+  private snapshot() {
+    const snapshot = this.queue.template.durable.snapshot;
+    if (!snapshot) throw new Error("INVALID_RESULT");
+    return snapshot;
   }
 
-  /** The draft's queue record: pending intents, the frozen head, local block IDs and the editor text of each touched container. */
-  private draftQueue(): TemplateDraftQueue | null {
-    // Server-first commands are input-locked and never retained; only text input is re-expressed after a crash.
-    const template = this.queue.template, pending = template.pending.flatMap(item =>
-      textOperation(item.intent.operation) && !this.serverFirst.has(item.intent.localId) ? [item] : []);
-    const unqueued = [...this.deferred.map(item => item.value), ...this.composed];
-    if (!pending.length && !unqueued.length) return null;
-    const containers = new Map<string, LocalContainer>();
-    for (const value of [...pending.map(item => item.intent), ...unqueued]) {
-      for (const key of value.prior.keys()) containers.set(key, parseContainer(key));
-      if (value.operation.kind === "split_block") {
-        const created: LocalContainer = { blockId: value.operation.created, kind: "content", cellId: null };
-        containers.set(containerKey(created), created);
-      }
-    }
-    const doc = this.editor?._tiptapEditor.state.doc;
-    const editorTexts = [...containers.values()].flatMap(container => {
-      const text = doc ? containerText(doc, container) : null;
-      return text === null ? [] : [{ container, text }];
-    });
-    const first = pending[0];
-    const head = first?.frozen ? { clientMutationId: first.clientMutationId, preparationWire: JSON.stringify(first.frozen.request.preparation),
-      stage: first.stage === "prepared" ? "prepared" as const : "frozen" as const } : null;
-    return { schemaVersion: 1, head, editorTexts, locals: [...template.localBlocks].map(([local, canonical]) => ({ local, canonical })),
-      intents: pending.map(item => ({ localId: item.intent.localId, actionId: item.actionId, actionToken: item.actionToken,
-        clientMutationId: item.clientMutationId, operation: wireOperation(textOperation(item.intent.operation)),
-        prior: wirePrior(item.intent.prior) })) };
+  private retainSoon(): void { void this.retain().catch(error => this.port.warning(errorMessage(error))); }
+
+  retain(): Promise<void> {
+    if (!this.pendingLoaded) return this.retention;
+    const intents = this.queue.template.pending.map(item => ({ localId: item.intent.localId, clientMutationId: item.clientMutationId,
+      baseRevision: item.baseRevision, actionId: item.actionId, actionToken: item.actionToken,
+      operation: structuredClone(item.intent.operation), prior: [...item.intent.prior], issued: item.issued,
+      text: item.intent.operation.kind === "replace_text" ? item.intent.operation.text : [...item.intent.prior.values()].join("\n") }));
+    const record: PendingRecord = { schemaVersion: 1, project: this.connection.project, intents, locals: [...this.queue.template.localBlocks],
+      navigation: this.pendingNavigation };
+    this.retention = this.retention.catch(() => {}).then(() => intents.length || record.navigation ? this.store.save(record) : this.store.clear(record.project));
+    return this.retention;
   }
 
-  /** A recovering opening: show the retained editor texts, reattach, and save them as corrections against the saved state.
-   * A container whose saved text is none of its own pending states needs the user's choice (keep editor text or use saved). */
-  async recoverDraft(choice: "keep" | "saved" | null = null): Promise<{ conflicts: number }> {
-    const editor = this.editor, record = this.writer.connection.local?.payload.templateQueue;
-    if (!editor || this.writer.mode !== "recovering") return { conflicts: 0 };
-    if (!record) { await this.writer.reattach(); await this.reproject(); await this.writer.clearCleanDraft(); return { conflicts: 0 }; }
-    const structural = record.intents.filter(item => item.operation.kind === "split_block" || item.operation.kind === "merge_blocks");
-    if (structural.length) {
-      // Text corrections cannot prove where an unacknowledged split or merge ended up.
-      if (choice !== "saved") return { conflicts: structural.length };
-      await this.writer.discardDraft(); await this.reproject();
-      return { conflicts: 0 };
-    }
-    const locals = new Map(record.locals.map(item => [item.local, item.canonical]));
-    const canonical = (container: LocalContainer): LocalContainer => ({ ...container, blockId: locals.get(container.blockId) ?? container.blockId });
-    const blocks = responseBlocks(this.writer.durable), states = new Map<string, Set<string>>();
-    for (const intent of record.intents) for (const prior of intent.prior) {
-      const key = containerKey(canonical(prior.container));
-      states.set(key, (states.get(key) ?? new Set()).add(prior.text));
-    }
-    const saved = (container: LocalContainer) => {
-      const group = blocks.get(container.blockId)?.groups.find(value => value.kind === container.kind
-        && (container.kind !== "cell" || value.key === container.cellId));
-      return group ? contentText(group.content) : null;
-    };
-    const texts = record.editorTexts.map(item => ({ container: canonical(item.container), text: item.text }));
-    const conflicts = texts.filter(item => {
-      const current = saved(item.container);
-      return current === null || current !== item.text && !states.get(containerKey(item.container))?.has(current);
-    });
-    if (conflicts.length && choice === null) return { conflicts: conflicts.length };
-    if (choice === "keep" && texts.some(item => saved(item.container) === null)) return { conflicts: conflicts.length };
-    const shown = texts.filter(item => saved(item.container) !== null && (choice === "keep" || !conflicts.includes(item)));
-    this.projecting = true;
-    try { editor.transact(tr => { tr.setMeta(projectionMeta, true); for (const item of shown) showText(tr, item.container, item.text); }); }
-    finally { this.projecting = false; }
-    await this.writer.reattach();
-    const corrections: V7Intent[] = [];
-    for (const item of shown) {
-      const value = correctionOperation(editor._tiptapEditor.state.doc, item.container, saved(item.container) ?? "");
-      if (value === null) continue;
-      if (!("operation" in value)) { this.refuse(value.reason); continue; }
-      corrections.push({ localId: `intent-${crypto.randomUUID()}`, operation: value.operation, prior: value.prior });
-    }
-    if (corrections.length) {
-      this.boundary();
-      const id = this.history.commit("structure", [], null);
-      if (id) {
-        const token = this.history.capture(id, [])?.actionToken ?? 0;
-        this.tokens.set(id, token);
-        for (const intent of corrections) { this.writer.input(); this.queue.template.enqueue(intent, id, token); }
-        this.action = id;
-        this.boundary();
-      }
-    }
-    this.retainSoon();
-    await this.flush();
-    if (!corrections.length) await this.reproject();
-    await this.writer.clearCleanDraft();
+  private lost(items: readonly TemplateQueuedIntent[]): void {
+    const text = items.map(item => item.intent.operation.kind === "replace_text" ? item.intent.operation.text
+      : [...item.intent.prior.values()].join("\n")).filter(Boolean).join("\n");
+    this.port.warning(`${errorMessage("V7_INPUT_CONFLICT")}${text ? "\n" + text : ""}`);
+  }
+
+  async recoverDraft(): Promise<{ conflicts: number }> {
+    this.recovery ??= this.restorePending().finally(() => { this.recovery = null; });
+    await this.recovery;
     return { conflicts: 0 };
+  }
+
+  private async restorePending(): Promise<void> {
+    const record = this.pendingLoaded ? null : await this.store.load(this.connection.project);
+    if (this.closed) return;
+    if (record) {
+      this.pendingNavigation = record.navigation;
+      this.queue.template.restore(record.intents.map(item => ({ intent: { localId: item.localId, operation: item.operation,
+        prior: new Map(item.prior) }, actionId: item.actionId, actionToken: item.actionToken, clientMutationId: item.clientMutationId,
+        baseRevision: item.baseRevision, issued: item.issued })), record.locals);
+    }
+    this.pendingLoaded = true;
+    if (this.pendingNavigation) await this.recoverNavigation();
+    while (this.queue.template.pending.length) {
+      const head = this.queue.template.pending[0];
+      await this.queue.template.recoverPending();
+      if (head?.clientMutationId === this.queue.template.pending[0]?.clientMutationId) break;
+    }
+    try { await this.flush(); }
+    catch (error) {
+      const state = this.queue.template.state.kind;
+      if (state !== "rejected" && state !== "conflict") throw error;
+      this.lost(this.queue.template.pending);
+      this.queue.template.discardUnsaved();
+    }
+    await this.retain();
+    this.setMode("normal");
+    await this.reproject();
   }
 
   private schedule(): void {
@@ -554,46 +515,41 @@ export class TemplateEditorSession {
     this.timer = setTimeout(() => { this.timer = null; void this.flush().catch(() => {}); }, this.debounce);
   }
 
-  /** Drain buffered input; a fenced head is resolved from the durable record before anything else moves. */
   async flush(): Promise<void> {
     if (this.timer) { clearTimeout(this.timer); this.timer = null; }
     try {
       await this.queue.flush();
+      if (this.historyNeedsRefresh) {
+        await this.connection.reopen();
+        this.queue.template.adoptDurable(this.connection.response);
+        this.historyNeedsRefresh = false;
+      }
+      await this.retention;
       this.port.status("Сохранено");
     } catch (error) {
-      // The head may now be prepared: keep the draft's record of it current.
       this.retainSoon();
       this.port.status(errorMessage(error));
-      if (error instanceof Error && error.message === "V7_OUTCOME_UNKNOWN") {
-        await this.writer.recover();
-        await this.queue.flush();
-        this.port.status("Сохранено");
-        return;
-      }
+      if (this.connection.replaced) this.setMode("read_only");
       throw error;
     }
   }
 
   private adopted(adoption: TemplateAdoption): void {
-    const ack = adoption.verification?.kind === "committed" ? adoption.verification.acknowledgment.localHistoryAck : null;
-    if (ack) this.generations.set(ack.actionId, ack.generation);
-    if (this.queue.template.pending.length) { this.retainSoon(); return; }
-    queueMicrotask(() => { void this.reproject(); });
-    // Everything retained is saved; a draft remains only while the editor holds unqueued input.
-    if (!this.composing && !this.deferred.length) void this.writer.clearCleanDraft().catch(error => this.port.warning(errorMessage(error)));
+    if (adoption.result === null) this.historyNeedsRefresh = true;
+    if (!this.queue.template.pending.length) queueMicrotask(() => { void this.reproject(); });
   }
 
   private queueChanged(state: TemplateQueueState): void {
     if (state.kind === "conflict") this.port.warning(errorMessage("V7_INPUT_CONFLICT"));
     else if (state.kind === "rejected") this.port.warning(errorMessage("V7_INPUT_REJECTED"));
-    else if (state.kind === "fenced") this.port.warning(errorMessage("V7_OUTCOME_UNKNOWN"));
+    else if (state.kind === "replaced") { this.setMode("read_only"); this.port.warning(errorMessage("EDITOR_REPLACED")); }
   }
 
   /** Containers are re-projected from canonical content only after the queue drains; local block IDs end there. */
   async reproject(): Promise<boolean> {
     const editor = this.editor, durable = this.queue.template.durable;
     if (!editor || this.closed || this.composing || this.queue.template.pending.length) return false;
-    const response = await templateProjectWire(durable), project = response?.workspace.project;
+    const response = durable, project = response.workspace.project;
     if (!response || !project) { this.port.warning(errorMessage("INVALID_RESULT")); return false; }
     if (durable !== this.queue.template.durable || this.closed || this.composing || this.queue.template.pending.length) return false;
     const locals = this.queue.template.localBlocks;
@@ -686,13 +642,32 @@ export class TemplateEditorSession {
     let reservation: HistoryReservation | null = null;
     try {
       await this.flush();
-      const actionId = this.history.actionFor(direction), generation = actionId ? this.generations.get(actionId) : undefined;
-      if (!actionId || generation === undefined) return;
-      reservation = this.history.reserveNavigation(direction, `${actionId}:${direction}:${crypto.randomUUID()}`);
-      if (!reservation) throw new Error("WRITER_RECOVERY_REQUIRED");
-      const view = await this.writer.history(direction, actionId, generation);
-      if (view.localHistoryAck) this.generations.set(view.localHistoryAck.actionId, view.localHistoryAck.generation);
-      if (!this.history.publishNavigation(reservation, direction, [])) throw new Error("WRITER_RECOVERY_REQUIRED");
+      if (this.pendingNavigation) { await this.recoverNavigation(); await this.reproject(); return; }
+      const actionId = this.connection.history[direction]?.actionId;
+      if (!actionId) return;
+      if (this.history.actionFor(direction) === actionId) reservation = this.history.reserveNavigation(direction, crypto.randomUUID());
+      const base = this.queue.template.durable.workspace.projectRevision, mutationId = crypto.randomUUID();
+      this.pendingNavigation = { direction, clientMutationId: mutationId, expectedActionId: actionId, baseRevision: base };
+      await this.retain();
+      let applied = true;
+      try {
+        const result = await this.connection.step(direction, mutationId, actionId, base);
+        this.queue.template.adoptDurable(result.response);
+      } catch (error) {
+        if (error instanceof ProjectApiFailure && !["EDITOR_TOKEN_UNKNOWN", "REVISION_CONFLICT"].includes(error.code)) {
+          this.pendingNavigation = null;
+          await this.retain();
+          if (error.code === "EDITOR_REPLACED") this.setMode("read_only");
+          throw error;
+        }
+        applied = await this.recoverNavigation();
+      }
+      this.pendingNavigation = null;
+      await this.retain();
+      if (reservation) {
+        if (applied) this.history.publishNavigation(reservation, direction, []);
+        else this.history.discard(reservation);
+      }
       reservation = null;
       this.navigating = false;
       await this.reproject();
@@ -703,6 +678,22 @@ export class TemplateEditorSession {
       this.navigating = false;
       if (focused && this.editor?.isEditable) this.editor.focus();
     }
+  }
+
+  private async recoverNavigation(): Promise<boolean> {
+    const pending = this.pendingNavigation;
+    if (!pending) return false;
+    let applied = true;
+    const current = await this.connection.read();
+    if (!(current.workspace.mutationReplay ?? []).some(row => row.clientMutationId === pending.clientMutationId)) {
+      if (current.workspace.projectRevision === pending.baseRevision) {
+        await this.connection.step(pending.direction, pending.clientMutationId, pending.expectedActionId, pending.baseRevision);
+      } else { applied = false; this.port.warning(errorMessage("HISTORY_STALE")); await this.connection.reopen(); }
+    } else await this.connection.reopen();
+    this.queue.template.adoptDurable(this.connection.response);
+    this.pendingNavigation = null;
+    await this.retain();
+    return applied;
   }
 
   /** After a block, re-express every container with pending input from canonical text to the editor text. */
@@ -734,9 +725,7 @@ export class TemplateEditorSession {
   }
 
   close(): void {
-    const copied = this.copied;
     this.copied = null;
-    if (copied) void copied.capture.then(value => value ? this.writer.releaseClipboard(value.id) : undefined).catch(() => {});
     this.closed = true;
     if (this.timer) clearTimeout(this.timer);
     this.timer = null;
@@ -744,24 +733,8 @@ export class TemplateEditorSession {
     this.waiters.clear();
     this.history.close();
     this.queue.close();
-    this.writer.close();
+    this.setMode("closed");
   }
-}
-
-function wirePrior(prior: ReadonlyMap<string, string>): TemplateDraftQueue["intents"][number]["prior"] {
-  const [first, second, ...rest] = [...prior].map(([key, text]) => ({ container: parseContainer(key), text }));
-  if (!first || rest.length) throw new Error("INVALID_RESULT");
-  return second ? [first, second] : [first];
-}
-
-type TextOperation = Extract<V7Operation, { kind: "replace_text" | "set_marks" | "split_block" | "merge_blocks" }>;
-function textOperation(operation: V7Operation): TextOperation | null {
-  return operation.kind === "replace_text" || operation.kind === "set_marks" || operation.kind === "split_block"
-    || operation.kind === "merge_blocks" ? operation : null;
-}
-function wireOperation(operation: TextOperation | null): TemplateDraftQueue["intents"][number]["operation"] {
-  if (!operation) throw new Error("INVALID_RESULT");
-  return structuredClone(operation);
 }
 
 function parseContainer(key: string): LocalContainer {

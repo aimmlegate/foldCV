@@ -8,7 +8,7 @@ import Ajv2020 from "ajv/dist/2020.js";
 import addFormats from "ajv-formats";
 import documentSchema from "../../../contracts/json-schema/rich_document_v2.schema.json" with { type: "json" };
 import type { RichDocumentV2 } from "../src/contracts/generated/rich_document_v2";
-import { parseJsonWire, type JsonWireNode } from "../src/contracts/lossless-json";
+import type { TemplateProjectResponseV1 } from "../src/contracts/generated/template_project_response_v1";
 import { taggedSchema } from "../src/contracts/tagged-schema";
 import { templateSchema } from "../src/rich/template-schema";
 import { extractOperations, foldComposition, mergeAt, selectedBlocks, splitAt, type ExtractedOperation } from "../src/rich/v7-extraction";
@@ -27,10 +27,10 @@ const fixture = record(JSON.parse(readFileSync(new URL("../../../tests/fixtures/
 assert.ok(Array.isArray(fixture["cases"]));
 const typingCase = record(fixture["cases"].map(record).find(value => value["name"] === "field-typing"));
 assert.equal(typeof typingCase["baseWire"], "string");
-const response = parseJsonWire(String(typingCase["baseWire"]));
-function documentOf(wire: JsonWireNode): RichDocumentV2 {
-  const value = wire.children.get("workspace")?.children.get("project")?.children.get("document")?.value;
-  assert.ok(documentShape(value)); return value;
+const response = JSON.parse(String(typingCase["baseWire"])) as TemplateProjectResponseV1;
+function documentOf(wire: TemplateProjectResponseV1): RichDocumentV2 {
+  const value = wire.workspace.project?.document;
+  assert.ok(documentShape(value)); return structuredClone(value);
 }
 
 function docOf(blocks: TemplateEditorBlock[]): Node {
@@ -57,7 +57,7 @@ function refused(tr: Transaction, reason: RegExp): void {
   assert.ok(result.kind === "unsupported", "input must be refused"); assert.match(result.reason, reason);
 }
 function translated(value: ExtractedOperation): unknown {
-  const result = translateIntent({ localId: "op-1", operation: value.operation, prior: value.prior }, { response, map: null, locals: new Map() });
+  const result = translateIntent({ localId: "op-1", operation: value.operation, prior: value.prior }, { response, locals: new Map() });
   assert.equal(result.kind, "operation", result.kind === "conflict" ? result.reason : "");
   return result.kind === "operation" ? result.operation : null;
 }

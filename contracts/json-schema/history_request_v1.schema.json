@@ -1,0 +1,50 @@
+{
+  "additionalProperties": false,
+  "properties": {
+    "baseRevision": {
+      "minimum": 1,
+      "title": "Baserevision",
+      "type": "integer"
+    },
+    "clientMutationId": {
+      "minLength": 1,
+      "title": "Clientmutationid",
+      "type": "string"
+    },
+    "direction": {
+      "enum": [
+        "undo",
+        "redo"
+      ],
+      "title": "Direction",
+      "type": "string"
+    },
+    "editorToken": {
+      "maxLength": 128,
+      "minLength": 1,
+      "title": "Editortoken",
+      "type": "string"
+    },
+    "expectedActionId": {
+      "anyOf": [
+        {
+          "minLength": 1,
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "title": "Expectedactionid"
+    }
+  },
+  "required": [
+    "editorToken",
+    "baseRevision",
+    "direction",
+    "clientMutationId",
+    "expectedActionId"
+  ],
+  "title": "HistoryRequestV1",
+  "type": "object"
+}

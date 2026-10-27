@@ -122,8 +122,7 @@ export function App({ portalHost }: { portalHost: HTMLElement }) {
         </>}
         {view === "editor" && template?.response.workspace.project && (template.connection
           ? <TemplateEditor key={`${template.response.workspace.projectId}:${workspace.openingEpoch}`} initial={template.response} connection={template.connection}
-            onStatus={setStatus} onShown={workspace.acknowledgeTemplate} ref={templateEditor} portalHost={portalHost}
-            takeOver={() => void workspace.takeOver()} />
+            onStatus={setStatus} onShown={workspace.acknowledgeTemplate} ref={templateEditor} portalHost={portalHost} />
           : <p className="notice warning" role="alert">{errorMessage("JOB_DISABLED")}</p>)}
         {view === "source" && !workspace.loading && <SourceForm input={input} change={setInput} textDraft={textDraft} busy={busy || creating} sourceName={source?.originalName ?? null}
           allowTextRewrite={workspace.allowTextRewrite} changeTextRewrite={workspace.setAllowTextRewrite}

@@ -4,6 +4,7 @@ import { mkdtempSync, realpathSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { createInterface } from "node:readline";
+import { ProjectEditorConnection, type Fetcher } from "../../src/rich/v7-connection";
 import { WriterApi } from "../../src/background/api";
 import type { WriterProofV1 } from "../../src/contracts/generated/background_writer_proof_v1";
 import { decodeJsonResponse } from "../../src/contracts/json-response";
@@ -87,4 +88,23 @@ export async function bootstrap(value: Harness): Promise<JsonWireNode> {
     headers: { "Content-Type": "application/json" }, body: JSON.stringify(value.proof) });
   assert.equal(response.status, 200);
   return parseJsonWire(await response.text());
+}
+
+export function projectFetcher(value: Harness, traffic: Traffic[] = [], fault: Fault | null = null): Fetcher {
+  return async (path, init) => {
+    const entry: Traffic = { path, wire: typeof init.body === "string" ? init.body : "" };
+    traffic.push(entry);
+    if (fault?.before && path.endsWith(fault.path) && fault.times > 0) { fault.times--; throw new TypeError("fetch failed"); }
+    const response = await fetch(value.origin + path, init);
+    entry.reply = JSON.parse(await response.clone().text()) as unknown;
+    if (fault && !fault.before && path.endsWith(fault.path) && fault.times > 0) {
+      fault.times--;
+      if (fault.replace !== undefined) return new Response(JSON.stringify(fault.replace), { status: 200 });
+      throw new TypeError("fetch failed");
+    }
+    return response;
+  };
+}
+export function projectClient(value: Harness, traffic: Traffic[] = [], fault: Fault | null = null): Promise<ProjectEditorConnection> {
+  return ProjectEditorConnection.open(value.project, projectFetcher(value, traffic, fault));
 }

@@ -1,15 +1,12 @@
+import { ProjectEditorConnection } from "../rich/v7-connection";
 import type { WriterViewV1 } from "../contracts/generated/background_writer_view_v1";
 import type { WriterProofV1 } from "../contracts/generated/background_writer_proof_v1";
 import type { DraftPayloadV1 } from "../contracts/generated/background_draft_payload_v1";
 import { validateContract } from "../contracts/validate";
 import { prepareWriterContracts } from "../contracts/background-validate";
 import { imageSource, RichApiFailure } from "../rich/api";
-import { WriterApi, type TemplateWriterTransport, type WriterTransport } from "./api";
-import type { WriterViewV2 } from "../contracts/generated/background_writer_view_v2";
-import { jsonResponseWire } from "../contracts/json-response";
-import type { JsonWireNode } from "../contracts/lossless-json";
+import { WriterApi, type WriterTransport } from "./api";
 import { BrowserDraftDatabase, DraftRepository, type LocalDraft } from "./drafts";
-import type { DraftPayloadV2 } from "../contracts/generated/background_writer_draft_payload_v2";
 import { applicationTabActive } from "./tab";
 
 type Resume = { schemaVersion: 1; proof: WriterProofV1; revision: number; sha256: string; cursor: number; sequence: number };
@@ -100,78 +97,11 @@ export async function attachWriter(project: string, api: WriterTransport = new W
   }
 }
 
-/** V7 opening through the same writer sessions, proofs and resume tokens; drafts join in the V7 draft slice. */
-export type TemplateLocalDraft = { record: LocalDraft; payload: DraftPayloadV2 };
-export type AttachedTemplateWriter = { api: TemplateWriterTransport; proof: WriterProofV1 | null; view: WriterViewV2;
-  viewWire: JsonWireNode; repository: DraftRepository; local: TemplateLocalDraft | null; error: string | null };
+export type AttachedTemplateWriter = ProjectEditorConnection;
 
-export function attachExclusiveTemplateWriter(project: string, takeOver = false): Promise<AttachedTemplateWriter | null> {
-  return attachTemplateWriter(project, new WriterApi(project), draftRepository(project), applicationTabActive, takeOver);
-}
-
-/** `takeOver` replaces another session's writer: this browser continues from the saved state and drops its stale drafts. */
-export async function attachTemplateWriter(project: string, api: TemplateWriterTransport = new WriterApi(project),
-  repository = draftRepository(project), exclusiveTab: (() => boolean) | null = null, takeOver = false): Promise<AttachedTemplateWriter | null> {
-  const requireTab = () => { if (exclusiveTab && !exclusiveTab()) throw new Error("TAB_LOCK_REQUIRED"); };
-  requireTab();
-  let bootstrap: WriterViewV2;
-  try { bootstrap = await api.templateBootstrap(); }
-  catch (error) { if (error instanceof RichApiFailure && error.code === "JOB_DISABLED") return null; throw error; }
-  requireTab();
-  // An unknown save outcome must be resolved first: taking over then would drop text that may still be unsaved.
-  if (takeOver && bootstrap.canonicalReady) {
-    const credential = crypto.randomUUID() + crypto.randomUUID();
-    // The other session's server drafts go with it, as the takeover notice says.
-    const view = await api.templateAbandon({ schemaVersion: 1, sessionId: crypto.randomUUID(), incarnation: crypto.randomUUID(), credential,
-      canonicalRevision: bootstrap.response.workspace.projectRevision, canonicalSha256: bootstrap.workspaceSha256,
-      discardDrafts: bootstrap.drafts.map(draft => draft.id) });
-    const proof: WriterProofV1 = { schemaVersion: 1, lineage: view.writer.lineage, epoch: view.writer.epoch,
-      sessionId: view.writer.sessionId, incarnation: view.writer.incarnation, credential };
-    await repository.discardProject(project);
-    retainResume(project, proof, view, view.writer.acknowledgedCursor, 0);
-    return { api, proof, view, viewWire: jsonResponseWire(view), repository, local: null, error: null };
-  }
-  let previous: Resume | null = null, local: TemplateLocalDraft | null = null;
-  const readOnly = (view: WriterViewV2, error: string): AttachedTemplateWriter =>
-    ({ api, proof: null, view, viewWire: jsonResponseWire(view), repository, local, error });
-  try {
-    const key = `foldcv-writer:${project}`, candidates = [sessionStorage.getItem(key)];
-    if (exclusiveTab) candidates.unshift(localStorage.getItem(key));
-    for (const wire of candidates) {
-      const stored: unknown = JSON.parse(wire ?? "null");
-      if (isResume(stored) && stored.proof.lineage === bootstrap.writer.lineage) { previous = stored; break; }
-    }
-    local = await repository.readTemplate(project, bootstrap.writer.lineage, { epoch: bootstrap.writer.epoch, incarnation: bootstrap.writer.incarnation });
-  } catch (error) { return readOnly(bootstrap, error instanceof Error ? error.message : "DRAFT_CORRUPT"); }
-  if (!bootstrap.canonicalReady) return readOnly(bootstrap, "OUTCOME_UNKNOWN");
-  const credential = previous?.proof.credential ?? crypto.randomUUID() + crypto.randomUUID();
-  const sessionId = previous?.proof.sessionId ?? crypto.randomUUID(), incarnation = crypto.randomUUID();
-  try {
-    requireTab();
-    // A browser can close without delivering its writer's unload beacon.
-    if (exclusiveTab && previous && bootstrap.writer.status !== "clean_detached"
-      && previous.proof.epoch === bootstrap.writer.epoch && previous.proof.incarnation === bootstrap.writer.incarnation
-      && previous.proof.sessionId === bootstrap.writer.sessionId) await api.templateSuspend(previous.proof);
-    requireTab();
-    const view = await api.templateOpen({ schemaVersion: 1, sessionId, incarnation, credential,
-      previousEpoch: previous?.proof.epoch ?? null, previousIncarnation: previous?.proof.incarnation ?? null,
-      canonicalRevision: bootstrap.response.workspace.projectRevision, canonicalSha256: bootstrap.workspaceSha256,
-      actionCursor: local?.record.cursor ?? previous?.cursor ?? 0, draftSequence: local?.record.sequence ?? previous?.sequence ?? 0 });
-    const proof: WriterProofV1 = { schemaVersion: 1, lineage: view.writer.lineage, epoch: view.writer.epoch,
-      sessionId: view.writer.sessionId, incarnation: view.writer.incarnation, credential };
-    retainResume(project, proof, view, local?.record.cursor ?? view.writer.acknowledgedCursor, local?.record.sequence ?? 0);
-    requireTab();
-    // A recovering opening keeps its proof: the editor session re-expresses the retained input before attaching again.
-    if (local && local.record.epoch !== proof.epoch) return readOnly(view, "DRAFT_OLD_EPOCH");
-    if (local && local.record.incarnation !== proof.incarnation) {
-      if (local.record.incarnation !== previous?.proof.incarnation) return readOnly(view, "DRAFT_OLD_CONNECTION");
-      const replacement = { ...local.record, incarnation: proof.incarnation };
-      try { await repository.replaceOwner(local.record, replacement); local = { ...local, record: replacement }; }
-      catch { return readOnly(view, "DRAFT_STORAGE_FAILED"); }
-    }
-    return { api, proof, view, viewWire: jsonResponseWire(view), repository, local, error: null };
-  } catch (error) {
-    if (error instanceof RichApiFailure && error.code === "WRITER_UNKNOWN") return readOnly(bootstrap, "WRITER_READ_ONLY");
-    throw error;
-  }
+export async function attachExclusiveTemplateWriter(project: string): Promise<ProjectEditorConnection> {
+  if (!applicationTabActive()) throw new Error("TAB_LOCK_REQUIRED");
+  const connection = await ProjectEditorConnection.open(project);
+  if (!applicationTabActive()) throw new Error("TAB_LOCK_REQUIRED");
+  return connection;
 }

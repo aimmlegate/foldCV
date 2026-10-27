@@ -5,13 +5,9 @@ import type { WorkingFacts } from "../contracts/generated/working_facts";
 import { semantic } from "./fact-cells";
 import { normalizedBlock } from "./normalize";
 import { compactMutation } from "./compact-mutation";
-import type { WriterPrepareEditV2 } from "../contracts/generated/background_writer_prepare_edit_v2";
-import type { WriterProofV1 } from "../contracts/generated/background_writer_proof_v1";
-import type { PreparedAddressMapV1 } from "../contracts/generated/template_address_map_v1";
-import { jsonWireAt, parseJsonWire, type JsonWireNode } from "../contracts/lossless-json";
-import type { TemplateSaveVerification } from "../contracts/template-save";
-import type { BoundTemplatePreparation } from "../contracts/template-transport";
-import { RichApiFailure } from "./api";
+import type { TemplateEditPreparationV1 } from "../contracts/generated/template_edit_preparation_v1";
+import type { TemplateProjectResponseV1 } from "../contracts/generated/template_project_response_v1";
+import { ProjectApiFailure, type EditResult } from "./v7-connection";
 import { createdLocals, translateIntent, type V7Intent } from "./v7-translation";
 
 export type RichBlock = RichDocumentV1["regions"][number]["blocks"][number];
@@ -265,70 +261,65 @@ export class RichSaveQueue {
     if (this.scheduler.closed || this.scheduler.running) throw new Error("AGENT_OUTCOME_UNKNOWN");
     this.scheduler.fence = null; value.prepared = key;
   }
-  /** Writer recovery resolves an unknown V7 outcome; dispatch stays stopped until then. */
-  resolveTemplateOutcome(read: JsonWireNode, committed: boolean): void {
-    if (this.scheduler.running || this.scheduler.closed) throw new Error("V7_OUTCOME_UNKNOWN");
-    this.template.resolve(read, committed);
-  }
 }
 
-/** V7 strategy state: ordered authored intents, one issued head, and only server-verified adoption. */
-export type TemplateQueueState = { kind: "ready" | "closed" } | { kind: "conflict" | "rejected" | "fenced"; reason: string };
-export type TemplateDisposition = "committed" | "no_op" | "discarded" | "corrected";
+/** V7 strategy (D109): ordered authored intents, one request per intent against the last verified response, the full
+ * response adopted from each reply. */
+export type TemplateQueueState = { kind: "ready" | "closed" } | { kind: "conflict" | "rejected" | "replaced"; reason: string };
+export type TemplateDisposition = "committed" | "no_op" | "discarded" | "corrected" | "lost";
 export type TemplateQueuedIntent = { intent: V7Intent; actionId: string; actionToken: number; clientMutationId: string;
-  frozen: { base: JsonWireNode; request: WriterPrepareEditV2 } | null; stage: "unsent" | "frozen" | "prepared" };
-export type TemplateAdoption = { item: TemplateQueuedIntent; noOp: boolean; response: JsonWireNode;
-  map: PreparedAddressMapV1 | null; verification: TemplateSaveVerification | null };
+  baseRevision: number; issued: TemplateEditPreparationV1 | null };
+export type TemplateAdoption = { item: TemplateQueuedIntent; noOp: boolean; response: TemplateProjectResponseV1; result: EditResult | null };
 export type TemplateQueuePorts = {
-  proof: () => WriterProofV1;
-  prepare: (base: JsonWireNode, request: WriterPrepareEditV2) => Promise<BoundTemplatePreparation>;
-  save: (preparation: BoundTemplatePreparation) => Promise<TemplateSaveVerification>;
+  edit: (preparation: TemplateEditPreparationV1, baseRevision: number) => Promise<EditResult>;
+  /** The current saved state, for the lost-acknowledgment rule. */
+  read: () => Promise<TemplateProjectResponseV1>;
   adopted: (adoption: TemplateAdoption) => void;
   changed: (state: TemplateQueueState) => void;
   /** An action is retained once any of its intents commits, released only after complete empty disposition. */
-  retained: (actionId: string, acknowledgment: TemplateSaveVerification | null) => void;
+  retained: (actionId: string) => void;
   released: (actionId: string) => void;
+  /** Intents the server neither applied nor can take any more; their text is reported before they are dropped. */
+  lost: (items: readonly TemplateQueuedIntent[]) => void;
+  /** The unacknowledged intents changed; the session keeps them in the pending draft. */
+  pending?: (items: readonly TemplateQueuedIntent[]) => void | Promise<void>;
 };
-export type TemplateStrategyInput = { durable: JsonWireNode; sessionId: string; ports: TemplateQueuePorts };
-type TemplateEntry = TemplateQueuedIntent & { prepared: BoundTemplatePreparation | null };
+export type TemplateStrategyInput = { durable: TemplateProjectResponseV1; sessionId: string; ports: TemplateQueuePorts };
 type ActionRecord = { pending: number; committed: boolean; sealed: boolean; finished: boolean };
-// A definitive server answer to frozen bytes; retrying them cannot succeed.
-const rejectedCodes = new Set(["JOB_SCOPE_INVALID", "JOB_IDEMPOTENCY_CONFLICT", "PREPARATION_RESPONSE_FORM_CONFLICT",
-  "REQUEST_EXPIRED", "JOB_STORAGE_FULL"]);
+// Refusals of the request itself; sending it again cannot succeed.
+const rejectedCodes = new Set(["V7_INPUT_REJECTED", "PROJECT_TOO_LARGE", "PROJECT_READ_ONLY", "MUTATION_ID_REUSED", "REQUEST_EXPIRED",
+  "DEPENDENCY_CHANGED", "INVALID_REQUEST", "HISTORY_STALE"]);
 
 export class TemplateIntentStrategy implements SaveStrategy {
-  private readonly entries: TemplateEntry[] = [];
-  private durableWire: JsonWireNode;
-  private map: PreparedAddressMapV1 | null = null;
+  private readonly entries: TemplateQueuedIntent[] = [];
+  private durableResponse: TemplateProjectResponseV1;
   private readonly locals = new Map<string, string>();
   private readonly actions = new Map<string, ActionRecord>();
-  private block: { kind: "conflict" | "rejected"; reason: string } | null = null;
+  private readonly recoveryRequired = new Set<string>();
+  private block: { kind: "conflict" | "rejected" | "replaced"; reason: string } | null = null;
   readonly sessionId: string;
   private readonly ports: TemplateQueuePorts;
   constructor(private readonly scheduler: SchedulerState, input: TemplateStrategyInput) {
-    this.durableWire = parseJsonWire(input.durable.wire);
+    this.durableResponse = input.durable;
     this.sessionId = input.sessionId;
     this.ports = input.ports;
   }
-  get durable(): JsonWireNode { return this.durableWire; }
+  get durable(): TemplateProjectResponseV1 { return this.durableResponse; }
   get localBlocks(): ReadonlyMap<string, string> { return new Map(this.locals); }
   get state(): TemplateQueueState {
     if (this.scheduler.closed) return { kind: "closed" };
-    if (this.scheduler.fence !== null) return { kind: "fenced", reason: this.scheduler.fence };
     return this.block ?? { kind: "ready" };
   }
-  get pending(): readonly TemplateQueuedIntent[] {
-    return this.entries.map(entry => ({ intent: entry.intent, actionId: entry.actionId, actionToken: entry.actionToken,
-      clientMutationId: entry.clientMutationId, frozen: entry.frozen, stage: entry.stage }));
-  }
-  enqueue(intent: V7Intent, actionId: string, actionToken: number): void {
+  get pending(): readonly TemplateQueuedIntent[] { return this.entries.map(entry => ({ ...entry })); }
+  enqueue(intent: V7Intent, actionId: string, actionToken: number, clientMutationId = `${this.sessionId}:${crypto.randomUUID()}`): void {
     if (this.scheduler.closed) throw new Error("Редактор закрыт.");
-    this.entries.push({ intent: { ...intent, prior: new Map(intent.prior) }, actionId, actionToken,
-      clientMutationId: `${this.sessionId}:${crypto.randomUUID()}`, frozen: null, prepared: null, stage: "unsent" });
+    this.entries.push({ intent: { ...intent, prior: new Map(intent.prior) }, actionId, actionToken, clientMutationId,
+      baseRevision: this.durableResponse.workspace.projectRevision, issued: null });
     const record = this.actions.get(actionId) ?? { pending: 0, committed: false, sealed: false, finished: false };
     if (record.finished) throw new Error("History action is already complete");
     record.pending++;
     this.actions.set(actionId, record);
+    void this.ports.pending?.(this.pending);
   }
   /** The editor seals an action when no further input can join it. */
   seal(actionId: string): void {
@@ -338,24 +329,24 @@ export class TemplateIntentStrategy implements SaveStrategy {
     this.settle(actionId);
   }
   admit(): void {
-    if (this.scheduler.fence !== null) throw new Error("V7_OUTCOME_UNKNOWN");
-    if (this.block) throw new Error(this.block.kind === "conflict" ? "V7_INPUT_CONFLICT" : "V7_INPUT_REJECTED");
+    if (this.block) throw new Error(this.block.kind === "conflict" ? "V7_INPUT_CONFLICT" : this.block.kind === "replaced" ? "EDITOR_REPLACED" : "V7_INPUT_REJECTED");
   }
   closed(): void { this.ports.changed({ kind: "closed" }); }
-  /** Explicit discard after a block; refused while an outcome is unknown. */
+  /** Explicit discard after a block. */
   discardUnsaved(): TemplateQueuedIntent[] {
-    if (this.scheduler.running || this.scheduler.fence !== null || this.scheduler.closed) throw new Error("Дождитесь восстановления сохранения");
+    if (this.scheduler.running || this.scheduler.closed) throw new Error("Дождитесь окончания сохранения");
     const discarded = this.pending.slice();
     this.dispose(this.entries.splice(0), "discarded");
-    this.block = null;
+    if (this.block?.kind !== "replaced") this.block = null;
     this.ports.changed(this.state);
+    this.ports.pending?.(this.pending);
     return discarded;
   }
-  /** Correction replaces a blocked head and its buffer with intents expressed against the canonical durable state.
-   * A container whose saved text moved since its pending input began needs the user's explicit keep choice. */
+  /** Correction replaces a blocked queue with intents expressed against the verified state. A container whose saved text
+   * moved since its pending input began needs the user's explicit keep choice. */
   correct(corrections: readonly V7Intent[], actionId: string, actionToken: number,
     choices: { keepEditorText?: ReadonlySet<string>; unchanged?: ReadonlySet<string> } = {}): void {
-    if (!this.block || this.scheduler.running || this.scheduler.fence !== null || this.scheduler.closed) throw new Error("V7_CORRECTION_NOT_ALLOWED");
+    if (!this.block || this.block.kind === "replaced" || this.scheduler.running || this.scheduler.closed) throw new Error("V7_CORRECTION_NOT_ALLOWED");
     const bases = this.unsavedBase(), covered = new Set(choices.unchanged ?? []);
     for (const intent of corrections) for (const [key, prior] of intent.prior) {
       const base = bases.get(key);
@@ -377,51 +368,36 @@ export class TemplateIntentStrategy implements SaveStrategy {
     for (const entry of this.entries) for (const [key, text] of entry.intent.prior) if (!result.has(key)) result.set(key, text);
     return result;
   }
-  /** A server history command result becomes the new base only when no input is pending. */
-  adoptDurable(response: JsonWireNode): void {
-    if (this.entries.length || this.block || this.scheduler.fence !== null || this.scheduler.running || this.scheduler.closed) {
-      throw new Error("V7_CORRECTION_NOT_ALLOWED");
+  /** A server history result or a fresh read becomes the base only when no input is pending. */
+  adoptDurable(response: TemplateProjectResponseV1): void {
+    if (this.entries.length || this.block || this.scheduler.running || this.scheduler.closed) throw new Error("V7_CORRECTION_NOT_ALLOWED");
+    this.durableResponse = response;
+  }
+  restore(items: readonly TemplateQueuedIntent[], locals: readonly [string, string][] = []): void {
+    if (this.entries.length || this.scheduler.running) throw new Error("V7_CORRECTION_NOT_ALLOWED");
+    for (const [local, canonical] of locals) this.locals.set(local, canonical);
+    for (const item of items) {
+      this.enqueue(item.intent, item.actionId, item.actionToken, item.clientMutationId);
+      const entry = this.entries.at(-1);
+      if (entry) { entry.baseRevision = item.baseRevision; entry.issued = item.issued; }
+      this.recoveryRequired.add(item.clientMutationId);
+      this.seal(item.actionId);
     }
-    this.durableWire = parseJsonWire(response.wire);
-    this.map = null;
   }
-  /** The issued head as recovery must look it up in the durable replay record. */
-  headIdentity(): { clientMutationId: string; mutationWire: string | null } | null {
-    const head = this.entries[0];
-    if (!head?.frozen) return null;
-    return { clientMutationId: head.clientMutationId, mutationWire: head.prepared?.prepared.delta.mutationWire ?? null };
+  async recoverPending(): Promise<void> {
+    for (const item of this.entries) this.recoveryRequired.add(item.clientMutationId);
+    const entry = this.entries[0];
+    if (entry) { await this.reconcile(entry); this.recoveryRequired.delete(entry.clientMutationId); }
+    else this.durableResponse = await this.ports.read();
   }
-  resolve(read: JsonWireNode, committed: boolean): void {
-    if (this.scheduler.fence === null) throw new Error("V7_OUTCOME_KNOWN");
-    const head = this.entries[0], response = parseJsonWire(read.wire), snapshot = jsonWireAt(response, ["snapshot"]).wire;
-    this.scheduler.fence = null;
-    if (!head?.frozen) { this.durableWire = response; this.map = null; this.ports.changed(this.state); return; }
-    if (committed) {
-      this.entries.shift();
-      const result = head.prepared;
-      // The kept map still translates later input only when the read state is exactly its result.
-      const mapped = result !== null && jsonWireAt(parseJsonWire(result.prepared.responseWire.wire), ["snapshot"]).wire === snapshot;
-      this.durableWire = response;
-      this.map = mapped ? result.address.map : null;
-      const created = mapped ? createdLocals(head.intent, { response, map: this.map, locals: this.locals }) : null;
-      for (const [local, canonicalId] of created ?? []) this.locals.set(local, canonicalId);
-      this.dispose([head], "committed", null);
-      this.ports.adopted({ item: head, noOp: false, response, map: this.map, verification: null });
-      if (!mapped && this.entries.length) this.block = { kind: "conflict", reason: "committed result has no retained map" };
-    } else if (jsonWireAt(head.frozen.base, ["snapshot"]).wire !== snapshot) {
-      this.durableWire = response; this.map = null;
-      this.block = { kind: "conflict", reason: "base changed before the head committed" };
-    }
-    this.ports.changed(this.state);
-  }
-  private dispose(items: readonly TemplateEntry[], disposition: TemplateDisposition, acknowledgment: TemplateSaveVerification | null = null): void {
+  private dispose(items: readonly TemplateQueuedIntent[], disposition: TemplateDisposition): void {
     for (const item of items) {
       const record = this.actions.get(item.actionId);
       if (!record) continue;
       record.pending--;
       if (disposition === "committed" && !record.committed) {
         record.committed = true;
-        this.ports.retained(item.actionId, acknowledgment);
+        this.ports.retained(item.actionId);
       }
       this.settle(item.actionId);
     }
@@ -434,7 +410,7 @@ export class TemplateIntentStrategy implements SaveStrategy {
   }
   private coalesce(): void {
     const [first, next] = this.entries;
-    if (!first || !next || first.frozen || next.frozen || first.actionId !== next.actionId) return;
+    if (!first || !next || first.issued || next.issued || first.actionId !== next.actionId) return;
     const left = first.intent.operation, right = next.intent.operation;
     if (left.kind !== "replace_text" || right.kind !== "replace_text" || JSON.stringify(left.styles) !== JSON.stringify(right.styles)
       || JSON.stringify(left.container) !== JSON.stringify(right.container) || right.start !== right.end
@@ -447,80 +423,76 @@ export class TemplateIntentStrategy implements SaveStrategy {
     if (record) record.pending--;
     this.coalesce();
   }
-  private stop(kind: "conflict" | "rejected", reason: string): never {
+  private stop(kind: "conflict" | "rejected" | "replaced", reason: string): never {
     this.block = { kind, reason };
     this.ports.changed(this.state);
-    throw new Error(kind === "conflict" ? "V7_INPUT_CONFLICT" : "V7_INPUT_REJECTED");
+    throw new Error(kind === "conflict" ? "V7_INPUT_CONFLICT" : kind === "replaced" ? "EDITOR_REPLACED" : "V7_INPUT_REJECTED");
   }
-  private fence(reason: string): never {
-    this.scheduler.fence = reason;
-    this.ports.changed(this.state);
-    throw new Error("V7_OUTCOME_UNKNOWN");
+  private adopt(entry: TemplateQueuedIntent, response: TemplateProjectResponseV1, result: EditResult | null, noOp: boolean): void {
+    this.durableResponse = response;
+    this.entries.shift();
+    this.dispose([entry], noOp ? "no_op" : "committed");
+    this.ports.adopted({ item: entry, noOp, response, result });
+    this.ports.pending?.(this.pending);
   }
-  private failed(error: unknown, stage: "prepare" | "save"): never {
-    // A malformed or oversized request is refused before any processing; resending it cannot help.
-    if (error instanceof RichApiFailure && (error.status >= 400 && error.status < 500 && rejectedCodes.has(error.code)
-      || error.status === 413 || error.status === 422)) {
-      return this.stop("rejected", error.code);
+  /** The lost-acknowledgment rule (plan 2.6): applied ids are dropped as done; an intent the current state can still take is
+   * re-issued; any other is reported with its text and dropped. */
+  private async reconcile(entry: TemplateQueuedIntent): Promise<void> {
+    const current = await this.ports.read();
+    const done = new Set((current.workspace.mutationReplay ?? []).map(row => row.clientMutationId));
+    if (done.has(entry.clientMutationId)) {
+      // The created blocks of a lost reply are unknown; later intents that name them conflict and keep their text.
+      this.adopt(entry, current, null, false);
+      return;
     }
-    if (error instanceof RichApiFailure && error.status >= 400 && error.status < 500
-      || error instanceof Error && error.message === "INVALID_RESULT") {
-      // The server answered, but the outcome cannot be trusted or applied to this base; recovery resolves it first.
-      return this.fence(error instanceof RichApiFailure ? error.code : `${stage}:INVALID_RESULT`);
+    this.durableResponse = current;
+    if (entry.baseRevision === current.workspace.projectRevision) return;
+    this.entries.shift();
+    this.dispose([entry], "lost");
+    this.ports.lost([entry]);
+    this.ports.pending?.(this.pending);
+  }
+  private async failed(error: unknown, entry: TemplateQueuedIntent): Promise<boolean> {
+    if (!(error instanceof ProjectApiFailure)) throw error;
+    if (error.code === "EDITOR_REPLACED") return this.stop("replaced", error.code);
+    if (error.code === "REVISION_CONFLICT" || error.code === "EDITOR_TOKEN_UNKNOWN") {
+      for (const item of this.entries) this.recoveryRequired.add(item.clientMutationId);
+      await this.reconcile(entry);
+      this.recoveryRequired.delete(entry.clientMutationId);
+      return true;
     }
-    // No answer: the frozen bytes stay issued for an identical retry.
+    if (error.status === 413 || error.status === 422 || rejectedCodes.has(error.code)) return this.stop("rejected", error.code);
+    // No usable answer: the issued request is retried unchanged on the next flush; its id makes the retry idempotent.
     throw error;
   }
   async step(): Promise<boolean> {
-    if (!this.entries[0]?.frozen) this.coalesce();
+    const head = this.entries[0];
+    if (head && this.recoveryRequired.delete(head.clientMutationId)) {
+      await this.reconcile(head);
+      if (this.entries[0] !== head) return true;
+    }
+    if (!this.entries[0]?.issued) this.coalesce();
     const entry = this.entries[0];
     if (!entry) return false;
-    if (!entry.frozen) {
+    if (!entry.issued) {
       const capture = { sessionId: this.sessionId, actionId: entry.actionId, actionToken: entry.actionToken, dependencies: [] };
-      const translated = translateIntent(entry.intent, { response: this.durableWire, map: this.map, locals: this.locals }, capture);
+      const translated = translateIntent(entry.intent, { response: this.durableResponse, locals: this.locals }, capture);
       if (translated.kind === "conflict") this.stop("conflict", translated.reason);
-      const request: WriterPrepareEditV2 = { schemaVersion: 2, proof: structuredClone(this.ports.proof()), preparation: {
-        schemaVersion: 1, clientMutationId: entry.clientMutationId, snapshot: snapshotIdentity(jsonWireAt(this.durableWire, ["snapshot"]).value),
-        capture, operations: [translated.operation] } };
-      entry.frozen = { base: this.durableWire, request };
-      entry.stage = "frozen";
+      const snapshot = this.durableResponse.snapshot;
+      if (!snapshot) this.stop("rejected", "verified result has no snapshot");
+      entry.issued = { schemaVersion: 1, clientMutationId: entry.clientMutationId, snapshot, capture, operations: [translated.operation] };
+      entry.baseRevision = this.durableResponse.workspace.projectRevision;
+      await this.ports.pending?.(this.pending);
     }
-    if (!entry.prepared) {
-      try { entry.prepared = await this.ports.prepare(entry.frozen.base, structuredClone(entry.frozen.request)); }
-      catch (error) { this.failed(error, "prepare"); }
-      entry.stage = "prepared";
-    }
+    let result: EditResult;
+    try { result = await this.ports.edit(entry.issued, entry.baseRevision); }
+    catch (error) { return this.failed(error, entry); }
     if (this.scheduler.closed) return false;
-    const prepared = entry.prepared;
-    if (prepared.prepared.delta.mutationWire === null) {
-      this.map = prepared.address.map;
-      this.entries.shift();
-      this.dispose([entry], "no_op");
-      this.ports.adopted({ item: entry, noOp: true, response: this.durableWire, map: prepared.address.map, verification: null });
-      return true;
-    }
-    let verification: TemplateSaveVerification;
-    try { verification = await this.ports.save(prepared); }
-    catch (error) { this.failed(error, "save"); }
-    if (this.scheduler.closed) return false;
-    if (verification.kind !== "committed") this.fence(verification.kind);
-    const created = createdLocals(entry.intent, { response: verification.responseWire, map: prepared.address.map, locals: this.locals });
-    if (!created) this.fence("created block has no single verified result");
-    for (const [local, canonicalId] of created) this.locals.set(local, canonicalId);
-    this.durableWire = verification.responseWire;
-    this.map = prepared.address.map;
-    this.entries.shift();
-    this.dispose([entry], "committed", verification);
-    this.ports.adopted({ item: entry, noOp: false, response: this.durableWire, map: prepared.address.map, verification });
+    const noOp = !result.replayed && result.revision === entry.baseRevision;
+    const created = createdLocals(entry.intent, result.createdBlocks);
+    if (!created && !result.replayed) this.stop("conflict", "created block has no single verified result");
+    for (const [local, canonicalId] of created ?? []) this.locals.set(local, canonicalId);
+    this.adopt(entry, result.response, result, noOp);
     return true;
   }
-}
-
-export function snapshotIdentity(value: unknown): WriterPrepareEditV2["preparation"]["snapshot"] {
-  if (typeof value !== "object" || value === null) throw new Error("INVALID_RESULT");
-  const field = (key: string): unknown => Reflect.get(value, key);
-  const text = (key: string): string => { const item = field(key); if (typeof item !== "string") throw new Error("INVALID_RESULT"); return item; };
-  const count = (key: string): number => { const item = field(key); if (typeof item !== "number") throw new Error("INVALID_RESULT"); return item; };
-  return { projectId: text("projectId"), projectRevision: count("projectRevision"), documentRevision: count("documentRevision"),
-    documentHash: text("documentHash"), factsHash: text("factsHash"), packageHash: text("packageHash"), presentationHash: text("presentationHash") };
 }

@@ -463,6 +463,8 @@ def create_app(*, origin: str, secret: str, temp_root: Path, dist: Path, runner:
     # The in-memory project repository on the same data root (D109); the old routes stay mounted until SR04.
     project_repository = ProjectRepository(rules_store.root)
     projects = ProjectService(project_repository, catalog=rich_projects.catalog)
+    projects.rewrite_text = rich_projects.template_rewrite_text
+    projects.rewrite_cancel = rich_projects.template_rewrite_cancel
     app.state.projects = projects
     mount_projects_v2(app, projects)
 

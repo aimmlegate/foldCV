@@ -3,16 +3,13 @@ import test from "node:test";
 import { BlockNoteEditor } from "@blocknote/core";
 import type { Node } from "@tiptap/pm/model";
 import { TextSelection } from "@tiptap/pm/state";
-import { attachTemplateWriter } from "../src/background/connection";
-import { DraftRepository, type LocalDraft } from "../src/background/drafts";
 import type { TemplateProjectResponseV1 } from "../src/contracts/generated/template_project_response_v1";
-import { templateProjectWire } from "../src/contracts/template-validate";
 import { templateSchema } from "../src/rich/template-schema";
 import { selectedBlocks, textPosition } from "../src/rich/v7-extraction";
 import { projectTemplateDocument } from "../src/rich/v7-projection";
 import { templateSheet } from "../src/rich/v7-presentation";
 import { TemplateEditorSession, type TemplateEditor } from "../src/rich/v7-session";
-import { client, harness, type Harness } from "./support/template-harness";
+import { projectClient, harness, type Harness, type Traffic } from "./support/template-harness";
 
 function storage(): Storage {
   const values = new Map<string, string>();
@@ -26,33 +23,26 @@ const TASK = "Implemented queue processing.";
 const RESULT = "Our team reduced median latency from 800 ms to 500 ms.";
 type Opened = { session: TemplateEditorSession; editor: TemplateEditor; warnings: string[]; reopen: () => Promise<Opened> };
 
-async function opened(value: Harness, detach = true): Promise<Opened> {
-  const api = client(value, []), warnings: string[] = [];
-  let rows: LocalDraft[] = [];
-  const repository = new DraftRepository({ transact: work => { const next = work(rows); rows = next.rows; return Promise.resolve(next.result); },
-    discardProject: () => { rows = []; return Promise.resolve(); } }, () => Promise.reject(new Error("unused")));
-  if (detach) {
-    const fixture = await api.templateRead(value.proof);
-    await api.templateDetach({ schemaVersion: 2, proof: value.proof, canonicalRevision: fixture.writer.acknowledgedRevision,
-      canonicalSha256: fixture.writer.acknowledgedSha256 ?? fixture.workspaceSha256, actionCursor: fixture.writer.acknowledgedCursor, touches: [] });
-  }
-  const connection = await attachTemplateWriter(value.project, api, repository);
-  assert.ok(connection?.proof, connection?.error ?? "attach failed");
+async function opened(value: Harness): Promise<Opened> {
+  const warnings: string[] = [];
+  const traffic: Traffic[] = [];
+  const connection = await projectClient(value, traffic);
   const session = new TemplateEditorSession(connection, { status: () => {}, warning: text => warnings.push(text), mode: () => {}, shown: () => {} }, 60_000);
-  const response = await templateProjectWire(session.writer.durable);
+  const response = session.queue.template.durable;
   assert.ok(response?.workspace.project);
   const editor: TemplateEditor = BlockNoteEditor.create({ schema: templateSchema, initialContent: projectTemplateDocument(response.workspace.project.document) });
   editor._tiptapEditor.registerPlugin(session.plugin);
   session.bind(editor, response.workspace.project.document);
+  await session.recoverDraft();
   // Reopen: a clean detach, then a new writer session reads only the durable record.
-  const reopen = async () => { await session.writer.navigate(); session.close(); return opened(value, false); };
+  const reopen = async () => { await session.navigateAway(); session.close(); return opened(value); };
   return { session, editor, warnings, reopen };
 }
 
 type Part = Record<string, unknown>;
 type Shown = { id: string; parent: string; type: string; text: string; parts: Part[] };
 async function shown(session: TemplateEditorSession): Promise<{ response: TemplateProjectResponseV1; blocks: Shown[] }> {
-  const response = await templateProjectWire(session.queue.template.durable), project = response?.workspace.project;
+  const response = session.queue.template.durable, project = response?.workspace.project;
   assert.ok(response && project);
   const blocks: Shown[] = [];
   const visit = (block: Record<string, unknown>, parent: string) => {

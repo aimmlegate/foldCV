@@ -3,16 +3,13 @@ import test from "node:test";
 import { BlockNoteEditor } from "@blocknote/core";
 import type { Node } from "@tiptap/pm/model";
 import { TextSelection } from "@tiptap/pm/state";
-import { attachTemplateWriter } from "../src/background/connection";
-import { DraftRepository, type LocalDraft } from "../src/background/drafts";
-import { contentText, responseBlocks } from "../src/contracts/template-address";
-import { templateProjectWire } from "../src/contracts/template-validate";
+import { contentText, responseBlocks } from "../src/rich/v7-response";
 import { knownErrorMessage } from "../src/errors/messages";
-import { RichApiFailure } from "../src/rich/api";
+import { ProjectApiFailure } from "../src/rich/v7-connection";
 import { templateSchema } from "../src/rich/template-schema";
 import { projectTemplateDocument } from "../src/rich/v7-projection";
 import { TemplateEditorSession, type TemplateEditor } from "../src/rich/v7-session";
-import { client, harness, type Harness, type Traffic } from "./support/template-harness";
+import { projectClient, harness, type Harness, type Traffic } from "./support/template-harness";
 
 function storage(): Storage {
   const values = new Map<string, string>();
@@ -26,22 +23,17 @@ const paperText = "By Shared title / Journal North.";
 type Opened = { session: TemplateEditorSession; editor: TemplateEditor; warnings: string[]; traffic: Traffic[] };
 
 async function opened(value: Harness): Promise<Opened> {
-  const traffic: Traffic[] = [], api = client(value, traffic), warnings: string[] = [];
-  let rows: LocalDraft[] = [];
-  const repository = new DraftRepository({ transact: work => { const next = work(rows); rows = next.rows; return Promise.resolve(next.result); },
-    discardProject: () => { rows = []; return Promise.resolve(); } }, () => Promise.reject(new Error("unused")));
-  const fixture = await api.templateRead(value.proof);
-  await api.templateDetach({ schemaVersion: 2, proof: value.proof, canonicalRevision: fixture.writer.acknowledgedRevision,
-    canonicalSha256: fixture.writer.acknowledgedSha256 ?? fixture.workspaceSha256, actionCursor: fixture.writer.acknowledgedCursor, touches: [] });
-  const connection = await attachTemplateWriter(value.project, api, repository);
-  assert.ok(connection?.proof, connection?.error ?? "attach failed");
+  const warnings: string[] = [];
+  const traffic: Traffic[] = [];
+  const connection = await projectClient(value, traffic);
   const session = new TemplateEditorSession(connection, { status: () => {}, warning: text => warnings.push(text), mode: () => {}, shown: () => {} }, 60_000);
-  const response = await templateProjectWire(session.writer.durable);
+  const response = session.queue.template.durable;
   assert.ok(response?.workspace.project);
   const editor: TemplateEditor = BlockNoteEditor.create({ schema: templateSchema, initialContent: projectTemplateDocument(response.workspace.project.document) });
   // Headless editors install extension plugins only on mount; the session plugin is registered directly.
   editor._tiptapEditor.registerPlugin(session.plugin);
   session.bind(editor);
+  await session.recoverDraft();
   return { session, editor, warnings, traffic };
 }
 function doc(editor: TemplateEditor): Node { return editor._tiptapEditor.state.doc; }
@@ -99,7 +91,7 @@ test("Undo and Redo run as server commands and re-project the editor", async () 
     await session.navigate("redo");
     assert.ok(editorTexts(editor).includes("block-paper-a=By Shared title! / Journal North."));
     assert.equal(session.history.position, 1);
-    assert.equal(session.writer.mode, "normal");
+    assert.equal(session.mode, "normal");
   } finally { session.close(); await value.close(); }
 });
 
@@ -168,7 +160,7 @@ test("IME input beside repeated characters survives save, projection and reopen"
     const expected = `block-paper-a=あああ${paperText}`;
     assert.ok(canonicalTexts(session).includes(expected));
     assert.ok(editorTexts(editor).includes(expected));
-    await session.writer.navigate(); await session.resume();
+    await session.navigateAway(); await session.resume();
     assert.ok(canonicalTexts(session).includes(expected));
     assert.equal(warnings.length, 0, warnings.join("\n"));
   } finally { session.close(); await value.close(); }
@@ -193,10 +185,10 @@ test("a definitive rejection keeps all input; retry re-expresses it from canonic
   const value = await harness();
   const { session, editor, warnings } = await opened(value);
   try {
-    const api = session.writer.connection.api, prepare = api.templatePrepareDelta.bind(api);
+    const api = session.connection, prepare = api.edit.bind(api);
     let reject = true;
-    api.templatePrepareDelta = (...args) => {
-      if (reject) { reject = false; return Promise.reject(new RichApiFailure("PREPARATION_RESPONSE_FORM_CONFLICT", 409)); }
+    api.edit = (...args) => {
+      if (reject) { reject = false; return Promise.reject(new ProjectApiFailure("V7_INPUT_REJECTED", 422)); }
       return prepare(...args);
     };
     const a = start(editor, "block-paper-a");
@@ -217,23 +209,6 @@ test("a definitive rejection keeps all input; retry re-expresses it from canonic
   } finally { session.close(); await value.close(); }
 });
 
-test("a composition ending while input is locked is queued once the writer unlocks", async () => {
-  const value = await harness();
-  const { session, editor } = await opened(value);
-  try {
-    session.compositionStart();
-    dispatch(editor, tr => { tr.insertText("ü", start(editor, "block-paper-a") + 16); });
-    for (let index = 0; index < 100; index++) session.writer.input();
-    assert.equal(session.writer.writable, false);
-    session.compositionEnd();
-    assert.equal(session.queue.template.pending.length, 0, "deferred while the writer is locked");
-    await session.writer.flushTouches();
-    assert.equal(session.queue.template.pending.length, 1);
-    await session.flush();
-    assert.ok(canonicalTexts(session).includes("block-paper-a=By Shared titleü / Journal North."));
-  } finally { session.close(); await value.close(); }
-});
-
 test("leaving drains and detaches; resume reattaches the same session and input saves again", async () => {
   const value = await harness();
   const { session, editor } = await opened(value);
@@ -241,11 +216,11 @@ test("leaving drains and detaches; resume reattaches the same session and input 
     dispatch(editor, tr => { tr.insertText("!", start(editor, "block-paper-a") + 16); });
     // The caret follows typed text; re-projections keep it after "!" although "!" becomes its own field fragment.
     caret(editor, start(editor, "block-paper-a") + 17);
-    await session.writer.navigate();
-    assert.equal(session.writer.mode, "detached");
+    await session.navigateAway();
+    assert.equal(session.mode, "detached");
     assert.ok(canonicalTexts(session).includes("block-paper-a=By Shared title! / Journal North."), "navigation drained pending input");
     await session.resume();
-    assert.equal(session.writer.mode, "normal");
+    assert.equal(session.mode, "normal");
     dispatch(editor, tr => { tr.insertText("?", tr.selection.from); });
     await session.flush();
     assert.ok(canonicalTexts(session).includes("block-paper-a=By Shared title!? / Journal North."));
@@ -268,7 +243,7 @@ test("an outside canonical advance (export record) is adopted; later saves and d
     assert.ok(canonicalTexts(session).includes("block-paper-a=By Shared title!? / Journal North."));
     // Without a refresh, a stale detach header is re-read once while this writer still owns the session.
     await advance();
-    await session.writer.navigate();
-    assert.equal(session.writer.mode, "detached");
+    await session.navigateAway();
+    assert.equal(session.mode, "detached");
   } finally { session.close(); await value.close(); }
 });
