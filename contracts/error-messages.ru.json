@@ -300,7 +300,13 @@
     "detail_text_meaning": "Текст мог изменить смысл исходных сведений. Сверьте его с оригиналом.",
     "detail_leadership_scope": "Проверьте масштаб руководства и роль кандидата по исходнику.",
     "editRejected": "Эту правку нельзя сохранить в текущем виде. Исправьте текст и повторите сохранение.",
-    "inputUnsupported": "Такое изменение пока недоступно в этом шаблоне. Текст в редакторе не изменён."
+    "inputUnsupported": "Такое изменение пока недоступно в этом шаблоне. Текст в редакторе не изменён.",
+    "revisionConflict": "Документ изменился, пока сохранялась правка. Открыта текущая версия; повторите правку, если она ещё нужна.",
+    "editorReopen": "Связь с редактором прервалась, например после перезапуска приложения. Документ открывается заново.",
+    "editorReplaced": "Этот проект открыт в другой вкладке или окне. Продолжите работу там.",
+    "projectReadOnly": "Проект открыт только для чтения. Изменения не сохранены.",
+    "historyStale": "История отмены изменилась. Шаг не выполнен; показана текущая версия документа.",
+    "projectExists": "Проект с таким идентификатором уже существует. Откройте его из списка."
   },
   "codes": {
     "ASSISTANT_UNSUPPORTED_TASK": "assistantUnsupported",
@@ -1089,7 +1095,13 @@
     "DRAFT_RECOVERY_REQUIRED": "draft",
     "WRITER_QUEUE_REQUIRED": "request",
     "WRITER_QUEUE_ATTACHED": "request",
-    "V7_INPUT_UNSUPPORTED": "inputUnsupported"
+    "V7_INPUT_UNSUPPORTED": "inputUnsupported",
+    "REVISION_CONFLICT": "revisionConflict",
+    "EDITOR_TOKEN_UNKNOWN": "editorReopen",
+    "EDITOR_REPLACED": "editorReplaced",
+    "PROJECT_READ_ONLY": "projectReadOnly",
+    "HISTORY_STALE": "historyStale",
+    "PROJECT_EXISTS": "projectExists"
   },
   "nonErrorSymbols": {
     "CLOCK_BOOTTIME": "Operating-system clock identifier",
@@ -1106,6 +1118,7 @@
     "XDG_CACHE_HOME": "Cache environment setting",
     "XDG_DATA_HOME": "Data environment setting",
     "XDG_STATE_HOME": "State environment setting",
-    "COPY_OK": "Successful clipboard marker"
+    "COPY_OK": "Successful clipboard marker",
+    "FOLDCV_VERIFY": "Test verification environment setting"
   }
 }

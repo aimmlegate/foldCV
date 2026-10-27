@@ -13,21 +13,12 @@ from .models.rich_workspace import WorkspaceV6
 from .models.template_workspace import WorkspaceV7
 from .project_store import ProjectStore, ProjectStoreFailure, owned_file, strict_json
 from .project_limits import project_file_bytes
+from .project_repository import (history_blobs, inline_history, load_stored_data, read_history_file,
+    rich_snapshot_bytes, stored_owners)
 from .rich_limits import DOCX_BYTES, WORKSPACE_BYTES
 from .rich_limits import ImageReferences, retained_image_bytes
 from .rich_images import ImageFailure, verify_image_bytes
 from .storage import StorageFailure, atomic_write, locked_root, private_directory
-
-
-def rich_snapshot_bytes(workspace: WorkspaceV6) -> bytes:
-    if workspace.schema_version == 7:
-        raw = json.dumps(workspace.model_dump(mode='json', by_alias=True), sort_keys=True,
-            ensure_ascii=False, allow_nan=False, separators=(',', ':')).encode('utf-8')
-    else:
-        raw = workspace.model_dump_json(by_alias=True).encode("utf-8")
-    if len(raw) > WORKSPACE_BYTES:
-        raise ProjectStoreFailure("PROJECT_TOO_LARGE")
-    return raw
 
 
 def decode_rich_snapshot(raw: bytes) -> WorkspaceV6:
@@ -40,38 +31,6 @@ def decode_rich_data(data) -> WorkspaceV6:
     if data["schemaVersion"] == 6: return WorkspaceV6.model_validate(data)
     if data["schemaVersion"] == 7: return WorkspaceV7.model_validate(data)
     raise ProjectStoreFailure("PROJECT_VERSION_UNSUPPORTED")
-
-
-def stored_owners(data):
-    return [owner for owner in (data.get("project"), data.get("preDraft")) if isinstance(owner, dict)] if isinstance(data, dict) else []
-
-
-def inline_history(data) -> bool:
-    """A version 7 file written before D104 keeps import records or asset bytes in the workspace JSON."""
-    if not isinstance(data, dict) or data.get("schemaVersion") != 7:
-        return False
-    project = data.get("project")
-    return (isinstance(project, dict) and "templateOperations" in project) or any(
-        isinstance(asset, dict) and "bytesBase64" in asset
-        for owner in stored_owners(data) for asset in ((owner.get("templatePackage") or {}).get("assets") or []))
-
-
-def history_blobs(workspace):
-    """Content-addressed files for a project's loaded import records and every captured asset (D104)."""
-    from .models.template_workspace import history_bytes
-    blobs = []
-    owner = workspace.project or workspace.pre_draft if workspace.schema_version == 7 else None
-    if owner is None:
-        return blobs
-    if workspace.project is not None:
-        for operation in workspace.project.template_operations:
-            raw = history_bytes(operation)
-            digest = hashlib.sha256(raw).hexdigest()
-            blobs.append(("history", digest, raw, digest))
-    if owner.template_package is not None:
-        for asset in owner.template_package.assets:
-            blobs.append(("template-assets", asset.sha256, base64.b64decode(asset.bytes_base64, validate=True), asset.sha256))
-    return blobs
 
 
 @dataclass(frozen=True)
@@ -167,32 +126,10 @@ class RichProjectStore(ProjectStore):
     def _decode(self, directory, raw, *, history=False):
         """The workspace of a project file; asset bytes come from the project's asset files and import records from its
         history files, and only when asked for (D104)."""
-        from .templates.models import asset_text, remember_asset
-        data = strict_json(raw)
-        for owner in stored_owners(data):
-            for asset in ((owner.get("templatePackage") or {}).get("assets") or []):
-                digest = asset.get("sha256") if isinstance(asset, dict) else None
-                if isinstance(digest, str) and "bytesBase64" not in asset and asset_text(digest) is None:
-                    path = self._blob(directory, "template-assets", digest)
-                    owned_file(path, 20 * 1024 * 1024)
-                    remember_asset(digest, base64.b64encode(path.read_bytes()).decode("ascii"))
-        project = data.get("project") if isinstance(data, dict) else None
-        if history and isinstance(project, dict) and project.get("importHistory") and "templateOperations" not in project:
-            project["templateOperations"] = [strict_json(self._history(directory, ref.get("sha256")))
-                for ref in project["importHistory"] if isinstance(ref, dict)]
-        return decode_rich_data(data)
+        return decode_rich_data(load_stored_data(directory, raw, history=history))
 
     def _history(self, directory, digest):
-        if not isinstance(digest, str) or re.fullmatch(r"[0-9a-f]{64}", digest) is None:
-            raise ProjectStoreFailure("PROJECT_LOAD_FAILED")
-        path = self._blob(directory, "history", digest)
-        owned_file(path, WORKSPACE_BYTES)
-        raw = path.read_bytes()
-        if hashlib.sha256(raw).hexdigest() != digest:
-            raise ProjectStoreFailure("PROJECT_LOAD_FAILED")
-        from .models.template_workspace import remember_history
-        remember_history(digest, raw)
-        return raw
+        return read_history_file(directory, digest)
 
     def load_history(self, workspace):
         """The same workspace with its project's import records loaded, for imports, publication and archives."""
@@ -213,29 +150,9 @@ class RichProjectStore(ProjectStore):
     def externalize_history(self):
         """Move import records and asset bytes of files written before D104 into their own files, once, before any
         service reads a project. Each editor state keeps working: its recorded file hash moves to the new bytes."""
+        from .project_repository import externalize_history
         try:
-            with locked_root(self.root, ".projects.lock"):
-                if not self.projects.exists():
-                    return []
-                moved = []
-                for directory in sorted(self.projects.iterdir()):
-                    target = directory / "workspace.json"
-                    if not target.is_file() or target.is_symlink():
-                        continue
-                    owned_file(target)
-                    raw = target.read_bytes()
-                    if not inline_history(strict_json(raw)):
-                        continue
-                    workspace = self._decode(directory, raw)
-                    for kind, identifier, blob, checksum in history_blobs(workspace):
-                        path = self._blob(directory, kind, identifier)
-                        if not path.exists():
-                            atomic_write(path, blob)
-                    slim = rich_snapshot_bytes(workspace)
-                    self._rebase_background(workspace.project_id, hashlib.sha256(raw).hexdigest(), hashlib.sha256(slim).hexdigest())
-                    atomic_write(target, slim)
-                    moved.append(workspace.project_id)
-                return moved
+            return externalize_history(self, moved=self._rebase_background)
         except ProjectStoreFailure:
             raise
         except (StorageFailure, OSError, ValueError):
@@ -618,7 +535,7 @@ class RichProjectStore(ProjectStore):
                 directory = self._directory(id)
                 files, folders = [], []
                 for path in directory.iterdir():
-                    if path.name in {"workspace.json", ".project-identity.json"}:
+                    if path.name in {"workspace.json", ".project-identity.json", "history.jsonl"}:
                         owned_file(path); files.append(path)
                     elif path.name in {"sources", "renders", "images", "history", "template-assets"}:
                         private_directory(path)

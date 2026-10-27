@@ -16,7 +16,7 @@ import uvicorn
 
 from .app import create_app
 from .contracts import HostLaunchOptions
-from .lifecycle import require_supported_host
+from .lifecycle import require_supported_host, tune_garbage_collector
 from .cli.experimental_profile import installed_profile
 
 
@@ -56,6 +56,7 @@ async def launch(*, port: int = 0, open_browser: bool = True,
                          cli_executable=profile.executable if profile else cli_executable,
                          experimental_profile=profile, background_enabled=True,
                          template_import_call_cap=TEMPLATE_IMPORT_CALL_CAP)
+        tune_garbage_collector()
         config = uvicorn.Config(app, host="127.0.0.1", port=actual_port, proxy_headers=False,
                                 access_log=False, server_header=False, log_level="critical",
                                 timeout_graceful_shutdown=2)

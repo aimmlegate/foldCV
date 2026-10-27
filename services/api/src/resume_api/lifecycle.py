@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from contextlib import contextmanager
+import gc
 import json
 import platform
 from pathlib import Path
@@ -14,6 +15,19 @@ from spikes.cli.runner import SpikeError, cleanup_intent_ids, operation, reap_ow
 
 
 OWNER = "foldcv-service-v1"
+
+
+# D108: collections of the long-lived project objects were 35-40 % of an edit; freeze them and collect less often.
+GC_THRESHOLD = (50000, 20, 20)
+
+
+def tune_garbage_collector() -> tuple[int, int, int]:
+    """Freeze what startup allocated and raise the thresholds; returns the previous thresholds."""
+    previous = gc.get_threshold()
+    gc.collect()
+    gc.freeze()
+    gc.set_threshold(*GC_THRESHOLD)
+    return previous
 
 
 def require_supported_host() -> None:
