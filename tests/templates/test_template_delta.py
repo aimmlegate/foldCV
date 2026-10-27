@@ -21,7 +21,7 @@ def test_one_character_delta_has_exact_result_and_omits_large_unchanged_resume()
     before, _ = large_workspace()
     base = response(before)
     request = command(before, start=2, end=2, text='!', target={'kind': 'literal'})
-    full = prepare_text_edit(base, request, proof())
+    full = prepare_text_edit(base, request)
     delta = prepared_delta(base, full)
     raw = canonical(delta)
     assert len(raw) < 6000
@@ -34,7 +34,7 @@ def test_one_character_delta_has_exact_result_and_omits_large_unchanged_resume()
     assert delta.mutation_wire == full.mutation.model_dump_json(by_alias=True)
     assert delta.presentation_patch.set == {} and delta.presentation_patch.remove == []
     assert delta.created_ids == full.created_ids
-    assert canonical(prepare_text_delta(base, request, proof())) == raw
+    assert canonical(prepare_text_delta(base, request)) == raw
 
 
 def test_noop_retains_exact_base_identity_generation_and_no_mutation_or_patch():
@@ -42,7 +42,7 @@ def test_noop_retains_exact_base_identity_generation_and_no_mutation_or_patch():
     base = response(before)
     base.generation = RichGenerationState(id='controlled-generation', status='running', stage='assemble', errorCode=None)
     original = before.project.document.regions[2].blocks[0].content[0]
-    result = prepare_text_delta(base, command(before, text=original.text[:6]), proof())
+    result = prepare_text_delta(base, command(before, text=original.text[:6]))
     assert result.mutation_wire is None and result.workspace_patch == []
     assert result.base_snapshot == result.result_snapshot and result.base_workspace_sha256 == result.result_workspace_sha256
     assert result.result_identity == base.identity and result.result_generation == base.generation
@@ -52,7 +52,7 @@ def test_noop_retains_exact_base_identity_generation_and_no_mutation_or_patch():
 @pytest.mark.parametrize('change', ['base', 'package', 'identity'])
 def test_unbound_base_package_or_derived_metadata_cannot_supply_a_delta(change):
     before, _ = workspace(); base = response(before)
-    full = prepare_text_edit(base, command(before), proof())
+    full = prepare_text_edit(base, command(before))
     if change == 'base':
         base.workspace.project.document.regions[2].blocks[0].content[0].text += 'changed'
     elif change == 'package':
@@ -67,7 +67,7 @@ def test_unbound_base_package_or_derived_metadata_cannot_supply_a_delta(change):
 @pytest.mark.parametrize('change', ['mutation_wire', 'client_id', 'result_revision', 'duplicate_ids', 'presentation_overlap'])
 def test_delta_wire_binds_its_mutation_capture_identity_and_disjoint_reference_patch(change):
     before, _ = workspace()
-    delta = prepare_text_delta(response(before), command(before), proof())
+    delta = prepare_text_delta(response(before), command(before))
     value = delta.model_dump(mode='json', by_alias=True)
     if change == 'mutation_wire':
         value['mutationWire'] += ' '
@@ -89,7 +89,7 @@ def test_delta_payload_enforces_existing_budget_before_any_retention(monkeypatch
     before, _ = workspace()
     monkeypatch.setattr(template_delta, 'LIMITS', replace(template_delta.LIMITS, proposal_bytes=1))
     with pytest.raises(BackgroundFailure, match='JOB_STORAGE_FULL'):
-        prepare_text_delta(response(before), command(before), proof())
+        prepare_text_delta(response(before), command(before))
 
 
 def test_editor_plan_patch_is_exact_and_sends_changed_parts_whole_past_its_bound():

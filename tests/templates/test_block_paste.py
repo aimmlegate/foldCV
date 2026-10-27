@@ -39,7 +39,7 @@ def test_block_capture_paste_keeps_order_styles_provenance_and_fresh_semantic_ro
     originals[0].props.alignment='right';originals[0].content[0].styles.bold=True
     clipboard=block_capture(before,list(reversed(originals)));raw=canonical(before)
     intent=block_request(before,clipboard,after=originals[-1].id)
-    prepared=prepare_edit(response(before),intent,proof(),clipboard=clipboard)
+    prepared=prepare_edit(response(before),intent,clipboard=clipboard)
     after=prepared.preview.workspace;copied=after.project.document.regions[2].blocks[2:]
     assert [block.content[0].cell_id for block in copied]==['a-title','b-title']
     assert not {block.id for block in copied}&{block.id for block in originals}
@@ -47,14 +47,14 @@ def test_block_capture_paste_keeps_order_styles_provenance_and_fresh_semantic_ro
     assert copied[0].props.alignment=='right' and copied[0].content[0].styles.bold
     assert copied[0].presentation==originals[0].presentation and after.project.facts==before.project.facts
     assert canonical(before)==raw and apply_rich_mutation(before,prepared.mutation)[0]==after
-    assert canonical(prepare_edit(response(before),intent,proof(),clipboard=clipboard))==canonical(prepared)
+    assert canonical(prepare_edit(response(before),intent,clipboard=clipboard))==canonical(prepared)
 
 
 def test_split_semantic_capture_keeps_one_fresh_occurrence_across_copied_blocks():
     before,_=workspace();region=before.project.document.regions[2]
     left,right=split_block(region.blocks[0],7);region.blocks[:1]=[left,right]
     clipboard=block_capture(before,[right,left])
-    prepared=prepare_edit(response(before),block_request(before,clipboard,after=region.blocks[-1].id),proof(),clipboard=clipboard)
+    prepared=prepare_edit(response(before),block_request(before,clipboard,after=region.blocks[-1].id),clipboard=clipboard)
     copied=prepared.preview.workspace.project.document.regions[2].blocks[-2:]
     spans=[block.content[0] for block in copied]
     assert [span.text for span in spans]==['Shared ','title']
@@ -68,7 +68,7 @@ def test_partial_block_capture_stays_cited_literal_after_former_cell_changes():
     left,right=split_block(region.blocks[0],7);region.blocks[:1]=[left,right]
     clipboard=block_capture(before,[left]);assert isinstance(clipboard.payload.blocks[0].content[0],PresentedText)
     before.project.facts=human_edit(before.project.facts,'paper-a','title','Later authority')
-    prepared=prepare_edit(response(before),block_request(before,clipboard,after=region.blocks[-1].id),proof(),clipboard=clipboard)
+    prepared=prepare_edit(response(before),block_request(before,clipboard,after=region.blocks[-1].id),clipboard=clipboard)
     part=prepared.preview.workspace.project.document.regions[2].blocks[-1].content[0]
     assert isinstance(part,PresentedText) and part.text=='Shared ' and part.citations
     assert prepared.preview.workspace.project.facts==before.project.facts
@@ -112,5 +112,5 @@ def test_block_paste_rejects_wrong_capture_or_current_authority_without_mutation
     elif damage=='placement':after='missing-sibling'
     elif damage=='identity':clipboard.capture.project_id='another-project'
     raw=canonical(before)
-    with pytest.raises(ValueError):prepare_edit(response(before),block_request(before,clipboard,parent=parent,after=after),proof(),clipboard=clipboard)
+    with pytest.raises(ValueError):prepare_edit(response(before),block_request(before,clipboard,parent=parent,after=after),clipboard=clipboard)
     assert canonical(before)==raw

@@ -1,7 +1,5 @@
-"""Safe project failure codes shared by project operations."""
+"""Safe project failure codes shared by project operations; the class lives with the /v2 project routes."""
 
+from .projects.errors import ProjectFailure
 
-class ProjectFailure(Exception):
-    def __init__(self, code, status=409):
-        self.code, self.status = code, status
-        super().__init__(code)
+__all__ = ['ProjectFailure']

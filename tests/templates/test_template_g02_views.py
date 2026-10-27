@@ -29,7 +29,7 @@ def request(workspace, operation, identifier):
 
 
 def edit(workspace, operation, identifier):
-    prepared = prepare_edit(response(workspace), request(workspace, operation, identifier), proof())
+    prepared = prepare_edit(response(workspace), request(workspace, operation, identifier))
     after = apply_rich_mutation(workspace, prepared.mutation)[0]
     assert canonical(after) == canonical(prepared.preview.workspace)
     return after

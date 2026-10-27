@@ -5,14 +5,13 @@ from .rich_fields import inline_groups
 from .template_anchors import anchor_steps
 from .template_preparation_blocks import changed_block_steps
 from .template_preparation_cells import human_cell_steps
-from .template_preparation_common import finish_preparation, prepared_response, validate_preparation
-from .template_preparation_ids import EditIdAllocator, existing_ids
+from .template_preparation_common import allocator_for, finish_preparation, prepared_response, validate_preparation
 
 
-def prepare_link_target(response, request, proof):
-    validate_preparation(response, request, proof)
+def prepare_link_target(response, request, *, occupied=None):
+    validate_preparation(response, request)
     workspace, operation = response.workspace, request.operations[0]
-    allocator = EditIdAllocator(proof, request.client_mutation_id, operation.op_id, existing_ids(workspace))
+    allocator = allocator_for(response, request, operation, occupied)
     candidate = workspace.project.model_copy(deep=True)
     block = next((value for value in candidate.document.blocks() if value.id == operation.block_id), None)
     if block is None or block.revision != operation.before_revision:

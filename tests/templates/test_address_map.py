@@ -25,7 +25,7 @@ from tests.templates.test_template_preparation import proof, response
 
 
 def mapped(value, request):
-    prepared = prepare_edit(response(value), request, proof())
+    prepared = prepare_edit(response(value), request)
     address = build_address_map(response(value), request, prepared)
     check_map(value, prepared.preview.workspace, address, prepared.created_ids)
     return prepared, address
@@ -172,7 +172,7 @@ def probe_targets(after, address):
                 continue
             request = text_request(after, offset, offset, 'z', target=target, block=entry['output']['blockId'],
                 identifier='probe-' + str(count))
-            prepared = prepare_edit(response(after), request, proof())
+            prepared = prepare_edit(response(after), request)
             assert prepared.mutation is not None
             count += 1
     return count
@@ -364,7 +364,7 @@ def test_both_response_forms_carry_the_map_of_their_own_preparation(tmp_path, fo
     fixture = setup(tmp_path)
     intent = bound(fixture, writer_request(fixture))
     base = response(fixture.current())
-    expected = build_address_map(base, intent.preparation, prepare_edit(base, intent.preparation, fixture.proof))
+    expected = build_address_map(base, intent.preparation, prepare_edit(base, intent.preparation))
     method = fixture.writers.prepare_edit if form == 'full' else fixture.writers.prepare_edit_delta
     result = method(fixture.project, intent)
     assert isinstance(result, WriterPreparedEditV2 if form == 'full' else WriterPreparedDeltaV2)
@@ -451,7 +451,7 @@ def test_table_cells_are_cell_containers_even_when_named_like_plain_fields(cell_
     inserted = next(value for value in entry['boundaries'] if value['offset'] == 9)['before']
     follow = text_request(prepared.preview.workspace, 9, 9, 'Y', target=inserted, identifier='cell-follow')
     follow.operations[0].range.cell_id = cell_id
-    assert prepare_edit(response(prepared.preview.workspace), follow, proof()).mutation is not None
+    assert prepare_edit(response(prepared.preview.workspace), follow).mutation is not None
 
 
 def test_text_inside_a_plain_link_uses_link_child_paths_and_reports_unsupported_interiors():

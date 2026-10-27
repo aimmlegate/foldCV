@@ -56,9 +56,9 @@ def panel(before, operation='edit', *, values=None, period_id=None, identifier='
 
 def prepared(before, request):
     raw=canonical(before)
-    result=prepare_edit(response(before),request,proof())
+    result=prepare_edit(response(before),request)
     assert canonical(before)==raw
-    assert canonical(result)==canonical(prepare_edit(response(before),request,proof()))
+    assert canonical(result)==canonical(prepare_edit(response(before),request))
     if result.mutation:
         assert apply_rich_mutation(before,result.mutation)[0]==result.preview.workspace
     return result
@@ -149,7 +149,7 @@ def test_independent_link_references_reject_panel_changes_even_without_field_chi
         labelBinding=bound if binding=='label' else None,urlBinding=bound if binding=='url' else None,presentation=original.presentation)
     before=WorkspaceV7.model_validate(before.model_dump(by_alias=True));raw=canonical(before)
     with pytest.raises(ValueError,match='semantic link panel editing'):
-        prepare_edit(response(before),panel(before,values={'employer':'Changed company'}),proof())
+        prepare_edit(response(before),panel(before,values={'employer':'Changed company'}))
     assert canonical(before)==raw
     role=prepared(before,panel(before,values={'role':'Unrelated role'}))
     assert role.preview.workspace.project.document.regions[2].blocks[0].content[0]==block.content[0]
@@ -223,7 +223,7 @@ def test_period_deletion_detaches_unowned_human_scope_and_history_restores_its_e
 def test_panel_edit_detaches_only_last_unowned_manual_display_and_preserves_historical_scope():
     before,_=scoped_workspace();block=before.project.document.regions[2].blocks[0]
     joined=text_command(before,start=0,end=sum(len(span.text) for span in block.content),text='Exact company and role')
-    before=prepare_edit(response(before),joined,proof()).preview.workspace
+    before=prepare_edit(response(before),joined).preview.workspace
     result=prepared(before,panel(before,values={'employer':'Direct company','role':'Direct role'}))
     current=result.preview.workspace
     assert current.project.facts.manual_scopes==before.project.facts.manual_scopes
@@ -262,7 +262,7 @@ def test_stale_or_unsupported_panel_request_retains_base(damage):
     elif damage=='capture':command.capture.action_token+=1
     else:command.operation='add_period'
     raw=canonical(before)
-    with pytest.raises(ValueError):prepare_edit(response(before),request,proof())
+    with pytest.raises(ValueError):prepare_edit(response(before),request)
     assert canonical(before)==raw
 
 

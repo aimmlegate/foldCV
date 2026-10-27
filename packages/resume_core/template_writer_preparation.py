@@ -114,7 +114,7 @@ class TemplateWriterPreparation:
                     if isinstance(operation, (PasteInline, PasteBlocks)) and operation.source.kind == 'same_project' else None)
                 try:
                     response = self.view(state, workspace, checksum).response
-                    prepared = prepare_edit(response, request.preparation, request.proof, clipboard=clipboard)
+                    prepared = prepare_edit(response, request.preparation, clipboard=clipboard)
                     # One preparation builds the map from its own exact result; retries reuse it.
                     address = build_address_map(response, request.preparation, prepared)
                     if response_form == 'delta':

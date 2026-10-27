@@ -32,7 +32,7 @@ def test_exact_run_citations_survive_cut_allocation_marks_and_partial_literal_co
     assert fragment.citations==[extra]
     allocated=allocate_classified_inline([fragment])[0]
     assert allocated.citations==[extra] and allocated.binding_id!=fragment.binding_id
-    prepared=prepare_text_edit(response(before),command(before,kind='set_marks',styles={'bold':True}),proof())
+    prepared=prepare_text_edit(response(before),command(before,kind='set_marks',styles={'bold':True}))
     assert all(part.citations==[extra] for part in prepared.preview.workspace.project.document.regions[2].blocks[0].content)
     literal=classify_fragment(before.project,block,1,4).content[0]
     assert literal.type=='text' and literal.citations==[extra,*before.project.facts.extensions[0].cells[0].evidence]

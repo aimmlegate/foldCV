@@ -34,7 +34,7 @@ def resolve_request(before,source=None):
 
 def moved():
     before,sources,_command=conflicted_move()
-    prepared=prepare_edit(response(before),move_request(before),proof())
+    prepared=prepare_edit(response(before),move_request(before))
     return before,sources,prepared
 
 
@@ -51,7 +51,7 @@ def link_mentions(before):
 def test_link_only_mentions_create_the_same_explicit_ownership_conflict():
     before,_sources,_command=conflicted_move();link_mentions(before)
     groups=occurrence_blocks(before.project,'paper-a');assert len(groups)==2
-    result=prepare_edit(response(before),move_request(before),proof()).preview.workspace
+    result=prepare_edit(response(before),move_request(before)).preview.workspace
     assert result.project.facts.relations[0].target_id=='employer-b'
     assert len(result.sync_records)==1
     conflict=result.sync_records[0].ownership_conflict
@@ -67,7 +67,7 @@ def test_prepared_move_reports_actual_lifecycles_preserves_other_mentions_and_re
     before.project.import_issues=[issue('subject-owner','paper-a'),issue('relation-owner',relation.id),issue('unrelated','paper-b')]
     before.project.import_issues[1].block_ids=['block-paper-a']
     raw=canonical(before);request=move_request(before)
-    result=prepare_edit(response(before),request,proof());current=result.preview.workspace
+    result=prepare_edit(response(before),request);current=result.preview.workspace
     assert canonical(before)==raw
     assert current.project.facts.relations[0].target_id=='employer-b'
     assert [value.state for value in current.project.import_issues]==['retired','retired','active']
@@ -76,13 +76,13 @@ def test_prepared_move_reports_actual_lifecycles_preserves_other_mentions_and_re
     source=current.sync_records[-1];outputs=result.created_ids['structure']
     assert outputs[canonical(['sync-lifecycle',source.id]).decode()]==source.lifecycle_id
     assert source.id in outputs.values() and source.ownership_conflict.record_id=='paper-a'
-    assert canonical(result)==canonical(prepare_edit(response(before),request,proof()))
+    assert canonical(result)==canonical(prepare_edit(response(before),request))
     assert apply_rich_mutation(before,result.mutation)[0]==current
 
 
 def test_explicit_ownership_resolution_supersedes_old_row_and_retains_a_new_unresolved_result():
     _before,_sources,move=moved();before=move.preview.workspace;original=before.sync_records[-1]
-    request=resolve_request(before);result=prepare_edit(response(before),request,proof());current=result.preview.workspace
+    request=resolve_request(before);result=prepare_edit(response(before),request);current=result.preview.workspace
     old,new=current.sync_records
     assert old.id==original.id and old.action_id==original.action_id and old.status=='stale'
     assert old.error_code=='SYNC_SUPERSEDED' and not old.ready and not old.proposed_steps
@@ -112,14 +112,14 @@ def test_invalid_resolution_rejects_before_any_row_changes(damage):
         else:source.dependencies[0].fingerprint='0'*64
         request=resolve_request(before)
     raw=canonical(before)
-    with pytest.raises(ValueError):prepare_edit(response(before),request,proof())
+    with pytest.raises(ValueError):prepare_edit(response(before),request)
     assert canonical(before)==raw
 
 
 @pytest.mark.parametrize('damage',['missing_lineage','wrong_lineage','old_status','new_payload','new_status','new_capture','extra_write'])
 def test_resolution_engine_requires_exact_lineage_and_atomic_supersession(damage):
     _before,_sources,move=moved();before=move.preview.workspace
-    result=prepare_edit(response(before),resolve_request(before),proof());value=result.mutation.model_dump(by_alias=True)
+    result=prepare_edit(response(before),resolve_request(before));value=result.mutation.model_dump(by_alias=True)
     old,new=value['steps']
     if damage=='missing_lineage':new['record'].pop('resolutionOf')
     elif damage=='wrong_lineage':new['record']['resolutionOf']['beforeRecordHash']='0'*64
@@ -137,7 +137,7 @@ def test_inert_archive_resolution_uses_current_opening_without_reusing_foreign_c
     _before,sources,move=moved();before=move.preview.workspace
     imported,retained,_,_=open_rich_archive(export_rich_archive(before,sources,{},{}),'ownership-copy')
     assert retained==sources and imported.sync_records[0].capture is None
-    request=resolve_request(imported);result=prepare_edit(response(imported),request,proof())
+    request=resolve_request(imported);result=prepare_edit(response(imported),request)
     assert all(row.capture==request.capture for row in result.preview.workspace.sync_records)
     assert result.preview.workspace.sync_records[-1].status=='conflict'
     assert result.preview.workspace.project.facts==imported.project.facts
@@ -150,7 +150,7 @@ def test_inert_resolution_preserves_historical_partition_after_current_display_m
     current,_=apply_rich_mutation(imported,mutation_request(imported,[{'kind':'move_block','blockId':block.id,
         'beforeRevision':block.revision,'parentId':'owner-a','afterId':None}],'display-return-only'))
     original=current.sync_records[0]
-    result=prepare_edit(response(current),resolve_request(current),proof()).preview.workspace
+    result=prepare_edit(response(current),resolve_request(current)).preview.workspace
     assert result.sync_records[-1].ownership_conflict==original.ownership_conflict
     assert result.sync_records[-1].status=='conflict'
     assert result.sync_records[-1].error_code=='NARRATIVE_REQUIRES_SCOPED_EDIT'
@@ -164,10 +164,10 @@ def test_move_and_resolution_preserve_unrelated_conflict_bytes():
     command=add(before,'unrelated')
     command.steps[0].record.fact_ids=['paper-b'];command.steps[0].record.block_ids=['block-paper-b']
     before,_=apply_rich_mutation(before,command);unrelated=canonical(before.sync_records[0])
-    move=prepare_edit(response(before),move_request(before),proof())
+    move=prepare_edit(response(before),move_request(before))
     current=move.preview.workspace
     assert canonical(current.sync_records[0])==unrelated
-    resolved=prepare_edit(response(current),resolve_request(current),proof()).preview.workspace
+    resolved=prepare_edit(response(current),resolve_request(current)).preview.workspace
     assert canonical(resolved.sync_records[0])==unrelated
     assert len(resolved.sync_records)==3
 
@@ -181,7 +181,7 @@ def test_deleted_subject_cannot_be_resolved_from_its_retained_description():
         for block in before.project.document.blocks() if block.id in identifiers]
     current,_=apply_rich_mutation(before,mutation_request(before,steps,'delete-conflict-subject'))
     raw=canonical(current)
-    with pytest.raises(ValueError):prepare_edit(response(current),resolve_request(current),proof())
+    with pytest.raises(ValueError):prepare_edit(response(current),resolve_request(current))
     assert canonical(current)==raw and current.sync_records==before.sync_records
 
 

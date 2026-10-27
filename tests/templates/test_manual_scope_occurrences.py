@@ -21,7 +21,7 @@ from tests.templates.test_template_preparation import command, proof, response
 
 def shared_workspace(text='Exact human input'):
     before, sources = workspace()
-    allocator = EditIdAllocator(proof(), 'create-shared', 'scope', existing_ids(before))
+    allocator = EditIdAllocator('template-project', 'create-shared', 'scope', existing_ids(before))
     steps = human_cell_steps(before, ['a-title', 'b-title'], text, 'scope-action', ['block-paper-a'], allocator)
     scope = steps[0]['scope']
     block = before.project.document.regions[2].blocks[0].model_copy(deep=True)
@@ -72,7 +72,7 @@ def test_scope_integrity_rejects_lost_text_identity_or_current_authority(change)
 def test_complete_scope_copy_has_fresh_display_identity_and_partial_copy_is_literal():
     value, _ = shared_workspace()
     original = value.project.document.regions[2].blocks[0]
-    allocator = EditIdAllocator(proof(), 'copy-scoped', 'copy', existing_ids(value))
+    allocator = EditIdAllocator('template-project', 'copy-scoped', 'copy', existing_ids(value))
     copied = copy_blocks(value.project, [original], id_factory=allocator)[0]
     span, source = copied.content[0], original.content[0]
     assert isinstance(span, ManualScopeSpan) and span.scope_id == source.scope_id
@@ -93,11 +93,11 @@ def test_complete_multifragment_scope_copy_freezes_coverage_and_one_new_root(sha
         region.blocks[0:1] = list(split_block(region.blocks[0], 5))
         selected = region.blocks[:2]
     else:
-        value = prepare_text_edit(response(value), command(value, start=2, end=6, kind='set_marks', styles={'bold': True}), proof()).preview.workspace
+        value = prepare_text_edit(response(value), command(value, start=2, end=6, kind='set_marks', styles={'bold': True})).preview.workspace
         region = value.project.document.regions[2]
         selected = region.blocks[:1]
     original = canonical(value)
-    options = {'id_factory': EditIdAllocator(proof(), 'copy-fragments', 'copy', existing_ids(value))} if deterministic else {}
+    options = {'id_factory': EditIdAllocator('template-project', 'copy-fragments', 'copy', existing_ids(value))} if deterministic else {}
     if shape == 'marked_inline':
         copied = selected[0].model_copy(deep=True); copied.id = 'inline-copy'
         copied.content = copy_inline(value.project, selected[0].content, **options)
@@ -126,7 +126,7 @@ def test_empty_scope_occurrence_has_one_exact_zero_length_anchor():
 def test_scope_split_merge_preserves_logical_identity_and_exact_text(offset):
     value, _ = shared_workspace()
     block = value.project.document.regions[2].blocks[0]
-    allocator = EditIdAllocator(proof(), 'split-scoped', 'split', existing_ids(value))
+    allocator = EditIdAllocator('template-project', 'split-scoped', 'split', existing_ids(value))
     left, right = split_block(block, offset, id_factory=allocator)
     value.project.document.regions[2].blocks[0:1] = [left, right]
     validated = WorkspaceV7.model_validate(value.model_dump(by_alias=True))
@@ -145,7 +145,7 @@ def test_manual_partial_cut_needs_an_explicit_allocator_and_retains_empty_anchor
         cut_inline([span], 1, 3)
     empty, _ = shared_workspace('')
     block = empty.project.document.regions[2].blocks[0]
-    allocator = EditIdAllocator(proof(), 'split-empty', 'split', existing_ids(empty))
+    allocator = EditIdAllocator('template-project', 'split-empty', 'split', existing_ids(empty))
     left, right = split_block(block, 0, id_factory=allocator)
     assert left.content == [] and len(right.content) == 1 and right.content[0].fragment_id == 'shared-fragment'
 
@@ -165,11 +165,11 @@ def test_scope_dependency_tracks_active_cells_without_resurrecting_historical_re
 
 def test_marks_preserve_scope_input_and_text_changes_create_new_exact_authority():
     value, _ = shared_workspace()
-    prepared = prepare_text_edit(response(value), command(value, start=2, end=6, kind='set_marks', styles={'bold': True}), proof())
+    prepared = prepare_text_edit(response(value), command(value, start=2, end=6, kind='set_marks', styles={'bold': True}))
     assert prepared.preview.workspace.project.facts == value.project.facts
     group = next(iter(scope_occurrences(prepared.preview.workspace.project.document).values()))
     assert group.text == 'Exact human input' and any(span.styles.bold for span in group.spans)
-    changed = prepare_text_edit(response(value), command(value), proof()).preview.workspace
+    changed = prepare_text_edit(response(value), command(value)).preview.workspace
     assert changed.project.facts.manual_scopes[-1].raw_input == 'Humanhuman input'
     assert changed.project.facts.manual_scopes[0] == value.project.facts.manual_scopes[0]
 
@@ -183,7 +183,7 @@ def test_empty_scope_at_selection_start_contributes_current_cells_to_replacement
     request = command(value, end=1)
     request.operations[0].range.block_id = copied.id
     request.operations[0].range.before_revision = copied.revision
-    changed = prepare_text_edit(response(value), request, proof()).preview.workspace
+    changed = prepare_text_edit(response(value), request).preview.workspace
     scope = changed.project.facts.manual_scopes[-1]
     assert scope.cell_ids == ['a-title','b-title'] and scope.raw_input == 'Human'
     assert changed.project.document.regions[2].blocks[0].content[0].text == ''

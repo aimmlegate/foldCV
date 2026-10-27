@@ -16,14 +16,21 @@ def preparation_hash(request):
     return sha256(canonical(request))
 
 
-def validate_preparation(response, request, proof):
+def validate_preparation(response, request):
+    """The exact durable base and current dependency stamps; the editor token and the replay window are checked by the
+    route and the repository commit."""
     workspace = response.workspace
     if (response.durability != 'durable' or workspace.project is None or response.snapshot != request.snapshot
             or snapshot_identity(workspace) != request.snapshot
-            or request.capture.session_id != proof.session_id or not dependencies_current(workspace, request.capture.dependencies)):
+            or not dependencies_current(workspace, request.capture.dependencies)):
         raise ValueError('preparation requires its exact durable base and capture')
-    if any(value.client_mutation_id == request.client_mutation_id for value in workspace.mutation_replay):
-        raise ValueError('preparation request ID is already committed')
+
+
+def allocator_for(response, request, operation, occupied=None):
+    from .template_preparation_ids import EditIdAllocator, existing_ids
+    workspace = response.workspace
+    return EditIdAllocator(workspace.project_id, request.client_mutation_id, operation.op_id,
+        occupied if occupied is not None else existing_ids(workspace))
 
 
 def prepared_response(response, request, allocator, mutation, preview):

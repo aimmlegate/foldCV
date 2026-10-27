@@ -28,9 +28,9 @@ def intent(before, kind, **values):
 def prepare(before, kind, **values):
     request=intent(before,kind,**values)
     raw=canonical(before)
-    result=prepare_edit(response(before),request,proof())
+    result=prepare_edit(response(before),request)
     assert canonical(before)==raw
-    assert canonical(result)==canonical(prepare_edit(response(before),request,proof()))
+    assert canonical(result)==canonical(prepare_edit(response(before),request))
     if result.mutation:
         assert apply_rich_mutation(before,result.mutation)[0]==result.preview.workspace
     return result
@@ -164,7 +164,7 @@ def test_invalid_structure_rejects_without_changing_base(damage):
         kind='merge_blocks';values={'leadingId':b.id,'leadingRevision':b.revision,'trailingId':a.id,'trailingRevision':a.revision}
     raw=canonical(before)
     with pytest.raises((ValueError,RichMutationFailure)):
-        prepare_edit(response(before),intent(before,kind,**values),proof())
+        prepare_edit(response(before),intent(before,kind,**values))
     assert canonical(before)==raw
 
 
@@ -245,7 +245,7 @@ def test_ownership_move_with_an_outside_copy_creates_an_atomic_explicit_conflict
     original=next(block for block in before.project.document.blocks() if block.id=='block-paper-a')
     before.project.document.regions[2].blocks[0].children.append(copy_blocks(before.project,[original])[0])
     raw=canonical(before)
-    result=prepare_edit(response(before),intent(before,'move_block',**selection(original),placement=place(parent='owner-b')),proof())
+    result=prepare_edit(response(before),intent(before,'move_block',**selection(original),placement=place(parent='owner-b')))
     current=result.preview.workspace
     assert current.project.facts.relations[0].target_id=='employer-b'
     assert current.sync_records[0].status=='conflict'

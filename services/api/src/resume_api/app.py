@@ -152,7 +152,7 @@ class LocalBoundary:
             return
         path = scope["path"]
         method = scope["method"]
-        is_api = path.startswith("/v1/")
+        is_api = path.startswith(("/v1/", "/v2/"))
         response = None
         if host != self.host or b"forwarded" in headers or b"x-forwarded-host" in headers or b"x-forwarded-proto" in headers:
             response = problem("HOST_DENIED", 403)
@@ -203,6 +203,9 @@ class LocalBoundary:
                 if writer_payload:
                     from packages.resume_core.background_limits import LIMITS
                     body_limit = LIMITS.draft_project_bytes + MAX_BODY
+                if path.startswith("/v2/projects/") and path.endswith("/edits"):
+                    # A preparation is bounded to 1 MiB; the envelope adds the token and the base revision.
+                    body_limit = MAX_BODY + 64 * 1024
                 if size > body_limit:
                     await problem("INPUT_TOO_LARGE", 413)(scope, receive, send)
                     return
@@ -210,7 +213,8 @@ class LocalBoundary:
                 if not message.get("more_body", False):
                     break
             body = b"".join(chunks)
-            project_json = (path == "/v1/projects" or path.startswith("/v1/projects/") or path == "/v1/rich/projects" or path.startswith("/v1/rich/projects/")) and not project_upload
+            project_json = (path == "/v1/projects" or path.startswith("/v1/projects/") or path == "/v1/rich/projects" or path.startswith("/v1/rich/projects/")
+                or path.startswith("/v2/projects")) and not project_upload
             if (method == "POST" and path in JSON_POST_PATHS) or (method == "PUT" and path in JSON_PUT_PATHS) or project_json:
                 if not is_json_media_type(headers.get(b"content-type", b"")):
                     await problem("INVALID_REQUEST", 415)(scope, receive, send)
@@ -305,6 +309,7 @@ def create_app(*, origin: str, secret: str, temp_root: Path, dist: Path, runner:
         externalize = getattr(rich_projects.storage, "externalize_history", None)
         if externalize is not None:
             await asyncio.to_thread(externalize)
+        await asyncio.to_thread(project_repository.start)
         recover_actions(rich_projects)
         await rich_projects.drain_catalog_actions()
         agent.recover()
@@ -316,6 +321,8 @@ def create_app(*, origin: str, secret: str, temp_root: Path, dist: Path, runner:
         agent.request_stop(reason="AGENT_INTERRUPTED")
         await gui_projects.shutdown()
         await rich_projects.shutdown()
+        for identifier in list(project_repository.sessions):
+            await asyncio.to_thread(project_repository.close, identifier)
         render_executor.shutdown(wait=True, cancel_futures=True)
         for task, (files, cancel) in list(connection_work.items()):
             await stop_connection(task, files, cancel)
@@ -450,6 +457,14 @@ def create_app(*, origin: str, secret: str, temp_root: Path, dist: Path, runner:
         renderer=RichDocxRenderer(executor=render_executor), **gui_options)
     app.state.rich_projects = rich_projects
     mount_rich_projects(app, rich_projects, problem)
+    from packages.resume_core.project_repository import ProjectRepository
+    from .projects.routes import mount_projects_v2
+    from .projects.service import ProjectService
+    # The in-memory project repository on the same data root (D109); the old routes stay mounted until SR04.
+    project_repository = ProjectRepository(rules_store.root)
+    projects = ProjectService(project_repository, catalog=rich_projects.catalog)
+    app.state.projects = projects
+    mount_projects_v2(app, projects)
 
     def agent_connection():
         reason = ("AGENT_CLEANUP_FAILED" if unsafe_cleanup or INFERENCE.blocked else
@@ -679,8 +694,9 @@ def create_app(*, origin: str, secret: str, temp_root: Path, dist: Path, runner:
         boundary.secret = None
         boundary.session = secrets.token_urlsafe(32)
         response = JSONResponse({"sessionReady": True}, headers={"Cache-Control": "no-store"})
+        # One cookie for /v1/ and /v2/ routes (D109); it stays HttpOnly and strictly same-site.
         response.set_cookie(boundary.cookie_name, boundary.session, httponly=True, secure=False,
-                            samesite="strict", path="/v1/")
+                            samesite="strict", path="/")
         return response
 
     def rules_failure(error: RulesFailure):

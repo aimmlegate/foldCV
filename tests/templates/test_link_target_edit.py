@@ -51,7 +51,7 @@ def values(workspace):
 def test_url_edit_changes_only_the_url_cell_and_target(href, occurrence):
     before, _ = linked_workspace()
     raw = canonical(before)
-    prepared = prepare_edit(response(before), link_request(before, href, occurrence=occurrence), proof())
+    prepared = prepare_edit(response(before), link_request(before, href, occurrence=occurrence))
     assert canonical(before) == raw
     after = prepared.preview.workspace
     link = after.project.document.regions[2].blocks[0].content[0]
@@ -68,7 +68,7 @@ def test_url_edit_changes_only_the_url_cell_and_target(href, occurrence):
 
 def test_url_only_link_shows_its_new_exact_url():
     before = url_only(linked_workspace()[0])
-    prepared = prepare_edit(response(before), link_request(before, 'https://example.test/other'), proof())
+    prepared = prepare_edit(response(before), link_request(before, 'https://example.test/other'))
     link = prepared.preview.workspace.project.document.regions[2].blocks[0].content[0]
     assert link.href == 'https://example.test/other' and [child.text for child in link.content] == ['https://example.test/other']
     assert link.content[0].complete
@@ -78,11 +78,11 @@ def test_url_only_link_shows_its_new_exact_url():
 
 def test_same_url_is_a_no_op_and_stale_or_unknown_targets_are_refused():
     before, _ = linked_workspace()
-    assert prepare_edit(response(before), link_request(before, 'https://example.test/a'), proof()).mutation is None
+    assert prepare_edit(response(before), link_request(before, 'https://example.test/a')).mutation is None
     for request in [link_request(before, 'https://example.test/b', revision=99),
             link_request(before, 'https://example.test/b', occurrence='missing-occurrence')]:
         with pytest.raises(ValueError):
-            prepare_edit(response(before), request, proof())
+            prepare_edit(response(before), request)
 
 
 def test_label_and_url_edits_have_independent_undo_through_the_writer_and_transfer(tmp_path):
@@ -127,4 +127,4 @@ def test_a_url_cell_waiting_on_a_manual_scope_is_refused():
     before.project.facts = ambiguous_edit(before.project.facts, ['a-journal', 'a-url'], 'Both', 'scoped', ['block-paper-a'])
     before = WorkspaceV7.model_validate(before.model_dump(by_alias=True))
     with pytest.raises(ValueError, match='manual edit scope'):
-        prepare_edit(response(before), link_request(before, 'https://example.test/b'), proof())
+        prepare_edit(response(before), link_request(before, 'https://example.test/b'))

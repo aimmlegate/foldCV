@@ -5,9 +5,8 @@ from .models.template_authoring import ReplaceText, SetMarks
 from .models.template_document import BoundLink, FieldRef, ManualScopeSpan, PresentedText
 from .rich_fields import field_key, inline_groups
 from .rich_mutations import cut_inline, inline_text, locate, utf16_slice
-from .template_preparation_common import finish_preparation, preparation_hash, prepared_response, validate_preparation
+from .template_preparation_common import allocator_for, finish_preparation, preparation_hash, prepared_response, validate_preparation
 from .template_preparation_cells import human_cell_steps
-from .template_preparation_ids import EditIdAllocator, existing_ids
 from .template_ranges import FlankRecorder
 
 
@@ -176,9 +175,9 @@ def _guard_links(content, selected, operation):
         cursor += length
 
 
-def prepare_text_edit(response, request, proof, *, operation=None, replacement=None):
+def prepare_text_edit(response, request, *, operation=None, replacement=None, occupied=None):
     workspace = response.workspace
-    validate_preparation(response, request, proof)
+    validate_preparation(response, request)
     operation = operation or request.operations[0]
     if not isinstance(operation, (ReplaceText, SetMarks)):
         raise ValueError('text preparation needs a text operation')
@@ -191,7 +190,7 @@ def prepare_text_edit(response, request, proof, *, operation=None, replacement=N
     if replacement is None and isinstance(operation, ReplaceText) and utf16_slice(text, selected.start, selected.end) == operation.text:
         operation = SetMarks(kind='set_marks', opId=operation.op_id, range=selected, styles=operation.styles)
     _guard_links(content, selected, operation)
-    allocator = EditIdAllocator(proof, request.client_mutation_id, operation.op_id, existing_ids(workspace))
+    allocator = allocator_for(response, request, operation, occupied)
     if replacement is not None:
         replacement.allocator = allocator
     def prepared(mutation, preview):
@@ -254,24 +253,26 @@ def prepare_text_edit(response, request, proof, *, operation=None, replacement=N
     return result
 
 
-def prepare_edit(response, request, proof, *, clipboard=None):
+def prepare_edit(response, request, *, clipboard=None, occupied=None):
+    """The prepared result of one authored operation on the exact durable response; `occupied` names the ids already
+    taken (the repository session keeps them, otherwise they are collected from the workspace)."""
     if isinstance(request.operations[0], (ReplaceText, SetMarks)):
-        return prepare_text_edit(response, request, proof)
+        return prepare_text_edit(response, request, occupied=occupied)
     from .models.template_authoring import PasteInline
     if isinstance(request.operations[0], PasteInline):
         from .template_preparation_paste import prepare_inline_paste
-        return prepare_inline_paste(response, request, proof, clipboard=clipboard)
+        return prepare_inline_paste(response, request, clipboard=clipboard, occupied=occupied)
     from .models.template_authoring import BuiltinPanel, DeleteEntity
     if isinstance(request.operations[0], (BuiltinPanel, DeleteEntity)):
         from .template_preparation_panel import prepare_panel_edit
-        return prepare_panel_edit(response, request, proof)
+        return prepare_panel_edit(response, request, occupied=occupied)
     from .models.template_authoring import ResolveTemplateSync
     if isinstance(request.operations[0], ResolveTemplateSync):
         from .template_preparation_sync import prepare_sync_resolution
-        return prepare_sync_resolution(response, request, proof)
+        return prepare_sync_resolution(response, request, occupied=occupied)
     from .models.template_authoring import SetLinkTarget
     if isinstance(request.operations[0], SetLinkTarget):
         from .template_preparation_link import prepare_link_target
-        return prepare_link_target(response, request, proof)
+        return prepare_link_target(response, request, occupied=occupied)
     from .template_preparation_structure import prepare_structure_edit
-    return prepare_structure_edit(response, request, proof, clipboard=clipboard)
+    return prepare_structure_edit(response, request, clipboard=clipboard, occupied=occupied)

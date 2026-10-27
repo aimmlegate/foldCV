@@ -23,7 +23,7 @@ def prepared(value,*,identifier='scope-edit',block_id=None,**kwargs):
     if block_id is not None:
         block=next(value for value in value.project.document.blocks() if value.id==block_id)
         request.operations[0].range.block_id=block.id;request.operations[0].range.before_revision=block.revision
-    return prepare_text_edit(response(value),request,proof())
+    return prepare_text_edit(response(value),request)
 
 
 @pytest.mark.parametrize('start,end,text,expected',[(1,4,'!','E!t human input'),(0,17,'',''),(2,6,'😀','Ex😀human input')])
@@ -147,7 +147,7 @@ def test_two_selected_scopes_share_only_current_cell_union_and_replacement_text(
     from packages.resume_core.template_preparation_ids import EditIdAllocator,existing_ids
     from tests.templates.test_scope_displays import command as mutation
     before,_=shared_workspace();block=before.project.document.regions[2].blocks[0].model_copy(deep=True)
-    allocator=EditIdAllocator(proof(),'separate-scopes','scope',existing_ids(before));steps=[];parts=[]
+    allocator=EditIdAllocator('template-project', 'separate-scopes','scope',existing_ids(before));steps=[];parts=[]
     for index,(cell,text) in enumerate([('a-title','Alpha'),('b-title','Beta')]):
         changes=human_cell_steps(before,[cell],text,'display-action',[block.id],allocator,ambiguous=True)
         steps.extend(changes)

@@ -111,7 +111,7 @@ def cases():
         value = build()
         request = make(value)
         base = response(value)
-        prepared = prepare_edit(base, request, proof())
+        prepared = prepare_edit(base, request)
         address = build_address_map(base, request, prepared)
         result.append({'name': name, 'clientMutationId': prepared.client_mutation_id, 'requestHash': prepared.request_hash,
             'createdIds': prepared.created_ids, 'mapSha256': address_map_sha256(address),
@@ -124,7 +124,7 @@ def transport():
     value = json.loads(TRANSPORT.read_text(encoding='utf-8'))
     base = TemplateProjectResponseV1.model_validate_json(value['baseWire'])
     request = WriterPrepareEditV2.model_validate_json(value['requestWire'])
-    prepared = prepare_edit(base, request.preparation, request.proof)
+    prepared = prepare_edit(base, request.preparation)
     reply = json.loads(value['replyWire'])
     delta = prepared_delta(base, prepared)
     # The workspace patch and hashes follow the project format (D104); the edit itself must reproduce.

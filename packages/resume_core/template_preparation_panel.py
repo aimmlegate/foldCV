@@ -8,8 +8,7 @@ from .template_anchors import anchor_steps
 from .template_facts import delete_subject
 from .template_panel_values import period_endpoint, period_field_id
 from .template_preparation_blocks import changed_block_steps
-from .template_preparation_common import finish_preparation, prepared_response, validate_preparation
-from .template_preparation_ids import EditIdAllocator, existing_ids
+from .template_preparation_common import allocator_for, finish_preparation, prepared_response, validate_preparation
 
 
 def _delete_entity(workspace, record_id, revision, action_id):
@@ -107,11 +106,11 @@ def _patch_displays(before, candidate, original, updated, selected, removed_peri
         block.provenance = kept
 
 
-def prepare_panel_edit(response, request, proof):
-    validate_preparation(response, request, proof)
+def prepare_panel_edit(response, request, *, occupied=None):
+    validate_preparation(response, request)
     workspace = response.workspace
     operation = request.operations[0]
-    allocator = EditIdAllocator(proof, request.client_mutation_id, operation.op_id, existing_ids(workspace))
+    allocator = allocator_for(response, request, operation, occupied)
     if isinstance(operation, DeleteEntity):
         candidate, steps = _delete_entity(workspace, operation.record_id, operation.before_revision, request.capture.action_id)
     elif isinstance(operation, BuiltinPanel):

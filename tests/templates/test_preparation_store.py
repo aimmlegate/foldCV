@@ -42,7 +42,7 @@ def other_edit(fixture):
     intent.preparation.client_mutation_id = 'other-edit'
     intent.preparation.capture.action_id = 'other-action'
     intent.preparation.operations[0].range.block_id = 'block-paper-b'
-    prepared = prepare_text_edit(response(value), intent.preparation, fixture.proof)
+    prepared = prepare_text_edit(response(value), intent.preparation)
     raw = save_request(fixture, prepared)
     raw.preparation = None
     return fixture.writers.save(fixture.project, raw, originals=fixture.originals)
@@ -328,7 +328,7 @@ def test_other_writer_commands_cannot_reuse_a_registered_preparation_id(tmp_path
 def test_new_preparation_rejects_an_id_retained_by_a_reconciled_canonical_intent(tmp_path, monkeypatch):
     fixture = setup(tmp_path)
     intent = request(fixture)
-    prepared = prepare_text_edit(response(fixture.current()), intent.preparation, fixture.proof)
+    prepared = prepare_text_edit(response(fixture.current()), intent.preparation)
     raw = save_request(fixture, prepared)
     raw.preparation = None
     before = canonical(fixture.current())

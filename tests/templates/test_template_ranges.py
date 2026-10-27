@@ -15,7 +15,7 @@ from tests.templates.test_template_preparation import command, proof, response
 
 def test_partial_field_range_has_exact_flanks_and_never_allocates_during_application(monkeypatch):
     before, _ = workspace()
-    prepared = prepare_text_edit(response(before), command(before, start=3, end=8), proof())
+    prepared = prepare_text_edit(response(before), command(before, start=3, end=8))
     step = prepared.mutation.steps[0]
     assert step.kind == 'replace_inline_range' and (step.start, step.end) == (3, 8)
     assert len(step.content) == 1 and step.content[0].text == 'Human'
@@ -37,7 +37,7 @@ def test_partial_field_range_has_exact_flanks_and_never_allocates_during_applica
 @pytest.mark.parametrize('change', ['missing', 'surplus', 'descriptor', 'duplicate_descriptor', 'duplicate_id', 'existing_id', 'replacement_id', 'source_kind'])
 def test_missing_surplus_or_colliding_flanks_reject_without_mutating_base(change):
     before, _ = workspace()
-    prepared = prepare_text_edit(response(before), command(before, start=3, end=8), proof())
+    prepared = prepare_text_edit(response(before), command(before, start=3, end=8))
     value = prepared.mutation.model_dump(by_alias=True)
     bindings = value['steps'][0]['flankBindings']
     if change == 'missing':
@@ -66,7 +66,7 @@ def test_missing_surplus_or_colliding_flanks_reject_without_mutating_base(change
 def test_nested_link_cut_coordinates_are_local_and_preserve_whole_link_metadata(monkeypatch):
     from tests.templates.test_bound_links import linked_workspace
     before, _ = linked_workspace()
-    prepared = prepare_text_edit(response(before), command(before, start=3, end=8), proof())
+    prepared = prepare_text_edit(response(before), command(before, start=3, end=8))
     step = prepared.mutation.steps[0]
     assert len(step.content) == 1 and step.content[0].type == 'bound_link'
     assert ''.join(span.text for span in step.content[0].content) == 'Human'
@@ -94,7 +94,7 @@ def test_literal_one_character_range_omits_large_provenance_and_unrelated_resume
             'content': [{'type': 'text', 'text': 'Unrelated text ' + 'z' * 10000, 'styles': {}}]})
     before = WorkspaceV7.model_validate(wire)
     assert len(canonical(before.project.document)) > 2 * 1024 * 1024
-    prepared = prepare_text_edit(response(before), command(before, start=2, end=2, text='!', target={'kind': 'literal'}), proof())
+    prepared = prepare_text_edit(response(before), command(before, start=2, end=2, text='!', target={'kind': 'literal'}))
     mutation_wire = canonical(prepared.mutation)
     assert len(mutation_wire) < 2000 and len(prepared.mutation.steps) == 1
     step = prepared.mutation.steps[0]

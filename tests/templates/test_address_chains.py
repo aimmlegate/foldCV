@@ -29,13 +29,13 @@ def test_every_expected_translation_prepares_and_lands_in_its_named_owner():
         if case['expected']['kind'] == 'conflict':
             continue
         value = build()
-        prepared = prepare_edit(response(value), head(value), proof())
+        prepared = prepare_edit(response(value), head(value))
         after = prepared.preview.workspace
         operation = case['expected']['operation']
         request = TemplateEditPreparationV1(schemaVersion=1, clientMutationId='chain-' + name,
             snapshot=snapshot_identity(after), capture={'sessionId': 'session', 'actionId': 'chain-' + name,
                 'actionToken': 1, 'dependencies': []}, operations=[{**operation, 'opId': 'op'}])
-        result = prepare_edit(response(after), request, proof())
+        result = prepare_edit(response(after), request)
         assert result.mutation is not None, name
         build_address_map(response(after), request, result)
         target = operation.get('range', {}).get('insertionTarget')

@@ -60,5 +60,5 @@ def prepared_delta(base, prepared):
     return result
 
 
-def prepare_text_delta(response, request, proof, *, clipboard=None):
-    return prepared_delta(response, prepare_edit(response, request, proof, clipboard=clipboard))
+def prepare_text_delta(response, request, *, clipboard=None):
+    return prepared_delta(response, prepare_edit(response, request, clipboard=clipboard))

@@ -44,7 +44,7 @@ def prepared_save(fixture, *, text='!', start=2, end=2, identifier='large-edit',
     request.capture.action_id = action
     request.capture.session_id = fixture.proof.session_id
     request.capture.action_token = token
-    prepared = prepare_text_edit(response(before), request, fixture.proof)
+    prepared = prepare_text_edit(response(before), request)
     mutation = prepared.mutation
     cursor = fixture.jobs.load(fixture.project).writer.acknowledged_cursor + 1
     return WriterMutationV2(**fixture.advance_request(cursor, [{'cursor': cursor, 'mutation': mutation}]).model_dump(by_alias=True),
@@ -101,7 +101,7 @@ def test_hash_guards_include_provenance_and_all_payload_values_and_reject_identi
 def test_retained_fragment_ids_restore_only_under_exact_history_and_still_reject_collisions():
     from tests.templates.test_template_preparation import proof
     before, _ = workspace()
-    prepared = prepare_text_edit(response(before), command(before, start=1, end=3, text='X'), proof())
+    prepared = prepare_text_edit(response(before), command(before, start=1, end=3, text='X'))
     after = prepared.preview.workspace
     inverse = inverse_template_mutation(before, after, origin_action_id=prepared.mutation.action_id,
         mutation_id='restore-fragments', session_id='session', action_token=2)

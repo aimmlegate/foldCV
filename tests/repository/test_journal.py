@@ -143,7 +143,7 @@ def test_undo_restores_fact_order_issues_and_sync_rows_exactly(tmp_path):
         before, _sources = loaded(corpus['fixtures'][entry['fixture']])
         request = TemplateEditPreparationV1.model_validate(entry['preparation'])
         request.capture.session_id = 'session'
-        after = prepare_edit(response(before), request, proof()).preview.workspace
+        after = prepare_edit(response(before), request).preview.workspace
         old, new = changes(snapshot(before), snapshot(after))
         assert comparable(apply(after, old)) == comparable(before), name
         assert comparable(apply(apply(after, old), new)) == comparable(after), name

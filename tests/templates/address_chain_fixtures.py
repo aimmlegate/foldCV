@@ -120,7 +120,7 @@ def chains():
         value = build()
         request = head(value)
         base = response(value)
-        prepared = prepare_edit(base, request, proof())
+        prepared = prepare_edit(base, request)
         address = build_address_map(base, request, prepared)
         after = prepared.preview.workspace
         locals_ = {options['created']: created_block(address)} if options.get('created') else {}
