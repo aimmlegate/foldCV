@@ -4,17 +4,16 @@ import pytest
 
 from packages.resume_core.models.template_authoring import TemplateEditPreparationV1
 from packages.resume_core.models.template_document import FieldOccurrence, PresentedText
-from packages.resume_core.models.template_writer import WriterPrepareEditV2
-from packages.resume_core.rich_archive import export_rich_archive, open_rich_archive
+from packages.resume_core.archive_zip import write_zip
+from packages.resume_core.template_archive import archive_payload_v7, open_archive_v7
 from packages.resume_core.rich_fields import occurrences
 from packages.resume_core.rich_mutations import RichMutationFailure, apply_rich_mutation
 from packages.resume_core.template_preparation import prepare_edit
 from packages.resume_core.templates.compiler import canonical
 from tests.templates.storage_fixtures import workspace
 from tests.templates.test_authored_anchors import anchored
-from tests.templates.test_compact_save import compact_command
-from tests.templates.test_preparation_store import setup
-from tests.templates.test_template_preparation import command, proof, response
+from tests.templates.editor_fixtures import TemplateEditor
+from tests.templates.test_template_preparation import command, response
 
 
 def intent(before, kind, **values):
@@ -255,22 +254,19 @@ def test_ownership_move_with_an_outside_copy_creates_an_atomic_explicit_conflict
     assert canonical(before)==raw
 
 
-def test_real_writer_delta_split_issue_history_reopen_and_archive(tmp_path):
-    fixture=setup(tmp_path);before=fixture.current();block=before.project.document.regions[2].blocks[0]
+def test_split_undo_redo_through_the_journal_then_reopen_and_archive(tmp_path):
+    before,sources=workspace();editor=TemplateEditor(tmp_path,before,sources)
+    block=before.project.document.regions[2].blocks[0]
     request=intent(before,'split_block',**selection(block),offset=7)
-    request.capture.session_id=fixture.proof.session_id
-    wrapped=WriterPrepareEditV2(schemaVersion=2,proof=fixture.proof,preparation=request)
-    prepared=fixture.writers.prepare_edit_delta(fixture.project,wrapped)
-    saved=fixture.writers.save(fixture.project,compact_command(fixture,prepared),originals=fixture.originals)
-    split=fixture.current()
-    assert saved.local_history_ack.action_id==request.capture.action_id
-    assert len(split.project.document.regions[2].blocks)==3
-    from tests.templates.test_template_local_history import history_request
-    undo=fixture.writers.local_history_command(fixture.project,history_request(fixture,saved.local_history_ack),originals=fixture.originals)
-    assert len(fixture.current().project.document.regions[2].blocks)==2
-    fixture.writers.local_history_command(fixture.project,history_request(fixture,undo.local_history_ack,'redo','local-redo'),originals=fixture.originals)
-    reopened=fixture.current()
+    result=editor.edit(request)
+    split=editor.current()
+    assert result.history.undo.action_id==request.capture.action_id
+    assert len(split.project.document.regions[2].blocks)==3 and result.created_blocks
+    editor.undo('local-undo',expected=request.capture.action_id)
+    assert editor.current().project.document.regions[2].blocks==before.project.document.regions[2].blocks
+    editor.redo('local-redo',expected=request.capture.action_id)
+    reopened=editor.reopen()
+    assert reopened.project.document.regions[2].blocks==split.project.document.regions[2].blocks
     assert reopened.project.document.regions[2].blocks[0].content[0].occurrence_id=='occurrence-paper-a'
-    originals={identifier:data for (_project,identifier),data in fixture.originals.items()}
-    transferred,_,_,_=open_rich_archive(export_rich_archive(reopened,originals,{},{}),'structure-transfer')
+    transferred,_,_,_=open_archive_v7(write_zip(archive_payload_v7(reopened,editor.originals,{})),'structure-transfer')
     assert transferred.project.document==reopened.project.document and transferred.project.facts==reopened.project.facts

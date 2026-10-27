@@ -1,4 +1,4 @@
-"""Shared C01 cases with independent expected outcomes."""
+"""Shared C01 cases with independent expected outcomes, for the contracts the service still serves."""
 
 import copy
 import json
@@ -11,43 +11,32 @@ from packages.resume_core.models import validate_contract
 from packages.resume_core.rendering.models import RenderRequest
 from packages.resume_core.rendering.preparation import PrepareRequest
 from packages.resume_core.extraction.models import ExtractResult
-from packages.resume_core.normalization import FactRequest, FactSheet, SemanticProposal
-from packages.resume_core.drafting import DraftRequest, DraftProposal, DraftResult
-from packages.resume_core.gui_drafting import GUI_DRAFT_CONTRACTS
-from packages.resume_core.gui_normalization import GUI_NORMALIZATION_CONTRACTS
-from packages.resume_core.gui_projects import GUI_PROJECT_CONTRACTS
-from packages.resume_core.models.background import BACKGROUND_CONTRACTS
-from packages.resume_core.models.recovery import RECOVERY_CONTRACTS
-
-# validate_contract registers only current contracts; the legacy cases leave with their modules in SR06 step 2.
-LEGACY_CONTRACTS = {**{kind: model for kind, model in RECOVERY_CONTRACTS.items() if model.__module__.endswith('.recovery')},
-    **GUI_NORMALIZATION_CONTRACTS, **GUI_DRAFT_CONTRACTS, **GUI_PROJECT_CONTRACTS, **BACKGROUND_CONTRACTS}
 
 
 EXAMPLES = Path(__file__).resolve().parents[2] / "contracts" / "examples"
-CASES = json.loads((EXAMPLES / "cases.json").read_text(encoding="utf-8"))
+ALL_CASES = json.loads((EXAMPLES / "cases.json").read_text(encoding="utf-8"))
 PROJECT = json.loads((EXAMPLES / "project.json").read_text(encoding="utf-8"))
-ZIP = json.loads((EXAMPLES / "zip_manifest.json").read_text(encoding="utf-8"))
-ARCHIVE = json.loads((EXAMPLES / "archive_manifest.json").read_text(encoding="utf-8"))
-RENDER = json.loads((EXAMPLES / "render_request.json").read_text(encoding="utf-8"))
-PREPARE = json.loads((EXAMPLES / "prepare_request.json").read_text(encoding="utf-8"))
-EXTRACT = json.loads((EXAMPLES / "extract_result.json").read_text(encoding="utf-8"))
-FACT_REQUEST = json.loads((EXAMPLES / "fact_request.json").read_text(encoding="utf-8"))
-FACT_SHEET = json.loads((EXAMPLES / "fact_sheet.json").read_text(encoding="utf-8"))
-SEMANTIC = json.loads((EXAMPLES / "semantic_proposal.json").read_text(encoding="utf-8"))
-DRAFT_REQUEST = json.loads((EXAMPLES / "draft_request.json").read_text(encoding="utf-8"))
-DRAFT_PROPOSAL = json.loads((EXAMPLES / "draft_proposal.json").read_text(encoding="utf-8"))
-DRAFT_RESULT = json.loads((EXAMPLES / "draft_result.json").read_text(encoding="utf-8"))
+DIRECT = {"render_request": RenderRequest, "prepare_request": PrepareRequest, "extract_result": ExtractResult}
+# Kinds whose models left with their modules in SR06 step 2: the V1 normalize/draft pipeline, the gui_* (V1-V5)
+# generations, the background job and writer protocol, and the agent access/run/edit records of the old assistant.
+RETIRED_PREFIXES = ("background_", "gui_", "agent_access", "agent_commit", "agent_conversation", "agent_edit",
+    "agent_history", "agent_prepare", "agent_project", "agent_read", "agent_run")
+RETIRED = frozenset({"fact_request", "fact_sheet", "semantic_proposal", "draft_request", "draft_proposal", "draft_result",
+    "archive_manifest_v5", "document", "editorial_plan", "mutation", "mutation_result", "project_v4", "render_snapshot_v4",
+    "selection", "source_context", "source_context_request", "workspace_v5"})
+
+
+def retired(kind: str) -> bool:
+    return kind in RETIRED or kind.startswith(RETIRED_PREFIXES)
+
+
+CASES = [case for case in ALL_CASES if not retired(case["contract"])]
 
 
 def case_data(case: dict) -> object:
-    bases = {"project": PROJECT, "proposal": PROJECT["proposals"][0], "template": PROJECT["template"], "zip_manifest": ZIP, "archive_manifest": ARCHIVE,
-             "render_request": RENDER, "prepare_request": PREPARE, "extract_result": EXTRACT,
-             "fact_request": FACT_REQUEST, "fact_sheet": FACT_SHEET, "semantic_proposal": SEMANTIC,
-             "draft_request": DRAFT_REQUEST, "draft_proposal": DRAFT_PROPOSAL, "draft_result": DRAFT_RESULT}
-    bases.update({path.stem: json.loads(path.read_text()) for path in (EXAMPLES / "recovery").glob("*.json")})
-    bases.update({path.stem: json.loads(path.read_text()) for path in (EXAMPLES / "agent").glob("*.json")})
-    bases.update({path.stem: json.loads(path.read_text()) for path in (EXAMPLES / "background").glob("*.json")})
+    bases = {path.stem: json.loads(path.read_text(encoding="utf-8")) for folder in (EXAMPLES, EXAMPLES / "recovery",
+        EXAMPLES / "agent") for path in folder.glob("*.json") if not retired(path.stem)}
+    bases["proposal"], bases["template"] = PROJECT["proposals"][0], PROJECT["template"]
     data = copy.deepcopy(bases[case["base"]])
     for edit in case["edits"]:
         target = data
@@ -75,29 +64,25 @@ def case_data(case: dict) -> object:
     return data
 
 
+def test_every_case_has_a_current_contract():
+    unknown = []
+    for case in CASES:
+        if case["contract"] in DIRECT:
+            continue
+        try:
+            validate_contract(case["contract"], None)
+        except ValueError as error:
+            # A registered kind fails validation of None; only an unregistered kind raises this message.
+            if str(error) == "unknown contract":
+                unknown.append(case["contract"])
+    assert unknown == []
+
+
 @pytest.mark.parametrize("case", CASES, ids=lambda c: c["name"])
 def test_shared_case(case: dict) -> None:
     try:
-        if case["contract"] == "render_request":
-            RenderRequest.model_validate(case_data(case))
-        elif case["contract"] == "prepare_request":
-            PrepareRequest.model_validate(case_data(case))
-        elif case["contract"] == "extract_result":
-            ExtractResult.model_validate(case_data(case))
-        elif case["contract"] == "fact_request":
-            FactRequest.model_validate(case_data(case))
-        elif case["contract"] == "fact_sheet":
-            FactSheet.model_validate(case_data(case))
-        elif case["contract"] == "semantic_proposal":
-            SemanticProposal.model_validate(case_data(case))
-        elif case["contract"] == "draft_request":
-            DraftRequest.model_validate(case_data(case))
-        elif case["contract"] == "draft_proposal":
-            DraftProposal.model_validate(case_data(case))
-        elif case["contract"] == "draft_result":
-            DraftResult.model_validate(case_data(case))
-        elif case["contract"] in LEGACY_CONTRACTS:
-            LEGACY_CONTRACTS[case["contract"]].model_validate(case_data(case))
+        if case["contract"] in DIRECT:
+            DIRECT[case["contract"]].model_validate(case_data(case))
         else:
             validate_contract(case["contract"], case_data(case))
         accepted = True

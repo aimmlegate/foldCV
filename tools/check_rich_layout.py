@@ -10,7 +10,7 @@ ROOT=Path(__file__).resolve().parents[1]
 sys.path.insert(0,str(ROOT))
 from packages.resume_core.rendering.rich_docx import render_rich_docx,RENDERER_VERSION
 from packages.resume_core.storage import atomic_write,private_directory
-from tests.recovery.rich_layout_fixtures import fixture
+from tests.render.rich_layout_fixtures import fixture
 
 
 def main():

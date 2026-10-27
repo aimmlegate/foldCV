@@ -1,12 +1,12 @@
 import { useEffect, useRef, useState } from "react";
-import type { RichProjectResponse } from "../../contracts/generated/rich_project_response";
-import type { PanelCommand } from "../../rich/synchronization";
+import type { PanelCommand } from "../../rich/v7-panel";
 import { Icon } from "../ui/Icon";
 import { Spinner } from "../ui/OperationStatus";
 import { Button } from "../ui/Button";
 import { useTechnologyDrag } from "./useTechnologyDrag";
 
-type Entry = NonNullable<NonNullable<RichProjectResponse["presentation"]>["focusEntries"]>[number];
+export type FocusEntry = { recordId: string; display: string; years: number | null };
+type Entry = FocusEntry;
 
 function YearsRow({ entry, paused, submit, drag }: { entry: Entry; paused: boolean; submit: (command: PanelCommand) => Promise<void>;
   drag: ReturnType<typeof useTechnologyDrag> }) {

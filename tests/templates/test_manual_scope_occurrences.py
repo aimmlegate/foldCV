@@ -5,7 +5,8 @@ import pytest
 from packages.resume_core.models.template_document import ManualScopeSpan, PresentedText
 from packages.resume_core.models.template_mutations import TemplateMutationV1
 from packages.resume_core.models.template_workspace import WorkspaceV7
-from packages.resume_core.rich_archive import export_rich_archive, open_rich_archive
+from packages.resume_core.archive_zip import write_zip
+from packages.resume_core.template_archive import archive_payload_v7, open_archive_v7
 from packages.resume_core.rich_dependencies import dependencies_current, dependency
 from packages.resume_core.rich_mutations import RichMutationFailure, apply_rich_mutation, cut_inline
 from packages.resume_core.template_authoring import copy_blocks, copy_fragment, copy_inline, merge_blocks, split_block
@@ -16,7 +17,7 @@ from packages.resume_core.template_preparation_ids import EditIdAllocator, exist
 from packages.resume_core.template_scope_occurrences import active_scope_cells, scope_occurrences
 from packages.resume_core.templates.compiler import canonical
 from tests.templates.storage_fixtures import workspace
-from tests.templates.test_template_preparation import command, proof, response
+from tests.templates.test_template_preparation import command, response
 
 
 def shared_workspace(text='Exact human input'):
@@ -44,7 +45,7 @@ def test_shared_occurrence_has_exact_input_and_survives_portable_transfer(text):
     assert active_scope_cells(value.project.facts)[span.scope_id] == {'a-title', 'b-title'}
     group = scope_occurrences(value.project.document)[(span.scope_id, span.occurrence_id)]
     assert group.text == text and group.block_ids == ['block-paper-a']
-    restored, _, _, _ = open_rich_archive(export_rich_archive(value, sources, {}, {}), 'scope-transfer')
+    restored, _, _, _ = open_archive_v7(write_zip(archive_payload_v7(value, sources, {})), 'scope-transfer')
     assert restored.project.document == value.project.document and restored.project.facts == value.project.facts
 
 

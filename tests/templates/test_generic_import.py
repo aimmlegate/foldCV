@@ -8,6 +8,8 @@ from tests.templates.generic_fixtures import F10_REJECTED, F10_RESULT, TABLES, g
 from tests.templates.test_template_view_adapters import text
 
 
+pytestmark = pytest.mark.slow
+
 IMPORTS = {}
 B02_CLAIM = 'I reduced median latency by 80%.'
 

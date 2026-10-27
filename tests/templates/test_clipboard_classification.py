@@ -12,7 +12,6 @@ from packages.resume_core.templates.compiler import canonical
 from tests.templates.storage_fixtures import workspace
 from tests.templates.test_manual_scope_occurrences import shared_workspace
 from tests.templates.test_sync_preparation import link_mentions
-from tests.templates.test_template_preparation import proof
 from tests.templates.test_template_synchronization import conflicted_move
 
 

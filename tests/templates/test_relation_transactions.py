@@ -2,7 +2,8 @@
 
 from packages.resume_core.models.template_workspace import WorkspaceV7
 from packages.resume_core.models.template_facts import Observation
-from packages.resume_core.rich_archive import export_rich_archive, open_rich_archive
+from packages.resume_core.archive_zip import write_zip
+from packages.resume_core.template_archive import archive_payload_v7, open_archive_v7
 from packages.resume_core.rich_mutations import apply_rich_mutation
 from packages.resume_core.template_inverse import inverse_template_mutation
 from packages.resume_core.template_authoring import move_occurrence_steps
@@ -81,7 +82,7 @@ def test_owner_delete_undo_redo_and_portable_keep_exact_record_and_relation_ids(
         mutation_id='redo-delete', session_id='session', action_token=3, kind='redo')
     again, _ = apply_rich_mutation(restored, redo, history_authorization=authorization(restored, redo))
     assert {t.record_id for t in again.project.facts.tombstones} == {'employer-a', 'claim', 'paper-a', 'paper-b'}
-    transferred, retained, _, _ = open_rich_archive(export_rich_archive(again, sources, {}, {}), 'delete-copy')
+    transferred, retained, _, _ = open_archive_v7(write_zip(archive_payload_v7(again, sources, {})), 'delete-copy')
     assert transferred.project.facts == again.project.facts and retained == sources
     assert transferred.project.document == again.project.document
 

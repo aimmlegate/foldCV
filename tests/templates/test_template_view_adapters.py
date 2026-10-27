@@ -10,7 +10,8 @@ import pytest
 from packages.resume_core.models.template_document import BoundLink, FieldOccurrence
 from packages.resume_core.models.template_render import TemplateRenderRequestV1
 from packages.resume_core.rendering.captured_docx import render_captured_docx, renderer_identity
-from packages.resume_core.rich_archive import export_rich_archive, open_rich_archive
+from packages.resume_core.archive_zip import write_zip
+from packages.resume_core.template_archive import archive_payload_v7, open_archive_v7
 from packages.resume_core.template_export import capture_export, snapshot_identity
 from packages.resume_core.template_identity import capture_span
 from packages.resume_core.templates.compiler import compile_bytes
@@ -19,7 +20,7 @@ from packages.resume_core.templates.presentation_plan import hyperlink_target
 from packages.resume_core.templates.store import BUNDLED_TEMPLATE
 from tests.templates.employment_fixtures import TEXT, employment_package, employment_source, object_schema
 from tests.templates.test_captured_docx import NS, emitted, parts, recapture, xml
-from tests.templates.test_template_employment import EmploymentFixture
+from tests.templates.template_runtime_fixtures import EmploymentFixture
 
 
 FOCUS = [('Python', '10 months'), ('SQL', 'about 2.5 years'), ('UnknownTool', '7 weeks')]
@@ -130,7 +131,7 @@ async def test_link_cells_keep_label_and_url_identities_through_archive_and_docx
         assert child.occurrence_id == (part.label_binding or part.url_binding).occurrence_id
     else:
         assert isinstance(part, FieldOccurrence) and part.field_key == 'name'
-    copied, *_ = open_rich_archive(export_rich_archive(workspace, originals, {}, {}), 'link-transfer')
+    copied, *_ = open_archive_v7(write_zip(archive_payload_v7(workspace, originals, {})), 'link-transfer')
     assert copied.project.document == workspace.project.document and copied.project.facts == workspace.project.facts
     content = render(workspace, tmp_path)
     assert hyperlinks(content) == ([(shown, (URL, 'External'))] if bound else [])
@@ -173,7 +174,7 @@ async def test_focus_entries_keep_stated_durations_and_show_catalog_icons_only(t
     assert styles == ['emphasis', 'body'] * len(FOCUS)
     sections = [block for block in view_blocks(workspace, 'focus') if block.type == 'section']
     assert [len(section.children) for section in sections] == [2] * len(FOCUS)
-    copied, *_ = open_rich_archive(export_rich_archive(workspace, originals, {}, {}), 'focus-transfer')
+    copied, *_ = open_archive_v7(write_zip(archive_payload_v7(workspace, originals, {})), 'focus-transfer')
     assert copied.project.document == workspace.project.document
     content = render(workspace, tmp_path)
     tree = xml(content)

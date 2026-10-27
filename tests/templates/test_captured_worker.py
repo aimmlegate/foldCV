@@ -53,31 +53,13 @@ def test_actual_worker_rejects_mismatched_or_ambiguous_capture(captured_request,
 
 
 @pytest.mark.asyncio
-async def test_existing_v6_worker_still_uses_shared_owner(tmp_path):
-    from resume_api.gui_rendering import RichDocxRenderer
-    from resume_api.lifecycle import OperationFiles
-    from packages.resume_core.models.rich_document import RichDocumentV1
-    document = RichDocumentV1(schemaVersion=1, revision=1, regions=[
-        {'id': name, 'role': name, 'revision': 1, 'blocks': [] if name != 'main' else [
-            {'id': 'legacy-paragraph', 'type': 'paragraph', 'revision': 1, 'props': {}, 'children': [],
-                'provenance': [], 'content': [{'type': 'text', 'text': 'Exact legacy V6 text', 'styles': {}}]}]}
-        for name in ('header', 'sidebar', 'main')])
-    with OperationFiles(tmp_path / 'v6-operations').open() as files:
-        path = files.path
-        content = await RichDocxRenderer().render(document, {}, files)
-        assert files.closed and files.process is None
-    assert not path.exists()
-    assert 'Exact legacy V6 text' in emitted(xml(content))
-
-
-@pytest.mark.asyncio
-async def test_existing_gui_owner_runs_actual_captured_worker_and_cleans(captured_request, tmp_path):
-    from resume_api.gui_rendering import RichDocxRenderer
+async def test_template_renderer_runs_actual_captured_worker_and_cleans(captured_request, tmp_path):
+    from resume_api.rendering import TemplateDocxRenderer
     from resume_api.lifecycle import OperationFiles
     root = tmp_path / 'isolated-operations'
     with OperationFiles(root).open() as files:
         path = files.path
-        content = await RichDocxRenderer().render_template(captured_request, files)
+        content = await TemplateDocxRenderer().render_template(captured_request, files)
         assert files.closed and files.process is None
         assert not (path / '.worker').exists()
     assert not path.exists()

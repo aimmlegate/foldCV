@@ -56,7 +56,7 @@ def export_archive(service, project_id, request, *, trusted=False):
 
 
 def import_archive(service, data):
-    """Store an uploaded .foldcv as a new project and adopt it into the rich catalog."""
+    """Store an uploaded .foldcv as a new project."""
     project_id = identity('project')
     try:
         workspace, originals, _artifacts, images = open_archive_v7(data, project_id)
@@ -70,17 +70,4 @@ def import_archive(service, data):
             if blob is not None:
                 blobs.append(('images', asset.path, blob, asset.sha256))
     service.repository.create(workspace, blobs=blobs)
-    adopt_rich(service, workspace, originals, images)
     return service.response(project_id)
-
-
-def adopt_rich(service, workspace, originals, images):
-    """v1 activate and the old list read rich memory; a repository project has to be a member too."""
-    rich = getattr(service, 'rich', None)
-    if rich is None:
-        return
-    rich.workspaces[workspace.project_id] = workspace
-    for source_id, blob in originals.items():
-        rich.originals[(workspace.project_id, source_id)] = blob
-    for asset_id, blob in images.items():
-        rich.images[(workspace.project_id, asset_id)] = blob

@@ -44,5 +44,4 @@ def test_export_then_import_matches_and_omits_the_journal(tmp_path):
         imported_bytes = client.get('/v2/projects/' + imported['projectId'] + '/sources/' + source + '/original')
         assert original_bytes.status_code == 200 and original_bytes.content == imported_bytes.content
         assert not (application.state.projects.repository.open(imported['projectId']).directory / 'history.jsonl').exists()
-        activated = client.post('/v1/rich/projects/' + imported['projectId'] + '/activate', json={})
-        assert activated.status_code == 200, activated.text[:300]
+        assert core(Editor(client, imported['projectId']).response['workspace']) == core(original)

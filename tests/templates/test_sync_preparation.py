@@ -2,22 +2,20 @@
 
 import pytest
 
-from packages.resume_core.agent_edits import semantic
+from packages.resume_core.template_inverse import semantic
 from packages.resume_core.models.template_document import BoundLink,FieldOccurrence,FieldRef,PresentedText
 from packages.resume_core.models.template_mutations import TemplateMutationV1
-from packages.resume_core.models.template_writer import WriterPrepareEditV2
-from packages.resume_core.rich_archive import export_rich_archive,open_rich_archive
+from packages.resume_core.archive_zip import write_zip
+from packages.resume_core.template_archive import archive_payload_v7, open_archive_v7
 from packages.resume_core.rich_dependencies import dependencies_current
 from packages.resume_core.rich_mutations import apply_rich_mutation,RichMutationFailure
 from packages.resume_core.template_preparation import prepare_edit
 from packages.resume_core.template_synchronization import occurrence_blocks,row_hash
 from packages.resume_core.templates.compiler import canonical
-from tests.templates.test_compact_save import compact_command
+from tests.templates.editor_fixtures import TemplateEditor
 from tests.templates.test_structural_preparation import intent,selection,place
-from tests.templates.test_template_local_history import history_request
-from tests.templates.test_template_preparation import proof,response
+from tests.templates.test_template_preparation import response
 from tests.templates.test_template_synchronization import add,conflicted_move
-from tests.templates.test_template_writers import TemplateWriterFixture
 from tests.templates.test_transactions import issue,request as mutation_request
 
 
@@ -135,7 +133,7 @@ def test_resolution_engine_requires_exact_lineage_and_atomic_supersession(damage
 
 def test_inert_archive_resolution_uses_current_opening_without_reusing_foreign_capture():
     _before,sources,move=moved();before=move.preview.workspace
-    imported,retained,_,_=open_rich_archive(export_rich_archive(before,sources,{},{}),'ownership-copy')
+    imported,retained,_,_=open_archive_v7(write_zip(archive_payload_v7(before,sources,{})),'ownership-copy')
     assert retained==sources and imported.sync_records[0].capture is None
     request=resolve_request(imported);result=prepare_edit(response(imported),request)
     assert all(row.capture==request.capture for row in result.preview.workspace.sync_records)
@@ -145,7 +143,7 @@ def test_inert_archive_resolution_uses_current_opening_without_reusing_foreign_c
 
 def test_inert_resolution_preserves_historical_partition_after_current_display_movement():
     _before,sources,move=moved();before=move.preview.workspace
-    imported,_,_,_=open_rich_archive(export_rich_archive(before,sources,{},{}),'ownership-return')
+    imported,_,_,_=open_archive_v7(write_zip(archive_payload_v7(before,sources,{})),'ownership-return')
     block=next(value for value in imported.project.document.blocks() if value.id=='block-paper-a')
     current,_=apply_rich_mutation(imported,mutation_request(imported,[{'kind':'move_block','blockId':block.id,
         'beforeRevision':block.revision,'parentId':'owner-a','afterId':None}],'display-return-only'))
@@ -185,64 +183,28 @@ def test_deleted_subject_cannot_be_resolved_from_its_retained_description():
     assert canonical(current)==raw and current.sync_records==before.sync_records
 
 
-@pytest.mark.parametrize('operation',['move','resolution'])
-@pytest.mark.parametrize('phase',['before_workspace_replaced','before_local_history_receipt'])
-def test_actual_compact_conflict_publication_failure_and_receipt_retry_are_atomic(tmp_path,operation,phase):
-    before,sources,_command=conflicted_move();before.project.import_issues=[issue('owner-issue','paper-a')]
-    fixture=TemplateWriterFixture(tmp_path,before,sources)
-    def prepare(request):
-        request.capture.session_id=fixture.proof.session_id
-        delta=fixture.writers.prepare_edit_delta(fixture.project,
-            WriterPrepareEditV2(schemaVersion=2,proof=fixture.proof,preparation=request))
-        cursor=fixture.jobs.load(fixture.project).writer.acknowledged_cursor+1
-        return compact_command(fixture,delta,cursor)
-    if operation=='resolution':
-        fixture.writers.save(fixture.project,prepare(move_request(fixture.current())),originals=fixture.originals)
-    command=prepare(move_request(fixture.current()) if operation=='move' else resolve_request(fixture.current()))
-    raw=canonical(fixture.current())
-    target=fixture.publisher if phase=='before_workspace_replaced' else fixture.writers
-    def interrupt(name,_project):
-        if name==phase:raise SystemExit('controlled ownership publication cut')
-    target.observer=interrupt
-    with pytest.raises(SystemExit,match='ownership publication cut'):
-        fixture.writers.save(fixture.project,command,originals=fixture.originals)
-    target.observer=lambda *_args:None
-    if phase=='before_workspace_replaced':
-        fixture.publisher.recover(fixture.project)
-        assert canonical(fixture.current())==raw
-    else:
-        saved=fixture.writers.save(fixture.project,command,originals=fixture.originals)
-        assert saved.replayed
-        current=fixture.current()
-        assert [row.status for row in current.sync_records]==(['conflict'] if operation=='move' else ['stale','conflict'])
-        assert current.project.facts.relations[0].target_id=='employer-b'
-        assert current.project.import_issues[0].state=='retired'
-
-
 @pytest.mark.parametrize('linked',[False,True])
-def test_actual_compact_move_resolution_full_history_chain_reopen_and_archive(tmp_path,linked):
+def test_move_and_resolution_undo_redo_through_the_journal_then_reopen_and_archive(tmp_path,linked):
     before,sources,_command=conflicted_move();before.project.import_issues=[issue('owner-issue','paper-a')]
     if linked:link_mentions(before)
-    fixture=TemplateWriterFixture(tmp_path,before,sources)
-    def save(request):
-        request.capture.session_id=fixture.proof.session_id
-        delta=fixture.writers.prepare_edit_delta(fixture.project,WriterPrepareEditV2(schemaVersion=2,proof=fixture.proof,preparation=request))
-        cursor=fixture.jobs.load(fixture.project).writer.acknowledged_cursor+1
-        return fixture.writers.save(fixture.project,compact_command(fixture,delta,cursor),originals=fixture.originals)
-    move=save(move_request(fixture.current()))
-    moved_state=fixture.current();assert moved_state.project.import_issues[0].state=='retired'
-    resolve=save(resolve_request(moved_state));resolved=fixture.current()
+    editor=TemplateEditor(tmp_path,before,sources)
+    move=move_request(editor.current());editor.edit(move)
+    moved_state=editor.current();assert moved_state.project.import_issues[0].state=='retired'
+    resolve=resolve_request(moved_state);editor.edit(resolve);resolved=editor.current()
     assert [row.status for row in resolved.sync_records]==['stale','conflict']
-    undo_resolve=fixture.writers.local_history_command(fixture.project,history_request(fixture,resolve.local_history_ack,identifier='undo-resolution'),originals=fixture.originals)
-    assert len(undo_resolve.workspace.sync_records)==1 and undo_resolve.workspace.sync_records[0].status=='conflict'
-    undo_move=fixture.writers.local_history_command(fixture.project,history_request(fixture,move.local_history_ack,identifier='undo-owner-move'),originals=fixture.originals)
-    assert not undo_move.workspace.sync_records and undo_move.workspace.project.facts.relations[0].target_id=='employer-a'
-    assert undo_move.workspace.project.import_issues[0].state=='active'
-    fixture.writers.local_history_command(fixture.project,history_request(fixture,undo_move.local_history_ack,'redo','redo-owner-move'),originals=fixture.originals)
-    fixture.writers.local_history_command(fixture.project,history_request(fixture,undo_resolve.local_history_ack,'redo','redo-resolution'),originals=fixture.originals)
-    reopened=fixture.current()
+    editor.undo('undo-resolution',expected=resolve.capture.action_id)
+    undone=editor.current()
+    assert len(undone.sync_records)==1 and undone.sync_records[0].status=='conflict'
+    assert undone.sync_records==moved_state.sync_records
+    editor.undo('undo-owner-move',expected=move.capture.action_id)
+    undone=editor.current()
+    assert not undone.sync_records and undone.project.facts.relations[0].target_id=='employer-a'
+    assert undone.project.import_issues[0].state=='active'
+    editor.redo('redo-owner-move',expected=move.capture.action_id)
+    editor.redo('redo-resolution',expected=resolve.capture.action_id)
+    reopened=editor.reopen()
     assert [row.status for row in reopened.sync_records]==['stale','conflict']
     assert reopened.project.facts.relations[0].target_id=='employer-b' and reopened.project.import_issues[0].state=='retired'
-    transferred,_,_,_=open_rich_archive(export_rich_archive(reopened,sources,{},{}),'ownership-transfer')
+    transferred,_,_,_=open_archive_v7(write_zip(archive_payload_v7(reopened,sources,{})),'ownership-transfer')
     assert transferred.project.facts==reopened.project.facts and transferred.project.document==reopened.project.document
     assert all(row.capture is None for row in transferred.sync_records)

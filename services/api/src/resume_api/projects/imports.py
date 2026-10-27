@@ -13,6 +13,8 @@ from packages.resume_core.models.template_import import ResumeTemplateImportV1
 from packages.resume_core.project_repository import RepositoryFailure, decode_project
 from packages.resume_core.template_import import TemplateImportFailure
 
+from ..importer.template_transport import JOB_PERMIT
+from ..inference_admission import INFERENCE, AdmissionBlocked, AdmissionCancelled
 from .errors import ProjectFailure
 from .fold import sidecar_store
 
@@ -28,12 +30,30 @@ class ImportCommand(BaseModel):
     task_id: str | None = Field(default=None, alias='taskId')
 
 
+class _Stop:
+    """The task's cancel flag as the admission queue waits on it."""
+
+    def __init__(self, event):
+        self.event = event
+
+    def is_set(self):
+        return self.event.is_set()
+
+    async def wait(self):
+        while not self.event.is_set():
+            await asyncio.sleep(0.05)
+
+
 class ImportService:
-    def __init__(self, projects, pipeline=None, *, commands=None):
+    def __init__(self, projects, pipeline=None, *, commands=None, admission=INFERENCE):
         self.projects = projects
         self.pipeline = pipeline
         self.commands = commands
+        self.admission = admission
         self.runners = {}
+        # project -> (permit, operation id): a permit whose import may still own a model process stays held until
+        # every attempt of that operation has verified cleanup.
+        self.retained = {}
 
     def _require_pipeline(self):
         if self.pipeline is None:
@@ -49,7 +69,7 @@ class ImportService:
 
     async def drive(self, task, request, started):
         project_id = task.project_id
-        session = None
+        session, held = None, {}
         try:
             session = self.projects.repository.open(project_id)
             with session.lock:
@@ -72,6 +92,10 @@ class ImportService:
                             operation_id = match.id
                     except Exception:
                         pass
+                # One permit for the whole run, as the job runtime held it: parallel blocks run under it and an
+                # assistant turn waits instead of turning a block into a source fallback.
+                held['permit'], held['operation'] = await self._permit(project_id, operation_id, task.cancel), operation_id
+                held['token'] = JOB_PERMIT.set(held['permit'])
                 self.projects.tasks.update(task.id, stage='processing', detail={'operationId': operation_id})
                 started.set()
 
@@ -103,12 +127,48 @@ class ImportService:
             LOG.exception('import task failed')
             self._fail(task.id, 'PROCESS_FAILED')
         finally:
+            if 'token' in held:
+                JOB_PERMIT.reset(held['token'])
+            if 'permit' in held:
+                await asyncio.to_thread(self._settle, project_id, held['operation'], held['permit'])
             if session is not None:
                 with session.lock:
                     session.pins -= 1
             self.runners.pop(task.id, None)
             if not started.is_set():
                 started.set()
+
+    async def _permit(self, project_id, operation_id, cancel):
+        retained = self.retained.pop(project_id, None)
+        if retained is not None:
+            permit, owner = retained
+            if owner == operation_id or not await asyncio.to_thread(self._verified, project_id, owner):
+                # The same import continues, or an earlier one may still own a process: nothing else may start.
+                return permit
+            permit.release()
+        try:
+            return await self.admission.reserve(_Stop(cancel))
+        except (AdmissionBlocked, AdmissionCancelled):
+            raise TemplateImportFailure('IMPORT_CLEANUP_UNKNOWN' if self.admission.blocked else 'CANCELLED') from None
+
+    def _verified(self, project_id, operation_id):
+        reader = getattr(self.pipeline, 'read', None)
+        if reader is None:
+            return True
+        try:
+            workspace = reader(project_id)
+        except Exception:
+            # Unknown cleanup keeps the permit: no other inference may start beside a process that may live.
+            return False
+        owner = workspace.project or workspace.pre_draft
+        operation = next((item for item in owner.template_operations if item.id == operation_id), None)
+        return operation is not None and all(attempt.cleanup.state == 'verified' for attempt in operation.attempts)
+
+    def _settle(self, project_id, operation_id, permit):
+        if self._verified(project_id, operation_id):
+            permit.release()
+        else:
+            self.retained[project_id] = (permit, operation_id)
 
     def _fail(self, task_id, code):
         try:

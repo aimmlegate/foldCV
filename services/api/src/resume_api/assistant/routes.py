@@ -1,11 +1,15 @@
-"""The /v2 assistant routes (plan 2.8). Handlers run file work in worker threads and never hold a project lock
-across an await."""
+"""The /v2 assistant routes (plan 2.8) and the assistant settings on /v1. Handlers run file work in worker threads
+and never hold a project lock across an await."""
 
 from __future__ import annotations
 
 import asyncio
 
+from fastapi import Request
+from fastapi.responses import JSONResponse
+
 from packages.resume_core.assistant_store import AgentFailure
+from packages.resume_core.models.agent import AgentSettingsRequest
 from packages.resume_core.models.assistant import AssistantApplyRequestV1, AssistantRunRequestV2, AssistantSkillListV1, AssistantSkillV1
 from packages.resume_core.models.assistant import AssistantChangeProposalListV1
 
@@ -31,6 +35,27 @@ async def worker(function, *args, **kwargs):
 
 
 def mount_assistant(app, service):
+    @app.exception_handler(AgentFailure)
+    async def agent_error(_request: Request, error: AgentFailure):
+        status = (404 if error.code == 'AGENT_NOT_FOUND' else 410 if error.code == 'AGENT_PROJECT_DELETED' else
+            503 if error.code in {'AGENT_STORE_UNAVAILABLE', 'AGENT_STORE_CORRUPT', 'AGENT_CLEANUP_FAILED'} else 409)
+        return JSONResponse({'error': {'code': error.code}}, status_code=status, headers={'Cache-Control': 'no-store'})
+
+    def settings_reply(value):
+        return JSONResponse(value.model_dump(mode='json', by_alias=True), headers={'Cache-Control': 'no-store'})
+
+    @app.get('/v1/settings/assistant')
+    async def settings():
+        return settings_reply(service.settings.load())
+
+    @app.put('/v1/settings/assistant')
+    async def save_settings(payload: AgentSettingsRequest):
+        prior = service.settings.load()
+        saved = service.settings.save(payload, service.connection().models or None)
+        if prior.enabled and not saved.enabled:
+            service.stop_all()
+        return settings_reply(saved)
+
     @app.get(PREFIX + '/capabilities')
     async def capabilities(project_id: str):
         return model_reply(await worker(service.capabilities))

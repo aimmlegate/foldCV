@@ -3,7 +3,7 @@ import { Extension } from "@tiptap/core";
 import { useCreateBlockNote } from "@blocknote/react";
 import { BlockNoteView } from "@blocknote/shadcn";
 import { useEffect, useImperativeHandle, useMemo, useRef, useState, type ReactNode, type Ref } from "react";
-import type { AttachedTemplateWriter } from "../background/connection";
+import type { ProjectEditorConnection } from "./v7-connection";
 import type { TemplateProjectResponseV1 } from "../contracts/generated/template_project_response_v1";
 import type { AssistantApplyResultV1 } from "../contracts/generated/assistant_apply_result_v1";
 import type { AssistantFinding, AssistantSelection } from "../assistant/controller";
@@ -15,7 +15,7 @@ import { FactsPanel } from "../workbench/facts/FactsPanel";
 import { RewritePanel } from "../workbench/editor/RewritePanel";
 import { LinkTargetDialog } from "../workbench/editor/LinkTargetDialog";
 import type { RewriteActivity } from "./rewrite-progress";
-import type { PanelCommand } from "./synchronization";
+import type { PanelCommand } from "./v7-panel";
 import { Toolbar, type ToolbarCommand } from "../workbench/editor/Toolbar";
 import { selectionLocation } from "./selection";
 import { tableIdentityAttributes } from "./table-identity";
@@ -42,7 +42,7 @@ function blockRevisions(response: TemplateProjectResponseV1): Map<string, number
 
 /** The V7 editor: the same BlockNote view and controls, bound to one TemplateEditorSession. */
 export function TemplateEditor({ initial, connection, onStatus, onShown, ref, portalHost, assistant }: {
-  initial: TemplateProjectResponseV1; connection: AttachedTemplateWriter; onStatus: (status: string) => void;
+  initial: TemplateProjectResponseV1; connection: ProjectEditorConnection; onStatus: (status: string) => void;
   onShown: (response: TemplateProjectResponseV1) => void; ref: Ref<TemplateEditorHandle>; portalHost?: HTMLElement; assistant?: ReactNode }) {
   const project = initial.workspace.project;
   if (!project) throw new Error("Document is missing");
@@ -205,18 +205,16 @@ export function TemplateEditor({ initial, connection, onStatus, onShown, ref, po
           {!recovering && <button type="button" onClick={() => void recover()}>Продолжить</button>}
         </div>}
         {mode === "read_only" && <div className="notice warning" role="alert"><p>{errorMessage("EDITOR_REPLACED")}</p></div>}
-        <EditorNotices mode={null} localDraft={false} warning={warning} clearWarning={() => setWarning("")} onOpen={() => {}}
-          resolveDraft={() => Promise.reject(new Error("DRAFT_RECOVERY_REQUIRED"))} syncRecords={[]}
-          resolve={() => Promise.resolve()} retry={() => Promise.resolve()} dismiss={() => Promise.resolve()} report={setWarning} />
+        <EditorNotices warning={warning} clearWarning={() => setWarning("")} onOpen={() => {}} />
         {(state.kind === "conflict" || state.kind === "rejected") && <div className="notice warning" role="alert">
           <p>{errorMessage(state.kind === "conflict" ? "V7_INPUT_CONFLICT" : "V7_INPUT_REJECTED")}</p>
           <button type="button" onClick={() => session.retry()}>Сохранить текст из редактора</button>
         </div>}
       </aside>
-      {/* The shared layout host: the facts panel floats over the document exactly as in the V1 editor. */}
+      {/* The layout host: the facts panel floats over the document. */}
       <ComparisonWorkspace view={workspaceView} original={sourceVisited && <SourceDialog projectId={initial.workspace.projectId} sources={sources}
         expanded={workspaceView === "original"} toggle={() => changeWorkspaceView(workspaceView === "original" ? "compare" : "original")}
-        close={() => { changeWorkspaceView("layout"); editor.focus(); }} version="v2" />} layout={<div className="document-workspace">
+        close={() => { changeWorkspaceView("layout"); editor.focus(); }} />} layout={<div className="document-workspace">
         <fieldset className="contents uir-editor-controls" disabled={locked}>
           <Toolbar command={command} textStyle={unsupported} factsVisible={factsVisible} selecting={session.rewriteSource() !== null} style="p"
             canUndo={session.canUndo} canRedo={session.canRedo}
@@ -224,7 +222,7 @@ export function TemplateEditor({ initial, connection, onStatus, onShown, ref, po
         </fieldset>
         <fieldset className="contents uir-editor-controls" disabled={locked}>
           <FactsPanel facts={facts} document={documentShown} submit={submitPanel} pending={panelPending} paused={false}
-            timeline={null} hidden={!factsVisible} close={() => { setFactsVisible(false); editor.focus(); }} />
+            hidden={!factsVisible} close={() => { setFactsVisible(false); editor.focus(); }} />
         </fieldset>
         <div className="paper-scroll">
           <div className="cv-document resume-paper" data-project-id={initial.workspace.projectId} data-template="v7"

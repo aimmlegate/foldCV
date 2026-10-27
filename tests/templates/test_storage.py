@@ -8,14 +8,15 @@ import pytest
 from packages.resume_core.archive_zip import ArchiveFailure, digest, read_zip, write_zip
 from packages.resume_core.models.template_workspace import WorkspaceV7
 from packages.resume_core.project_store import ProjectStoreFailure
-from packages.resume_core.rich_archive import export_rich_archive, open_rich_archive
-from packages.resume_core.rich_project_store import RichProjectStore, decode_rich_snapshot
+from packages.resume_core.template_archive import archive_payload_v7, open_archive_v7
+from packages.resume_core.project_repository import ProjectRepository, decode_project
 from packages.resume_core.template_facts import ambiguous_edit, human_edit
 from packages.resume_core.template_inverse import inverse_template_mutation
 from packages.resume_core.rich_mutations import apply_rich_mutation
 from packages.resume_core.templates.compiler import canonical, compile_bytes, sha256
 from packages.resume_core.templates.projection import SchemaFailure, validate_payload
 from packages.resume_core.templates.store import BUNDLED_TEMPLATE
+from tests.templates.editor_fixtures import saved_sources, source_blobs
 from tests.templates.storage_fixtures import PAPER_SCHEMA, workspace
 from tests.templates.test_transactions import authorization, extension_step, request
 
@@ -24,20 +25,17 @@ def test_restart_and_portable_transfer_keep_exact_sources_cells_and_package(tmp_
     original, sources = workspace()
     original.project.facts = human_edit(original.project.facts, 'paper-a', 'year', 'forthcoming')
     original.project.facts = human_edit(original.project.facts, 'paper-b', 'status', 'submitted')
-    store = RichProjectStore(tmp_path / 'first')
-    store.save(original, {(original.project_id, key): value for key, value in sources.items()}, {})
-    loaded, failures, _ = RichProjectStore(tmp_path / 'first').load_all()
-    recovered, originals, _, images = loaded[original.project_id]
-    assert not failures and recovered == original and not images
-    assert originals == {(original.project_id, key): value for key, value in sources.items()}
-    data = export_rich_archive(recovered, sources, {}, {})
-    moved, retained, artifacts, images = open_rich_archive(data, 'portable-copy')
+    ProjectRepository(tmp_path / 'first').create(original, blobs=source_blobs(sources))
+    reopened = ProjectRepository(tmp_path / 'first')
+    recovered = reopened.read(original.project_id)
+    assert recovered == original and saved_sources(reopened, original.project_id) == sources
+    data = write_zip(archive_payload_v7(recovered, sources, {}))
+    moved, retained, artifacts, images = open_archive_v7(data, 'portable-copy')
     expected = original.model_copy(deep=True)
     expected.project_id = expected.project.project_id = 'portable-copy'
     assert moved == expected and retained == sources and not artifacts and not images
-    second = RichProjectStore(tmp_path / 'second')
-    second.save(moved, {(moved.project_id, key): value for key, value in retained.items()}, {})
-    assert RichProjectStore(tmp_path / 'second').load_all()[0]['portable-copy'][0] == moved
+    ProjectRepository(tmp_path / 'second').create(moved, blobs=source_blobs(retained))
+    assert ProjectRepository(tmp_path / 'second').read('portable-copy') == moved
     assert moved.project.template_package == original.project.template_package
     year = moved.project.facts.extensions[0].cells[2]
     status = moved.project.facts.extensions[1].cells[4]
@@ -49,7 +47,7 @@ def test_restart_and_portable_transfer_keep_exact_sources_cells_and_package(tmp_
     'duplicate_source', 'undeclared_relation'])
 def test_corrupt_portable_fails_before_destination_publication(tmp_path, corruption):
     original, sources = workspace()
-    files = read_zip(export_rich_archive(original, sources, {}, {}))
+    files = read_zip(write_zip(archive_payload_v7(original, sources, {})))
     manifest = json.loads(files['manifest.json'])
     if corruption == 'missing_font':
         font = next(asset for asset in original.project.template_package.assets if asset.role == 'font')
@@ -78,8 +76,8 @@ def test_corrupt_portable_fails_before_destination_publication(tmp_path, corrupt
     files['manifest.json'] = json.dumps(manifest).encode()
     destination = tmp_path / 'destination'
     with pytest.raises(ArchiveFailure):
-        restored, originals, artifacts, images = open_rich_archive(write_zip(files), 'must-not-exist')
-        RichProjectStore(destination).save(restored, originals, artifacts, images)
+        restored, originals, _artifacts, _images = open_archive_v7(write_zip(files), 'must-not-exist')
+        ProjectRepository(destination).create(restored, blobs=source_blobs(originals))
     assert not destination.exists()
     assert original.project.document.regions[2].blocks[0].content[0].record_id == 'paper-a'
 
@@ -124,15 +122,16 @@ def test_ambiguous_edit_retains_one_scope_without_stale_typed_claims():
     assert WorkspaceV7.model_validate_json(original.model_dump_json(by_alias=True)) == original
 
 
-def test_unknown_wire_version_fails_without_touching_old_bytes(tmp_path):
+@pytest.mark.parametrize('version', [6, 999])
+def test_a_version_other_than_7_fails_without_touching_old_bytes(tmp_path, version):
     old = Path('tests/fixtures/rich_workspace.json').read_bytes()
     path = tmp_path / 'prototype.json'
     path.write_bytes(old)
-    assert decode_rich_snapshot(old).schema_version == 6
     value = json.loads(old)
-    value['schemaVersion'] = 999
+    assert value['schemaVersion'] == 6
+    value['schemaVersion'] = version
     with pytest.raises(ProjectStoreFailure, match='PROJECT_VERSION_UNSUPPORTED'):
-        decode_rich_snapshot(json.dumps(value).encode())
+        decode_project(tmp_path, json.dumps(value).encode())
     assert path.read_bytes() == old
 
 

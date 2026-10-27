@@ -1,11 +1,9 @@
-"""Technology identity, display, selection, and independent check boundaries."""
+"""Technology identity, display and selection for the prepared render document."""
 
 import copy
 import json
-from hashlib import sha256
 from pathlib import Path
 
-from packages.resume_core.checks import preservation_issues, selection_issues, source_byte_issues
 from packages.resume_core.models.contracts import Project
 from packages.resume_core.selection import _latest_jobs, early_career_rows, format_early_career, group_technologies, select_focus
 from packages.resume_core.technologies import resolve_technology
@@ -178,117 +176,3 @@ def test_early_career_uses_exact_cutoff_and_approved_labels() -> None:
     assert (rows[0].employer, rows[0].role, rows[0].labels) == ("Example One", "Engineer", ("Payments",))
     assert rows[0].periods == ("2005–2011-10-09",)
     assert format_early_career(rows[0]) == "Example One — Engineer (2005–2011-10-09): Payments"
-
-
-def test_preservation_and_selection_report_separate_failures() -> None:
-    data = copy.deepcopy(EXAMPLE)
-    original = b"synthetic source bytes"
-    data["sources"][0]["byteSha256"] = sha256(original).hexdigest()
-    project = Project.model_validate(data)
-    assert source_byte_issues(project, {"sources/source_1/original.txt": original}) == ()
-    assert "original bytes missing or changed" in source_byte_issues(project, {})[0]
-    newer = copy.deepcopy(data["sources"][0])
-    newer.update(revision=2, byteRef="sources/source_1/revision_2.txt")
-    newer["units"] = []
-    newer["overlays"] = []
-    data["sources"].append(newer)
-    revised = Project.model_validate(data)
-    assert source_byte_issues(revised, {"sources/source_1/original.txt": original}) == (
-        "source_1@2: original bytes missing or changed",)
-    assert selection_issues(project, ("python",), frozenset({"devicon/python.png"}),
-                            ("job_1", "job_2"), ()) == (
-                                "unit_2: source unit unresolved", "python: missing job link, catalog entry, or logo")
-    selection = selection_issues(project, ("python", "python"), frozenset(), ("job_1",), ())
-    assert any("duplicate" in issue for issue in selection)
-    assert any("logo" in issue for issue in selection)
-    assert any("each job" in issue for issue in selection)
-    partial = copy.deepcopy(data)
-    partial["sources"].pop()
-    partial["asOf"] = {"precision": "year", "year": 2026, "month": None, "day": None}
-    assert selection_issues(Project.model_validate(partial), (), frozenset(),
-                            ("job_1", "job_2"), ()) == ("unit_2: source unit unresolved",)
-
-
-def test_preservation_catches_lost_or_unrevisioned_facts() -> None:
-    original = b"synthetic source bytes"
-    baseline_data = copy.deepcopy(EXAMPLE)
-    baseline_data["sources"][0]["byteSha256"] = sha256(original).hexdigest()
-    baseline = Project.model_validate(baseline_data)
-    changed = copy.deepcopy(baseline_data)
-    changed["facts"][0]["value"]["number"] = 9000
-    assert source_byte_issues(Project.model_validate(changed),
-                              {"sources/source_1/original.txt": original}) == ()
-    assert preservation_issues(Project.model_validate(changed), baseline) == (
-        "fact_metric@2: fact changed without revision",)
-
-    corrected = copy.deepcopy(changed)
-    corrected["facts"][0]["revision"] = 3
-    corrected["review"]["acknowledgments"][0]["targetRevision"] = 3
-    assert preservation_issues(Project.model_validate(corrected), baseline) == ()
-
-    removed = copy.deepcopy(baseline_data)
-    removed["facts"] = [fact for fact in removed["facts"] if fact["id"] != "fact_user"]
-    removed["employment"][1]["factIds"] = []
-    assert preservation_issues(Project.model_validate(removed), baseline) == ("fact_user: fact removed",)
-
-    earlier = copy.deepcopy(baseline_data)
-    earlier["facts"][2]["revision"] = 2
-    assert preservation_issues(baseline, Project.model_validate(earlier)) == (
-        "fact_user: fact revision went backwards",)
-
-
-def test_preservation_keeps_original_extraction_and_allows_review_changes() -> None:
-    baseline_data = copy.deepcopy(EXAMPLE)
-    extra = copy.deepcopy(baseline_data["sources"][0])
-    extra.update(revision=2, byteRef="sources/source_1/revision_2.txt", units=[], overlays=[])
-    baseline_data["sources"].append(extra)
-    baseline = Project.model_validate(baseline_data)
-
-    revised = copy.deepcopy(baseline_data)
-    revised["sources"].pop()
-    assert preservation_issues(Project.model_validate(revised), baseline) == (
-        "source_1@2: original source revision removed",)
-
-    revised = copy.deepcopy(baseline_data)
-    revised["sources"][0]["parserVersion"] = "changed"
-    assert preservation_issues(Project.model_validate(revised), baseline) == (
-        "source_1@1: original source revision changed",)
-
-    revised = copy.deepcopy(baseline_data)
-    revised["sources"][0]["units"][1]["text"] = "Lost extraction"
-    assert preservation_issues(Project.model_validate(revised), baseline) == (
-        "source_1@1/unit_2@1: extracted unit changed",)
-
-    revised = copy.deepcopy(baseline_data)
-    revised["sources"][0]["units"].pop()
-    revised["sources"][0]["overlays"] = []
-    revised["review"]["decisions"] = []
-    assert preservation_issues(Project.model_validate(revised), baseline) == (
-        "source_1@1/unit_2@1: extracted unit removed",)
-
-    revised = copy.deepcopy(baseline_data)
-    added = copy.deepcopy(revised["sources"][0]["units"][1])
-    added.update(id="unit_3", order=2)
-    revised["sources"][0]["units"].append(added)
-    assert preservation_issues(Project.model_validate(revised), baseline) == (
-        "source_1@1/unit_3@1: extracted unit added to original revision",)
-
-    reviewed = copy.deepcopy(baseline_data)
-    reviewed["sources"][0]["units"][1]["disposition"] = "archived"
-    reviewed["sources"][0]["overlays"][0]["text"] = "User correction"
-    reviewed["views"][0]["visible"] = False
-    reviewed["views"][0]["state"]["text"] = "Short"
-    assert preservation_issues(Project.model_validate(reviewed), baseline) == ()
-
-    represented = copy.deepcopy(baseline_data)
-    new_fact = copy.deepcopy(represented["facts"][0])
-    new_fact.update(id="fact_new", revision=1, subprojectId=None)
-    new_fact["evidence"][0].update(unitId="unit_2", unitRevision=1)
-    represented["facts"].append(new_fact)
-    represented["employment"][0]["factIds"].append("fact_new")
-    represented["sources"][0]["units"][1]["representedFactIds"].append("fact_new")
-    assert preservation_issues(Project.model_validate(represented), baseline) == ()
-
-    assert preservation_issues(Project.model_validate(reviewed), Project.model_validate(EXAMPLE)) == ()
-    assert preservation_issues(baseline, Project.model_validate({**EXAMPLE, "projectId": "other"})) == (
-        "project: baseline belongs to a different project",)

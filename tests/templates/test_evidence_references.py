@@ -1,6 +1,5 @@
 """Replies select offered evidence and review checks by reference; the coordinator restores captured identities."""
 
-import asyncio
 from copy import deepcopy
 import json
 
@@ -21,7 +20,7 @@ from tests.templates.pipeline_fixtures import NOW, cleaned, owner, ready_operati
 from tests.templates.scripted_template_provider import (ScriptedTemplateProvider, scripted_template_answer,
     scripted_template_result)
 from tests.templates.test_semantic_admission import raw_proposal
-from tests.templates.test_template_import_app import app_client, upload
+from tests.templates.test_template_import_app import app_client, operation_of, run_import, upload
 
 
 def offered(src):
@@ -270,18 +269,10 @@ class CitingProvider(ScriptedTemplateProvider):
 @pytest.mark.asyncio
 async def test_app_import_selects_evidence_by_reference_and_receipts_retain_restored_spans(tmp_path):
     provider = CitingProvider()
-    async with app_client(tmp_path, call_cap=4, provider=provider) as (client, service, _jobs):
+    async with app_client(tmp_path, call_cap=4, provider=provider) as (client, app):
         project = (await upload(client)).json()['workspace']['projectId']
-        job = (await client.post(f'/v1/rich/projects/{project}/template-import',
-            json={'clientRequestId': 'references', 'allowTextRewrite': True})).json()
-        async def finished():
-            while True:
-                current = (await client.post(f'/v1/rich/projects/{project}/jobs/{job["id"]}/read', json={})).json()
-                if current.get('templateOutcome') is not None:
-                    return current
-                await asyncio.sleep(0.05)
-        assert (await asyncio.wait_for(finished(), 60))['templateOutcome']['state'] == 'saved'
-        operation = service.storage.load_history(service.read(project)).project.template_operations[0]
+        assert (await run_import(client, app, project, 'references'))['state'] == 'succeeded'
+        operation = operation_of(app, project)
     extraction, review = operation.attempts
     assert [call['kind'] for call in provider.calls] == ['template_extraction', 'template_review']
     assert 'evidence' in extraction.request_value and not {'sourceSpans', 'sourceTexts'} & set(extraction.request_value)
@@ -320,18 +311,10 @@ class PromptRecorder(CitingProvider):
 @pytest.mark.asyncio
 async def test_model_prompts_offer_refs_and_texts_while_storage_keeps_spans_and_reads_the_same(tmp_path):
     provider = PromptRecorder()
-    async with app_client(tmp_path, call_cap=4, provider=provider) as (client, service, _jobs):
+    async with app_client(tmp_path, call_cap=4, provider=provider) as (client, app):
         project = (await upload(client)).json()['workspace']['projectId']
-        job = (await client.post(f'/v1/rich/projects/{project}/template-import',
-            json={'clientRequestId': 'lean', 'allowTextRewrite': True})).json()
-        async def finished():
-            while True:
-                current = (await client.post(f'/v1/rich/projects/{project}/jobs/{job["id"]}/read', json={})).json()
-                if current.get('templateOutcome') is not None:
-                    return current
-                await asyncio.sleep(0.05)
-        assert (await asyncio.wait_for(finished(), 60))['templateOutcome']['state'] == 'saved'
-        operation = service.storage.load_history(service.read(project)).project.template_operations[0]
+        assert (await run_import(client, app, project, 'lean'))['state'] == 'succeeded'
+        operation = operation_of(app, project)
     assert len(provider.prompts) == len(operation.attempts) == 2
     for prompt, attempt in zip(provider.prompts, operation.attempts, strict=True):
         # A review attempt's request is its review input record (stored once).

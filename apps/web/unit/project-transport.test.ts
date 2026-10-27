@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import test from "node:test";
 import type { TemplateProjectResponseV1 } from "../src/contracts/generated/template_project_response_v1";
-import { openFoldcv } from "../src/projects/api";
+import { catalogFlag, createProject, deleteProject, listProjects, openFoldcv } from "../src/projects/api";
 import { ProjectApiFailure, ProjectEditorConnection, type Fetcher } from "../src/rich/v7-connection";
 
 const base = JSON.parse(readFileSync(new URL("../../../tests/fixtures/synthetic/projects/v7-response.json", import.meta.url), "utf8")) as TemplateProjectResponseV1;
@@ -54,7 +54,34 @@ test("rename, export and .foldcv use the open editor token and the current revis
   assert.deepEqual(calls[2]?.body, { editorToken: "editor-token", projectRevision: 2, documentRevision: 1 });
 });
 
-test("a V6 archive is refused by its code so the caller can open the old route", async () => {
-  const fetcher: Fetcher = () => Promise.resolve(Response.json({ error: { code: "ARCHIVE_WORKSPACE_INVALID" } }, { status: 422 }));
-  await assert.rejects(openFoldcv(new File(["v6"], "old.foldcv"), fetcher), (error: unknown) => error instanceof ProjectApiFailure && error.code === "ARCHIVE_WORKSPACE_INVALID");
+test("a refused archive keeps its code and an older workspace is not opened", async () => {
+  const refused: Fetcher = () => Promise.resolve(Response.json({ error: { code: "ARCHIVE_WORKSPACE_INVALID" } }, { status: 422 }));
+  await assert.rejects(openFoldcv(new File(["v6"], "old.foldcv"), refused), (error: unknown) => error instanceof ProjectApiFailure && error.code === "ARCHIVE_WORKSPACE_INVALID");
+  const older = structuredClone(base) as unknown as { workspace: { schemaVersion: number } };
+  older.workspace.schemaVersion = 6;
+  await assert.rejects(openFoldcv(new File(["v6"], "old.foldcv"), () => Promise.resolve(Response.json(older, { status: 201 }))), /INVALID_RESULT/);
+});
+
+test("listing, creation, catalog flags and deletion use the kept routes", async () => {
+  const calls: { path: string; method: string; body: unknown }[] = [];
+  const listing = { entries: [{ projectId: "p", title: "T", updatedAt: "2026-10-27T00:00:00Z", tombstoned: false, cleanupStatus: "none",
+    lastOpenedAt: null, archived: false }], errors: [] };
+  const fetcher: Fetcher = (path, init) => {
+    calls.push({ path, method: init.method ?? "GET", body: init.body instanceof FormData ? [...init.body.keys()] : init.body ? JSON.parse(String(init.body)) as unknown : null });
+    if (path === "/v2/projects") return Promise.resolve(Response.json(listing));
+    if (path.endsWith("/template-input")) return Promise.resolve(Response.json(base, { status: 201 }));
+    if (init.method === "DELETE") return Promise.resolve(Response.json({ projectId: "p", cleanupStatus: "cleanup_incomplete" }));
+    return Promise.resolve(Response.json({ projectId: "p", archived: true }));
+  };
+  assert.deepEqual(await listProjects(fetcher), listing);
+  const body = new FormData(); body.append("paste", new Blob(["text"]), "pasted.txt");
+  assert.equal((await createProject(body, fetcher)).workspace.projectId, base.workspace.projectId);
+  await catalogFlag("p", true, fetcher);
+  assert.equal((await deleteProject("p", fetcher)).cleanupStatus, "cleanup_incomplete");
+  assert.deepEqual(calls, [
+    { path: "/v2/projects", method: "GET", body: null },
+    { path: "/v1/rich/projects/template-input", method: "POST", body: ["paste"] },
+    { path: "/v2/projects/p/catalog/archive", method: "POST", body: {} },
+    { path: "/v2/projects/p", method: "DELETE", body: { confirmed: true } },
+  ]);
 });

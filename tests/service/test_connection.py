@@ -9,7 +9,6 @@ from pathlib import Path
 import shutil
 import sys
 import threading
-import time
 
 import httpx
 import pytest
@@ -218,7 +217,7 @@ def make_app(tmp_path: Path, adapter: ConnectionAdapter):
     dist.mkdir(exist_ok=True)
     (dist / "index.html").write_text("<html>fixture</html>")
     return create_app(origin=ORIGIN, secret=SECRET, temp_root=tmp_path / "service-operations",
-                      dist=dist, connection_adapter=adapter)
+                      dist=dist, connection_adapter=adapter, data_root=tmp_path / "data")
 
 
 async def post(client: httpx.AsyncClient, name: str, body: dict | None = None):
@@ -244,8 +243,7 @@ async def test_protected_routes_select_detach_and_closed_generation(cli, tmp_pat
         assert (await post(client, "select", {"model": "gpt-6-luna"})).status_code == 409
         assert (await post(client, "login", {"argv": ["codex", "login"]})).status_code == 422
         assert (await post(client, "login")).status_code == 409
-        assert (await client.get("/v1/capabilities")).json()["generationReady"] is False
-        assert (await client.post("/v1/normalize", headers={"Origin": ORIGIN}, json={})).status_code == 422
+        assert (await client.get("/v1/settings/connection")).json()["generationReady"] is False
     audit = (tmp_path / "audit.jsonl").read_text()
     assert "logout" not in audit and '"exec"' not in audit
 
@@ -288,7 +286,7 @@ async def test_login_completes_only_after_click_and_refresh(cli, tmp_path):
         assert (tmp_path / "login_ready").exists()
         configure("valid")
         assert (await post(client, "status")).json()["state"] == "connected"
-        assert (await client.get("/v1/capabilities")).json()["generationReady"] is False
+        assert (await client.get("/v1/settings/connection")).json()["generationReady"] is False
 
 
 @pytest.mark.asyncio
@@ -418,3 +416,81 @@ async def test_cleanup_failure_blocks_connection_and_survives_restart(cli, tmp_p
     async with httpx.AsyncClient(transport=httpx.ASGITransport(app=restarted), base_url=ORIGIN) as client:
         await client.post("/v1/session/exchange", headers={"Origin": ORIGIN}, json={"secret": SECRET})
         assert (await post(client, "status")).json()["state"] == "cleanup_blocked"
+
+
+@pytest.mark.asyncio
+async def test_a_refresh_during_sign_in_starts_no_process_and_cancel_closes_spawning_before_the_worker_resumes(tmp_path):
+    started = threading.Event()
+    outcome = {}
+
+    class LateSpawn(ConnectionAdapter):
+        inspections = 0
+
+        def inspect(self, files, cancel, *, full=True):
+            self.inspections += 1
+            raise ConnectionFailure("LOGIN_REQUIRED")
+
+        def login(self, files, cancel):
+            started.set()
+            assert cancel.wait(5)
+            try:
+                files.spawn(Path(sys.executable), ("-c", "import signal; signal.pause()"))
+            except RuntimeError:
+                outcome["denied"] = True
+            raise ConnectionFailure("CANCELLED")
+
+    adapter = LateSpawn()
+    app = make_app(tmp_path, adapter)
+    async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url=ORIGIN) as client:
+        await client.post("/v1/session/exchange", headers={"Origin": ORIGIN}, json={"secret": SECRET})
+        assert (await post(client, "status")).json()["state"] == "login_required"
+        pending = asyncio.create_task(post(client, "login"))
+        assert await asyncio.to_thread(started.wait, 5)
+        # A refresh during the sign-in reports the pending state without a second CLI process.
+        during = await post(client, "status")
+        assert during.status_code == 200 and during.json()["state"] == "login_pending"
+        assert adapter.inspections == 1
+        assert (await post(client, "cancel-login")).json()["state"] == "login_required"
+        assert (await pending).json()["state"] == "login_required"
+    assert outcome == {"denied": True}
+    assert not list((tmp_path / "service-operations").iterdir())
+
+
+@pytest.mark.asyncio
+async def test_a_job_cancelled_before_its_thread_starts_releases_the_slot(tmp_path, monkeypatch):
+    from resume_api import app as service
+
+    class Counting(ConnectionAdapter):
+        calls = 0
+
+        def inspect(self, files, cancel, *, full=True):
+            self.calls += 1
+            return Metadata("codex-cli fixture", ("gpt-6-luna",), "plus", Quota("available", 25, 1800000000))
+
+    adapter = Counting()
+    monkeypatch.setattr(service, "MAX_CONCURRENT", 1)
+    app = make_app(tmp_path, adapter)
+    original_create_task = asyncio.create_task
+    cancelled = []
+
+    def cancel_first(coroutine):
+        task = original_create_task(coroutine)
+        code = getattr(coroutine, "cr_code", None)
+        if code is not None and code.co_name == "to_thread" and not cancelled:
+            cancelled.append(True)
+            task.cancel()
+        return task
+
+    async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url=ORIGIN) as client:
+        await client.post("/v1/session/exchange", headers={"Origin": ORIGIN}, json={"secret": SECRET})
+        monkeypatch.setattr(service.asyncio, "create_task", cancel_first)
+        try:
+            await post(client, "status")
+        except asyncio.CancelledError:
+            pass
+        finally:
+            monkeypatch.setattr(service.asyncio, "create_task", original_create_task)
+        assert cancelled and adapter.calls == 0
+        assert (await post(client, "status")).json()["state"] == "connected"
+        assert adapter.calls == 1
+    assert not list((tmp_path / "service-operations").iterdir())

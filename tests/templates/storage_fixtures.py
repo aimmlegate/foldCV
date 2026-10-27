@@ -110,3 +110,26 @@ def workspace():
         'preDraft': None, 'formattingAsOf': {'precision': 'day', 'year': 2026, 'month': 10, 'day': 21},
         'sourceObservedAt': None, 'rulesUsed': None, 'syncRecords': [], 'mutationReplay': [], 'warnings': []}
     return WorkspaceV7.model_validate(data), {src.id: raw}
+
+
+def literal(text, ref):
+    return {'type': 'text', 'text': text, 'styles': {}, 'presentation': ref}
+
+
+def field(key, cell, binding, occurrence, text, ref, *, complete=True):
+    return {'type': 'fact_field', 'bindingId': binding, 'bindingRootId': occurrence, 'occurrenceId': occurrence,
+        'recordId': 'paper-a', 'fieldKey': key, 'cellId': cell, 'text': text, 'styles': {}, 'syncedFactRevision': 1,
+        'complete': complete, 'presentation': ref}
+
+
+def joined(content=None):
+    """The papers workspace whose first entry joins two bound fields with literal text."""
+    before, _sources = workspace()
+    data = before.model_dump(by_alias=True)
+    block = data['project']['document']['regions'][2]['blocks'][0]
+    ref = block['content'][0]['presentation']
+    block['content'] = content(ref) if content else [literal('By ', ref),
+        field('title', 'a-title', 'fragment-paper-a', 'occurrence-paper-a', 'Shared title', ref),
+        literal(' / ', ref), field('journal', 'a-journal', 'binding-journal', 'occurrence-journal', 'Journal North', ref),
+        literal('.', ref)]
+    return WorkspaceV7.model_validate(data)

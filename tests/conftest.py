@@ -13,6 +13,17 @@ def default_settings_limits():
     apply_preferences(None)
 
 
+@pytest.fixture(autouse=True)
+def free_inference_permit():
+    # The permit is process-wide too; an import keeps it while an attempt's cleanup is unproven, which must not
+    # hold the next test.
+    yield
+    from resume_api.inference_admission import INFERENCE
+    with INFERENCE.condition:
+        INFERENCE.owned, INFERENCE.reservation, INFERENCE.blocked = False, None, False
+        INFERENCE._notify()
+
+
 @pytest.fixture
 def frozen_clock() -> FrozenClock:
     return FrozenClock()

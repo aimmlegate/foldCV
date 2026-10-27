@@ -8,7 +8,6 @@ from pydantic import ValidationError
 
 from packages.resume_core.models.template_authoring import (BlockFormatPatch,
     TemplateClipboardCaptureV1, TemplateEditPreparationV1)
-from packages.resume_core.models.template_writer import WriterCaptureClipboardV2, WriterPrepareEditV2
 
 
 SNAPSHOT = {'projectId': 'project', 'projectRevision': 1, 'documentRevision': 2,
@@ -123,14 +122,6 @@ def test_preparation_bound_precedes_service_acceptance():
     value = preparation({**OPERATIONS[0], 'text': 'x' * (1024 * 1024)})
     with pytest.raises(ValidationError, match='exceeds 1 MiB'):
         TemplateEditPreparationV1.model_validate(value)
-
-
-def test_writer_wrappers_keep_v2_and_existing_owner_proof():
-    for model in [WriterPrepareEditV2, WriterCaptureClipboardV2]:
-        schema = model.model_json_schema()
-        assert schema['properties']['schemaVersion']['const'] == 2
-        assert schema['properties']['proof']['$ref'] == '#/$defs/WriterProofV1'
-        assert schema['additionalProperties'] is False
 
 
 def test_panel_creation_context_is_explicit_and_absence_keeps_original_encoding():

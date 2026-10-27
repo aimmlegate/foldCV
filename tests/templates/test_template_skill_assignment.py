@@ -12,7 +12,7 @@ from packages.resume_core.templates.models import SkillsOperation
 from packages.resume_core.templates.operations import OperationContext, assign_skills, derive_task, runnable
 from packages.resume_core.templates.store import BUNDLED_TEMPLATE
 from tests.templates.employment_fixtures import TEXT, employment_package, employment_source, object_schema
-from tests.templates.test_template_employment import EmploymentFixture
+from tests.templates.template_runtime_fixtures import EmploymentFixture
 from tests.templates.test_template_operations import history_proposal
 from tests.templates.test_template_role_branch import FAMILY, branch
 

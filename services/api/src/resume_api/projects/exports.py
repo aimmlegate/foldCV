@@ -135,17 +135,19 @@ class _Prepared:
     request: object
 
 
-async def production_render(owner, request):
-    """The DOCX worker already used by the legacy exporter, in its own operation directory."""
+async def production_render(request, *, temp_root, worker_slot, renderer, cleanup_error=lambda _error: None):
+    """The DOCX worker in its own operation directory, under the service's worker slot. A worker failure answers with
+    its public code; a cleanup failure also latches the service, as every other worker does."""
+    from packages.resume_core.rendering.template import RenderFailure
     from ..inference_admission import AdmissionCancelled
     from ..lifecycle import OperationFiles, SpikeError
-    files, cancel = OperationFiles(owner.temp_root), threading.Event()
+    files, cancel = OperationFiles(temp_root), threading.Event()
     try:
-        async with owner.worker_slot(cancel):
+        async with worker_slot(cancel):
             if cancel.is_set():
                 raise ProjectFailure('CANCELLED', 409)
             with files.open():
-                blob = await owner.renderer.render_template(request, files)
+                blob = await renderer.render_template(request, files)
             if cancel.is_set():
                 raise ProjectFailure('CANCELLED', 409)
             return blob
@@ -154,4 +156,12 @@ async def production_render(owner, request):
     except AdmissionCancelled:
         raise ProjectFailure('CANCELLED', 409) from None
     except SpikeError as error:
+        cleanup_error(error)
         raise ProjectFailure(error.code, 503) from None
+    except RenderFailure as error:
+        raise ProjectFailure(error.code, 422) from None
+    except asyncio.TimeoutError:
+        raise ProjectFailure('RENDER_FAILED', 422) from None
+    finally:
+        if files.cleanup_failed:
+            cleanup_error(SpikeError('PROCESS_CLEANUP_FAILED'))

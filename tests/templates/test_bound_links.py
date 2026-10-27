@@ -4,7 +4,8 @@ import pytest
 
 from packages.resume_core.models.template_document import BoundLink, PresentedText
 from packages.resume_core.models.template_workspace import WorkspaceV7
-from packages.resume_core.rich_archive import export_rich_archive, open_rich_archive
+from packages.resume_core.archive_zip import write_zip
+from packages.resume_core.template_archive import archive_payload_v7, open_archive_v7
 from packages.resume_core.rich_fields import bound_link_fields
 from packages.resume_core.rich_mutations import apply_rich_mutation
 from packages.resume_core.template_authoring import copy_fragment
@@ -45,7 +46,7 @@ def test_bound_link_edits_change_only_the_selected_cell_and_survive_transfer(rol
     assert fields[1].text == (text if role == 'url' else 'https://example.test/a')
     untouched = 3 if role == 'label' else 0
     assert changed.project.facts.extensions[0].cells[untouched] == before.project.facts.extensions[0].cells[untouched]
-    copied, _, _, _ = open_rich_archive(export_rich_archive(changed, sources, {}, {}), 'bound-link-copy')
+    copied, _, _, _ = open_archive_v7(write_zip(archive_payload_v7(changed, sources, {})), 'bound-link-copy')
     assert copied.project.document == changed.project.document
     assert copied.project.facts == changed.project.facts
 

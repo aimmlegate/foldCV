@@ -27,9 +27,9 @@ function pdfAssets(): Plugin {
   } };
 }
 
-function proofBoundary(mode: string): Plugin {
+function proofBoundary(): Plugin {
   return { name: "foldcv-uir-boundary", generateBundle() {
-    const entryName = mode === "uir-proof" ? "uir-proof.html" : "index.html";
+    const entryName = "index.html";
     const entry = fileURLToPath(new URL(`./${entryName}`, import.meta.url));
     const root = fileURLToPath(new URL("../../", import.meta.url));
     const visited = new Set<string>();
@@ -43,12 +43,12 @@ function proofBoundary(mode: string): Plugin {
     const modules = [...visited].map(id => id.startsWith(root) ? id.slice(root.length) : id).sort();
     const forbidden = modules.filter(id => /src\/(shell\/|next\/|internal\/|assistant\/assistant\.css|rich\/(editor|shell)\.css)|future-editor\/(prototype\.js|agent-chat\.js|visual\/index\.js)|tailwindcss\/preflight/.test(id));
     if (forbidden.length) this.error(`UIR stylesheet/runtime boundary: ${forbidden.join(", ")}`);
-    this.emitFile({ type: "asset", fileName: mode === "uir-proof" ? "uir-proof-imports.json" : "frontend-imports.json", source: JSON.stringify({ entry: entryName, forbidden, modules }, null, 2) });
+    this.emitFile({ type: "asset", fileName: "frontend-imports.json", source: JSON.stringify({ entry: entryName, forbidden, modules }, null, 2) });
   } };
 }
 
-export default defineConfig(({ mode }) => ({
-  plugins: [react(), tailwindcss(), proofBoundary(mode), pdfAssets()],
+export default defineConfig(() => ({
+  plugins: [react(), tailwindcss(), proofBoundary(), pdfAssets()],
   server: { host: "127.0.0.1", fs: { allow: [
     fileURLToPath(new URL("./", import.meta.url)),
     fileURLToPath(new URL("../../contracts", import.meta.url)),
@@ -56,8 +56,7 @@ export default defineConfig(({ mode }) => ({
     fileURLToPath(new URL("../../skills/format-resume/assets", import.meta.url)),
     fileURLToPath(new URL("../../design/future-editor/visual", import.meta.url)),
   ] } },
-  build: { target: "es2022", cssCodeSplit: true, manifest: mode === "uir-proof", rollupOptions: { input: {
+  build: { target: "es2022", cssCodeSplit: true, rollupOptions: { input: {
     main: fileURLToPath(new URL("./index.html", import.meta.url)),
-    ...(mode === "uir-proof" ? { uirProof: fileURLToPath(new URL("./uir-proof.html", import.meta.url)) } : {}),
   } } },
 }));

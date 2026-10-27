@@ -1,265 +1,30 @@
-import type { RichDocumentV1 } from "../contracts/generated/rich_document_v1";
-import type { RichMutation } from "../contracts/generated/rich_mutation";
-import type { RichProjectResponse } from "../contracts/generated/rich_project_response";
-import type { WorkingFacts } from "../contracts/generated/working_facts";
-import { semantic } from "./fact-cells";
-import { normalizedBlock } from "./normalize";
-import { compactMutation } from "./compact-mutation";
 import type { TemplateEditPreparationV1 } from "../contracts/generated/template_edit_preparation_v1";
 import type { TemplateProjectResponseV1 } from "../contracts/generated/template_project_response_v1";
 import { ProjectApiFailure, type EditResult } from "./v7-connection";
 import { createdLocals, translateIntent, type V7Intent } from "./v7-translation";
 
-export type RichBlock = RichDocumentV1["regions"][number]["blocks"][number];
-type Placement = { block: RichBlock; parentId: string; afterId: string | null };
-function placements(document: RichDocumentV1): Map<string, Placement> {
-  const result = new Map<string, Placement>();
-  function visit(blocks: RichBlock[], parentId: string) {
-    let afterId: string | null = null;
-    for (const block of blocks) {
-      result.set(block.id, { block, parentId, afterId }); visit(block.children, block.id); afterId = block.id;
-    }
-  }
-  document.regions.forEach(region => visit(region.blocks, region.id));
-  return result;
-}
-function canonical(value: unknown): string {
-  if (Array.isArray(value)) return `[${value.map((item: unknown) => canonical(item)).join(",")}]`;
-  if (typeof value === "object" && value !== null) {
-    return `{${Object.entries(value).sort(([a], [b]) => a.localeCompare(b)).map(([key, item]) => `${JSON.stringify(key)}:${canonical(item)}`).join(",")}}`;
-  }
-  return JSON.stringify(value) ?? "null";
-}
-function logical(block: RichBlock, exact: boolean): string {
-  if (!exact) block = normalizedBlock(block);
-  const content = block.type === "table" ? { ...block.content, rows: block.content.rows.map(row => ({ ...row,
-    cells: row.cells.map(({ revision: _revision, ...cell }) => cell) })) } : block.content;
-  return canonical(semantic({ type: block.type, props: block.props, content, provenance: block.provenance }));
-}
+/** The scheduler alone owns these; the strategy only reads them. */
+type SchedulerState = { closed: boolean; running: Promise<void> | null };
 
-export function factSteps(before: WorkingFacts, after: WorkingFacts): RichMutation["steps"][number][] {
-  const old = new Map(before.records.map(record => [record.id, record]));
-  const current = new Map(after.records.map(record => [record.id, record]));
-  return [...before.records.filter(record => !current.has(record.id)).map(record => ({ kind: "remove_record" as const,
-    recordId: record.id, beforeRevision: record.revision })), ...after.records.flatMap(record => {
-    const previous = old.get(record.id);
-    return previous && canonical(semantic(previous)) === canonical(semantic(record)) ? [] : [{ kind: "put_record" as const,
-      beforeRevision: previous?.revision ?? before.tombstones.find(item => item.recordId === record.id)?.revision ?? null, record }];
-  })];
-}
-
-export function documentSteps(before: RichDocumentV1, after: RichDocumentV1, exact = false): RichMutation["steps"][number][] {
-  const old = placements(before), current = placements(after);
-  const steps: RichMutation["steps"][number][] = [];
-  const parents = new Map([...old].map(([id, item]) => [id, item.parentId]));
-  const children = new Map<string, string[]>();
-  for (const [id, item] of old) children.set(item.parentId, [...(children.get(item.parentId) ?? []), id]);
-  function place(id: string, parent: string, previous: string | null) {
-    const oldParent = parents.get(id), siblings = oldParent ? children.get(oldParent) : undefined;
-    if (siblings) { const index = siblings.indexOf(id); if (index >= 0) siblings.splice(index, 1); }
-    const target = children.get(parent) ?? [];
-    target.splice(previous === null ? 0 : target.indexOf(previous) + 1, 0, id);
-    children.set(parent, target); parents.set(id, parent);
-  }
-  // New siblings keep their relative order while retained children escape deleted ancestors.
-  const lastNew = new Map<string, string>();
-  for (const [id, item] of current) if (!old.has(id)) {
-    const afterId = lastNew.get(item.parentId) ?? null;
-    steps.push({ kind: "put_block", parentId: item.parentId, afterId, beforeRevision: null, block: { ...item.block, children: [] } });
-    place(id, item.parentId, afterId); lastNew.set(item.parentId, id);
-  }
-  for (const [id, item] of current) {
-    const previous = old.get(id);
-    if (previous && previous.parentId !== item.parentId) {
-      steps.push({ kind: "move_block", blockId: id, beforeRevision: previous.block.revision, parentId: item.parentId, afterId: null });
-      place(id, item.parentId, null);
-    }
-  }
-  for (const [id, item] of old) if (!current.has(id) && !(!current.has(item.parentId) && old.has(item.parentId))) {
-    steps.push({ kind: "remove_block", blockId: id, beforeRevision: item.block.revision });
-    const siblings = children.get(item.parentId), index = siblings?.indexOf(id);
-    if (siblings && index !== undefined && index >= 0) siblings.splice(index, 1);
-  }
-  for (const [id, item] of current) {
-    const previous = old.get(id);
-    if (!previous) continue;
-    if (logical(previous.block, exact) !== logical(item.block, exact)) {
-      steps.push({ kind: "put_block", parentId: item.parentId, afterId: null,
-        beforeRevision: previous.block.revision, block: { ...item.block, children: [] }, keepChildren: true });
-    }
-    const siblings = children.get(item.parentId) ?? [], index = siblings.indexOf(id);
-    const actualPrevious = index > 0 ? siblings[index - 1] : null;
-    if (parents.get(id) !== item.parentId || actualPrevious !== item.afterId) {
-      steps.push({ kind: "move_block", blockId: id, beforeRevision: previous.block.revision,
-        parentId: item.parentId, afterId: item.afterId });
-      place(id, item.parentId, item.afterId);
-    }
-  }
-  return steps;
-}
-
-/** Replies update the save baseline; the mounted typing buffer always stays current. */
-type SaveTarget = { document: RichDocumentV1; facts: WorkingFacts; actionId: string; actionToken: number; kind: RichMutation["kind"] };
-/** The scheduler alone owns these; strategies only read them. */
-type SchedulerState = { closed: boolean; fence: string | null; running: Promise<void> | null };
-interface SaveStrategy {
-  admit(): void;
-  step(): Promise<boolean>;
-}
-
-class DocumentDiffStrategy implements SaveStrategy {
-  target: RichDocumentV1;
-  facts: WorkingFacts;
-  readonly targets: SaveTarget[] = [];
-  sendingTarget: SaveTarget | null = null;
-  rejectedTarget: SaveTarget | null = null;
-  pendingRequest: RichMutation | null = null;
-  prepared: string | null = null;
-  constructor(private readonly scheduler: SchedulerState, public response: RichProjectResponse, readonly sessionId: string,
-    private readonly send: (request: RichMutation) => Promise<RichProjectResponse>,
-    readonly acknowledged: (response: RichProjectResponse) => void) {
-    if (!response.workspace.project) throw new Error("Document not created");
-    this.target = response.workspace.project.document;
-    this.facts = response.workspace.project.facts;
-  }
-  get fenced(): boolean { return this.scheduler.fence !== null; }
-  admit(): void { if (this.prepared !== null || this.fenced) throw new Error("AGENT_OUTCOME_UNKNOWN"); }
-  rejectTarget(target: SaveTarget): void {
-    this.pendingRequest = null;
-    this.sendingTarget = null;
-    if (this.targets.length > 1 && this.targets[0] === target) {
-      this.targets.shift();
-      this.rejectedTarget = null;
-    } else this.rejectedTarget = target;
-  }
-  async step(): Promise<boolean> {
-    const target = this.sendingTarget ?? this.targets[0];
-    if (!target) return false;
-    const before = this.response.workspace.project?.document;
-    if (!before) throw new Error("Document not created");
-    const beforeFacts = this.response.workspace.project?.facts;
-    if (!beforeFacts) throw new Error("Facts not created");
-    const steps = [...documentSteps(before, target.document), ...factSteps(beforeFacts, target.facts)];
-    const [first, ...rest] = steps;
-    if (!first && !this.pendingRequest) { this.targets.shift(); return true; }
-    let request: RichMutation | null = this.pendingRequest ?? (first ? { schemaVersion: 1, projectId: this.response.workspace.projectId,
-      clientMutationId: crypto.randomUUID(), actionId: target.actionId, kind: target.kind,
-      capture: { sessionId: this.sessionId, actionId: target.actionId, actionToken: target.actionToken, dependencies: [] }, steps: [first, ...rest] } : null);
-    if (!request) return false;
-    const size = (value: RichMutation) => new TextEncoder().encode(JSON.stringify(value)).length;
-    if (!this.pendingRequest && size(request) > 1024 * 1024) request = compactMutation(request, before);
-    if (size(request) > 1024 * 1024 || request.steps.length > 1000) {
-      this.rejectTarget(target);
-      throw new Error("Изменение слишком большое для сохранения (лимит 1 МБ). Сократите объём изменения.");
-    }
-    this.pendingRequest = request;
-    this.sendingTarget = target;
-    this.rejectedTarget = null;
-    let response: RichProjectResponse;
-    try { response = await this.send(request); }
-    catch (error) {
-      if (typeof error === "object" && error !== null && "status" in error && typeof error.status === "number"
-        && error.status >= 400 && error.status < 500) {
-        this.rejectTarget(target);
-      }
-      throw error;
-    }
-    if (this.scheduler.closed) return false;
-    this.response = response;
-    this.acknowledged(response);
-    if (response.durability === "failed") throw new Error(response.saveError ?? "PROJECT_SAVE_FAILED");
-    this.pendingRequest = null;
-    this.targets.shift();
-    this.sendingTarget = null;
-    return true;
-  }
-}
-
-/** One scheduler for V1 document saves and V7 authored intents; strategies never schedule themselves. */
+/** One scheduler over the V7 strategy; the strategy never schedules itself. */
 export class RichSaveQueue {
-  private readonly scheduler: SchedulerState = { closed: false, fence: null, running: null };
-  private readonly v1: DocumentDiffStrategy | null = null;
-  private readonly v7: TemplateIntentStrategy | null = null;
-  readonly sessionId: string;
-  constructor(response: RichProjectResponse, sessionId: string, send: (request: RichMutation) => Promise<RichProjectResponse>,
-    acknowledged: (response: RichProjectResponse) => void);
-  constructor(template: TemplateStrategyInput);
-  constructor(first: RichProjectResponse | TemplateStrategyInput, sessionId?: string,
-    send?: (request: RichMutation) => Promise<RichProjectResponse>, acknowledged?: (response: RichProjectResponse) => void) {
-    if ("ports" in first) {
-      this.v7 = new TemplateIntentStrategy(this.scheduler, first);
-      this.sessionId = first.sessionId;
-      return;
-    }
-    if (sessionId === undefined || !send || !acknowledged) throw new Error("Document queue needs its transport");
-    this.v1 = new DocumentDiffStrategy(this.scheduler, first, sessionId, send, acknowledged);
-    this.sessionId = sessionId;
-  }
-  private get strategy(): SaveStrategy {
-    const value = this.v1 ?? this.v7;
-    if (!value) throw new Error("Save strategy missing");
-    return value;
-  }
-  private get legacy(): DocumentDiffStrategy { if (!this.v1) throw new Error("V1_QUEUE_REQUIRED"); return this.v1; }
+  private readonly scheduler: SchedulerState = { closed: false, running: null };
   /** V7 strategy state and operations; scheduling stays here. */
-  get template(): TemplateIntentStrategy { if (!this.v7) throw new Error("V7_QUEUE_REQUIRED"); return this.v7; }
-  update(document: RichDocumentV1, actionId: string, kind: RichMutation["kind"] = "typing", facts?: WorkingFacts, actionToken = 0): void {
-    const value = this.legacy;
-    if (value.prepared !== null || value.fenced) throw new Error("AGENT_OUTCOME_UNKNOWN");
-    if (value.rejectedTarget) {
-      const index = value.targets.indexOf(value.rejectedTarget);
-      if (index >= 0) value.targets.splice(index, 1);
-      value.rejectedTarget = null;
-    }
-    value.target = document; if (facts) value.facts = facts;
-    const target = { document: structuredClone(document), facts: structuredClone(value.facts), actionId, actionToken, kind };
-    const last = value.targets.at(-1);
-    if (last?.actionId === actionId && last !== value.sendingTarget) value.targets[value.targets.length - 1] = target;
-    else value.targets.push(target);
+  readonly template: TemplateIntentStrategy;
+  readonly sessionId: string;
+  constructor(input: TemplateStrategyInput) {
+    this.template = new TemplateIntentStrategy(this.scheduler, input);
+    this.sessionId = input.sessionId;
   }
-  get baseline(): RichProjectResponse { return this.legacy.response; }
-  refreshMetadata(response: RichProjectResponse): void {
-    const value = this.legacy, previous = value.response.workspace.project, current = response.workspace.project;
-    if (this.scheduler.closed || value.fenced || value.prepared !== null || !previous || !current || response.durability !== "durable"
-      || response.workspace.projectId !== value.response.workspace.projectId || documentSteps(previous.document, current.document).length
-      || factSteps(previous.facts, current.facts).length) throw new Error("AGENT_STALE_READ");
-    value.response = response;
-    value.acknowledged(response);
-  }
-  close(): void { this.scheduler.closed = true; this.v7?.closed(); }
+  close(): void { this.scheduler.closed = true; this.template.closed(); }
   async flush(): Promise<void> {
-    this.strategy.admit();
+    this.template.admit();
     if (this.scheduler.running) return this.scheduler.running;
     const operation = this.drain(); this.scheduler.running = operation;
     try { await operation; } finally { if (this.scheduler.running === operation) this.scheduler.running = null; }
   }
   private async drain(): Promise<void> {
-    while (!this.scheduler.closed && await this.strategy.step()) { /* one unit per step */ }
-  }
-  beginPrepared(key: string): void {
-    const value = this.legacy, project = value.response.workspace.project;
-    if (this.scheduler.closed || value.fenced || value.prepared !== null || this.scheduler.running || value.pendingRequest || value.targets.length || !project
-      || documentSteps(project.document, value.target).length || factSteps(project.facts, value.facts).length) throw new Error("AGENT_STALE_READ");
-    value.prepared = key;
-  }
-  adoptPrepared(key: string, response: RichProjectResponse): void {
-    const value = this.legacy, project = response.workspace.project;
-    if (this.scheduler.closed || value.fenced || value.prepared !== key || response.durability !== "durable" || !project
-      || response.workspace.projectId !== value.response.workspace.projectId) throw new Error("AGENT_OUTCOME_UNKNOWN");
-    value.response = response;
-    value.target = project.document;
-    value.facts = project.facts;
-    value.pendingRequest = null;
-    value.targets.length = 0;
-    value.sendingTarget = value.rejectedTarget = null;
-    value.acknowledged(response);
-  }
-  endPrepared(key: string): void { const value = this.legacy; if (value.prepared === key && !value.fenced) value.prepared = null; }
-  fencePrepared(): void { if (!this.v1) throw new Error("V1_QUEUE_REQUIRED"); this.scheduler.fence = "AGENT_OUTCOME_UNKNOWN"; }
-  recoverPrepared(key: string): void {
-    const value = this.legacy;
-    if (this.scheduler.closed || this.scheduler.running) throw new Error("AGENT_OUTCOME_UNKNOWN");
-    this.scheduler.fence = null; value.prepared = key;
+    while (!this.scheduler.closed && await this.template.step()) { /* one unit per step */ }
   }
 }
 
@@ -290,7 +55,7 @@ type ActionRecord = { pending: number; committed: boolean; sealed: boolean; fini
 const rejectedCodes = new Set(["V7_INPUT_REJECTED", "PROJECT_TOO_LARGE", "PROJECT_READ_ONLY", "MUTATION_ID_REUSED", "REQUEST_EXPIRED",
   "DEPENDENCY_CHANGED", "INVALID_REQUEST", "HISTORY_STALE"]);
 
-export class TemplateIntentStrategy implements SaveStrategy {
+export class TemplateIntentStrategy {
   private readonly entries: TemplateQueuedIntent[] = [];
   private durableResponse: TemplateProjectResponseV1;
   private readonly locals = new Map<string, string>();

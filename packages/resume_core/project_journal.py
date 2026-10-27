@@ -15,6 +15,7 @@ import os
 from pathlib import Path
 
 from .storage import StorageFailure, atomic_write, private_directory
+from .template_local_history import values
 
 ACTIONS = 200
 BYTES = 16 * 1024 * 1024
@@ -47,8 +48,6 @@ def snapshot(workspace):
     """The undoable state: every `values()` key with its full payload, plus the id order of the keyed lists."""
     if workspace.project is None:
         return {}
-    # Imported here: the rest of template_local_history still loads the old history stack (SR06 step 2).
-    from .template_local_history import values
     result = values(workspace)
     project = workspace.project
     facts = project.facts

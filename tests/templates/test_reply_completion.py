@@ -202,6 +202,7 @@ def test_derived_items_and_relations_match_an_explicit_reply():
     assert shape(explicit) == shape(derived)
 
 
+@pytest.mark.slow
 @pytest.mark.asyncio
 async def test_an_generic_import_with_lean_first_replies_publishes_the_same_blocks(tmp_path):
     # P13: first replies carry the payload and entries only for values not copied word for word; no discoveries,

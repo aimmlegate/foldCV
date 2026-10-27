@@ -11,13 +11,10 @@ from packages.resume_core.templates.compiler import compile_bytes, sha256
 from packages.resume_core.templates.loading import load_definition
 from packages.resume_core.templates.store import BUNDLED_TEMPLATE
 from tests.templates.template_runtime_fixtures import RuntimeFixture
-from tests.templates.test_template_finalization_flow import queued
-from tests.templates.test_template_job_routing import service_for
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize('entry', ['direct', 'queued'])
-async def test_nine_accepted_projects_and_one_unresolved_scope_publish_together(tmp_path, entry):
+async def test_nine_accepted_projects_and_one_unresolved_scope_publish_together(tmp_path):
     lines = ['Company ' + str(index) + ': Implemented queue processing.' for index in range(1, 11)]
     raw = ('\n'.join(lines) + '\n').encode()
     source = Source(id='source-x05', revision=1, originalName='X05-projects.txt', mimeType='text/plain', byteSha256=sha256(raw),
@@ -55,17 +52,7 @@ async def test_nine_accepted_projects_and_one_unresolved_scope_publish_together(
                 for index in range(10) for field in ['employer', 'text']],
             'lineage': [{'kind': 'add', 'parents': [], 'children': ['p' + str(index) for index in range(1, 11)]}], 'relations': []}
     fixture.transport.scripted = script
-    service = await service_for(fixture) if entry == 'queued' else None
-    try:
-        if service:
-            await queued(service, fixture, fixture.command)
-            result = fixture.current().project.template_operations[0]
-        else:
-            result = await fixture.pipeline.run(fixture.project, fixture.command, admitted=fixture.admitted)
-    finally:
-        if service:
-            await service.shutdown()
-            service.supervisor.clock.verify()
+    result = await fixture.pipeline.run(fixture.project, fixture.command, admitted=fixture.admitted)
     assert result.state == 'published' and result.issues and spent_calls(result) == 2
     project = fixture.current().project
     assert len(project.facts.extensions) == 10

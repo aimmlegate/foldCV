@@ -3,15 +3,12 @@ import { hasInput, type ResumeInput } from "../../rich/import-source";
 import { Button } from "../ui/Button";
 import { Icon } from "../ui/Icon";
 
-export function SourceForm({ input, change, busy, sourceName, process, textDraft, allowTextRewrite, changeTextRewrite, strictTemplate = null,
-  strict = false, changeStrict = () => {} }: {
-  input: ResumeInput; change: (input: ResumeInput) => void; busy: boolean; sourceName: string | null;
+export function SourceForm({ input, change, busy, process, textDraft, allowTextRewrite, changeTextRewrite }: {
+  input: ResumeInput; change: (input: ResumeInput) => void; busy: boolean;
   process: () => void; textDraft: string; allowTextRewrite: boolean; changeTextRewrite: (allowed: boolean) => void;
-  /** The active template when the service offers strict import; otherwise the option is not shown. */
-  strictTemplate?: { name: string; revision: string } | null; strict?: boolean; changeStrict?: (value: boolean) => void;
 }) {
   const fileInput = useRef<HTMLInputElement>(null);
-  const name = input.kind === "file" ? input.file.name : sourceName;
+  const name = input.kind === "file" ? input.file.name : null;
   return <section className="new-screen" aria-label="Новое резюме"><div className="source-form">
     <h2>Добавить исходник</h2>
     <button className="dropzone" type="button" disabled={busy} onClick={() => fileInput.current?.click()}
@@ -27,9 +24,6 @@ export function SourceForm({ input, change, busy, sourceName, process, textDraft
     <label className="source-rewrite"><input type="checkbox" checked={allowTextRewrite} disabled={busy}
       aria-label="Разрешить переписывание текста" aria-describedby="source-rewrite-help" onChange={event => changeTextRewrite(event.currentTarget.checked)} />
       <span>Разрешить переписывание текста<small id="source-rewrite-help">Без галочки — только оформление.</small></span></label>
-    {strictTemplate && <label className="source-rewrite"><input type="checkbox" checked={strict} disabled={busy}
-      aria-label="Импорт по шаблону" aria-describedby="source-strict-help" onChange={event => changeStrict(event.currentTarget.checked)} />
-      <span>Импорт по шаблону «{strictTemplate.name} · {strictTemplate.revision}»<small id="source-strict-help">Данные извлекаются по схеме шаблона и проверяются до открытия.</small></span></label>}
-    <div className="source-bottom"><Button className="ml-auto" variant="primary" busy={busy} busyLabel="Подготовка…" disabled={!hasInput(input) && !sourceName} onClick={process}>Обработать<Icon name="arrow" /></Button></div>
+    <div className="source-bottom"><Button className="ml-auto" variant="primary" busy={busy} busyLabel="Подготовка…" disabled={!hasInput(input)} onClick={process}>Обработать<Icon name="arrow" /></Button></div>
   </div></section>;
 }

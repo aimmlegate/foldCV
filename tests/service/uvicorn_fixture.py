@@ -1,4 +1,7 @@
-"""Synthetic loopback server for the real ASGI disconnect test."""
+"""Synthetic loopback servers for the real uvicorn checks; every file stays under the root given as the first argument.
+
+`launcher`: the real launcher on a temporary data root and operation root.
+`child`: the app whose status job starts a real child process and waits until it is cancelled."""
 
 import asyncio
 from pathlib import Path
@@ -12,27 +15,25 @@ sys.path.insert(0, str(ROOT))
 sys.path.insert(0, str(ROOT / "services/api/src"))
 
 from resume_api.app import create_app
+from resume_api.connection import ConnectionAdapter, ConnectionFailure
+
+SECRET = "synthetic-startup-secret-0123456789"
 
 
-class WaitingRunner:
-    async def run(self, _kind, _request, files):
-        assert files.path is not None
-        (files.path / "active").touch()
-        process = None
-        if len(sys.argv) > 2 and sys.argv[2] == "child":
-            process = files.spawn(Path(sys.executable), ("-c", "import time; time.sleep(30)"))
-            (Path(sys.argv[1]) / "worker-pgid").write_text(str(process.pid), encoding="utf-8")
-        try:
-            await asyncio.Event().wait()
-        except asyncio.CancelledError:
-            (Path(sys.argv[1]) / "cancelled").touch()
-            if process is not None and all(stream.closed for stream in (process.stdin, process.stdout, process.stderr)):
-                (Path(sys.argv[1]) / "pipes-closed").touch()
-            raise
+class HeldConnection(ConnectionAdapter):
+    def __init__(self, root: Path):
+        super().__init__()
+        self.root = root
+
+    def inspect(self, files, cancel, *, full=True):
+        process = files.spawn(Path(sys.executable), ("-c", "import signal; signal.pause()"))
+        (self.root / "worker-pgid").write_text(str(process.pid), encoding="utf-8")
+        cancel.wait()
+        (self.root / "cancelled").touch()
+        raise ConnectionFailure("CANCELLED")
 
 
-async def main():
-    root = Path(sys.argv[1])
+async def child(root: Path):
     dist = root / "dist"
     dist.mkdir(parents=True)
     (dist / "index.html").write_text("synthetic shell", encoding="utf-8")
@@ -41,11 +42,11 @@ async def main():
         listener.listen(128)
         port = listener.getsockname()[1]
         origin = f"http://127.0.0.1:{port}"
-        app = create_app(origin=origin, secret="synthetic-startup-secret-0123456789",
-                         temp_root=root / "operations", dist=dist, runner=WaitingRunner())
+        app = create_app(origin=origin, secret=SECRET, temp_root=root / "operations", dist=dist,
+                         data_root=root / "data", connection_adapter=HeldConnection(root))
+        # A short grace lets SIGTERM cancel the held request instead of waiting for it.
         server = uvicorn.Server(uvicorn.Config(app, host="127.0.0.1", port=port, proxy_headers=False,
-                                                access_log=False, log_level="critical",
-                                                timeout_graceful_shutdown=2))
+                                                access_log=False, log_level="critical", timeout_graceful_shutdown=0.1))
         task = asyncio.create_task(server.serve(sockets=[listener]))
         while not server.started:
             if task.done():
@@ -56,4 +57,16 @@ async def main():
         await task
 
 
-asyncio.run(main())
+def launcher(root: Path):
+    from resume_api import launcher as module
+    module.trusted_temp_root = lambda: root / "operations"
+    sys.argv = ["launcher", "--no-open"]
+    module.main()
+
+
+if __name__ == "__main__":
+    base = Path(sys.argv[1])
+    if sys.argv[2] == "launcher":
+        launcher(base)
+    else:
+        asyncio.run(child(base))

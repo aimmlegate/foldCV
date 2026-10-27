@@ -9,12 +9,10 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { createElement } from "react";
 import catalog from "../../../contracts/error-messages.ru.json" with { type: "json" };
 import { defaultErrorMessage, errorMessage, knownErrorMessage, messageText } from "../src/errors/messages";
-import { RichApiFailure } from "../src/rich/api";
-import { warningLabel, processingFailure } from "../src/workbench/import/notices";
+import { ProjectApiFailure } from "../src/rich/v7-connection";
 import { factError } from "../src/workbench/facts/error";
 import { noticeText } from "../src/workbench/ui/notice-text";
 import { errorText } from "../src/assistant/presentation";
-import { failureLabel } from "../src/background/status";
 register(`data:text/javascript,${encodeURIComponent('export async function load(url, context, next) { if (url.includes("/icons.svg")) return { format: "module", source: \'export default "icons.svg"\', shortCircuit: true }; return next(url, context); }')}`, import.meta.url);
 const { Header } = await import("../src/workbench/layout/Header");
 const { Installation } = await import("../src/workbench/settings/Installation");
@@ -71,7 +69,7 @@ for (const raw of ["FUTURE_SAVE_FAILURE", "toString", "__proto__", "Cannot read 
 }
 
 test("presentation preserves machine errors and existing human validation text", () => {
-  const error = new RichApiFailure("PROJECT_SAVE_FAILED", 503);
+  const error = new ProjectApiFailure("PROJECT_SAVE_FAILED", 503);
   const message = errorMessage(error);
   assert.match(message, /сохранить/u); assert.ok(!message.includes(error.code));
   assert.equal(error.code, "PROJECT_SAVE_FAILED"); assert.equal(error.message, "PROJECT_SAVE_FAILED"); assert.equal(error.status, 503);
@@ -86,13 +84,10 @@ test("presentation preserves machine errors and existing human validation text",
 
 test("all existing error presentation adapters use safe readable messages", () => {
   for (const code of ["PROJECT_SAVE_FAILED", "RICH_MUTATION_LIMIT", "AGENT_OUTCOME_UNKNOWN", "FUTURE_SAVE_FAILURE"]) {
-    for (const message of [warningLabel(code), factError(new RichApiFailure(code)), errorText(code), failureLabel(code), noticeText(code)]) {
+    for (const message of [factError(new ProjectApiFailure(code)), errorText(code), noticeText(code)]) {
       assert.ok(message && /[А-Яа-яЁё]/u.test(message)); assert.ok(!message.includes(code)); assert.ok(!rawCode.test(message));
     }
   }
-  const failure = processingFailure({ id: "synthetic", status: "failed", stage: "draft_prose", errorCode: "PROJECT_SAVE_FAILED" });
-  assert.ok(failure && !failure.includes("PROJECT_SAVE_FAILED") && !failure.includes("draft_prose"));
-  assert.equal(failureLabel("CANCELLED"), null); assert.equal(failureLabel("PROJECT_DELETED"), null);
 });
 
 test("save status and installation render descriptions without error codes in visible text or titles", () => {

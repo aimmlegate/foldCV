@@ -11,7 +11,8 @@ from packages.resume_core.models.rich_facts import WorkingPeriod
 from packages.resume_core.models.template_facts import WorkingFactsV2
 from packages.resume_core.models.template_mutations import TemplateMutationV1
 from packages.resume_core.models.template_workspace import WorkspaceV7
-from packages.resume_core.rich_archive import export_rich_archive, open_rich_archive
+from packages.resume_core.archive_zip import write_zip
+from packages.resume_core.template_archive import archive_payload_v7, open_archive_v7
 from packages.resume_core.rich_fields import field_key, working_field
 from packages.resume_core.rich_mutations import RichMutationFailure, apply_rich_mutation
 from packages.resume_core.template_inverse import inverse_template_mutation
@@ -162,7 +163,7 @@ def test_delete_undo_and_portable_preserve_historical_scope_without_current_ghos
     deleted, _ = apply_rich_mutation(changed, request(changed, steps, 'delete'))
     assert not deleted.project.facts.builtin_manual_scopes
     assert deleted.project.facts.manual_scopes[0].id == scope['id']
-    transferred, _originals, _, _ = open_rich_archive(export_rich_archive(deleted, sources, {}, {}), 'scope-copy')
+    transferred, _originals, _, _ = open_archive_v7(write_zip(archive_payload_v7(deleted, sources, {})), 'scope-copy')
     assert transferred.project.facts == deleted.project.facts
     inverse = inverse_template_mutation(changed, deleted, origin_action_id='delete',
         mutation_id='undo-delete', session_id='session', action_token=2)

@@ -1,19 +1,17 @@
-"""Scripted Generic F10 through the v2 repository matches the old pipeline's composition (plan S12).
+"""Scripted Generic F10 through the v2 import route matches the composition of a direct coordinator run (plan S12).
 
 Revisions, timestamps and mutation-replay rows are the repository's commit record. Fact text, source text and the
 composition report of everything else must match. A semantic difference stops the slice; the golden is not updated.
 """
 
-import hashlib
 from itertools import count
 from pathlib import Path
 import re
 
 import pytest
 
-from packages.resume_core.project_repository import ProjectRepository, decode_project
-from resume_api.projects.fold import register_import_fold
-from resume_api.projects.pipeline import RepositoryPipeline
+from packages.resume_core.project_repository import decode_project
+from resume_api.importer.template_pipeline import TemplatePipeline
 from tests.projects.support import ORIGIN, v2_app
 
 HEX = re.compile(r'^[0-9a-f]{64}$')
@@ -21,11 +19,10 @@ TEXT_KEYS = {'text', 'rawInput'}
 
 
 def prepare(root, name='F10'):
-    from packages.resume_core.background_limits import import_seconds
-    from packages.resume_core.project_limits import finalization_seconds
+    from packages.resume_core.project_limits import finalization_seconds, import_seconds
     from packages.resume_core.templates.operations import derive_task
     from tests.templates.generic_fixtures import REVIEWS, TABLES, generic_package, generic_script, source_fixture
-    from tests.templates.test_template_employment import EmploymentFixture
+    from tests.templates.template_runtime_fixtures import EmploymentFixture
     src, raw = source_fixture(name)
     fixture = EmploymentFixture(root, captured=generic_package(), src=src, original_bytes=raw, cap=60, fallback=False)
     fixture.command.capture.allow_text_rewrite = True
@@ -89,27 +86,24 @@ def differing(left, right, path=''):
     return []
 
 
+@pytest.mark.slow
 @pytest.mark.asyncio
 async def test_f10_through_the_repository_matches_the_scripted_composition(tmp_path):
     import importlib.util
     def ids():
         serial = count(1)
         return lambda prefix: prefix + '-' + str(next(serial))
-    old_fixture, _raw, _derive = prepare(tmp_path / 'legacy', 'F10')
+    old_fixture, _raw, _derive = prepare(tmp_path / 'direct', 'F10')
     old_fixture.pipeline.id_factory = ids()
     old_result = await old_fixture.pipeline.run(old_fixture.project, old_fixture.command, admitted=old_fixture.admitted)
     assert old_result.publication.state == 'saved'
     baseline = old_fixture.current()
-    fixture, raw, derive_task = prepare(tmp_path / 'jobs', 'F10')
-    repository = ProjectRepository(tmp_path / 'repository', clock=lambda: fixture.now)
-    repository.start()
-    register_import_fold(repository)
-    repository.create(fixture.before, blobs=[('sources', fixture.source.id, raw, hashlib.sha256(raw).hexdigest())])
+    fixture, raw, derive_task = prepare(tmp_path / 'route', 'F10')
     import httpx
     with v2_app(tmp_path / 'http', [(fixture.before, {fixture.source.id: raw})]) as (client, app):
         service = app.state.projects
-        pipeline = RepositoryPipeline(None, fixture.transport, repository=service.repository,
-            originals=fixture.originals, authority=fixture.pipeline.authority, assemble=fixture.assemble,
+        pipeline = TemplatePipeline(fixture.transport, repository=service.repository,
+            authority=fixture.pipeline.authority, assemble=fixture.assemble,
             derive=derive_task, wall=lambda: fixture.now, id_factory=ids())
         service.imports.pipeline = pipeline
         service.imports.commands = lambda *_args: fixture.command

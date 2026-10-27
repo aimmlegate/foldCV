@@ -1,33 +1,22 @@
 """Retained clipboard authority follows cells and transitive ownership only."""
 
 import pytest
-from dataclasses import replace
-from types import SimpleNamespace
 
-import httpx
-from fastapi import FastAPI
-from fastapi.responses import JSONResponse
-
-from packages.resume_core import background_store
-from packages.resume_core.background_limits import LIMITS
-from packages.resume_core.background_store import BackgroundFailure
 from packages.resume_core.models.template_facts import Relation
 from packages.resume_core.models.rich_document import FieldBinding
 from packages.resume_core.models.template_authoring import TemplateClipboardCaptureV1
 from packages.resume_core.models.template_document import BoundLink,FieldRef,PresentedText
-from packages.resume_core.models.template_writer import WriterCaptureClipboardV2,WriterReleaseClipboardV2
 from packages.resume_core.template_authoring import split_block
 from packages.resume_core.template_clipboard import capture_clipboard
-from packages.resume_core.template_clipboard_store import TemplateClipboards
 from packages.resume_core.template_clipboard_witnesses import (captured_package_hash,field_witness,fingerprint,ownership_witness,scope_witness,
     source_witness,verify_witness,verify_witnesses)
 from packages.resume_core.template_facts import human_edit
 from packages.resume_core.templates.compiler import canonical
 from packages.resume_core.templates.presentation import snapshot_identity
+from tests.templates.editor_fixtures import TemplateEditor
 from tests.templates.storage_fixtures import workspace
 from tests.templates.test_manual_scope_occurrences import shared_workspace
 from tests.templates.test_relation_transactions import related_workspace
-from tests.templates.test_template_writers import TemplateWriterFixture
 
 
 def test_field_witness_survives_source_display_removal_and_unrelated_cell_changes():
@@ -158,14 +147,14 @@ def test_complete_capture_is_immutable_and_survives_display_removal_without_reta
 def test_complete_field_capture_preserves_block_field_provenance_as_exact_run_citations(tmp_path):
     before,sources=workspace();block=before.project.document.regions[2].blocks[0]
     block.provenance=[FieldBinding(kind='field_binding',id='exact-field-provenance',recordId='paper-a',fieldKey='title')]
-    fixture=TemplateWriterFixture(tmp_path,before,sources);request=clipboard_request(fixture)
-    capture=fixture.writers.capture_clipboard(fixture.project,request)
-    registry=fixture.writers.clipboards;state=fixture.jobs.load(fixture.project)
-    retained=registry.read_for_paste(state,fixture.current(),capture.clipboard_capture_id)
+    editor=TemplateEditor(tmp_path,before,sources)
+    capture=editor.capture({'kind':'range','range':{'blockId':block.id,'beforeRevision':block.revision,'cellId':None,
+        'field':'content','start':0,'end':12}},'copy-one')
+    retained=editor.retained(capture)
     assert retained.payload.content[0].citations==before.project.facts.extensions[0].cells[0].evidence
     assert any(item.kind=='source_span' and item.span==retained.payload.content[0].citations[0]
         for item in retained.witnesses)
-    assert fixture.current().project.document.regions[2].blocks[0].content[0].citations==[]
+    assert editor.current().project.document.regions[2].blocks[0].content[0].citations==[]
 
 
 def test_partial_literal_capture_keeps_citations_and_survives_former_cell_change():
@@ -226,153 +215,3 @@ def test_capture_rejects_stale_or_unsupported_source_without_mutating_it(damage)
             sourceSnapshot=snapshot_identity(before),selection={'kind':'blocks','blocks':[{'blockId':block.id,'beforeRevision':1}]})
         before.document_revision+=1
         with pytest.raises(ValueError,match='snapshot'):capture_clipboard(before,capture,'a'*64)
-
-
-def clipboard_request(fixture,identifier='copy-one'):
-    current=fixture.current();block=current.project.document.regions[2].blocks[0]
-    return WriterCaptureClipboardV2(schemaVersion=2,proof=fixture.proof,clientCaptureId=identifier,
-        snapshot=snapshot_identity(current),selection={'kind':'range','range':{'blockId':block.id,
-            'beforeRevision':block.revision,'cellId':None,'field':'content','start':0,'end':12}})
-
-
-def admit(fixture,registry,request):
-    with fixture.writers.local_history.guard(fixture.project),fixture.writers.guard(fixture.project) as (_directory,state,current,_hash):
-        fixture.writers.require(state,request.proof)
-        return registry.admit(state,current,request)
-
-
-def clipboard_fixture(tmp_path):
-    before,sources=workspace();fixture=TemplateWriterFixture(tmp_path,before,sources)
-    return fixture,TemplateClipboards(fixture.jobs)
-
-
-def test_clipboard_registry_immutable_retry_release_and_terminal_hash_guards(tmp_path):
-    fixture,registry=clipboard_fixture(tmp_path);request=clipboard_request(fixture)
-    capture=admit(fixture,registry,request);state=fixture.jobs.load(fixture.project)
-    entry=registry.find(state,request);retained=registry.read(state,entry);raw=canonical(retained)
-    retained.payload.content[0].text='Mutated caller copy'
-    assert canonical(registry.read(state,entry))==raw and admit(fixture,registry,request)==capture
-    before=registry.usage()[fixture.project]
-    assert before.draft_bytes==len(entry.payload) and before.owned_bytes>before.draft_bytes and before.records>3
-    registry.release(state,capture.clipboard_capture_id);released=registry.usage()[fixture.project]
-    assert released.draft_bytes==0 and 0<released.owned_bytes<before.owned_bytes and released.records==4
-    registry.release(state,capture.clipboard_capture_id)
-    with pytest.raises(BackgroundFailure,match='REQUEST_EXPIRED'):admit(fixture,registry,request)
-    changed=request.model_copy(deep=True);changed.selection.range.end=5
-    with pytest.raises(BackgroundFailure,match='JOB_IDEMPOTENCY_CONFLICT'):admit(fixture,registry,changed)
-
-
-def test_clipboard_capacity_failure_creates_no_id_or_payload_and_later_admission_can_use_that_id(tmp_path,monkeypatch):
-    fixture,registry=clipboard_fixture(tmp_path);request=clipboard_request(fixture)
-    raw=canonical(fixture.current())
-    with monkeypatch.context() as limited:
-        limited.setattr(background_store,'LIMITS',replace(LIMITS,draft_project_bytes=1))
-        with pytest.raises(BackgroundFailure,match='JOB_STORAGE_FULL'):admit(fixture,registry,request)
-    assert not registry.openings and not registry.usage() and canonical(fixture.current())==raw
-    changed=request.model_copy(deep=True);changed.selection.range.end=5
-    capture=admit(fixture,registry,changed)
-    assert capture.clipboard_capture_id.startswith('clipboard-')
-
-
-def test_clipboard_usage_blocks_ordinary_writes_and_expired_attached_lease_stays_charged(tmp_path,monkeypatch):
-    fixture,registry=clipboard_fixture(tmp_path);admit(fixture,registry,clipboard_request(fixture))
-    usage=registry.usage()[fixture.project];state=fixture.jobs.load(fixture.project)
-    state.writer.lease_expires_at='2000-01-01T00:00:00Z'
-    assert registry.usage(states={fixture.project:state})[fixture.project]==usage
-    with monkeypatch.context() as limited:
-        limited.setattr(background_store,'LIMITS',replace(LIMITS,draft_project_bytes=usage.draft_bytes-1))
-        with pytest.raises(BackgroundFailure,match='JOB_STORAGE_FULL'):fixture.writers.heartbeat(fixture.project,fixture.proof)
-    assert registry.usage()[fixture.project]==usage
-
-
-def test_clipboard_failed_durable_detach_preserves_payload_and_successful_detach_releases(tmp_path,monkeypatch):
-    fixture,registry=clipboard_fixture(tmp_path);admit(fixture,registry,clipboard_request(fixture))
-    before=registry.usage();write=fixture.writers.write
-    def fail(directory,state):
-        if state.writer.status=='clean_detached':
-            assert registry.usage(states={fixture.project:state})=={}
-            raise BackgroundFailure('JOB_STORE_UNAVAILABLE')
-        return write(directory,state)
-    with monkeypatch.context() as failed:
-        failed.setattr(fixture.writers,'write',fail)
-        with pytest.raises(BackgroundFailure,match='JOB_STORE_UNAVAILABLE'):
-            fixture.writers.detach(fixture.project,fixture.advance_request(0))
-    assert registry.usage()==before and fixture.jobs.load(fixture.project).writer.status=='attached'
-    fixture.writers.detach(fixture.project,fixture.advance_request(0))
-    assert not registry.openings and not registry.usage()
-
-
-def test_clipboard_providers_have_unique_keys_and_cannot_hide_each_others_retention(tmp_path):
-    fixture,first=clipboard_fixture(tmp_path);second=TemplateClipboards(fixture.jobs)
-    assert first.usage_key!=second.usage_key and first.usage_key in fixture.jobs.usage_providers
-    request=clipboard_request(fixture);admit(fixture,first,request);admit(fixture,second,request)
-    assert first.usage()[fixture.project]==second.usage()[fixture.project]
-    assert first.usage_key in fixture.jobs.usage_providers and second.usage_key in fixture.jobs.usage_providers
-
-
-def test_clipboard_read_for_paste_checks_current_authority_and_release(tmp_path):
-    fixture,registry=clipboard_fixture(tmp_path);capture=admit(fixture,registry,clipboard_request(fixture))
-    state=fixture.jobs.load(fixture.project);current=fixture.current()
-    retained=registry.read_for_paste(state,current,capture.clipboard_capture_id)
-    assert retained.capture==capture
-    current.project.document.regions[2].blocks=[]
-    assert registry.read_for_paste(state,current,capture.clipboard_capture_id)==retained
-    current.project.facts=human_edit(current.project.facts,'paper-a','title','Changed current fact')
-    with pytest.raises(BackgroundFailure,match='DEPENDENCY_CHANGED'):
-        registry.read_for_paste(state,current,capture.clipboard_capture_id)
-    registry.release(state,capture.clipboard_capture_id)
-    with pytest.raises(BackgroundFailure,match='REQUEST_EXPIRED'):
-        registry.read_for_paste(state,fixture.current(),capture.clipboard_capture_id)
-
-
-def test_actual_writer_capture_retry_after_expiry_and_release_preserve_opening_rules(tmp_path):
-    fixture,_registry=clipboard_fixture(tmp_path);request=clipboard_request(fixture)
-    capture=fixture.writers.capture_clipboard(fixture.project,request)
-    registry=fixture.writers.clipboards;before=registry.usage()[fixture.project]
-    fixture.elapsed.advance(LIMITS.writer_lease_seconds+1)
-    assert fixture.writers.capture_clipboard(fixture.project,request)==capture
-    fresh=request.model_copy(deep=True);fresh.client_capture_id='new-after-expiry'
-    with pytest.raises(BackgroundFailure,match='WRITER_UNKNOWN'):
-        fixture.writers.capture_clipboard(fixture.project,fresh)
-    assert registry.usage()[fixture.project]==before
-    released=fixture.writers.release_clipboard(fixture.project,WriterReleaseClipboardV2(schemaVersion=2,
-        proof=fixture.proof,clipboardCaptureId=capture.clipboard_capture_id))
-    assert released.released and registry.usage()[fixture.project].draft_bytes==0
-    with pytest.raises(BackgroundFailure,match='REQUEST_EXPIRED'):
-        fixture.writers.capture_clipboard(fixture.project,request)
-
-
-@pytest.mark.parametrize('damage',['credential','epoch','incarnation','snapshot'])
-def test_actual_writer_capture_rejects_foreign_proof_or_snapshot_without_accepting_id(tmp_path,damage):
-    fixture,_registry=clipboard_fixture(tmp_path);request=clipboard_request(fixture)
-    if damage=='credential':request.proof.credential='wrong-credential'
-    elif damage=='epoch':request.proof.epoch+=1
-    elif damage=='incarnation':request.proof.incarnation='another-opening'
-    else:request.snapshot.document_revision+=1
-    code='DEPENDENCY_CHANGED' if damage=='snapshot' else 'WRITER_UNKNOWN'
-    with pytest.raises(BackgroundFailure,match=code):fixture.writers.capture_clipboard(fixture.project,request)
-    assert not fixture.writers.clipboards.openings
-
-
-@pytest.mark.asyncio
-async def test_actual_clipboard_routes_return_only_capture_metadata_and_explicit_release(tmp_path):
-    from resume_api.jobs.writers import mount_writers
-    fixture,_registry=clipboard_fixture(tmp_path);service=SimpleNamespace(enabled=True,writers=fixture.writers)
-    app=FastAPI()
-    @app.exception_handler(BackgroundFailure)
-    async def failure(_request,error):return JSONResponse({'error':{'code':error.code}},status_code=409)
-    mount_writers(app,service)
-    async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app),base_url='http://foldcv.test') as client:
-        path='/v1/rich/projects/'+fixture.project+'/writer/clipboard'
-        request=clipboard_request(fixture);raw=canonical(fixture.current())
-        response=await client.post(path+'/capture',json=request.model_dump(mode='json',by_alias=True))
-        assert response.status_code==200 and response.headers['Cache-Control']=='no-store'
-        capture=TemplateClipboardCaptureV1.model_validate(response.json())
-        assert set(response.json())=={'schemaVersion','clipboardCaptureId','projectId','sourceSnapshot','selection'}
-        assert (await client.post(path+'/capture',json=request.model_dump(mode='json',by_alias=True))).content==response.content
-        release=WriterReleaseClipboardV2(schemaVersion=2,proof=fixture.proof,clipboardCaptureId=capture.clipboard_capture_id)
-        response=await client.post(path+'/release',json=release.model_dump(mode='json',by_alias=True))
-        assert response.status_code==200 and response.json()=={'schemaVersion':2,'clipboardCaptureId':capture.clipboard_capture_id,'released':True}
-        expired=await client.post(path+'/capture',json=request.model_dump(mode='json',by_alias=True))
-        assert expired.status_code==409 and expired.json()['error']['code']=='REQUEST_EXPIRED'
-        assert canonical(fixture.current())==raw

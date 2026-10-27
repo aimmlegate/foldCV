@@ -7,9 +7,8 @@ export function originalKind(name: string): OriginalKind {
   return extension === "txt" ? "text" : "unsupported";
 }
 
-export function originalUrl(projectId: string, sourceId: string, version: "v1" | "v2" = "v1"): string {
-  const root = version === "v2" ? "/v2/projects" : "/v1/rich/projects";
-  return `${root}/${encodeURIComponent(projectId)}/sources/${encodeURIComponent(sourceId)}/original`;
+export function originalUrl(projectId: string, sourceId: string): string {
+  return `/v2/projects/${encodeURIComponent(projectId)}/sources/${encodeURIComponent(sourceId)}/original`;
 }
 
 export async function loadOriginal(url: string, hash: string, signal: AbortSignal): Promise<Blob> {

@@ -14,8 +14,7 @@ import type { templateSchema } from "./template-schema";
 import { blockAt, copySource, correctionOperation, extractOperations, foldComposition, insertionAt, mergeAt, placementOf,
   itemContaining, replacementAt, selectedBlocks, splitAt, textPoint, textPosition, type ExtractedOperation, type TextPoint } from "./v7-extraction";
 import { wireMarks } from "./inline";
-import type { PanelCommand } from "./synchronization";
-import { employmentPanelCommands } from "./v7-panel";
+import { employmentPanelCommands, type PanelCommand } from "./v7-panel";
 import { projectTemplateBlock, templateTableIdentities } from "./v7-projection";
 import { clipboardSelection, containerKey, correctionRange, verifiedRange, type ClipboardSource, type LocalContainer, type Placement,
   type V7Intent, type V7Operation } from "./v7-translation";
@@ -449,7 +448,7 @@ export class TemplateEditorSession {
     if (text) editor._tiptapEditor.view.dispatch(state.tr.insertText(text));
   }
 
-  /** Moving the caret to another container ends the current typing action, as in the V1 editor. */
+  /** Moving the caret to another container ends the current typing action. */
   selected(location: string | null): void {
     if (!this.composing && this.location !== null && this.location !== location) this.boundary();
     this.location = location;

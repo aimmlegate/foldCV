@@ -3,15 +3,14 @@
 from collections import Counter
 import json
 from pathlib import Path
+import re
 
 import pymupdf
 import pytest
 
 from packages.resume_core.extraction.parser import extract, W
-from packages.resume_core.gui_normalization import canonical_source
-from packages.resume_core.import_agent import source_parts
-from packages.resume_core.import_content import source_paragraphs
 from packages.resume_core.models.contracts import Source
+from packages.resume_core.sources import canonical_source
 from tests.extract.test_parser import rebuild
 
 
@@ -26,9 +25,11 @@ def pdf(rows, *, scale=1, pages=1):
 
 
 def view(data, name):
+    """The extraction result and the stored source units; every layout cue must survive into the stored source."""
     result = extract(data, name)
     source = canonical_source(result)
-    return result, source_paragraphs([source], source_parts([source]))
+    assert [unit.structure for unit in source.units] == [unit.structure for unit in result.units]
+    return result, source.units
 
 
 @pytest.mark.parametrize("scale", [.6, 1, 1.8])
@@ -42,15 +43,15 @@ def test_pdf_visual_order_and_entry_spacing_survive_object_order_and_page_scale(
     rows = [(0, 40, 100 + i * 18, text, text.startswith("Institute")) for i, text in enumerate(texts)]
     rows += [(0, 40, 180 + i * 18, text, text.startswith("Institute")) for i, text in enumerate(second)]
     rows += [(1, 40, 70, expected[-1], False), (0, 40, 40, "Candidate", True)]
-    result, paragraphs = view(pdf(rows[::-1], scale=scale, pages=2), "varied.pdf")
+    result, units = view(pdf(rows[::-1], scale=scale, pages=2), "varied.pdf")
     assert [u.text.strip() for u in result.units] == expected
     groups = [u.structure.group for u in result.units]
     assert len(set(groups[1:4])) == len(set(groups[4:7])) == 1
     assert groups[1] != groups[4]
     assert result.units[4].structure.gap_before > result.units[3].structure.gap_before * 2
     assert all(u.structure.bold for u in result.units if "Institute" in u.text)
-    assert paragraphs[-1].page == 2
-    assert all(p.hints and "visual group" in p.hints for p in paragraphs)
+    assert (units[-1].location.kind, units[-1].location.index) == ("page", 1)
+    assert all(unit.structure.group is not None for unit in units)
 
 
 def test_pdf_columns_and_spanning_headings_keep_each_column_together():
@@ -60,15 +61,13 @@ def test_pdf_columns_and_spanning_headings_keep_each_column_together():
             rows += [(0, x, base + i * 18, f"{prefix} {side} line {i}", False) for i in range(3)]
     rows += [(0, 40, 40, "Candidate heading across both columns with a long profession title", True),
              (0, 40, 180, "A wide section heading spanning both columns of the source document", True)]
-    result, paragraphs = view(pdf(rows), "columns.pdf")
+    result, units = view(pdf(rows), "columns.pdf")
     expected = [rows[-2][3], *[f"Top {side} line {i}" for side in ("left", "right") for i in range(3)],
                 rows[-1][3], *[f"Bottom {side} line {i}" for side in ("left", "right") for i in range(3)]]
     assert "".join(u.text for u in result.units).splitlines() == expected
-    left = [p for p in paragraphs if "left line" in p.text]
-    right = [p for p in paragraphs if "right line" in p.text]
-    assert all("column 1" in p.hints for p in left)
-    assert all("column 2" in p.hints for p in right)
-    assert any("reading order uncertain" in p.hints for p in paragraphs)
+    assert all(unit.structure.column == 1 for unit in units if "left line" in unit.text)
+    assert all(unit.structure.column == 2 for unit in units if "right line" in unit.text)
+    assert any(unit.structure.layout_uncertain for unit in units)
 
 
 @pytest.mark.parametrize("side", ["left", "right"])
@@ -77,13 +76,13 @@ def test_pdf_sparse_side_labels_stay_near_their_rows_without_semantic_binding(si
     rows = [(0, label_x, y, year, False) for y, year in ((80, "2024"), (180, "2021"))]
     for y, name in ((80, "First"), (180, "Second")):
         rows += [(0, body_x, y + i * 18, f"{name} entry has detailed source line {i}", i == 0) for i in range(3)]
-    result, paragraphs = view(pdf(rows), "side-labels.pdf")
+    result, units = view(pdf(rows), "side-labels.pdf")
     text = "".join(u.text for u in result.units)
     assert text.index("2024") < text.index("First entry has detailed source line 1")
     assert text.index("2021") < text.index("Second entry has detailed source line 1")
     assert text.index("First entry has detailed source line 2") < text.index("2021")
-    assert all("reading order uncertain" in p.hints for p in paragraphs)
-    assert all(f"column {1 if side == 'left' else 2}" in p.hints for p in paragraphs if p.text.strip() in {"2024", "2021"})
+    assert all(unit.structure.layout_uncertain for unit in units)
+    assert all(unit.structure.column == (1 if side == "left" else 2) for unit in units if unit.text.strip() in {"2024", "2021"})
     assert Counter(text.splitlines()) == Counter(row[3] for row in rows)
 
 
@@ -122,7 +121,7 @@ def structured_docx():
 
 
 def test_docx_preserves_inherited_headings_lists_cells_merges_and_header_footer_context():
-    result, paragraphs = view(structured_docx(), "tables.docx")
+    result, stored = view(structured_docx(), "tables.docx")
     units = {u.text: u for u in result.units}
     assert units["Education"].structure.heading_level == 2
     assert units["Education"].structure.bold is True
@@ -133,12 +132,14 @@ def test_docx_preserves_inherited_headings_lists_cells_merges_and_header_footer_
     assert units["More details"].structure.row_merge == "continue"
     assert units["2009"].location.column == units["2005"].location.column == 2
     assert units["2009"].location.row == 0 and units["2005"].location.row == 1
-    hints = {p.text: p.hints for p in paragraphs}
-    assert "table 1, row 1, cell 3" in hints["2009"]
-    assert "table 1, row 2, cell 3" in hints["2005"]
-    assert "spans 2 cells" in hints["Institution"]
-    assert "header" in hints["Header repeated"] and "footer" in hints["Footer text"]
-    assert "heading 2" in hints["Education"] and "list level 3" in hints["Python"]
+    saved = {unit.text: unit for unit in stored}
+    cells = {text: (saved[text].location.kind, saved[text].location.index, saved[text].location.row, saved[text].location.column)
+        for text in ("2009", "2005")}
+    assert cells == {"2009": ("table_cell", 0, 0, 2), "2005": ("table_cell", 0, 1, 2)}
+    assert saved["Institution"].structure.column_span == 2
+    assert re.fullmatch(r"word/header\d*\.xml", saved["Header repeated"].structure.part)
+    assert re.fullmatch(r"word/footer\d*\.xml", saved["Footer text"].structure.part)
+    assert saved["Education"].structure.heading_level == 2 and saved["Python"].structure.list_level == 2
     assert all(not u.structure.bounds for u in result.units)
 
 

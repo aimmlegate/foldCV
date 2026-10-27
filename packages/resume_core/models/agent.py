@@ -1,20 +1,26 @@
-"""Version 1 assistant wires and private journal; canonical project wires stay fixed."""
+"""Assistant wires the runtime, web fetcher, settings and the repository assistant share."""
 
 from __future__ import annotations
 
 from datetime import datetime
 from typing import Annotated, Literal, Union
 
-from pydantic import AfterValidator, ConfigDict, Field, RootModel, model_validator, model_serializer
+from pydantic import AfterValidator, ConfigDict, Field, RootModel, model_validator
 
 from .. import agent_limits as limits
-from .contracts import MetricValue, PartialDate, Revision, Sha256, Wire, _unique
-from .rich_mutations import DependencyStamp, RichMutation, RichSelection
-from ..rich_api import RichProjectResponse
+from .contracts import Revision, Sha256, Wire, _unique
+from .rich_mutations import DependencyStamp
+
 
 AgentId = Annotated[str, Field(min_length=1, max_length=128, pattern=r"^[A-Za-z0-9_-]+$")]
+
+
 ReferenceId = Annotated[str, Field(min_length=1, max_length=256)]
+
+
 ModelId = Annotated[str, Field(pattern=r"^[a-zA-Z0-9][a-zA-Z0-9._-]{0,79}$")]
+
+
 def valid_timestamp(value: str) -> str:
     datetime.fromisoformat(value.replace("Z", "+00:00"))
     return value
@@ -22,10 +28,14 @@ def valid_timestamp(value: str) -> str:
 
 Timestamp = Annotated[str, Field(pattern=r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:Z|\+00:00)$",
     json_schema_extra={"format": "date-time"}), AfterValidator(valid_timestamp)]
+
+
 RunState = Literal["queued", "running", "waiting_for_editor", "cancelling", "completed", "failed", "cancelled", "interrupted"]
+
+
 EditState = Literal["prepared", "offered", "applying", "saved", "stale", "rejected", "cancelled", "save_failed", "outcome_unknown"]
-TERMINAL_RUNS = frozenset({"completed", "failed", "cancelled", "interrupted"})
-TERMINAL_EDITS = frozenset({"saved", "stale", "rejected", "cancelled", "save_failed"})
+
+
 ErrorCode = Literal[
     "AGENT_DISABLED", "AGENT_MODEL_REQUIRED", "AGENT_MODEL_UNAVAILABLE", "AGENT_MODEL_INCOMPATIBLE",
     "AGENT_SETTINGS_CONFLICT", "AGENT_SETTINGS_CORRUPT", "AGENT_SETTINGS_SAVE_FAILED",
@@ -80,20 +90,6 @@ class AgentError(AgentWire):
     code: ErrorCode
 
 
-class AgentEmptyRequest(AgentWire):
-    pass
-
-
-class AgentAccess(AgentWire):
-    revision: Revision
-    read_only: bool = Field(strict=True)
-
-
-class AgentAccessRequest(AgentWire):
-    expected_revision: Revision
-    read_only: bool = Field(strict=True)
-
-
 class AgentSettings(AgentWire):
     schema_version: Literal[1]
     revision: Revision
@@ -107,155 +103,11 @@ class AgentSettingsRequest(AgentWire):
     selected_agent_model: ModelId | None
 
 
-class AgentModelCapability(AgentWire):
-    model: ModelId
-    state: Literal["unverified", "verified", "incompatible"]
-    binary_sha256: Sha256
-    protocol_sha256: Sha256
-    config_sha256: Sha256
-    account_epoch: AgentId
-    reason: AgentError | None
-
-
-class AgentCapabilities(AgentWire):
-    schema_version: Literal[1]
-    ready: bool
-    binary_version: str = Field(max_length=128)
-    binary_sha256: Sha256 | None
-    protocol_sha256: Sha256 | None
-    config_sha256: Sha256 | None
-    connection_epoch: AgentId | None
-    modes: list[Literal["edit", "check_only"]]
-    tools: list[str] = Field(max_length=32)
-    web_available: bool
-    models: list[AgentModelCapability] = Field(max_length=100)
-    unavailable: AgentError | None
-
-
-class WholeResumeScope(AgentWire):
-    kind: Literal["resume"]
-
-
-class SelectionScope(AgentWire):
-    kind: Literal["selection"]
-    selection: RichSelection
-
-
-AgentScope = Annotated[Union[WholeResumeScope, SelectionScope], Field(discriminator="kind")]
-
-
-class AgentOwner(AgentWire):
-    token: str = Field(min_length=32, max_length=128, pattern=r"^[A-Za-z0-9_-]+$")
-    epoch: Revision
-
-
-class AgentLeaseOpen(AgentWire):
-    session_id: AgentId
-
-
-class AgentLease(AgentWire):
-    project_id: AgentId
-    session_id: AgentId
-    owner: AgentOwner
-    expires_at: Timestamp
-
-
-class AgentOwnerRequest(AgentWire):
-    owner: AgentOwner
-
-
-class AgentHistoryOffer(AgentOwnerRequest):
-    project_revision: Revision
-    document_revision: Revision
-    facts_revision: Revision
-    undo: RichMutation | None
-    redo: RichMutation | None
-
-
-class AgentRunRequest(AgentOwnerRequest):
-    client_request_id: AgentId
-    conversation_id: AgentId
-    message: str = Field(min_length=1, max_length=limits.USER_CHARS)
-    allow_edits: bool
-    allow_web: bool
-    scope: AgentScope
-    selection_context: RichSelection | None = None
-    settings_revision: Revision
-    project_revision: Revision
-    document_revision: Revision
-    facts_revision: Revision
-
-
-class AgentQuery(AgentWire):
-    kind: Literal["context", "document", "find", "facts", "source", "history", "resources"]
-    text: str = Field(default="", max_length=1000)
-    ids: list[ReferenceId] = Field(default_factory=list, max_length=100)
-    parent_id: ReferenceId | None = None
-    cursor: str | None = Field(default=None, max_length=512)
-
-
-class AgentEntityDependency(AgentWire):
-    kind: Literal["entity"]
-    stamp: DependencyStamp
-
-
-class AgentQueryDependency(AgentWire):
-    kind: Literal["query"]
-    query: AgentQuery
-    fingerprint: Sha256
-
-
-AgentSnapshotDependency = Annotated[Union[AgentEntityDependency, AgentQueryDependency], Field(discriminator="kind")]
-
-
-class AgentReadSnapshot(AgentWire):
-    id: AgentId
-    run_id: AgentId
-    content_sha256: Sha256
-    dependencies: list[AgentSnapshotDependency] = Field(max_length=2000)
-    truncated: bool
-    next_cursor: str | None = Field(max_length=512)
-
-
 class AgentUsage(AgentWire):
     input_tokens: int = Field(ge=0)
     cached_input_tokens: int = Field(ge=0)
     output_tokens: int = Field(ge=0)
     total_tokens: int = Field(ge=0)
-
-
-class AgentRun(AgentWire):
-    id: AgentId
-    conversation_id: AgentId
-    project_id: AgentId
-    client_request_id: AgentId
-    owner_epoch: Revision
-    state: RunState
-    allow_edits: bool
-    allow_web: bool
-    scope: AgentScope
-    selection_context: RichSelection | None = None
-    access_revision: Revision = 1
-    model: ModelId
-    connection_epoch: AgentId
-    settings_revision: Revision
-    created_at: Timestamp
-    deadline: Timestamp
-    finished_at: Timestamp | None
-    usage: AgentUsage | None
-    error: AgentError | None
-    saved_batch_id: AgentId | None
-    outcome_unknown: bool
-
-    @model_validator(mode="after")
-    def coherent_terminal(self):
-        if (self.state in TERMINAL_RUNS) != (self.finished_at is not None):
-            raise ValueError("terminal run needs its finish time")
-        if self.state == "completed" and (self.error is not None or self.outcome_unknown):
-            raise ValueError("completed run cannot conceal a failure or uncertain write")
-        if not self.allow_edits and (self.saved_batch_id is not None or self.outcome_unknown):
-            raise ValueError("read-only run cannot have an edit outcome")
-        return self
 
 
 class AgentReference(AgentWire):
@@ -342,299 +194,6 @@ class AgentFinding(AgentWire):
         return self
 
 
-class AgentInline(AgentWire):
-    text: str = Field(max_length=16000)
-    marks: list[Literal["bold", "italic", "underline", "strike", "code"]] = Field(default_factory=list, max_length=5)
-
-
-class AgentRange(AgentWire):
-    snapshot_id: AgentId
-    block_id: ReferenceId
-    cell_id: ReferenceId | None
-    field: Literal["content", "caption"]
-    # Both absent means the whole field (A1, 2026-10-25): a sentence rewrite no longer depends on exact UTF-16 offsets.
-    start: int | None = Field(default=None, ge=0)
-    end: int | None = Field(default=None, ge=0)
-
-    @model_validator(mode="after")
-    def ordered_range(self):
-        if (self.start is None) != (self.end is None):
-            raise ValueError("edit range needs both start and end, or neither for the whole field")
-        if self.start is not None and self.end < self.start:
-            raise ValueError("edit range ends before its start")
-        return self
-
-    @property
-    def whole_field(self):
-        return self.start is None
-
-
-class AgentReplaceText(AgentWire):
-    kind: Literal["replace_text"]
-    target: AgentRange
-    content: list[AgentInline] = Field(max_length=100)
-
-
-class AgentBlockAnchor(AgentWire):
-    snapshot_id: AgentId
-    parent_id: ReferenceId
-    after_id: ReferenceId | None
-
-
-class AgentNewBlock(AgentWire):
-    key: AgentId
-    kind: Literal["paragraph", "bullet_list_item", "numbered_list_item", "heading", "section"]
-    content: list[AgentInline] = Field(max_length=100)
-    level: Literal[1, 2, 3] = 2
-
-
-class AgentInsertBlocks(AgentWire):
-    kind: Literal["insert_blocks"]
-    destination: AgentBlockAnchor
-    blocks: list[AgentNewBlock] = Field(min_length=1, max_length=100)
-
-
-class AgentDeleteBlocks(AgentWire):
-    kind: Literal["delete_blocks"]
-    snapshot_id: AgentId
-    block_ids: list[ReferenceId] = Field(min_length=1, max_length=100)
-
-
-class AgentMoveBlocks(AgentDeleteBlocks):
-    kind: Literal["move_blocks"]
-    destination: AgentBlockAnchor
-
-
-class AgentFormatTemplate(AgentWire):
-    kind: Literal["format_template"]
-    snapshot_id: AgentId
-
-
-class AgentHistoryCommand(AgentWire):
-    kind: Literal["history"]
-    snapshot_id: AgentId
-    direction: Literal["undo", "redo"]
-
-
-class AgentInsertTable(AgentWire):
-    kind: Literal["insert_table"]
-    destination: AgentBlockAnchor
-    rows: list[list[str]] = Field(min_length=1, max_length=100)
-    header_rows: int = Field(default=1, ge=0, le=100)
-
-
-class AgentInsertAsset(AgentWire):
-    kind: Literal["insert_asset"]
-    destination: AgentBlockAnchor
-    asset_id: ReferenceId
-    alt: str = Field(max_length=1000)
-    width: float = Field(gt=0, le=2000)
-    height: float = Field(gt=0, le=2000)
-
-
-class AgentSourceEvidence(AgentWire):
-    kind: Literal["source"]
-    source_id: ReferenceId
-    unit_id: ReferenceId
-
-
-class AgentFactEvidence(AgentWire):
-    kind: Literal["fact"]
-    record_id: ReferenceId
-
-
-class AgentUserCorrection(AgentWire):
-    kind: Literal["user_correction"]
-    quote: str = Field(min_length=1, max_length=limits.USER_CHARS)
-
-
-AgentEvidence = Annotated[Union[AgentSourceEvidence, AgentFactEvidence, AgentUserCorrection], Field(discriminator="kind")]
-
-
-class AgentFactValue(AgentWire):
-    status: Literal["known", "uncertain"]
-    value: str | PartialDate | bool | MetricValue | None
-    text: str = Field(max_length=8000)
-
-    @model_validator(mode="after")
-    def authority(self):
-        if (self.status == "uncertain") != (self.value is None):
-            raise ValueError("uncertain fact cannot claim a typed value")
-        return self
-
-
-FactKey = Literal["name", "title", "location", "label", "value", "employer", "role", "display", "canonical_id", "institution", "qualification", "specialty", "completion", "language", "level", "issuer", "date", "start", "end", "present"]
-
-
-class AgentUpdateFact(AgentWire):
-    kind: Literal["update_fact"]
-    snapshot_id: AgentId
-    record_id: ReferenceId
-    field_key: FactKey
-    period_id: ReferenceId | None = None
-    value: AgentFactValue
-    evidence: list[AgentEvidence] = Field(min_length=1, max_length=20)
-
-
-class AgentNewPeriod(AgentWire):
-    start: AgentFactValue
-    end: AgentFactValue
-    present: AgentFactValue
-
-
-class AgentCreateFact(AgentWire):
-    kind: Literal["create_fact"]
-    key: AgentId
-    record_kind: Literal["candidate", "detail", "employment", "technology", "education", "language", "certification", "claim", "metric"]
-    owner_record_id: ReferenceId | None
-    values: dict[FactKey, AgentFactValue] = Field(min_length=1, max_length=20)
-    correction: AgentUserCorrection
-    periods: list[AgentNewPeriod] = Field(default_factory=list, max_length=20)
-
-
-class AgentDeleteFact(AgentWire):
-    kind: Literal["delete_fact"]
-    snapshot_id: AgentId
-    record_id: ReferenceId
-    correction: AgentUserCorrection
-
-
-AgentEditOperation = Annotated[Union[AgentReplaceText, AgentInsertBlocks, AgentDeleteBlocks,
-    AgentMoveBlocks, AgentUpdateFact, AgentCreateFact, AgentDeleteFact, AgentFormatTemplate,
-    AgentInsertTable, AgentInsertAsset, AgentHistoryCommand], Field(discriminator="kind")]
-
-
-class AgentPrepareRequest(AgentWire):
-    key: AgentId
-    snapshot_ids: list[AgentId] = Field(max_length=limits.TOOL_CALLS)
-    operations: list[AgentEditOperation] = Field(max_length=limits.EDIT_OPERATIONS)
-
-
-class AgentApplyRequest(AgentWire):
-    batch_id: AgentId
-
-
-class AgentProjectAction(AgentWire):
-    key: AgentId
-    snapshot_id: AgentId
-    action: Literal["rename", "formatting_date", "add_source_text", "remove_source", "import_asset", "remove_asset",
-        "export_docx", "export_project", "archive", "restore", "delete", "undo", "redo"]
-    value: str = Field(default="", max_length=64000)
-    target_id: ReferenceId | None = None
-
-
-class AgentProjectOperation(AgentWire):
-    id: AgentId
-    project_id: AgentId
-    run_id: AgentId
-    action: str = Field(max_length=40)
-    status: str = Field(max_length=40)
-    durable: bool
-    download_url: str | None
-    error_code: str | None
-
-
-class AgentProjectOperations(AgentWire):
-    items: list[AgentProjectOperation] = Field(max_length=500)
-
-
-class AgentEditBatch(AgentWire):
-    id: AgentId
-    run_id: AgentId
-    tool_key: AgentId
-    owner_epoch: Revision
-    state: EditState
-    scope: AgentScope
-    read_snapshot_ids: list[AgentId] = Field(max_length=limits.TOOL_CALLS)
-    dependencies: list[AgentSnapshotDependency] = Field(max_length=2000)
-    mutation: RichMutation
-    request_sha256: Sha256
-    preview_sha256: Sha256
-    affected: list[AgentAnchor] = Field(max_length=100)
-    affected_count: int | None = Field(default=None, ge=0)
-    fact_record_ids: list[ReferenceId] = Field(max_length=100)
-
-    @model_validator(mode="after")
-    def journal_limit(self):
-        if self.mutation.kind not in {"structure", "undo", "redo"}:
-            raise ValueError("prepared edit uses the shared structure action")
-        bounded(self, limits.JOURNAL_BYTES)
-        return self
-
-
-class AgentEditReceipt(AgentWire):
-    batch_id: AgentId
-    run_id: AgentId
-    tool_key: AgentId
-    client_mutation_id: AgentId
-    request_sha256: Sha256
-    disposition: EditState
-    project_revision: Revision | None
-    document_revision: Revision | None
-    facts_revision: Revision | None
-    durable: bool
-    error: AgentError | None
-
-    @model_validator(mode="after")
-    def saved_proof(self):
-        if self.durable != (self.disposition == "saved"):
-            raise ValueError("only saved receipt can claim durability")
-        if self.durable and (self.error is not None or any(rev is None for rev in (
-                self.project_revision, self.document_revision, self.facts_revision))):
-            raise ValueError("saved receipt needs resulting revisions")
-        return self
-
-
-class AgentPrepareResult(AgentWire):
-    model_config = ConfigDict(json_schema_extra={"x-maxSerializedBytes": limits.TOOL_BYTES})
-    disposition: Literal["prepared", "no_change"]
-    batch_id: AgentId | None
-    affected: list[AgentAnchor] = Field(max_length=100)
-    affected_count: int | None = Field(default=None, ge=0)
-    preview: str = Field(max_length=4000)
-
-    @model_validator(mode="after")
-    def no_change(self):
-        if (self.disposition == "prepared") != (self.batch_id is not None):
-            raise ValueError("no_change has no batch")
-        bounded(self, limits.TOOL_BYTES)
-        return self
-
-
-class AgentCommitRequest(AgentOwnerRequest):
-    ticket: str = Field(min_length=32, max_length=128, pattern=r"^[A-Za-z0-9_-]+$")
-    request_sha256: Sha256
-
-
-class AgentClaimResult(AgentWire):
-    ticket: str = Field(min_length=32, max_length=128)
-    expires_at: Timestamp
-    batch: AgentEditBatch
-
-
-class AgentResultRequest(AgentOwnerRequest):
-    receipt: AgentEditReceipt
-
-
-class AgentCommitResult(AgentWire):
-    receipt: AgentEditReceipt
-    project: RichProjectResponse
-
-    @model_validator(mode="after")
-    def exact_saved_proof(self):
-        if self.receipt.durable:
-            proof = next((item for item in self.project.workspace.mutation_replay
-                if item.client_mutation_id == self.receipt.client_mutation_id), None)
-            current = self.project.workspace
-            if (self.project.durability != "durable" or current.project is None or proof is None
-                    or proof.request_sha256 != self.receipt.request_sha256 or proof.resulting_revision != self.receipt.project_revision
-                    or current.project_revision < self.receipt.project_revision or current.document_revision < self.receipt.document_revision
-                    or current.project.facts.revision < self.receipt.facts_revision
-                    or self.project.saved_project_revision != current.project_revision or self.project.saved_document_revision != current.document_revision):
-                raise ValueError("saved publication needs exact canonical replay proof")
-        return self
-
-
 class EventBase(AgentWire):
     schema_version: Literal[1]
     id: AgentId
@@ -718,265 +277,17 @@ class AgentEvent(RootModel[Annotated[Union[MessageDelta, ActivityEvent, ToolEven
     pass
 
 
-class AgentConversation(AgentWire):
-    schema_version: Literal[1]
-    id: AgentId
-    project_id: AgentId
-    created_at: Timestamp
-    updated_at: Timestamp
-    messages: list[AgentMessage] = Field(max_length=limits.CONVERSATION_MESSAGES)
-    runs: list[AgentRun]
-    sources: list[AgentWebSource]
-    findings: list[AgentFinding]
-
-    @model_validator(mode="after")
-    def references(self):
-        for collection in (self.messages, self.runs, self.sources, self.findings):
-            _unique([item.id for item in collection], "conversation item")
-        runs = {run.id for run in self.runs}
-        sources = {source.id for source in self.sources}
-        findings = {finding.id for finding in self.findings}
-        if any(run.conversation_id != self.id or run.project_id != self.project_id for run in self.runs):
-            raise ValueError("foreign conversation run")
-        if sum(run.state not in TERMINAL_RUNS for run in self.runs) > 1:
-            raise ValueError("conversation has more than one active run")
-        if any(item.run_id not in runs for item in [*self.messages, *self.sources, *self.findings]):
-            raise ValueError("foreign conversation resource")
-        if any(ref.id not in sources for msg in self.messages for ref in msg.sources):
-            raise ValueError("message cites an unstored source")
-        if any(ref.id not in findings for msg in self.messages for ref in msg.findings):
-            raise ValueError("message refers to an unstored finding")
-        if any(id not in sources for finding in self.findings for id in finding.source_ids):
-            raise ValueError("finding cites an unstored source")
-        return self
-
-
-class AgentPageRequest(AgentWire):
-    cursor: str | None = Field(default=None, max_length=512)
-    limit: int = Field(default=20, ge=1, le=20)
-    ids: list[AgentId] = Field(default_factory=list, max_length=20)
-
-
-class AgentConversationSummary(AgentWire):
-    id: AgentId
-    created_at: Timestamp
-    updated_at: Timestamp
-    title: str = Field(max_length=120)
-    active_run_id: AgentId | None
-
-
-class AgentConversationPage(AgentWire):
-    items: list[AgentConversationSummary] = Field(max_length=20)
-    next_cursor: str | None = Field(max_length=512)
-
-
-class AgentMessagePage(AgentWire):
-    model_config = ConfigDict(json_schema_extra={"x-maxSerializedBytes": limits.RESPONSE_BYTES})
-    items: list[AgentMessage] = Field(max_length=20)
-    next_cursor: str | None = Field(max_length=512)
-
-    @model_validator(mode="after")
-    def response_limit(self):
-        bounded(self, limits.RESPONSE_BYTES)
-        return self
-
-
-class AgentResourcePage(AgentWire):
-    model_config = ConfigDict(json_schema_extra={"x-maxSerializedBytes": limits.RESPONSE_BYTES})
-    sources: list[AgentWebSource] = Field(max_length=20)
-    findings: list[AgentFinding] = Field(max_length=20)
-    next_cursor: str | None = Field(max_length=512)
-
-    @model_validator(mode="after")
-    def response_limit(self):
-        bounded(self, limits.RESPONSE_BYTES)
-        return self
-
-
-class AgentEventsRequest(AgentOwnerRequest):
-    after_sequence: int = Field(ge=0)
-
-
-class AgentRunRead(AgentWire):
-    run: AgentRun
-    receipts: list[AgentEditReceipt] = Field(max_length=100)
-
-
-class AgentToolRead(AgentWire):
-    query: AgentQuery
-
-
-class AgentToolResult(AgentWire):
-    model_config = ConfigDict(json_schema_extra={"x-maxSerializedBytes": limits.TOOL_BYTES})
-    snapshot: AgentReadSnapshot
-    content: str
-
-    @model_validator(mode="after")
-    def response_limit(self):
-        bounded(self, limits.TOOL_BYTES)
-        return self
-
-
 class AgentFetchRequest(AgentWire):
     url: str = Field(min_length=1, max_length=4096)
 
 
-class AgentFindingTarget(AgentWire):
-    snapshot_id: AgentId
-    block_id: ReferenceId | None
-    cell_id: ReferenceId | None
-    record_id: ReferenceId | None
-    field_key: ReferenceId | None
-    start: int | None = Field(ge=0)
-    end: int | None = Field(ge=0)
-
-    @model_validator(mode="after")
-    def ordered_range(self):
-        if (self.start is None) != (self.end is None) or self.start is not None and self.end < self.start:
-            raise ValueError("finding target needs an ordered UTF-16 range")
-        return self
-
-
-class AgentFindingInput(AgentWire):
-    severity: Literal["info", "warning", "error"]
-    message: str = Field(min_length=1, max_length=4000)
-    targets: list[AgentFindingTarget] = Field(max_length=20)
-    source_ids: list[AgentId] = Field(max_length=20)
-
-
-class AgentPublishFindings(AgentWire):
-    findings: list[AgentFindingInput] = Field(max_length=20)
-
-
-class AgentJournalRequest(AgentWire):
-    client_request_id: AgentId
-    conversation_id: AgentId
-    message: str = Field(min_length=1, max_length=limits.USER_CHARS)
-    allow_edits: bool
-    allow_web: bool
-    scope: AgentScope
-    selection_context: RichSelection | None = None
-    settings_revision: Revision
-    project_revision: Revision
-    document_revision: Revision
-    facts_revision: Revision
-
-    @model_serializer(mode="wrap")
-    def stored_request(self, handler):
-        value = handler(self)
-        if self.selection_context is None:
-            value.pop("selectionContext", None)
-            value.pop("selection_context", None)
-        return value
-
-
-class AgentHistoryAction(AgentWire):
-    kind: Literal["undo", "redo"]
-    client_mutation_id: AgentId
-    request_sha256: Sha256
-    project_revision: Revision
-    timestamp: Timestamp
-
-
-class AgentPublicationStamp(AgentWire):
-    workspace_sha256: Sha256
-    project_revision: Revision
-    document_revision: Revision
-    facts_revision: Revision
-
-
-class AgentBatchJournal(AgentWire):
-    key: AgentId
-    payload_sha256: Sha256
-    result: AgentPrepareResult
-    batch: AgentEditBatch | None
-    receipt: AgentEditReceipt | None
-    publication: AgentPublicationStamp | None = None
-    history_actions: list[AgentHistoryAction] = Field(default_factory=list, max_length=100)
-    history_actions_omitted: int = Field(default=0, ge=0)
-
-
-class AgentRunJournal(AgentWire):
-    model_config = ConfigDict(json_schema_extra={"x-maxSerializedBytes": limits.JOURNAL_BYTES + limits.RUN_BYTES})
-    run_id: AgentId
-    request: AgentJournalRequest
-    request_sha256: Sha256
-    reserved: bool
-    snapshots: list[AgentReadSnapshot] = Field(max_length=limits.TOOL_CALLS)
-    batches: list[AgentBatchJournal] = Field(max_length=100)
-    events: list[AgentEvent]
-
-    @model_validator(mode="after")
-    def bounded_journal(self):
-        bounded(self, limits.JOURNAL_BYTES + limits.RUN_BYTES)
-        return self
-
-
-class AgentProjectState(AgentWire):
-    model_config = ConfigDict(json_schema_extra={"x-maxSerializedBytes": limits.PROJECT_BYTES})
-    schema_version: Literal[1]
-    project_id: AgentId
-    revision: Revision
-    owner_epoch: int = Field(ge=0)
-    conversations: list[AgentConversation]
-    journals: list[AgentRunJournal]
-
-    @model_validator(mode="after")
-    def owned_records(self):
-        _unique([item.id for item in self.conversations], "conversation")
-        _unique([item.run_id for item in self.journals], "run journal")
-        if any(conv.project_id != self.project_id for conv in self.conversations):
-            raise ValueError("foreign project conversation")
-        runs = {run.id: run for conv in self.conversations for run in conv.runs}
-        _unique([run.id for conv in self.conversations for run in conv.runs], "run")
-        if set(runs) != {journal.run_id for journal in self.journals}:
-            raise ValueError("every run needs exactly one journal")
-        _unique([journal.request.client_request_id for journal in self.journals], "client request")
-        for journal in self.journals:
-            run = runs[journal.run_id]
-            if journal.request.conversation_id != run.conversation_id or journal.request.client_request_id != run.client_request_id:
-                raise ValueError("journal run identity mismatch")
-            if any(snapshot.run_id != run.id for snapshot in journal.snapshots):
-                raise ValueError("foreign read snapshot")
-            _unique([snapshot.id for snapshot in journal.snapshots], "read snapshot")
-            _unique([item.key for item in journal.batches], "prepare key")
-            if sum(item.receipt is not None and item.receipt.durable for item in journal.batches) > 1:
-                raise ValueError("run has more than one saved batch")
-            if sum(item.batch is not None and item.batch.state not in TERMINAL_EDITS for item in journal.batches) > 1:
-                raise ValueError("run has more than one live batch")
-            sequences = [event.root.sequence for event in journal.events]
-            if sequences != sorted(set(sequences)):
-                raise ValueError("events must be ordered without duplicates")
-            if any((event.root.run_id, event.root.project_id, event.root.conversation_id) !=
-                    (run.id, self.project_id, run.conversation_id) for event in journal.events):
-                raise ValueError("foreign event")
-            if any(item.batch is not None and item.batch.run_id != run.id or
-                    item.receipt is not None and item.receipt.run_id != run.id for item in journal.batches):
-                raise ValueError("foreign batch")
-        bounded(self, limits.PROJECT_BYTES)
-        return self
-
-
 AGENT_CONTRACTS = {
-    "agent_history_offer": AgentHistoryOffer,
-    "agent_access": AgentAccess, "agent_access_request": AgentAccessRequest,
-    "agent_error": AgentError, "agent_empty_request": AgentEmptyRequest, "agent_capabilities": AgentCapabilities,
-    "agent_settings": AgentSettings, "agent_settings_request": AgentSettingsRequest,
-    "agent_conversation": AgentConversation, "agent_message": AgentMessage,
-    "agent_run_request": AgentRunRequest, "agent_run": AgentRun,
-    "agent_read_snapshot": AgentReadSnapshot, "agent_web_source": AgentWebSource,
-    "agent_finding": AgentFinding, "agent_prepare_request": AgentPrepareRequest,
-    "agent_prepare_result": AgentPrepareResult, "agent_apply_request": AgentApplyRequest,
-    "agent_project_action": AgentProjectAction,
-    "agent_project_operations": AgentProjectOperations,
-    "agent_edit_batch": AgentEditBatch, "agent_edit_receipt": AgentEditReceipt,
-    "agent_event": AgentEvent, "agent_page_request": AgentPageRequest,
-    "agent_conversation_page": AgentConversationPage, "agent_message_page": AgentMessagePage,
-    "agent_resource_page": AgentResourcePage, "agent_lease_open": AgentLeaseOpen,
-    "agent_lease": AgentLease, "agent_owner_request": AgentOwnerRequest,
-    "agent_commit_request": AgentCommitRequest, "agent_commit_result": AgentCommitResult, "agent_claim_result": AgentClaimResult,
-    "agent_result_request": AgentResultRequest, "agent_events_request": AgentEventsRequest,
-    "agent_run_read": AgentRunRead, "agent_tool_read": AgentToolRead,
-    "agent_tool_result": AgentToolResult, "agent_fetch_request": AgentFetchRequest,
-    "agent_publish_findings": AgentPublishFindings, "agent_project_state": AgentProjectState,
+    "agent_error": AgentError,
+    "agent_settings": AgentSettings,
+    "agent_settings_request": AgentSettingsRequest,
+    "agent_message": AgentMessage,
+    "agent_web_source": AgentWebSource,
+    "agent_finding": AgentFinding,
+    "agent_event": AgentEvent,
+    "agent_fetch_request": AgentFetchRequest,
 }

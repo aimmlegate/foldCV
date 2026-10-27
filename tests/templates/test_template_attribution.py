@@ -6,13 +6,10 @@ from packages.resume_core.template_import import spent_calls
 from tests.templates.claim_runtime_fixtures import claim_fixture, claim_proposal
 from tests.templates.template_runtime_fixtures import RuntimeFixture
 from resume_api.importer.template_pipeline import DerivedTask
-from tests.templates.test_template_job_routing import service_for
-from tests.templates.test_template_finalization_flow import queued
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize('entry', ['direct', 'queued'])
-async def test_f01_team_attribution_rejection_keeps_employer_and_exact_source_fallback(tmp_path, entry):
+async def test_f01_team_attribution_rejection_keeps_employer_and_exact_source_fallback(tmp_path):
     package, source, raw = claim_fixture(dependent=True)
     fixture = RuntimeFixture(tmp_path, captured=package, src=source, original_bytes=raw, cap=2)
     def script(_request, value):
@@ -33,19 +30,8 @@ async def test_f01_team_attribution_rejection_keeps_employer_and_exact_source_fa
         assert {record['semanticType'] for record in value['effectiveRecords']} == {'employers'}
         assert all(cell['typedValue'] not in {80, 'individual', 'Reduced latency by 80%.'} for cell in value['effectiveCells'])
         return DerivedTask([], (), ())
-    service = await service_for(fixture) if entry == 'queued' else None
-    pipeline = service.templates.pipeline if service else fixture.pipeline
-    pipeline.derive = derive
-    try:
-        if service:
-            await queued(service, fixture, fixture.command)
-            result = fixture.current().project.template_operations[0]
-        else:
-            result = await pipeline.run(fixture.project, fixture.command, admitted=fixture.admitted)
-    finally:
-        if service:
-            await service.shutdown()
-            service.supervisor.clock.verify()
+    fixture.pipeline.derive = derive
+    result = await fixture.pipeline.run(fixture.project, fixture.command, admitted=fixture.admitted)
     assert result.state == 'published' and spent_calls(result) == 2 and len(dependent_inputs) == 1
     current = fixture.current().project
     assert {record.semantic_type for record in current.facts.extensions} == {'employers'}
@@ -57,8 +43,7 @@ async def test_f01_team_attribution_rejection_keeps_employer_and_exact_source_fa
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize('entry', ['direct', 'queued'])
-async def test_f01_named_repair_reuses_unadmitted_item_and_relation_identity(tmp_path, entry):
+async def test_f01_named_repair_reuses_unadmitted_item_and_relation_identity(tmp_path):
     package, source, raw = claim_fixture()
     fixture = RuntimeFixture(tmp_path, captured=package, src=source, original_bytes=raw)
     reviews = []
@@ -85,17 +70,7 @@ async def test_f01_named_repair_reuses_unadmitted_item_and_relation_identity(tmp
             relation['target'] = {'kind': 'handle', 'itemHandle': handles['employer']}
         return proposal
     fixture.transport.scripted = script
-    service = await service_for(fixture) if entry == 'queued' else None
-    try:
-        if service:
-            await queued(service, fixture, fixture.command)
-            result = fixture.current().project.template_operations[0]
-        else:
-            result = await fixture.pipeline.run(fixture.project, fixture.command, admitted=fixture.admitted)
-    finally:
-        if service:
-            await service.shutdown()
-            service.supervisor.clock.verify()
+    result = await fixture.pipeline.run(fixture.project, fixture.command, admitted=fixture.admitted)
     assert result.state == 'published' and not result.issues and len(reviews) == 2 and spent_calls(result) == 4
     assert len(result.allocations) == 2 and len(result.relation_allocations) == 1
     current = fixture.current().project

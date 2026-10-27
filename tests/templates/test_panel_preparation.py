@@ -2,25 +2,23 @@
 
 import pytest
 
-from packages.resume_core.agent_edits import semantic
+from packages.resume_core.template_inverse import semantic
 from packages.resume_core.models.template_authoring import TemplateEditPreparationV1
 from packages.resume_core.models.template_document import FieldOccurrence, PresentedText, TemplateParagraphBlock, TemplateSectionBlock
 from packages.resume_core.models.rich_facts import TechnologyRecord, TextField, WorkingPeriod
 from packages.resume_core.models.template_workspace import WorkspaceV7
-from packages.resume_core.models.template_writer import WriterPrepareEditV2
-from packages.resume_core.rich_archive import export_rich_archive, open_rich_archive
+from packages.resume_core.archive_zip import write_zip
+from packages.resume_core.template_archive import archive_payload_v7, open_archive_v7
 from packages.resume_core.rich_fields import field_key, set_text
 from packages.resume_core.rich_mutations import apply_rich_mutation
 from packages.resume_core.template_inverse import inverse_template_mutation
 from packages.resume_core.template_preparation import prepare_edit
 from packages.resume_core.templates.compiler import canonical
+from tests.templates.editor_fixtures import TemplateEditor
 from tests.templates.test_builtin_scopes import scoped_workspace
-from tests.templates.test_compact_save import compact_command
 from tests.templates.test_relation_transactions import related_workspace, owner_sections
 from tests.templates.test_structural_preparation import intent
-from tests.templates.test_template_local_history import history_request
-from tests.templates.test_template_preparation import command as text_command, proof, response
-from tests.templates.test_template_writers import TemplateWriterFixture
+from tests.templates.test_template_preparation import command as text_command, response
 from tests.templates.test_transactions import authorization, issue
 
 
@@ -361,39 +359,34 @@ def test_stale_or_unsupported_panel_request_retains_base(damage):
     assert canonical(before)==raw
 
 
-def test_real_compact_panel_save_undo_redo_reopen_and_archive(tmp_path):
-    before,sources=scoped_workspace();fixture=TemplateWriterFixture(tmp_path,before,sources)
+def test_real_panel_save_undo_redo_reopen_and_archive(tmp_path):
+    before,sources=scoped_workspace();editor=TemplateEditor(tmp_path,before,sources)
     request=panel(before,values={'employer':'Human employer'})
-    request.capture.session_id=fixture.proof.session_id
     request.operations[0].command.capture=request.capture.model_copy(deep=True)
-    wrapped=WriterPrepareEditV2(schemaVersion=2,proof=fixture.proof,preparation=request)
-    value=fixture.writers.prepare_edit_delta(fixture.project,wrapped)
-    saved=fixture.writers.save(fixture.project,compact_command(fixture,value),originals=fixture.originals)
-    undo=fixture.writers.local_history_command(fixture.project,history_request(fixture,saved.local_history_ack),originals=fixture.originals)
-    assert semantic(undo.workspace.project.document)==semantic(before.project.document)
-    redo=fixture.writers.local_history_command(fixture.project,history_request(fixture,undo.local_history_ack,'redo','redo-panel'),originals=fixture.originals)
-    reopened=fixture.current()
+    editor.edit(request)
+    undo=editor.undo('undo-panel',expected='panel-edit').response.workspace
+    assert semantic(undo.project.document)==semantic(before.project.document)
+    redo=editor.redo('redo-panel',expected='panel-edit').response.workspace
+    reopened=editor.reopen()
     assert any(span.text=='Human employer' for block in reopened.project.document.blocks() for span in block.content)
-    transferred,retained,_,_=open_rich_archive(export_rich_archive(reopened,sources,{},{}),'panel-transfer')
+    transferred,retained,_,_=open_archive_v7(write_zip(archive_payload_v7(reopened,sources,{})),'panel-transfer')
     assert transferred.project.document==reopened.project.document and transferred.project.facts==reopened.project.facts
-    assert retained==sources and redo.workspace==reopened
+    assert retained==sources and redo==reopened
 
 
-@pytest.mark.parametrize('form',['full','delta'])
-def test_actual_preparer_maps_tree_guard_failure_without_accepting_an_id_or_changing_input(tmp_path,form):
-    from packages.resume_core.background_store import BackgroundFailure
-    before,sources=scoped_workspace();fixture=TemplateWriterFixture(tmp_path,before,sources)
+def test_actual_preparer_maps_tree_guard_failure_without_accepting_an_id_or_changing_input(tmp_path):
+    from resume_api.projects.errors import ProjectFailure
+    before,sources=scoped_workspace();editor=TemplateEditor(tmp_path,before,sources)
     block=before.project.document.regions[2].blocks[0]
     request=intent(before,'move_block',blockId=block.id,beforeRevision=block.revision,
         placement={'parentId':'missing','afterId':None})
-    request.capture.session_id=fixture.proof.session_id
-    wrapped=WriterPrepareEditV2(schemaVersion=2,proof=fixture.proof,preparation=request)
-    method=fixture.writers.prepare_edit if form=='full' else fixture.writers.prepare_edit_delta
-    raw=canonical(fixture.current())
-    with pytest.raises(BackgroundFailure,match='JOB_SCOPE_INVALID'):
-        method(fixture.project,wrapped)
-    assert canonical(fixture.current())==raw
-    opening=fixture.writers.preparations.openings.get(fixture.project)
-    assert opening is None or request.client_mutation_id not in opening.entries
+    raw=canonical(editor.current())
+    with pytest.raises(ProjectFailure) as refused:
+        editor.edit(request)
+    assert (refused.value.code,refused.value.status)==('V7_INPUT_REJECTED',422)
+    assert canonical(editor.current())==raw
+    assert request.client_mutation_id not in editor.session().replays
     request.operations[0].placement.parent_id='main'
-    assert method(fixture.project,wrapped).client_mutation_id==request.client_mutation_id
+    request.operations[0].placement.after_id=before.project.document.regions[2].blocks[-1].id
+    assert editor.edit(request).client_mutation_id==request.client_mutation_id
+    assert editor.current().project.document.regions[2].blocks[-1].id==block.id

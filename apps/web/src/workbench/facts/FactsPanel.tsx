@@ -1,17 +1,15 @@
 import type { OrderDocument } from "../../rich/technology-order";
 import { errorMessage } from "../../errors/messages";
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { WorkingFacts } from "../../contracts/generated/working_facts";
-import type { PanelCommand } from "../../rich/synchronization";
+import type { PanelCommand } from "../../rich/v7-panel";
 import { labels, needsCheck, type Kind, type RecordValue } from "../../rich/fact-fields";
 import { TechnologySelect } from "./TechnologySelect";
 import { FactDialog, type FactTarget } from "./FactDialog";
 import { Icon } from "../ui/Icon";
 import { factError } from "./error";
-import { AppliedIntentFailure } from "../../rich/intent-queue";
 import { dateText } from "./dates";
-import type { RichProjectResponse } from "../../contracts/generated/rich_project_response";
-import { FocusYears } from "./FocusYears";
+import { FocusYears, type FocusEntry } from "./FocusYears";
 import { OperationStatus } from "../ui/OperationStatus";
 
 function summary(record: RecordValue): [string, string] {
@@ -23,19 +21,18 @@ function summary(record: RecordValue): [string, string] {
   if (record.kind === "claim") return [record.value.rawText || "Новый факт", ""];
   return ["", ""];
 }
-export function FactsPanel({ facts, document, focusEntries = [], focusOptions = [], submit, pending, paused, timeline, hidden, close,
+export function FactsPanel({ facts, document, focusEntries = [], focusOptions = [], submit, pending, paused, hidden, close,
   focusRequest = null, onFocused }: {
   facts: WorkingFacts; document: OrderDocument; submit: (command: PanelCommand) => Promise<void>; pending: readonly PanelCommand[]; paused: boolean;
-  focusEntries?: NonNullable<RichProjectResponse["presentation"]>["focusEntries"];
-  focusOptions?: NonNullable<RichProjectResponse["presentation"]>["focusOptions"];
-  timeline: ReactNode; hidden: boolean; close: () => void;
+  focusEntries?: readonly FocusEntry[];
+  focusOptions?: readonly FocusEntry[];
+  hidden: boolean; close: () => void;
   focusRequest?: { recordId: string } | null; onFocused?: () => void;
 }) {
   const panel = useRef<HTMLElement>(null);
-  const [target, setTarget] = useState<FactTarget | null>(null), [error, setError] = useState<{ message: string; save: boolean } | null>(null);
+  const [target, setTarget] = useState<FactTarget | null>(null), [error, setError] = useState<string | null>(null);
   const groups: Kind[] = ["candidate", "employment", "technology", "education", "language"];
   if ((facts.mode === "digest" || facts.mode === "imported") && facts.records.some(record => record.kind === "claim")) groups.push("claim");
-  useEffect(() => { if (error?.save && !paused && !pending.length) setError(null); }, [error, paused, pending.length]);
   useEffect(() => {
     if (!focusRequest || hidden) return;
     const frame = requestAnimationFrame(() => {
@@ -51,13 +48,13 @@ export function FactsPanel({ facts, document, focusEntries = [], focusOptions = 
   async function apply(command: PanelCommand) {
     setError(null);
     try { await submit(command); }
-    catch (error) { setError({ message: factError(error), save: error instanceof AppliedIntentFailure }); throw error; }
+    catch (error) { setError(factError(error)); throw error; }
   }
   return <><aside ref={panel} className="facts-panel" aria-label="Факты резюме" id="rich-facts-panel" hidden={hidden}
     onKeyDown={event => { if (event.key === "Escape") { event.preventDefault(); event.stopPropagation(); close(); } }}>
     <div className="panel-heading"><h2>Факты</h2><button className="icon" aria-label="Скрыть факты" onClick={close}><Icon name="close" /></button></div>
     <div className="facts-feedback">
-      {error && <p className="notice warning" role="alert">{errorMessage(error.message)}</p>}
+      {error && <p className="notice warning" role="alert">{errorMessage(error)}</p>}
       {pending.length > 0 && <OperationStatus state={paused ? "error" : "working"} label={paused ? "Ожидает повторного сохранения" : `Сохраняем изменения: ${pending.length}`} timed={!paused} />}
     </div>
     {facts.extraction && <div className="notice" role="status">
@@ -80,7 +77,6 @@ export function FactsPanel({ facts, document, focusEntries = [], focusOptions = 
             <button className="icon" aria-label={`Удалить: ${name}`} disabled={paused} onClick={() => setTarget({ kind, record, remove: true })}><Icon name="close" /></button>
           </div>{record.kind === "employment" && <TechnologySelect facts={facts} document={document} jobId={record.id} label={name} pending={pending} paused={paused} submit={apply} focusRecordId={focusRequest?.recordId} />}</div>;
         })}
-      {kind === "employment" && timeline}
       {kind !== "technology" && (kind !== "candidate" || !facts.records.some(record => record.kind === "candidate")) && <button className="text-button fact-add" disabled={paused}
         onClick={() => setTarget({ kind, record: null })}>+ {kind === "employment" ? "Место работы" : kind === "language" ? "Язык" : kind === "claim" ? "Факт" : labels[kind]}</button>}
     </details>)}

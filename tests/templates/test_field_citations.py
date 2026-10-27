@@ -12,7 +12,7 @@ from packages.resume_core.templates.compiler import canonical
 from tests.templates.storage_fixtures import workspace
 from tests.templates.test_bound_links import linked_workspace
 from tests.templates.test_clipboard_retention import captured
-from tests.templates.test_template_preparation import command,proof,response
+from tests.templates.test_template_preparation import command,response
 from packages.resume_core.template_preparation import prepare_text_edit
 
 

@@ -1,24 +1,22 @@
 """S7e: processing steps are saved to one sidecar; the project is saved whole at start, admission and publication."""
 
-import asyncio
 import json
 
 import pytest
 
-from packages.resume_core.background_store import BackgroundFailure
+from packages.resume_core.project_repository import RepositoryFailure
 from packages.resume_core.template_import import spent_calls
 from tests.templates.template_runtime_fixtures import RuntimeFixture
 
 
 def counted(fixture):
-    """Count whole-project saves of the fixture's publisher."""
+    """Count whole-project commits through the repository."""
     saves = []
-    original = fixture.publisher.snapshot
-    def snapshot(*args, **kwargs):
-        saves.append(1)
+    original = fixture.repository.replace
+    def replace(*args, **kwargs):
+        saves.append(kwargs.get('reason'))
         return original(*args, **kwargs)
-    fixture.publisher.snapshot = snapshot
-    fixture.pipeline = fixture.fresh_pipeline()
+    fixture.repository.replace = replace
     return saves
 
 
@@ -33,21 +31,21 @@ async def test_an_import_saves_the_project_at_start_admission_and_publication_an
     # Start, admission, finalization, publication and its record: 5 saves, where the same import saved 16 times
     # before (two time observations, two reservations, two dispatches, two returns, a task input, parse, accept
     # and finish).
-    assert len(saves) == 5, len(saves)
-    assert not (fixture.pipeline.sidecar.path(fixture.project, result.id)).exists()
-    assert fixture.pipeline.read_saved(fixture.project)[0] == fixture.current()
+    assert saves == ['import', 'import', 'import', 'publication', 'import'], saves
+    assert not fixture.sidecar.path(fixture.project, result.id).exists()
+    assert fixture.saved() == fixture.current()
 
 
 @pytest.mark.asyncio
 async def test_a_sidecar_on_the_current_revision_is_overlaid_and_a_folded_one_is_ignored(tmp_path):
     fixture = RuntimeFixture(tmp_path)
     operation = await fixture.pipeline.start(fixture.project, fixture.command)
-    saved = fixture.pipeline.read_saved(fixture.project)[0]
+    saved = fixture.saved()
     changed = operation.model_copy(update={'last_observed_at': fixture.now})
-    fixture.pipeline.sidecar.write(fixture.project, saved.project_revision, changed, saved.pre_draft.facts)
+    fixture.sidecar.write(fixture.project, saved.project_revision, changed, saved.pre_draft.facts)
     assert fixture.current().pre_draft.template_operations[0] == changed
     # One revision on, a sidecar whose attempts the project holds at least as far is already folded.
-    fixture.pipeline.sidecar.write(fixture.project, saved.project_revision - 1, changed, saved.pre_draft.facts)
+    fixture.sidecar.write(fixture.project, saved.project_revision - 1, changed, saved.pre_draft.facts)
     assert fixture.current().pre_draft.template_operations[0] == saved.pre_draft.template_operations[0]
 
 
@@ -58,15 +56,15 @@ async def test_a_save_that_lost_sidecar_steps_or_a_damaged_sidecar_fences_the_re
     fixture.transport.fail_at = 'dispatch'
     with pytest.raises(SystemExit):
         await fixture.pipeline.run(fixture.project, fixture.command, admitted=fixture.admitted)
-    path = fixture.pipeline.sidecar.path(fixture.project, fixture.current().pre_draft.template_operations[0].id)
+    path = fixture.sidecar.path(fixture.project, fixture.current().pre_draft.template_operations[0].id)
     stored = json.loads(path.read_bytes())
     assert stored['operation']['attempts'][0]['state'] == 'dispatch_started'
     stored['projectRevision'] -= 1
     path.write_text(json.dumps(stored))
-    with pytest.raises(BackgroundFailure, match='OUTCOME_UNKNOWN'):
+    with pytest.raises(RepositoryFailure, match='OUTCOME_UNKNOWN'):
         fixture.pipeline.read(fixture.project)
     path.write_text('{"schemaVersion": 1, "projectRevision": 1}')
-    with pytest.raises(BackgroundFailure, match='JOB_STORE_CORRUPT'):
+    with pytest.raises(RepositoryFailure, match='JOB_STORE_CORRUPT'):
         fixture.pipeline.read(fixture.project)
 
 
@@ -77,9 +75,9 @@ async def test_a_crash_between_sidecar_steps_recovers_from_them_without_a_resend
     fixture.transport.fail_at = 'dispatch'
     with pytest.raises(SystemExit):
         await fixture.pipeline.run(fixture.project, fixture.command, admitted=fixture.admitted)
-    assert spent_calls(fixture.pipeline.read_saved(fixture.project)[0].pre_draft.template_operations[0]) == 0
+    assert spent_calls(fixture.saved().pre_draft.template_operations[0]) == 0
     operation = fixture.current().pre_draft.template_operations[0]
     assert spent_calls(operation) == 1 and operation.attempts[0].state == 'dispatch_started'
-    recovered = await fixture.fresh_pipeline().recover(fixture.project, operation.id)
+    recovered = await fixture.restart().recover(fixture.project, operation.id)
     assert recovered.state == 'fenced' and len(fixture.transport.calls) == 1
-    assert spent_calls(fixture.pipeline.read_saved(fixture.project)[0].pre_draft.template_operations[0]) == 1
+    assert spent_calls(fixture.saved().pre_draft.template_operations[0]) == 1

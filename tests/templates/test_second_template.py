@@ -13,6 +13,8 @@ from tests.templates.publications_fixtures import (AWARD, BLOCKS, DIVISION, TITL
 from tests.templates.test_template_view_adapters import emitted, hyperlinks, render, text, xml
 
 
+pytestmark = pytest.mark.slow
+
 def views(workspace):
     """Each view's visible texts in document order."""
     result = {}
@@ -104,9 +106,10 @@ def test_the_editor_plan_and_recipe_carry_the_templates_columns_and_type():
 
 def test_a_transfer_keeps_the_template_its_equal_titles_and_its_owners():
     # N04: copy the project out and back in; package, document and facts survive unchanged.
-    from packages.resume_core.rich_archive import export_rich_archive, open_rich_archive
+    from packages.resume_core.archive_zip import write_zip
+    from packages.resume_core.template_archive import archive_payload_v7, open_archive_v7
     workspace, originals = publications_workspace('F11')
-    copied, *_ = open_rich_archive(export_rich_archive(workspace, originals, {}, {}), 'publications-transfer')
+    copied, *_ = open_archive_v7(write_zip(archive_payload_v7(workspace, originals, {})), 'publications-transfer')
     assert copied.project.template_package.package_hash == workspace.project.template_package.package_hash
     assert copied.project.document == workspace.project.document and copied.project.facts == workspace.project.facts
 
@@ -123,52 +126,38 @@ def renamed(workspace, identifier):
     return WorkspaceV7.model_validate_json(json.dumps(data).replace('"' + workspace.project_id + '"', '"' + identifier + '"'))
 
 
-@pytest.mark.asyncio
-async def test_a_mounted_project_keeps_its_template_while_another_template_is_active(tmp_path):
+def test_a_mounted_project_keeps_its_template_while_another_template_is_active(tmp_path):
     # N03: activating the second template changes only new projects; interleaved exports keep each project's own.
-    from types import SimpleNamespace
-    import httpx
-    from packages.resume_core.template_export import snapshot_identity
     from packages.resume_core.templates.presentation import project_presentation
     from packages.resume_core.templates.store import TemplateStore
-    from resume_api.jobs.service import JobService
+    from tests.projects.support import Editor, v2_app
     from tests.templates.generic_fixtures import direct_generic, generic_package
-    from tests.templates.test_template_api import application, isolated_service
     first, first_originals = direct_generic('F01', ['identity', 'projects'])
     second, second_originals = publications_workspace('F05')
     second = renamed(second, 'publications-project')
-    service, first_id = isolated_service(tmp_path, first, first_originals)
-    service.workspaces[second.project_id] = second.model_copy(deep=True)
-    service.originals.update({(second.project_id, key): value for key, value in second_originals.items()})
-    assert service.persist(second.project_id) == 'durable'
-    store = TemplateStore(service.storage.root)
-    store.activate(generic_package())
-    mounted = project_presentation(service.storage.read_committed(first_id)[0])
-    store.activate(publications_package())
-    assert store.active().package_hash == publications_package().package_hash
-    jobs = JobService(service, None, lambda: SimpleNamespace(ready=False), enabled=False, template_cleanup_verified=lambda: True)
-    await jobs.start()
+    first_id = first.project_id
     exported = []
-    try:
-        async with httpx.AsyncClient(transport=httpx.ASGITransport(app=application(service)), base_url='http://foldcv.test') as client:
-            for identifier in [first_id, second.project_id, first_id]:
-                before = service.storage.read_committed(identifier)[0]
-                response = await client.post('/v1/rich/projects/' + identifier + '/export',
-                    json={'schemaVersion': 1, 'snapshot': snapshot_identity(before).model_dump(mode='json', by_alias=True)})
-                assert response.status_code == 200, response.text
-                attempt = service.storage.read_committed(identifier)[0].project.exports[-1]
-                exported.append((attempt.package_hash, parts(response.content)['word/footer1.xml']))
-    finally:
-        await service.shutdown()
-        await jobs.shutdown()
+    with v2_app(tmp_path, [(first, first_originals), (second, second_originals)], template_import_call_cap=4) as (client, app):
+        repository = app.state.projects.repository
+        store = TemplateStore(repository.root)
+        store.activate(generic_package())
+        mounted = project_presentation(repository.read(first_id))
+        store.activate(publications_package())
+        assert store.active().package_hash == publications_package().package_hash
+        for identifier in [first_id, second.project_id, first_id]:
+            editor = Editor(client, identifier)
+            response = client.post('/v2/projects/' + identifier + '/export',
+                json={'schemaVersion': 1, 'editorToken': editor.token, 'snapshot': editor.response['snapshot']})
+            assert response.status_code == 200, response.text
+            attempt = repository.read(identifier).project.exports[-1]
+            exported.append((attempt.package_hash, parts(response.content)['word/footer1.xml']))
+        # The mounted project's presentation is still its own; a new upload captures the active second template.
+        assert project_presentation(repository.read(first_id))['recipe'] == mounted['recipe']
+        assert app.state.intake.package().package_hash == publications_package().package_hash
     hashes = [value for value, _footer in exported]
     assert hashes == [first.project.template_package.package_hash, second.project.template_package.package_hash,
         first.project.template_package.package_hash]
     assert 'mail@example.com' in exported[0][1] and 'Synthetic publications CV' in exported[1][1] and exported[2][1] == exported[0][1]
-    # The mounted project's presentation is still its own; a new project captures the active second template.
-    assert project_presentation(service.storage.read_committed(first_id)[0])['recipe'] == mounted['recipe']
-    new = service.allocate_template('Новое резюме', store.active())
-    assert service.read(new).pre_draft.template_package.package_hash == publications_package().package_hash
 
 
 def test_a_date_or_period_shows_its_stated_wording_and_other_objects_their_json():

@@ -2,7 +2,7 @@ import type { WorkingFacts } from "../contracts/generated/working_facts";
 
 type Technology = Extract<WorkingFacts["records"][number], { kind: "technology" }>;
 type OrderBlock = { id: string; type: string; props?: unknown; content?: unknown; children: readonly OrderBlock[] };
-/** The fields technology order reads; V1 and V7 documents both provide them. */
+/** The fields technology order reads from a document. */
 export type OrderDocument = { regions: readonly { role: string; blocks: readonly OrderBlock[] }[] };
 
 function field(value: unknown, key: string): unknown { return typeof value === "object" && value !== null ? Reflect.get(value, key) : undefined; }

@@ -4,20 +4,13 @@ import test from "node:test";
 import { BlockNoteEditor } from "@blocknote/core";
 import type { Node } from "@tiptap/pm/model";
 import { EditorState, TextSelection, type Transaction } from "@tiptap/pm/state";
-import Ajv2020 from "ajv/dist/2020.js";
-import addFormats from "ajv-formats";
-import documentSchema from "../../../contracts/json-schema/rich_document_v2.schema.json" with { type: "json" };
 import type { RichDocumentV2 } from "../src/contracts/generated/rich_document_v2";
 import type { TemplateProjectResponseV1 } from "../src/contracts/generated/template_project_response_v1";
-import { taggedSchema } from "../src/contracts/tagged-schema";
 import { templateSchema } from "../src/rich/template-schema";
 import { extractOperations, foldComposition, mergeAt, selectedBlocks, splitAt, type ExtractedOperation } from "../src/rich/v7-extraction";
 import { projectTemplateDocument, type TemplateEditorBlock } from "../src/rich/v7-projection";
 import { translateIntent, type V7Operation } from "../src/rich/v7-translation";
 
-const ajv = new Ajv2020({ strict: false, allErrors: true, discriminator: true });
-addFormats(ajv);
-const documentShape = ajv.compile<RichDocumentV2>(taggedSchema(documentSchema));
 
 function record(value: unknown): Record<string, unknown> {
   assert.ok(typeof value === "object" && value !== null && !Array.isArray(value));
@@ -30,7 +23,7 @@ assert.equal(typeof typingCase["baseWire"], "string");
 const response = JSON.parse(String(typingCase["baseWire"])) as TemplateProjectResponseV1;
 function documentOf(wire: TemplateProjectResponseV1): RichDocumentV2 {
   const value = wire.workspace.project?.document;
-  assert.ok(documentShape(value)); return structuredClone(value);
+  assert.ok(value && Array.isArray(value.regions)); return structuredClone(value);
 }
 
 function docOf(blocks: TemplateEditorBlock[]): Node {

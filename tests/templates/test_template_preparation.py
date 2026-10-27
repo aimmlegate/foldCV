@@ -2,7 +2,6 @@
 
 import pytest
 
-from packages.resume_core.models.background import WriterProofV1
 from packages.resume_core.models.template_authoring import TemplateEditPreparationV1
 from packages.resume_core.models.template_document import ManualScopeSpan, PresentedText
 from packages.resume_core.rich_mutations import RichMutationFailure, apply_rich_mutation
@@ -31,10 +30,6 @@ def command(value, *, start=0, end=6, text='Human', styles=None, target=None, ki
         operation['text'] = text
     return TemplateEditPreparationV1(schemaVersion=1, clientMutationId='text-edit', snapshot=snapshot_identity(value),
         capture={'sessionId': 'session', 'actionId': 'action', 'actionToken': 1, 'dependencies': []}, operations=[operation])
-
-
-def proof():
-    return WriterProofV1(schemaVersion=1, lineage='lineage', epoch=1, incarnation='opening', sessionId='session', credential='x' * 32)
 
 
 def test_partial_field_edit_prepares_whole_raw_field_and_issue_retirement_atomically(monkeypatch):

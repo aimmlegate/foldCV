@@ -155,12 +155,12 @@ def test_explicit_model_context_keeps_authoritative_raw_and_pending_scope_values
 
 def test_extension_only_inverse_obeys_the_existing_history_capacity(monkeypatch):
     from packages.resume_core import template_inverse as module
-    from packages.resume_core.background_store import BackgroundFailure
+    from packages.resume_core.project_repository import RepositoryFailure
     before, _ = workspace()
     edited = human_edit(before.project.facts, 'paper-a', 'year', 'forthcoming')
     changed, _ = apply_rich_mutation(before, request(before, [extension_step(before, edited.extensions[0])]))
     monkeypatch.setattr(module, 'INVERSE_BYTES', 1024)
-    with pytest.raises(BackgroundFailure, match='JOB_STORAGE_FULL'):
+    with pytest.raises(RepositoryFailure, match='JOB_STORAGE_FULL'):
         inverse_template_mutation(before, changed, origin_action_id='human-edit',
             mutation_id='undo', session_id='session', action_token=2)
 

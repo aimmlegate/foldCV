@@ -1,6 +1,6 @@
 import { createRoot } from "react-dom/client";
 import { exchangeSession } from "../api/client";
-import { claimApplicationTab, type TabLease } from "../background/tab";
+import { claimApplicationTab, type TabLease } from "./tab";
 import { App } from "./App";
 import { BlockedTab } from "./BlockedTab";
 import "./styles/index.css";

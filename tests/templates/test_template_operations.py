@@ -15,7 +15,7 @@ from packages.resume_core.templates.operations import OperationContext, derive_t
 from packages.resume_core.templates.store import BUNDLED_TEMPLATE
 from tests.templates.employment_fixtures import employment_package, employment_source
 from tests.templates.pipeline_fixtures import setup_operation
-from tests.templates.test_template_employment import EmploymentFixture
+from tests.templates.template_runtime_fixtures import EmploymentFixture
 
 
 EXPECTED = json.loads(open('tests/fixtures/synthetic/templates/expected.json').read())

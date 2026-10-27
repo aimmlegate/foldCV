@@ -84,6 +84,16 @@ class RewritePreviewRequestV1(Wire):
     instruction: str = Field(min_length=1, max_length=8000)
 
 
+class TemplateRewritePreviewV1(Wire):
+    """A rewrite preview: the selected source and the model's text; the document changes only through Apply."""
+    schema_version: Literal[1]
+    request_id: Id
+    snapshot: TemplateSnapshotIdentity
+    range: AuthoredRange
+    source: str
+    text: str = Field(min_length=1, max_length=65536)
+
+
 class RewriteCancelRequestV1(Wire):
     editor_token: str = Field(min_length=1, max_length=128)
     request_id: Id

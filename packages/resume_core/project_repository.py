@@ -158,9 +158,13 @@ def externalize_history(store, *, moved=None):
                 continue
             owned_file(target)
             raw = target.read_bytes()
-            if not inline_history(strict_json(raw)):
+            try:
+                if not inline_history(strict_json(raw)):
+                    continue
+                workspace = WorkspaceV7.model_validate(load_stored_data(directory, raw))
+            except (ValueError, RecursionError):
+                # An unreadable file stays as it is; opening that project reports it, the service still starts.
                 continue
-            workspace = WorkspaceV7.model_validate(load_stored_data(directory, raw))
             for kind, identifier, blob, _checksum in history_blobs(workspace):
                 path = blob_path(directory, kind, identifier)
                 if not path.exists():
@@ -657,8 +661,14 @@ class ProjectRepository:
             directory = self.store.projects / project_id
             try:
                 if directory.exists() or directory.is_symlink():
-                    directory = self.store._directory(project_id)
-                    _remove_project_files(directory)
+                    marker = directory / '.project-identity.json'
+                    if not marker.exists() and not directory.is_symlink() and directory.is_dir() and not any(directory.iterdir()):
+                        # A prior cleanup can remove the identity before an empty-directory removal fails.
+                        private_directory(directory)
+                        directory.rmdir()
+                    else:
+                        directory = self.store._directory(project_id)
+                        _remove_project_files(directory)
                 entry.cleanup_status = 'complete'
             except (OSError, StorageFailure, ProjectStoreFailure):
                 entry.cleanup_status = 'failed'

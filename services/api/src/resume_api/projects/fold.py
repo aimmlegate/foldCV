@@ -12,27 +12,15 @@ import logging
 from packages.resume_core.models.template_import import ImportOperation
 from packages.resume_core.project_repository import RepositoryFailure, read_history_file
 from packages.resume_core.project_store import ProjectStoreFailure
+from packages.resume_core.template_import import retain_operation
 
 from ..importer.template_sidecar import PROGRESS, OperationSidecar
 
 LOG = logging.getLogger(__name__)
 
 
-class _DirectoryCanonical:
-    def __init__(self, directory):
-        self.directory = directory
-
-    def project_directory(self, _project):
-        return self.directory
-
-
-class _DirectoryPublisher:
-    def __init__(self, directory):
-        self.canonical = _DirectoryCanonical(directory)
-
-
 def sidecar_store(directory):
-    return OperationSidecar(_DirectoryPublisher(directory))
+    return OperationSidecar(directory)
 
 
 def register_import_fold(repository):
@@ -146,7 +134,6 @@ def _same_facts(workspace, facts):
 def _forward(before, after):
     if before == after:
         return True
-    from packages.resume_core.template_retention import retain_operation
     try:
         retain_operation(before, after)
     except ProjectStoreFailure:

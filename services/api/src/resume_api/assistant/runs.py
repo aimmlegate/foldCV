@@ -43,6 +43,15 @@ FILES_KEPT = 10
 LOG = logging.getLogger(__name__)
 
 
+@dataclass(frozen=True)
+class AgentConnection:
+    """The model connection as a run sees it: ready, the offered models, the epoch a run is bound to."""
+    ready: bool
+    models: tuple[str, ...]
+    epoch: str
+    reason: str | None = None
+
+
 @dataclass
 class Control:
     project_id: str

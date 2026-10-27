@@ -6,16 +6,16 @@ from packages.resume_core.project_repository import ProjectRepository
 from packages.resume_core.template_import import admit_operation
 from packages.resume_core.templates.operations import derive_task
 from resume_api.projects.fold import register_import_fold, sidecar_store
-from resume_api.projects.pipeline import RepositoryPipeline
+from resume_api.importer.template_pipeline import TemplatePipeline
 from tests.projects.support import source_blobs
 from tests.templates.employment_fixtures import employment_package, employment_source
 from tests.templates.pipeline_fixtures import resume_command
-from tests.templates.test_template_employment import EmploymentFixture, scripted_employment
+from tests.templates.template_runtime_fixtures import EmploymentFixture, scripted_employment
 
 
 def coordinator(fixture, repository):
-    return RepositoryPipeline(None, fixture.transport, repository=repository, originals=fixture.originals,
-        authority=fixture.pipeline.authority, assemble=fixture.assemble, derive=derive_task, wall=lambda: fixture.now)
+    return TemplatePipeline(fixture.transport, repository=repository, authority=fixture.pipeline.authority,
+        assemble=fixture.assemble, derive=derive_task, wall=lambda: fixture.now)
 
 
 @pytest.mark.asyncio

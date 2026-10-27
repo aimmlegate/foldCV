@@ -85,3 +85,43 @@ test("a superseded page shows the replaced state and sends no more requests", as
   await assert.rejects(connection.capture("capture", base.snapshot!, { kind: "blocks", blocks: [{ blockId: container.blockId, beforeRevision: 1 }] }), /EDITOR_REPLACED/);
   assert.equal(requests, 1);
 });
+
+test("contiguous typing of one action is one request; a new action sends its own", async () => {
+  const sent: string[] = [];
+  const queue = new RichSaveQueue({ durable: base, sessionId: "session", ports: {
+    edit: request => {
+      const operation = request.operations[0];
+      sent.push(operation && "text" in operation ? String(operation.text) : "");
+      return Promise.resolve(result(base, request.clientMutationId));
+    },
+    read: () => Promise.resolve(base), adopted: () => {}, changed: () => {}, retained: () => {}, released: () => {}, lost: () => assert.fail("lost"),
+  } });
+  const typed = (text: string, start: number): V7Intent => ({ localId: `op-${start}`, prior: intent.prior,
+    operation: { kind: "replace_text", container, start, end: start, text, side: "before",
+      styles: { bold: false, italic: false, underline: false, strike: false, code: false, textColor: "default", backgroundColor: "default" } } });
+  queue.template.enqueue(intent, "action", 0, "first");
+  queue.template.enqueue(typed("Y", 9), "action", 1, "second");
+  queue.template.enqueue(typed("Z", 10), "another", 0, "third");
+  await queue.flush();
+  assert.deepEqual(sent, ["XY", "Z"]);
+});
+
+test("closing the queue ignores a late reply and sends nothing after it", async () => {
+  let release: (value: EditResult) => void = () => {};
+  const sent: string[] = [], adopted: string[] = [];
+  const queue = new RichSaveQueue({ durable: base, sessionId: "session", ports: {
+    edit: request => { sent.push(request.clientMutationId); return new Promise(resolve => { release = resolve; }); },
+    read: () => Promise.resolve(base), adopted: adoption => adopted.push(adoption.item.clientMutationId),
+    changed: () => {}, retained: () => {}, released: () => {}, lost: () => assert.fail("lost"),
+  } });
+  queue.template.enqueue(intent, "action", 0, "first");
+  queue.template.enqueue(intent, "another", 0, "second");
+  const flushing = queue.flush();
+  await new Promise(resolve => setImmediate(resolve));
+  queue.close();
+  release(result(base, "first"));
+  await flushing;
+  assert.deepEqual(sent, ["first"]);
+  assert.deepEqual(adopted, []);
+  assert.equal(queue.template.state.kind, "closed");
+});

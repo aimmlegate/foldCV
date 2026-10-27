@@ -2,23 +2,18 @@
 
 import pytest
 
-from packages.resume_core.background_store import BackgroundFailure
 from packages.resume_core.models.template_authoring import TemplateEditPreparationV1
 from packages.resume_core.models.template_document import BoundLink,ManualScopeSpan,PresentedHyperlink,PresentedText
-from packages.resume_core.models.template_writer import WriterPrepareEditV2,WriterReleaseClipboardV2
 from packages.resume_core.rich_mutations import apply_rich_mutation,inline_text
 from packages.resume_core.template_preparation import prepare_edit
 from packages.resume_core.template_identity import capture_span
 from packages.resume_core.templates.compiler import canonical
 from tests.templates.storage_fixtures import workspace
 from tests.templates.test_bound_links import linked_workspace
-from tests.templates.test_clipboard_retention import captured,clipboard_request
-from tests.templates.test_compact_save import compact_command
-from tests.templates.test_preparation_store import request as text_request
+from tests.templates.editor_fixtures import TemplateEditor
+from tests.templates.test_clipboard_retention import captured
 from tests.templates.test_manual_scope_occurrences import shared_workspace
-from tests.templates.test_template_local_history import history_request
-from tests.templates.test_template_preparation import command,proof,response
-from tests.templates.test_template_writers import TemplateWriterFixture
+from tests.templates.test_template_preparation import command,response
 from tests.templates.test_transactions import issue
 
 
@@ -255,66 +250,28 @@ def test_empty_semantic_scope_capture_inserts_a_fresh_anchor_without_losing_auth
     assert prepared.preview.workspace.project.facts==before.project.facts
 
 
+def test_a_block_capture_cannot_be_pasted_inline():
+    before,_=workspace();clipboard=captured(before,blocks=[{'blockId':'block-paper-a','beforeRevision':1}])
+    raw=canonical(before)
+    with pytest.raises(ValueError,match='matching retained capture kind'):
+        prepare_edit(response(before),paste_request(before,clipboard=clipboard,start=0,end=0,target={'kind':'literal'}),clipboard=clipboard)
+    assert canonical(before)==raw
+
+
 def test_failed_semantic_destination_accepts_corrected_intent_without_consuming_id_or_capture(tmp_path):
-    before,sources=workspace();fixture=TemplateWriterFixture(tmp_path,before,sources)
-    capture=fixture.writers.capture_clipboard(fixture.project,clipboard_request(fixture))
-    retained=fixture.writers.clipboards.read_for_paste(fixture.jobs.load(fixture.project),fixture.current(),capture.clipboard_capture_id)
-    intent=paste_request(fixture.current(),clipboard=retained);intent.capture.session_id=fixture.proof.session_id
-    request=WriterPrepareEditV2(schemaVersion=2,proof=fixture.proof,preparation=intent)
-    with pytest.raises(BackgroundFailure,match='JOB_SCOPE_INVALID'):fixture.writers.prepare_edit_delta(fixture.project,request)
-    assert not fixture.writers.preparations.openings
-    corrected=paste_request(fixture.current(),clipboard=retained,start=0,end=0,target={'kind':'literal'})
-    corrected.capture.session_id=fixture.proof.session_id;request.preparation=corrected
-    prepared=fixture.writers.prepare_edit_delta(fixture.project,request)
-    saved=fixture.writers.save(fixture.project,compact_command(fixture,prepared),originals=fixture.originals)
-    assert saved.local_history_ack.action_id==corrected.capture.action_id
-    assert words(fixture.current().project.document.regions[2].blocks[0])=='Shared titleShared title'
-    assert fixture.current().project.facts==before.project.facts
-
-
-@pytest.mark.parametrize('form',['full','delta'])
-def test_real_writer_paste_release_retry_compact_save_and_issue_undo_redo(tmp_path,form):
-    before,sources=workspace();finding=issue('paste-issue','a-title');finding.block_ids=['block-paper-a'];before.project.import_issues=[finding]
-    fixture=TemplateWriterFixture(tmp_path,before,sources)
-    capture_request=clipboard_request(fixture);capture_request.selection.range.start=1;capture_request.selection.range.end=4
-    capture=fixture.writers.capture_clipboard(fixture.project,capture_request)
-    registry=fixture.writers.clipboards;retained=registry.read_for_paste(fixture.jobs.load(fixture.project),fixture.current(),capture.clipboard_capture_id)
-    intent=paste_request(fixture.current(),clipboard=retained);intent.capture.session_id=fixture.proof.session_id
-    request=WriterPrepareEditV2(schemaVersion=2,proof=fixture.proof,preparation=intent)
-    method=fixture.writers.prepare_edit if form=='full' else fixture.writers.prepare_edit_delta
-    prepared=method(fixture.project,request)
-    fixture.writers.release_clipboard(fixture.project,WriterReleaseClipboardV2(schemaVersion=2,proof=fixture.proof,clipboardCaptureId=capture.clipboard_capture_id))
-    assert canonical(method(fixture.project,request))==canonical(prepared)
-    saved=fixture.writers.save(fixture.project,compact_command(fixture,prepared),originals=fixture.originals)
-    assert fixture.current().project.import_issues[0].state=='retired'
-    assert fixture.current().project.facts.extensions[0].cells[0].raw_input=='har title'
-    undone=fixture.writers.local_history_command(fixture.project,history_request(fixture,saved.local_history_ack),originals=fixture.originals)
-    assert words(undone.workspace.project.document.regions[2].blocks[0])=='Shared title'
-    assert undone.workspace.project.import_issues[0].state=='active'
-    redone=fixture.writers.local_history_command(fixture.project,history_request(fixture,undone.local_history_ack,'redo','redo-paste'),originals=fixture.originals)
-    assert words(redone.workspace.project.document.regions[2].blocks[0])=='har title'
-    assert redone.workspace.project.import_issues[0].state=='retired'
-    assert redone.workspace.project.document.regions[2].blocks[0].content[0].citations==retained.payload.content[0].citations
-
-
-@pytest.mark.parametrize('damage',['release','authority','expired','missing','blocks'])
-def test_actual_writer_new_paste_requires_retained_inline_capture_current_witnesses_and_live_proof(tmp_path,damage):
-    before,sources=workspace();fixture=TemplateWriterFixture(tmp_path,before,sources)
-    capture_request=clipboard_request(fixture)
-    capture_value=capture_request.model_dump(by_alias=True)
-    if damage=='blocks':capture_value['selection']={'kind':'blocks','blocks':[{'blockId':'block-paper-a','beforeRevision':1}]}
-    capture_request=type(capture_request).model_validate(capture_value)
-    capture=fixture.writers.capture_clipboard(fixture.project,capture_request)
-    if damage=='release':fixture.writers.clipboards.release(fixture.jobs.load(fixture.project),capture.clipboard_capture_id)
-    elif damage=='authority':
-        prepared=fixture.writers.prepare_edit_delta(fixture.project,text_request(fixture,text='Changed'))
-        fixture.writers.save(fixture.project,compact_command(fixture,prepared),originals=fixture.originals)
-    elif damage=='expired':fixture.elapsed.advance(1000)
-    intent=paste_request(fixture.current(),start=0,end=0,target={'kind':'literal'});value=intent.model_dump(mode='json',by_alias=True)
-    value['operations'][0]['source']={'kind':'same_project','clipboardCaptureId':'missing' if damage=='missing' else capture.clipboard_capture_id}
-    value['capture']['sessionId']=fixture.proof.session_id
-    request=WriterPrepareEditV2(schemaVersion=2,proof=fixture.proof,preparation=value)
-    raw=canonical(fixture.current())
-    with pytest.raises(BackgroundFailure):fixture.writers.prepare_edit_delta(fixture.project,request)
-    opening=fixture.writers.preparations.openings.get(fixture.project)
-    assert canonical(fixture.current())==raw and (opening is None or 'paste-edit' not in opening.entries)
+    from resume_api.projects.errors import ProjectFailure
+    before,sources=workspace();editor=TemplateEditor(tmp_path,before,sources)
+    block=before.project.document.regions[2].blocks[0]
+    capture=editor.capture({'kind':'range','range':{'blockId':block.id,'beforeRevision':block.revision,'cellId':None,
+        'field':'content','start':0,'end':12}},'copy-one')
+    retained=editor.retained(capture)
+    raw=canonical(editor.current())
+    with pytest.raises(ProjectFailure) as refused:
+        editor.edit(paste_request(editor.current(),clipboard=retained))
+    assert (refused.value.code,refused.value.status)==('V7_INPUT_REJECTED',422)
+    assert canonical(editor.current())==raw and 'paste-edit' not in editor.session().replays
+    corrected=paste_request(editor.current(),clipboard=retained,start=0,end=0,target={'kind':'literal'})
+    saved=editor.edit(corrected)
+    assert saved.history.undo.action_id==corrected.capture.action_id
+    assert words(editor.current().project.document.regions[2].blocks[0])=='Shared titleShared title'
+    assert editor.current().project.facts==before.project.facts

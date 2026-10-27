@@ -5,16 +5,14 @@ import pytest
 from packages.resume_core.models.template_authoring import TemplateEditPreparationV1
 from packages.resume_core.models.template_document import BoundLink
 from packages.resume_core.models.template_workspace import WorkspaceV7
-from packages.resume_core.models.template_writer import WriterPrepareEditV2
-from packages.resume_core.rich_archive import export_rich_archive, open_rich_archive
+from packages.resume_core.archive_zip import write_zip
+from packages.resume_core.template_archive import archive_payload_v7, open_archive_v7
 from packages.resume_core.rich_fields import bound_link_fields
 from packages.resume_core.template_preparation import prepare_edit
 from packages.resume_core.templates.compiler import canonical
+from tests.templates.editor_fixtures import TemplateEditor
 from tests.templates.test_bound_links import linked_workspace
-from tests.templates.test_compact_save import compact_command
-from tests.templates.test_template_local_history import history_request
-from tests.templates.test_template_preparation import command, proof, response
-from tests.templates.test_template_writers import TemplateWriterFixture
+from tests.templates.test_template_preparation import command, response
 
 
 def link_request(before, href, *, occurrence='url-occurrence', revision=None, identifier='link-target'):
@@ -85,37 +83,29 @@ def test_same_url_is_a_no_op_and_stale_or_unknown_targets_are_refused():
             prepare_edit(response(before), request)
 
 
-def test_label_and_url_edits_have_independent_undo_through_the_writer_and_transfer(tmp_path):
+def test_label_and_url_edits_have_independent_undo_through_the_journal_and_transfer(tmp_path):
     before, sources = linked_workspace()
-    fixture = TemplateWriterFixture(tmp_path, before, sources)
-    def save(request, cursor):
-        request.capture.session_id = fixture.proof.session_id
-        prepared = fixture.writers.prepare_edit_delta(fixture.project, WriterPrepareEditV2(schemaVersion=2, proof=fixture.proof,
-            preparation=request))
-        return fixture.writers.save(fixture.project, compact_command(fixture, prepared, cursor), originals=fixture.originals)
-    url_saved = save(link_request(fixture.current(), 'https://example.test/revised'), 1)
-    label = command(fixture.current(), start=0, end=6, text='Human')
+    editor = TemplateEditor(tmp_path, before, sources)
+    editor.edit(link_request(editor.current(), 'https://example.test/revised'))
+    label = command(editor.current(), start=0, end=6, text='Human')
     label.client_mutation_id = label.capture.action_id = 'label-edit'
-    label_saved = save(label, 2)
-    current = fixture.current()
+    editor.edit(label)
+    current = editor.current()
     link = current.project.document.regions[2].blocks[0].content[0]
     assert (''.join(child.text for child in link.content), link.href) == ('Human title', 'https://example.test/revised')
     assert (cells(current)['title'].raw_input, cells(current)['url'].raw_input) == ('Human title', 'https://example.test/revised')
-    moved, *_ = open_rich_archive(export_rich_archive(current, sources, {}, {}), 'link-transfer')
+    moved, *_ = open_archive_v7(write_zip(archive_payload_v7(current, sources, {})), 'link-transfer')
     assert moved.project.document == current.project.document and moved.project.facts == current.project.facts
     # Undo takes back the label edit alone, then the URL edit alone; Redo restores only the URL.
-    label_undone = fixture.writers.local_history_command(fixture.project, history_request(fixture, label_saved.local_history_ack),
-        originals=fixture.originals)
-    link = label_undone.workspace.project.document.regions[2].blocks[0].content[0]
+    label_undone = editor.undo('undo-label', expected='label-edit').response.workspace
+    link = label_undone.project.document.regions[2].blocks[0].content[0]
     assert (''.join(child.text for child in link.content), link.href) == ('Shared title', 'https://example.test/revised')
-    assert values(label_undone.workspace)['title'] == values(before)['title']
-    url_undone = fixture.writers.local_history_command(fixture.project, history_request(fixture, url_saved.local_history_ack,
-        identifier='undo-url'), originals=fixture.originals)
-    link = url_undone.workspace.project.document.regions[2].blocks[0].content[0]
+    assert values(label_undone)['title'] == values(before)['title']
+    url_undone = editor.undo('undo-url', expected='link-target').response.workspace
+    link = url_undone.project.document.regions[2].blocks[0].content[0]
     assert (''.join(child.text for child in link.content), link.href) == ('Shared title', 'https://example.test/a')
-    assert values(url_undone.workspace) == values(before)
-    redone = fixture.writers.local_history_command(fixture.project, history_request(fixture, url_undone.local_history_ack,
-        'redo', 'redo-url'), originals=fixture.originals).workspace
+    assert values(url_undone) == values(before)
+    redone = editor.redo('redo-url', expected='link-target').response.workspace
     link = redone.project.document.regions[2].blocks[0].content[0]
     assert (''.join(child.text for child in link.content), link.href) == ('Shared title', 'https://example.test/revised')
     assert values(redone)['title'] == values(before)['title']

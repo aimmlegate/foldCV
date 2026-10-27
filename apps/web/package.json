@@ -7,11 +7,9 @@
     "contracts:check": "../../.venv/bin/python ../../tools/check_contract_drift.py",
     "typecheck": "tsc --noEmit",
     "lint": "eslint . --max-warnings 0",
-    "test:contracts": "node --import tsx src/contracts/check-fixtures.ts",
-    "test:state": "node --import tsx --test --experimental-test-coverage --test-coverage-include='**/src/background/*.ts' --test-coverage-include='**/src/assistant/*.ts' --test-coverage-include='**/src/rich/*.ts' --test-reporter=../../tools/background_node_reporter.mjs unit/*.test.ts",
+    "test:state": "node --import tsx --test --experimental-test-coverage --test-coverage-include='**/src/assistant/*.ts' --test-coverage-include='**/src/rich/*.ts' unit/*.test.ts",
     "dev": "vite --host 127.0.0.1",
-    "build": "vite build",
-    "test:browser": "playwright test --forbid-only"
+    "build": "vite build"
   },
   "dependencies": {
     "@blocknote/core": "0.55.0",

@@ -1,12 +1,11 @@
 import { errorMessage } from "../../errors/messages";
 import { useRef, useState } from "react";
 import { fields, names, labels, type RecordValue, type Kind } from "../../rich/fact-fields";
-import type { PanelCommand } from "../../rich/synchronization";
+import type { PanelCommand } from "../../rich/v7-panel";
 import { Dialog } from "../ui/Dialog";
 import { Button } from "../ui/Button";
 import { Icon } from "../ui/Icon";
 import { factError } from "./error";
-import { AppliedIntentFailure } from "../../rich/intent-queue";
 import { DateInput } from "./DateInput";
 
 export type FactTarget = { kind: Kind; record: RecordValue | null; remove?: boolean };
@@ -28,7 +27,7 @@ export function FactDialog({ target, close, submit }: { target: FactTarget; clos
   async function apply(command: PanelCommand) {
     setBusy(true); setError("");
     try { await submit(command); close(); }
-    catch (error) { if (error instanceof AppliedIntentFailure) close(); else setError(factError(error)); }
+    catch (error) { setError(factError(error)); }
     finally { setBusy(false); }
   }
   return <Dialog open close={() => { if (!busy) close(); }} title={target.remove ? "Удалить факт?" : labels[target.kind]}>

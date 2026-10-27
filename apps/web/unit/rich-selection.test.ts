@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { Schema } from "@tiptap/pm/model";
 import { EditorState, TextSelection } from "@tiptap/pm/state";
-import { selectedRange, selectionLocation } from "../src/rich/selection";
+import { selectionLocation } from "../src/rich/selection";
 
 const schema = new Schema({ nodes: {
   doc: { content: "blockGroup" }, blockGroup: { content: "blockContainer+" },
@@ -13,22 +13,15 @@ const schema = new Schema({ nodes: {
   hardBreak: { inline: true, group: "inline" }, text: { group: "inline" },
 } });
 
-for (const table of [false, true]) for (const field of [false, true]) for (const backwards of [false, true]) {
-  test(`serialized selection retains newlines and UTF-16 offsets table=${table} field=${field} backwards=${backwards}`, () => {
+for (const table of [false, true]) for (const field of [false, true]) {
+  test(`a caret after a line break reports its block and cell table=${table} field=${field}`, () => {
     const name = field ? schema.node("factField", null, schema.text("A😀")) : schema.text("A😀");
     const paragraph = schema.node("paragraph", null, [name, schema.node("hardBreak"), schema.text("works daily")]);
     const content = table ? schema.node("table", null, schema.node("tableRow", null, schema.node("tableCell", null, paragraph))) : paragraph;
     const doc = schema.node("doc", null, schema.node("blockGroup", null, schema.node("blockContainer", null, content)));
     let from = 0;
     doc.descendants((node, pos) => { if (node.isText && node.text === "works daily") from = pos; });
-    const tr = EditorState.create({ schema, doc }).tr.setSelection(TextSelection.create(doc, backwards ? from + 5 : from, backwards ? from : from + 5));
-    const selected = selectedRange(tr);
-    assert.ok(selected);
-    assert.deepEqual([selected.anchor.offset, selected.head.offset], [4, 9]);
-    assert.equal("A😀\nworks daily".slice(selected.anchor.offset, selected.head.offset), "works");
-    assert.equal(selected.anchor.cellId, table ? "cell" : null);
-    const caret = tr.setSelection(TextSelection.create(doc, from));
-    assert.equal(selectedRange(caret), null);
+    const caret = EditorState.create({ schema, doc }).tr.setSelection(TextSelection.create(doc, from));
     assert.equal(selectionLocation(caret), JSON.stringify(["block", table ? "cell" : null]));
   });
 }

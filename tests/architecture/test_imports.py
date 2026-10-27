@@ -1,6 +1,8 @@
-"""Modules that stay import neither the legacy generations, the job stack nor spikes (plan 1.3, 1.4).
+"""No module imports the legacy generations, the job stack or spikes, and none of the deleted modules is back (plan 1.3,
+1.4, S22).
 
-Static AST check; the modules are never imported. Function-level imports count.
+Static AST check over every module of packages/resume_core and resume_api; the modules are never imported.
+Function-level imports count.
 """
 
 import ast
@@ -10,55 +12,45 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[2]
 PACKAGES = {'packages.resume_core': ROOT / 'packages/resume_core', 'resume_api': ROOT / 'services/api/src/resume_api'}
 
-# Skip-list mode: files named in the deletion lists of plan 1.3 and 1.4. SR06 step 2 deletes them and
-# switches this test to full coverage.
+# Module names SR06 deleted (plan 1.3, 1.4 and the dead V6 import modules); none may exist again.
 DELETED = [
     'packages.resume_core.background_*', 'packages.resume_core.template_commit_proofs',
     'packages.resume_core.template_preparation_store', 'packages.resume_core.template_writer_*',
     'packages.resume_core.template_delta', 'packages.resume_core.template_address_map',
     'packages.resume_core.template_retention', 'packages.resume_core.template_clipboard_store',
-    'packages.resume_core.template_finalization', 'packages.resume_core.template_local_history',
-    'packages.resume_core.rich_project_store', 'packages.resume_core.rich_snapshot_merge',
-    'packages.resume_core.rich_asset_lifecycle', 'packages.resume_core.rich_archive', 'packages.resume_core.rich_import',
+    'packages.resume_core.template_finalization', 'packages.resume_core.rich_project_store',
+    'packages.resume_core.rich_snapshot_merge', 'packages.resume_core.rich_asset_lifecycle', 'packages.resume_core.rich_archive',
+    'packages.resume_core.rich_import', 'packages.resume_core.rich_timeline', 'packages.resume_core.rich_format',
     'packages.resume_core.agent_store', 'packages.resume_core.agent_artifacts', 'packages.resume_core.agent_edits',
     'packages.resume_core.assistant_actions', 'packages.resume_core.assistant_coverage',
     'packages.resume_core.assistant_proposals', 'packages.resume_core.assistant_publication',
     'packages.resume_core.gui_*', 'packages.resume_core.normalization', 'packages.resume_core.drafting',
-    'packages.resume_core.rewriting', 'packages.resume_core.checks',
+    'packages.resume_core.rewriting', 'packages.resume_core.checks', 'packages.resume_core.import_*',
+    'packages.resume_core.resume_assessment', 'packages.resume_core.extraction_outcome', 'packages.resume_core.source_dates',
     'packages.resume_core.models.background', 'packages.resume_core.models.template_writer',
     'packages.resume_core.models.template_delta', 'packages.resume_core.models.template_authority',
     'packages.resume_core.models.template_publication', 'packages.resume_core.models.template_address',
     'packages.resume_core.models.assistant_*', 'packages.resume_core.models.recovery',
-    'resume_api.jobs', 'resume_api.jobs.*', 'resume_api.rich_synchronization', 'resume_api.rich_assets',
-    'resume_api.rich_projects', 'resume_api.rich_routes', 'resume_api.template_exports',
+    'resume_api.jobs', 'resume_api.jobs.*', 'resume_api.rich_*', 'resume_api.template_exports', 'resume_api.template_imports',
     'resume_api.importer.template_checkpoints', 'resume_api.importer.template_persistence', 'resume_api.importer.job',
-    'resume_api.importer.direct', 'resume_api.importer.template_direct', 'resume_api.importer.session',
+    'resume_api.importer.direct', 'resume_api.importer.template_direct', 'resume_api.importer.template_export',
+    'resume_api.importer.session', 'resume_api.importer.result', 'resume_api.projects.pipeline',
     'resume_api.agent.approval*', 'resume_api.agent.action_*', 'resume_api.agent.continuation',
     'resume_api.agent.capabilities', 'resume_api.agent.history_proposals', 'resume_api.agent.outcomes',
     'resume_api.agent.project_*', 'resume_api.agent.proposals', 'resume_api.agent.publication',
     'resume_api.agent.leases', 'resume_api.agent.events', 'resume_api.agent.edits', 'resume_api.agent.service',
-    'resume_api.agent.routes', 'resume_api.agent.tools', 'resume_api.agent.context',
-    'resume_api.gui_*', 'resume_api.normalization_content', 'resume_api.drafting_content',
-    'resume_api.rewriting_content', 'resume_api.contracts',
+    'resume_api.agent.routes', 'resume_api.agent.tools', 'resume_api.agent.context', 'resume_api.agent.skills',
+    'resume_api.gui_*', 'resume_api.normalization_content', 'resume_api.drafting_content', 'resume_api.rewriting_content',
+    'resume_api.resume_assessment_content', 'resume_api.original_sources', 'resume_api.contracts',
 ]
-# The app still mounts the legacy routes and the job service until step 2; each import here is one of those.
-ALLOWED = {'resume_api.app': {
-    'packages.resume_core.background_limits': 'body limit of the old writer routes',
-    'packages.resume_core.gui_projects': 'V5 project store of the V1 routes',
-    'resume_api.gui_projects': 'V1 project service',
-    'resume_api.gui_routes': 'V1 project routes',
-    'resume_api.gui_rendering': 'DOCX renderers, including the one the V7 export uses',
-    'resume_api.jobs.feasibility': 'native parallel jobs',
-    'resume_api.jobs.routes': 'job routes',
-    'resume_api.jobs.service': 'job service; the V7 import pipeline is built from it',
-    'spikes.background.appserver_driver': 'native parallel jobs',
-}}
 
 
 def modules():
     found = {}
     for prefix, folder in PACKAGES.items():
         for path in sorted(folder.rglob('*.py')):
+            if '__pycache__' in path.parts:
+                continue
             parts = [part for part in path.relative_to(folder).with_suffix('').parts if part != '__init__']
             found['.'.join([prefix, *parts])] = path
     return found
@@ -91,21 +83,24 @@ def forbidden(target):
         or target == 'spikes' or target.startswith('spikes.'))
 
 
-def kept():
+def deleted(name):
+    return any(fnmatch.fnmatchcase(name, pattern) for pattern in DELETED)
+
+
+def test_no_module_imports_a_legacy_generation_job_stack_or_spike():
     known = modules()
-    for name, path in known.items():
-        if not any(fnmatch.fnmatchcase(name, pattern) for pattern in DELETED):
-            yield name, imported(name, path, known)
-
-
-def test_kept_modules_import_no_legacy_generation_job_stack_or_spike():
-    found = [(name, target) for name, targets in kept() for target in sorted(targets) if forbidden(target)]
-    assert [pair for pair in found if pair[1] not in ALLOWED.get(pair[0], {})] == []
-    unused = {(name, target) for name, targets in ALLOWED.items() for target in targets} - set(found)
-    assert not unused, f'allowed imports that are gone; remove them from ALLOWED: {sorted(unused)}'
+    found = [(name, target) for name, path in known.items() for target in sorted(imported(name, path, known))
+        if forbidden(target) or deleted(target)]
+    assert found == []
 
 
 def test_core_does_not_import_the_api():
-    found = [(name, target) for name, targets in kept() if name.startswith('packages.')
-        for target in sorted(targets) if target == 'resume_api' or target.startswith('resume_api.')]
+    known = modules()
+    found = [(name, target) for name, path in known.items() if name.startswith('packages.')
+        for target in sorted(imported(name, path, known)) if target == 'resume_api' or target.startswith('resume_api.')]
     assert found == []
+
+
+def test_no_module_is_named_like_a_deleted_one():
+    assert [name for name in modules() if deleted(name)] == []
+    assert not (ROOT / 'spikes').exists()

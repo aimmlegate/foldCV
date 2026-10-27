@@ -60,8 +60,7 @@ async def launch(*, port: int = 0, open_browser: bool = True,
                    if experimental_cli else None)
         app = create_app(origin=origin, secret=secret, temp_root=temp_root, dist=dist,
                          cli_executable=profile.executable if profile else cli_executable,
-                         experimental_profile=profile, background_enabled=True,
-                         template_import_call_cap=TEMPLATE_IMPORT_CALL_CAP, legacy_routes=False)
+                         experimental_profile=profile, template_import_call_cap=TEMPLATE_IMPORT_CALL_CAP)
         tune_garbage_collector()
         config = uvicorn.Config(app, host="127.0.0.1", port=actual_port, proxy_headers=False,
                                 access_log=False, server_header=False, log_level="critical",

@@ -80,7 +80,7 @@ def test_assets_come_from_the_active_package_and_paths_stay_inside_the_template(
 
 @pytest.mark.asyncio
 async def test_routes_activate_a_new_revision_only_for_projects_created_after_it(tmp_path):
-    async with app_client(tmp_path, call_cap=4, provider=ScriptedTemplateProvider()) as (client, _service, _jobs):
+    async with app_client(tmp_path, call_cap=4, provider=ScriptedTemplateProvider()) as (client, _app):
         state = (await client.get('/v1/rich/template-config')).json()
         before = (await upload(client)).json()['workspace']
         definition = json.loads(state['text'])
@@ -94,7 +94,7 @@ async def test_routes_activate_a_new_revision_only_for_projects_created_after_it
         status = (await client.get('/v1/rich/template-import')).json()
         assert status['package']['revision'] == definition['template']['revision']
         after = (await upload(client)).json()['workspace']
-        reread = (await client.get('/v1/rich/projects/' + before['projectId'])).json()['workspace']
+        reread = (await client.post('/v2/projects/' + before['projectId'] + '/open', json={})).json()['response']['workspace']
         assert reread['preDraft']['templatePackage']['packageHash'] == state['package']['packageHash']
         assert after['preDraft']['templatePackage']['packageHash'] == status['package']['packageHash'] != state['package']['packageHash']
         too_long = await client.post('/v1/rich/template-config/check', json={'text': 'x' * (1024 * 1024 + 1)})

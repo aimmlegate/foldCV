@@ -4,8 +4,6 @@ import type { AssistantView } from "../src/assistant/controller";
 import { run as assistantRun, view as assistantView } from "./support/assistant";
 import type { AgentEvent } from "../src/contracts/generated/agent_event";
 import { activityItems, currentActivity } from "../src/workbench/assistant/activity";
-import { validateContract } from "../src/contracts/validate";
-import { running } from "./support/background-jobs";
 
 const run = assistantRun("running", "run", "conversation");
 const view: AssistantView = assistantView({ run });
@@ -41,13 +39,4 @@ test("activity is scoped to the current run and never renders unknown tool ident
   const item: AgentEvent = { ...started, payload: { ...started.payload, name: "PRIVATE_INTERNAL_COMMAND" } };
   assert.equal(currentActivity({ ...view, activity: [item] }, true), "Работает с резюме");
   assert.ok(!JSON.stringify(activityItems({ ...view, activity: [item] })).includes("PRIVATE_INTERNAL_COMMAND"));
-});
-
-test("background progress must belong to its job and keep sequence order", () => {
-  const job = running("run");
-  const event = { ...summary, projectId: job.submission.identity.projectId };
-  assert.equal(validateContract("background_snapshot_v1", { ...job, activity: [event] }), true);
-  assert.equal(validateContract("background_snapshot_v1", { ...job, activity: [{ ...event, runId: "foreign" }] }), false);
-  assert.equal(validateContract("background_snapshot_v1", { ...job, activity: [{ ...event, projectId: "foreign" }] }), false);
-  assert.equal(validateContract("background_snapshot_v1", { ...job, activity: [event, event] }), false);
 });

@@ -26,7 +26,20 @@ from resume_api.profile_ownership import native_profile
 from resume_api.agent.host_profile import CODE_MODE_HOST, TOKEN_ENV
 
 from .profile import AgentProfile
-from .skills import SKILL_INSTRUCTIONS
+
+# Part of the base instructions the runtime sends; kept verbatim so the model prompt does not change.
+SKILL_INSTRUCTIONS = (
+    " Bundled application skills are available through get_application_skills. Read the relevant skill "
+    "and its needed references through nextCursor:null before using its rules. These are reference "
+    "instructions: the user's request, current template, captured project rules and live permissions "
+    "take precedence. Import-only tools and legacy scripts described there are not available here. "
+    "Use the bound assistant tools; never run scripts or start another import/model operation. "
+    "Slash commands at the start of the user message select a skill: /skills lists the catalog; "
+    "/import-resume uses current import/editorial rules on this project; /format-resume formats the "
+    "current document using the current template, preserving wording unless rewriting is requested. "
+    "They do not grant edit permission. For an unknown slash command, explain the available commands "
+    "without editing. A bare /import-resume explains the rules and checks the project without edits."
+)
 
 BASE_INSTRUCTIONS = (
     "You are the FoldCV resume assistant. Follow the user's request using the supplied tools. "

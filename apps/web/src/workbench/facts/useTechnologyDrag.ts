@@ -1,5 +1,5 @@
 import { useId, useState, type DragEvent, type KeyboardEvent } from "react";
-import type { PanelCommand } from "../../rich/synchronization";
+import type { PanelCommand } from "../../rich/v7-panel";
 import { adjacentTechnology } from "../../rich/technology-order";
 
 export function useTechnologyDrag(ids: readonly string[], operation: "move_technology" | "move_focus", disabled: boolean,

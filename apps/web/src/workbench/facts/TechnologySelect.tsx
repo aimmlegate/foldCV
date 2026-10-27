@@ -1,7 +1,7 @@
 import type { OrderDocument } from "../../rich/technology-order";
 import { useEffect, useId, useMemo, useRef, useState } from "react";
 import type { WorkingFacts } from "../../contracts/generated/working_facts";
-import type { PanelCommand } from "../../rich/synchronization";
+import type { PanelCommand } from "../../rich/v7-panel";
 import { technologyKey, technologyName } from "../../rich/panel-intents";
 import { Icon } from "../ui/Icon";
 import { technologySuggestions } from "./technology-catalog";

@@ -2,23 +2,20 @@
 
 import pytest
 
-from packages.resume_core.background_store import BackgroundFailure
 from packages.resume_core.models.template_authoring import TemplateEditPreparationV1
 from packages.resume_core.models.template_document import PresentedText
-from packages.resume_core.models.template_writer import WriterPrepareEditV2
-from packages.resume_core.rich_archive import export_rich_archive,open_rich_archive
+from packages.resume_core.archive_zip import write_zip
+from packages.resume_core.template_archive import archive_payload_v7, open_archive_v7
 from packages.resume_core.rich_mutations import apply_rich_mutation,inline_text
 from packages.resume_core.template_authoring import split_block
 from packages.resume_core.template_facts import human_edit
 from packages.resume_core.template_preparation import prepare_edit
 from packages.resume_core.templates.compiler import canonical
 from tests.templates.storage_fixtures import workspace
-from tests.templates.test_clipboard_retention import captured,clipboard_request
-from tests.templates.test_compact_save import compact_command
+from tests.templates.editor_fixtures import TemplateEditor
+from tests.templates.test_clipboard_retention import captured
 from tests.templates.test_structural_preparation import intent as structure_intent
-from tests.templates.test_template_local_history import history_request
-from tests.templates.test_template_preparation import proof,response
-from tests.templates.test_template_writers import TemplateWriterFixture
+from tests.templates.test_template_preparation import response
 
 
 def block_capture(before,blocks=None):
@@ -75,32 +72,28 @@ def test_partial_block_capture_stays_cited_literal_after_former_cell_changes():
 
 
 def test_actual_capture_source_removal_block_paste_full_history_chain_and_portable_transfer(tmp_path):
-    before,sources=workspace();fixture=TemplateWriterFixture(tmp_path,before,sources)
-    capture_value=clipboard_request(fixture).model_dump(by_alias=True)
-    capture_value['selection']={'kind':'blocks','blocks':[{'blockId':block.id,'beforeRevision':block.revision}
-        for block in before.project.document.regions[2].blocks]}
-    capture=fixture.writers.capture_clipboard(fixture.project,type(clipboard_request(fixture)).model_validate(capture_value))
-    retained=fixture.writers.clipboards.read_for_paste(fixture.jobs.load(fixture.project),fixture.current(),capture.clipboard_capture_id)
-    removal=structure_intent(fixture.current(),'remove_occurrences',blocks=capture_value['selection']['blocks'])
-    removal.client_mutation_id='remove-source';removal.capture.action_id='remove-source';removal.capture.session_id=fixture.proof.session_id
-    prepared=fixture.writers.prepare_edit_delta(fixture.project,WriterPrepareEditV2(schemaVersion=2,proof=fixture.proof,preparation=removal))
-    removed=fixture.writers.save(fixture.project,compact_command(fixture,prepared),originals=fixture.originals)
-    assert not fixture.current().project.document.regions[2].blocks
-    intent=block_request(fixture.current(),retained);intent.capture.session_id=fixture.proof.session_id
-    prepared=fixture.writers.prepare_edit_delta(fixture.project,WriterPrepareEditV2(schemaVersion=2,proof=fixture.proof,preparation=intent))
-    pasted=fixture.writers.save(fixture.project,compact_command(fixture,prepared,2),originals=fixture.originals)
-    current=fixture.current();copied_ids=[block.id for block in current.project.document.regions[2].blocks]
+    before,sources=workspace();editor=TemplateEditor(tmp_path,before,sources)
+    blocks=[{'blockId':block.id,'beforeRevision':block.revision} for block in before.project.document.regions[2].blocks]
+    capture=editor.capture({'kind':'blocks','blocks':blocks},'copy-blocks')
+    retained=editor.retained(capture)
+    removal=structure_intent(editor.current(),'remove_occurrences',blocks=blocks)
+    removal.client_mutation_id='remove-source';removal.capture.action_id='remove-source'
+    editor.edit(removal)
+    assert not editor.current().project.document.regions[2].blocks
+    # The capture outlives its source: the paste uses the frozen payload, not the removed blocks.
+    editor.edit(block_request(editor.current(),retained))
+    current=editor.current();copied_ids=[block.id for block in current.project.document.regions[2].blocks]
     assert len(copied_ids)==2 and current.project.facts==before.project.facts
-    moved,*_=open_rich_archive(export_rich_archive(current,sources,{},{}),'transferred')
+    moved,*_=open_archive_v7(write_zip(archive_payload_v7(current,sources,{})),'transferred')
     assert moved.project.document==current.project.document and moved.project.facts==current.project.facts
-    undone=fixture.writers.local_history_command(fixture.project,history_request(fixture,pasted.local_history_ack),originals=fixture.originals)
-    assert not undone.workspace.project.document.regions[2].blocks
-    undone_source=fixture.writers.local_history_command(fixture.project,history_request(fixture,removed.local_history_ack,identifier='undo-source'),originals=fixture.originals)
-    assert [block.id for block in undone_source.workspace.project.document.regions[2].blocks]==[block.id for block in before.project.document.regions[2].blocks]
-    redone_source=fixture.writers.local_history_command(fixture.project,history_request(fixture,undone_source.local_history_ack,'redo','redo-source'),originals=fixture.originals)
-    assert not redone_source.workspace.project.document.regions[2].blocks
-    redone=fixture.writers.local_history_command(fixture.project,history_request(fixture,undone.local_history_ack,'redo','redo-paste'),originals=fixture.originals)
-    assert [block.id for block in redone.workspace.project.document.regions[2].blocks]==copied_ids
+    undone=editor.undo('undo-paste',expected='paste-blocks').response.workspace
+    assert not undone.project.document.regions[2].blocks
+    undone_source=editor.undo('undo-source',expected='remove-source').response.workspace
+    assert [block.id for block in undone_source.project.document.regions[2].blocks]==[block.id for block in before.project.document.regions[2].blocks]
+    redone_source=editor.redo('redo-source',expected='remove-source').response.workspace
+    assert not redone_source.project.document.regions[2].blocks
+    redone=editor.redo('redo-paste',expected='paste-blocks').response.workspace
+    assert [block.id for block in redone.project.document.regions[2].blocks]==copied_ids
 
 
 @pytest.mark.parametrize('damage',['inline','package','cell','placement','identity'])

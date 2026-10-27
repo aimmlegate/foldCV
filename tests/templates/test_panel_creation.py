@@ -4,13 +4,13 @@ from copy import deepcopy
 
 import pytest
 
-from packages.resume_core.agent_edits import semantic
+from packages.resume_core.template_inverse import semantic
 from packages.resume_core.models.template_authoring import TemplateEditPreparationV1
 from packages.resume_core.models.template_document import FieldOccurrence, PresentedText, TemplateParagraphBlock
 from packages.resume_core.models.template_facts import WorkingFactsV2
 from packages.resume_core.models.template_workspace import WorkspaceV7
-from packages.resume_core.models.template_writer import WriterPrepareEditV2
-from packages.resume_core.rich_archive import export_rich_archive, open_rich_archive
+from packages.resume_core.archive_zip import write_zip
+from packages.resume_core.template_archive import archive_payload_v7, open_archive_v7
 from packages.resume_core.rich_fields import builtin_cell_values, field_key
 from packages.resume_core.rich_mutations import apply_rich_mutation, RichMutationFailure
 from packages.resume_core.template_assembly import assemble_template
@@ -21,13 +21,11 @@ from packages.resume_core.template_preparation_ids import EditIdAllocator,existi
 from packages.resume_core.templates.compiler import canonical, compile_bytes
 from packages.resume_core.templates.materialize_nodes import reference
 from packages.resume_core.templates.store import BUNDLED_TEMPLATE
+from tests.templates.editor_fixtures import TemplateEditor
 from tests.templates.pipeline_fixtures import source_draft
-from tests.templates.test_compact_save import compact_command
 from tests.templates.test_materialize import admitted
 from tests.templates.test_panel_preparation import prepared, restore
-from tests.templates.test_template_local_history import history_request
-from tests.templates.test_template_preparation import proof, response
-from tests.templates.test_template_writers import TemplateWriterFixture
+from tests.templates.test_template_preparation import response
 
 
 def employment_workspace():
@@ -384,19 +382,16 @@ def test_invalid_creation_retains_base_without_a_partial_record(damage):
 
 
 def test_actual_prepared_creation_save_undo_redo_reopen_and_portable_transfer(tmp_path):
-    before,sources=employment_workspace();fixture=TemplateWriterFixture(tmp_path,before,sources)
+    before,sources=employment_workspace();editor=TemplateEditor(tmp_path,before,sources)
     value=request(before,values={'employer':'New exact company','start':'2026'})
-    value.capture.session_id=fixture.proof.session_id
     value.operations[0].command.capture=value.capture.model_copy(deep=True)
-    wrapped=WriterPrepareEditV2(schemaVersion=2,proof=fixture.proof,preparation=value)
-    delta=fixture.writers.prepare_edit_delta(fixture.project,wrapped)
-    saved=fixture.writers.save(fixture.project,compact_command(fixture,delta),originals=fixture.originals)
-    undo=fixture.writers.local_history_command(fixture.project,history_request(fixture,saved.local_history_ack),originals=fixture.originals)
-    assert semantic(undo.workspace.project.document)==semantic(before.project.document)
-    assert semantic(undo.workspace.project.facts.records)==semantic(before.project.facts.records)
-    fixture.writers.local_history_command(fixture.project,history_request(fixture,undo.local_history_ack,'redo','redo-creation'),originals=fixture.originals)
-    reopened=fixture.current()
+    editor.edit(value)
+    undo=editor.undo('undo-creation',expected='create-item').response.workspace
+    assert semantic(undo.project.document)==semantic(before.project.document)
+    assert semantic(undo.project.facts.records)==semantic(before.project.facts.records)
+    editor.redo('redo-creation',expected='create-item')
+    reopened=editor.reopen()
     assert any(record.kind=='employment' and record.employer.raw_text=='New exact company' for record in reopened.project.facts.records)
-    transferred,retained,_,_=open_rich_archive(export_rich_archive(reopened,sources,{},{}),'creation-transfer')
+    transferred,retained,_,_=open_archive_v7(write_zip(archive_payload_v7(reopened,sources,{})),'creation-transfer')
     assert transferred.project.document==reopened.project.document and transferred.project.facts==reopened.project.facts
     assert retained==sources

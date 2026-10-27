@@ -16,22 +16,19 @@ import zipfile
 from docx import Document
 from docx.oxml.ns import qn
 from PIL import Image, ImageChops
-import httpx
 import pymupdf
 import pytest
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "services/api/src"))
 from resume_api.lifecycle import OperationFiles
 from resume_api.rendering import DocumentRenderer
-from resume_api.app import create_app
 from packages.resume_core.rendering.models import RenderDocument, RenderIdentity, RenderRequest, snapshot_digest
 from packages.resume_core.rendering.template import PACKAGE_SHA256, RenderFailure, renderer_sha256, require_template
 from packages.resume_core.rendering import template, worker
 
 ROOT = Path(__file__).resolve().parents[2]
-FIXTURES = ROOT / "spikes/render/fixtures"
-BASELINES = ROOT / "tests/render_spike/baselines"
-ARTIFACTS = ROOT / ".devloop/artifacts/T05"
+FIXTURES = ROOT / "tests/fixtures/synthetic/render"
+BASELINES = FIXTURES / "baselines"
 CASES = {
     "short": (1, ["Мария Примерова", "35%", "Лаборатория Север", "НАВЫКИ"]),
     "long-main": (4, ["Тестовая команда 01", "Тестовая команда 10", "20%", "НАВЫКИ"]),
@@ -67,15 +64,10 @@ def normalized(value: str) -> str:
 @pytest.mark.asyncio
 async def test_real_renderer_content_layout_and_rasters(tmp_path):
     require_template()
-    ARTIFACTS.mkdir(parents=True, exist_ok=True)
     for stem, (pages, markers) in CASES.items():
-        for stale in ARTIFACTS.glob(f"{stem}-*.png"):
-            stale.unlink()
         data = json.loads((FIXTURES / f"{stem}.json").read_text(encoding="utf-8"))
         request = request_for(data, stem)
         docx_bytes, pdf_bytes, meta = await render(request, tmp_path / stem)
-        (ARTIFACTS / f"{stem}.docx").write_bytes(docx_bytes)
-        (ARTIFACTS / f"{stem}.pdf").write_bytes(pdf_bytes)
         assert meta["snapshotSha256"] == request.snapshot.snapshot_sha256
         assert meta["templatePackageSha256"] == PACKAGE_SHA256
         assert meta["rendererSha256"] == renderer_sha256()
@@ -106,7 +98,6 @@ async def test_real_renderer_content_layout_and_rasters(tmp_path):
                 assert {name.split("+")[-1] for _, _, _, name, *_ in page.get_fonts(full=True)} <= {"SourceSansPro-Regular", "SourceSansPro-Bold"}
                 pix = page.get_pixmap(matrix=pymupdf.Matrix(1.5, 1.5), alpha=False)
                 image = Image.frombytes("RGB", (pix.width, pix.height), pix.samples)
-                image.save(ARTIFACTS / f"{stem}-{number:02d}.png")
                 with Image.open(BASELINES / f"{stem}-{number:02d}.png") as baseline:
                     difference = ImageChops.difference(image, baseline.convert("RGB"))
                     changed = sum(1 for value in difference.convert("L").get_flattened_data() if value > 8)
@@ -120,19 +111,11 @@ async def test_long_project_and_education_are_complete_and_editable(tmp_path):
     data["sidebar"][0]["items"] += [f"Synthetic education course {number:02d} at Example Institute." for number in range(1, 16)]
     request = request_for(data, "long-project-education")
     docx_bytes, pdf_bytes, meta = await render(request, tmp_path)
-    ARTIFACTS.mkdir(parents=True, exist_ok=True)
-    for stale in ARTIFACTS.glob("long-project-education-*.png"):
-        stale.unlink()
-    (ARTIFACTS / "long-project-education.docx").write_bytes(docx_bytes)
-    (ARTIFACTS / "long-project-education.pdf").write_bytes(pdf_bytes)
     assert meta["pageCount"] > 3
     document = Document(BytesIO(docx_bytes))
     word_text = normalized(" ".join(node.text or "" for node in document.element.body.iter(qn("w:t"))))
     with pymupdf.open(stream=pdf_bytes, filetype="pdf") as pdf:
         pdf_text = normalized(" ".join(page.get_text() for page in pdf))
-        for page_number, page in enumerate(pdf, 1):
-            pix = page.get_pixmap(matrix=pymupdf.Matrix(1.5, 1.5), alpha=False)
-            Image.frombytes("RGB", (pix.width, pix.height), pix.samples).save(ARTIFACTS / f"long-project-education-{page_number:02d}.png")
     for marker in ("Synthetic extended project task 01", "Synthetic extended project task 29",
                    "Synthetic education course 01", "Synthetic education course 15"):
         assert marker in word_text and marker in pdf_text
@@ -156,11 +139,6 @@ async def test_oversize_individual_paragraphs_flow_across_pages(tmp_path):
     data["projects"][0]["tasks"] = [task]
     request = request_for(data, "flowing-paragraphs")
     docx_bytes, pdf_bytes, metadata = await render(request, tmp_path)
-    ARTIFACTS.mkdir(parents=True, exist_ok=True)
-    for stale in ARTIFACTS.glob("flowing-paragraphs-*.png"):
-        stale.unlink()
-    (ARTIFACTS / "flowing-paragraphs.docx").write_bytes(docx_bytes)
-    (ARTIFACTS / "flowing-paragraphs.pdf").write_bytes(pdf_bytes)
     document = Document(BytesIO(docx_bytes))
     word_text = normalized(" ".join(node.text or "" for node in document.element.body.iter(qn("w:t"))))
     assert "(continued)" not in word_text
@@ -171,9 +149,6 @@ async def test_oversize_individual_paragraphs_flow_across_pages(tmp_path):
         for text in page_text:
             body = text.replace(data["candidate"]["name"], "").replace(data["candidate"]["title"], "")
             assert normalized(body.replace(data["footer"], ""))
-        for number, page in enumerate(pdf, 1):
-            pix = page.get_pixmap(matrix=pymupdf.Matrix(1.5, 1.5), alpha=False)
-            Image.frombytes("RGB", (pix.width, pix.height), pix.samples).save(ARTIFACTS / f"flowing-paragraphs-{number:02d}.png")
     for prefix in ("EDU", "PROJECT", "TASK"):
         locations = []
         for marker in (f"{prefix}_BEGIN", f"{prefix}_MIDDLE", f"{prefix}_END"):
@@ -186,26 +161,15 @@ async def test_oversize_individual_paragraphs_flow_across_pages(tmp_path):
 
 
 @pytest.mark.asyncio
-async def test_real_protected_api_zip_and_unknown_icon_error(tmp_path):
-    origin = "http://127.0.0.1:39280"
-    secret = "synthetic-render-secret-01234567890123"
-    dist = tmp_path / "dist"
-    dist.mkdir()
-    (dist / "index.html").write_text("synthetic shell")
-    app = create_app(origin=origin, secret=secret, temp_root=tmp_path / "operations", dist=dist)
+async def test_unknown_focus_icon_fails_with_a_public_code_and_cleans(tmp_path):
     data = json.loads((FIXTURES / "short.json").read_text(encoding="utf-8"))
-    async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url=origin) as client:
-        await client.post("/v1/session/exchange", headers={"Origin": origin}, json={"secret": secret})
-        good = await client.post("/v1/render", headers={"Origin": origin},
-                                 json=request_for(data, "api-short").model_dump(mode="json", by_alias=True))
-        assert good.status_code == 200 and good.headers["content-type"] == "application/zip"
-        with zipfile.ZipFile(BytesIO(good.content)) as archive:
-            assert archive.namelist() == ["resume.docx", "resume.pdf", "render.json"]
-        data["focus"][0]["icon"] = "external"
-        bad = await client.post("/v1/render", headers={"Origin": origin},
-                                json=request_for(data, "api-unknown").model_dump(mode="json", by_alias=True))
-        assert bad.status_code == 422 and bad.json()["error"]["code"] == "UNSUPPORTED_FOCUS_ICON"
-        assert "Мария Примерова" not in bad.text
+    data["focus"][0]["icon"] = "external"
+    files = OperationFiles(tmp_path / "operations")
+    with pytest.raises(RenderFailure) as caught:
+        with files.open():
+            await DocumentRenderer().render(request_for(data, "unknown-icon"), files)
+    assert caught.value.code == "UNSUPPORTED_FOCUS_ICON"
+    assert "Мария Примерова" not in str(caught.value)
     assert list((tmp_path / "operations").iterdir()) == []
 
 

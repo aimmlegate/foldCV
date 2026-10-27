@@ -10,17 +10,7 @@ from packages.resume_core.models.contracts import ArchiveManifest, Project, Prop
 from packages.resume_core.rendering.models import RenderRequest
 from packages.resume_core.rendering.preparation import PrepareRequest
 from packages.resume_core.extraction.models import ExtractResult
-from packages.resume_core.normalization import FactRequest, FactSheet, SemanticProposal
-from packages.resume_core.drafting import DraftRequest, DraftProposal, DraftResult
-from packages.resume_core.rewriting import RewritePreflightFailure, RewriteRequest, RewriteProposal, RewriteResult
 from packages.resume_core.technologies import CATALOG, CATALOG_VERSION
-from packages.resume_core.models.recovery import RECOVERY_CONTRACTS
-from packages.resume_core.gui_normalization import GUI_NORMALIZATION_CONTRACTS
-from packages.resume_core.gui_drafting import GUI_DRAFT_CONTRACTS
-from packages.resume_core.gui_projects import GUI_PROJECT_CONTRACTS
-from packages.resume_core.gui_rewriting import GUI_REWRITE_CONTRACTS
-from packages.resume_core.gui_exports import GUI_EXPORT_CONTRACTS
-from packages.resume_core.gui_reconciliation import GUI_RECONCILE_CONTRACTS
 from packages.resume_core.models.rich_document import RichDocumentV1
 from packages.resume_core.models.rich_facts import WorkingFacts
 from packages.resume_core.models.rich_mutations import RichMutation, RichSelection, DateCascadeProposal
@@ -29,15 +19,7 @@ from packages.resume_core.rich_api import RichProjectResponse, ImageSessionReque
 from packages.resume_core.rich_sync import RichCompletionRequest, RichRewriteRequest, RichRewriteProposal, RichReconcileProposal, RichSyncDisposition
 from packages.resume_core.text_rewrite import RichRewriteEditRequest
 from packages.resume_core.rich_panel import RichPanelRequest, RichPanelSyncRequest, RichPanelProposal
-from packages.resume_core.rich_timeline import TimelineReport, CascadeRequest, CascadeApplyRequest
 from packages.resume_core.models.agent import AGENT_CONTRACTS
-from packages.resume_core.models.assistant_capabilities import ASSISTANT_CAPABILITY_CONTRACTS
-from packages.resume_core.models.assistant_proposals import ASSISTANT_PROPOSAL_CONTRACTS
-from packages.resume_core.models.assistant_approval import ASSISTANT_APPROVAL_CONTRACTS
-from packages.resume_core.models.assistant_actions import ASSISTANT_ACTION_CONTRACTS
-from packages.resume_core.models.assistant_history import ASSISTANT_HISTORY_CONTRACTS
-from packages.resume_core.models.assistant_continuation import ASSISTANT_CONTINUATION_CONTRACTS
-from packages.resume_core.models.background import BACKGROUND_CONTRACTS
 from packages.resume_core.models.connection import CliInstallationPayload
 from packages.resume_core.templates.models import TemplateDefinition, TemplatePackage
 from packages.resume_core.templates.shorthand import source_schema
@@ -48,16 +30,13 @@ from packages.resume_core.models.template_render import TemplateRenderRequestV1,
 from packages.resume_core.models.template_mutations import TemplateMutationV1
 from packages.resume_core.models.template_workspace import ProjectV6, WorkspaceV7, ArchiveManifestV7
 from packages.resume_core.template_api import TemplateProjectResponseV1, TemplatePresentationV1
-from packages.resume_core.models.template_writer import TEMPLATE_WRITER_CONTRACTS
 from packages.resume_core.models.template_authoring import TEMPLATE_AUTHORING_CONTRACTS
 from packages.resume_core.models.canonical_patch import CanonicalPatchV1
-from packages.resume_core.models.template_delta import TemplatePreparedEditDeltaV1
-from packages.resume_core.models.projects import PROJECT_CONTRACTS
+from packages.resume_core.models.projects import PROJECT_CONTRACTS, TemplateRewritePreviewV1
 from packages.resume_core.models.assistant import ASSISTANT_CONTRACTS
 
 OUT = ROOT / "contracts" / "json-schema"
 RICH_CONTRACTS = {
-    "timeline_report": TimelineReport, "cascade_request": CascadeRequest, "cascade_apply_request": CascadeApplyRequest,
     "rich_panel_request": RichPanelRequest, "rich_panel_sync_request": RichPanelSyncRequest, "rich_panel_proposal": RichPanelProposal,
     "rich_completion_request": RichCompletionRequest, "rich_rewrite_request": RichRewriteRequest,
     "rich_rewrite_proposal": RichRewriteProposal, "rich_reconcile_proposal": RichReconcileProposal,
@@ -73,9 +52,8 @@ RICH_CONTRACTS = {
 }
 TEMPLATE_CONTRACTS = {
     "canonical_patch_v1": CanonicalPatchV1,
-    "template_prepared_edit_delta_v1": TemplatePreparedEditDeltaV1,
     **TEMPLATE_AUTHORING_CONTRACTS,
-    **TEMPLATE_WRITER_CONTRACTS,
+    "template_rewrite_preview_v1": TemplateRewritePreviewV1,
     'template_project_response_v1': TemplateProjectResponseV1, 'template_presentation_v1': TemplatePresentationV1,
     "template_definition": TemplateDefinition, "template_package": TemplatePackage,
     "working_facts_v2": WorkingFactsV2, "rich_document_v2": RichDocumentV2,
@@ -86,9 +64,8 @@ TEMPLATE_CONTRACTS = {
     "template_mutation_v1": TemplateMutationV1,
     "project_v6": ProjectV6, "workspace_v7": WorkspaceV7, "archive_manifest_v7": ArchiveManifestV7,
 }
-RECOVERY_MODELS = {**RECOVERY_CONTRACTS, **GUI_NORMALIZATION_CONTRACTS, **GUI_DRAFT_CONTRACTS, **GUI_PROJECT_CONTRACTS, **GUI_REWRITE_CONTRACTS, **GUI_EXPORT_CONTRACTS, **GUI_RECONCILE_CONTRACTS, **RICH_CONTRACTS, **AGENT_CONTRACTS, **ASSISTANT_CAPABILITY_CONTRACTS, **ASSISTANT_PROPOSAL_CONTRACTS, **ASSISTANT_APPROVAL_CONTRACTS, **ASSISTANT_ACTION_CONTRACTS, **BACKGROUND_CONTRACTS, "cli_installation_payload": CliInstallationPayload, **TEMPLATE_CONTRACTS}
-RECOVERY_MODELS.update(ASSISTANT_HISTORY_CONTRACTS)
-RECOVERY_MODELS.update(ASSISTANT_CONTINUATION_CONTRACTS)
+# Step 3 of SR06 rewrites this list; until then it is what remains after the legacy generations went.
+RECOVERY_MODELS = {**RICH_CONTRACTS, **AGENT_CONTRACTS, "cli_installation_payload": CliInstallationPayload, **TEMPLATE_CONTRACTS}
 RECOVERY_MODELS.update(PROJECT_CONTRACTS)
 RECOVERY_MODELS.update(ASSISTANT_CONTRACTS)
 
@@ -113,16 +90,6 @@ def main() -> None:
         "render_request": RenderRequest,
         "prepare_request": PrepareRequest,
         "extract_result": ExtractResult,
-        "fact_request": FactRequest,
-        "fact_sheet": FactSheet,
-        "semantic_proposal": SemanticProposal,
-        "draft_request": DraftRequest,
-        "draft_proposal": DraftProposal,
-        "draft_result": DraftResult,
-        "rewrite_request": RewriteRequest,
-        "rewrite_proposal": RewriteProposal,
-        "rewrite_result": RewriteResult,
-        "rewrite_preflight_failure": RewritePreflightFailure,
         **RECOVERY_MODELS,
     }.items():
         schema = model.model_json_schema(mode="validation")

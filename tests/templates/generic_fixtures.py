@@ -290,10 +290,9 @@ def empty_object(block, package=None):
 async def generic_import(root, name, *, rewrite=True, verdict=None, table=None, cap=60, wrap=None, package=None):
     """A published Generic import of one synthetic fixture through the coordinator and the real materializer; wrap
     changes the scripted answers. Another compiled package (CT08) imports with its own table."""
-    from packages.resume_core.background_limits import import_seconds
-    from packages.resume_core.project_limits import finalization_seconds
+    from packages.resume_core.project_limits import finalization_seconds, import_seconds
     from packages.resume_core.templates.operations import derive_task
-    from tests.templates.test_template_employment import EmploymentFixture
+    from tests.templates.template_runtime_fixtures import EmploymentFixture
     src, raw = source_fixture(name)
     fixture = EmploymentFixture(root, captured=package or generic_package(), src=src, original_bytes=raw, cap=cap, fallback=False)
     fixture.command.capture.allow_text_rewrite = rewrite
@@ -308,27 +307,17 @@ async def generic_import(root, name, *, rewrite=True, verdict=None, table=None, 
 
 
 async def export_through_service(tmp_path, workspace, originals):
-    """One export through the actual HTTP route and captured worker; the stored attempt completes with the captured package."""
-    from types import SimpleNamespace
-    import httpx
-    from packages.resume_core.template_export import snapshot_identity
-    from resume_api.jobs.service import JobService
-    from tests.templates.test_template_api import application, isolated_service
-    service, identifier = isolated_service(tmp_path, workspace, originals)
-    jobs = JobService(service, None, lambda: SimpleNamespace(ready=False), enabled=False, template_cleanup_verified=lambda: True)
-    await jobs.start()
-    try:
-        before = service.storage.read_committed(identifier)[0]
-        async with httpx.AsyncClient(transport=httpx.ASGITransport(app=application(service)), base_url='http://foldcv.test') as client:
-            response = await client.post('/v1/rich/projects/' + identifier + '/export',
-                json={'schemaVersion': 1, 'snapshot': snapshot_identity(before).model_dump(mode='json', by_alias=True)})
+    """One export through the v2 route and the captured worker; the stored attempt completes with the captured package."""
+    from tests.projects.support import Editor, v2_app
+    identifier = workspace.project_id
+    with v2_app(tmp_path / 'export-service', [(workspace, originals)]) as (client, app):
+        editor = Editor(client, identifier)
+        response = client.post('/v2/projects/' + identifier + '/export',
+            json={'schemaVersion': 1, 'editorToken': editor.token, 'snapshot': editor.response['snapshot']})
         assert response.status_code == 200, response.text
-        attempt = service.storage.read_committed(identifier)[0].project.exports[-1]
-        assert attempt.state == 'completed' and attempt.package_hash == before.project.template_package.package_hash
+        attempt = app.state.projects.repository.read(identifier).project.exports[-1]
+        assert attempt.state == 'completed' and attempt.package_hash == workspace.project.template_package.package_hash
         return response.content
-    finally:
-        await service.shutdown()
-        await jobs.shutdown()
 
 
 def direct_generic(name, blocks, *, rewrite=True, table=None, package=None):

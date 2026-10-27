@@ -2,8 +2,8 @@
 
 A processing step (task input, reservation, dispatch, return, parse, review, admission, finish, fallback) replaces
 `imports/<operation>.json` in the project folder atomically: the operation and the facts after the step and the
-project revision they extend. The whole project is saved through the publisher at start, admission, publication and
-every other template write; each such save folds the sidecar in first. A reader overlays the sidecar while its
+project revision they extend. The whole project is saved through the repository at start, admission, publication and
+every other template write; each such commit folds the sidecar in first. A reader overlays the sidecar while its
 revision is the project's; an older sidecar must already be folded into the project, otherwise the import is fenced.
 """
 
@@ -37,17 +37,15 @@ def _fsync_directory(path):
 
 
 class OperationSidecar:
-    def __init__(self, publisher):
-        self.publisher = publisher
+    """The sidecars of one project folder; `project` arguments name the project they belong to."""
 
-    @property
-    def store(self):
-        return self.publisher.canonical
+    def __init__(self, directory):
+        self.directory = directory
 
-    def path(self, project, operation_id):
+    def path(self, _project, operation_id):
         if NAME.fullmatch(operation_id) is None:
             raise RepositoryFailure('JOB_STORE_UNAVAILABLE')
-        return self.store.project_directory(project) / 'imports' / (operation_id + '.json')
+        return self.directory / 'imports' / (operation_id + '.json')
 
     def write(self, project, revision, operation, facts):
         """Atomically replace the sidecar with the operation and facts after one step on the given project revision."""

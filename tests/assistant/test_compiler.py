@@ -12,7 +12,7 @@ from packages.resume_core.rich_fields import inline_groups
 from packages.resume_core.rich_mutations import inline_text
 from resume_api.projects.service import response_for_workspace
 from tests.assistant.fixtures import joined, tabled
-from tests.templates.golden.old_path import fixtures
+from tests.templates.golden.corpus import fixtures
 
 ACTION = 'proposal-under-test'
 

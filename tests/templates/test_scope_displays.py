@@ -2,7 +2,6 @@
 
 import pytest
 
-from packages.resume_core.background_scopes import mutation_selectors
 from packages.resume_core.models.template_document import ManualScopeSpan, PresentedText
 from packages.resume_core.models.template_mutations import TemplateMutationV1
 from packages.resume_core.models.template_workspace import WorkspaceV7
@@ -15,7 +14,6 @@ from packages.resume_core.template_preparation_ids import EditIdAllocator, exist
 from packages.resume_core.template_scope_displays import capture_source, inline_addresses, node_hash
 from packages.resume_core.templates.compiler import canonical
 from tests.templates.test_manual_scope_occurrences import shared_workspace
-from tests.templates.test_template_preparation import proof
 
 
 def copied_workspace():
@@ -56,9 +54,6 @@ def test_detaching_a_copy_preserves_exact_values_cells_and_issues_and_has_guarde
     assert isinstance(literal,PresentedText) and literal.text == scope_span.text
     assert literal.styles == scope_span.styles and literal.presentation == scope_span.presentation and literal.citations == scope_span.citations
     assert result.project.facts == before.project.facts and result.project.import_issues == before.project.import_issues
-    selectors = mutation_selectors(before,mutation)
-    assert any(value.stamp.kind == 'block' and value.stamp.id == copied_id for value in selectors)
-    assert any('scope_occurrence' in value.stamp.id for value in selectors)
     inverse = inverse_template_mutation(before,result,origin_action_id=mutation.action_id,mutation_id='undo-display',
         session_id='session',action_token=3)
     from packages.resume_core.rich_mutations import mutation_sha256

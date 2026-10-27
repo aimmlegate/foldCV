@@ -1,6 +1,10 @@
-import { readCaptureCurrent, type ReadCapture } from "../contracts/template-export";
+export type ReadCapture = Readonly<{ projectId: string; selectionEpoch: number; requestId: number }>;
 
-export type WorkspaceReadSlot = "poll" | "export" | "archive" | "process";
+export function readCaptureCurrent(captured: ReadCapture, current: ReadCapture): boolean {
+  return captured.projectId === current.projectId && captured.selectionEpoch === current.selectionEpoch && captured.requestId === current.requestId;
+}
+
+export type WorkspaceReadSlot = "export" | "archive";
 
 /** Pending selection reads are separate from the opening still shown after a failed load. */
 export class WorkspaceReads {

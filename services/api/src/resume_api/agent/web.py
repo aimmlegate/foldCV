@@ -191,7 +191,10 @@ class PublicFetcher:
     def __init__(self, root):
         self.root = root
 
-    async def fetch(self, url, cancel):
+    async def fetch(self, request, cancel):
+        # The assistant passes its AgentFetchRequest; a plain URL string still works.
+        url = getattr(request, "url", request)
+
         def work():
             module = Path(__file__).resolve()
             def launch(executable, args, operation):

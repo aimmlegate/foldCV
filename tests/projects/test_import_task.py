@@ -64,17 +64,6 @@ def test_import_reports_progress_and_cancel_stops_it(tmp_path):
         assert cancelled.json()['state'] == 'cancelled'
 
 
-def test_a_v7_import_on_the_legacy_route_is_refused(tmp_path):
-    with v2_app(tmp_path, [papers()], legacy_routes=False) as (client, _application):
-        reply = client.post('/v1/rich/projects/' + PROJECT + '/template-import',
-            json={'clientRequestId': 'request-1', 'allowTextRewrite': False})
-        assert reply.status_code == 409 and reply.json()['error']['code'] == 'IMPORT_PROTOCOL_MISMATCH'
-        for path in ('save', 'mutations', 'writer/open', 'jobs/fixed', 'title'):
-            method = client.put if path == 'title' else client.post
-            refused = method('/v1/rich/projects/' + PROJECT + '/' + path, json={})
-            assert refused.status_code == 409 and refused.json()['error']['code'] == 'IMPORT_PROTOCOL_MISMATCH'
-
-
 def test_a_sidecar_resumes_after_a_crash_and_a_manual_edit_keeps_its_text(tmp_path):
     workspace, sources, operation = with_operation()
     observed = operation.model_copy(update={'last_observed_at': '2026-10-21T00:10:00+00:00'})
@@ -128,11 +117,11 @@ def test_publication_at_an_old_revision_fails_the_import(tmp_path):
 
 
 def test_import_read_cache_hits_verify_the_committed_value(tmp_path, monkeypatch):
-    from resume_api.projects.pipeline import RepositoryPipeline
+    from resume_api.importer.template_pipeline import TemplatePipeline
     monkeypatch.setenv('FOLDCV_VERIFY', '1')
     with v2_app(tmp_path, [papers()]) as (_client, application):
-        pipeline = RepositoryPipeline(None, None, repository=application.state.projects.repository,
-            originals={}, authority=None, assemble=None, derive=None, wall=lambda: '2026-10-21T00:00:00+00:00')
+        pipeline = TemplatePipeline(None, repository=application.state.projects.repository,
+            authority=None, assemble=None, derive=None, wall=lambda: '2026-10-21T00:00:00+00:00')
         pipeline.read(PROJECT).title = 'mutated cached value'
         with pytest.raises(RuntimeError, match='Import read cache changed'):
             pipeline.read(PROJECT)

@@ -38,6 +38,12 @@ class ProjectService:
         # Built once per committed workspace object; a hit is verified again under FOLDCV_VERIFY (D108).
         self.responses = {}
         self.identities = {}
+        # Any commit (import, assistant Apply, export record) may change the heading the listing shows.
+        repository.committed_hooks.append(self._forget_identity)
+
+    def _forget_identity(self, session):
+        with self.lock:
+            self.identities.pop(session.project_id, None)
 
     def response(self, project_id, workspace=None):
         workspace = workspace if workspace is not None else self.repository.read(project_id)
@@ -123,7 +129,6 @@ class ProjectService:
             self.repository.replace(project_id, base_revision=request.base_revision, workspace=renamed, reason='rename')
             self.repository.write_registry(project_id)
             workspace = session.workspace
-        self._remember_title(project_id, workspace)
         with self.lock:
             self.identities.pop(project_id, None)
         return self.response(project_id, workspace)
@@ -141,15 +146,6 @@ class ProjectService:
             self.repository.replace(project_id, base_revision=base, workspace=updated, reason='formatting-date')
             workspace = session.workspace
         return self.response(project_id, workspace)
-
-    def _remember_title(self, project_id, workspace):
-        rich = getattr(self, 'rich', None)
-        if rich is None:
-            return
-        remembered = rich.workspaces.get(project_id)
-        if remembered is None or remembered is workspace:
-            return
-        remembered.title, remembered.title_manually_set = workspace.title, True
 
     def archive(self, project_id, archived):
         self.repository._directory(project_id)
@@ -171,12 +167,6 @@ class ProjectService:
         deleted = getattr(self, 'on_deleted', None)
         if deleted is not None:
             deleted(project_id)
-        rich = getattr(self, 'rich', None)
-        if rich is not None:
-            rich.workspaces.pop(project_id, None)
-            for mapping in (getattr(rich, 'originals', {}), getattr(rich, 'images', {}), getattr(rich, 'artifacts', {})):
-                for key in [key for key in mapping if key[0] == project_id]:
-                    mapping.pop(key, None)
         with self.lock:
             self.responses.pop(project_id, None)
             self.identities.pop(project_id, None)

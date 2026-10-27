@@ -1,25 +1,24 @@
-"""One proposal-only coordinator for direct and queued template processing."""
+"""The template import coordinator: proposals, reviews and publication through the project repository, with the
+running steps in the operation sidecar (S7e, D109)."""
 
 import asyncio
 from dataclasses import dataclass, replace
+import hashlib
 import json
 import threading
 import time
 
-from packages.resume_core.project_repository import RepositoryFailure
-from packages.resume_core.models.template_import import (CleanupOutcome, ImportIssue, ObservedUsage, ReferenceTable,
-    ReviewInputRecord, TaskResultRecord)
-from packages.resume_core.models.template_workspace import WorkspaceV7, validated_with_history
-from packages.resume_core.models.template_authority import DeletedTemplateCleanupV1, TemplateFinalizationBinding
+from packages.resume_core.project_repository import RepositoryFailure, decode_project, rich_snapshot_bytes, verifying
+from packages.resume_core.models.template_import import (CleanupOutcome, ImportIssue, ObservedUsage, PublicationOutcome,
+    ReferenceTable, ReviewInputRecord, TaskResultRecord)
 from packages.resume_core.template_admission import admit_proposal, task_facts_digest
 from packages.resume_core.template_builtin_admission import current_handles
 from packages.resume_core.template_effective import effective_cells
 from packages.resume_core.template_capture import item_identities, prepare_builtin_identities
-from packages.resume_core.template_finalization import capture_finalization
 from packages.resume_core.template_identity import (capture_span, empty_value, evidence_options, line_spans,
     offered_evidence, source_slice)
-from packages.resume_core.template_import import (CleanupProof, ProcessingDeadline, TemplateImportFailure, admit_operation, attempt_in,
-    authorization, cancel_operation, capture_task_input, checked, digest, dispatch_attempt, identity, observe_time,
+from packages.resume_core.template_import import (ProcessingDeadline, TemplateImportFailure, admit_operation, attempt_in,
+    cancel_operation, capture_finalization, capture_task_input, checked, digest, dispatch_attempt, identity, observe_time,
     record_return, reconcile_cleanup, recover_operation, reserve_attempt, resume_operation, spent_calls, start_operation,
     task_in)
 from packages.resume_core.template_proposals import parse_proposal, transport_refusal
@@ -31,8 +30,7 @@ from packages.resume_core.templates.replies import BOOKKEEPING_KEYS, proposal_pr
 from ..providers.content import (ContentFailure, ContentInput, ContentTransportReturn, GenerationPolicy,
     MAX_GENERATION_SECONDS, outcome_state)
 from ..providers.dynamic_result import dynamic_result
-from .template_persistence import PersistenceWindow, TemplatePersistence
-from .template_checkpoints import TemplateCheckpoints
+from .template_sidecar import OperationSidecar
 
 
 # No later call of the import can succeed after these, so the import stops instead of saving empty blocks (D104).
@@ -259,62 +257,70 @@ def operation_in(workspace, identifier):
     return value
 
 
-class TemplatePipeline(TemplateCheckpoints):
-    def __init__(self, publisher, transport, *, originals, authority, assemble, derive, artifacts=None, images=None,
-                 wall, elapsed=time.monotonic, id_factory=identity):
-        super().__init__(publisher, originals=originals, artifacts=artifacts, images=images, wall=wall, id_factory=id_factory)
-        self.transport, self.authority, self.assemble, self.derive = transport, authority, assemble, derive
-        self.elapsed = elapsed
-        self.persistence = TemplatePersistence(publisher, wall=wall, elapsed=elapsed)
-        self.locks, self.cancels = {}, {}
-        publisher.template_authority = self.finalization_authority
+class TemplatePipeline:
+    def __init__(self, transport, *, repository, authority, assemble, derive, wall, elapsed=time.monotonic,
+                 id_factory=identity):
+        self.repository, self.transport = repository, transport
+        self.authority, self.assemble, self.derive = authority, assemble, derive
+        self.wall, self.elapsed, self.id_factory = wall, elapsed, id_factory
+        self.locks, self.cancels, self.read_cache = {}, {}, {}
 
-    def finalization_authority(self, binding, before, _after):
-        operation = operation_in(before, binding.operation_id)
-        try:
-            self.authority(operation, before)
-            self.facts_current(operation, owner(before).facts)
-        except TemplateImportFailure:
-            raise RepositoryFailure('DEPENDENCY_CHANGED') from None
+    def read(self, project):
+        session = self.repository.open(project)
+        with session.lock:
+            workspace = session.workspace
+            data = owner(workspace)
+            if workspace.project is not None and not data.history_loaded:
+                workspace = decode_project(session.directory, rich_snapshot_bytes(workspace), history=True)
+                data = owner(workspace)
+            sidecar = OperationSidecar(session.directory)
+            key = (id(session.workspace), sidecar.keys(project, workspace))
+            cached = self.read_cache.get(project)
+            if cached is not None and cached[0] == key and not verifying():
+                return cached[1]
+            overlays = [sidecar.overlay(project, session.revision, value) for value in data.template_operations]
+            facts = [value for _operation, value in overlays if value is not None]
+            if len(facts) > 1:
+                raise RepositoryFailure('OUTCOME_UNKNOWN')
+            view = workspace.model_copy(deep=True)
+            holder = owner(view)
+            holder.template_operations = [operation for operation, _facts in overlays]
+            if facts:
+                holder.facts = facts[0]
+            if cached is not None and cached[0] == key:
+                if cached[1] != view:
+                    raise RuntimeError('Import read cache changed')
+                return cached[1]
+            self.read_cache[project] = (key, view)
+            return view
 
-    def cleanup_deleted(self, project, identifier=None):
-        jobs = self.publisher.jobs
-        with jobs.guard(project, deleted=True) as directory:
-            state = jobs._read(project, directory)
-            latest = {value.operation_id: value for value in state.template_authorizations}
-            if identifier is not None and identifier not in latest:
-                raise TemplateImportFailure('IMPORT_AUTHORITY_REVOKED')
-            for operation_id, authority in latest.items():
-                if identifier is not None and operation_id != identifier:
-                    continue
-                if authority.deleted_cleanup is not None and authority.deleted_cleanup.complete:
-                    continue
-                operation, revision = self.publisher.canonical._read_template_cleanup_unlocked(project, operation_id,
-                    with_revision=True)
-                # Attempts of the running step may be saved only in the sidecar (S7e).
-                operation, _facts = self.sidecar.overlay(project, revision, operation)
-                owners = {attempt.id: attempt.owner for attempt in operation.attempts}
-                retained = authority.deleted_cleanup
-                if retained is not None:
-                    if retained.capture_hash != digest(operation.capture) or retained.owners != owners:
-                        raise TemplateImportFailure('IMPORT_CLEANUP_PROOF_CONFLICT')
-                    for record in retained.records:
-                        operation = reconcile_cleanup(operation, CleanupProof(record.attempt_id, record.owner_hash,
-                            record.evidence_hash, record.witness, record.never_dispatched), record.verified_at)
-                def persist():
-                    authority.deleted_cleanup = DeletedTemplateCleanupV1(captureHash=digest(operation.capture),
-                        owners=owners, records=operation.cleanup_records)
-                    authority.state = 'cancelled'
-                    jobs._write(directory, state, jobs._all())
-                persist()
-                for attempt in operation.attempts:
-                    if attempt.cleanup.state != 'verified':
-                        proof = self.transport.reconcile(attempt)
-                        if proof is None:
-                            return False
-                        operation = reconcile_cleanup(operation, proof, self.wall())
-                        persist()
-            return True
+    def checkpoint(self, project, transition, **_options):
+        session = self.repository.open(project)
+        with session.lock:
+            before = self.read(project)
+            after = transition(before.model_copy(deep=True))
+            if after == before:
+                return before
+            identifier = self.id_factory('metadata_template')
+            self.repository.replace(project, base_revision=before.project_revision, workspace=after, reason='import',
+                client_mutation_id=identifier, request_sha256=hashlib.sha256(identifier.encode()).hexdigest())
+            return self.read(project)
+
+    def update_operation(self, project, operation_id, transition, *, copy_on_write=False):
+        del copy_on_write
+        session = self.repository.open(project)
+        with session.lock:
+            before = self.read(project)
+            view = before.model_copy(deep=True)
+            data = owner(view)
+            prior = operation_in(view, operation_id)
+            updated = checked(transition(prior, data, view))
+            data.template_operations = [updated if value.id == operation_id else value for value in data.template_operations]
+            if view == before:
+                return before
+            OperationSidecar(session.directory).write(project, before.project_revision, updated, data.facts)
+            self.read_cache.pop(project, None)
+            return self.read(project)
 
     def update(self, project, identifier, transition):
         def apply(workspace):
@@ -325,24 +331,13 @@ class TemplatePipeline(TemplateCheckpoints):
         return self.checkpoint(project, apply)
 
     def guard(self, project, operation):
-        authorization(operation)
         workspace = self.read(project)
         self.authority(operation, workspace)
-        if (owner(workspace).template_package.package_hash != operation.capture.package_hash
-                or {source.id: source.byte_sha256 for source in owner(workspace).sources} != operation.capture.source_hashes):
+        data = owner(workspace)
+        if (data.template_package.package_hash != operation.capture.package_hash or
+                {value.id: value.byte_sha256 for value in data.sources} != operation.capture.source_hashes):
             raise TemplateImportFailure('IMPORT_CAPTURE_STALE')
-        # The facts and the admissions that explain them come from one read: a parallel block may admit between an
-        # earlier read of the operation and this one (CT10).
-        current = next((value for value in owner(workspace).template_operations if value.id == operation.id), operation)
-        self.facts_current(current, owner(workspace).facts)
-        with self.publisher.jobs.guard(project) as directory:
-            state = self.publisher.jobs._read(project, directory)
-            self.publisher._writable(state)
-            current = [value for value in state.template_authorizations if value.operation_id == operation.id]
-            account = self.publisher.jobs._read_dispatch(self.publisher.jobs.background / 'dispatch.json').account_generation
-            if (not current or current[-1].authorization_id != authorization(operation).id or current[-1].state != 'active'
-                    or current[-1].account_generation != account):
-                raise TemplateImportFailure('IMPORT_AUTHORITY_REVOKED')
+        self.facts_current(operation_in(workspace, operation.id), data.facts)
 
     def facts_current(self, operation, facts):
         expected, relations = dict(operation.capture.fact_revisions), dict(operation.captured_relation_revisions)
@@ -378,32 +373,30 @@ class TemplatePipeline(TemplateCheckpoints):
         return operation
 
     async def recover(self, project, identifier):
-        await self.persistence.reconcile(project)
-        current = self.read(project)
-        retained = operation_in(current, identifier)
-        if current.project is not None and retained.finalization is not None:
-            return await self.finalize(project, identifier)
-        def recover(operation, _data, _workspace):
-            result = recover_operation(operation)
-            for attempt in result.attempts:
+        workspace = self.read(project)
+        operation = operation_in(workspace, identifier)
+        if workspace.project is not None and operation.finalization is not None:
+            return await asyncio.to_thread(self.record_publication, project, identifier)
+        def recover(value, _data, _workspace):
+            updated = recover_operation(value)
+            for attempt in updated.attempts:
                 if attempt.state == 'outcome_unknown' or attempt.cleanup.state != 'verified':
                     proof = self.transport.reconcile(attempt)
                     if proof is not None:
-                        result = reconcile_cleanup(result, proof, self.wall())
-            return result
-        workspace = await asyncio.to_thread(self.update, project, identifier, recover)
-        return operation_in(workspace, identifier)
+                        updated = reconcile_cleanup(updated, proof, self.wall())
+            return updated
+        updated = await asyncio.to_thread(self.update, project, identifier, recover)
+        return operation_in(updated, identifier)
 
     async def cancel(self, project, identifier):
-        won = await asyncio.to_thread(self.publisher.cancel_template, project, identifier)
-        if not won:
-            return False
+        import threading
         self.cancels.setdefault((project, identifier), threading.Event()).set()
-        await asyncio.to_thread(self.update, project, identifier, lambda operation, _data, _workspace: cancel_operation(operation))
+        await asyncio.to_thread(self.update, project, identifier,
+            lambda operation, _data, _workspace: cancel_operation(operation))
         return True
 
     def authorize(self, project, operation):
-        self.publisher.authorize_template(project, operation)
+        self.guard(project, operation)
 
     async def run(self, project, command, *, admitted, finalize=True, cancel_event=None):
         if command.protocol != 'template_import_v1':
@@ -919,68 +912,58 @@ class TemplatePipeline(TemplateCheckpoints):
                 'diagnostics': list(errors), 'scope': scope, **({'leftoverOnly': leftover} if leftover else {})}, spans,
             task.allowed_handles, 'source_fallback', issues, accepted=kept)
 
-    async def finalize(self, project, operation_id):
+    async def finalize(self, project, identifier):
         workspace = self.read(project)
-        operation = operation_in(workspace, operation_id)
+        operation = operation_in(workspace, identifier)
         if workspace.project is not None and operation.finalization is not None:
-            candidate = operation.finalization
-            binding = TemplateFinalizationBinding(operationId=operation.id, authorizationId=candidate.authorization_id,
-                finalizationId=candidate.id)
-            outcome = self.persistence.outcome(project, binding)
-            if outcome.state != 'saved':
-                operation = operation.model_copy(deep=True)
-                operation.publication = outcome
-                return operation
-            if operation.state == 'published':
-                return operation
-            # Receipt reconciliation reports saved even if its metadata window has expired.
-            result = operation.model_copy(deep=True)
-            result.state, result.publication = 'published', outcome
-            return result
+            return await asyncio.to_thread(self.record_publication, project, identifier)
         self.guard(project, operation)
         if any(attempt.cleanup.state != 'verified' for attempt in operation.attempts):
             return operation
-        authored = self.assemble(workspace, operation)
+        authored = await asyncio.to_thread(self.assemble, workspace, operation)
         authored.document_revision = workspace.document_revision + 1
         authored.project.document.revision = authored.document_revision
-        if operation.finalization is not None and operation.finalization.authorization_id != authorization(operation).id:
-            candidate = await asyncio.to_thread(self.persistence.renew_candidate, project, operation, authored.project,
-                self.wall(), id_factory=self.id_factory)
-        else:
-            candidate = capture_finalization(operation, authored.project, self.wall(), id_factory=self.id_factory)
-        def prepare(result, _data, _workspace):
-            if result.finalization is not None and result.finalization != candidate:
-                result.finalization_history.append(result.finalization)
-            result.finalization, result.state = candidate, 'finalizing'
-            return result
-        window = self.persistence.windows.setdefault((project, candidate.id), PersistenceWindow.capture(candidate.expires_at,
-            self.wall(), self.elapsed(), started_at=candidate.started_at))
-        try:
-            before = await self.persistence.bounded(project, lambda: self.update(project, operation_id, prepare), window)
-        except RepositoryFailure:
-            from packages.resume_core.models.template_import import PublicationOutcome
-            result = operation.model_copy(deep=True)
-            result.state = 'fenced'
-            result.publication = PublicationOutcome(state='outcome_unknown', intentId=None, workspaceHash=None,
-                errorCode='OUTCOME_UNKNOWN')
-            return result
-        operation = operation_in(before, operation_id)
+        candidate = capture_finalization(operation, authored.project, self.wall(), id_factory=self.id_factory)
+
+        def prepare(value, _data, current):
+            if current.project_revision != workspace.project_revision:
+                raise RepositoryFailure('REVISION_CONFLICT', revision=current.project_revision)
+            if value.finalization is not None and value.finalization != candidate:
+                value.finalization_history.append(value.finalization)
+            value.finalization, value.state = candidate, 'finalizing'
+            return value
+
+        before = await asyncio.to_thread(self.update, project, identifier, prepare)
         authored.project.template_operations = owner(before).template_operations
         authored.project_revision = before.project_revision + 1
         authored.project.revision = authored.project_revision
-        authored.document_revision = before.document_revision + 1
-        authored.project.document.revision = authored.document_revision
         authored.updated_at = self.wall()
-        authored = validated_with_history(authored)
-        outcome = await self.persistence.publish(before, authored, operation, originals=self.originals,
-            artifacts=self.artifacts, images=self.images)
-        result = operation.model_copy(deep=True)
-        if outcome.state == 'saved':
-            result.publication, result.state = outcome, 'published'
-            return result
-        result.publication = outcome
-        result.state = 'fenced' if outcome.state == 'outcome_unknown' else 'cancelled' if outcome.state == 'cancelled' else 'failed'
-        return result
+
+        def publish():
+            mutation_id = 'template_publication_' + candidate.id
+            self.repository.replace(project, base_revision=before.project_revision, workspace=authored,
+                reason='publication', client_mutation_id=mutation_id, request_sha256=hashlib.sha256(mutation_id.encode()).hexdigest())
+            return self.record_publication(project, identifier)
+
+        return await asyncio.to_thread(publish)
+
+    def record_publication(self, project, identifier):
+        session = self.repository.open(project)
+        with session.lock:
+            workspace = self.read(project)
+            operation = operation_in(workspace, identifier)
+            if operation.publication.state == 'saved':
+                return operation
+            # A finalizing pre-draft becomes an authored project in the publication write itself.
+            # After a crash, finish its outcome metadata; never assemble over later manual edits.
+            if workspace.project is None or operation.finalization is None:
+                raise RepositoryFailure('OUTCOME_UNKNOWN')
+            outcome = PublicationOutcome(state='saved', intentId=operation.finalization.id,
+                workspaceHash=hashlib.sha256(rich_snapshot_bytes(workspace)).hexdigest(), errorCode=None)
+            def recorded(value, _data, _workspace):
+                value.publication, value.state = outcome, 'published'
+                return value
+            return operation_in(self.update(project, identifier, recorded), identifier)
 
     async def finish_fallbacks(self, project, operation_id):
         for task_id in [task.id for task in operation_in(self.read(project), operation_id).tasks]:
