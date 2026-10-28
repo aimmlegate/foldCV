@@ -11,6 +11,8 @@ import { factError } from "./error";
 import { dateText } from "./dates";
 import { FocusYears, type FocusEntry } from "./FocusYears";
 import { OperationStatus } from "../ui/OperationStatus";
+import type { PlacedRemarks } from "../../rich/remarks";
+import { CheckFooter, RemarkSections, type CheckState } from "./RemarkSections";
 
 function summary(record: RecordValue): [string, string] {
   if (record.kind === "candidate") return [record.name.rawText || "Кандидат", [record.title.rawText, record.location.rawText].filter(Boolean).join("\n")];
@@ -22,12 +24,15 @@ function summary(record: RecordValue): [string, string] {
   return ["", ""];
 }
 export function FactsPanel({ facts, document, focusEntries = [], focusOptions = [], submit, pending, paused, hidden, close,
-  focusRequest = null, onFocused }: {
+  focusRequest = null, onFocused, remarks, showBlock = () => {}, check }: {
   facts: WorkingFacts; document: OrderDocument; submit: (command: PanelCommand) => Promise<void>; pending: readonly PanelCommand[]; paused: boolean;
   focusEntries?: readonly FocusEntry[];
   focusOptions?: readonly FocusEntry[];
   hidden: boolean; close: () => void;
   focusRequest?: { recordId: string } | null; onFocused?: () => void;
+  /** Remarks by resume section, with the place each one names in the document. */
+  remarks?: PlacedRemarks; showBlock?: (blockId: string) => void;
+  check?: { state: CheckState; run: () => void };
 }) {
   const panel = useRef<HTMLElement>(null);
   const [target, setTarget] = useState<FactTarget | null>(null), [error, setError] = useState<string | null>(null);
@@ -80,5 +85,7 @@ export function FactsPanel({ facts, document, focusEntries = [], focusOptions = 
       {kind !== "technology" && (kind !== "candidate" || !facts.records.some(record => record.kind === "candidate")) && <button className="text-button fact-add" disabled={paused}
         onClick={() => setTarget({ kind, record: null })}>+ {kind === "employment" ? "Место работы" : kind === "language" ? "Язык" : kind === "claim" ? "Факт" : labels[kind]}</button>}
     </details>)}
+    {remarks && <RemarkSections remarks={remarks} show={showBlock} />}
+    {check && <CheckFooter state={check.state} run={check.run} disabled={paused} />}
   </aside>{target && <FactDialog target={target} close={() => setTarget(null)} submit={apply} />}</>;
 }

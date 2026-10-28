@@ -2,7 +2,7 @@ import { createExtension } from "@blocknote/core";
 import { Extension } from "@tiptap/core";
 import { useCreateBlockNote } from "@blocknote/react";
 import { BlockNoteView } from "@blocknote/shadcn";
-import { useEffect, useImperativeHandle, useMemo, useRef, useState, type ReactNode, type Ref } from "react";
+import { useEffect, useImperativeHandle, useMemo, useRef, useState, type KeyboardEvent, type ReactNode, type Ref } from "react";
 import type { ProjectEditorConnection } from "./v7-connection";
 import type { TemplateProjectResponseV1 } from "../contracts/generated/template_project_response_v1";
 import type { AssistantApplyResultV1 } from "../contracts/generated/assistant_apply_result_v1";
@@ -17,11 +17,13 @@ import { LinkTargetDialog } from "../workbench/editor/LinkTargetDialog";
 import type { RewriteActivity } from "./rewrite-progress";
 import type { PanelCommand } from "./v7-panel";
 import { Toolbar, type ToolbarCommand } from "../workbench/editor/Toolbar";
-import { selectionLocation } from "./selection";
+import { blockStyle, selectionLocation, type BlockStyle } from "./selection";
 import { tableIdentityAttributes } from "./table-identity";
 import { templateSchema } from "./template-schema";
 import { projectTemplateDocument } from "./v7-projection";
-import { blockNotices } from "./import-notices";
+import { checkCount, checkRemarks, importRemarks, placeRemarks } from "./remarks";
+import type { ProjectCheckResultV1 } from "../contracts/generated/project_check_result_v1";
+import type { CheckState } from "../workbench/facts/RemarkSections";
 import { presentationMeta, templatePresentationPlugin, templateSheet, type TemplateSheet } from "./v7-presentation";
 import { TemplateEditorSession, type TemplateRewrite, type EditorMode } from "./v7-session";
 
@@ -68,16 +70,16 @@ export function TemplateEditor({ initial, connection, onStatus, onShown, ref, po
   const [rewriteAnchor, setRewriteAnchor] = useState<{ left: number; top: number; bottom: number } | null>(null);
   // A bound link's URL is edited through Python, which changes its URL cell and target together.
   const [linkTarget, setLinkTarget] = useState<{ blockId: string; occurrenceId: string; href: string } | null>(null);
+  // The last explicit check; its findings stay listed until the next check and read as stale after a document change.
+  const [checked, setChecked] = useState<ProjectCheckResultV1 | null>(null);
+  const [checkState, setCheckState] = useState<{ kind: "idle" | "running" } | { kind: "failed"; message: string }>({ kind: "idle" });
   const callbacks = useRef({ onStatus, onShown });
   callbacks.current = { onStatus, onShown };
   // The compiled presentation of the verified state; decorations read the latest one.
   const sheet = useMemo(() => templateSheet(shown), [shown]);
-  const notices = useMemo(() => blockNotices(shown.workspace.project?.importIssues ?? []), [shown]);
   const presented = useRef<TemplateSheet | null>(sheet);
-  const noticeRef = useRef(notices);
   presented.current = sheet;
-  noticeRef.current = notices;
-  const presentation = useMemo(() => templatePresentationPlugin(() => presented.current, () => noticeRef.current), []);
+  const presentation = useMemo(() => templatePresentationPlugin(() => presented.current), []);
   const session = useMemo(() => new TemplateEditorSession(connection, {
     status: text => { callbacks.current.onStatus(text); refresh(value => value + 1); },
     warning: text => setWarning(text),
@@ -99,9 +101,8 @@ export function TemplateEditor({ initial, connection, onStatus, onShown, ref, po
   }, [editor, session]);
   useEffect(() => {
     presented.current = sheet;
-    noticeRef.current = notices;
     editor.transact(tr => { tr.setMeta(presentationMeta, true); });
-  }, [editor, sheet, notices]);
+  }, [editor, sheet]);
   useImperativeHandle(ref, () => ({ background: true,
     flush: async () => {
       await session.flush();
@@ -121,12 +122,7 @@ export function TemplateEditor({ initial, connection, onStatus, onShown, ref, po
       const records = new Map((durable.workspace.project?.facts.records ?? []).map(record => [record.id, record.revision]));
       if (!anchor.dependencies.every(stamp => stamp.kind === "block" ? revisions.get(stamp.id) === stamp.revision
         : stamp.kind !== "record" || records.get(stamp.id) === stamp.revision)) return false;
-      if (anchor.blockId) {
-        if (!editor.getBlock(anchor.blockId)) return false;
-        editor.setTextCursorPosition(anchor.blockId, "start"); editor.focus();
-        document.querySelector(`.cv-document [data-id="${CSS.escape(anchor.blockId)}"]`)?.scrollIntoView({ block: "center", behavior: "smooth" });
-        return true;
-      }
+      if (anchor.blockId) return showBlock(anchor.blockId);
       if (!anchor.recordId || !records.has(anchor.recordId)) return false;
       setFactsVisible(true);
       return true;
@@ -140,6 +136,23 @@ export function TemplateEditor({ initial, connection, onStatus, onShown, ref, po
   }
   useEffect(() => { if (mode === "recovering") void recover(); }, [mode]);
   const unsupported = () => setWarning(knownErrorMessage("V7_INPUT_UNSUPPORTED") ?? "");
+  function showBlock(blockId: string): boolean {
+    if (!editor.getBlock(blockId)) return false;
+    // A block without text (an item frame) cannot hold the caret; it is still scrolled to.
+    try { editor.setTextCursorPosition(blockId, "start"); editor.focus(); } catch { /* scroll only */ }
+    document.querySelector(`.cv-document [data-id="${CSS.escape(blockId)}"]`)?.scrollIntoView({ block: "center", behavior: "smooth" });
+    return true;
+  }
+  // The check reads the committed state, so typing is saved first and the result matches what the page shows.
+  async function runCheck() {
+    setCheckState({ kind: "running" });
+    try { await session.flush(); setChecked(await connection.check()); setCheckState({ kind: "idle" }); }
+    catch (error) { setCheckState({ kind: "failed", message: errorMessage(error) }); }
+  }
+  function formatBlocks(style: BlockStyle) {
+    // The style select keeps focus after a choice; the caret goes back to the document once Python's result is shown.
+    void session.format(style).then(() => { if (editor.isEditable) editor.focus(); });
+  }
   function openRewrite() {
     const source = session.rewriteSource();
     if (!source) { unsupported(); return; }
@@ -168,9 +181,15 @@ export function TemplateEditor({ initial, connection, onStatus, onShown, ref, po
     if (value === "rewrite") { openRewrite(); return; }
     if (value === "bold" || value === "italic" || value === "underline") { editor.toggleStyles({ [value]: true }); editor.focus(); return; }
     if (value === "facts") { setFactsVisible(visible => !visible); return; }
-    if (value === "link") { const link = session.linkAtCaret(); if (link) { setLinkTarget(link); return; } }
-    unsupported();
+    formatBlocks(value);
   };
+  // Links are no longer inserted from the toolbar; ⌘K on an existing bound link still edits its address.
+  function linkShortcut(event: KeyboardEvent) {
+    if (!(event.metaKey || event.ctrlKey) || event.key.toLowerCase() !== "k" || event.shiftKey || event.altKey) return;
+    const link = session.linkAtCaret();
+    if (!link) return;
+    event.preventDefault(); event.stopPropagation(); setLinkTarget(link);
+  }
   async function applyLinkTarget(target: { blockId: string; occurrenceId: string }, href: string) {
     try { await session.linkTarget(target, href); }
     catch (error) { setWarning(errorMessage(error)); }
@@ -188,7 +207,13 @@ export function TemplateEditor({ initial, connection, onStatus, onShown, ref, po
     setWorkspaceView(view);
     if (view !== "layout") setSourceVisited(true);
   }
-  const state = session.queue.template.state, styles = editor.getActiveStyles();
+  const state = session.queue.template.state, styles = editor.getActiveStyles(), textBlocks = session.textBlocks();
+  const listed = (type: string) => textBlocks.length > 0 && textBlocks.every(block => block.type === type);
+  // Selection changes re-render the editor; the outline is read again only when the shown state or the check changes.
+  const remarks = useMemo(() => placeRemarks(documentShown, [...importRemarks(shown.workspace.project?.importIssues ?? []),
+    ...checked ? checkRemarks(checked) : []]), [documentShown, shown, checked]);
+  const check: CheckState = checkState.kind !== "idle" ? checkState : checked ? { kind: "done", count: checkCount(checked),
+    stale: checked.documentRevision !== shown.workspace.documentRevision } : { kind: "idle" };
   const locked = mode === "read_only" || mode === "detached" || mode === "recovering";
   return <div className="contents uir-editor-session">
     <RewritePanel open={rewriteOpen} close={() => setRewriteOpen(false)} instruction={instruction} change={setInstruction}
@@ -216,15 +241,17 @@ export function TemplateEditor({ initial, connection, onStatus, onShown, ref, po
         expanded={workspaceView === "original"} toggle={() => changeWorkspaceView(workspaceView === "original" ? "compare" : "original")}
         close={() => { changeWorkspaceView("layout"); editor.focus(); }} />} layout={<div className="document-workspace">
         <fieldset className="contents uir-editor-controls" disabled={locked}>
-          <Toolbar command={command} textStyle={unsupported} factsVisible={factsVisible} selecting={session.rewriteSource() !== null} style="p"
-            canUndo={session.canUndo} canRedo={session.canRedo}
-            active={{ bold: styles.bold === true, italic: styles.italic === true, underline: styles.underline === true }} />
+          <Toolbar command={command} textStyle={formatBlocks} factsVisible={factsVisible} selecting={session.rewriteSource() !== null}
+            style={blockStyle(textBlocks[0])} canUndo={session.canUndo} canRedo={session.canRedo}
+            active={{ bold: styles.bold === true, italic: styles.italic === true, underline: styles.underline === true,
+              list: listed("bullet_list"), numbered: listed("numbered_list") }} />
         </fieldset>
         <fieldset className="contents uir-editor-controls" disabled={locked}>
           <FactsPanel facts={facts} document={documentShown} submit={submitPanel} pending={panelPending} paused={false}
-            hidden={!factsVisible} close={() => { setFactsVisible(false); editor.focus(); }} />
+            hidden={!factsVisible} close={() => { setFactsVisible(false); editor.focus(); }}
+            remarks={remarks} showBlock={blockId => { showBlock(blockId); }} check={{ state: check, run: () => void runCheck() }} />
         </fieldset>
-        <div className="paper-scroll">
+        <div className="paper-scroll" onKeyDownCapture={linkShortcut}>
           <div className="cv-document resume-paper" data-project-id={initial.workspace.projectId} data-template="v7"
             data-history-position={session.history.position} data-history-length={session.history.length}>
             {sheet && <style>{sheet.css}</style>}

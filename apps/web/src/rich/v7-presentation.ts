@@ -3,7 +3,6 @@ import type { Node } from "@tiptap/pm/model";
 import { Plugin, PluginKey } from "@tiptap/pm/state";
 import { Decoration, DecorationSet } from "@tiptap/pm/view";
 import type { TemplateProjectResponseV1 } from "../contracts/generated/template_project_response_v1";
-import type { BlockNotice } from "./import-notices";
 
 type Presentation = NonNullable<TemplateProjectResponseV1["presentation"]>;
 type Asset = NonNullable<TemplateProjectResponseV1["workspace"]["project"]>["templatePackage"]["assets"][number];
@@ -102,33 +101,14 @@ function paintLiterals(content: Node, origin: number, runs: readonly { start: nu
   });
 }
 
-function noteWidget(at: number, notice: BlockNotice): Decoration {
-  return Decoration.widget(at, () => {
-    const note = document.createElement("p");
-    note.className = "fcv-import-note";
-    note.dataset["issueId"] = notice.id;
-    note.textContent = notice.message;
-    return note;
-  }, { side: -1, ignoreSelection: true, key: `import-note-${notice.id}` });
-}
-
 /** Node decorations that apply the plan to canonical block IDs; a block without a plan entry keeps the sheet defaults. */
-export function templatePresentationPlugin(current: () => TemplateSheet | null, notices: () => readonly BlockNotice[] = () => []): Plugin {
+export function templatePresentationPlugin(current: () => TemplateSheet | null): Plugin {
   return new Plugin({ key: new PluginKey(presentationMeta), props: { decorations: state => {
     const sheet = current();
     if (!sheet) return DecorationSet.empty;
     const plan = sheet.presentation.editor, refs = sheet.presentation.blocks, views = sheet.presentation.recipe.views;
-    const notes = new Map<string, BlockNotice>();
-    for (const notice of notices()) if (!notes.has(notice.blockId)) notes.set(notice.blockId, notice);
+    if (!plan) return DecorationSet.empty;
     const decorations: Decoration[] = [];
-    if (!plan) {
-      state.doc.descendants((node, position) => {
-        if (node.type.name !== "blockContainer") return;
-        const id: unknown = node.attrs["id"], notice = typeof id === "string" ? notes.get(id) : undefined;
-        if (notice) decorations.push(noteWidget(position + node.nodeSize - 1, notice));
-      });
-      return DecorationSet.create(state.doc, decorations);
-    }
     const rows = new Set(Object.values(plan.blocks).flatMap(entry => entry.focus?.blocks ?? []));
     state.doc.descendants((node, position) => {
       if (node.type.name === "blockGroup" && position === 0) {
@@ -143,11 +123,7 @@ export function templatePresentationPlugin(current: () => TemplateSheet | null, 
         return;
       }
       const entry = typeof id === "string" ? plan.blocks[id] : undefined, ref = typeof id === "string" ? refs[id] : undefined;
-      const notice = typeof id === "string" ? notes.get(id) : undefined;
-      if (!entry || !ref) {
-        if (notice) decorations.push(noteWidget(position + node.nodeSize - 1, notice));
-        return;
-      }
+      if (!entry || !ref) return;
       const view = views[ref.viewKey], attributes: Record<string, string> = { "data-fcv-style": sheet.styles.get(entry.style) ?? "" };
       const properties: string[] = [];
       if (entry.band) attributes["data-fcv-band"] = "true";
@@ -167,7 +143,6 @@ export function templatePresentationPlugin(current: () => TemplateSheet | null, 
       }
       if (properties.length) attributes["style"] = properties.join("; ");
       decorations.push(Decoration.node(position, position + node.nodeSize, attributes));
-      if (notice) decorations.push(noteWidget(position + node.nodeSize - 1, notice));
       // Inline spans that keep another style, and links. A technical link is a BlockNote link, not a bound link.
       const runs = literalRuns(entry.inline);
       content.descendants((child, offset) => {
