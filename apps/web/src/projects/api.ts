@@ -1,6 +1,7 @@
 import type { RegistryEntry } from "../contracts/generated/registry";
 import type { TemplateProjectResponseV1 } from "../contracts/generated/template_project_response_v1";
 import type { TaskStatusV1 } from "../contracts/generated/task_status_v1";
+import type { ReasoningEffort } from "../connection/reasoning";
 import { ProjectApiFailure, v2Request, type Fetcher } from "../rich/v7-connection";
 
 export type ProjectTask = TaskStatusV1;
@@ -14,6 +15,16 @@ export type ImportDiscoveries = {
   name: string; title: string; facts: number; jobs: { id: string; employer: string; role: string }[];
   jobCount: number; technologies: string[]; technologyCount: number;
 };
+
+/** `detail.progress` of a running import task (`projects/import_progress.py`): steps, model activity and the stall
+ * check the service computed from the operation record. */
+export type ImportPhase = "starting" | "queued" | "processing" | "publication";
+export type ImportProgress = {
+  phase: ImportPhase; done: number; total: number; current: string[]; events: { at: string; text: string }[];
+  lastEventAt: string | null; lastModelAt: string | null; quietSeconds: number; quietLimitSeconds: number; stalled: boolean;
+};
+export type ImportOptions = { allowTextRewrite: boolean; effort: ReasoningEffort | null };
+export type TemplateImportStatus = { available: boolean; package: { id: string; name: string; revision: string; packageHash: string } | null };
 
 function projectPath(projectId: string, tail = ""): string {
   return `/v2/projects/${encodeURIComponent(projectId)}${tail}`;
@@ -56,8 +67,10 @@ export function openFoldcv(file: File, fetcher: Fetcher = browserFetch): Promise
   return upload("/v2/projects/archive", body, fetcher);
 }
 
-export function startImport(projectId: string, body: { clientRequestId: string; allowTextRewrite: boolean }, fetcher?: Fetcher): Promise<ProjectTask> {
-  return v2Request<ProjectTask>(projectPath(projectId, "/import"), "POST", { kind: "start", ...body }, fetcher);
+/** A null effort keeps the import model's catalog default; the service checks a chosen one against the catalog. */
+export function startImport(projectId: string, body: { clientRequestId: string } & ImportOptions, fetcher?: Fetcher): Promise<ProjectTask> {
+  const { effort, ...rest } = body;
+  return v2Request<ProjectTask>(projectPath(projectId, "/import"), "POST", { kind: "start", ...rest, ...(effort ? { effort } : {}) }, fetcher);
 }
 
 export function resumeImport(projectId: string, operationId: string, fetcher?: Fetcher): Promise<ProjectTask> {
@@ -72,6 +85,18 @@ export function cancelImport(projectId: string, taskId: string, fetcher?: Fetche
 export async function projectTasks(projectId: string, fetcher?: Fetcher): Promise<ProjectTask[]> {
   const value = await v2Request<{ tasks: ProjectTask[] }>(projectPath(projectId, "/tasks"), "GET", undefined, fetcher);
   return value.tasks;
+}
+
+/** The newest import operation of a pre-draft, read without an editor token; null before the first start. */
+export async function lastImportOperation(projectId: string, fetcher?: Fetcher): Promise<string | null> {
+  const value = await v2Request<TemplateProjectResponseV1>(projectPath(projectId), "GET", undefined, fetcher);
+  const owner = value.workspace.project ?? value.workspace.preDraft;
+  return owner?.templateOperations?.at(-1)?.id ?? null;
+}
+
+/** The store's active template for new imports. */
+export function templateImportStatus(fetcher?: Fetcher): Promise<TemplateImportStatus> {
+  return v2Request<TemplateImportStatus>("/v1/rich/template-import", "GET", undefined, fetcher);
 }
 
 export function catalogFlag(projectId: string, archived: boolean, fetcher?: Fetcher): Promise<unknown> {

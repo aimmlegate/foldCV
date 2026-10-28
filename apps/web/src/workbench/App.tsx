@@ -9,6 +9,7 @@ import { Header } from "./layout/Header";
 import { SourceForm } from "./import/SourceForm";
 import { TaskProgress } from "./import/TaskProgress";
 import { TaskNotices } from "./import/TaskNotices";
+import { sourceSummary } from "./import/progress";
 import { Settings } from "./settings/Settings";
 import { readPaneOrder, savePaneOrder, type PaneOrder } from "./settings/interface";
 import { FileDialog, type FileMode } from "./files/FileDialog";
@@ -19,8 +20,8 @@ import { NotificationCenter, NotificationProvider, NotificationSection } from ".
 
 export function App({ portalHost }: { portalHost: HTMLElement }) {
   const workspace = useResumeWorkspace();
-  const { template, projects, input, setInput, textDraft, error, status, setStatus, busy, settings, setSettings,
-    templateEditor, assistant, action, fresh, open, remove, archive, process, upload, exportFile } = workspace;
+  const { template, projects, error, status, setStatus, busy, settings, setSettings,
+    templateEditor, assistant, action, fresh, open, remove, archive, process, upload, exportFile, imports, importActions } = workspace;
   const shown = template?.response ?? null;
   const [collapsed, setCollapsed] = useState(() => innerWidth <= 600);
   const [paneOrder, setPaneOrder] = useState(readPaneOrder);
@@ -32,7 +33,9 @@ export function App({ portalHost }: { portalHost: HTMLElement }) {
   const [connection, setConnection] = useState<ConnectionView | null>(null);
   const [settingsVisited, setSettingsVisited] = useState(false), [fileMode, setFileMode] = useState<FileMode | null>(null);
   useEffect(() => { const workflow = new ConnectionWorkflow(setConnection); void workflow.peek(); return () => workflow.close(); }, []);
-  const view = workspace.importTask?.state === "running" && busy ? "template_progress" : template ? "editor" : "source";
+  // The import screen shows only inside the importing resume; other resumes open and edit meanwhile.
+  const shownImport = shown ? imports.get(shown.workspace.projectId) : undefined;
+  const view = !template ? "source" : template.response.workspace.project ? "editor" : shownImport ? "template_progress" : "pre_draft";
   useEffect(() => {
     if (settings || view !== "editor") return;
     const save = (event: KeyboardEvent) => {
@@ -77,16 +80,17 @@ export function App({ portalHost }: { portalHost: HTMLElement }) {
             <button className="icon" aria-label="Скрыть сообщение" onClick={workspace.dismissError}><Icon name="close" /></button></div>}
         </section>
       </NotificationSection>
-      <TaskNotices task={workspace.importTask} stop={workspace.importTask?.state === "running" ? workspace.operation?.cancel : undefined} />
-      {/* A running import has its own screen and a «Задачи» notification, so the floating bar stays for other work. */}
-      {busy && workspace.operation && !fileMode && workspace.importTask?.state !== "running" && <div className="workspace-operation">
+      <TaskNotices entries={imports} activeId={shown?.workspace.projectId ?? null}
+        titleOf={id => projects?.entries.find(entry => entry.projectId === id)?.title} stop={importActions.stop}
+        close={importActions.dismiss} open={id => void navigate(id)} />
+      {busy && workspace.operation && !fileMode && <div className="workspace-operation">
         <OperationStatus label={workspace.operation.label} timed startedAt={workspace.operation.startedAt} />
-        {workspace.operation.cancel && <button type="button" className="text-button" onClick={() => void workspace.operation?.cancel?.()}>Остановить импорт</button>}
       </div>}
       <div className="screen uir-proof-screen" hidden={settings}>
-        {view === "template_progress" && workspace.importTask && <TaskProgress task={workspace.importTask}
-          cancel={async () => { await workspace.operation?.cancel?.(); }} />}
-        {view === "editor" && template && !template.response.workspace.project && <section className="progress-screen"><div className="progress-content">
+        {view === "template_progress" && shownImport && <TaskProgress entry={shownImport} source={sourceSummary(shown)} busy={busy}
+          stop={() => importActions.stop(shownImport.projectId)} retry={() => importActions.retry(shownImport.projectId)}
+          close={() => importActions.dismiss(shownImport.projectId)} open={() => importActions.reopen(shownImport.projectId)} />}
+        {view === "pre_draft" && <section className="progress-screen"><div className="progress-content">
           <h2>Импорт резюме</h2><p>Исходник и промежуточные результаты сохранены.</p>
           <button type="button" disabled={busy} onClick={() => void workspace.resumeTemplate()}>Продолжить импорт</button>
         </div></section>}
@@ -97,8 +101,8 @@ export function App({ portalHost }: { portalHost: HTMLElement }) {
           assistant={<AssistantDrawer key={template.response.workspace.projectId} projectId={template.response.workspace.projectId} editor={templateEditor}
             settingsOpen={settings} ref={assistant} onProjectLifecycle={kind => workspace.projectLifecycle(template.response.workspace.projectId, kind)}
             title={projectTitle} settings={openSettings} />} />}
-        {view === "source" && !workspace.loading && <SourceForm input={input} change={setInput} textDraft={textDraft} busy={busy}
-          allowTextRewrite={workspace.allowTextRewrite} changeTextRewrite={workspace.setAllowTextRewrite} process={() => void process()} />}
+        {view === "source" && !workspace.loading && <SourceForm busy={busy} connection={connection?.snapshot ?? null}
+          process={(file, options) => void process(file, options)} />}
       </div>
       {settingsVisited && <div className="screen" hidden={!settings}><Settings close={() => void action(async current => { await templateEditor.current?.resume(); if (current()) setSettings(false); })} connectionChanged={setConnection} paneOrder={paneOrder} changePaneOrder={changePaneOrder} /></div>}
     </section>

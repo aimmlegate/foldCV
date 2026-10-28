@@ -1,29 +1,78 @@
-import { useRef } from "react";
-import { hasInput, type ResumeInput } from "../../rich/import-source";
+import { useEffect, useRef, useState } from "react";
+import { preferencesRequest, saveImportModelRequest } from "../../api/client";
+import type { ConnectionSnapshot } from "../../connection/workflow";
+import { isReasoningEffort, type ReasoningEffort } from "../../connection/reasoning";
+import { errorMessage } from "../../errors/messages";
+import { templateImportStatus, type ImportOptions } from "../../projects/api";
 import { Button } from "../ui/Button";
 import { Icon } from "../ui/Icon";
 
-export function SourceForm({ input, change, busy, process, textDraft, allowTextRewrite, changeTextRewrite }: {
-  input: ResumeInput; change: (input: ResumeInput) => void; busy: boolean;
-  process: () => void; textDraft: string; allowTextRewrite: boolean; changeTextRewrite: (allowed: boolean) => void;
+const effortLabels: Record<ReasoningEffort, string> = { none: "None · без рассуждений", minimal: "Minimal · минимум", low: "Low · быстрее",
+  medium: "Medium · баланс", high: "High · подробнее", xhigh: "XHigh · глубже", max: "Max · максимум", ultra: "Ultra" };
+
+/** A new resume from one file (PDF, DOCX, TXT, Markdown) with the import model, its effort and the rewrite choice. */
+export function SourceForm({ busy, process, connection }: {
+  busy: boolean; process: (file: File, options: ImportOptions) => void; connection: ConnectionSnapshot | null;
 }) {
   const fileInput = useRef<HTMLInputElement>(null);
-  const name = input.kind === "file" ? input.file.name : null;
+  const [file, setFile] = useState<File | null>(null), [rewrite, setRewrite] = useState(true);
+  const [importModel, setImportModel] = useState<string | null>(null), [loaded, setLoaded] = useState(false);
+  const [effort, setEffort] = useState<ReasoningEffort | null>(null), [template, setTemplate] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false), [modelError, setModelError] = useState("");
+  useEffect(() => {
+    let alive = true;
+    void preferencesRequest().then(value => { if (alive) setImportModel(value.selectedImportModel ?? null); })
+      .catch((error: unknown) => { if (alive) setModelError(errorMessage(error)); }).finally(() => { if (alive) setLoaded(true); });
+    void templateImportStatus().then(value => { if (alive) setTemplate(value.package?.name ?? null); }).catch(() => {});
+    return () => { alive = false; };
+  }, []);
+  const models = connection?.models ?? [];
+  const model = importModel ?? connection?.selectedModel ?? null;
+  const reasoning = model ? connection?.modelReasoning?.[model] : undefined;
+  const chosen = effort && reasoning?.supported.includes(effort) ? effort : null;
+  async function changeModel(next: string | null) {
+    setSaving(true); setModelError("");
+    try { setImportModel((await saveImportModelRequest(next)).selectedImportModel ?? null); }
+    catch (error) { setModelError(errorMessage(error)); } finally { setSaving(false); }
+  }
+  const choose = (next: File | undefined) => { if (next && !busy) setFile(next); };
   return <section className="new-screen" aria-label="Новое резюме"><div className="source-form">
     <h2>Добавить исходник</h2>
+    <label htmlFor="import-template">Шаблон</label>
+    <select className="model-select" id="import-template" aria-label="Шаблон" disabled={busy} defaultValue="default">
+      <option value="default">{template ?? "Шаблон по умолчанию"}</option>
+    </select>
     <button className="dropzone" type="button" disabled={busy} onClick={() => fileInput.current?.click()}
-      onDragOver={event => event.preventDefault()} onDrop={event => { event.preventDefault(); const file = event.dataTransfer.files[0]; if (file && !busy) change({ kind: "file", file }); }}>
+      onDragOver={event => event.preventDefault()} onDrop={event => { event.preventDefault(); choose(event.dataTransfer.files[0]); }}>
       <span className="upload-mark"><Icon name="upload" /></span><span><strong>Выбрать файл</strong><small>PDF, DOCX, TXT, Markdown</small></span>
     </button>
     <input ref={fileInput} hidden type="file" aria-label="Исходное резюме" accept=".pdf,.docx,.txt,.md,.markdown" disabled={busy}
-      onChange={event => { const file = event.currentTarget.files?.[0]; event.currentTarget.value = ""; if (file) change({ kind: "file", file }); }} />
-    {name && <div className="source-filename"><Icon name="file" /><span>{name}</span>{input.kind === "file" && <button className="icon" disabled={busy} aria-label="Убрать файл" onClick={() => change({ kind: "text", text: textDraft })}><Icon name="close" /></button>}</div>}
-    <label htmlFor="source-text">Текст резюме</label><textarea className="source-text" id="source-text" aria-label="Текст резюме" placeholder="Имя, опыт работы, навыки…"
-      disabled={busy || input.kind === "file"} value={textDraft} onChange={event => change({ kind: "text", text: event.currentTarget.value })} />
-    {input.kind === "file" && <p className="small muted">Будет обработан выбранный файл. Уберите его, чтобы использовать текст.</p>}
-    <label className="source-rewrite"><input type="checkbox" checked={allowTextRewrite} disabled={busy}
-      aria-label="Разрешить переписывание текста" aria-describedby="source-rewrite-help" onChange={event => changeTextRewrite(event.currentTarget.checked)} />
-      <span>Разрешить переписывание текста<small id="source-rewrite-help">Без галочки — только оформление.</small></span></label>
-    <div className="source-bottom"><Button className="ml-auto" variant="primary" busy={busy} busyLabel="Подготовка…" disabled={!hasInput(input)} onClick={process}>Обработать<Icon name="arrow" /></Button></div>
+      onChange={event => { const next = event.currentTarget.files?.[0]; event.currentTarget.value = ""; choose(next); }} />
+    {file && <div className="source-filename"><Icon name="file" /><span>{file.name}</span>
+      <button className="icon" disabled={busy} aria-label="Убрать файл" onClick={() => setFile(null)}><Icon name="close" /></button></div>}
+    <div className="source-bottom import-options">
+      <div className="import-option"><label htmlFor="import-model">Модель</label>
+        <select className="model-select" id="import-model" aria-label="Модель импорта" value={importModel ?? ""}
+          disabled={busy || saving || !loaded || !connection?.metadataReady} onChange={event => void changeModel(event.currentTarget.value || null)}>
+          <option value="">{connection?.selectedModel ? `Модель обработки · ${connection.selectedModel}` : "Модель обработки"}</option>
+          {(importModel && !models.includes(importModel) ? [importModel, ...models] : models).map(name =>
+            <option key={name} value={name} disabled={!models.includes(name)}>{name}{models.includes(name) ? "" : " · недоступна"}</option>)}
+        </select></div>
+      <div className="import-option"><label htmlFor="import-effort">Рассуждения</label>
+        <select className="model-select" id="import-effort" aria-label="Уровень рассуждений импорта" value={chosen ?? ""}
+          disabled={busy || !reasoning?.supported.length} onChange={event => {
+            const next = event.currentTarget.value;
+            setEffort(isReasoningEffort(next) ? next : null);
+          }}>
+          <option value="">По умолчанию{reasoning?.default ? ` · ${reasoning.default}` : ""}</option>
+          {(reasoning?.supported ?? []).map(value => <option key={value} value={value}>{effortLabels[value]}</option>)}
+        </select></div>
+      <label className="import-rewrite" htmlFor="import-rewrite"><input className="switch" id="import-rewrite" type="checkbox" role="switch"
+        checked={rewrite} disabled={busy} aria-describedby="import-rewrite-help" onChange={event => setRewrite(event.currentTarget.checked)} />
+        <span>Переписывать текст<small id="import-rewrite-help">{rewrite ? "Модель улучшит формулировки." : "Только оформление."}</small></span></label>
+      <Button className="import-process-button" variant="primary" busy={busy} busyLabel="Подготовка…" disabled={!file}
+        onClick={() => { if (file) process(file, { allowTextRewrite: rewrite, effort: chosen }); }}>Обработать<Icon name="arrow" /></Button>
+    </div>
+    {modelError && <p className="notice error" role="alert">{modelError}</p>}
   </div></section>;
 }
