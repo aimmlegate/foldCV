@@ -15,8 +15,8 @@ export function Connection({ view, workflow, model, change, disabled, selectionD
   const canInstall = installation?.available && ["cli_missing", "launcher_unsupported", "unsupported_version"].includes(snapshot.state);
   return <><h3>Модель и подключение</h3><p>Подключение через Codex по подписке ChatGPT.</p>
     <div className="connection-status"><span className="connection-check">{view.pending || view.detaching || snapshot.state === "login_pending" ? <Spinner /> : <Icon name={snapshot.state === "connected" ? "check" : "info"} />}</span>
-      <div><strong role="status">{view.detaching ? "Останавливаем подключение…" : installing ? "Подготавливаем подключение ChatGPT…" : snapshot.state === "login_pending" ? connectionMessages.login_pending : view.pending ? "Проверяем CLI, вход и доступные модели…" : connectionMessages[snapshot.state]}</strong>
-        <small>{[snapshot.plan, snapshot.version].filter(Boolean).join(" · ") || "Сведения о подписке ещё не получены"}</small></div></div>
+      <div><strong role="status">{view.detaching ? "Останавливаем подключение…" : installing ? "Устанавливаем Codex…" : snapshot.state === "login_pending" ? connectionMessages.login_pending : view.pending ? "Проверяем подключение…" : connectionMessages[snapshot.state]}</strong>
+        <small>{[snapshot.plan, snapshot.version].filter(Boolean).join(" · ") || "Нет сведений о подписке"}</small></div></div>
     <ModelSelect id="model-select" label="Модель обработки" value={model} models={snapshot.models}
       disabled={disabled || selectionDisabled || view.pending || !snapshot.metadataReady}
       change={value => { if (value) change(value); }} />
@@ -35,9 +35,8 @@ export function Connection({ view, workflow, model, change, disabled, selectionD
       <Button variant="quiet" busy={view.detaching} busyLabel="Отключаем…" disabled={disabled} onClick={() => void workflow.detach()}>Отключить модель</Button>
     </div>
     {view.error && <p className="notice error" role="alert">{errorMessage(view.error)}</p>}
-    <p className="settings-disclosure">Проверка, вход и отключение выполняются сразу. Отмена черновика настроек их не отменяет.</p>
-    {snapshot.experimentalMode ? <p className="settings-disclosure">Текст передаётся через Codex CLI по вашей подписке ChatGPT; действуют правила хранения провайдера.
-      CLI может предоставлять встроенные инструменты и сохранять запросы и ответы. Вход остаётся после отключения.</p>
+    {snapshot.experimentalMode ? <p className="settings-disclosure">Текст уходит в OpenAI, действуют её правила хранения. Codex может сохранять
+      запросы и ответы. Вход остаётся после отключения.</p>
       : <p className="settings-disclosure">Обработка недоступна в текущем режиме подключения.</p>}
   </>;
 }

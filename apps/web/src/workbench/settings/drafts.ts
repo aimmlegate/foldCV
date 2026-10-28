@@ -34,9 +34,9 @@ function message(error: unknown, part: SettingsPart): string {
   if (part === "limits" && code === "INVALID_REQUEST") return "Не удалось сохранить лимиты. Укажите целые числа в допустимых пределах.";
   const known = knownErrorMessage(code);
   if (known) return known;
-  if (part === "reasoning") return "Не удалось сохранить reasoning. Проверьте, что этот уровень доступен выбранной модели.";
+  if (part === "reasoning") return "Не удалось сохранить уровень рассуждений. Проверьте, что модель его поддерживает.";
   if (part === "model" || part === "import" || part === "fallback") return "Не удалось сохранить модель. Проверьте подключение и выберите доступную модель.";
-  return "Не удалось сохранить этот раздел. Черновик остался в форме; повторите действие.";
+  return "Не удалось сохранить. Правки остались в форме, повторите.";
 }
 
 export class SettingsDrafts {
@@ -83,7 +83,7 @@ export class SettingsDrafts {
     } else errors.model = "Не удалось загрузить настройки обработки. Повторите загрузку.";
     if (rules.status === "fulfilled") {
       if (!this.state.rules) { draft.markdown = rules.value.markdown; this.publish({ rules: rules.value }); delete errors.rules; }
-    } else errors.rules = "Не удалось загрузить правила. Повторите загрузку.";
+    } else errors.rules = "Не удалось загрузить команды. Повторите загрузку.";
     if (assistant.status === "fulfilled") {
       if (!this.state.assistant) { draft.agentEnabled = assistant.value.enabled; draft.agentModel = assistant.value.selectedAgentModel;
         this.publish({ assistant: assistant.value }); delete errors.assistant; }
@@ -100,7 +100,7 @@ export class SettingsDrafts {
       projectMegabytes: preferences ? limit(preferences, "projectMegabytes") : draft.projectMegabytes,
       agentEnabled: assistant?.enabled ?? draft.agentEnabled, agentModel: assistant ? assistant.selectedAgentModel : draft.agentModel,
       markdown: rules?.markdown ?? draft.markdown }, errors: this.state.staleRules ? { rules: knownErrorMessage("RULES_STALE") ?? "Обновите правила." } : {},
-      saved: [], message: "Несохранённые изменения отменены." });
+      saved: [], message: "Правки отменены." });
   }
   async reloadRules(): Promise<void> {
     if (this.state.saving || this.state.loading || this.closed) return;
@@ -109,8 +109,8 @@ export class SettingsDrafts {
       const rules = await this.api.rules(); if (this.closed || epoch !== this.epoch) return;
       const errors = { ...this.state.errors }; delete errors.rules;
       this.publish({ rules, errors, staleRules: false, comparison: true,
-        message: "Актуальные правила загружены. Ваш текст сохранён в форме; сравните версии ниже." });
-    } catch { this.publish({ errors: { ...this.state.errors, rules: "Не удалось загрузить правила. Ваш текст остался в форме." } }); }
+        message: "Сохранённая версия загружена ниже. Ваш текст остался в форме." });
+    } catch { this.publish({ errors: { ...this.state.errors, rules: "Не удалось загрузить команды. Ваш текст остался в форме." } }); }
     finally { if (epoch === this.epoch) this.publish({ loading: false }); }
   }
   async reloadAssistant(): Promise<void> {
@@ -119,7 +119,7 @@ export class SettingsDrafts {
     try {
       const assistant = await this.api.assistant(); if (this.closed || epoch !== this.epoch) return;
       const errors = { ...this.state.errors }; delete errors.assistant;
-      this.publish({ assistant, errors, message: "Настройки помощника обновлены. Ваш выбор остался в форме." });
+      this.publish({ assistant, errors, message: "Настройки помощника загружены. Ваш выбор остался в форме." });
     } catch { this.publish({ errors: { ...this.state.errors, assistant: "Не удалось загрузить настройки помощника." } }); }
     finally { if (epoch === this.epoch) this.publish({ loading: false }); }
   }
