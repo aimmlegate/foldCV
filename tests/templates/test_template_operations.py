@@ -1,4 +1,4 @@
-"""Deterministic operations read admitted facts: the F04 ten-year partition and declared period formatting."""
+"""Deterministic operations read admitted facts: the F04 fifteen-year partition and declared period formatting."""
 
 import json
 from types import SimpleNamespace
@@ -19,8 +19,8 @@ from tests.templates.template_runtime_fixtures import EmploymentFixture
 
 
 EXPECTED = json.loads(open('tests/fixtures/synthetic/templates/expected.json').read())
-JOBS = [('Early Systems', (2013, None), (2015, None), False, 'Perl'), ('Year Boundary', (2014, None), (2016, None), False, None),
-    ('Month Boundary', (2015, None), (2016, 10), False, None), ('Current Systems', (2020, None), None, True, 'Python')]
+JOBS = [('Early Systems', (2008, None), (2010, None), False, 'Perl'), ('Year Boundary', (2009, None), (2011, None), False, None),
+    ('Month Boundary', (2010, None), (2011, 10), False, None), ('Current Systems', (2020, None), None, True, 'Python')]
 
 
 def partial(value):
@@ -49,7 +49,7 @@ def capture(*, rewrite=True, as_of=(2026, 10, 21)):
     return ImportCapture.model_validate(value)
 
 
-def window(years=10):
+def window(years=15):
     return PartitionOperation.model_validate({'id': 'project-window', 'kind': 'partition_employment', 'version': 1,
         'inputs': [{'kind': 'block', 'id': 'employment-view'}], 'depends_on': [],
         'parameters': {'years': years, 'detailed': 'employment-view', 'compact': 'old-projects'}})
@@ -66,7 +66,7 @@ def test_partition_compacts_only_employment_wholly_older_than_the_cutoff(as_of):
         handles={'job-0': 'handle-0'}))
     assert names(result.value['compact']) == EXPECTED['F04']['compact']
     assert names(result.value['detailed']) == EXPECTED['F04']['detailed']
-    assert result.value['cutoff'] == ('2016-10-21' if as_of[2] else '2016-10-01') and result.item_handles == ('handle-0',)
+    assert result.value['cutoff'] == ('2011-10-21' if as_of[2] else '2011-10-01') and result.item_handles == ('handle-0',)
 
 
 def test_disabled_rewriting_or_unknown_end_keeps_employment_detailed():
@@ -84,7 +84,7 @@ def history_package():
         nodes=[{'type': 'join_items', 'field': '/items', 'separator': ', ', 'style': 'body'}])
     config['operations'] = [
         {'id': 'project-window', 'kind': 'partition_employment', 'version': 1, 'inputs': [{'kind': 'block', 'id': 'employment-view'}],
-            'depends_on': [], 'parameters': {'years': 10, 'detailed': 'employment-view', 'compact': 'old-projects'}},
+            'depends_on': [], 'parameters': {'years': 15, 'detailed': 'employment-view', 'compact': 'old-projects'}},
         {'id': 'source-periods', 'kind': 'format_period', 'version': 1, 'inputs': [{'kind': 'source', 'id': 'all'}],
             'depends_on': [], 'parameters': {'separator': ' – ', 'ongoing_label': {'en': 'present'}}}]
     config['blocks'].append({'id': 'old-projects', 'mode': 'derived', 'selectors': [{'kind': 'source', 'id': 'all'}],
@@ -157,4 +157,4 @@ async def test_partition_view_shows_detailed_employment_and_compact_names_while_
         assert texts.index('Early Systems') > heading > max(texts.index(name) for name in EXPECTED['F04']['detailed'])
     else:
         assert 'OTHER PROJECTS' not in texts
-    assert '2014 – 2016' in texts and '2020 – present' in texts and '2015 – 2016-10' in texts
+    assert '2009 – 2011' in texts and '2020 – present' in texts and '2010 – 2011-10' in texts

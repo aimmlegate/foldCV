@@ -161,9 +161,9 @@ def f03(_rewrite):
 
 
 def f04(_rewrite):
-    jobs = [job('Early Systems', 'engineer', period('2013–2015', date('2013', 2013), date('2015', 2015), False), technologies=['Perl']),
-        job('Year Boundary', 'engineer', period('2014–2016', date('2014', 2014), date('2016', 2016), False)),
-        job('Month Boundary', 'engineer', period('2015–2016-10', date('2015', 2015), date('2016-10', 2016, 10), False)),
+    jobs = [job('Early Systems', 'engineer', period('2008–2010', date('2008', 2008), date('2010', 2010), False), technologies=['Perl']),
+        job('Year Boundary', 'engineer', period('2009–2011', date('2009', 2009), date('2011', 2011), False)),
+        job('Month Boundary', 'engineer', period('2010–2011-10', date('2010', 2010), date('2011-10', 2011, 10), False)),
         job('Current Systems', 'engineer', period('2020–present', date('2020', 2020), None, True), technologies=['Python'])]
     cites = {}
     for index, value in enumerate(jobs):
@@ -225,7 +225,7 @@ def f10(_rewrite):
         'languages': ([{'name': 'English', 'level': None, 'note': None}], {}),
         'opensource': ([{'name': 'Queue Tools', 'url': 'https://example.org/queue-tools'}], {}),
         'projects': ([
-            job('Old Systems', 'engineer', period('2010–2012', date('2010', 2010), date('2012', 2012), False), technologies=['Perl']),
+            job('Old Systems', 'engineer', period('2006–2008', date('2006', 2006), date('2008', 2008), False), technologies=['Perl']),
             job('Example Labs', 'backend engineer', period('03.2020–11.2023', date('03.2020', 2020, 3), date('11.2023', 2023, 11), False),
                 project={'name': 'Queue Platform', 'description': 'Message queue platform for internal services.'},
                 technologies=['Python', 'PostgreSQL', 'Docker'], tasks=['Implemented queue processing.'],

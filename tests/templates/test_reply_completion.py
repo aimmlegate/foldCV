@@ -87,7 +87,7 @@ def per_field_location(request):
 
 
 def verbatim_jobs():
-    return [job('Old Systems', 'engineer', period('2010–2012', date('2010', 2010), date('2012', 2012), False), technologies=['Perl']),
+    return [job('Old Systems', 'engineer', period('2006–2008', date('2006', 2006), date('2008', 2008), False), technologies=['Perl']),
         job('Example Labs', 'backend engineer', period('03.2020–11.2023', date('03.2020', 2020, 3), date('11.2023', 2023, 11), False),
             project={'name': 'Queue Platform', 'description': 'message queue platform for internal services.'},
             technologies=['Python', 'PostgreSQL', 'Docker'], tasks=['Implemented queue processing.'],
