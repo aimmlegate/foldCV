@@ -2,7 +2,7 @@
 schema_version: 4
 template:
   id: generic-two-column
-  revision: 2.5.0
+  revision: 2.6.0
   name: Две колонки
   default_locale: ru
 model:
@@ -12,12 +12,20 @@ model:
   - Preserve names, technical terms, versions, units, numeric bounds, dates, uncertainty and ownership.
   - Keep each claim linked to its source entry; do not move career-level claims into a specific project.
   - Leave unsupported values null or empty; mandatory field presence does not authorize invented content.
+  - When source statements conflict, do not choose one of them; leave the value null.
+  - Keep an uncertain acronym as the source writes it; never expand it from outside knowledge.
+  - Join lines the source layout broke and leave out empty bullets.
+  - Gaps, conflicts and warnings never go into resume text.
   - A list of technologies, tools or libraries holds names only, one per item, exactly as the source writes them, such as
     PostgreSQL, Kafka 4.0 or Docker Compose. Never put a sentence, a description of use, a project, experience or an explanation
     after a colon or semicolon into such an item; leave the explanation out.
   rewrite:
   - Rewrite only allowed fields when runtime permission is true; otherwise keep source wording.
   - Improve clarity and grammar without adding facts, translating technical names or changing meaning.
+  - Keep the language of the source wording; do not translate.
+  - Do not add praise, claims, seniority, employers, clients, quantities, currencies or language levels the source does not
+    state.
+  - Correct clear spelling and casing errors and remove repeated claims.
   - Preserve individual versus team attribution, uncertainty and all meaningful qualifications.
   - Do not add a minimum number of tasks, results, technologies or sentences.
   permission: allowTextRewrite
@@ -69,9 +77,10 @@ blocks:
         pattern: \d
         description: Only the length of work with this technology the source states, such as 6 лет or 10 месяцев; null when
           it states none. Never a description of work or projects.
-    maxItems: 10
+    maxItems: 8
   extract:
-  - Select up to ten primary technologies supported by source emphasis and actual work, most important first.
+  - Select up to eight primary technologies supported by source emphasis and actual work, most relevant to the latest jobs
+    first. Fewer are fine.
   - One technology per entry, named as in the source (Golang, PostgreSQL, Kafka); never a comma-separated list.
   - experience is only a length of work with that technology that the source states for it, written short (6 лет, 1,5 года,
     10 месяцев). It is never a description of work, projects or responsibilities.
@@ -107,6 +116,7 @@ blocks:
   - Give the graduation year as a date with its exact source text; a sole year keeps year precision.
   - Put the stated city in place.city; leave place null when no city is stated.
   - Keep unfinished education and uncertainty explicit; do not invent a degree or completion year.
+  - Write the institution and degree as the source does; do not expand an abbreviated name.
   - Exclude short courses from this block; place them in courses.
   view:
     title:
@@ -232,13 +242,17 @@ blocks:
   schema:
     text: text
   extract:
-  - Collect supported specialization, stated total experience, additional expertise and significant competencies.
+  - Collect supported specialization, domains, responsibilities and outcomes, focusing on the latest one or two jobs.
+  - Add stated total experience, additional expertise and significant competencies.
   - Include leadership, architecture and professional interests only when supported by the source.
   - When rewriting is disabled, use the original professional summary or leave this block empty.
   rewrite:
     fields: [/text]
     instructions:
-    - Write a concise professional paragraph in the source language from the collected facts.
+    - Write a short first-person paragraph from the collected facts.
+    - Write it in the predominant language of the source narrative; when two languages are even, use the language of the first
+      substantive narrative.
+    - Replace generic interests with supported context from recent work.
     - Do not calculate total tenure, add generic praise or invent professional interests.
   view:
     title:
@@ -283,7 +297,11 @@ blocks:
     project_claim (owned_by): [tasks/*/value, results/*/value]
   extract:
   - Keep source-backed company and project boundaries; one entry per stated project or employment.
+  - Keep grouped employment as one entry when the source gives no separate records.
+  - Order entries newest first.
   - Extract the period, local technology stack, project name, product purpose and business problem.
+  - Keep the stated date precision and overlapping periods; a current job stays present; never invent a month or an end
+    date.
   - Extract the job title, and in role_details the responsibility scope, functions and level of involvement when stated.
   - Leave project or role_details null when the source states none of their fields.
   - Separate specific duties and performed work from achieved changes and effects.
@@ -298,8 +316,10 @@ blocks:
     - /*/results
     instructions:
     - Describe the product, its purpose and business problem concisely without adding domain claims.
-    - Express each task as one concrete action and preserve the specialist's actual contribution.
-    - Use action verbs such as developed, designed, implemented, optimized, configured or led in the source language.
+    - Write each task as one clear noun phrase, such as разработка API or настройка CI, and preserve the specialist's actual
+      contribution.
+    - Start each result with a past-tense verb in the source language, such as сократил or внедрил. In Russian, when the
+      source does not show the candidate's gender, use a short passive form instead, such as сокращено or внедрена.
     - Describe each result as an achieved change or effect; use metrics only when supported by the source.
     - Do not restate a duty as a result or turn a team result into an individual result.
   checks:
@@ -418,6 +438,7 @@ blocks:
     programming: [items/*=display]
   extract:
   - Collect languages, frameworks and libraries from all source sections, including older projects.
+  - Order items by relevance to the target role, most relevant first.
   - Each item is one short name as the source writes it, such as Go, Python 3.12, Laravel 5.1 or React; never
     a sentence, a description of how it was used, or experience.
   - Leave out a language's standard-library packages and built-in features (Go sync, Go reflect, goroutines).
@@ -455,6 +476,7 @@ blocks:
     data_and_tools: [items/*=display]
   extract:
   - Collect databases, message brokers, monitoring, CI/CD and other tools from all source sections.
+  - Order items by relevance to the target role, most relevant first.
   - Each item is one short name as the source writes it, such as PostgreSQL, Kafka 4.0, Docker Compose or CTE (WITH); never
     a sentence, a description of how it was used, or experience.
   - Preserve role-relevant concepts with uncertain categorization here and report the uncertainty.
@@ -491,6 +513,7 @@ blocks:
     infrastructure: [items/*=display]
   extract:
   - Collect containers, orchestration, operating systems, cloud platforms, version control and task management.
+  - Order items by relevance to the target role, most relevant first.
   - Each item is one short name as the source writes it, such as Docker Compose, Kubernetes, GitLab CI or Jira; never
     a sentence, a description of how it was used, or experience.
   - Include technologies found only in earlier work; do not duplicate another active bottom group.
@@ -518,6 +541,7 @@ blocks:
     key_skills: [items/*=name]
   extract:
   - For analyst, tester or designer roles, collect source-supported professional skills related to the role.
+  - Order items by relevance to the target role, most relevant first.
   - Put named software and technology stack in role_tools instead.
   view:
     heading: band
@@ -549,6 +573,7 @@ blocks:
     role_tools: [items/*=display]
   extract:
   - For analyst, tester or designer roles, collect the source-supported technology stack and tools.
+  - Order items by relevance to the target role, most relevant first.
   - Each item is one short name as the source writes it, such as PostgreSQL, Kafka 4.0, Docker Compose or CTE (WITH); never
     a sentence, a description of how it was used, or experience.
   - Keep canonical versions and qualifiers and avoid duplication with key_skills.
@@ -903,7 +928,7 @@ operations:
 - id: project-window
   kind: partition_employment
   parameters:
-    years: 10
+    years: 15
     detailed: projects
     compact: other_projects
   inputs: [projects]

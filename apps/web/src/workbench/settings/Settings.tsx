@@ -81,9 +81,9 @@ export function Settings({ close, connectionChanged, paneOrder, changePaneOrder 
           {current.errors.assistant && current.assistant && <button className="text-button" disabled={busy} onClick={() => void controller.reloadAssistant()}>Загрузить настройки помощника</button>}
         </div></>}
       {section === "rules" && <><h3>Правила и шаблон</h3><p>Все инструкции для модели. Для каждой указано, на каком шаге она действует.</p><RulesGuide />
-        <div className="uir-assistant-options"><h3>Общие правила и команды</h3>
-        <p className="small muted">Один файл Markdown для всех резюме: сначала редакторские правила, затем команды. Сохраните оба заголовка: <code>## Preset: shorten</code> и <code>## Preset: clarify</code> с инструкциями под ними.</p>
-        <label htmlFor="rules-text">Правила и команды в Markdown</label><textarea className="rules-text" id="rules-text" aria-label="Markdown правил" spellCheck={false}
+        <div className="uir-assistant-options"><h3>Команды «Сократить» и «Сделать яснее»</h3>
+        <p className="small muted">Один файл Markdown для всех резюме. Сохраните оба заголовка: <code>## Preset: shorten</code> и <code>## Preset: clarify</code> с инструкциями под ними. Текст вне этих разделов модели не передаётся. Общие правила импорта задаются в разделе <code>model</code> шаблона ниже.</p>
+        <label htmlFor="rules-text">Команды в Markdown</label><textarea className="rules-text" id="rules-text" aria-label="Markdown правил" spellCheck={false}
           disabled={!current.rules} value={current.draft.markdown} onChange={event => controller.change("markdown", event.currentTarget.value)} />
         {current.rules && <><p className="small muted">Версия правил: {current.rules.revision}</p><button className="text-button" disabled={busy} onClick={() => void controller.reloadRules()}>Загрузить актуальную версию правил</button></>}
         {current.comparison && current.rules && <><label htmlFor="rules-comparison">Сохранённая версия для сравнения</label>
