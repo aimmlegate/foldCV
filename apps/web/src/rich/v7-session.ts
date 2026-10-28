@@ -5,7 +5,7 @@ import type { AssistantApplyResultV1 } from "../contracts/generated/assistant_ap
 import { ProjectEditorConnection, ProjectApiFailure, pendingStore, type PendingNavigation, type PendingRecord, type PendingStore } from "./v7-connection";
 import type { RichDocumentV2, TemplateProjectResponseV1 } from "../contracts/generated/template_project_response_v1";
 import { contentText, responseBlocks } from "./v7-response";
-import { errorMessage } from "../errors/messages";
+import { errorMessage, knownErrorMessage } from "../errors/messages";
 import { projectRegionChildren } from "../workbench/editor/regions";
 import { SessionHistory, type HistoryKind, type HistoryReservation } from "./history";
 import { RichSaveQueue, type TemplateAdoption, type TemplateQueueState, type TemplateQueuedIntent } from "./save-queue";
@@ -66,8 +66,11 @@ export class TemplateEditorSession {
   private timer: ReturnType<typeof setTimeout> | null = null;
   private projecting = false;
   private navigating = false;
+  // Settles when the undo or redo in flight has been adopted or given up.
+  private navigation: Promise<void> = Promise.resolve();
   private panelBusy = false;
   private closed = false;
+  private retries = 0;
 
   private modeValue: EditorMode = "recovering";
   private retention: Promise<void> = Promise.resolve();
@@ -137,7 +140,10 @@ export class TemplateEditorSession {
 
   async refresh(): Promise<void> {
     await this.flush();
-    this.queue.template.adoptDurable(await this.connection.read());
+    const current = await this.connection.read();
+    // Input typed meanwhile meets the newer revision itself and is translated again there.
+    if (this.queue.template.pending.length) return;
+    this.queue.template.adoptDurable(current);
     await this.reproject();
   }
 
@@ -193,6 +199,7 @@ export class TemplateEditorSession {
 
   /** A facts-panel command: typing drains first; input stays locked until Python's verified result is adopted and shown. */
   async panel(command: PanelCommand): Promise<void> {
+    await this.navigation;
     if (!this.editor || this.closed || this.composing || this.panelBusy || this.mode !== "normal") throw new Error("WRITER_INPUT_BLOCKED");
     const commands = employmentPanelCommands(command, this.recordKinds());
     if (!commands) { this.refuse(`panel ${command.operation} is not a V7 employment command`); throw new Error("V7_INPUT_UNSUPPORTED"); }
@@ -201,6 +208,8 @@ export class TemplateEditorSession {
 
   /** One server-first action: typing drains, input locks, and Python's verified result is shown before input continues. */
   private async command(items: { operation: V7Operation; prior: ReadonlyMap<string, string> }[], kind: HistoryKind): Promise<void> {
+    // An undo or redo in flight moves the revision; the command is expressed on the state it leaves.
+    await this.navigation;
     if (!this.editor || this.closed || this.composing || this.panelBusy || this.mode !== "normal") throw new Error("WRITER_INPUT_BLOCKED");
     await this.flush();
     // Locking turns the contenteditable read-only and drops its focus; an editor command gives it back.
@@ -225,6 +234,7 @@ export class TemplateEditorSession {
         // Typing drained first, so only this command is pending; a definitive answer drops it and input continues.
         const state = this.queue.template.state.kind;
         if (state === "rejected" || state === "conflict") this.queue.template.discardUnsaved();
+        this.retryLater();
         throw error;
       }
       await this.reproject();
@@ -500,6 +510,8 @@ export class TemplateEditorSession {
     const text = items.map(item => item.intent.operation.kind === "replace_text" ? item.intent.operation.text
       : [...item.intent.prior.values()].join("\n")).filter(Boolean).join("\n");
     this.port.warning(`${errorMessage("V7_INPUT_CONFLICT")}${text ? "\n" + text : ""}`);
+    // The editor still shows the dropped text; the saved state replaces it once nothing else is pending.
+    if (!this.queue.template.pending.length) queueMicrotask(() => { void this.reproject(); });
   }
 
   async recoverDraft(): Promise<{ conflicts: number }> {
@@ -518,7 +530,8 @@ export class TemplateEditorSession {
         baseRevision: item.baseRevision, issued: item.issued })), record.locals);
     }
     this.pendingLoaded = true;
-    if (this.pendingNavigation) await this.recoverNavigation();
+    // An undo or redo that cannot be settled is given up with a notice; it does not keep the editor in recovery.
+    if (this.pendingNavigation) await this.recoverNavigation().catch(error => { this.port.warning(errorMessage(error)); });
     while (this.queue.template.pending.length) {
       const head = this.queue.template.pending[0];
       await this.queue.template.recoverPending();
@@ -554,13 +567,23 @@ export class TemplateEditorSession {
         this.historyNeedsRefresh = false;
       }
       await this.retention;
+      this.retries = 0;
       this.port.status("Сохранено");
     } catch (error) {
       this.retainSoon();
       this.port.status(errorMessage(error));
       if (this.connection.replaced) this.setMode("read_only");
+      this.retryLater();
       throw error;
     }
+  }
+
+  /** Pending input without an answer is sent again with the same ids after 1, 2, 4… up to 30 seconds; a refusal or a
+   * conflict blocks the queue instead and waits for the user. */
+  private retryLater(): void {
+    if (this.closed || this.timer || !this.writable || this.queue.template.state.kind !== "ready" || !this.queue.template.pending.length) return;
+    const delay = Math.min(30_000, 1000 * 2 ** Math.min(this.retries++, 5));
+    this.timer = setTimeout(() => { this.timer = null; void this.flush().catch(() => {}); }, delay);
   }
 
   private adopted(adoption: TemplateAdoption): void {
@@ -570,7 +593,7 @@ export class TemplateEditorSession {
 
   private queueChanged(state: TemplateQueueState): void {
     if (state.kind === "conflict") this.port.warning(errorMessage("V7_INPUT_CONFLICT"));
-    else if (state.kind === "rejected") this.port.warning(errorMessage("V7_INPUT_REJECTED"));
+    else if (state.kind === "rejected") this.port.warning(knownErrorMessage(state.reason) ?? errorMessage("V7_INPUT_REJECTED"));
     else if (state.kind === "replaced") { this.setMode("read_only"); this.port.warning(errorMessage("EDITOR_REPLACED")); }
   }
 
@@ -664,6 +687,8 @@ export class TemplateEditorSession {
   /** Undo/Redo drain input, then one server history command; SessionHistory moves only after its verified result. */
   async navigate(direction: "undo" | "redo"): Promise<void> {
     if (this.closed || this.navigating || this.composing) return;
+    let settled = () => {};
+    this.navigation = new Promise(resolve => { settled = resolve; });
     this.boundary();
     this.navigating = true;
     // The command locks input, and a contenteditable that turns read-only loses focus; give it back afterwards.
@@ -705,24 +730,33 @@ export class TemplateEditorSession {
     } finally {
       if (reservation) this.history.discard(reservation);
       this.navigating = false;
+      settled();
       if (focused && this.editor?.isEditable) this.editor.focus();
     }
   }
 
+  /** Settle an unconfirmed undo or redo from the saved state. When that fails too it is given up, so input is never
+   * blocked by it: the next save re-opens the project and the editor and its buttons follow the server again. */
   private async recoverNavigation(): Promise<boolean> {
     const pending = this.pendingNavigation;
     if (!pending) return false;
-    let applied = true;
-    const current = await this.connection.read();
-    if (!(current.workspace.mutationReplay ?? []).some(row => row.clientMutationId === pending.clientMutationId)) {
-      if (current.workspace.projectRevision === pending.baseRevision) {
-        await this.connection.step(pending.direction, pending.clientMutationId, pending.expectedActionId, pending.baseRevision);
-      } else { applied = false; this.port.warning(errorMessage("HISTORY_STALE")); await this.connection.reopen(); }
-    } else await this.connection.reopen();
-    this.queue.template.adoptDurable(this.connection.response);
-    this.pendingNavigation = null;
-    await this.retain();
-    return applied;
+    try {
+      let applied = true;
+      const current = await this.connection.read();
+      if (!(current.workspace.mutationReplay ?? []).some(row => row.clientMutationId === pending.clientMutationId)) {
+        if (current.workspace.projectRevision === pending.baseRevision) {
+          await this.connection.step(pending.direction, pending.clientMutationId, pending.expectedActionId, pending.baseRevision);
+        } else { applied = false; this.port.warning(errorMessage("HISTORY_STALE")); await this.connection.reopen(); }
+      } else await this.connection.reopen();
+      this.queue.template.adoptDurable(this.connection.response);
+      return applied;
+    } catch (error) {
+      this.historyNeedsRefresh = true;
+      throw error;
+    } finally {
+      this.pendingNavigation = null;
+      await this.retain();
+    }
   }
 
   /** After a block, re-express every container with pending input from canonical text to the editor text. */

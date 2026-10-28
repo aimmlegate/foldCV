@@ -17,7 +17,8 @@ from .errors import ProjectFailure
 
 def original(service, project_id, source_id, *, download=False):
     session = service.repository.open(project_id)
-    owner = session.workspace.project or session.workspace.pre_draft
+    workspace = service.repository.read(project_id)
+    owner = workspace.project or workspace.pre_draft
     source = next((item for item in owner.sources if item.id == source_id), None) if owner is not None else None
     if source is None:
         raise ProjectFailure('SOURCE_NOT_FOUND', 404)

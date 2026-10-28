@@ -18,6 +18,15 @@ def repository(root, *, clock=None):
     return repo
 
 
+def create_other(repo, project_id):
+    """A second synthetic project in the same store."""
+    other, sources = papers()
+    data = other.model_dump(by_alias=True)
+    data['projectId'] = data['project']['projectId'] = project_id
+    return repo.create(type(other).model_validate(data),
+        blobs=[('sources', key, raw, hashlib.sha256(raw).hexdigest()) for key, raw in sources.items()])
+
+
 def text_of(workspace, index=0):
     return ''.join(span.text for span in workspace.project.document.regions[2].blocks[index].content)
 

@@ -25,34 +25,37 @@ class ArchiveDownload(BaseModel):
 
 
 def export_archive(service, project_id, request, *, trusted=False):
-    """The open editor's project as a .foldcv file. The journal stays on disk. `trusted` is the assistant's export."""
+    """The open editor's project as a .foldcv file. The journal stays on disk. `trusted` is the assistant's export.
+    The lock covers the project file and the images, which a sweep may remove. Sources and import records are
+    content-addressed and stay until delete, so they are read, and the zip is built, after the lock."""
     session = service.repository.open(project_id)
-    with session.lock:
-        if not trusted:
-            session.require_editor(request.editor_token)
-        workspace = session.workspace
-        if (workspace.project_revision, workspace.document_revision) != (request.project_revision, request.document_revision):
-            raise ProjectFailure('STALE_ARCHIVE', 409)
-        try:
-            loaded = decode_project(session.directory, (session.directory / 'workspace.json').read_bytes(), history=True)
-            owner = loaded.project or loaded.pre_draft
-            originals = {}
-            for source in owner.sources:
-                path = blob_path(session.directory, 'sources', source.id)
-                originals[source.id] = read_owned(path, MAX_SOURCE, 'SOURCE_BYTES_MISSING')
+    try:
+        with session.lock:
+            if not trusted:
+                session.require_editor(request.editor_token)
+            workspace = service.repository.read(project_id)
+            if (workspace.project_revision, workspace.document_revision) != (request.project_revision, request.document_revision):
+                raise ProjectFailure('STALE_ARCHIVE', 409)
+            raw = (session.directory / 'workspace.json').read_bytes()
             images = {}
-            if loaded.project is not None:
-                for asset in loaded.project.assets:
+            if workspace.project is not None:
+                for asset in workspace.project.assets:
                     path = session.directory / asset.path
                     if path.is_file():
                         images[asset.id] = read_owned(path, IMAGE_BYTES, 'IMAGE_NOT_FOUND')
-            return write_zip(archive_payload_v7(loaded, originals, images))
-        except ArchiveFailure as error:
-            raise ProjectFailure(error.code, 422) from None
-        except ProjectFailure:
-            raise
-        except OSError:
-            raise ProjectFailure('SOURCE_BYTES_MISSING', 404) from None
+        loaded = decode_project(session.directory, raw, history=True)
+        owner = loaded.project or loaded.pre_draft
+        originals = {}
+        for source in owner.sources:
+            path = blob_path(session.directory, 'sources', source.id)
+            originals[source.id] = read_owned(path, MAX_SOURCE, 'SOURCE_BYTES_MISSING')
+        return write_zip(archive_payload_v7(loaded, originals, images))
+    except ArchiveFailure as error:
+        raise ProjectFailure(error.code, 422) from None
+    except ProjectFailure:
+        raise
+    except OSError:
+        raise ProjectFailure('SOURCE_BYTES_MISSING', 404) from None
 
 
 def import_archive(service, data):

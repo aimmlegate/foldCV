@@ -5,7 +5,7 @@ import threading
 import pytest
 
 from packages.resume_core.project_repository import ProjectRepository, RepositoryFailure
-from tests.repository.support import PROJECT, edit, repository, text_of, typing
+from tests.repository.support import PROJECT, create_other, edit, repository, text_of, typing
 
 
 def test_concurrent_writers_serialize_and_no_update_is_lost(tmp_path):
@@ -72,7 +72,7 @@ def test_eviction_keeps_the_revision_history_and_writes_the_registry(tmp_path):
     data['projectId'] = data['project']['projectId'] = 'second-project'
     other = type(other).model_validate(data)
     repo.create(other, blobs=[('sources', key, raw, hashlib.sha256(raw).hexdigest()) for key, raw in sources.items()])
-    assert list(repo.sessions) == ['second-project']
+    assert [key for key, value in repo.sessions.items() if value.workspace is not None] == ['second-project']
     entry = next(value for value in repo.store.registry().entries if value.project_id == PROJECT)
     assert entry.updated_at != '2026-10-21T00:00:00Z'
     session = repo.open(PROJECT)
@@ -126,3 +126,87 @@ def test_a_new_editor_keeps_its_token_when_all_older_sessions_are_pinned(tmp_pat
         repo.mutate('new-project', base_revision=1, client_mutation_id='new-edit', request_sha256='a' * 64,
             action_id='new-action', kind='edit', build=typing('Still open', identifier='new-edit'))
         assert text_of(repo.read('new-project')) == 'Still open'
+
+
+def test_a_session_held_across_an_eviction_stays_the_project_session(tmp_path):
+    repo = repository(tmp_path)
+    repo.open_limit = 1
+    held = repo.open(PROJECT)
+    create_other(repo, 'second-project')
+    assert held.workspace is None
+    with held.lock:
+        assert held.revision == 1
+        edit(repo, 'Through the held session', identifier='edit-1')
+        assert text_of(held.workspace) == 'Through the held session'
+    assert repo.open(PROJECT) is held and repo.read(PROJECT).project_revision == 2
+    with pytest.raises(RepositoryFailure) as refused:
+        edit(repo, 'Same base again', identifier='edit-2', base=1)
+    assert refused.value.code == 'REVISION_CONFLICT'
+
+
+def test_an_eviction_keeps_the_editor_tokens_and_the_clipboard(tmp_path):
+    repo = repository(tmp_path)
+    repo.open_limit = 1
+    session = repo.open(PROJECT)
+    first = session.open_editor()
+    current = session.open_editor()
+    session.remember_capture('capture-1', 'copied')
+    create_other(repo, 'second-project')
+    reopened = repo.open(PROJECT)
+    reopened.require_editor(current)
+    with pytest.raises(RepositoryFailure) as replaced:
+        reopened.require_editor(first)
+    assert replaced.value.code == 'EDITOR_REPLACED' and reopened.clipboard['capture-1'] == 'copied'
+
+
+def test_a_failed_registry_write_on_eviction_does_not_fail_another_open(tmp_path, monkeypatch):
+    repo = repository(tmp_path)
+    repo.open_limit = 1
+    edit(repo, 'Dirty title time', identifier='edit-1')
+    def refused(_workspace):
+        raise RepositoryFailure('PROJECT_SAVE_FAILED')
+    monkeypatch.setattr(repo, '_write_registry_entry', refused)
+    create_other(repo, 'second-project')
+    evicted = repo.sessions[PROJECT]
+    assert evicted.workspace is None and evicted.registry_dirty
+    monkeypatch.undo()
+    assert text_of(repo.read(PROJECT)) == 'Dirty title time'
+    repo.close(PROJECT)
+    assert not evicted.registry_dirty
+
+
+def test_an_edit_racing_a_delete_is_refused_even_when_cleanup_fails(tmp_path, monkeypatch):
+    from packages.resume_core import project_repository
+    repo = repository(tmp_path)
+    workspace_file = tmp_path / 'data/projects' / PROJECT / 'workspace.json'
+    raw = workspace_file.read_bytes()
+    outcome = {}
+    def racing_edit():
+        try:
+            edit(repo, 'Zombie', identifier='zombie', base=1)
+        except RepositoryFailure as error:
+            outcome['code'] = error.code
+    original = repo.store.tombstone
+    def tombstone(project_id):
+        # Before the fix the racing edit loaded a second session here and committed into the project being deleted.
+        racer = threading.Thread(target=racing_edit)
+        racer.start()
+        racer.join(0.5)
+        outcome['racer'] = racer
+        return original(project_id)
+    monkeypatch.setattr(repo.store, 'tombstone', tombstone)
+    monkeypatch.setattr(project_repository, '_remove_project_files', lambda _directory: (_ for _ in ()).throw(OSError('busy')))
+    entry = repo.delete(PROJECT)
+    outcome['racer'].join(5)
+    assert entry.cleanup_status == 'failed' and outcome.get('code') == 'PROJECT_DELETED'
+    assert workspace_file.read_bytes() == raw and PROJECT not in repo.sessions
+
+
+def test_cleanup_removes_temporary_files_left_in_blob_folders(tmp_path):
+    repo = repository(tmp_path)
+    directory = repo.open(PROJECT).directory
+    leftover = directory / 'sources' / '.foldcv-write-interrupted'
+    leftover.write_bytes(b'partial')
+    leftover.chmod(0o600)
+    entry = repo.delete(PROJECT)
+    assert entry.cleanup_status == 'complete' and not directory.exists()

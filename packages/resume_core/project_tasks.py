@@ -6,6 +6,7 @@ import that the service lost resumes from its operation sidecar, not from this r
 
 from __future__ import annotations
 
+from contextlib import contextmanager
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 import itertools
@@ -50,14 +51,16 @@ class TaskRegistry:
         self.lock = threading.Lock()
         self.tasks: dict[str, Task] = {}
         self.counter = itertools.count(1)
+        self.closing = {}
 
     def start(self, project_id, kind, *, stage=None, detail=None, exclusive=True):
-        """A running task; with `exclusive` a second running task of the same kind on the project is refused."""
+        """A running task; with `exclusive` a second running task of the same kind on the project is refused, and so
+        is any task of a project inside `closed`."""
         if kind not in KINDS:
             raise ValueError('unknown task kind')
         with self.lock:
-            if exclusive and any(task.project_id == project_id and task.kind == kind and task.state == 'running'
-                    for task in self.tasks.values()):
+            if project_id in self.closing or exclusive and any(task.project_id == project_id and task.kind == kind
+                    and task.state == 'running' for task in self.tasks.values()):
                 raise TaskFailure('REQUEST_IN_PROGRESS')
             identifier = '%s_%d' % (kind, next(self.counter))
             task = Task(identifier, project_id, kind, 'running', stage, self.wall(), self.clock(), dict(detail or {}))
@@ -102,6 +105,19 @@ class TaskRegistry:
         now = self.clock()
         with self.lock:
             return [task.status(now) for task in self.tasks.values() if project_id is None or task.project_id == project_id]
+
+    @contextmanager
+    def closed(self, project_id):
+        """No task of the project starts inside: a deletion waits for the running ones and no new one may begin."""
+        with self.lock:
+            self.closing[project_id] = self.closing.get(project_id, 0) + 1
+        try:
+            yield
+        finally:
+            with self.lock:
+                self.closing[project_id] -= 1
+                if not self.closing[project_id]:
+                    del self.closing[project_id]
 
     def forget(self, project_id):
         """Drop the finished tasks of a deleted project; running ones are cancelled by their owner first."""

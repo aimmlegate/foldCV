@@ -491,8 +491,10 @@ def retain_operation(before, after):
                 new.admitted_record_revisions, new.admitted_relation_revisions):
             _refuse()
     if before.finalization is not None and before.finalization != after.finalization:
+        # A resume may renew a candidate nothing was published with, also with new content (a formatting date
+        # changed meanwhile); a saved publication keeps its candidate.
         if (before.finalization not in after.finalization_history or after.finalization is None
-                or before.finalization.candidate_hash != after.finalization.candidate_hash
+                or before.publication.state == 'saved'
                 or not after.authorizations or after.authorizations[-1].kind != 'resume'
                 or after.finalization.authorization_id != after.authorizations[-1].id
                 or before.finalization.authorization_id == after.finalization.authorization_id):

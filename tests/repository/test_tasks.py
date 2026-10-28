@@ -57,6 +57,18 @@ def test_cancel_sets_the_task_event_and_unknown_ids_are_refused():
     assert refused.value.code == 'JOB_NOT_FOUND'
 
 
+def test_no_task_starts_on_a_project_that_is_being_deleted():
+    tasks, _clock = registry()
+    with tasks.closed('project-a'):
+        with tasks.closed('project-a'):
+            pass
+        with pytest.raises(TaskFailure) as refused:
+            tasks.start('project-a', 'export', exclusive=False)
+        assert refused.value.code == 'REQUEST_IN_PROGRESS'
+        tasks.start('project-b', 'export')
+    assert tasks.start('project-a', 'export').state == 'running'
+
+
 def test_finished_tasks_are_bounded_and_forgotten_with_their_project(monkeypatch):
     monkeypatch.setattr(project_tasks, 'FINISHED_KEPT', 2)
     tasks, clock = registry()

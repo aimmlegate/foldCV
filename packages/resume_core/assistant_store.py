@@ -30,6 +30,7 @@ EVENTS_KEPT = 500
 PROPOSALS_KEPT = 100
 SOURCES_KEPT = 100
 FINDINGS_KEPT = 200
+FILE_BYTES = limits.RUN_BYTES * 8
 
 
 class ConversationFile(Wire):
@@ -71,6 +72,21 @@ def _safe(identifier):
     return identifier
 
 
+def _fit(conversation):
+    """Drop the oldest turns' sources, findings and messages until the file fits FILE_BYTES. The count bounds allow
+    far more, and a file over the limit would refuse every later update of the conversation."""
+    excess = len(conversation.model_dump_json(by_alias=True).encode()) - FILE_BYTES
+    order = {}
+    for message in conversation.messages:
+        order.setdefault(message.run_id, len(order))
+    lists = (conversation.sources, conversation.findings, conversation.messages)
+    while excess > 0 and any(lists):
+        # Entries of a turn whose messages are gone count as the oldest; within a turn sources go first.
+        _turn, oldest = min((order.get(items[0].run_id, -1), position) for position, items in enumerate(lists) if items)
+        # The separating comma is not counted, so the estimate never undershoots.
+        excess -= len(lists[oldest].pop(0).model_dump_json(by_alias=True).encode())
+
+
 class AssistantStore:
     def __init__(self, root: Path):
         self.root = Path(root) / "assistant"
@@ -91,7 +107,7 @@ class AssistantStore:
 
     def _write(self, path, value):
         raw = value.model_dump_json(by_alias=True).encode()
-        if len(raw) > limits.RUN_BYTES * 8:
+        if len(raw) > FILE_BYTES:
             raise AgentFailure("AGENT_STORE_FULL")
         try:
             atomic_write(path, raw)
@@ -144,6 +160,7 @@ class AssistantStore:
             value.findings = value.findings[-FINDINGS_KEPT:]
             value.runs = value.runs[-RUNS_KEPT:]
             value.updated_at = timestamp()
+            _fit(value)
             self._write(self.directory(project_id, "conversations", value.id + ".json"), value)
             return result
 

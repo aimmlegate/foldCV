@@ -10,6 +10,8 @@ from __future__ import annotations
 import asyncio
 import logging
 from collections import OrderedDict, deque
+from concurrent.futures import ThreadPoolExecutor
+from contextlib import ExitStack
 from dataclasses import dataclass, field
 import threading
 import time
@@ -98,6 +100,12 @@ class AssistantService:
         self.loop = None
         self.closed = False
         self.verified = set()
+        # Run files (event lines, the run state, the answer, sources, findings, proposals) are written on this one
+        # thread: in order, and never on the event loop.
+        self.writer = ThreadPoolExecutor(max_workers=1, thread_name_prefix='assistant-files')
+
+    async def write(self, work, *args):
+        return await asyncio.wrap_future(self.writer.submit(work, *args))
 
     @property
     def fetcher(self):
@@ -170,24 +178,28 @@ class AssistantService:
     # Runs
 
     def active(self, project_id):
-        return any(control.project_id == project_id and control.task is not None and not control.task.done()
-            for control in self.controls.values())
+        # A control without a task is a run that submit is still starting.
+        return any(control.project_id == project_id and (control.task is None or not control.task.done())
+            for control in list(self.controls.values()))
 
-    def submit(self, project_id, conversation_id, request):
+    async def submit(self, project_id, conversation_id, request):
         if self.closed:
             raise ProjectFailure('AGENT_CONNECTION_UNAVAILABLE', 409)
-        stored = self.store.conversation(project_id, conversation_id)
-        existing = next((run for run in stored.runs if run.client_request_id == request.client_request_id), None)
+        if not request.message.strip():
+            raise ProjectFailure('INVALID_REQUEST', 422)
+        existing, workspace, settings = await asyncio.to_thread(self._admit, project_id, conversation_id, request)
         if existing is not None:
             return self._current_run(existing)
-        capability = self.capabilities()
-        if not capability.ready:
-            raise ProjectFailure(capability.unavailable.code, 409)
+        # No await from here to the reserved control, so two submits cannot both start a run.
+        starting = next((control.run for control in self.controls.values() if control.conversation_id == conversation_id
+            and control.run.client_request_id == request.client_request_id), None)
+        if starting is not None:
+            return starting
+        if self.closed:
+            raise ProjectFailure('AGENT_CONNECTION_UNAVAILABLE', 409)
         if self.active(project_id):
             raise ProjectFailure('ASSISTANT_RUN_ACTIVE', 409)
-        workspace = self._require_project(project_id)
         now = timestamp()
-        settings = self.settings.load()
         run = AssistantRunV1(id=identity('run'), conversationId=conversation_id, projectId=project_id,
             clientRequestId=request.client_request_id, state='queued', allowEdits=request.allow_edits,
             allowWeb=request.allow_web, model=settings.selected_agent_model, baseRevision=workspace.project_revision,
@@ -200,41 +212,76 @@ class AssistantService:
                 conversation.title = request.message.strip().splitlines()[0][:120]
             conversation.messages.append(message)
             conversation.runs.append(run)
-        self.store.update_conversation(project_id, conversation_id, record)
-        control = Control(project_id, conversation_id, run, time.monotonic(),
+        control = self.controls[run.id] = Control(project_id, conversation_id, run, time.monotonic(),
             effort=self.connection().effort(run.model, settings.reasoning_effort))
-        self.controls[run.id] = control
+        try:
+            await asyncio.to_thread(self.store.update_conversation, project_id, conversation_id, record)
+        except BaseException:
+            self.controls.pop(run.id, None)
+            raise
         self.loop = asyncio.get_running_loop()
         control.task = asyncio.create_task(self._drive(control, request))
         return run
 
+    def _admit(self, project_id, conversation_id, request):
+        """A submit's reads, in a worker thread: the run of an earlier send of this request, readiness, the project, settings."""
+        stored = self.store.conversation(project_id, conversation_id)
+        existing = next((run for run in stored.runs if run.client_request_id == request.client_request_id), None)
+        if existing is not None:
+            return existing, None, None
+        capability = self.capabilities()
+        if not capability.ready:
+            raise ProjectFailure(capability.unavailable.code, 409)
+        return None, self._require_project(project_id), self.settings.load()
+
     def _set_run(self, control, **changes):
         control.run = control.run.model_copy(update=changes)
+        self._store_run(control)
+
+    def _store_run(self, control):
+        if control.deleted:
+            return
 
         def record(conversation):
             conversation.runs = [control.run if run.id == control.run.id else run for run in conversation.runs]
         self.store.update_conversation(control.project_id, control.conversation_id, record)
 
+    def _store_run_quietly(self, control):
+        try:
+            self._store_run(control)
+        except AgentFailure:
+            LOG.warning('assistant run state not saved')
+
     def emit(self, control, kind, payload, *, terminal=False):
         if control.cancel.is_set() and not terminal and kind not in {'run.state_changed'}:
             return
         with self.lock:
+            event = self._event(control, kind, payload)
+            control.events.append(event)
+            # Deltas stay in memory only; the transcript keeps the final text. Under the lock the lines reach the
+            # writer in sequence order.
+            if kind != 'message.delta':
+                self.writer.submit(self._append, control, event)
+        self._wake(control)
+
+    def _event(self, control, kind, payload):
+        with self.lock:
             control.sequence += 1
             if kind == 'message.delta':
                 control.text += payload.get('text', '')
-            event = AgentEvent.model_validate({'schemaVersion': 1, 'id': identity('event'), 'sequence': control.sequence,
-                'projectId': control.project_id, 'conversationId': control.conversation_id, 'runId': control.run_id,
-                'timestamp': timestamp(), 'type': kind, 'payload': payload})
-            control.events.append(event)
             if kind == 'usage.reported':
                 control.run = control.run.model_copy(update={'usage': AgentUsage.model_validate(payload)})
-        # Deltas stay in memory only; the transcript keeps the final text.
-        if kind != 'message.delta' and not control.deleted:
-            try:
-                self.store.append_event(control.project_id, control.run_id, event)
-            except AgentFailure:
-                pass
-        self._wake(control)
+            return AgentEvent.model_validate({'schemaVersion': 1, 'id': identity('event'), 'sequence': control.sequence,
+                'projectId': control.project_id, 'conversationId': control.conversation_id, 'runId': control.run_id,
+                'timestamp': timestamp(), 'type': kind, 'payload': payload})
+
+    def _append(self, control, event):
+        if control.deleted:
+            return
+        try:
+            self.store.append_event(control.project_id, control.run_id, event)
+        except AgentFailure:
+            pass
 
     def _wake(self, control):
         loop = self.loop
@@ -252,34 +299,34 @@ class AssistantService:
     def _running(self, control):
         if control.cancel.is_set():
             raise AgentFailure('AGENT_CANCELLED')
-        self._set_run(control, state='running')
+        # The runtime calls this on the event loop: the stored run state follows on the writer.
+        control.run = control.run.model_copy(update={'state': 'running'})
+        self.writer.submit(self._store_run_quietly, control)
         self.emit(control, 'run.state_changed', {'state': 'running', 'error': None, 'savedBatchId': None, 'outcomeUnknown': False})
 
     async def _drive(self, control, request):
         result = RuntimeResult(error='AGENT_RUNTIME_UNSUPPORTED')
         tools = None
         loop = asyncio.get_running_loop()
+        pin = ExitStack()
         try:
             if self.runtime is None:
                 raise AgentFailure('AGENT_RUNTIME_UNSUPPORTED')
-            with self.projects.repository.pinned(control.project_id) as session:
-                with session.lock:
-                    pinned = session.workspace
-                history = self.store.conversation(control.project_id, control.conversation_id).messages[:-1]
-                prompt = context.prompt(pinned, message=request.message, history=history, allow_edits=control.run.allow_edits,
-                    allow_web=control.run.allow_web, selection=request.selection)
-                tools = control.tools = ToolSession(self, control, pinned)
-                await tools.start()
+            pinned, history = await asyncio.to_thread(self._pin, pin, control)
+            prompt = context.prompt(pinned, message=request.message, history=history, allow_edits=control.run.allow_edits,
+                allow_web=control.run.allow_web, selection=request.selection)
+            tools = control.tools = ToolSession(self, control, pinned)
+            await tools.start()
 
-                def close_tools(timeout):
-                    asyncio.run_coroutine_threadsafe(tools.close(), loop).result(timeout=min(3, timeout))
-                value = RuntimeInput(model=control.run.model, prompt=prompt, url=tools.url, token=tools.token,
-                    tools=tuple(tools.names), allow_web=control.run.allow_web, before_start=lambda: self._running(control),
-                    revoke=tools.revoke, close_tools=close_tools, queued_at=control.queued_at,
-                    developer_instructions=DEVELOPER_INSTRUCTIONS,
-                    **({'reasoning_effort': control.effort} if control.effort else {}))
-                result = await self.runtime.run(value, control.cancel,
-                    lambda kind, payload: self.emit(control, kind, payload))
+            def close_tools(timeout):
+                asyncio.run_coroutine_threadsafe(tools.close(), loop).result(timeout=min(3, timeout))
+            value = RuntimeInput(model=control.run.model, prompt=prompt, url=tools.url, token=tools.token,
+                tools=tuple(tools.names), allow_web=control.run.allow_web, before_start=lambda: self._running(control),
+                revoke=tools.revoke, close_tools=close_tools, queued_at=control.queued_at,
+                developer_instructions=DEVELOPER_INSTRUCTIONS,
+                **({'reasoning_effort': control.effort} if control.effort else {}))
+            result = await self.runtime.run(value, control.cancel,
+                lambda kind, payload: self.emit(control, kind, payload))
         except asyncio.CancelledError:
             result = RuntimeResult(state='cancelled', error='AGENT_CANCELLED')
         except AgentFailure as error:
@@ -298,7 +345,33 @@ class AssistantService:
                     result.state, result.error = 'failed', 'AGENT_CLEANUP_FAILED'
             if control.cancel.is_set() and result.state != 'completed':
                 result.state, result.error = 'cancelled', 'AGENT_CANCELLED'
-            self._finish(control, result)
+            terminal = None
+            try:
+                # The answer and the final run state follow the run's pending lines on the writer, then the terminal
+                # line. The terminal event shows only with the control gone: a poll that sees it reads complete files
+                # and a new run can start at once.
+                terminal = await self.write(self._finish, control, result)
+                if terminal is not None:
+                    await self.write(self._append, control, terminal)
+            finally:
+                if terminal is not None:
+                    with self.lock:
+                        control.events.append(terminal)
+                # From here the run is read from its files; the control would keep the pinned workspace alive.
+                self.controls.pop(control.run_id, None)
+                self._wake(control)
+                try:
+                    await asyncio.to_thread(pin.close)
+                except Exception:
+                    LOG.exception('assistant run unpin failed')
+
+    def _pin(self, pin, control):
+        """Pin the project for the run; read its committed workspace and the earlier messages. A worker-thread call:
+        a load or a held project lock must not stall the event loop."""
+        session = pin.enter_context(self.projects.repository.pinned(control.project_id))
+        with session.lock:
+            pinned = session.workspace
+        return pinned, self.store.conversation(control.project_id, control.conversation_id).messages[:-1]
 
     def _finish(self, control, result):
         state = result.state if result.state in TERMINAL else 'failed'
@@ -326,13 +399,14 @@ class AssistantService:
             self._set_run(control, state=state, error=error, finished_at=timestamp())
         except AgentFailure:
             control.run = control.run.model_copy(update={'state': state, 'error': error, 'finished_at': timestamp()})
-        self.emit(control, 'run.state_changed', {'state': state, 'error': {'code': error.code if error.code in KNOWN_CODES
-            else 'AGENT_PROTOCOL'} if error else None, 'savedBatchId': None, 'outcomeUnknown': False}, terminal=True)
+        return self._event(control, 'run.state_changed', {'state': state, 'error': {'code': error.code
+            if error.code in KNOWN_CODES else 'AGENT_PROTOCOL'} if error else None, 'savedBatchId': None,
+            'outcomeUnknown': False})
 
-    def cancel(self, project_id, run_id):
+    async def cancel(self, project_id, run_id):
         control = self.controls.get(run_id)
         if control is None or control.project_id != project_id:
-            _conversation, run = self.store.find_run(project_id, run_id)
+            _conversation, run = await asyncio.to_thread(self.store.find_run, project_id, run_id)
             return self._current_run(run)
         if control.run.state not in TERMINAL:
             control.cancel.set()
@@ -344,10 +418,7 @@ class AssistantService:
     async def events(self, project_id, run_id, after=0, wait=None):
         control = self.controls.get(run_id)
         if control is None or control.project_id != project_id:
-            _conversation, run = self.store.find_run(project_id, run_id)
-            events = self.store.events(project_id, run_id, after)
-            return AssistantEventsV1(run=self._current_run(run), events=events,
-                next=events[-1].root.sequence if events else after)
+            return await asyncio.to_thread(self._stored_events, project_id, run_id, after)
         wait = self.wait_seconds if wait is None else max(0.0, min(float(wait), 30.0))
         deadline = time.monotonic() + wait
         while True:
@@ -363,7 +434,16 @@ class AssistantService:
                 pass
         return AssistantEventsV1(run=control.run, events=fresh, next=fresh[-1].root.sequence if fresh else after)
 
+    def _stored_events(self, project_id, run_id, after):
+        _conversation, run = self.store.find_run(project_id, run_id)
+        events = self.store.events(project_id, run_id, after)
+        return AssistantEventsV1(run=self._current_run(run), events=events,
+            next=events[-1].root.sequence if events else after)
+
     def record_source(self, control, source):
+        if control.deleted:
+            return
+
         def record(conversation):
             conversation.sources.append(source)
         self.store.update_conversation(control.project_id, control.conversation_id, record)
@@ -374,6 +454,9 @@ class AssistantService:
         return {source.id for source in stored.sources}
 
     def record_findings(self, control, findings):
+        if control.deleted:
+            return
+
         def record(conversation):
             conversation.findings.extend(findings)
         self.store.update_conversation(control.project_id, control.conversation_id, record)
@@ -383,14 +466,13 @@ class AssistantService:
     # Exports for the export_document tool: the ordinary export task, served by id for a while.
 
     async def export(self, project_id, fmt, control=None):
+        workspace = await asyncio.to_thread(self.projects.repository.read, project_id)
         if fmt == 'docx':
-            workspace = self.projects.repository.read(project_id)
             result = await self.projects.exports.export(project_id, snapshot_identity(workspace), None, trusted=True)
             data, filename, media = result.artifact, 'resume.docx', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
         else:
             from types import SimpleNamespace
             from resume_api.projects.archive import export_archive
-            workspace = self.projects.repository.read(project_id)
             request = SimpleNamespace(editor_token=None, project_revision=workspace.project_revision,
                 document_revision=workspace.document_revision)
             data = await asyncio.to_thread(export_archive, self.projects, project_id, request, trusted=True)
@@ -415,8 +497,9 @@ class AssistantService:
 
     # Lifecycle
 
+    # The project callers run in worker threads while runs end on the event loop, so they iterate over copies.
     def stop_project(self, project_id):
-        for control in self.controls.values():
+        for control in list(self.controls.values()):
             if control.project_id == project_id:
                 control.cancel.set()
 
@@ -433,10 +516,16 @@ class AssistantService:
             control.cancel.set()
         if tasks:
             await asyncio.wait(tasks, timeout=5)
+        await self.write(lambda: None)
 
     def project_deleted(self, project_id):
-        for control in self.controls.values():
+        for control in list(self.controls.values()):
             if control.project_id == project_id:
                 control.deleted = True
         self.stop_project(project_id)
+        with self.lock:
+            for identifier in [key for key, value in self.files.items() if value[0] == project_id]:
+                del self.files[identifier]
+        # Writes queued before the flag skip themselves; waiting for them keeps a late one from recreating the files.
+        self.writer.submit(lambda: None).result()
         self.store.delete_project(project_id)

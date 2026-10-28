@@ -9,8 +9,13 @@ const editor = (apply: AssistantEditor["applyProposal"] = () => Promise.reject(n
   actionApplied?: AssistantEditor["actionApplied"]): AssistantEditor => ({ applyProposal: apply, ...(actionApplied ? { actionApplied } : {}) });
 function until(controller: AssistantController, done: (view: AssistantView) => boolean): Promise<void> {
   return new Promise((resolve, reject) => {
-    const timer = setTimeout(() => reject(new Error("view never matched")), 2000);
-    const check = () => { if (done(controller.view)) { clearTimeout(timer); resolve(); } else setTimeout(check, 5); };
+    // The check stops at the deadline too: a timer left running would keep a failing file from ending.
+    const deadline = Date.now() + 2000;
+    const check = () => {
+      if (done(controller.view)) resolve();
+      else if (Date.now() > deadline) reject(new Error("view never matched"));
+      else setTimeout(check, 5);
+    };
     check();
   });
 }
@@ -32,6 +37,55 @@ test("a run is followed by one long-poll loop that advances its cursor and ends 
     await new Promise(resolve => setTimeout(resolve, 20));
     assert.equal(calls.events.length, polls, "no poll after the run ended");
     assert.equal(controller.active, false);
+  } finally { controller.close(); }
+});
+
+test("failed polls are retried while the panel shows the reconnect, and the run is still followed to its end", async () => {
+  const { api } = fakeApi([[event(1, "run.state_changed", { state: "running", error: null, savedBatchId: null, outcomeUnknown: false })], []]);
+  const events = api.events;
+  let failures = 5;
+  api.events = (runId, after, signal) => failures-- > 0 ? Promise.reject(new TypeError("fetch failed")) : events(runId, after, signal);
+  const views: AssistantView[] = [], controller = new AssistantController(api, editor(), view => views.push(view), 1);
+  try {
+    await controller.init(); controller.draft("Проверь резюме"); await controller.send();
+    await until(controller, view => view.run?.state === "completed");
+    assert.ok(views.some(view => view.loading === "Восстанавливаем связь с помощником"));
+    assert.equal(controller.view.loading, null);
+    assert.equal(controller.view.error, null);
+  } finally { controller.close(); }
+});
+
+test("a run that stays unreachable is reported after the bounded retries, and Stop follows it again to its end", async () => {
+  const { api } = fakeApi([[]]);
+  const events = api.events;
+  let down = true, attempts = 0;
+  api.events = (runId, after, signal) => { attempts++; return down ? Promise.reject(new TypeError("fetch failed")) : events(runId, after, signal); };
+  const controller = new AssistantController(api, editor(), () => {}, 1);
+  try {
+    await controller.init(); controller.draft("Проверь резюме"); await controller.send();
+    await until(controller, view => view.error === "SERVICE_UNAVAILABLE");
+    assert.equal(controller.view.loading, "Нет связи с помощником");
+    const given = attempts;
+    await new Promise(resolve => setTimeout(resolve, 30));
+    assert.equal(attempts, given, "no poll after giving up");
+    down = false;
+    await controller.stop();
+    assert.equal(controller.view.run?.state, "cancelled");
+    assert.equal(controller.view.loading, null);
+    assert.equal(controller.active, false);
+  } finally { controller.close(); }
+});
+
+test("a run the service no longer has ends the loop at once", async () => {
+  const { api } = fakeApi([[]]);
+  let attempts = 0;
+  api.events = () => { attempts++; return Promise.reject(new AgentApiFailure("AGENT_NOT_FOUND", 404)); };
+  const controller = new AssistantController(api, editor(), () => {}, 1);
+  try {
+    await controller.init(); controller.draft("Проверь резюме"); await controller.send();
+    await until(controller, view => view.error === "AGENT_NOT_FOUND");
+    assert.equal(attempts, 1);
+    assert.equal(controller.view.loading, null);
   } finally { controller.close(); }
 });
 

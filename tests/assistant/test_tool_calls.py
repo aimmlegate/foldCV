@@ -5,7 +5,10 @@ import json
 import pytest
 
 from packages.resume_core import agent_limits as limits
+from packages.resume_core.models.template_render import TemplateRendererIdentity
+from packages.resume_core.models.template_workspace import WorkspaceV7
 from resume_api.agent.web import PublicFetcher
+from tests.assistant.support import PROJECT, assistant_app, conversation, finish, papers, proposals, start
 from tests.support.assistant_tools import Fetcher, tool_session
 
 
@@ -59,3 +62,66 @@ async def test_read_public_page_through_the_real_fetcher_denies_a_private_addres
         assert reply(result) == {"error": {"code": "AGENT_SOURCE_DENIED"}}
     finally:
         await session.close()
+
+
+def long_blocks(count=12):
+    """The papers workspace with `count` more main blocks of Cyrillic text: one format over them previews ~130 KB."""
+    workspace, sources = papers()
+    data = workspace.model_dump(by_alias=True)
+    blocks = data['project']['document']['regions'][2]['blocks']
+    first = blocks[0]
+    for index in range(count):
+        blocks.append({**first, 'id': f'block-long-{index}', 'content': [{'type': 'text', 'text': 'Опыт ' * 600,
+            'styles': {}, 'presentation': first['content'][0]['presentation']}]})
+    return WorkspaceV7.model_validate(data), sources
+
+
+def test_a_large_proposal_is_stored_once_and_reaches_the_model_as_a_compact_success(tmp_path):
+    results = []
+
+    async def steps(tools, _value, _cancel, _emit):
+        ops = [{'op': 'format_block', 'blockId': f'block-long-{index}', 'alignment': 'right'} for index in range(12)]
+        results.append(await tools.call('propose_changes', {'request': {'summary': 'Выровнять', 'ops': ops}}))
+        return 'Готово.'
+    with assistant_app(tmp_path, steps, [long_blocks()]) as (client, _app, _runtime):
+        _run, events = finish(client, start(client, conversation(client)))
+        stored = proposals(client)
+    assert [item['id'] for item in stored] == [results[0]['proposalId']] and len(stored[0]['preview']) == 12
+    assert len(json.dumps(results[0], ensure_ascii=False).encode()) < 1024
+    assert [event['type'] for event in events].count('proposal.ready') == 1
+
+
+def test_a_proposal_over_the_run_budget_is_refused_before_it_is_stored(tmp_path):
+    results = []
+
+    async def steps(tools, _value, _cancel, _emit):
+        tools.session().result_bytes = limits.TOOL_TOTAL_BYTES - 16
+        results.append(await tools.call('propose_changes', {'request': {'summary': 'Правка', 'ops': [
+            {'op': 'replace_text', 'blockId': 'block-paper-a', 'find': 'Shared', 'replace': 'Common'}]}}))
+        return 'Готово.'
+    with assistant_app(tmp_path, steps) as (client, _app, _runtime):
+        _run, events = finish(client, start(client, conversation(client)))
+        assert proposals(client) == []
+    assert results == [{'error': {'code': 'AGENT_TOOL_LIMIT'}}]
+    assert 'proposal.ready' not in [event['type'] for event in events]
+
+
+def test_an_export_whose_link_reply_cannot_fit_the_run_budget_is_refused_before_it_runs(tmp_path):
+    results, rendered = [], []
+
+    async def render(_request):
+        rendered.append(True)
+        return b'PK\x03\x04synthetic-assistant-export'
+
+    async def steps(tools, _value, _cancel, _emit):
+        tools.session().result_bytes = limits.TOOL_TOTAL_BYTES - 200
+        results.append(await tools.call('export_document', {'format': 'docx'}))
+        return 'Готово.'
+    with assistant_app(tmp_path, steps) as (client, application, _runtime):
+        exports = application.state.projects.exports
+        exports._renderer = TemplateRendererIdentity(id='captured-docx', version='test', sha256='a' * 64)
+        exports.render = render
+        _run, events = finish(client, start(client, conversation(client)))
+        assert application.state.projects.repository.read(PROJECT).project.exports == []
+    assert results == [{'error': {'code': 'AGENT_TOOL_LIMIT'}}] and rendered == []
+    assert 'file.ready' not in [event['type'] for event in events]

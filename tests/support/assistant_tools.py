@@ -38,6 +38,9 @@ class Service:
     def emit(self, _control, kind, payload):
         self.events.append((kind, payload))
 
+    async def write(self, work, *args):
+        return work(*args)
+
 
 def tool_session(*, allow_web=False, fetcher=None):
     control = SimpleNamespace(project_id="template-project", run_id="run-1", cancel=threading.Event(),

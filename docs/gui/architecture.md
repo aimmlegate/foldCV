@@ -98,11 +98,16 @@ assistant/<projectId>/{conversations,runs,proposals}/
 ### Repository
 
 `packages/resume_core/project_repository.py`. `ProjectRepository` keeps one
-`ProjectSession` per open project: the committed `WorkspaceV7` object (replaced on
-each commit, never changed in place), its `projectRevision`, one `RLock`, the journal,
-the editor token, the replay window, the occupied ids and up to 20 clipboard
-captures. At most three sessions stay open; idle ones are evicted, pinned ones
-(import, export, assistant run) stay. `start()` runs the D104/D105 history
+`ProjectSession` per project for the life of the service: the committed `WorkspaceV7`
+object (replaced on each commit, never changed in place), its `projectRevision`, one
+reentrant lock, the journal, the editor token, the replay window, the occupied ids
+and up to 20 clipboard captures. At most three sessions stay loaded. Eviction unloads
+an idle one (workspace and journal); pinned ones (import, export, assistant run) and
+locked ones stay. Entering a session's lock loads it again, so every caller works on
+the same object, and editor tokens and clipboard captures survive eviction. Read the
+workspace, journal and revision only under the lock (or through `repository.read`).
+A deletion writes the tombstone under the session lock: a caller waiting for that lock
+and any later open get `PROJECT_DELETED`. `start()` runs the D104/D105 history
 externalize pass once before any open. Route handlers run repository work in a
 worker thread (`asyncio.to_thread`) and never hold a project lock across an `await`.
 
@@ -121,10 +126,14 @@ A commit runs under the session lock. `mutate` serves edits, undo and redo;
    the last 200; the size is checked against the D096 setting (`PROJECT_TOO_LARGE`).
 6. One serialization (`rich_snapshot_bytes`) and `storage.atomic_write` (temp file,
    fsync, rename, directory fsync). An edit writes nothing else. `replace` writes
-   its blobs first: written when missing, checked by hash when present.
+   its blobs first: written when missing, checked by hash when present. A workspace
+   with loaded import records is decoded back before the file is replaced, so a
+   decode failure commits nothing.
 7. Memory follows the file.
 8. The journal line is appended. A failure there is logged as a journal gap and does
    not fail the request: the committed state is the file.
+9. Commit hooks run (sidecar discard, listing heading). A hook failure is logged; the
+   commit stands.
 
 A crash leaves the previous or the new `workspace.json`, never a partial one. A retry
 after a crash or restart is recognized from `mutationReplay`. An edit costs at most
@@ -135,7 +144,9 @@ flags and at close or eviction, not per edit; the listing lays open sessions ove
 
 `packages/resume_core/project_journal.py`, file `history.jsonl`. Line kinds: `edit`
 (action id, mutation id, revisions, full `before` and `after` payloads of the
-undoable keys that changed), `undo`, `redo` and `barrier`. The keys are those of
+undoable keys that changed), `undo`, `redo`, `barrier` and `mark` (a commit without
+undoable changes, written only while there is history). Every line names the
+revision after it. The keys are those of
 `template_local_history.values` (blocks, placements, builtin records, extensions,
 relations, issues, scopes, tombstones, coverage anchors, sync rows) plus the order of
 the lists those keys do not encode.
@@ -147,8 +158,13 @@ the lists those keys do not encode.
 - A `replace` that changes undoable keys (import publication) writes a barrier, which
   clears both stacks. Export records, rename, sources, assets and the template
   package are not on the stack.
+- A journal that ends at another revision than `workspace.json` (a line lost in a
+  crash) gets a barrier at load instead of undoing around the missing edit. After a
+  failed append the next line is preceded by a barrier, so a reload cannot bring the
+  cleared actions back.
 - Bounds: 200 actions and 16 MiB. A corrupt tail is truncated; the file is compacted
-  on load and close. The journal is not part of `.foldcv`.
+  on load, at close and while open past 800 lines or 32 MiB. The journal is not part
+  of `.foldcv`.
 
 ### Editor token and one tab
 
@@ -183,10 +199,20 @@ on purpose: no patches and no client re-verification.
 
 Lost acknowledgment (after `REVISION_CONFLICT`, after `EDITOR_TOKEN_UNKNOWN`, and at
 reopen with a pending draft): the client reads the current state; an intent whose id
-is in `appliedClientMutationIds` is applied and dropped; one whose base revision
-equals the current revision is sent again; any other intent's text is shown in a
-notice and dropped. IndexedDB (`foldcv-pending-edits`) keeps unacknowledged intents
-with their mutation id and base revision.
+is in `appliedClientMutationIds` is applied and dropped; an issued one whose base
+revision equals the current revision is sent again; an issued one whose document
+revision is unchanged (only an export record, a rename or another non-document commit
+moved the revision) is translated again and sent with the same id; any other issued
+intent's text is shown in a notice and dropped. An unsent intent is never dropped for
+its revision: it is translated at its turn, and only a failed translation drops it
+with a notice. IndexedDB (`foldcv-pending-edits`) keeps unacknowledged intents with
+their mutation id and base revision.
+
+A 4xx refusal other than 408 and 429 stops the queue with its reason. No answer, 408,
+429 and 5xx are sent again with the same id after 1, 2, 4, 8 and 16 seconds, then
+every 30 seconds. One re-open at a time: requests that lost the token share it. An
+undo or redo that cannot be settled is given up with a notice and never blocks input;
+a `HISTORY_STALE` reply brings the server's history, which the buttons follow.
 
 Under `FOLDCV_VERIFY=1` the server also decodes the written bytes and compares them
 with memory, and rechecks the response snapshot and presentation (`verify_response`).
@@ -241,9 +267,21 @@ activity view (stage, elapsed time, saved discoveries). Nothing there is durable
 
 - Import (`projects/intake.py`, `projects/imports.py`, `importer/template_pipeline.py`):
   the upload becomes a V7 pre-draft through `repository.create`; the import runs as a
-  task that holds one inference permit. Checkpoints and publication are
-  `repository.replace` with the revision of the snapshot the pipeline computed from;
-  on `REVISION_CONFLICT` the pipeline re-bases or fails the task.
+  task that holds one inference permit. The start answers 202 at once; an import
+  queued behind another one or an assistant turn shows stage `waiting`, and the
+  client counts its time limit from the end of that wait. Checkpoints and publication
+  are `repository.replace` with the revision of the snapshot the pipeline computed
+  from; on `REVISION_CONFLICT` the pipeline re-bases or fails the task. The
+  publication commit is the point of no return: a cancel before it leaves the import
+  unpublished and resumable, a cancel after it leaves the task succeeded. A resume
+  renews a saved finalization of an earlier authorization; nothing was published with
+  it, so the renewal takes the current content (a formatting date changed meanwhile).
+  Cancel only asks the import to stop; the runner finishes its own task
+  after it released its permit and pin. Shutdown, sign-out and a sign-in change stop
+  running imports (15 s bound).
+- Deletion (`ProjectService.delete`): no task of the project starts meanwhile; its
+  imports, exports and rewrite are cancelled and awaited for up to 15 s (else 409
+  `REQUEST_IN_PROGRESS`); a permit its stopped import kept is released.
 - Operation sidecar (`importer/template_sidecar.py`, `projects/fold.py`): each
   processing step replaces `imports/<operation>.json` atomically, bound to the
   project revision it extends. A fold hook folds a sidecar at the current revision
@@ -253,7 +291,8 @@ activity view (stage, elapsed time, saved discoveries). Nothing there is durable
   continues from the sidecar.
 - Export (`projects/exports.py`): renders DOCX through the render worker
   (`rendering.TemplateDocxRenderer`) and records the attempt, capture and artifact
-  with one `replace` that changes no undoable key. Reply headers name the attempt,
+  with one `replace` on the current workspace that changes no undoable key, so edits
+  made during the render stay and the attempt keeps the snapshot it rendered. Reply headers name the attempt,
   the artifact hash and the rendered snapshot; the client checks the snapshot
   (`contracts/template-export.ts`).
 - Rewrite preview (`projects/rewrite.py`, `template_rewrite.py`): one model call and
@@ -279,7 +318,12 @@ MCP listener with a bearer token (`agent/mcp.py`), the public page fetcher
 - Tools (`assistant/tools.py`, ten): `read_resume`, `find_text`, `read_facts`,
   `read_original`, `read_skill`, `check_resume`, `read_public_page`,
   `export_document`, `propose_changes`, `publish_findings`. Only the last two store
-  anything, and neither writes the project.
+  anything, and neither writes the project. A tool reply is checked against the size
+  limits before anything is stored, so a stored proposal always reaches the model as
+  a success. A conversation file is trimmed by size (oldest turns first) as well as
+  by count. Run files (event lines, the run state, the answer, sources, findings and
+  proposals) are written on one writer thread, in order and never on the event loop;
+  the terminal event shows once its line is on disk and the run's control is gone.
 - Proposals (`assistant_store.py`, `assistant_compiler.py`, `assistant/proposals.py`):
   a proposal file holds the ops, the preview and the hash of each touched block or
   record in the pinned workspace. Only the user applies it (D093). Apply runs inside

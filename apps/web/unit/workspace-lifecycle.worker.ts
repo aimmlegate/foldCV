@@ -9,9 +9,9 @@ function deferred() {
 }
 const effects: (() => void | (() => void))[] = [], cleanups: (() => void)[] = [], events: string[] = [];
 const scenario = process.argv[2] ?? "", importing = scenario.startsWith("import-");
-// useState call order in useResumeWorkspace: error is the 6th state, busy the 8th.
-const ERROR = 5, BUSY = 7;
-const stateWrites = new Map<number, unknown[]>();
+// useState call order in useResumeWorkspace: the open template is the 1st state, error the 6th, busy the 8th.
+const TEMPLATE = 0, ERROR = 5, BUSY = 7;
+const stateWrites = new Map<number, unknown[]>(), initialStates = new Map<number, unknown>();
 let stateIndex = 0, importReads = 0;
 let mounted = true, staleState = 0;
 Object.defineProperty(globalThis, "location", { value: { search: "?project=A", href: "http://foldcv.test/?project=A", pathname: "/" } });
@@ -21,7 +21,8 @@ mock.module("react", { namedExports: {
   useEffect: (effect: () => void | (() => void)) => { effects.push(effect); const cleanup = effect(); if (cleanup) cleanups.push(cleanup); },
   useRef: (current: unknown) => ({ current }),
   useState: (value: unknown): [unknown, (next: unknown) => void] => {
-    const index = stateIndex++, initial: unknown = typeof value === "function" ? Reflect.apply(value, null, []) : value;
+    const index = stateIndex++;
+    const initial: unknown = initialStates.has(index) ? initialStates.get(index) : typeof value === "function" ? Reflect.apply(value, null, []) : value;
     return [initial, (next: unknown) => { if (!mounted) staleState++; stateWrites.set(index, [...stateWrites.get(index) ?? [], next]); }];
   },
 } });
@@ -29,21 +30,27 @@ const file = (path: string) => new URL(path, import.meta.url).href;
 mock.module(file("../src/errors/messages.ts"), { namedExports: { errorMessage: (error: unknown) => String(error) } });
 mock.module(file("../src/rich/import-source.ts"), { namedExports: { hasInput: () => importing, importBody: () => ({}) } });
 const pending = deferred();
-let holdDelete = false, holdOpen = false;
+let holdDelete = false, holdOpen = false, cleanupStatus = "complete";
 const opened = (id: string) => ({ response: { workspace: { projectId: id, project: {} }, identity: null } });
 mock.module(file("../src/workbench/open-editor.ts"), { namedExports: {
   openEditor: async (id: string) => { events.push(`open:${id}`); if (holdOpen) await pending.promise; return opened(id); },
 } });
-const importState = scenario === "import-timeout" ? "running" : scenario === "import-cancelled" ? "cancelled" : "failed";
+const queued = scenario === "import-queued";
+const importState = scenario === "import-timeout" || queued ? "running" : scenario === "import-cancelled" ? "cancelled" : "failed";
 mock.module(file("../src/projects/api.ts"), { namedExports: {
   listProjects: async () => { events.push("catalog"); return { entries: [], errors: [] }; },
   createProject: async () => { events.push("create"); return { workspace: { projectId: "T" } }; },
   startImport: async () => {
     if (!importing) throw new Error("unused");
     events.push("import:start");
-    return { id: "task-1", state: importState, stage: "processing", detail: {}, error: importState === "failed" ? "PROCESS_FAILED" : null };
+    return { id: "task-1", state: importState, stage: queued ? "waiting" : "processing", detail: {},
+      error: importState === "failed" ? "PROCESS_FAILED" : null };
   },
-  projectTasks: async () => { importReads++; return [{ id: "task-1", state: "running", stage: "processing", detail: {}, error: null }]; },
+  projectTasks: async () => {
+    importReads++;
+    // The queued import waits 100 minutes behind another one, then runs.
+    return [{ id: "task-1", state: "running", stage: queued && importReads <= 100 ? "waiting" : "processing", detail: {}, error: null }];
+  },
   resumeImport: async () => { throw new Error("unused"); },
   cancelImport: async () => { events.push("import:cancel"); },
   openFoldcv: async () => {
@@ -51,9 +58,17 @@ mock.module(file("../src/projects/api.ts"), { namedExports: {
     events.push("request:/v2/projects/archive");
     return { workspace: { projectId: "T", project: {} }, identity: null };
   },
-  deleteProject: async (id: string) => { events.push(`delete:${id}`); if (holdDelete) await pending.promise; return { cleanupStatus: "deleted" }; },
+  deleteProject: async (id: string) => { events.push(`delete:${id}`); if (holdDelete) await pending.promise; return { cleanupStatus }; },
   catalogFlag: async (id: string, archived: boolean) => { events.push(`catalog-flag:${id}:${archived}`); },
 } });
+if (scenario === "export-refresh-failed") {
+  initialStates.set(TEMPLATE, { response: opened("A").response, connection: { response: opened("A").response,
+    exportDocx: async () => ({ blob: new Blob(["docx"]), attemptId: "attempt" }) } });
+  Object.defineProperty(globalThis, "document", { value: { createElement: () => {
+    const anchor = { href: "", download: "", click: () => events.push(`download:${anchor.download}`) };
+    return anchor;
+  } } });
+}
 const { useResumeWorkspace } = await import("../src/workbench/useResumeWorkspace");
 const hook = useResumeWorkspace();
 await new Promise<void>(resolve => setImmediate(resolve));
@@ -97,8 +112,9 @@ if (importing) {
   mock.method(globalThis, "setTimeout", (callback: () => void) => { now += 60_000; return schedule(callback, 0); });
   await hook.process();
   // One read per minute until the default import window plus cleanup (5 s), publication (158 s) and a minute.
-  assert.equal(importReads, scenario === "import-timeout" ? 64 : 0);
-  const expected = scenario === "import-timeout" ? "PROCESS_TIMEOUT" : scenario === "import-cancelled" ? "CANCELLED" : "PROCESS_FAILED";
+  // A queued import gets the same window once it runs: the 100 minutes in the queue do not count.
+  assert.equal(importReads, scenario === "import-timeout" ? 64 : queued ? 101 + 64 : 0);
+  const expected = scenario === "import-timeout" || queued ? "PROCESS_TIMEOUT" : scenario === "import-cancelled" ? "CANCELLED" : "PROCESS_FAILED";
   assert.ok(stateWrites.get(ERROR)?.some(value => String(value).includes(expected)), "terminal imports report an error without an optional server error");
   assert.equal(stateWrites.get(BUSY)?.at(-1), false, "the busy state is released");
   assert.equal(await hook.action(async () => {}), true, "another action is admitted after failure");
@@ -150,6 +166,19 @@ if (importing) {
   events.length = 0;
   assert.equal(await hook.open("B"), true);
   assert.deepEqual(events, ["template-navigate", "open:B", "catalog", "url:/?project=B"]);
+} else if (scenario === "delete-cleanup-failed") {
+  // The project is deleted, but some of its files remain; the service reports "failed" and the action says so.
+  cleanupStatus = "failed"; editor.navigate = async () => {};
+  assert.equal(await hook.remove("A"), false);
+  assert.ok(events.includes("delete:A"));
+  assert.ok(stateWrites.get(ERROR)?.some(value => String(value).includes("PROJECT_CLEANUP_INCOMPLETE")));
+} else if (scenario === "export-refresh-failed") {
+  // The refresh after the export record fails; the downloaded file is still delivered and the action succeeds.
+  editor.flush = async () => opened("A").response as never;
+  editor.refresh = async () => { throw new Error("REFRESH_FAILED"); };
+  assert.equal(await hook.exportFile("export", "resume.docx"), true);
+  assert.deepEqual(events, ["download:resume.docx"]);
+  assert.ok(!stateWrites.get(ERROR)?.some(Boolean));
 } else if (scenario === "upload-archive") {
   // A .foldcv opens through v2 and takes its own editor token, like a project from the list.
   gate.resolve(); await hook.fresh(); events.length = 0;

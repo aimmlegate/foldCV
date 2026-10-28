@@ -16,3 +16,7 @@ test("an import task is one notification until it is closed; a failure stays in 
   assert.equal(taskNotice(task("running", "export"), null), null);
   assert.equal(taskNotice(null, null), null);
 });
+
+test("an import queued behind other model work says that it waits", () => {
+  assert.equal(taskNotice({ ...task("running"), stage: "waiting" }, null)?.text, "Импорт ждёт очереди");
+});

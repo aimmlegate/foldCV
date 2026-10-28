@@ -51,15 +51,19 @@ export type TemplateQueuePorts = {
 };
 export type TemplateStrategyInput = { durable: TemplateProjectResponseV1; sessionId: string; ports: TemplateQueuePorts };
 type ActionRecord = { pending: number; committed: boolean; sealed: boolean; finished: boolean };
-// Refusals of the request itself; sending it again cannot succeed.
-const rejectedCodes = new Set(["V7_INPUT_REJECTED", "PROJECT_TOO_LARGE", "PROJECT_READ_ONLY", "MUTATION_ID_REUSED", "REQUEST_EXPIRED",
-  "DEPENDENCY_CHANGED", "INVALID_REQUEST", "HISTORY_STALE"]);
+// A refusal of the request itself (4xx: rejected input, a deleted project, a fenced import), so sending it again cannot
+// succeed. No answer, a timeout or a server failure (5xx, for example a full disk) is sent again.
+function refused(error: ProjectApiFailure): boolean {
+  return error.status >= 400 && error.status < 500 && error.status !== 408 && error.status !== 429;
+}
 
 export class TemplateIntentStrategy {
   private readonly entries: TemplateQueuedIntent[] = [];
   private durableResponse: TemplateProjectResponseV1;
   private readonly locals = new Map<string, string>();
   private readonly actions = new Map<string, ActionRecord>();
+  // Intents queued before a lost acknowledgment: an issued one is checked against the saved state before it is sent again,
+  // and one the current state cannot take is reported with its text instead of blocking the queue (plan 2.6).
   private readonly recoveryRequired = new Set<string>();
   private block: { kind: "conflict" | "rejected" | "replaced"; reason: string } | null = null;
   readonly sessionId: string;
@@ -152,7 +156,7 @@ export class TemplateIntentStrategy {
   async recoverPending(): Promise<void> {
     for (const item of this.entries) this.recoveryRequired.add(item.clientMutationId);
     const entry = this.entries[0];
-    if (entry) { await this.reconcile(entry); this.recoveryRequired.delete(entry.clientMutationId); }
+    if (entry) await this.reconcile(entry);
     else this.durableResponse = await this.ports.read();
   }
   private dispose(items: readonly TemplateQueuedIntent[], disposition: TemplateDisposition): void {
@@ -200,18 +204,28 @@ export class TemplateIntentStrategy {
     this.ports.adopted({ item: entry, noOp, response, result });
     this.ports.pending?.(this.pending);
   }
-  /** The lost-acknowledgment rule (plan 2.6): applied ids are dropped as done; an intent the current state can still take is
-   * re-issued; any other is reported with its text and dropped. */
+  /** The lost-acknowledgment rule (plan 2.6) for the head: an applied id is done; an issued intent is sent again at the same
+   * revision; any other issued one is reported with its text and dropped. An unsent intent is never dropped here: it is
+   * translated against the current state at its turn. */
   private async reconcile(entry: TemplateQueuedIntent): Promise<void> {
     const current = await this.ports.read();
     const done = new Set((current.workspace.mutationReplay ?? []).map(row => row.clientMutationId));
     if (done.has(entry.clientMutationId)) {
       // The created blocks of a lost reply are unknown; later intents that name them conflict and keep their text.
+      this.recoveryRequired.delete(entry.clientMutationId);
       this.adopt(entry, current, null, false);
       return;
     }
     this.durableResponse = current;
-    if (entry.baseRevision === current.workspace.projectRevision) return;
+    const issued = entry.issued, workspace = current.workspace;
+    if (!issued) return;
+    if (entry.baseRevision === workspace.projectRevision) { this.recoveryRequired.delete(entry.clientMutationId); return; }
+    // Only commits outside the document (an export record, a rename) moved the revision: translate it again at its turn.
+    if (issued.snapshot.documentRevision === workspace.documentRevision) { entry.issued = null; return; }
+    this.drop(entry);
+  }
+  private drop(entry: TemplateQueuedIntent): void {
+    this.recoveryRequired.delete(entry.clientMutationId);
     this.entries.shift();
     this.dispose([entry], "lost");
     this.ports.lost([entry]);
@@ -223,16 +237,15 @@ export class TemplateIntentStrategy {
     if (error.code === "REVISION_CONFLICT" || error.code === "EDITOR_TOKEN_UNKNOWN") {
       for (const item of this.entries) this.recoveryRequired.add(item.clientMutationId);
       await this.reconcile(entry);
-      this.recoveryRequired.delete(entry.clientMutationId);
       return true;
     }
-    if (error.status === 413 || error.status === 422 || rejectedCodes.has(error.code)) return this.stop("rejected", error.code);
-    // No usable answer: the issued request is retried unchanged on the next flush; its id makes the retry idempotent.
+    if (refused(error)) return this.stop("rejected", error.code);
+    // No usable answer: the issued request is sent again unchanged; its id makes the retry idempotent.
     throw error;
   }
   async step(): Promise<boolean> {
     const head = this.entries[0];
-    if (head && this.recoveryRequired.delete(head.clientMutationId)) {
+    if (head?.issued && this.recoveryRequired.has(head.clientMutationId)) {
       await this.reconcile(head);
       if (this.entries[0] !== head) return true;
     }
@@ -242,7 +255,11 @@ export class TemplateIntentStrategy {
     if (!entry.issued) {
       const capture = { sessionId: this.sessionId, actionId: entry.actionId, actionToken: entry.actionToken, dependencies: [] };
       const translated = translateIntent(entry.intent, { response: this.durableResponse, locals: this.locals }, capture);
-      if (translated.kind === "conflict") this.stop("conflict", translated.reason);
+      if (translated.kind === "conflict") {
+        if (this.recoveryRequired.has(entry.clientMutationId)) { this.drop(entry); return true; }
+        this.stop("conflict", translated.reason);
+      }
+      this.recoveryRequired.delete(entry.clientMutationId);
       const snapshot = this.durableResponse.snapshot;
       if (!snapshot) this.stop("rejected", "verified result has no snapshot");
       entry.issued = { schemaVersion: 1, clientMutationId: entry.clientMutationId, snapshot, capture, operations: [translated.operation] };

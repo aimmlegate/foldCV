@@ -5,6 +5,9 @@ import history and template assets, and the `history.jsonl` undo journal. One lo
 write; a commit checks the base revision, applies a retried `clientMutationId` once (the file carries the last 200
 ids), validates, writes the file and only then changes memory. The journal line follows; a failure there is a logged
 gap, because the committed state is the file.
+
+A project keeps one session object for the life of the service. Eviction unloads its workspace and journal, and
+entering its lock loads them again, so a caller that opened the project before an eviction never works on a copy.
 """
 
 from __future__ import annotations
@@ -189,13 +192,52 @@ class EditOutcome:
     replayed: bool = False
 
 
-@dataclass
+class SessionLock:
+    """The project lock (reentrant). Entering it runs `enter`, which loads an unloaded session or refuses a deleted one;
+    `acquire` alone does not."""
+
+    def __init__(self, enter=None):
+        self._lock = threading.RLock()
+        self.enter = enter
+        self.owner, self.depth = None, 0
+
+    def acquire(self, blocking=True, timeout=-1):
+        if not self._lock.acquire(blocking, timeout):
+            return False
+        self.owner, self.depth = threading.get_ident(), self.depth + 1
+        return True
+
+    def release(self):
+        self.depth -= 1
+        if not self.depth:
+            self.owner = None
+        self._lock.release()
+
+    def held(self):
+        return self.owner == threading.get_ident()
+
+    def __enter__(self):
+        self.acquire()
+        try:
+            if self.enter is not None:
+                self.enter()
+        except BaseException:
+            self.release()
+            raise
+        return self
+
+    def __exit__(self, *_exc):
+        self.release()
+
+
+@dataclass(eq=False)
 class ProjectSession:
+    """A project's handle; `workspace` and `journal` are None while it is unloaded, so read them under `lock` only."""
     project_id: str
-    workspace: WorkspaceV7
-    directory: Path
-    journal: ProjectJournal
-    lock: threading.RLock = field(default_factory=threading.RLock)
+    directory: Path | None = None
+    workspace: WorkspaceV7 | None = None
+    journal: ProjectJournal | None = None
+    lock: SessionLock = field(default_factory=SessionLock)
     editor_token: str | None = None
     replaced_tokens: list = field(default_factory=list)
     replays: OrderedDict = field(default_factory=OrderedDict)
@@ -206,6 +248,9 @@ class ProjectSession:
     file_key: tuple | None = None
     pins: int = 0
     registry_dirty: bool = False
+    deleted: bool = False
+    # (workspace, journal snapshot) of the committed workspace, reused as the next commit's `before`.
+    snapshot: tuple | None = None
 
     @property
     def revision(self):
@@ -286,7 +331,8 @@ class ProjectRepository:
         except ProjectStoreFailure as error:
             raise RepositoryFailure(error.code) from None
         with self.mutex:
-            live = {identifier: (session.title, session.updated_at) for identifier, session in self.sessions.items()}
+            live = {identifier: (session.title, session.updated_at) for identifier, session in self.sessions.items()
+                if session.updated_at}
         result = []
         for entry in entries:
             if entry.project_id in live:
@@ -296,31 +342,55 @@ class ProjectRepository:
         return result
 
     def open(self, project_id):
+        """The project's loaded session; the same object for every caller while the service runs."""
         with self.mutex:
             session = self.sessions.get(project_id)
-            if session is not None:
+            created = session is None
+            if created:
+                session = self._handle(project_id)
+                self.sessions[project_id] = session
+            else:
                 self.sessions.move_to_end(project_id)
-                return session
-        session = self._load(project_id)
-        with self.mutex:
-            existing = self.sessions.get(project_id)
-            if existing is not None:
-                return existing
-            self.sessions[project_id] = session
-            self._evict(keep=project_id)
+        if session.workspace is not None:
             return session
+        try:
+            with session.lock:
+                pass
+        except RepositoryFailure:
+            if created:
+                with self.mutex:
+                    if self.sessions.get(project_id) is session and session.workspace is None:
+                        self.sessions.pop(project_id)
+            raise
+        with self.mutex:
+            self._evict(keep=project_id)
+        return session
 
-    def _load(self, project_id):
+    def _handle(self, project_id):
+        session = ProjectSession(project_id=project_id)
+        session.lock.enter = lambda: self._ensure(session)
+        return session
+
+    def _ensure(self, session):
+        """Run on entering a session's lock: refuse a deleted project, load an unloaded one."""
+        if session.deleted:
+            raise RepositoryFailure('PROJECT_DELETED')
+        if session.workspace is None:
+            self._load(session)
+
+    def _load(self, session):
+        project_id = session.project_id
         entry = self._registry_entry(project_id)
         if entry is None or entry.tombstoned:
             raise RepositoryFailure('PROJECT_DELETED' if entry is not None else 'PROJECT_NOT_FOUND')
         directory = self._directory(project_id)
         workspace, key = self._read_file(directory, project_id)
-        journal = ProjectJournal.load(directory / 'history.jsonl')
-        session = ProjectSession(project_id=project_id, workspace=workspace, directory=directory, journal=journal,
-            title=workspace.title, updated_at=workspace.updated_at, file_key=key)
-        self._seed(session)
-        return session
+        journal = ProjectJournal.load(directory / 'history.jsonl', revision=workspace.project_revision)
+        replays, occupied = self._seeded(workspace)
+        session.directory, session.journal, session.file_key, session.snapshot = directory, journal, key, None
+        session.title, session.updated_at = workspace.title, workspace.updated_at
+        session.replays, session.occupied_ids = replays, occupied
+        session.workspace = workspace
 
     def _read_file(self, directory, project_id):
         path = directory / 'workspace.json'
@@ -347,39 +417,61 @@ class ProjectRepository:
             raise RepositoryFailure('PROJECT_UNSAFE_STORAGE')
         return workspace, (before.st_ino, before.st_size, before.st_mtime_ns)
 
-    def _seed(self, session):
+    @staticmethod
+    def _seeded(workspace):
         from .template_preparation_ids import existing_ids
-        session.replays = OrderedDict((row.client_mutation_id, EditOutcome(row.client_mutation_id, row.request_sha256,
-            row.resulting_revision, 'edit', replayed=True)) for row in session.workspace.mutation_replay[-REPLAY_WINDOW:])
-        session.occupied_ids = existing_ids(session.workspace)
+        replays = OrderedDict((row.client_mutation_id, EditOutcome(row.client_mutation_id, row.request_sha256,
+            row.resulting_revision, 'edit', replayed=True)) for row in workspace.mutation_replay[-REPLAY_WINDOW:])
+        return replays, existing_ids(workspace)
 
     def _evict(self, *, keep):
-        """Close least recently used sessions above the limit; a session with a held lock or a pin stays open."""
-        for identifier, session in list(self.sessions.items()):
-            if len(self.sessions) <= self.open_limit:
+        """Unload least recently used sessions above the limit; one with a held lock or a pin stays loaded."""
+        loaded = [session for session in self.sessions.values() if session.workspace is not None]
+        excess = len(loaded) - self.open_limit
+        for session in loaded:
+            if excess <= 0:
                 return
-            if identifier == keep or session.pins or not session.lock.acquire(blocking=False):
+            # A lock this thread holds further up its stack is reentrant here, so it is skipped explicitly.
+            if session.project_id == keep or session.pins or session.lock.held() or not session.lock.acquire(blocking=False):
                 continue
             try:
-                self._close(session)
-                self.sessions.pop(identifier, None)
+                if session.workspace is not None and not session.pins:
+                    self._unload(session)
+                    excess -= 1
             finally:
                 session.lock.release()
 
     def close(self, project_id):
+        """Write the registry entry, compact the journal and unload; the session keeps its editor tokens."""
         with self.mutex:
-            session = self.sessions.pop(project_id, None)
-        if session is not None:
-            with session.lock:
-                self._close(session)
+            session = self.sessions.get(project_id)
+        if session is None:
+            return
+        session.lock.acquire()
+        try:
+            if session.workspace is not None:
+                self._unload(session)
+        finally:
+            session.lock.release()
+
+    def _unload(self, session):
+        try:
+            self._close(session)
+        except Exception:
+            LOG.exception('closing a project session failed')
+        session.workspace = session.journal = session.file_key = session.snapshot = None
+        session.replays, session.occupied_ids = OrderedDict(), set()
 
     def _close(self, session):
         if session.registry_dirty:
-            self._write_registry_entry(session.workspace)
-            session.registry_dirty = False
-        session.journal.compact()
+            try:
+                self._write_registry_entry(session.workspace)
+                session.registry_dirty = False
+            except RepositoryFailure:
+                LOG.warning('registry entry not written on close')
+        session.journal.compact(revision=session.workspace.project_revision)
         try:
-            self.sweep_assets(session.project_id, session=session)
+            self._sweep(session)
         except RepositoryFailure:
             LOG.warning('asset sweep failed on close')
 
@@ -399,8 +491,10 @@ class ProjectRepository:
         try:
             yield session
         finally:
-            with session.lock:
-                session.pins -= 1
+            # Plain acquire: unpinning must not load or refuse a project deleted meanwhile.
+            session.lock.acquire()
+            session.pins -= 1
+            session.lock.release()
 
     def _refresh_if_changed(self, session):
         """Adopt a file written outside this repository (an older service during the switch) instead of overwriting it."""
@@ -412,9 +506,9 @@ class ProjectRepository:
             return
         LOG.warning('project file changed outside the repository; reloading')
         workspace, key = self._read_file(session.directory, session.project_id)
-        session.workspace, session.file_key = workspace, key
+        session.replays, session.occupied_ids = self._seeded(workspace)
+        session.workspace, session.file_key, session.snapshot = workspace, key, None
         session.title, session.updated_at = workspace.title, workspace.updated_at
-        self._seed(session)
         session.journal.barrier(revision_after=workspace.project_revision, reason='external_write')
 
     # Commits
@@ -476,7 +570,8 @@ class ProjectRepository:
                 try:
                     action, payloads = session.journal.target(direction, snapshot(workspace))
                     rebuilt = apply_payloads(workspace, payloads)
-                except JournalStale:
+                except (JournalStale, ValueError):
+                    # ValueError: the rebuilt workspace no longer validates against the current one.
                     session.journal.barrier(revision_after=workspace.project_revision, reason='stale')
                     raise RepositoryFailure('HISTORY_STALE', history=session.journal.state()) from None
                 return _advance(rebuilt, workspace, document=True), {'action': action}
@@ -519,6 +614,8 @@ class ProjectRepository:
         try:
             with locked_root(self.root, '.projects.lock'):
                 self._write_blobs(session.directory, [*history_blobs(after), *blobs] if loaded or blobs else ())
+                # Decoded before the file is replaced: a failure here leaves memory and file at the old revision.
+                after = _stored(session.directory, raw, after, loaded)
                 target = session.directory / 'workspace.json'
                 atomic_write(target, raw)
                 key = _key(target)
@@ -530,12 +627,6 @@ class ProjectRepository:
             raise RepositoryFailure('PROJECT_UNSAFE_STORAGE') from None
         except OSError:
             raise RepositoryFailure('PROJECT_SAVE_FAILED') from None
-        if loaded:
-            # Memory keeps the slim project a reopen would read; the records live in their history files.
-            after = decode_project(session.directory, raw)
-        elif verifying():
-            if decode_project(session.directory, raw) != after:
-                raise RuntimeError('written bytes decode to a different workspace')
         from .template_preparation_ids import existing_ids
         session.workspace, session.file_key = after, key
         session.occupied_ids |= existing_ids(after) if kind != 'edit' else _created(details)
@@ -547,28 +638,40 @@ class ProjectRepository:
             session.replays[client_mutation_id] = outcome
             while len(session.replays) > REPLAY_WINDOW:
                 session.replays.popitem(last=False)
-        for committed in self.committed_hooks:
-            committed(session)
         self._journal(session, before, after, kind=kind, action_id=action_id, client_mutation_id=client_mutation_id,
             details=details, reason=reason)
+        for committed in self.committed_hooks:
+            try:
+                committed(session)
+            except Exception:
+                # The commit is durable; a hook failure must not turn it into an error reply.
+                LOG.exception('commit hook failed')
         return outcome
 
     def _journal(self, session, before, after, *, kind, action_id, client_mutation_id, details, reason):
+        journal = session.journal
         try:
+            cached = session.snapshot
+            old = cached[1] if cached is not None and cached[0] is before else snapshot(before)
+            new = snapshot(after)
+            session.snapshot = (after, new)
             if kind == 'edit':
-                session.journal.record_edit(action_id=action_id, client_mutation_id=client_mutation_id,
-                    revision_before=before.project_revision, revision_after=after.project_revision,
-                    before=snapshot(before), after=snapshot(after))
+                journal.record_edit(action_id=action_id, client_mutation_id=client_mutation_id,
+                    revision_before=before.project_revision, revision_after=after.project_revision, before=old, after=new)
             elif kind in {'undo', 'redo'}:
-                session.journal.record_history(direction=kind, action=details['action'],
+                journal.record_history(direction=kind, action=details['action'],
                     client_mutation_id=client_mutation_id, revision_before=before.project_revision,
                     revision_after=after.project_revision)
-            elif snapshot(before) != snapshot(after):
-                session.journal.barrier(revision_after=after.project_revision, reason=reason or 'replace')
+            elif old != new:
+                journal.barrier(revision_after=after.project_revision, reason=reason or 'replace')
+            else:
+                journal.mark(revision_before=before.project_revision, revision_after=after.project_revision)
+            if journal.oversized(factor=4):
+                journal.compact(revision=after.project_revision)
         except Exception:
             # The committed state is the file; history restarts empty rather than failing the request.
             LOG.exception('journal gap')
-            session.journal.undo, session.journal.redo, session.journal.open_seq = [], [], None
+            journal.lost()
 
     def _write_blobs(self, directory, blobs):
         """Content-addressed files: written when missing, verified by hash when present."""
@@ -636,21 +739,32 @@ class ProjectRepository:
             session.registry_dirty = False
 
     def delete(self, project_id):
-        """Tombstone the project, drop its session and remove its files; the registry keeps the tombstone."""
+        """Tombstone the project, drop its session and remove its files; the registry keeps the tombstone. The tombstone
+        is written under the session lock, so a holder waiting for it and any later open refuse the project."""
         with self.mutex:
-            session = self.sessions.pop(project_id, None)
-        if session is not None:
-            session.lock.acquire()
+            session = self.sessions.get(project_id)
+            created = session is None
+            if created:
+                session = self._handle(project_id)
+                self.sessions[project_id] = session
+        session.lock.acquire()
         try:
+            if session.deleted:
+                raise RepositoryFailure('PROJECT_DELETED')
             try:
                 entry = self.store.tombstone(project_id)
             except ProjectStoreFailure as error:
                 raise RepositoryFailure(error.code) from None
+            session.deleted = True
+            session.workspace = session.journal = session.file_key = session.snapshot = None
+            session.editor_token, session.replaced_tokens = None, []
+            session.clipboard.clear()
             return self.cleanup_deleted(project_id) or entry
         finally:
-            if session is not None:
-                session.editor_token, session.replaced_tokens = None, []
-                session.lock.release()
+            with self.mutex:
+                if self.sessions.get(project_id) is session and (session.deleted or created):
+                    self.sessions.pop(project_id)
+            session.lock.release()
 
     def cleanup_deleted(self, project_id):
         with locked_root(self.root, '.projects.lock'):
@@ -675,9 +789,13 @@ class ProjectRepository:
             self.store._write_registry(registry)
             return entry.model_copy(deep=True)
 
-    def sweep_assets(self, project_id, *, session=None):
+    def sweep_assets(self, project_id):
         """Remove image files that neither the project nor its undo history references."""
-        session = session or self.open(project_id)
+        session = self.open(project_id)
+        with session.lock:
+            return self._sweep(session)
+
+    def _sweep(self, session):
         folder = session.directory / 'images'
         if not folder.exists():
             return []
@@ -712,6 +830,9 @@ def _remove_project_files(directory):
             suffix = {'sources': 'bin', 'renders': '(?:docx|foldcv)', 'images': '(?:png|jpg)', 'history': 'bin',
                 'template-assets': 'bin'}[path.name]
             for blob in path.iterdir():
+                if blob.name.startswith('.foldcv-write-'):
+                    files.append(blob)
+                    continue
                 if re.fullmatch(r'[0-9a-f]{64}\.' + suffix, blob.name) is None:
                     raise StorageFailure('UNSAFE_STORAGE')
                 owned_file(blob, DOCX_BYTES); files.append(blob)
@@ -719,6 +840,9 @@ def _remove_project_files(directory):
         elif path.name == 'imports':
             private_directory(path)
             for blob in path.iterdir():
+                if blob.name.startswith('.foldcv-write-'):
+                    files.append(blob)
+                    continue
                 if re.fullmatch(r'[A-Za-z0-9_-]{1,128}\.json(?:\.tmp)?', blob.name) is None:
                     raise StorageFailure('UNSAFE_STORAGE')
                 owned_file(blob, WORKSPACE_BYTES); files.append(blob)
@@ -735,6 +859,20 @@ def _remove_project_files(directory):
     if marker.exists():
         marker.unlink()
     directory.rmdir()
+
+
+def _stored(directory, raw, after, loaded):
+    """The workspace memory keeps for these bytes: the slim project a reopen would read when import records were
+    loaded (they live in their history files), else `after` itself."""
+    if not loaded and not verifying():
+        return after
+    try:
+        stored = decode_project(directory, raw)
+    except (ProjectStoreFailure, StorageFailure, ValueError, RecursionError):
+        raise RepositoryFailure('PROJECT_SAVE_FAILED') from None
+    if not loaded and stored != after:
+        raise RuntimeError('written bytes decode to a different workspace')
+    return stored if loaded else after
 
 
 def _digest(workspace):

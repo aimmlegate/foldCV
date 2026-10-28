@@ -3,7 +3,7 @@ import test from "node:test";
 import { BlockNoteEditor } from "@blocknote/core";
 import { TextSelection } from "@tiptap/pm/state";
 import type { TemplateProjectResponseV1 } from "../src/contracts/generated/template_project_response_v1";
-import { MemoryPendingStore } from "../src/rich/v7-connection";
+import { MemoryPendingStore, type EditResult } from "../src/rich/v7-connection";
 import { contentText, responseBlocks } from "../src/rich/v7-response";
 import { templateSchema } from "../src/rich/template-schema";
 import { projectTemplateDocument } from "../src/rich/v7-projection";
@@ -11,15 +11,16 @@ import { TemplateEditorSession, type TemplateEditor } from "../src/rich/v7-sessi
 import { harness, projectClient, type Fault, type Harness, type Traffic } from "./support/template-harness";
 
 async function open(value: Harness, local: MemoryPendingStore, fault: Fault | null = null) {
-  const traffic: Traffic[] = [], connection = await projectClient(value, traffic, fault);
-  const session = new TemplateEditorSession(connection, { status: () => {}, warning: () => {}, mode: () => {}, shown: () => {} }, 60_000, local);
+  const traffic: Traffic[] = [], warnings: string[] = [], connection = await projectClient(value, traffic, fault);
+  const session = new TemplateEditorSession(connection, { status: () => {}, warning: text => warnings.push(text), mode: () => {}, shown: () => {} },
+    60_000, local);
   const project = connection.response.workspace.project;
   assert.ok(project);
   const editor: TemplateEditor = BlockNoteEditor.create({ schema: templateSchema, initialContent: projectTemplateDocument(project.document) });
   editor._tiptapEditor.registerPlugin(session.plugin);
   session.bind(editor, project.document);
   await session.recoverDraft();
-  return { session, editor, traffic };
+  return { session, editor, traffic, warnings };
 }
 
 function pair(response: TemplateProjectResponseV1) {
@@ -94,16 +95,20 @@ test("E09: reopening replays a pending intent once and preserves the coherent pa
   } finally { await value.close(); }
 });
 
-test("an unsent Undo survives a page restart and runs once with its original id", async () => {
-  const value = await harness("issues"), local = new MemoryPendingStore(), fault: Fault = { path: "/history", times: 2, before: true };
+test("an Undo in flight when the page closes runs once with its original id after a restart", async () => {
+  const value = await harness("issues"), local = new MemoryPendingStore();
   let first: Awaited<ReturnType<typeof open>> | null = null;
   try {
-    first = await open(value, local, fault);
+    first = await open(value, local);
     const before = pair(first.session.queue.template.durable);
     typeRole(first.editor, "!");
     await first.session.flush();
-    await first.session.navigate("undo");
-    assert.equal(fault.times, 0);
+    // The page closes while its history request is on the way.
+    let sending = () => {};
+    const sent = new Promise<void>(resolve => { sending = resolve; });
+    first.session.connection.step = () => { sending(); return new Promise<EditResult>(() => {}); };
+    void first.session.navigate("undo");
+    await sent;
     const pending = await local.load(value.project);
     assert.ok(pending?.navigation);
     first.session.close();
@@ -118,4 +123,20 @@ test("an unsent Undo survives a page restart and runs once with its original id"
       assert.equal(second.session.canRedo, true);
     } finally { second.session.close(); }
   } finally { first?.session.close(); await value.close(); }
+});
+
+test("an Undo that cannot be sent is given up with a notice; input continues and a restart does not repeat it", async () => {
+  const value = await harness("issues"), local = new MemoryPendingStore(), fault: Fault = { path: "/history", times: 2, before: true };
+  const opened = await open(value, local, fault);
+  try {
+    typeRole(opened.editor, "!");
+    await opened.session.flush();
+    await opened.session.navigate("undo");
+    assert.equal(fault.times, 0);
+    assert.equal(opened.warnings.length, 1);
+    assert.equal((await local.load(value.project))?.navigation ?? null, null);
+    typeRole(opened.editor, "?");
+    await opened.session.flush();
+    assert.equal(pair(opened.session.queue.template.durable).text, "Role: backend engineer!?");
+  } finally { opened.session.close(); await value.close(); }
 });

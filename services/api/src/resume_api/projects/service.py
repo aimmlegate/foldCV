@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from collections import OrderedDict
 import threading
 
 from packages.resume_core.models.projects import HistoryStateV1, ProjectOpenResultV1, TaskStatusV1
@@ -10,10 +11,13 @@ from packages.resume_core.project_repository import RepositoryFailure, decode_pr
 from packages.resume_core.project_store import ProjectStoreFailure
 from packages.resume_core.project_tasks import TaskRegistry
 from packages.resume_core.rich_identity import display_identity
+from packages.resume_core.storage import StorageFailure
 from packages.resume_core.template_api import TemplateProjectResponseV1, verify_response, verifying
 from packages.resume_core.templates.presentation import project_presentation, snapshot_identity
 
 from .errors import ProjectFailure
+
+RESPONSES_KEPT = 4
 
 
 def response_for_workspace(workspace, *, generation=None):
@@ -35,8 +39,9 @@ class ProjectService:
         self.tasks = tasks or TaskRegistry()
         self.catalog = catalog or ProjectCatalog(repository.store)
         self.lock = threading.Lock()
-        # Built once per committed workspace object; a hit is verified again under FOLDCV_VERIFY (D108).
-        self.responses = {}
+        # Built once per committed workspace object, for the latest few projects; a hit is verified again under
+        # FOLDCV_VERIFY (D108).
+        self.responses = OrderedDict()
         self.identities = {}
         # Any commit (import, assistant Apply, export record) may change the heading the listing shows.
         repository.committed_hooks.append(self._forget_identity)
@@ -49,6 +54,8 @@ class ProjectService:
         workspace = workspace if workspace is not None else self.repository.read(project_id)
         with self.lock:
             cached = self.responses.get(project_id)
+            if cached is not None:
+                self.responses.move_to_end(project_id)
         if cached is not None and cached[0] is workspace:
             if verifying():
                 verify_response(cached[1])
@@ -56,6 +63,9 @@ class ProjectService:
         response = response_for_workspace(workspace)
         with self.lock:
             self.responses[project_id] = (workspace, response)
+            self.responses.move_to_end(project_id)
+            while len(self.responses) > RESPONSES_KEPT:
+                self.responses.popitem(last=False)
             self.identities[project_id] = (response.identity.title, response.identity.subtitle)
         return response
 
@@ -85,15 +95,18 @@ class ProjectService:
 
     def _identity(self, project_id):
         session = self.repository.sessions.get(project_id)
-        if session is not None:
-            workspace = session.workspace
-        else:
+        # Read once and without the lock, which would load an evicted session or wait for a writer: a committed
+        # workspace is never changed in place, and an evicted session has none, so its file is read.
+        workspace = session.workspace if session is not None else None
+        if workspace is None:
             directory = self.repository._directory(project_id)
             try:
                 workspace = decode_project(directory, (directory / 'workspace.json').read_bytes())
             except ProjectStoreFailure as error:
                 raise RepositoryFailure(error.code) from None
-            except (OSError, ValueError):
+            except StorageFailure:
+                raise RepositoryFailure('PROJECT_UNSAFE_STORAGE') from None
+            except (OSError, ValueError, RecursionError):
                 raise RepositoryFailure('PROJECT_LOAD_FAILED') from None
         identity = display_identity(workspace)
         value = (identity.title, identity.subtitle)
@@ -155,14 +168,28 @@ class ProjectService:
             raise RepositoryFailure(error.code) from None
         return self.listing()
 
-    def delete(self, project_id, request):
+    def delete(self, project_id, request, *, wait=15):
+        """Stop the project's work, then remove the project. The work ends on the event loop, so this runs in a worker
+        thread; work still running after `wait` seconds refuses the deletion."""
+        import time
         if request.confirmed is not True:
             raise ProjectFailure('INVALID_REQUEST', 422)
-        for task in self.tasks.running(project_id):
-            self.tasks.cancel(task.id)
-        if self.tasks.running(project_id):
-            raise RepositoryFailure('REQUEST_IN_PROGRESS')
-        entry = self.repository.delete(project_id)
+        with self.tasks.closed(project_id):
+            deadline = time.monotonic() + wait
+            while running := self.tasks.running(project_id):
+                if time.monotonic() >= deadline:
+                    raise RepositoryFailure('REQUEST_IN_PROGRESS')
+                for task in running:
+                    self.tasks.cancel(task.id)
+                    rewrite_cancel = getattr(self, 'rewrite_cancel', None)
+                    if task.kind == 'rewrite' and rewrite_cancel is not None:
+                        # A rewrite preview watches its own cancel, not the task's.
+                        rewrite_cancel(project_id, task.detail.get('requestId'))
+                time.sleep(0.05)
+            entry = self.repository.delete(project_id)
+            imports = getattr(self, 'imports', None)
+            if imports is not None:
+                imports.release(project_id)
         self.tasks.forget(project_id)
         deleted = getattr(self, 'on_deleted', None)
         if deleted is not None:

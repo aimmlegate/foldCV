@@ -89,9 +89,9 @@ def start(client, conversation_id, message='Проверь резюме', *, edi
     return reply.json()
 
 
-def finish(client, run, project=PROJECT, deadline=10.0):
-    """Long-poll the run's events until it ends; returns (run, events)."""
-    events, after, ends = [], 0, time.monotonic() + deadline
+def finish(client, run, project=PROJECT, deadline=10.0, after=0):
+    """Long-poll the run's events after `after` until it ends; returns (run, events)."""
+    events, ends = [], time.monotonic() + deadline
     while time.monotonic() < ends:
         reply = client.get(base(project) + f"/runs/{run['id']}/events/{after}")
         assert reply.status_code == 200, reply.text[:300]

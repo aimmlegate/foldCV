@@ -5,6 +5,7 @@ import asyncio
 import threading
 import time
 
+from packages.resume_core.models.template_render import TemplateRendererIdentity
 from packages.resume_core.reasoning import ModelReasoning
 from resume_api.connection import Metadata, Quota
 from tests.assistant.support import MODEL, PROJECT, MetadataAdapter, assistant_app, base, conversation, finish, start
@@ -66,9 +67,10 @@ def test_deleting_the_project_stops_its_run_and_the_ending_run_writes_no_assista
         run = start(client, conversation(client))
         wait(started)
         store = application.state.assistant.store
+        # Taken before the delete: a run that ended drops its control.
+        control = application.state.assistant.controls[run['id']]
         deleted = client.request('DELETE', '/v2/projects/' + PROJECT, json={'confirmed': True})
         assert deleted.status_code == 200, deleted.text[:300]
-        control = next(control for control in application.state.assistant.controls.values() if control.run.id == run['id'])
         deadline = time.monotonic() + 5
         while control.task is not None and not control.task.done():
             assert time.monotonic() < deadline, 'the run did not stop'
@@ -103,3 +105,23 @@ def test_the_chosen_assistant_effort_reaches_the_run_and_null_runs_the_catalog_d
             'selectedAgentModel': 'processing-model', 'reasoningEffort': 'high'})
         assert refused.status_code == 409 and refused.json()['error']['code'] == 'AGENT_MODEL_INCOMPATIBLE'
         assert client.get('/v1/settings/assistant').json() == current
+
+
+def test_deleting_the_project_drops_its_export_links(tmp_path):
+    links = []
+
+    async def render(_request):
+        return b'PK\x03\x04synthetic-assistant-export'
+
+    async def steps(tools, _value, _cancel, _emit):
+        links.append(await tools.call('export_document', {'format': 'docx'}))
+        return 'Файл готов.'
+    with assistant_app(tmp_path, steps) as (client, application, _runtime):
+        exports = application.state.projects.exports
+        exports._renderer = TemplateRendererIdentity(id='captured-docx', version='test', sha256='a' * 64)
+        exports.render = render
+        finish(client, start(client, conversation(client)))
+        assert client.get(links[0]['url']).status_code == 200
+        deleted = client.request('DELETE', '/v2/projects/' + PROJECT, json={'confirmed': True})
+        assert deleted.status_code == 200, deleted.text[:300]
+        assert client.get(links[0]['url']).status_code == 404 and not application.state.assistant.files

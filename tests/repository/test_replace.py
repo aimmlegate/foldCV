@@ -46,7 +46,7 @@ def test_a_barrier_is_written_only_when_undoable_keys_change(tmp_path):
     repo.replace(PROJECT, base_revision=3, workspace=changed, reason='import')
     assert repo.open(PROJECT).journal.state() == {'undo': None, 'redo': None}
     lines = (tmp_path / 'data/projects' / PROJECT / 'history.jsonl').read_text().splitlines()
-    assert '"reason":"import"' in lines[-1] and len(lines) == 2
+    assert '"kind":"mark"' in lines[1] and '"reason":"import"' in lines[-1] and len(lines) == 3
 
 
 def test_a_workspace_computed_from_an_older_revision_is_refused(tmp_path):
