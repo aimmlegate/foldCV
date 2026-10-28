@@ -15,10 +15,14 @@ import webbrowser
 from pydantic import Field
 import uvicorn
 
-from .app import create_app
+from .app import ProviderSlot, create_app
 from .host_models import Transport
 from .lifecycle import require_supported_host, tune_garbage_collector
 from .cli.experimental_profile import installed_profile
+from .cli.profiles import claude
+from .cli.profiles.claude import ClaudeCliProfile
+from .connection_claude import ClaudeConnectionAdapter
+from .providers.claude_cli import ClaudeCliProvider
 
 
 ROOT = Path(__file__).resolve().parents[4]
@@ -42,6 +46,15 @@ def trusted_temp_root() -> Path:
     return base / "foldcv-service"
 
 
+def claude_slot(data_root: Path) -> ProviderSlot:
+    """Claude next to Codex; it stays unlisted until its parity matrix passes (MP07), so it runs nothing."""
+    executable = claude.installed_executable()
+    if executable is None:
+        return ProviderSlot(ClaudeConnectionAdapter(None))
+    profile = ClaudeCliProfile(data_root / ("cli-profile-" + claude.KIND), executable)
+    return ProviderSlot(ClaudeConnectionAdapter(profile), ClaudeCliProvider(executable, profile=profile), profile)
+
+
 async def launch(*, port: int = 0, open_browser: bool = True,
                  cli_executable: Path | None = None,
                  experimental_cli: bool = False) -> None:
@@ -60,7 +73,9 @@ async def launch(*, port: int = 0, open_browser: bool = True,
                    if experimental_cli else None)
         app = create_app(origin=origin, secret=secret, temp_root=temp_root, dist=dist,
                          cli_executable=profile.executable if profile else cli_executable,
-                         experimental_profile=profile, template_import_call_cap=TEMPLATE_IMPORT_CALL_CAP)
+                         experimental_profile=profile, template_import_call_cap=TEMPLATE_IMPORT_CALL_CAP,
+                         provider_slots={"claude_cli": claude_slot(Path.home() / "Library/Application Support/FoldCV")}
+                         if experimental_cli else None)
         tune_garbage_collector()
         config = uvicorn.Config(app, host="127.0.0.1", port=actual_port, proxy_headers=False,
                                 access_log=False, server_header=False, log_level="critical",

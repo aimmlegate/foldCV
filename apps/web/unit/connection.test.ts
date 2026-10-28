@@ -2,8 +2,8 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { ConnectionWorkflow, providerNames, validConnection, type ConnectionSnapshot } from "../src/connection/workflow";
 
-const codex = { kind: "codex_cli", display: "Codex", subscription: "ChatGPT", publisher: "OpenAI", installed: true };
-const claude = { kind: "claude_cli", display: "Claude", subscription: "Claude", publisher: "Anthropic", installed: true };
+const codex = { kind: "codex_cli", display: "Codex", subscription: "ChatGPT", publisher: "OpenAI", loginCode: false, installed: true };
+const claude = { kind: "claude_cli", display: "Claude", subscription: "Claude", publisher: "Anthropic", loginCode: true, installed: true };
 const ready = { provider: "codex_cli", providers: [codex], providerNotice: null, state: "connected",
   version: "codex-cli 0.162.0-alpha.2", versionStatus: "supported", plan: "plus",
   models: ["gpt-6-luna"], selectedModel: null,
@@ -34,6 +34,8 @@ test("connection response names a listed active provider and bounded provider fi
   assert.equal(validConnection({ ...ready, providers: [codex, codex] }), false);
   assert.equal(validConnection({ ...ready, providers: [{ ...codex, display: "" }] }), false);
   assert.equal(validConnection({ ...ready, providers: [{ ...codex, installed: "yes" }] }), false);
+  const { loginCode: _loginCode, ...noCode } = codex;
+  assert.equal(validConnection({ ...ready, providers: [noCode] }), false);
   assert.equal(validConnection({ ...ready, providerNotice: "other" }), false);
   assert.equal(validConnection({ ...ready, versionStatus: "broken" }), false);
   const { provider: _provider, ...unnamed } = ready;
@@ -66,6 +68,22 @@ test("host requests name the provider and a switch checks the new provider", asy
   assert.equal(workflow.view.snapshot.quota.state, "not_provided");
   await workflow.detach();
   assert.deepEqual(calls.at(-1), { path: "/v1/host/detach", body: { provider: "claude_cli" } });
+});
+
+test("a sign-in code is sent only while signing in and only in the code format", async () => {
+  const calls: { path: string; body: unknown }[] = [];
+  const pending = { ...ready, provider: "claude_cli", providers: [codex, claude], state: "login_pending" };
+  const request: typeof fetch = (input, init) => {
+    calls.push({ path: String(input), body: init?.body ? JSON.parse(String(init.body)) : null });
+    return Promise.resolve(response(String(input).endsWith("/connection") ? pending : pending));
+  };
+  const workflow = new ConnectionWorkflow(() => {}, request);
+  assert.equal(await workflow.sendLoginCode("abc"), false, "nothing is pending before the first reply");
+  await workflow.peek();
+  assert.equal(await workflow.sendLoginCode("two words"), false);
+  assert.equal(await workflow.sendLoginCode("  code-1#state  "), true);
+  assert.deepEqual(calls.at(-1), { path: "/v1/host/login-code", body: { provider: "claude_cli", code: "code-1#state" } });
+  assert.equal(calls.filter(call => call.path.endsWith("/login-code")).length, 1);
 });
 
 test("detach discards a late metadata result", async () => {

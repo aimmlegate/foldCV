@@ -44,6 +44,16 @@ SWITCHES = {
 # Kept across operations; everything else in the config directory is wiped after each one.
 KEEP = frozenset({".claude.json", ".credentials.json"})
 MARKER = ".foldcv-claude-profile-v1"
+# The native installer links ~/.local/bin/claude; Homebrew links its own bin. The binary is still qualified later.
+INSTALL_LINKS = (Path.home() / ".local/bin/claude", Path("/opt/homebrew/bin/claude"), Path("/usr/local/bin/claude"))
+
+
+def installed_executable() -> Path | None:
+    detected = shutil.which("claude")
+    for candidate in ((Path(detected),) if detected else ()) + INSTALL_LINKS:
+        if candidate.is_file() and os.access(candidate, os.X_OK):
+            return candidate.absolute()
+    return None
 
 
 class ClaudeProfileError(Exception):

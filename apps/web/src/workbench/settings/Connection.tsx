@@ -1,5 +1,6 @@
+import { useState } from "react";
 import { errorMessage } from "../../errors/messages";
-import { providerNames, type ConnectionView, type ConnectionWorkflow, type ProviderKind } from "../../connection/workflow";
+import { loginCodePattern, providerNames, type ConnectionView, type ConnectionWorkflow, type ProviderKind } from "../../connection/workflow";
 import { connectionMessage } from "../../connection/messages";
 import { Button } from "../ui/Button";
 import { Icon } from "../ui/Icon";
@@ -11,7 +12,8 @@ export function Connection({ view, workflow, model, change, disabled, selectionD
   workflow: ConnectionWorkflow; model: string | null; change: (value: string) => void; disabled: boolean; selectionDisabled: boolean;
   switchDisabled: boolean; providerChanged: () => void }) {
   const snapshot = view.snapshot;
-  const { display, subscription, publisher } = providerNames(snapshot);
+  const { display, subscription, publisher, loginCode } = providerNames(snapshot);
+  const [code, setCode] = useState(""), [codeSent, setCodeSent] = useState(false);
   const installation = snapshot.installation;
   const installing = installation && ["downloading", "verifying", "extracting"].includes(installation.state);
   const canInstall = installation?.available && ["cli_missing", "launcher_unsupported", "unsupported_version"].includes(snapshot.state);
@@ -48,6 +50,17 @@ export function Connection({ view, workflow, model, change, disabled, selectionD
       {snapshot.state === "login_pending" && <button className="text-button" disabled={disabled} onClick={() => void workflow.cancelLogin()}>Отменить вход</button>}
       <Button variant="quiet" busy={view.detaching} busyLabel="Отключаем…" disabled={disabled} onClick={() => void workflow.detach()}>Отключить модель</Button>
     </div>
+    {snapshot.state === "login_pending" && loginCode && <form className="login-code" onSubmit={event => {
+      event.preventDefault();
+      void workflow.sendLoginCode(code).then(sent => { if (sent) { setCode(""); setCodeSent(true); } });
+    }}>
+      <label htmlFor="login-code">Код со страницы входа</label>
+      <p className="small muted">Если после входа в браузере {display} показал код, вставьте его сюда.</p>
+      <input id="login-code" autoComplete="off" spellCheck={false} value={code} disabled={disabled}
+        onChange={event => { setCode(event.currentTarget.value); setCodeSent(false); }} />
+      <Button type="submit" className="small" disabled={disabled || !loginCodePattern.test(code.trim())}>Отправить код</Button>
+      {codeSent && <p className="small muted" role="status">Код передан. Дождитесь завершения входа.</p>}
+    </form>}
     {view.error && <p className="notice error" role="alert">{errorMessage(view.error)}</p>}
     <p className="settings-disclosure">Проверка, вход, отключение и смена провайдера выполняются сразу. Отмена черновика настроек их не отменяет.</p>
     {snapshot.experimentalMode ? <p className="settings-disclosure">Текст передаётся через {display} CLI по вашей подписке {subscription}; действуют правила хранения провайдера.

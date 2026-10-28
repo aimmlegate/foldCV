@@ -21,12 +21,13 @@ from fastapi.responses import FileResponse, JSONResponse, Response
 from starlette.exceptions import HTTPException as StarletteHTTPException
 from pydantic import ValidationError
 
-from .host_models import (ConnectionPayload, ErrorEnvelope, ErrorPayload, HostRequest, ProviderSummary, QuotaPayload,
-                          SelectModelRequest, SelectProviderRequest, SelectReasoningRequest)
+from .host_models import (ConnectionPayload, ErrorEnvelope, ErrorPayload, HostRequest, LoginCodeRequest, ProviderSummary,
+                          QuotaPayload, SelectModelRequest, SelectProviderRequest, SelectReasoningRequest)
 from .lifecycle import OperationFiles, SpikeError, has_blocked_owned, reap_owned
 from .connection import ConnectionAdapter, ConnectionFailure, Metadata
 from .cli.experimental_profile import ExperimentalCliProfile, ExperimentalProfileError
 from .cli.installation import CliInstallation
+from .cli.profiles.claude import ClaudeProfileError
 from .providers.codex_cli import CodexCliProvider
 from .providers.registry import DESCRIPTORS, ProviderRegistry, discovered
 from .extracting import MAX_BODY as MAX_EXTRACT_BODY
@@ -51,7 +52,7 @@ CANCEL_GRACE_SECONDS = 0.5
 USABLE_QUOTA = frozenset({"available", "not_provided"})
 POST_ONLY_PATHS = frozenset({"session/exchange", "host/discover", "host/status", "host/login", "host/detach", "host/models",
                             "host/select", "host/cancel-login", "host/install", "host/cancel-install",
-                            "host/select-provider"})
+                            "host/select-provider", "host/login-code"})
 JSON_POST_PATHS = frozenset("/v1/" + path for path in POST_ONLY_PATHS)
 JSON_PUT_PATHS = frozenset({"/v1/settings/rules", "/v1/settings/assistant"})
 
@@ -651,7 +652,7 @@ def create_app(*, origin: str, secret: str, temp_root: Path, dist: Path, cli_exe
                          else executable is not None and executable.is_file() if getattr(slot.profile, "managed", False)
                          else discovered(item, executable))
             summaries.append(ProviderSummary(kind=item.kind, display=item.display, subscription=item.subscription,
-                                             publisher=item.publisher, installed=installed))
+                                             publisher=item.publisher, loginCode=item.login_code, installed=installed))
         return summaries
 
     def connection_response() -> JSONResponse:
@@ -771,7 +772,7 @@ def create_app(*, origin: str, secret: str, temp_root: Path, dist: Path, cli_exe
                             operations_root=temp_root):
                         with files.open():
                             return work(files, cancel)
-                except ExperimentalProfileError as error:
+                except (ExperimentalProfileError, ClaudeProfileError) as error:
                     raise ConnectionFailure("UNSUPPORTED_VERSION" if str(error) == "CLI_UNSUPPORTED" else "METADATA_FAILED") from None
 
             task = asyncio.create_task(asyncio.to_thread(execute))
@@ -879,6 +880,8 @@ def create_app(*, origin: str, secret: str, temp_root: Path, dist: Path, cli_exe
         finally:
             if login_task is task:
                 login_task = None
+                with login_code_lock:
+                    login_code.clear()
             if install_task is task:
                 install_task = None
 
@@ -898,10 +901,33 @@ def create_app(*, origin: str, secret: str, temp_root: Path, dist: Path, cli_exe
     async def models(payload: HostRequest):
         return await status(payload)
 
+    login_code: list[str] = []
+    login_code_lock = threading.Lock()
+
+    def take_login_code() -> str | None:
+        with login_code_lock:
+            return login_code.pop() if login_code else None
+
     async def login(payload: HostRequest):
         if refused := inactive(payload):
             return refused
+        with login_code_lock:
+            login_code.clear()
+        if DESCRIPTORS[active_kind].login_code:
+            return await connection_job("login", lambda files, cancel, adapter=connection: adapter.login(
+                files, cancel, code=take_login_code))
         return await connection_job("login", connection.login)
+
+    async def send_login_code(payload: LoginCodeRequest):
+        if refused := inactive(payload):
+            return refused
+        async with gate:
+            if (login_task is None or login_task.done() or connection_state.state != "login_pending"
+                    or not DESCRIPTORS[active_kind].login_code):
+                return problem("LOGIN_NOT_AVAILABLE", 409, "host")
+            with login_code_lock:
+                login_code[:] = [payload.code]
+            return connection_response()
 
     async def install_cli(payload: HostRequest):
         if refused := inactive(payload):
@@ -1015,7 +1041,7 @@ def create_app(*, origin: str, secret: str, temp_root: Path, dist: Path, cli_exe
     for path, handler in (("discover", discover), ("status", status), ("models", models),
                           ("login", login), ("select", select), ("detach", detach),
                           ("cancel-login", cancel_login), ("install", install_cli), ("cancel-install", cancel_install),
-                          ("select-provider", select_provider)):
+                          ("select-provider", select_provider), ("login-code", send_login_code)):
         app.add_api_route(f"/v1/host/{path}", handler, methods=["POST"])
 
     @app.get("/{path:path}")

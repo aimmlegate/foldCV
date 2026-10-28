@@ -52,7 +52,7 @@ async def test_only_complete_providers_are_offered(tmp_path):
         state = (await client.get("/v1/settings/connection")).json()
         assert state["provider"] == "codex_cli" and state["providerNotice"] is None
         assert state["providers"] == [{"kind": "codex_cli", "display": "Codex", "subscription": "ChatGPT",
-                                       "publisher": "OpenAI", "installed": True}]
+                                       "publisher": "OpenAI", "loginCode": False, "installed": True}]
         refused = await host(client, "select-provider", {"provider": "claude_cli"})
         assert refused.status_code == 409 and refused.json()["error"]["code"] == "PROVIDER_UNAVAILABLE"
         assert (await host(client, "select-provider", {"provider": "grok_cli"})).status_code == 422

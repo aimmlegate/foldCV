@@ -7,7 +7,7 @@ export type ConnectionState = "unchecked" | "detached" | "cli_missing" | "launch
 
 export type CliInstallation = CliInstallationPayload;
 export type ProviderKind = "codex_cli" | "claude_cli";
-export type ProviderSummary = { kind: ProviderKind; display: string; subscription: string; publisher: string; installed: boolean };
+export type ProviderSummary = { kind: ProviderKind; display: string; subscription: string; publisher: string; loginCode: boolean; installed: boolean };
 export type QuotaState = "unknown" | "available" | "exhausted" | "not_provided";
 
 export type ConnectionSnapshot = {
@@ -42,9 +42,12 @@ const initial: ConnectionSnapshot = { provider: null, providers: [], providerNot
   generationReady: false, experimentalMode: false };
 
 /** Names of the active provider; neutral words until the server has named it. */
-export function providerNames(snapshot: ConnectionSnapshot): Pick<ProviderSummary, "display" | "subscription" | "publisher"> {
-  return snapshot.providers.find(item => item.kind === snapshot.provider) ?? { display: "CLI", subscription: "подписки", publisher: "поставщика" };
+export function providerNames(snapshot: ConnectionSnapshot): Pick<ProviderSummary, "display" | "subscription" | "publisher" | "loginCode"> {
+  return snapshot.providers.find(item => item.kind === snapshot.provider)
+    ?? { display: "CLI", subscription: "подписки", publisher: "поставщика", loginCode: false };
 }
+
+export const loginCodePattern = /^[A-Za-z0-9._~#-]{1,512}$/;
 
 function record(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
@@ -65,7 +68,7 @@ function validProviders(value: unknown, active: unknown): boolean {
   const name = (entry: unknown) => typeof entry === "string" && entry.length > 0 && entry.length <= 40;
   return Array.isArray(value) && value.length <= 8 && new Set(value.map(item => record(item) ? item.kind : null)).size === value.length &&
     value.every(item => record(item) && kinds.includes(String(item.kind)) && name(item.display) && name(item.subscription) &&
-      name(item.publisher) && typeof item.installed === "boolean") &&
+      name(item.publisher) && typeof item.loginCode === "boolean" && typeof item.installed === "boolean") &&
     value.some(item => record(item) && item.kind === active);
 }
 
@@ -231,6 +234,13 @@ export class ConnectionWorkflow {
     const epoch = this.epoch + 1;
     await this.run("login");
     if (epoch === this.epoch && this.view.snapshot.state === "login_required" && !this.view.error) await this.refresh();
+  }
+  /** Passes the code from the provider's sign-in page to the running sign-in; the reply changes nothing on screen. */
+  async sendLoginCode(code: string): Promise<boolean> {
+    const value = code.trim();
+    if (this.view.snapshot.state !== "login_pending" || !loginCodePattern.test(value)) return false;
+    try { await this.post("login-code", { code: value }); return true; }
+    catch { this.publish({ ...this.view, error: "Could not send the sign-in code. Try again." }); return false; }
   }
   async cancelLogin(): Promise<void> {
     if (this.view.detaching) return;

@@ -42,11 +42,17 @@ class SelectProviderRequest(Transport):
     provider: ProviderKind
 
 
+class LoginCodeRequest(HostRequest):
+    # The one-time code from the provider's sign-in page; held in memory for the running sign-in only.
+    code: str = Field(min_length=1, max_length=512, pattern=r"^[A-Za-z0-9._~#-]+$")
+
+
 class ProviderSummary(Transport):
     kind: ProviderKind
     display: str = Field(min_length=1, max_length=40)
     subscription: str = Field(min_length=1, max_length=40)
     publisher: str = Field(min_length=1, max_length=40)
+    loginCode: bool = False
     # Inactive providers: binary and publisher signature only, never a CLI process.
     installed: bool
 

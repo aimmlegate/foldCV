@@ -57,14 +57,39 @@ class ScriptedConnection:
 
 
 class ScriptedClaude(ScriptedConnection):
-    """The unlisted Claude provider in preview: two catalog models and no usage read (decision 15)."""
+    """The unlisted Claude provider in preview: signed out until a code is pasted, then two catalog models and no
+    usage read (decision 15)."""
     executable = None
+
+    def __init__(self):
+        super().__init__()
+        self.signed_in = False
+
+    def login(self, _files, cancel, code=None):
+        self.calls.append('scripted_login')
+        while not cancel.wait(0.05):
+            if code is not None and code():
+                self.signed_in = True
+                return
 
     def inspect(self, _files, _cancel, *, full=True):
         self.calls.append('inspect_claude')
+        if full and not self.signed_in:
+            from resume_api.connection import ConnectionFailure
+            raise ConnectionFailure('LOGIN_REQUIRED', '2.1.308 (Claude Code)')
         models = ('claude-sonnet-5-5', 'claude-opus-5-5')
         return Metadata('2.1.308 (Claude Code)', models, 'max', Quota('not_provided'),
             reasoning={name: ModelReasoning(supported=['low', 'medium', 'high'], default='medium') for name in models})
+
+
+class ScriptedProfile:
+    """A private directory for the scripted Claude slot's profile lock; it marks the slot as native mode."""
+
+    def __init__(self, root):
+        self.root, self.executable = root, Path(sys.executable)
+
+    def prepare(self):
+        self.root.mkdir(mode=0o700, exist_ok=True)
 
 
 class ScriptedContent:
@@ -262,7 +287,8 @@ async def main(args):
                 clock=lambda: datetime.fromisoformat(NOW), agent_runtime=runtime,
                 template_import_call_cap=args.template_call_cap,
                 provider_registry=ProviderRegistry(frozenset({'claude_cli'})) if args.preview_claude else None,
-                provider_slots={'claude_cli': ProviderSlot(ScriptedClaude())} if args.preview_claude else None)
+                provider_slots={'claude_cli': ProviderSlot(ScriptedClaude(), profile=ScriptedProfile(root / 'claude-profile'))}
+                if args.preview_claude else None)
         app.app.state.assistant._fetcher = web
     repository = app.app.state.projects.repository
     if args.template_call_cap is not None and not args.reopen:
