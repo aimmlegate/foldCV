@@ -15,16 +15,16 @@ QUIET_GRACE_SECONDS = 60
 STARTING_QUIET_SECONDS = 2 * QUIET_GRACE_SECONDS
 EVENTS_SHOWN = 6
 
-OPERATION_TITLES = {'partition_employment': 'Разбивка опыта по проектам', 'select_role_branch': 'Выбор профиля роли',
-    'assign_skills': 'Распределение навыков', 'format_period': 'Периоды работы',
+OPERATION_TITLES = {'partition_employment': 'Опыт по проектам', 'select_role_branch': 'Тип роли',
+    'assign_skills': 'Навыки по группам', 'format_period': 'Периоды работы',
     'preserve_stated_text': 'Исходные формулировки'}
-UNTITLED_BLOCK = 'Шапка резюме'
-CALLED = {'initial': 'Модель извлекает данные', 'review': 'Модель проверяет результат',
-    'primary_repair': 'Модель исправляет ответ', 'fallback_repair': 'Резервная модель исправляет ответ',
-    'replacement_review': 'Модель проверяет исправление'}
-RETURNED = {'completed': 'Ответ получен', 'timed_out': 'Ответ не пришёл вовремя',
-    'invalid_payload': 'Ответ не прошёл проверку формата', 'refused': 'Модель отказалась отвечать',
-    'incomplete': 'Ответ неполный', 'cancelled': 'Вызов остановлен', 'transport_failure': 'Сбой связи с моделью',
+UNTITLED_BLOCK = 'Шапка'
+CALLED = {'initial': 'Извлекаем данные', 'review': 'Проверяем результат',
+    'primary_repair': 'Исправляем ответ', 'fallback_repair': 'Исправляем ответ резервной моделью',
+    'replacement_review': 'Проверяем исправление'}
+RETURNED = {'completed': 'Ответ получен', 'timed_out': 'Нет ответа в срок',
+    'invalid_payload': 'Ответ в неверном формате', 'refused': 'Модель отказалась отвечать',
+    'incomplete': 'Ответ неполный', 'cancelled': 'Остановлено', 'transport_failure': 'Сбой связи с моделью',
     'cleanup_failure': 'Процесс модели не завершился'}
 
 
@@ -89,7 +89,7 @@ def activity(operation, titles):
     model_at = latest([at for at, _text in events])
     started = moment(operation.finalization.started_at) if operation.finalization is not None else None
     if started is not None:
-        events.append((started, 'Применяем макет и сохраняем документ'))
+        events.append((started, 'Собираем документ'))
     events.sort(key=lambda item: item[0], reverse=True)
     return events, model_at
 

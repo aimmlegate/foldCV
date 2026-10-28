@@ -61,9 +61,9 @@ def test_steps_and_activity_come_from_the_operation_records():
         attempt('task-projects', 'initial', 41), results=['task-identity'])
     found = progress(value, 50, admitted_at=at(5))
     assert (found['phase'], found['done'], found['total'], found['current']) == ('processing', 1, 3, ['ПРОЕКТЫ'])
-    assert [event['text'] for event in found['events']] == ['Модель извлекает данные: «ПРОЕКТЫ»',
-        'Ответ получен: «Шапка резюме»', 'Модель проверяет результат: «Шапка резюме»', 'Ответ получен: «Шапка резюме»',
-        'Модель извлекает данные: «Шапка резюме»']
+    assert [event['text'] for event in found['events']] == ['Извлекаем данные: «ПРОЕКТЫ»',
+        'Ответ получен: «Шапка»', 'Проверяем результат: «Шапка»', 'Ответ получен: «Шапка»',
+        'Извлекаем данные: «Шапка»']
     assert found['lastModelAt'] == found['lastEventAt'] == at(41)
     assert (found['quietSeconds'], found['stalled']) == (9.0, False)
 
@@ -137,7 +137,7 @@ async def test_a_second_project_imports_queued_behind_the_first_and_both_finish(
         await until(provider.entered.is_set)
         held = (await task_of(client, first, running.json()['id']))['detail']['progress']
         assert (held['phase'], held['done'], held['total'], held['current']) == ('processing', 0, 1, ['PROJECTS'])
-        assert held['events'][0]['text'] == 'Модель извлекает данные: «PROJECTS»' and held['stalled'] is False
+        assert held['events'][0]['text'] == 'Извлекаем данные: «PROJECTS»' and held['stalled'] is False
         assert held['lastModelAt'] is not None
         # The start reply of the waiting import returns at once instead of timing out after 30 s.
         queued = await start(client, second, 'import-b')
