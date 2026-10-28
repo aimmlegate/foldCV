@@ -13,14 +13,14 @@ export function SourceDialog({ projectId, sources, expanded, toggle, close }: {
   return <div id="original-source-panel" className="source-viewer"
     onKeyDown={event => { if (event.key === "Escape") { event.stopPropagation(); close(); } }}>
     <div className="workspace-pane-heading">
-      <div className="workspace-pane-title"><h2>Оригинал</h2><span>Только просмотр</span></div>
+      <div className="workspace-pane-title"><h2>Оригинал</h2></div>
       {source && <a className="icon" aria-label="Скачать оригинал" title="Скачать оригинал" href={`${originalUrl(projectId, source.id)}/download`} download><Icon name="download" /></a>}
       <button className="icon" aria-label={expanded ? "Сравнить рядом" : "Развернуть оригинал"} title={expanded ? "Сравнить рядом" : "Развернуть оригинал"} onClick={toggle}><Icon name={expanded ? "panel" : "expand"} /></button>
       <button className="icon" aria-label="Закрыть оригинал" title="Закрыть оригинал" onClick={close}><Icon name="close" /></button></div>
     <div className="source-viewer-file">
-      {sources.length > 1 ? <select aria-label="Источник" value={source?.id ?? ""} onChange={event => setId(event.currentTarget.value)}>
+      {sources.length > 1 ? <select aria-label="Файл оригинала" value={source?.id ?? ""} onChange={event => setId(event.currentTarget.value)}>
         {sources.map(item => <option key={item.id} value={item.id}>{item.originalName}</option>)}
-      </select> : <span title={source?.originalName}>{source?.originalName ?? "Источник отсутствует"}</span>}
+      </select> : <span title={source?.originalName}>{source?.originalName ?? "Нет файла"}</span>}
       <span className="source-file-type">{source?.originalName.split(".").pop()?.toUpperCase()}</span>
     </div>
     {source && <OriginalPreview key={`${projectId}:${source.id}:${source.byteSha256}`} projectId={projectId} source={source} />}

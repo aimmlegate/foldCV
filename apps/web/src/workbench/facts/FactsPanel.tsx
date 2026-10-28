@@ -55,20 +55,20 @@ export function FactsPanel({ facts, document, focusEntries = [], focusOptions = 
     try { await submit(command); }
     catch (error) { setError(factError(error)); throw error; }
   }
-  return <><aside ref={panel} className="facts-panel" aria-label="Факты резюме" id="rich-facts-panel" hidden={hidden}
+  return <><aside ref={panel} className="facts-panel" aria-label="Факты" id="rich-facts-panel" hidden={hidden}
     onKeyDown={event => { if (event.key === "Escape") { event.preventDefault(); event.stopPropagation(); close(); } }}>
     <div className="panel-heading"><h2>Факты</h2><button className="icon" aria-label="Скрыть факты" onClick={close}><Icon name="close" /></button></div>
     <div className="facts-feedback">
       {error && <p className="notice warning" role="alert">{errorMessage(error)}</p>}
-      {pending.length > 0 && <OperationStatus state={paused ? "error" : "working"} label={paused ? "Ожидает повторного сохранения" : `Сохраняем изменения: ${pending.length}`} timed={!paused} />}
+      {pending.length > 0 && <OperationStatus state={paused ? "error" : "working"} label={paused ? "Не сохранено" : `Сохраняем: ${pending.length}`} timed={!paused} />}
     </div>
     {facts.extraction && <div className="notice" role="status">
-      <p>{facts.extraction.status === "complete" ? "Факты извлечены" : "Факты извлечены частично"}: {facts.extraction.factCount}.</p>
-      {facts.extraction.unresolved.length > 0 && <details><summary>Требует проверки: {facts.extraction.unresolved.length}</summary>
+      <p>Фактов: {facts.extraction.factCount}{facts.extraction.status === "complete" ? "" : ", извлечены не все"}.</p>
+      {facts.extraction.unresolved.length > 0 && <details><summary>Проверьте: {facts.extraction.unresolved.length}</summary>
         <ul>{facts.extraction.unresolved.map((issue, index) => <li key={`${issue.sourceId}:${issue.unitId ?? "result"}:${index}`}>
-          {issue.code === "FACT_SECTION_OMITTED" ? `Не извлечён раздел: ${issue.section}` : issue.code === "FACT_ROWS_RECOVERED" ? "Часть строк ответа модели отклонена; подтверждённые факты сохранены" : issue.section || "Сведения исходника не представлены в фактах"}
+          {issue.code === "FACT_SECTION_OMITTED" ? `Не извлечён раздел: ${issue.section}` : issue.code === "FACT_ROWS_RECOVERED" ? "Часть ответа модели отклонена" : issue.section || "Не попало в факты"}
           {issue.page ? `, стр. ${issue.page}` : ""}</li>)}</ul>
-        <p>Сверьте исходник и внесите исправления вручную или повторите обработку.</p></details>}
+        <p>Сверьте с исходником и исправьте вручную.</p></details>}
     </div>}
     {groups.map(kind => <details className="fact-group" key={kind} data-group={kind} open={kind !== "claim"}>
       <summary>{labels[kind]}</summary>

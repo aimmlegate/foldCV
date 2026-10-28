@@ -6,7 +6,7 @@ export type TaskNotice = {
   state: "running" | "queued" | "stalled" | "failed" | "done" | "stopped"; text: string;
 };
 
-/** Every followed import as one notification in «Задачи»: running and queued ones with Stop, finished ones until closed. */
+/** Every followed import as one notification in «Импорт»: running and queued ones with Stop, finished ones until closed. */
 export function taskNotices(entries: Iterable<ImportEntry>, now: number, titleOf: (projectId: string) => string | undefined = () => undefined): TaskNotice[] {
   return [...entries].map(entry => {
     const view = importView(entry, now);
@@ -14,7 +14,7 @@ export function taskNotices(entries: Iterable<ImportEntry>, now: number, titleOf
       stopping: entry.stopping };
     switch (view.kind) {
       case "running": {
-        if (view.phase === "queued") return { ...base, state: "queued", text: "Импорт в очереди: ждём, пока модель освободится" };
+        if (view.phase === "queued") return { ...base, state: "queued", text: "Импорт в очереди" };
         const step = stepText(view.progress);
         return { ...base, state: "running", text: step ? `Идёт импорт · ${step}` : "Идёт импорт" };
       }

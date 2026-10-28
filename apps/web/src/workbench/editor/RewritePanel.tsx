@@ -43,7 +43,7 @@ export function RewritePanel({ open, close, instruction, change, submit, apply, 
     const outside = (event: PointerEvent) => { if (event.target instanceof Node && !dialog.current?.contains(event.target)) close(); };
     document.addEventListener("pointerdown", outside); return () => document.removeEventListener("pointerdown", outside);
   }, [open, close]);
-  const fields = <><label htmlFor="uir-rewrite-instruction">Что изменить?</label><textarea id="uir-rewrite-instruction" rows={2} aria-label="Инструкция для фрагмента" disabled={busy} value={instruction} onChange={event => change(event.currentTarget.value)} />
+  const fields = <><label htmlFor="uir-rewrite-instruction">Что изменить?</label><textarea id="uir-rewrite-instruction" rows={2} aria-label="Что изменить" disabled={busy} value={instruction} onChange={event => change(event.currentTarget.value)} />
     <div className="rewrite-chips"><button disabled={busy} onClick={() => change(presets.shorten)}>Сократить</button><button disabled={busy} onClick={() => change(presets.clarify)}>Сделать яснее</button></div></>;
   return <section ref={dialog} hidden={!open} role="dialog" aria-modal="false" className="rewrite-panel uir-rewrite" aria-labelledby="uir-rewrite-title"
     onKeyDown={event => {
@@ -53,16 +53,16 @@ export function RewritePanel({ open, close, instruction, change, submit, apply, 
         else if (instruction.trim() && source.trim()) submit();
       }
     }}>
-    <div className="dialog-heading"><div><h2 id="uir-rewrite-title">Изменить текст</h2></div><button className="icon" aria-label={busy ? "Скрыть окно изменения текста" : "Закрыть изменение текста"} onClick={close}><Icon name="close" /></button></div>
+    <div className="dialog-heading"><div><h2 id="uir-rewrite-title">Изменить текст</h2></div><button className="icon" aria-label={busy ? "Скрыть" : "Закрыть"} onClick={close}><Icon name="close" /></button></div>
     {!preview && <details className="rewrite-original"><summary>Выделено: {source.length} знаков</summary><blockquote className="rewrite-source">{source}</blockquote></details>}
     {preview ? <>
-      <section className="rewrite-result" aria-label="Предпросмотр правки"><label htmlFor="uir-rewrite-result">Новый текст — можно исправить вручную</label>
-        <textarea id="uir-rewrite-result" aria-label="Новый текст" rows={5} maxLength={65536} disabled={busy || preview.applied === true} value={preview.text} onChange={event => editPreview(event.currentTarget.value)} /></section></>
+      <section className="rewrite-result"><label htmlFor="uir-rewrite-result">Новый текст</label>
+        <textarea id="uir-rewrite-result" rows={5} maxLength={65536} disabled={busy || preview.applied === true} value={preview.text} onChange={event => editPreview(event.currentTarget.value)} /></section></>
       : fields}
     {preview && <details className="rewrite-adjust"><summary>Изменить инструкцию</summary>{fields}</details>}
     <div className="rewrite-progress-slot">{error ? <p className="notice warning" role="alert">{errorMessage(error)}</p> : busy && activity ? <>
       <OperationStatus label={rewriteLabels[activity.stage]} timed startedAt={activity.startedAt} />
-      {rewriteCancellable(activity.stage) && <button className="text-button" onClick={() => cancel(activity.actionId)}>Отменить правку</button>}
+      {rewriteCancellable(activity.stage) && <button className="text-button" onClick={() => cancel(activity.actionId)}>Отменить</button>}
     </> : null}</div>
     <div className="rewrite-actions"><Button variant="primary" busy={busy} busyLabel={preview ? "Применяем…" : "Готовим вариант…"} disabled={preview ? !preview.text.trim() : !instruction.trim() || !source.trim()} onClick={preview ? apply : submit}>{preview ? "Применить" : "Изменить текст"}<Icon name={preview ? "check" : "spark"} /></Button>
       {preview && <Button variant="quiet" disabled={busy || !instruction.trim()} onClick={submit}>Ещё вариант</Button>}

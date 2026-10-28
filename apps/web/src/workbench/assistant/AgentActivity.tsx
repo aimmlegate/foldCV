@@ -12,8 +12,8 @@ export function Activity({ view, active }: { view: AssistantView; active: boolea
   const quiet = active && Number.isFinite(observed) && now - observed >= 20000;
   const summary = [...items].reverse().find(item => item.state === "summary");
   const preview = view.run?.state === "queued" ? "Начнём, когда освободится модель."
-    : quiet && view.run?.state === "running" ? "Новых событий пока нет. Ожидаем ответ модели."
-    : summary?.text ?? (latest ? `${latest.label}${latest.state === "success" ? " · готово" : latest.state === "error" ? " · не удалось" : ""}` : "Ход работы появится здесь.");
+    : quiet && view.run?.state === "running" ? "Ждём ответа модели."
+    : summary?.text ?? (latest ? `${latest.label}${latest.state === "success" ? " · готово" : latest.state === "error" ? " · не удалось" : ""}` : "");
   return <details className="chat-activity">
     <summary>{active && !view.pendingSend ? <Spinner /> : <Icon name={view.run?.state === "completed" ? "check" : "info"} />}
       <span className="operation-copy"><span role="status">{currentActivity(view, active)}</span>
@@ -22,10 +22,10 @@ export function Activity({ view, active }: { view: AssistantView; active: boolea
         finishedAt={active ? null : view.run.finishedAt} active={active && !view.pendingSend} />}
       <Icon name="chevron" />
     </summary>
-    <ol className="chat-activity-log" aria-label="Ход работы помощника">{items.map(item => <li key={item.id}>
+    <ol className="chat-activity-log" aria-label="Ход работы">{items.map(item => <li key={item.id}>
       {item.state === "working" && active ? <Spinner /> : <Icon name={item.state === "success" ? "check" : item.state === "summary" ? "spark" : "info"} />}
-      <span>{item.text || item.label}<small>{item.state === "summary" ? "Краткое сообщение модели" : item.state === "error" ? "Не удалось выполнить" : item.state === "success" ? "Готово" : active ? "В работе" : "Выполнение завершено"}</small></span>
+      <span>{item.text || item.label}<small>{item.state === "summary" ? "От модели" : item.state === "error" ? "Не удалось" : item.state === "success" ? "Готово" : active ? "В работе" : "Завершено"}</small></span>
     </li>)}</ol>
-    <p className="chat-activity-note">Модель: {view.run?.model ?? "подготавливаем"}</p>
+    <p className="chat-activity-note">Модель: {view.run?.model ?? "—"}</p>
   </details>;
 }

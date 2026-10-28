@@ -77,7 +77,7 @@ export function App({ portalHost }: { portalHost: HTMLElement }) {
       <NotificationSection count={Number(!!error && !fileMode)}>
         <section className="notice-group" aria-label="Ошибки"><h3>Ошибки</h3>
           {error && !fileMode && <div className="notification-error" role="alert"><p>{errorMessage(error)}</p>
-            <button className="icon" aria-label="Скрыть сообщение" onClick={workspace.dismissError}><Icon name="close" /></button></div>}
+            <button className="icon" aria-label="Скрыть ошибку" onClick={workspace.dismissError}><Icon name="close" /></button></div>}
         </section>
       </NotificationSection>
       <TaskNotices entries={imports} activeId={shown?.workspace.projectId ?? null}
@@ -91,10 +91,10 @@ export function App({ portalHost }: { portalHost: HTMLElement }) {
           stop={() => importActions.stop(shownImport.projectId)} retry={() => importActions.retry(shownImport.projectId)}
           close={() => importActions.dismiss(shownImport.projectId)} open={() => importActions.reopen(shownImport.projectId)} />}
         {view === "pre_draft" && <section className="progress-screen"><div className="progress-content">
-          <h2>Импорт резюме</h2><p>Исходник и промежуточные результаты сохранены.</p>
+          <h2>Импорт не завершён</h2><p>Готовые шаги сохранены.</p>
           <button type="button" disabled={busy} onClick={() => void workspace.resumeTemplate()}>Продолжить импорт</button>
         </div></section>}
-        {workspace.loading && <div className="workspace-loading"><OperationStatus label="Открываем резюме" detail="Загружаем документ, факты и историю проекта." timed /></div>}
+        {workspace.loading && <div className="workspace-loading"><OperationStatus label="Открываем резюме" timed /></div>}
         {view === "editor" && template?.response.workspace.project && <TemplateEditor key={`${template.response.workspace.projectId}:${workspace.openingEpoch}`}
           initial={template.response} connection={template.connection}
           onStatus={setStatus} onShown={workspace.acknowledgeTemplate} ref={templateEditor} portalHost={portalHost}

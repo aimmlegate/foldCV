@@ -4,7 +4,7 @@ import { Elapsed } from "../ui/OperationStatus";
 import type { ImportEntry } from "./progress";
 import { taskNotices } from "./task-notice";
 
-/** Imports of every project in «Уведомления» → «Задачи»; the import screen itself shows only inside its resume. */
+/** Imports of every project in «Уведомления» → «Импорт»; the import screen itself shows only inside its resume. */
 export function TaskNotices({ entries, activeId, titleOf, stop, close, open }: {
   entries: ReadonlyMap<string, ImportEntry>; activeId: string | null; titleOf: (projectId: string) => string | undefined;
   stop: (projectId: string) => void; close: (projectId: string) => void; open: (projectId: string) => void;
@@ -18,7 +18,7 @@ export function TaskNotices({ entries, activeId, titleOf, stop, close, open }: {
   }, [following]);
   const notices = taskNotices(entries.values(), now, titleOf);
   return <NotificationSection count={notices.length}>
-    {notices.length > 0 && <section className="notice-group" aria-label="Задачи"><h3>Задачи</h3>
+    {notices.length > 0 && <section className="notice-group" aria-label="Импорт"><h3>Импорт</h3>
       {notices.map(notice => <div className={`notice task-notice${notice.state === "failed" || notice.state === "stalled" ? " error" : ""}`}
         role="status" key={notice.projectId}>
         <p><strong>{notice.title}</strong><span>{notice.text}{(notice.state === "running" || notice.state === "queued")

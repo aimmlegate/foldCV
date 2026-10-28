@@ -25,7 +25,7 @@ async function mountApplication(lease: TabLease, host: HTMLElement): Promise<voi
     document.body.append(portalHost); root.render(<App portalHost={portalHost} />);
   } catch {
     lease.release();
-    if (!leaving) root.render(<p role="alert">Откройте приложение по адресу из запуска сервиса.</p>);
+    if (!leaving) root.render(<p role="alert">Откройте FoldCV по ссылке, выданной при запуске.</p>);
   }
 }
 

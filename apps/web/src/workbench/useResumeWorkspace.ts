@@ -76,7 +76,7 @@ export function useResumeWorkspace() {
     if (!previousEditor?.background) await previousAssistant?.stop();
     if (current()) await previousEditor?.navigate();
   }
-  async function action(work: (current: () => boolean) => Promise<void>, labelText = "Сохраняем последние изменения"): Promise<boolean> {
+  async function action(work: (current: () => boolean) => Promise<void>, labelText = "Сохраняем изменения"): Promise<boolean> {
     const owner = lifetime.current;
     if (!owner || acting.current) return false;
     const current = () => lifetime.current === owner, operation = {};
@@ -104,7 +104,7 @@ export function useResumeWorkspace() {
       await leave(current);
       if (!current()) return;
       clear(); setSettings(false);
-    }, "Подготавливаем новое резюме");
+    }, "Готовим новое резюме");
   }
   async function open(id: string) {
     return action(async current => {
@@ -147,7 +147,7 @@ export function useResumeWorkspace() {
       if (archived && activeProject.current === id) clear();
       const catalog = await listProjects();
       if (current()) setProjects(catalog);
-    }, archived ? "Перемещаем резюме в архив" : "Восстанавливаем резюме");
+    }, archived ? "Переносим в архив" : "Возвращаем из архива");
   }
   async function projectLifecycle(id: string, kind: "archive" | "delete") {
     return action(async current => {
@@ -234,7 +234,7 @@ export function useResumeWorkspace() {
         if (result && reads.current.selectionCurrent(capture)) { show(result, capture); setSettings(false); }
       } finally { reads.current.cancelSelection(capture); }
       if (refused) throw refused;
-    }, "Загружаем и читаем файл");
+    }, "Читаем файл");
   }
   async function upload(file: File) {
     return action(async current => {
@@ -251,7 +251,7 @@ export function useResumeWorkspace() {
         const capture = reads.current.opening, catalog = await listProjects();
         if (reads.current.matchesOpening(capture)) setProjects(catalog);
       } finally { reads.current.cancelReplacement(version); }
-    }, "Открываем файл проекта");
+    }, "Открываем файл");
   }
   async function exportFile(kind: "export" | "archive", filename?: string | ((current: TemplateProjectResponseV1) => string)) {
     const deliver = (blob: Blob, name: string) => {
@@ -262,19 +262,19 @@ export function useResumeWorkspace() {
     const fallback = kind === "export" ? "resume.docx" : "project.foldcv";
     return action(async () => {
       const capture = reads.current.begin(kind);
-      if (!capture) throw new Error("Откройте резюме перед сохранением файла.");
+      if (!capture) throw new Error("Сначала откройте резюме.");
       await templateEditor.current?.flush();
       const connection = template?.connection;
       const current = connection?.response ?? template?.response;
-      if (!current || !connection) throw new Error("Откройте резюме перед сохранением файла.");
+      if (!current || !connection) throw new Error("Сначала откройте резюме.");
       if (!reads.current.current(kind, capture) || current.workspace.projectId !== capture.projectId) return;
-      stage(kind === "export" ? "Создаём документ DOCX" : "Собираем файл проекта");
+      stage(kind === "export" ? "Готовим DOCX" : "Готовим файл .foldcv");
       let blob: Blob;
       // The editor token and the flushed revision go with the file. Refresh adopts the commit.
       try { blob = kind === "export" ? (await connection.exportDocx()).blob : await connection.saveFoldcv(); }
       finally { if (reads.current.current(kind, capture)) await templateEditor.current?.refresh(); }
       if (reads.current.current(kind, capture)) deliver(blob, typeof filename === "function" ? filename(current) : filename ?? fallback);
-    }, "Сохраняем изменения перед скачиванием");
+    }, "Сохраняем изменения");
   }
   async function renameTemplate(title: string) {
     const next = title.trim();

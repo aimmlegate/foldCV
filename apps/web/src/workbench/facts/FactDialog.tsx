@@ -38,7 +38,7 @@ export function FactDialog({ target, close, submit }: { target: FactTarget; clos
       if (record && !Object.keys(values).length) { close(); return; }
       void apply(record ? { operation: "edit", recordId: record.id, values } : { operation: "add", recordKind: target.kind, values });
     }}>
-      {target.remove ? <p className="dialog-copy">{target.kind === "claim" ? "Заметка будет удалена. Текст резюме сохранится." : "Связанные поля будут удалены из документа. Остальной текст сохранится."}</p> : <>
+      {target.remove ? <p className="dialog-copy">{target.kind === "claim" ? "Текст резюме не изменится." : "Поля этого факта будут удалены из документа."}</p> : <>
         <div className="fact-form-grid">{[...inputs, ...addingPeriod].map((field, index) => "date" in field || field.key === "start" || field.key === "end" || field.key === "completion"
           ? <DateInput key={field.key} name={field.key} label={field.label} field={"date" in field ? field.date : undefined} disabled={busy} />
           : target.kind === "claim" ? <div key={field.key} className="full">
@@ -58,7 +58,7 @@ export function FactDialog({ target, close, submit }: { target: FactTarget; clos
       </>}
       {error && <p className="notice warning" role="alert">{errorMessage(error)}</p>}
       <div className="dialog-actions"><Button disabled={busy} onClick={close}>Отмена</Button>
-        <Button type="submit" variant={target.remove ? "danger" : "primary"} busy={busy} busyLabel={target.remove ? "Удаляем…" : "Сохраняем…"}>{target.remove ? "Удалить факт" : "Сохранить факт"}{!target.remove && <Icon name="check" />}</Button></div>
+        <Button type="submit" variant={target.remove ? "danger" : "primary"} busy={busy} busyLabel={target.remove ? "Удаляем…" : "Сохраняем…"}>{target.remove ? "Удалить" : "Сохранить"}{!target.remove && <Icon name="check" />}</Button></div>
     </form>
   </Dialog>;
 }

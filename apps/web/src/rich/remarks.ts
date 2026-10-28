@@ -12,7 +12,7 @@ export type RemarkSection = { id: string; title: string; focusId: string | null;
 export type PlacedRemarks = { sections: RemarkSection[]; unplaced: Remark[]; count: number };
 
 const REGION_TITLES: Readonly<Record<string, string>> = { header: "Шапка", sidebar: "Боковая колонка", main: "Основная колонка" };
-export const EMPTY_BLOCK = "Пустой блок: в нём нет текста.";
+export const EMPTY_BLOCK = "Пустой блок.";
 export const LINK_WITHOUT_TARGET = "Ссылка без адреса.";
 
 function field(value: unknown, key: string): unknown { return typeof value === "object" && value !== null ? Reflect.get(value, key) : undefined; }

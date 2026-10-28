@@ -8,11 +8,11 @@ const run = assistantRun("completed", "run", "conversation");
 const view: AssistantView = assistantView({ run });
 
 test("a terminal server run still waits for the mounted editor acknowledgment", () => {
-  assert.equal(activityText(view, true), "Подтверждаем изменения в редакторе");
+  assert.equal(activityText(view, true), "Применяем правки");
   assert.equal(activityText(view, false), "Завершено");
   assert.equal(activityText({ ...view, run: { ...run, state: "cancelled" } }, false), "Остановлено");
 });
 test("a new submission and a lost submission response keep their own states", () => {
-  assert.equal(activityText({ ...view, submitting: true }, true), "Отправляем задачу…");
-  assert.match(activityText({ ...view, pendingSend: true }, true), /Ответ на отправку потерян/);
+  assert.equal(activityText({ ...view, submitting: true }, true), "Отправляем…");
+  assert.match(activityText({ ...view, pendingSend: true }, true), /Нет ответа на отправку/);
 });

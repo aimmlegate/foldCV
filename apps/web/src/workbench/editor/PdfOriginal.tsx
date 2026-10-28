@@ -19,7 +19,7 @@ export default function PdfOriginal({ blob }: { blob: Blob }) {
       standardFontDataUrl: `${assets}standard_fonts/`, wasmUrl: `${assets}wasm/`, iccUrl: `${assets}iccs/` });
     void task.promise.then(result => { if (active) setPdf(result); }).catch((cause: unknown) => {
       if (active) setError(cause instanceof Error && cause.name === "PasswordException"
-        ? "PDF защищён паролем. Скачайте оригинал для просмотра." : "Не удалось показать PDF. Скачайте оригинал для просмотра.");
+        ? "PDF защищён паролем. Скачайте оригинал." : "Не удалось показать PDF. Скачайте оригинал.");
     });
     return () => { active = false; void task.destroy(); URL.revokeObjectURL(url); };
   }, [blob]);
@@ -51,7 +51,7 @@ export default function PdfOriginal({ blob }: { blob: Blob }) {
       render = documentPage.render({ canvas, viewport, transform: [density, 0, 0, density, 0, 0] });
       await render.promise;
       if (active) { container.replaceChildren(canvas); setRendering(false); }
-    }).catch(() => { if (active) { setError("Не удалось отрисовать страницу PDF. Скачайте оригинал для просмотра."); setRendering(false); } });
+    }).catch(() => { if (active) { setError("Не удалось показать страницу. Скачайте оригинал."); setRendering(false); } });
     return () => { active = false; render?.cancel(); canvas.width = 0; canvas.height = 0; };
   }, [pdf, page, zoom, width]);
   return <>
@@ -59,13 +59,13 @@ export default function PdfOriginal({ blob }: { blob: Blob }) {
       <button className="text-button" disabled={!pdf || page <= 1} onClick={() => setPage(value => value - 1)}>Назад</button>
       <span>{pdf ? `${page} / ${pdf.numPages}` : "PDF"}</span>
       <button className="text-button" disabled={!pdf || page >= pdf.numPages} onClick={() => setPage(value => value + 1)}>Далее</button>
-      <select aria-label="Масштаб оригинала" value={zoom} onChange={event => setZoom(Number(event.currentTarget.value))}>
+      <select aria-label="Масштаб" value={zoom} onChange={event => setZoom(Number(event.currentTarget.value))}>
         <option value={1}>По ширине</option><option value={1.5}>150%</option><option value={2}>200%</option>
       </select>
     </div>
     {error && <p className="source-viewer-message" role="alert">{errorMessage(error)}</p>}
     <div ref={scroll} className="source-pdf-scroll">
-      {!error && rendering && <div className="source-render-status"><OperationStatus label={pdf ? `Отрисовываем страницу ${page}` : "Читаем PDF"} /></div>}
+      {!error && rendering && <div className="source-render-status"><OperationStatus label={pdf ? `Показываем страницу ${page}` : "Читаем PDF"} /></div>}
       <div ref={host} />
     </div>
   </>;

@@ -9,7 +9,7 @@ export const names: Record<Kind, readonly (readonly [string, string])[]> = {
   employment: [["employer", "Компания"], ["role", "Роль"]], technology: [["display", "Технология"], ["experience", "Опыт, как в резюме"]],
   education: [["institution", "Учебное заведение"], ["qualification", "Квалификация"], ["specialty", "Специальность"], ["completion", "Дата окончания"]],
   language: [["language", "Язык"], ["level", "Уровень"]],
-  claim: [["value", "Содержание и пометки"]],
+  claim: [["value", "Текст"]],
 };
 export function fields(record: RecordValue): Field[] {
   if (!(record.kind in names)) return [];

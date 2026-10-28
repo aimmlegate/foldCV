@@ -30,7 +30,7 @@ export type CheckState = { kind: "idle" } | { kind: "running" } | { kind: "faile
 export function RemarkSections({ remarks, show }: { remarks: PlacedRemarks; show: (blockId: string) => void }) {
   if (!remarks.sections.length && !remarks.unplaced.length) return null;
   return <section className="fact-group remark-sections" aria-labelledby="remark-sections-title">
-    <h3 id="remark-sections-title" className="remark-sections-title">Разделы резюме
+    <h3 id="remark-sections-title" className="remark-sections-title">Разделы
       {remarks.count > 0 && <small>Замечаний: {remarks.count}</small>}</h3>
     <ul className="remark-section-list">
       {remarks.sections.map(section => <li key={section.id} className="remark-section" data-remark-section={section.id}>
@@ -58,8 +58,8 @@ export function CheckFooter({ state, run, disabled }: { state: CheckState; run: 
     <Button disabled={disabled} busy={state.kind === "running"} busyLabel="Проверяем…" onClick={run}><Icon name="check" />Проверить резюме</Button>
     <p role="status" className={state.kind === "failed" ? "facts-check-status warning" : "facts-check-status"}>
       {state.kind === "failed" ? state.message
-        : state.kind === "done" ? state.stale ? "Резюме изменено после проверки. Проверьте снова."
-          : state.count === 0 ? "Замечаний нет" : `Замечаний: ${state.count}. Они отмечены в разделах выше.` : ""}
+        : state.kind === "done" ? state.stale ? "Резюме изменилось. Проверьте снова."
+          : state.count === 0 ? "Замечаний нет" : `Замечаний: ${state.count}` : ""}
     </p>
   </div>;
 }

@@ -27,10 +27,10 @@ test("public activity groups each tool and summary update without leaving a fini
 
 test("queue, cancellation, uncertain send and editor publication take precedence over an old tool", () => {
   const current = { ...view, activity: [started, summary] };
-  assert.equal(currentActivity({ ...current, run: { ...run, state: "queued" } }, true), "Ожидает очереди");
+  assert.equal(currentActivity({ ...current, run: { ...run, state: "queued" } }, true), "В очереди");
   assert.equal(currentActivity({ ...current, run: { ...run, state: "cancelling" } }, true), "Останавливаем…");
-  assert.match(currentActivity({ ...current, pendingSend: true }, true), /Ответ на отправку потерян/);
-  assert.equal(currentActivity({ ...current, run: { ...run, state: "completed" } }, true), "Подтверждаем изменения в редакторе");
+  assert.match(currentActivity({ ...current, pendingSend: true }, true), /Нет ответа на отправку/);
+  assert.equal(currentActivity({ ...current, run: { ...run, state: "completed" } }, true), "Применяем правки");
   assert.equal(currentActivity({ ...current, loading: "Открываем диалог" }, false), "Открываем диалог");
 });
 

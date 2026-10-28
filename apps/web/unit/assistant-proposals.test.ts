@@ -14,8 +14,8 @@ test("the preview shows the server's before and after text as plain text, with n
   const html = render({ value });
   assert.ok(html.includes("Разработал API 😀") && html.includes("&lt;img"));
   assert.equal(/<img|<dialog|role="dialog"/u.test(html), false);
-  assert.ok(html.includes("Сейчас") && html.includes("После применения") && html.includes("Текст · 1"));
-  assert.ok(html.includes("Документ пока не изменён") && html.includes("одна отмена"));
+  assert.ok(html.includes("Было") && html.includes("Станет") && html.includes("Текст · 1"));
+  assert.ok(html.includes("одним шагом"));
 });
 
 test("Apply needs a current draft and the edits flag; Discard needs only a draft", () => {
@@ -23,17 +23,17 @@ test("Apply needs a current draft and the edits flag; Discard needs only a draft
   assert.deepEqual(proposalControls(value, false, false, true), { apply: true, discard: true, reason: null });
   assert.equal(proposalControls(value, true, false, true).apply, false);
   const off = proposalControls(value, false, false, false);
-  assert.equal(off.apply, false); assert.equal(off.discard, true); assert.match(off.reason ?? "", /Разрешите правки/u);
+  assert.equal(off.apply, false); assert.equal(off.discard, true); assert.match(off.reason ?? "", /«Разрешить правки»/u);
   const stale = proposalControls(value, false, true, true);
-  assert.equal(stale.apply, false); assert.match(stale.reason ?? "", /документ изменился/u);
+  assert.equal(stale.apply, false); assert.match(stale.reason ?? "", /Документ изменился/u);
   for (const state of ["applied", "discarded"] as const) assert.deepEqual(proposalControls({ ...value, state }, false, false, true), { apply: false, discard: false, reason: null });
-  assert.ok(render({ stale: true }).includes("Вариант устарел"));
-  assert.ok(render({ value: { ...value, state: "applied" } }).includes("Вариант сохранён"));
+  assert.ok(render({ stale: true }).includes("Правки устарели"));
+  assert.ok(render({ value: { ...value, state: "applied" } }).includes("Правки применены"));
 });
 
 test("history and project actions name what Apply does", () => {
   assert.equal(proposalTitle(proposal({ kind: "history", ops: [{ op: "history", direction: "undo" }] })), "Отменить последнее действие");
   assert.equal(proposalTitle(proposal({ kind: "action", ops: [{ op: "action", action: "archive", value: null, targetId: null }] })), "Перенести резюме в архив");
   const html = render({ value: proposal({ kind: "history", ops: [{ op: "history", direction: "redo" }], preview: [] }) });
-  assert.ok(html.includes("Повторить отменённое действие") && html.includes("Новая запись в истории не создаётся"));
+  assert.ok(html.includes("Повторить отменённое действие") && !html.includes("одним шагом"));
 });

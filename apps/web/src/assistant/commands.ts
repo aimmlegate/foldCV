@@ -1,7 +1,7 @@
 export const assistantCommands = [
-  { command: "/skills", description: "Показать доступные скилы" },
-  { command: "/import-resume", description: "Использовать правила импорта и обработки резюме" },
-  { command: "/format-resume", description: "Оформить по текущему шаблону без изменения текста" },
+  { command: "/skills", description: "Показать навыки помощника" },
+  { command: "/import-resume", description: "Правила импорта резюме" },
+  { command: "/format-resume", description: "Оформить по шаблону, не меняя текст" },
 ] as const;
 
 export function commandSuggestions(value: string) {

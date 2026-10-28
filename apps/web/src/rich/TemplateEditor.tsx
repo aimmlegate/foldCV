@@ -224,7 +224,7 @@ export function TemplateEditor({ initial, connection, onStatus, onShown, ref, po
       apply={href => void applyLinkTarget(linkTarget, href)} />}
     <WorkspaceViews view={workspaceView} change={changeWorkspaceView} hasSource={sources.length > 0} notices={null} />
     <div className="editor-body uir-editor-body">
-      <aside className="editor-notifications" aria-label="Уведомления редактора">
+      <aside className="editor-notifications" aria-label="Уведомления">
         {mode === "recovering" && <div className="notice warning" role="alert">
           <p>{recovering ? "Восстанавливаем введённый текст…" : errorMessage("WRITER_RECOVERY_REQUIRED")}</p>
           {!recovering && <button type="button" onClick={() => void recover()}>Продолжить</button>}
@@ -233,7 +233,7 @@ export function TemplateEditor({ initial, connection, onStatus, onShown, ref, po
         <EditorNotices warning={warning} clearWarning={() => setWarning("")} onOpen={() => {}} />
         {(state.kind === "conflict" || state.kind === "rejected") && <div className="notice warning" role="alert">
           <p>{errorMessage(state.kind === "conflict" ? "V7_INPUT_CONFLICT" : "V7_INPUT_REJECTED")}</p>
-          <button type="button" onClick={() => session.retry()}>Сохранить текст из редактора</button>
+          <button type="button" onClick={() => session.retry()}>Сохранить мой текст</button>
         </div>}
       </aside>
       {/* The layout host: the facts panel floats over the document. */}
