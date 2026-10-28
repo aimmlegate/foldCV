@@ -19,6 +19,7 @@ from .app import ProviderSlot, create_app
 from .host_models import Transport
 from .lifecycle import require_supported_host, tune_garbage_collector
 from .cli.experimental_profile import installed_profile
+from .cli.installation import ClaudeInstallation
 from .cli.profiles import claude
 from .cli.profiles.claude import ClaudeCliProfile
 from .connection_claude import ClaudeConnectionAdapter
@@ -46,13 +47,20 @@ def trusted_temp_root() -> Path:
     return base / "foldcv-service"
 
 
+def bind_claude(slot: ProviderSlot, executable: Path) -> ProviderSlot:
+    profile = ClaudeCliProfile(slot.profile.root, executable)
+    return ProviderSlot(ClaudeConnectionAdapter(profile), ClaudeCliProvider(executable, profile=profile), profile,
+                        slot.installation, rebind=bind_claude)
+
+
 def claude_slot(data_root: Path) -> ProviderSlot:
-    """Claude next to Codex; it stays unlisted until its parity matrix passes (MP07), so it runs nothing."""
-    executable = claude.installed_executable()
-    if executable is None:
-        return ProviderSlot(ClaudeConnectionAdapter(None))
+    """Claude next to Codex; it stays unlisted until its parity matrix passes (MP07), so it runs nothing.
+    FoldCV's managed runtime comes first, then a native install, else the managed path that Settings installs into."""
+    installation = ClaudeInstallation(data_root / ("cli-runtime-" + claude.KIND))
+    managed = installation.executable
+    executable = managed if managed.is_file() else claude.installed_executable() or managed
     profile = ClaudeCliProfile(data_root / ("cli-profile-" + claude.KIND), executable)
-    return ProviderSlot(ClaudeConnectionAdapter(profile), ClaudeCliProvider(executable, profile=profile), profile)
+    return bind_claude(ProviderSlot(None, profile=profile, installation=installation), executable)
 
 
 async def launch(*, port: int = 0, open_browser: bool = True,

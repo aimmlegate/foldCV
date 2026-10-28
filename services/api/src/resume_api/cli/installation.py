@@ -13,7 +13,7 @@ import threading
 import time
 import uuid
 
-from . import distribution as release
+from . import claude_distribution, distribution as release
 from .process_runner import ProcessExit, ProcessRunner
 from ..lifecycle import SpikeError
 
@@ -48,13 +48,35 @@ def private_directory(path, *, create=False):
 
 
 class CliInstallation:
+    """The Codex package: one pinned archive with the CLI, its code-mode host and the package manifest."""
+
+    download_name = "codex.tar.gz"
+    seconds = 300
+
     def __init__(self, root):
         self.root = Path(os.path.abspath(root))
         self.cancel = threading.Event()
         self.lock = threading.Lock()
-        self.value = {"state": "idle", "downloadedBytes": 0, "totalBytes": release.ARCHIVE_BYTES,
-                      "version": release.RELEASE, "error": None,
+        self.value = {"state": "idle", "downloadedBytes": 0, "totalBytes": self.size,
+                      "version": self.release, "error": None,
                       "available": platform.system() == "Darwin" and platform.machine() == "arm64"}
+
+    # Read on each use, so a test can patch the pinned module values.
+    @property
+    def release(self):
+        return release.RELEASE
+
+    @property
+    def url(self):
+        return release.ARCHIVE_URL
+
+    @property
+    def size(self):
+        return release.ARCHIVE_BYTES
+
+    @property
+    def sha256(self):
+        return release.ARCHIVE_SHA256
 
     @property
     def executable(self):
@@ -98,20 +120,20 @@ class CliInstallation:
             raise InstallationFailure("cancelled")
 
     def download(self, files, archive):
-        deadline = time.monotonic() + 300
+        deadline = time.monotonic() + self.seconds
 
         def progress():
             self.check_cancel()
             size = archive.stat().st_size if archive.exists() else 0
-            if size > release.ARCHIVE_BYTES:
+            if size > self.size:
                 raise InstallationFailure("download_failed")
             self.update(downloadedBytes=size)
 
         try:
             ProcessRunner(Path("/usr/bin/curl")).run(files, (
                 "-q", "--fail", "--silent", "--show-error", "--location", "--proto", "=https",
-                "--proto-redir", "=https", "--connect-timeout", "15", "--max-time", "300",
-                "--max-filesize", str(release.ARCHIVE_BYTES), "--output", str(archive), release.ARCHIVE_URL,
+                "--proto-redir", "=https", "--connect-timeout", "15", "--max-time", str(self.seconds),
+                "--max-filesize", str(self.size), "--output", str(archive), self.url,
             ), cancel=self.cancel, deadline=deadline, poll_input=progress, max_output=16384)
         except ProcessExit:
             raise InstallationFailure("download_failed") from None
@@ -153,6 +175,10 @@ class CliInstallation:
                     or not path.is_file() or digest(path, self.check_cancel) != expected):
                 raise InstallationFailure("invalid_package")
 
+    def stage(self, download, staging):
+        self.unpack(download, staging)
+        self.verify(staging)
+
     def install(self, files):
         staging = None
         previous = None
@@ -162,18 +188,17 @@ class CliInstallation:
                 raise InstallationFailure("unsupported_platform")
             with self.owned():
                 self.check_cancel()
-                archive = files.path / "codex.tar.gz"
+                archive = files.path / self.download_name
                 self.update(state="downloading", downloadedBytes=0, error=None)
                 self.download(files, archive)
                 self.check_cancel()
-                self.update(state="verifying", downloadedBytes=min(archive.stat().st_size, release.ARCHIVE_BYTES))
-                if archive.stat().st_size != release.ARCHIVE_BYTES or digest(archive, self.check_cancel) != release.ARCHIVE_SHA256:
+                self.update(state="verifying", downloadedBytes=min(archive.stat().st_size, self.size))
+                if archive.stat().st_size != self.size or digest(archive, self.check_cancel) != self.sha256:
                     raise InstallationFailure("checksum_failed")
                 staging = self.root / (".staging-" + uuid.uuid4().hex)
                 staging.mkdir(mode=0o700)
                 self.update(state="extracting")
-                self.unpack(archive, staging)
-                self.verify(staging)
+                self.stage(archive, staging)
                 self.check_cancel()
                 destination = self.executable.parent.parent
                 if destination.exists() or destination.is_symlink():
@@ -204,3 +229,40 @@ class CliInstallation:
                 if path is not None and path.exists():
                     shutil.rmtree(path)
         return None
+
+
+class ClaudeInstallation(CliInstallation):
+    """One notarized Claude Code binary, pinned from the signed release manifest (MP02b)."""
+
+    download_name = "claude"
+    # The binary is about twice the Codex archive.
+    seconds = 600
+
+    @property
+    def release(self):
+        return claude_distribution.RELEASE
+
+    @property
+    def url(self):
+        return claude_distribution.BINARY_URL
+
+    @property
+    def size(self):
+        return claude_distribution.BINARY_BYTES
+
+    @property
+    def sha256(self):
+        return claude_distribution.BINARY_SHA256
+
+    @property
+    def executable(self):
+        return claude_distribution.managed_executable(self.root)
+
+    def stage(self, download, staging):
+        target = staging / "bin/claude"
+        target.parent.mkdir(mode=0o700)
+        with download.open("rb") as source, target.open("xb") as output:
+            while chunk := source.read(1024 * 1024):
+                self.check_cancel()
+                output.write(chunk)
+        target.chmod(0o700)

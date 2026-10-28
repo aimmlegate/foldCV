@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 from concurrent.futures import ThreadPoolExecutor
+from collections.abc import Callable
 from dataclasses import dataclass
 from io import BytesIO
 from contextlib import asynccontextmanager
@@ -66,6 +67,8 @@ class ProviderSlot:
     profile: object | None = None
     installation: CliInstallation | None = None
     runtime: object | None = None
+    # How a finished managed install rebinds the slot to the new executable.
+    rebind: Callable[[ProviderSlot, Path], ProviderSlot] | None = None
 
 
 def problem(code: str, status: int, stage: str = "request", retryable: bool = False) -> JSONResponse:
@@ -282,8 +285,18 @@ def create_app(*, origin: str, secret: str, temp_root: Path, dist: Path, cli_exe
     connection_state = ConnectionPayload(state="unchecked")
     connection_epoch = 0
     connection_namespace = secrets.token_hex(12)
+
+    def bind_codex(slot, executable):
+        # The connection object stays: the assistant connection and the routes read it.
+        profile = ExperimentalCliProfile(slot.profile.root, executable)
+        slot.connection.executable = executable
+        slot.connection.experimental_profile = profile
+        return ProviderSlot(slot.connection, CodexCliProvider(executable, experimental_profile=profile), profile,
+                            slot.installation, CodexAgentRuntime(slot.connection, temp_root), bind_codex)
+
     # The names above always hold the active slot; a provider switch rebinds them after a clean detach.
-    slots = {"codex_cli": ProviderSlot(connection, provider, experimental_profile, installation), **(provider_slots or {})}
+    slots = {"codex_cli": ProviderSlot(connection, provider, experimental_profile, installation, rebind=bind_codex),
+             **(provider_slots or {})}
     active_kind = "codex_cli"
     provider_notice = None
 
@@ -735,7 +748,7 @@ def create_app(*, origin: str, secret: str, temp_root: Path, dist: Path, cli_exe
                 return problem(error.code, 409, "settings")
 
     async def connection_job(kind: str, work):
-        nonlocal active, connection_epoch, connection_state, login_task, install_task, experimental_profile, provider
+        nonlocal active, connection_epoch, connection_state, login_task, install_task
         async with gate:
             if unsafe_cleanup:
                 connection_state = ConnectionPayload(state="cleanup_blocked")
@@ -756,6 +769,7 @@ def create_app(*, origin: str, secret: str, temp_root: Path, dist: Path, cli_exe
                 provider.invalidate_preflight()
             active += 1
             epoch = connection_epoch
+            started_kind = active_kind
             files = OperationFiles(temp_root)
             cancel = threading.Event()
             if kind == "install":
@@ -797,14 +811,11 @@ def create_app(*, origin: str, secret: str, temp_root: Path, dist: Path, cli_exe
             result = await asyncio.shield(task)
             async with gate:
                 if kind == "install":
-                    if isinstance(result, Path) and experimental_profile is not None:
-                        experimental_profile = ExperimentalCliProfile(experimental_profile.root, result)
-                        connection.executable = result
-                        connection.experimental_profile = experimental_profile
-                        provider = CodexCliProvider(result, experimental_profile=experimental_profile)
-                        assistant.runtime = CodexAgentRuntime(connection, temp_root)
-                        slots["codex_cli"] = ProviderSlot(connection, provider, experimental_profile, installation,
-                                                          assistant.runtime)
+                    slot = slots[started_kind]
+                    if isinstance(result, Path) and slot.profile is not None and slot.rebind is not None:
+                        slots[started_kind] = slot.rebind(slot, result)
+                        if started_kind == active_kind:
+                            activate(started_kind)
                         if epoch == connection_epoch:
                             connection_state = ConnectionPayload(state="unchecked")
                     return connection_response()
