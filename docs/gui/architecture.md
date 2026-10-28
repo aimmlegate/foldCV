@@ -252,8 +252,10 @@ install); `GET /v1/rich/template-config` (templates and the default one),
 `PUT /v1/rich/template-default` (Settings template editor); `GET /v1/rich/template-assets/{sha}`;
 `GET /v1/rich/template-import` (import availability, templates, default);
 `POST /v1/rich/projects/template-input` and `/template-input/{templateId}` (the upload that
-creates a V7 pre-draft with the default or the chosen template); `GET /v1/template-package`. The template routes are in
-`templates_routes.py`, the others in `app.py`.
+creates a V7 pre-draft with the default or the chosen template; an unknown template answers 404 before the upload is
+parsed); `GET /v1/template-package`. A new template id is one URL path segment (letters, digits, `.`, `_`, `-`); the
+compiler refuses other ids, stored packages keep opening. The template routes are in `templates_routes.py`, the others
+in `app.py`.
 
 Boundary (`app.py`): loopback Host and Origin checks; a session cookie from the
 one-shot secret exchange (HttpOnly, SameSite=Strict, path `/`); no query strings on
