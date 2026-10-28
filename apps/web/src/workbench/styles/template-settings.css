@@ -1,12 +1,9 @@
 .template-yaml-editor { height: max(420px, calc(100vh - 460px)); border: 1px solid var(--line); border-radius: 5px; overflow: hidden; margin-top: 8px; }
 .template-yaml-loading { height: max(420px, calc(100vh - 460px)); display: flex; align-items: center; justify-content: center; margin-top: 8px; border: 1px dashed var(--line); border-radius: 5px; }
 .template-active { display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px 12px; }
+.template-choice { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; }
+.template-choice label { flex-basis: 100%; }
+.template-choice select { flex: 0 1 420px; }
 .template-problem { overflow-wrap: anywhere; }
 .template-problem code { font-size: inherit; }
 .template-technical { display: inline-flex; align-items: center; gap: 6px; margin-top: 8px; cursor: pointer; }
-.rules-guide { display: grid; grid-template-columns: minmax(170px, 230px) minmax(0, 1fr); gap: 10px 18px; max-width: 880px; margin: 14px 0 0; }
-.rules-guide dt { color: var(--ink); font-weight: 600; }
-.rules-guide dd { margin: 0; color: var(--muted); font-size: var(--ui-small); line-height: 1.6; }
-.rules-guide dd strong { color: var(--ink); font-weight: 600; }
-.rules-guide code { font-size: inherit; }
-@media (max-width: 800px) { .rules-guide { grid-template-columns: minmax(0, 1fr); gap: 2px; } .rules-guide dd { margin-bottom: 10px; } }

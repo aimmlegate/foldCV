@@ -39,7 +39,7 @@ const task = (state: string, error: string | null = null) => ({ id: "task-1", pr
   startedAt: "2026-10-28T00:00:00+00:00", elapsed: 1, detail: { operationId: "operation-1" }, error });
 mock.module(file("../src/projects/api.ts"), { namedExports: {
   listProjects: async () => { events.push("catalog"); return { entries: [], errors: [] }; },
-  createProject: async () => { events.push("create"); return { workspace: { projectId: "T" } }; },
+  createProject: async (_body: FormData, templateId: string | null) => { events.push(`create:${templateId}`); return { workspace: { projectId: "T" } }; },
   startImport: async (_id: string, body: { allowTextRewrite: boolean; effort: string | null }) => {
     if (!importing) throw new Error("unused");
     events.push(`import:start:${body.allowTextRewrite}:${body.effort}`);
@@ -100,12 +100,13 @@ function invoke(): Promise<unknown> {
 if (importing) {
   type Followed = ReadonlyMap<string, { task: { state: string; error: string | null } }>;
   const followed = () => stateWrites.get(IMPORTS)?.at(-1) as Followed | undefined;
-  await hook.process(new File(["synthetic"], "cv.txt"), { allowTextRewrite: false, effort: "high" });
-  // The import start carries the form's choices; the new resume opens as a pre-draft whose running task is read.
+  await hook.process(new File(["synthetic"], "cv.txt"), { allowTextRewrite: false, effort: "high" }, "second-one-column");
+  // The upload carries the chosen template and the import start the other choices; the new resume opens as a
+  // pre-draft whose running task is read.
   const opening = ["open:T", "catalog", "tasks:T", "url:/?project=T"];
   // A start that already failed is a finished import: the resume list is read again at once.
   const started = scenario === "import-failed" ? ["import:start:false:high", "catalog"] : ["import:start:false:high"];
-  assert.deepEqual(events, ["create", "catalog", ...started, ...opening]);
+  assert.deepEqual(events, ["create:second-one-column", "catalog", ...started, ...opening]);
   assert.equal(stateWrites.get(BUSY)?.at(-1), false, "the busy state is released when the import has started");
   if (scenario === "import-background") {
     assert.equal(followed()?.get("T")?.task.state, "running", "the import still runs in the background");

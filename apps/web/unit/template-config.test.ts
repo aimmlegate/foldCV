@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { parseCheck, parseConfigState, pointerRange, technicalLines } from "../src/workbench/settings/template/config";
+import { parseCheck, parseConfigState, pointerRange, technicalLines, withState } from "../src/workbench/settings/template/config";
 
 const source = [
   "# yaml-language-server: $schema=schema.json",
@@ -47,15 +47,25 @@ test("escaped pointer tokens and unknown roots fall back sensibly", () => {
 
 test("responses are validated before use", () => {
   const summary = { id: "generic", name: "Generic", revision: "2.0.0", packageHash: "a".repeat(64) };
-  assert.deepEqual(parseConfigState({ schemaVersion: 1, package: summary, format: "yaml", text: "x: 1\n", bundled: true }),
-    { package: summary, format: "yaml", text: "x: 1\n", bundled: true });
-  assert.throws(() => parseConfigState({ schemaVersion: 1, package: summary, format: "toml", text: "", bundled: true }), /INVALID_RESULT/);
-  assert.throws(() => parseConfigState({ schemaVersion: 2, package: summary, format: "yaml", text: "", bundled: true }), /INVALID_RESULT/);
+  assert.deepEqual(parseConfigState({ schemaVersion: 1, package: summary, format: "yaml", text: "x: 1\n", bundled: true, edited: false }),
+    { package: summary, format: "yaml", text: "x: 1\n", bundled: true, edited: false });
+  assert.throws(() => parseConfigState({ schemaVersion: 1, package: summary, format: "toml", text: "", bundled: true, edited: false }), /INVALID_RESULT/);
+  assert.throws(() => parseConfigState({ schemaVersion: 2, package: summary, format: "yaml", text: "", bundled: true, edited: false }), /INVALID_RESULT/);
+  assert.throws(() => parseConfigState({ schemaVersion: 1, package: summary, format: "yaml", text: "", bundled: true }), /INVALID_RESULT/);
   assert.deepEqual(parseCheck({ schemaVersion: 1, valid: true, package: summary, error: null }), { valid: true, package: summary });
   assert.deepEqual(parseCheck({ schemaVersion: 1, valid: false, package: null, error: { path: "/template", message: "bad" } }),
     { valid: false, error: { path: "/template", message: "bad" } });
   assert.throws(() => parseCheck({ schemaVersion: 1, valid: false, package: null, error: null }), /INVALID_RESULT/);
   assert.throws(() => parseCheck({ schemaVersion: 1, valid: "yes" }), /INVALID_RESULT/);
+});
+
+test("a save or reset updates only its own template in the list and keeps the default", () => {
+  const entry = (id: string, revision: string, edited: boolean) => ({ id, name: id, revision, packageHash: id.padEnd(64, "0"), bundled: true, edited });
+  const catalog = { defaultId: "second", templates: [entry("generic", "2.6.0", false), entry("second", "1.0.0", false)] };
+  const saved = { package: { id: "generic", name: "Generic edited", revision: "9.0.0", packageHash: "b".repeat(64) }, format: "yaml" as const,
+    text: "", bundled: true, edited: true };
+  assert.deepEqual(withState(catalog, saved), { defaultId: "second", templates: [
+    { id: "generic", name: "Generic edited", revision: "9.0.0", packageHash: "b".repeat(64), bundled: true, edited: true }, catalog.templates[1]] });
 });
 
 test("technical sections are found by their top-level keys only", () => {

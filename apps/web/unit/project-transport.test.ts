@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import test from "node:test";
 import type { TemplateProjectResponseV1 } from "../src/contracts/generated/template_project_response_v1";
-import { catalogFlag, createProject, deleteProject, listProjects, openFoldcv } from "../src/projects/api";
+import { catalogFlag, createProject, deleteProject, listProjects, openFoldcv, parseTemplateCatalog, templateImportStatus } from "../src/projects/api";
 import { ProjectApiFailure, ProjectEditorConnection, type Fetcher } from "../src/rich/v7-connection";
 
 const base = JSON.parse(readFileSync(new URL("../../../tests/fixtures/synthetic/projects/v7-response.json", import.meta.url), "utf8")) as TemplateProjectResponseV1;
@@ -69,19 +69,33 @@ test("listing, creation, catalog flags and deletion use the kept routes", async 
   const fetcher: Fetcher = (path, init) => {
     calls.push({ path, method: init.method ?? "GET", body: init.body instanceof FormData ? [...init.body.keys()] : init.body ? JSON.parse(String(init.body)) as unknown : null });
     if (path === "/v2/projects") return Promise.resolve(Response.json(listing));
-    if (path.endsWith("/template-input")) return Promise.resolve(Response.json(base, { status: 201 }));
+    if (path.includes("/template-input")) return Promise.resolve(Response.json(base, { status: 201 }));
     if (init.method === "DELETE") return Promise.resolve(Response.json({ projectId: "p", cleanupStatus: "cleanup_incomplete" }));
     return Promise.resolve(Response.json({ projectId: "p", archived: true }));
   };
   assert.deepEqual(await listProjects(fetcher), listing);
   const body = new FormData(); body.append("paste", new Blob(["text"]), "pasted.txt");
-  assert.equal((await createProject(body, fetcher)).workspace.projectId, base.workspace.projectId);
+  assert.equal((await createProject(body, null, fetcher)).workspace.projectId, base.workspace.projectId);
+  await createProject(body, "my cv/2", fetcher);
   await catalogFlag("p", true, fetcher);
   assert.equal((await deleteProject("p", fetcher)).cleanupStatus, "cleanup_incomplete");
   assert.deepEqual(calls, [
     { path: "/v2/projects", method: "GET", body: null },
     { path: "/v1/rich/projects/template-input", method: "POST", body: ["paste"] },
+    // A chosen template is a path segment: the service refuses query strings.
+    { path: "/v1/rich/projects/template-input/my%20cv%2F2", method: "POST", body: ["paste"] },
     { path: "/v2/projects/p/catalog/archive", method: "POST", body: {} },
     { path: "/v2/projects/p", method: "DELETE", body: { confirmed: true } },
   ]);
+});
+
+test("the template list is checked before the import form offers it", async () => {
+  const entry = { id: "generic", name: "Generic", revision: "2.6.0", packageHash: "a".repeat(64), bundled: true, edited: false };
+  const reply = (value: unknown): Fetcher => () => Promise.resolve(Response.json(value));
+  const status = { schemaVersion: 1, available: false, defaultId: "generic", templates: [entry] };
+  assert.deepEqual(await templateImportStatus(reply(status)), { available: false, defaultId: "generic", templates: [entry] });
+  for (const broken of [{ ...status, defaultId: "missing" }, { ...status, available: undefined },
+    { ...status, templates: [{ ...entry, edited: "no" }] }, { ...status, schemaVersion: 2 }])
+    await assert.rejects(templateImportStatus(reply(broken)), /INVALID_RESULT/);
+  assert.deepEqual(parseTemplateCatalog({ schemaVersion: 1, defaultId: "generic", templates: [entry] }), { defaultId: "generic", templates: [entry] });
 });

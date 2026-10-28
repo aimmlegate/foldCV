@@ -102,7 +102,7 @@ export function App({ portalHost }: { portalHost: HTMLElement }) {
             settingsOpen={settings} ref={assistant} onProjectLifecycle={kind => workspace.projectLifecycle(template.response.workspace.projectId, kind)}
             title={projectTitle} settings={openSettings} />} />}
         {view === "source" && !workspace.loading && <SourceForm busy={busy} connection={connection?.snapshot ?? null}
-          process={(file, options) => void process(file, options)} />}
+          process={(file, options, templateId) => void process(file, options, templateId)} />}
       </div>
       {settingsVisited && <div className="screen" hidden={!settings}><Settings close={() => void action(async current => { await templateEditor.current?.resume(); if (current()) setSettings(false); })} connectionChanged={setConnection} paneOrder={paneOrder} changePaneOrder={changePaneOrder} /></div>}
     </section>

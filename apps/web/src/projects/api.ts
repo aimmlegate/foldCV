@@ -24,7 +24,11 @@ export type ImportProgress = {
   lastEventAt: string | null; lastModelAt: string | null; quietSeconds: number; quietLimitSeconds: number; stalled: boolean;
 };
 export type ImportOptions = { allowTextRewrite: boolean; effort: ReasoningEffort | null };
-export type TemplateImportStatus = { available: boolean; package: { id: string; name: string; revision: string; packageHash: string } | null };
+/** A template new resumes can use: `bundled` when the app ships its id, `edited` when its current version is not the
+ * shipped one. */
+export type TemplateEntry = { id: string; name: string; revision: string; packageHash: string; bundled: boolean; edited: boolean };
+export type TemplateCatalog = { defaultId: string; templates: TemplateEntry[] };
+export type TemplateImportStatus = TemplateCatalog & { available: boolean };
 
 function projectPath(projectId: string, tail = ""): string {
   return `/v2/projects/${encodeURIComponent(projectId)}${tail}`;
@@ -55,9 +59,10 @@ async function upload(path: string, body: FormData, fetcher: Fetcher): Promise<T
   return value as TemplateProjectResponseV1;
 }
 
-/** A pasted text or file becomes a V7 project with the store's active template, ready for import. */
-export function createProject(body: FormData, fetcher: Fetcher = browserFetch): Promise<TemplateProjectResponseV1> {
-  return upload("/v1/rich/projects/template-input", body, fetcher);
+/** A pasted text or file becomes a V7 project with the chosen template (null: the default one), ready for import. */
+export function createProject(body: FormData, templateId: string | null, fetcher: Fetcher = browserFetch): Promise<TemplateProjectResponseV1> {
+  const path = "/v1/rich/projects/template-input";
+  return upload(templateId === null ? path : `${path}/${encodeURIComponent(templateId)}`, body, fetcher);
 }
 
 /** Opens a .foldcv as a new V7 project. */
@@ -94,9 +99,32 @@ export async function lastImportOperation(projectId: string, fetcher?: Fetcher):
   return owner?.templateOperations?.at(-1)?.id ?? null;
 }
 
-/** The store's active template for new imports. */
-export function templateImportStatus(fetcher?: Fetcher): Promise<TemplateImportStatus> {
-  return v2Request<TemplateImportStatus>("/v1/rich/template-import", "GET", undefined, fetcher);
+function invalid(): never {
+  throw new ProjectApiFailure("INVALID_RESULT");
+}
+function templateEntry(value: unknown): TemplateEntry {
+  if (typeof value !== "object" || value === null) invalid();
+  const { id, name, revision, packageHash, bundled, edited } = value as Record<string, unknown>;
+  if (typeof id !== "string" || typeof name !== "string" || typeof revision !== "string" || typeof packageHash !== "string"
+    || typeof bundled !== "boolean" || typeof edited !== "boolean") invalid();
+  return { id, name, revision, packageHash, bundled, edited };
+}
+/** The templates and the default one, from the import status or the Settings list. */
+export function parseTemplateCatalog(value: unknown): TemplateCatalog {
+  const record = typeof value === "object" && value !== null ? value as Record<string, unknown> : {};
+  const { schemaVersion, defaultId, templates } = record;
+  if (schemaVersion !== 1 || typeof defaultId !== "string" || !Array.isArray(templates)) invalid();
+  const entries = templates.map(templateEntry);
+  if (!entries.some(entry => entry.id === defaultId)) invalid();
+  return { defaultId, templates: entries };
+}
+
+/** Whether imports run, and the templates a new resume can use. */
+export async function templateImportStatus(fetcher?: Fetcher): Promise<TemplateImportStatus> {
+  const value = await v2Request<unknown>("/v1/rich/template-import", "GET", undefined, fetcher);
+  const available: unknown = typeof value === "object" && value !== null ? Reflect.get(value, "available") : undefined;
+  if (typeof available !== "boolean") invalid();
+  return { available, ...parseTemplateCatalog(value) };
 }
 
 export function catalogFlag(projectId: string, archived: boolean, fetcher?: Fetcher): Promise<unknown> {

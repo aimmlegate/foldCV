@@ -211,12 +211,12 @@ export function useResumeWorkspace() {
   }
   /** The file becomes a V7 pre-draft and its import starts; the action ends there, so other resumes, Settings and more
    * imports stay available while the tracker follows this one. */
-  async function process(file: File, options: ImportOptions) {
+  async function process(file: File, options: ImportOptions, templateId: string | null) {
     await action(async current => {
       const version = reads.current.beginReplacement();
       let id: string;
       try {
-        const created = await createProject(importBody({ kind: "file", file }));
+        const created = await createProject(importBody({ kind: "file", file }), templateId);
         if (!reads.current.replacementCurrent(version)) return;
         id = created.workspace.projectId;
       } finally { reads.current.cancelReplacement(version); }
