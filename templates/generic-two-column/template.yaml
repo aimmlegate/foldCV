@@ -2,7 +2,7 @@
 schema_version: 4
 template:
   id: generic-two-column
-  revision: 2.4.0
+  revision: 2.5.0
   name: Две колонки
   default_locale: ru
 model:
@@ -323,8 +323,9 @@ blocks:
       style: support
     - type: tags
       field: /technologies
-      style: support
+      style: tag
       background: band
+      separator: ' '
       item_field: /display
     - type: text
       field: /project/description
@@ -624,6 +625,11 @@ style:
       size: 10
       line_height: 12.57
       color: ink
+    tag:
+      font: regular
+      size: 9
+      line_height: 16
+      color: ink
     footer:
       font: light
       size: 12
@@ -658,7 +664,7 @@ style:
     text_offset: 36
     marker_size: 14
   focus:
-    icon_catalog: icon-aliases
+    icon_catalog: technology-icons
     icon_x: 4.5
     icon_width: 28
     icon_height: 34
@@ -949,18 +955,8 @@ assets:
   generic:
     path: assets/foldcv.png
     role: logo
-  icon-aliases: assets/icon-aliases.json
-  cplusplus: assets/cplusplus.png
-  csharp: assets/csharp.png
-  djangorest: assets/djangorest.png
-  docker: assets/docker.png
-  dotnet: assets/dotnet.png
-  fastapi: assets/fastapi.png
-  grafana: assets/grafana.png
-  grpc: assets/grpc.png
-  kibana: assets/kibana.png
-  linux: assets/linux.png
-  python: assets/python.png
+  technology-icons: assets/technology-icons.json
+  devicon-license: assets/devicon-LICENSE.txt
 provenance:
   references:
   - id: reference_a

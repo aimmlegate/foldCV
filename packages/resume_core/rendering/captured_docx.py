@@ -18,7 +18,7 @@ from ..models.template_render import TemplateRendererIdentity, TemplateRenderReq
 from ..rich_limits import DOCX_BYTES
 from ..templates.compiler import ADDED_CAPABILITIES, CAPABILITIES, canonical
 from ..templates.focus import focus_icon, icon_catalog
-from ..templates.presentation_plan import focus_row, hyperlink_target
+from ..templates.presentation_plan import chip_background, focus_row, hyperlink_target
 from ..templates.materialize_nodes import reference
 from .captured_assets import CapturedAssets, decode_logo, decode_png
 from .captured_embedding import embed_captured_fonts
@@ -29,6 +29,10 @@ from .template import RenderFailure
 
 ROOT = Path(__file__).resolve().parents[3]
 RENDERER_VERSION = '1.0.0'
+# Word draws no rounded run background: a chip is shaded text with a border of its own color as padding, and a
+# whitespace separator between two chips is widened so the borders keep a visible gap.
+CHIP_BORDER = 12
+CHIP_GAP = 4
 BLOCKS = {'section', 'paragraph', 'heading', 'bullet_list', 'numbered_list'}
 NODES = {'text', 'join_fields', 'join_items', 'period', 'tags', 'bullets', 'link', 'focus_entry'}
 
@@ -71,10 +75,14 @@ def run_properties(style):
             ('strike', style.strike)]:
         props.append(element('w:' + tag, val='1' if value else '0'))
     props.append(element('w:color', val=style.color.removeprefix('#')))
+    if style.gap:
+        props.append(element('w:spacing', val=native_units(style.gap)))
     size = half_points(style.size)
     props.append(element('w:sz', val=size))
     props.append(element('w:szCs', val=size))
     props.append(element('w:u', val='single' if style.underline else 'none'))
+    if style.chip:
+        props.append(element('w:bdr', val='single', sz=CHIP_BORDER, space=0, color=style.background.removeprefix('#')))
     if style.background is not None:
         fill(props, style.background)
     return props
@@ -142,15 +150,20 @@ class CapturedWriter:
                     resolved_node(self.resolver, span.presentation)
             actual, links = [], []
             for span, link in authored_spans(block):
-                node = resolved_node(self.resolver, span.presentation or block.presentation)
+                resolved_node(self.resolver, span.presentation or block.presentation)
                 if not span.text:
                     continue
                 style = self.resolver.run(block, span)
-                if style.background is None and node is not None and node.type == 'tags' and node.background:
-                    style = replace(style, background=self.recipe.style.colors[node.background])
+                chip = chip_background(block, span, self.recipe) if link is None else None
+                if chip is not None:
+                    style = replace(style, background=style.background or chip, chip=True)
                 self.remember(style)
                 actual.append((span.text, style))
                 links.append(link)
+            for index in range(1, len(actual) - 1):
+                (_before, left), (text, style), (_after, right) = actual[index - 1:index + 2]
+                if left.chip and right.chip and not style.chip and text.isspace() and not set(text) & set('\r\n\t'):
+                    actual[index] = (text, replace(style, gap=CHIP_GAP / len(text)))
             self.runs[block.id] = actual
             self.links[block.id] = links
             emitted = (block.type != 'section' or block.content) and (self.regions[block.id] != 'header' or actual)
@@ -174,7 +187,7 @@ class CapturedWriter:
                 raise RenderFailure('ASSET_MISMATCH') from None
             icon = focus_icon(request.package, request.facts, row, catalog)
             if icon is not None and icon not in self.icons:
-                self.icons[icon] = decode_png(next(asset for asset in request.package.assets if asset.id == icon), 'icon')
+                self.icons[icon] = decode_png(catalog.files[icon], 'icon')
             self.rows[block.id] = (row, icon)
         self.configure_page()
 

@@ -181,8 +181,10 @@ def render_nodes(package, declaration, instance, fields, scopes, shown_scopes, p
             for field, part in visible:
                 block(lead() + [part], ref, [field], kind='bullet_list', suffix=field.cell.id)
             continue
+        # Tags without a declared separator keep the comma every package before 2.5.0 materialized.
         separator = ((period_format['separator'] if period_format else '–') if node.type == 'period'
-            else node.separator if node.type in {'join_fields', 'join_items'} else ', ' if node.type == 'tags' else '')
+            else node.separator if node.type in {'join_fields', 'join_items'} else (node.separator or ', ') if node.type == 'tags'
+            else '')
         content = lead()
         for position, (_field, part) in enumerate(visible):
             if position:

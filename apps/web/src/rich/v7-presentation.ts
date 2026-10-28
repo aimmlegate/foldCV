@@ -14,7 +14,7 @@ export type TemplateSheet = { css: string; variables: CSSProperties; logo: { url
   presentation: Presentation; styles: ReadonlyMap<string, string>; icons: ReadonlyMap<string, string> };
 
 /** Captured fonts and icons load once by hash and stay cached; replies carry only their names (D104). */
-function assetUrl(asset: Asset): string {
+function assetUrl(asset: Pick<Asset, "sha256">): string {
   return `/v1/rich/template-assets/${asset.sha256}`;
 }
 
@@ -44,7 +44,11 @@ export function templateSheet(response: TemplateProjectResponseV1): TemplateShee
       + ` font-family: var(--fcv-regular), sans-serif; font-size: ${pt(style.size)}; line-height: ${pt(style.lineHeight)};`
       + ` color: ${style.color};${style.alignment ? ` text-align: ${style.alignment};` : ""} }`);
   });
-  const icons = new Map(plan.icons.flatMap(id => { const asset = assets.get(id); return asset ? [[id, assetUrl(asset)] as const] : []; }));
+  // A packed icon has no asset entry; the plan names its PNG by hash.
+  const icons = new Map(plan.icons.flatMap(id => {
+    const sha256 = plan.iconFiles?.[id] ?? assets.get(id)?.sha256;
+    return sha256 ? [[id, assetUrl({ sha256 })] as const] : [];
+  }));
   const recipe = presentation.recipe, style = recipe.style, [header, sidebar, main] = recipe.layout.regions;
   if (!header || !sidebar || !main) return null;
   const band = style.section_band, focus = style.focus, divider = style.header.divider, logoValue = style.header.logo;
@@ -143,13 +147,17 @@ export function templatePresentationPlugin(current: () => TemplateSheet | null):
       }
       if (properties.length) attributes["style"] = properties.join("; ");
       decorations.push(Decoration.node(position, position + node.nodeSize, attributes));
-      // Inline spans that keep another style, and links. A technical link is a BlockNote link, not a bound link.
+      // Inline spans that keep another style, technology chips, and links. A technical link is a BlockNote link, not a bound link.
       const runs = literalRuns(entry.inline);
       content.descendants((child, offset) => {
         const at = position + 2 + offset, name = child.type.name;
         const identity: unknown = name === "templateField" ? child.attrs["bindingId"] : name === "manualScope" ? child.attrs["fragmentId"] : null;
         const key = typeof identity === "string" ? entry.inline?.[identity] : undefined;
-        if (key) decorations.push(Decoration.node(at, at + child.nodeSize, { "data-fcv-style": sheet.styles.get(key) ?? "" }));
+        const chip = typeof identity === "string" ? entry.chips?.[identity] : undefined;
+        const inline: Record<string, string> = {};
+        if (key) inline["data-fcv-style"] = sheet.styles.get(key) ?? "";
+        if (chip) Object.assign(inline, { "data-fcv-chip": "true", style: `--fcv-chip: ${chip}` });
+        if (key || chip) decorations.push(Decoration.node(at, at + child.nodeSize, inline));
         if (name === "link" || (name === "boundLink" && entry.links?.includes(String(child.attrs["occurrenceId"]))))
           decorations.push(Decoration.node(at, at + child.nodeSize, { class: "fcv-link" }));
       });

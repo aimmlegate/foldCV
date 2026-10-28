@@ -42,6 +42,9 @@
 .fcv-sheet [data-fcv-focus] > .bn-block::before { content: ""; position: absolute; left: var(--fcv-focus-icon-x); top: 50%;
   width: var(--fcv-focus-icon-width); height: var(--fcv-focus-icon-height); transform: translateY(-50%);
   background: var(--fcv-icon, none) center / contain no-repeat; pointer-events: none; }
+/* A technology chip from the plan; the DOCX draws the same shade with a border of its color, so corners stay small. */
+.fcv-sheet [data-fcv-chip] { background: var(--fcv-chip); border-radius: 2pt; padding: .5pt 1.5pt; margin-inline: 1pt;
+  white-space: nowrap; -webkit-box-decoration-break: clone; box-decoration-break: clone; }
 .uir-prototype .fcv-sheet .fcv-link,
 .uir-prototype .fcv-sheet .bn-editor a,
 .fcv-sheet .fcv-link,

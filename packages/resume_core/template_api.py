@@ -1,10 +1,10 @@
 """Versioned template responses bind authored state, presentation and durability."""
 
-from typing import Literal
+from typing import Annotated, Literal
 
 from pydantic import Field, model_validator
 
-from .models.contracts import Id, Revision, Wire
+from .models.contracts import Id, Revision, Sha256, Wire
 from .models.template_render import TemplateSnapshotIdentity
 from .models.template_workspace import WorkspaceV7
 from .rich_api import RichGenerationState
@@ -39,6 +39,9 @@ class EditorBlock(Wire):
     focus: EditorFocus | None = Field(default=None, exclude_if=lambda value: value is None)
     inline: dict[str, str] = Field(default_factory=dict, exclude_if=lambda value: not value)
     links: list[Id] = Field(default_factory=list, exclude_if=lambda value: not value)
+    # Binding or fragment id of each span shown as a chip, with its background.
+    chips: dict[str, Annotated[str, Field(pattern=r'^#[a-fA-F0-9]{6}$')]] = Field(default_factory=dict,
+        exclude_if=lambda value: not value)
 
 
 class EditorPlanV1(Wire):
@@ -47,6 +50,8 @@ class EditorPlanV1(Wire):
     blocks: dict[str, EditorBlock]
     fonts: list[Id]
     icons: list[Id]
+    # Each used icon's PNG by hash; a packed icon has no asset entry of its own.
+    icon_files: dict[str, Sha256] = Field(default_factory=dict, exclude_if=lambda value: not value)
 
 
 class TemplatePresentationV1(Wire):

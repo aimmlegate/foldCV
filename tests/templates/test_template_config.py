@@ -65,7 +65,7 @@ def test_invalid_text_reports_a_path_and_saves_nothing(tmp_path, text, path, fra
 def test_assets_come_from_the_active_package_and_paths_stay_inside_the_template(tmp_path):
     folder = tmp_path / 'template'
     shutil.copytree(BUNDLED_TEMPLATE.parent, folder)
-    (folder / 'assets/extra.png').write_bytes((folder / 'assets/docker.png').read_bytes())
+    (folder / 'assets/extra.png').write_bytes((folder / 'assets/foldcv.png').read_bytes())
     text = revised(BUNDLED_TEXT, '9.1.0').replace('\nassets:\n', '\nassets:\n  extra: assets/extra.png\n', 1)
     (folder / 'template.yaml').write_text(text, encoding='utf-8')
     TemplateStore(tmp_path / 'data').activate(compile_template(folder / 'template.yaml'))

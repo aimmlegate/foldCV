@@ -2032,6 +2032,7 @@ export interface StyleOverrides {
 export interface EditorPlanV1 {
   blocks: Blocks1;
   fonts: Fonts;
+  iconFiles?: Iconfiles;
   icons: Icons;
   styles: Styles;
 }
@@ -2040,16 +2041,23 @@ export interface Blocks1 {
 }
 export interface EditorBlock {
   band?: Band;
+  chips?: Chips;
   focus?: EditorFocus | null;
   inline?: Inline;
   links?: Links;
   style: Style;
+}
+export interface Chips {
+  [k: string]: string;
 }
 export interface EditorFocus {
   blocks: Blocks2;
   icon: Icon;
 }
 export interface Inline {
+  [k: string]: string;
+}
+export interface Iconfiles {
   [k: string]: string;
 }
 export interface Styles {

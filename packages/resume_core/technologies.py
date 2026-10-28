@@ -180,15 +180,19 @@ def normalize_name(value: str) -> str:
     return " ".join(unicodedata.normalize("NFKC", value).casefold().split())
 
 
-def resolve_technology(display: str) -> ResolvedTechnology:
+def split_version(display: str) -> tuple[str, str | None]:
+    """The normalized name without a leading "microsoft " and a trailing version, and that version."""
     name = normalize_name(display)
-    if not name:
-        return ResolvedTechnology(None, display, None, "unknown")
     if name.startswith("microsoft "):
         name = name[len("microsoft "):]
     match = _VERSION.search(name)
-    version = match.group(1) if match else None
-    base = name[:match.start()] if match else name
+    return (name[:match.start()], match.group(1)) if match else (name, None)
+
+
+def resolve_technology(display: str) -> ResolvedTechnology:
+    if not normalize_name(display):
+        return ResolvedTechnology(None, display, None, "unknown")
+    base, version = split_version(display)
     if base == "go" and version:
         base = "golang"
     if base in {"go", "drf", "r", "node"}:

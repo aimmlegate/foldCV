@@ -1,0 +1,62 @@
+{
+ "def94b9f98429d43e5eba4e622c20b474bad2f8b39f4177898d14b0e859429f1": {
+  "id": "icon-aliases",
+  "mimeType": "application/json",
+  "bytesBase64": "ewogICJweXRob24iOiAicHl0aG9uIiwKICAiYyMiOiAiY3NoYXJwIiwKICAiLm5ldCI6ICJkb3RuZXQiLAogICIubmV0IGZyYW1ld29yayI6ICJkb3RuZXQiLAogICIubmV0INC4IC5uZXQgZnJhbWV3b3JrIjogImRvdG5ldCIsCiAgImRvY2tlciI6ICJkb2NrZXIiLAogICJmYXN0YXBpIjogImZhc3RhcGkiLAogICJkamFuZ28gcmVzdCBmcmFtZXdvcmsiOiAiZGphbmdvcmVzdCIsCiAgImRqYW5nbyByZXN0IGZyYW1ld29yayAoZHJmKSI6ICJkamFuZ29yZXN0IiwKICAiZ3JhZmFuYSI6ICJncmFmYW5hIiwKICAia2liYW5hIjogImtpYmFuYSIsCiAgImMrKyI6ICJjcGx1c3BsdXMiLAogICJncnBjIjogImdycGMiLAogICJsaW51eCI6ICJsaW51eCIKfQo="
+ },
+ "97067628be544f333ec2c22cd6e97c30116b69ec966822d770434d84c33f538b": {
+  "id": "cplusplus",
+  "mimeType": "image/png",
+  "path": "skills/format-resume/assets/devicon/cplusplus.png"
+ },
+ "456f7742f055e47bc238c957f4a9a840f1b3b833b2b51b89d8f8279ec623e0b1": {
+  "id": "csharp",
+  "mimeType": "image/png",
+  "path": "skills/format-resume/assets/devicon/csharp.png"
+ },
+ "1762651fb0600f9012b20df0c64500609090f1b4269a2893b272113b4eee3939": {
+  "id": "djangorest",
+  "mimeType": "image/png",
+  "path": "skills/format-resume/assets/devicon/djangorest.png"
+ },
+ "e80d1a289454caa71e023b24a961c18f2cd7b27ad044fffb475523042034924e": {
+  "id": "docker",
+  "mimeType": "image/png",
+  "path": "skills/format-resume/assets/devicon/docker.png"
+ },
+ "088b5a476b9f95bf9013794562f86ce01d8f6c69c57a15ba3b1ed5dd6e1d854a": {
+  "id": "dotnet",
+  "mimeType": "image/png",
+  "path": "skills/format-resume/assets/devicon/dotnet.png"
+ },
+ "d897c2eb2c35855a651c49f1c2af2dbb4c94a23e597d58bfefa09e850b103672": {
+  "id": "fastapi",
+  "mimeType": "image/png",
+  "path": "skills/format-resume/assets/devicon/fastapi.png"
+ },
+ "459c3147b2f61602d8b2ec2c060031df7b9deabbbf5f24cf4cac1d9b001aaeae": {
+  "id": "grafana",
+  "mimeType": "image/png",
+  "path": "skills/format-resume/assets/devicon/grafana.png"
+ },
+ "e3b955ed640d386a60463aee78276804e8b43e237cc58da2260b38fc48734b92": {
+  "id": "grpc",
+  "mimeType": "image/png",
+  "path": "skills/format-resume/assets/devicon/grpc.png"
+ },
+ "8a39694bdbaf90d634b6c87d8ece5c2cc716b0593cc56d38f54f6afdfa7f201b": {
+  "id": "kibana",
+  "mimeType": "image/png",
+  "path": "skills/format-resume/assets/devicon/kibana.png"
+ },
+ "bfc157bd4f66a7341e2ce18340b9d72763c0f90666dfabf15238b5651f826de1": {
+  "id": "linux",
+  "mimeType": "image/png",
+  "path": "skills/format-resume/assets/devicon/linux.png"
+ },
+ "d1ba62be5d5ac23f76bc3d517e0b8d339e03aa468f150ba1259df0c2079a98a2": {
+  "id": "python",
+  "mimeType": "image/png",
+  "path": "skills/format-resume/assets/devicon/python.png"
+ }
+}
