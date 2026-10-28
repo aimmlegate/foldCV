@@ -166,6 +166,9 @@ async def test_an_upload_captures_the_chosen_template_and_the_old_path_the_defau
         assert default['packageHash'] == employment_package().package_hash
         missing = await upload(client, template_id='missing')
         assert (missing.status_code, missing.json()['error']['code']) == (404, 'TEMPLATE_NOT_FOUND')
+        # An unknown template answers before the body is parsed: a body that is not an upload still gets 404, not 422.
+        unparsed = await client.post('/v1/rich/projects/template-input/missing', json={})
+        assert (unparsed.status_code, unparsed.json()['error']['code']) == (404, 'TEMPLATE_NOT_FOUND')
         assert len((await client.get('/v2/projects')).json()['entries']) == 2
 
 

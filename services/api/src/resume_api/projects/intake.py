@@ -68,12 +68,13 @@ class TemplateIntake:
     def status(self):
         return {'schemaVersion': 1, 'available': self.available, **TemplateConfig(self.repository.root).catalog()}
 
-    async def create(self, data, name, pasted, template_id=None):
+    async def create(self, data, name, pasted, template_id=None, package=None):
         """Extract the upload, then store one pre-draft with its source; a failed extraction keeps the bytes and
-        names the failure in the pre-draft warnings."""
+        names the failure in the pre-draft warnings. `package`: the chosen template, already read by the caller."""
         if not self.available:
             raise ProjectFailure('JOB_DISABLED', 409)
-        package = await asyncio.to_thread(self.package, template_id)
+        if package is None:
+            package = await asyncio.to_thread(self.package, template_id)
         project_id, source_id = identity('project'), identity('source')
         source = Source.model_validate({'id': source_id, 'revision': 1, 'originalName': name,
             'mimeType': 'text/plain' if pasted else 'application/octet-stream',

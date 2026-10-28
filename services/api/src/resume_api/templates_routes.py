@@ -76,11 +76,13 @@ def mount_template_routes(app, *, root, intake, projects, problem):
         return await config_call(TemplateConfig(root).reset, template_id, write=True)
 
     async def create_from_upload(request, template_id):
+        # A chosen template that does not exist answers before the upload is read and parsed.
+        package = None if template_id is None else await asyncio.to_thread(intake.package, template_id)
         try:
             data, name, pasted = parse_one_part(await request.body(), request.headers.get('content-type', ''))
         except UploadFailure as error:
             return problem(error.code, 422, 'input')
-        project_id = await intake.create(data, name, pasted, template_id)
+        project_id = await intake.create(data, name, pasted, package=package)
         return wire_response(await asyncio.to_thread(projects.response, project_id), status=201)
 
     @app.post('/v1/rich/projects/template-input')

@@ -164,10 +164,9 @@ class TemplateStore:
         return self._versions(template_id, self._pointer()[1])
 
     def _current(self, template_id, current) -> TemplatePackage:
+        # A saved version needs no bundled compile; otherwise the bundled one is current.
         if template_id in current: return self._stored(current[template_id], template_id)
-        package = bundled_package(template_id)
-        if package is None: raise UnknownTemplate(template_id)
-        return package
+        return self._versions(template_id, current)[0]
 
     def current(self, template_id: str) -> TemplatePackage:
         """The package new imports with this id use: the one saved last, else the bundled one."""
